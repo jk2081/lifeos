@@ -1,0 +1,45 @@
+# Decisions
+
+Every place where the build chose a default, or differs from `SPEC.md`, with the reason.
+
+## Defaults from section 15
+
+| Question | Default used |
+| --- | --- |
+| Cycle start date | 5 October 2026, the first Monday of October 2026. Ends 27 December 2026 |
+| Unclear journal items | Seeded as written, with `[?]`: "Generic promotion [?]" and "Read three books [?]" |
+| Weekly review time | Sunday 18:00, in `Life Settings` |
+| Priority codes | Stored as written (I to IV). Lists sort I first, blank last |
+| Family or product | One family on one site. No tenant field |
+| Folio | Left where it is. `lifeos` reads and writes no Folio DocType |
+
+## Build environment
+
+- **Docker stack.** `docker/docker-compose.yml` starts three containers: `lifeos-bench` (image `frappe/bench`), `lifeos-db` (MariaDB 11.8) and `lifeos-redis`. Volumes and the network are also prefixed `lifeos-`. Host ports are 18000 (web) and 19000 (socketio). The bench lives in the `lifeos-bench-home` volume, outside the repo.
+- **Frappe version.** The bench runs Frappe 16.56.0, the same as the live site.
+- **The repo is the app.** The repo root is the Frappe app root (`pyproject.toml`, `lifeos/`), so `bench get-app` works on it. The front end is in `frontend/` at the repo root, which is `lifeos/frontend` when the repo is cloned as `apps/lifeos`. This is the layout other `frappe-ui` apps use.
+- **Front-end build during this run.** The repo is bind-mounted into the container and the front end is built on the host with Node 24, because `node_modules` holds platform-specific binaries. On a real bench, `bench build --app lifeos` runs the same `yarn build`.
+- **Built assets are not committed.** `lifeos/public/frontend/` and `lifeos/www/life.html` are produced by the build, as in other `frappe-ui` apps.
+- **Test users.** `lifeos.devtools.setup_users` creates three users on the test site. Their password is generated into the git-ignored `.env`.
+
+## Differences from the spec
+
+- **Permissions apply to the owner too.** `Life Admin` can manage every `Life Space` and its members, but sees records only in spaces he is a member of, as section 3 says for every user. The `Administrator` account is not restricted.
+- **`Life Area` is a plain parent link, not a Frappe nested set.** The tree is small and per space, and a nested set would add `lft`/`rgt` upkeep for no gain. A loop check runs on save.
+- **Area is not forced on direct creation.** Section 4a says area is required once a record leaves the Inbox. Accepting a proposal requires an area. Quick add and direct API creation allow a blank area, so quick add stays one text box; such records show as Unfiled.
+- **`Life Task.status` has one more value, `Carried`.** Section 7 says carry forward marks the old task `Carried`, but the status list in section 4 lacks it.
+- **Extra fields.** These were needed to implement rules in the spec:
+  - `Life Month Plan Habit.tracked_from` and `tracked_until`: the days a habit counts in that month (section 8, habits added or removed mid-month).
+  - `Life Month Plan Goal.carried_from`: the row a carried goal came from.
+  - `Life Goal Action.done_on`: the day an action was marked Done, so later weeks stop counting it.
+  - `Life Cycle.final_score`, `closed_on` and `Life Goal.final_score`: stored by Close cycle.
+  - `Life Inbox Item.finished_on` (for the archive rule) and `preview_image` (the 1600 px preview).
+  - `Life Project.is_archived`, `archived_on`.
+  - `space` on `Life Proposal`, `Life Link`, `Life Index`, `Life Action Log` and `Life Habit Log`, so the same permission hooks cover them.
+  - `inbox_item` on records a proposal can create, so every created record links back to its source.
+  - `Life Index.status` and `record_owner`, so list screens need no second query.
+- **A completed task has two index rows.** The Timeline must show tasks both when created and when completed, so a Done task gets a second `Life Index` row of kind `Task Done`, dated `completed_on`. Search ignores that row.
+- **Events.** Core `Event` shows a record to other users only when `event_type` is Public, and controller hooks can only narrow access. So every event with a `life_space` is saved as Public, and the lifeos hooks narrow it to the members of that space. Events without a `life_space` behave exactly as in core.
+- **Time zone.** Dates are stored and shown in the site time zone. The test site is set to Asia/Kolkata; the live site should have the same System Setting.
+- **Text size.** The mockups use 14 px interface text on desktop and 15 px on phones. The app follows the mockups for interface text; all long reading text (notes, transcripts, summaries) is 15 px or larger.
+- **Two seed commands.** `lifeos.seed.load` loads exactly the seed in section 11. `lifeos.seed.load_demo` adds example ticks, tasks, chats and notes so the screens can be checked against the mockups; it is not the owner's data and has its own remove command.

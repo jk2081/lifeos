@@ -1,0 +1,146 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "inbox_item",
+  "kind",
+  "preview",
+  "payload",
+  "confidence",
+  "status",
+  "created_doctype",
+  "created_name",
+  "decided_by",
+  "decided_on",
+  "sort_order"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "inbox_item",
+   "fieldtype": "Link",
+   "label": "Inbox Item",
+   "options": "Life Inbox Item",
+   "reqd": 1,
+   "search_index": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Task\nEvent\nImportant Date\nNote\nVault Document\nMonth Goal\nHabit Log\nCheck-in\nWeek Tick\nJournal Page",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "preview",
+   "fieldtype": "Small Text",
+   "label": "Preview",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "payload",
+   "fieldtype": "JSON",
+   "label": "Payload"
+  },
+  {
+   "fieldname": "confidence",
+   "fieldtype": "Float",
+   "label": "Confidence"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nAccepted\nRejected",
+   "default": "Pending",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "created_doctype",
+   "fieldtype": "Link",
+   "label": "Created Doctype",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "created_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Created Name",
+   "options": "created_doctype"
+  },
+  {
+   "fieldname": "decided_by",
+   "fieldtype": "Link",
+   "label": "Decided By",
+   "options": "User"
+  },
+  {
+   "fieldname": "decided_on",
+   "fieldtype": "Datetime",
+   "label": "Decided On"
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Proposal",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "preview"
+}

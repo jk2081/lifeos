@@ -1,0 +1,144 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "cycle",
+  "title",
+  "area",
+  "project",
+  "sort_order",
+  "actions",
+  "outcome",
+  "result_note",
+  "carried_from",
+  "final_score"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "cycle",
+   "fieldtype": "Link",
+   "label": "Cycle",
+   "options": "Life Cycle",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Life Area",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Life Project"
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "actions",
+   "fieldtype": "Table",
+   "label": "Actions",
+   "options": "Life Goal Action"
+  },
+  {
+   "fieldname": "outcome",
+   "fieldtype": "Select",
+   "label": "Outcome",
+   "options": "In Progress\nAchieved\nPartly Achieved\nNot Achieved\nCarried\nDropped",
+   "default": "In Progress"
+  },
+  {
+   "fieldname": "result_note",
+   "fieldtype": "Small Text",
+   "label": "Result Note"
+  },
+  {
+   "fieldname": "carried_from",
+   "fieldtype": "Link",
+   "label": "Carried From",
+   "options": "Life Goal",
+   "search_index": 1
+  },
+  {
+   "fieldname": "final_score",
+   "fieldtype": "Float",
+   "label": "Final Score",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Goal",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "search_fields": "title",
+ "show_title": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

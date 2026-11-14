@@ -1,0 +1,104 @@
+"""Archive rules of section 4a. Nothing is ever deleted here."""
+import frappe
+from frappe.utils import add_days, cint, today
+
+from lifeos.constants import ORG_DOCTYPES
+
+AUTO_DOCTYPES = ("Life Task", "Life Inbox Item", "Life Chat Log")
+
+
+def _sync_index(doctype, where="1=1", values=()):
+	frappe.db.sql(
+		f"""update `tabLife Index` i join `tab{doctype}` t on t.name = i.ref_name
+		set i.is_archived = t.is_archived where i.ref_doctype = %s and i.is_archived != t.is_archived and {where}""",
+		(doctype, *values),
+	)
+
+
+def run_daily(on=None) -> dict:
+	"""The daily job. Run by the scheduler, or: bench --site SITE execute lifeos.archive.run_daily"""
+	on = on or today()
+	days = cint(frappe.db.get_single_value("Life Settings", "archive_after_days")) or 90
+	cutoff = add_days(on, -days)
+	out = {}
+	frappe.db.sql(
+		"""update `tabLife Task` set is_archived=1, archived_on=%s, archive_reason='Auto'
+		where is_archived=0 and status in ('Done', 'Dropped') and completed_on is not null and completed_on <= %s""", (on, cutoff))
+	out["Life Task"] = frappe.db.sql("select row_count()")[0][0]
+	frappe.db.sql(
+		"""update `tabLife Inbox Item` set is_archived=1, archived_on=%s, archive_reason='Auto'
+		where is_archived=0 and status='Done' and finished_on is not null and finished_on <= %s""", (on, cutoff))
+	out["Life Inbox Item"] = frappe.db.sql("select row_count()")[0][0]
+	frappe.db.sql(
+		"""update `tabLife Chat Log` c set c.is_archived=1, c.archived_on=%s, c.archive_reason='Auto'
+		where c.is_archived=0 and c.date <= %s and not exists (
+			select 1 from `tabLife Chat Open Item` o where o.parent=c.name and o.parenttype='Life Chat Log' and o.status='Open')""",
+		(on, cutoff))
+	out["Life Chat Log"] = frappe.db.sql("select row_count()")[0][0]
+	for dt in AUTO_DOCTYPES:
+		_sync_index(dt)
+	frappe.db.commit()
+	return out
+
+
+def set_archived(doctype, name, archived=True, reason="Manual"):
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("write")
+	if doctype == "Life Project":
+		if archived:
+			return archive_project(doc)
+		return restore_project(doc)
+	if doctype not in ORG_DOCTYPES:
+		frappe.throw(f"{doctype} cannot be archived.")
+	doc.is_archived = 1 if archived else 0
+	doc.archived_on = today() if archived else None
+	doc.archive_reason = reason if archived else ""
+	doc.flags.keep_touched = True
+	doc.save(ignore_permissions=True)
+	return {"doctype": doctype, "name": name, "is_archived": doc.is_archived}
+
+
+def project_record_count(project) -> int:
+	total = 0
+	for dt in ORG_DOCTYPES:
+		total += frappe.db.count(dt, {"project": project, "is_archived": 0})
+	return total
+
+
+def archive_project(project) -> dict:
+	"""Archive a project and every record whose `project` points to it."""
+	count = 0
+	for dt in ORG_DOCTYPES:
+		frappe.db.sql(
+			f"update `tab{dt}` set is_archived=1, archived_on=%s, archive_reason='Project' where project=%s and is_archived=0",
+			(today(), project.name))
+		count += frappe.db.sql("select row_count()")[0][0]
+		_sync_index(dt, "t.project = %s", (project.name,))
+	frappe.db.set_value("Life Project", project.name, {"is_archived": 1, "archived_on": today()}, update_modified=False)
+	project.is_archived = 1
+	return {"doctype": "Life Project", "name": project.name, "is_archived": 1, "records": count}
+
+
+def restore_project(project) -> dict:
+	count = 0
+	for dt in ORG_DOCTYPES:
+		frappe.db.sql(
+			f"update `tab{dt}` set is_archived=0, archived_on=null, archive_reason='' where project=%s and is_archived=1 and archive_reason='Project'",
+			project.name)
+		count += frappe.db.sql("select row_count()")[0][0]
+		_sync_index(dt, "t.project = %s", (project.name,))
+	values = {"is_archived": 0, "archived_on": None}
+	if project.status in ("Done", "Dropped"):
+		values.update({"status": "Active", "completed_on": None})
+	frappe.db.set_value("Life Project", project.name, values, update_modified=False)
+	return {"doctype": "Life Project", "name": project.name, "is_archived": 0, "records": count}
+
+
+def archived_in_week(space, from_date, to_date) -> list:
+	"""What the job archived in a date range, for the weekly review."""
+	out = []
+	for dt in AUTO_DOCTYPES:
+		for r in frappe.get_all(dt, filters={"space": space, "is_archived": 1, "archive_reason": "Auto",
+				"archived_on": ("between", [from_date, to_date])}, fields=["name", "title", "archived_on"], limit=100):
+			out.append({"doctype": dt, **r})
+	return out

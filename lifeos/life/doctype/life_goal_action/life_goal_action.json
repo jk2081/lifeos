@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "per_week",
+  "status",
+  "done_on",
+  "ticks"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "per_week",
+   "fieldtype": "Int",
+   "label": "Per Week",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nDone\nDropped",
+   "default": "Open",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "done_on",
+   "fieldtype": "Date",
+   "label": "Done On"
+  },
+  {
+   "fieldname": "ticks",
+   "fieldtype": "Data",
+   "label": "Ticks",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Summary computed from Life Action Log"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Goal Action",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,221 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "title",
+  "source_type",
+  "received_on",
+  "instruction",
+  "raw_text",
+  "transcript_md",
+  "summary_md",
+  "source_url",
+  "status",
+  "claimed_by",
+  "claimed_on",
+  "error",
+  "finished_on",
+  "preview_image",
+  "organisation_section",
+  "area",
+  "also_in",
+  "project",
+  "tags",
+  "is_archived",
+  "archived_on",
+  "archive_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "source_type",
+   "fieldtype": "Select",
+   "label": "Source Type",
+   "options": "Upload\nJournal Photo\nVoice Note\nEmail\nChat\nMessage\nWeb",
+   "default": "Upload",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "received_on",
+   "fieldtype": "Datetime",
+   "label": "Received On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "instruction",
+   "fieldtype": "Small Text",
+   "label": "Instruction"
+  },
+  {
+   "fieldname": "raw_text",
+   "fieldtype": "Long Text",
+   "label": "Raw Text"
+  },
+  {
+   "fieldname": "transcript_md",
+   "fieldtype": "Long Text",
+   "label": "Transcript"
+  },
+  {
+   "fieldname": "summary_md",
+   "fieldtype": "Long Text",
+   "label": "Summary"
+  },
+  {
+   "fieldname": "source_url",
+   "fieldtype": "Data",
+   "label": "Source URL",
+   "length": 500
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "New\nProcessing\nTo Review\nDone\nFailed",
+   "default": "New",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "claimed_by",
+   "fieldtype": "Link",
+   "label": "Claimed By",
+   "options": "User"
+  },
+  {
+   "fieldname": "claimed_on",
+   "fieldtype": "Datetime",
+   "label": "Claimed On"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error"
+  },
+  {
+   "fieldname": "finished_on",
+   "fieldtype": "Date",
+   "label": "Finished On"
+  },
+  {
+   "fieldname": "preview_image",
+   "fieldtype": "Attach Image",
+   "label": "Preview Image"
+  },
+  {
+   "fieldname": "organisation_section",
+   "fieldtype": "Section Break",
+   "label": "Organisation"
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Life Area",
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "also_in",
+   "fieldtype": "Table MultiSelect",
+   "label": "Also In",
+   "options": "Life Also In"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Link",
+   "label": "Project",
+   "options": "Life Project",
+   "search_index": 1
+  },
+  {
+   "fieldname": "tags",
+   "fieldtype": "Table MultiSelect",
+   "label": "Tags",
+   "options": "Life Tag Link"
+  },
+  {
+   "fieldname": "is_archived",
+   "fieldtype": "Check",
+   "label": "Is Archived",
+   "default": "0",
+   "search_index": 1
+  },
+  {
+   "fieldname": "archived_on",
+   "fieldtype": "Date",
+   "label": "Archived On"
+  },
+  {
+   "fieldname": "archive_reason",
+   "fieldtype": "Select",
+   "label": "Archive Reason",
+   "options": "\nManual\nAuto\nProject"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Inbox Item",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "show_title": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

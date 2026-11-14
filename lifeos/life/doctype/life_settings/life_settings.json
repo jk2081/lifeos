@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "default_space",
+  "weekly_review_day",
+  "weekly_review_time",
+  "score_target",
+  "archive_after_days",
+  "stale_task_days"
+ ],
+ "fields": [
+  {
+   "fieldname": "default_space",
+   "fieldtype": "Link",
+   "label": "Default Space",
+   "options": "Life Space"
+  },
+  {
+   "fieldname": "weekly_review_day",
+   "fieldtype": "Select",
+   "label": "Weekly Review Day",
+   "options": "Sunday\nMonday\nTuesday\nWednesday\nThursday\nFriday\nSaturday",
+   "default": "Sunday"
+  },
+  {
+   "fieldname": "weekly_review_time",
+   "fieldtype": "Time",
+   "label": "Weekly Review Time",
+   "default": "18:00:00"
+  },
+  {
+   "fieldname": "score_target",
+   "fieldtype": "Int",
+   "label": "Score Target",
+   "default": "85"
+  },
+  {
+   "fieldname": "archive_after_days",
+   "fieldtype": "Int",
+   "label": "Archive After Days",
+   "default": "90"
+  },
+  {
+   "fieldname": "stale_task_days",
+   "fieldtype": "Int",
+   "label": "Stale Task Days",
+   "default": "90"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

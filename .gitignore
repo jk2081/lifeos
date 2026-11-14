@@ -9,3 +9,9 @@ sites/
 build-logs/
 bench/
 frappe-bench/
+# built front end, produced by `bench build --app lifeos`
+lifeos/public/frontend/
+lifeos/www/life.html
+# screenshots taken during the build
+screenshots/
+tools/node_modules/

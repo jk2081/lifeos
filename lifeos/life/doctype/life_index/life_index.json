@@ -1,0 +1,150 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "ref_doctype",
+  "ref_name",
+  "area",
+  "also_in_csv",
+  "project",
+  "tags_csv",
+  "record_date",
+  "title",
+  "search_text",
+  "is_archived",
+  "kind",
+  "status",
+  "record_owner"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "ref_doctype",
+   "fieldtype": "Data",
+   "label": "Ref Doctype",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "ref_name",
+   "fieldtype": "Data",
+   "label": "Ref Name",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Data",
+   "label": "Area"
+  },
+  {
+   "fieldname": "also_in_csv",
+   "fieldtype": "Small Text",
+   "label": "Also In (CSV)"
+  },
+  {
+   "fieldname": "project",
+   "fieldtype": "Data",
+   "label": "Project"
+  },
+  {
+   "fieldname": "tags_csv",
+   "fieldtype": "Small Text",
+   "label": "Tags (CSV)"
+  },
+  {
+   "fieldname": "record_date",
+   "fieldtype": "Date",
+   "label": "Record Date",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "length": 255,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "search_text",
+   "fieldtype": "Long Text",
+   "label": "Search Text"
+  },
+  {
+   "fieldname": "is_archived",
+   "fieldtype": "Check",
+   "label": "Is Archived",
+   "default": "0"
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Data",
+   "label": "Kind",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "label": "Status"
+  },
+  {
+   "fieldname": "record_owner",
+   "fieldtype": "Data",
+   "label": "Record Owner"
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Index",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""Generate the DocType JSON files for lifeos from one compact definition.
+
+Run from the repo root:  python3 scripts/gen_doctypes.py
+It rewrites every lifeos/life/doctype/*/*.json and creates controller stubs
+that do not exist yet. Hand-written controllers are never overwritten.
+"""
+import json
+import os
+import re
+
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lifeos", "life", "doctype")
+STAMP = "2026-11-15 00:00:00.000000"
+
+
+def scrub(name):
+	return name.lower().replace(" ", "_").replace("-", "_")
+
+
+def label(fieldname):
+	special = {"notes_md": "Notes", "content_md": "Content", "summary_md": "Summary", "transcript_md": "Transcript",
+		"reflection_md": "Reflection", "mindsweep_md": "Mindsweep", "projects_md": "Projects", "url": "URL",
+		"source_url": "Source URL", "number_last4": "Number (last 4)", "also_in_csv": "Also In (CSV)", "tags_csv": "Tags (CSV)"}
+	return special.get(fieldname) or fieldname.replace("_", " ").title()
+
+
+def f(fieldname, fieldtype="Data", options=None, **kw):
+	d = {"fieldname": fieldname, "fieldtype": fieldtype, "label": kw.pop("label", None) or label(fieldname)}
+	if options is not None:
+		d["options"] = "\n".join(options) if isinstance(options, (list, tuple)) else options
+	for k, v in kw.items():
+		d[k] = v
+	return d
+
+
+def link(fieldname, target, **kw):
+	return f(fieldname, "Link", target, **kw)
+
+
+def sel(fieldname, opts, **kw):
+	return f(fieldname, "Select", opts, **kw)
+
+
+def md(fieldname, **kw):
+	return f(fieldname, "Long Text", **kw)
+
+
+SPACE = link("space", "Life Space", reqd=1, search_index=1, in_standard_filter=1)
+
+
+def org():
+	return [
+		f("organisation_section", "Section Break", label="Organisation"),
+		link("area", "Life Area", search_index=1, in_standard_filter=1),
+		f("also_in", "Table MultiSelect", "Life Also In"),
+		link("project", "Life Project", search_index=1),
+		f("tags", "Table MultiSelect", "Life Tag Link"),
+		f("is_archived", "Check", default="0", search_index=1),
+		f("archived_on", "Date"),
+		sel("archive_reason", ["", "Manual", "Auto", "Project"]),
+	]
+
+
+def perms(admin_only_write=False, agent_write=True):
+	full = {"read": 1, "write": 1, "create": 1, "delete": 1, "report": 1, "export": 1, "print": 1, "email": 1, "share": 1}
+	ro = {"read": 1, "report": 1}
+	out = [{"role": "Life Admin", **full}]
+	if admin_only_write:
+		out += [{"role": "Life User", **ro}, {"role": "Life Agent", **ro}]
+	else:
+		out.append({"role": "Life User", **full})
+		agent = {"read": 1, "report": 1}
+		if agent_write:
+			agent.update({"write": 1, "create": 1})
+		out.append({"role": "Life Agent", **agent})
+	return out
+
+
+DOCTYPES = {}
+
+
+def dt(name, fields, **kw):
+	DOCTYPES[name] = (fields, kw)
+
+
+PRIORITY = ["", "I", "II", "III", "IV"]
+
+# ---- child tables ----
+dt("Life Space Member", [link("user", "User", reqd=1, in_list_view=1), sel("access", ["Read", "Write"], default="Write", reqd=1, in_list_view=1)], istable=1)
+dt("Life Also In", [link("area", "Life Area", reqd=1, in_list_view=1)], istable=1)
+dt("Life Tag Link", [link("tag", "Life Tag", reqd=1, in_list_view=1)], istable=1)
+dt("Life Goal Action", [
+	f("title", reqd=1, in_list_view=1),
+	f("per_week", "Int", default="1", in_list_view=1),
+	sel("status", ["Open", "Done", "Dropped"], default="Open", in_list_view=1),
+	f("done_on", "Date"),
+	f("ticks", read_only=1, in_list_view=1, description="Summary computed from Life Action Log"),
+], istable=1)
+dt("Life Month Plan Goal", [
+	f("title", reqd=1, in_list_view=1),
+	sel("priority", PRIORITY, in_list_view=1),
+	sel("status", ["Open", "Done", "Carried", "Dropped"], default="Open", in_list_view=1),
+	link("area", "Life Area", in_list_view=1),
+	link("task", "Life Task"),
+	f("carried_from", read_only=1, description="Row this goal was carried from"),
+], istable=1)
+dt("Life Month Plan Habit", [
+	link("habit", "Life Habit", reqd=1, in_list_view=1),
+	f("days_per_week", "Int", default="7", in_list_view=1),
+	f("sort_order", "Int"),
+	f("tracked_from", "Date", in_list_view=1),
+	f("tracked_until", "Date", in_list_view=1),
+], istable=1)
+dt("Life Check-in Score", [
+	link("dimension", "Life Dimension", reqd=1, in_list_view=1),
+	f("habits_low", "Float", in_list_view=1), f("habits_high", "Float", in_list_view=1),
+	f("situation_low", "Float", in_list_view=1), f("situation_high", "Float", in_list_view=1),
+	f("note", "Small Text"),
+], istable=1)
+dt("Life Chat Open Item", [
+	f("text", "Small Text", reqd=1, in_list_view=1),
+	sel("status", ["Open", "Task Created", "Closed"], default="Open", in_list_view=1),
+	link("task", "Life Task"),
+], istable=1)
+
+# ---- core ----
+dt("Life Space", [
+	f("space_name", reqd=1, unique=1, in_list_view=1),
+	link("owner_user", "User", in_list_view=1),
+	f("members", "Table", "Life Space Member"),
+], autoname="field:space_name", permissions=perms(admin_only_write=True), title_field="space_name")
+dt("Life Area", [
+	SPACE, f("area_name", reqd=1, in_list_view=1), link("parent_area", "Life Area"),
+	f("sort_order", "Int"), f("is_archived", "Check", default="0"),
+], title_field="area_name", show_title=1, search_fields="area_name")
+dt("Life Project", [
+	SPACE, f("title", reqd=1, in_list_view=1), link("area", "Life Area", reqd=1, in_list_view=1, search_index=1),
+	sel("status", ["Active", "On Hold", "Done", "Dropped"], default="Active", in_list_view=1, search_index=1),
+	f("outcome", "Small Text"), f("target_date", "Date"), f("completed_on", "Date"), md("notes_md"),
+	f("is_archived", "Check", default="0", search_index=1), f("archived_on", "Date"),
+], title_field="title", show_title=1, search_fields="title")
+dt("Life Tag", [SPACE, f("tag_name", reqd=1, in_list_view=1)], title_field="tag_name", show_title=1, search_fields="tag_name")
+dt("Life Dimension", [SPACE, f("dimension_name", reqd=1, in_list_view=1), f("sort_order", "Int")], title_field="dimension_name", show_title=1)
+dt("Life Person", [
+	SPACE, f("full_name", reqd=1, in_list_view=1), f("relation", in_list_view=1), link("user", "User"), md("notes_md"),
+], title_field="full_name", show_title=1, search_fields="full_name")
+dt("Life Settings", [
+	link("default_space", "Life Space"),
+	sel("weekly_review_day", ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], default="Sunday"),
+	f("weekly_review_time", "Time", default="18:00:00"),
+	f("score_target", "Int", default="85"),
+	f("archive_after_days", "Int", default="90"),
+	f("stale_task_days", "Int", default="90"),
+], issingle=1, permissions=[
+	{"role": "Life Admin", "read": 1, "write": 1, "create": 1},
+	{"role": "Life User", "read": 1}, {"role": "Life Agent", "read": 1}])
+
+# ---- capture ----
+dt("Life Inbox Item", [
+	SPACE, f("title", reqd=1, in_list_view=1),
+	sel("source_type", ["Upload", "Journal Photo", "Voice Note", "Email", "Chat", "Message", "Web"], default="Upload", in_list_view=1),
+	f("received_on", "Datetime", search_index=1),
+	f("instruction", "Small Text"), md("raw_text"), md("transcript_md"), md("summary_md"),
+	f("source_url", length=500),
+	sel("status", ["New", "Processing", "To Review", "Done", "Failed"], default="New", in_list_view=1, search_index=1),
+	link("claimed_by", "User"), f("claimed_on", "Datetime"), f("error", "Small Text"), f("finished_on", "Date"),
+	f("preview_image", "Attach Image"),
+	*org(),
+], title_field="title", show_title=1)
+dt("Life Proposal", [
+	SPACE, link("inbox_item", "Life Inbox Item", reqd=1, search_index=1, in_list_view=1),
+	sel("kind", ["Task", "Event", "Important Date", "Note", "Vault Document", "Month Goal", "Habit Log", "Check-in", "Week Tick", "Journal Page"], reqd=1, in_list_view=1),
+	f("preview", "Small Text", in_list_view=1), f("payload", "JSON"), f("confidence", "Float"),
+	sel("status", ["Pending", "Accepted", "Rejected"], default="Pending", in_list_view=1, search_index=1),
+	link("created_doctype", "DocType"), f("created_name", "Dynamic Link", "created_doctype"),
+	link("decided_by", "User"), f("decided_on", "Datetime"), f("sort_order", "Int"),
+], title_field="preview")
+
+# ---- tasks and dates ----
+dt("Life Task", [
+	SPACE, f("title", reqd=1, in_list_view=1),
+	sel("status", ["Open", "Doing", "Waiting", "Done", "Dropped", "Carried"], default="Open", in_list_view=1, search_index=1),
+	sel("priority", PRIORITY, in_list_view=1),
+	f("due_date", "Date", in_list_view=1, search_index=1),
+	link("goal", "Life Goal"), link("month_plan", "Life Month Plan"), link("inbox_item", "Life Inbox Item", search_index=1),
+	f("source_url", length=500), md("notes_md"), f("waiting_on"), f("completed_on", "Date"),
+	link("carried_from", "Life Task"), f("last_touched_on", "Date"),
+	*org(),
+], title_field="title", show_title=1, search_fields="title")
+dt("Life Important Date", [
+	SPACE, f("title", reqd=1, in_list_view=1), link("person", "Life Person"),
+	f("day", "Int", reqd=1, in_list_view=1), f("month", "Int", reqd=1, in_list_view=1), f("year", "Int"),
+	sel("kind", ["Birthday", "Anniversary", "Other"], default="Birthday", in_list_view=1),
+	link("inbox_item", "Life Inbox Item"),
+], title_field="title", show_title=1)
+
+# ---- journal ----
+dt("Life Cycle", [
+	SPACE, f("title", reqd=1, in_list_view=1), f("start_date", "Date", reqd=1, in_list_view=1),
+	f("end_date", "Date", read_only=1, in_list_view=1),
+	sel("status", ["Planned", "Active", "Closed"], default="Planned", in_list_view=1, search_index=1),
+	f("final_score", "Float", read_only=1), f("closed_on", "Date", read_only=1),
+], title_field="title", show_title=1)
+dt("Life Goal", [
+	SPACE, link("cycle", "Life Cycle", reqd=1, in_list_view=1, search_index=1), f("title", reqd=1, in_list_view=1),
+	link("area", "Life Area", in_list_view=1, search_index=1), link("project", "Life Project"), f("sort_order", "Int"),
+	f("actions", "Table", "Life Goal Action"),
+	sel("outcome", ["In Progress", "Achieved", "Partly Achieved", "Not Achieved", "Carried", "Dropped"], default="In Progress"),
+	f("result_note", "Small Text"), link("carried_from", "Life Goal", search_index=1), f("final_score", "Float", read_only=1),
+], title_field="title", show_title=1, search_fields="title")
+dt("Life Month Plan", [
+	SPACE, f("year", "Int", reqd=1, in_list_view=1), f("month", "Int", reqd=1, in_list_view=1),
+	f("goals", "Table", "Life Month Plan Goal"), f("habits", "Table", "Life Month Plan Habit"),
+	md("mindsweep_md"), md("projects_md"),
+], autoname="prompt")
+dt("Life Habit", [SPACE, f("title", reqd=1, in_list_view=1), link("area", "Life Area")], title_field="title", show_title=1, search_fields="title")
+dt("Life Habit Log", [
+	SPACE, link("habit", "Life Habit", reqd=1, in_list_view=1, search_index=1),
+	f("date", "Date", reqd=1, in_list_view=1, search_index=1), f("done", "Check", default="1", in_list_view=1),
+	link("inbox_item", "Life Inbox Item"),
+], autoname="prompt")
+dt("Life Check-in", [
+	SPACE, f("date", "Date", reqd=1, in_list_view=1, search_index=1), f("scores", "Table", "Life Check-in Score"), md("reflection_md"),
+	link("inbox_item", "Life Inbox Item"),
+])
+dt("Life Journal Page", [
+	SPACE, f("page_date", "Date", reqd=1, in_list_view=1, search_index=1), f("page_number", in_list_view=1),
+	f("image", "Attach Image"), md("transcript_md"), link("inbox_item", "Life Inbox Item", search_index=1),
+	*org(),
+])
+
+# ---- library ----
+dt("Life Note", [
+	SPACE, f("title", reqd=1, in_list_view=1), link("parent_note", "Life Note", search_index=1), md("content_md"),
+	link("inbox_item", "Life Inbox Item", search_index=1),
+	*org(),
+], title_field="title", show_title=1, search_fields="title")
+dt("Life Vault Document", [
+	SPACE, f("title", reqd=1, in_list_view=1),
+	sel("doc_type", ["ID", "Travel", "Insurance", "Property", "Tax", "Medical", "Other"], default="Other", in_list_view=1),
+	link("holder", "Life Person", in_list_view=1), f("file", "Attach"),
+	f("number_last4", length=4), f("issue_date", "Date"), f("expiry_date", "Date", in_list_view=1, search_index=1),
+	f("remind_days_before", "Int", default="60"), md("notes_md"), link("inbox_item", "Life Inbox Item", search_index=1),
+	*org(),
+], title_field="title", show_title=1, search_fields="title")
+dt("Life Chat Log", [
+	SPACE, f("date", "Date", reqd=1, in_list_view=1, search_index=1), f("title", reqd=1, in_list_view=1),
+	f("url", length=500), sel("assistant", ["Claude", "ChatGPT", "Other"], default="Claude", in_list_view=1),
+	md("summary_md"), f("open_items", "Table", "Life Chat Open Item"), link("inbox_item", "Life Inbox Item"),
+	*org(),
+], title_field="title", show_title=1, search_fields="title")
+dt("Life Link", [
+	SPACE, f("from_doctype", reqd=1, in_list_view=1), f("from_name", reqd=1, in_list_view=1),
+	f("to_doctype", reqd=1, in_list_view=1), f("to_name", reqd=1, in_list_view=1), f("link_text"),
+], permissions=perms(agent_write=False), in_create=1)
+dt("Life Index", [
+	SPACE, f("ref_doctype", reqd=1, in_list_view=1), f("ref_name", reqd=1, in_list_view=1),
+	f("area"), f("also_in_csv", "Small Text"), f("project"), f("tags_csv", "Small Text"),
+	f("record_date", "Date", in_list_view=1), f("title", length=255, in_list_view=1), f("search_text", "Long Text"),
+	f("is_archived", "Check", default="0"), f("kind", in_list_view=1), f("status"), f("record_owner"),
+], permissions=perms(agent_write=False), in_create=1)
+dt("Life Action Log", [
+	SPACE, link("goal", "Life Goal", reqd=1, search_index=1), f("action_id", reqd=1, search_index=1),
+	link("cycle", "Life Cycle", reqd=1, search_index=1), f("week", "Int", reqd=1), f("date", "Date", reqd=1, search_index=1),
+	f("count", "Int", default="1"), link("inbox_item", "Life Inbox Item"),
+], autoname="prompt")
+
+TRACK = {"Life Note", "Life Task", "Life Vault Document", "Life Project", "Life Goal", "Life Month Plan", "Life Journal Page", "Life Inbox Item"}
+
+
+def build(name, fields, kw):
+	doc = {
+		"actions": [], "creation": STAMP, "doctype": "DocType", "engine": "InnoDB",
+		"field_order": [x["fieldname"] for x in fields], "fields": fields,
+		"links": [], "modified": STAMP, "modified_by": "Administrator", "module": "Life", "name": name,
+		"owner": "Administrator", "sort_field": "creation", "sort_order": "DESC", "states": [],
+	}
+	if kw.get("istable"):
+		doc["istable"] = 1
+		doc["editable_grid"] = 1
+		doc["permissions"] = []
+	elif kw.get("issingle"):
+		doc["issingle"] = 1
+		doc["permissions"] = kw["permissions"]
+	else:
+		doc["permissions"] = kw.get("permissions") or perms()
+		doc["autoname"] = kw.get("autoname", "hash")
+		doc["naming_rule"] = {"hash": "Random", "prompt": "Set by user"}.get(doc["autoname"], "By fieldname")
+		if name in TRACK:
+			doc["track_changes"] = 1
+	for k in ("title_field", "show_title", "search_fields", "in_create"):
+		if k in kw:
+			doc[k] = kw[k]
+	return dict(sorted(doc.items()))
+
+
+def main():
+	for name, (fields, kw) in DOCTYPES.items():
+		folder = os.path.join(ROOT, scrub(name))
+		os.makedirs(folder, exist_ok=True)
+		with open(os.path.join(folder, scrub(name) + ".json"), "w") as fh:
+			json.dump(build(name, [dict(x) for x in fields], kw), fh, indent=1, sort_keys=False)
+			fh.write("\n")
+		init = os.path.join(folder, "__init__.py")
+		if not os.path.exists(init):
+			open(init, "w").close()
+		py = os.path.join(folder, scrub(name) + ".py")
+		if not os.path.exists(py):
+			cls = re.sub(r"[ \-]", "", name)
+			with open(py, "w") as fh:
+				fh.write(f"from frappe.model.document import Document\n\n\nclass {cls}(Document):\n\tpass\n")
+	open(os.path.join(ROOT, "__init__.py"), "a").close()
+	print(f"{len(DOCTYPES)} doctypes written")
+
+
+if __name__ == "__main__":
+	main()

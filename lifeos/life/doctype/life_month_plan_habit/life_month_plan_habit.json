@@ -1,0 +1,59 @@
+{
+ "actions": [],
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "habit",
+  "days_per_week",
+  "sort_order",
+  "tracked_from",
+  "tracked_until"
+ ],
+ "fields": [
+  {
+   "fieldname": "habit",
+   "fieldtype": "Link",
+   "label": "Habit",
+   "options": "Life Habit",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "days_per_week",
+   "fieldtype": "Int",
+   "label": "Days Per Week",
+   "default": "7",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "tracked_from",
+   "fieldtype": "Date",
+   "label": "Tracked From",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tracked_until",
+   "fieldtype": "Date",
+   "label": "Tracked Until",
+   "in_list_view": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Month Plan Habit",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

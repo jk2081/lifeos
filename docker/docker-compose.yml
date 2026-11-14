@@ -1,0 +1,37 @@
+# Local build stack for Life OS. Everything is prefixed lifeos-. Host ports avoid 80, 443 and 3306.
+name: lifeos
+services:
+  db:
+    image: mariadb:11.8
+    container_name: lifeos-db
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--skip-character-set-client-handshake", "--innodb-buffer-pool-size=256M"]
+    environment:
+      MARIADB_ROOT_PASSWORD: lifeos-local-root
+    volumes: ["lifeos-db-data:/var/lib/mysql"]
+    networks: [lifeos-net]
+    mem_limit: 900m
+  redis:
+    image: redis:7-alpine
+    container_name: lifeos-redis
+    networks: [lifeos-net]
+    mem_limit: 200m
+  bench:
+    image: frappe/bench:latest
+    container_name: lifeos-bench
+    command: ["sleep", "infinity"]
+    working_dir: /home/frappe
+    volumes:
+      - lifeos-bench-home:/home/frappe
+      - ..:/workspace/lifeos
+    ports: ["18000:8000", "19000:9000"]
+    networks: [lifeos-net]
+    depends_on: [db, redis]
+    mem_limit: 2500m
+volumes:
+  lifeos-db-data:
+    name: lifeos-db-data
+  lifeos-bench-home:
+    name: lifeos-bench-home
+networks:
+  lifeos-net:
+    name: lifeos-net
