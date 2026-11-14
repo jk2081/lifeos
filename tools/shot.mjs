@@ -28,7 +28,18 @@ for (const width of widths) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
   const res = await page.request.post(base + '/api/method/login', { form: { usr: user, pwd: env.LIFEOS_DEV_PASSWORD } })
   if (!res.ok()) throw new Error('login failed ' + res.status())
-  for (const [name, p] of pages) {
+  for (let [name, p] of pages) {
+    // {review} = the oldest item waiting for review; {method:lifeos.api.x|field} = a value from an API call
+    if (p.includes('{review}')) {
+      const r = await (await page.request.get(base + '/api/method/lifeos.api.inbox.list?space=Private&status=To%20Review')).json()
+      const items = r.message.items
+      p = p.replace('{review}', items[items.length - 1].name)
+    }
+    const m = p.match(/\{get:([^|]+)\|([^|]+)\|([^}]+)\}/)
+    if (m) {
+      const r = await (await page.request.get(base + `/api/method/frappe.client.get_value?doctype=${encodeURIComponent(m[1])}&filters=${encodeURIComponent(m[2])}&fieldname=name`)).json()
+      p = p.replace(m[0], r.message.name)
+    }
     await page.goto(base + p, { waitUntil: 'networkidle' })
     await page.waitForTimeout(500)
     if (script) { await page.evaluate(script); await page.waitForTimeout(600) }
