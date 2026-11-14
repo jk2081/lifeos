@@ -16,6 +16,8 @@ class LifeTestCase(IntegrationTestCase):
 		devtools.make_user(OWNER, "Jai", ["Life Admin", "Life User"])
 		devtools.make_user(FAMILY, "Family", ["Life User"])
 		devtools.make_user(AGENT, "Hermes", ["Life Agent"])
+		for name in (PRIVATE, SHARED):
+			devtools.purge_space(name)
 		for name, members in ((PRIVATE, [OWNER, AGENT]), (SHARED, [OWNER, FAMILY, AGENT])):
 			if not frappe.db.exists("Life Space", name):
 				frappe.get_doc({"doctype": "Life Space", "space_name": name, "owner_user": OWNER,
@@ -24,6 +26,15 @@ class LifeTestCase(IntegrationTestCase):
 		cls.shared_areas = seed.make_areas(SHARED, ["Family", "Work"])
 		seed.make_dimensions(PRIVATE)
 		permissions.clear_cache()
+
+	@classmethod
+	def tearDownClass(cls):
+		frappe.set_user("Administrator")
+		for name in (PRIVATE, SHARED, "Anya's space"):
+			devtools.purge_space(name, drop=True)
+		frappe.db.commit()
+		permissions.clear_cache()
+		super().tearDownClass()
 
 	def setUp(self):
 		permissions.clear_cache()

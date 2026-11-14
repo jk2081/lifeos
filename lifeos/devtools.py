@@ -10,7 +10,10 @@ def make_user(email, first_name, roles, password=None):
 			"user_type": "System User"}).insert(ignore_permissions=True)
 	else:
 		user = frappe.get_doc("User", email)
-	user.add_roles(*roles)
+	missing = [r for r in roles if r not in [x.role for x in user.roles]]
+	if missing:
+		user.flags.ignore_permissions = True
+		user.add_roles(*missing)
 	if password:
 		from frappe.utils.password import update_password
 		update_password(email, password)
@@ -46,3 +49,19 @@ def agent_api_key(user=AGENT):
 	doc.save(ignore_permissions=True)
 	frappe.db.commit()
 	return f"{doc.api_key}:{secret}"
+
+
+def purge_space(space, drop=False):
+	"""Delete every lifeos record in a space with plain SQL. For test spaces only."""
+	from lifeos.constants import SPACE_DOCTYPES
+
+	for dt in SPACE_DOCTYPES:
+		meta = frappe.get_meta(dt)
+		for tf in meta.get_table_fields():
+			frappe.db.sql(
+				f"delete c from `tab{tf.options}` c join `tab{dt}` p on p.name = c.parent where c.parenttype=%s and p.space=%s", (dt, space))
+		frappe.db.sql(f"delete from `tab{dt}` where space=%s", space)
+	frappe.db.sql("delete from `tabEvent` where life_space=%s", space)
+	if drop:
+		frappe.db.sql("delete from `tabLife Space Member` where parent=%s", space)
+		frappe.db.sql("delete from `tabLife Space` where name=%s", space)
