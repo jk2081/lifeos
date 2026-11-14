@@ -9,3 +9,5 @@ Build the `lifeos` Frappe app described in SPEC.md, in this repository. Nobody i
 5. If a command is refused by the permission system, do not retry it. Find another way, or record it in STATUS.md and move on.
 6. When every milestone is finished and the acceptance list in section 13 has been checked, write STATUS.md with: what works, what is stubbed, what is untested, and the exact commands to install the app on an existing bench. Then create an empty file named BUILD_DONE and commit.
 7. If you cannot make any further progress, write the reason to BUILD_BLOCKED, commit, and stop.
+
+This machine already runs other Docker containers, including a Frappe Manager stack (`fm_global-nginx`, `fm_global-db`) that holds ports 80 and 443. Do not stop, restart, remove or change any container, image, volume or network that you did not create in this build. Prefix everything you create with `lifeos-`. Use ports other than 80, 443 and 3306 on the host. Docker has about 4 GB of memory unless the owner raised it, so keep the stack small: one bench container with its database and Redis, and no parallel heavy jobs.
