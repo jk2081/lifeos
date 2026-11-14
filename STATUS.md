@@ -12,7 +12,7 @@ Build of Life OS v1. Updated at the end of every milestone.
 | M3 Inbox and review | Done |
 | M4 Tasks and Today | Done |
 | M5 Journal | Done |
-| M6 Calendar | Not started |
+| M6 Calendar | Done |
 | M7 Library and Vault | Not started |
 | M8 Search and graph | Not started |
 | M9 Polish | Not started |
@@ -55,6 +55,13 @@ Build of Life OS v1. Updated at the end of every milestone.
 - Screens checked at 1440 px and 390 px against mockups 03, 06 and 08.
 - Tests: `lifeos/tests/test_m5_journal.py` passes (21 tests).
 - Known limit: a "starred topic" in the mindsweep is a Markdown heading that starts with a star character. There is no separate star control.
+
+## M6 Calendar
+
+- Works: `calendar.get` merges core `Event` records (repeats expanded by core's own `get_events`), important dates repeated every year (29 February falls on 28 February outside leap years), task due dates and vault expiry dates. `calendar.year` gives the year view: important dates, all-day and multi-day events on each of their days, document expiries and cycle start and end, with timed meetings left out. `calendar.add_event`, `calendar.delete_event`, `calendar.add_important_date`. Events carry `life_space`; an event created by an agent in a space is visible to the owner and hidden from users outside the space.
+- Screen: month, week, agenda and year views, a day side panel with Add event and Add important date, previous and next, the year view as in mockup 07 (weekends tinted, today outlined, a bar on days inside the active 12 Week Year), and a list by month at phone width. A one-line prompt shows when Google Calendar is not connected.
+- Tests: `lifeos/tests/test_m6_calendar.py` passes (7 tests).
+- Untested against the real service: the Google Calendar connection. When the user has an enabled `Google Calendar` record with a refresh token, new events are saved with `sync_with_google_calendar` and that calendar, which is what Frappe's integration pushes. Events pulled from Google take the default space of the user who owns them (tested with a plain insert, not with a real sync).
 
 ## How to run the local stack
 

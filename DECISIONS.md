@@ -52,3 +52,6 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Close cycle default outcome.** A goal still In Progress with no outcome given is stored as Not Achieved.
 - **Charts.** Check-in charts are small SVG line charts written for this app (two series on one 0 to 10 axis, colours checked for colour-blind separation in both themes). `frappe-ui` charts would add the whole of ECharts for eight sparklines.
 - **Habit targets.** A habit's month target is its tracked days so far, scaled by `days_per_week / 7` and rounded. The percentage is capped at 100.
+- **Deleting events.** Core `Event` lets only its creator delete it. `calendar.delete_event` lets any person with Write access to the event's space delete it (never an agent), so the owner can remove an event an agent filed. It checks read permission and space membership itself before deleting.
+- **Calendar range.** `calendar.get` returns at most 100 days per call. The year view has its own method, which returns only the entries the year pages show.
+- **Week view.** The week view lists each day's items in seven columns. It is not an hour grid; Google Calendar remains the place for that.
