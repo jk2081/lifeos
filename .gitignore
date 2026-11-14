@@ -6,3 +6,6 @@ dist/
 .env
 *.egg-info/
 sites/
+build-logs/
+bench/
+frappe-bench/

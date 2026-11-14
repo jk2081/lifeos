@@ -9,3 +9,5 @@ This repo will hold `lifeos`, a Frappe v16 app. It is empty apart from the spec 
 - **Record every deviation from the spec in `DECISIONS.md`**, with the reason.
 - **Never write secrets** to the repo, logs or docs.
 - The spec contains the owner's personal goals as seed data. Keep this repo private.
+- **This build runs unattended.** Do not ask questions. When finished, create `BUILD_DONE`. If you cannot go further, write the reason to `BUILD_BLOCKED`. `scripts/start-build.sh` restarts you with `CONTINUE_PROMPT.md` until one of those files exists.
+- Do not read or change anything outside this repository and the local bench you create for it.

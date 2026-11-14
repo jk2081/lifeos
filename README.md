@@ -9,12 +9,23 @@ A personal operating system on Frappe: inbox and review, tasks, calendar, a jour
 | `SPEC.md` | The v1 build spec |
 | `mockups/` | Approved screen mockups as PNG, with their HTML source |
 | `CLAUDE.md` | Standing instructions for a coding agent working in this repo |
-| `START_PROMPT.md` | The prompt that starts the build |
+| `START_PROMPT.md`, `CONTINUE_PROMPT.md` | The prompts the build script sends |
+| `scripts/start-build.sh` | Starts and supervises an unattended build |
 
 ## Start the build
 
-1. Install Docker Desktop and Claude Code on the machine that will run the build.
-2. Clone this repo and open a terminal in it.
-3. Run `claude`, choose the Fable model, and paste the contents of `START_PROMPT.md`.
+On a Mac with Docker Desktop and Claude Code installed:
 
-The app does not exist yet. Install steps for an existing bench will be written here by the build.
+```
+git clone https://github.com/jk2081/lifeos.git
+cd lifeos
+./scripts/start-build.sh
+```
+
+The script keeps the Mac awake, runs Claude Code without prompts in auto permission mode, restarts it if a run ends early, commits after every round and pushes to GitHub. It stops when the build writes `BUILD_DONE` or `BUILD_BLOCKED`, or after 12 rounds.
+
+- Progress: `STATUS.md`, `git log`, and `build-logs/build.log`.
+- To continue a stopped build, run the script again.
+- To use another model or permission mode: `MODEL=opus PERMISSION_MODE=acceptEdits ./scripts/start-build.sh`.
+
+The app does not exist yet. Install steps for an existing bench will be written to `STATUS.md` by the build.
