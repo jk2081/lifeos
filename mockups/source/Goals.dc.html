@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Goals across 12 Week Years</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3}a:hover{color:#004F91}
+.app{display:flex;flex-wrap:wrap;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:1 1 220px;max-width:240px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.sp{display:flex;align-items:center;gap:8px;padding:6px 8px 12px;font-weight:600}
+.lg{width:26px;height:26px;border-radius:7px;background:#171717;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.nv{display:flex;align-items:center;gap:10px;min-height:32px;padding:0 8px;border-radius:6px;color:#383838;text-decoration:none}
+.nv:hover{background:#EDEDED;color:#171717}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv svg{flex:none;color:#6B6B6B}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:16px 28px 0}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:32px;padding:0 12px;border-radius:8px;border:0;font:500 13px Inter,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}
+.tb{display:flex;gap:20px;flex-wrap:wrap;padding:12px 28px 0;border-bottom:1px solid #EDEDED}
+.tb a{padding:8px 0 10px;color:#525252;text-decoration:none;border-bottom:2px solid transparent}
+.tb a.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}
+.ch{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:7px;border:1px solid #E2E2E2;background:#fff;color:#383838;font-size:13px;text-decoration:none}
+.ch.on{background:#171717;border-color:#171717;color:#fff}
+.gr{display:grid;grid-template-columns:minmax(230px,2fr) 150px 80px minmax(170px,1.2fr) 130px;gap:0 12px;align-items:center;padding:10px 16px;border-top:1px solid #F0F0F0}
+.gr.hdr{border-top:0;background:#F8F8F8;font-size:12px;color:#6B6B6B;padding:8px 16px}
+.cy{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid #EDEDED;background:#FCFCFC}
+.cy b{font-weight:600}
+.br{height:6px;border-radius:3px;background:#EDEDED;overflow:hidden;flex-grow:1}
+.br i{display:block;height:6px;background:#171717}
+.pg{display:flex;align-items:center;gap:8px}
+.pg span{width:36px;text-align:right;font-variant-numeric:tabular-nums}
+@media(max-width:800px){.sb{max-width:none}}
+</style>
+</helmet>
+<div class="app">
+  <nav class="sb" aria-label="Sections">
+    <div class="sp"><div class="lg">L</div>Private<svg style="margin-left: auto;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></div>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="13">
+      <a class="{{n.cls}}" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.d}}"></path></svg>{{n.label}}<sc-if value="{{n.count}}" hint-placeholder-val="{{false}}"><span class="ct">{{n.count}}</span></sc-if></a>
+    </sc-for>
+  </nav>
+
+  <main class="main">
+    <header class="hd">
+      <div>
+        <h1 class="h1">Journal</h1>
+        <div class="sub">Every goal, across every 12 Week Year</div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="bt s" type="button">Plan next cycle</button>
+        <button class="bt p" type="button">Add goal</button>
+      </div>
+    </header>
+    <nav class="tb" aria-label="Journal sections">
+      <a href="Journal12WY.dc.html">12 Week Year</a><a class="on" href="#">Goals</a><a href="#">Month</a><a href="#">Habits</a><a href="#">Check-ins</a><a href="#">Pages</a><a href="#">Weekly review</a>
+    </nav>
+
+    <div style="padding: 20px 28px 40px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;" aria-label="Filter by area">
+        <a class="ch on" href="#">All areas</a><a class="ch" href="#">Tea &amp; Coffee</a><a class="ch" href="#">Personal</a><a class="ch" href="#">Money &amp; Legal</a><a class="ch" href="#">Learning</a><a class="ch" href="#">Business That Works</a>
+      </div>
+
+      <div style="overflow-x: auto; border: 1px solid #EDEDED; border-radius: 10px;">
+        <div style="min-width: 860px;">
+          <div class="gr hdr"><div>Goal</div><div>Area</div><div>Actions</div><div>Ticks done</div><div>Outcome</div></div>
+
+          <div class="cy"><b>Jan to Mar 2027</b><span class="pl n">Planned</span><span class="mt">Starts 4 January · goals carried from the current cycle show here until you confirm them</span></div>
+          <div class="gr"><div><a href="#" style="font-weight: 500; text-decoration: none;">RMT: GHL turnaround</a><div class="mt">Carried from Oct to Dec 2026</div></div><div><span class="pl n">Tea &amp; Coffee</span></div><div>2</div><div class="mt">Not started</div><div><span class="pl n">Draft</span></div></div>
+
+          <div class="cy"><b>Oct to Dec 2026</b><span class="pl b">Active · week 6</span><span class="mt">Average score 46% · target 85%</span><a href="Journal12WY.dc.html" style="margin-left: auto; text-decoration: none; font-weight: 500;">Open grid</a></div>
+          <div class="gr"><div><a href="#" style="font-weight: 500; text-decoration: none;">RMT: improve systems</a></div><div><span class="pl n">Tea &amp; Coffee</span></div><div>4</div><div class="pg"><div class="br"><i style="width: 38%;"></i></div><span>38%</span></div><div><span class="pl b">In progress</span></div></div>
+          <div class="gr"><div><a href="#" style="font-weight: 500; text-decoration: none;">Close open loops</a><div class="mt">1 of 4 actions finished</div></div><div><span class="pl n">Personal</span></div><div>4</div><div class="pg"><div class="br"><i style="width: 19%;"></i></div><span>19%</span></div><div><span class="pl b">In progress</span></div></div>
+          <div class="gr"><div><a href="#" style="font-weight: 500; text-decoration: none;">Golf: hit 5 birdies</a></div><div><span class="pl n">Personal</span></div><div>2</div><div class="pg"><div class="br"><i style="width: 75%;"></i></div><span>75%</span></div><div><span class="pl b">In progress</span></div></div>
+          <div class="gr"><div><a href="#" style="font-weight: 500; text-decoration: none;">Money</a></div><div><span class="pl n">Money &amp; Legal</span></div><div>2</div><div class="pg"><div class="br"><i style="width: 42%;"></i></div><span>42%</span></div><div><span class="pl b">In progress</span></div></div>
+          <div class="gr"><div><a href="#" style="font-weight: 500; text-decoration: none;">RMT: GHL turnaround</a><div class="mt">Linked to project Ghillidary turnaround</div></div><div><span class="pl n">Tea &amp; Coffee</span></div><div>2</div><div class="pg"><div class="br"><i style="width: 42%;"></i></div><span>42%</span></div><div><span class="pl b">In progress</span></div></div>
+          <div class="gr"><div><a href="#" style="font-weight: 500; text-decoration: none;">Get super-fit</a></div><div><span class="pl n">Personal</span></div><div>2</div><div class="pg"><div class="br"><i style="width: 67%;"></i></div><span>67%</span></div><div><span class="pl b">In progress</span></div></div>
+          <div class="gr"><div><a href="#" style="font-weight: 500; text-decoration: none;">Mind and learning</a></div><div><span class="pl n">Learning</span></div><div>2</div><div class="pg"><div class="br"><i style="width: 67%;"></i></div><span>67%</span></div><div><span class="pl b">In progress</span></div></div>
+
+          <div class="cy"><b>Jul to Sep 2026</b><span class="pl n">Closed</span><span class="mt">Final score and outcomes are recorded when a cycle is closed</span></div>
+          <div class="gr"><div><span style="font-weight: 500;">[Goal from this cycle]</span><div class="mt">Carried into Oct to Dec 2026</div></div><div><span class="pl n">[Area]</span></div><div>3</div><div class="pg"><div class="br"><i style="width: 55%;"></i></div><span>55%</span></div><div><span class="pl o">Carried</span></div></div>
+          <div class="gr"><div><span style="font-weight: 500;">[Goal from this cycle]</span></div><div><span class="pl n">[Area]</span></div><div>2</div><div class="pg"><div class="br"><i style="width: 90%;"></i></div><span>90%</span></div><div><span class="pl g">Achieved</span></div></div>
+          <div class="gr"><div><span style="font-weight: 500;">[Goal from this cycle]</span></div><div><span class="pl n">[Area]</span></div><div>2</div><div class="pg"><div class="br"><i style="width: 20%;"></i></div><span>20%</span></div><div><span class="pl r">Dropped</span></div></div>
+        </div>
+      </div>
+      <p class="mt" style="margin: 0;">The current cycle's goals are from the journal and its percentages match the example ticks on the grid. The earlier cycle is a placeholder until you upload those pages.</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const items = [
+      ['Today', 'M4 11l8-7 8 7v9H4z'],
+      ['Inbox', 'M4 13l2-8h12l2 8v6H4zM4 13h5l1 3h4l1-3h5', '3'],
+      ['Timeline', 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+      ['Tasks', 'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2'],
+      ['Calendar', 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4'],
+      ['Journal', 'M6 3h12v18H6zM10 3v18'],
+      ['Areas', 'M4 6h6l2 2h8v11H4z'],
+      ['Projects', 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+      ['Library', 'M5 4h4v16H5zM11 4h4v16h-4zM17 6l3 13'],
+      ['Vault', 'M5 11h14v9H5zM8 11V8a4 4 0 0 1 8 0v3'],
+      ['Chats', 'M4 5h16v11H9l-5 4z'],
+      ['Graph', 'M8 7l8 1.5M17 11l-7 6M4 6a2 2 0 1 0 4 0 2 2 0 1 0-4 0M16 9a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0'],
+      ['Archive', 'M4 5h16v4H4zM6 9v10h12V9M10 13h4']
+    ];
+    return { nav: items.map((i) => ({ label: i[0], d: i[1], count: i[2] || '', cls: i[0] === 'Journal' ? 'nv on' : 'nv' })) };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3}a:hover{color:#004F91}
+.app{display:flex;flex-wrap:wrap;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:1 1 220px;max-width:240px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.sp{display:flex;align-items:center;gap:8px;padding:6px 8px 12px;font-weight:600}
+.lg{width:26px;height:26px;border-radius:7px;background:#171717;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.nv{display:flex;align-items:center;gap:10px;min-height:32px;padding:0 8px;border-radius:6px;color:#383838;text-decoration:none}
+.nv:hover{background:#EDEDED;color:#171717}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv svg{flex:none;color:#6B6B6B}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #EDEDED}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:32px;padding:0 12px;border-radius:8px;border:0;font:500 13px Inter,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}
+.bd{padding:24px 28px 40px;display:flex;flex-direction:column;gap:24px}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px}
+.sh{font-size:13px;font-weight:600;color:#525252;margin:0 0 8px}
+.pl{display:inline-flex;align-items:center;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}
+.rw{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid #F0F0F0}
+.rw:last-child{border-bottom:0}
+.mt{font-size:12.5px;color:#6B6B6B}
+.st{display:flex;flex-direction:column;gap:2px}
+.st b{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.ck{width:18px;height:18px;margin:2px 0 0;accent-color:#171717;flex:none}
+.hb{width:44px;height:44px;border-radius:10px;border:1px solid #DADADA;background:#fff;color:#171717;font:600 15px Inter,system-ui,sans-serif;cursor:pointer}
+.hb.on{background:#171717;color:#fff;border-color:#171717}
+@media(max-width:800px){.sb{max-width:none}}
+</style>
+</helmet>
+<div class="app">
+  <nav class="sb" aria-label="Sections">
+    <div class="sp"><div class="lg">L</div>Private<svg style="margin-left: auto;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></div>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="13">
+      <a class="{{n.cls}}" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.d}}"></path></svg>{{n.label}}<sc-if value="{{n.count}}" hint-placeholder-val="{{false}}"><span class="ct">{{n.count}}</span></sc-if></a>
+    </sc-for>
+  </nav>
+
+  <main class="main">
+    <header class="hd">
+      <div>
+        <h1 class="h1">Saturday, 14 November</h1>
+        <div class="sub">Week 6 of 12 · Oct to Dec 2026</div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="bt s" type="button">New task</button>
+        <button class="bt p" type="button">Add to Inbox</button>
+      </div>
+    </header>
+
+    <div class="bd">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;">
+        <div class="cd st"><span class="mt">To review</span><b>3</b><span class="mt">12 proposals waiting</span></div>
+        <div class="cd st"><span class="mt">Due today</span><b>4</b><span class="mt">1 overdue</span></div>
+        <div class="cd st"><span class="mt">Week 6 score</span><b>71%</b><span class="mt">Target 85%</span></div>
+        <div class="cd st"><span class="mt">Open loops</span><b>6</b><span class="mt">Older than 14 days, no date</span></div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 24px;">
+        <div style="flex: 2 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 24px;">
+          <section>
+            <h2 class="sh">Tasks</h2>
+            <div class="cd" style="padding: 4px 16px;">
+              <div class="rw"><input class="ck" type="checkbox" id="t1"><div style="flex-grow: 1; min-width: 0;"><label for="t1" style="font-weight: 500;">Download Merrill statements for Ruchi ITR</label><div class="mt">Money &amp; Legal · from chat, 14 Nov</div></div><span class="pl r">Overdue 2 days</span></div>
+              <div class="rw"><input class="ck" type="checkbox" id="t2"><div style="flex-grow: 1; min-width: 0;"><label for="t2" style="font-weight: 500;">Send quote request to data vendors</label><div class="mt">Business That Works · Owner outreach funnel</div></div><span class="pl n">I</span></div>
+              <div class="rw"><input class="ck" type="checkbox" id="t3"><div style="flex-grow: 1; min-width: 0;"><label for="t3" style="font-weight: 500;">Six questions to Mithun on the blend sheets</label><div class="mt">Business That Works · Dalmia Gold</div></div><span class="pl n">I</span></div>
+              <div class="rw"><input class="ck" type="checkbox" id="t4"><div style="flex-grow: 1; min-width: 0;"><label for="t4" style="font-weight: 500;">Practise 5-footers, 30 minutes</label><div class="mt">Personal · Golf: hit 5 birdies</div></div><span class="pl b">12WY</span></div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="sh">To review</h2>
+            <div class="cd" style="padding: 4px 16px;">
+              <div class="rw"><div style="flex-grow: 1; min-width: 0;"><a href="Review.dc.html" style="font-weight: 500; text-decoration: none;">Journal photo, pages 187 to 188</a><div class="mt">Transcribed · 5 proposals · filed by Hermes, 21:40</div></div><span class="pl o">To review</span></div>
+              <div class="rw"><div style="flex-grow: 1; min-width: 0;"><a href="#" style="font-weight: 500; text-decoration: none;">Voice note, 2 min 10 s</a><div class="mt">Summary ready · 4 proposals</div></div><span class="pl o">To review</span></div>
+              <div class="rw"><div style="flex-grow: 1; min-width: 0;"><a href="#" style="font-weight: 500; text-decoration: none;">Mithun production documents.pdf</a><div class="mt">Summary ready · 3 proposals</div></div><span class="pl o">To review</span></div>
+            </div>
+          </section>
+        </div>
+
+        <div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 24px;">
+          <section>
+            <h2 class="sh">Habits today</h2>
+            <div class="cd" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; text-align: center;">
+              <div><button class="hb on" type="button" aria-label="Japa, done">J</button><div class="mt">Japa</div></div>
+              <div><button class="hb on" type="button" aria-label="Mala, done">M</button><div class="mt">Mala</div></div>
+              <div><button class="hb" type="button" aria-label="Journal, not done">J</button><div class="mt">Journal</div></div>
+              <div><button class="hb" type="button" aria-label="Workout, not done">W</button><div class="mt">Workout</div></div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="sh">Calendar</h2>
+            <div class="cd" style="padding: 4px 16px;">
+              <div class="rw"><span style="width: 52px; flex: none; font-variant-numeric: tabular-nums; color: #525252;">07:00</span><div>Golf round</div></div>
+              <div class="rw"><span style="width: 52px; flex: none; font-variant-numeric: tabular-nums; color: #525252;">16:30</span><div>Call with Vivek on the ITR</div></div>
+              <div class="rw"><span style="width: 52px; flex: none; color: #525252;">Mon</span><div>Weekly review <span class="mt">· moved from Sunday</span></div></div>
+            </div>
+          </section>
+
+          <section>
+            <h2 class="sh">Coming up</h2>
+            <div class="cd" style="padding: 4px 16px;">
+              <div class="rw"><div style="flex-grow: 1;">Driving licence<div class="mt">Vault · expires in 28 days</div></div><span class="pl o">Renew</span></div>
+              <div class="rw"><div style="flex-grow: 1;">Anniversary<div class="mt">Important date · 23 November</div></div><span class="pl n">9 days</span></div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <p class="mt" style="margin: 0;">Example data, taken from this week's chats and the journal pages.</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const items = [
+      ['Today', 'M4 11l8-7 8 7v9H4z'],
+      ['Inbox', 'M4 13l2-8h12l2 8v6H4zM4 13h5l1 3h4l1-3h5', '3'],
+      ['Timeline', 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+      ['Tasks', 'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2'],
+      ['Calendar', 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4'],
+      ['Journal', 'M6 3h12v18H6zM10 3v18'],
+      ['Areas', 'M4 6h6l2 2h8v11H4z'],
+      ['Projects', 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+      ['Library', 'M5 4h4v16H5zM11 4h4v16h-4zM17 6l3 13'],
+      ['Vault', 'M5 11h14v9H5zM8 11V8a4 4 0 0 1 8 0v3'],
+      ['Chats', 'M4 5h16v11H9l-5 4z'],
+      ['Graph', 'M8 7l8 1.5M17 11l-7 6M4 6a2 2 0 1 0 4 0 2 2 0 1 0-4 0M16 9a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0'],
+      ['Archive', 'M4 5h16v4H4zM6 9v10h12V9M10 13h4']
+    ];
+    return { nav: items.map((i) => ({ label: i[0], d: i[1], count: i[2] || '', cls: i[0] === 'Today' ? 'nv on' : 'nv' })) };
+  }
+}
+</script>
+</body>
+</html>

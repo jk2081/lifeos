@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today on a phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3}a:hover{color:#004F91}
+.ph{width:390px;height:844px;box-sizing:border-box;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.45;display:flex;flex-direction:column;overflow:hidden}
+.cd{border:1px solid #EDEDED;border-radius:12px;padding:12px 14px}
+.sh{font-size:13px;font-weight:600;color:#525252;margin:0 0 6px}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}
+.rw{display:flex;align-items:flex-start;gap:10px;padding:11px 0;border-bottom:1px solid #F0F0F0}
+.rw:last-child{border-bottom:0}
+.ck{width:22px;height:22px;margin:0;accent-color:#171717;flex:none}
+.hb{width:48px;height:48px;border-radius:12px;border:1px solid #DADADA;background:#fff;color:#171717;font:600 16px Inter,system-ui,sans-serif}
+.hb.on{background:#171717;color:#fff;border-color:#171717}
+.st b{display:block;font-size:22px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;font-size:11.5px;color:#525252;text-decoration:none}
+.tab.on{color:#171717;font-weight:600}
+.fab{position:absolute;right:16px;bottom:72px;width:52px;height:52px;border-radius:26px;border:0;background:#171717;color:#fff;display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.18)}
+</style>
+</helmet>
+<div class="ph" style="position: relative;">
+  <header style="padding: 18px 16px 10px; display: flex; align-items: center; gap: 10px;">
+    <div style="flex-grow: 1;">
+      <h1 style="margin: 0; font-size: 20px; font-weight: 600;">Sat, 14 November</h1>
+      <div class="mt">Week 6 of 12 · score 71%</div>
+    </div>
+    <button type="button" aria-label="Search" style="width: 44px; height: 44px; border-radius: 10px; border: 0; background: #F3F3F3; color: #171717; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+  </header>
+
+  <div style="flex: 1; min-height: 0; overflow: hidden; padding: 4px 16px 0; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+      <a class="cd st" href="#" style="text-decoration: none; color: #171717; padding: 10px 12px;"><span class="mt">To review</span><b>3</b></a>
+      <a class="cd st" href="#" style="text-decoration: none; color: #171717; padding: 10px 12px;"><span class="mt">Due today</span><b>4</b></a>
+      <a class="cd st" href="#" style="text-decoration: none; color: #171717; padding: 10px 12px;"><span class="mt">Open loops</span><b>6</b></a>
+    </div>
+
+    <section>
+      <h2 class="sh">Habits today</h2>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; text-align: center;">
+        <div><button class="hb on" type="button" aria-label="Japa, done">J</button><div class="mt">Japa</div></div>
+        <div><button class="hb on" type="button" aria-label="Mala, done">M</button><div class="mt">Mala</div></div>
+        <div><button class="hb" type="button" aria-label="Journal, not done">J</button><div class="mt">Journal</div></div>
+        <div><button class="hb" type="button" aria-label="Workout, not done">W</button><div class="mt">Workout</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="sh">Tasks</h2>
+      <div class="cd" style="padding: 2px 14px;">
+        <div class="rw"><input class="ck" type="checkbox" id="p1"><div style="flex-grow: 1; min-width: 0;"><label for="p1" style="font-weight: 500;">Download Merrill statements for Ruchi ITR</label><div class="mt">Money &amp; Legal</div></div><span class="pl r">2 days</span></div>
+        <div class="rw"><input class="ck" type="checkbox" id="p2"><div style="flex-grow: 1; min-width: 0;"><label for="p2" style="font-weight: 500;">Send quote request to data vendors</label><div class="mt">Business That Works</div></div></div>
+        <div class="rw"><input class="ck" type="checkbox" id="p3"><div style="flex-grow: 1; min-width: 0;"><label for="p3" style="font-weight: 500;">Practise 5-footers, 30 minutes</label><div class="mt">Personal · 12 Week Year</div></div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="sh">To review</h2>
+      <div class="cd" style="padding: 2px 14px;">
+        <div class="rw"><div style="flex-grow: 1; min-width: 0;"><a href="#" style="font-weight: 500; text-decoration: none;">Journal photo, pages 187 to 188</a><div class="mt">5 proposals</div></div><span class="pl o">Review</span></div>
+        <div class="rw"><div style="flex-grow: 1; min-width: 0;"><a href="#" style="font-weight: 500; text-decoration: none;">Voice note, 2 min 10 s</a><div class="mt">4 proposals</div></div><span class="pl o">Review</span></div>
+      </div>
+    </section>
+  </div>
+
+  <button class="fab" type="button" aria-label="Add to Inbox: photo, voice note or file"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+
+  <nav aria-label="Sections" style="display: flex; border-top: 1px solid #EDEDED; background: #FCFCFC;">
+    <a class="tab on" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"></path></svg>Today</a>
+    <a class="tab" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 13l2-8h12l2 8v6H4zM4 13h5l1 3h4l1-3h5"></path></svg>Inbox</a>
+    <a class="tab" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"></path></svg>Tasks</a>
+    <a class="tab" href="HabitsPhone.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18H6zM10 3v18"></path></svg>Journal</a>
+    <a class="tab" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14"></path></svg>More</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

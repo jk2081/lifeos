@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Review an inbox item</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3}a:hover{color:#004F91}
+.app{display:flex;flex-wrap:wrap;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:1 1 220px;max-width:240px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.sp{display:flex;align-items:center;gap:8px;padding:6px 8px 12px;font-weight:600}
+.lg{width:26px;height:26px;border-radius:7px;background:#171717;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.nv{display:flex;align-items:center;gap:10px;min-height:32px;padding:0 8px;border-radius:6px;color:#383838;text-decoration:none}
+.nv:hover{background:#EDEDED;color:#171717}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv svg{flex:none;color:#6B6B6B}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #EDEDED}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:32px;padding:0 12px;border-radius:8px;border:0;font:500 13px Inter,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}.bt.q{background:transparent;color:#525252}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px}
+.sh{font-size:13px;font-weight:600;color:#525252;margin:0 0 8px}
+.pl{display:inline-flex;align-items:center;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.n{background:#F3F3F3;color:#525252}
+.mt{font-size:12.5px;color:#6B6B6B}
+.ch{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 9px;border-radius:7px;border:1px solid #E2E2E2;background:#fff;color:#383838;font:500 12.5px Inter,system-ui,sans-serif;cursor:pointer}
+.ch.add{border-style:dashed;color:#6B6B6B}
+.pr{border:1px solid #EDEDED;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.pr.done{background:#FAFAFA}
+@media(max-width:800px){.sb{max-width:none}}
+</style>
+</helmet>
+<div class="app">
+  <nav class="sb" aria-label="Sections">
+    <div class="sp"><div class="lg">L</div>Private<svg style="margin-left: auto;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></div>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="13">
+      <a class="{{n.cls}}" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.d}}"></path></svg>{{n.label}}<sc-if value="{{n.count}}" hint-placeholder-val="{{false}}"><span class="ct">{{n.count}}</span></sc-if></a>
+    </sc-for>
+  </nav>
+
+  <main class="main">
+    <header class="hd">
+      <div>
+        <div class="sub"><a href="Main.dc.html" style="text-decoration: none;">Inbox</a> / Journal photo</div>
+        <h1 class="h1">Journal photo, pages 187 to 188</h1>
+        <div class="sub">Uploaded 14 Nov, 21:36 · instruction: "transcribe and update my journal" · processed by Hermes</div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="bt s" type="button">Reject all</button>
+        <button class="bt p" type="button">Accept all 4 pending</button>
+      </div>
+    </header>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; padding: 24px 28px 40px;">
+      <div style="flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <section>
+          <h2 class="sh">Original</h2>
+          <div role="img" aria-label="Photograph of journal pages 187 and 188" style="height: 300px; border-radius: 10px; border: 1px dashed #CFCFCF; background: #FAFAFA; display: grid; place-items: center; color: #6B6B6B; text-align: center; padding: 16px;">Journal photo<br>pages 187 to 188<br><span class="mt">The uploaded image shows here, with zoom</span></div>
+        </section>
+        <section>
+          <h2 class="sh">Transcript</h2>
+          <div class="cd" style="font-size: 15px; line-height: 1.65; max-width: 70ch;">
+            <p style="margin: 0 0 10px;"><b>Goal Oct to Dec</b> · Actions · Week 1 to 12</p>
+            <p style="margin: 0 0 10px;"><b>Money.</b> Meet Arjun Singh for PMS. Complete usable MoneyOS.</p>
+            <p style="margin: 0 0 10px;"><b>RMT, GHL turnaround.</b> Discuss going with Nowrojee. Make detailed plan for poor sections. Visit leased gardens. Start internal audit.</p>
+            <p style="margin: 0;"><b>Close open loops.</b> Ruchi ITR. Driver's licence. <s>Anya passport</s>. Generic promotion <span class="pl o">[?] unclear</span></p>
+          </div>
+          <div class="mt" style="margin-top: 6px;">Words marked [?] were hard to read. Edit the transcript to correct them.</div>
+        </section>
+      </div>
+
+      <div style="flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <section>
+          <h2 class="sh">Summary</h2>
+          <div class="cd" style="font-size: 15px; line-height: 1.6;">The 12 Week Year plan for October to December. Seven goals with their actions. One action, Anya passport, is struck through as done.</div>
+        </section>
+
+        <section style="display: flex; flex-direction: column; gap: 10px;">
+          <h2 class="sh" style="margin: 0;">Proposals · 4 pending, 1 accepted</h2>
+
+          <div class="pr">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;"><span class="pl b">Task</span><span style="font-weight: 500; flex-grow: 1;">Meet Arjun Singh for PMS</span><span class="mt">92% sure</span></div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><button class="ch" type="button">Money &amp; Legal</button><button class="ch" type="button">Goal: Money</button><button class="ch add" type="button">+ also in</button><button class="ch add" type="button">+ due date</button></div>
+            <div style="display: flex; gap: 6px; justify-content: flex-end;"><button class="bt q" type="button">Reject</button><button class="bt s" type="button">Edit</button><button class="bt p" type="button">Accept</button></div>
+          </div>
+
+          <div class="pr">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;"><span class="pl b">Task</span><span style="font-weight: 500; flex-grow: 1;">Visit leased gardens</span><span class="mt">88% sure</span></div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><button class="ch" type="button">Tea &amp; Coffee</button><button class="ch" type="button">Project: Ghillidary turnaround</button><button class="ch add" type="button">+ also in</button></div>
+            <div style="display: flex; gap: 6px; justify-content: flex-end;"><button class="bt q" type="button">Reject</button><button class="bt s" type="button">Edit</button><button class="bt p" type="button">Accept</button></div>
+          </div>
+
+          <div class="pr">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;"><span class="pl n">Week tick</span><span style="font-weight: 500; flex-grow: 1;">Mark "Anya passport" as done in the 12 Week Year</span><span class="mt">95% sure</span></div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><button class="ch" type="button">Personal</button><button class="ch" type="button">Goal: Close open loops</button></div>
+            <div style="display: flex; gap: 6px; justify-content: flex-end;"><button class="bt q" type="button">Reject</button><button class="bt s" type="button">Edit</button><button class="bt p" type="button">Accept</button></div>
+          </div>
+
+          <div class="pr">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;"><span class="pl b">Task</span><span style="font-weight: 500; flex-grow: 1;">Generic promotion [?]</span><span class="pl o">41% sure</span></div>
+            <div class="mt">The agent could not read this line. Edit the title or reject it.</div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><button class="ch" type="button">Personal</button><button class="ch add" type="button">+ project</button></div>
+            <div style="display: flex; gap: 6px; justify-content: flex-end;"><button class="bt q" type="button">Reject</button><button class="bt s" type="button">Edit</button><button class="bt p" type="button">Accept</button></div>
+          </div>
+
+          <div class="pr done">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;"><span class="pl n">Journal page</span><span style="font-weight: 500; flex-grow: 1;">Save pages 187 to 188 with this transcript</span><span class="pl g">Accepted</span></div>
+            <div class="mt">Filed under Journal, Pages, 14 November. <a href="#">Open</a></div>
+          </div>
+        </section>
+        <p class="mt" style="margin: 0;">Nothing here becomes a record until you accept it. The photo is always kept.</p>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const items = [
+      ['Today', 'M4 11l8-7 8 7v9H4z'],
+      ['Inbox', 'M4 13l2-8h12l2 8v6H4zM4 13h5l1 3h4l1-3h5', '3'],
+      ['Timeline', 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+      ['Tasks', 'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2'],
+      ['Calendar', 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4'],
+      ['Journal', 'M6 3h12v18H6zM10 3v18'],
+      ['Areas', 'M4 6h6l2 2h8v11H4z'],
+      ['Projects', 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+      ['Library', 'M5 4h4v16H5zM11 4h4v16h-4zM17 6l3 13'],
+      ['Vault', 'M5 11h14v9H5zM8 11V8a4 4 0 0 1 8 0v3'],
+      ['Chats', 'M4 5h16v11H9l-5 4z'],
+      ['Graph', 'M8 7l8 1.5M17 11l-7 6M4 6a2 2 0 1 0 4 0 2 2 0 1 0-4 0M16 9a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0'],
+      ['Archive', 'M4 5h16v4H4zM6 9v10h12V9M10 13h4']
+    ];
+    return { nav: items.map((i) => ({ label: i[0], d: i[1], count: i[2] || '', cls: i[0] === 'Inbox' ? 'nv on' : 'nv' })) };
+  }
+}
+</script>
+</body>
+</html>

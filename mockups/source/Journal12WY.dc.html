@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Journal, 12 Week Year</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3}a:hover{color:#004F91}
+.app{display:flex;flex-wrap:wrap;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:1 1 220px;max-width:240px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.sp{display:flex;align-items:center;gap:8px;padding:6px 8px 12px;font-weight:600}
+.lg{width:26px;height:26px;border-radius:7px;background:#171717;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.nv{display:flex;align-items:center;gap:10px;min-height:32px;padding:0 8px;border-radius:6px;color:#383838;text-decoration:none}
+.nv:hover{background:#EDEDED;color:#171717}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv svg{flex:none;color:#6B6B6B}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:16px 28px 0}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:32px;padding:0 12px;border-radius:8px;border:0;font:500 13px Inter,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}
+.tb{display:flex;gap:20px;flex-wrap:wrap;padding:12px 28px 0;border-bottom:1px solid #EDEDED}
+.tb a{padding:8px 0 10px;color:#525252;text-decoration:none;border-bottom:2px solid transparent}
+.tb a.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:12px;font-weight:500;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.n{background:#F3F3F3;color:#525252}
+.st{display:flex;flex-direction:column;gap:2px}
+.st b{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2}
+.gr{display:grid;grid-template-columns:minmax(250px,1.7fr) repeat(12,minmax(36px,1fr));align-items:center}
+.gh{font-size:12px;color:#6B6B6B;text-align:center;padding:8px 0;font-variant-numeric:tabular-nums}
+.gh.cur{color:#0062B3;font-weight:600}
+.gl{display:flex;align-items:center;gap:8px;padding:12px 12px 6px;font-weight:600;border-top:1px solid #EDEDED}
+.ac{padding:5px 12px 5px 24px;color:#383838}
+.ac.fin{text-decoration:line-through;color:#6B6B6B}
+.wc{display:grid;place-items:center;padding:3px 0}
+.wk{width:28px;height:28px;border-radius:7px;border:1px solid #E2E2E2;background:#fff;color:#171717;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;padding:0}
+.wk.done{background:#171717;border-color:#171717;color:#fff}
+.wk.miss{background:#F3F3F3;border-color:#F3F3F3;color:#6B6B6B}
+.wk.cur{border:2px solid #0062B3}
+.wk.curdone{background:#0062B3;border-color:#0062B3;color:#fff}
+.wk.na{visibility:hidden}
+.sc{font-size:12.5px;font-weight:600;text-align:center;padding:10px 0;font-variant-numeric:tabular-nums}
+@media(max-width:800px){.sb{max-width:none}}
+</style>
+</helmet>
+<div class="app">
+  <nav class="sb" aria-label="Sections">
+    <div class="sp"><div class="lg">L</div>Private<svg style="margin-left: auto;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></div>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="13">
+      <a class="{{n.cls}}" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.d}}"></path></svg>{{n.label}}<sc-if value="{{n.count}}" hint-placeholder-val="{{false}}"><span class="ct">{{n.count}}</span></sc-if></a>
+    </sc-for>
+  </nav>
+
+  <main class="main">
+    <header class="hd">
+      <div>
+        <h1 class="h1">Journal</h1>
+        <div class="sub">Oct to Dec 2026 · 5 October to 27 December</div>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="bt s" type="button">Add goal</button>
+        <button class="bt p" type="button">Weekly review</button>
+      </div>
+    </header>
+    <nav class="tb" aria-label="Journal sections">
+      <a class="on" href="#">12 Week Year</a><a href="Goals.dc.html">Goals</a><a href="#">Month</a><a href="HabitsPhone.dc.html">Habits</a><a href="#">Check-ins</a><a href="#">Pages</a><a href="#">Weekly review</a>
+    </nav>
+
+    <div style="padding: 24px 28px 40px; display: flex; flex-direction: column; gap: 20px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;">
+        <div class="cd st"><span class="mt">This week, week 6</span><b>{{thisWeek}}</b><span class="mt">{{thisWeekNote}}</span></div>
+        <div class="cd st"><span class="mt">Average so far</span><b>{{average}}</b><span class="mt">Target 85%</span></div>
+        <div class="cd st"><span class="mt">Weeks left</span><b>6</b><span class="mt">Cycle ends 27 December</span></div>
+      </div>
+
+      <div style="overflow-x: auto; border: 1px solid #EDEDED; border-radius: 10px;">
+        <div style="min-width: 820px;">
+          <div class="gr" style="background: #F8F8F8; border-bottom: 1px solid #EDEDED;">
+            <div style="padding: 8px 12px; font-size: 12px; color: #6B6B6B;">Goal and action</div>
+            <sc-for list="{{weeks}}" as="w" hint-placeholder-count="12"><div class="{{w.cls}}">{{w.n}}</div></sc-for>
+          </div>
+
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="10">
+            <sc-if value="{{r.isGoal}}" hint-placeholder-val="{{false}}">
+              <div class="gl"><span>{{r.title}}</span><span class="pl n">{{r.area}}</span></div>
+            </sc-if>
+            <sc-if value="{{r.isAction}}" hint-placeholder-val="{{true}}">
+              <div class="gr">
+                <div class="{{r.cls}}">{{r.title}}</div>
+                <sc-for list="{{r.cells}}" as="c" hint-placeholder-count="12"><div class="wc"><button class="{{c.cls}}" type="button" aria-label="{{c.al}}">{{c.t}}</button></div></sc-for>
+              </div>
+            </sc-if>
+          </sc-for>
+
+          <div class="gr" style="border-top: 1px solid #EDEDED; background: #F8F8F8;">
+            <div style="padding: 10px 12px; font-weight: 600;">Week score</div>
+            <sc-for list="{{scores}}" as="s" hint-placeholder-count="12"><div class="sc">{{s}}</div></sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center;" class="mt">
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><span class="wk done" style="width: 16px; height: 16px; border-radius: 4px; display: inline-block;"></span>Done</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><span class="wk miss" style="width: 16px; height: 16px; border-radius: 4px; display: inline-block;"></span>Missed</span>
+        <span style="display: inline-flex; align-items: center; gap: 6px;"><span class="wk cur" style="width: 16px; height: 16px; border-radius: 4px; display: inline-block; box-sizing: border-box;"></span>This week, tap to tick</span>
+        <span>A struck-through action is finished and no longer counts.</span>
+      </div>
+      <p class="mt" style="margin: 0;">Goals and actions are from the journal. The ticks are example data.</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const items = [
+      ['Today', 'M4 11l8-7 8 7v9H4z'],
+      ['Inbox', 'M4 13l2-8h12l2 8v6H4zM4 13h5l1 3h4l1-3h5', '3'],
+      ['Timeline', 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+      ['Tasks', 'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2'],
+      ['Calendar', 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4'],
+      ['Journal', 'M6 3h12v18H6zM10 3v18'],
+      ['Areas', 'M4 6h6l2 2h8v11H4z'],
+      ['Projects', 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+      ['Library', 'M5 4h4v16H5zM11 4h4v16h-4zM17 6l3 13'],
+      ['Vault', 'M5 11h14v9H5zM8 11V8a4 4 0 0 1 8 0v3'],
+      ['Chats', 'M4 5h16v11H9l-5 4z'],
+      ['Graph', 'M8 7l8 1.5M17 11l-7 6M4 6a2 2 0 1 0 4 0 2 2 0 1 0-4 0M16 9a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0'],
+      ['Archive', 'M4 5h16v4H4zM6 9v10h12V9M10 13h4']
+    ];
+    const nav = items.map((i) => ({ label: i[0], d: i[1], count: i[2] || '', cls: i[0] === 'Journal' ? 'nv on' : 'nv' }));
+    // d done, m missed, c this week open, x this week done, D finished for good, - not applicable, . future
+    const goals = [
+      ['RMT: improve systems', 'Tea & Coffee', [['Appoint ERP champion', 'mmmmmc......'], ['Start internal audit', 'mmdddx......'], ['Start RMT newsletter', 'mmmmmx......'], ['Start training programme', 'mdmddx......']]],
+      ['Close open loops', 'Personal', [['Ruchi ITR', 'mmmddx......'], ['Driver\'s licence', 'mmmmmc......'], ['Anya passport', 'mmD---------'], ['Pay managers', 'mmmmmc......']]],
+      ['Golf: hit 5 birdies', 'Personal', [['300-ball practice, 6 iron', 'dmddmx......'], ['Practise 5-footers', 'ddmddx......']]],
+      ['Money', 'Money & Legal', [['Meet Arjun Singh for PMS', 'mmmmmc......'], ['Complete a usable MoneyOS', 'mddddx......']]],
+      ['RMT: GHL turnaround', 'Tea & Coffee', [['Detailed plan for poor sections', 'mmdddx......'], ['Visit leased gardens', 'mmmdmc......']]],
+      ['Get super-fit', 'Personal', [['Workout', 'dmmdmx......'], ['Walking', 'ddmddx......']]],
+      ['Mind and learning', 'Learning', [['Agentic certification', 'mddddx......'], ['Accounting in ERPNext', 'mmddmx......']]]
+    ];
+    const map = { d: ['wk done', '✓', 'done'], m: ['wk miss', '–', 'missed'], c: ['wk cur', '', 'not done yet'], x: ['wk curdone', '✓', 'done'], D: ['wk done', '✓', 'finished'], '-': ['wk na', '', 'not applicable'], '.': ['wk', '', 'upcoming'] };
+    const rows = [];
+    const planned = new Array(12).fill(0);
+    const done = new Array(12).fill(0);
+    goals.forEach((g) => {
+      rows.push({ isGoal: true, isAction: false, title: g[0], area: g[1] });
+      g[2].forEach((a) => {
+        const cells = a[1].split('').map((ch, i) => {
+          if ('dmcxD'.indexOf(ch) >= 0) planned[i] += 1;
+          if ('dxD'.indexOf(ch) >= 0) done[i] += 1;
+          return { cls: map[ch][0], t: map[ch][1], al: a[0] + ', week ' + (i + 1) + ', ' + map[ch][2] };
+        });
+        rows.push({ isGoal: false, isAction: true, title: a[0], cls: a[1].indexOf('D') >= 0 ? 'ac fin' : 'ac', cells });
+      });
+    });
+    const pct = (i) => Math.round((done[i] / planned[i]) * 100);
+    const scores = planned.map((p, i) => (i < 6 && p ? pct(i) + '%' : ''));
+    let sum = 0;
+    for (let i = 0; i < 6; i += 1) sum += pct(i);
+    const weeks = [];
+    for (let i = 1; i <= 12; i += 1) weeks.push({ n: i, cls: i === 6 ? 'gh cur' : 'gh' });
+    return { nav, rows, weeks, scores, thisWeek: pct(5) + '%', thisWeekNote: done[5] + ' of ' + planned[5] + ' ticks so far', average: Math.round(sum / 6) + '%' };
+  }
+}
+</script>
+</body>
+</html>

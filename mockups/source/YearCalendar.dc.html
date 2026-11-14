@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Calendar, year view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3}a:hover{color:#004F91}
+.app{display:flex;flex-wrap:wrap;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:1 1 220px;max-width:240px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:2px}
+.sp{display:flex;align-items:center;gap:8px;padding:6px 8px 12px;font-weight:600}
+.lg{width:26px;height:26px;border-radius:7px;background:#171717;color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+.nv{display:flex;align-items:center;gap:10px;min-height:32px;padding:0 8px;border-radius:6px;color:#383838;text-decoration:none}
+.nv:hover{background:#EDEDED;color:#171717}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv svg{flex:none;color:#6B6B6B}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;padding:16px 28px 0}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:32px;padding:0 12px;border-radius:8px;border:0;font:500 13px Inter,system-ui,sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}
+.tb{display:flex;gap:20px;flex-wrap:wrap;padding:12px 28px 0;border-bottom:1px solid #EDEDED}
+.tb a{padding:8px 0 10px;color:#525252;text-decoration:none;border-bottom:2px solid transparent}
+.tb a.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.mt{font-size:12.5px;color:#6B6B6B}
+.yr{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));min-width:1080px}
+.mo{border-right:1px solid #EDEDED}
+.mo:last-child{border-right:0}
+.mh{padding:8px 8px;font-size:12px;font-weight:600;color:#525252;background:#F8F8F8;border-bottom:1px solid #EDEDED}
+.mh.cur{color:#0062B3}
+.dc{display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;border-bottom:1px solid #F5F5F5;font-size:12px;white-space:nowrap;overflow:hidden}
+.dc .dn{width:16px;flex:none;text-align:right;color:#6B6B6B;font-variant-numeric:tabular-nums}
+.dc .dl{overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.dc.we{background:#FAFAFA}
+.dc.b .dl{color:#0062B3}
+.dc.e .dl{color:#171717}
+.dc.t{background:#FFF1E7}.dc.t .dl{color:#A8480A}
+.dc.v{background:#FFE7E7}.dc.v .dl{color:#B42525}
+.dc.td{box-shadow:inset 0 0 0 2px #0062B3;border-radius:5px}
+.dc.td .dn{color:#0062B3;font-weight:700}
+.dc.cy{border-left:3px solid #171717;padding-left:3px}
+.lgd{display:inline-flex;align-items:center;gap:6px}
+.sw{width:12px;height:12px;border-radius:3px;display:inline-block}
+@media(max-width:800px){.sb{max-width:none}}
+</style>
+</helmet>
+<div class="app">
+  <nav class="sb" aria-label="Sections">
+    <div class="sp"><div class="lg">L</div>Private<svg style="margin-left: auto;" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></div>
+    <sc-for list="{{nav}}" as="n" hint-placeholder-count="13">
+      <a class="{{n.cls}}" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.d}}"></path></svg>{{n.label}}<sc-if value="{{n.count}}" hint-placeholder-val="{{false}}"><span class="ct">{{n.count}}</span></sc-if></a>
+    </sc-for>
+  </nav>
+
+  <main class="main">
+    <header class="hd">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <button class="bt s" type="button" aria-label="Previous year"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m15 6-6 6 6 6"></path></svg></button>
+        <h1 class="h1">2026</h1>
+        <button class="bt s" type="button" aria-label="Next year"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m9 6 6 6-6 6"></path></svg></button>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <button class="bt s" type="button">Add important date</button>
+        <button class="bt p" type="button">Add event</button>
+      </div>
+    </header>
+    <nav class="tb" aria-label="Calendar views">
+      <a href="#">Month</a><a href="#">Week</a><a href="#">Agenda</a><a class="on" href="#">Year</a>
+    </nav>
+
+    <div style="padding: 16px 28px 40px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="mt" style="display: flex; gap: 16px; flex-wrap: wrap; align-items: center;">
+        <span class="lgd"><span class="sw" style="background: #0062B3;"></span>Birthday or anniversary</span>
+        <span class="lgd"><span class="sw" style="background: #FFF1E7; border: 1px solid #F3C9A8;"></span>Trip</span>
+        <span class="lgd"><span class="sw" style="background: #FFE7E7; border: 1px solid #EDB9B9;"></span>Document expiry</span>
+        <span class="lgd"><span class="sw" style="background: #171717; width: 4px;"></span>12 Week Year in progress</span>
+        <span class="lgd"><span class="sw" style="box-shadow: inset 0 0 0 2px #0062B3;"></span>Today</span>
+      </div>
+
+      <div style="overflow-x: auto; border: 1px solid #EDEDED; border-radius: 10px;">
+        <div class="yr">
+          <sc-for list="{{months}}" as="m" hint-placeholder-count="12">
+            <div class="mo">
+              <div class="{{m.hcls}}">{{m.name}}</div>
+              <sc-for list="{{m.days}}" as="d" hint-placeholder-count="30">
+                <div class="{{d.cls}}"><span class="dn">{{d.n}}</span><span class="dl">{{d.label}}</span></div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <p class="mt" style="margin: 0;">Laid out like the year pages in the journal: one column a month, one line a day. Names are a few entries read from those pages and may be misread. Click a day to add or open an entry. On a phone this becomes a list by month.</p>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const items = [
+      ['Today', 'M4 11l8-7 8 7v9H4z'],
+      ['Inbox', 'M4 13l2-8h12l2 8v6H4zM4 13h5l1 3h4l1-3h5', '3'],
+      ['Timeline', 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+      ['Tasks', 'M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2'],
+      ['Calendar', 'M5 5h14v15H5zM5 10h14M9 3v4M15 3v4'],
+      ['Journal', 'M6 3h12v18H6zM10 3v18'],
+      ['Areas', 'M4 6h6l2 2h8v11H4z'],
+      ['Projects', 'M4 20V10M10 20V4M16 20v-7M22 20H2'],
+      ['Library', 'M5 4h4v16H5zM11 4h4v16h-4zM17 6l3 13'],
+      ['Vault', 'M5 11h14v9H5zM8 11V8a4 4 0 0 1 8 0v3'],
+      ['Chats', 'M4 5h16v11H9l-5 4z'],
+      ['Graph', 'M8 7l8 1.5M17 11l-7 6M4 6a2 2 0 1 0 4 0 2 2 0 1 0-4 0M16 9a2 2 0 1 0 4 0 2 2 0 1 0-4 0M7 18a2 2 0 1 0 4 0 2 2 0 1 0-4 0'],
+      ['Archive', 'M4 5h16v4H4zM6 9v10h12V9M10 13h4']
+    ];
+    const nav = items.map((i) => ({ label: i[0], d: i[1], count: i[2] || '', cls: i[0] === 'Calendar' ? 'nv on' : 'nv' }));
+    const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    // month-day: [label, kind]  b birthday, e event, t trip, v document expiry
+    const marks = {
+      '0-7': ['Phuket', 't'], '0-8': ['Phuket', 't'], '0-9': ['Phuket', 't'], '0-10': ['Phuket', 't'], '0-11': ['Phuket', 't'],
+      '0-14': ['Ruchi', 'b'], '0-20': ['Jai', 'b'], '0-28': ['Shatul', 'b'],
+      '1-8': ['Subhangee', 'b'], '1-16': ['Kartik', 'b'], '1-26': ['Board meeting', 'e'],
+      '3-15': ['Dad', 'b'], '4-17': ['Mom', 'b'], '7-30': ['Deven', 'b'], '8-14': ['Anya', 'b'],
+      '9-5': ['12WY starts', 'e'], '10-23': ['Anniversary', 'b'],
+      '11-12': ['Licence expires', 'v'], '11-25': ['Christmas', 'e'], '11-27': ['12WY ends', 'e']
+    };
+    const cycleStart = new Date(2026, 9, 5).getTime();
+    const cycleEnd = new Date(2026, 11, 27).getTime();
+    const months = names.map((name, mi) => {
+      const len = new Date(2026, mi + 1, 0).getDate();
+      const days = [];
+      for (let n = 1; n <= len; n += 1) {
+        const dt = new Date(2026, mi, n);
+        const wd = dt.getDay();
+        const mk = marks[mi + '-' + n];
+        let cls = 'dc';
+        if (wd === 0 || wd === 6) cls += ' we';
+        if (mk) cls += ' ' + mk[1];
+        if (dt.getTime() >= cycleStart && dt.getTime() <= cycleEnd) cls += ' cy';
+        if (mi === 10 && n === 14) cls += ' td';
+        days.push({ n, label: mk ? mk[0] : '', cls });
+      }
+      return { name, days, hcls: mi === 10 ? 'mh cur' : 'mh' };
+    });
+    return { nav, months };
+  }
+}
+</script>
+</body>
+</html>
