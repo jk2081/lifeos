@@ -43,3 +43,7 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Time zone.** Dates are stored and shown in the site time zone. The test site is set to Asia/Kolkata; the live site should have the same System Setting.
 - **Text size.** The mockups use 14 px interface text on desktop and 15 px on phones. The app follows the mockups for interface text; all long reading text (notes, transcripts, summaries) is 15 px or larger.
 - **Two seed commands.** `lifeos.seed.load` loads exactly the seed in section 11. `lifeos.seed.load_demo` adds example ticks, tasks, chats and notes so the screens can be checked against the mockups; it is not the owner's data and has its own remove command.
+- **Journal pages do not need an area.** Accepting a Task, Note or Vault Document proposal requires an area. A Journal Page is a record by date and often spans areas, so its area is optional.
+- **Area page and tasks.** The area and project pages read `Life Index` for every cross-type list. Their open-task lists read `Life Task` directly, since they show due date, priority and project, which the index does not hold.
+- **An area page includes its sub-areas.** The Tea & Coffee page shows records filed under Ghatia, Ghillidary and so on, with chips to narrow to one sub-area, as in the mockup.
+- **Quick add reads a date word only at the start or end of the title.** "Buy sun screen" and "Fix the Monday report" stay as typed.

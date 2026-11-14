@@ -1,0 +1,62 @@
+"""The Timeline: every record by day, newest first. Reads only Life Index."""
+import frappe
+from frappe.utils import add_days, getdate, today
+
+from lifeos import links, permissions
+from lifeos.api.utils import flag, names_map, page, user_names
+
+KIND_DOCTYPES = {
+	"Life Inbox Item": ["Inbox"], "Life Task": ["Task", "Task Done"], "Life Note": ["Note"], "Life Vault Document": ["Document"],
+	"Life Chat Log": ["Chat"], "Life Journal Page": ["Journal Page"], "Life Check-in": ["Check-in"], "Life Month Plan": ["Month Plan"],
+}
+ROW_FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, project, is_archived, status, record_owner, also_in_csv"
+
+
+def decorate(rows):
+	areas = names_map("Life Area", [r.area for r in rows], "area_name")
+	projects = names_map("Life Project", [r.project for r in rows], "title")
+	users = user_names([r.record_owner for r in rows])
+	for r in rows:
+		r["area_name"], r["project_title"] = areas.get(r.area), projects.get(r.project)
+		r["route"] = links.route_of(r.ref_doctype, r.ref_name)
+		r["filed_by"] = users.get(r.record_owner)
+		r["record_date"] = str(r.record_date) if r.record_date else None
+		r.pop("also_in_csv", None)
+	return rows
+
+
+def index_rows(space, where="", values=None, order="record_date desc, modified desc", start=0, page_length=50):
+	rows = frappe.db.sql(
+		f"select {ROW_FIELDS} from `tabLife Index` where space=%(space)s {where} order by {order} limit %(start)s, %(len)s",
+		{"space": space, "start": start, "len": page_length, **(values or {})}, as_dict=True)
+	return decorate(rows)
+
+
+@frappe.whitelist()
+def get(space=None, from_date=None, to_date=None, area=None, doctype=None, include_archived=0, start=0, page_length=50):
+	"""Every record by day, newest first: inbox items, tasks created and completed, notes, documents, chats, journal pages, check-ins."""
+	space = permissions.resolve_space(space)
+	start, page_length = page(start, page_length)
+	where, values = [], {}
+	if from_date:
+		where.append("record_date >= %(from_date)s")
+		values["from_date"] = getdate(from_date)
+	if to_date:
+		where.append("record_date <= %(to_date)s")
+		values["to_date"] = getdate(to_date)
+	if area:
+		where.append("(area = %(area)s or also_in_csv like %(area_like)s)")
+		values.update({"area": area, "area_like": f"%,{area},%"})
+	if doctype:
+		where.append("ref_doctype = %(doctype)s")
+		values["doctype"] = doctype
+	if not flag(include_archived):
+		where.append("is_archived = 0")
+	clause = (" and " + " and ".join(where)) if where else ""
+	rows = index_rows(space, clause, values, start=start, page_length=page_length)
+	days = []
+	for r in rows:
+		if not days or days[-1]["date"] != r["record_date"]:
+			days.append({"date": r["record_date"], "entries": []})
+		days[-1]["entries"].append(r)
+	return {"days": days, "count": len(rows), "start": start, "page_length": page_length, "has_more": len(rows) == page_length}

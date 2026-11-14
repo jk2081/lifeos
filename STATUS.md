@@ -10,7 +10,7 @@ Build of Life OS v1. Updated at the end of every milestone.
 | M1 Spaces and permissions | Done |
 | M2 Data model | Done |
 | M3 Inbox and review | Done |
-| M4 Tasks and Today | Not started |
+| M4 Tasks and Today | Done |
 | M5 Journal | Not started |
 | M6 Calendar | Not started |
 | M7 Library and Vault | Not started |
@@ -41,6 +41,13 @@ Build of Life OS v1. Updated at the end of every milestone.
 - `agent/fake_agent.py` runs the pipeline over HTTP with an API key, with canned results.
 - Tests: `lifeos/tests/test_m3_inbox.py` passes (23 tests).
 - Untested against a real service: a real agent over MCP. The fake agent uses the same methods over REST.
+
+## M4 Tasks and Today
+
+- Works: `tasks.list` (filters: area including also-in, project, tag, priority, goal; due date then priority order; 100 rows at most), `tasks.quick_add` with date words (today, tomorrow, fri, next week, in 3 days, 20 nov, ISO dates) at the start or end of the title, `tasks.set_status`, `tasks.update`, `tasks.carry_forward`, `tasks.open_loops`, `today.get`, `timeline.get`, `area.get`, `area.tree`, `projects.list`, `projects.get`, `projects.set_status`, `archive.set`.
+- Screens: Today (desktop and phone, as in mockups 01 and 05), Tasks (list grouped by due date, board with drag or a status menu, table, open loops view, quick add, filters, a task side panel with filing chips, carry forward, archive), Timeline, Areas, the area page (as in mockup 04), Projects, the project page with Complete and its confirm dialog showing the record count. `n` opens quick add anywhere.
+- Tests: `lifeos/tests/test_m4_tasks.py` passes (11 tests).
+- Note: the area page reads `Life Index` for notes, documents, chats, references and the timeline. Open tasks are read from `Life Task`, because the rows need due date and priority.
 
 ## How to run the local stack
 
