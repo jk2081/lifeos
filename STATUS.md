@@ -11,7 +11,7 @@ Build of Life OS v1. Updated at the end of every milestone.
 | M2 Data model | Done |
 | M3 Inbox and review | Done |
 | M4 Tasks and Today | Done |
-| M5 Journal | Not started |
+| M5 Journal | Done |
 | M6 Calendar | Not started |
 | M7 Library and Vault | Not started |
 | M8 Search and graph | Not started |
@@ -48,6 +48,13 @@ Build of Life OS v1. Updated at the end of every milestone.
 - Screens: Today (desktop and phone, as in mockups 01 and 05), Tasks (list grouped by due date, board with drag or a status menu, table, open loops view, quick add, filters, a task side panel with filing chips, carry forward, archive), Timeline, Areas, the area page (as in mockup 04), Projects, the project page with Complete and its confirm dialog showing the record count. `n` opens quick add anywhere.
 - Tests: `lifeos/tests/test_m4_tasks.py` passes (11 tests).
 - Note: the area page reads `Life Index` for notes, documents, chats, references and the timeline. Open tasks are read from `Life Task`, because the rows need due date and priority.
+
+## M5 Journal
+
+- Works: the 12 Week Year grid (tap to tick, count up for actions done several times a week, week scores, average against the target, actions finished for good or dropped), ticks stored as dated `Life Action Log` rows, the Goals tab across cycles with an area filter, Close cycle (outcome and note per goal, final score, read-only afterwards), Plan next cycle (starts the Monday after, carries chosen goals with their open actions), goal history through `carried_from`, the month plan (goals with priority, done, carry forward, Make task, mindsweep with autosave), habits per month (seven boxes a row, count and percentage, Manage habits for one month, year view, `days_per_week` targets, mid-month add and remove), check-ins with ranges and a line chart per dimension, the Pages gallery and page view with an editable transcript, and the weekly review (score, habits, done and carried tasks, open loops, Decide with three buttons, what the job archived with Undo, notes saved as a Life Note under Reviews).
+- Screens checked at 1440 px and 390 px against mockups 03, 06 and 08.
+- Tests: `lifeos/tests/test_m5_journal.py` passes (21 tests).
+- Known limit: a "starred topic" in the mindsweep is a Markdown heading that starts with a star character. There is no separate star control.
 
 ## How to run the local stack
 

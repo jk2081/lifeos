@@ -47,3 +47,8 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Area page and tasks.** The area and project pages read `Life Index` for every cross-type list. Their open-task lists read `Life Task` directly, since they show due date, priority and project, which the index does not hold.
 - **An area page includes its sub-areas.** The Tea & Coffee page shows records filed under Ghatia, Ghillidary and so on, with chips to narrow to one sub-area, as in the mockup.
 - **Quick add reads a date word only at the start or end of the title.** "Buy sun screen" and "Fix the Monday report" stay as typed.
+- **Week score rules.** A dropped action is not planned in any week. An action marked Done counts as planned up to the week it was finished and not after. Ticks above `per_week` do not count. The cycle average is the mean of the week scores up to the current week.
+- **Ticks and dates.** `journal.tick(action, week, count)` keeps one `Life Action Log` row per action per week, dated today when the week is the current one, else the last day of a past week or the first day of a future one. Unique on action and date as the spec asks.
+- **Close cycle default outcome.** A goal still In Progress with no outcome given is stored as Not Achieved.
+- **Charts.** Check-in charts are small SVG line charts written for this app (two series on one 0 to 10 axis, colours checked for colour-blind separation in both themes). `frappe-ui` charts would add the whole of ECharts for eight sparklines.
+- **Habit targets.** A habit's month target is its tracked days so far, scaled by `days_per_week / 7` and rounded. The percentage is capped at 100.
