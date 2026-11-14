@@ -6,10 +6,7 @@
       "Bash(git push -f*)",
       "Read(~/.ssh/**)",
       "Read(~/.aws/**)",
-      "Read(~/.config/gh/**)",
-      "Read(~/Documents/**)",
-      "Read(~/Desktop/**)",
-      "Read(~/Downloads/**)"
+      "Read(~/.config/gh/**)"
     ]
   }
 }
