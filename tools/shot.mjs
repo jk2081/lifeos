@@ -14,7 +14,7 @@ const user = opt('user', 'owner') + '@lifeos.test'
 const widths = opt('widths', '1440,390').split(',').map(Number)
 const base = opt('base', 'http://localhost:18000')
 const scheme = opt('scheme', 'light')
-const pages = args.filter((a) => a.includes('=') && !a.startsWith('--')).map((a) => { const i = a.indexOf('='); return [a.slice(0, i), a.slice(i + 1)] })
+const pages = args.filter((a, i) => a.includes('=') && !a.startsWith('--') && !(args[i - 1] || '').startsWith('--')).map((a) => { const i = a.indexOf('='); return [a.slice(0, i), a.slice(i + 1)] })
 const script = opt('eval', '')
 
 const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true })

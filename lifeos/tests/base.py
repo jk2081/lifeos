@@ -18,6 +18,7 @@ class LifeTestCase(IntegrationTestCase):
 		devtools.make_user(AGENT, "Hermes", ["Life Agent"])
 		for name in (PRIVATE, SHARED):
 			devtools.purge_space(name)
+		frappe.db.commit()  # the full-text index drops deleted rows only at commit
 		for name, members in ((PRIVATE, [OWNER, AGENT]), (SHARED, [OWNER, FAMILY, AGENT])):
 			if not frappe.db.exists("Life Space", name):
 				frappe.get_doc({"doctype": "Life Space", "space_name": name, "owner_user": OWNER,

@@ -14,7 +14,7 @@ Build of Life OS v1. Updated at the end of every milestone.
 | M5 Journal | Done |
 | M6 Calendar | Done |
 | M7 Library and Vault | Done |
-| M8 Search and graph | Not started |
+| M8 Search and graph | Done |
 | M9 Polish | Not started |
 
 ## M0 Skeleton
@@ -68,6 +68,11 @@ Build of Life OS v1. Updated at the end of every milestone.
 - Works: the Library (notes in a tree under area and parent note, a reader in a reading typeface with the line capped near 70 characters, a CodeMirror 6 Markdown editor with a live sanitised preview, autosave two seconds after typing stops, earlier versions from Frappe's versioning with restore), `[[Title]]` links (a picker opens on `[[`, links are resolved to records on save and stored in `Life Link`, missing targets render muted and are not stored, a rename rewrites the link text in records that point to it, two records with one title are told apart by `[[Title#id]]`), a backlinks panel on notes, tasks, inbox items, projects, goals and vault documents, the Vault (by holder, expiry badges here and on Today, a file viewer, last four characters only), the chat log (`chats.log` for agents, `chats.report` grouped by day, area or project, counts by area, the week's open items with Make task and Close), the daily archive job, `archive.set`, `archive.restore`, the Archive screen, and Undo in the weekly review.
 - Tests: `lifeos/tests/test_m7_library.py` passes (14 tests).
 - Known limit: the Library tree loads up to 2,000 light rows (name, title, parent, area) in one call so the tree is whole. Every other list is capped at 100 rows per call.
+
+## M8 Search and graph
+
+- Works: `search.query` (MariaDB FULLTEXT on `Life Index` in boolean mode with prefix matching, a plain-match fallback for short words, results only from spaces the user belongs to, archived records hidden unless asked, a snippet around the match), the search palette on `Cmd+K`, `Ctrl+K` or `/` with arrow keys and Enter, `graph.get` (notes, people, goals and vault documents; edges from `Life Link`, `parent_note`, a document's holder, a goal's `carried_from` and project; two steps around one record), and the Graph screen (click to select, double-click to open, the same links as a list).
+- Tests: `lifeos/tests/test_m8_search_graph.py` passes (6 tests), including a second user who finds nothing from a private space.
 
 ## How to run the local stack
 

@@ -60,3 +60,6 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Link targets.** A link can point to notes, tasks, people, vault documents and chat logs as the spec says, and also to goals and projects.
 - **Open items become tasks only for people.** `chats.make_task` is refused for agents, in line with section 5.
 - **Library tree size.** `library.tree` returns up to 2,000 light rows so the tree is complete; this is the one list method above the 100-row cap.
+- **Graph library.** Cytoscape.js (MIT, actively maintained) draws the graph. Linked records are laid out with its built-in force layout; records with no link yet sit in rows underneath so their labels do not overlap.
+- **Graph colours.** Notes, people, goals and vault documents each have a colour, checked for colour-blind separation in both themes. Tasks, chats and projects join the graph only when a link touches them, and share one neutral colour. Every node carries its title, so colour is never the only cue.
+- **Search covers journal pages too.** `search.query` searches every `Life Index` row: notes, tasks, inbox items with their transcripts, chat logs, vault documents, journal page transcripts, check-in reflections and month plans.

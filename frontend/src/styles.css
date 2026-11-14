@@ -179,3 +179,5 @@ select.inp { padding-right: 28px; }
 /* chart series colours, validated for colour-blind separation in both themes */
 :root { --series-1: #0062b3; --series-2: #c4611a; }
 [data-theme='dark'] { --series-1: #3f8fd6; --series-2: #cf7538; }
+:root { --series-3: #8a4fd0; --series-4: #1a8a5a; }
+[data-theme='dark'] { --series-3: #9a7bea; --series-4: #2fa571; }
