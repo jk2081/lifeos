@@ -55,6 +55,7 @@ def list(space=None, include_archived=0, start=0, page_length=100):
 
 @frappe.whitelist()
 def get(document):
+	"""One vault document with its holder, file and expiry badge."""
 	doc = permissions.get_doc_checked("Life Vault Document", document)
 	row = _decorate([frappe._dict({f: doc.get(f) for f in FIELDS})])[0]
 	row.update({"space": doc.space, "notes_md": doc.notes_md or "", "also_in": [r.area for r in doc.also_in]})
@@ -95,6 +96,7 @@ def set_file(document, file_url):
 
 @frappe.whitelist(methods=["POST"])
 def add_person(space=None, full_name=None, relation=None):
+	"""Add a person, for example a document holder."""
 	space = permissions.resolve_space(space, write=True)
 	doc = frappe.get_doc({"doctype": "Life Person", "space": space, "full_name": full_name, "relation": relation}).insert()
 	return {"name": doc.name, "full_name": doc.full_name}

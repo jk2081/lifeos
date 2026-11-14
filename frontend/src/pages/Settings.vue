@@ -12,7 +12,7 @@
             <div style="display: flex; justify-content: space-between; gap: 8px"><b style="font-weight: 600">{{ s.name }}</b><span class="mt">owner {{ s.owner_user }}</span></div>
             <div v-for="m in s.members" :key="m.user" class="rw" style="align-items: center">
               <div class="grow"><div class="ttl">{{ m.full_name }}</div><div class="mt">{{ m.user }} · {{ m.roles.join(', ') || 'no Life role' }}</div></div>
-              <select v-if="d.is_admin" class="inp" :value="m.access" :aria-label="`Access for ${m.user}`" @change="member(s.name, m.user, $event.target.value)"><option>Write</option><option>Read</option></select>
+              <select v-if="d.is_admin" class="inp" style="flex: none" :value="m.access" :aria-label="`Access for ${m.user}`" @change="member(s.name, m.user, $event.target.value)"><option>Write</option><option>Read</option></select>
               <span v-else class="pl n">{{ m.access }}</span>
               <button v-if="d.is_admin && m.user !== s.owner_user" class="bt t" type="button" @click="member(s.name, m.user, m.access, 1)">Remove</button>
             </div>

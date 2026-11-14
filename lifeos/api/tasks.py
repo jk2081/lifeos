@@ -86,6 +86,7 @@ def list(space=None, status="open", area=None, project=None, tag=None, priority=
 
 @frappe.whitelist()
 def get(task):
+	"""One task with its filing, source and tags."""
 	doc = permissions.get_doc_checked("Life Task", task)
 	row = decorate([frappe._dict({f: doc.get(f) for f in FIELDS})])[0]
 	row["also_in"] = [r.area for r in doc.also_in]

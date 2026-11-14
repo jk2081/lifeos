@@ -95,6 +95,7 @@ def save_goal(goal=None, cycle=None, title=None, area=None, project=None, action
 
 @frappe.whitelist(methods=["POST"])
 def delete_goal(goal):
+	"""Delete a goal. Refused for agents, who cannot delete."""
 	doc = permissions.get_doc_checked("Life Goal", goal, "delete")
 	doc.delete()
 	return {"deleted": goal}
@@ -239,6 +240,7 @@ def save_month_goal(plan, row=None, title=None, priority=None, status=None, area
 
 @frappe.whitelist(methods=["POST"])
 def save_month_text(plan, mindsweep_md=None, projects_md=None):
+	"""Save the mindsweep or the projects text of a month plan (autosave)."""
 	doc = permissions.get_doc_checked("Life Month Plan", plan, "write")
 	if mindsweep_md is not None:
 		doc.mindsweep_md = mindsweep_md
@@ -409,6 +411,7 @@ def page_detail(page):
 
 @frappe.whitelist(methods=["POST"])
 def save_page_transcript(page, transcript_md):
+	"""Correct the transcript of a journal page."""
 	doc = permissions.get_doc_checked("Life Journal Page", page, "write")
 	doc.transcript_md = transcript_md
 	doc.save()

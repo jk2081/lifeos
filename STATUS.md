@@ -1,6 +1,6 @@
 # Status
 
-Build of Life OS v1. Updated at the end of every milestone.
+Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** The summary at the end says what works, what is stubbed, what is untested, and how to install.
 
 ## Milestones
 
@@ -15,7 +15,7 @@ Build of Life OS v1. Updated at the end of every milestone.
 | M6 Calendar | Done |
 | M7 Library and Vault | Done |
 | M8 Search and graph | Done |
-| M9 Polish | Not started |
+| M9 Polish | Done |
 
 ## M0 Skeleton
 
@@ -74,6 +74,65 @@ Build of Life OS v1. Updated at the end of every milestone.
 - Works: `search.query` (MariaDB FULLTEXT on `Life Index` in boolean mode with prefix matching, a plain-match fallback for short words, results only from spaces the user belongs to, archived records hidden unless asked, a snippet around the match), the search palette on `Cmd+K`, `Ctrl+K` or `/` with arrow keys and Enter, `graph.get` (notes, people, goals and vault documents; edges from `Life Link`, `parent_note`, a document's holder, a goal's `carried_from` and project; two steps around one record), and the Graph screen (click to select, double-click to open, the same links as a list).
 - Tests: `lifeos/tests/test_m8_search_graph.py` passes (6 tests), including a second user who finds nothing from a private space.
 
+## M9 Polish
+
+- Works: the Settings screen (spaces and members, areas, tags, dimensions, habits, people, review day and time, score target, archive days, default space; owner-only changes are refused for others), the PWA manifest with icons and shortcuts, light and dark themes that follow the system with a manual switch in Settings, an empty state on every list, `agent/SKILL.md`, `README.md` with install steps and every API method, the load test, and `tools/acceptance.mjs`.
+- Screenshot pass: all 24 screens at 1440 px and 390 px, in light and dark, with no horizontal overflow and no console errors. Every screen was also opened as the family user, whose space is nearly empty, to check the empty states. Fixed in this pass: native checkboxes and date inputs were light in the dark theme; the access select in Settings was clipped at phone width; a habit could be ticked for a day that had not come, which gave counts such as "16 of 15 days".
+- Load test (`lifeos/loadtest.py`, `lifeos/tests/test_m9_load.py`): 100,000 `Life Index` rows, 20 users, 50 spaces, half the rows in one space. Median times on this machine, read in that largest space: Today 5 ms, Timeline 112 ms, a later Timeline page 52 ms, area page 78 ms, search 1 to 9 ms. The target is 500 ms.
+- Acceptance (`node tools/acceptance.mjs`): all 16 items of section 13 pass against the running site, through a real browser for the owner and the second user and through `agent/fake_agent.py` over HTTP. Two more checks pass: rendered Markdown is sanitised in the browser, and an agent is refused when it tries to decide proposals, delete a task or change space members.
+- Checked by hand in this milestone: a fresh site (`bench new-site`, `install-app lifeos`, `lifeos.seed.load`, `migrate`) works; a clean `yarn install` and `yarn build` on Linux builds the front end; Frappe's MCP server at `/api/v2/mcp` runs `lifeos.api` methods through `call_method` with an agent's API key, and refuses `review.decide_all` for it.
+- Tests: `lifeos/tests/test_m9_load.py` passes (3 tests). The whole suite passes: 125 tests.
+- Changed in an earlier milestone's test: `test_event_from_a_user_takes_their_default_space` (M6) depended on what else was on the test site. It now sets the site default space itself.
+
+## Summary
+
+### What works
+
+Everything in sections 3 to 12 of the spec, as listed under each milestone above: spaces and permissions, the data model and index, the inbox and review pipeline, tasks and Today, the Timeline, areas and projects, the journal (12 Week Year, goals across cycles, month plan, habits, check-ins, pages, weekly review), the calendar with its year view, the library with links and backlinks, the vault, the chat log and report, the archive job and screen, search, the graph, Settings, and the PWA manifest.
+
+### What is stubbed
+
+Nothing shows a placeholder. These are smaller than a reader of the spec might expect, and each is in `DECISIONS.md`:
+
+- The week view of the calendar is seven day columns, not an hour grid.
+- A starred mindsweep topic is a heading that starts with a star character. There is no star control.
+- The PWA has a manifest and icons, so it installs to a home screen. It has no service worker, so it does not work offline.
+- Install creates the spaces, areas and dimensions. The seed of section 11 (cycle, goals, October plan, habits) is loaded with `lifeos.seed.load`, not by the install itself.
+- Rename and Remove in Settings use the browser's own prompt and confirm boxes.
+
+### What is untested
+
+- **Google Calendar.** No Google account was connected. Events made in the app are core `Event` records with `sync_with_google_calendar` set when the user has a connected `Google Calendar` record, which is what Frappe's integration pushes. Events arriving from Google take the user's default space; this was tested with a plain insert, not a real sync.
+- **A real agent.** Hermes and Claude were not connected. The fake agent runs the same methods over REST, and three of them were called once through the MCP endpoint by hand. `agent/SKILL.md` has not been tried with a real model.
+- **The live site.** Nothing was installed on or read from the live site. Installing beside Folio is untested; `lifeos` reads and writes no Folio DocType, and all its DocTypes start with `Life `.
+- **`bench get-app` from GitHub and `bench build --app lifeos`.** The app was linked into the bench from this folder. The same `yarn install` and `yarn build` that bench runs were tested in a clean copy on Linux.
+- **Real phones.** Phone layouts were checked in headless Chrome at 390 px with touch emulation, not on a device. Installing to a home screen was not tried.
+- **Real files.** Handwriting photos, audio and large PDFs were stood in for by small generated files.
+- **The scheduler.** The archive job and the release of stale claims were run directly and through tests, not by a running scheduler.
+- Load timings were taken in-process on the bench, without the HTTP layer.
+
+### Known limits
+
+- The test site holds records left by the acceptance runs (tasks, notes and inbox items with a random suffix in the title) on top of the seed and demo data.
+- `tools/acceptance.mjs` and `tools/shot.mjs` expect Google Chrome at its macOS path.
+
+### Install on an existing bench
+
+Frappe v16, Node 20 or newer, yarn. Replace `SITE` with the site name and the address with the owner's login.
+
+```
+cd ~/frappe-bench
+bench get-app https://github.com/jk2081/lifeos.git
+bench --site SITE install-app lifeos
+bench --site SITE migrate
+bench build --app lifeos
+bench --site SITE execute lifeos.install.set_owner --kwargs "{'user': 'you@example.com'}"
+bench --site SITE execute lifeos.seed.load
+bench restart
+```
+
+Then: set the time zone to Asia/Kolkata in System Settings, make sure the scheduler is enabled, and open `https://SITE/life`. For agents, create one user per agent with the role `Life Agent`, add it to its spaces in Life OS Settings, generate its API key, and switch on Enable MCP in System Settings. `README.md` has the same steps with more detail. Take a backup of the live site before installing.
+
 ## How to run the local stack
 
 ```
@@ -81,4 +140,11 @@ docker compose -f docker/docker-compose.yml up -d
 docker exec -d lifeos-bench bash -lc 'cd ~/frappe-bench && bench serve --port 8000'
 cd frontend && npx vite build        # rebuild the front end
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost run-tests --app lifeos'
+node tools/acceptance.mjs            # the acceptance list of section 13, against http://localhost:18000
+```
+
+The test site is `lifeos.localhost`, at http://localhost:18000/life. The three test users are `owner@lifeos.test`, `family@lifeos.test` and `hermes@lifeos.test`; their password is in the git-ignored `.env`. The stack is three containers (`lifeos-bench`, `lifeos-db`, `lifeos-redis`) with volumes and a network that carry the same prefix. To remove it all:
+
+```
+docker compose -f docker/docker-compose.yml down -v
 ```

@@ -96,7 +96,8 @@ const iso = (day) => `${year.value}-${pad(month.value)}-${pad(day)}`
 const current = computed(() => d.value.habits.find((h) => h.habit === pick.value) || d.value.habits[0])
 const isThisMonth = computed(() => year.value === now.getFullYear() && month.value === now.getMonth() + 1)
 const isDone = (day) => current.value.done_days.includes(day)
-const tracked = (day) => iso(day) >= current.value.tracked_from && iso(day) <= current.value.tracked_until
+// a day counts from the day the habit was added to the day it was removed, and never before it has come
+const tracked = (day) => iso(day) >= current.value.tracked_from && iso(day) <= current.value.tracked_until && iso(day) <= d.value.today
 const unused = computed(() => library.value.filter((h) => !draft.value.some((x) => x.habit === h.name)))
 
 function dayClass(day) {

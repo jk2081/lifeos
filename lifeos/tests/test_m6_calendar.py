@@ -91,6 +91,10 @@ class TestCalendar(LifeTestCase):
 		calendar.delete_event(out["name"])
 
 	def test_event_from_a_user_takes_their_default_space(self):
+		# the family member owns no space, so the site default applies when they belong to it
+		before = frappe.db.get_single_value("Life Settings", "default_space")
+		frappe.db.set_single_value("Life Settings", "default_space", SHARED)
+		self.addCleanup(frappe.db.set_single_value, "Life Settings", "default_space", before)
 		self.as_user(FAMILY)
 		event = frappe.get_doc({"doctype": "Event", "subject": "Synced from Google m6", "starts_on": "2026-11-21 09:00:00"}).insert()
 		self.assertEqual(event.life_space, SHARED)

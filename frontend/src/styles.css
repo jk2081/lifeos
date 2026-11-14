@@ -2,6 +2,7 @@
 
 /* Life OS design tokens, taken from the approved mockups. One accent colour, neutral palette. */
 :root {
+  color-scheme: light;
   --bg: #ffffff; --side: #f8f8f8; --soft: #fafafa; --softer: #fcfcfc;
   --line: #ededed; --line2: #f0f0f0; --line3: #e2e2e2; --line4: #dadada; --faint: #f5f5f5;
   --ink: #171717; --ink2: #383838; --mut: #6b6b6b; --mut2: #525252; --fill: #f3f3f3;
@@ -12,6 +13,7 @@
   --read: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
 }
 [data-theme='dark'] {
+  color-scheme: dark;
   --bg: #141414; --side: #1a1a1a; --soft: #1b1b1b; --softer: #191919;
   --line: #2a2a2a; --line2: #262626; --line3: #333333; --line4: #3d3d3d; --faint: #202020;
   --ink: #ededed; --ink2: #d2d2d2; --mut: #9b9b9b; --mut2: #b4b4b4; --fill: #262626;

@@ -364,6 +364,8 @@ def toggle_habit(habit, on, done=None) -> dict:
 	if done is None:
 		done = not (existing and existing.done)
 	done = bool(int(done)) if not isinstance(done, bool) else done
+	if done and on > getdate(today()):
+		frappe.throw(_("A habit cannot be ticked for a day that has not come yet."))
 	if existing and not done:
 		frappe.delete_doc("Life Habit Log", existing.name, ignore_permissions=True, force=True)
 	elif not existing and done:

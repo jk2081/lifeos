@@ -262,6 +262,8 @@ class TestMonthAndHabits(JournalCase):
 		self.assertTrue(frappe.db.exists("Life Habit Log", {"habit": habit.name, "date": "2026-11-10"}))
 		self.assertFalse(journal.toggle_habit(habit.name, "2026-11-10")["done"])
 		self.assertFalse(frappe.db.exists("Life Habit Log", {"habit": habit.name, "date": "2026-11-10"}))
+		# a day that has not come cannot be ticked
+		self.assertRaises(frappe.ValidationError, journal.toggle_habit, habit.name, frappe.utils.add_days(frappe.utils.today(), 1))
 		self.as_user(FAMILY)
 		self.assertRaises(frappe.PermissionError, journal.toggle_habit, habit.name, "2026-11-10")
 		self.assertRaises(frappe.PermissionError, journal.habits, space=PRIVATE)
