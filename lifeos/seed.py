@@ -122,13 +122,13 @@ def _remove(key):
 
 # ---------- the owner's seed ----------
 
-def load(space="Private"):
+def load(space="Private", key=SEED_KEY):
 	"""Load the seed of section 11 into a space. Safe to run twice."""
-	if json.loads(frappe.db.get_default(SEED_KEY) or "[]"):
+	if json.loads(frappe.db.get_default(key) or "[]"):
 		return "Seed is already loaded. Run lifeos.seed.remove first to reload it."
 	ensure_structure()
-	areas = make_areas(space, PRIVATE_AREAS if space == "Private" else SHARED_AREAS)
-	t = Tracker(SEED_KEY)
+	areas = make_areas(space, SHARED_AREAS if space == "Shared" else PRIVATE_AREAS)
+	t = Tracker(key)
 
 	habits = []
 	for title in HABITS:
@@ -161,7 +161,7 @@ def load(space="Private"):
 	return f"Seed loaded into {space}: {len(t.records)} records."
 
 
-def remove():
+def remove(key=SEED_KEY):
 	"""Remove what `load` created."""
-	n = _remove(SEED_KEY)
+	n = _remove(key)
 	return f"Seed removed: {n} records."
