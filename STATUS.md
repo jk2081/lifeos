@@ -13,7 +13,7 @@ Build of Life OS v1. Updated at the end of every milestone.
 | M4 Tasks and Today | Done |
 | M5 Journal | Done |
 | M6 Calendar | Done |
-| M7 Library and Vault | Not started |
+| M7 Library and Vault | Done |
 | M8 Search and graph | Not started |
 | M9 Polish | Not started |
 
@@ -62,6 +62,12 @@ Build of Life OS v1. Updated at the end of every milestone.
 - Screen: month, week, agenda and year views, a day side panel with Add event and Add important date, previous and next, the year view as in mockup 07 (weekends tinted, today outlined, a bar on days inside the active 12 Week Year), and a list by month at phone width. A one-line prompt shows when Google Calendar is not connected.
 - Tests: `lifeos/tests/test_m6_calendar.py` passes (7 tests).
 - Untested against the real service: the Google Calendar connection. When the user has an enabled `Google Calendar` record with a refresh token, new events are saved with `sync_with_google_calendar` and that calendar, which is what Frappe's integration pushes. Events pulled from Google take the default space of the user who owns them (tested with a plain insert, not with a real sync).
+
+## M7 Library and Vault
+
+- Works: the Library (notes in a tree under area and parent note, a reader in a reading typeface with the line capped near 70 characters, a CodeMirror 6 Markdown editor with a live sanitised preview, autosave two seconds after typing stops, earlier versions from Frappe's versioning with restore), `[[Title]]` links (a picker opens on `[[`, links are resolved to records on save and stored in `Life Link`, missing targets render muted and are not stored, a rename rewrites the link text in records that point to it, two records with one title are told apart by `[[Title#id]]`), a backlinks panel on notes, tasks, inbox items, projects, goals and vault documents, the Vault (by holder, expiry badges here and on Today, a file viewer, last four characters only), the chat log (`chats.log` for agents, `chats.report` grouped by day, area or project, counts by area, the week's open items with Make task and Close), the daily archive job, `archive.set`, `archive.restore`, the Archive screen, and Undo in the weekly review.
+- Tests: `lifeos/tests/test_m7_library.py` passes (14 tests).
+- Known limit: the Library tree loads up to 2,000 light rows (name, title, parent, area) in one call so the tree is whole. Every other list is capped at 100 rows per call.
 
 ## How to run the local stack
 

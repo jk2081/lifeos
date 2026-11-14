@@ -55,3 +55,8 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Deleting events.** Core `Event` lets only its creator delete it. `calendar.delete_event` lets any person with Write access to the event's space delete it (never an agent), so the owner can remove an event an agent filed. It checks read permission and space membership itself before deleting.
 - **Calendar range.** `calendar.get` returns at most 100 days per call. The year view has its own method, which returns only the entries the year pages show.
 - **Week view.** The week view lists each day's items in seven columns. It is not an hour grid; Google Calendar remains the place for that.
+- **Links: both rules kept.** Section 4b says links point to records and a rename needs no rewrite; section 9 and the tests say a rename updates the link text. The app does both: `Life Link` stores the target record, rendering shows the target's current title, and a rename also rewrites `[[Old]]` to `[[New]]` in the Markdown of records that point to it.
+- **Ambiguous titles.** When two records in a space share a title, the picker inserts `[[Title#id]]`, which pins the link to one record.
+- **Link targets.** A link can point to notes, tasks, people, vault documents and chat logs as the spec says, and also to goals and projects.
+- **Open items become tasks only for people.** `chats.make_task` is refused for agents, in line with section 5.
+- **Library tree size.** `library.tree` returns up to 2,000 light rows so the tree is complete; this is the one list method above the 100-row cap.
