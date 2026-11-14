@@ -7,7 +7,7 @@ Build of Life OS v1. Updated at the end of every milestone.
 | Milestone | State |
 | --- | --- |
 | M0 Skeleton | Done |
-| M1 Spaces and permissions | In progress |
+| M1 Spaces and permissions | Done |
 | M2 Data model | Not started |
 | M3 Inbox and review | Not started |
 | M4 Tasks and Today | Not started |
@@ -22,6 +22,12 @@ Build of Life OS v1. Updated at the end of every milestone.
 - Works: Docker stack (`docker/docker-compose.yml`), bench on Frappe 16.56.0, test site `lifeos.localhost` on host port 18000, `lifeos` app installed, front-end scaffold (Vue 3, Vite, Tailwind, frappe-ui 1.2.0) served at `/life` behind login, sidebar and phone tab bar as in the mockups.
 - Stubbed: every screen shows a placeholder until its milestone.
 - Tests: `lifeos/tests/test_m0_skeleton.py` passes.
+
+## M1 Spaces and permissions
+
+- Works: `Life Space` with members and Read or Write access, roles `Life Admin`, `Life User`, `Life Agent`, `permission_query_conditions` and `has_permission` hooks on every DocType with a `space`, the same checks for `Life Space` itself, helper checks used by API methods. Agents cannot delete, cannot change spaces or settings.
+- Tests: `lifeos/tests/test_m1_permissions.py` passes, with an owner, a family member who is only in the shared space, and an agent.
+- Not yet covered here: file access and search for a second user (tested in M3 and M8), `review.decide` refusal for agents (M3).
 
 ## How to run the local stack
 
