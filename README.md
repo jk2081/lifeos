@@ -29,3 +29,11 @@ The script keeps the Mac awake, runs Claude Code without prompts in auto permiss
 - To use another model or permission mode: `MODEL=opus PERMISSION_MODE=acceptEdits ./scripts/start-build.sh`.
 
 The app does not exist yet. Install steps for an existing bench will be written to `STATUS.md` by the build.
+
+### Using an existing bench instead of Docker
+
+```
+BENCH_PATH=~/frappe-bench ./scripts/start-build.sh
+```
+
+The build then creates one new site, `lifeos.localhost`, on that bench and is told not to touch other sites, run `bench update`, or change other apps. The bench must be Frappe v16. Docker is the safer choice, because the build cannot affect anything else.
