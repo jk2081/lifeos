@@ -17,9 +17,27 @@ PROMPT="Nobody is watching this run. Do not ask questions and do not wait for in
 Read CLAUDE.md, STATUS.md and DECISIONS.md. Start the local stack as STATUS.md describes and check that the site and the tests work. Then carry out every item in $TASK, in order, following its working rules. If part of it is already done, check it and continue with the rest. When everything in it is finished and its checks pass, create an empty file named $DONE and commit. If you cannot go further, write the reason to BUILD_BLOCKED, commit, and stop.
 
 Do not stop, restart, remove or change any Docker container, image, volume or network whose name does not start with lifeos-."
+START_SHA="$(git rev-parse HEAD)"; START_TIME=$(date +%s); ROUND_FILE="$LOG_DIR/.round"; echo 1 > "$ROUND_FILE"
+# A progress line every few minutes (UPDATE_EVERY seconds, default 300): in this window, in build-logs/build.log,
+# as a Mac notification, and pushed to GitHub so the commits can be followed from a phone.
+heartbeat() {
+  while sleep "${UPDATE_EVERY:-300}"; do
+    commits=$(git rev-list --count "$START_SHA"..HEAD 2>/dev/null || echo 0)
+    latest=$(git log -1 --format='%s (%cr)' 2>/dev/null | cut -c1-90)
+    editing=$(git --no-optional-locks status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    mins=$(( ($(date +%s) - START_TIME) / 60 ))
+    line="Update at ${mins} min: round $(cat "$ROUND_FILE"), $commits steps committed, $editing files being edited. Latest: $latest"
+    say "$line"
+    command -v osascript >/dev/null && osascript -e "display notification \"${line//\"/}\" with title \"Life OS build\"" >/dev/null 2>&1
+    git push -q origin HEAD >/dev/null 2>&1
+  done
+}
+heartbeat & HEARTBEAT=$!
+trap 'kill $HEARTBEAT 2>/dev/null' EXIT
 round=1
 while [ "$round" -le "$MAX_ROUNDS" ] && [ ! -f "$DONE" ] && [ ! -f BUILD_BLOCKED ]; do
   say "Task $TASK, round $round"
+  echo "$round" > "$ROUND_FILE"
   started=$(date +%s)
   claude -p "$PROMPT" --model "$MODEL" --permission-mode "$PERMISSION_MODE" --verbose > "$LOG_DIR/$(basename "$TASK" .md)-round-$round.log" 2>&1
   elapsed=$(( $(date +%s) - started ))
