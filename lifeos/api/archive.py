@@ -4,7 +4,8 @@ import frappe
 from lifeos import archive as rules
 from lifeos import permissions
 from lifeos.api.timeline import index_rows
-from lifeos.api.utils import area_filter, flag, names_map, order_by, page
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import order_by as sort_order
 
 
 @frappe.whitelist(methods=["POST"])
@@ -26,7 +27,8 @@ SORTS = {"title": "title", "kind": "kind", "record_date": "record_date", "area":
 
 
 @frappe.whitelist()
-def list(space=None, area=None, start=0, page_length=50, doctype=None, reason=None, archived_from=None, archived_to=None, sort=None, dir=None):
+def list(space=None, area=None, start=0, page_length=50, doctype=None, reason=None, archived_from=None, archived_to=None, sort=None, dir=None,
+		filters=None, order_by=None, summary=None):
 	"""Archived records, grouped by area, plus archived projects.
 	Filters: doctype (the record type), area (with its sub-areas, or "none"), reason (Auto, Manual, Project),
 	archived_from and archived_to on the day it was archived. `total` is the number of records the filters match."""
@@ -54,7 +56,11 @@ def list(space=None, area=None, start=0, page_length=50, doctype=None, reason=No
 			parts.append(f"(ref_doctype = '{dt}' and exists (select 1 from `tab{dt}` x where {cond}))")
 		where += " and (" + (" or ".join(parts) or "1=0") + ")"
 		values.update({"reason": reason, "archived_from": archived_from, "archived_to": archived_to})
-	order = order_by(sort, dir, SORTS, None)
+	extra, values = std_clause("Life Index", filters, "", values)
+	where += extra
+	if summary:
+		return {"summary": summarise("Life Index", f"from `tabLife Index` where space=%(space)s {where}", {"space": space, **values}, "", summary, start, page_length)}
+	order = std_order("Life Index", order_by, "", SORTS) or sort_order(sort, dir, SORTS, None)
 	rows = index_rows(space, where, values, order=(order + ", modified desc") if order else "area asc, record_date desc, modified desc",
 		start=start, page_length=page_length)
 	total = frappe.db.sql(f"select count(*) from `tabLife Index` where space=%(space)s {where}", {"space": space, **values})[0][0]

@@ -60,7 +60,7 @@ onMounted(async () => {
 })
 </script>
 <style scoped>
-.imgwrap { border: 1px solid var(--line); border-radius: 10px; background: var(--soft); overflow: auto; max-height: 80vh; cursor: zoom-in; }
+.imgwrap { border: 1px solid var(--outline-gray-1); border-radius: 10px; background: var(--surface-gray-1); overflow: auto; max-height: 80vh; cursor: zoom-in; }
 .imgwrap img { display: block; width: 100%; height: auto; }
 .imgwrap.zoom { cursor: zoom-out; }
 .imgwrap.zoom img { width: 220%; max-width: none; }

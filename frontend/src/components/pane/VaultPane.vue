@@ -114,6 +114,6 @@ onMounted(async () => {
 })
 </script>
 <style scoped>
-.viewer { width: 100%; border: 1px solid var(--line); border-radius: 10px; display: block; }
+.viewer { width: 100%; border: 1px solid var(--outline-gray-1); border-radius: 10px; display: block; }
 .viewer.pdf { height: 420px; }
 </style>

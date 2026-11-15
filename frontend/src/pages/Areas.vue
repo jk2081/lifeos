@@ -5,7 +5,7 @@
   <div class="bd">
     <div class="grid">
       <div v-for="a in top" :key="a.name" class="cd ar" @click="(e) => !e.target.closest('a') && $router.push(`/areas/${a.name}`)">
-        <RouterLink :to="`/areas/${a.name}`" style="font-weight: 600; color: var(--ink)">{{ a.area_name }}</RouterLink>
+        <RouterLink :to="`/areas/${a.name}`" style="font-weight: 600; color: var(--ink-gray-9)">{{ a.area_name }}</RouterLink>
         <div class="mt"><RouterLink class="num" :to="{ path: '/projects', query: { area: a.name, status: 'Active' } }">{{ a.projects }} active project{{ a.projects === 1 ? '' : 's' }}</RouterLink> ·
           <RouterLink class="num" :to="{ path: '/tasks', query: { area: a.name, view: 'list' } }">{{ a.open_tasks }} open task{{ a.open_tasks === 1 ? '' : 's' }}</RouterLink> ·
           <RouterLink class="num" :to="{ path: '/library', query: { view: 'list', area: a.name } }">{{ a.notes }} note{{ a.notes === 1 ? '' : 's' }}</RouterLink></div>
@@ -54,6 +54,6 @@ onMounted(load)
 </script>
 <style scoped>
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
-.ar { color: var(--ink); display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
-.ar:hover { background: var(--soft); }
+.ar { color: var(--ink-gray-9); display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+.ar:hover { background: var(--surface-gray-1); }
 </style>

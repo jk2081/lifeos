@@ -17,10 +17,10 @@
     </div>
 
     <div class="bd">
-      <div v-if="item.status === 'Failed'" class="cd" style="background: var(--r-bg); color: var(--r-ink); border-color: transparent">
+      <div v-if="item.status === 'Failed'" class="cd" style="background: var(--surface-red-2); color: var(--ink-red-9); border-color: transparent">
         <b>Processing failed.</b> {{ item.error }}
       </div>
-      <div v-else-if="item.status === 'New' || item.status === 'Processing'" class="cd" style="background: var(--soft)">
+      <div v-else-if="item.status === 'New' || item.status === 'Processing'" class="cd" style="background: var(--surface-gray-1)">
         <b>{{ item.status === 'New' ? 'Waiting for an agent.' : 'An agent is processing this.' }}</b>
         <span class="mt"> The summary and proposals show here when it is done.</span>
       </div>
@@ -82,7 +82,7 @@
                   <span v-else class="mt" style="white-space: nowrap">{{ pct(p.confidence) }}% sure</span>
                 </div>
                 <template v-if="p.status === 'Pending'">
-                  <div v-if="p.confidence < 0.6 || p.error" class="mt" :style="p.error ? 'color: var(--r-ink)' : ''">
+                  <div v-if="p.confidence < 0.6 || p.error" class="mt" :style="p.error ? 'color: var(--ink-red-9)' : ''">
                     {{ p.error || 'The agent was not sure about this one. Edit it or reject it.' }}
                   </div>
                   <div class="chips">
@@ -403,14 +403,14 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.pr { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
-.pr.done { background: var(--soft); }
+.pr { border: 1px solid var(--outline-gray-1); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.pr.done { background: var(--surface-gray-1); }
 .orig { margin-bottom: 12px; }
-.orig-empty { border: 1px dashed var(--line4); border-radius: 10px; background: var(--soft); min-height: 120px; display: grid; place-items: center; color: var(--mut); }
-.imgwrap { border: 1px solid var(--line); border-radius: 10px; background: var(--soft); overflow: auto; max-height: 520px; cursor: zoom-in; }
+.orig-empty { border: 1px dashed var(--outline-gray-3); border-radius: 10px; background: var(--surface-gray-1); min-height: 120px; display: grid; place-items: center; color: var(--ink-gray-6); }
+.imgwrap { border: 1px solid var(--outline-gray-1); border-radius: 10px; background: var(--surface-gray-1); overflow: auto; max-height: 520px; cursor: zoom-in; }
 .imgwrap img { display: block; width: 100%; height: auto; }
 .imgwrap.zoom { cursor: zoom-out; }
 .imgwrap.zoom img { width: 220%; max-width: none; }
-.pdf { width: 100%; height: 520px; border: 1px solid var(--line); border-radius: 10px; }
+.pdf { width: 100%; height: 520px; border: 1px solid var(--outline-gray-1); border-radius: 10px; }
 .dateinp { border: 0; background: transparent; color: inherit; font: inherit; padding: 0; height: 22px; }
 </style>

@@ -53,7 +53,7 @@
           <h2 class="sh">{{ l.label }} <span class="mt" style="font-weight: 400">in {{ d.space }}</span></h2>
           <div class="cd list">
             <div v-for="it in rows(l)" :key="it.name" class="rw" style="align-items: center">
-              <div class="grow" :style="it.depth ? 'padding-left: 18px' : ''"><span class="ttl" :style="it.is_archived ? 'color: var(--mut); text-decoration: line-through' : ''">{{ it.title }}</span>
+              <div class="grow" :style="it.depth ? 'padding-left: 18px' : ''"><span class="ttl" :style="it.is_archived ? 'color: var(--ink-gray-6); text-decoration: line-through' : ''">{{ it.title }}</span>
                 <span v-if="it.relation" class="mt"> · {{ it.relation }}</span></div>
               <template v-if="canWrite()">
                 <button v-if="l.ordered" class="bt t ic" type="button" :aria-label="`Move ${it.title} up`" @click="moveUp(l, it)">↑</button>

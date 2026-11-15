@@ -42,18 +42,18 @@ async function wikiSource(context) {
 }
 
 const theme = EditorView.theme({
-  '&': { fontSize: '15px', color: 'var(--ink)', backgroundColor: 'var(--bg)' },
-  '.cm-content': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: '1.6', padding: '12px 0', caretColor: 'var(--ink)' },
+  '&': { fontSize: '15px', color: 'var(--ink-gray-9)', backgroundColor: 'var(--surface-base)' },
+  '.cm-content': { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', lineHeight: '1.6', padding: '12px 0', caretColor: 'var(--ink-gray-9)' },
   '.cm-line': { padding: '0 14px' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': { minHeight: '320px' },
-  '.cm-cursor': { borderLeftColor: 'var(--ink)' },
-  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--b-bg) !important' },
-  '.cm-tooltip': { backgroundColor: 'var(--bg)', border: '1px solid var(--line3)', borderRadius: '8px', color: 'var(--ink)', overflow: 'hidden' },
+  '.cm-cursor': { borderLeftColor: 'var(--ink-gray-9)' },
+  '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': { backgroundColor: 'var(--surface-blue-2) !important' },
+  '.cm-tooltip': { backgroundColor: 'var(--surface-base)', border: '1px solid var(--outline-gray-2)', borderRadius: '8px', color: 'var(--ink-gray-9)', overflow: 'hidden' },
   '.cm-tooltip-autocomplete ul li': { padding: '4px 10px !important' },
-  '.cm-tooltip-autocomplete ul li[aria-selected]': { backgroundColor: 'var(--fill)', color: 'var(--ink)' },
-  '.cm-completionDetail': { color: 'var(--mut)', fontStyle: 'normal', marginLeft: '8px' },
-  '.cm-placeholder': { color: 'var(--mut)' },
+  '.cm-tooltip-autocomplete ul li[aria-selected]': { backgroundColor: 'var(--surface-gray-2)', color: 'var(--ink-gray-9)' },
+  '.cm-completionDetail': { color: 'var(--ink-gray-6)', fontStyle: 'normal', marginLeft: '8px' },
+  '.cm-placeholder': { color: 'var(--ink-gray-6)' },
 })
 
 onMounted(() => {
@@ -78,5 +78,5 @@ onBeforeUnmount(() => view && view.destroy())
 defineExpose({ focus: () => view && view.focus() })
 </script>
 <style scoped>
-.mdeditor { border: 1px solid var(--line3); border-radius: 10px; overflow: hidden; background: var(--bg); }
+.mdeditor { border: 1px solid var(--outline-gray-2); border-radius: 10px; overflow: hidden; background: var(--surface-base); }
 </style>

@@ -41,5 +41,5 @@ onMounted(() => {
 })
 </script>
 <style scoped>
-.when { width: 64px; flex: none; font-variant-numeric: tabular-nums; color: var(--mut2); }
+.when { width: 64px; flex: none; font-variant-numeric: tabular-nums; color: var(--ink-gray-7); }
 </style>

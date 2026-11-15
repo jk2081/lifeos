@@ -9,7 +9,7 @@
       <div><div class="lbl">Every year on</div><div>{{ e.day }} {{ MONTHS[e.month - 1] }}{{ e.year ? `, since ${e.year}` : '' }}</div></div>
       <div><div class="lbl">Kind</div><div>{{ e.date_kind }}{{ e.person_name ? ' · ' + e.person_name : '' }}</div></div>
     </template>
-    <div v-if="writable" class="chips"><button class="bt s" type="button" style="color: var(--r-ink)" @click="remove">Remove</button></div>
+    <div v-if="writable" class="chips"><button class="bt s" type="button" style="color: var(--ink-red-9)" @click="remove">Remove</button></div>
   </template>
 </template>
 <script setup>

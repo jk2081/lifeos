@@ -6,7 +6,7 @@
           <button class="sp" type="button" aria-label="Switch space">
             <div class="lg">L</div>
             <span class="truncate">{{ store.space || 'No space' }}</span>
-            <Ico style="margin-left: auto; color: var(--mut)" :size="14" stroke="2" d="m6 9 6 6 6-6" />
+            <Ico style="margin-left: auto; color: var(--ink-gray-6)" :size="14" stroke="2" d="m6 9 6 6 6-6" />
           </button>
         </Dropdown>
         <div v-for="n in NAV" :key="n.to" class="nvw">

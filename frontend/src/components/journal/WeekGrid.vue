@@ -6,7 +6,7 @@
       <RouterLink v-if="g.cycle.status === 'Active' && g.past_end" class="bt s" to="/journal/goals">Close cycle</RouterLink>
       <button v-if="g.cycle.status !== 'Closed'" class="bt s" type="button" @click="editGoal(null)">Add goal</button>
     </template>
-    <RouterLink class="bt p" to="/journal/review" style="color: var(--bg)">Weekly review</RouterLink>
+    <RouterLink class="bt p" to="/journal/review" style="color: var(--surface-base)">Weekly review</RouterLink>
   </Teleport>
 
   <div v-if="g" class="bd">
@@ -21,13 +21,13 @@
     <div v-if="g.goals.length" class="tblwrap"><div class="tblscroll">
       <div class="grid">
         <div class="gr hdr">
-          <div class="gcol" style="padding: 8px 12px; font-size: 12.5px; color: var(--mut)">Goal and action</div>
+          <div class="gcol" style="padding: 8px 12px; font-size: 12.5px; color: var(--ink-gray-6)">Goal and action</div>
           <div v-for="w in 12" :key="w" class="gh" :class="{ cur: w === g.current_week }">{{ w }}</div>
         </div>
         <template v-for="goal in g.goals" :key="goal.name">
           <div class="gr gline">
             <div class="gcol gl">
-              <RouterLink :to="`/journal/goals/${goal.name}`" style="color: var(--ink)">{{ goal.title }}</RouterLink>
+              <RouterLink :to="`/journal/goals/${goal.name}`" style="color: var(--ink-gray-9)">{{ goal.title }}</RouterLink>
               <span v-if="goal.area_name" class="pl n">{{ goal.area_name }}</span>
               <button v-if="canEdit" class="edit" type="button" :aria-label="`Edit ${goal.title}`" @click="editGoal(goal)">Edit</button>
             </div>
@@ -60,8 +60,8 @@
     <div v-else class="cd"><Empty title="No goals in this cycle yet." hint="Add a goal with its weekly actions. Each week you tick what you did, and the score follows." /></div>
 
     <div class="mt legend">
-      <span><i class="sw" style="background: var(--ink)"></i>Done</span><span><i class="sw" style="background: var(--fill)"></i>Missed</span>
-      <span><i class="sw" style="border: 2px solid var(--accent)"></i>This week, tap to tick</span>
+      <span><i class="sw" style="background: var(--ink-gray-9)"></i>Done</span><span><i class="sw" style="background: var(--surface-gray-2)"></i>Missed</span>
+      <span><i class="sw" style="border: 2px solid var(--ink-blue-8)"></i>This week, tap to tick</span>
       <span>A struck-through action is finished and no longer counts. Tap an action's name to finish or drop it.</span>
     </div>
   </div>
@@ -170,27 +170,27 @@ onMounted(load)
 .stats.three { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .grid { min-width: 760px; }
 .gr { display: grid; grid-template-columns: minmax(250px, 1.7fr) repeat(12, minmax(36px, 1fr)); align-items: center; }
-.gr.hdr { background: var(--side); border-bottom: 1px solid var(--line); }
-.gr.foot { background: var(--side); border-top: 1px solid var(--line); }
-.gcol { position: sticky; left: 0; background: var(--bg); z-index: 1; min-width: 0; }
-.gr.hdr .gcol, .gr.foot .gcol { background: var(--side); }
-.gh { font-size: 12px; color: var(--mut); text-align: center; padding: 8px 0; font-variant-numeric: tabular-nums; }
-.gh.cur { color: var(--accent); font-weight: 600; }
-.gline { border-top: 1px solid var(--line); }
+.gr.hdr { background: var(--surface-gray-1); border-bottom: 1px solid var(--outline-gray-1); }
+.gr.foot { background: var(--surface-gray-1); border-top: 1px solid var(--outline-gray-1); }
+.gcol { position: sticky; left: 0; background: var(--surface-base); z-index: 1; min-width: 0; }
+.gr.hdr .gcol, .gr.foot .gcol { background: var(--surface-gray-1); }
+.gh { font-size: 12px; color: var(--ink-gray-6); text-align: center; padding: 8px 0; font-variant-numeric: tabular-nums; }
+.gh.cur { color: var(--ink-blue-8); font-weight: 600; }
+.gline { border-top: 1px solid var(--outline-gray-1); }
 .gline:first-of-type { border-top: 0; }
 .gl { display: flex; align-items: center; gap: 8px; padding: 12px 12px 6px; font-weight: 600; flex-wrap: wrap; grid-column: 1 / -1; position: static; }
-.gl .edit { border: 0; background: none; color: var(--mut); font-size: 12px; cursor: pointer; opacity: 0; }
+.gl .edit { border: 0; background: none; color: var(--ink-gray-6); font-size: 12px; cursor: pointer; opacity: 0; }
 .gline:hover .edit, .edit:focus { opacity: 1; }
-.ac { padding: 5px 12px 5px 24px; color: var(--ink2); }
+.ac { padding: 5px 12px 5px 24px; color: var(--ink-gray-8); }
 .acbtn { border: 0; background: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.fin, .acbtn.fin { text-decoration: line-through; color: var(--mut); }
+.fin, .acbtn.fin { text-decoration: line-through; color: var(--ink-gray-6); }
 .wc { display: grid; place-items: center; padding: 3px 0; }
-.wk { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--line3); background: var(--bg); color: var(--ink); font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; padding: 0; display: grid; place-items: center; }
-.wk.done { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.wk.miss { background: var(--fill); border-color: var(--fill); color: var(--mut); }
-.wk.part { background: var(--fill); border-color: var(--line4); }
-.wk.cur { border: 2px solid var(--accent); }
-.wk.curdone { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.wk { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--outline-gray-2); background: var(--surface-base); color: var(--ink-gray-9); font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; padding: 0; display: grid; place-items: center; }
+.wk.done { background: var(--ink-gray-9); border-color: var(--ink-gray-9); color: var(--surface-base); }
+.wk.miss { background: var(--surface-gray-2); border-color: var(--surface-gray-2); color: var(--ink-gray-6); }
+.wk.part { background: var(--surface-gray-2); border-color: var(--outline-gray-3); }
+.wk.cur { border: 2px solid var(--ink-blue-8); }
+.wk.curdone { background: var(--ink-blue-8); border-color: var(--ink-blue-8); color: var(--surface-base); }
 .wk.na { visibility: hidden; }
 .wk:disabled { cursor: default; }
 .sc { font-size: 12.5px; font-weight: 600; text-align: center; padding: 10px 0; font-variant-numeric: tabular-nums; }

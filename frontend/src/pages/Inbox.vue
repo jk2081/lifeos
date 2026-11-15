@@ -33,7 +33,7 @@
     <template #cell-title="{ row }">
       <div class="ttl">{{ row.title }}</div>
       <div class="mt">{{ describe(row) }}</div>
-      <div v-if="row.status === 'Failed' && row.error" class="mt" style="color: var(--r-ink)">{{ row.error }}</div>
+      <div v-if="row.status === 'Failed' && row.error" class="mt" style="color: var(--ink-red-9)">{{ row.error }}</div>
     </template>
     <template #cell-area="{ row }"><span class="mt">{{ row.area_name || '' }}</span></template>
     <template #cell-received_on="{ row }"><span class="mt">{{ dateTime(row.received_on) }}</span></template>
@@ -50,7 +50,7 @@
         <div style="flex: 1; min-width: 0">
           <div class="ttl">{{ row.title }}</div>
           <div class="mt">{{ describe(row) }}</div>
-          <div v-if="row.status === 'Failed' && row.error" class="mt" style="color: var(--r-ink)">{{ row.error }}</div>
+          <div v-if="row.status === 'Failed' && row.error" class="mt" style="color: var(--ink-red-9)">{{ row.error }}</div>
           <a v-if="row.pending" href="#" class="num mt" @click.prevent="openRef('inbox:' + row.name, { focus: 'pending' })">{{ row.pending }} of {{ row.proposals }} proposals pending</a>
         </div>
         <span class="pl" :class="PILL[row.status]">{{ row.status === 'To Review' ? 'To review' : row.status }}</span>
@@ -168,8 +168,8 @@ onMounted(loadLookups)
 </script>
 
 <style scoped>
-.drop { border: 1px dashed var(--line4); border-radius: 10px; padding: 16px; background: var(--soft); }
-.drop.over { border-color: var(--accent); background: var(--b-bg); }
+.drop { border: 1px dashed var(--outline-gray-3); border-radius: 10px; padding: 16px; background: var(--surface-gray-1); }
+.drop.over { border-color: var(--ink-blue-8); background: var(--surface-blue-2); }
 .drop-hint { display: flex; flex-direction: column; gap: 2px; padding: 6px 0 12px; }
 .drop-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 </style>

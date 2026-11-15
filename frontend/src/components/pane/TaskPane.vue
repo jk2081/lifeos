@@ -46,7 +46,7 @@
   <div v-if="writable || canRestore" class="chips">
     <button v-if="writable && OPEN.includes(task.status)" class="bt s" type="button" @click="carry">Carry to next month →</button>
     <button v-if="writable" class="bt s" type="button" @click="archive">Archive</button>
-    <button v-if="canRestore && !isAgent" class="bt t" type="button" style="color: var(--r-ink)" @click="remove">Delete</button>
+    <button v-if="canRestore && !isAgent" class="bt t" type="button" style="color: var(--ink-red-9)" @click="remove">Delete</button>
   </div>
   <Backlinks doctype="Life Task" :name="task.name" :reload="reloadKey" />
   </template>

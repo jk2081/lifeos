@@ -158,11 +158,11 @@ onMounted(load)
 <style scoped>
 .split { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 32px; align-items: start; }
 .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.dy { height: 44px; border-radius: 10px; border: 1px solid var(--line3); background: var(--bg); color: var(--ink); font: 500 14px Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; padding: 0; cursor: pointer; }
-.dy.d { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.dy.m { background: var(--fill); border-color: var(--fill); color: var(--mut); }
-.dy.t { border: 2px solid var(--accent); color: var(--accent); font-weight: 700; }
-.dy.f { color: var(--mut); }
-.dy.off { border-style: dashed; color: var(--line4); cursor: default; }
+.dy { height: 44px; border-radius: 10px; border: 1px solid var(--outline-gray-2); background: var(--surface-base); color: var(--ink-gray-9); font: 500 14px Inter, system-ui, sans-serif; font-variant-numeric: tabular-nums; padding: 0; cursor: pointer; }
+.dy.d { background: var(--ink-gray-9); border-color: var(--ink-gray-9); color: var(--surface-base); }
+.dy.m { background: var(--surface-gray-2); border-color: var(--surface-gray-2); color: var(--ink-gray-6); }
+.dy.t { border: 2px solid var(--ink-blue-8); color: var(--ink-blue-8); font-weight: 700; }
+.dy.f { color: var(--ink-gray-6); }
+.dy.off { border-style: dashed; color: var(--outline-gray-3); cursor: default; }
 @media (max-width: 800px) { .split { grid-template-columns: 1fr; gap: 20px; } }
 </style>

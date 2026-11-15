@@ -12,7 +12,7 @@
       </div>
       <div class="only-desktop" style="display: flex; gap: 8px">
         <button class="bt s" type="button" @click="store.quickAdd = true">New task</button>
-        <RouterLink class="bt p" to="/inbox" style="color: var(--bg)">Add to Inbox</RouterLink>
+        <RouterLink class="bt p" to="/inbox" style="color: var(--surface-base)">Add to Inbox</RouterLink>
       </div>
       <button class="bt s ic only-phone" type="button" aria-label="Search" @click="store.searchOpen = true"><Ico :d="SEARCH_ICON" :size="20" /></button>
     </header>
@@ -140,6 +140,6 @@ onUnmounted(() => (paneNav.rows = []))
 </script>
 <style scoped>
 .st a { color: inherit; text-decoration: none; }
-.st a.big:hover b, .st a.mt:hover { color: var(--accent); text-decoration: underline; }
-.when { width: 52px; flex: none; font-variant-numeric: tabular-nums; color: var(--mut2); }
+.st a.big:hover b, .st a.mt:hover { color: var(--ink-blue-8); text-decoration: underline; }
+.when { width: 52px; flex: none; font-variant-numeric: tabular-nums; color: var(--ink-gray-7); }
 </style>

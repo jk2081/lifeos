@@ -250,13 +250,13 @@ onBeforeUnmount(flush)
 </script>
 <style scoped>
 .lib { display: flex; flex: 1; min-height: 0; }
-.tree { width: 300px; flex: none; border-right: 1px solid var(--line); padding: 16px 12px 40px; overflow-y: auto; }
+.tree { width: 300px; flex: none; border-right: 1px solid var(--outline-gray-1); padding: 16px 12px 40px; overflow-y: auto; }
 .reader { flex: 1; min-width: 0; padding: 24px 28px 48px; }
 .grp { margin-bottom: 14px; }
-.glabel { font-size: 12px; font-weight: 600; color: var(--mut2); padding: 4px 8px; }
-.nt { display: block; padding: 5px 8px; border-radius: 6px; color: var(--ink2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nt:hover { background: var(--fill); color: var(--ink); }
-.nt.on { background: var(--fill); color: var(--ink); font-weight: 500; }
+.glabel { font-size: 12px; font-weight: 600; color: var(--ink-gray-7); padding: 4px 8px; }
+.nt { display: block; padding: 5px 8px; border-radius: 6px; color: var(--ink-gray-8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt:hover { background: var(--surface-gray-2); color: var(--ink-gray-9); }
+.nt.on { background: var(--surface-gray-2); color: var(--ink-gray-9); font-weight: 500; }
 .rhead { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
 .rtitle { font-size: 24px; font-weight: 600; margin: 0; line-height: 1.25; font-family: var(--read); }
 .inp.ttl { width: 100%; font-size: 18px; font-weight: 600; height: 40px; }

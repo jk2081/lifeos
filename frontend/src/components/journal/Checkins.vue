@@ -39,7 +39,7 @@
       <div class="half">
         <section>
           <h2 class="sh">Over time
-            <span class="legend"><i style="background: var(--series-1)"></i>Habits <i style="background: var(--series-2)"></i>Situation</span></h2>
+            <span class="legend"><i style="background: var(--ink-blue-7)"></i>Habits <i style="background: var(--ink-amber-7)"></i>Situation</span></h2>
           <div v-if="charts.length" class="charts">
             <div v-for="s in charts" :key="s.dimension" class="cd"><div style="font-weight: 500; margin-bottom: 4px">{{ s.dimension_name }}</div>
               <LineChart :points="s.points" :label="`${s.dimension_name}: habits and situation scores over time`" /></div>
@@ -99,7 +99,7 @@ onMounted(() => {
 <style scoped>
 .scores { display: grid; grid-template-columns: minmax(110px, 1.4fr) 72px 72px minmax(0, 2fr); gap: 6px 8px; align-items: center; }
 .charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
-.legend { margin-left: auto; font-weight: 400; display: inline-flex; align-items: center; gap: 6px; color: var(--mut2); }
+.legend { margin-left: auto; font-weight: 400; display: inline-flex; align-items: center; gap: 6px; color: var(--ink-gray-7); }
 .legend i { width: 10px; height: 10px; border-radius: 5px; display: inline-block; margin-left: 8px; }
 @media (max-width: 800px) { .scores { grid-template-columns: minmax(0, 1fr) 64px 64px; } .scores > :nth-child(4n) { grid-column: 1 / -1; } .scores > .mt:nth-child(4) { display: none; } }
 </style>

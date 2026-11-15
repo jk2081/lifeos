@@ -77,9 +77,9 @@ onMounted(() => input.value?.focus())
 </script>
 <style scoped>
 .sp-back { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.25); z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding: 10vh 16px 0; }
-.spal { width: min(640px, 100%); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); }
+.spal { width: min(640px, 100%); background: var(--surface-base); border: 1px solid var(--outline-gray-1); border-radius: 12px; padding: 14px; box-shadow: var(--elevation-lg); }
 .res { max-height: 56vh; overflow-y: auto; margin-top: 8px; }
-.hit { display: block; padding: 8px 10px; border-radius: 8px; color: var(--ink); }
-.hit.on { background: var(--fill); }
+.hit { display: block; padding: 8px 10px; border-radius: 8px; color: var(--ink-gray-9); }
+.hit.on { background: var(--surface-gray-2); }
 .snip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>

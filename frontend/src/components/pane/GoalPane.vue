@@ -4,7 +4,7 @@
       <span class="mt">{{ d.cycle.title }} · {{ Math.round(d.goal.percent) }}% of ticks done</span></div>
     <section><h2 class="sh">Actions</h2>
       <div class="cd list"><div v-for="a in d.goal.actions" :key="a.name" class="rw">
-        <div class="grow"><div class="ttl" :style="a.status !== 'Open' ? 'text-decoration: line-through; color: var(--mut)' : ''">{{ a.title }}</div>
+        <div class="grow"><div class="ttl" :style="a.status !== 'Open' ? 'text-decoration: line-through; color: var(--ink-gray-6)' : ''">{{ a.title }}</div>
           <div class="mt">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
         <span v-if="a.status !== 'Open'" class="pl" :class="a.status === 'Done' ? 'g' : 'n'">{{ a.status }}</span></div>
         <Empty v-if="!d.goal.actions.length" title="No actions." hint="Edit the goal on the grid to add weekly actions." /></div>

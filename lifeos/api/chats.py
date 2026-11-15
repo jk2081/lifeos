@@ -4,7 +4,8 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.api.utils import area_filter, flag, names_map, order_by, page, parse
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import order_by as sort_order
 
 
 @frappe.whitelist()
@@ -111,7 +112,7 @@ def _chat_rows(rows):
 
 @frappe.whitelist()
 def list(space=None, area=None, project=None, open_items=0, from_date=None, to_date=None, include_archived=0, group_by="day",
-		sort=None, dir=None, start=0, page_length=50):
+		sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None):
 	"""Chat logs of a space as one list, newest first, ordered so that the groups of group_by (day, area, project) stay together.
 	Filters: area (with its sub-areas, or "none"), project, open_items=1 for chats that still have an open item, from_date, to_date.
 	`total` is the number of chats the filters match. `with_open_items` and `by_area` count inside the same filters."""
@@ -120,8 +121,12 @@ def list(space=None, area=None, project=None, open_items=0, from_date=None, to_d
 	if group_by not in GROUP_ORDER:
 		frappe.throw(_("group_by must be day, area or project."))
 	clause, values = where_clause(space, area, project, open_items, from_date, to_date, include_archived)
+	extra, values = std_clause("Life Chat Log", filters, "c", values)
+	clause += extra
 	values["space"] = space
-	order = order_by(sort, dir, SORTS, None)
+	if summary:
+		return {"summary": summarise("Life Chat Log", f"from `tabLife Chat Log` c where c.space=%(space)s {clause}", values, "c", summary, start, page_length)}
+	order = std_order("Life Chat Log", order_by, "c", SORTS) or sort_order(sort, dir, SORTS, None)
 	order = f"{order}, c.creation desc" if order else f"{GROUP_ORDER[group_by]}, c.modified desc"
 	rows = _chat_rows(frappe.db.sql(
 		f"""select c.name, c.title, c.date, c.url, c.assistant, c.summary_md, c.area, c.project, c.is_archived

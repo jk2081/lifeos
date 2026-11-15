@@ -125,7 +125,7 @@
   }
  ],
  "search_fields": "title",
- "show_title": 1,
+ "show_title_field_in_link": 1,
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],

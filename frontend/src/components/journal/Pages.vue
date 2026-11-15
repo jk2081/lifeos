@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="#jr-actions"><RouterLink class="bt p" to="/inbox" style="color: var(--bg)">Add a page photo</RouterLink></Teleport>
+  <Teleport to="#jr-actions"><RouterLink class="bt p" to="/inbox" style="color: var(--surface-base)">Add a page photo</RouterLink></Teleport>
   <div class="bd">
     <div v-if="pages.length" class="gal">
       <RouterLink v-for="p in pages" :key="p.name" class="cd pg" :to="`/journal/pages/${p.name}`">
@@ -37,8 +37,8 @@ onMounted(() => {
 </script>
 <style scoped>
 .gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-.pg { color: var(--ink); text-decoration: none; display: flex; flex-direction: column; gap: 2px; padding: 10px; }
-.pg:hover { background: var(--soft); }
-.thumb { aspect-ratio: 3 / 4; background: var(--soft); border-radius: 6px; overflow: hidden; display: grid; place-items: center; margin-bottom: 6px; }
+.pg { color: var(--ink-gray-9); text-decoration: none; display: flex; flex-direction: column; gap: 2px; padding: 10px; }
+.pg:hover { background: var(--surface-gray-1); }
+.thumb { aspect-ratio: 3 / 4; background: var(--surface-gray-1); border-radius: 6px; overflow: hidden; display: grid; place-items: center; margin-bottom: 6px; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
 </style>

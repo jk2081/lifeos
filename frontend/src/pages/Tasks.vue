@@ -26,7 +26,7 @@
       <div v-if="view !== 'table'" class="mt">{{ taskMeta(row, today, { withDue: true }) }}</div>
     </template>
     <template #cell-pill="{ row }"><span v-if="taskPill(row, today)" class="pl" :class="taskPill(row, today).cls">{{ taskPill(row, today).text }}</span></template>
-    <template #cell-due_date="{ row }"><span :style="row.due_date && row.due_date < today && OPEN.includes(row.status) ? 'color: var(--r-ink)' : ''">{{ short(row.due_date, true) }}</span></template>
+    <template #cell-due_date="{ row }"><span :style="row.due_date && row.due_date < today && OPEN.includes(row.status) ? 'color: var(--ink-red-9)' : ''">{{ short(row.due_date, true) }}</span></template>
     <template #stack="{ row }">
       <div style="display: flex; gap: 10px; align-items: flex-start">
         <input class="ck" type="checkbox" :checked="row.status === 'Done'" :disabled="!canWrite()" :aria-label="'Done: ' + row.title" @change="toggle(row)" />
@@ -101,7 +101,7 @@ const columns = computed(() => (view.value === 'table'
 
 const SORTS = [{ sort: 'due_date', label: 'Due date' }, { sort: 'priority', label: 'Priority' }, { sort: 'title', label: 'Title' }, { sort: 'status', label: 'Status' },
   { sort: 'creation', label: 'Created' }, { sort: 'completed_on', label: 'Completed' }]
-const struck = (t) => (t.status === 'Done' || t.status === 'Dropped' ? 'text-decoration: line-through; color: var(--mut)' : '')
+const struck = (t) => (t.status === 'Done' || t.status === 'Dropped' ? 'text-decoration: line-through; color: var(--ink-gray-6)' : '')
 function dueGroup(t) {
   if (route.query.sort) return null
   const d = t.due_date
@@ -168,9 +168,9 @@ onMounted(loadLookups)
 </script>
 <style scoped>
 .board { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 16px; align-items: start; }
-.col { background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-height: 120px; display: flex; flex-direction: column; gap: 8px; }
+.col { background: var(--surface-gray-1); border: 1px solid var(--outline-gray-1); border-radius: 10px; padding: 12px; min-height: 120px; display: flex; flex-direction: column; gap: 8px; }
 .card { cursor: grab; padding: 10px 12px; }
-.card.on { border-color: var(--accent); background: var(--b-bg); }
+.card.on { border-color: var(--ink-blue-8); background: var(--surface-blue-2); }
 .inp.mini { height: 26px; font-size: 12.5px; padding: 0 6px; border-radius: 6px; }
 @media (max-width: 800px) { .board { grid-template-columns: 1fr; } .inp.mini { height: 36px; } }
 </style>

@@ -128,5 +128,5 @@ onMounted(load)
 </script>
 <style scoped>
 .st a { color: inherit; text-decoration: none; }
-.st a.big:hover b, .st a.mt:hover { color: var(--accent); text-decoration: underline; }
+.st a.big:hover b, .st a.mt:hover { color: var(--ink-blue-8); text-decoration: underline; }
 </style>

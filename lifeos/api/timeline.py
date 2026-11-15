@@ -3,7 +3,7 @@ import frappe
 from frappe.utils import add_days, getdate, today
 
 from lifeos import links, permissions
-from lifeos.api.utils import flag, names_map, page, user_names
+from lifeos.api.utils import flag, names_map, page, std_filters, summarise, user_names
 
 KIND_DOCTYPES = {
 	"Life Inbox Item": ["Inbox"], "Life Task": ["Task", "Task Done"], "Life Note": ["Note"], "Life Vault Document": ["Document"],
@@ -42,7 +42,7 @@ def index_rows(space, where="", values=None, order="record_date desc, modified d
 
 
 @frappe.whitelist()
-def get(space=None, from_date=None, to_date=None, area=None, doctype=None, include_archived=0, start=0, page_length=50):
+def get(space=None, from_date=None, to_date=None, area=None, doctype=None, include_archived=0, start=0, page_length=50, filters=None, summary=None):
 	"""Every record by day, newest first: inbox items, tasks created and completed, notes, documents, chats, journal pages, check-ins."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
@@ -61,7 +61,11 @@ def get(space=None, from_date=None, to_date=None, area=None, doctype=None, inclu
 		values["doctype"] = doctype
 	if not flag(include_archived):
 		where.append("is_archived = 0")
+	conds, values = std_filters("Life Index", filters, "", values)
+	where += conds
 	clause = (" and " + " and ".join(where)) if where else ""
+	if summary:
+		return {"summary": summarise("Life Index", f"from `tabLife Index` where space=%(space)s {clause}", {"space": space, **values}, "", summary, start, page_length)}
 	rows = index_rows(space, clause, values, start=start, page_length=page_length)
 	total = frappe.db.sql(f"select count(*) from `tabLife Index` where space=%(space)s {clause}", {"space": space, **values})[0][0]
 	days = []

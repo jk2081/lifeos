@@ -17,7 +17,7 @@
               @change="setGoal(g, { status: g.status === 'Done' ? 'Open' : 'Done' })" />
             <span class="pl n" style="min-width: 26px; justify-content: center">{{ g.priority || '·' }}</span>
             <div class="grow">
-              <div class="ttl" :style="g.status === 'Done' || g.status === 'Dropped' ? 'text-decoration: line-through; color: var(--mut)' : g.status === 'Carried' ? 'color: var(--mut)' : ''">
+              <div class="ttl" :style="g.status === 'Done' || g.status === 'Dropped' ? 'text-decoration: line-through; color: var(--ink-gray-6)' : g.status === 'Carried' ? 'color: var(--ink-gray-6)' : ''">
                 {{ g.title }}<span v-if="g.status === 'Carried'" title="Carried to next month"> →</span></div>
               <div class="mt">{{ [g.area_name, g.carried_from ? 'carried from last month' : '', g.status === 'Carried' ? 'carried forward' : '', g.status === 'Dropped' ? 'dropped' : ''].filter(Boolean).join(' · ') }}
                 <a v-if="g.task" href="#" @click.prevent="openRef('task:' + g.task)">{{ g.area_name || g.carried_from ? '· ' : '' }}task</a></div>

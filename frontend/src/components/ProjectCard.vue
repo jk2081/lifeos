@@ -24,7 +24,7 @@ function open(e) {
 }
 </script>
 <style scoped>
-.pj { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; color: var(--ink); }
-.pj:hover { background: var(--soft); }
-.pj.on { border-color: var(--accent); background: var(--b-bg); }
+.pj { border: 1px solid var(--outline-gray-1); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; color: var(--ink-gray-9); }
+.pj:hover { background: var(--surface-gray-1); }
+.pj.on { border-color: var(--ink-blue-8); background: var(--surface-blue-2); }
 </style>

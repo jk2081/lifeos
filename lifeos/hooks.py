@@ -21,9 +21,12 @@ permission_query_conditions = {dt: "lifeos.permissions.query_conditions" for dt 
 permission_query_conditions["Life Space"] = "lifeos.permissions.space_query_conditions"
 permission_query_conditions["Event"] = "lifeos.permissions.event_query_conditions"
 
+permission_query_conditions["Life View State"] = "lifeos.permissions.view_state_query_conditions"
+
 has_permission = {dt: "lifeos.permissions.has_permission" for dt in SPACE_DOCTYPES}
 has_permission["Life Space"] = "lifeos.permissions.space_has_permission"
 has_permission["Event"] = "lifeos.permissions.event_has_permission"
+has_permission["Life View State"] = "lifeos.permissions.view_state_has_permission"
 
 doc_events = {
 	dt: {"validate": "lifeos.org.validate_common", "on_update": "lifeos.org.on_update", "on_trash": "lifeos.org.on_trash"}

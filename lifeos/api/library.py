@@ -3,7 +3,8 @@ import frappe
 from frappe import _
 
 from lifeos import links, permissions
-from lifeos.api.utils import area_filter, flag, names_map, order_by, page, parse
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import order_by as sort_order
 
 
 @frappe.whitelist()
@@ -28,7 +29,7 @@ SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modi
 
 
 @frappe.whitelist()
-def list(space=None, area=None, project=None, tag=None, include_archived=0, sort=None, dir=None, start=0, page_length=50):
+def list(space=None, area=None, project=None, tag=None, include_archived=0, sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None):
 	"""Notes of a space as a flat list, by title. Reads Life Index.
 	Filters: area (with its sub-areas, or "none"), project (a project, or "none" for reference notes), tag.
 	`total` is the number of notes the filters match."""
@@ -45,10 +46,14 @@ def list(space=None, area=None, project=None, tag=None, include_archived=0, sort
 	if tag:
 		where.append("exists (select 1 from `tabLife Tag Link` tl where tl.parent = x.ref_name and tl.parenttype = 'Life Note' and tl.tag = %(tag)s)")
 		values["tag"] = tag
-	clause = " and ".join(where)
+	conds, values = std_filters("Life Index", filters, "x", values)
+	clause = " and ".join(where + conds)
+	if summary:
+		return {"summary": summarise("Life Index", f"from `tabLife Index` x where {clause}", values, "x", summary, start, page_length)}
+	order = std_order("Life Index", order_by, "x", SORTS) or sort_order(sort, dir, SORTS, "x.title asc")
 	rows = frappe.db.sql(
 		f"""select x.ref_name as name, x.title, x.area, x.project, x.record_date, x.modified, x.is_archived from `tabLife Index` x
-		where {clause} order by {order_by(sort, dir, SORTS, "x.title asc")}, x.ref_name limit %(start)s, %(len)s""",
+		where {clause} order by {order}, x.ref_name limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True)
 	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {clause}", values)[0][0]
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")

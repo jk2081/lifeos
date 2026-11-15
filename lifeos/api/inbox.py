@@ -4,7 +4,8 @@ from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import files, links, permissions, proposals
-from lifeos.api.utils import area_filter, flag, names_map, order_by, page, parse, user_names
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, user_names
+from lifeos.api.utils import order_by as sort_order
 
 CLAIM_MINUTES = 30
 LIST = list  # this module defines its own `list` method below
@@ -184,7 +185,7 @@ SORTS = {"received_on": "i.received_on", "title": "i.title", "status": "i.status
 
 @frappe.whitelist()
 def list(space=None, status=None, include_archived=0, start=0, page_length=30, source_type=None, area=None,
-		from_date=None, to_date=None, sort=None, dir=None):
+		from_date=None, to_date=None, sort=None, dir=None, filters=None, order_by=None, summary=None):
 	"""Inbox items of a space, newest first, with proposal counts.
 	Filters: status (one status or a JSON list), source_type, area (with its sub-areas, or "none"), from_date and to_date on the day received.
 	`total` is the number of items the filters match; `pending_total` is the pending proposals of those items."""
@@ -208,8 +209,11 @@ def list(space=None, status=None, include_archived=0, start=0, page_length=30, s
 	if to_date:
 		where.append("date(i.received_on) <= %(to_date)s")
 		values["to_date"] = frappe.utils.getdate(to_date)
-	clause = " and ".join(where)
-	order = order_by(sort, dir, SORTS, "i.received_on desc")
+	conds, values = std_filters("Life Inbox Item", filters, "i", values)
+	clause = " and ".join(where + conds)
+	if summary:
+		return {"summary": summarise("Life Inbox Item", f"from `tabLife Inbox Item` i where {clause}", values, "i", summary, start, page_length)}
+	order = std_order("Life Inbox Item", order_by, "i", SORTS) or sort_order(sort, dir, SORTS, "i.received_on desc")
 	rows = frappe.db.sql(
 		f"""select i.name, i.title, i.source_type, i.status, i.received_on, i.instruction, i.claimed_by, i.error, i.owner, i.area,
 			i.summary_md, i.transcript_md from `tabLife Inbox Item` i where {clause} order by {order}, i.creation desc limit %(start)s, %(len)s""",

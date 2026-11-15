@@ -7,7 +7,7 @@
     <section><h2 class="sh">Open items</h2>
       <div class="cd list">
         <div v-for="i in c.open_items" :key="i.row" class="rw" style="align-items: center; flex-wrap: wrap" data-open-item>
-          <div class="grow" style="flex-basis: 200px"><div class="ttl" :style="i.status !== 'Open' ? 'text-decoration: line-through; color: var(--mut)' : ''">{{ i.text }}</div>
+          <div class="grow" style="flex-basis: 200px"><div class="ttl" :style="i.status !== 'Open' ? 'text-decoration: line-through; color: var(--ink-gray-6)' : ''">{{ i.text }}</div>
             <div v-if="i.status !== 'Open'" class="mt">{{ i.status === 'Task Created' ? 'Made into a task' : 'Closed' }}</div></div>
           <a v-if="i.task" href="#" class="bt t" @click.prevent="openRef('task:' + i.task)">Open task</a>
           <div v-else-if="writable && i.status === 'Open'" class="chips"><button class="bt s" type="button" @click="makeTask(i)">Make task</button>

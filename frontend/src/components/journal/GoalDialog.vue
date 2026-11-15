@@ -14,7 +14,7 @@
       </div>
     </div>
     <template #actions><div style="display: flex; gap: 8px; justify-content: space-between">
-      <button v-if="goal" class="bt t" type="button" style="color: var(--r-ink)" @click="remove">Delete goal</button><span v-else></span>
+      <button v-if="goal" class="bt t" type="button" style="color: var(--ink-red-9)" @click="remove">Delete goal</button><span v-else></span>
       <div style="display: flex; gap: 8px"><button class="bt s" type="button" @click="open = false">Cancel</button>
         <button class="bt p" type="button" @click="save">Save goal</button></div></div></template>
   </Dialog>

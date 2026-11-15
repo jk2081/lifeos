@@ -9,7 +9,7 @@
       <div class="half">
         <section><h2 class="sh">Actions</h2>
           <div class="cd list"><div v-for="a in d.goal.actions" :key="a.name" class="rw">
-            <div class="grow"><div class="ttl" :style="a.status !== 'Open' ? 'text-decoration: line-through; color: var(--mut)' : ''">{{ a.title }}</div>
+            <div class="grow"><div class="ttl" :style="a.status !== 'Open' ? 'text-decoration: line-through; color: var(--ink-gray-6)' : ''">{{ a.title }}</div>
               <div class="mt">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
             <span v-if="a.status !== 'Open'" class="pl" :class="a.status === 'Done' ? 'g' : 'n'">{{ a.status }}</span></div>
             <Empty v-if="!d.goal.actions.length" title="No actions." hint="Edit the goal on the grid to add weekly actions." /></div>
@@ -24,7 +24,7 @@
       <div class="half">
         <section><h2 class="sh">History across cycles</h2>
           <div class="cd list"><div v-for="h in d.history" :key="h.name" class="rw" style="align-items: center">
-            <div class="grow"><RouterLink class="ttl" :to="`/journal/goals/${h.name}`" :style="h.name === d.goal.name ? 'color: var(--ink)' : ''">{{ h.cycle_title }}</RouterLink>
+            <div class="grow"><RouterLink class="ttl" :to="`/journal/goals/${h.name}`" :style="h.name === d.goal.name ? 'color: var(--ink-gray-9)' : ''">{{ h.cycle_title }}</RouterLink>
               <div class="mt">{{ h.cycle_status }}{{ h.result_note ? ' · ' + h.result_note : '' }}</div></div>
             <div class="br" style="max-width: 120px"><i :style="`width: ${h.score}%`"></i></div><span style="width: 40px; text-align: right">{{ Math.round(h.score) }}%</span>
             <span class="pl n">{{ h.outcome }}</span></div></div>

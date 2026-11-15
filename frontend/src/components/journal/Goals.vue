@@ -136,9 +136,9 @@ onMounted(() => {
 })
 </script>
 <style scoped>
-.gr { display: grid; grid-template-columns: minmax(230px, 2fr) 150px 80px minmax(170px, 1.2fr) 130px; gap: 0 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line2); }
-.gr.hdr { border-top: 0; background: var(--side); font-size: 12px; color: var(--mut); padding: 8px 16px; }
-.cy { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--line); background: var(--softer); }
+.gr { display: grid; grid-template-columns: minmax(230px, 2fr) 150px 80px minmax(170px, 1.2fr) 130px; gap: 0 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--outline-gray-1); }
+.gr.hdr { border-top: 0; background: var(--surface-gray-1); font-size: 12px; color: var(--ink-gray-6); padding: 8px 16px; }
+.cy { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--outline-gray-1); background: var(--surface-gray-1); }
 .cy b { font-weight: 600; }
 .pg { display: flex; align-items: center; gap: 8px; }
 .pg span { width: 36px; text-align: right; font-variant-numeric: tabular-nums; }

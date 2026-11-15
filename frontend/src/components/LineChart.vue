@@ -2,16 +2,16 @@
   <div class="lc" @mouseleave="hover = -1">
     <svg :viewBox="`0 0 ${W} ${H}`" role="img" :aria-label="label" @mousemove="move" @touchstart.passive="move" @touchmove.passive="move">
       <g v-for="y in [0, 5, 10]" :key="y">
-        <line :x1="PL" :x2="W - PR" :y1="sy(y)" :y2="sy(y)" stroke="var(--line)" stroke-width="1" />
+        <line :x1="PL" :x2="W - PR" :y1="sy(y)" :y2="sy(y)" stroke="var(--outline-gray-1)" stroke-width="1" />
         <text :x="PL - 6" :y="sy(y) + 3.5" text-anchor="end" class="ax">{{ y }}</text>
       </g>
       <text v-for="(p, i) in points" v-show="i === 0 || i === points.length - 1" :key="'d' + i" :x="sx(i)" :y="H - 4"
         :text-anchor="i === 0 ? 'start' : 'end'" class="ax">{{ short(p.date) }}</text>
-      <line v-if="hover >= 0" :x1="sx(hover)" :x2="sx(hover)" :y1="PT" :y2="H - PB" stroke="var(--line4)" stroke-width="1" />
+      <line v-if="hover >= 0" :x1="sx(hover)" :x2="sx(hover)" :y1="PT" :y2="H - PB" stroke="var(--outline-gray-3)" stroke-width="1" />
       <g v-for="s in SERIES" :key="s.key">
         <path :d="path(s.key)" fill="none" :stroke="`var(${s.color})`" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
         <template v-for="(p, i) in points" :key="i">
-          <circle v-if="p[s.key] != null" :cx="sx(i)" :cy="sy(p[s.key])" :r="hover === i ? 5 : 4" :fill="`var(${s.color})`" stroke="var(--bg)" stroke-width="2" />
+          <circle v-if="p[s.key] != null" :cx="sx(i)" :cy="sy(p[s.key])" :r="hover === i ? 5 : 4" :fill="`var(${s.color})`" stroke="var(--surface-base)" stroke-width="2" />
         </template>
       </g>
     </svg>
@@ -27,7 +27,7 @@ import { ref } from 'vue'
 import { short } from '@/lib/dates'
 
 const props = defineProps({ points: Array, label: String })
-const SERIES = [{ key: 'habits', label: 'Habits', color: '--series-1' }, { key: 'situation', label: 'Situation', color: '--series-2' }]
+const SERIES = [{ key: 'habits', label: 'Habits', color: '--ink-blue-7' }, { key: 'situation', label: 'Situation', color: '--ink-amber-7' }]
 const W = 320, H = 132, PL = 22, PR = 8, PT = 8, PB = 20
 const hover = ref(-1)
 const sx = (i) => (props.points.length < 2 ? (PL + W - PR) / 2 : PL + (i * (W - PL - PR)) / (props.points.length - 1))
@@ -52,7 +52,7 @@ function move(e) {
 <style scoped>
 .lc { position: relative; }
 svg { width: 100%; height: auto; display: block; }
-.ax { font-size: 10px; fill: var(--mut); font-variant-numeric: tabular-nums; }
-.tip { position: absolute; top: 0; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--line3); border-radius: 8px; padding: 6px 8px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; box-shadow: var(--shadow); white-space: nowrap; z-index: 2; color: var(--ink); }
+.ax { font-size: 10px; fill: var(--ink-gray-6); font-variant-numeric: tabular-nums; }
+.tip { position: absolute; top: 0; transform: translateX(-50%); background: var(--surface-base); border: 1px solid var(--outline-gray-2); border-radius: 8px; padding: 6px 8px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; box-shadow: var(--elevation-lg); white-space: nowrap; z-index: 2; color: var(--ink-gray-9); }
 .tip i { display: inline-block; width: 8px; height: 8px; border-radius: 4px; margin-right: 6px; }
 </style>

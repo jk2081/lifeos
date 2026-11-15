@@ -5,7 +5,7 @@
   <div class="bd" style="flex: 1">
     <div class="chips">
       <span v-for="t in LEGEND" :key="t.type" class="lgd"><i :style="`background: var(${t.color})`"></i>{{ t.label }}</span>
-      <span class="lgd"><i style="background: var(--mut)"></i>Task, chat or project that is linked</span>
+      <span class="lgd"><i style="background: var(--ink-gray-6)"></i>Task, chat or project that is linked</span>
       <span style="flex: 1"></span>
       <span v-if="picked" class="chips">
         <b style="font-weight: 500">{{ picked.label }}</b>
@@ -22,6 +22,7 @@
   </div>
 </template>
 <script setup>
+import { tokenColor } from '@/lib/tokens'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import cytoscape from 'cytoscape'
@@ -30,8 +31,8 @@ import Empty from '@/components/Empty.vue'
 import { api, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 
-const LEGEND = [{ type: 'Note', label: 'Note', color: '--series-1' }, { type: 'Person', label: 'Person', color: '--series-2' },
-  { type: 'Goal', label: 'Goal', color: '--series-3' }, { type: 'Document', label: 'Vault document', color: '--series-4' }]
+const LEGEND = [{ type: 'Note', label: 'Note', color: '--ink-blue-7' }, { type: 'Person', label: 'Person', color: '--ink-amber-7' },
+  { type: 'Goal', label: 'Goal', color: '--ink-violet-6' }, { type: 'Document', label: 'Vault document', color: '--ink-green-7' }]
 const route = useRoute()
 const router = useRouter()
 const host = ref(null)
@@ -39,7 +40,7 @@ const d = ref(null)
 const picked = ref(null)
 const center = ref(route.query.center || '')
 let cy = null
-const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+const css = tokenColor
 const label = (id) => d.value.nodes.find((n) => n.id === id)?.label || id
 
 function draw() {
@@ -48,14 +49,14 @@ function draw() {
   cy = cytoscape({
     container: host.value,
     elements: [
-      ...d.value.nodes.map((n) => ({ data: { id: n.id, label: n.label, color: color[n.type] || css('--mut'), route: n.route, full: n.label } })),
+      ...d.value.nodes.map((n) => ({ data: { id: n.id, label: n.label, color: color[n.type] || css('--ink-gray-6'), route: n.route, full: n.label } })),
       ...d.value.edges.map((e, i) => ({ data: { id: 'e' + i, source: e.source, target: e.target, kind: e.kind } })),
     ],
     style: [
-      { selector: 'node', style: { 'background-color': 'data(color)', label: 'data(label)', color: css('--ink'), 'font-size': 11, 'font-family': 'Inter, system-ui, sans-serif',
-        'text-valign': 'bottom', 'text-margin-y': 5, 'text-wrap': 'ellipsis', 'text-max-width': 120, width: 16, height: 16, 'border-width': 2, 'border-color': css('--bg'), 'text-background-color': css('--bg'), 'text-background-opacity': 0.8, 'text-background-padding': 2 } },
-      { selector: 'node:selected', style: { 'border-color': css('--ink'), width: 20, height: 20 } },
-      { selector: 'edge', style: { width: 1.5, 'line-color': css('--line4'), 'target-arrow-color': css('--line4'), 'target-arrow-shape': 'triangle', 'arrow-scale': 0.8, 'curve-style': 'bezier' } },
+      { selector: 'node', style: { 'background-color': 'data(color)', label: 'data(label)', color: css('--ink-gray-9'), 'font-size': 11, 'font-family': 'Inter, system-ui, sans-serif',
+        'text-valign': 'bottom', 'text-margin-y': 5, 'text-wrap': 'ellipsis', 'text-max-width': 120, width: 16, height: 16, 'border-width': 2, 'border-color': css('--surface-base'), 'text-background-color': css('--surface-base'), 'text-background-opacity': 0.8, 'text-background-padding': 2 } },
+      { selector: 'node:selected', style: { 'border-color': css('--ink-gray-9'), width: 20, height: 20 } },
+      { selector: 'edge', style: { width: 1.5, 'line-color': css('--outline-gray-3'), 'target-arrow-color': css('--outline-gray-3'), 'target-arrow-shape': 'triangle', 'arrow-scale': 0.8, 'curve-style': 'bezier' } },
       { selector: 'edge[kind = "parent"]', style: { 'line-style': 'dashed' } },
     ],
     layout: { name: 'preset' },
@@ -92,8 +93,8 @@ onMounted(load)
 onBeforeUnmount(() => cy && cy.destroy())
 </script>
 <style scoped>
-.cy { flex: 1; min-height: 520px; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); }
-.lgd { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--mut2); }
+.cy { flex: 1; min-height: 520px; border: 1px solid var(--outline-gray-1); border-radius: 10px; background: var(--surface-gray-1); }
+.lgd { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-gray-7); }
 .lgd i { width: 10px; height: 10px; border-radius: 5px; display: inline-block; }
 @media (max-width: 800px) { .cy { min-height: 60vh; } }
 </style>

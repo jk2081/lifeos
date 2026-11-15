@@ -117,6 +117,25 @@ def event_has_permission(doc, ptype=None, user=None, debug=False):
 	return True
 
 
+def view_state_query_conditions(user=None, doctype=None):
+	"""A saved list state belongs to one person. Nobody else lists it, the owner of the site included."""
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return ""
+	if is_agent(user):
+		return "1=0"
+	return f"`tabLife View State`.`user` = {frappe.db.escape(user)}"
+
+
+def view_state_has_permission(doc, ptype=None, user=None, debug=False):
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	if is_agent(user):
+		return False
+	return not doc.get("user") or doc.user == user
+
+
 # ---- helpers for API methods ----
 
 def require_login():

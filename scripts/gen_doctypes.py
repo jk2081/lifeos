@@ -265,6 +265,13 @@ dt("Life Action Log", [
 	f("count", "Int", default="1"), link("inbox_item", "Life Inbox Item"),
 ], autoname="prompt")
 
+# ---- per-user screen state (UX fixes, set 2): one row per user, screen and space ----
+OWN_ROWS = {"read": 1, "write": 1, "create": 1, "delete": 1}
+dt("Life View State", [
+	link("user", "User", reqd=1, search_index=1, in_list_view=1), f("screen", reqd=1, in_list_view=1, length=60),
+	link("space", "Life Space", in_list_view=1), f("state", "JSON"),
+], permissions=[{"role": "Life Admin", **OWN_ROWS}, {"role": "Life User", **OWN_ROWS}], in_create=1)
+
 TRACK = {"Life Note", "Life Task", "Life Vault Document", "Life Project", "Life Goal", "Life Month Plan", "Life Journal Page", "Life Inbox Item"}
 
 
@@ -288,9 +295,11 @@ def build(name, fields, kw):
 		doc["naming_rule"] = {"hash": "Random", "prompt": "Set by user"}.get(doc["autoname"], "By fieldname")
 		if name in TRACK:
 			doc["track_changes"] = 1
-	for k in ("title_field", "show_title", "search_fields", "in_create"):
+	for k in ("title_field", "search_fields", "in_create"):
 		if k in kw:
 			doc[k] = kw[k]
+	if kw.get("show_title"):
+		doc["show_title_field_in_link"] = 1  # link pickers show the title, not the random id
 	return dict(sorted(doc.items()))
 
 

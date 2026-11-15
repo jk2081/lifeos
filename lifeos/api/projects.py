@@ -6,7 +6,8 @@ from lifeos import archive, permissions
 from lifeos.api import tasks as task_api
 from lifeos.api.area import chat_open_counts, project_cards
 from lifeos.api.timeline import index_rows
-from lifeos.api.utils import area_filter, flag, order_by, page
+from lifeos.api.utils import area_filter, extra_columns, flag, page, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import order_by as sort_order
 
 
 SORTS = {"title": "p.title", "status": "field(p.status, 'Active', 'On Hold', 'Done', 'Dropped')", "target_date": "p.target_date is null, p.target_date",
@@ -34,7 +35,7 @@ def count(space, **filters):
 
 
 @frappe.whitelist()
-def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None, start=0, page_length=100):
+def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None, start=0, page_length=100, filters=None, order_by=None, summary=None):
 	"""Projects of a space, as a flat list and grouped by area. With no status: active and on hold ones; include_done=1 for every status.
 	Filters: status (Active, On Hold, Done, Dropped), area (with its sub-areas). `total` is the number the filters match."""
 	space = permissions.resolve_space(space)
@@ -42,13 +43,19 @@ def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None
 	if status and status not in ("Active", "On Hold", "Done", "Dropped"):
 		frappe.throw(_("Unknown status."))
 	where, values = where_clause(space, status, area, include_done)
-	rows = project_cards(space, where, values, order_by(sort, dir, SORTS, None), start, page_length)
+	extra, values = std_clause("Life Project", filters, "p", values)
+	where += extra
+	if summary:
+		return {"summary": summarise("Life Project", f"from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values},
+			"p", summary, start, page_length)}
+	order = std_order("Life Project", order_by, "p", SORTS) or sort_order(sort, dir, SORTS, None)
+	rows = project_cards(space, where, values, order, start, page_length)
 	groups = {}
 	for r in rows:
 		groups.setdefault((r.area, r.area_name), []).append(r)
 	out = [{"area": k[0], "area_name": k[1], "projects": v} for k, v in groups.items()]
 	out.sort(key=lambda g: g["area_name"] or "")
-	return {"space": space, "groups": out, "projects": rows, "total": count(space, status=status, area=area, include_done=include_done)}
+	return {"space": space, "groups": out, "projects": rows, "total": frappe.db.sql(f"select count(*) from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values})[0][0]}
 
 
 @frappe.whitelist()

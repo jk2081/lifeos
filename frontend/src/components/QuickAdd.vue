@@ -33,5 +33,5 @@ onMounted(() => input.value?.focus())
 </script>
 <style scoped>
 .qa-back { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.25); z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 0; }
-.qa { width: min(560px, 100%); background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); }
+.qa { width: min(560px, 100%); background: var(--surface-base); border: 1px solid var(--outline-gray-1); border-radius: 12px; padding: 14px; box-shadow: var(--elevation-lg); }
 </style>

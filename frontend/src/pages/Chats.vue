@@ -70,6 +70,6 @@ function setGroup(g) {
 onMounted(loadLookups)
 </script>
 <style scoped>
-.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink2); font-size: 13.5px; }
-a.pl:hover { background: var(--line3); }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink-gray-8); font-size: 13.5px; }
+a.pl:hover { background: var(--outline-gray-2); }
 </style>
