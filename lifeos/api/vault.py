@@ -1,10 +1,10 @@
 """Vault: documents by holder and type, with expiry badges."""
 import frappe
 from frappe import _
-from frappe.utils import getdate, today
+from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.api.utils import flag, names_map, page, parse
+from lifeos.api.utils import area_filter, flag, names_map, order_by, page, parse
 
 FIELDS = ["name", "title", "doc_type", "holder", "file", "number_last4", "issue_date", "expiry_date", "remind_days_before", "area", "project", "is_archived", "inbox_item"]
 EDITABLE = {"title", "doc_type", "holder", "number_last4", "issue_date", "expiry_date", "remind_days_before", "notes_md", "area", "project"}
@@ -34,23 +34,72 @@ def _decorate(rows):
 	return rows
 
 
+SOON_DAYS = 60
+EXPIRY = {
+	"expired": "d.expiry_date < %(today)s",
+	"soon": "d.expiry_date between %(today)s and %(soon)s",
+	"later": "d.expiry_date > %(soon)s",
+	"none": "d.expiry_date is null",
+}
+SORTS = {"title": "d.title", "doc_type": "d.doc_type", "expiry_date": "d.expiry_date is null, d.expiry_date",
+	"holder": "(select full_name from `tabLife Person` h where h.name = d.holder)"}
+
+
+def where_clause(space, holder=None, doc_type=None, expiry=None, area=None, project=None, include_archived=0):
+	where, values = [], {"today": getdate(today()), "soon": add_days(getdate(today()), SOON_DAYS)}
+	if not flag(include_archived):
+		where.append("d.is_archived = 0")
+	if holder:
+		where.append("ifnull(d.holder, '') = %(holder)s")
+		values["holder"] = "" if holder == "none" else holder
+	if doc_type:
+		where.append("d.doc_type = %(doc_type)s")
+		values["doc_type"] = doc_type
+	if expiry:
+		if expiry not in EXPIRY:
+			frappe.throw(_("expiry must be one of: {0}.").format(", ".join(EXPIRY)))
+		where.append(EXPIRY[expiry])
+	if area:
+		where.append(area_filter(space, area, "d.area", values))
+	if project:
+		where.append("d.project = %(project)s")
+		values["project"] = project
+	return "".join(" and " + w for w in where), values
+
+
+def count(space, **filters):
+	clause, values = where_clause(space, **filters)
+	return frappe.db.sql(f"select count(*) from `tabLife Vault Document` d where d.space=%(space)s {clause}", {"space": space, **values})[0][0]
+
+
+def expiry_counts(space):
+	"""How many documents have expired and how many expire within 60 days, counted as the Expiry filter counts them."""
+	return {"expired": count(space, expiry="expired"), "soon": count(space, expiry="soon")}
+
+
 @frappe.whitelist()
-def list(space=None, include_archived=0, start=0, page_length=100):
-	"""Vault documents of a space, grouped by holder, soonest expiry first."""
+def list(space=None, include_archived=0, start=0, page_length=100, holder=None, doc_type=None, expiry=None, area=None, project=None,
+		sort=None, dir=None):
+	"""Vault documents of a space, soonest expiry first, as a flat list and grouped by holder.
+	Filters: holder (a person, or "none"), doc_type, expiry (expired, soon = within 60 days, later, none), area, project.
+	`total` is the number of documents the filters match."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	filters = {"space": space}
-	if not flag(include_archived):
-		filters["is_archived"] = 0
-	rows = _decorate(frappe.get_all("Life Vault Document", filters=filters, fields=FIELDS,
-		order_by="expiry_date asc, title asc", limit_start=start, limit=page_length))
-	rows.sort(key=lambda r: (r["expiry_date"] is None, r["expiry_date"] or "", r["title"]))
+	clause, values = where_clause(space, holder, doc_type, expiry, area, project, include_archived)
+	cols = ", ".join(f"d.`{f}`" for f in FIELDS)
+	order = order_by(sort, dir, SORTS, "d.expiry_date is null, d.expiry_date asc")
+	rows = _decorate(frappe.db.sql(
+		f"select {cols} from `tabLife Vault Document` d where d.space=%(space)s {clause} order by {order}, d.title asc limit %(start)s, %(len)s",
+		{"space": space, "start": start, "len": page_length, **values}, as_dict=True))
+	total = frappe.db.sql(f"select count(*) from `tabLife Vault Document` d where d.space=%(space)s {clause}", {"space": space, **values})[0][0]
 	groups = {}
 	for r in rows:
 		groups.setdefault(r["holder_name"] or "No holder", []).append(r)
 	people = frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], order_by="full_name", limit=500)
-	return {"space": space, "groups": [{"holder": k, "documents": v} for k, v in sorted(groups.items(), key=lambda kv: (kv[0] == "No holder", kv[0]))],
-		"total": len(rows), "people": people, "expiring": sum(1 for r in rows if r["badge"])}
+	counts = expiry_counts(space)
+	return {"space": space, "documents": rows,
+		"groups": [{"holder": k, "documents": v} for k, v in sorted(groups.items(), key=lambda kv: (kv[0] == "No holder", kv[0]))],
+		"total": total, "people": people, "expiring": sum(1 for r in rows if r["badge"]), "expired": counts["expired"], "soon": counts["soon"]}
 
 
 @frappe.whitelist()
@@ -58,7 +107,8 @@ def get(document):
 	"""One vault document with its holder, file and expiry badge."""
 	doc = permissions.get_doc_checked("Life Vault Document", document)
 	row = _decorate([frappe._dict({f: doc.get(f) for f in FIELDS})])[0]
-	row.update({"space": doc.space, "notes_md": doc.notes_md or "", "also_in": [r.area for r in doc.also_in]})
+	row.update({"space": doc.space, "notes_md": doc.notes_md or "", "also_in": [r.area for r in doc.also_in],
+		"project_title": frappe.db.get_value("Life Project", doc.project, "title") if doc.project else None})
 	if doc.file:
 		f = frappe.db.get_value("File", {"file_url": doc.file, "attached_to_name": doc.name}, ["file_name", "file_size"], as_dict=True)
 		row["file_name"], row["file_size"] = (f.file_name, f.file_size) if f else (doc.file.split("/")[-1], None)

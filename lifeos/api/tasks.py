@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import datewords, journal, permissions
-from lifeos.api.utils import flag, names_map, page
+from lifeos.api.utils import area_filter, flag, names_map, order_by, page
 
 OPEN = ("Open", "Doing", "Waiting")
 FIELDS = ["name", "title", "status", "priority", "due_date", "area", "project", "goal", "inbox_item", "carried_from", "waiting_on",
@@ -43,14 +43,23 @@ def query(space, where="", values=None, order=None, start=0, page_length=50):
 	return decorate(rows)
 
 
-@frappe.whitelist()
-def list(space=None, status="open", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None,
-		include_archived=0, start=0, page_length=50):
-	"""Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first."""
-	space = permissions.resolve_space(space)
-	start, page_length = page(start, page_length)
+DUE = {
+	"overdue": "t.due_date < %(today)s",
+	"today": "t.due_date = %(today)s",
+	"week": "t.due_date between %(week_start)s and %(week_end)s",
+	"none": "t.due_date is null",
+}
+SORTS = {"due_date": "t.due_date is null, t.due_date", "priority": PRIORITY_ORDER, "title": "t.title", "status": "t.status",
+	"creation": "t.creation", "completed_on": "t.completed_on"}
+
+
+def where_clause(space, status="open", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None,
+		include_archived=0, due=None, done=0, loops=0, completed_from=None, completed_to=None):
+	"""The WHERE of a task list. Every count in the app that leads to a task list is made with this, so the two agree."""
 	where, values = [], {}
-	if status == "open":
+	if status == "open" and flag(done):
+		where.append("t.status in ('Open', 'Doing', 'Waiting', 'Done', 'Dropped')")
+	elif status == "open":
 		where.append("t.status in ('Open', 'Doing', 'Waiting')")
 	elif status == "done":
 		where.append("t.status in ('Done', 'Dropped', 'Carried')")
@@ -60,11 +69,10 @@ def list(space=None, status="open", area=None, project=None, tag=None, priority=
 	if not flag(include_archived):
 		where.append("t.is_archived = 0")
 	if area:
-		where.append("(t.area = %(area)s or exists (select 1 from `tabLife Also In` ai where ai.parent = t.name and ai.parenttype='Life Task' and ai.area = %(area)s))")
-		values["area"] = area
+		where.append(area_filter(space, area, "t.area", values, also_in="Life Task"))
 	if project:
-		where.append("t.project = %(project)s")
-		values["project"] = project
+		where.append("ifnull(t.project, '') = %(project)s")
+		values["project"] = "" if project == "none" else project
 	if tag:
 		where.append("exists (select 1 from `tabLife Tag Link` tl where tl.parent = t.name and tl.parenttype='Life Task' and tl.tag = %(tag)s)")
 		values["tag"] = tag
@@ -77,8 +85,46 @@ def list(space=None, status="open", area=None, project=None, tag=None, priority=
 	if month_plan:
 		where.append("t.month_plan = %(month_plan)s")
 		values["month_plan"] = month_plan
-	clause = (" and " + " and ".join(where)) if where else ""
-	order = "t.completed_on desc, t.modified desc" if status == "done" else None
+	if due:
+		parts = [DUE[d.strip()] for d in str(due).split(",") if d.strip() in DUE]
+		if not parts:
+			frappe.throw(_("due must be one or more of: {0}.").format(", ".join(DUE)))
+		now = getdate(today())
+		values.update({"today": now, "week_start": add_days(now, -now.weekday()), "week_end": add_days(now, 6 - now.weekday())})
+		where.append("(" + " or ".join(parts) + ")")
+	if flag(loops):
+		where.append("t.due_date is null and t.creation < %(cutoff)s")
+		values["cutoff"] = add_days(today(), -OPEN_LOOP_DAYS)
+	if completed_from:
+		where.append("t.completed_on >= %(completed_from)s")
+		values["completed_from"] = getdate(completed_from)
+	if completed_to:
+		where.append("t.completed_on <= %(completed_to)s")
+		values["completed_to"] = getdate(completed_to)
+	return ((" and " + " and ".join(where)) if where else ""), values
+
+
+def count(space, **filters):
+	clause, values = where_clause(space, **filters)
+	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
+
+
+@frappe.whitelist()
+def list(space=None, status="open", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None,
+		include_archived=0, start=0, page_length=50, due=None, done=0, loops=0, completed_from=None, completed_to=None,
+		sort=None, dir=None):
+	"""Tasks of a space. status: open, done, all, or one status; done=1 adds Done and Dropped to open.
+	area takes an area (its sub-areas and also-in count) or "none". due: overdue, today, week, none, or several with commas.
+	loops=1 keeps open tasks older than 14 days with no date. completed_from and completed_to bound completed_on.
+	Sorted by due date, then priority I first, unless sort (due_date, priority, title, status, creation, completed_on) and dir say otherwise."""
+	space = permissions.resolve_space(space)
+	start, page_length = page(start, page_length)
+	clause, values = where_clause(space, status, area, project, tag, priority, goal, month_plan, include_archived, due, done, loops,
+		completed_from, completed_to)
+	default = "t.completed_on desc, t.modified desc" if status in ("done", "Done", "Carried", "Dropped") else None
+	order = order_by(sort, dir, SORTS, default)
+	if order and order != default:
+		order += ", t.creation asc"
 	rows = query(space, clause, values, order, start, page_length)
 	total = frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 	return {"tasks": rows, "total": total, "start": start, "page_length": page_length, "today": today()}

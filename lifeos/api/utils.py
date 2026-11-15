@@ -43,3 +43,41 @@ def user_names(users):
 	for name, first, full in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "first_name", "full_name"], as_list=True):
 		out[name] = first or full or name
 	return out
+
+
+def descendants(space, area):
+	"""The area and every area below it."""
+	rows = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "parent_area"], limit=2000)
+	children = {}
+	for r in rows:
+		children.setdefault(r.parent_area, []).append(r.name)
+	out, stack = [], [area]
+	while stack:
+		cur = stack.pop()
+		if cur in out:
+			continue
+		out.append(cur)
+		stack.extend(children.get(cur, []))
+	return out
+
+
+def area_filter(space, area, column, values, also_in=None):
+	"""SQL for an Area filter, the same on every list: the area with its sub-areas, or "none" for records with no area.
+	`also_in` is the parenttype of a record that can also be filed under other areas."""
+	if area == "none":
+		return f"ifnull({column}, '') = ''"
+	values["area_ids"] = descendants(space, area)
+	sql = f"{column} in %(area_ids)s"
+	if also_in:
+		name = column.rsplit(".", 1)[0] + ".name" if "." in column else "name"
+		sql = (f"({sql} or exists (select 1 from `tabLife Also In` ai where ai.parent = {name} "
+			f"and ai.parenttype = '{also_in}' and ai.area in %(area_ids)s))")
+	return sql
+
+
+def order_by(sort, direction, allowed, default):
+	"""An ORDER BY for a list. `allowed` maps the sort keys a caller may name to SQL, so nothing else reaches the query."""
+	if not sort or sort not in allowed:
+		return default
+	way = "desc" if str(direction or "").lower() == "desc" else "asc"
+	return ", ".join(f"{part.strip()} {way}" for part in allowed[sort].split(","))

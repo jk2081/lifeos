@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import files, links, permissions, proposals
-from lifeos.api.utils import flag, names_map, page, parse, user_names
+from lifeos.api.utils import area_filter, flag, names_map, order_by, page, parse, user_names
 
 CLAIM_MINUTES = 30
 LIST = list  # this module defines its own `list` method below
@@ -179,25 +179,51 @@ def retry(item):
 	return {"item": doc.name, "status": doc.status}
 
 
+SORTS = {"received_on": "i.received_on", "title": "i.title", "status": "i.status", "source_type": "i.source_type"}
+
+
 @frappe.whitelist()
-def list(space=None, status=None, include_archived=0, start=0, page_length=30):
-	"""Inbox items of a space, newest first, with proposal counts."""
+def list(space=None, status=None, include_archived=0, start=0, page_length=30, source_type=None, area=None,
+		from_date=None, to_date=None, sort=None, dir=None):
+	"""Inbox items of a space, newest first, with proposal counts.
+	Filters: status (one status or a JSON list), source_type, area (with its sub-areas, or "none"), from_date and to_date on the day received.
+	`total` is the number of items the filters match; `pending_total` is the pending proposals of those items."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	filters = {"space": space}
+	where, values = ["i.space = %(space)s"], {"space": space}
 	if status:
-		filters["status"] = ("in", parse(status) if str(status).startswith("[") else [status])
+		statuses = parse(status) if str(status).startswith("[") else [status]
+		where.append("i.status in %(statuses)s")
+		values["statuses"] = statuses or [""]
 	if not flag(include_archived):
-		filters["is_archived"] = 0
-	rows = frappe.get_all("Life Inbox Item", filters=filters,
-		fields=["name", "title", "source_type", "status", "received_on", "instruction", "claimed_by", "error", "owner", "summary_md", "transcript_md"],
-		order_by="received_on desc", limit_start=start, limit=page_length)
+		where.append("i.is_archived = 0")
+	if source_type:
+		where.append("i.source_type = %(source_type)s")
+		values["source_type"] = source_type
+	if area:
+		where.append(area_filter(space, area, "i.area", values))
+	if from_date:
+		where.append("date(i.received_on) >= %(from_date)s")
+		values["from_date"] = frappe.utils.getdate(from_date)
+	if to_date:
+		where.append("date(i.received_on) <= %(to_date)s")
+		values["to_date"] = frappe.utils.getdate(to_date)
+	clause = " and ".join(where)
+	order = order_by(sort, dir, SORTS, "i.received_on desc")
+	rows = frappe.db.sql(
+		f"""select i.name, i.title, i.source_type, i.status, i.received_on, i.instruction, i.claimed_by, i.error, i.owner, i.area,
+			i.summary_md, i.transcript_md from `tabLife Inbox Item` i where {clause} order by {order}, i.creation desc limit %(start)s, %(len)s""",
+		{**values, "start": start, "len": page_length}, as_dict=True)
+	total = frappe.db.sql(f"select count(*) from `tabLife Inbox Item` i where {clause}", values)[0][0]
+	pending_total = frappe.db.sql(
+		f"select count(*) from `tabLife Proposal` p join `tabLife Inbox Item` i on i.name = p.inbox_item where p.status = 'Pending' and {clause}", values)[0][0]
 	counts = {}
 	if rows:
 		for item, st, n in frappe.db.sql(
 			"select inbox_item, status, count(*) from `tabLife Proposal` where inbox_item in %s group by inbox_item, status", ([r.name for r in rows],)):
 			counts.setdefault(item, {})[st] = n
 	users = user_names([r.owner for r in rows] + [r.claimed_by for r in rows])
+	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	for r in rows:
 		c = counts.get(r.name, {})
 		r["proposals"] = sum(c.values())
@@ -207,8 +233,9 @@ def list(space=None, status=None, include_archived=0, start=0, page_length=30):
 		r["received_on"] = str(r.received_on) if r.received_on else None
 		r["filed_by"] = users.get(r.owner)
 		r["processed_by"] = users.get(r.claimed_by)
+		r["area_name"] = areas.get(r.area)
 	totals = dict(frappe.db.sql("select status, count(*) from `tabLife Inbox Item` where space=%s and is_archived=0 group by status", space))
-	return {"items": rows, "totals": totals, "start": start, "page_length": page_length}
+	return {"items": rows, "total": total, "pending_total": pending_total, "totals": totals, "start": start, "page_length": page_length}
 
 
 @frappe.whitelist()
@@ -218,6 +245,8 @@ def get(item):
 	out = _item_dict(doc)
 	users = user_names([doc.owner, doc.claimed_by])
 	out["filed_by"], out["processed_by"] = users.get(doc.owner), users.get(doc.claimed_by)
+	out["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
+	out["project_title"] = frappe.db.get_value("Life Project", doc.project, "title") if doc.project else None
 	props = frappe.get_all("Life Proposal", filters={"inbox_item": doc.name},
 		fields=["name", "kind", "preview", "payload", "confidence", "status", "created_doctype", "created_name", "decided_on"],
 		order_by="sort_order asc, creation asc", limit=100)

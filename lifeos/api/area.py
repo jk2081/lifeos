@@ -5,26 +5,10 @@ from frappe import _
 from lifeos import journal, permissions
 from lifeos.api import tasks as task_api
 from lifeos.api.timeline import index_rows
-from lifeos.api.utils import flag, names_map
+from lifeos.api.utils import descendants, flag, names_map
 
 
-def descendants(space, area):
-	"""The area and every area below it."""
-	rows = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "parent_area"], limit=2000)
-	children = {}
-	for r in rows:
-		children.setdefault(r.parent_area, []).append(r.name)
-	out, stack = [], [area]
-	while stack:
-		cur = stack.pop()
-		if cur in out:
-			continue
-		out.append(cur)
-		stack.extend(children.get(cur, []))
-	return out
-
-
-def project_cards(space, where, values):
+def project_cards(space, where, values, order=None, start=0, page_length=100):
 	rows = frappe.db.sql(
 		f"""select p.name, p.title, p.status, p.outcome, p.target_date, p.area, p.is_archived, p.completed_on,
 			(select count(*) from `tabLife Task` t where t.project = p.name and t.status != 'Carried') as tasks_total,
@@ -60,10 +44,10 @@ def get(area, include_archived=0):
 
 	subs = frappe.get_all("Life Area", filters={"space": space, "parent_area": doc.name, "is_archived": 0}, fields=["name", "area_name"], order_by="sort_order, area_name")
 	projects = project_cards(space, "and p.area in %(ids)s and p.is_archived = 0 and p.status in ('Active', 'On Hold')", v)
-	tasks = task_api.query(space, "and t.area in %(ids)s and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0", v, None, 0, 8)
-	open_tasks = frappe.db.sql(
-		"select count(*) from `tabLife Task` t where t.space=%(space)s and t.area in %(ids)s and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0",
-		{"space": space, **v})[0][0]
+	# the same filter as the Tasks screen, so the count here equals the list it links to
+	t_clause, t_values = task_api.where_clause(space, area=doc.name)
+	tasks = task_api.query(space, t_clause, t_values, None, 0, 8)
+	open_tasks = task_api.count(space, area=doc.name)
 
 	counts = dict(frappe.db.sql(
 		f"select kind, count(*) from `tabLife Index` where space=%(space)s and area in %(ids)s {arch} group by kind", {"space": space, **v}))
@@ -95,7 +79,7 @@ def get(area, include_archived=0):
 		"sub_areas": subs, "projects": projects, "tasks": tasks, "notes": notes, "documents": documents, "chats": chats,
 		"timeline": timeline, "references": references, "goals": goals,
 		"counts": {"projects": sum(1 for p in projects if p.status == "Active"), "open_tasks": open_tasks, "notes": counts.get("Note", 0),
-			"reference_notes": reference_notes, "documents": counts.get("Document", 0), "chats": counts.get("Chat", 0)},
+			"all_projects": len(projects), "reference_notes": reference_notes, "documents": counts.get("Document", 0), "chats": counts.get("Chat", 0)},
 	}
 
 
@@ -108,13 +92,25 @@ def tree(space=None, include_archived=0):
 		filters["is_archived"] = 0
 	areas = frappe.get_all("Life Area", filters=filters, fields=["name", "area_name", "parent_area", "sort_order", "is_archived"],
 		order_by="sort_order asc, area_name asc", limit=1000)
-	tasks = dict(frappe.db.sql(
-		"select area, count(*) from `tabLife Task` where space=%s and status in ('Open', 'Doing', 'Waiting') and is_archived=0 group by area", space))
-	projects = dict(frappe.db.sql(
-		"select area, count(*) from `tabLife Project` where space=%s and status='Active' and is_archived=0 group by area", space))
-	notes = dict(frappe.db.sql("select area, count(*) from `tabLife Index` where space=%s and kind='Note' and is_archived=0 group by area", space))
+	# each number is counted the way the list it links to is filtered: the area with its sub-areas
+	kids = {}
 	for a in areas:
-		a["open_tasks"], a["projects"], a["notes"] = tasks.get(a.name, 0), projects.get(a.name, 0), notes.get(a.name, 0)
+		kids.setdefault(a.parent_area, []).append(a.name)
+
+	def below(name):
+		out = [name]
+		for k in kids.get(name, []):
+			out.extend(below(k))
+		return out
+
+	direct_projects = dict(frappe.db.sql(
+		"select area, count(*) from `tabLife Project` where space=%s and status='Active' and is_archived=0 group by area", space))
+	direct_notes = dict(frappe.db.sql("select area, count(*) from `tabLife Index` where space=%s and kind='Note' and is_archived=0 group by area", space))
+	for a in areas:
+		ids = below(a.name)
+		a["open_tasks"] = task_api.count(space, area=a.name)
+		a["projects"] = sum(direct_projects.get(i, 0) for i in ids)
+		a["notes"] = sum(direct_notes.get(i, 0) for i in ids)
 	return {"space": space, "areas": areas,
 		"tags": frappe.get_all("Life Tag", filters={"space": space}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
-		"unfiled_tasks": tasks.get(None, 0) + tasks.get("", 0)}
+		"unfiled_tasks": task_api.count(space, area="none")}

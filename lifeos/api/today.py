@@ -4,6 +4,7 @@ from frappe.utils import add_days, getdate, today
 
 from lifeos import calendar_data, journal, permissions
 from lifeos.api import tasks as task_api
+from lifeos.api import vault as vault_api
 from lifeos.api.utils import user_names
 
 
@@ -16,7 +17,9 @@ def get(space=None):
 
 	due = task_api.query(space, "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date <= %(today)s",
 		{"today": now}, None, 0, 30)
-	overdue = sum(1 for t in due if t.due_date < str(now))
+	# the two numbers are counted with the filters their links lead to, not from the 30 rows shown
+	due_count = task_api.count(space, due="today,overdue")
+	overdue = task_api.count(space, due="overdue")
 
 	review_items = frappe.get_all("Life Inbox Item", filters={"space": space, "status": "To Review", "is_archived": 0},
 		fields=["name", "title", "source_type", "received_on", "owner", "claimed_by", "transcript_md", "summary_md"], order_by="received_on desc", limit=5)
@@ -24,9 +27,15 @@ def get(space=None):
 	if review_items:
 		pending = dict(frappe.db.sql(
 			"select inbox_item, count(*) from `tabLife Proposal` where inbox_item in %s group by inbox_item", ([r.name for r in review_items],)))
+	waiting = {}
+	if review_items:
+		waiting = dict(frappe.db.sql(
+			"select inbox_item, count(*) from `tabLife Proposal` where inbox_item in %s and status='Pending' group by inbox_item",
+			([r.name for r in review_items],)))
 	users = user_names([r.claimed_by for r in review_items])
 	for r in review_items:
 		r["proposals"] = pending.get(r.name, 0)
+		r["pending"] = waiting.get(r.name, 0)
 		r["state"] = "Transcribed" if r.pop("transcript_md") else ("Summary ready" if r.pop("summary_md", None) else "Processed")
 		r.pop("summary_md", None)
 		r["processed_by"] = users.get(r.claimed_by)
@@ -65,8 +74,9 @@ def get(space=None):
 		"date": str(now), "space": space,
 		"cycle": cycle_out, "target": frappe.db.get_single_value("Life Settings", "score_target") or 85,
 		"to_review": {"count": to_review, "proposals": proposals_waiting, "items": review_items},
-		"tasks": {"items": due, "due": len(due), "overdue": overdue},
+		"tasks": {"items": due, "due": due_count, "overdue": overdue},
 		"events": events, "habits": habits,
 		"open_loops": task_api.open_loops_count(space),
 		"coming_up": coming,
+		"vault_soon": vault_api.expiry_counts(space)["soon"],
 	}

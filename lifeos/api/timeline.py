@@ -16,7 +16,16 @@ def decorate(rows):
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	projects = names_map("Life Project", [r.project for r in rows], "title")
 	users = user_names([r.record_owner for r in rows])
+	inbox = [r.ref_name for r in rows if r.ref_doctype == "Life Inbox Item"]
+	proposals = {}
+	if inbox:
+		for item, st, n in frappe.db.sql(
+			"select inbox_item, status, count(*) from `tabLife Proposal` where inbox_item in %s group by inbox_item, status", (inbox,)):
+			proposals.setdefault(item, {})[st] = n
 	for r in rows:
+		if r.ref_doctype == "Life Inbox Item":
+			c = proposals.get(r.ref_name, {})
+			r["proposals"], r["pending"] = sum(c.values()), c.get("Pending", 0)
 		r["area_name"], r["project_title"] = areas.get(r.area), projects.get(r.project)
 		r["route"] = links.route_of(r.ref_doctype, r.ref_name)
 		r["filed_by"] = users.get(r.record_owner)
@@ -45,7 +54,7 @@ def get(space=None, from_date=None, to_date=None, area=None, doctype=None, inclu
 		where.append("record_date <= %(to_date)s")
 		values["to_date"] = getdate(to_date)
 	if area:
-		where.append("(area = %(area)s or also_in_csv like %(area_like)s)")
+		where.append("(area = %(area)s or also_in_csv like %(area_like)s)")  # this one area only; sub-areas have their own pages
 		values.update({"area": area, "area_like": f"%,{area},%"})
 	if doctype:
 		where.append("ref_doctype = %(doctype)s")
@@ -54,9 +63,10 @@ def get(space=None, from_date=None, to_date=None, area=None, doctype=None, inclu
 		where.append("is_archived = 0")
 	clause = (" and " + " and ".join(where)) if where else ""
 	rows = index_rows(space, clause, values, start=start, page_length=page_length)
+	total = frappe.db.sql(f"select count(*) from `tabLife Index` where space=%(space)s {clause}", {"space": space, **values})[0][0]
 	days = []
 	for r in rows:
 		if not days or days[-1]["date"] != r["record_date"]:
 			days.append({"date": r["record_date"], "entries": []})
 		days[-1]["entries"].append(r)
-	return {"days": days, "count": len(rows), "start": start, "page_length": page_length, "has_more": len(rows) == page_length}
+	return {"days": days, "count": len(rows), "start": start, "page_length": page_length, "total": total, "has_more": start + len(rows) < total}

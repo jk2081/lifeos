@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.api.utils import names_map, page, parse
+from lifeos.api.utils import area_filter, flag, names_map, order_by, page, parse
 
 
 @frappe.whitelist()
@@ -58,6 +58,91 @@ def report(space=None, from_date=None, to_date=None, group_by="day", start=0, pa
 	open_items = [{**i, "chat": c["name"], "chat_title": c["title"], "area_name": c["area_name"]} for c in chats for i in c["open_items"] if i["status"] == "Open"]
 	return {"space": space, "from_date": str(begin), "to_date": str(end), "group_by": group_by, "groups": out, "total": len(chats),
 		"counts_by_area": [{"area_name": k, "count": v} for k, v in sorted(counts.items(), key=lambda kv: -kv[1])], "open_items": open_items}
+
+
+OPEN_ITEM = "exists (select 1 from `tabLife Chat Open Item` oi where oi.parent = c.name and oi.parenttype = 'Life Chat Log' and oi.status = 'Open')"
+SORTS = {"date": "c.date", "title": "c.title", "assistant": "c.assistant"}
+GROUP_ORDER = {
+	"day": "c.date desc",
+	"area": "(c.area is null or c.area = ''), (select area_name from `tabLife Area` a where a.name = c.area), c.area, c.date desc",
+	"project": "(c.project is null or c.project = ''), (select title from `tabLife Project` p where p.name = c.project), c.project, c.date desc",
+}
+
+
+def where_clause(space, area=None, project=None, open_items=0, from_date=None, to_date=None, include_archived=0):
+	where, values = [], {}
+	if not flag(include_archived):
+		where.append("c.is_archived = 0")
+	if area:
+		where.append(area_filter(space, area, "c.area", values))
+	if project:
+		where.append("ifnull(c.project, '') = %(project)s")
+		values["project"] = "" if project == "none" else project
+	if flag(open_items):
+		where.append(OPEN_ITEM)
+	if from_date:
+		where.append("c.date >= %(from_date)s")
+		values["from_date"] = getdate(from_date)
+	if to_date:
+		where.append("c.date <= %(to_date)s")
+		values["to_date"] = getdate(to_date)
+	return "".join(" and " + w for w in where), values
+
+
+def _chat_rows(rows):
+	names = [r.name for r in rows]
+	items = {}
+	if names:
+		for r in frappe.db.sql(
+			"select parent, name, text, status, task from `tabLife Chat Open Item` where parenttype='Life Chat Log' and parent in %s order by parent, idx",
+			(names,), as_dict=True):
+			items.setdefault(r.parent, []).append({"row": r.name, "text": r.text, "status": r.status, "task": r.task})
+	areas = names_map("Life Area", [r.area for r in rows], "area_name")
+	projects = names_map("Life Project", [r.project for r in rows], "title")
+	for r in rows:
+		r["date"] = str(r.date) if r.date else None
+		r["area"], r["project"] = r.area or None, r.project or None
+		r["area_name"], r["project_title"] = areas.get(r.area), projects.get(r.project)
+		r["summary_md"] = r.summary_md or ""
+		r["open_items"] = items.get(r.name, [])
+		r["open_count"] = sum(1 for i in r["open_items"] if i["status"] == "Open")
+	return rows
+
+
+@frappe.whitelist()
+def list(space=None, area=None, project=None, open_items=0, from_date=None, to_date=None, include_archived=0, group_by="day",
+		sort=None, dir=None, start=0, page_length=50):
+	"""Chat logs of a space as one list, newest first, ordered so that the groups of group_by (day, area, project) stay together.
+	Filters: area (with its sub-areas, or "none"), project, open_items=1 for chats that still have an open item, from_date, to_date.
+	`total` is the number of chats the filters match. `with_open_items` and `by_area` count inside the same filters."""
+	space = permissions.resolve_space(space)
+	start, page_length = page(start, page_length)
+	if group_by not in GROUP_ORDER:
+		frappe.throw(_("group_by must be day, area or project."))
+	clause, values = where_clause(space, area, project, open_items, from_date, to_date, include_archived)
+	values["space"] = space
+	order = order_by(sort, dir, SORTS, None)
+	order = f"{order}, c.creation desc" if order else f"{GROUP_ORDER[group_by]}, c.modified desc"
+	rows = _chat_rows(frappe.db.sql(
+		f"""select c.name, c.title, c.date, c.url, c.assistant, c.summary_md, c.area, c.project, c.is_archived
+		from `tabLife Chat Log` c where c.space=%(space)s {clause} order by {order} limit %(start)s, %(len)s""",
+		{**values, "start": start, "len": page_length}, as_dict=True))
+	base = f"from `tabLife Chat Log` c where c.space=%(space)s {clause}"
+	total = frappe.db.sql(f"select count(*) {base}", values)[0][0]
+	with_open = frappe.db.sql(f"select count(*) {base} and {OPEN_ITEM}", values)[0][0]
+	by_area = frappe.db.sql(f"select ifnull(c.area, ''), count(*) {base} group by ifnull(c.area, '') order by count(*) desc", values)
+	area_names = names_map("Life Area", [a for a, n in by_area], "area_name")
+	return {"space": space, "chats": rows, "total": total, "with_open_items": with_open, "group_by": group_by,
+		"by_area": [{"area": a or "none", "area_name": area_names.get(a) or "No area", "count": n} for a, n in by_area]}
+
+
+@frappe.whitelist()
+def get(chat):
+	"""One chat log with its summary and open items."""
+	doc = permissions.get_doc_checked("Life Chat Log", chat)
+	row = _chat_rows([frappe._dict({k: doc.get(k) for k in ("name", "title", "date", "url", "assistant", "summary_md", "area", "project", "is_archived")})])[0]
+	row["space"] = doc.space
+	return row
 
 
 @frappe.whitelist(methods=["POST"])

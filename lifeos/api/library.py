@@ -3,7 +3,7 @@ import frappe
 from frappe import _
 
 from lifeos import links, permissions
-from lifeos.api.utils import flag, names_map, parse
+from lifeos.api.utils import area_filter, flag, names_map, order_by, page, parse
 
 
 @frappe.whitelist()
@@ -22,6 +22,48 @@ def tree(space=None, include_archived=0):
 		n["project_title"] = projects.get(n.project)
 		n["modified"] = str(n.modified)[:10]
 	return {"space": space, "notes": notes, "areas": areas}
+
+
+SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modified"}
+
+
+@frappe.whitelist()
+def list(space=None, area=None, project=None, tag=None, include_archived=0, sort=None, dir=None, start=0, page_length=50):
+	"""Notes of a space as a flat list, by title. Reads Life Index.
+	Filters: area (with its sub-areas, or "none"), project (a project, or "none" for reference notes), tag.
+	`total` is the number of notes the filters match."""
+	space = permissions.resolve_space(space)
+	start, page_length = page(start, page_length)
+	where, values = ["x.space = %(space)s", "x.kind = 'Note'"], {"space": space}
+	if not flag(include_archived):
+		where.append("x.is_archived = 0")
+	if area:
+		where.append(area_filter(space, area, "x.area", values))
+	if project:
+		where.append("x.project = %(project)s")
+		values["project"] = "" if project == "none" else project
+	if tag:
+		where.append("exists (select 1 from `tabLife Tag Link` tl where tl.parent = x.ref_name and tl.parenttype = 'Life Note' and tl.tag = %(tag)s)")
+		values["tag"] = tag
+	clause = " and ".join(where)
+	rows = frappe.db.sql(
+		f"""select x.ref_name as name, x.title, x.area, x.project, x.record_date, x.modified, x.is_archived from `tabLife Index` x
+		where {clause} order by {order_by(sort, dir, SORTS, "x.title asc")}, x.ref_name limit %(start)s, %(len)s""",
+		{**values, "start": start, "len": page_length}, as_dict=True)
+	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {clause}", values)[0][0]
+	areas = names_map("Life Area", [r.area for r in rows], "area_name")
+	projects = names_map("Life Project", [r.project for r in rows], "title")
+	tags = {}
+	if rows:
+		for parent, name in frappe.db.sql(
+			"select l.parent, g.tag_name from `tabLife Tag Link` l join `tabLife Tag` g on g.name = l.tag where l.parenttype='Life Note' and l.parent in %s",
+			([r.name for r in rows],)):
+			tags.setdefault(parent, []).append(name)
+	for r in rows:
+		r["area_name"], r["project_title"], r["tags"] = areas.get(r.area), projects.get(r.project), tags.get(r.name, [])
+		r["record_date"] = str(r.record_date) if r.record_date else None
+		r["modified"] = str(r.modified)[:10]
+	return {"space": space, "notes": rows, "total": total}
 
 
 @frappe.whitelist()
