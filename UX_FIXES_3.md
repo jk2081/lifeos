@@ -1,4 +1,4 @@
-# UX fixes, set 3: tabbed navigation, Settings, the sidebar and permissions
+# UX fixes, set 3: tabs, Settings, the sidebar, permissions and goals
 
 Frappe organises information with tabs in three ways: tabs on a record, tabs on a list that split it by state, and tabs on a page with sub-screens. This set applies the same three patterns to Life OS.
 
@@ -163,7 +163,7 @@ Today the sidebar is 13 items in one flat list at equal weight. Rebuild it in gr
 | --- | --- |
 | Top | Space switcher. Under it, **Search** (with the ⌘K hint) and a **New** button side by side |
 | (no heading) | Today, Inbox, Tasks, Calendar |
-| Plan | Journal, Projects |
+| Plan | Journal, Goals, Projects |
 | Areas | Every active area of the current space, in its saved order, with sub-areas nested under their parent |
 | Records | Notes, Vault, Chats, Timeline |
 | Bottom, pinned | Archive, Settings |
@@ -213,14 +213,61 @@ Unit tests, run as the agent, family and owner test users:
 - The family user and the agent user are refused at `/app` and the agent's `claim_next` and `submit_result` still work.
 - Saving a user with Life Agent plus Life User is refused.
 
-## 8. Leave as they are
+## 8. Goals: any goal, with task completion, in one view
+
+Today every goal must belong to a 12 Week Year, its percentage comes only from weekly action ticks, and tasks filed under a goal are listed but not counted. The owner has goals outside the 12 Week Year too and wants one view of all goals showing how far their tasks have got.
+
+### Data
+
+- `Life Goal.cycle` becomes optional.
+- Add `goal_type` (Select: 12 Week Year, Annual, Open; required), `target_date` (Date, optional) and `closed_on` (Date, set when the outcome leaves In Progress).
+- Validation: a 12 Week Year goal must have a cycle; Annual and Open goals must not. An Annual goal must have a target date.
+- Patch: every existing goal gets `goal_type` = 12 Week Year. Nothing else about existing goals changes.
+- Weekly actions and ticks stay a 12 Week Year feature. Annual and Open goals have no action grid.
+- The 12 Week Year score, the grid, Close cycle and Plan next cycle are unchanged, and goals without a cycle never appear in them.
+- **Add to a 12 Week Year:** an Annual or Open goal can be moved into the current or a planned cycle from its pane. It becomes a 12 Week Year goal in that cycle and keeps its tasks. Record nothing in `carried_from`; that field stays for carrying between cycles.
+
+### Task completion
+
+One definition, computed on the server and used everywhere:
+
+- **Counted tasks:** tasks whose `goal` is this goal and whose status is Open, Doing, Waiting or Done. Dropped and Carried tasks are left out.
+- **Done:** those with status Done.
+- **Archived tasks count.** Done tasks are archived after a while; the figure must not fall when they are.
+- Shown as "6 of 10 tasks" with a `Progress` bar. A goal with no counted tasks shows "No tasks yet", not 0%.
+- Tasks in a goal's linked project do not count unless they are filed under the goal themselves. Note this in `DECISIONS.md`.
+- Compute it for a list of goals in one grouped query, not one query per goal.
+
+### Goals screen
+
+A new screen at `/goals`, in the sidebar's Plan group between Journal and Projects, built on `ListView` like the other lists.
+
+- **Columns:** Goal, Type, Area, When (the cycle's title for a 12 Week Year goal, the target date otherwise), Tasks (bar and "6 of 10"), Score (the 12 Week Year percentage; blank for other types), Outcome.
+- **State tabs:** In progress (default), Achieved, Closed (Partly Achieved, Not Achieved, Carried, Dropped), All.
+- **Filters:** type, area, cycle, target date range. Group by area, type or cycle. Sort by title, target date, task completion.
+- **Row click** opens the goal pane. Its Tasks tab shows the goal's tasks with the same figure, quick add for a task filed under this goal, and a link to the Tasks screen filtered to the goal.
+- **New goal** button: title, type, area, optional project, target date, and the cycle when the type is 12 Week Year.
+- **Closing a goal** that has no cycle: an action in the pane sets the outcome and an optional result note. 12 Week Year goals are still closed through Close cycle.
+- Phone: stacked rows showing title, area, the task bar and the score when there is one.
+- A summary line under the title: number of goals in progress, and tasks done out of counted tasks across the goals currently shown.
+
+### Elsewhere
+
+- **Journal, Goals tab** stays as it is (12 Week Year goals across cycles) and gains a link "All goals" to `/goals`. Its rows also show the task figure beside the score.
+- **Area page:** the "12 Week Year goals" block on Overview becomes "Goals", listing every in-progress goal for the area with the task bar, and the score for 12 Week Year goals. Its link goes to `/goals` filtered to the area.
+- **Goal picker on a task** (pane, quick add, proposals review) offers every in-progress goal, grouped by type, not only the current cycle's.
+- **Today** is unchanged.
+- Agents may propose a task under any in-progress goal, as now. They cannot create or close goals.
+- Space rules apply to goals and to the task counts: a member sees only goals in their spaces, and a count never includes tasks they cannot see.
+
+## 9. Leave as they are
 
 Today, Timeline, Areas, Library (now labelled Notes; Tree, List and Graph are a view switch), the Goal page, and everything inside the Journal tabs. Journal and Calendar already have tabs; check they meet the rules above (URL, phone scrolling, `[` and `]`) and change nothing else.
 
 ## What must not change
 
 - No record, field, filter or action is removed. Everything on a screen today is still reachable, at most one tab away.
-- The API and data model, apart from the tab counts added to list methods and the small additions the Settings and Permissions sections name.
+- The API and data model, apart from the tab counts added to list methods and the additions the Settings, Permissions and Goals sections name.
 - Space rules, the pane behaviour, count links, shortcuts and remembered views from sets 1 and 2.
 
 ## Checks
@@ -234,6 +281,7 @@ Today, Timeline, Areas, Library (now labelled Notes; Tree, List and Graph are a 
   - Phone: the review screen and the journal page show tabs; at 1440 px they do not.
   - Settings: every section opens from the menu and from its URL. Rename, reorder and nest an area. Archive an area with a sub-area: both leave the Areas screen and the area pickers, their records are unchanged, and both appear under Archived. Restore brings them back in place. No Delete or Remove action exists for areas, tags, habits or dimensions. Add and remove a member through the dialogs. No role name and no Administrator row appears. A changed setting shows "Saved" and survives a reload. The family test user sees no Admin group.
   - Sidebar: the groups and items match the table in section 6. Each seeded area shows and opens its page, and is marked active there. Sub-areas expand under their parent. Collapsing a group survives leaving and reloading. The Tasks count equals Today's "Due today" number and drops by one when such a task is completed. New opens its menu and each entry works. "Library" appears nowhere in the interface; "Notes" opens `/library`. `/graph` opens the Graph view of Notes. Archiving an area in Settings removes it from the sidebar without a reload. The phone More list shows the same groups.
+  - Goals: create an Open goal and an Annual goal with no cycle. File three tasks under one, complete one and drop one: the goal shows "1 of 2 tasks". Archive the done task: the figure is unchanged. `/goals` lists these beside the seeded 12 Week Year goals, each tab's count matches its rows, and the Score column is blank for the two new goals. The 12 Week Year grid and score are unchanged and do not show the new goals. Add the Open goal to the current cycle: it appears in the grid and keeps its tasks. The family test user sees no goals or counts from the Private space.
   - No screen scrolls sideways at 390 px; the tab row does.
 - All unit tests pass, with new tests for the tab counts in each list method, including a member of another space seeing only their own counts.
 - Screenshot every changed screen and each tab at both widths in light and dark, look at each, and fix anything broken.
@@ -241,6 +289,6 @@ Today, Timeline, Areas, Library (now labelled Notes; Tree, List and Graph are a 
 
 ## Working rules
 
-- Work in this order: shared tab helpers and the URL rule, list state tabs (Tasks first), record pane, Area page, Project page, phone-only tabs, Settings (layout first, then the shared list component, archive and the Archived section, members and agents), the sidebar, permissions (section 7), then the check on Journal and Calendar.
+- Work in this order: shared tab helpers and the URL rule, list state tabs (Tasks first), record pane, Area page, Project page, phone-only tabs, Settings (layout first, then the shared list component, archive and the Archived section, members and agents), the sidebar, permissions (section 7), goals (section 8), then the check on Journal and Calendar.
 - Run the acceptance script after each step and commit once per step.
 - Record deviations in `DECISIONS.md`. Add a "UX fixes, set 3" section to `STATUS.md` when finished, then create an empty file named `UX_FIXES_3_DONE` and commit.
