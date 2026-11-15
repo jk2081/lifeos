@@ -114,6 +114,26 @@ Everything in `UX_FIXES_2.md` is done. The front end is now built the way Frappe
   - `node tools/screens.mjs`: 38 screens at 1440 px and 390 px in light and dark (152 screenshots), with no horizontal scrolling, no script errors and no text below 4.5 to 1. Each screenshot was looked at; what was found is fixed, or listed in `DECISIONS.md` where it was left.
 - Deviations are in `DECISIONS.md` under "UX fixes, set 2".
 
+## UX fixes, set 3
+
+Everything in `UX_FIXES_3.md` is done. Frappe's three tab patterns are applied with one component, `TabBar.vue` (frappe-ui `Tabs`), and the URL rule in `lib/tabs.js`: `tab=` on a page, `ptab=` in the record pane, a list's state tabs on its own short parameter. The first tab adds nothing to the URL; `[` and `]` move between tabs and are in the shortcut help.
+
+- **List state tabs** on Inbox, Tasks, Projects, Archive, Chats and Vault, and on the new Goals screen. Each list method returns `tabs`, counted in one query under every other filter. Tasks: Open, Open loops, Waiting, Done, All, with the layout switch (List, Board, Table) separate and Board only on Open and All.
+- **Record pane tabs** for task, note, project, goal, chat, journal page and vault document, with counts; one tab means no bar; "3 open items" opens a chat on its Open items tab.
+- **Area page** (Overview, Projects, Tasks, Notes, Documents, Chats, Timeline) and **project page** (Overview, Tasks, Notes, Documents, Chats, Links). Each list tab is the main screen's own list with the area or project fixed, its view remembered per tab; its count equals the main screen filtered the same way.
+- **Phone-only tabs** on the review of an inbox item (Original, Transcript, Summary, Proposals) and the journal page (Page, Transcript).
+- **Settings rebuilt**: Me (Appearance, Default space, Weekly review), This space with its own space picker (Areas, Tags, Habits, Check-in dimensions, Archive rules, Archived), Admin (Spaces and members, Agents). One shared list for the four headings with counts, rename in place, drag, Alt+arrow and menu reordering, nesting, Archive with a dialog that says what happens, and an Archived section with Restore. No delete on the screen, no role names, no Administrator. Each plain setting saves on its own with "Saved".
+- **Sidebar in groups**: Search and New at the top; Today, Inbox, Tasks, Calendar; Plan (Journal, Goals, Projects); the space's Areas with sub-areas; Records (Notes, Vault, Chats, Timeline); Archive and Settings pinned. Groups and parent areas collapse and are remembered; the icon rail is remembered; Inbox and Tasks carry live counts. Library is now Notes everywhere, and Graph is the third view of Notes. The phone's More list has the same groups.
+- **Permissions**: `agents_can_read_vault` per space (off), enforced on every path an agent can read a Vault document, its index rows or its file; Life User and Life Agent have no desk access and `/app` sends them to `/life`; Life Agent with another Life role is refused.
+- **Goals of every type** (12 Week Year, Annual, Open) with the task figure ("6 of 10 tasks", archived tasks counted), the Goals screen at `/goals`, Close goal and Add to a 12 Week Year in the pane, goals on the area page's Overview, the goal picker on tasks grouped by type, and "All goals" plus the task figure on the Journal's Goals tab.
+- **Fixed on the way**: the weekly review's "tasks done" and "carried forward" numbers stopped at 100; they are now the true totals.
+- **Checks.**
+  - Unit tests: 168 pass (`test_ux3_tabs.py`: tab counts of every list method and of the area and project pages, with a member of another space; `test_ux3_more.py`: Settings archive, restore, order and counts, the Vault switch for the agent, the owner and the family member, desk access, the role mix, goals).
+  - Front-end tests: 11 pass (`node --test tests/*.test.js` in `frontend/`). `node scripts/check-sfc.mjs` and `check-singletons.mjs` pass.
+  - `node tools/acceptance.mjs`: 49 of 49 pass at 1440 px and 390 px: everything from sets 1 and 2, plus S3 (family and agent land on `/life` from `/app`, the fake agent runs end to end without desk access, the agent cannot read a closed Vault) and, at both widths, U.8 to U.15 (state tabs, pane tabs, area and project tabs, phone-only tabs, Settings, sidebar, goals, Journal and Calendar tabs).
+  - `node tools/screens.mjs`: 73 screens at 1440 px and 390 px in light and dark (292 screenshots), including each new tab, every Settings section, the Goals screen and the phone's More list, with no horizontal scrolling, script errors or text below 4.5 to 1. About thirty of them, at least one of each new kind of screen (area and project tabs, pane tabs, the phone review and journal page, Settings sections, Goals, the More list), were looked at by eye; the rest passed the automatic checks only. What was found (double padding in Settings rows, the Settings phone menu jumping to Appearance, the sidebar remembering the library's own collapse on a phone, the Goals columns) is fixed.
+- Deviations are in `DECISIONS.md` under "UX fixes, set 3".
+
 ## Summary
 
 ### What works

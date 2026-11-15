@@ -51,7 +51,7 @@
             <Select class="w-44" :model-value="d.settings.default_space" :options="d.spaces.map((s) => s.name)" :disabled="!d.is_admin" data-setting="default_space"
               @update:model-value="(v) => setOne('default_space', v)" />
           </SettingRow>
-          <p v-if="!d.is_admin" class="px-4 pb-3 text-sm text-ink-gray-6">Only the owner can change this.</p>
+          <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change this.</p>
         </Card>
         <Card v-else-if="section === 'review'" flush>
           <SettingRow label="Review day" help="The day the weekly review is due. Today shows a reminder on that day." :error="errors.weekly_review_day">
@@ -66,7 +66,7 @@
             <TextInput class="w-44" type="number" min="1" max="100" :model-value="d.settings.score_target" :disabled="!d.is_admin" data-setting="score_target"
               @change="(e) => setOne('score_target', Number(e.target.value))" />
           </SettingRow>
-          <p v-if="!d.is_admin" class="px-4 pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
+          <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
         </Card>
 
         <!-- This space -->
@@ -85,7 +85,7 @@
             <TextInput class="w-28" type="number" min="1" :model-value="d.settings.stale_task_days" :disabled="!d.is_admin" data-setting="stale_task_days"
               @change="(e) => setOne('stale_task_days', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">days</span></template></TextInput>
           </SettingRow>
-          <p v-if="!d.is_admin" class="px-4 pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
+          <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
         </Card>
         <template v-else-if="section === 'archived'">
           <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/archive" data-archive-link>Archived records are on the Archive screen</RouterLink>.
@@ -93,7 +93,7 @@
           <section v-for="l in LISTS" :key="l.kind" :data-archived-group="l.kind">
             <SectionHead :count="archived(l).length">{{ l.label }}</SectionHead>
             <Card flush>
-              <div v-for="r in archived(l)" :key="r.name" class="flex min-h-11 flex-wrap items-center gap-2 border-b border-outline-gray-1 px-3 py-1.5 last:border-b-0" :data-archived-row="r.name">
+              <div v-for="r in archived(l)" :key="r.name" class="flex min-h-11 flex-wrap items-center gap-2 border-b border-outline-gray-1 py-1.5 last:border-b-0" :data-archived-row="r.name">
                 <div class="min-w-0 flex-1"><div class="break-words text-base text-ink-gray-9">{{ r.title }}<span v-if="r.parentTitle" class="text-ink-gray-6"> · under {{ r.parentTitle }}</span></div>
                   <div class="text-sm text-ink-gray-6">{{ r.archived_on ? 'Archived ' + short(r.archived_on, true) : 'Archived before the date was kept' }} · {{ r.count }} {{ r.count === 1 ? l.countNoun[0] : l.countNoun[1] }}</div></div>
                 <Button v-if="canEdit" label="Restore" :data-restore="r.name" @click="askRestore(l, r)" />
@@ -111,7 +111,7 @@
               <Button v-for="s in d.spaces" :key="s.name" class="!justify-start" :variant="s.name === memberSpace ? 'subtle' : 'ghost'" :label="s.name" :data-space="s.name" @click="memberSpace = s.name" />
             </div>
             <Card v-if="mSpace" flush class="min-w-0 flex-1" data-members>
-              <div v-for="m in mSpace.members" :key="m.user" class="flex min-h-12 flex-wrap items-center gap-2.5 border-b border-outline-gray-1 px-3 py-2 last:border-b-0" :data-member="m.user">
+              <div v-for="m in mSpace.members" :key="m.user" class="flex min-h-12 flex-wrap items-center gap-2.5 border-b border-outline-gray-1 py-2 last:border-b-0" :data-member="m.user">
                 <Avatar size="md" :label="m.full_name" :image="m.image" />
                 <div class="min-w-0 flex-1 basis-40"><div class="break-words text-base-medium text-ink-gray-9">{{ m.full_name }}</div><div class="break-all text-sm text-ink-gray-6">{{ m.user }}</div></div>
                 <Badge v-if="m.is_owner" label="Owner" data-owner-badge />
@@ -127,7 +127,7 @@
         </template>
         <template v-else-if="section === 'agents'">
           <Card flush data-agents>
-            <div v-for="a in d.agents" :key="a.user" class="flex flex-col gap-2 border-b border-outline-gray-1 px-3 py-3 last:border-b-0" :data-agent="a.user">
+            <div v-for="a in d.agents" :key="a.user" class="flex flex-col gap-2 border-b border-outline-gray-1 py-3 last:border-b-0" :data-agent="a.user">
               <div class="flex items-center gap-2.5"><Avatar size="md" :label="a.full_name" />
                 <div class="min-w-0 flex-1"><div class="text-base-medium text-ink-gray-9">{{ a.full_name }}</div>
                   <div class="text-sm text-ink-gray-6">{{ a.last_filed ? 'Last filed something ' + dateTime(a.last_filed) : 'Has not filed anything yet' }}</div></div></div>

@@ -2,8 +2,8 @@
   <!-- One list of Settings: areas, tags, habits or check-in dimensions. Rename in place, reorder by dragging the handle
        (Alt+Up and Alt+Down on a focused row, Move up and Move down in the row menu), nest areas one level, archive. -->
   <Card flush :data-settings-list="kind">
-    <div v-for="r in shown" :key="r.name" class="group relative flex min-h-11 items-center gap-2 border-b border-outline-gray-1 px-3 py-1.5 last:border-b-0 focus-visible:focus-ring"
-      :class="[r.depth ? 'pl-9' : '', over === r.name ? (where === 'under' ? 'bg-surface-gray-2' : '') : '', over === r.name && where === 'before' ? 'border-t-2 border-t-outline-gray-4' : '',
+    <div v-for="r in shown" :key="r.name" class="group relative flex min-h-11 items-center gap-2 border-b border-outline-gray-1 py-1.5 last:border-b-0 focus-visible:focus-ring"
+      :class="[r.depth ? 'pl-6' : '', over === r.name ? (where === 'under' ? 'bg-surface-gray-2' : '') : '', over === r.name && where === 'before' ? 'border-t-2 border-t-outline-gray-4' : '',
         over === r.name && where === 'after' ? '!border-b-2 !border-b-outline-gray-4' : '']"
       tabindex="0" :data-row-name="r.name" :data-depth="r.depth" :aria-label="r.title" @keydown="onKey($event, r)"
       @dragover.prevent="dragOver($event, r)" @dragleave="over = over === r.name ? null : over" @drop.prevent="drop(r)">
