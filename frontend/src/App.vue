@@ -9,10 +9,11 @@
             <Ico style="margin-left: auto; color: var(--mut)" :size="14" stroke="2" d="m6 9 6 6 6-6" />
           </button>
         </Dropdown>
-        <RouterLink v-for="n in NAV" :key="n.to" :to="n.to" class="nv" :class="{ on: isOn(n) }">
-          <Ico :d="n.d" />{{ n.label }}
-          <span v-if="n.label === 'Inbox' && store.counts.to_review" class="ct">{{ store.counts.to_review }}</span>
-        </RouterLink>
+        <div v-for="n in NAV" :key="n.to" class="nvw">
+          <RouterLink :to="n.to" class="nv" :class="{ on: isOn(n) }"><Ico :d="n.d" />{{ n.label }}</RouterLink>
+          <RouterLink v-if="n.label === 'Inbox' && store.counts.to_review" class="ct" :to="{ path: '/inbox', query: { status: 'To Review' } }"
+            :aria-label="`${store.counts.to_review} to review`" data-door="nav-review">{{ store.counts.to_review }}</RouterLink>
+        </div>
         <div style="flex: 1"></div>
         <button class="nv" type="button" style="border: 0; background: none; cursor: pointer; width: 100%; font-size: 14px"
           @click="store.searchOpen = true">
@@ -35,7 +36,7 @@
           <Ico :d="MORE_ICON" :size="22" />More
         </button>
       </nav>
-      <button v-if="showFab" class="fab" type="button" aria-label="Add" @click="store.quickAdd = true">
+      <button v-if="showFabNow" class="fab" type="button" aria-label="Add" @click="store.quickAdd = true">
         <Ico :d="PLUS_ICON" :size="24" stroke="2" />
       </button>
 
@@ -51,6 +52,7 @@
         <a class="nv" href="/api/method/logout" @click.prevent="logout"><Ico d="M10 5H5v14h5M14 8l4 4-4 4M18 12H9" :size="20" />Log out</a>
       </div>
 
+      <RecordPane />
       <SearchPalette v-if="store.searchOpen" @close="store.searchOpen = false" />
       <QuickAdd v-if="store.quickAdd" @close="store.quickAdd = false" />
     </div>
@@ -64,6 +66,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Dropdown, FrappeUIProvider, useColorScheme } from 'frappe-ui'
 import Ico from './components/Ico.vue'
 import SearchPalette from './components/SearchPalette.vue'
+import RecordPane from './components/RecordPane.vue'
 import QuickAdd from './components/QuickAdd.vue'
 import { MORE_ICON, NAV, PLUS_ICON, SEARCH_ICON, SETTINGS } from './lib/nav'
 import { boot, store } from './lib/store'
@@ -93,6 +96,7 @@ async function logout() {
 }
 
 watch(() => route.fullPath, () => (moreOpen.value = false))
+const showFabNow = computed(() => showFab.value && !route.query.open)
 
 // Keyboard: Cmd/Ctrl+K search, n new task, g then a letter to jump, Esc closes panels.
 let gAt = 0
@@ -103,10 +107,12 @@ function onKey(e) {
     return
   }
   if (e.key === 'Escape') {
-    store.searchOpen = false
-    store.quickAdd = false
-    moreOpen.value = false
-    window.dispatchEvent(new CustomEvent('lifeos-escape'))
+    // Esc closes the thing on top: search, quick add or the menu first, then the record pane
+    if (store.searchOpen || store.quickAdd || moreOpen.value) {
+      store.searchOpen = false
+      store.quickAdd = false
+      moreOpen.value = false
+    } else window.dispatchEvent(new CustomEvent('lifeos-escape'))
     return
   }
   const el = e.target

@@ -5,7 +5,9 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 const routes = [
   { path: '/', name: 'Today', component: page('Today') },
   { path: '/inbox', name: 'Inbox', component: page('Inbox') },
-  { path: '/inbox/:id', name: 'Review', component: page('Review'), props: true },
+  { path: '/inbox/:id/review', name: 'Review', component: page('Review'), props: true },
+  // an inbox item opens in the pane over the list; old links to /inbox/:id still work
+  { path: '/inbox/:id', redirect: (to) => ({ path: '/inbox', query: { ...to.query, open: `inbox:${to.params.id}` } }) },
   { path: '/timeline', name: 'Timeline', component: page('Timeline') },
   { path: '/tasks', name: 'Tasks', component: page('Tasks') },
   { path: '/calendar/:view?', name: 'Calendar', component: page('Calendar'), props: true },
@@ -25,4 +27,6 @@ const routes = [
   { path: '/:rest(.*)*', redirect: '/' },
 ]
 
-export default createRouter({ history: createWebHistory('/life'), routes, scrollBehavior: () => ({ top: 0 }) })
+// Opening or closing the pane and changing a filter only change the query: the list keeps its scroll position.
+export default createRouter({ history: createWebHistory('/life'), routes,
+  scrollBehavior: (to, from, saved) => (to.path === from.path ? false : saved || { top: 0 }) })

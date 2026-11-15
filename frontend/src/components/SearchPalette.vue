@@ -25,6 +25,7 @@ import { useRouter } from 'vue-router'
 import { api } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
+import { openRef, refOf } from '@/lib/pane'
 
 const emit = defineEmits(['close'])
 const KIND = { Inbox: 'Inbox item', 'Journal Page': 'Journal page', 'Month Plan': 'Month plan' }
@@ -67,7 +68,9 @@ function move(n) {
 function go(r) {
   if (!r) return
   if (r.space && r.space !== store.space) store.space = r.space
-  router.push(r.route)
+  // the result opens in the pane over the screen you are on
+  const ref = refOf(r.ref_doctype, r.ref_name)
+  ref ? openRef(ref) : router.push(r.route)
   emit('close')
 }
 onMounted(() => input.value?.focus())

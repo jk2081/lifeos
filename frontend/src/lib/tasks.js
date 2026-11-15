@@ -43,3 +43,8 @@ export function groupByDue(tasks, today) {
   }
   return groups.filter(([, list]) => list.length).map(([label, list]) => ({ label, tasks: list }))
 }
+
+export const VAULT_TYPES = ['ID', 'Travel', 'Insurance', 'Property', 'Tax', 'Medical', 'Other']
+export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
+// "4 of 10 tasks done" leads to the tasks of the project with Show done on. Archived ones are counted, so they are listed too.
+export const doneLink = (p) => ({ path: '/tasks', query: { project: p.name, done: '1', archived: '1' } })

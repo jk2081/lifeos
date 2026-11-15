@@ -1,80 +1,94 @@
 <template>
-  <PageHead title="Inbox" :sub="headSub" />
-  <div class="bd">
+  <ListView ref="list" title="Inbox" noun="inbox items" :filters="FILTERS" :columns="COLUMNS" :fetch="fetch" :row-ref="(r) => 'inbox:' + r.name"
+    default-sort="newest first" empty-title="The Inbox is empty." empty-hint="Drop a file above or forward something to your agent. What it proposes waits here for you."
+    @loaded="(res) => (pendingTotal = res.pending_total)">
+    <template #sub>{{ store.space }} · drop anything here, an agent proposes, you approve<template v-if="pendingTotal"> ·
+      <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template></template>
+    <template #above>
     <section v-if="canWrite()">
-      <div class="drop" :class="{ over }" @dragover.prevent="over = true" @dragleave.prevent="over = false" @drop.prevent="onDrop">
-        <input ref="picker" type="file" multiple style="display: none" @change="onPick" />
-        <div v-if="!files.length" class="drop-hint">
-          <b>Drop files here</b>
-          <span class="mt">A journal photo, a voice note, a PDF, anything. Or <a href="#" @click.prevent="picker.click()">choose files</a>.</span>
-        </div>
-        <div v-else class="chips">
-          <span v-for="(f, i) in files" :key="i" class="ch sm">{{ f.name }} <span class="mt">{{ fileSize(f.size) }}</span>
-            <a href="#" aria-label="Remove" @click.prevent="files.splice(i, 1)">×</a></span>
-          <a href="#" class="ch sm add" @click.prevent="picker.click()">+ more</a>
-        </div>
-        <div class="drop-form">
-          <input v-model="instruction" class="inp" style="flex: 1 1 260px" placeholder="What should the agent do? For example: summarise and pull out to-dos"
-            @keydown.enter="add" />
-          <select v-model="sourceType" class="inp" aria-label="Kind">
-            <option v-for="s in SOURCES" :key="s" :value="s">{{ s }}</option>
-          </select>
-          <button class="bt p" type="button" :disabled="busy || (!files.length && !text.trim())" @click="add">{{ busy ? 'Adding…' : 'Add to Inbox' }}</button>
-        </div>
-        <textarea v-if="showText" v-model="text" class="inp" rows="3" style="width: 100%; margin-top: 8px" placeholder="Paste or type text to file"></textarea>
-        <a v-else href="#" class="mt" style="display: inline-block; margin-top: 8px" @click.prevent="showText = true">Or paste text instead</a>
-      </div>
-    </section>
-
-    <section>
-      <div class="chips" style="margin-bottom: 12px">
-        <button v-for="t in TABS" :key="t.key" class="ch" :class="{ on: tab === t.key }" type="button" @click="setTab(t.key)">
-          {{ t.label }}<span v-if="count(t)" class="mt" :style="tab === t.key ? 'color: inherit; opacity: .7' : ''">&nbsp;{{ count(t) }}</span>
-        </button>
-      </div>
-      <div class="cd list">
-        <div v-for="it in items" :key="it.name" class="rw">
-          <div class="grow">
-            <RouterLink class="ttl" :to="`/inbox/${it.name}`">{{ it.title }}</RouterLink>
-            <div class="mt">{{ describe(it) }}</div>
-            <div v-if="it.status === 'Failed' && it.error" class="mt" style="color: var(--r-ink)">{{ it.error }}</div>
+        <div class="drop" :class="{ over }" @dragover.prevent="over = true" @dragleave.prevent="over = false" @drop.prevent="onDrop">
+          <input ref="picker" type="file" multiple style="display: none" @change="onPick" />
+          <div v-if="!files.length" class="drop-hint">
+            <b>Drop files here</b>
+            <span class="mt">A journal photo, a voice note, a PDF, anything. Or <a href="#" @click.prevent="picker.click()">choose files</a>.</span>
           </div>
-          <button v-if="it.status === 'Failed' && canWrite()" class="bt s" type="button" @click="retry(it)">Retry</button>
-          <span class="pl" :class="PILL[it.status]">{{ it.status === 'To Review' ? 'To review' : it.status }}</span>
+          <div v-else class="chips">
+            <span v-for="(f, i) in files" :key="i" class="ch sm">{{ f.name }} <span class="mt">{{ fileSize(f.size) }}</span>
+              <a href="#" aria-label="Remove" @click.prevent="files.splice(i, 1)">×</a></span>
+            <a href="#" class="ch sm add" @click.prevent="picker.click()">+ more</a>
+          </div>
+          <div class="drop-form">
+            <input v-model="instruction" class="inp" style="flex: 1 1 260px" placeholder="What should the agent do? For example: summarise and pull out to-dos"
+              @keydown.enter="add" />
+            <select v-model="sourceType" class="inp" aria-label="Kind">
+              <option v-for="s in SOURCES" :key="s" :value="s">{{ s }}</option>
+            </select>
+            <button class="bt p" type="button" :disabled="busy || (!files.length && !text.trim())" @click="add">{{ busy ? 'Adding…' : 'Add to Inbox' }}</button>
+          </div>
+          <textarea v-if="showText" v-model="text" class="inp" rows="3" style="width: 100%; margin-top: 8px" placeholder="Paste or type text to file"></textarea>
+          <a v-else href="#" class="mt" style="display: inline-block; margin-top: 8px" @click.prevent="showText = true">Or paste text instead</a>
         </div>
-        <Empty v-if="loaded && !items.length" :title="EMPTY[tab][0]" :hint="EMPTY[tab][1]" />
-        <div v-if="more" class="rw"><button class="bt s" type="button" @click="load(true)">Show more</button></div>
+      </section>
+    </template>
+    <template #cell-title="{ row }">
+      <div class="ttl">{{ row.title }}</div>
+      <div class="mt">{{ describe(row) }}</div>
+      <div v-if="row.status === 'Failed' && row.error" class="mt" style="color: var(--r-ink)">{{ row.error }}</div>
+    </template>
+    <template #cell-area="{ row }"><span class="mt">{{ row.area_name || '' }}</span></template>
+    <template #cell-received_on="{ row }"><span class="mt">{{ dateTime(row.received_on) }}</span></template>
+    <template #cell-proposals="{ row }">
+      <a v-if="row.pending" href="#" class="num" data-door="inbox-row" @click.prevent="openRef('inbox:' + row.name, { focus: 'pending' })">{{ row.pending }} of {{ row.proposals }} proposals pending</a>
+      <span v-else-if="row.proposals" class="mt">{{ row.proposals }} proposal{{ row.proposals === 1 ? '' : 's' }}, all decided</span>
+    </template>
+    <template #cell-status="{ row }">
+      <button v-if="row.status === 'Failed' && canWrite()" class="bt s" type="button" style="margin-right: 8px" @click="retry(row)">Retry</button>
+      <span class="pl" :class="PILL[row.status]">{{ row.status === 'To Review' ? 'To review' : row.status }}</span>
+    </template>
+    <template #stack="{ row }">
+      <div style="display: flex; gap: 10px; align-items: flex-start">
+        <div style="flex: 1; min-width: 0">
+          <div class="ttl">{{ row.title }}</div>
+          <div class="mt">{{ describe(row) }}</div>
+          <div v-if="row.status === 'Failed' && row.error" class="mt" style="color: var(--r-ink)">{{ row.error }}</div>
+          <a v-if="row.pending" href="#" class="num mt" @click.prevent="openRef('inbox:' + row.name, { focus: 'pending' })">{{ row.pending }} of {{ row.proposals }} proposals pending</a>
+        </div>
+        <span class="pl" :class="PILL[row.status]">{{ row.status === 'To Review' ? 'To review' : row.status }}</span>
       </div>
-    </section>
-  </div>
+      <button v-if="row.status === 'Failed' && canWrite()" class="bt s" type="button" style="margin-top: 8px" @click="retry(row)">Retry</button>
+    </template>
+  </ListView>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'frappe-ui'
-import PageHead from '@/components/PageHead.vue'
-import Empty from '@/components/Empty.vue'
+import ListView from '@/components/ListView.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { canWrite, refreshCounts, store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { fileKind, fileSize, uploadFile } from '@/lib/upload'
+import { areaOptions, loadLookups } from '@/lib/lookups'
+import { openRef } from '@/lib/pane'
 
 const SOURCES = ['Upload', 'Journal Photo', 'Voice Note', 'Email', 'Chat', 'Message', 'Web']
-const TABS = [
-  { key: 'review', label: 'To review', status: ['To Review'] },
-  { key: 'waiting', label: 'Waiting for the agent', status: ['New', 'Processing'] },
-  { key: 'failed', label: 'Failed', status: ['Failed'] },
-  { key: 'done', label: 'Done', status: ['Done'] },
+// "Waiting for the agent" is two statuses: New and Processing
+const STATUS = { 'To Review': ['To Review'], Waiting: ['New', 'Processing'], Failed: ['Failed'], Done: ['Done'] }
+const FILTERS = computed(() => [
+  { key: 'status', label: 'Status', all: 'Any status', options: [{ value: 'To Review', label: 'To review' }, { value: 'Waiting', label: 'Waiting for the agent' },
+    { value: 'Failed', label: 'Failed' }, { value: 'Done', label: 'Done' }] },
+  { key: 'source_type', label: 'Source', all: 'Any source', options: SOURCES.map((s) => ({ value: s, label: s })) },
+  { key: 'area', label: 'Area', all: 'All areas', options: [...areaOptions(), { value: 'none', label: 'No area' }] },
+  { key: 'from', label: 'From', type: 'date' }, { key: 'to', label: 'To', type: 'date' },
+])
+const COLUMNS = [
+  { key: 'title', label: 'Item', sort: 'title' }, { key: 'area', label: 'Area', width: '120px' },
+  { key: 'received_on', label: 'Received', width: '110px', sort: 'received_on' }, { key: 'proposals', label: 'Proposals', width: '190px' },
+  { key: 'status', label: 'Status', width: 'max-content', sort: 'status', align: 'right', nowrap: true },
 ]
 const PILL = { 'To Review': 'o', New: 'n', Processing: 'b', Failed: 'r', Done: 'g' }
-const EMPTY = {
-  review: ['Nothing to review.', 'When an agent has processed something you added, it shows here with its proposals.'],
-  waiting: ['Nothing is waiting.', 'Drop a file above or forward something to your agent. It appears here until the agent picks it up.'],
-  failed: ['Nothing has failed.', 'If an agent cannot process an item, it lands here with the reason and a Retry button.'],
-  done: ['Nothing is done yet.', 'Items move here once every proposal has been accepted or rejected.'],
-}
-
+const route = useRoute()
 const router = useRouter()
 const picker = ref(null)
 const files = ref([])
@@ -84,24 +98,16 @@ const text = ref('')
 const showText = ref(false)
 const over = ref(false)
 const busy = ref(false)
-const tab = ref('review')
-const items = ref([])
-const totals = ref({})
-const loaded = ref(false)
-const more = ref(false)
-
-const count = (t) => t.status.reduce((n, s) => n + (totals.value[s] || 0), 0)
-const headSub = computed(() => `${store.space} · drop anything here, an agent proposes, you approve`)
+const list = ref(null)
+const pendingTotal = ref(0)
 
 function describe(it) {
   const parts = []
   if (it.status === 'To Review' || it.status === 'Done') {
     parts.push(it.has_transcript ? 'Transcribed' : it.has_summary ? 'Summary ready' : 'Processed')
-    parts.push(`${it.proposals} proposal${it.proposals === 1 ? '' : 's'}`)
   } else if (it.status === 'Processing') parts.push(`Being processed${it.processed_by ? ' by ' + it.processed_by : ''}`)
   else if (it.status === 'New') parts.push('Waiting for an agent')
-  else parts.push(it.source_type)
-  parts.push(`${it.filed_by ? 'filed by ' + it.filed_by + ', ' : ''}${dateTime(it.received_on)}`)
+  parts.push(`${it.source_type}${it.filed_by ? ', filed by ' + it.filed_by : ''}`)
   return parts.join(' · ')
 }
 
@@ -139,7 +145,8 @@ async function add() {
     text.value = ''
     showText.value = false
     sourceType.value = 'Upload'
-    setTab('waiting')
+    if (route.query.status === 'Waiting') list.value.reload()
+    else router.push({ query: { status: 'Waiting' } })
   } catch (e) {
     toast.error(errorText(e))
   } finally {
@@ -147,29 +154,17 @@ async function add() {
   }
 }
 
-async function load(append = false) {
-  const t = TABS.find((x) => x.key === tab.value)
-  const res = await tryCall(() => api('inbox.list', { space: store.space, status: JSON.stringify(t.status), start: append ? items.value.length : 0, page_length: 30 }))
-  if (!res) return
-  items.value = append ? [...items.value, ...res.items] : res.items
-  totals.value = res.totals
-  more.value = res.items.length === 30
-  loaded.value = true
+async function fetch({ filters: f, sort, dir, start, page_length }) {
+  const res = await api('inbox.list', { space: store.space, status: f.status ? JSON.stringify(STATUS[f.status] || [f.status]) : undefined,
+    source_type: f.source_type || undefined, area: f.area || undefined, from_date: f.from || undefined, to_date: f.to || undefined,
+    sort: sort || undefined, dir: dir || undefined, start, page_length })
   refreshCounts()
-}
-function setTab(key) {
-  tab.value = key
-  loaded.value = false
-  load()
+  return { rows: res.items, total: res.total, pending_total: res.pending_total }
 }
 async function retry(it) {
-  if (await tryCall(() => api('inbox.retry', { item: it.name }), 'Sent back to the agent.')) load()
+  if (await tryCall(() => api('inbox.retry', { item: it.name }), 'Sent back to the agent.')) list.value.reload()
 }
-
-onMounted(async () => {
-  await load()
-  if (!items.value.length && (totals.value.New || totals.value.Processing)) setTab('waiting')
-})
+onMounted(loadLookups)
 </script>
 
 <style scoped>
