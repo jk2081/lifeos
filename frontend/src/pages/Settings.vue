@@ -3,7 +3,8 @@
   <div class="flex min-h-0 flex-1 max-md:block" data-settings>
     <!-- the menu: three groups. On a phone it is the first screen and a section opens full width with Back. -->
     <nav v-if="!phone || !section" class="w-60 flex-none overflow-y-auto border-r border-outline-gray-1 px-3 pb-10 pt-4 max-md:w-auto max-md:border-r-0 max-md:p-4" aria-label="Settings sections" data-settings-menu>
-      <Tabs vertical :model-value="section || ''" @update:model-value="open">
+      <!-- wide screens: frappe-ui Tabs in its vertical form; a phone: the same groups as a list of rows, the first screen -->
+      <Tabs v-if="!phone && d" vertical :model-value="section" @update:model-value="open">
         <TabList variant="ghost" class="w-full">
           <template v-for="g in groups" :key="g.key">
             <div class="px-2 pb-1 pt-4 text-sm-medium text-ink-gray-6 first:pt-0" :data-settings-group="g.key">{{ g.label }}</div>
@@ -11,10 +12,21 @@
               <Select :model-value="spaceSel" :options="d.spaces.map((s) => ({ label: s.name, value: s.name }))" aria-label="Space for these settings" data-settings-space
                 @update:model-value="pickSpace" />
             </div>
-            <TabTrigger v-for="it in g.items" :key="it.value" class="w-full justify-start max-md:min-h-11" :value="it.value" :label="it.label" :data-section="it.value" />
+            <TabTrigger v-for="it in g.items" :key="it.value" class="w-full justify-start" :value="it.value" :label="it.label" :data-section="it.value" />
           </template>
         </TabList>
       </Tabs>
+      <template v-else>
+        <section v-for="g in groups" :key="g.key" class="mb-4 flex flex-col gap-0.5">
+          <div class="mb-1 text-sm-medium text-ink-gray-6" :data-settings-group="g.key">{{ g.label }}</div>
+          <div v-if="g.key === 'space' && d" class="mb-1.5">
+            <Select :model-value="spaceSel" :options="d.spaces.map((s) => ({ label: s.name, value: s.name }))" aria-label="Space for these settings" data-settings-space
+              @update:model-value="pickSpace" />
+          </div>
+          <Button v-for="it in g.items" :key="it.value" class="!justify-start" size="lg" variant="ghost" icon-right="lucide-chevron-right" :label="it.label" :data-section="it.value"
+            @click="open(it.value)" />
+        </section>
+      </template>
     </nav>
 
     <section v-if="section && (!phone || section)" class="min-w-0 flex-1 overflow-y-auto px-7 pb-16 pt-6 max-md:p-4" data-settings-section :data-current="section">
@@ -163,7 +175,7 @@
   <Dialog v-model:open="addOpen" :title="`Add a member to ${memberSpace}`" size="sm"
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Add', variant: 'solid', onClick: addMember }]">
     <div class="flex flex-col gap-3" data-add-dialog>
-      <LifeLink v-model="newMember.user" doctype="User" label="Person" placeholder="Search by name or email" :filters="{ name: ['not in', ['Administrator', 'Guest']], enabled: 1 }" />
+      <LifeLink v-model="newMember.user" doctype="User" label="Person" placeholder="Search by name or email" />
       <Select v-model="newMember.access" :options="ACCESS" aria-label="Access" />
     </div>
   </Dialog>
@@ -171,7 +183,7 @@
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Create space', variant: 'solid', onClick: createSpace }]">
     <div class="flex flex-col gap-3">
       <TextInput v-model="newSpace.name" label="Name" placeholder="For example Anya" />
-      <LifeLink v-model="newSpace.owner" doctype="User" label="Owner" placeholder="You, unless you choose someone" :filters="{ name: ['not in', ['Administrator', 'Guest']], enabled: 1 }" />
+      <LifeLink v-model="newSpace.owner" doctype="User" label="Owner" placeholder="You, unless you choose someone" />
       <p class="text-sm text-ink-gray-6">A new space starts with four areas: Work, Personal &amp; Health, Money &amp; Legal and Family. Rename or archive them later.</p>
     </div>
   </Dialog>
@@ -234,9 +246,11 @@ const groups = computed(() => [
 ])
 const sections = computed(() => groups.value.flatMap((g) => g.items))
 // the open section is tab= in the URL. On a wide screen the first section is the default; on a phone the menu is.
+const ADMIN_ONLY = ['members', 'agents']
 const section = computed(() => {
   const v = route.query.tab ? String(route.query.tab) : ''
-  if (sections.value.some((s) => s.value === v)) return v
+  // an Admin section asked for before the settings have loaded is kept; once loaded, only a Life Admin has it
+  if (sections.value.some((s) => s.value === v) || (!d.value && ADMIN_ONLY.includes(v))) return v
   return phone.value ? '' : 'appearance'
 })
 function open(v) {

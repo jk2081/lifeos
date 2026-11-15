@@ -205,9 +205,9 @@ dt("Life Cycle", [
 	f("final_score", "Float", read_only=1), f("closed_on", "Date", read_only=1),
 ], title_field="title", show_title=1)
 dt("Life Goal", [
-	SPACE, link("cycle", "Life Cycle", in_list_view=1, search_index=1), f("title", reqd=1, in_list_view=1),
-	sel("goal_type", ["12 Week Year", "Annual", "Open"], reqd=1, default="12 Week Year", in_list_view=1, search_index=1),
-	f("target_date", "Date", in_list_view=1), f("closed_on", "Date"),
+	SPACE, link("cycle", "Life Cycle", search_index=1), f("title", reqd=1, in_list_view=1),
+	sel("goal_type", ["12 Week Year", "Annual", "Open"], reqd=1, default="12 Week Year", in_list_view=1, search_index=1, label="Type"),
+	f("target_date", "Date"), f("closed_on", "Date"),
 	link("area", "Life Area", in_list_view=1, search_index=1), link("project", "Life Project"), f("sort_order", "Int"),
 	f("actions", "Table", "Life Goal Action"),
 	sel("outcome", ["In Progress", "Achieved", "Partly Achieved", "Not Achieved", "Carried", "Dropped"], default="In Progress"),

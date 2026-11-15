@@ -12,9 +12,8 @@ function restore() {
   nav.closed = s.closed || []
   nav.openAreas = s.open_areas || []
   nav.rail = !!s.rail
+  openActiveParent()
 }
-whenViewsLoaded(restore)
-watch(() => store.space, () => whenViewsLoaded(restore))
 const save = () => saveView('sidebar', { closed: [...nav.closed], open_areas: [...nav.openAreas], rail: nav.rail })
 export function setGroup(key, closed) {
   nav.closed = closed ? [...new Set([...nav.closed, key])] : nav.closed.filter((k) => k !== key)
@@ -48,14 +47,14 @@ export const activeKey = computed(() => {
   const first = '/' + p.split('/')[1]
   return first
 })
-watch(activeKey, (k) => {
-  if (!k.startsWith('area:')) return
-  const a = (lookups.areas || []).find((x) => x.name === k.slice(5))
-  if (a?.parent_area && !nav.openAreas.includes(a.parent_area)) nav.openAreas = [...nav.openAreas, a.parent_area]
-}, { immediate: true })
-watch(() => lookups.areas, () => {
+// on a sub-area's page its parent is open in the sidebar (not remembered: it follows the page)
+function openActiveParent() {
   const k = activeKey.value
   if (!k.startsWith('area:')) return
   const a = (lookups.areas || []).find((x) => x.name === k.slice(5))
   if (a?.parent_area && !nav.openAreas.includes(a.parent_area)) nav.openAreas = [...nav.openAreas, a.parent_area]
-})
+}
+watch(activeKey, openActiveParent, { immediate: true })
+watch(() => lookups.areas, openActiveParent)
+whenViewsLoaded(restore)
+watch(() => store.space, () => whenViewsLoaded(restore))

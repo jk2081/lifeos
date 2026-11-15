@@ -35,7 +35,6 @@
    "fieldtype": "Link",
    "label": "Cycle",
    "options": "Life Cycle",
-   "in_list_view": 1,
    "search_index": 1
   },
   {
@@ -48,7 +47,7 @@
   {
    "fieldname": "goal_type",
    "fieldtype": "Select",
-   "label": "Goal Type",
+   "label": "Type",
    "options": "12 Week Year\nAnnual\nOpen",
    "reqd": 1,
    "default": "12 Week Year",
@@ -58,8 +57,7 @@
   {
    "fieldname": "target_date",
    "fieldtype": "Date",
-   "label": "Target Date",
-   "in_list_view": 1
+   "label": "Target Date"
   },
   {
    "fieldname": "closed_on",

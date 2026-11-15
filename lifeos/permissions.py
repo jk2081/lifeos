@@ -247,8 +247,10 @@ def no_desk_redirect():
 		return
 	if frappe.get_cached_value("User", frappe.session.user, "user_type") == "System User":
 		return
-	frappe.local.flags.redirect_location = "/life"
-	raise frappe.Redirect
+	from werkzeug.exceptions import HTTPException
+	from werkzeug.utils import redirect
+
+	raise HTTPException(response=redirect("/life", 302))
 
 
 def validate_user_roles(doc, method=None):

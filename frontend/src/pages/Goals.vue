@@ -16,7 +16,7 @@
     <template #cell-_when="{ row }"><span class="truncate">{{ when(row) }}</span></template>
     <template #cell-_tasks="{ row }"><GoalTasks :row="row" /></template>
     <template #cell-_score="{ row }"><span class="tabular-nums" data-goal-score>{{ row.score === null || row.score === undefined ? '' : Math.round(row.score) + '%' }}</span></template>
-    <template #cell-outcome="{ row }"><Badge :theme="OUTCOME_THEME[row.outcome] || 'gray'" :label="row.outcome === 'In Progress' ? 'In progress' : row.outcome" /></template>
+    <template #cell-_outcome="{ row }"><Badge :theme="OUTCOME_THEME[row.outcome] || 'gray'" :label="row.outcome === 'In Progress' ? 'In progress' : row.outcome" /></template>
     <template #stack="{ row }">
       <div class="flex flex-col gap-1">
         <div class="flex items-start gap-2"><div class="min-w-0 flex-1 break-words text-base-medium text-ink-gray-9">{{ row.title }}</div>
@@ -47,7 +47,7 @@ const EMPTY = { in_progress: 'No goals in progress.', achieved: 'No achieved goa
 const SPEC = [{ key: 'status', field: 'outcome', kind: 'value' }, { key: 'type', field: 'goal_type', kind: 'value', label: 'Type' }, { key: 'area', field: 'area', kind: 'link' },
   { key: 'cycle', field: 'cycle', kind: 'link' }, { key: 'target_from', field: 'target_date', kind: 'from' }, { key: 'target_to', field: 'target_date', kind: 'to' }]
 const SYNTHETIC = [{ key: '_when', label: 'When', width: '10rem', place: 'end' }, { key: '_tasks', label: 'Tasks', width: '12rem', place: 'end' },
-  { key: '_score', label: 'Score', width: '5rem', align: 'right', place: 'end' }]
+  { key: '_score', label: 'Score', width: '5rem', align: 'right', place: 'end' }, { key: '_outcome', label: 'Outcome', width: '9rem', place: 'end' }]
 const HIDDEN = ['actions', 'sort_order', 'final_score', 'carried_from', 'result_note']
 const ORDERS = [{ label: 'Default order', value: '' }, { label: 'Task completion', value: 'completion' }]
 const OUTCOME_THEME = { 'In Progress': 'blue', Achieved: 'green', 'Partly Achieved': 'amber', 'Not Achieved': 'red' }

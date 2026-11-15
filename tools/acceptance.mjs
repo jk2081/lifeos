@@ -55,7 +55,7 @@ async function session(user, width = 1440) {
 const ONLY_UX = process.argv.includes('--ux') // run only the UX checks (U1 and up)
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7) // run only the checks whose number ends with this: --only=.8
 async function check(n, title, fn) {
-  if ((ONLY_UX || ONLY) && !String(n).startsWith('U')) return
+  if (ONLY_UX && !String(n).startsWith('U')) return
   if (ONLY && !String(n).endsWith(ONLY)) return
   try {
     const note = await fn()
@@ -378,6 +378,33 @@ await check('S1', 'Security: rendered Markdown is sanitised', async () => {
   }))
   must(found.shown, 'the note did not render')
   must(!found.pwned && !found.scripts && !found.handlers && !found.js, JSON.stringify(found))
+})
+
+await check('S3', 'Security: the family and agent users land on /life from /app; the agent works without desk access and cannot read a closed Vault', async () => {
+  for (const user of ['family@lifeos.test', 'hermes@lifeos.test']) {
+    const ctx = await browser.newContext()
+    const r = await ctx.request.post(base + '/api/method/login', { form: { usr: user, pwd: env.LIFEOS_DEV_PASSWORD } })
+    must(r.ok(), 'login failed for ' + user)
+    for (const p of ['/app', '/app/todo', '/desk']) {
+      const res = await ctx.request.get(base + p, { maxRedirects: 0 })
+      const to = res.headers().location || ''
+      must(res.status() >= 300 && res.status() < 400 && /\/life$/.test(to.replace(base, '')), `${user} at ${p}: ${res.status()} ${to}`)
+    }
+    await ctx.close()
+  }
+  // the agent end to end with its API key: claim_next and submit_result through the fake agent
+  const item = await owner.api('inbox.create_item', { title: `S3 agent item ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'Call the plumber tomorrow.' })
+  runAgent()
+  must((await owner.api('inbox.get', { item: item.name })).status === 'To Review', 'the agent did not process the item without desk access')
+  // with the switch off the agent's key cannot read a Vault document
+  const doc = await owner.api('vault.save', { space: SPACE, values: { title: `S3 secret ${stamp}`, doc_type: 'ID' } })
+  const asAgent = (m, args) => fetch(`${base}/api/method/lifeos.api.${m}?${new URLSearchParams(args)}`, { headers: { Authorization: `token ${agentKey}:${agentSecret}` } })
+  const vaultOpen = (await owner.api('settings.get', { space: SPACE })).spaces.find((x) => x.name === SPACE).agents_can_read_vault
+  if (!vaultOpen) {
+    must((await asAgent('vault.get', { document: doc.name })).status === 404, 'the agent read a Vault document with the switch off')
+    const listed = await (await asAgent('vault.list', { space: SPACE })).json()
+    must(listed.message.total === 0, 'the agent listed Vault documents with the switch off')
+  }
 })
 
 await check('S2', 'Security: the PWA manifest and icons are served; an agent cannot decide or delete', async () => {
@@ -941,6 +968,286 @@ for (const width of [1440, 390]) {
       must((await jt.getAttribute('data-tab-current')) === 'transcript', 'the journal page tab did not survive a reload')
     }
     must((await overflow()) <= 0, 'the page scrolls sideways')
+  })
+
+  await check(`${tag}.12`, `${width} px: Settings: sections from the menu and the URL, rename, reorder and nest, archive and restore, members, saved settings, no role names`, async () => {
+    let step = 'sections'
+    try {
+    const SECTIONS = ['appearance', 'default', 'review', 'areas', 'tags', 'habits', 'dimensions', 'archive', 'archived', 'members', 'agents']
+    const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
+    for (const sec of SECTIONS) {
+      await s.open(`/life/settings?tab=${sec}`)
+      must((await cur()) === sec, `?tab=${sec} opened ${await cur()}`)
+      await s.open('/life/settings')
+      if (phone) must(await pg.locator('[data-settings-menu]').isVisible() && !(await pg.locator('[data-settings-section]').count()), 'on a phone the menu is not the first screen')
+      await pg.locator(`[data-settings-menu] [data-section="${sec}"]`).click()
+      await settle()
+      must((await cur()) === sec && (phone ? !(await pg.locator('[data-settings-menu]').count()) : true), `the menu did not open ${sec}`)
+      must((await overflow()) <= 0, `${sec}: the page scrolls sideways`)
+      const text = await pg.locator('[data-main]').innerText()
+      must(!/Life (Agent|User|Admin)|Administrator/.test(text), `${sec}: a role name or Administrator shows`)
+    }
+    // areas: rename in place, reorder, nest
+    step = 'areas: rename in place, reorder, nest'
+    const A = `UX3 area A ${width} ${stamp}`
+    const B = `UX3 area B ${width} ${stamp}`
+    const a = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: A, sort_order: 900 })).name
+    const b = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: B, sort_order: 901 })).name
+    await s.open('/life/settings?tab=areas')
+    const row = (n) => pg.locator(`[data-settings-list="area"] [data-row-name="${n}"]`)
+    must(!(await row(a).locator('[data-row-menu]').count()) || true, '')
+    await row(a).locator('[data-row-title]').click()
+    await pg.keyboard.press('ControlOrMeta+a')
+    await pg.keyboard.type(A + ' renamed')
+    await pg.keyboard.press('Enter')
+    await pg.waitForTimeout(900)
+    const got = async () => (await s.api('settings.get', { space: SPACE })).areas
+    must((await got()).find((x) => x.name === a).area_name === A + ' renamed', 'rename in place did not save')
+    const order = async () => { const all = (await got()).filter((x) => !x.parent_area && !x.is_archived); return [all.findIndex((x) => x.name === a), all.findIndex((x) => x.name === b)] }
+    const [ia, ib] = await order()
+    must(ia < ib, 'A is not above B to start with')
+    const menuPick = async (n, label) => { await row(n).locator('[data-row-menu]').click(); await pg.waitForTimeout(250); await pg.getByRole('menuitem', { name: label }).click(); await pg.waitForTimeout(250) }
+    const itemsOf = async (n) => { await row(n).locator('[data-row-menu]').click(); await pg.waitForTimeout(250); const t = await pg.getByRole('menuitem').allInnerTexts(); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); return t.map((x) => x.trim()) }
+    if (phone) await menuPick(b, 'Move up')
+    else { await row(b).focus(); await pg.keyboard.press('Alt+ArrowUp') }
+    await pg.waitForTimeout(900)
+    const [ja, jb] = await order()
+    must(jb < ja, `reordering did not move B above A (${ja}, ${jb})`)
+    await menuPick(a, 'Move under…')
+    await pg.locator('[data-under-select]').click()
+    await pg.getByRole('option', { name: B, exact: true }).click()
+    await pg.getByRole('button', { name: 'Move', exact: true }).click()
+    await pg.waitForTimeout(900)
+    must((await got()).find((x) => x.name === a).parent_area === b, 'Move under did not nest A under B')
+    // no Delete or Remove for areas, tags, habits or dimensions
+    step = 'no Delete or Remove for areas, tags, habits or dimensions'
+    const items = await itemsOf(b)
+    must(!items.some((t) => /Delete|Remove/.test(t)) && items.includes('Archive'), `the row menu offers ${items}`)
+    for (const sec of ['tags', 'habits', 'dimensions']) {
+      await s.open(`/life/settings?tab=${sec}`)
+      const first = pg.locator('[data-settings-list] [data-row-name]').first()
+      if (await first.count()) { const t = await itemsOf(await first.getAttribute('data-row-name')).catch(() => []); must(!t.some((x) => /Delete|Remove/.test(x)), `${sec}: ${t}`) }
+      must(!(await pg.getByRole('button', { name: /^(Delete|Remove)$/ }).count()), `${sec}: a Delete or Remove button`)
+    }
+    // archive B with its sub-area A: both leave the Areas screen and the pickers, their records stay, both are under Archived
+    step = 'archive B with its sub-area A: both leave the Areas scree'
+    const task = await s.api('tasks.quick_add', { text: `UX3 filed under A ${width} ${stamp}`, space: SPACE, area: a })
+    await s.open('/life/settings?tab=areas')
+    await menuPick(b, 'Archive')
+    must((await pg.locator('[data-archive-dialog]').innerText()).includes('1 sub-area'), 'the archive dialog does not say how many sub-areas go with it')
+    await pg.getByRole('button', { name: 'Archive', exact: true }).last().click()
+    await pg.waitForTimeout(1200)
+    const tree = (await s.api('area.tree', { space: SPACE })).areas.map((x) => x.name)
+    const ctx = (await s.api('meta.space_context', { space: SPACE })).areas.map((x) => x.name)
+    must(!tree.includes(a) && !tree.includes(b) && !ctx.includes(a) && !ctx.includes(b), 'an archived area is still on the Areas screen or in the pickers')
+    must((await s.api('tasks.get', { task: task.name })).area === a, 'the task under the archived area changed')
+    if (!phone) must(!(await pg.locator(`[data-nav-area="${b}"]`).count()), 'the archived area is still in the sidebar')
+    await s.open('/life/settings?tab=archived')
+    must(await pg.locator(`[data-archived-row="${a}"]`).count() && await pg.locator(`[data-archived-row="${b}"]`).count(), 'the archived areas are not under Archived')
+    await pg.locator(`[data-restore="${b}"]`).click()
+    await pg.getByRole('button', { name: 'Restore with sub-areas' }).click()
+    await pg.waitForTimeout(1200)
+    const back = await got()
+    must(!back.find((x) => x.name === b).is_archived && !back.find((x) => x.name === a).is_archived && back.find((x) => x.name === a).parent_area === b, 'Restore did not bring both back in place')
+    await s.api('settings.save_item', { kind: 'area', name: b, is_archived: 1 }) // tidy: leave the test areas archived
+    // a changed setting says Saved and survives a reload
+    step = 'a changed setting says Saved and survives a reload'
+    const before = (await s.api('settings.get', { space: SPACE })).settings.score_target
+    const next = before === 86 ? 85 : 86
+    await s.open('/life/settings?tab=review')
+    const box = pg.locator('[data-setting="score_target"] input, input[data-setting="score_target"]').first()
+    await box.fill(String(next))
+    await box.press('Tab')
+    await pg.getByText('Saved', { exact: true }).first().waitFor({ timeout: 5000 })
+    await pg.reload({ waitUntil: 'networkidle' })
+    await settle()
+    must(Number(await pg.locator('[data-setting="score_target"] input, input[data-setting="score_target"]').first().inputValue()) === next, 'the setting did not survive a reload')
+    await s.api('settings.save', { values: { score_target: before } })
+    // add and remove a member through the dialogs
+    step = 'add and remove a member through the dialogs'
+    await s.open('/life/settings?tab=members')
+    if (phone) { await pg.locator('[data-settings-section] button[role="combobox"], [data-settings-section] [aria-label="Space"]').first().click(); await pg.getByRole('option', { name: 'Shared', exact: true }).click() }
+    else await pg.locator('[data-member-spaces] [data-space="Shared"]').click()
+    await settle()
+    const who = 'stranger@lifeos.test'
+    if (await pg.locator(`[data-member="${who}"]`).count()) await s.api('settings.set_member', { space: 'Shared', user: who, remove: 1 }), await s.open('/life/settings?tab=members')
+    await pg.locator('[data-add-member]').click()
+    await pg.waitForTimeout(300)
+    await pg.locator('[data-add-dialog] button, [data-add-dialog] input').first().click()
+    await pg.keyboard.type('stranger', { delay: 30 })
+    await pg.waitForTimeout(1200)
+    await pg.getByRole('option', { name: /stranger/i }).first().click()
+    await pg.getByRole('button', { name: 'Add', exact: true }).last().click()
+    await pg.waitForTimeout(1200)
+    must(await pg.locator(`[data-member="${who}"]`).count(), 'Add member did not add the person')
+    await pg.locator(`[data-member-menu="${who}"]`).click()
+    await pg.getByRole('menuitem', { name: 'Remove' }).click()
+    await pg.getByRole('button', { name: 'Remove', exact: true }).last().click()
+    await pg.waitForTimeout(1200)
+    must(!(await pg.locator(`[data-member="${who}"]`).count()), 'Remove did not remove the person')
+    must(await pg.locator('[data-owner-badge]').count(), 'the owner has no Owner badge')
+    // the family member has no Admin group
+    step = 'the family member has no Admin group'
+    const fam = await session('family@lifeos.test', width)
+    await fam.open('/life/settings')
+    must(!(await fam.page.locator('[data-settings-group="admin"]').count()), 'the family user sees the Admin group')
+    await fam.ctx.close()
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    return `${SECTIONS.length} sections`
+    } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) }
+  })
+
+  await check(`${tag}.13`, `${width} px: sidebar: groups, areas, active item, collapse remembered, counts, New, Notes and Graph`, async () => {
+    let step = 'start'
+    try {
+    await s.api('views.save', { screen: 'sidebar', space: SPACE, state: { closed: [], open_areas: [], rail: false } }) // start from the default state
+    const want = { main: ['Today', 'Inbox', 'Tasks', 'Calendar'], plan: ['Journal', 'Goals', 'Projects'], records: ['Notes', 'Vault', 'Chats', 'Timeline'] }
+    const areas = (await s.api('area.tree', { space: SPACE })).areas
+    const top = areas.filter((x) => !x.parent_area)
+    if (phone) {
+      await s.open('/life')
+      await pg.locator('[data-tabbar] [data-slot="mobile-nav-item"][aria-label="More"]').click()
+      await settle()
+      const more = pg.locator('[data-more]')
+      for (const [g, items] of Object.entries(want)) must(JSON.stringify((await more.locator(`[data-more-group="${g}"] button, [data-more-group="${g}"] a`).allInnerTexts()).map((t) => t.trim().replace(/\s*\d+$/, '')).filter((t) => items.includes(t))) === JSON.stringify(items), `More: group ${g} is wrong`)
+      for (const x of top.slice(0, 12)) must(await more.locator(`[data-more-group="areas"]`, { hasText: x.area_name }).count(), `More: no area ${x.area_name}`)
+      must(await more.locator('[data-more-new]').count() && (await more.innerText()).includes('Search'), 'More has no Search and New')
+      await pg.keyboard.press('Escape')
+      const due = (await s.api('today.get', { space: SPACE })).tasks.due
+      const badge = pg.locator('[data-tabbar] [data-tab-count="Tasks"]')
+      must(due === 0 ? !(await badge.count()) : num(await badge.innerText()) === due, `the Tasks tab says ${await badge.count() ? await badge.innerText() : 'nothing'}, Today says ${due}`)
+    } else {
+      await s.open('/life')
+      const groupItems = async (g) => (await pg.locator(`[data-nav-group="${g}"] [data-nav-item]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item'))))
+      for (const [g, items] of Object.entries(want)) must(JSON.stringify(await groupItems(g)) === JSON.stringify(items), `group ${g}: ${await groupItems(g)}`)
+      must(JSON.stringify(await pg.locator('[data-nav-bottom] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')))) === JSON.stringify(['Archive', 'Settings']), 'the bottom is not Archive and Settings')
+      must(await pg.locator('[data-nav-search]').count() && await pg.locator('[data-nav-new]').count(), 'no Search and New at the top')
+      must(!(await pg.locator('[data-nav-item="Graph"], [data-nav-item="Library"]').count()), 'Graph or Library is still in the sidebar')
+      // each area opens its page and is the one active item; a parent opens its sub-areas
+      step = 'each area opens its page and is the one active item; a pa'
+      for (const x of top.slice(0, 12)) {
+        await pg.locator(`[data-nav-area="${x.name}"]`).first().click()
+        await pg.waitForLoadState('networkidle')
+        await settle()
+        must(new URL(pg.url()).pathname === `/life/areas/${x.name}`, `${x.area_name} did not open its page`)
+        must((await pg.locator('[data-sidebar] [data-state="active"]').count()) === 1 && (await pg.locator(`[data-nav-area="${x.name}"]`).locator('xpath=..').getAttribute('data-state')) === 'active', `${x.area_name} is not the one active item`)
+      }
+      const parent = top.find((x) => areas.some((c) => c.parent_area === x.name))
+      if (parent) {
+        const child = areas.find((c) => c.parent_area === parent.name)
+        await s.open(`/life/areas/${child.name}`)
+        must(await pg.locator(`[data-nav-area="${child.name}"]`).isVisible() && (await pg.locator(`[data-nav-area="${child.name}"]`).locator('xpath=..').getAttribute('data-state')) === 'active', 'a sub-area page does not open its parent in the sidebar')
+      }
+      await s.open('/life/projects/' + ux.project)
+      must((await pg.locator('[data-nav-item="Projects"]').locator('xpath=..').getAttribute('data-state')) === 'active', 'Projects is not active on a project page')
+      await s.open('/life/areas')
+      must(await pg.locator('[data-nav-heading="areas"][data-active]').count() && !(await pg.locator('[data-sidebar] [data-state="active"]').count()), 'the Areas heading is not the active item on /areas')
+      // collapsing a group survives leaving and reloading
+      step = 'collapsing a group survives leaving and reloading'
+      await pg.locator('[data-nav-group="records"] h3 button').click()
+      await settle()
+      await s.open('/life/tasks?view=list')
+      await pg.waitForTimeout(1500)
+      await pg.reload({ waitUntil: 'networkidle' })
+      await settle()
+      must((await pg.locator('[data-nav-group="records"]').getAttribute('data-state')) === 'collapsed', 'the collapsed group opened again after a reload')
+      await pg.locator('[data-nav-group="records"] h3 button').click()
+      await pg.waitForTimeout(1300)
+      // the Tasks count equals Today's Due today and drops by one when such a task is done
+      step = "the Tasks count equals Today's Due today and drops by one"
+      await s.open('/life')
+      const t = await s.api('today.get', { space: SPACE })
+      const count = async () => (await pg.locator('[data-nav-count="Tasks"]').count()) ? num(await pg.locator('[data-nav-count="Tasks"]').innerText()) : 0
+      must((await count()) === t.tasks.due, `the sidebar says ${await count()} tasks, Today says ${t.tasks.due}`)
+      const dueTask = await s.api('tasks.quick_add', { text: `UX3 due today ${width} ${stamp} today`, space: SPACE })
+      await s.open('/life')
+      const n = await count()
+      // tick it done in the Tasks list, as a person would; the sidebar follows without a reload
+      await s.open(`/life/tasks?view=list&due=today`)
+      await pg.locator(`${ROW}`, { hasText: `UX3 due today ${width} ${stamp}` }).getByRole('checkbox').first().click()
+      await pg.waitForTimeout(1500)
+      must((await count()) === n - 1, `the count did not drop by one without a reload (${n} -> ${await count()})`)
+      // New opens its menu and each entry works
+      step = 'New opens its menu and each entry works'
+      for (const [label, check] of [['Task', async () => pg.getByRole('dialog', { name: 'New task' }).isVisible()], ['Note', async () => pg.getByRole('dialog', { name: 'New note' }).isVisible()],
+        ['Project', async () => pg.getByRole('dialog', { name: 'New project' }).isVisible()], ['Add to Inbox', async () => new URL(pg.url()).pathname === '/life/inbox']]) {
+        await s.open('/life')
+        await pg.locator('[data-nav-new]').click()
+        await pg.getByRole('menuitem', { name: label }).click()
+        await settle()
+        must(await check(), `New, ${label} did not open`)
+        await pg.keyboard.press('Escape')
+      }
+      // Timeline has its tooltip
+      step = 'Timeline has its tooltip'
+      await pg.locator('[data-nav-item="Timeline"]').hover()
+      await pg.waitForTimeout(900)
+      must((await pg.locator('body').innerText()).includes('Everything, by date'), 'the Timeline tooltip is missing')
+    }
+    // "Library" appears nowhere; Notes opens /library; /graph opens the Graph view of Notes
+    step = '"Library" appears nowhere; Notes opens /library; /graph o'
+    for (const p of ['/life', '/life/library', '/life/library?view=list', '/life/graph']) {
+      await s.open(p)
+      must(!(await pg.locator('body').innerText()).includes('Library'), `"Library" shows on ${p}`)
+    }
+    await s.open('/life/graph')
+    must((await pg.locator('h1, [data-slot="page-header-title"]').first().innerText()).includes('Notes') && (await pg.locator('[data-library-views] [aria-checked="true"], [data-library-views] [data-state="checked"]').first().innerText()).includes('Graph'), '/graph is not the Graph view of Notes')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) }
+  })
+
+  await check(`${tag}.14`, `${width} px: goals of every type: task figure, archive keeps it, tabs, score blank, add to a cycle, family sees none`, async () => {
+    let step = 'start'
+    try {
+    const open = await s.api('goals.create', { title: `UX3 open goal ${width} ${stamp}`, goal_type: 'Open', space: SPACE, area: uxArea })
+    const annual = await s.api('goals.create', { title: `UX3 annual goal ${width} ${stamp}`, goal_type: 'Annual', space: SPACE, area: uxArea, target_date: addDays(200) })
+    const ts = []
+    for (const i of [1, 2, 3]) ts.push(await s.api('tasks.quick_add', { text: `UX3 goal task ${i} ${width} ${stamp}`, space: SPACE, goal: open.name }))
+    await s.api('tasks.set_status', { task: ts[0].name, status: 'Done' })
+    await s.api('tasks.set_status', { task: ts[1].name, status: 'Dropped' })
+    const figure = async () => { await s.open(`/life/goals?status=all&open=goal:${open.name}`); await paneTitle(); await settle(); return (await pg.locator('[data-goal-figure]').innerText()).replace(/\s+/g, ' ') }
+    must((await figure()).includes('1 of 2 tasks'), `the goal shows "${await figure()}"`)
+    await s.api('archive.set', { doctype: 'Life Task', name: ts[0].name, archived: 1 })
+    must((await figure()).includes('1 of 2 tasks'), 'archiving the done task changed the figure')
+    // the Goals screen: both new goals beside the seeded 12 Week Year goals; each tab's count matches its rows; Score blank for the new ones
+    step = 'the Goals screen: both new goals beside the seeded 12 Wee'
+    const bar = pg.locator('[data-state-tabs]')
+    for (const v of ['in_progress', 'achieved', 'closed', 'all']) {
+      await s.open(`/life/goals?${v === 'in_progress' ? 'all=1' : 'status=' + v}`)
+      const said = num(await bar.locator(`[data-tab="${v}"] [data-tab-count]`).innerText())
+      must(said === await count() && (await pg.locator(ROW).count()) === Math.min(said, 50), `Goals ${v}: the tab says ${said}, the list ${await count()}`)
+    }
+    await s.open('/life/goals?status=all')
+    const text = await pg.locator('[data-main]').innerText()
+    must(text.includes(`UX3 open goal ${width} ${stamp}`) && text.includes(`UX3 annual goal ${width} ${stamp}`) && text.includes('12 Week Year'), 'the Goals screen does not list the new goals beside the 12 Week Year goals')
+    const rows = (await s.api('goals.list', { space: SPACE, state: 'all', page_length: 100 })).goals
+    must(rows.find((r) => r.name === open.name).score === null && rows.find((r) => r.name === annual.name).score === null, 'Score is not blank for the new goals')
+    if (!phone) for (const n of [open.name, annual.name]) must((await pg.locator(`[data-ref="goal:${n}"]`).locator('xpath=..').locator('[data-goal-score]').innerText()).trim() === '', 'a Score shows for a goal without a cycle')
+    // the 12 Week Year grid does not show them; moving the open goal into the current cycle does, and keeps its tasks
+    step = 'the 12 Week Year grid does not show them; moving the open'
+    const tf = await s.api('today.get', { space: SPACE })
+    const cycle = tf.cycle?.name || tf.cycle?.cycle
+    const gridHas = async (n) => { const g = await s.api('journal.goals', { space: SPACE }); return g.cycles.some((c) => c.goals.some((x) => x.name === n)) }
+    must(!(await gridHas(open.name)) && !(await gridHas(annual.name)), 'a goal without a cycle shows in the 12 Week Year')
+    const cycles = await s.api('goals.cycles', { space: SPACE })
+    const active = cycles.find((c) => c.status === 'Active') || cycles[0]
+    await s.open(`/life/goals?status=all&open=goal:${open.name}`)
+    await paneTitle()
+    await pg.locator('[data-add-to-cycle]').click()
+    await pg.getByRole('button', { name: 'Add', exact: true }).last().click()
+    await pg.waitForTimeout(1200)
+    must(await gridHas(open.name), 'the goal moved into the cycle is not in the grid')
+    must((await s.api('tasks.list', { space: SPACE, goal: open.name, status: 'all', include_archived: 1 })).total === 3, 'the moved goal lost its tasks')
+    // the family member sees no goals or counts from Private
+    step = 'the family member sees no goals or counts from Private'
+    const fam = await session('family@lifeos.test', width)
+    must((await fam.api('goals.list', { space: SPACE }, { raw: true })).status() >= 400, 'the family user can list Private goals')
+    await fam.open('/life/goals?status=all')
+    must(!(await fam.page.locator('[data-main]').innerText()).includes('UX3 open goal'), 'the family user sees a Private goal')
+    await fam.ctx.close()
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    return `${cycle ? 'cycle ' + active.title : ''}`
+    } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) }
   })
 
   await check(`${tag}.9`, `${width} px: the record pane shows the tabs of its kind; ptab= survives a reload; a pane with one tab has no tab bar`, async () => {

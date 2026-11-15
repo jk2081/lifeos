@@ -2,15 +2,16 @@
   <!-- The sidebar in groups: space switcher, Search and New, the daily places, Plan, the space's Areas, Records, and
        Archive and Settings pinned at the bottom. Plan, Areas and Records collapse from their heading; the whole bar
        collapses to an icon rail. Which groups and parent areas are open, and the rail, are remembered per user. -->
-  <Sidebar :collapsible="true" :collapsed="nav.rail" width="232px" aria-label="Sections" data-sidebar @update:collapsed="(v) => setRail(!!v)">
+  <Sidebar :collapsible="true" :collapsed="nav.rail" width="232px" aria-label="Sections" data-sidebar @update:collapsed="onCollapse">
     <SidebarHeader :title="store.space || 'No space'" :subtitle="store.fullName || store.user" :menu-items="spaceMenu" />
-    <div class="flex gap-1.5 px-2 pb-1 pt-1" :class="nav.rail && 'flex-col'">
-      <Button class="flex-1 !justify-start" :class="nav.rail && '!justify-center'" icon-left="lucide-search" :label="nav.rail ? undefined : 'Search'" :icon="nav.rail ? 'lucide-search' : undefined"
-        :tooltip="nav.rail ? 'Search' : undefined" aria-label="Search" data-nav-search @click="store.searchOpen = true">
-        <template v-if="!nav.rail" #suffix><KeyboardShortcut combo="Mod+K" /></template>
+    <div class="flex gap-1.5 px-2 pb-1 pt-1" :class="nav.rail && 'flex-col items-center'">
+      <Button v-if="nav.rail" icon="lucide-search" label="Search" tooltip="Search" data-nav-search @click="store.searchOpen = true" />
+      <Button v-else class="flex-1 !justify-start" icon-left="lucide-search" label="Search" data-nav-search @click="store.searchOpen = true">
+        <template #suffix><KeyboardShortcut class="ml-auto" combo="Mod+K" /></template>
       </Button>
       <Dropdown v-if="canWrite()" :options="newMenu">
-        <Button :icon-left="nav.rail ? undefined : 'lucide-plus'" :icon="nav.rail ? 'lucide-plus' : undefined" :label="nav.rail ? 'New' : 'New'" variant="solid" data-nav-new />
+        <Button v-if="nav.rail" icon="lucide-plus" label="New" variant="solid" tooltip="New" data-nav-new />
+        <Button v-else icon-left="lucide-plus" label="New" variant="solid" data-nav-new />
       </Dropdown>
     </div>
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2" data-nav-groups>
@@ -79,6 +80,8 @@ const emit = defineEmits(['logout', 'shortcuts'])
 const router = useRouter()
 const newMenu = computed(() => newMenuItems())
 const countOf = (n) => navCount(n.label)
+// the rail is a desktop choice: the library collapses the sidebar by itself on a narrow window, which is not remembered
+const onCollapse = (v) => { if (window.innerWidth >= 768) setRail(!!v) }
 const spaceMenu = computed(() => [
   { group: 'Spaces', options: store.spaces.map((s) => ({ label: s.name, selected: s.name === store.space, onClick: () => (store.space = s.name) })) },
   { group: store.fullName || store.user, options: [

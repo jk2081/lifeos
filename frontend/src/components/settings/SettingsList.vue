@@ -91,7 +91,7 @@ async function startRename(r) {
   editing.value = r.name
   draft.value = r.title
   await nextTick()
-  const el = [editBox.value].flat()[0]?.$el?.querySelector('input')
+  const el = document.querySelector('input[data-rename-input], [data-rename-input] input')
   el?.focus()
   el?.select()
 }
