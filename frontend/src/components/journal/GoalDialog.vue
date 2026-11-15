@@ -1,27 +1,27 @@
 <template>
-  <Dialog v-model="open" :title="goal ? 'Edit goal' : 'Add goal'" size="lg">
-    <div style="display: flex; flex-direction: column; gap: 12px">
-      <div class="field"><label class="lbl" for="gd-title">Goal</label><input id="gd-title" v-model="form.title" class="inp" placeholder="For example: Golf: hit 5 birdies" /></div>
-      <div class="field"><label class="lbl" for="gd-area">Area</label>
-        <select id="gd-area" v-model="form.area" class="inp"><option value="">—</option><option v-for="o in areaOptions()" :key="o.value" :value="o.value">{{ o.label }}</option></select></div>
-      <div class="field"><span class="lbl">Actions, and how many times a week</span>
-        <div v-for="(a, i) in form.actions" :key="i" style="display: flex; gap: 8px; margin-bottom: 6px">
-          <input v-model="a.title" class="inp" style="flex: 1" :aria-label="`Action ${i + 1}`" placeholder="Action" />
-          <input v-model.number="a.per_week" type="number" min="1" max="7" class="inp" style="width: 64px" :aria-label="`Times a week for action ${i + 1}`" />
-          <button class="bt s ic" type="button" aria-label="Remove action" @click="form.actions.splice(i, 1)">×</button>
+  <Dialog v-model:open="open" :title="goal ? 'Edit goal' : 'Add goal'" size="lg">
+    <div class="flex flex-col gap-3">
+      <FormControl v-model="form.title" label="Goal" placeholder="For example: Golf: hit 5 birdies" />
+      <FormControl v-model="form.area" type="select" label="Area" :options="[{ label: '—', value: '' }, ...areaOptions()]" />
+      <div>
+        <div class="mb-1.5 text-sm text-ink-gray-6">Actions, and how many times a week</div>
+        <div v-for="(a, i) in form.actions" :key="i" class="mb-1.5 flex gap-2">
+          <TextInput v-model="a.title" class="min-w-0 flex-1" :aria-label="`Action ${i + 1}`" placeholder="Action" />
+          <TextInput v-model.number="a.per_week" class="w-16" type="number" min="1" max="7" :aria-label="`Times a week for action ${i + 1}`" />
+          <Button icon="lucide-x" label="Remove action" @click="form.actions.splice(i, 1)" />
         </div>
-        <button class="ch sm add" type="button" @click="form.actions.push({ title: '', per_week: 1 })">+ action</button>
+        <Button size="sm" variant="outline" icon-left="lucide-plus" label="action" @click="form.actions.push({ title: '', per_week: 1 })" />
       </div>
     </div>
-    <template #actions><div style="display: flex; gap: 8px; justify-content: space-between">
-      <button v-if="goal" class="bt t" type="button" style="color: var(--ink-red-9)" @click="remove">Delete goal</button><span v-else></span>
-      <div style="display: flex; gap: 8px"><button class="bt s" type="button" @click="open = false">Cancel</button>
-        <button class="bt p" type="button" @click="save">Save goal</button></div></div></template>
+    <template #actions><div class="flex justify-between gap-2">
+      <Button v-if="goal" variant="ghost" theme="red" label="Delete goal" @click="remove" /><span v-else></span>
+      <div class="flex gap-2"><Button label="Cancel" @click="open = false" />
+        <Button variant="solid" label="Save goal" @click="save" /></div></div></template>
   </Dialog>
 </template>
 <script setup>
 import { reactive, ref, watch } from 'vue'
-import { Dialog } from 'frappe-ui'
+import { Button, Dialog, FormControl, TextInput, dialog } from 'frappe-ui'
 import { api, tryCall } from '@/lib/api'
 import { areaOptions, loadLookups } from '@/lib/lookups'
 
@@ -39,17 +39,23 @@ watch(() => props.modelValue, (v) => {
 })
 watch(open, (v) => emit('update:modelValue', v))
 async function save() {
-  const res = await tryCall(() => api('journal.save_goal', { goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area, actions: form.actions }), 'Goal saved.')
+  const res = await tryCall(() => api('journal.save_goal', { goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area || '', actions: form.actions }), 'Goal saved.')
   if (res) {
     open.value = false
     emit('saved')
   }
 }
-async function remove() {
-  if (!window.confirm('Delete this goal and its ticks?')) return
-  if (await tryCall(() => api('journal.delete_goal', { goal: props.goal.name }), 'Goal deleted.')) {
-    open.value = false
-    emit('saved')
-  }
+function remove() {
+  dialog.danger({
+    title: 'Delete goal',
+    message: 'Delete this goal and its ticks?',
+    confirmLabel: 'Delete goal',
+    onConfirm: async () => {
+      if (await tryCall(() => api('journal.delete_goal', { goal: props.goal.name }), 'Goal deleted.')) {
+        open.value = false
+        emit('saved')
+      }
+    },
+  })
 }
 </script>

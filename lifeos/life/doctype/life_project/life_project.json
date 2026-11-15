@@ -59,7 +59,8 @@
   {
    "fieldname": "target_date",
    "fieldtype": "Date",
-   "label": "Target Date"
+   "label": "Target Date",
+   "in_list_view": 1
   },
   {
    "fieldname": "completed_on",

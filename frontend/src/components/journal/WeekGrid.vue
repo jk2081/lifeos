@@ -1,80 +1,88 @@
 <template>
   <Teleport to="#jr-actions">
-    <Dropdown v-if="g && g.cycles.length > 1" :options="cycleOptions"><button class="bt s" type="button">{{ g.cycle.title }} ▾</button></Dropdown>
+    <Dropdown v-if="g && g.cycles.length > 1" :options="cycleOptions"><Button :label="g.cycle.title" icon-right="lucide-chevron-down" /></Dropdown>
     <template v-if="g && writable">
-      <button v-if="g.cycle.status === 'Planned'" class="bt s" type="button" @click="startCycle">Start this cycle</button>
-      <RouterLink v-if="g.cycle.status === 'Active' && g.past_end" class="bt s" to="/journal/goals">Close cycle</RouterLink>
-      <button v-if="g.cycle.status !== 'Closed'" class="bt s" type="button" @click="editGoal(null)">Add goal</button>
+      <Button v-if="g.cycle.status === 'Planned'" label="Start this cycle" @click="startCycle" />
+      <Button v-if="g.cycle.status === 'Active' && g.past_end" label="Close cycle" route="/journal/goals" />
+      <Button v-if="g.cycle.status !== 'Closed'" label="Add goal" @click="editGoal(null)" />
     </template>
-    <RouterLink class="bt p" to="/journal/review" style="color: var(--surface-base)">Weekly review</RouterLink>
+    <Button variant="solid" label="Weekly review" route="/journal/review" />
   </Teleport>
 
-  <div v-if="g" class="bd">
-    <div class="stats three">
-      <div class="cd st"><span class="mt">{{ g.current_week ? `This week, week ${g.current_week}` : g.cycle.status === 'Closed' ? 'Final score' : 'Week score' }}</span>
-        <b data-week-score>{{ g.current_week ? pct(week.percent) : g.cycle.status === 'Closed' ? pct(g.cycle.final_score) : '—' }}</b>
-        <span class="mt">{{ g.current_week ? `${week.done} of ${week.planned} ticks so far` : g.cycle.status }}</span></div>
-      <div class="cd st"><span class="mt">{{ g.cycle.status === 'Closed' ? 'Cycle average' : 'Average so far' }}</span><b>{{ pct(g.average) }}</b><span class="mt">Target {{ g.target }}%</span></div>
-      <div class="cd st"><span class="mt">Weeks left</span><b>{{ g.cycle.status === 'Closed' ? 0 : g.weeks_left }}</b><span class="mt">Cycle ends {{ long(g.cycle.end_date) }}</span></div>
+  <div v-if="g" class="page-body">
+    <div class="stats">
+      <Stat :label="g.current_week ? `This week, week ${g.current_week}` : g.cycle.status === 'Closed' ? 'Final score' : 'Week score'">
+        <span data-week-score>{{ g.current_week ? pct(week.percent) : g.cycle.status === 'Closed' ? pct(g.cycle.final_score) : '—' }}</span>
+        <template #sub><span class="max-md:hidden">{{ g.current_week ? `${week.done} of ${week.planned} ticks so far` : g.cycle.status }}</span></template>
+      </Stat>
+      <Stat :label="g.cycle.status === 'Closed' ? 'Cycle average' : 'Average so far'" :value="pct(g.average)">
+        <template #sub><span class="max-md:hidden">Target {{ g.target }}%</span></template>
+      </Stat>
+      <Stat label="Weeks left" :value="g.cycle.status === 'Closed' ? 0 : g.weeks_left">
+        <template #sub><span class="max-md:hidden">Cycle ends {{ long(g.cycle.end_date) }}</span></template>
+      </Stat>
     </div>
 
-    <div v-if="g.goals.length" class="tblwrap"><div class="tblscroll">
-      <div class="grid">
-        <div class="gr hdr">
-          <div class="gcol" style="padding: 8px 12px; font-size: 12.5px; color: var(--ink-gray-6)">Goal and action</div>
-          <div v-for="w in 12" :key="w" class="gh" :class="{ cur: w === g.current_week }">{{ w }}</div>
+    <div v-if="g.goals.length" class="overflow-hidden rounded-5 border border-outline-gray-2"><div class="scroll-x">
+      <div class="grid-w">
+        <div class="gr border-b border-outline-gray-1 bg-surface-gray-1">
+          <div class="sticky left-0 z-[1] min-w-0 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-6">Goal and action</div>
+          <div v-for="w in 12" :key="w" class="py-2 text-center text-xs tabular-nums" :class="w === g.current_week ? 'font-semibold text-ink-blue-8' : 'text-ink-gray-6'">{{ w }}</div>
         </div>
-        <template v-for="goal in g.goals" :key="goal.name">
-          <div class="gr gline">
-            <div class="gcol gl">
-              <RouterLink :to="`/journal/goals/${goal.name}`" style="color: var(--ink-gray-9)">{{ goal.title }}</RouterLink>
-              <span v-if="goal.area_name" class="pl n">{{ goal.area_name }}</span>
-              <button v-if="canEdit" class="edit" type="button" :aria-label="`Edit ${goal.title}`" @click="editGoal(goal)">Edit</button>
-            </div>
+        <template v-for="(goal, gi) in g.goals" :key="goal.name">
+          <div class="group flex flex-wrap items-center gap-2 px-3 pb-1.5 pt-3 max-md:px-2" :class="gi && 'border-t border-outline-gray-1'">
+            <RouterLink class="font-semibold text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/journal/goals/${goal.name}`">{{ goal.title }}</RouterLink>
+            <Badge v-if="goal.area_name" :label="goal.area_name" />
+            <Button v-if="canEdit" class="opacity-0 focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100" variant="ghost" size="sm" label="Edit" :aria-label="`Edit ${goal.title}`" @click="editGoal(goal)" />
           </div>
           <div v-for="a in goal.actions" :key="a.name" class="gr">
-            <div class="gcol ac" :class="{ fin: a.status !== 'Open' }">
-              <Dropdown v-if="canEdit" :options="actionMenu(a)"><button class="acbtn" type="button" :class="{ fin: a.status !== 'Open' }">{{ a.title }}<span
-                v-if="a.per_week > 1" class="mt"> ×{{ a.per_week }}</span></button></Dropdown>
-              <span v-else>{{ a.title }}</span>
+            <div class="sticky left-0 z-[1] min-w-0 bg-surface-base py-1 pl-4 pr-3 max-md:pl-1 max-md:pr-2" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-8'">
+              <Dropdown v-if="canEdit" :options="actionMenu(a)"><Button class="max-w-full" :class="a.status !== 'Open' && 'line-through'" variant="ghost" size="sm">{{ a.title }}<span
+                v-if="a.per_week > 1" class="text-ink-gray-6"> ×{{ a.per_week }}</span></Button></Dropdown>
+              <span v-else class="px-2">{{ a.title }}</span>
             </div>
-            <div v-for="w in 12" :key="w" class="wc">
-              <button class="wk" :class="cellClass(a, w)" type="button" :disabled="!canEdit || cellClass(a, w) === 'na'"
+            <div v-for="w in 12" :key="w" class="grid place-items-center py-[3px]">
+              <Button class="!size-7 !p-0 tabular-nums max-md:!size-10" :class="cellClass(a, w) === 'na' && 'invisible'" size="sm" v-bind="CELL[cellClass(a, w)]"
+                :disabled="!canEdit || cellClass(a, w) === 'na'" :data-week-cell="w" :aria-pressed="count(a, w) >= a.per_week"
                 :aria-label="`${a.title}, week ${w}, ${count(a, w)} of ${a.per_week}`" @click="tap(a, w)">
                 <template v-if="count(a, w) >= a.per_week">
-                  <svg v-if="a.per_week === 1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>
+                  <span v-if="a.per_week === 1" class="lucide-check size-4" aria-hidden="true" />
                   <template v-else>{{ count(a, w) }}</template>
                 </template>
                 <template v-else-if="count(a, w) > 0">{{ count(a, w) }}</template>
                 <template v-else-if="g.current_week && w < g.current_week || !g.current_week && g.cycle.status === 'Closed'">–</template>
-              </button>
+              </Button>
             </div>
           </div>
         </template>
-        <div class="gr foot">
-          <div class="gcol" style="padding: 10px 12px; font-weight: 600">Week score</div>
-          <div v-for="w in g.weeks" :key="w.week" class="sc">{{ showScore(w.week) ? pct(w.percent) : '' }}</div>
+        <div class="gr border-t border-outline-gray-1 bg-surface-gray-1">
+          <div class="sticky left-0 z-[1] min-w-0 bg-surface-gray-1 px-3 py-2.5 font-semibold text-ink-gray-9">Week score</div>
+          <div v-for="w in g.weeks" :key="w.week" class="py-2.5 text-center text-sm font-semibold tabular-nums text-ink-gray-9">{{ showScore(w.week) ? pct(w.percent) : '' }}</div>
         </div>
       </div>
     </div></div>
-    <div v-else class="cd"><Empty title="No goals in this cycle yet." hint="Add a goal with its weekly actions. Each week you tick what you did, and the score follows." /></div>
+    <Card v-else><Empty title="No goals in this cycle yet." hint="Add a goal with its weekly actions. Each week you tick what you did, and the score follows." /></Card>
 
-    <div class="mt legend">
-      <span><i class="sw" style="background: var(--ink-gray-9)"></i>Done</span><span><i class="sw" style="background: var(--surface-gray-2)"></i>Missed</span>
-      <span><i class="sw" style="border: 2px solid var(--ink-blue-8)"></i>This week, tap to tick</span>
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-ink-gray-6">
+      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3.5 rounded-1 bg-surface-gray-9"></i>Done</span>
+      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3.5 rounded-1 bg-surface-gray-2"></i>Missed</span>
+      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3.5 rounded-1 border-2 border-outline-blue-4"></i>This week, tap to tick</span>
       <span>A struck-through action is finished and no longer counts. Tap an action's name to finish or drop it.</span>
     </div>
   </div>
-  <div v-else-if="loaded" class="bd"><div class="cd">
+  <div v-else-if="loaded" class="page-body"><Card>
     <Empty title="No 12 Week Year yet." hint="A cycle is twelve weeks of goals with weekly actions." />
-    <button v-if="canWrite()" class="bt p" type="button" @click="createCycle">Start a cycle next Monday</button></div></div>
+    <Button v-if="canWrite()" variant="solid" label="Start a cycle next Monday" @click="createCycle" /></Card></div>
   <GoalDialog v-model="goalOpen" :cycle="g && g.cycle.name" :goal="editing" @saved="load()" />
 </template>
 <script setup>
+// The 12 Week Year grid: one row per action, one cell per week. A cell is a frappe-ui Button; its variant says its state.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Dropdown, toast } from 'frappe-ui'
+import { Badge, Button, Dropdown, toast } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
+import Card from '@/components/ui/Card.vue'
+import Stat from '@/components/ui/Stat.vue'
 import GoalDialog from './GoalDialog.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
@@ -94,6 +102,11 @@ const week = computed(() => g.value.weeks[(g.value.current_week || 1) - 1])
 const cycleOptions = computed(() => g.value.cycles.map((c) => ({ label: `${c.title} · ${c.status}`, onClick: () => router.push({ query: { cycle: c.name } }).then(() => load()) })))
 const count = (a, w) => a.ticks[String(w)] || 0
 const showScore = (w) => g.value.cycle.status === 'Closed' || (g.value.current_week && w <= g.value.current_week)
+// the Button that draws each state of a cell: done is solid, this week is blue, missed or part done is filled, not yet is outlined
+const CELL = {
+  done: { variant: 'solid' }, curdone: { variant: 'solid', theme: 'blue' }, cur: { variant: 'outline', theme: 'blue' },
+  miss: { variant: 'subtle' }, part: { variant: 'subtle' }, na: { variant: 'outline' }, '': { variant: 'outline' },
+}
 
 function planned(a, w) {
   if (a.status === 'Dropped') return 0
@@ -167,44 +180,11 @@ async function load() {
 onMounted(load)
 </script>
 <style scoped>
-.stats.three { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
-.grid { min-width: 760px; }
+/* geometry only: the columns of the grid (the action name, then twelve weeks) */
+.grid-w { min-width: 760px; }
 .gr { display: grid; grid-template-columns: minmax(250px, 1.7fr) repeat(12, minmax(36px, 1fr)); align-items: center; }
-.gr.hdr { background: var(--surface-gray-1); border-bottom: 1px solid var(--outline-gray-1); }
-.gr.foot { background: var(--surface-gray-1); border-top: 1px solid var(--outline-gray-1); }
-.gcol { position: sticky; left: 0; background: var(--surface-base); z-index: 1; min-width: 0; }
-.gr.hdr .gcol, .gr.foot .gcol { background: var(--surface-gray-1); }
-.gh { font-size: 12px; color: var(--ink-gray-6); text-align: center; padding: 8px 0; font-variant-numeric: tabular-nums; }
-.gh.cur { color: var(--ink-blue-8); font-weight: 600; }
-.gline { border-top: 1px solid var(--outline-gray-1); }
-.gline:first-of-type { border-top: 0; }
-.gl { display: flex; align-items: center; gap: 8px; padding: 12px 12px 6px; font-weight: 600; flex-wrap: wrap; grid-column: 1 / -1; position: static; }
-.gl .edit { border: 0; background: none; color: var(--ink-gray-6); font-size: 12px; cursor: pointer; opacity: 0; }
-.gline:hover .edit, .edit:focus { opacity: 1; }
-.ac { padding: 5px 12px 5px 24px; color: var(--ink-gray-8); }
-.acbtn { border: 0; background: none; padding: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.fin, .acbtn.fin { text-decoration: line-through; color: var(--ink-gray-6); }
-.wc { display: grid; place-items: center; padding: 3px 0; }
-.wk { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--outline-gray-2); background: var(--surface-base); color: var(--ink-gray-9); font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; padding: 0; display: grid; place-items: center; }
-.wk.done { background: var(--ink-gray-9); border-color: var(--ink-gray-9); color: var(--surface-base); }
-.wk.miss { background: var(--surface-gray-2); border-color: var(--surface-gray-2); color: var(--ink-gray-6); }
-.wk.part { background: var(--surface-gray-2); border-color: var(--outline-gray-3); }
-.wk.cur { border: 2px solid var(--ink-blue-8); }
-.wk.curdone { background: var(--ink-blue-8); border-color: var(--ink-blue-8); color: var(--surface-base); }
-.wk.na { visibility: hidden; }
-.wk:disabled { cursor: default; }
-.sc { font-size: 12.5px; font-weight: 600; text-align: center; padding: 10px 0; font-variant-numeric: tabular-nums; }
-.legend { display: flex; gap: 6px 18px; flex-wrap: wrap; align-items: center; }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
-.sw { width: 14px; height: 14px; border-radius: 4px; display: inline-block; box-sizing: border-box; }
-@media (max-width: 800px) {
-  .grid { min-width: 0; width: max-content; }
+@media (max-width: 767px) {
+  .grid-w { min-width: 0; width: max-content; }
   .gr { grid-template-columns: 150px repeat(12, 48px); }
-  .wk { width: 40px; height: 40px; border-radius: 9px; }
-  .ac { padding: 5px 8px 5px 12px; font-size: 13.5px; }
-  .gl { padding: 12px 8px 6px; }
-  .gl .edit { opacity: 1; }
-  .stats.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .stats.three .mt:last-child { display: none; }
 }
 </style>

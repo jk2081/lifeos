@@ -1,68 +1,70 @@
 <template>
   <Teleport to="#jr-actions">
-    <button class="bt s ic" type="button" aria-label="Previous week" @click="step(-7)"><Ico d="m15 6-6 6 6 6" stroke="2" /></button>
-    <button class="bt s ic" type="button" aria-label="Next week" @click="step(7)"><Ico d="m9 6 6 6-6 6" stroke="2" /></button>
+    <Button icon="lucide-chevron-left" label="Previous week" @click="step(-7)" />
+    <Button icon="lucide-chevron-right" label="Next week" @click="step(7)" />
   </Teleport>
-  <div v-if="d" class="bd">
+  <div v-if="d" class="page-body">
     <div class="stats">
-      <div class="cd st"><span class="mt">{{ d.cycle ? `Week ${d.cycle.week} score` : '12 Week Year' }}</span><b>{{ d.cycle ? Math.round(d.cycle.percent) + '%' : '—' }}</b>
-        <span class="mt only-desktop">{{ d.cycle ? `${d.cycle.done} of ${d.cycle.planned} ticks · ${d.cycle.title}` : 'No cycle in this week' }}</span></div>
-      <div class="cd st"><span class="mt">Tasks done</span><RouterLink class="big" :to="door('Done')" data-door="review-done"><b>{{ d.done.length }}</b></RouterLink>
-        <RouterLink class="mt only-desktop" :to="door('Carried')" data-door="review-carried"><span>{{ d.carried.length }}</span> carried forward</RouterLink></div>
-      <div class="cd st"><span class="mt">Open loops</span><RouterLink class="big" :to="{ path: '/tasks', query: { view: 'loops' } }" data-door="review-loops"><b>{{ d.open_loops_total }}</b></RouterLink>
-        <span class="mt only-desktop">Older than 14 days, no date</span></div>
+      <Stat :label="d.cycle ? `Week ${d.cycle.week} score` : '12 Week Year'" :value="d.cycle ? Math.round(d.cycle.percent) + '%' : '—'">
+        <template #sub><span class="max-md:hidden">{{ d.cycle ? `${d.cycle.done} of ${d.cycle.planned} ticks · ${d.cycle.title}` : 'No cycle in this week' }}</span></template>
+      </Stat>
+      <Stat label="Tasks done"><NumLink :to="door('Done')" data-door="review-done">{{ d.done.length }}</NumLink>
+        <template #sub><NumLink class="max-md:hidden" :to="door('Carried')" data-door="review-carried"><span>{{ d.carried.length }}</span> carried forward</NumLink></template>
+      </Stat>
+      <Stat label="Open loops"><NumLink :to="{ path: '/tasks', query: { view: 'loops' } }" data-door="review-loops">{{ d.open_loops_total }}</NumLink>
+        <template #sub><span class="max-md:hidden">Older than 14 days, no date</span></template>
+      </Stat>
     </div>
     <div class="cols">
       <div class="half">
-        <section><h2 class="sh">Habits this week</h2>
-          <div class="cd list"><div v-for="h in d.habits" :key="h.habit" class="rw" style="align-items: center; gap: 14px">
-            <span style="width: 84px; flex: none">{{ h.title }}</span><div class="br"><i :style="`width: ${Math.min(100, (100 * h.done) / h.target)}%`"></i></div>
-            <span style="font-variant-numeric: tabular-nums">{{ h.done }}/{{ h.target }}</span></div>
-            <Empty v-if="!d.habits.length" title="No habits were tracked this week." hint="Habits come from the month plan." /></div>
+        <section><SectionHead>Habits this week</SectionHead>
+          <Card flush><Row v-for="h in d.habits" :key="h.habit" class="!items-center !gap-3.5">
+            <span class="w-[84px] flex-none">{{ h.title }}</span><div class="min-w-0 flex-1"><Progress size="sm" :value="Math.min(100, (100 * h.done) / h.target)" /></div>
+            <span class="tabular-nums">{{ h.done }}/{{ h.target }}</span></Row>
+            <Empty v-if="!d.habits.length" title="No habits were tracked this week." hint="Habits come from the month plan." /></Card>
         </section>
-        <section><h2 class="sh">Done this week</h2>
-          <div class="cd list"><TaskRow v-for="t in d.done" :key="t.name" :task="t" :today="store.today" readonly @open="openRef('task:' + t.name)" />
-            <Empty v-if="!d.done.length" title="No tasks were completed this week." hint="Tasks you tick off show here." /></div>
+        <section><SectionHead>Done this week</SectionHead>
+          <Card flush><TaskRow v-for="t in d.done" :key="t.name" :task="t" :today="store.today" readonly />
+            <Empty v-if="!d.done.length" title="No tasks were completed this week." hint="Tasks you tick off show here." /></Card>
         </section>
-        <section v-if="d.carried.length"><h2 class="sh">Carried forward</h2>
-          <div class="cd list"><TaskRow v-for="t in d.carried" :key="t.name" :task="t" :today="store.today" readonly @open="openRef('task:' + t.name)" /></div>
+        <section v-if="d.carried.length"><SectionHead>Carried forward</SectionHead>
+          <Card flush><TaskRow v-for="t in d.carried" :key="t.name" :task="t" :today="store.today" readonly /></Card>
         </section>
-        <section><h2 class="sh">Open loops <RouterLink class="more num" :to="{ path: '/tasks', query: { view: 'loops' } }">All {{ d.open_loops_total }}</RouterLink></h2>
-          <div class="cd list"><TaskRow v-for="t in d.open_loops.slice(0, 8)" :key="t.name" :task="t" :today="store.today" with-due :readonly="!canWrite()" @toggle="done" @open="openRef('task:' + t.name)" />
-            <Empty v-if="!d.open_loops.length" title="No open loops." hint="Open tasks older than 14 days with no due date gather here." /></div>
+        <section><SectionHead :count="d.open_loops_total" :to="{ path: '/tasks', query: { view: 'loops' } }">Open loops</SectionHead>
+          <Card flush><TaskRow v-for="t in d.open_loops.slice(0, 8)" :key="t.name" :task="t" :today="store.today" with-due :readonly="!canWrite()" @toggle="done" />
+            <Empty v-if="!d.open_loops.length" title="No open loops." hint="Open tasks older than 14 days with no due date gather here." /></Card>
         </section>
       </div>
       <div class="half">
-        <section><h2 class="sh">Decide</h2>
-          <div class="cd list">
-            <div v-for="t in d.decide" :key="t.name" class="rw" style="flex-wrap: wrap; align-items: center">
-              <div class="grow rowlink" style="flex-basis: 200px" @click="openRef('task:' + t.name)"><div class="ttl">{{ t.title }}</div><div class="mt">{{ t.area_name || 'Unfiled' }} · not touched since {{ short(t.last_touched_on || t.creation, true) }}</div></div>
-              <div v-if="canWrite()" class="chips"><button class="bt s" type="button" @click="decide(t, 'do')">Do this week</button>
-                <button class="bt s" type="button" @click="decide(t, 'carry')">Carry</button><button class="bt s" type="button" @click="decide(t, 'drop')">Drop</button></div>
-            </div>
+        <section><SectionHead>Decide</SectionHead>
+          <Card flush>
+            <Row v-for="t in d.decide" :key="t.name" class="flex-wrap !items-center" :pane="'task:' + t.name" :label="t.title">
+              <div class="min-w-0 flex-[1_1_200px]"><div class="break-words text-base-medium text-ink-gray-9">{{ t.title }}</div><div class="text-sm text-ink-gray-6">{{ t.area_name || 'Unfiled' }} · not touched since {{ short(t.last_touched_on || t.creation, true) }}</div></div>
+              <div v-if="canWrite()" class="chips"><Button class="relative" label="Do this week" @click="decide(t, 'do')" />
+                <Button class="relative" label="Carry" @click="decide(t, 'carry')" /><Button class="relative" label="Drop" @click="decide(t, 'drop')" /></div>
+            </Row>
             <Empty v-if="!d.decide.length" title="Nothing to decide." :hint="`Open tasks not touched for ${d.stale_days} days are listed here. They are never archived for you.`" />
-          </div>
+          </Card>
         </section>
-        <section v-if="d.archived.length"><h2 class="sh">Archived this week by the daily job
-          <RouterLink class="more num" :to="{ path: '/archive', query: { reason: 'Auto', archived_from: d.week_start, archived_to: d.week_end } }" data-door="review-archived">All <span>{{ d.archived.length }}</span></RouterLink></h2>
-          <div class="cd list"><div v-for="a in d.archived" :key="a.name" class="rw" style="align-items: center">
-            <div class="grow rowlink" @click="openRef(refOf(a.doctype, a.name))"><div class="ttl">{{ a.title }}</div><div class="mt">{{ a.doctype.replace('Life ', '') }} · archived {{ short(a.archived_on) }}</div></div>
-            <button v-if="canWrite()" class="bt s" type="button" @click="undo(a)">Undo</button></div></div>
+        <section v-if="d.archived.length"><SectionHead :count="d.archived.length" :to="{ path: '/archive', query: { reason: 'Auto', archived_from: d.week_start, archived_to: d.week_end } }" door="review-archived">Archived this week by the daily job</SectionHead>
+          <Card flush><Row v-for="a in d.archived" :key="a.name" class="!items-center" :pane="refOf(a.doctype, a.name)" :label="a.title">
+            <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ a.title }}</div><div class="text-sm text-ink-gray-6">{{ a.doctype.replace('Life ', '') }} · archived {{ short(a.archived_on) }}</div></div>
+            <Button v-if="canWrite()" class="relative" label="Undo" @click="undo(a)" /></Row></Card>
         </section>
-        <section><h2 class="sh">Latest check-in <RouterLink class="more" to="/journal/checkins">Check-ins</RouterLink></h2>
-          <div class="cd list">
-            <template v-if="d.latest_checkin"><div class="rw"><span class="mt">{{ long(d.latest_checkin.date, true) }}</span></div>
-              <div v-for="s in d.latest_checkin.scores" :key="s.dimension" class="rw"><span class="grow">{{ s.dimension_name }}</span>
-                <span class="mt">{{ range(s.habits_low, s.habits_high) }} · {{ range(s.situation_low, s.situation_high) }}</span></div></template>
+        <section><SectionHead>Latest check-in <template #action><Button variant="ghost" size="sm" label="Check-ins" route="/journal/checkins" /></template></SectionHead>
+          <Card flush>
+            <template v-if="d.latest_checkin"><Row><span class="text-sm text-ink-gray-6">{{ long(d.latest_checkin.date, true) }}</span></Row>
+              <Row v-for="s in d.latest_checkin.scores" :key="s.dimension"><span class="min-w-0 flex-1">{{ s.dimension_name }}</span>
+                <span class="text-sm text-ink-gray-6">{{ range(s.habits_low, s.habits_high) }} · {{ range(s.situation_low, s.situation_high) }}</span></Row></template>
             <Empty v-else title="No check-in yet." hint="Score each life dimension under Check-ins." />
-          </div>
+          </Card>
         </section>
-        <section><h2 class="sh">Your notes for the week</h2>
-          <textarea v-model="note" class="inp" rows="8" style="width: 100%" placeholder="What went well, what did not, what changes next week. Markdown." :disabled="!canWrite()" @input="queue"></textarea>
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px">
-            <span class="mt">{{ state || `Saved as the note “${d.note.title}” under Reviews.` }}
-              <a v-if="d.note.name" href="#" @click.prevent="openRef('note:' + d.note.name)">Open note</a></span>
-            <button v-if="canWrite()" class="bt p" type="button" @click="saveNote">Save notes</button>
+        <section><SectionHead>Your notes for the week</SectionHead>
+          <Textarea v-model="note" :rows="8" aria-label="Your notes for the week" placeholder="What went well, what did not, what changes next week. Markdown." :disabled="!canWrite()" @update:model-value="queue" />
+          <div class="mt-2 flex items-center justify-between gap-2">
+            <span class="text-sm text-ink-gray-6">{{ state || `Saved as the note “${d.note.title}” under Reviews.` }}
+              <a v-if="d.note.name" href="#" class="text-ink-blue-8 hover:underline focus-visible:focus-ring" @click.prevent="openRef('note:' + d.note.name)">Open note</a></span>
+            <Button v-if="canWrite()" variant="solid" label="Save notes" @click="saveNote" />
           </div>
         </section>
       </div>
@@ -71,9 +73,14 @@
 </template>
 <script setup>
 import { onMounted, ref } from 'vue'
-import Ico from '@/components/Ico.vue'
+import { Button, Progress, Textarea } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
 import TaskRow from '@/components/TaskRow.vue'
+import Card from '@/components/ui/Card.vue'
+import NumLink from '@/components/ui/NumLink.vue'
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
+import Stat from '@/components/ui/Stat.vue'
 import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { addDays, long, short, startOfWeek } from '@/lib/dates'
@@ -126,7 +133,3 @@ async function undo(a) {
 onRecordChanged(load)
 onMounted(load)
 </script>
-<style scoped>
-.st a { color: inherit; text-decoration: none; }
-.st a.big:hover b, .st a.mt:hover { color: var(--ink-blue-8); text-decoration: underline; }
-</style>

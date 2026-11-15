@@ -1,59 +1,46 @@
 <template>
   <template v-if="task">
-  <div class="field"><label class="lbl" for="tp-title">Title</label>
-    <input id="tp-title" v-model="task.title" class="inp" :disabled="!writable" @change="save({ title: task.title })" /></div>
-  <div class="formgrid">
-    <div class="field"><label class="lbl" for="tp-status">Status</label>
-      <select id="tp-status" :value="task.status" class="inp" :disabled="!writable" @change="setStatus($event.target.value)">
-        <option v-for="s in ['Open', 'Doing', 'Waiting', 'Done', 'Dropped', 'Carried']" :key="s">{{ s }}</option>
-      </select></div>
-    <div class="field"><label class="lbl" for="tp-pri">Priority</label>
-      <select id="tp-pri" v-model="task.priority" class="inp" :disabled="!writable" @change="save({ priority: task.priority })">
-        <option :value="null">—</option><option v-for="p in PRIORITIES" :key="p">{{ p }}</option>
-      </select></div>
-    <div class="field"><label class="lbl" for="tp-due">Due date</label>
-      <input id="tp-due" v-model="task.due_date" type="date" class="inp" :disabled="!writable" @change="save({ due_date: task.due_date })" /></div>
+  <FormControl v-model="task.title" type="text" label="Title" :disabled="!writable" @change="save({ title: task.title })" />
+  <div class="form-grid">
+    <FormControl type="select" label="Status" :model-value="task.status" :options="STATUSES" :disabled="!writable" @update:model-value="setStatus" />
+    <FormControl type="select" label="Priority" :model-value="task.priority || ''" :options="PRIORITY_OPTIONS" :disabled="!writable" @update:model-value="(v) => save({ priority: v || null })" />
+    <DatePicker label="Due date" :model-value="task.due_date || ''" clearable :disabled="!writable" @update:model-value="(v) => save({ due_date: v || null })" />
   </div>
-  <div v-if="task.status === 'Waiting' || askWaiting" class="field"><label class="lbl" for="tp-wait">Waiting on</label>
-    <input id="tp-wait" ref="waitInput" v-model="task.waiting_on" class="inp" placeholder="Who or what is this waiting on?" :disabled="!writable"
-      @change="askWaiting ? setStatus('Waiting') : save({ waiting_on: task.waiting_on })" /></div>
-  <div class="field"><span class="lbl">Filed under</span>
-    <div class="chips">
+  <TextInput v-if="task.status === 'Waiting' || askWaiting" ref="waitInput" v-model="task.waiting_on" label="Waiting on" placeholder="Who or what is this waiting on?" :disabled="!writable"
+    @change="askWaiting ? setStatus('Waiting') : save({ waiting_on: task.waiting_on })" />
+  <div><div class="mb-1.5 text-sm text-ink-gray-6">Filed under</div>
+    <div class="flex flex-wrap items-center gap-2">
       <Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" />
       <Pick :model-value="task.project" :options="projectOptions" prefix="Project: " placeholder="project" :disabled="!writable" @update:model-value="(v) => save({ project: v })" />
-      <span v-for="a in task.also_in" :key="a" class="ch sm">also in {{ areaName(a) }}
-        <a v-if="writable" href="#" aria-label="Remove" @click.prevent="save({ also_in: task.also_in.filter((x) => x !== a) })">×</a></span>
+      <Badge v-for="a in task.also_in" :key="a" size="lg">also in {{ areaName(a) }}
+        <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)" @click="save({ also_in: task.also_in.filter((x) => x !== a) })" /></template></Badge>
       <Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== task.area && !task.also_in.includes(o.value))" placeholder="also in"
         :clearable="false" :disabled="!writable" @update:model-value="(v) => save({ also_in: [...task.also_in, v] })" />
-      <span v-for="t in task.tag_ids" :key="t" class="ch sm">#{{ tagName(t) }}
-        <a v-if="writable" href="#" aria-label="Remove" @click.prevent="save({ tag_ids: task.tag_ids.filter((x) => x !== t) })">×</a></span>
+      <Badge v-for="t in task.tag_ids" :key="t" size="lg">#{{ tagName(t) }}
+        <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove #' + tagName(t)" @click="save({ tag_ids: task.tag_ids.filter((x) => x !== t) })" /></template></Badge>
       <Pick v-if="lookups.tags.length" :model-value="null" :options="lookups.tags.filter((t) => !task.tag_ids.includes(t.name)).map((t) => ({ value: t.name, label: '#' + t.tag_name }))"
         placeholder="tag" :clearable="false" :disabled="!writable" @update:model-value="(v) => save({ tag_ids: [...task.tag_ids, v] })" />
     </div>
   </div>
-  <div class="field"><label class="lbl" for="tp-goal">12 Week Year goal</label>
-    <select id="tp-goal" v-model="task.goal" class="inp" :disabled="!writable" @change="save({ goal: task.goal })">
-      <option :value="null">—</option><option v-for="g in lookups.goals" :key="g.name" :value="g.name">{{ g.title }}</option>
-    </select></div>
-  <div class="field"><label class="lbl" for="tp-notes">Notes</label>
-    <textarea id="tp-notes" v-model="task.notes_md" class="inp" rows="5" placeholder="Markdown. Link a record with [[Title]]." :disabled="!writable" @change="save({ notes_md: task.notes_md })"></textarea></div>
-  <div class="mt">
-    <div v-if="task.inbox_item">From <a href="#" @click.prevent="openRef('inbox:' + task.inbox_item)">{{ task.source_title || 'an inbox item' }}</a></div>
-    <div v-if="task.source_url"><a :href="task.source_url" target="_blank" rel="noopener noreferrer">Source link</a></div>
+  <FormControl type="select" label="12 Week Year goal" :model-value="task.goal || ''" :options="goalOptions" :disabled="!writable" @update:model-value="(v) => save({ goal: v || null })" />
+  <FormControl v-model="task.notes_md" type="textarea" label="Notes" :rows="5" placeholder="Markdown. Link a record with [[Title]]." :disabled="!writable" @change="save({ notes_md: task.notes_md })" />
+  <div class="text-sm text-ink-gray-6">
+    <div v-if="task.inbox_item">From <a class="text-ink-blue-8 hover:underline" href="#" @click.prevent="openRef('inbox:' + task.inbox_item)">{{ task.source_title || 'an inbox item' }}</a></div>
+    <div v-if="task.source_url"><a class="text-ink-blue-8 hover:underline" :href="task.source_url" target="_blank" rel="noopener noreferrer">Source link</a></div>
     <div v-if="task.month_plan">In the month plan {{ task.month_plan.split('-').slice(-2).join('-') }}</div>
     <div>Created {{ short(task.creation, true) }}<span v-if="task.completed_on"> · closed {{ short(task.completed_on, true) }}</span></div>
   </div>
-  <div v-if="writable || canRestore" class="chips">
-    <button v-if="writable && OPEN.includes(task.status)" class="bt s" type="button" @click="carry">Carry to next month →</button>
-    <button v-if="writable" class="bt s" type="button" @click="archive">Archive</button>
-    <button v-if="canRestore && !isAgent" class="bt t" type="button" style="color: var(--ink-red-9)" @click="remove">Delete</button>
+  <div v-if="writable || canRestore" class="flex flex-wrap items-center gap-2">
+    <Button v-if="writable && OPEN.includes(task.status)" label="Carry to next month" icon-right="lucide-arrow-right" @click="carry" />
+    <Button v-if="writable" label="Archive" @click="archive" />
+    <Button v-if="canRestore && !isAgent" variant="ghost" theme="red" label="Delete" @click="remove" />
   </div>
   <Backlinks doctype="Life Task" :name="task.name" :reload="reloadKey" />
   </template>
 </template>
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
-import { toast } from 'frappe-ui'
+import { Badge, Button, DatePicker, FormControl, TextInput, dialog, toast } from 'frappe-ui'
 import Pick from '../Pick.vue'
 import Backlinks from '../Backlinks.vue'
 import { openRef } from '@/lib/pane'
@@ -70,6 +57,10 @@ const askWaiting = ref(false)
 const waitInput = ref(null)
 const reloadKey = ref(0)
 const isAgent = false
+const STATUSES = ['Open', 'Doing', 'Waiting', 'Done', 'Dropped', 'Carried']
+// a Select has no empty row of its own: the dash is an option whose value is the empty string
+const PRIORITY_OPTIONS = [{ label: '—', value: '' }, ...PRIORITIES.map((p) => ({ label: p, value: p }))]
+const goalOptions = computed(() => [{ label: '—', value: '' }, ...lookups.goals.map((g) => ({ label: g.title, value: g.name }))])
 const canRestore = computed(() => store.spaces.find((s) => s.name === task.value?.space)?.access === 'Write')
 // an archived task is shown read-only; Restore is in the pane header
 const writable = computed(() => canRestore.value && !task.value?.is_archived)
@@ -136,8 +127,10 @@ async function archive() {
     emit('close')
   }
 }
-async function remove() {
-  if (!window.confirm('Delete this task for good?')) return
+function remove() {
+  dialog.danger({ title: 'Delete task', message: 'Delete this task for good?', onConfirm: doRemove })
+}
+async function doRemove() {
   if ((await tryCall(() => db.delete('Life Task', props.name), 'Deleted.')) !== undefined) {
     emit('changed', null)
     emit('close')

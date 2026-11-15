@@ -1,26 +1,25 @@
 <template>
-  <div class="rw rowlink" :class="{ on: ref_ && current && current.ref === ref_ }" tabindex="0" :data-ref="ref_" @click="open" @keydown.enter.self="open">
-    <div class="grow">
-      <div class="ttl">{{ row.title || 'Untitled' }}</div>
-      <div class="mt"><slot>{{ meta }}</slot><template v-if="row.pending"> ·
-        <a href="#" class="num" @click.prevent.stop="openRef(ref_, { focus: 'pending' })">{{ row.pending }} of {{ row.proposals }} proposals pending</a></template></div>
+  <Row :pane="ref_" :label="row.title || 'Untitled'" data-index-row @click="!ref_ && openRoute(row.route)">
+    <div class="min-w-0 flex-1" data-row-main>
+      <div class="break-words text-base-medium text-ink-gray-9">{{ row.title || 'Untitled' }}</div>
+      <div class="text-sm text-ink-gray-6"><slot>{{ meta }}</slot><template v-if="row.pending"> ·
+        <NumLink class="relative" :to="{ query: { ...$route.query, open: ref_, focus: 'pending' } }" data-door="row-pending">{{ row.pending }} of {{ row.proposals }} proposals pending</NumLink></template></div>
     </div>
-    <slot name="pill"><span v-if="pill" class="pl" :class="pillClass">{{ pill }}</span></slot>
-  </div>
+    <slot name="pill"><Badge v-if="pill" :theme="pillTheme" :label="pill" /></slot>
+  </Row>
 </template>
 <script setup>
 // A row for a record from Life Index. Clicking it opens the record in the pane; the page does not change.
 import { computed } from 'vue'
+import { Badge } from 'frappe-ui'
+import Row from './ui/Row.vue'
+import NumLink from './ui/NumLink.vue'
 import { short } from '@/lib/dates'
-import { current, openRef, openRoute, refOf } from '@/lib/pane'
+import { openRoute, refOf } from '@/lib/pane'
 
-const props = defineProps({ row: Object, pill: String, pillClass: { type: String, default: 'n' }, showKind: Boolean, showArea: Boolean })
+const props = defineProps({ row: Object, pill: String, pillTheme: { type: String, default: 'gray' }, showKind: Boolean, showArea: Boolean })
 const KIND = { 'Task Done': 'Task completed', Inbox: 'Inbox item', 'Journal Page': 'Journal page', Document: 'Document' }
 const ref_ = computed(() => refOf(props.row.ref_doctype, props.row.ref_name))
-function open(e) {
-  if (e.target.closest && e.target.closest('a, button')) return
-  ref_.value ? openRef(ref_.value) : openRoute(props.row.route)
-}
 const meta = computed(() => {
   const r = props.row
   const parts = []

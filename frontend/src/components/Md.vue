@@ -1,7 +1,9 @@
 <template>
-  <div class="md" :class="{ read }" @click="onClick" v-html="html"></div>
+  <div class="md prose prose-sm max-w-none break-words text-ink-gray-8" :class="read && 'read'" @click="onClick" v-html="html"></div>
 </template>
 <script setup>
+// Rendered Markdown. Raw HTML is off in the renderer and the result goes through DOMPurify. The type comes from the
+// typography styles of the frappe-ui preset; `read` switches to the reading typeface with the line capped near 70 characters.
 import { computed } from 'vue'
 import DOMPurify from 'dompurify'
 import { renderMarkdown } from '@/lib/markdown'

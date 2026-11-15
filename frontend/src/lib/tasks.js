@@ -3,19 +3,19 @@ import { diffDays, short, startOfWeek, addDays } from './dates'
 export const PRIORITIES = ['I', 'II', 'III', 'IV']
 export const OPEN = ['Open', 'Doing', 'Waiting']
 
-// The pill at the right of a task row, as in the mockups.
+// The badge at the right of a task row, as in the mockups: { theme, text } for frappe-ui's Badge.
 export function taskPill(t, today) {
-  if (t.status === 'Done') return { cls: 'g', text: 'Done' }
-  if (t.status === 'Carried') return { cls: 'o', text: 'Carried' }
-  if (t.status === 'Dropped') return { cls: 'n', text: 'Dropped' }
+  if (t.status === 'Done') return { theme: 'green', text: 'Done' }
+  if (t.status === 'Carried') return { theme: 'amber', text: 'Carried' }
+  if (t.status === 'Dropped') return { theme: 'gray', text: 'Dropped' }
   if (t.due_date && t.due_date < today) {
     const n = diffDays(today, t.due_date)
-    return { cls: 'r', text: `Overdue ${n} day${n === 1 ? '' : 's'}`, shortText: `${n} day${n === 1 ? '' : 's'}` }
+    return { theme: 'red', text: `Overdue ${n} day${n === 1 ? '' : 's'}`, shortText: `${n} day${n === 1 ? '' : 's'}` }
   }
-  if (t.status === 'Waiting') return { cls: 'o', text: 'Waiting' }
-  if (t.carried_from) return { cls: 'o', text: 'Carried' }
-  if (t.priority) return { cls: 'n', text: t.priority }
-  if (t.goal) return { cls: 'b', text: '12WY' }
+  if (t.status === 'Waiting') return { theme: 'amber', text: 'Waiting' }
+  if (t.carried_from) return { theme: 'amber', text: 'Carried' }
+  if (t.priority) return { theme: 'gray', text: t.priority }
+  if (t.goal) return { theme: 'blue', text: '12WY' }
   return null
 }
 

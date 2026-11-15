@@ -1,17 +1,22 @@
 <template>
-  <header class="hd tabs">
-    <div><h1 class="h1">Journal</h1><div class="sub">{{ sub || '&nbsp;' }}</div></div>
-    <div id="jr-actions" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center"></div>
-  </header>
-  <nav class="tb" aria-label="Journal sections">
-    <RouterLink v-for="t in TABS" :key="t.key" :to="t.key === 'year' ? '/journal' : `/journal/${t.key}`" :class="{ on: current === t.key }">
-      <span class="only-desktop">{{ t.label }}</span><span class="only-phone">{{ t.short || t.label }}</span>
-    </RouterLink>
-  </nav>
+  <PageHead title="Journal">
+    <template #sub>{{ sub || ' ' }}</template>
+    <div id="jr-actions" class="contents"></div>
+  </PageHead>
+  <Tabs :model-value="current">
+    <TabList class="px-4 md:px-7" aria-label="Journal sections">
+      <TabTrigger v-for="t in TABS" :key="t.key" :value="t.key" :label="t.label" :route="t.key === 'year' ? '/journal' : `/journal/${t.key}`">
+        <span class="max-md:hidden">{{ t.label }}</span><span class="md:hidden">{{ t.short || t.label }}</span>
+      </TabTrigger>
+    </TabList>
+  </Tabs>
   <component :is="VIEWS[current]" v-if="ready" :key="current" @sub="(s) => (sub = s)" />
 </template>
 <script setup>
+// The journal: one header, a row of tabs that are links, and the tab's own screen below. Each tab teleports its buttons into the header.
 import { computed, onMounted, ref } from 'vue'
+import { TabList, Tabs, TabTrigger } from 'frappe-ui'
+import PageHead from '@/components/PageHead.vue'
 import WeekGrid from '@/components/journal/WeekGrid.vue'
 import Goals from '@/components/journal/Goals.vue'
 import Month from '@/components/journal/Month.vue'

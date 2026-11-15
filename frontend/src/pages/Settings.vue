@@ -1,85 +1,101 @@
 <template>
   <PageHead title="Settings" :sub="`${store.space} · ${store.fullName || store.user}`">
-    <button class="bt s" type="button" @click="toggleColorScheme()">{{ resolvedColorScheme === 'dark' ? 'Light theme' : 'Dark theme' }}</button>
-    <button v-if="colorScheme !== 'system'" class="bt t" type="button" @click="setColorScheme('system')">Follow the system</button>
+    <TabButtons :model-value="colorScheme" :options="SCHEMES" aria-label="Theme" @update:model-value="setColorScheme" />
   </PageHead>
-  <div v-if="d" class="bd">
+  <div v-if="d" class="page-body">
     <div class="cols">
       <div class="half">
         <section>
-          <h2 class="sh">Spaces and members</h2>
-          <div v-for="s in d.spaces" :key="s.name" class="cd" style="margin-bottom: 12px">
-            <div style="display: flex; justify-content: space-between; gap: 8px"><b style="font-weight: 600">{{ s.name }}</b><span class="mt">owner {{ s.owner_user }}</span></div>
-            <div v-for="m in s.members" :key="m.user" class="rw" style="align-items: center">
-              <div class="grow"><div class="ttl">{{ m.full_name }}</div><div class="mt">{{ m.user }} · {{ m.roles.join(', ') || 'no Life role' }}</div></div>
-              <select v-if="d.is_admin" class="inp" style="flex: none" :value="m.access" :aria-label="`Access for ${m.user}`" @change="member(s.name, m.user, $event.target.value)"><option>Write</option><option>Read</option></select>
-              <span v-else class="pl n">{{ m.access }}</span>
-              <button v-if="d.is_admin && m.user !== s.owner_user" class="bt t" type="button" @click="member(s.name, m.user, m.access, 1)">Remove</button>
+          <SectionHead>Spaces and members</SectionHead>
+          <Card v-for="s in d.spaces" :key="s.name" class="mb-3">
+            <div class="flex justify-between gap-2"><b class="text-base font-semibold text-ink-gray-9">{{ s.name }}</b><span class="text-sm text-ink-gray-6">owner {{ s.owner_user }}</span></div>
+            <Row v-for="m in s.members" :key="m.user" class="!items-center">
+              <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ m.full_name }}</div>
+                <div class="break-words text-sm text-ink-gray-6">{{ m.user }} · {{ m.roles.join(', ') || 'no Life role' }}</div></div>
+              <Select v-if="d.is_admin" class="w-24 shrink-0" :model-value="m.access" :options="['Write', 'Read']" :aria-label="`Access for ${m.user}`"
+                @update:model-value="(v) => v && v !== m.access && member(s.name, m.user, v)" />
+              <Badge v-else :label="m.access" />
+              <Button v-if="d.is_admin && m.user !== s.owner_user" variant="ghost" label="Remove" @click="member(s.name, m.user, m.access, 1)" />
+            </Row>
+            <div v-if="d.is_admin" class="mt-2 flex gap-2">
+              <TextInput v-model="newMember[s.name]" class="flex-1" placeholder="Email of an existing user" :aria-label="`Add a member to ${s.name}`" @keydown.enter="member(s.name, newMember[s.name])" />
+              <Button label="Add" @click="member(s.name, newMember[s.name])" />
             </div>
-            <div v-if="d.is_admin" style="display: flex; gap: 8px; margin-top: 8px">
-              <input v-model="newMember[s.name]" class="inp" style="flex: 1" placeholder="Email of an existing user" :aria-label="`Add a member to ${s.name}`" @keydown.enter="member(s.name, newMember[s.name])" />
-              <button class="bt s" type="button" @click="member(s.name, newMember[s.name])">Add</button>
-            </div>
+          </Card>
+          <div v-if="d.is_admin" class="flex flex-wrap gap-2">
+            <TextInput v-model="newSpace.name" class="flex-[1_1_160px]" placeholder="New space, for example Anya" aria-label="New space name" />
+            <TextInput v-model="newSpace.owner" class="flex-[1_1_160px]" placeholder="Owner's email (optional)" aria-label="Owner of the new space" />
+            <Button label="Create space" @click="createSpace" />
           </div>
-          <div v-if="d.is_admin" style="display: flex; gap: 8px; flex-wrap: wrap">
-            <input v-model="newSpace.name" class="inp" style="flex: 1 1 160px" placeholder="New space, for example Anya" aria-label="New space name" />
-            <input v-model="newSpace.owner" class="inp" style="flex: 1 1 160px" placeholder="Owner's email (optional)" aria-label="Owner of the new space" />
-            <button class="bt s" type="button" @click="createSpace">Create space</button>
-          </div>
-          <p class="mt" style="margin: 8px 0 0">A person sees a record only if they are a member of its space. A new space starts with the areas Work, Personal &amp; Health, Money &amp; Legal and Family.</p>
+          <p class="mt-2 text-sm text-ink-gray-6">A person sees a record only if they are a member of its space. A new space starts with the areas Work, Personal &amp; Health, Money &amp; Legal and Family.</p>
         </section>
 
         <section>
-          <h2 class="sh">Review and archive</h2>
-          <div class="cd">
-            <div class="formgrid">
-              <div class="field"><label class="lbl" for="s-day">Weekly review day</label><select id="s-day" v-model="d.settings.weekly_review_day" class="inp" :disabled="!d.is_admin">
-                <option v-for="x in DAYS" :key="x">{{ x }}</option></select></div>
-              <div class="field"><label class="lbl" for="s-time">Review time</label><input id="s-time" v-model="d.settings.weekly_review_time" type="time" class="inp" :disabled="!d.is_admin" /></div>
-              <div class="field"><label class="lbl" for="s-target">Score target, %</label><input id="s-target" v-model.number="d.settings.score_target" type="number" min="1" max="100" class="inp" :disabled="!d.is_admin" /></div>
-              <div class="field"><label class="lbl" for="s-arch">Archive after, days</label><input id="s-arch" v-model.number="d.settings.archive_after_days" type="number" min="1" class="inp" :disabled="!d.is_admin" /></div>
-              <div class="field"><label class="lbl" for="s-stale">Task is stale after, days</label><input id="s-stale" v-model.number="d.settings.stale_task_days" type="number" min="1" class="inp" :disabled="!d.is_admin" /></div>
-              <div class="field"><label class="lbl" for="s-space">Default space</label><select id="s-space" v-model="d.settings.default_space" class="inp" :disabled="!d.is_admin">
-                <option v-for="s in d.spaces" :key="s.name">{{ s.name }}</option></select></div>
+          <SectionHead>Review and archive</SectionHead>
+          <Card flush>
+            <div class="divide-y divide-outline-gray-1">
+              <SettingsRow title="Weekly review day">
+                <Select v-model="d.settings.weekly_review_day" class="w-36" :options="DAYS" :disabled="!d.is_admin" />
+              </SettingsRow>
+              <SettingsRow title="Review time">
+                <TimePicker v-model="d.settings.weekly_review_time" class="w-36" :disabled="!d.is_admin" />
+              </SettingsRow>
+              <SettingsRow title="Score target, %">
+                <TextInput v-model.number="d.settings.score_target" class="w-36" type="number" min="1" max="100" :disabled="!d.is_admin" />
+              </SettingsRow>
+              <SettingsRow title="Archive after, days">
+                <TextInput v-model.number="d.settings.archive_after_days" class="w-36" type="number" min="1" :disabled="!d.is_admin" />
+              </SettingsRow>
+              <SettingsRow title="Task is stale after, days">
+                <TextInput v-model.number="d.settings.stale_task_days" class="w-36" type="number" min="1" :disabled="!d.is_admin" />
+              </SettingsRow>
+              <SettingsRow title="Default space">
+                <Select v-model="d.settings.default_space" class="w-36" :options="d.spaces.map((s) => s.name)" :disabled="!d.is_admin" />
+              </SettingsRow>
             </div>
-            <div v-if="d.is_admin" style="display: flex; justify-content: flex-end; margin-top: 12px"><button class="bt p" type="button" @click="saveSettings">Save</button></div>
-            <p v-else class="mt" style="margin: 10px 0 0">Only the owner can change these.</p>
-          </div>
+            <div v-if="d.is_admin" class="flex justify-end border-t border-outline-gray-1 py-3"><Button variant="solid" label="Save" @click="saveSettings" /></div>
+            <p v-else class="border-t border-outline-gray-1 py-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
+          </Card>
         </section>
       </div>
 
       <div class="half">
         <section v-for="l in LISTS" :key="l.kind">
-          <h2 class="sh">{{ l.label }} <span class="mt" style="font-weight: 400">in {{ d.space }}</span></h2>
-          <div class="cd list">
-            <div v-for="it in rows(l)" :key="it.name" class="rw" style="align-items: center">
-              <div class="grow" :style="it.depth ? 'padding-left: 18px' : ''"><span class="ttl" :style="it.is_archived ? 'color: var(--ink-gray-6); text-decoration: line-through' : ''">{{ it.title }}</span>
-                <span v-if="it.relation" class="mt"> · {{ it.relation }}</span></div>
-              <template v-if="canWrite()">
-                <button v-if="l.ordered" class="bt t ic" type="button" :aria-label="`Move ${it.title} up`" @click="moveUp(l, it)">↑</button>
-                <button class="bt t" type="button" @click="rename(l, it)">Rename</button>
-                <button v-if="l.kind === 'area'" class="bt t" type="button" @click="item(l, { name: it.name, is_archived: it.is_archived ? 0 : 1 })">{{ it.is_archived ? 'Restore' : 'Archive' }}</button>
-                <button class="bt t" type="button" @click="remove(l, it)">Remove</button>
-              </template>
-            </div>
+          <SectionHead>{{ l.label }} <span class="font-normal text-ink-gray-6">in {{ d.space }}</span></SectionHead>
+          <Card flush>
+            <Row v-for="it in rows(l)" :key="it.name" class="!items-center">
+              <div class="min-w-0 flex-1" :class="it.depth && 'pl-5'"><span class="break-words text-base-medium" :class="it.is_archived ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ it.title }}</span>
+                <span v-if="it.relation" class="text-sm text-ink-gray-6"> · {{ it.relation }}</span></div>
+              <div v-if="canWrite()" class="flex shrink-0 flex-wrap items-center justify-end">
+                <Button v-if="l.ordered" variant="ghost" icon="lucide-arrow-up" :label="`Move ${it.title} up`" @click="moveUp(l, it)" />
+                <Button variant="ghost" label="Rename" @click="rename(l, it)" />
+                <Button v-if="l.kind === 'area'" variant="ghost" :label="it.is_archived ? 'Restore' : 'Archive'" @click="item(l, { name: it.name, is_archived: it.is_archived ? 0 : 1 })" />
+                <Button variant="ghost" label="Remove" @click="remove(l, it)" />
+              </div>
+            </Row>
             <Empty v-if="!rows(l).length" :title="`No ${l.label.toLowerCase()} yet.`" :hint="l.hint" />
-            <div v-if="canWrite()" class="rw">
-              <input v-model="draft[l.kind]" class="inp" style="flex: 1" :placeholder="l.add" :aria-label="l.add" @keydown.enter="add(l)" />
-              <select v-if="l.kind === 'area'" v-model="draftParent" class="inp" aria-label="Inside"><option value="">Top level</option>
-                <option v-for="a in d.areas.filter((x) => !x.parent_area)" :key="a.name" :value="a.name">in {{ a.area_name }}</option></select>
-              <button class="bt s" type="button" @click="add(l)">Add</button>
-            </div>
-          </div>
+            <Row v-if="canWrite()" class="flex-wrap">
+              <TextInput v-model="draft[l.kind]" class="min-w-32 flex-1" :placeholder="l.add" :aria-label="l.add" @keydown.enter="add(l)" />
+              <Select v-if="l.kind === 'area'" v-model="draftParent" class="w-40" aria-label="Inside"
+                :options="[{ label: 'Top level', value: '' }, ...d.areas.filter((x) => !x.parent_area).map((a) => ({ label: 'in ' + a.area_name, value: a.name }))]" />
+              <Button label="Add" @click="add(l)" />
+            </Row>
+          </Card>
         </section>
-        <p class="mt" style="margin: 0">Habits here are the library of habits ever tracked. Which ones count in a month is set under Journal, Habits, Manage habits.</p>
+        <p class="text-sm text-ink-gray-6">Habits here are the library of habits ever tracked. Which ones count in a month is set under Journal, Habits, Manage habits.</p>
       </div>
     </div>
   </div>
 </template>
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { useColorScheme } from 'frappe-ui'
+// A routed page, not frappe-ui's SettingsDialog: that family's panels and nav items are reka-ui tab parts that only work
+// inside the dialog's own TabsRoot. SettingsRow is the one part with no such tie, and lays out the review settings.
+import { Badge, Button, Select, SettingsRow, TabButtons, TextInput, TimePicker, dialog, useColorScheme } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
+import Card from '@/components/ui/Card.vue'
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
 import { api, tryCall } from '@/lib/api'
 import { boot, canWrite, store } from '@/lib/store'
@@ -93,7 +109,8 @@ const LISTS = [
   { kind: 'habit', label: 'Habits', key: 'habits', field: 'title', add: 'New habit', hint: 'Habits you may track in a month.' },
   { kind: 'person', label: 'People', key: 'people', field: 'full_name', add: 'New person', hint: 'People you refer to: document holders, birthdays.' },
 ]
-const { colorScheme, resolvedColorScheme, setColorScheme, toggleColorScheme } = useColorScheme()
+const SCHEMES = [{ label: 'System', value: 'system' }, { label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }]
+const { colorScheme, setColorScheme } = useColorScheme()
 const d = ref(null)
 const draft = reactive({})
 const draftParent = ref('')
@@ -132,11 +149,16 @@ async function add(l) {
   if (await item(l, { title, ...extra })) draft[l.kind] = ''
 }
 function rename(l, it) {
-  const title = window.prompt('Name', it.title)
-  if (title && title.trim() && title.trim() !== it.title) item(l, { name: it.name, title: title.trim() }, 'Renamed.')
+  dialog.prompt({
+    title: 'Rename', confirmLabel: 'Rename', fields: [{ name: 'title', label: 'Name', type: 'text', defaultValue: it.title, required: true }],
+    onConfirm: async ({ values }) => {
+      const title = (values.title || '').trim()
+      if (title && title !== it.title) await item(l, { name: it.name, title }, 'Renamed.')
+    },
+  })
 }
 function remove(l, it) {
-  if (window.confirm(`Remove “${it.title}”?`)) item(l, { name: it.name, delete: 1 }, 'Removed.')
+  dialog.danger({ title: 'Remove', message: `Remove “${it.title}”?`, confirmLabel: 'Remove', onConfirm: async () => { await item(l, { name: it.name, delete: 1 }, 'Removed.') } })
 }
 async function moveUp(l, it) {
   const peers = rows(l).filter((x) => (x.parent_area || '') === (it.parent_area || ''))

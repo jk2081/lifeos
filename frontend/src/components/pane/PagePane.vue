@@ -1,23 +1,28 @@
 <template>
   <template v-if="d">
-    <section><h2 class="sh">Page</h2>
-      <div v-if="d.image" class="imgwrap" :class="{ zoom }" @click="zoom = !zoom"><img :src="d.image" alt="Photographed journal page" /></div>
-      <div v-else class="cd"><Empty title="No image." hint="This page has a transcript but no photograph." /></div></section>
-    <section><h2 class="sh">Transcript</h2>
-      <div class="cd"><Md v-if="d.transcript_md" :text="d.transcript_md" read /><Empty v-else title="No transcript." hint="Open the full page to type what the page says." /></div></section>
-    <section v-if="d.created.length"><h2 class="sh">Created from this page</h2>
-      <div class="cd list"><div v-for="c in d.created" :key="c.route" class="rw rowlink" @click="openRoute(c.route)"><div class="grow"><div class="ttl">{{ c.title }}</div><div class="mt">{{ c.kind }}</div></div></div></div></section>
-    <div v-if="d.inbox_item" class="mt"><a href="#" @click.prevent="openRef('inbox:' + d.inbox_item)">Open the inbox item it came from</a></div>
+    <section><SectionHead>Page</SectionHead>
+      <div v-if="d.image" class="max-h-[60vh] overflow-auto rounded-5 border border-outline-gray-1 bg-surface-gray-1" :class="zoom ? 'cursor-zoom-out' : 'cursor-zoom-in'" @click="zoom = !zoom">
+        <img class="block h-auto" :class="zoom ? 'w-[220%] max-w-none' : 'w-full'" :src="d.image" alt="Photographed journal page" /></div>
+      <Card v-else><Empty title="No image." hint="This page has a transcript but no photograph." /></Card></section>
+    <section><SectionHead>Transcript</SectionHead>
+      <Card><Md v-if="d.transcript_md" :text="d.transcript_md" read /><Empty v-else title="No transcript." hint="Open the full page to type what the page says." /></Card></section>
+    <section v-if="d.created.length"><SectionHead>Created from this page</SectionHead>
+      <Card flush><Row v-for="c in d.created" :key="c.route" :pane="refOfRoute(c.route)" :label="c.title" @click="!refOfRoute(c.route) && openRoute(c.route)">
+        <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ c.title }}</div><div class="text-sm text-ink-gray-6">{{ c.kind }}</div></div></Row></Card></section>
+    <div v-if="d.inbox_item" class="text-sm text-ink-gray-6"><a class="text-ink-blue-8 hover:underline" href="#" @click.prevent="openRef('inbox:' + d.inbox_item)">Open the inbox item it came from</a></div>
   </template>
 </template>
 <script setup>
 import { onMounted, ref } from 'vue'
+import Card from '../ui/Card.vue'
+import Row from '../ui/Row.vue'
+import SectionHead from '../ui/SectionHead.vue'
 import Md from '../Md.vue'
 import Empty from '../Empty.vue'
 import { api } from '@/lib/api'
 import { long } from '@/lib/dates'
 import { areaName, loadLookups } from '@/lib/lookups'
-import { openRef, openRoute } from '@/lib/pane'
+import { openRef, openRoute, refOfRoute } from '@/lib/pane'
 
 const props = defineProps({ name: String, type: String })
 const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
@@ -34,9 +39,3 @@ onMounted(async () => {
   }
 })
 </script>
-<style scoped>
-.imgwrap { border: 1px solid var(--outline-gray-1); border-radius: 10px; background: var(--surface-gray-1); overflow: auto; max-height: 60vh; cursor: zoom-in; }
-.imgwrap img { display: block; width: 100%; height: auto; }
-.imgwrap.zoom { cursor: zoom-out; }
-.imgwrap.zoom img { width: 220%; max-width: none; }
-</style>

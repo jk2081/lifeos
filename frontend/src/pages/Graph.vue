@@ -1,24 +1,24 @@
 <template>
   <PageHead title="Graph" :sub="d ? `${d.nodes.length} records · ${d.edges.length} links${center ? ' · two steps around one record' : ''}` : ''">
-    <button v-if="center" class="bt s" type="button" @click="setCenter('')">Show the whole space</button>
+    <Button v-if="center" label="Show the whole space" @click="setCenter('')" />
   </PageHead>
-  <div class="bd" style="flex: 1">
+  <div class="page-body flex-1">
     <div class="chips">
-      <span v-for="t in LEGEND" :key="t.type" class="lgd"><i :style="`background: var(${t.color})`"></i>{{ t.label }}</span>
-      <span class="lgd"><i style="background: var(--ink-gray-6)"></i>Task, chat or project that is linked</span>
-      <span style="flex: 1"></span>
+      <span v-for="t in LEGEND" :key="t.type" class="inline-flex items-center gap-1.5 text-sm text-ink-gray-7"><span class="inline-block size-2.5 rounded-full" :style="`background: var(${t.color})`" />{{ t.label }}</span>
+      <span class="inline-flex items-center gap-1.5 text-sm text-ink-gray-7"><span class="inline-block size-2.5 rounded-full" style="background: var(--ink-gray-6)" />Task, chat or project that is linked</span>
+      <span class="flex-1" />
       <span v-if="picked" class="chips">
-        <b style="font-weight: 500">{{ picked.label }}</b>
-        <RouterLink class="bt s" :to="picked.route">Open</RouterLink>
-        <button class="bt s" type="button" @click="setCenter(picked.id)">Two steps around it</button>
+        <b class="text-base-medium text-ink-gray-9">{{ picked.label }}</b>
+        <Button label="Open" :route="picked.route" />
+        <Button label="Two steps around it" @click="setCenter(picked.id)" />
       </span>
-      <span v-else class="mt">Click a record to select it. Double-click to open it.</span>
+      <span v-else class="text-sm text-ink-gray-6">Click a record to select it. Double-click to open it.</span>
     </div>
-    <div v-show="d && d.nodes.length" ref="host" class="cy" role="img" aria-label="Graph of linked records"></div>
-    <div v-if="d && !d.nodes.length" class="cd"><Empty title="Nothing to draw yet."
-      hint="Notes, people, goals and vault documents show here, joined by [[links]], parent notes and fields such as a document's holder." /></div>
-    <details v-if="d && d.edges.length" class="mt"><summary>The same links as a list</summary>
-      <ul style="margin: 8px 0 0; padding-left: 18px; list-style: disc"><li v-for="(e, i) in d.edges.slice(0, 200)" :key="i">{{ label(e.source) }} → {{ label(e.target) }} <span>({{ e.kind }})</span></li></ul></details>
+    <div v-show="d && d.nodes.length" ref="host" class="min-h-[520px] flex-1 rounded-5 border border-outline-gray-1 bg-surface-gray-1 max-md:min-h-[60vh]" role="img" aria-label="Graph of linked records" />
+    <Card v-if="d && !d.nodes.length"><Empty title="Nothing to draw yet."
+      hint="Notes, people, goals and vault documents show here, joined by [[links]], parent notes and fields such as a document's holder." /></Card>
+    <details v-if="d && d.edges.length" class="text-sm text-ink-gray-6"><summary class="cursor-pointer">The same links as a list</summary>
+      <ul class="mt-2 list-disc pl-5"><li v-for="(e, i) in d.edges.slice(0, 200)" :key="i">{{ label(e.source) }} → {{ label(e.target) }} <span>({{ e.kind }})</span></li></ul></details>
   </div>
 </template>
 <script setup>
@@ -26,7 +26,9 @@ import { tokenColor } from '@/lib/tokens'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import cytoscape from 'cytoscape'
+import { Button } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
+import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import { api, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
@@ -92,9 +94,3 @@ function setCenter(id) {
 onMounted(load)
 onBeforeUnmount(() => cy && cy.destroy())
 </script>
-<style scoped>
-.cy { flex: 1; min-height: 520px; border: 1px solid var(--outline-gray-1); border-radius: 10px; background: var(--surface-gray-1); }
-.lgd { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-gray-7); }
-.lgd i { width: 10px; height: 10px; border-radius: 5px; display: inline-block; }
-@media (max-width: 800px) { .cy { min-height: 60vh; } }
-</style>

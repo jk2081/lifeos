@@ -33,21 +33,20 @@
   {
    "fieldname": "ref_doctype",
    "fieldtype": "Data",
-   "label": "Ref Doctype",
-   "reqd": 1,
-   "in_list_view": 1
+   "label": "Record Type",
+   "reqd": 1
   },
   {
    "fieldname": "ref_name",
    "fieldtype": "Data",
-   "label": "Ref Name",
-   "reqd": 1,
-   "in_list_view": 1
+   "label": "Record",
+   "reqd": 1
   },
   {
    "fieldname": "area",
    "fieldtype": "Data",
-   "label": "Area"
+   "label": "Area",
+   "in_list_view": 1
   },
   {
    "fieldname": "also_in_csv",
@@ -57,7 +56,8 @@
   {
    "fieldname": "project",
    "fieldtype": "Data",
-   "label": "Project"
+   "label": "Project",
+   "in_list_view": 1
   },
   {
    "fieldname": "tags_csv",
@@ -67,7 +67,7 @@
   {
    "fieldname": "record_date",
    "fieldtype": "Date",
-   "label": "Record Date",
+   "label": "Date",
    "in_list_view": 1
   },
   {
@@ -146,5 +146,6 @@
  ],
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "title"
 }

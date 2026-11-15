@@ -1,173 +1,167 @@
 <template>
   <template v-if="item">
     <PageHead v-if="page" :title="item.title" :crumb="{ to: '/inbox', label: 'Inbox', here: item.source_type }">
-      <template #sub>{{ headSub }}</template>
+      <template #sub><span class="flex flex-wrap items-center gap-1">{{ headParts.text }}<template v-if="headParts.who"> · {{ headParts.verb }}
+        <Avatar size="xs" :label="headParts.who" />{{ headParts.who }}</template></span></template>
       <template v-if="pending.length && writable">
-        <button class="bt s" type="button" @click="decideAll('reject')">Reject all</button>
-        <button class="bt p" type="button" @click="decideAll('accept')">Accept all {{ pending.length }} pending</button>
+        <Button label="Reject all" @click="decideAll('reject')" />
+        <Button variant="solid" :label="`Accept all ${pending.length} pending`" @click="decideAll('accept')" />
       </template>
-      <button v-else-if="item.status === 'Failed' && writable" class="bt p" type="button" @click="retry">Retry</button>
+      <Button v-else-if="item.status === 'Failed' && writable" variant="solid" label="Retry" @click="retry" />
     </PageHead>
-    <div v-else-if="writable && (pending.length || item.status === 'Failed')" class="chips" style="justify-content: flex-end">
+    <div v-else-if="writable && (pending.length || item.status === 'Failed')" class="flex flex-wrap items-center justify-end gap-2">
       <template v-if="pending.length">
-        <button class="bt s" type="button" @click="decideAll('reject')">Reject all</button>
-        <button class="bt p" type="button" @click="decideAll('accept')">Accept all {{ pending.length }} pending</button>
+        <Button label="Reject all" @click="decideAll('reject')" />
+        <Button variant="solid" :label="`Accept all ${pending.length} pending`" @click="decideAll('accept')" />
       </template>
-      <button v-else class="bt p" type="button" @click="retry">Retry</button>
+      <Button v-else variant="solid" label="Retry" @click="retry" />
     </div>
 
-    <div class="bd">
-      <div v-if="item.status === 'Failed'" class="cd" style="background: var(--surface-red-2); color: var(--ink-red-9); border-color: transparent">
-        <b>Processing failed.</b> {{ item.error }}
-      </div>
-      <div v-else-if="item.status === 'New' || item.status === 'Processing'" class="cd" style="background: var(--surface-gray-1)">
-        <b>{{ item.status === 'New' ? 'Waiting for an agent.' : 'An agent is processing this.' }}</b>
-        <span class="mt"> The summary and proposals show here when it is done.</span>
-      </div>
+    <div :class="page ? 'page-body' : 'flex flex-col gap-4'">
+      <Alert v-if="item.status === 'Failed'" theme="red" title="Processing failed." :description="item.error" />
+      <Alert v-else-if="item.status === 'New' || item.status === 'Processing'" :title="item.status === 'New' ? 'Waiting for an agent.' : 'An agent is processing this.'"
+        description="The summary and proposals show here when it is done." />
       <div class="cols">
         <div class="half">
           <section>
-            <h2 class="sh">Original</h2>
-            <div v-if="!item.files.length && !item.raw_text" class="orig-empty"><span>No file was attached.</span></div>
-            <div v-for="f in item.files" :key="f.file_url" class="orig">
+            <SectionHead>Original</SectionHead>
+            <div v-if="!item.files.length && !item.raw_text" class="grid min-h-[120px] place-items-center rounded-5 border border-dashed border-outline-gray-3 bg-surface-gray-1 text-base text-ink-gray-6"><span>No file was attached.</span></div>
+            <div v-for="f in item.files" :key="f.file_url" class="mb-3">
               <template v-if="fileKind(f.file_name) === 'image'">
-                <div class="imgwrap" :class="{ zoom }" @click="zoom = !zoom">
-                  <img :src="item.files.length === 1 && item.preview_image ? item.preview_image : f.file_url" :alt="f.file_name" />
+                <div class="max-h-[520px] overflow-auto rounded-5 border border-outline-gray-1 bg-surface-gray-1" :class="zoom ? 'cursor-zoom-out' : 'cursor-zoom-in'" @click="zoom = !zoom">
+                  <img class="block h-auto" :class="zoom ? 'w-[220%] max-w-none' : 'w-full'" :src="item.files.length === 1 && item.preview_image ? item.preview_image : f.file_url" :alt="f.file_name" />
                 </div>
               </template>
-              <audio v-else-if="fileKind(f.file_name) === 'audio'" :src="f.file_url" controls style="width: 100%"></audio>
-              <object v-else-if="fileKind(f.file_name) === 'pdf'" :data="f.file_url" type="application/pdf" class="pdf">
-                <a :href="f.file_url" target="_blank" rel="noopener">Open {{ f.file_name }}</a>
+              <audio v-else-if="fileKind(f.file_name) === 'audio'" :src="f.file_url" controls class="w-full"></audio>
+              <object v-else-if="fileKind(f.file_name) === 'pdf'" :data="f.file_url" type="application/pdf" class="block h-[520px] w-full rounded-5 border border-outline-gray-1">
+                <a class="text-ink-blue-8 hover:underline" :href="f.file_url" target="_blank" rel="noopener">Open {{ f.file_name }}</a>
               </object>
-              <div class="mt" style="margin-top: 6px">
-                <a :href="f.file_url" target="_blank" rel="noopener">{{ f.file_name }}</a> · {{ fileSize(f.file_size) }}
+              <div class="mt-1.5 text-sm text-ink-gray-6">
+                <a class="text-ink-blue-8 hover:underline" :href="f.file_url" target="_blank" rel="noopener">{{ f.file_name }}</a> · {{ fileSize(f.file_size) }}
                 <span v-if="fileKind(f.file_name) === 'image'"> · click the image to zoom</span>
               </div>
             </div>
-            <div v-if="item.raw_text" class="cd" style="margin-top: 8px"><Md :text="item.raw_text" /></div>
+            <Card v-if="item.raw_text" class="mt-2"><Md :text="item.raw_text" /></Card>
           </section>
           <section v-if="item.transcript_md || editingTranscript">
-            <h2 class="sh">Transcript
-              <a v-if="writable && !editingTranscript" href="#" class="more" @click.prevent="startTranscript">Edit</a>
-            </h2>
-            <div class="cd">
+            <SectionHead>Transcript
+              <template v-if="writable && !editingTranscript" #action><Button variant="ghost" size="sm" label="Edit" @click="startTranscript" /></template>
+            </SectionHead>
+            <Card>
               <template v-if="editingTranscript">
-                <textarea v-model="transcriptDraft" class="inp" rows="12" style="width: 100%"></textarea>
-                <div style="display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end">
-                  <button class="bt s" type="button" @click="editingTranscript = false">Cancel</button>
-                  <button class="bt p" type="button" @click="saveTranscript">Save transcript</button>
+                <Textarea v-model="transcriptDraft" :rows="12" aria-label="Transcript" />
+                <div class="mt-2 flex justify-end gap-2">
+                  <Button label="Cancel" @click="editingTranscript = false" />
+                  <Button variant="solid" label="Save transcript" @click="saveTranscript" />
                 </div>
               </template>
               <Md v-else :text="item.transcript_md" />
-            </div>
-            <p v-if="(item.transcript_md || '').includes('[?]')" class="mt" style="margin: 8px 0 0">Words marked [?] were hard to read. Edit the transcript to correct them.</p>
+            </Card>
+            <p v-if="(item.transcript_md || '').includes('[?]')" class="mt-2 text-sm text-ink-gray-6">Words marked [?] were hard to read. Edit the transcript to correct them.</p>
           </section>
         </div>
 
         <div class="half">
           <section v-if="item.summary_md">
-            <h2 class="sh">Summary</h2>
-            <div class="cd"><Md :text="item.summary_md" /></div>
+            <SectionHead>Summary</SectionHead>
+            <Card><Md :text="item.summary_md" /></Card>
           </section>
           <section>
-            <h2 ref="proposalsHead" class="sh" data-proposals>Proposals<template v-if="item.proposals.length"> · {{ countsLine }}</template></h2>
-            <div style="display: flex; flex-direction: column; gap: 12px">
-              <div v-for="p in item.proposals" :key="p.name" class="pr" :class="{ done: p.status !== 'Pending' }" :data-proposal="p.status">
-                <div style="display: flex; align-items: flex-start; gap: 8px">
-                  <span class="pl" :class="p.kind === 'Task' ? 'b' : 'n'">{{ KIND_LABEL[p.kind] || p.kind }}</span>
-                  <div class="ttl" style="flex: 1; min-width: 0; font-weight: 500; overflow-wrap: anywhere">{{ p.preview }}</div>
-                  <span v-if="p.status === 'Accepted'" class="pl g">Accepted</span>
-                  <span v-else-if="p.status === 'Rejected'" class="pl n">Rejected</span>
-                  <span v-else-if="p.confidence < 0.6" class="pl o">{{ pct(p.confidence) }}% sure</span>
-                  <span v-else class="mt" style="white-space: nowrap">{{ pct(p.confidence) }}% sure</span>
+            <SectionHead ref="proposalsHead" data-proposals>Proposals<template v-if="item.proposals.length"> · {{ countsLine }}</template></SectionHead>
+            <div class="flex flex-col gap-3">
+              <Card v-for="p in item.proposals" :key="p.name" class="flex flex-col gap-2" :tint="p.status !== 'Pending'" :data-proposal="p.status">
+                <div class="flex items-start gap-2">
+                  <Badge :theme="p.kind === 'Task' ? 'blue' : 'gray'" :label="KIND_LABEL[p.kind] || p.kind" />
+                  <div class="min-w-0 flex-1 break-words text-base-medium text-ink-gray-9">{{ p.preview }}</div>
+                  <Badge v-if="p.status === 'Accepted'" theme="green" label="Accepted" />
+                  <Badge v-else-if="p.status === 'Rejected'" label="Rejected" />
+                  <Badge v-else-if="p.confidence < 0.6" theme="amber" :label="`${pct(p.confidence)}% sure`" />
+                  <span v-else class="whitespace-nowrap text-sm text-ink-gray-6">{{ pct(p.confidence) }}% sure</span>
                 </div>
                 <template v-if="p.status === 'Pending'">
-                  <div v-if="p.confidence < 0.6 || p.error" class="mt" :style="p.error ? 'color: var(--ink-red-9)' : ''">
+                  <div v-if="p.confidence < 0.6 || p.error" class="text-sm" :class="p.error ? 'text-ink-red-8' : 'text-ink-gray-6'">
                     {{ p.error || 'The agent was not sure about this one. Edit it or reject it.' }}
                   </div>
-                  <div class="chips">
+                  <div class="flex flex-wrap items-center gap-2">
                     <template v-if="p.filed || p.kind === 'Month Goal'">
                       <Pick :model-value="p.payload.area || null" :options="areaOptions" placeholder="area" :disabled="!writable"
                         @update:model-value="(v) => setField(p, 'area', v)" />
                     </template>
-                    <span v-if="p.payload.goal" class="ch sm" style="cursor: default">Goal: {{ goalTitle(p.payload.goal) }}</span>
+                    <Badge v-if="p.payload.goal" size="lg" :label="'Goal: ' + goalTitle(p.payload.goal)" />
                     <template v-if="p.filed">
                       <Pick v-if="p.payload.project || projectOptions(p).length" :model-value="p.payload.project || null" :options="projectOptions(p)"
                         prefix="Project: " placeholder="project" :disabled="!writable" @update:model-value="(v) => setField(p, 'project', v)" />
-                      <span v-for="a in p.payload.also_in || []" :key="a" class="ch sm">also in {{ areaName(a) }}
-                        <a v-if="writable" href="#" aria-label="Remove" @click.prevent="setField(p, 'also_in', p.payload.also_in.filter((x) => x !== a))">×</a></span>
+                      <Badge v-for="a in p.payload.also_in || []" :key="a" size="lg">also in {{ areaName(a) }}
+                        <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)"
+                          @click="setField(p, 'also_in', p.payload.also_in.filter((x) => x !== a))" /></template></Badge>
                       <Pick :model-value="null" :options="areaOptions.filter((o) => o.value !== p.payload.area && !(p.payload.also_in || []).includes(o.value))"
                         placeholder="also in" :clearable="false" :disabled="!writable" @update:model-value="(v) => setField(p, 'also_in', [...(p.payload.also_in || []), v])" />
-                      <span v-for="t in p.payload.tags || []" :key="tagKey(t)" class="ch sm">#{{ tagName(t) }}
-                        <a v-if="writable" href="#" aria-label="Remove" @click.prevent="setField(p, 'tags', p.payload.tags.filter((x) => tagKey(x) !== tagKey(t)))">×</a></span>
+                      <Badge v-for="t in p.payload.tags || []" :key="tagKey(t)" size="lg">#{{ tagName(t) }}
+                        <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove #' + tagName(t)"
+                          @click="setField(p, 'tags', p.payload.tags.filter((x) => tagKey(x) !== tagKey(t)))" /></template></Badge>
                       <Pick :model-value="null" :options="tagOptions(p)" placeholder="tag" :clearable="false" :disabled="!writable"
                         @update:model-value="(v) => setField(p, 'tags', [...(p.payload.tags || []), v])" />
                     </template>
                     <template v-if="p.kind === 'Task'">
-                      <label v-if="p.payload.due_date || dueFor === p.name" class="ch sm">due
-                        <input type="date" class="dateinp" :value="p.payload.due_date" :disabled="!writable" @change="(e) => setField(p, 'due_date', e.target.value || null)" /></label>
-                      <button v-else class="ch sm add" type="button" :disabled="!writable" @click="dueFor = p.name">+ due date</button>
+                      <span v-if="p.payload.due_date || dueFor === p.name" class="inline-flex items-center gap-1.5 text-sm text-ink-gray-6">due
+                        <DatePicker class="w-36" size="sm" :model-value="p.payload.due_date || ''" clearable :disabled="!writable" aria-label="Due date"
+                          @update:model-value="(v) => setField(p, 'due_date', v || null)" /></span>
+                      <Button v-else size="sm" variant="outline" icon-left="lucide-plus" label="due date" :disabled="!writable" @click="dueFor = p.name" />
                     </template>
-                    <span v-for="c in factChips(p)" :key="c" class="ch sm" style="cursor: default">{{ c }}</span>
+                    <Badge v-for="c in factChips(p)" :key="c" size="lg" :label="c" />
                   </div>
-                  <div v-if="writable" style="display: flex; gap: 8px; justify-content: flex-end; align-items: center">
-                    <button class="bt t" type="button" @click="decide(p, 'reject')">Reject</button>
-                    <button class="bt s" type="button" @click="openEdit(p)">Edit</button>
-                    <button class="bt p" type="button" @click="decide(p, 'accept')">Accept</button>
+                  <div v-if="writable" class="flex items-center justify-end gap-2">
+                    <Button variant="ghost" label="Reject" @click="decide(p, 'reject')" />
+                    <Button label="Edit" @click="openEdit(p)" />
+                    <Button variant="solid" label="Accept" @click="decide(p, 'accept')" />
                   </div>
                 </template>
-                <div v-else-if="p.status === 'Accepted'" class="mt">
+                <div v-else-if="p.status === 'Accepted'" class="text-sm text-ink-gray-6">
                   Filed as {{ (p.created_doctype || '').replace('Life ', '').toLowerCase() }}.
-                  <a v-if="p.route && p.exists" href="#" style="text-decoration: underline" @click.prevent="openRoute(p.route)">Open</a>
+                  <a v-if="p.route && p.exists" href="#" class="text-ink-blue-8 underline" @click.prevent="openRoute(p.route)">Open</a>
                 </div>
-              </div>
-              <div v-if="!item.proposals.length" class="cd"><Empty title="No proposals."
-                :hint="item.status === 'To Review' || item.status === 'Done' ? 'The agent found nothing to file from this item.' : 'Proposals appear here once an agent has processed the item.'" /></div>
+              </Card>
+              <Card v-if="!item.proposals.length"><Empty title="No proposals."
+                :hint="item.status === 'To Review' || item.status === 'Done' ? 'The agent found nothing to file from this item.' : 'Proposals appear here once an agent has processed the item.'" /></Card>
             </div>
-            <p class="mt" style="margin: 12px 0 0">Nothing here becomes a record until you accept it. The original is always kept.</p>
+            <p class="mt-3 text-sm text-ink-gray-6">Nothing here becomes a record until you accept it. The original is always kept.</p>
           </section>
           <Backlinks doctype="Life Inbox Item" :name="item.name" :reload="reloadKey" />
         </div>
       </div>
     </div>
 
-    <Dialog v-model="editOpen" title="Edit proposal" size="xl">
-        <div v-if="editing" style="display: flex; flex-direction: column; gap: 12px">
-          <div v-for="(spec, field) in editFields" :key="field" class="field">
-            <label class="lbl" :for="'f-' + field">{{ fieldLabel(field) }}<span v-if="spec.required"> *</span></label>
-            <textarea v-if="spec.type === 'markdown'" :id="'f-' + field" v-model="draft[field]" class="inp" rows="5"></textarea>
-            <select v-else-if="spec.type === 'select'" :id="'f-' + field" v-model="draft[field]" class="inp">
-              <option v-for="o in spec.options" :key="o" :value="o">{{ o || '—' }}</option>
-            </select>
-            <select v-else-if="spec.type === 'link'" :id="'f-' + field" v-model="draft[field]" class="inp">
-              <option :value="undefined">—</option>
-              <option v-for="o in linkOptions(spec.doctype)" :key="o.value" :value="o.value">{{ o.label }}</option>
-            </select>
-            <input v-else-if="spec.type === 'date'" :id="'f-' + field" v-model="draft[field]" type="date" class="inp" />
-            <input v-else-if="spec.type === 'datetime'" :id="'f-' + field" v-model="draft[field]" type="datetime-local" class="inp" />
-            <input v-else-if="spec.type === 'int'" :id="'f-' + field" v-model.number="draft[field]" type="number" class="inp" />
-            <label v-else-if="spec.type === 'bool'" style="display: flex; gap: 8px; align-items: center"><input v-model="draft[field]" type="checkbox" class="ck" :true-value="1" :false-value="0" /> Yes</label>
-            <textarea v-else-if="spec.type === 'scores'" :id="'f-' + field" v-model="draft[field]" class="inp" rows="6" style="font-family: monospace; font-size: 12.5px"></textarea>
-            <input v-else :id="'f-' + field" v-model="draft[field]" class="inp" :maxlength="spec.max_length" />
-            <div v-if="spec.help" class="mt" style="margin-top: 2px">{{ spec.help }}</div>
-          </div>
-        </div>
-      <template #actions>
-        <div style="display: flex; gap: 8px; justify-content: flex-end">
-          <button class="bt s" type="button" @click="saveEdit(false)">Save</button>
-          <button class="bt p" type="button" @click="saveEdit(true)">Save and accept</button>
-        </div>
-      </template>
+    <Dialog v-model:open="editOpen" title="Edit proposal" size="xl"
+      :actions="[{ label: 'Save', onClick: () => saveEdit(false) }, { label: 'Save and accept', variant: 'solid', onClick: () => saveEdit(true) }]">
+      <div v-if="editing" class="flex flex-col gap-3">
+        <template v-for="(spec, field) in editFields" :key="field">
+          <FormControl v-if="spec.type === 'markdown'" v-model="draft[field]" type="textarea" :rows="5" :label="fieldLabel(field)" :required="spec.required" :description="spec.help" />
+          <FormControl v-else-if="spec.type === 'select'" v-model="draft[field]" type="select" :options="spec.options.map((o) => ({ label: o || '—', value: o }))"
+            :label="fieldLabel(field)" :required="spec.required" :description="spec.help" />
+          <FormControl v-else-if="spec.type === 'link'" type="select" :model-value="draft[field] ?? ''" :options="[{ label: '—', value: '' }, ...linkOptions(spec.doctype)]"
+            :label="fieldLabel(field)" :required="spec.required" :description="spec.help" @update:model-value="(v) => (draft[field] = v || undefined)" />
+          <DatePicker v-else-if="spec.type === 'date'" :model-value="draft[field] || ''" clearable :label="fieldLabel(field)" :required="spec.required" :description="spec.help"
+            @update:model-value="(v) => (draft[field] = v)" />
+          <DateTimePicker v-else-if="spec.type === 'datetime'" :model-value="draft[field] || ''" clearable :label="fieldLabel(field)" :required="spec.required" :description="spec.help"
+            @update:model-value="(v) => (draft[field] = v)" />
+          <FormControl v-else-if="spec.type === 'int'" type="number" :model-value="draft[field]" :label="fieldLabel(field)" :required="spec.required" :description="spec.help"
+            @update:model-value="(v) => (draft[field] = v === '' || v === null ? '' : Number(v))" />
+          <Checkbox v-else-if="spec.type === 'bool'" :model-value="!!Number(draft[field])" :label="fieldLabel(field)" :description="spec.help" @update:model-value="(v) => (draft[field] = v ? 1 : 0)" />
+          <FormControl v-else-if="spec.type === 'scores'" v-model="draft[field]" type="textarea" class="font-mono" :rows="6" :label="fieldLabel(field)" :required="spec.required" :description="spec.help" />
+          <FormControl v-else v-model="draft[field]" type="text" :maxlength="spec.max_length" :label="fieldLabel(field)" :required="spec.required" :description="spec.help" />
+        </template>
+      </div>
     </Dialog>
   </template>
-  <div v-else-if="missing && page" class="bd"><div class="cd"><Empty title="This item was not found." hint="It may be in another space, or it was removed." /></div></div>
+  <div v-else-if="missing && page" class="page-body"><Card><Empty title="This item was not found." hint="It may be in another space, or it was removed." /></Card></div>
 </template>
-
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Dialog, toast } from 'frappe-ui'
+import { Alert, Avatar, Badge, Button, Checkbox, DatePicker, DateTimePicker, Dialog, FormControl, Textarea, toast } from 'frappe-ui'
 import PageHead from './PageHead.vue'
+import Card from './ui/Card.vue'
+import SectionHead from './ui/SectionHead.vue'
 import Md from './Md.vue'
 import Pick from './Pick.vue'
 import Empty from './Empty.vue'
@@ -207,14 +201,17 @@ const countsLine = computed(() => {
   const by = (s) => item.value.proposals.filter((p) => p.status === s).length
   return [[by('Pending'), 'pending'], [by('Accepted'), 'accepted'], [by('Rejected'), 'rejected']].filter(([n]) => n).map(([n, l]) => `${n} ${l}`).join(', ')
 })
-const headSub = computed(() => {
+// the line under the title: when it came in, the instruction, and the person or agent who handled it
+const headParts = computed(() => {
   const it = item.value
   const parts = [`${it.source_type === 'Upload' ? 'Uploaded' : 'Received'} ${dateTime(it.received_on)}`]
   if (it.instruction) parts.push(`instruction: "${it.instruction}"`)
-  if (it.processed_by && it.status !== 'New') parts.push(`processed by ${it.processed_by}`)
-  else if (it.filed_by) parts.push(`filed by ${it.filed_by}`)
-  return parts.join(' · ')
+  const out = { text: parts.join(' · '), verb: '', who: '' }
+  if (it.processed_by && it.status !== 'New') Object.assign(out, { verb: 'processed by', who: it.processed_by })
+  else if (it.filed_by) Object.assign(out, { verb: 'filed by', who: it.filed_by })
+  return out
 })
+const headSub = computed(() => [headParts.value.text, headParts.value.who && `${headParts.value.verb} ${headParts.value.who}`].filter(Boolean).join(' · '))
 
 const areaOptions = computed(() => ctx.value.areas.map((a) => ({ value: a.name, label: (a.parent_area ? areaName(a.parent_area) + ' / ' : '') + a.area_name })))
 const areaName = (id) => ctx.value.areas.find((a) => a.name === id)?.area_name || id
@@ -355,7 +352,8 @@ function openEdit(p) {
   editing.value = p
   const d = { ...p.payload }
   if (d.scores) d.scores = JSON.stringify(d.scores, null, 1)
-  for (const k of ['starts_on', 'ends_on']) if (d[k]) d[k] = String(d[k]).slice(0, 16).replace(' ', 'T')
+  // the date and time picker reads 'YYYY-MM-DD HH:mm:ss'
+  for (const k of ['starts_on', 'ends_on']) if (d[k]) d[k] = (String(d[k]).replace('T', ' ') + (String(d[k]).length <= 10 ? ' 00:00:00' : ':00')).slice(0, 19)
   draft.value = d
   editOpen.value = true
 }
@@ -395,22 +393,10 @@ onMounted(async () => {
     // a link from "4 of 13 proposals pending" lands on the pending proposals
     if (route.query.focus !== 'pending' || !item.value) return
     await nextTick()
-    const first = proposalsHead.value?.parentElement.querySelector('[data-proposal="Pending"]') || proposalsHead.value
+    const head = proposalsHead.value?.$el
+    const first = head?.parentElement.querySelector('[data-proposal="Pending"]') || head
     first?.scrollIntoView({ block: 'start' })
   })
   schema.value = (await tryCall(() => api('meta.proposal_schema'))) || {}
 })
 </script>
-
-<style scoped>
-.pr { border: 1px solid var(--outline-gray-1); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
-.pr.done { background: var(--surface-gray-1); }
-.orig { margin-bottom: 12px; }
-.orig-empty { border: 1px dashed var(--outline-gray-3); border-radius: 10px; background: var(--surface-gray-1); min-height: 120px; display: grid; place-items: center; color: var(--ink-gray-6); }
-.imgwrap { border: 1px solid var(--outline-gray-1); border-radius: 10px; background: var(--surface-gray-1); overflow: auto; max-height: 520px; cursor: zoom-in; }
-.imgwrap img { display: block; width: 100%; height: auto; }
-.imgwrap.zoom { cursor: zoom-out; }
-.imgwrap.zoom img { width: 220%; max-width: none; }
-.pdf { width: 100%; height: 520px; border: 1px solid var(--outline-gray-1); border-radius: 10px; }
-.dateinp { border: 0; background: transparent; color: inherit; font: inherit; padding: 0; height: 22px; }
-</style>

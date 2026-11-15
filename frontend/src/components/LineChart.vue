@@ -1,5 +1,5 @@
 <template>
-  <div class="lc" @mouseleave="hover = -1">
+  <div class="relative" @mouseleave="hover = -1">
     <svg :viewBox="`0 0 ${W} ${H}`" role="img" :aria-label="label" @mousemove="move" @touchstart.passive="move" @touchmove.passive="move">
       <g v-for="y in [0, 5, 10]" :key="y">
         <line :x1="PL" :x2="W - PR" :y1="sy(y)" :y2="sy(y)" stroke="var(--outline-gray-1)" stroke-width="1" />
@@ -15,9 +15,11 @@
         </template>
       </g>
     </svg>
-    <div v-if="hover >= 0" class="tip" :style="`left: ${Math.min(Math.max((sx(hover) / W) * 100, 18), 82)}%`">
+    <div v-if="hover >= 0" class="pointer-events-none absolute top-0 z-[2] flex -translate-x-1/2 flex-col gap-0.5 whitespace-nowrap rounded-4 border border-outline-gray-2 bg-surface-base px-2 py-1.5 text-xs text-ink-gray-9 shadow-lg"
+      :style="`left: ${Math.min(Math.max((sx(hover) / W) * 100, 18), 82)}%`">
       <b>{{ short(points[hover].date, true) }}</b>
-      <span v-for="s in SERIES" :key="s.key"><i :style="`background: var(${s.color})`"></i>{{ s.label }} {{ points[hover][s.key] ?? '—' }}</span>
+      <span v-for="s in SERIES" :key="s.key" class="inline-flex items-center gap-1.5">
+        <svg class="size-2" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" :fill="`var(${s.color})`" /></svg>{{ s.label }} {{ points[hover][s.key] ?? '—' }}</span>
     </div>
   </div>
 </template>
@@ -50,9 +52,7 @@ function move(e) {
 }
 </script>
 <style scoped>
-.lc { position: relative; }
+/* drawing code only: the SVG fills its box, and its axis text reads a token variable */
 svg { width: 100%; height: auto; display: block; }
 .ax { font-size: 10px; fill: var(--ink-gray-6); font-variant-numeric: tabular-nums; }
-.tip { position: absolute; top: 0; transform: translateX(-50%); background: var(--surface-base); border: 1px solid var(--outline-gray-2); border-radius: 8px; padding: 6px 8px; font-size: 12px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; box-shadow: var(--elevation-lg); white-space: nowrap; z-index: 2; color: var(--ink-gray-9); }
-.tip i { display: inline-block; width: 8px; height: 8px; border-radius: 4px; margin-right: 6px; }
 </style>

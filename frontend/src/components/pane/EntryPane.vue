@@ -1,20 +1,21 @@
 <template>
   <template v-if="e">
     <template v-if="e.kind === 'event'">
-      <div><div class="lbl">When</div><div>{{ when }}</div></div>
-      <div v-if="e.description"><div class="lbl">Notes</div><div style="white-space: pre-wrap">{{ e.description }}</div></div>
-      <div class="mt">{{ e.synced_to_google ? 'Pushed to Google Calendar.' : 'Kept on this site.' }}{{ e.repeats ? ' It repeats.' : '' }}</div>
+      <div><div class="mb-1 text-sm-medium text-ink-gray-7">When</div><div class="text-base text-ink-gray-8">{{ when }}</div></div>
+      <div v-if="e.description"><div class="mb-1 text-sm-medium text-ink-gray-7">Notes</div><div class="whitespace-pre-wrap text-base text-ink-gray-8">{{ e.description }}</div></div>
+      <div class="text-sm text-ink-gray-6">{{ e.synced_to_google ? 'Pushed to Google Calendar.' : 'Kept on this site.' }}{{ e.repeats ? ' It repeats.' : '' }}</div>
     </template>
     <template v-else>
-      <div><div class="lbl">Every year on</div><div>{{ e.day }} {{ MONTHS[e.month - 1] }}{{ e.year ? `, since ${e.year}` : '' }}</div></div>
-      <div><div class="lbl">Kind</div><div>{{ e.date_kind }}{{ e.person_name ? ' · ' + e.person_name : '' }}</div></div>
+      <div><div class="mb-1 text-sm-medium text-ink-gray-7">Every year on</div><div class="text-base text-ink-gray-8">{{ e.day }} {{ MONTHS[e.month - 1] }}{{ e.year ? `, since ${e.year}` : '' }}</div></div>
+      <div><div class="mb-1 text-sm-medium text-ink-gray-7">Kind</div><div class="text-base text-ink-gray-8">{{ e.date_kind }}{{ e.person_name ? ' · ' + e.person_name : '' }}</div></div>
     </template>
-    <div v-if="writable" class="chips"><button class="bt s" type="button" style="color: var(--ink-red-9)" @click="remove">Remove</button></div>
+    <div v-if="writable" class="flex flex-wrap items-center gap-2"><Button theme="red" label="Remove" @click="remove" /></div>
   </template>
 </template>
 <script setup>
 // An event or an important date in the pane.
 import { computed, onMounted, ref } from 'vue'
+import { Button, dialog } from 'frappe-ui'
 import { api, db, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { MONTHS, long, time } from '@/lib/dates'
@@ -29,8 +30,10 @@ const when = computed(() => {
   if (v.all_day) return b && b.slice(0, 10) !== a.slice(0, 10) ? `${long(a, true)} to ${long(b, true)}` : `${long(a, true)}, all day`
   return `${long(a, true)}, ${time(a)}${b ? ' to ' + time(b) : ''}`
 })
-async function remove() {
-  if (!window.confirm(`Remove “${e.value.title}”?`)) return
+function remove() {
+  dialog.danger({ title: 'Remove', message: `Remove “${e.value.title}”?`, confirmLabel: 'Remove', onConfirm: doRemove })
+}
+async function doRemove() {
   const ok = e.value.kind === 'event' ? await tryCall(() => api('calendar.delete_event', { event: e.value.name }), 'Removed.')
     : await tryCall(() => db.delete('Life Important Date', e.value.name), 'Removed.')
   if (ok !== undefined) {

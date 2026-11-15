@@ -51,7 +51,7 @@ SPACE = link("space", "Life Space", reqd=1, search_index=1, in_standard_filter=1
 def org():
 	return [
 		f("organisation_section", "Section Break", label="Organisation"),
-		link("area", "Life Area", search_index=1, in_standard_filter=1),
+		link("area", "Life Area", search_index=1, in_standard_filter=1, in_list_view=1),
 		f("also_in", "Table MultiSelect", "Life Also In"),
 		link("project", "Life Project", search_index=1),
 		f("tags", "Table MultiSelect", "Life Tag Link"),
@@ -136,7 +136,7 @@ dt("Life Area", [
 dt("Life Project", [
 	SPACE, f("title", reqd=1, in_list_view=1), link("area", "Life Area", reqd=1, in_list_view=1, search_index=1),
 	sel("status", ["Active", "On Hold", "Done", "Dropped"], default="Active", in_list_view=1, search_index=1),
-	f("outcome", "Small Text"), f("target_date", "Date"), f("completed_on", "Date"), md("notes_md"),
+	f("outcome", "Small Text"), f("target_date", "Date", in_list_view=1), f("completed_on", "Date"), md("notes_md"),
 	f("is_archived", "Check", default="0", search_index=1), f("archived_on", "Date"),
 ], title_field="title", show_title=1, search_fields="title")
 dt("Life Tag", [SPACE, f("tag_name", reqd=1, in_list_view=1)], title_field="tag_name", show_title=1, search_fields="tag_name")
@@ -158,8 +158,8 @@ dt("Life Settings", [
 # ---- capture ----
 dt("Life Inbox Item", [
 	SPACE, f("title", reqd=1, in_list_view=1),
-	sel("source_type", ["Upload", "Journal Photo", "Voice Note", "Email", "Chat", "Message", "Web"], default="Upload", in_list_view=1),
-	f("received_on", "Datetime", search_index=1),
+	sel("source_type", ["Upload", "Journal Photo", "Voice Note", "Email", "Chat", "Message", "Web"], default="Upload"),
+	f("received_on", "Datetime", search_index=1, in_list_view=1),
 	f("instruction", "Small Text"), md("raw_text"), md("transcript_md"), md("summary_md"),
 	f("source_url", length=500),
 	sel("status", ["New", "Processing", "To Review", "Done", "Failed"], default="New", in_list_view=1, search_index=1),
@@ -254,11 +254,11 @@ dt("Life Link", [
 	f("to_doctype", reqd=1, in_list_view=1), f("to_name", reqd=1, in_list_view=1), f("link_text"),
 ], permissions=perms(agent_write=False), in_create=1)
 dt("Life Index", [
-	SPACE, f("ref_doctype", reqd=1, in_list_view=1), f("ref_name", reqd=1, in_list_view=1),
-	f("area"), f("also_in_csv", "Small Text"), f("project"), f("tags_csv", "Small Text"),
-	f("record_date", "Date", in_list_view=1), f("title", length=255, in_list_view=1), f("search_text", "Long Text"),
+	SPACE, f("ref_doctype", reqd=1, label="Record Type"), f("ref_name", reqd=1, label="Record"),
+	f("area", in_list_view=1), f("also_in_csv", "Small Text"), f("project", in_list_view=1), f("tags_csv", "Small Text"),
+	f("record_date", "Date", in_list_view=1, label="Date"), f("title", length=255, in_list_view=1), f("search_text", "Long Text"),
 	f("is_archived", "Check", default="0"), f("kind", in_list_view=1), f("status"), f("record_owner"),
-], permissions=perms(agent_write=False), in_create=1)
+], permissions=perms(agent_write=False), in_create=1, title_field="title")
 dt("Life Action Log", [
 	SPACE, link("goal", "Life Goal", reqd=1, search_index=1), f("action_id", reqd=1, search_index=1),
 	link("cycle", "Life Cycle", reqd=1, search_index=1), f("week", "Int", reqd=1), f("date", "Date", reqd=1, search_index=1),

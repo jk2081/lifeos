@@ -1,11 +1,13 @@
 import { reactive, watch } from 'vue'
 import { api } from './api'
+import { loadViews } from './views'
 
 export const store = reactive({
   ready: false,
   user: null,
   fullName: '',
   isAdmin: false,
+  isAgent: false,
   spaces: [],
   space: localStorage.getItem('lifeos-space') || '',
   counts: { to_review: 0 },
@@ -18,10 +20,12 @@ export const store = reactive({
 export async function boot() {
   const data = await api('session.boot')
   Object.assign(store, {
-    user: data.user, fullName: data.full_name, isAdmin: data.is_admin, spaces: data.spaces,
+    user: data.user, fullName: data.full_name, isAdmin: data.is_admin, isAgent: data.is_agent, spaces: data.spaces,
     settings: data.settings, today: data.today,
   })
   if (!data.spaces.find((s) => s.name === store.space)) store.space = data.default_space || data.spaces[0]?.name || ''
+  // saved list views: the local copy is used at once, and the server copy for at most a moment before the first screen draws
+  await Promise.race([loadViews(), new Promise((r) => setTimeout(r, 1200))])
   store.ready = true
   refreshCounts()
 }

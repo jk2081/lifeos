@@ -87,7 +87,7 @@ await check(1, 'Log in, open /life, Today is filled from seed data', async () =>
   must((await guest.request.get(base + '/api/method/lifeos.api.today.get')).status() >= 400, 'a guest can call the API')
   await guest.close()
   await owner.open('/life')
-  const text = await owner.page.locator('.main').innerText()
+  const text = await owner.page.locator('[data-main]').innerText()
   must(/Week \d+ of 12/.test(text), 'no 12 Week Year week on Today')
   must(text.includes('Habits today') && text.includes('Japa'), 'habits are missing on Today')
   const t = await owner.api('today.get', { space: SPACE })
@@ -106,9 +106,9 @@ await check(2, 'Journal photo: agent submits 5 proposals; accept 3, edit 1, reje
   must(got.transcript_md && got.proposals.length === 5, `expected 5 proposals, got ${got.proposals.length}`)
   // accept the first and reject the second with the buttons on the Review screen
   await owner.open('/life/inbox/' + item.name)
-  await owner.page.locator('button.bt.p', { hasText: /^Accept$/ }).first().click()
+  await owner.page.getByRole('button', { name: 'Accept', exact: true }).first().click()
   await owner.page.waitForTimeout(800)
-  await owner.page.locator('button.bt.t', { hasText: /^Reject$/ }).first().click()
+  await owner.page.getByRole('button', { name: 'Reject', exact: true }).first().click()
   await owner.page.waitForTimeout(800)
   got = await owner.api('inbox.get', { item: item.name })
   must(got.proposals[0].status === 'Accepted' && got.proposals[1].status === 'Rejected', 'the Review buttons did not decide')
@@ -149,15 +149,15 @@ await check(4, 'Tick a habit at phone width and see the month count change', asy
   const count = () => phone.page.locator('text=/\\d+ of \\d+ days/').first().innerText()
   const before = await count()
   // an empty box if the month has one, else untick a ticked one: the count changes either way
-  const empty = phone.page.locator('button.dy[aria-pressed="false"]:not([disabled])')
-  const box = (await empty.count()) ? empty.first() : phone.page.locator('button.dy[aria-pressed="true"]:not([disabled])').last()
+  const empty = phone.page.locator('[data-habit-day][aria-pressed="false"]:not([disabled])')
+  const box = (await empty.count()) ? empty.first() : phone.page.locator('[data-habit-day][aria-pressed="true"]:not([disabled])').last()
   const size = await box.boundingBox()
   must(size.width >= 40 && size.height >= 40, `habit box is ${size.width}x${size.height}`)
   await box.click()
   await phone.page.waitForTimeout(700)
   const after = await count()
   must(before !== after, `count stayed at ${before}`)
-  must(await phone.page.locator('button.dy:not([disabled])').count() <= Number(today.slice(8)), 'a day that has not come can be ticked')
+  must(await phone.page.locator('[data-habit-day]:not([disabled])').count() <= Number(today.slice(8)), 'a day that has not come can be ticked')
   must(await phone.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'the page scrolls sideways')
   await phone.ctx.close()
   return `${before} -> ${after}`
@@ -165,18 +165,15 @@ await check(4, 'Tick a habit at phone width and see the month count change', asy
 
 await check(5, 'Tick week cells in the 12 Week Year grid and see the week score change', async () => {
   await owner.open('/life/journal')
-  const stat = () => owner.page.locator('.stats .cd').first().innerText()
+  const stat = () => owner.page.locator('[data-stat]').first().innerText()
   const before = (await stat()).replace(/\n/g, ' ')
   const g = await owner.api('journal.grid', { space: SPACE })
   const col = g.current_week
   // an empty cell of the current week
-  const cells = owner.page.locator(`.gr:not(.hdr) .wc:nth-of-type(${col}) button.wk:not([disabled]):not(.on):not(.done)`)
-  let clicked = false
-  for (let i = 0; i < await cells.count() && !clicked; i++) {
-    const c = cells.nth(i)
-    if (((await c.innerText()).trim() === '') && (await c.getAttribute('aria-pressed')) !== 'true') { await c.click(); clicked = true }
-  }
-  if (!clicked) await owner.page.locator('.wc button.wk:not([disabled])').nth(col - 1).click()
+  const cells = owner.page.locator(`[data-week-cell="${col}"]:not([disabled])`)
+  const empty = owner.page.locator(`[data-week-cell="${col}"][aria-pressed="false"]:not([disabled])`)
+  must(await cells.count(), 'the grid has no cells for the current week')
+  await ((await empty.count()) ? empty.first() : cells.first()).click()
   await owner.page.waitForTimeout(800)
   const after = (await stat()).replace(/\n/g, ' ')
   must(before !== after, 'score stayed at ' + before)
@@ -211,7 +208,7 @@ await check(7, 'Add a birthday and see it on the calendar this year and next', a
     must(JSON.stringify(y).includes(title), 'not on the year view in ' + year)
   }
   await owner.open('/life/calendar/year')
-  must((await owner.page.locator('.main').innerText()).includes('Birthday'), 'not shown on the year screen')
+  must((await owner.page.locator('[data-main]').innerText()).includes('Birthday'), 'not shown on the year screen')
 })
 
 await check(8, 'Vault document expiring in 30 days shows a badge on Today', async () => {
@@ -222,9 +219,9 @@ await check(8, 'Vault document expiring in 30 days shows a badge on Today', asyn
   const t = await owner.api('today.get', { space: SPACE })
   must(t.coming_up.some((c) => c.kind === 'vault' && c.title === title), 'not in today.get')
   await owner.open('/life')
-  must((await owner.page.locator('.main').innerText()).includes(title), 'not shown on Today')
+  must((await owner.page.locator('[data-main]').innerText()).includes(title), 'not shown on Today')
   await owner.open('/life/vault')
-  must((await owner.page.locator('.main').innerText()).includes(title), 'not shown in the Vault')
+  must((await owner.page.locator('[data-main]').innerText()).includes(title), 'not shown in the Vault')
 })
 
 await check(9, 'Note with a [[link]]: the target shows the backlink, both are in the graph', async () => {
@@ -238,7 +235,7 @@ await check(9, 'Note with a [[link]]: the target shows the backlink, both are in
   must(ids.includes('Life Note/' + tName) && ids.includes('Life Note/' + sName), 'notes are not in the graph')
   must(graph.edges.some((e) => e.source === 'Life Note/' + sName && e.target === 'Life Note/' + tName), 'the link is not an edge')
   await owner.open('/life/library/' + tName)
-  must((await owner.page.locator('.main').innerText()).includes(`Source note ${stamp}`), 'the backlinks panel does not show the source')
+  must((await owner.page.locator('[data-main]').innerText()).includes(`Source note ${stamp}`), 'the backlinks panel does not show the source')
 })
 
 await check(10, 'Search for a word in a transcript finds the inbox item', async () => {
@@ -280,7 +277,7 @@ await check(11, 'A second user who is only in Shared sees nothing from Private, 
   for (const p of ['', '/inbox', '/timeline', '/tasks', '/calendar/year', '/journal', '/journal/goals', '/journal/month', '/journal/habits', '/journal/checkins',
     '/journal/pages', '/journal/review', '/areas', '/projects', '/library', '/vault', '/chats', '/graph', '/archive', '/settings']) {
     await fam.open('/life' + p)
-    const text = await fam.page.locator('.app').innerText()
+    const text = await fam.page.locator('[data-app]').innerText()
     must(!/Ruchi|Merrill|Japa|Tea & Coffee|Private/.test(text) && !text.includes(stamp), `screen ${p || '/'} shows Private content`)
     screens++
   }
@@ -296,14 +293,14 @@ await check(12, 'At review, change the area with one tap and add a second: the r
   must(personal.references.some((t) => t.title === title), 'not under References on the Personal page')
   const item = await owner.api('inbox.list', { space: SPACE, status: 'To Review' })
   await owner.open('/life/inbox/' + item.items[0].name)
-  must(await owner.page.locator('text=+ also in').count() > 0, 'the Review screen has no area chips')
+  must(await owner.page.locator('text=also in').count() > 0, 'the Review screen has no area chips')
 })
 
 await check(13, 'Tea & Coffee area page shows projects, tasks, notes and chats together', async () => {
   const a = await owner.api('area.get', { area: areaId('Tea & Coffee') })
   must(a.projects.length && a.tasks.length && a.notes.length && a.chats.length, `projects ${a.projects.length}, tasks ${a.tasks.length}, notes ${a.notes.length}, chats ${a.chats.length}`)
   await owner.open('/life/areas/' + areaId('Tea & Coffee'))
-  const text = await owner.page.locator('.main').innerText()
+  const text = await owner.page.locator('[data-main]').innerText()
   must(text.includes(a.projects[0].title) && text.includes(a.notes[0].title) && text.includes(a.chats[0].title), 'the screen does not show them')
   return `${a.projects.length} projects, ${a.counts.open_tasks} open tasks, ${a.counts.notes} notes, ${a.counts.chats} chats`
 })
@@ -314,7 +311,7 @@ await check(14, 'Timeline shows everything captured on one day', async () => {
   for (const k of ['Inbox', 'Task', 'Note', 'Document', 'Journal Page']) must(kinds.has(k), `no ${k} on today's timeline`)
   must(t.days.length === 1, 'more than one day returned')
   await owner.open('/life/timeline')
-  must((await owner.page.locator('.main').innerText()).includes(`Target note ${stamp}`), 'the screen does not show today')
+  must((await owner.page.locator('[data-main]').innerText()).includes(`Target note ${stamp}`), 'the screen does not show today')
   return [...kinds].join(', ')
 })
 
@@ -330,7 +327,7 @@ await check(15, 'Complete a project: it and its records move to Archive. Restore
   must(!(await owner.api('tasks.list', { space: SPACE, page_length: 100 })).tasks.some((t) => t.name === task.name), 'the task is still in Tasks')
   must(!JSON.stringify(await owner.api('projects.list', { space: SPACE })).includes(r.name), 'the project is still in Projects')
   await owner.open('/life/archive')
-  must((await owner.page.locator('.main').innerText()).includes(`Project ${stamp}`), 'the Archive screen does not show it')
+  must((await owner.page.locator('[data-main]').innerText()).includes(`Project ${stamp}`), 'the Archive screen does not show it')
   await owner.api('archive.restore', { doctype: 'Life Project', name: r.name })
   arch = await owner.api('archive.list', { space: SPACE, page_length: 100 })
   must(!arch.projects.some((p) => p.name === r.name) && !JSON.stringify(arch.groups).includes(task.name), 'restore left it in Archive')
@@ -355,7 +352,7 @@ archive.run_daily()`)
   must(review.decide.some((t) => t.name === stale.name), 'the stale task is not under Decide')
   must(JSON.stringify(review).includes(done.name), 'the weekly review does not list what the job archived')
   await owner.open('/life/journal/review')
-  must((await owner.page.locator('.main').innerText()).includes(`Stale open task ${stamp}`), 'the screen does not show it under Decide')
+  must((await owner.page.locator('[data-main]').innerText()).includes(`Stale open task ${stamp}`), 'the screen does not show it under Decide')
 })
 
 await check('S1', 'Security: rendered Markdown is sanitised', async () => {
@@ -363,10 +360,10 @@ await check('S1', 'Security: rendered Markdown is sanitised', async () => {
   const note = await owner.api('library.save', { space: SPACE, title: `Sanitise ${stamp}`, content_md: bad, area: areaId('Learning') })
   await owner.open('/life/library/' + (note.name || note.note?.name))
   const found = await owner.page.evaluate(() => ({
-    pwned: window.__pwned, scripts: document.querySelectorAll('.main script, .main iframe').length,
-    handlers: [...document.querySelectorAll('.main *')].filter((e) => [...e.attributes].some((a) => a.name.startsWith('on'))).length,
-    js: [...document.querySelectorAll('.main a')].filter((a) => (a.getAttribute('href') || '').trim().toLowerCase().startsWith('javascript:')).length,
-    shown: document.querySelector('.main').innerText.includes('Hello'),
+    pwned: window.__pwned, scripts: document.querySelectorAll('[data-main] script, [data-main] iframe').length,
+    handlers: [...document.querySelectorAll('[data-main] *')].filter((e) => [...e.attributes].some((a) => a.name.startsWith('on'))).length,
+    js: [...document.querySelectorAll('[data-main] a')].filter((a) => (a.getAttribute('href') || '').trim().toLowerCase().startsWith('javascript:')).length,
+    shown: document.querySelector('[data-main]').innerText.includes('Hello'),
   }))
   must(found.shown, 'the note did not render')
   must(!found.pwned && !found.scripts && !found.handlers && !found.js, JSON.stringify(found))
@@ -417,16 +414,19 @@ const ux = {}
 }
 
 const num = (text, which = 0) => { const m = String(text).match(/\d+/g); if (!m) throw new Error(`no number in "${text}"`); return Number(m[which]) }
+// A bare list URL restores the remembered view, so the checks that want the whole list say so: all=1.
+const ROW = '[data-row]'
 const LISTS = [
-  ['Inbox', '/life/inbox', '.lv-row'], ['Timeline', '/life/timeline', '.rw.rowlink'], ['Tasks', '/life/tasks?view=list', '.lv-row'],
-  ['Projects', '/life/projects', '.lv-row'], ['Vault', '/life/vault', '.lv-row'], ['Chats', '/life/chats', '.lv-row'],
-  ['Library list', '/life/library?view=list', '.lv-row'], ['Archive', '/life/archive', '.lv-row'],
-]
-// one filter for each ListView: [screen, path, filter key, value]
+  ['Inbox', '/life/inbox?all=1'], ['Timeline', '/life/timeline?all=1'], ['Tasks', '/life/tasks?view=list'],
+  ['Projects', '/life/projects?all=1'], ['Vault', '/life/vault?all=1'], ['Chats', '/life/chats?all=1'],
+  ['Library list', '/life/library?view=list'], ['Archive', '/life/archive?all=1'],
+].map(([name, p]) => [name, p, ROW])
+// one filter for each ListView, set through the library's quick-filter strip: [screen, path, URL key, URL value, the control's label, the option to pick, text to type for a Link]
 const FILTERS = [
-  ['Inbox', '/life/inbox', 'status', 'Done'], ['Tasks', '/life/tasks?view=list', 'due', 'overdue'], ['Tasks table', '/life/tasks?view=table', 'priority', 'I'],
-  ['Projects', '/life/projects', 'area', uxArea], ['Vault', '/life/vault', 'expiry', 'soon'], ['Chats', '/life/chats', 'area', uxArea],
-  ['Library list', '/life/library?view=list', 'area', uxArea], ['Archive', '/life/archive', 'type', 'Life Task'],
+  ['Inbox', '/life/inbox?all=1', 'status', 'Done', 'Status', 'Done'], ['Tasks', '/life/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
+  ['Tasks table', '/life/tasks?view=table', 'status', 'Waiting', 'Status', 'Waiting'], ['Projects', '/life/projects?all=1', 'status', 'On Hold', 'Status', 'On Hold'],
+  ['Vault', '/life/vault?all=1', 'type', 'Travel', 'Doc Type', 'Travel'], ['Chats', '/life/chats?all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
+  ['Library list', '/life/library?view=list', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'], ['Archive', '/life/archive?all=1', 'type', 'Life Task', 'Type', 'Life Task'],
 ]
 
 for (const width of [1440, 390]) {
@@ -440,7 +440,30 @@ for (const width of [1440, 390]) {
   const settle = () => pg.waitForTimeout(450)
   const overflow = () => pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   const count = async () => num(await pg.locator('[data-lv-count]').first().innerText())
-  const clickRow = async (sel) => { await pg.locator(sel).first().click({ position: { x: 90, y: 14 } }); await settle() }
+  const clickRow = async (sel) => { await pg.locator(sel).first().click({ position: { x: 120, y: 14 } }); await settle() }
+  // the list controls: the quick-filter strip on a wide screen, the same controls in a sheet behind the Filters button on a phone
+  const controls = () => pg.locator(phone ? '[data-filter-sheet]' : '[data-lv-bar]')
+  const openControls = async () => { if (phone) { await pg.locator('[data-filters-button]').click(); await pg.waitForTimeout(400) } }
+  const closeControls = async () => { if (phone) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(400) } }
+  const pickQuick = async (label, option, type) => {
+    await openControls()
+    const box = controls().locator('[data-quick-filters], [data-filter-sheet]').first().locator(`[aria-label="${label}"]`).first()
+    const more = controls().getByRole('button', { name: /\d+ more/ })
+    if (!(await box.count()) && await more.count()) { await more.first().click(); await pg.waitForTimeout(200) }
+    await box.click()
+    if (type) await pg.keyboard.type(type, { delay: 20 })
+    await pg.waitForTimeout(type ? 900 : 300)
+    await pg.getByRole('option', { name: option, exact: !type }).first().click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    await closeControls()
+  }
+  const nav = async (label) => { // through the sidebar on a wide screen, the tab bar on a phone
+    if (phone) await pg.locator(`[data-tabbar] [data-slot="mobile-nav-item"][aria-label="${label}"]`).click()
+    else await pg.locator('[data-slot="sidebar-item"]', { hasText: new RegExp(`^\\s*${label}`) }).first().locator('a, button').first().click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+  }
 
   await check(`${tag}.1`, `${width} px: a row opens a pane on every list screen and the list stays in the page`, async () => {
     for (const [name, p, sel] of LISTS) {
@@ -452,7 +475,7 @@ for (const width of [1440, 390]) {
       must(pg.url().includes('open='), `${name}: the URL has no open=`)
       must(new URL(pg.url()).pathname === new URL(before).pathname, `${name}: the page changed`)
       must(await pg.locator(sel).count(), `${name}: the list left the page`)
-      must(await pg.locator(`${sel}.on`).count() >= 1, `${name}: the open row is not highlighted`)
+      must(await pg.locator(`${sel}[data-active]`).count() >= 1, `${name}: the open row is not highlighted`)
     }
     return `${LISTS.length} screens`
   })
@@ -479,17 +502,18 @@ for (const width of [1440, 390]) {
       must((await pg.locator('[data-pane-title]').innerText()) === title, `${name}: reload opened another record`)
     }
     await s.open('/life/inbox/' + ux.inbox)
-    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/inbox' && await pg.locator('.lv-row').count(), '/inbox/:id does not show the list with the pane open')
+    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/inbox' && await pg.locator(ROW).count(), '/inbox/:id does not show the list with the pane open')
     must((await pg.locator('[data-pane-title]').innerText()).includes('UX inbox'), '/inbox/:id opened another item')
   })
 
   if (phone) {
-    await check(`${tag}.3`, '390 px: the pane covers the screen and closes with its close button', async () => {
+    await check(`${tag}.3`, '390 px: the pane is a bottom sheet across the screen and closes with its close button', async () => {
       for (const [name, p, sel] of LISTS) {
         await s.open(p)
         await clickRow(sel)
         const box = await pane.boundingBox()
-        must(box && box.x === 0 && box.y === 0 && Math.round(box.width) === 390 && Math.round(box.height) === 844, `${name}: the pane is ${JSON.stringify(box)}`)
+        // frappe-ui's BottomSheet: full width, standing on the bottom edge, most of the screen high
+        must(box && box.x === 0 && Math.round(box.width) === 390 && Math.round(box.y + box.height) === 844 && box.height >= 600, `${name}: the pane is ${JSON.stringify(box)}`)
         must((await overflow()) <= 0, `${name}: horizontal scrolling with the pane open`)
         await pg.locator('[data-pane-close]').click()
         await settle()
@@ -500,7 +524,7 @@ for (const width of [1440, 390]) {
   } else {
     await check(`${tag}.3`, '1440 px: pane widths, Esc, j and k, focus, Open full page, search opens in the pane', async () => {
       await s.open('/life/tasks?view=list')
-      await clickRow('.lv-row')
+      await clickRow(ROW)
       must(Math.round((await pane.boundingBox()).width) === 520, 'a task pane is not 520 px wide')
       must(await pg.evaluate(() => document.activeElement?.hasAttribute('data-pane')), 'focus did not move into the pane')
       const first = new URL(pg.url()).searchParams.get('open')
@@ -511,7 +535,7 @@ for (const width of [1440, 390]) {
       await pg.keyboard.press('ArrowUp')
       await settle()
       must(new URL(pg.url()).searchParams.get('open') === first, 'the up arrow did not move back')
-      await pg.locator('.lv-row').nth(2).click({ position: { x: 90, y: 14 } }) // the list is still usable beside the pane
+      await pg.locator(ROW).nth(2).click({ position: { x: 120, y: 14 } }) // the list is still usable beside the pane
       await settle()
       const third = new URL(pg.url()).searchParams.get('open')
       must(third !== first, 'a second row could not be opened beside the pane')
@@ -576,7 +600,7 @@ for (const width of [1440, 390]) {
     await door(area, 'area-reference', { path: '/life/library' })
     for (const i of [0, 1, 2, 3]) { // the section counts: projects, open tasks, chats, documents
       await s.open(area)
-      const links = pg.locator('.sh a.num')
+      const links = pg.locator('[data-section-count]')
       if (i >= await links.count()) break
       const n = num(await links.nth(i).innerText())
       await links.nth(i).click({ timeout: 8000 }).catch((e) => { throw new Error(`area section ${i}: the count cannot be clicked`) })
@@ -606,7 +630,7 @@ for (const width of [1440, 390]) {
     await door('/life/journal/review', 'review-archived', { path: '/life/archive' })
     // an inbox row: "4 of 13 proposals pending" opens that item in the pane at its pending proposals
     await s.open('/life/inbox?status=To+Review')
-    const link = pg.locator('.lv-row a.num:visible', { hasText: 'pending' }).first()
+    const link = pg.locator('[data-row] a:visible', { hasText: 'pending' }).first()
     const text = await link.innerText()
     must(/^\d+ of \d+ proposals pending$/.test(text.trim()), `an inbox row says "${text}"`)
     await link.click({ timeout: 8000 }).catch(() => { throw new Error('the proposals count on an inbox row cannot be clicked') })
@@ -623,20 +647,19 @@ for (const width of [1440, 390]) {
   })
 
   await check(`${tag}.5`, `${width} px: filters on every ListView are in the URL and survive a reload`, async () => {
-    for (const [name, p, key, value] of FILTERS) {
+    for (const [name, p, key, value, label, option, type] of FILTERS) {
       await s.open(p)
-      if (phone) await pg.locator('.lv-fbtn').click()
-      await pg.locator(`[data-filter="${key}"]`).selectOption(value)
-      await pg.waitForLoadState('networkidle')
-      await settle()
-      must(new URL(pg.url()).searchParams.get(key) === value, `${name}: the filter is not in the URL`)
+      await pickQuick(label, option, type)
+      must(new URL(pg.url()).searchParams.get(key) === value, `${name}: the filter is not in the URL (${new URL(pg.url()).search})`)
       const filtered = await count()
-      const rows = await pg.locator('.lv-row').count()
+      const rows = await pg.locator(ROW).count()
       must(rows === Math.min(filtered, 50), `${name}: the count says ${filtered} but ${rows} rows are shown`)
-      if (phone) must((await pg.locator('.lv-fbtn').innerText()).includes('(1)'), `${name}: the Filters button does not show one active filter`)
+      if (phone) must((await pg.locator('[data-filters-button]').innerText()).includes('(1)'), `${name}: the Filters button does not show one active filter`)
+      else must((await pg.locator('[data-active-filters]').innerText()).includes('1 filter'), `${name}: the list does not say one filter is on`)
+      must(await pg.locator('[data-clear]:visible').count(), `${name}: no Clear button while a filter is on`)
       await pg.reload({ waitUntil: 'networkidle' })
       await settle()
-      must((await pg.locator(`[data-filter="${key}"]`).inputValue()) === value, `${name}: the filter was lost on reload`)
+      must(new URL(pg.url()).searchParams.get(key) === value, `${name}: the filter was lost on reload`)
       must((await count()) === filtered, `${name}: the count changed on reload`)
       await pg.goBack()
       await settle()
@@ -664,12 +687,69 @@ for (const width of [1440, 390]) {
     // Area, Project and Today: a row opens the pane and the page does not change
     for (const p of ['/life/areas/' + uxArea, '/life/projects/' + ux.project, '/life']) {
       await s.open(p)
-      await pg.locator('.rw[data-ref]').first().locator('.grow').click({ position: { x: 20, y: 10 } })
+      await pg.locator('[data-row]:has([data-ref])').first().click({ position: { x: 120, y: 12 } })
       await settle()
       must(await pane.isVisible() && new URL(pg.url()).pathname.replace(/\/$/, '') === p, `${p}: a row did not open the pane in place`)
     }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${screens.length} screens`
+  })
+
+  await check(`${tag}.7`, `${width} px: a list remembers its view on every device, a link with a query wins, Clear clears`, async () => {
+    const param = (k) => new URL(pg.url()).searchParams.get(k)
+    await s.open('/life/tasks?view=list') // a query: the list shows exactly this, and it becomes the saved state
+    await pickQuick('Priority', 'II')
+    must(param('priority') === 'II', 'the filter was not set')
+    const filtered = await count()
+    await nav('Today')
+    must(new URL(pg.url()).pathname === '/life' || new URL(pg.url()).pathname === '/life/', 'the sidebar did not go to Today')
+    await nav('Tasks')
+    must(new URL(pg.url()).pathname === '/life/tasks', 'the sidebar did not go to Tasks')
+    must(param('priority') === 'II' && param('view') === 'list', `coming back lost the view: ${new URL(pg.url()).search}`)
+    must((await count()) === filtered, 'the remembered filter is in the URL but the list is not filtered')
+    must(!param('open'), 'an open record was restored')
+    // the same person on another device: the state comes from the server, not from this browser
+    await pg.waitForTimeout(1600)
+    const other = await session('owner@lifeos.test', width)
+    await other.open('/life/tasks')
+    must(new URL(other.page.url()).searchParams.get('priority') === 'II', `a second browser does not show the saved filter: ${new URL(other.page.url()).search}`)
+    await other.ctx.close()
+    // a link with a query wins over what was saved, and then becomes the saved state
+    await s.open('/life')
+    const loops = num(await pg.locator('[data-door="today-loops"]:visible').first().innerText())
+    await pg.locator('[data-door="today-loops"]:visible').first().click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must(!param('priority'), 'the Open loops link kept the saved filter')
+    must((await count()) === loops, `Open loops shows ${await count()}, the number said ${loops}`)
+    const loopsQuery = new URL(pg.url()).search
+    await nav('Today')
+    await nav('Tasks')
+    must(new URL(pg.url()).search === loopsQuery, `the list did not remember the link's query: ${new URL(pg.url()).search} instead of ${loopsQuery}`)
+    // Clear removes the filters and the cleared state is what is remembered
+    await s.open('/life/tasks?view=list')
+    await pickQuick('Priority', 'II')
+    must(param('priority') === 'II', 'the filter was not set again')
+    await pg.locator('[data-clear]:visible').first().click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must(!param('priority'), 'Clear did not remove the filter')
+    must(!(await pg.locator('[data-active-filters]:visible').count()), 'the list still says a filter is on')
+    await nav('Today')
+    await nav('Tasks')
+    must(!param('priority'), 'the cleared filter came back')
+    // another person has their own states
+    await pg.waitForTimeout(1600)
+    const saved = await s.api('views.get_all')
+    must(Object.keys(saved).some((k) => k.startsWith('tasks|')), 'nothing was saved on the server for the owner')
+    const fam = await session('family@lifeos.test', width)
+    const theirs = await fam.api('views.get_all')
+    must(!Object.keys(theirs).some((k) => k.includes('Private')) && !JSON.stringify(theirs).includes('loops'), 'the family user sees the owner\'s saved states')
+    await fam.open('/life/tasks')
+    must(!new URL(fam.page.url()).search.includes('view=loops') && !new URL(fam.page.url()).searchParams.get('priority'), 'the family user got the owner\'s view')
+    const rest = await fam.page.request.get(base + '/api/resource/Life%20View%20State?limit_page_length=100&fields=["user"]')
+    must(!JSON.stringify(await rest.json()).includes('owner@lifeos.test'), 'the REST list shows the owner\'s saved states')
+    await fam.ctx.close()
   })
   await s.ctx.close()
 }

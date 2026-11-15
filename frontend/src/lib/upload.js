@@ -1,16 +1,9 @@
-// Upload one file to a record with Frappe's standard endpoint. Files are always private.
-export async function uploadFile(file, doctype, docname, fieldname) {
-  const body = new FormData()
-  body.append('file', file, file.name)
-  body.append('is_private', '1')
-  body.append('doctype', doctype)
-  body.append('docname', docname)
-  if (fieldname) body.append('fieldname', fieldname)
-  const res = await fetch('/api/method/upload_file', {
-    method: 'POST', body, headers: { 'X-Frappe-CSRF-Token': window.csrf_token || '', Accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error(`Upload of ${file.name} failed (${res.status}).`)
-  return (await res.json()).message
+// Upload one file to a record. Files are always private. The request is frappe-ui's own upload helper
+// (Frappe's standard /api/method/upload_file), so size limits and server messages are handled as in other Frappe apps.
+import { useFileUpload } from 'frappe-ui'
+
+export function uploadFile(file, doctype, docname, fieldname, onProgress) {
+  return useFileUpload().upload(file, { private: true, doctype, docname, fieldname: fieldname || undefined, onProgress })
 }
 
 export function fileKind(name = '') {

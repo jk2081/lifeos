@@ -1,93 +1,92 @@
 <template>
-  <ListView ref="list" title="Inbox" noun="inbox items" :filters="FILTERS" :columns="COLUMNS" :fetch="fetch" :row-ref="(r) => 'inbox:' + r.name"
-    default-sort="newest first" empty-title="The Inbox is empty." empty-hint="Drop a file above or forward something to your agent. What it proposes waits here for you."
+  <ListView ref="list" title="Inbox" noun="inbox items" screen="inbox" doctype="Life Inbox Item" :spec="SPEC" :quick="['status', 'source_type', 'area']"
+    :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => 'inbox:' + r.name"
+    empty-title="The Inbox is empty." empty-hint="Drop a file above or forward something to your agent. What it proposes waits here for you."
     @loaded="(res) => (pendingTotal = res.pending_total)">
     <template #sub>{{ store.space }} · drop anything here, an agent proposes, you approve<template v-if="pendingTotal"> ·
       <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template></template>
     <template #above>
-    <section v-if="canWrite()">
-        <div class="drop" :class="{ over }" @dragover.prevent="over = true" @dragleave.prevent="over = false" @drop.prevent="onDrop">
-          <input ref="picker" type="file" multiple style="display: none" @change="onPick" />
-          <div v-if="!files.length" class="drop-hint">
-            <b>Drop files here</b>
-            <span class="mt">A journal photo, a voice note, a PDF, anything. Or <a href="#" @click.prevent="picker.click()">choose files</a>.</span>
-          </div>
-          <div v-else class="chips">
-            <span v-for="(f, i) in files" :key="i" class="ch sm">{{ f.name }} <span class="mt">{{ fileSize(f.size) }}</span>
-              <a href="#" aria-label="Remove" @click.prevent="files.splice(i, 1)">×</a></span>
-            <a href="#" class="ch sm add" @click.prevent="picker.click()">+ more</a>
-          </div>
-          <div class="drop-form">
-            <input v-model="instruction" class="inp" style="flex: 1 1 260px" placeholder="What should the agent do? For example: summarise and pull out to-dos"
-              @keydown.enter="add" />
-            <select v-model="sourceType" class="inp" aria-label="Kind">
-              <option v-for="s in SOURCES" :key="s" :value="s">{{ s }}</option>
-            </select>
-            <button class="bt p" type="button" :disabled="busy || (!files.length && !text.trim())" @click="add">{{ busy ? 'Adding…' : 'Add to Inbox' }}</button>
-          </div>
-          <textarea v-if="showText" v-model="text" class="inp" rows="3" style="width: 100%; margin-top: 8px" placeholder="Paste or type text to file"></textarea>
-          <a v-else href="#" class="mt" style="display: inline-block; margin-top: 8px" @click.prevent="showText = true">Or paste text instead</a>
+      <!-- The drop zone. Files wait here until Add to Inbox creates the item they belong to; then each is uploaded, private, to that item. -->
+      <section v-if="canWrite()" class="rounded-5 border border-dashed p-4" :class="over ? 'border-outline-gray-5 bg-surface-gray-3' : 'border-outline-gray-3 bg-surface-gray-1'"
+        data-dropzone @dragover.prevent="over = true" @dragleave.prevent="over = false" @drop.prevent="onDrop">
+        <input ref="picker" type="file" multiple class="hidden" aria-label="Choose files" @change="onPick" />
+        <div v-if="!files.length" class="flex flex-col gap-0.5 pb-3 pt-1.5">
+          <b class="text-base-medium text-ink-gray-9">Drop files here</b>
+          <span class="text-sm text-ink-gray-6">A journal photo, a voice note, a PDF, anything. Or
+            <Button class="!inline-flex align-baseline" size="sm" variant="ghost" label="choose files" @click="picker.click()" /></span>
         </div>
+        <div v-else class="chips">
+          <Badge v-for="(f, i) in files" :key="i" size="lg">{{ f.name }} <span class="text-ink-gray-6">{{ fileSize(f.size) }}</span>
+            <template #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove ' + f.name" @click="files.splice(i, 1)" /></template></Badge>
+          <Button size="sm" variant="outline" icon-left="lucide-plus" label="more" @click="picker.click()" />
+        </div>
+        <div class="mt-2.5 flex flex-wrap gap-2">
+          <TextInput v-model="instruction" class="min-w-64 flex-1" placeholder="What should the agent do? For example: summarise and pull out to-dos" aria-label="Instruction" @keydown.enter="add" />
+          <Select v-model="sourceType" class="w-36" :options="SOURCES" aria-label="Kind" />
+          <Button variant="solid" :loading="busy" loading-text="Adding…" :disabled="!files.length && !text.trim()" label="Add to Inbox" @click="add" />
+        </div>
+        <Textarea v-if="showText" v-model="text" class="mt-2" :rows="3" placeholder="Paste or type text to file" aria-label="Text to file" />
+        <Button v-else class="mt-2" size="sm" variant="ghost" label="Or paste text instead" @click="showText = true" />
       </section>
     </template>
     <template #cell-title="{ row }">
-      <div class="ttl">{{ row.title }}</div>
-      <div class="mt">{{ describe(row) }}</div>
-      <div v-if="row.status === 'Failed' && row.error" class="mt" style="color: var(--ink-red-9)">{{ row.error }}</div>
+      <div class="min-w-0">
+        <div class="break-words font-medium text-ink-gray-9">{{ row.title }}</div>
+        <div class="flex flex-wrap items-center gap-1 text-sm text-ink-gray-6"><Avatar v-if="row.filed_by" size="xs" :label="row.filed_by" />{{ describe(row) }}</div>
+        <div v-if="row.status === 'Failed' && row.error" class="text-sm text-ink-red-8">{{ row.error }}</div>
+      </div>
     </template>
-    <template #cell-area="{ row }"><span class="mt">{{ row.area_name || '' }}</span></template>
-    <template #cell-received_on="{ row }"><span class="mt">{{ dateTime(row.received_on) }}</span></template>
-    <template #cell-proposals="{ row }">
-      <a v-if="row.pending" href="#" class="num" data-door="inbox-row" @click.prevent="openRef('inbox:' + row.name, { focus: 'pending' })">{{ row.pending }} of {{ row.proposals }} proposals pending</a>
-      <span v-else-if="row.proposals" class="mt">{{ row.proposals }} proposal{{ row.proposals === 1 ? '' : 's' }}, all decided</span>
+    <template #cell-area="{ row }"><span class="truncate text-ink-gray-6">{{ row.area_name || '' }}</span></template>
+    <template #cell-received_on="{ row }"><span class="whitespace-nowrap text-ink-gray-6">{{ dateTime(row.received_on) }}</span></template>
+    <template #cell-_proposals="{ row }">
+      <NumLink v-if="row.pending" class="relative" :to="{ query: { ...route.query, open: 'inbox:' + row.name, focus: 'pending' } }" data-door="inbox-row">{{ row.pending }} of {{ row.proposals }} proposals pending</NumLink>
+      <span v-else-if="row.proposals" class="text-sm text-ink-gray-6">{{ row.proposals }} proposal{{ row.proposals === 1 ? '' : 's' }}, all decided</span>
     </template>
     <template #cell-status="{ row }">
-      <button v-if="row.status === 'Failed' && canWrite()" class="bt s" type="button" style="margin-right: 8px" @click="retry(row)">Retry</button>
-      <span class="pl" :class="PILL[row.status]">{{ row.status === 'To Review' ? 'To review' : row.status }}</span>
+      <div class="flex items-center gap-2">
+        <Button v-if="row.status === 'Failed' && canWrite()" class="relative" size="sm" label="Retry" @click="retry(row)" />
+        <Badge :theme="THEME[row.status]" :label="row.status === 'To Review' ? 'To review' : row.status" />
+      </div>
     </template>
     <template #stack="{ row }">
-      <div style="display: flex; gap: 10px; align-items: flex-start">
-        <div style="flex: 1; min-width: 0">
-          <div class="ttl">{{ row.title }}</div>
-          <div class="mt">{{ describe(row) }}</div>
-          <div v-if="row.status === 'Failed' && row.error" class="mt" style="color: var(--ink-red-9)">{{ row.error }}</div>
-          <a v-if="row.pending" href="#" class="num mt" @click.prevent="openRef('inbox:' + row.name, { focus: 'pending' })">{{ row.pending }} of {{ row.proposals }} proposals pending</a>
+      <div class="flex items-start gap-2.5">
+        <div class="min-w-0 flex-1">
+          <div class="break-words text-base-medium text-ink-gray-9">{{ row.title }}</div>
+          <div class="text-sm text-ink-gray-6">{{ describe(row) }}</div>
+          <div v-if="row.status === 'Failed' && row.error" class="text-sm text-ink-red-8">{{ row.error }}</div>
+          <NumLink v-if="row.pending" class="relative text-sm" :to="{ query: { ...route.query, open: 'inbox:' + row.name, focus: 'pending' } }">{{ row.pending }} of {{ row.proposals }} proposals pending</NumLink>
         </div>
-        <span class="pl" :class="PILL[row.status]">{{ row.status === 'To Review' ? 'To review' : row.status }}</span>
+        <Badge :theme="THEME[row.status]" :label="row.status === 'To Review' ? 'To review' : row.status" />
       </div>
-      <button v-if="row.status === 'Failed' && canWrite()" class="bt s" type="button" style="margin-top: 8px" @click="retry(row)">Retry</button>
+      <Button v-if="row.status === 'Failed' && canWrite()" class="relative mt-2" size="sm" label="Retry" @click="retry(row)" />
     </template>
   </ListView>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { toast } from 'frappe-ui'
+import { Avatar, Badge, Button, Select, TextInput, Textarea, toast } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
+import NumLink from '@/components/ui/NumLink.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { canWrite, refreshCounts, store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { fileKind, fileSize, uploadFile } from '@/lib/upload'
-import { areaOptions, loadLookups } from '@/lib/lookups'
-import { openRef } from '@/lib/pane'
+import { loadLookups } from '@/lib/lookups'
 
 const SOURCES = ['Upload', 'Journal Photo', 'Voice Note', 'Email', 'Chat', 'Message', 'Web']
-// "Waiting for the agent" is two statuses: New and Processing
+// status=Waiting in the URL is two statuses, New and Processing: "waiting for the agent"
 const STATUS = { 'To Review': ['To Review'], Waiting: ['New', 'Processing'], Failed: ['Failed'], Done: ['Done'] }
-const FILTERS = computed(() => [
-  { key: 'status', label: 'Status', all: 'Any status', options: [{ value: 'To Review', label: 'To review' }, { value: 'Waiting', label: 'Waiting for the agent' },
-    { value: 'Failed', label: 'Failed' }, { value: 'Done', label: 'Done' }] },
-  { key: 'source_type', label: 'Source', all: 'Any source', options: SOURCES.map((s) => ({ value: s, label: s })) },
-  { key: 'area', label: 'Area', all: 'All areas', options: [...areaOptions(), { value: 'none', label: 'No area' }] },
-  { key: 'from', label: 'From', type: 'date' }, { key: 'to', label: 'To', type: 'date' },
-])
-const COLUMNS = [
-  { key: 'title', label: 'Item', sort: 'title' }, { key: 'area', label: 'Area', width: '120px' },
-  { key: 'received_on', label: 'Received', width: '110px', sort: 'received_on' }, { key: 'proposals', label: 'Proposals', width: '190px' },
-  { key: 'status', label: 'Status', width: 'max-content', sort: 'status', align: 'right', nowrap: true },
+const SPEC = [
+  { key: 'status', field: 'status', kind: 'preset', labels: { Waiting: 'Waiting for the agent', 'To Review': 'To review' },
+    presets: { 'To Review': () => ['status', '=', 'To Review'], Waiting: () => ['status', 'in', ['New', 'Processing']], Failed: () => ['status', '=', 'Failed'], Done: () => ['status', '=', 'Done'] } },
+  { key: 'source_type', field: 'source_type', kind: 'value' }, { key: 'area', field: 'area', kind: 'link' },
+  { key: 'from', field: 'received_on', kind: 'from' }, { key: 'to', field: 'received_on', kind: 'to' },
 ]
-const PILL = { 'To Review': 'o', New: 'n', Processing: 'b', Failed: 'r', Done: 'g' }
+const SYNTHETIC = [{ key: '_proposals', label: 'Proposals', width: '12rem', place: 'end' }]
+const HIDDEN = ['raw_text', 'transcript_md', 'summary_md', 'preview_image', 'claimed_by', 'claimed_on']
+const THEME = { 'To Review': 'amber', New: 'gray', Processing: 'blue', Failed: 'red', Done: 'green' }
 const route = useRoute()
 const router = useRouter()
 const picker = ref(null)
@@ -154,10 +153,10 @@ async function add() {
   }
 }
 
-async function fetch({ filters: f, sort, dir, start, page_length }) {
-  const res = await api('inbox.list', { space: store.space, status: f.status ? JSON.stringify(STATUS[f.status] || [f.status]) : undefined,
-    source_type: f.source_type || undefined, area: f.area || undefined, from_date: f.from || undefined, to_date: f.to || undefined,
-    sort: sort || undefined, dir: dir || undefined, start, page_length })
+async function fetch({ params: p, filters, order_by, summary, start, page_length }) {
+  const res = await api('inbox.list', { space: store.space, status: p.status ? JSON.stringify(STATUS[p.status] || [p.status]) : undefined,
+    source_type: p.source_type, area: p.area, from_date: p.from, to_date: p.to, filters, order_by, summary, start, page_length })
+  if (summary) return res
   refreshCounts()
   return { rows: res.items, total: res.total, pending_total: res.pending_total }
 }
@@ -166,10 +165,3 @@ async function retry(it) {
 }
 onMounted(loadLookups)
 </script>
-
-<style scoped>
-.drop { border: 1px dashed var(--outline-gray-3); border-radius: 10px; padding: 16px; background: var(--surface-gray-1); }
-.drop.over { border-color: var(--ink-blue-8); background: var(--surface-blue-2); }
-.drop-hint { display: flex; flex-direction: column; gap: 2px; padding: 6px 0 12px; }
-.drop-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-</style>

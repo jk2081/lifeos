@@ -1,138 +1,302 @@
 <template>
-  <PageHead v-if="title" :title="title" :crumb="crumb" :count="loaded ? total : null">
+  <PageHead v-if="title" :title="title" :crumb="crumb" :count="loaded && !grouped ? total : null">
     <template #sub><slot name="sub">{{ sub }}</slot></template>
+    <TabButtons v-if="views.length" class="max-md:hidden" :model-value="view" :options="viewOptions" data-views @update:model-value="setView" />
     <slot name="actions" />
   </PageHead>
-  <div class="bd lv">
+  <div class="page-body" data-list :data-screen="screen" :data-view="view">
     <slot name="above" />
-    <div class="lv-bar">
-      <slot name="bar" />
-      <span v-if="!title && loaded" class="pl n" data-lv-count>{{ total }}</span>
-      <button class="ch only-phone lv-fbtn" :class="{ on: showFilters }" type="button" :aria-expanded="showFilters" @click="showFilters = !showFilters">
-        Filters<template v-if="active.length"> ({{ active.length }})</template>
-      </button>
-      <div class="lv-filters" :class="{ open: showFilters }">
-        <template v-for="f in shown" :key="f.key">
-          <label v-if="f.type === 'check'" class="mt lv-check"><input type="checkbox" class="ck" style="margin: 0" :checked="!!values[f.key]"
-            :data-filter="f.key" @change="setFilter(f.key, $event.target.checked ? '1' : '')" /> {{ f.label }}</label>
-          <label v-else-if="f.type === 'date'" class="lv-date"><span class="mt">{{ f.label }}</span>
-            <input type="date" class="inp" :value="values[f.key]" :aria-label="f.label" :data-filter="f.key" @change="setFilter(f.key, $event.target.value)" /></label>
-          <select v-else class="inp" :class="{ set: !!values[f.key] }" :value="values[f.key]" :aria-label="f.label" :data-filter="f.key" @change="setFilter(f.key, $event.target.value)">
-            <option value="">{{ f.all || 'Any ' + f.label.toLowerCase() }}</option>
-            <option v-for="o in f.options" :key="o.value" :value="o.value">{{ o.label }}</option>
-            <option v-if="values[f.key] && !f.options.some((o) => String(o.value) === values[f.key])" :value="values[f.key]">{{ f.label }}: {{ values[f.key] }}</option>
-          </select>
-        </template>
-        <template v-if="sortable.length && !custom">
-          <select class="inp lv-sort" :value="sort" aria-label="Sort by" data-sort @change="setSort($event.target.value, dir)">
-            <option value="">Sort: {{ defaultSort || 'default' }}</option>
-            <option v-for="c in sortable" :key="c.sort" :value="c.sort">Sort: {{ c.label }}</option>
-          </select>
-          <button v-if="sort" class="bt s ic" type="button" :aria-label="dir === 'desc' ? 'Descending. Switch to ascending' : 'Ascending. Switch to descending'"
-            @click="setSort(sort, dir === 'desc' ? '' : 'desc')">{{ dir === 'desc' ? '↓' : '↑' }}</button>
-        </template>
-        <button v-if="active.length" class="bt t" type="button" data-clear @click="clearFilters">Clear filters</button>
-      </div>
-    </div>
+    <TabButtons v-if="views.length" class="md:hidden" :model-value="view" :options="viewOptions" @update:model-value="setView" />
 
-    <slot v-if="custom" name="body" :rows="rows" :loaded="loaded" :reload="refresh" />
-    <div v-else-if="rows.length" class="cd list lv-list" role="list">
-      <div v-if="!noHead && columns.some((c) => c.label)" class="lv-cells lv-head" :style="grid" aria-hidden="true">
-        <span v-for="c in columns" :key="c.key" :class="{ r: c.align === 'right' }">
-          <button v-if="c.sort" type="button" class="lv-th" @click="setSort(c.sort, sort === c.sort && dir !== 'desc' ? 'desc' : '')">{{ c.label }}<template v-if="sort === c.sort"> {{ dir === 'desc' ? '↓' : '↑' }}</template></button>
-          <template v-else>{{ c.label }}</template>
-        </span>
-      </div>
-      <template v-for="(row, i) in rows" :key="rowKey(row)">
-        <div v-if="groupBy && groupBy(row) !== (i ? groupBy(rows[i - 1]) : undefined)" class="lv-group">{{ groupBy(row) }}</div>
-        <div class="lv-row" :class="{ on: openRefNow === rowRef(row) }" role="listitem" tabindex="0" :data-ref="rowRef(row)"
-          @click="click($event, row)" @keydown.enter.self="open(row)">
-          <div class="lv-cells" :style="grid">
-            <div v-for="c in columns" :key="c.key" class="lv-cell" :class="{ r: c.align === 'right', nw: c.nowrap }">
-              <slot :name="'cell-' + c.key" :row="row">{{ row[c.key] }}</slot>
-            </div>
-          </div>
-          <div class="lv-stack"><slot name="stack" :row="row">
-            <div v-for="c in columns" :key="c.key"><slot :name="'cell-' + c.key" :row="row">{{ row[c.key] }}</slot></div>
-          </slot></div>
-        </div>
+    <!-- The controls. Wide screens: a strip of quick filters with Filter, Sort, Group and Columns beside it.
+         Below 640 px: one Filters button with the count of active filters, opening the same controls in a sheet. -->
+    <div class="flex flex-wrap items-center gap-2" data-lv-bar>
+      <slot name="bar" />
+      <Badge v-if="!title && loaded && !grouped" size="lg" :label="total" data-lv-count />
+      <template v-if="!phone">
+        <div class="min-w-40 flex-1" data-quick-filters><LifeQuickFilter :list="list" /></div>
+        <template v-if="!list.view.quickFilter.customizing.value">
+          <Checkbox v-for="f in shownFlags" :key="f.key" :label="f.label" :model-value="!!flagValues[f.key]" :data-flag="f.key" @update:model-value="(v) => setFlag(f.key, v)" />
+          <LifeFilter :list="list" align="end" />
+          <LifeSortBy :list="list" />
+          <LifeGroupBy v-if="groupable" :list="list" />
+          <LifeColumnSettings v-if="mode === 'table'" :list="list" />
+          <Button v-if="list.view.quickFilter.canCustomize.value" icon="lucide-sliders-horizontal" label="Choose the quick filters" tooltip="Choose the quick filters"
+            @click="list.view.quickFilter.customizing.value = true" />
+        </template>
+      </template>
+      <Button v-else icon-left="lucide-list-filter" :label="activeN ? `Filters (${activeN})` : 'Filters'" :variant="activeN ? 'outline' : 'subtle'" data-filters-button @click="sheet = true" />
+      <template v-if="activeN">
+        <Badge v-if="!phone" theme="blue" size="lg" :label="`${activeN} filter${activeN === 1 ? '' : 's'} on`" data-active-filters />
+        <Button variant="ghost" label="Clear" icon-left="lucide-x" data-clear @click="clearFilters" />
       </template>
     </div>
-    <div v-if="loaded && !rows.length && !(custom && !active.length)" class="cd" data-lv-empty>
-      <Empty v-if="active.length" :title="`No ${noun} match these filters.`">
-        {{ active.map((f) => `${f.label}: ${labelOf(f)}`).join(' · ') }}.
-        <div style="margin-top: 10px"><button class="bt s" type="button" @click="clearFilters">Clear filters</button></div>
+    <BottomSheet v-if="phone" v-model:open="sheet" title="Filters">
+      <div class="flex flex-col gap-4 px-4 pb-6" data-filter-sheet>
+        <LifeQuickFilter :list="list" />
+        <Checkbox v-for="f in shownFlags" :key="f.key" :label="f.label" :model-value="!!flagValues[f.key]" :data-flag="f.key" @update:model-value="(v) => setFlag(f.key, v)" />
+        <div class="flex flex-wrap gap-2">
+          <LifeFilter :list="list" align="start" />
+          <LifeSortBy :list="list" />
+          <LifeGroupBy v-if="groupable" :list="list" />
+        </div>
+        <div class="flex gap-2">
+          <Button v-if="activeN" class="flex-1" size="md" label="Clear filters" data-clear @click="clearFilters" />
+          <Button class="flex-1" size="md" variant="solid" :label="loaded ? `Show ${total} ${noun}` : 'Show'" @click="sheet = false" />
+        </div>
+      </div>
+    </BottomSheet>
+
+    <Card v-if="grouped" flush class="!px-1" data-lv-groups>
+      <LifeGroupTable :list="list" :rows="groupRows" :totals="groupTotals" :loading="loading" />
+    </Card>
+    <slot v-else-if="mode === 'custom'" name="body" :rows="rows" :loaded="loaded" :reload="refresh" />
+    <Card v-else-if="rows.length" flush class="!px-1" data-lv-rows>
+      <List :columns="tracks" class="list-row-px-3">
+        <ListHeader v-if="mode === 'table'" class="group max-md:!hidden">
+          <div v-for="c in columns" :key="c.fieldname" class="relative flex min-w-0" :class="c.align === 'right' ? 'justify-end' : ''">
+            <ListHeaderCellSort v-if="c.sortable" class="min-w-0" :direction="directionFor(sorts, c.fieldname)" :align="c.align === 'right' ? 'end' : 'start'"
+              :data-sort="c.fieldname" @click="list.view.sort.by.value = nextSort(sorts, c.fieldname)">{{ c.label }}</ListHeaderCellSort>
+            <ListHeaderCell v-else class="min-w-0">{{ c.label }}</ListHeaderCell>
+            <!-- the drag handle of @framework/ui's own list: drag to resize, double-click to go back to automatic -->
+            <span class="absolute inset-y-0 -right-2 flex w-2 cursor-col-resize items-center justify-center"
+              @pointerdown.stop.prevent="resize.startResize(c, $event)" @dblclick.stop.prevent="resize.resetColumn(c)">
+              <span class="h-4 border-l border-outline-gray-2 opacity-0 transition-opacity group-hover:opacity-100" :class="{ 'opacity-100': resize.resizingFieldname.value === c.fieldname }" />
+            </span>
+          </div>
+        </ListHeader>
+        <ListGroup v-for="g in groups" :key="g.key" :label="g.label || undefined">
+          <ListRow v-for="row in g.rows" :key="rowKey(row)" class="cursor-pointer sm:rounded-[10px]" :class="isOpen(row) ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-1'"
+            data-row :data-active="isOpen(row) || undefined">
+            <!-- the whole-row target; links and controls inside a row carry the class `relative` to sit above it -->
+            <button type="button" class="absolute inset-0 sm:rounded-[10px] focus-visible:focus-ring" :aria-label="rowLabel(row)" :data-ref="rowRef(row)" @click="open(row)" />
+            <template v-if="mode === 'table'">
+              <ListCell v-for="c in columns" :key="c.fieldname" class="py-2.5 text-base text-ink-gray-8 max-md:!hidden" :class="c.align === 'right' ? 'justify-end' : ''" :data-cell="c.fieldname">
+                <slot :name="'cell-' + c.fieldname" :row="row" :column="c"><span class="truncate">{{ display(row, c) }}</span></slot>
+              </ListCell>
+              <ListCell class="py-2.5 md:!hidden">
+                <div class="min-w-0 flex-1"><slot name="stack" :row="row">
+                  <div class="text-base-medium text-ink-gray-9">{{ rowLabel(row) }}</div>
+                  <div class="text-sm text-ink-gray-6">{{ columns.slice(1).map((c) => display(row, c)).filter(Boolean).join(' · ') }}</div>
+                </slot></div>
+              </ListCell>
+            </template>
+            <ListCell v-else class="py-2.5"><div class="min-w-0 flex-1"><slot name="row" :row="row" /></div></ListCell>
+          </ListRow>
+        </ListGroup>
+      </List>
+    </Card>
+    <Card v-if="!grouped && loaded && !rows.length && !(mode === 'custom' && !activeN)" data-lv-empty>
+      <Empty v-if="activeN" :title="`No ${noun} match these filters.`">
+        {{ activeText }}.
+        <div class="mt-2.5"><Button label="Clear filters" @click="clearFilters" /></div>
       </Empty>
       <Empty v-else :title="emptyTitle || `No ${noun} yet.`" :hint="emptyHint" />
-    </div>
-    <div v-if="rows.length < total"><button class="bt s" type="button" data-more :disabled="loading" @click="load(true)">Show more ({{ total - rows.length }} left)</button></div>
+    </Card>
+    <div v-if="!loaded" class="flex flex-col gap-3 py-2" aria-busy="true"><Skeleton v-for="i in 5" :key="i" class="h-9 w-full rounded-4" /></div>
+    <div v-if="!grouped && rows.length < total"><Button :loading="loading" :label="`Show more (${total - rows.length} left)`" data-more @click="load(true)" /></div>
     <slot name="below" />
   </div>
 </template>
 
 <script setup>
-// The one list every list screen uses: a filter bar kept in the URL, a count of what the filters match,
-// aligned and sortable columns on desktop, stacked rows on phones, 50 rows at a time, and rows that open the record pane.
+// The one list every list screen uses. It owns the view switch, the URL form of the filters, the row that is open in the
+// pane, and the remembered state. Everything inside it comes from the two libraries: frappe-ui's list parts for the rows,
+// and @framework/ui's Filter, QuickFilter, SortBy, GroupBy and ColumnSettings (through src/framework) for the controls.
+//
+// The URL is the single source of truth for what is listed. Controls write to it; a change of the URL fetches.
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
+import { Badge, BottomSheet, Button, Checkbox, Skeleton, TabButtons } from 'frappe-ui'
+import { List, ListCell, ListGroup, ListHeader, ListHeaderCell, ListHeaderCellSort, ListRow } from 'frappe-ui/list'
 import PageHead from './PageHead.vue'
 import Empty from './Empty.vue'
+import Card from './ui/Card.vue'
+import LifeFilter from '@/framework/LifeFilter.vue'
+import LifeQuickFilter from '@/framework/LifeQuickFilter.vue'
+import LifeSortBy from '@/framework/LifeSortBy.vue'
+import LifeGroupBy from '@/framework/LifeGroupBy.vue'
+import LifeGroupTable from '@/framework/LifeGroupTable.vue'
+import LifeColumnSettings from '@/framework/LifeColumnSettings.vue'
+import { useLifeListView } from '@/framework/useLifeListView'
+import { directionFor, nextSort, useLifeColumnResize } from '@/framework/columnResize'
 import { tryCall } from '@/lib/api'
+import { store } from '@/lib/store'
+import { lookups } from '@/lib/lookups'
+import { dateTime, short } from '@/lib/dates'
 import { current, openRef, onRecordChanged, paneNav } from '@/lib/pane'
+import { activeCount, canonical, filtersToQuery, orderByToQuery, queryToFilters, queryToOrderBy, queryToRequest } from '@/lib/filterUrl'
+import { saveView, savedView, viewsLoaded, whenViewsLoaded } from '@/lib/views'
 
 const props = defineProps({
   title: String, sub: String, crumb: Object,
   noun: { type: String, default: 'records' },
-  filters: { type: Array, default: () => [] }, // [{ key, label, type: 'select' | 'date' | 'check', options, all, quiet }]
-  columns: { type: Array, default: () => [] }, // [{ key, label, width, sort, align, nowrap }]
-  fetch: { type: Function, required: true }, // ({ filters, sort, dir, start, page_length }) => { rows, total }
+  screen: { type: String, required: true }, // the key the view is remembered under: 'tasks'
+  doctype: { type: String, required: true }, // whose fields the controls offer: 'Life Task', or 'Life Index' for a cross-type list
+  spec: { type: Array, default: () => [] }, // the short URL parameters of this list (see lib/filterUrl.js)
+  flagLabels: { type: Object, default: () => ({}) }, // { done: 'Show done' }: switches of kind 'flag', shown as checkboxes; the rest show only while on
+  quiet: { type: Array, default: () => [] }, // flags that show only while they are on (set by a count link)
+  quick: { type: Array, default: () => [] }, // the fields of the quick-filter strip until the person chooses others
+  virtual: { type: Array, default: () => [] }, // filter fields with no column behind them, resolved by the server from a short parameter
+  synthetic: { type: Array, default: () => [] }, // table columns the screen draws itself: { key: '_badge', label, width, align, place }
+  hidden: { type: Array, default: () => [] }, // fields not offered in the filter
+  views: { type: Array, default: () => [] }, // [{ key, label, mode }] with mode 'table' (columns), 'feed' (the #row slot) or 'custom' (the #body slot)
+  mode: { type: String, default: 'table' }, // the mode when there is no view switch
+  groupable: { type: Boolean, default: true },
+  fetch: { type: Function, required: true }, // ({ params, filters, order_by, fields, summary, start, page_length, view }) => { rows, total } or { summary }
   rowRef: { type: Function, default: () => null },
   rowKey: { type: Function, default: (r) => r.name },
-  groupBy: { type: Function, default: null },
+  rowLabel: { type: Function, default: (r) => r.title || r.name },
+  groupBy: { type: Function, default: null }, // (row) => the heading its rows are listed under
   watchKeys: { type: Array, default: () => [] }, // other query keys that change what is listed
-  defaultSort: String, emptyTitle: String, emptyHint: String,
+  emptyTitle: String, emptyHint: String,
   pageSize: { type: Number, default: 50 },
-  sorts: { type: Array, default: null }, // [{ sort, label }] when the sort choices are not the column heads
-  noHead: Boolean,
-  custom: Boolean, // the screen draws the rows itself (a board, cards) in the #body slot
 })
 const emit = defineEmits(['loaded'])
 const route = useRoute()
 const router = useRouter()
+const phone = useMediaQuery('(max-width: 639px)')
+const list = useLifeListView(props.doctype, { virtual: props.virtual, synthetic: props.synthetic, hidden: props.hidden })
+const resize = useLifeColumnResize(list)
 const rows = ref([])
 const total = ref(0)
 const loaded = ref(false)
 const loading = ref(false)
-const showFilters = ref(false)
+const sheet = ref(false)
+const groupRows = ref([])
+const groupTotals = ref(null)
 let seq = 0
+let touched = false // the person has changed something on this screen since it opened
 
-const values = computed(() => Object.fromEntries(props.filters.map((f) => [f.key, route.query[f.key] ? String(route.query[f.key]) : ''])))
-const active = computed(() => props.filters.filter((f) => values.value[f.key]))
-// a quiet filter is set by a link from a count; it shows in the bar only while it is on
-const shown = computed(() => props.filters.filter((f) => !f.quiet || values.value[f.key]))
-const sortable = computed(() => props.sorts || props.columns.filter((c) => c.sort))
-const sort = computed(() => (route.query.sort ? String(route.query.sort) : ''))
-const dir = computed(() => (route.query.dir === 'desc' ? 'desc' : ''))
-const grid = computed(() => `grid-template-columns: ${props.columns.map((c) => c.width || 'minmax(0, 1fr)').join(' ')}`)
-const openRefNow = computed(() => current.value?.ref)
-
-function labelOf(f) {
-  const v = values.value[f.key]
-  if (f.type === 'check') return 'yes'
-  return f.options?.find((o) => String(o.value) === v)?.label || v
+// ---- the view switch ----
+const viewOptions = computed(() => props.views.map((v) => ({ label: v.label, value: v.key })))
+const view = computed(() => {
+  const q = route.query.view
+  if (props.views.some((v) => v.key === q)) return q
+  return props.views[0]?.key || ''
+})
+const mode = computed(() => props.views.find((v) => v.key === view.value)?.mode || props.mode)
+const keep = computed(() => [...(props.views.length ? ['view'] : []), ...props.watchKeys])
+function setView(v) {
+  touched = true
+  router.push({ query: { ...route.query, view: v, all: undefined } })
 }
+
+// ---- filters: the URL, the controls, and what the server is asked ----
+const flagSpec = computed(() => props.spec.filter((e) => e.kind === 'flag'))
+const flagValues = computed(() => queryToFilters(route.query, props.spec, store.today).flags)
+const shownFlags = computed(() => flagSpec.value.filter((e) => props.flagLabels[e.key] && (!props.quiet.includes(e.key) || flagValues.value[e.key]))
+  .map((e) => ({ key: e.key, label: props.flagLabels[e.key] })))
+const activeN = computed(() => activeCount(route.query, props.spec))
+const sorts = computed(() => list.view.sort.by.value)
+const grouped = computed(() => !!list.summary.value)
+const key = (w) => JSON.stringify([...w].map((x) => JSON.stringify(x)).sort())
+const urlWire = () => queryToFilters(route.query, props.spec, store.today).wire
+
+// the active filters in words, for the empty state: "Type: Medical · Expiry: Expired"
+const activeText = computed(() => {
+  const parts = []
+  for (const e of props.spec) {
+    const v = route.query[e.key] ? String(route.query[e.key]) : ''
+    if (!v) continue
+    if (e.kind === 'flag') parts.push(props.flagLabels[e.key] || e.key)
+    else parts.push(`${e.label || list.field(e.field)?.label || e.key}: ${e.labels?.[v] || nameOf(e.field, v)}`)
+  }
+  for (const [field, op, value] of queryToRequest(route.query, props.spec).filters) {
+    parts.push(`${list.field(field)?.label || field} ${op} ${Array.isArray(value) ? value.join(', ') : value}`)
+  }
+  return parts.join(' · ')
+})
+function nameOf(field, value) {
+  if (value === 'none') return 'none'
+  const hit = lookups.areas.find((a) => a.name === value) || lookups.projects.find((x) => x.name === value) || (lookups.people || []).find((x) => x.name === value)
+  return hit ? hit.area_name || hit.title || hit.full_name : value
+}
+
 function push(patch) {
-  router.push({ query: { ...route.query, ...patch } })
+  touched = true
+  router.push({ query: { ...route.query, ...patch, all: undefined } })
 }
-const setFilter = (key, value) => push({ [key]: value || undefined })
-const setSort = (s, d) => push({ sort: s || undefined, dir: s && d ? d : undefined })
-const clearFilters = () => push(Object.fromEntries(props.filters.map((f) => [f.key, undefined])))
+const setFlag = (k, on) => push({ [k]: on ? '1' : undefined })
+const clearFilters = () => push(filtersToQuery([], {}, props.spec, store.today))
 
+// URL -> controls. Skipped when the controls already say the same thing, so an edit in the Filter popover is not reset under the cursor.
+function applyUrl() {
+  if (!list.ready.value) return
+  const wire = urlWire()
+  if (key(wire) !== key(list.wire.value)) list.setWire(wire)
+  const order = queryToOrderBy(route.query)
+  if (order !== list.orderBy.value) list.setOrderBy(order)
+}
+// controls -> URL
+watch(() => [key(list.wire.value), list.orderBy.value], () => {
+  if (!list.ready.value) return
+  const patch = {}
+  if (key(list.wire.value) !== key(urlWire())) Object.assign(patch, filtersToQuery(list.wire.value, flagValues.value, props.spec, store.today))
+  if (list.orderBy.value !== queryToOrderBy(route.query)) Object.assign(patch, orderByToQuery(list.orderBy.value))
+  if (Object.keys(patch).length) push(patch)
+})
+
+// ---- columns of the table view ----
+const columns = computed(() => list.view.columns.shown.value.map((c) => {
+  const syn = props.synthetic.find((s) => s.key === c.fieldname)
+  const meta = list.fieldMeta(c.fieldname)
+  const numeric = meta && ['Int', 'Float', 'Currency', 'Percent'].includes(meta.fieldtype)
+  return { ...c, sortable: !syn, align: syn?.align || (numeric ? 'right' : 'left'), width: c.width || syn?.width }
+}))
+const tracks = computed(() => {
+  if (mode.value !== 'table') return ['minmax(0, 1fr)']
+  const wide = columns.value.map((c, i) => resize.drafts[c.fieldname] || c.width || (i === 0 ? 'minmax(0, 2fr)' : 'minmax(0, 1fr)'))
+  return { base: ['minmax(0, 1fr)'], md: wide.length ? wide : ['minmax(0, 1fr)'] }
+})
+// columns the table shows that the list method does not return by itself
+const extraFields = computed(() => (mode.value === 'table' ? list.view.columns.shown.value.map((c) => c.fieldname).filter((f) => !f.startsWith('_')) : []))
+
+function display(row, c) {
+  const f = c.fieldname
+  const v = row[f]
+  const type = list.fieldMeta(f)?.fieldtype
+  if (type === 'Link' || f === 'area' || f === 'project') return row[f + '_name'] ?? row[f + '_title'] ?? row[f + '_label'] ?? v ?? ''
+  if (type === 'Date') return v ? short(v, true) : ''
+  if (type === 'Datetime' || f === 'creation' || f === 'modified') return v ? dateTime(v) : ''
+  if (type === 'Check') return v ? 'Yes' : 'No'
+  return v ?? ''
+}
+
+// ---- rows ----
+const groups = computed(() => {
+  const out = []
+  for (const row of rows.value) {
+    const label = props.groupBy ? props.groupBy(row) || '' : ''
+    const last = out[out.length - 1]
+    if (last && last.label === label) last.rows.push(row)
+    else out.push({ label, key: `${out.length}:${label}`, rows: [row] })
+  }
+  return out
+})
+const isOpen = (row) => !!current.value && current.value.ref === props.rowRef(row)
+const open = (row) => openRef(props.rowRef(row))
+
+function request(start, page_length) {
+  const { params, filters } = queryToRequest(route.query, props.spec)
+  return { params, filters: filters.length ? filters : undefined, order_by: queryToOrderBy(route.query) || undefined,
+    fields: extraFields.value.length ? extraFields.value : undefined, start, page_length, view: view.value, query: route.query }
+}
 async function load(append = false) {
   const mine = ++seq
   loading.value = true
-  const res = await tryCall(() => props.fetch({ filters: { ...values.value }, sort: sort.value, dir: dir.value,
-    start: append ? rows.value.length : 0, page_length: props.pageSize }))
+  if (grouped.value) {
+    const res = await tryCall(() => props.fetch({ ...request(0, 100), summary: list.summary.value }))
+    if (mine !== seq) return
+    loading.value = false
+    if (!res) return
+    groupRows.value = res.summary?.rows || []
+    groupTotals.value = res.summary?.totals || null
+    loaded.value = true
+    return
+  }
+  const res = await tryCall(() => props.fetch(request(append ? rows.value.length : 0, props.pageSize)))
   if (mine !== seq) return
   loading.value = false
   if (!res) return
@@ -143,13 +307,13 @@ async function load(append = false) {
 }
 // Load again in place after a record changed, keeping as many rows as were on screen so the scroll position holds.
 async function refresh() {
+  if (grouped.value) return load()
   const mine = ++seq
   const want = Math.max(rows.value.length, props.pageSize)
   let out = []
   let res = null
   while (out.length < want) {
-    res = await tryCall(() => props.fetch({ filters: { ...values.value }, sort: sort.value, dir: dir.value, start: out.length,
-      page_length: Math.min(100, want - out.length) }))
+    res = await tryCall(() => props.fetch(request(out.length, Math.min(100, want - out.length))))
     if (!res || mine !== seq) return
     out = [...out, ...res.rows]
     if (!res.rows.length || out.length >= res.total) break
@@ -159,16 +323,50 @@ async function refresh() {
   loaded.value = true
   emit('loaded', res)
 }
-const open = (row) => openRef(props.rowRef(row))
-function click(e, row) {
-  if (e.target.closest('a, button, input, select, label, textarea')) return
-  open(row)
-}
 
-watch(() => [...props.filters.map((f) => f.key), 'sort', 'dir', ...props.watchKeys].map((k) => route.query[k] || '').join('\u0001'), () => load())
+// ---- remembered state: one per user, screen and space, kept on the server (lib/views.js) ----
+const listQuery = () => canonical(route.query, props.spec, keep.value)
+const hasQuery = () => Object.keys(listQuery()).length > 0 || route.query.all === '1'
+function remember() {
+  const layout = { ...list.layout.value }
+  // the quick-filter fields are saved only once the person has chosen their own
+  if (!quickReady || JSON.stringify(layout.quick) === JSON.stringify(props.quick)) delete layout.quick
+  saveView(props.screen, { query: listQuery(), ...layout })
+}
+// Opening the list with no query restores the saved one and writes it into the URL. With a query, the list shows exactly
+// that, and the saved view switch still applies. The open record is never saved or restored.
+function restore(saved, { late = false } = {}) {
+  if (!saved) return
+  if (!late) list.restoreLayout(saved)
+  const q = saved.query || {}
+  if (!hasQuery()) {
+    if (Object.keys(q).length) router.replace({ query: { ...route.query, ...q } })
+  } else if (!route.query.view && q.view && props.views.some((v) => v.key === q.view)) {
+    router.replace({ query: { ...route.query, view: q.view } })
+  }
+}
+const initial = savedView(props.screen)
+let quickReady = false // the strip shows the screen's own fields, or the saved ones
+restore(initial)
+if (!viewsLoaded()) whenViewsLoaded(() => { if (!touched) restore(savedView(props.screen)) })
+
+const fetchKey = computed(() => JSON.stringify([listQuery(), list.summary.value, extraFields.value, mode.value]))
+watch(fetchKey, () => load())
+watch(() => JSON.stringify(listQuery()), () => { applyUrl(); if (viewsLoaded()) remember() })
+watch(() => JSON.stringify(list.layout.value), () => { if (list.ready.value && viewsLoaded()) remember() })
+watch(() => list.ready.value, (ok) => {
+  if (!ok) return
+  const quick = (savedView(props.screen) || initial)?.quick
+  if (quick?.length || props.quick.length) list.setQuickFields(quick?.length ? quick : props.quick)
+  quickReady = true
+  applyUrl()
+}, { immediate: true })
 watch(rows, () => (paneNav.rows = rows.value.map((r) => props.rowRef(r)).filter(Boolean)), { immediate: true })
 onRecordChanged(refresh)
-onMounted(() => load())
+onMounted(() => {
+  load()
+  if (viewsLoaded() && hasQuery()) remember()
+})
 onUnmounted(() => (paneNav.rows = []))
-defineExpose({ reload: refresh, rows, total })
+defineExpose({ reload: refresh, rows, total, view, mode })
 </script>

@@ -1,93 +1,97 @@
 <template>
-  <header class="hd tabs">
-    <div style="display: flex; align-items: center; gap: 8px">
-      <button class="bt s ic" type="button" aria-label="Previous" @click="step(-1)"><Ico d="m15 6-6 6 6 6" stroke="2" /></button>
-      <h1 class="h1" style="min-width: 60px; text-align: center">{{ title }}</h1>
-      <button class="bt s ic" type="button" aria-label="Next" @click="step(1)"><Ico d="m9 6 6 6-6 6" stroke="2" /></button>
-      <button class="bt t only-desktop" type="button" @click="goToday">Today</button>
-    </div>
-    <div v-if="canWrite()" style="display: flex; gap: 8px; flex-wrap: wrap">
-      <button class="bt s" type="button" @click="openDate(cursor)">Add important date</button>
-      <button class="bt p" type="button" @click="openEvent(cursor)">Add event</button>
-    </div>
-  </header>
-  <nav class="tb" aria-label="Calendar views">
-    <RouterLink v-for="v in VIEWS" :key="v" :to="`/calendar/${v}`" :class="{ on: mode === v }">{{ v[0].toUpperCase() + v.slice(1) }}</RouterLink>
-  </nav>
+  <PageHead :title="title">
+    <Button icon="lucide-chevron-left" label="Previous" tooltip="Previous" data-cal-prev @click="step(-1)" />
+    <Button icon="lucide-chevron-right" label="Next" tooltip="Next" data-cal-next @click="step(1)" />
+    <Button class="max-md:hidden" variant="ghost" label="Today" data-cal-today @click="goToday" />
+    <TabButtons :model-value="mode" :options="VIEW_OPTIONS" aria-label="Calendar views" data-views />
+    <template v-if="canWrite()">
+      <Button label="Add important date" @click="openDate(cursor)" />
+      <Button variant="solid" icon-left="lucide-plus" label="Add event" @click="openEvent(cursor)" />
+    </template>
+  </PageHead>
 
-  <div class="bd">
-    <div v-if="google && !google.connected" class="mt">Google Calendar is not connected, so events here stay on this site.
-      <a :href="google.setup_url" target="_blank" rel="noopener">Connect it in Frappe's Google settings</a>.</div>
+  <div class="page-body" data-calendar :data-view="mode">
+    <Alert v-if="google && !google.connected" title="Google Calendar is not connected, so events here stay on this site."
+      :primary-action="{ label: 'Connect it in Frappe\'s Google settings', href: google.setup_url }" data-google-prompt />
 
-    <!-- year -->
+    <!-- year: one column a month, one line a day, as in the journal -->
     <template v-if="mode === 'year' && yearData">
-      <div class="mt lgds">
-        <span class="lgd"><i class="sw" style="background: var(--ink-blue-8)"></i>Birthday or anniversary</span>
-        <span class="lgd"><i class="sw" style="background: var(--surface-amber-2); border: 1px solid var(--ink-amber-9)"></i>Trip</span>
-        <span class="lgd"><i class="sw" style="background: var(--surface-red-2); border: 1px solid var(--ink-red-9)"></i>Document expiry</span>
-        <span class="lgd"><i class="sw" style="width: 3px; background: var(--ink-gray-9)"></i>12 Week Year in progress</span>
-        <span class="lgd"><i class="sw" style="box-shadow: inset 0 0 0 2px var(--ink-blue-8)"></i>Today</span>
+      <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-ink-gray-6">
+        <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-current text-ink-blue-8"></i>Birthday or anniversary</span>
+        <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm border border-outline-gray-3 bg-surface-amber-2"></i>Trip</span>
+        <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm border border-outline-gray-3 bg-surface-red-2"></i>Document expiry</span>
+        <span class="inline-flex items-center gap-1.5"><i class="inline-block h-3 w-[3px] bg-surface-gray-9"></i>12 Week Year in progress</span>
+        <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm border-2 border-outline-gray-5"></i>Today</span>
       </div>
-      <div class="tblwrap only-desktop"><div class="tblscroll"><div class="yr">
-        <div v-for="m in 12" :key="m" class="mo">
-          <div class="mh" :class="{ cur: isCurMonth(m) }">{{ MONTHS[m - 1] }}</div>
-          <button v-for="day in daysIn(year, m)" :key="day" class="dc" :class="yearClass(m, day)" type="button"
-            :aria-label="`${day} ${MONTHS[m - 1]}${yearFirst(m, day) ? ', ' + yearFirst(m, day).title : ''}`" @click="openDay(ymd(year, m, day))">
-            <span class="dn">{{ day }}</span>
-            <span v-if="yearFirst(m, day)" class="dl">{{ yearFirst(m, day).label || yearFirst(m, day).title }}</span>
-            <span v-if="yearList(m, day).length > 1" class="more">+{{ yearList(m, day).length - 1 }}</span>
-          </button>
+      <div class="overflow-hidden rounded-5 border border-outline-gray-2 max-md:hidden" data-year-grid><div class="overflow-x-auto"><div class="grid min-w-[1080px] grid-cols-12">
+        <div v-for="mo in yearCells" :key="mo.m" class="min-w-0 border-r border-outline-gray-1 last:border-r-0">
+          <div class="border-b border-outline-gray-1 bg-surface-gray-1 p-2 text-xs font-semibold" :class="mo.current ? 'text-ink-blue-8' : 'text-ink-gray-7'">{{ MONTHS[mo.m - 1] }}</div>
+          <div v-for="c in mo.days" :key="c.day" class="relative flex h-6 items-center gap-1.5 overflow-hidden whitespace-nowrap border-b border-outline-gray-1 px-1.5 text-xs text-ink-gray-9 hover:bg-surface-gray-2"
+            :class="[c.bg, c.today && 'rounded !border-2 !border-outline-gray-5']" :data-day="c.date" :data-today="c.today || undefined" :data-cycle="c.cycle || undefined">
+            <button type="button" class="absolute inset-0 focus-visible:focus-ring" :aria-label="`${c.day} ${MONTHS[mo.m - 1]}${c.first ? ', ' + c.first.title : ''}`" @click="openDay(c.date)" />
+            <span v-if="c.cycle" class="absolute inset-y-0 left-0 w-[3px] bg-surface-gray-9" aria-hidden="true" />
+            <span class="w-4 flex-none text-right tabular-nums" :class="c.today ? 'font-bold text-ink-gray-9' : 'text-ink-gray-6'">{{ c.day }}</span>
+            <span v-if="c.first" class="min-w-0 flex-1 truncate font-medium" :class="c.ink">{{ c.first.label || c.first.title }}</span>
+            <span v-if="c.count > 1" class="text-ink-gray-6">+{{ c.count - 1 }}</span>
+          </div>
         </div>
       </div></div></div>
-      <div class="only-phone">
-        <section v-for="m in monthsWithEntries" :key="m" style="margin-bottom: 20px">
-          <h2 class="sh">{{ MONTHS[m - 1] }}</h2>
-          <div class="cd list">
-            <button v-for="day in entryDays(m)" :key="day" class="rw rowbtn" type="button" @click="openDay(ymd(year, m, day))">
-              <span class="when">{{ day }} {{ weekday(ymd(year, m, day), 3) }}</span>
-              <span class="grow" :class="'yt-' + yearFirst(m, day).type">{{ yearList(m, day).map((e) => e.label || e.title).join(', ') }}</span>
-            </button>
-          </div>
+      <div class="flex flex-col gap-5 md:hidden">
+        <section v-for="m in monthsWithEntries" :key="m">
+          <SectionHead>{{ MONTHS[m - 1] }}</SectionHead>
+          <Card flush>
+            <Row v-for="day in entryDays(m)" :key="day" :pane="'day:' + ymd(year, m, day)" :label="`${day} ${MONTHS[m - 1]}`">
+              <span class="w-16 flex-none tabular-nums text-ink-gray-7">{{ day }} {{ weekday(ymd(year, m, day), 3) }}</span>
+              <span class="min-w-0 flex-1 break-words" :class="INK[yearFirst(m, day).type] || 'text-ink-gray-9'">{{ yearList(m, day).map((e) => e.label || e.title).join(', ') }}</span>
+            </Row>
+          </Card>
         </section>
-        <div v-if="!monthsWithEntries.length" class="cd"><Empty :title="`Nothing in ${year} yet.`" hint="Add an important date or an all-day event, and it shows here." /></div>
+        <Card v-if="!monthsWithEntries.length"><Empty :title="`Nothing in ${year} yet.`" hint="Add an important date or an all-day event, and it shows here." /></Card>
       </div>
-      <p class="mt only-desktop" style="margin: 0">Laid out like the year pages in the journal: one column a month, one line a day. Timed meetings are left out. Click a day to add or open an entry.</p>
+      <p class="text-sm text-ink-gray-6 max-md:hidden">Laid out like the year pages in the journal: one column a month, one line a day. Timed meetings are left out. Click a day to add or open an entry.</p>
     </template>
 
     <!-- month -->
     <template v-else-if="mode === 'month' && data">
-      <div class="tblwrap"><div class="mgrid">
-        <div v-for="w in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="w" class="mhd">{{ w }}</div>
-        <button v-for="c in monthCells" :key="c.date" class="mc" :class="{ out: !c.inMonth, we: c.weekend, td: c.date === data.today }" type="button"
-          :aria-label="long(c.date, true)" @click="openDay(c.date)">
-          <span class="dnum">{{ c.day }}</span>
-          <span v-for="(it, i) in itemsOn(c.date).slice(0, 3)" :key="i" class="chip" :class="'s-' + chipType(it)">{{ it.all_day ? '' : time(it.start) + ' ' }}{{ it.label || it.title }}</span>
-          <span v-if="itemsOn(c.date).length > 3" class="mt" style="font-size: 11px">+{{ itemsOn(c.date).length - 3 }} more</span>
-        </button>
+      <div class="overflow-hidden rounded-5 border border-outline-gray-2" data-month-grid><div class="grid grid-cols-7">
+        <div v-for="w in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="w"
+          class="border-b border-outline-gray-1 bg-surface-gray-1 p-2 text-xs font-semibold text-ink-gray-7 max-md:px-1 max-md:py-1.5">{{ w }}</div>
+        <div v-for="c in monthCells" :key="c.date" class="relative flex min-h-[104px] min-w-0 flex-col gap-[3px] border-b border-r border-outline-gray-1 p-1.5 text-left hover:bg-surface-gray-2 max-md:min-h-16 max-md:p-1 [&:nth-child(7n)]:border-r-0"
+          :class="[c.weekend ? 'bg-surface-gray-1' : 'bg-surface-base', c.date === data.today && '!border-2 !border-outline-gray-5']" :data-day="c.date" :data-today="c.date === data.today || undefined">
+          <button type="button" class="absolute inset-0 focus-visible:focus-ring" :aria-label="long(c.date, true)" @click="openDay(c.date)" />
+          <span class="text-sm tabular-nums" :class="c.date === data.today ? 'font-bold text-ink-gray-9' : c.inMonth ? 'text-ink-gray-7' : 'text-ink-gray-4'">{{ c.day }}</span>
+          <span v-for="(it, i) in itemsOn(c.date).slice(0, 3)" :key="i" class="truncate rounded px-[5px] text-xs leading-[1.5] max-md:h-1.5 max-md:p-0 max-md:text-[0px]" :class="CHIP[chipType(it)]">{{ it.all_day ? '' : time(it.start) + ' ' }}{{ it.label || it.title }}</span>
+          <span v-if="itemsOn(c.date).length > 3" class="text-xs text-ink-gray-6">+{{ itemsOn(c.date).length - 3 }} more</span>
+        </div>
       </div></div>
     </template>
 
     <!-- week -->
     <template v-else-if="mode === 'week' && data">
-      <div class="wgrid">
-        <div v-for="dte in weekDays" :key="dte" class="cd wcol" :class="{ tdcol: dte === data.today }">
-          <button class="wkhd" type="button" @click="openDay(dte)"><b>{{ weekday(dte, 3) }}</b> {{ short(dte) }}</button>
-          <div v-for="(it, i) in itemsOn(dte)" :key="i" class="witem" :class="'s-' + chipType(it)" style="cursor: pointer" @click="openRef(itemRef(it))">
-            <span v-if="!it.all_day" class="mt">{{ time(it.start) }}</span> {{ it.label || it.title }}</div>
-          <div v-if="!itemsOn(dte).length" class="mt">Nothing</div>
-        </div>
+      <div class="grid grid-cols-7 items-start gap-2 max-md:grid-cols-1" data-week-grid>
+        <Card v-for="dte in weekDays" :key="dte" class="flex min-h-40 min-w-0 flex-col gap-1.5 !p-2.5 max-md:min-h-0" :class="dte === data.today && '!border-outline-gray-5'" :data-day="dte" :data-today="dte === data.today || undefined">
+          <Button class="-mx-1 !justify-start" variant="ghost" :label="`${weekday(dte, 3)} ${short(dte)}`" @click="openDay(dte)" />
+          <div v-for="(it, i) in itemsOn(dte)" :key="i" class="relative cursor-pointer rounded px-1.5 py-[3px] text-sm [overflow-wrap:anywhere]" :class="CHIP[chipType(it)]">
+            <button type="button" class="absolute inset-0 rounded focus-visible:focus-ring" :aria-label="it.label || it.title" :data-ref="itemRef(it)" @click="openRef(itemRef(it))" />
+            <span v-if="!it.all_day" class="tabular-nums text-ink-gray-6">{{ time(it.start) }}</span> {{ it.label || it.title }}</div>
+          <div v-if="!itemsOn(dte).length" class="text-sm text-ink-gray-6">Nothing</div>
+        </Card>
       </div>
     </template>
 
     <!-- agenda -->
     <template v-else-if="mode === 'agenda' && data">
       <section v-for="dte in agendaDays" :key="dte">
-        <h2 class="sh">{{ dte === data.today ? 'Today · ' : '' }}{{ weekday(dte) }}, {{ long(dte) }}</h2>
-        <div class="cd list"><div v-for="(it, i) in itemsOn(dte)" :key="i" class="rw rowlink" :data-ref="itemRef(it)" tabindex="0" @click="openRef(itemRef(it))" @keydown.enter.self="openRef(itemRef(it))">
-          <span class="when">{{ it.all_day ? 'All day' : time(it.start) }}</span>
-          <div class="grow"><div class="ttl" :class="'yt-' + chipType(it)">{{ it.label || it.title }}</div><div class="mt">{{ SOURCE[it.source] }}</div></div></div></div>
+        <SectionHead>{{ dte === data.today ? 'Today · ' : '' }}{{ weekday(dte) }}, {{ long(dte) }}</SectionHead>
+        <Card flush>
+          <Row v-for="(it, i) in itemsOn(dte)" :key="i" :pane="itemRef(it)" :label="it.label || it.title">
+            <span class="w-16 flex-none tabular-nums text-ink-gray-7">{{ it.all_day ? 'All day' : time(it.start) }}</span>
+            <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="INK[chipType(it)] || 'text-ink-gray-9'">{{ it.label || it.title }}</div>
+              <div class="text-sm text-ink-gray-6">{{ SOURCE[it.source] }}</div></div>
+          </Row>
+        </Card>
       </section>
-      <div v-if="!agendaDays.length" class="cd"><Empty title="Nothing in the next 30 days." hint="Events, important dates, tasks with a due date and expiring documents show here." /></div>
+      <Card v-if="!agendaDays.length"><Empty title="Nothing in the next 30 days." hint="Events, important dates, tasks with a due date and expiring documents show here." /></Card>
     </template>
   </div>
 
@@ -96,20 +100,32 @@
 </template>
 
 <script setup>
+// The calendar: month, week, agenda and year. All four views are ours, drawn with token classes. A day, and every entry,
+// opens in the record pane; events are created through the NewRecord dialogs and the lifeos.api methods.
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { toast } from 'frappe-ui'
-import Ico from '@/components/Ico.vue'
+import { Alert, Button, TabButtons, toast } from 'frappe-ui'
+import PageHead from '@/components/PageHead.vue'
 import Empty from '@/components/Empty.vue'
 import NewRecord from '@/components/NewRecord.vue'
-import { api, db, tryCall } from '@/lib/api'
+import Card from '@/components/ui/Card.vue'
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
+import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
 import { MONTHS, addDays, iso, long, parse, short, startOfWeek, time, weekday } from '@/lib/dates'
 
 const props = defineProps({ view: String })
 const VIEWS = ['month', 'week', 'agenda', 'year']
+const VIEW_OPTIONS = VIEWS.map((v) => ({ label: v[0].toUpperCase() + v.slice(1), value: v, route: `/calendar/${v}` }))
 const SOURCE = { event: 'Event', important: 'Important date', task: 'Task due', vault: 'Vault document' }
-const mode = computed(() => (VIEWS.includes(props.view) ? props.view : window.innerWidth < 800 ? 'agenda' : 'month'))
+// the colours of an entry by its type: as a chip (month, week) and as a line of text (agenda, year)
+const CHIP = {
+  event: 'bg-surface-gray-2 text-ink-gray-8', important: 'bg-surface-blue-2 text-ink-blue-9', trip: 'bg-surface-amber-2 text-ink-amber-9',
+  vault: 'bg-surface-red-2 text-ink-red-8', task: 'border border-outline-gray-2 text-ink-gray-7',
+}
+const INK = { important: 'text-ink-blue-8', trip: 'text-ink-amber-9', vault: 'text-ink-red-8', task: 'text-ink-gray-7' }
+const mode = computed(() => (VIEWS.includes(props.view) ? props.view : window.innerWidth < 768 ? 'agenda' : 'month'))
 const cursor = ref(store.today)
 const data = ref(null)
 const yearData = ref(null)
@@ -172,16 +188,27 @@ const agendaDays = computed(() => Object.keys(byDate.value).filter((k) => k >= r
 // year view helpers
 const yearList = (m, day) => yearData.value.days[ymd(year.value, m, day)] || []
 const yearFirst = (m, day) => yearList(m, day)[0]
-const isCurMonth = (m) => yearData.value.today.slice(0, 7) === `${year.value}-${pad(m)}`
-function yearClass(m, day) {
-  const dte = ymd(year.value, m, day)
-  const first = yearFirst(m, day)
-  const dow = new Date(year.value, m - 1, day).getDay()
+// Every day of the year, with what its line shows: weekends tinted, a trip or an expiry filled, today outlined,
+// and a bar on the days inside a 12 Week Year in progress.
+const yearCells = computed(() => Array.from({ length: 12 }, (_, i) => {
+  const m = i + 1
   return {
-    we: dow === 0 || dow === 6, td: dte === yearData.value.today, cy: yearData.value.active_ranges.some((r) => dte >= r.start && dte <= r.end),
-    b: first?.type === 'important', t: first?.type === 'trip', v: first?.type === 'vault', e: first?.type === 'event' || first?.type === 'cycle',
+    m, current: yearData.value.today.slice(0, 7) === `${year.value}-${pad(m)}`,
+    days: Array.from({ length: daysIn(year.value, m) }, (_, j) => {
+      const day = j + 1
+      const date = ymd(year.value, m, day)
+      const list = yearList(m, day)
+      const type = list[0]?.type
+      const dow = new Date(year.value, m - 1, day).getDay()
+      return {
+        day, date, first: list[0], count: list.length, today: date === yearData.value.today,
+        cycle: yearData.value.active_ranges.some((r) => date >= r.start && date <= r.end),
+        bg: type === 'trip' ? 'bg-surface-amber-2' : type === 'vault' ? 'bg-surface-red-2' : dow === 0 || dow === 6 ? 'bg-surface-gray-1' : 'bg-surface-base',
+        ink: INK[type] || '',
+      }
+    }),
   }
-}
+}))
 const entryDays = (m) => Array.from({ length: daysIn(year.value, m) }, (_, i) => i + 1).filter((day) => yearList(m, day).length)
 const monthsWithEntries = computed(() => Array.from({ length: 12 }, (_, i) => i + 1).filter((m) => entryDays(m).length))
 
@@ -241,50 +268,3 @@ async function saveDate(v) {
 }
 watch([mode, cursor], reload, { immediate: true })
 </script>
-
-<style scoped>
-.lgds { display: flex; gap: 6px 18px; flex-wrap: wrap; }
-.lgd { display: inline-flex; align-items: center; gap: 6px; }
-.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; box-sizing: border-box; }
-.yr { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); min-width: 1080px; }
-.mo { border-right: 1px solid var(--outline-gray-1); min-width: 0; }
-.mo:last-child { border-right: 0; }
-.mh { padding: 8px; font-size: 12px; font-weight: 600; color: var(--ink-gray-7); background: var(--surface-gray-1); border-bottom: 1px solid var(--outline-gray-1); }
-.mh.cur { color: var(--ink-blue-8); }
-.dc { display: flex; align-items: center; gap: 6px; height: 24px; width: 100%; padding: 0 6px; border: 0; border-bottom: 1px solid var(--surface-gray-1); background: var(--surface-base); font-size: 12px; white-space: nowrap; overflow: hidden; cursor: pointer; color: var(--ink-gray-9); text-align: left; box-sizing: border-box; }
-.dc:hover { background: var(--surface-gray-2); }
-.dc .dn { width: 16px; flex: none; text-align: right; color: var(--ink-gray-6); font-variant-numeric: tabular-nums; }
-.dc .dl { overflow: hidden; text-overflow: ellipsis; font-weight: 500; flex: 1; min-width: 0; }
-.dc .more { color: var(--ink-gray-6); font-size: 11px; }
-.dc.we { background: var(--surface-gray-1); }
-.dc.b .dl { color: var(--ink-blue-8); }
-.dc.t { background: var(--surface-amber-2); } .dc.t .dl { color: var(--ink-amber-9); }
-.dc.v { background: var(--surface-red-2); } .dc.v .dl { color: var(--ink-red-9); }
-.dc.td { box-shadow: inset 0 0 0 2px var(--ink-blue-8); border-radius: 5px; }
-.dc.td .dn { color: var(--ink-blue-8); font-weight: 700; }
-.dc.cy { border-left: 3px solid var(--ink-gray-9); padding-left: 3px; }
-.when { width: 64px; flex: none; font-variant-numeric: tabular-nums; color: var(--ink-gray-7); }
-.rowbtn { width: 100%; background: none; border-left: 0; border-right: 0; border-top: 0; text-align: left; color: var(--ink-gray-9); font: inherit; cursor: pointer; }
-.yt-important { color: var(--ink-blue-8); } .yt-trip { color: var(--ink-amber-9); } .yt-vault { color: var(--ink-red-9); } .yt-task { color: var(--ink-gray-7); }
-.mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.mhd { padding: 8px; font-size: 12px; font-weight: 600; color: var(--ink-gray-7); background: var(--surface-gray-1); border-bottom: 1px solid var(--outline-gray-1); }
-.mc { min-height: 104px; border: 0; border-right: 1px solid var(--outline-gray-1); border-bottom: 1px solid var(--outline-gray-1); background: var(--surface-base); padding: 6px; display: flex; flex-direction: column; gap: 3px; align-items: stretch; text-align: left; cursor: pointer; min-width: 0; color: var(--ink-gray-9); }
-.mc:nth-child(7n) { border-right: 0; }
-.mc.we { background: var(--surface-gray-1); }
-.mc.out .dnum { color: var(--outline-gray-3); }
-.mc.td { box-shadow: inset 0 0 0 2px var(--ink-blue-8); }
-.mc.td .dnum { color: var(--ink-blue-8); font-weight: 700; }
-.dnum { font-size: 12.5px; color: var(--ink-gray-7); font-variant-numeric: tabular-nums; }
-.chip { font-size: 11.5px; line-height: 1.5; padding: 0 5px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--surface-gray-2); }
-.s-important { background: var(--surface-blue-2); color: var(--ink-blue-9); } .s-trip { background: var(--surface-amber-2); color: var(--ink-amber-9); }
-.s-vault { background: var(--surface-red-2); color: var(--ink-red-9); } .s-task { background: transparent; color: var(--ink-gray-7); box-shadow: inset 0 0 0 1px var(--outline-gray-2); }
-.wgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: start; }
-.wcol { padding: 10px; display: flex; flex-direction: column; gap: 6px; min-height: 160px; }
-.wcol.tdcol { border-color: var(--ink-blue-8); }
-.wkhd { border: 0; background: none; padding: 0; text-align: left; font: inherit; color: var(--ink-gray-9); cursor: pointer; }
-.witem { font-size: 12.5px; padding: 3px 6px; border-radius: 6px; background: var(--surface-gray-2); overflow-wrap: anywhere; }
-@media (max-width: 800px) {
-  .wgrid { grid-template-columns: 1fr; } .wcol { min-height: 0; }
-  .mc { min-height: 64px; padding: 4px; } .chip { font-size: 0; height: 6px; padding: 0; border-radius: 3px; } .mhd { padding: 6px 4px; font-size: 11px; }
-}
-</style>

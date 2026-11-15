@@ -1,24 +1,28 @@
 <template>
-  <div class="cd list">
-    <div v-for="(it, i) in items" :key="i" class="rw rowlink" data-day-item @click="openRef(REF[it.source] + ':' + it.name)">
-      <span class="when">{{ it.all_day ? 'All day' : time(it.start) }}</span>
-      <div class="grow"><div class="ttl">{{ it.label || it.title }}</div><div class="mt">{{ SOURCE[it.source] }}<template v-if="it.multi_day"> · {{ short(it.date) }} to {{ short(it.end_date) }}</template></div></div>
-    </div>
+  <Card flush>
+    <Row v-for="(it, i) in items" :key="i" :pane="REF[it.source] + ':' + it.name" :label="it.label || it.title" data-day-item>
+      <span class="w-16 flex-none tabular-nums text-ink-gray-7">{{ it.all_day ? 'All day' : time(it.start) }}</span>
+      <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ it.label || it.title }}</div>
+        <div class="text-sm text-ink-gray-6">{{ SOURCE[it.source] }}<template v-if="it.multi_day"> · {{ short(it.date) }} to {{ short(it.end_date) }}</template></div></div>
+    </Row>
     <Empty v-if="loaded && !items.length" title="Nothing on this day." hint="Add an event or an important date below." />
-  </div>
-  <div v-if="canWrite()" class="chips">
-    <button class="bt s" type="button" @click="add('date')">Add important date</button>
-    <button class="bt p" type="button" @click="add('event')">Add event</button>
+  </Card>
+  <div v-if="canWrite()" class="flex flex-wrap items-center gap-2">
+    <Button label="Add important date" @click="add('date')" />
+    <Button variant="solid" label="Add event" @click="add('event')" />
   </div>
 </template>
 <script setup>
 // One day of the calendar in the pane. Each entry opens its own record.
 import { onMounted, ref } from 'vue'
+import { Button } from 'frappe-ui'
+import Card from '../ui/Card.vue'
+import Row from '../ui/Row.vue'
 import Empty from '../Empty.vue'
 import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { long, short, time, weekday } from '@/lib/dates'
-import { onRecordChanged, openRef } from '@/lib/pane'
+import { onRecordChanged } from '@/lib/pane'
 
 const SOURCE = { event: 'Event', important: 'Important date', task: 'Task due', vault: 'Vault document' }
 const REF = { event: 'event', important: 'date', task: 'task', vault: 'vault' }
@@ -40,6 +44,3 @@ onMounted(() => {
   load()
 })
 </script>
-<style scoped>
-.when { width: 64px; flex: none; font-variant-numeric: tabular-nums; color: var(--ink-gray-7); }
-</style>

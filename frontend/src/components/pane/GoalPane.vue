@@ -1,34 +1,37 @@
 <template>
   <template v-if="d">
-    <div class="chips"><span class="pl" :class="d.goal.outcome === 'In Progress' ? 'b' : 'n'">{{ d.goal.outcome }}</span>
-      <span class="mt">{{ d.cycle.title }} · {{ Math.round(d.goal.percent) }}% of ticks done</span></div>
-    <section><h2 class="sh">Actions</h2>
-      <div class="cd list"><div v-for="a in d.goal.actions" :key="a.name" class="rw">
-        <div class="grow"><div class="ttl" :style="a.status !== 'Open' ? 'text-decoration: line-through; color: var(--ink-gray-6)' : ''">{{ a.title }}</div>
-          <div class="mt">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
-        <span v-if="a.status !== 'Open'" class="pl" :class="a.status === 'Done' ? 'g' : 'n'">{{ a.status }}</span></div>
-        <Empty v-if="!d.goal.actions.length" title="No actions." hint="Edit the goal on the grid to add weekly actions." /></div>
+    <div class="flex flex-wrap items-center gap-2"><Badge :theme="d.goal.outcome === 'In Progress' ? 'blue' : 'gray'" :label="d.goal.outcome" />
+      <span class="text-sm text-ink-gray-6">{{ d.cycle.title }} · {{ Math.round(d.goal.percent) }}% of ticks done</span></div>
+    <section><SectionHead>Actions</SectionHead>
+      <Card flush><Row v-for="a in d.goal.actions" :key="a.name">
+        <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
+          <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
+        <Badge v-if="a.status !== 'Open'" :theme="a.status === 'Done' ? 'green' : 'gray'" :label="a.status" /></Row>
+        <Empty v-if="!d.goal.actions.length" title="No actions." hint="Edit the goal on the grid to add weekly actions." /></Card>
     </section>
-    <section v-if="d.goal.result_note"><h2 class="sh">Result</h2><div class="cd">{{ d.goal.result_note }}</div></section>
-    <section v-if="d.tasks.length"><h2 class="sh">Tasks for this goal</h2>
-      <div class="cd list"><div v-for="t in d.tasks" :key="t.name" class="rw rowlink" @click="openRef('task:' + t.name)"><div class="grow">
-        <div class="ttl">{{ t.title }}</div><div class="mt">{{ t.status }}{{ t.due_date ? ' · due ' + short(t.due_date) : '' }}</div></div></div></div>
+    <section v-if="d.goal.result_note"><SectionHead>Result</SectionHead><Card class="text-base text-ink-gray-8">{{ d.goal.result_note }}</Card></section>
+    <section v-if="d.tasks.length"><SectionHead>Tasks for this goal</SectionHead>
+      <Card flush><Row v-for="t in d.tasks" :key="t.name" :pane="'task:' + t.name" :label="t.title"><div class="min-w-0 flex-1">
+        <div class="break-words text-base-medium text-ink-gray-9">{{ t.title }}</div><div class="text-sm text-ink-gray-6">{{ t.status }}{{ t.due_date ? ' · due ' + short(t.due_date) : '' }}</div></div></Row></Card>
     </section>
-    <section v-if="d.history.length > 1"><h2 class="sh">History across cycles</h2>
-      <div class="cd list"><div v-for="h in d.history" :key="h.name" class="rw" :class="{ rowlink: h.name !== d.goal.name }" style="align-items: center" @click="h.name !== d.goal.name && openRef('goal:' + h.name)">
-        <div class="grow"><div class="ttl">{{ h.cycle_title }}</div><div class="mt">{{ h.cycle_status }}{{ h.result_note ? ' · ' + h.result_note : '' }}</div></div>
-        <span style="width: 40px; text-align: right">{{ Math.round(h.score) }}%</span><span class="pl n">{{ h.outcome }}</span></div></div>
+    <section v-if="d.history.length > 1"><SectionHead>History across cycles</SectionHead>
+      <Card flush><Row v-for="h in d.history" :key="h.name" class="!items-center" :pane="h.name !== d.goal.name ? 'goal:' + h.name : null" :label="h.cycle_title">
+        <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ h.cycle_title }}</div><div class="text-sm text-ink-gray-6">{{ h.cycle_status }}{{ h.result_note ? ' · ' + h.result_note : '' }}</div></div>
+        <span class="w-10 text-right tabular-nums text-ink-gray-8">{{ Math.round(h.score) }}%</span><Badge :label="h.outcome" /></Row></Card>
     </section>
     <Backlinks doctype="Life Goal" :name="d.goal.name" />
   </template>
 </template>
 <script setup>
 import { onMounted, ref } from 'vue'
+import { Badge } from 'frappe-ui'
+import Card from '../ui/Card.vue'
+import Row from '../ui/Row.vue'
+import SectionHead from '../ui/SectionHead.vue'
 import Empty from '../Empty.vue'
 import Backlinks from '../Backlinks.vue'
 import { api } from '@/lib/api'
 import { short } from '@/lib/dates'
-import { openRef } from '@/lib/pane'
 
 const props = defineProps({ name: String, type: String })
 const emit = defineEmits(['meta', 'missing', 'changed', 'close'])

@@ -1,22 +1,22 @@
 <template>
-  <div class="rw" :class="{ gone: task._done, on: current && current.ref === 'task:' + task.name }" :data-ref="'task:' + task.name" tabindex="0" @keydown.enter.self="$emit('open', task)">
-    <input class="ck" type="checkbox" :checked="task.status === 'Done'" :disabled="readonly" :aria-label="'Done: ' + task.title" @change="$emit('toggle', task)" />
-    <div class="grow" style="cursor: pointer" @click="$emit('open', task)">
-      <div class="ttl" :style="task.status === 'Done' || task.status === 'Dropped' ? 'text-decoration: line-through; color: var(--ink-gray-6)' : ''">{{ task.title }}</div>
-      <div class="mt">{{ taskMeta(task, today, { withDue }) }}</div>
+  <Row :pane="'task:' + task.name" :label="task.title" class="transition-opacity" :class="task._done && 'opacity-45'" data-task-row>
+    <Checkbox class="relative mt-0.5" :model-value="task.status === 'Done'" :disabled="readonly" :aria-label="'Done: ' + task.title" @update:model-value="$emit('toggle', task)" />
+    <div class="min-w-0 flex-1" data-row-main>
+      <div class="break-words text-base-medium" :class="closed ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ task.title }}</div>
+      <div class="text-sm text-ink-gray-6">{{ taskMeta(task, today, { withDue }) }}</div>
     </div>
-    <span v-if="pill" class="pl" :class="pill.cls"><span class="only-desktop">{{ pill.text }}</span><span class="only-phone">{{ pill.shortText || pill.text }}</span></span>
-  </div>
+    <Badge v-if="pill" :theme="pill.theme"><span class="max-md:hidden">{{ pill.text }}</span><span class="md:hidden">{{ pill.shortText || pill.text }}</span></Badge>
+  </Row>
 </template>
 <script setup>
+// A task in a section list: tick it off with the checkbox, open it in the pane by clicking anywhere else on the row.
 import { computed } from 'vue'
+import { Badge, Checkbox } from 'frappe-ui'
+import Row from './ui/Row.vue'
 import { taskMeta, taskPill } from '@/lib/tasks'
-import { current } from '@/lib/pane'
 
 const props = defineProps({ task: Object, today: String, withDue: Boolean, readonly: Boolean })
-defineEmits(['toggle', 'open'])
+defineEmits(['toggle'])
 const pill = computed(() => taskPill(props.task, props.today))
+const closed = computed(() => props.task.status === 'Done' || props.task.status === 'Dropped')
 </script>
-<style scoped>
-.gone { opacity: 0.45; transition: opacity 0.2s; }
-</style>

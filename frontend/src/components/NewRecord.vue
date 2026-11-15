@@ -1,30 +1,25 @@
 <template>
-  <Dialog v-model="open" :title="title" size="md">
-    <div style="display: flex; flex-direction: column; gap: 12px">
-      <div v-for="fld in fields" :key="fld.name" class="field">
-        <label class="lbl" :for="'nr-' + fld.name">{{ fld.label }}</label>
-        <select v-if="fld.options" :id="'nr-' + fld.name" v-model="values[fld.name]" class="inp">
-          <option v-if="!fld.required" :value="undefined">—</option>
-          <option v-for="o in fld.options" :key="o.value ?? o" :value="o.value ?? o">{{ o.label ?? o }}</option>
-        </select>
-        <textarea v-else-if="fld.type === 'textarea'" :id="'nr-' + fld.name" v-model="values[fld.name]" class="inp" rows="3"></textarea>
-        <input v-else :id="'nr-' + fld.name" v-model="values[fld.name]" class="inp" :type="fld.type || 'text'" :maxlength="fld.maxlength"
-          :placeholder="fld.placeholder" @keydown.enter="fld.type !== 'textarea' && submit()" />
-        <div v-if="fld.help" class="mt">{{ fld.help }}</div>
-      </div>
+  <Dialog v-model:open="open" :title="title" size="md" :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: action, variant: 'solid', onClick: submit }]">
+    <div class="flex flex-col gap-3">
+      <template v-for="fld in fields" :key="fld.name">
+        <LifeLink v-if="fld.link" v-model="values[fld.name]" :doctype="fld.link" :filters="fld.filters" :label="fld.label" :required="fld.required" :placeholder="fld.placeholder" />
+        <FormControl v-else-if="fld.options" v-model="values[fld.name]" type="select" :label="fld.label" :required="fld.required" :description="fld.help"
+          :placeholder="fld.placeholder || 'Choose'" :options="options(fld)" />
+        <FormControl v-else-if="fld.type === 'textarea'" v-model="values[fld.name]" type="textarea" :label="fld.label" :required="fld.required" :description="fld.help" :rows="3" />
+        <DatePicker v-else-if="fld.type === 'date'" v-model="values[fld.name]" :label="fld.label" :required="fld.required" :description="fld.help" />
+        <FormControl v-else v-model="values[fld.name]" :type="fld.type || 'text'" :label="fld.label" :required="fld.required" :description="fld.help" :maxlength="fld.maxlength"
+          :placeholder="fld.placeholder" @keydown.enter="submit()" />
+      </template>
     </div>
-    <template #actions>
-      <div style="display: flex; gap: 8px; justify-content: flex-end">
-        <button class="bt s" type="button" @click="open = false">Cancel</button>
-        <button class="bt p" type="button" :disabled="busy" @click="submit">{{ action }}</button>
-      </div>
-    </template>
   </Dialog>
 </template>
 <script setup>
-// A small form dialog used for "New project", "New note", "Add event" and the like.
+// A small form dialog used for "New project", "New note", "Add event" and the like. Every control is a library control:
+// frappe-ui FormControl and DatePicker, and @framework/ui's Link (through LifeLink) for a field that points to a record.
+// A field is { name, label, required, help, placeholder } plus one of: options (a select), type ('textarea', 'date', 'number'), link (a DocType).
 import { reactive, ref, watch } from 'vue'
-import { Dialog, toast } from 'frappe-ui'
+import { DatePicker, Dialog, FormControl, toast } from 'frappe-ui'
+import LifeLink from '@/framework/LifeLink.vue'
 import { errorText } from '@/lib/api'
 
 const props = defineProps({ modelValue: Boolean, title: String, action: { type: String, default: 'Save' }, fields: Array, initial: { type: Object, default: () => ({}) }, save: Function })
@@ -32,6 +27,7 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 const open = ref(props.modelValue)
 const values = reactive({})
 const busy = ref(false)
+const options = (fld) => fld.options.map((o) => (typeof o === 'object' ? { label: o.label, value: o.value } : { label: String(o), value: o }))
 watch(() => props.modelValue, (v) => {
   open.value = v
   if (v) {
@@ -42,6 +38,7 @@ watch(() => props.modelValue, (v) => {
 watch(open, (v) => emit('update:modelValue', v))
 
 async function submit() {
+  if (busy.value) return
   for (const fld of props.fields) {
     if (fld.required && (values[fld.name] === undefined || values[fld.name] === '' || values[fld.name] === null)) {
       toast.error(`${fld.label} is needed.`)
@@ -50,7 +47,8 @@ async function submit() {
   }
   busy.value = true
   try {
-    const out = await props.save({ ...values })
+    const clean = Object.fromEntries(Object.entries(values).map(([k, v]) => [k, v === null ? undefined : v]))
+    const out = await props.save(clean)
     open.value = false
     emit('saved', out)
   } catch (e) {

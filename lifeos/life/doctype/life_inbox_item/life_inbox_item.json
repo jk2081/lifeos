@@ -51,14 +51,14 @@
    "fieldtype": "Select",
    "label": "Source Type",
    "options": "Upload\nJournal Photo\nVoice Note\nEmail\nChat\nMessage\nWeb",
-   "default": "Upload",
-   "in_list_view": 1
+   "default": "Upload"
   },
   {
    "fieldname": "received_on",
    "fieldtype": "Datetime",
    "label": "Received On",
-   "search_index": 1
+   "search_index": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "instruction",
@@ -132,7 +132,8 @@
    "label": "Area",
    "options": "Life Area",
    "search_index": 1,
-   "in_standard_filter": 1
+   "in_standard_filter": 1,
+   "in_list_view": 1
   },
   {
    "fieldname": "also_in",
