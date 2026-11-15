@@ -54,6 +54,21 @@ These components exist in frappe-ui 1.2.0 and must be used.
 | Markdown reader and editor | Ours. Toolbar buttons are `Button`. Editor theme uses token variables |
 | Review layout, month plan layout, check-in form | Ours for layout. Every control inside is frappe-ui |
 
+### Try frappe-ui's experimental parts first
+
+frappe-ui also ships components under `frappe-ui/experimental` and a data layer. Before keeping a hand-written version, try these, in this order of value:
+
+| Ours today | Try | Keep ours if |
+| --- | --- | --- |
+| Row rendering inside `ListView` | `experimental/ListView` (rows, columns, selection, group headers) | It cannot do our board, cards and phone row layouts, or the list + pane selection state. Our `ListView` stays as the wrapper that owns filters, views and the remembered state either way |
+| Hand-written fetch, paging and reload code in lists | `useList`, `useDoc`, `useCall` from the data-fetching layer | A screen reads from `Life Index` through a custom method that these cannot wrap cleanly |
+| Calendar month and week views | `experimental/Calendar` | It cannot show our event types or the click-to-open pane. The year view stays ours |
+| Search and quick jump | `experimental/CommandPalette` | It cannot be fed from our search method |
+
+These are marked experimental and their APIs may change. Pin the frappe-ui version exactly in `package.json`, import them only inside our own wrapper components so one file changes if they move, and record in `DECISIONS.md` which were adopted and which were not, with the reason.
+
+Note: frappe-ui does not remember list filters. Nothing in the library saves or restores list state, so the next section is our code whichever list rows are used.
+
 ## One behaviour change in this set: lists remember their filters
 
 Today a list's filters survive a reload but are lost when the owner goes to another screen and comes back. Fix this in `ListView`, so every list gets it.
