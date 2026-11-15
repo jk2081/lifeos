@@ -88,7 +88,72 @@ Below 640 px wide, two side-by-side layouts become tabs. Desktop keeps them side
 
 ## 5. Settings
 
-Tabs down the left on desktop and across the top on a phone: **Spaces and members**, **Review and archive**, **Areas**, **Tags**, **Check-in dimensions**, **Habits**. Use frappe-ui's settings layout if set 2 adopted it; otherwise `Tabs` in its vertical form. The theme buttons stay in the header.
+Settings is rebuilt, not just split. Today it shows six unrelated jobs at once in two columns, repeats three text buttons on every row, mixes personal and admin settings, and shows technical role names.
+
+### Layout
+
+A left menu with three groups. One section shows at a time, in a single column no wider than about 720 px. Use frappe-ui's settings layout if set 2 adopted it; otherwise `Tabs` in its vertical form. The open section is in the URL (`tab=`).
+
+| Group | Sections |
+| --- | --- |
+| Me | Appearance, Default space, Weekly review |
+| This space | Areas, Tags, Habits, Check-in dimensions, Archive rules, Archived |
+| Admin | Spaces and members, Agents |
+
+- **This space** has a space picker at the top of the group, defaulting to the current space. Every section under it names the space in its heading. Changing it here does not change the space in the sidebar.
+- **Admin** shows only to a Life Admin.
+- **Phone:** the menu is the first screen; tapping a section opens it full width with Back to return.
+
+### Lists: areas, tags, habits, check-in dimensions
+
+One shared component for all four.
+
+- A row shows the name and a quiet count of what sits under it (areas: active records; tags: tagged records; habits: months it is used in; dimensions: check-ins that scored it). The count links to the matching list where one exists.
+- **Reorder by dragging** a handle, where the list is ordered. Areas can also be dragged under another area to nest them, one level deep as today, and back out to the top level. Keyboard: with a row focused, Alt+Up and Alt+Down move it. On a phone, the row menu offers Move up, Move down and Move under.
+- **Rename in place:** click the name, edit, Enter saves, Escape cancels.
+- **One "…" menu per row** with Rename, Move under (areas), and Archive. No row of text buttons.
+- **One "New …" button** at the top right of the section, opening a small dialog (name, and for an area, its parent).
+
+### Archive, never delete
+
+Nothing in these four lists is deleted from Settings. The only removal is **Archive**.
+
+- Archiving an area asks for confirmation in a `Dialog` that states what happens: the area leaves the Areas screen, the pickers and the filters; its records are not changed and stay where they are, still findable through search, the Timeline and their own screens. If the area has sub-areas, they are archived with it and the dialog says how many.
+- Archiving a tag, habit or dimension works the same way: it leaves the pickers, and past records that use it keep it.
+- Keep the server behaviour for archiving as it is today. If the current code does something different from the description above (for example to the records under an archived area), keep the code's behaviour, make the dialog describe it accurately, and note it in `DECISIONS.md`.
+- Remove the delete path for these four kinds from the Settings screen. The API method may keep it for agents and tests.
+
+### Archived section
+
+A separate section, under This space, listing everything archived from these lists, grouped as Areas, Tags, Habits, Check-in dimensions.
+
+- A row shows the name, when it was archived, and the count of records still filed under it.
+- **Restore** on each row puts it back where it was (an area returns under its old parent if that parent is active, otherwise at the top level). Restoring an area asks whether to restore the sub-areas that were archived with it.
+- A link at the top, "Archived records are on the Archive screen", goes to `/archive`. This section is only for the headings themselves; archived tasks, notes and the rest stay on the Archive screen.
+- If the archive date is not stored today, add it (`archived_on`) to these four DocTypes with a patch that leaves existing archived rows blank. This and the counts are the only data changes Settings needs.
+
+### Spaces and members
+
+- A list of spaces on the left of the section (or a `Select` on a phone); choosing one shows its members as rows: `Avatar`, name, email, access, and a "…" menu with Remove.
+- Access is a `Select` reading **Can view** or **Can edit**. Do not show role names such as "Life Agent, Life Admin, Life User" anywhere.
+- Hide the built-in Administrator account from every list.
+- Agents are not shown here; they are in the Agents section.
+- **Add member** opens a dialog with a user search (`Link` on User through our wrapper), not a free-text email box, plus the access choice.
+- The owner of a space cannot be removed and shows an "Owner" badge.
+- **New space** is a button opening a dialog (name, owner). The line about a new space starting with four areas becomes help text in that dialog.
+- Removing a member asks for confirmation.
+
+### Agents
+
+Lists the agent users (Hermes, Claude and any other with the agent role): name, which spaces each can reach with what access, and when each last filed something if that is cheap to read from existing data. Access per space is changed here with the same Can view / Can edit control. No keys or secrets are shown or created on this screen.
+
+### Plain settings: Appearance, Default space, Weekly review, Archive rules
+
+- One setting per row: label, one line of help text, control on the right (stacked on a phone).
+- **Appearance:** Light, Dark, System as `TabButtons`. Remove the theme buttons from the page header.
+- **Weekly review:** review day, review time, score target.
+- **Archive rules:** archive after (days), task is stale after (days), each with help text saying exactly what it does (for example which record types are never archived automatically).
+- Each change saves on its own and confirms with a short "Saved" toast, or shows the error inline under the field and restores the old value.
 
 ## 6. Leave as they are
 
@@ -97,7 +162,7 @@ Today, Timeline, Areas, Graph, Library (Tree and List stay a view switch), the G
 ## What must not change
 
 - No record, field, filter or action is removed. Everything on a screen today is still reachable, at most one tab away.
-- The API and data model, apart from the tab counts added to list methods.
+- The API and data model, apart from the tab counts added to list methods and the small additions the Settings section names.
 - Space rules, the pane behaviour, count links, shortcuts and remembered views from sets 1 and 2.
 
 ## Checks
@@ -109,7 +174,7 @@ Today, Timeline, Areas, Graph, Library (Tree and List stay a view switch), the G
   - Inbox, Tasks, Projects, Archive, Chats, Vault: each tab's count equals the number of rows it shows, with and without another filter applied. Every count link from Today and the Area page lands on the expected tab.
   - Tasks: Open loops is a tab, the layout switch has three options, and Board is not offered on Done.
   - Phone: the review screen and the journal page show tabs; at 1440 px they do not.
-  - Settings: each tab opens and saves as before.
+  - Settings: every section opens from the menu and from its URL. Rename, reorder and nest an area. Archive an area with a sub-area: both leave the Areas screen and the area pickers, their records are unchanged, and both appear under Archived. Restore brings them back in place. No Delete or Remove action exists for areas, tags, habits or dimensions. Add and remove a member through the dialogs. No role name and no Administrator row appears. A changed setting shows "Saved" and survives a reload. The family test user sees no Admin group.
   - No screen scrolls sideways at 390 px; the tab row does.
 - All unit tests pass, with new tests for the tab counts in each list method, including a member of another space seeing only their own counts.
 - Screenshot every changed screen and each tab at both widths in light and dark, look at each, and fix anything broken.
@@ -117,6 +182,6 @@ Today, Timeline, Areas, Graph, Library (Tree and List stay a view switch), the G
 
 ## Working rules
 
-- Work in this order: shared tab helpers and the URL rule, list state tabs (Tasks first), record pane, Area page, Project page, phone-only tabs, Settings, then the check on Journal and Calendar.
+- Work in this order: shared tab helpers and the URL rule, list state tabs (Tasks first), record pane, Area page, Project page, phone-only tabs, Settings (layout first, then the shared list component, archive and the Archived section, members and agents), then the check on Journal and Calendar.
 - Run the acceptance script after each step and commit once per step.
 - Record deviations in `DECISIONS.md`. Add a "UX fixes, set 3" section to `STATUS.md` when finished, then create an empty file named `UX_FIXES_3_DONE` and commit.
