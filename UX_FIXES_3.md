@@ -1,4 +1,4 @@
-# UX fixes, set 3: tabbed navigation
+# UX fixes, set 3: tabbed navigation, Settings and the sidebar
 
 Frappe organises information with tabs in three ways: tabs on a record, tabs on a list that split it by state, and tabs on a page with sub-screens. This set applies the same three patterns to Life OS.
 
@@ -155,9 +155,34 @@ Lists the agent users (Hermes, Claude and any other with the agent role): name, 
 - **Archive rules:** archive after (days), task is stale after (days), each with help text saying exactly what it does (for example which record types are never archived automatically).
 - Each change saves on its own and confirms with a short "Saved" toast, or shows the error inline under the field and restores the old value.
 
-## 6. Leave as they are
+## 6. Sidebar
 
-Today, Timeline, Areas, Graph, Library (Tree and List stay a view switch), the Goal page, and everything inside the Journal tabs. Journal and Calendar already have tabs; check they meet the rules above (URL, phone scrolling, `[` and `]`) and change nothing else.
+Today the sidebar is 13 items in one flat list at equal weight. Rebuild it in groups, with the owner's areas in the middle. Use frappe-ui's `Sidebar` as adopted in set 2.
+
+| Group | Items |
+| --- | --- |
+| Top | Space switcher. Under it, **Search** (with the ⌘K hint) and a **New** button side by side |
+| (no heading) | Today, Inbox, Tasks, Calendar |
+| Plan | Journal, Projects |
+| Areas | Every active area of the current space, in its saved order, with sub-areas nested under their parent |
+| Records | Notes, Vault, Chats, Timeline |
+| Bottom, pinned | Archive, Settings |
+
+- **Areas group.** Each area links to its area page. A parent with sub-areas has a chevron to expand it; clicking its name still opens the parent's page. The group heading "Areas" links to the all-areas screen (`/areas`). If a space has more than 12 top-level areas, show the first 12 and a "All areas" row. Archived areas do not show. The list updates at once when an area is added, renamed, reordered or archived in Settings.
+- **Collapsible groups.** Plan, Areas and Records each collapse from their heading. Which groups and which parent areas are open is remembered per user, with the other view state from set 2. All open by default.
+- **Active item.** Exactly one item is marked active. On an area page it is that area (and its parent is expanded). On a project page it is Projects. On `/areas` it is the Areas heading.
+- **Counts.** Inbox keeps its count of items to review. Tasks gains a count of tasks due today or overdue, the same number as Today's "Due today". No other counts. Both update when the underlying number changes, without a reload.
+- **New button.** Opens a small menu: Task (the existing quick add), Note, Project, Add to Inbox. The `n` shortcut still opens quick add for a task directly.
+- **Rename Library to Notes.** This is a label change everywhere the word shows: sidebar, page title, breadcrumbs, empty states, search results, shortcut help, phone "More" list. The route stays `/library` and the DocType stays `Life Note`. **Vault keeps its name.**
+- **Graph leaves the sidebar** and becomes a third view on the Notes screen, beside Tree and List. The route `/graph` keeps working and opens Notes on the Graph view. Its `g` shortcut, if it has one, still works.
+- **Timeline** gains a `Tooltip` on its sidebar item: "Everything, by date".
+- **Collapsed rail.** If frappe-ui's sidebar offers a collapsed icon-only state, enable it on desktop, remembered per user. In that state the Areas group shows one Areas icon that opens `/areas`.
+- **Phone.** The bottom bar is unchanged: Today, Inbox, Tasks, Journal, More. "More" opens this same grouped list, full screen, with Search and New at the top. The Tasks tab shows the same count as the sidebar.
+- **Access.** A member with view-only access sees no New button. Everyone sees only the areas of spaces they belong to.
+
+## 7. Leave as they are
+
+Today, Timeline, Areas, Library (now labelled Notes; Tree, List and Graph are a view switch), the Goal page, and everything inside the Journal tabs. Journal and Calendar already have tabs; check they meet the rules above (URL, phone scrolling, `[` and `]`) and change nothing else.
 
 ## What must not change
 
@@ -175,6 +200,7 @@ Today, Timeline, Areas, Graph, Library (Tree and List stay a view switch), the G
   - Tasks: Open loops is a tab, the layout switch has three options, and Board is not offered on Done.
   - Phone: the review screen and the journal page show tabs; at 1440 px they do not.
   - Settings: every section opens from the menu and from its URL. Rename, reorder and nest an area. Archive an area with a sub-area: both leave the Areas screen and the area pickers, their records are unchanged, and both appear under Archived. Restore brings them back in place. No Delete or Remove action exists for areas, tags, habits or dimensions. Add and remove a member through the dialogs. No role name and no Administrator row appears. A changed setting shows "Saved" and survives a reload. The family test user sees no Admin group.
+  - Sidebar: the groups and items match the table in section 6. Each seeded area shows and opens its page, and is marked active there. Sub-areas expand under their parent. Collapsing a group survives leaving and reloading. The Tasks count equals Today's "Due today" number and drops by one when such a task is completed. New opens its menu and each entry works. "Library" appears nowhere in the interface; "Notes" opens `/library`. `/graph` opens the Graph view of Notes. Archiving an area in Settings removes it from the sidebar without a reload. The phone More list shows the same groups.
   - No screen scrolls sideways at 390 px; the tab row does.
 - All unit tests pass, with new tests for the tab counts in each list method, including a member of another space seeing only their own counts.
 - Screenshot every changed screen and each tab at both widths in light and dark, look at each, and fix anything broken.
@@ -182,6 +208,6 @@ Today, Timeline, Areas, Graph, Library (Tree and List stay a view switch), the G
 
 ## Working rules
 
-- Work in this order: shared tab helpers and the URL rule, list state tabs (Tasks first), record pane, Area page, Project page, phone-only tabs, Settings (layout first, then the shared list component, archive and the Archived section, members and agents), then the check on Journal and Calendar.
+- Work in this order: shared tab helpers and the URL rule, list state tabs (Tasks first), record pane, Area page, Project page, phone-only tabs, Settings (layout first, then the shared list component, archive and the Archived section, members and agents), the sidebar, then the check on Journal and Calendar.
 - Run the acceptance script after each step and commit once per step.
 - Record deviations in `DECISIONS.md`. Add a "UX fixes, set 3" section to `STATUS.md` when finished, then create an empty file named `UX_FIXES_3_DONE` and commit.
