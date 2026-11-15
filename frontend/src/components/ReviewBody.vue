@@ -21,9 +21,11 @@
       <Alert v-if="item.status === 'Failed'" theme="red" title="Processing failed." :description="item.error" />
       <Alert v-else-if="item.status === 'New' || item.status === 'Processing'" :title="item.status === 'New' ? 'Waiting for an agent.' : 'An agent is processing this.'"
         description="The summary and proposals show here when it is done." />
+      <!-- below 640 px the four parts are tabs; wider screens show them side by side -->
+      <TabBar v-if="phone" :tabs="phoneTabs" :model-value="ptab.current.value" label="Inbox item parts" :level="page ? 1 : 2" data-review-tabs @update:model-value="ptab.set" />
       <div class="cols">
         <div class="half">
-          <section>
+          <section v-show="part('original')">
             <SectionHead>Original</SectionHead>
             <div v-if="!item.files.length && !item.raw_text" class="grid min-h-[120px] place-items-center rounded-5 border border-dashed border-outline-gray-3 bg-surface-gray-1 text-base text-ink-gray-6"><span>No file was attached.</span></div>
             <div v-for="f in item.files" :key="f.file_url" class="mb-3">
@@ -43,7 +45,9 @@
             </div>
             <Card v-if="item.raw_text" class="mt-2"><Md :text="item.raw_text" /></Card>
           </section>
-          <section v-if="item.transcript_md || editingTranscript">
+          <Card v-if="phone && part('transcript') && !item.transcript_md && !editingTranscript"><Empty title="No transcript." :hint="writable ? 'Add one if the original needs it.' : ''" />
+            <div v-if="writable" class="mt-2"><Button label="Write a transcript" @click="startTranscript" /></div></Card>
+          <section v-if="(item.transcript_md || editingTranscript) && part('transcript')">
             <SectionHead>Transcript
               <template v-if="writable && !editingTranscript" #action><Button variant="ghost" size="sm" label="Edit" @click="startTranscript" /></template>
             </SectionHead>
@@ -62,11 +66,12 @@
         </div>
 
         <div class="half">
-          <section v-if="item.summary_md">
+          <Card v-if="phone && part('summary') && !item.summary_md"><Empty title="No summary." hint="The agent adds a summary when it processes the item." /></Card>
+          <section v-if="item.summary_md && part('summary')">
             <SectionHead>Summary</SectionHead>
             <Card><Md :text="item.summary_md" /></Card>
           </section>
-          <section>
+          <section v-show="part('proposals')">
             <SectionHead ref="proposalsHead" data-proposals>Proposals<template v-if="item.proposals.length"> · {{ countsLine }}</template></SectionHead>
             <div class="flex flex-col gap-3">
               <Card v-for="p in item.proposals" :key="p.name" class="flex flex-col gap-2" :tint="p.status !== 'Pending'" :data-proposal="p.status">
@@ -126,7 +131,7 @@
             </div>
             <p class="mt-3 text-sm text-ink-gray-6">Nothing here becomes a record until you accept it. The original is always kept.</p>
           </section>
-          <Backlinks doctype="Life Inbox Item" :name="item.name" :reload="reloadKey" />
+          <Backlinks v-show="part('proposals')" doctype="Life Inbox Item" :name="item.name" :reload="reloadKey" />
         </div>
       </div>
     </div>
@@ -166,11 +171,15 @@ import Md from './Md.vue'
 import Pick from './Pick.vue'
 import Empty from './Empty.vue'
 import Backlinks from './Backlinks.vue'
+import TabBar from './TabBar.vue'
+import { useMediaQuery } from '@vueuse/core'
+import { useUrlTab } from '@/lib/tabs'
 import { api, errorText, tryCall } from '@/lib/api'
 import { refreshCounts, store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { fileKind, fileSize } from '@/lib/upload'
 import { openRoute, recordChanged } from '@/lib/pane'
+import { goalOptions } from '@/lib/lookups'
 
 // The review of one inbox item. It is the full page at /inbox/:id/review and the content of the record pane.
 const props = defineProps({ id: String, name: String, type: String, page: Boolean })
@@ -196,6 +205,16 @@ const ctx = computed(() => item.value?.context || { areas: [], projects: [], tag
 const canRestore = computed(() => store.spaces.find((s) => s.name === item.value?.space)?.access === 'Write')
 const writable = computed(() => canRestore.value && !item.value?.is_archived)
 const pending = computed(() => item.value.proposals.filter((p) => p.status === 'Pending'))
+// Phone only: Original, Transcript, Summary, Proposals as tabs (tab= on the page, ptab= in the pane). It opens on
+// Proposals while some are pending, otherwise on Summary.
+const phone = useMediaQuery('(max-width: 639px)')
+const phoneTabs = computed(() => !item.value ? [] : [{ value: 'original', label: 'Original' }, { value: 'transcript', label: 'Transcript' },
+  { value: 'summary', label: 'Summary' }, { value: 'proposals', label: 'Proposals', count: item.value.proposals.length, noun: 'proposals' }])
+// the opening tab is decided once, so accepting the last proposal does not move the screen to another tab
+let opening = null
+const ptab = useUrlTab(props.page ? 'tab' : 'ptab', phoneTabs, { replace: !props.page,
+  fallback: () => opening || (opening = item.value ? (pending.value.length ? 'proposals' : 'summary') : null) })
+const part = (t) => !phone.value || ptab.current.value === t
 const pct = (c) => Math.round((c || 0) * 100)
 const countsLine = computed(() => {
   const by = (s) => item.value.proposals.filter((p) => p.status === s).length
@@ -230,7 +249,7 @@ function linkOptions(doctype) {
   const c = ctx.value
   const map = {
     'Life Area': areaOptions.value, 'Life Project': c.projects.map((x) => ({ value: x.name, label: x.title })),
-    'Life Goal': c.goals.map((x) => ({ value: x.name, label: x.title })), 'Life Person': c.people.map((x) => ({ value: x.name, label: x.full_name })),
+    'Life Goal': goalOptions(c.goals, { empty: null }), 'Life Person': c.people.map((x) => ({ value: x.name, label: x.full_name })),
     'Life Habit': c.habits.map((x) => ({ value: x.name, label: x.title })),
   }
   return map[doctype] || []

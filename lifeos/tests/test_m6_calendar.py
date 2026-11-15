@@ -96,7 +96,9 @@ class TestCalendar(LifeTestCase):
 		frappe.db.set_single_value("Life Settings", "default_space", SHARED)
 		self.addCleanup(frappe.db.set_single_value, "Life Settings", "default_space", before)
 		self.as_user(FAMILY)
-		event = frappe.get_doc({"doctype": "Event", "subject": "Synced from Google m6", "starts_on": "2026-11-21 09:00:00"}).insert()
+		# set 3: a Life User has no desk access, so core Event's own create permission (Desk User) is not theirs; the
+		# Google sync writes the event for them, which is what this stands for
+		event = frappe.get_doc({"doctype": "Event", "subject": "Synced from Google m6", "starts_on": "2026-11-21 09:00:00"}).insert(ignore_permissions=True)
 		self.assertEqual(event.life_space, SHARED)
 		self.as_user(OWNER)
 		self.assertIn("Synced from Google m6", titles(calendar.get(space=SHARED, from_date="2026-11-21", to_date="2026-11-21")["items"]))

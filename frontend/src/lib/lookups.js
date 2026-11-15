@@ -19,3 +19,11 @@ export function areaLabel(a) {
 }
 export const areaOptions = () => lookups.areas.map((a) => ({ value: a.name, label: areaLabel(a) }))
 export const areaName = (id) => lookups.areas.find((a) => a.name === id)?.area_name || ''
+
+// The goal picker on a task: every goal in progress, grouped by type (12 Week Year, Annual, Open) in that order
+const GOAL_TYPES = ['12 Week Year', 'Annual', 'Open']
+export function goalOptions(goals = lookups.goals || [], { empty = '—' } = {}) {
+  const out = empty === null ? [] : [{ label: empty, value: '' }]
+  for (const t of GOAL_TYPES) for (const g of goals.filter((x) => (x.goal_type || '12 Week Year') === t)) out.push({ label: `${t} · ${g.title}`, value: g.name })
+  return out
+}

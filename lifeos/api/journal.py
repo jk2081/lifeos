@@ -132,18 +132,37 @@ def goals(space=None, area=None):
 			"current_week": g["current_week"], "average": g["average"], "past_end": g["past_end"], "goals": rows})
 	areas = frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set"), "is_archived": 0}, fields=["name", "area_name"], order_by="sort_order")
 	used = {r[0] for r in frappe.db.sql("select distinct area from `tabLife Goal` where space=%s", space)}
+	from lifeos.api.goals import with_tasks
+
+	with_tasks([r for c in out for r in c["goals"]])
 	return {"cycles": out, "target": target, "areas": [a for a in areas if a.name in used]}
 
 
 @frappe.whitelist()
 def goal(goal):
 	"""A goal page: the goal, its actions, and its history across cycles through the carried_from chain."""
+	from lifeos.api.goals import task_counts
+
 	doc = permissions.get_doc_checked("Life Goal", goal)
+	done, counted = task_counts([doc.name]).get(doc.name, (0, 0))
+	order = ["Doing", "Open", "Waiting", "Done", "Dropped", "Carried"]
+	tf = {"goal": doc.name}
+	if frappe.session.user != "Administrator":  # a member sees only the tasks of their own spaces
+		tf["space"] = ("in", [*permissions.user_spaces()] or [""])
+	tasks = sorted(frappe.get_all("Life Task", filters=tf,
+		fields=["name", "title", "status", "due_date", "is_archived"], limit=200),
+		key=lambda t: (order.index(t.status) if t.status in order else 9, t.due_date is None, str(t.due_date or "")))
+	common = {"space": doc.space, "goal_type": doc.goal_type or "12 Week Year", "target_date": str(doc.target_date) if doc.target_date else None,
+		"closed_on": str(doc.closed_on) if doc.closed_on else None, "tasks": tasks, "tasks_done": done, "tasks_counted": counted}
+	if not doc.cycle:
+		g = {"name": doc.name, "title": doc.title, "area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
+			"project": doc.project, "actions": [], "percent": None, "outcome": doc.outcome, "result_note": doc.result_note, "carried_from": None}
+		cycles = frappe.get_all("Life Cycle", filters={"space": doc.space, "status": ("in", ["Active", "Planned"])}, fields=["name", "title", "status"], order_by="start_date")
+		return {"goal": g, "cycle": None, "cycles": cycles, "history": [], **common}
 	g = next((x for x in rules.grid(doc.cycle)["goals"] if x["name"] == doc.name), None)
 	cycle = frappe.db.get_value("Life Cycle", doc.cycle, ["title", "status", "start_date", "end_date"], as_dict=True)
-	return {"goal": g, "cycle": {"name": doc.cycle, "title": cycle.title, "status": cycle.status}, "space": doc.space,
-		"history": rules.goal_history(doc.name),
-		"tasks": frappe.get_all("Life Task", filters={"goal": doc.name}, fields=["name", "title", "status", "due_date"], limit=50)}
+	return {"goal": g, "cycle": {"name": doc.cycle, "title": cycle.title, "status": cycle.status},
+		"history": rules.goal_history(doc.name), **common}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -294,7 +313,7 @@ def toggle_habit(habit, date=None, done=None):
 def habit_library(space=None):
 	"""Every habit ever tracked in a space."""
 	space = permissions.resolve_space(space)
-	return frappe.get_all("Life Habit", filters={"space": space}, fields=["name", "title", "area"], order_by="title", limit=200)
+	return frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title", "area"], order_by="title", limit=200)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -339,7 +358,7 @@ def checkins(space=None, start=0, page_length=30):
 	start, page_length = page(start, page_length)
 	names = frappe.get_all("Life Check-in", filters={"space": space}, pluck="name", order_by="date desc", limit_start=start, limit=page_length)
 	rows = [_checkin_dict(frappe.get_doc("Life Check-in", n)) for n in names]
-	dims = frappe.get_all("Life Dimension", filters={"space": space}, fields=["name", "dimension_name"], order_by="sort_order", limit=50)
+	dims = frappe.get_all("Life Dimension", filters={"space": space}, fields=["name", "dimension_name", "is_archived"], order_by="sort_order", limit=50)
 	series = []
 	for d in dims:
 		points = []

@@ -1,12 +1,14 @@
 <template>
-  <ListView ref="list" title="Tasks" noun="tasks" screen="tasks" doctype="Life Task" :spec="SPEC" :flag-labels="FLAGS" :quiet="['archived']" :quick="QUICK" :virtual="VIRTUAL"
+  <ListView ref="list" :title="embed ? null : 'Tasks'" noun="tasks" :screen="embed ? embed.screen + '-tasks' : 'tasks'" :fixed="embed?.fixed" :active="embed ? embed.active : true" :tabs-in-filter="!!embed"
+    doctype="Life Task" :spec="SPEC" :flag-labels="FLAGS" :quiet="['archived']" :quick="QUICK" :virtual="VIRTUAL"
     :synthetic="SYNTHETIC" :views="views" :tabs="TABS" :fetch="fetch" :row-ref="(r) => 'task:' + r.name" :group-by="dueGroup"
     :empty-title="EMPTY[tab] || 'No tasks here.'"
     :empty-hint="tab === 'loops' ? 'Open tasks older than 14 days with no due date gather here.' : tab === 'open' ? 'Type a title in the box above and press Enter, or accept a task proposal in the Inbox.' : ''"
     @loaded="(res) => (today = res.today)">
     <template #sub><span data-tasks-sub>{{ tab === 'loops' ? 'Open loops: open tasks older than 14 days with no due date. Give each a date, carry it, or drop it.' : `${store.space} · by due date, then priority` }}</span></template>
     <template #above>
-      <TextInput v-if="canWrite()" v-model="quick" size="md" placeholder="Add a task and press Enter. A date word such as tomorrow or fri sets the due date."
+ <div v-if="embed && tab === 'loops'" class="text-sm text-ink-gray-6" data-tasks-sub>Open loops: open tasks older than 14 days with no due date. Give each a date, carry it, or drop it.</div>
+      <TextInput v-if="embed ? embed.writable : canWrite()" v-model="quick" size="md" placeholder="Add a task and press Enter. A date word such as tomorrow or fri sets the due date."
         aria-label="Quick add" @keydown.enter="add" />
     </template>
 
@@ -90,6 +92,8 @@ const FLAGS = { archived: 'Include archived' }
 const QUICK = ['area', 'project', 'priority', 'due_date']
 const VIRTUAL = [{ fieldname: 'tag', label: 'Tag', fieldtype: 'Link', options: 'Life Tag' }]
 const SYNTHETIC = [{ key: '_check', label: '', width: '2rem', place: 'start' }]
+// Inside a record page's tab (the area or project page): { screen, fixed: { area } or { project }, active(route) }
+const props = defineProps({ embed: { type: Object, default: null } })
 const route = useRoute()
 const router = useRouter()
 const list = ref(null)
@@ -104,7 +108,7 @@ const board = computed(() => (tab.value === 'open' ? ['Open', 'Doing'] : BOARD))
 
 // Links from before the tabs: view=loops was a layout and is now the Open loops tab; done=1 added closed tasks to the open ones.
 watch(() => [route.query.view, route.query.done], ([v, done]) => {
-  if (v !== 'loops' && !done) return
+  if ((v !== 'loops' && !done) || (props.embed && !props.embed.active(route))) return
   const query = { ...route.query, done: undefined }
   if (v === 'loops') Object.assign(query, { view: undefined, status: 'loops' })
   else if (!query.status) query.f = JSON.stringify([...parseWire(query.f).filter((w) => w[0] !== 'status'), ['status', '!=', 'Carried']])
@@ -125,7 +129,7 @@ function dueGroup(t) {
 }
 
 async function fetch({ params: p, tab: t, filters, order_by, fields, summary, start, page_length, view: v }) {
-  const base = { space: store.space, area: p.area, project: p.project, tag: p.tag, priority: p.priority, goal: p.goal, due: p.due,
+  const base = { space: props.embed?.space || store.space, area: p.area, project: p.project, tag: p.tag, priority: p.priority, goal: p.goal, due: p.due,
     include_archived: p.archived ? 1 : 0, completed_from: p.completed_from, completed_to: p.completed_to, filters }
   // what each tab asks the server for; under All a status that is not a tab (status=Dropped) is passed as it is
   const status = t === 'open' ? 'open_doing' : t === 'loops' ? 'open' : t === 'all' ? p.status || 'all' : t
@@ -147,9 +151,9 @@ async function add() {
   const text = quick.value.trim()
   if (!text) return
   quick.value = ''
-  const q = route.query
+  const q = { ...route.query, ...(props.embed?.fixed || {}) }
   const area = q.area && q.area !== 'none' ? q.area : undefined
-  const t = await tryCall(() => api('tasks.quick_add', { text, space: store.space, area, project: q.project && q.project !== 'none' ? q.project : undefined, goal: q.goal || undefined }))
+  const t = await tryCall(() => api('tasks.quick_add', { text, space: props.embed?.space || store.space, area, project: q.project && q.project !== 'none' ? q.project : undefined, goal: q.goal || undefined }))
   if (t) list.value.reload()
   else quick.value = text
 }

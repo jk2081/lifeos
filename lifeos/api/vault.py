@@ -75,6 +75,8 @@ def count(space, **filters):
 
 def expiry_counts(space):
 	"""How many documents have expired and how many expire within 60 days, counted as the Expiry filter counts them."""
+	if permissions.vault_hidden(space):
+		return {"expired": 0, "soon": 0}
 	return {"expired": count(space, expiry="expired"), "soon": count(space, expiry="soon")}
 
 
@@ -87,6 +89,12 @@ def list(space=None, include_archived=0, start=0, page_length=100, holder=None, 
 	`tabs` counts all documents, those expiring within 60 days and the expired ones, under the same filters."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
+	if permissions.vault_hidden(space):
+		# an agent, and this space's Vault is closed to agents: the same answer as an empty Vault
+		empty = {"tabs": {"all": 0, "soon": 0, "expired": 0}, "expired": 0, "soon": 0}
+		if summary:
+			return {"summary": {"rows": [], "totals": None}, **empty}
+		return {"space": space, "documents": [], "groups": [], "total": 0, **empty}
 	clause, values = where_clause(space, holder, doc_type, expiry, area, project, include_archived)
 	extra, values = std_clause("Life Vault Document", filters, "d", values)
 	clause += extra

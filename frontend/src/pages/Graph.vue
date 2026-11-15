@@ -1,5 +1,6 @@
 <template>
-  <PageHead title="Graph" :sub="d ? `${d.nodes.length} records · ${d.edges.length} links${center ? ' · two steps around one record' : ''}` : ''">
+  <PageHead title="Notes" :sub="d ? `Graph: ${d.nodes.length} records · ${d.edges.length} links${center ? ' · two steps around one record' : ''}` : ''">
+    <TabButtons model-value="graph" :options="NOTES_VIEWS" data-library-views />
     <Button v-if="center" label="Show the whole space" @click="setCenter('')" />
   </PageHead>
   <div class="page-body flex-1">
@@ -26,7 +27,8 @@ import { tokenColor } from '@/lib/tokens'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import cytoscape from 'cytoscape'
-import { Button } from 'frappe-ui'
+import { Button, TabButtons } from 'frappe-ui'
+import { NOTES_VIEWS } from '@/lib/nav'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'

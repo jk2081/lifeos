@@ -3,12 +3,15 @@
     <PageHead :title="d.page_number ? `Journal page ${d.page_number}` : 'Journal page'" :crumb="{ to: '/journal/pages', label: 'Pages', here: long(d.page_date, true) }" :sub="long(d.page_date, true)">
       <Button v-if="d.inbox_item" label="Open the inbox item" @click="openRef('inbox:' + d.inbox_item)" />
     </PageHead>
-    <div class="page-body"><div class="cols">
-      <div class="half"><section><SectionHead>Page</SectionHead>
+    <div class="page-body">
+      <!-- below 640 px the page and its transcript are tabs; wider screens show them side by side -->
+      <TabBar v-if="phone" :tabs="TABS" :model-value="tab.current.value" label="Journal page parts" data-journal-tabs @update:model-value="tab.set" />
+      <div class="cols">
+      <div v-show="!phone || tab.current.value === 'page'" class="half"><section><SectionHead>Page</SectionHead>
         <div v-if="d.image" class="max-h-[80vh] overflow-auto rounded-5 border border-outline-gray-2 bg-surface-gray-1" :class="zoom ? 'cursor-zoom-out' : 'cursor-zoom-in'" @click="zoom = !zoom">
           <img class="block h-auto" :class="zoom ? 'w-[220%] max-w-none' : 'w-full'" :src="d.image" alt="Photographed journal page" /></div>
         <Card v-else><Empty title="No image." hint="This page has a transcript but no photograph." /></Card></section></div>
-      <div class="half">
+      <div v-show="!phone || tab.current.value === 'transcript'" class="half">
         <section><SectionHead>Transcript <template v-if="writable && !editing" #action><Button variant="ghost" size="sm" label="Edit" @click="start" /></template></SectionHead>
           <Card>
             <template v-if="editing"><Textarea v-model="draft" :rows="16" aria-label="Transcript" />
@@ -38,6 +41,14 @@ import SectionHead from '@/components/ui/SectionHead.vue'
 import { api, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { long } from '@/lib/dates'
+import TabBar from '@/components/TabBar.vue'
+import { useMediaQuery } from '@vueuse/core'
+import { useUrlTab } from '@/lib/tabs'
+
+// Phone only: Page and Transcript as tabs (tab=); "Created from this page" sits under the transcript
+const TABS = [{ value: 'page', label: 'Page' }, { value: 'transcript', label: 'Transcript' }]
+const phone = useMediaQuery('(max-width: 639px)')
+const tab = useUrlTab('tab', TABS)
 import { openRef, openRoute, refOfRoute } from '@/lib/pane'
 
 const props = defineProps({ id: String })

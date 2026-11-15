@@ -36,7 +36,7 @@ def decorate(rows):
 
 def index_rows(space, where="", values=None, order="record_date desc, modified desc", start=0, page_length=50):
 	rows = frappe.db.sql(
-		f"select {ROW_FIELDS} from `tabLife Index` where space=%(space)s {where} order by {order} limit %(start)s, %(len)s",
+		f"select {ROW_FIELDS} from `tabLife Index` where space=%(space)s {where}{permissions.vault_guard(space)} order by {order} limit %(start)s, %(len)s",
 		{"space": space, "start": start, "len": page_length, **(values or {})}, as_dict=True)
 	return decorate(rows)
 
@@ -63,7 +63,7 @@ def get(space=None, from_date=None, to_date=None, area=None, doctype=None, inclu
 		where.append("is_archived = 0")
 	conds, values = std_filters("Life Index", filters, "", values)
 	where += conds
-	clause = (" and " + " and ".join(where)) if where else ""
+	clause = ((" and " + " and ".join(where)) if where else "") + permissions.vault_guard(space)
 	if summary:
 		return {"summary": summarise("Life Index", f"from `tabLife Index` where space=%(space)s {clause}", {"space": space, **values}, "", summary, start, page_length)}
 	rows = index_rows(space, clause, values, start=start, page_length=page_length)

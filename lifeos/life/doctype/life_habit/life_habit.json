@@ -7,7 +7,9 @@
  "field_order": [
   "space",
   "title",
-  "area"
+  "area",
+  "is_archived",
+  "archived_on"
  ],
  "fields": [
   {
@@ -31,6 +33,17 @@
    "fieldtype": "Link",
    "label": "Area",
    "options": "Life Area"
+  },
+  {
+   "fieldname": "is_archived",
+   "fieldtype": "Check",
+   "label": "Is Archived",
+   "default": "0"
+  },
+  {
+   "fieldname": "archived_on",
+   "fieldtype": "Date",
+   "label": "Archived On"
   }
  ],
  "links": [],

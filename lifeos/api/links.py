@@ -44,6 +44,8 @@ def backlinks(doctype, name):
 	def add(dt, n, why):
 		if (dt, n) in seen or not frappe.db.exists(dt, n):
 			return
+		if dt == permissions.VAULT and permissions.vault_hidden(frappe.db.get_value(dt, n, "space")):
+			return
 		seen.add((dt, n))
 		out.append({"doctype": dt, "name": n, "title": _title(dt, n), "kind": KIND.get(dt, dt.replace("Life ", "")),
 			"why": why, "route": rules.route_of(dt, n)})
@@ -68,6 +70,8 @@ def suggest(space=None, text="", limit=12):
 	limit = min(int(limit or 12), 30)
 	out = []
 	for dt, field in LINKABLE.items():
+		if dt == permissions.VAULT and permissions.vault_hidden(space):
+			continue
 		filters = {"space": space}
 		if text:
 			filters[field] = ("like", f"%{text}%")

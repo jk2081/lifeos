@@ -1,5 +1,6 @@
 <template>
   <Teleport to="#jr-actions">
+    <Button label="All goals" icon-right="lucide-arrow-right" :route="{ path: '/goals', query: { status: 'all' } }" data-all-goals />
     <template v-if="active && canWrite()">
       <Button v-if="active.past_end" label="Close cycle" @click="openClose" />
       <Button label="Plan next cycle" @click="openPlan" />
@@ -26,7 +27,8 @@
           <div><Badge v-if="g.area_name" :label="g.area_name" /></div>
           <div>{{ g.actions }}</div>
           <div v-if="c.status === 'Planned'" class="text-sm text-ink-gray-6">Not started</div>
-          <div v-else class="flex items-center gap-2"><div class="min-w-0 flex-1"><Progress size="sm" :value="Math.round(g.percent)" /></div><span class="w-9 text-right tabular-nums">{{ Math.round(g.percent) }}%</span></div>
+          <div v-else><div class="flex items-center gap-2"><div class="min-w-0 flex-1"><Progress size="sm" :value="Math.round(g.percent)" /></div><span class="w-9 text-right tabular-nums">{{ Math.round(g.percent) }}%</span></div>
+            <div class="text-sm text-ink-gray-6" data-goal-tasks>{{ g.tasks_counted ? `${g.tasks_done} of ${g.tasks_counted} tasks` : 'No tasks yet' }}</div></div>
           <div><Badge :theme="OUTCOME[c.status === 'Planned' ? 'Draft' : g.outcome]" :label="c.status === 'Planned' ? 'Draft' : g.outcome === 'In Progress' ? 'In progress' : g.outcome" /></div>
         </div>
         <div v-if="!c.goals.length" class="border-t border-outline-gray-1 px-4 py-2.5 text-sm text-ink-gray-6">No goals{{ area ? ' in this area' : '' }} in this cycle.</div>

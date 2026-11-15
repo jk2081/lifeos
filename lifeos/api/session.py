@@ -35,4 +35,8 @@ def boot():
 def counts(space=None):
 	"""Small numbers for the sidebar."""
 	space = permissions.resolve_space(space)
-	return {"to_review": frappe.db.count("Life Inbox Item", {"space": space, "status": "To Review", "is_archived": 0})}
+	from lifeos.api import tasks as task_api
+
+	# due: open tasks due today or overdue, the same number as Today's "Due today" and the list it opens
+	return {"to_review": frappe.db.count("Life Inbox Item", {"space": space, "status": "To Review", "is_archived": 0}),
+		"due": task_api.list(space=space, status="open_doing", due="today,overdue", page_length=1)["total"]}

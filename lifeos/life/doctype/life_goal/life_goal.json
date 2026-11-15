@@ -8,6 +8,9 @@
   "space",
   "cycle",
   "title",
+  "goal_type",
+  "target_date",
+  "closed_on",
   "area",
   "project",
   "sort_order",
@@ -32,7 +35,6 @@
    "fieldtype": "Link",
    "label": "Cycle",
    "options": "Life Cycle",
-   "reqd": 1,
    "in_list_view": 1,
    "search_index": 1
   },
@@ -42,6 +44,27 @@
    "label": "Title",
    "reqd": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "goal_type",
+   "fieldtype": "Select",
+   "label": "Goal Type",
+   "options": "12 Week Year\nAnnual\nOpen",
+   "reqd": 1,
+   "default": "12 Week Year",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "target_date",
+   "fieldtype": "Date",
+   "label": "Target Date",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "closed_on",
+   "fieldtype": "Date",
+   "label": "Closed On"
   },
   {
    "fieldname": "area",

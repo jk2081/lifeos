@@ -2,7 +2,7 @@
   <!-- One row. On a phone it scrolls sideways inside itself and the open tab is brought into view. -->
   <div ref="el" class="scroll-x" data-tab-bar :data-tab-current="modelValue">
     <Tabs :model-value="modelValue" @update:model-value="pick">
-      <TabList class="min-w-max" :class="inset ? 'px-4 md:px-7' : ''" :aria-label="label">
+      <TabList class="min-w-max" :class="[inset ? 'px-4 md:px-7' : '', listClass]" :aria-label="label">
         <TabTrigger v-for="t in tabs" :key="t.value" class="max-md:min-h-11" :value="t.value" :label="t.label" :data-tab="t.value">
           <template v-if="t.count !== undefined && t.count !== null" #suffix>
             <span class="text-sm tabular-nums text-ink-gray-6" data-tab-count :aria-label="`${t.count} ${t.noun || 'records'}`">{{ t.count }}</span>
@@ -26,6 +26,7 @@ const props = defineProps({
   label: { type: String, default: 'Tabs' }, // the accessible name of the row
   level: { type: Number, default: 1 }, // 1 on a page, 2 in the record pane: [ and ] go to the highest on screen
   inset: Boolean, // the page's side padding, for a bar that sits outside .page-body
+  listClass: { type: String, default: '' }, // other padding, such as the pane's
 })
 const emit = defineEmits(['update:modelValue'])
 const el = ref(null)

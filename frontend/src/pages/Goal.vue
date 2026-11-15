@@ -1,13 +1,14 @@
 <template>
   <template v-if="d">
-    <PageHead :title="d.goal.title" :crumb="{ to: '/journal/goals', label: 'Goals', here: d.cycle.title }"
-      :sub="[d.goal.area_name, `${d.goal.actions.length} actions`, `${Math.round(d.goal.percent)}% of ticks done`].filter(Boolean).join(' · ')">
+    <PageHead :title="d.goal.title" :crumb="d.cycle ? { to: '/journal/goals', label: 'Goals', here: d.cycle.title } : { to: '/goals', label: 'Goals', here: d.goal_type }"
+      :sub="(d.cycle ? [d.goal.area_name, `${d.goal.actions.length} actions`, `${Math.round(d.goal.percent)}% of ticks done`]
+        : [d.goal.area_name, d.goal_type + ' goal', d.target_date && 'by ' + short(d.target_date, true), d.tasks_counted ? `${d.tasks_done} of ${d.tasks_counted} tasks` : 'No tasks yet']).filter(Boolean).join(' · ')">
       <Badge :theme="d.goal.outcome === 'In Progress' ? 'blue' : 'gray'" :label="d.goal.outcome" />
-      <Button label="Open grid" :route="`/journal?cycle=${d.cycle.name}`" />
+      <Button v-if="d.cycle" label="Open grid" :route="`/journal?cycle=${d.cycle.name}`" />
     </PageHead>
     <div class="page-body"><div class="cols">
       <div class="half">
-        <section><SectionHead>Actions</SectionHead>
+        <section v-if="d.cycle"><SectionHead>Actions</SectionHead>
           <Card flush><Row v-for="a in d.goal.actions" :key="a.name">
             <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
               <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
@@ -22,7 +23,7 @@
         </section>
       </div>
       <div class="half">
-        <section><SectionHead>History across cycles</SectionHead>
+        <section v-if="d.cycle"><SectionHead>History across cycles</SectionHead>
           <Card flush><Row v-for="h in d.history" :key="h.name" class="!items-center">
             <div class="min-w-0 flex-1"><RouterLink class="break-words text-base-medium hover:underline focus-visible:focus-ring" :class="h.name === d.goal.name ? 'text-ink-gray-9' : 'text-ink-blue-8'" :to="`/journal/goals/${h.name}`">{{ h.cycle_title }}</RouterLink>
               <div class="text-sm text-ink-gray-6">{{ h.cycle_status }}{{ h.result_note ? ' · ' + h.result_note : '' }}</div></div>

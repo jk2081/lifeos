@@ -8,7 +8,7 @@ export const TYPES = {
   note: { label: 'Note', doctype: 'Life Note' },
   vault: { label: 'Vault document', doctype: 'Life Vault Document' },
   project: { label: 'Project', doctype: 'Life Project' },
-  goal: { label: '12 Week Year goal', doctype: 'Life Goal' },
+  goal: { label: 'Goal', doctype: 'Life Goal' },
   page: { label: 'Journal page', doctype: 'Life Journal Page' },
   chat: { label: 'AI chat', doctype: 'Life Chat Log' },
   event: { label: 'Event', doctype: 'Event' },

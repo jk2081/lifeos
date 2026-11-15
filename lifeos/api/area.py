@@ -50,7 +50,7 @@ def get(area, include_archived=0):
 	open_tasks = task_api.count(space, area=doc.name)
 
 	counts = dict(frappe.db.sql(
-		f"select kind, count(*) from `tabLife Index` where space=%(space)s and area in %(ids)s {arch} group by kind", {"space": space, **v}))
+		f"select kind, count(*) from `tabLife Index` where space=%(space)s and area in %(ids)s {arch}{permissions.vault_guard(space)} group by kind", {"space": space, **v}))
 	notes = index_rows(space, f"and area in %(ids)s and kind = 'Note' and project = '' {arch}", v, page_length=6)
 	reference_notes = frappe.db.sql(
 		f"select count(*) from `tabLife Index` where space=%(space)s and area in %(ids)s and kind='Note' and project = '' {arch}", {"space": space, **v})[0][0]
@@ -65,11 +65,10 @@ def get(area, include_archived=0):
 	like_values = {f"like{i}": f"%,{a},%" for i, a in enumerate(ids)}
 	references = index_rows(space, f"and also_in_csv != '' and ({like}) and area not in %(ids)s and kind != 'Task Done' {arch}", {**v, **like_values}, page_length=20)
 
-	goals = []
-	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, "name")
-	if cycle:
-		grid = journal.grid(cycle)
-		goals = [{"name": g["name"], "title": g["title"], "percent": g["percent"], "actions": len(g["actions"])} for g in grid["goals"] if g["area"] in ids]
+	# every goal in progress for this area and its sub-areas, of every type, with its task figure and 12 Week Year score
+	from lifeos.api import goals as goals_api
+
+	goals = goals_api.list(space=space, state="in_progress", area=doc.name, page_length=50)["goals"]
 
 	parent = None
 	if doc.parent_area:
@@ -80,6 +79,22 @@ def get(area, include_archived=0):
 		"timeline": timeline, "references": references, "goals": goals,
 		"counts": {"projects": sum(1 for p in projects if p.status == "Active"), "open_tasks": open_tasks, "notes": counts.get("Note", 0),
 			"all_projects": len(projects), "reference_notes": reference_notes, "documents": counts.get("Document", 0), "chats": counts.get("Chat", 0)},
+		"tabs": tab_counts(space, doc.name),
+	}
+
+
+def tab_counts(space, area):
+	"""The count on each tab of the area page: what that tab's list shows when it opens, asked of the same list method
+	the main screen uses, so the number equals the main screen filtered by this area."""
+	from lifeos.api import chats, library, projects, timeline, vault
+
+	return {
+		"projects": projects.list(space=space, area=area, page_length=1)["total"],
+		"tasks": task_api.list(space=space, area=area, status="open_doing", page_length=1)["total"],
+		"notes": library.list(space=space, area=area, page_length=1)["total"],
+		"documents": vault.list(space=space, area=area, page_length=1)["total"],
+		"chats": chats.list(space=space, area=area, page_length=1)["total"],
+		"timeline": timeline.get(space=space, area=area, page_length=1)["total"],
 	}
 
 
@@ -112,5 +127,5 @@ def tree(space=None, include_archived=0):
 		a["projects"] = sum(direct_projects.get(i, 0) for i in ids)
 		a["notes"] = sum(direct_notes.get(i, 0) for i in ids)
 	return {"space": space, "areas": areas,
-		"tags": frappe.get_all("Life Tag", filters={"space": space}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
+		"tags": frappe.get_all("Life Tag", filters={"space": space, "is_archived": 0}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
 		"unfiled_tasks": task_api.count(space, area="none")}

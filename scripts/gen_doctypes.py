@@ -128,10 +128,12 @@ dt("Life Space", [
 	f("space_name", reqd=1, unique=1, in_list_view=1),
 	link("owner_user", "User", in_list_view=1),
 	f("members", "Table", "Life Space Member"),
+	f("agents_can_read_vault", "Check", default="0", label="Agents Can Read Vault",
+		description="Let agents open documents in this space's Vault. Off by default."),
 ], autoname="field:space_name", permissions=perms(admin_only_write=True), title_field="space_name")
 dt("Life Area", [
 	SPACE, f("area_name", reqd=1, in_list_view=1), link("parent_area", "Life Area"),
-	f("sort_order", "Int"), f("is_archived", "Check", default="0"),
+	f("sort_order", "Int"), f("is_archived", "Check", default="0"), f("archived_on", "Date"),
 ], title_field="area_name", show_title=1, search_fields="area_name")
 dt("Life Project", [
 	SPACE, f("title", reqd=1, in_list_view=1), link("area", "Life Area", reqd=1, in_list_view=1, search_index=1),
@@ -139,8 +141,9 @@ dt("Life Project", [
 	f("outcome", "Small Text"), f("target_date", "Date", in_list_view=1), f("completed_on", "Date"), md("notes_md"),
 	f("is_archived", "Check", default="0", search_index=1), f("archived_on", "Date"),
 ], title_field="title", show_title=1, search_fields="title")
-dt("Life Tag", [SPACE, f("tag_name", reqd=1, in_list_view=1)], title_field="tag_name", show_title=1, search_fields="tag_name")
-dt("Life Dimension", [SPACE, f("dimension_name", reqd=1, in_list_view=1), f("sort_order", "Int")], title_field="dimension_name", show_title=1)
+dt("Life Tag", [SPACE, f("tag_name", reqd=1, in_list_view=1), f("is_archived", "Check", default="0"), f("archived_on", "Date")], title_field="tag_name", show_title=1, search_fields="tag_name")
+dt("Life Dimension", [SPACE, f("dimension_name", reqd=1, in_list_view=1), f("sort_order", "Int"),
+	f("is_archived", "Check", default="0"), f("archived_on", "Date")], title_field="dimension_name", show_title=1)
 dt("Life Person", [
 	SPACE, f("full_name", reqd=1, in_list_view=1), f("relation", in_list_view=1), link("user", "User"), md("notes_md"),
 ], title_field="full_name", show_title=1, search_fields="full_name")
@@ -202,7 +205,9 @@ dt("Life Cycle", [
 	f("final_score", "Float", read_only=1), f("closed_on", "Date", read_only=1),
 ], title_field="title", show_title=1)
 dt("Life Goal", [
-	SPACE, link("cycle", "Life Cycle", reqd=1, in_list_view=1, search_index=1), f("title", reqd=1, in_list_view=1),
+	SPACE, link("cycle", "Life Cycle", in_list_view=1, search_index=1), f("title", reqd=1, in_list_view=1),
+	sel("goal_type", ["12 Week Year", "Annual", "Open"], reqd=1, default="12 Week Year", in_list_view=1, search_index=1),
+	f("target_date", "Date", in_list_view=1), f("closed_on", "Date"),
 	link("area", "Life Area", in_list_view=1, search_index=1), link("project", "Life Project"), f("sort_order", "Int"),
 	f("actions", "Table", "Life Goal Action"),
 	sel("outcome", ["In Progress", "Achieved", "Partly Achieved", "Not Achieved", "Carried", "Dropped"], default="In Progress"),
@@ -213,7 +218,8 @@ dt("Life Month Plan", [
 	f("goals", "Table", "Life Month Plan Goal"), f("habits", "Table", "Life Month Plan Habit"),
 	md("mindsweep_md"), md("projects_md"),
 ], autoname="prompt")
-dt("Life Habit", [SPACE, f("title", reqd=1, in_list_view=1), link("area", "Life Area")], title_field="title", show_title=1, search_fields="title")
+dt("Life Habit", [SPACE, f("title", reqd=1, in_list_view=1), link("area", "Life Area"),
+	f("is_archived", "Check", default="0"), f("archived_on", "Date")], title_field="title", show_title=1, search_fields="title")
 dt("Life Habit Log", [
 	SPACE, link("habit", "Life Habit", reqd=1, in_list_view=1, search_index=1),
 	f("date", "Date", reqd=1, in_list_view=1, search_index=1), f("done", "Check", default="1", in_list_view=1),

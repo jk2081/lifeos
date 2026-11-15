@@ -1,5 +1,6 @@
 <template>
-  <ListView ref="list" title="Projects" noun="projects" screen="projects" doctype="Life Project" :spec="SPEC" :tabs="TABS" :quick="['area']" :synthetic="SYNTHETIC"
+  <ListView ref="list" :title="embed ? null : 'Projects'" noun="projects" :screen="embed ? embed.screen + '-projects' : 'projects'" :fixed="embed?.fixed" :active="embed ? embed.active : true"
+    :tabs-in-filter="!!embed" doctype="Life Project" :spec="SPEC" :tabs="embed ? EMBED_TABS : TABS" :quick="['area']" :synthetic="SYNTHETIC"
     :views="VIEWS" :fetch="fetch" :row-ref="(r) => 'project:' + r.name" :empty-title="emptyTitle"
     empty-hint="A project lives inside one area and holds tasks, notes, documents and chats. Add one with New project.">
     <template #sub>Across areas in {{ store.space }}</template>
@@ -50,8 +51,11 @@ const SYNTHETIC = [{ key: '_progress', label: 'Progress', width: '15rem', place:
 // the state tabs, on status=. Active is the default
 const TABS = { key: 'status', field: 'status', label: 'Project state', items: [{ value: 'Active', label: 'Active' }, { value: 'On Hold', label: 'On hold' },
   { value: 'Done', label: 'Done' }, { value: 'Dropped', label: 'Dropped' }, { value: 'all', label: 'All' }] }
+// inside the area page's Projects tab the states are one control in the filter bar, and the list opens on active and on hold together
+const EMBED_TABS = { ...TABS, items: [{ value: 'current', label: 'Active and on hold' }, ...TABS.items] }
+const props = defineProps({ embed: { type: Object, default: null } })
 const list = ref(null)
-const emptyTitle = computed(() => ({ Active: 'No active projects.', 'On Hold': 'No projects on hold.', Done: 'No done projects.', Dropped: 'No dropped projects.' }[list.value?.tab] || 'No projects yet.'))
+const emptyTitle = computed(() => ({ current: 'No active projects.', Active: 'No active projects.', 'On Hold': 'No projects on hold.', Done: 'No done projects.', Dropped: 'No dropped projects.' }[list.value?.tab] || 'No projects yet.'))
 const newOpen = ref(false)
 const FIELDS = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'area', label: 'Area', required: true, options: areaOptions() },
   { name: 'outcome', label: 'Outcome', type: 'textarea', help: 'What will be true when this is done.' }, { name: 'target_date', label: 'Target date', type: 'date' }])
@@ -66,7 +70,7 @@ function groups(rows) {
   return [...by.values()].sort((a, b) => (a.area_name || '').localeCompare(b.area_name || ''))
 }
 async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
-  const res = await api('projects.list', { space: store.space, status: tab === 'all' ? undefined : tab, include_done: tab === 'all' ? 1 : 0, area: p.area,
+  const res = await api('projects.list', { space: props.embed?.space || store.space, status: ['all', 'current'].includes(tab) ? undefined : tab, include_done: tab === 'all' ? 1 : 0, area: p.area,
     filters, order_by, summary, start, page_length })
   return summary ? res : { rows: res.projects, total: res.total, tabs: res.tabs }
 }

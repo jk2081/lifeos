@@ -31,6 +31,14 @@ def make_roles():
 	for role in ROLES:
 		if not frappe.db.exists("Role", role):
 			frappe.get_doc({"doctype": "Role", "role_name": role, "desk_access": 1 if role == "Life Admin" else 0}).insert(ignore_permissions=True)
+	# Frappe creates a role named in a DocType's permissions before after_install runs, with desk access on. Life User
+	# and Life Agent never open the back office: turn it off, which also makes their users Website Users again.
+	for role in ("Life User", "Life Agent"):
+		doc = frappe.get_doc("Role", role)
+		if doc.desk_access:
+			doc.desk_access = 0
+			doc.save(ignore_permissions=True)
+			doc.update_user_type_on_change()  # on_update skips this while installing
 
 
 def make_spaces():

@@ -27,6 +27,7 @@ has_permission = {dt: "lifeos.permissions.has_permission" for dt in SPACE_DOCTYP
 has_permission["Life Space"] = "lifeos.permissions.space_has_permission"
 has_permission["Event"] = "lifeos.permissions.event_has_permission"
 has_permission["Life View State"] = "lifeos.permissions.view_state_has_permission"
+has_permission["File"] = "lifeos.permissions.file_has_permission"
 
 doc_events = {
 	dt: {"validate": "lifeos.org.validate_common", "on_update": "lifeos.org.on_update", "on_trash": "lifeos.org.on_trash"}
@@ -34,6 +35,8 @@ doc_events = {
 }
 doc_events["Event"] = {"validate": "lifeos.events.validate_event"}
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
+doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
+before_request = ["lifeos.permissions.no_desk_redirect"]
 
 scheduler_events = {
 	"daily": ["lifeos.archive.run_daily"],

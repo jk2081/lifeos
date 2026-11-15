@@ -10,11 +10,12 @@ export const store = reactive({
   isAgent: false,
   spaces: [],
   space: localStorage.getItem('lifeos-space') || '',
-  counts: { to_review: 0 },
+  counts: { to_review: 0, due: 0 },
   settings: {},
   today: '',
   searchOpen: false,
   quickAdd: false,
+  newKind: '', // the New menu's note or project dialog
 })
 
 export async function boot() {
@@ -35,6 +36,15 @@ export async function refreshCounts() {
   try {
     store.counts = await api('session.counts', { space: store.space })
   } catch (e) { /* the badge is not worth an error */ }
+}
+
+// a change that can move the counts asks for them again, at most once in a short while
+let stale = null
+if (typeof window !== 'undefined') {
+  const later = () => { clearTimeout(stale); stale = setTimeout(refreshCounts, 250) }
+  window.addEventListener('lifeos-counts-stale', later)
+  window.addEventListener('lifeos-record-changed', later)
+  window.addEventListener('lifeos-task-added', later)
 }
 
 watch(() => store.space, (v) => {

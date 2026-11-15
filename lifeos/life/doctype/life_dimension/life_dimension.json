@@ -7,7 +7,9 @@
  "field_order": [
   "space",
   "dimension_name",
-  "sort_order"
+  "sort_order",
+  "is_archived",
+  "archived_on"
  ],
  "fields": [
   {
@@ -30,6 +32,17 @@
    "fieldname": "sort_order",
    "fieldtype": "Int",
    "label": "Sort Order"
+  },
+  {
+   "fieldname": "is_archived",
+   "fieldtype": "Check",
+   "label": "Is Archived",
+   "default": "0"
+  },
+  {
+   "fieldname": "archived_on",
+   "fieldtype": "Date",
+   "label": "Archived On"
   }
  ],
  "links": [],

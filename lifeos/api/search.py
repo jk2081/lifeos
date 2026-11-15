@@ -40,9 +40,12 @@ def query(text, limit=20, space=None, include_archived=0):
 	if not words or not spaces:
 		return {"text": text, "results": []}
 	where = "space in %(spaces)s and kind != 'Task Done'"
+	closed = [s for s in spaces if permissions.vault_hidden(s)]  # an agent's spaces whose Vault is closed to it
+	if closed:
+		where += " and not (ref_doctype = 'Life Vault Document' and space in %(closed)s)"
 	if not flag(include_archived):
 		where += " and is_archived = 0"
-	values = {"spaces": spaces, "limit": limit}
+	values = {"spaces": spaces, "limit": limit, "closed": closed or [""]}
 	rows = []
 	long_words = [w for w in words if len(w) >= 3]
 	if long_words:

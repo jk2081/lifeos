@@ -1,26 +1,15 @@
 <template>
   <!-- the list: /library?view=list, on the cross-type index -->
-  <ListView v-if="listView" ref="list" title="Library" noun="notes" screen="library" doctype="Life Index" :spec="SPEC" :flag-labels="{ archived: 'Include archived' }" :quiet="['archived']"
-    :virtual="VIRTUAL" :hidden="HIDDEN" :quick="['title', 'area', 'project']" :synthetic="SYNTHETIC" :fetch="fetchList" :row-ref="(r) => 'note:' + r.name"
-    empty-title="No notes yet." empty-hint="Notes hold reference material and project notes, in Markdown. Add one with New note.">
-    <template #sub>Notes in {{ store.space }}</template>
+  <NotesList v-if="listView" ref="list">
     <template #actions>
       <TabButtons model-value="list" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
     </template>
-    <template #cell-title="{ row }"><span class="break-words font-medium text-ink-gray-9">{{ row.title }}</span></template>
-    <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="`/areas/${row.area}`">{{ row.area_name }}</RouterLink></template>
-    <template #cell-project="{ row }"><span class="truncate">{{ row.project_title }}</span></template>
-    <template #cell-record_date="{ row }"><span class="whitespace-nowrap">{{ short(row.record_date || row.modified, true) }}</span></template>
-    <template #cell-kind><span class="truncate">Note</span></template>
-    <template #cell-_tags="{ row }"><span class="truncate text-sm text-ink-gray-6">{{ row.tags.map((t) => '#' + t).join(' ') }}</span></template>
-    <template #stack="{ row }"><div class="break-words text-base-medium text-ink-gray-9">{{ row.title }}</div>
-      <div class="text-sm text-ink-gray-6">{{ [row.area_name, row.project_title, 'edited ' + short(row.modified, true), ...row.tags.map((t) => '#' + t)].filter(Boolean).join(' · ') }}</div></template>
-  </ListView>
+  </NotesList>
 
   <!-- the tree with the reader: /library and /library/<id> -->
   <template v-else>
-    <PageHead title="Library">
+    <PageHead title="Notes">
       <template #sub><NumLink :to="{ path: '/library', query: { view: 'list', all: '1' } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink> in {{ store.space }}</template>
       <TabButtons model-value="tree" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
@@ -107,7 +96,8 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Dialog, Dropdown, TabButtons, TextInput, Tree, dialog } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
-import ListView from '@/components/ListView.vue'
+import NotesList from '@/components/lists/NotesList.vue'
+import { NOTES_VIEWS } from '@/lib/nav'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
 import MdEditor from '@/components/MdEditor.vue'
@@ -128,18 +118,8 @@ const route = useRoute()
 // the list view sits beside the tree: /library?view=list, with its filters in the URL
 const listView = computed(() => !props.id && route.query.view === 'list')
 const list = ref(null)
-const SWITCH = [{ label: 'Tree', value: 'tree', route: '/library' }, { label: 'List', value: 'list', route: { path: '/library', query: { view: 'list' } } }]
-// the short URL parameters of the list (lib/filterUrl.js)
-const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'project', field: 'project', kind: 'link' }, { key: 'tag', field: 'tag', kind: 'value' }, { key: 'archived', kind: 'flag' }]
-const VIRTUAL = [{ fieldname: 'area', label: 'Area', fieldtype: 'Link', options: 'Life Area' }, { fieldname: 'project', label: 'Project', fieldtype: 'Link', options: 'Life Project' },
-  { fieldname: 'tag', label: 'Tag', fieldtype: 'Link', options: 'Life Tag' }]
-const HIDDEN = ['ref_doctype', 'ref_name', 'kind', 'search_text', 'also_in_csv', 'tags_csv', 'status', 'record_owner']
-const SYNTHETIC = [{ key: '_tags', label: 'Tags' }]
-async function fetchList({ params: p, filters, order_by, summary, start, page_length }) {
-  const res = await api('library.list', { space: store.space, area: p.area, project: p.project, tag: p.tag, include_archived: p.archived ? 1 : 0,
-    filters, order_by, summary, start, page_length })
-  return summary ? res : { rows: res.notes, total: res.total }
-}
+// Notes has three views: Tree, List and Graph (/graph, the graph of linked records)
+const SWITCH = NOTES_VIEWS
 const router = useRouter()
 const notes = ref([])
 const areas = ref([])

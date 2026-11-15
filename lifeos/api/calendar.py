@@ -107,7 +107,8 @@ def add_event(space=None, subject=None, starts_on=None, ends_on=None, all_day=0,
 	if google["connected"]:
 		doc.sync_with_google_calendar = 1
 		doc.google_calendar = google["calendar"]
-	doc.insert()
+	# the space check above is the rule; core Event asks for the Desk User role, which Life User and Life Agent do not have
+	doc.insert(ignore_permissions=True)
 	return {"name": doc.name, "synced_to_google": bool(google["connected"])}
 
 

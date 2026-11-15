@@ -74,19 +74,21 @@ def space_context(space):
 	"""What an agent needs to file proposals: the space's areas, projects, tags, people, habits, dimensions and active goals."""
 	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area"], order_by="sort_order, area_name", limit=500)
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)
+	# every goal in progress, of every type, for filing a task under it; 12 Week Year goals of the active cycle carry their actions
 	goals = []
-	if cycle:
-		for g in frappe.get_all("Life Goal", filters={"cycle": cycle.name}, fields=["name", "title", "area"], order_by="sort_order"):
-			g["actions"] = frappe.get_all("Life Goal Action", filters={"parent": g.name}, fields=["name", "title", "status", "per_week"], order_by="idx")
-			goals.append(g)
+	for g in frappe.db.sql("""select g.name, g.title, g.area, g.goal_type, g.cycle from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
+			where g.space=%s and g.outcome='In Progress' and (ifnull(g.cycle, '') = '' or c.status in ('Active', 'Planned'))
+			order by field(g.goal_type, '12 Week Year', 'Annual', 'Open'), g.sort_order, g.title""", space, as_dict=True):
+		g["actions"] = frappe.get_all("Life Goal Action", filters={"parent": g.name}, fields=["name", "title", "status", "per_week"], order_by="idx") if g.cycle else []
+		goals.append(g)
 	return {
 		"space": space,
 		"areas": areas,
 		"projects": frappe.get_all("Life Project", filters={"space": space, "is_archived": 0, "status": ("in", ["Active", "On Hold"])}, fields=["name", "title", "area"], limit=500),
-		"tags": frappe.get_all("Life Tag", filters={"space": space}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
+		"tags": frappe.get_all("Life Tag", filters={"space": space, "is_archived": 0}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
 		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], limit=500),
-		"habits": frappe.get_all("Life Habit", filters={"space": space}, fields=["name", "title"], limit=200),
-		"dimensions": frappe.get_all("Life Dimension", filters={"space": space}, fields=["name", "dimension_name"], order_by="sort_order", limit=50),
+		"habits": frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title"], limit=200),
+		"dimensions": frappe.get_all("Life Dimension", filters={"space": space, "is_archived": 0}, fields=["name", "dimension_name"], order_by="sort_order", limit=50),
 		"cycle": ({"name": cycle.name, "title": cycle.title, "start_date": str(cycle.start_date)} if cycle else None),
 		"goals": goals,
 	}

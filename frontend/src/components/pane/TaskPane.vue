@@ -1,5 +1,6 @@
 <template>
   <template v-if="task">
+  <template v-if="on('details')">
   <FormControl v-model="task.title" type="text" label="Title" :disabled="!writable" @change="save({ title: task.title })" />
   <div class="form-grid">
     <FormControl type="select" label="Status" :model-value="task.status" :options="STATUSES" :disabled="!writable" @update:model-value="setStatus" />
@@ -22,8 +23,7 @@
         placeholder="tag" :clearable="false" :disabled="!writable" @update:model-value="(v) => save({ tag_ids: [...task.tag_ids, v] })" />
     </div>
   </div>
-  <FormControl type="select" label="12 Week Year goal" :model-value="task.goal || ''" :options="goalOptions" :disabled="!writable" @update:model-value="(v) => save({ goal: v || null })" />
-  <FormControl v-model="task.notes_md" type="textarea" label="Notes" :rows="5" placeholder="Markdown. Link a record with [[Title]]." :disabled="!writable" @change="save({ notes_md: task.notes_md })" />
+   <FormControl type="select" label="Goal" :model-value="task.goal || ''" :options="goalOptions" :disabled="!writable" @update:model-value="(v) => save({ goal: v || null })" />
   <div class="text-sm text-ink-gray-6">
     <div v-if="task.inbox_item">From <a class="text-ink-blue-8 hover:underline" href="#" @click.prevent="openRef('inbox:' + task.inbox_item)">{{ task.source_title || 'an inbox item' }}</a></div>
     <div v-if="task.source_url"><a class="text-ink-blue-8 hover:underline" :href="task.source_url" target="_blank" rel="noopener noreferrer">Source link</a></div>
@@ -35,7 +35,12 @@
     <Button v-if="writable" label="Archive" @click="archive" />
     <Button v-if="canRestore && !isAgent" variant="ghost" theme="red" label="Delete" @click="remove" />
   </div>
-  <Backlinks doctype="Life Task" :name="task.name" :reload="reloadKey" />
+  </template>
+  <template v-if="on('notes')">
+    <FormControl v-model="task.notes_md" type="textarea" label="Notes" :rows="12" placeholder="Markdown. Link a record with [[Title]]." :disabled="!writable" @change="save({ notes_md: task.notes_md })" />
+    <Md v-if="task.notes_md" :text="task.notes_md" />
+  </template>
+  <Backlinks v-if="on('links')" tab doctype="Life Task" :name="task.name" :items="links" />
   </template>
 </template>
 <script setup>
@@ -43,31 +48,41 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { Badge, Button, DatePicker, FormControl, TextInput, dialog, toast } from 'frappe-ui'
 import Pick from '../Pick.vue'
 import Backlinks from '../Backlinks.vue'
+import Md from '../Md.vue'
+import { loadBacklinks } from '@/lib/links'
 import { openRef } from '@/lib/pane'
 import { api, db, errorText, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { OPEN, PRIORITIES } from '@/lib/tasks'
-import { areaName, areaOptions, loadLookups, lookups } from '@/lib/lookups'
+import { areaName, areaOptions, goalOptions as goalsByType, loadLookups, lookups } from '@/lib/lookups'
 
-const props = defineProps({ name: String, type: String })
+const props = defineProps({ name: String, type: String, tab: String })
 const emit = defineEmits(['close', 'changed', 'meta', 'missing'])
 const task = ref(null)
 const askWaiting = ref(false)
 const waitInput = ref(null)
-const reloadKey = ref(0)
+const links = ref([])
+// the pane's tabs: Details (all fields and filing), Notes, Links
+const on = (t) => !props.tab || props.tab === t
 const isAgent = false
 const STATUSES = ['Open', 'Doing', 'Waiting', 'Done', 'Dropped', 'Carried']
 // a Select has no empty row of its own: the dash is an option whose value is the empty string
 const PRIORITY_OPTIONS = [{ label: '—', value: '' }, ...PRIORITIES.map((p) => ({ label: p, value: p }))]
-const goalOptions = computed(() => [{ label: '—', value: '' }, ...lookups.goals.map((g) => ({ label: g.title, value: g.name }))])
+// every goal in progress, grouped by type; a goal no longer in progress stays shown while the task points to it
+const goalOptions = computed(() => {
+  const opts = goalsByType()
+  if (task.value?.goal && !opts.some((o) => o.value === task.value.goal)) opts.push({ label: task.value.goal_title || task.value.goal, value: task.value.goal })
+  return opts
+})
 const canRestore = computed(() => store.spaces.find((s) => s.name === task.value?.space)?.access === 'Write')
 // an archived task is shown read-only; Restore is in the pane header
 const writable = computed(() => canRestore.value && !task.value?.is_archived)
 function tell() {
   const t = task.value
   emit('meta', { title: t.title, area: t.area, area_name: t.area_name, project: t.project, project_title: t.project_title,
-    sub: !t.area && !t.project ? 'Unfiled' : '', archived: !!t.is_archived, canRestore: canRestore.value })
+    sub: !t.area && !t.project ? 'Unfiled' : '', archived: !!t.is_archived, canRestore: canRestore.value,
+    tabs: [{ value: 'details', label: 'Details' }, { value: 'notes', label: 'Notes' }, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
 }
 const tagName = (id) => lookups.tags.find((t) => t.name === id)?.tag_name || id
 const projectOptions = computed(() => {
@@ -77,7 +92,7 @@ const projectOptions = computed(() => {
 
 async function load() {
   try {
-    task.value = await api('tasks.get', { task: props.name })
+    ;[task.value, links.value] = await Promise.all([api('tasks.get', { task: props.name }), loadBacklinks('Life Task', props.name)])
     tell()
   } catch (e) {
     emit('missing')

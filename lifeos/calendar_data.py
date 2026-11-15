@@ -5,6 +5,8 @@ from datetime import date, timedelta
 import frappe
 from frappe.utils import add_days, get_datetime, getdate
 
+from lifeos import permissions
+
 
 def events_between(space, start, end):
 	"""Core Event records of a space between two dates, with repeats expanded by core's own get_events."""
@@ -56,6 +58,8 @@ def task_dues_between(space, start, end):
 
 
 def vault_expiries_between(space, start, end):
+	if permissions.vault_hidden(space):
+		return []
 	rows = frappe.get_all("Life Vault Document", filters={"space": space, "is_archived": 0, "expiry_date": ("between", [start, end])},
 		fields=["name", "title", "expiry_date"], limit=1000)
 	return [{"source": "vault", "name": r.name, "title": f"{r.title} expires", "date": str(r.expiry_date), "all_day": 1} for r in rows]
@@ -69,6 +73,8 @@ def cycles_between(space, start, end):
 
 def expiring_documents(space, on):
 	"""Vault documents inside their own reminder window, soonest first. Expired ones are included."""
+	if permissions.vault_hidden(space):
+		return []
 	on = getdate(on)
 	rows = frappe.db.sql(
 		"""select name, title, expiry_date, remind_days_before, doc_type from `tabLife Vault Document`

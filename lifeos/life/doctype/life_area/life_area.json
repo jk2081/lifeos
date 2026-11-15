@@ -9,7 +9,8 @@
   "area_name",
   "parent_area",
   "sort_order",
-  "is_archived"
+  "is_archived",
+  "archived_on"
  ],
  "fields": [
   {
@@ -44,6 +45,11 @@
    "fieldtype": "Check",
    "label": "Is Archived",
    "default": "0"
+  },
+  {
+   "fieldname": "archived_on",
+   "fieldtype": "Date",
+   "label": "Archived On"
   }
  ],
  "links": [],

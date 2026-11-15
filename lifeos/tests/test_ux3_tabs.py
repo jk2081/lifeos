@@ -5,7 +5,7 @@ import frappe
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.api import archive, chats, inbox, projects, tasks, vault
+from lifeos.api import archive, area, chats, inbox, library, projects, tasks, timeline, vault
 from lifeos.api import today as today_api
 from lifeos.tests.base import FAMILY, PRIVATE, SHARED, LifeTestCase
 
@@ -86,13 +86,14 @@ class TestTabCounts(LifeTestCase):
 			for status in ("Active", "On Hold", "Done", "Dropped"):
 				self.assertEqual(tabs[status], get(status=status)["total"], status)
 			self.assertEqual(tabs["all"], get(include_done=1)["total"])
+			self.assertEqual(tabs["current"], get()["total"])  # active and on hold: the area page's Projects tab
 			self.assertEqual(get(status="Done")["tabs"], tabs)
 			return tabs
 
 		mine = [["title", "like", "ux3 p %"]]
 		check()
-		self.assertEqual(check(filters=mine), {"Active": 2, "On Hold": 1, "Done": 1, "Dropped": 1, "all": 5})
-		self.assertEqual(check(area=tea, filters=mine), {"Active": 1, "On Hold": 1, "Done": 1, "Dropped": 0, "all": 3})
+		self.assertEqual(check(filters=mine), {"current": 3, "Active": 2, "On Hold": 1, "Done": 1, "Dropped": 1, "all": 5})
+		self.assertEqual(check(area=tea, filters=mine), {"current": 2, "Active": 1, "On Hold": 1, "Done": 1, "Dropped": 0, "all": 3})
 
 	def test_archive(self):
 		tea = self.areas["Tea"]
@@ -184,3 +185,44 @@ class TestTabCounts(LifeTestCase):
 			tabs = method(space=SHARED)["tabs"]
 			self.assertEqual(sum(tabs.values()), 2 if method is tasks.list else 0, method.__module__)
 		self.assertNotIn(PRIVATE, permissions.user_spaces())
+
+
+class TestRecordPageTabs(LifeTestCase):
+	"""The tab counts of the area and project pages equal the main screen's list filtered by that area or project."""
+
+	def test_area_page(self):
+		tea = self.areas["Tea"]
+		p = self.make("Life Project", title="ux3 area project", area=tea)
+		self.make("Life Task", title="ux3 area task", area=tea)
+		self.make("Life Task", title="ux3 area waiting", area=tea, status="Waiting", waiting_on="x")
+		self.make("Life Note", title="ux3 area note", area=tea, project=p.name)
+		self.make("Life Vault Document", title="ux3 area doc", doc_type="Other", area=tea)
+		chats.log(space=PRIVATE, title="ux3 area chat", summary_md="s", area=tea)
+		tabs = area.get(tea)["tabs"]
+		self.assertEqual(tabs["projects"], projects.list(space=PRIVATE, area=tea)["total"])
+		self.assertEqual(tabs["tasks"], tasks.list(space=PRIVATE, area=tea, status="open_doing")["total"])
+		self.assertEqual(tabs["notes"], library.list(space=PRIVATE, area=tea)["total"])
+		self.assertEqual(tabs["documents"], vault.list(space=PRIVATE, area=tea)["total"])
+		self.assertEqual(tabs["chats"], chats.list(space=PRIVATE, area=tea)["total"])
+		self.assertEqual(tabs["timeline"], timeline.get(space=PRIVATE, area=tea)["total"])
+		self.assertTrue(all(tabs[k] >= 1 for k in tabs))
+
+	def test_project_page(self):
+		tea = self.areas["Tea"]
+		p = self.make("Life Project", title="ux3 page project", area=tea)
+		self.make("Life Task", title="ux3 page task", area=tea, project=p.name)
+		self.make("Life Task", title="ux3 page done", area=tea, project=p.name, status="Done")
+		self.make("Life Note", title="ux3 page note", area=tea, project=p.name, content_md="see [[ux3 page project]]")
+		tabs = projects.get(p.name)["tabs"]
+		self.assertEqual(tabs["tasks"], 1)
+		self.assertEqual(tabs["notes"], 1)
+		self.assertEqual(tabs["documents"], 0)
+		self.assertEqual(tabs["chats"], 0)
+		self.assertGreaterEqual(tabs["links"], 1)
+
+	def test_other_space_member_cannot_read_the_counts(self):
+		tea = self.areas["Tea"]
+		p = self.make("Life Project", title="ux3 hidden project", area=tea)
+		self.as_user(FAMILY)
+		self.assertRaises(frappe.PermissionError, area.get, tea)
+		self.assertRaises(frappe.PermissionError, projects.get, p.name)

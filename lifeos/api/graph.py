@@ -36,7 +36,7 @@ def get(space=None, center=None):
 	goals = frappe.get_all("Life Goal", filters={"space": space}, fields=["name", "title", "carried_from", "project"], order_by="creation desc", limit=100)
 	for g in goals:
 		add("Life Goal", g.name, g.title)
-	docs = frappe.get_all("Life Vault Document", filters={"space": space, "is_archived": 0}, fields=["name", "title", "holder"], limit=100)
+	docs = [] if permissions.vault_hidden(space) else frappe.get_all("Life Vault Document", filters={"space": space, "is_archived": 0}, fields=["name", "title", "holder"], limit=100)
 	for d in docs:
 		add("Life Vault Document", d.name, d.title)
 

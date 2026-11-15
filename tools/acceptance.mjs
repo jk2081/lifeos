@@ -308,9 +308,11 @@ await check(12, 'At review, change the area with one tap and add a second: the r
 await check(13, 'Tea & Coffee area page shows projects, tasks, notes and chats together', async () => {
   const a = await owner.api('area.get', { area: areaId('Tea & Coffee') })
   must(a.projects.length && a.tasks.length && a.notes.length && a.chats.length, `projects ${a.projects.length}, tasks ${a.tasks.length}, notes ${a.notes.length}, chats ${a.chats.length}`)
-  await owner.open('/life/areas/' + areaId('Tea & Coffee'))
-  const text = await owner.page.locator('[data-main]').innerText()
-  must(text.includes(a.projects[0].title) && text.includes(a.notes[0].title) && text.includes(a.chats[0].title), 'the screen does not show them')
+  // since set 3 each kind is a tab of the area page
+  for (const [tab, title] of [['overview', a.projects[0].title], ['tasks', a.tasks[0].title], ['notes', a.notes[0].title], ['chats', a.chats[0].title]]) {
+    await owner.open(`/life/areas/${areaId('Tea & Coffee')}?tab=${tab}&all=1`)
+    must((await owner.page.locator('[data-main]').innerText()).includes(title), `the ${tab} tab does not show ${title}`)
+  }
   return `${a.projects.length} projects, ${a.counts.open_tasks} open tasks, ${a.counts.notes} notes, ${a.counts.chats} chats`
 })
 
@@ -319,7 +321,7 @@ await check(14, 'Timeline shows everything captured on one day', async () => {
   const kinds = new Set(t.days.flatMap((d) => d.entries.map((e) => e.kind)))
   for (const k of ['Inbox', 'Task', 'Note', 'Document', 'Journal Page']) must(kinds.has(k), `no ${k} on today's timeline`)
   must(t.days.length === 1, 'more than one day returned')
-  await owner.open('/life/timeline')
+  await owner.open('/life/timeline?all=1') // a bare URL restores the remembered view, which a UX check may have filtered
   must((await owner.page.locator('[data-main]').innerText()).includes(`Target note ${stamp}`), 'the screen does not show today')
   return [...kinds].join(', ')
 })
@@ -615,32 +617,16 @@ for (const width of [1440, 390]) {
     await door('/life', 'today-score', { target: '[data-week-score]', path: '/life/journal', ...hidden })
     await door('/life', 'today-vault', { path: '/life/vault' })
     await door('/life', 'nav-review', { path: '/life/inbox', ...hidden })
+    // the area and project pages: the preview headings of Overview lead to their tab (set 3), whose list holds that number
     const area = '/life/areas/' + uxArea
-    await door(area, 'area-projects', { path: '/life/projects' })
-    await door(area, 'area-tasks', { path: '/life/tasks' })
-    await door(area, 'area-notes', { path: '/life/library' })
-    await door(area, 'area-documents', { path: '/life/vault' })
-    await door(area, 'area-reference', { path: '/life/library' })
-    for (const i of [0, 1, 2, 3]) { // the section counts: projects, open tasks, chats, documents
-      await s.open(area)
-      const links = pg.locator('[data-section-count]')
-      if (i >= await links.count()) break
-      const n = num(await links.nth(i).innerText())
-      await links.nth(i).click({ timeout: 8000 }).catch((e) => { throw new Error(`area section ${i}: the count cannot be clicked`) })
-      await pg.waitForLoadState('networkidle')
-      await settle()
-      const got = await count()
-      must(got === n, `area section ${i}: clicked ${n}, the list says ${got}`)
-      done.push(`section ${n}`)
-    }
-    await door(area, 'project-tasks', { which: 1, path: '/life/tasks' }) // "4 of 10 tasks done" on a project card
-    await door('/life/projects?all=1', 'project-tasks', { which: 1, path: '/life/tasks' })
     const proj = '/life/projects/' + ux.project
+    const tabList = '[data-tab-panel]:visible [data-lv-count]'
+    await door(area, 'area-overview-projects', { path: area, target: tabList })
+    await door(area, 'area-overview-tasks', { path: area, target: tabList })
+    await door(area, 'area-overview-timeline', { path: area, target: tabList })
+    await door('/life/projects?all=1', 'project-tasks', { which: 1, path: '/life/tasks' })
     await door(proj, 'project-tasks', { which: 1, path: '/life/tasks' })
-    await door(proj, 'project-open', { path: '/life/tasks' })
-    await door(proj, 'project-notes', { path: '/life/library' })
-    await door(proj, 'project-documents', { path: '/life/vault' })
-    await door(proj, 'project-chats', { path: '/life/chats' })
+    await door(proj, 'project-overview-tasks', { path: proj, target: tabList })
     await door('/life/chats?from=' + addDays(-6), 'chats-open', { path: '/life/chats' })
     must(new URL(pg.url()).searchParams.get('from') === addDays(-6) && new URL(pg.url()).searchParams.get('open_items') === '1', 'chats: the date range was not kept')
     await door('/life/chats?all=1', 'chats-area', { path: '/life/chats' })
@@ -832,8 +818,6 @@ for (const width of [1440, 390]) {
     await lands('/life', 'today-loops', 'loops')
     await lands('/life', 'today-review', 'To Review')
     await lands('/life', 'today-vault', 'soon')
-    await lands('/life/areas/' + uxArea, 'area-projects', 'Active')
-    await lands('/life/areas/' + uxArea, 'area-tasks', 'open')
     await lands('/life/vault?all=1', 'vault-expired', 'expired')
     await lands('/life/chats?all=1', 'chats-open', '1')
     // Tasks: Open loops is a tab with its explanation, the layout switch has three options, the board is not offered on Done
@@ -879,6 +863,144 @@ for (const width of [1440, 390]) {
     }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${checked} tabs`
+  })
+  await check(`${tag}.10`, `${width} px: area and project pages: each tab opens with its count, its list matches the main screen, reload stays, a row opens the pane in the tab`, async () => {
+    const pageBar = pg.locator('[data-page-tabs]')
+    const cur = () => pageBar.getAttribute('data-tab-current')
+    const panelCount = async (t) => num(await pg.locator(`[data-tab-panel="${t}"] [data-lv-count]`).innerText())
+    const f = JSON.stringify([['status', 'in', ['Active', 'On Hold']], ['is_archived', '=', 0]])
+    const PAGES = [
+      ['/life/areas/' + uxArea, [['projects', `/life/projects?area=${uxArea}&f=${encodeURIComponent(f)}`], ['tasks', `/life/tasks?area=${uxArea}&view=list`],
+        ['notes', `/life/library?view=list&area=${uxArea}`], ['documents', `/life/vault?area=${uxArea}`], ['chats', `/life/chats?area=${uxArea}`], ['timeline', `/life/timeline?area=${uxArea}`]]],
+      ['/life/projects/' + ux.project, [['tasks', `/life/tasks?project=${ux.project}&view=list`], ['notes', `/life/library?view=list&project=${ux.project}`],
+        ['documents', `/life/vault?project=${ux.project}`], ['chats', `/life/chats?project=${ux.project}`], ['links', null]]],
+    ]
+    let n = 0
+    for (const [page, tabs] of PAGES) {
+      await s.open(page)
+      must((await cur()) === 'overview', `${page}: opens on ${await cur()}`)
+      for (const [t, main] of tabs) {
+        // clear this tab's remembered view, so it opens as the main screen does
+        await s.open(page)
+        await pageBar.locator(`[data-tab="${t}"]`).click()
+        await pg.waitForLoadState('networkidle')
+        await settle()
+        must((await cur()) === t && new URL(pg.url()).searchParams.get('tab') === t, `${page}: the ${t} tab is not open or not in the URL`)
+        const said = num(await pageBar.locator(`[data-tab="${t}"] [data-tab-count]`).innerText())
+        if (main) {
+          if (await pg.locator('[data-tab-panel]:visible [data-clear]').count()) { await pg.locator('[data-tab-panel]:visible [data-clear]').first().click(); await settle() }
+          const listed = await panelCount(t)
+          must(listed === said, `${page} ${t}: the tab says ${said}, its list ${listed}`)
+          await s.open(main)
+          const there = await count()
+          must(there === listed, `${page} ${t}: ${listed} here, ${there} on the main screen`)
+          await s.open(`${page}?tab=${t}`)
+          must((await cur()) === t, `${page}: reload left the ${t} tab`)
+          const row = pg.locator(`[data-tab-panel="${t}"] [data-row]`).first()
+          if (await row.count()) {
+            await row.click({ position: { x: 120, y: 12 } })
+            await settle()
+            must(await pane.isVisible() && new URL(pg.url()).searchParams.get('tab') === t && new URL(pg.url()).pathname === page, `${page} ${t}: a row did not open the pane in the tab`)
+          }
+        } else {
+          must((await pg.locator('[data-tab-panel="links"] [data-row]').count()) === said, `${page} links: the tab says ${said}`)
+        }
+        must((await overflow()) <= 0, `${page} ${t}: the page scrolls sideways`)
+        n++
+      }
+    }
+    // the main screens keep their own remembered view: the area's Tasks tab does not change it
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    return `${n} tabs`
+  })
+
+  await check(`${tag}.11`, `${width} px: the review screen and the journal page show tabs on a phone only`, async () => {
+    await s.open('/life/inbox/' + ux.inbox)
+    const review = pg.locator('[data-review-tabs]')
+    if (!phone) must(!(await review.count()), 'the review screen shows tabs at 1440 px')
+    else {
+      must(JSON.stringify((await review.locator('[role="tab"]').allInnerTexts()).map((t) => t.replace(/\s*\d+$/, '').trim())) === JSON.stringify(['Original', 'Transcript', 'Summary', 'Proposals']), 'the review tabs are wrong')
+      const pendingNow = (await s.api('inbox.get', { item: ux.inbox })).proposals.some((x) => x.status === 'Pending')
+      must((await review.getAttribute('data-tab-current')) === (pendingNow ? 'proposals' : 'summary'), `the review opened on ${await review.getAttribute('data-tab-current')}`)
+      await review.locator('[data-tab="original"]').click()
+      await settle()
+      must(new URL(pg.url()).searchParams.get('ptab') === 'original', 'the review tab is not in the URL as ptab= in the pane')
+      await s.open(`/life/inbox/${ux.inbox}/review?tab=transcript`) // the full page uses tab=
+      must((await pg.locator('[data-review-tabs]').getAttribute('data-tab-current')) === 'transcript', 'the full review page does not open on tab=transcript')
+      if (pendingNow) must(await pg.getByRole('button', { name: /Accept all/ }).isVisible(), 'Accept all is hidden on the Original tab')
+    }
+    const jp = bench(`print(frappe.db.sql("select name from \`tabLife Journal Page\` where space='${SPACE}' limit 1")[0][0])`).split('\n').pop()
+    await s.open('/life/journal/pages/' + jp)
+    const jt = pg.locator('[data-journal-tabs]')
+    if (!phone) must(!(await jt.count()), 'the journal page shows tabs at 1440 px')
+    else {
+      await jt.locator('[data-tab="transcript"]').click()
+      await settle()
+      await pg.reload({ waitUntil: 'networkidle' })
+      await settle()
+      must((await jt.getAttribute('data-tab-current')) === 'transcript', 'the journal page tab did not survive a reload')
+    }
+    must((await overflow()) <= 0, 'the page scrolls sideways')
+  })
+
+  await check(`${tag}.9`, `${width} px: the record pane shows the tabs of its kind; ptab= survives a reload; a pane with one tab has no tab bar`, async () => {
+    const one = (dt, where = '1=1') => bench(`print(frappe.db.sql("select name from \`tab${dt}\` where space='${SPACE}' and ${where} order by modified desc limit 1")[0][0])`).split('\n').pop()
+    const parent = (await s.api('library.save', { space: SPACE, title: `UX parent ${width} ${stamp}`, content_md: 'A parent.', area: uxArea })).name
+    await s.api('library.save', { space: SPACE, title: `UX child ${width} ${stamp}`, content_md: 'A child.', area: uxArea, parent_note: parent })
+    const leaf = one('Life Note', "is_archived=0 and name not in (select ifnull(parent_note,'') from `tabLife Note`)")
+    const KINDS = [
+      ['task:' + one('Life Task', 'is_archived=0'), ['Details', 'Notes', 'Links']],
+      ['note:' + parent, ['Note', 'Notes under this one', 'Links']],
+      ['note:' + leaf, ['Note', 'Links']],
+      ['project:' + one('Life Project', 'is_archived=0'), ['Overview', 'Tasks']],
+      ['goal:' + one('Life Goal'), null], // Actions, Tasks, History across cycles, Links (Annual and Open goals have no History)
+      ['chat:' + one('Life Chat Log', 'is_archived=0'), ['Summary', 'Open items', 'Links']],
+      ['page:' + one('Life Journal Page'), ['Page', 'Transcript', 'Created from this page']],
+      ['vault:' + one('Life Vault Document', 'is_archived=0'), ['Details', 'File']],
+      ['day:' + today, []], ['vault:new', []],
+    ]
+    const tabsOf = async () => (await pg.locator('[data-pane-tabs] [role="tab"]').allInnerTexts()).map((t) => t.replace(/\s*\d+$/, '').trim())
+    for (const [ref, want] of KINDS) {
+      await s.open(`/life/tasks?view=list&open=${encodeURIComponent(ref)}`)
+      await paneTitle()
+      await settle()
+      const got = await tabsOf()
+      const expect = want || (got.includes('History across cycles') ? ['Actions', 'Tasks', 'History across cycles', 'Links'] : ['Actions', 'Tasks', 'Links'])
+      must(JSON.stringify(got) === JSON.stringify(expect), `${ref}: tabs ${JSON.stringify(got)}, not ${JSON.stringify(expect)}`)
+      if (!expect.length) { must(!(await pg.locator('[data-pane-tabs]').count()), `${ref}: a tab bar with no tabs`); continue }
+      // the last tab is in the URL as ptab= and survives a reload; the first adds nothing
+      const last = pg.locator('[data-pane-tabs] [role="tab"]').last()
+      const value = await last.getAttribute('data-tab')
+      await last.click()
+      await settle()
+      must(new URL(pg.url()).searchParams.get('ptab') === value, `${ref}: ptab= is ${new URL(pg.url()).searchParams.get('ptab')}, not ${value}`)
+      await pg.reload({ waitUntil: 'networkidle' })
+      await paneTitle()
+      await settle()
+      must((await pg.locator('[data-pane-tabs]').getAttribute('data-tab-current')) === value, `${ref}: reload left the ${value} tab`)
+      must((await overflow()) <= 0, `${ref}: the page scrolls sideways`)
+    }
+    // Back closes the pane in one step even after changing its tab
+    await s.open('/life/tasks?view=list')
+    await clickRow(ROW)
+    await pg.locator('[data-pane-tabs] [role="tab"]').last().click()
+    await settle()
+    await pg.goBack()
+    await settle()
+    must(!(await pane.isVisible()), 'Back after changing the pane tab did not close the pane')
+    // a count of open items opens the chat on its Open items tab
+    await s.open('/life/chats?open_items=1&view=table')
+    const door = pg.locator('[data-door="chat-items"]:visible').first()
+    if (await door.count()) {
+      const n = num(await door.innerText())
+      await door.click()
+      await paneTitle()
+      await settle()
+      must((await pg.locator('[data-pane-tabs]').getAttribute('data-tab-current')) === 'items', 'the open items count did not open the Open items tab')
+      must(num(await pg.locator('[data-pane-tabs] [data-tab="items"] [data-tab-count]').innerText()) === n && (await pg.locator('[data-pane] [data-open-item]').count()) >= n, 'the Open items tab does not hold the number clicked')
+    }
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    return `${KINDS.length} kinds`
   })
   await s.ctx.close()
 }

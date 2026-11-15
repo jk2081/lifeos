@@ -55,7 +55,7 @@ def list(space=None, area=None, start=0, page_length=50, doctype=None, reason=No
 		where += " and (" + (" or ".join(parts) or "1=0") + ")"
 		values.update({"reason": reason, "archived_from": archived_from, "archived_to": archived_to})
 	extra, values = std_clause("Life Index", filters, "", values)
-	where += extra
+	where += extra + permissions.vault_guard(space)
 	# the state tabs of the Archive screen: one per record type, counted under every filter but the type itself
 	tabs = tab_counts(f"from `tabLife Index` where space=%(space)s {where}", {"space": space, **values},
 		{"all": None, **{dt: f"ref_doctype = '{dt}'" for dt in TYPES}})

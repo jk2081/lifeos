@@ -7,7 +7,8 @@
  "field_order": [
   "space_name",
   "owner_user",
-  "members"
+  "members",
+  "agents_can_read_vault"
  ],
  "fields": [
   {
@@ -30,6 +31,13 @@
    "fieldtype": "Table",
    "label": "Members",
    "options": "Life Space Member"
+  },
+  {
+   "fieldname": "agents_can_read_vault",
+   "fieldtype": "Check",
+   "label": "Agents Can Read Vault",
+   "default": "0",
+   "description": "Let agents open documents in this space's Vault. Off by default."
   }
  ],
  "links": [],

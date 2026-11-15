@@ -3,8 +3,12 @@ import { call, toast } from 'frappe-ui'
 // Every server call goes through here. Methods live under lifeos.api.
 export function api(method, args = {}) {
   const path = method.startsWith('frappe.') ? method : `lifeos.api.${method}`
-  return call(path, args)
+  const out = call(path, args)
+  // the sidebar's counts (items to review, tasks due) follow any change that can move them, without a reload
+  if (CHANGES.test(method)) out.then(() => window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))).catch(() => {})
+  return out
 }
+const CHANGES = /^(tasks\.(set_status|update|quick_add|carry_forward)|archive\.|inbox\.|review\.|chats\.make_task|journal\.(month_plan_make_task|decide))/
 
 export function errorText(e) {
   const messages = e?.messages || e?.exc_messages

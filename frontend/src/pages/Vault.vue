@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Vault" noun="documents" screen="vault" doctype="Life Vault Document" :spec="SPEC" :tabs="TABS" :flag-labels="{ archived: 'Include archived' }" :quiet="['archived']"
+  <ListView ref="list" :title="embed ? null : 'Vault'" :fixed="embed?.fixed" :active="embed ? embed.active : true" :tabs-in-filter="!!embed" noun="documents" :screen="embed ? embed.screen + '-vault' : 'vault'" doctype="Life Vault Document" :spec="SPEC" :tabs="TABS" :flag-labels="{ archived: 'Include archived' }" :quiet="['archived']"
     :quick="['doc_type', 'holder', 'area']" :synthetic="SYNTHETIC" :fetch="fetch" :row-ref="(r) => 'vault:' + r.name" empty-title="The vault is empty."
     empty-hint="Keep IDs, travel papers, insurance and tax documents here with their expiry dates. Add one, or drop a scan in the Inbox."
     @loaded="(res) => (counts = res)">
@@ -35,6 +35,8 @@ import { loadLookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 import { EXPIRY_PRESETS } from '@/lib/filterUrl'
 
+// inside a record page's tab (the area or project page): { screen, space, fixed: { area } or { project }, active(route) }
+const props = defineProps({ embed: { type: Object, default: null } })
 const list = ref(null)
 const counts = ref({ expired: 0, soon: 0 })
 const SPEC = [
@@ -47,7 +49,7 @@ const TABS = { key: 'expiry', field: 'expiry_date', label: 'Expiry', items: [{ v
 const SYNTHETIC = [{ key: '_badge', label: '', width: '9rem', align: 'right', place: 'end' }]
 const badgeText = (b) => (b.state === 'expired' ? 'Expired' : b.days === 0 ? 'Expires today' : `Expires in ${b.days} days`)
 async function fetch({ params: p, tab, filters, order_by, fields, summary, start, page_length }) {
-  const res = await api('vault.list', { space: store.space, holder: p.holder, doc_type: p.type, expiry: tab === 'all' ? p.expiry : tab, area: p.area, project: p.project,
+  const res = await api('vault.list', { space: props.embed?.space || store.space, holder: p.holder, doc_type: p.type, expiry: tab === 'all' ? p.expiry : tab, area: p.area, project: p.project,
     include_archived: p.archived ? 1 : 0, filters, order_by, fields, summary, start, page_length })
   return summary ? res : { rows: res.documents, total: res.total, expired: res.expired, soon: res.soon, tabs: res.tabs }
 }

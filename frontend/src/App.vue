@@ -2,26 +2,7 @@
   <FrappeUIProvider>
     <div v-if="store.ready" class="flex min-h-full bg-surface-base" data-app>
       <div class="sticky top-0 hidden h-screen shrink-0 border-r border-outline-gray-1 md:block">
-        <Sidebar :collapsible="false" width="220px" aria-label="Sections">
-          <SidebarHeader :title="store.space || 'No space'" :subtitle="store.fullName || store.user" :menu-items="spaceOptions" />
-          <div class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pt-1">
-            <SidebarItem v-for="n in NAV" :key="n.to" :label="n.label" :icon="n.icon" :route="n.to" :active="isOn(n)">
-              <template v-if="n.label === 'Inbox' && store.counts.to_review" #suffix>
-                <RouterLink class="mr-1.5 rounded-full focus-visible:focus-ring" :to="{ path: '/inbox', query: { status: 'To Review' } }"
-                  :aria-label="`${store.counts.to_review} to review`" data-door="nav-review"><Badge :label="store.counts.to_review" /></RouterLink>
-              </template>
-            </SidebarItem>
-          </div>
-          <div class="flex flex-col gap-0.5 px-2 pb-3 pt-1">
-            <SidebarItem label="Search" icon="lucide-search" @click="store.searchOpen = true">
-              <template #suffix><KeyboardShortcut class="mr-2" combo="Mod+K" /></template>
-            </SidebarItem>
-            <SidebarItem label="Shortcuts" icon="lucide-keyboard" @click="shortcutsOpen = true">
-              <template #suffix><KeyboardShortcut class="mr-2" combo="Shift+Slash" /></template>
-            </SidebarItem>
-            <SidebarItem :label="SETTINGS.label" :icon="SETTINGS.icon" :route="SETTINGS.to" :active="isOn(SETTINGS)" />
-          </div>
-        </Sidebar>
+        <AppSidebar @logout="logout" @shortcuts="shortcutsOpen = true" />
       </div>
 
       <main class="flex min-w-0 flex-1 flex-col pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0" data-main>
@@ -32,7 +13,11 @@
 
       <div class="fixed inset-x-0 bottom-0 z-30 md:hidden" data-tabbar>
         <MobileNav aria-label="Sections">
-          <MobileNavItem v-for="n in TABS" :key="n.to" :label="n.label" :icon="n.icon" :route="n.to" :active="isOn(n) && !moreOpen" />
+          <MobileNavItem v-for="n in TABS" :key="n.to" :label="n.label" :icon="navCount(n.label) ? undefined : n.icon" :route="n.to" :active="isOn(n) && !moreOpen" :data-tab-item="n.label">
+            <!-- Inbox and Tasks carry the sidebar's counts -->
+            <span v-if="navCount(n.label)" class="relative inline-flex"><span :class="n.icon" class="size-5" aria-hidden="true" />
+              <span class="absolute -right-3 -top-1.5" :data-tab-count="n.label"><Badge size="sm" theme="red" :label="navCount(n.label).n" /></span></span>
+          </MobileNavItem>
           <MobileNavItem label="More" icon="lucide-menu" :active="moreOpen" @click="moreOpen = !moreOpen" />
         </MobileNav>
       </div>
@@ -40,19 +25,44 @@
         <Button class="!size-12 !rounded-full shadow-lg" variant="solid" size="lg" icon="lucide-plus" label="Add" @click="store.quickAdd = true" />
       </div>
 
+      <!-- Phone: More is the sidebar's grouped list, full screen, with Search and New at the top -->
       <BottomSheet v-model:open="moreOpen" title="Life OS">
-        <div class="flex flex-col gap-4 px-4 pb-6">
+        <div class="flex h-[86dvh] flex-col gap-4 overflow-y-auto px-4 pb-6" data-more>
+          <div class="flex gap-2">
+            <Button class="flex-1" size="lg" icon-left="lucide-search" label="Search" @click="moreOpen = false; store.searchOpen = true" />
+            <Dropdown v-if="canWrite()" :options="newMenuItems().map((o) => ({ ...o, onClick: () => { moreOpen = false; o.onClick() } }))">
+              <Button size="lg" variant="solid" icon-left="lucide-plus" label="New" data-more-new />
+            </Dropdown>
+          </div>
           <div>
             <div class="mb-2 text-sm-medium text-ink-gray-6">Space</div>
             <TabButtons :model-value="store.space" :options="store.spaces.map((s) => ({ label: s.name, value: s.name }))" @update:model-value="(v) => (store.space = v)" />
           </div>
-          <div class="flex flex-col gap-0.5">
-            <Button v-for="n in [...NAV, SETTINGS]" :key="n.to" class="!justify-start" size="lg" :variant="isOn(n) ? 'subtle' : 'ghost'" :icon-left="n.icon" :label="n.label"
-              :route="n.to" @click="moreOpen = false" />
+          <section v-for="g in GROUPS" :key="g.key" class="flex flex-col gap-0.5" :data-more-group="g.key">
+            <RouterLink v-if="g.key === 'areas'" to="/areas" class="mb-1 rounded-4 text-sm-medium text-ink-gray-6 hover:underline focus-visible:focus-ring" @click="moreOpen = false">Areas</RouterLink>
+            <div v-else-if="g.label" class="mb-1 text-sm-medium text-ink-gray-6">{{ g.label }}</div>
+            <template v-if="g.key === 'areas'">
+              <template v-for="a in areaTree.slice(0, MAX_AREAS)" :key="a.name">
+                <Button class="!justify-start" size="lg" :variant="activeKey === 'area:' + a.name ? 'subtle' : 'ghost'" icon-left="lucide-folder" :label="a.area_name" :route="`/areas/${a.name}`" />
+                <Button v-for="c in a.children" :key="c.name" class="!justify-start pl-8" size="lg" :variant="activeKey === 'area:' + c.name ? 'subtle' : 'ghost'" icon-left="lucide-corner-down-right"
+                  :label="c.area_name" :route="`/areas/${c.name}`" />
+              </template>
+              <Button v-if="areaTree.length > MAX_AREAS" class="!justify-start" size="lg" variant="ghost" icon-left="lucide-folders" label="All areas" route="/areas" />
+            </template>
+            <Button v-for="n in g.items" v-else :key="n.to" class="!justify-start" size="lg" :variant="activeKey === n.to ? 'subtle' : 'ghost'" :icon-left="n.icon" :label="n.label" :route="n.to">
+              <template v-if="navCount(n.label)" #suffix><Badge :label="navCount(n.label).n" /></template>
+            </Button>
+          </section>
+          <section class="flex flex-col gap-0.5 border-t border-outline-gray-1 pt-3">
+            <Button v-for="n in BOTTOM" :key="n.to" class="!justify-start" size="lg" :variant="activeKey === n.to ? 'subtle' : 'ghost'" :icon-left="n.icon" :label="n.label" :route="n.to" />
             <Button class="!justify-start" size="lg" variant="ghost" icon-left="lucide-log-out" label="Log out" @click="logout" />
-          </div>
+          </section>
         </div>
       </BottomSheet>
+      <NewRecord v-if="store.newKind === 'note'" :model-value="true" title="New note" action="Create note" :fields="[{ name: 'title', label: 'Title', required: true }]"
+        :save="createNote" @update:model-value="(v) => !v && (store.newKind = '')" />
+      <NewRecord v-if="store.newKind === 'project'" :model-value="true" title="New project" action="Add project" :fields="projectFields" :save="createProject"
+        @update:model-value="(v) => !v && (store.newKind = '')" />
 
       <RecordPane />
       <SearchPalette v-model:open="store.searchOpen" />
@@ -78,13 +88,20 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Alert, Badge, BottomSheet, Button, FrappeUIProvider, KeyboardShortcut, KeyboardShortcutsDialog, LoadingIndicator, MobileNav, MobileNavItem,
-  Sidebar, SidebarHeader, SidebarItem, TabButtons, useColorScheme } from 'frappe-ui'
+import { Alert, Badge, BottomSheet, Button, Dropdown, FrappeUIProvider, KeyboardShortcut, KeyboardShortcutsDialog, LoadingIndicator, MobileNav, MobileNavItem,
+  TabButtons, useColorScheme } from 'frappe-ui'
+import AppSidebar from './components/AppSidebar.vue'
+import NewRecord from './components/NewRecord.vue'
+import { BOTTOM, GROUPS } from './lib/nav'
+import { MAX_AREAS, activeKey, areaTree } from './lib/sidebar'
+import { navCount, newMenuItems } from './lib/newMenu'
+import { db } from './lib/api'
+import { areaOptions, loadLookups } from './lib/lookups'
 import SearchPalette from './components/SearchPalette.vue'
 import RecordPane from './components/RecordPane.vue'
 import QuickAdd from './components/QuickAdd.vue'
 import { NAV, SETTINGS } from './lib/nav'
-import { boot, store } from './lib/store'
+import { boot, canWrite, store } from './lib/store'
 import { errorText } from './lib/api'
 import { stepTab } from './lib/tabs'
 
@@ -94,6 +111,7 @@ const moreOpen = ref(false)
 const shortcutsOpen = ref(false)
 const bootError = ref('')
 const TABS = NAV.filter((n) => ['Today', 'Inbox', 'Tasks', 'Journal'].includes(n.label))
+// Graph is a view of Notes; its G shortcut stays
 const SHORTCUTS = [
   { title: 'Anywhere', shortcuts: [
     { label: 'Search', combo: 'Mod+K', altCombos: ['Slash'] }, { label: 'New task', combo: 'N' }, { label: 'Close the pane or dialog', combo: 'Escape' },
@@ -108,13 +126,21 @@ useColorScheme() // light and dark come from frappe-ui: it follows the system se
 
 const isOn = (n) => (n.to === '/' ? route.path === '/' : route.path === n.to || route.path.startsWith(n.to + '/'))
 const showFab = computed(() => ['/', '/tasks', '/inbox'].includes(route.path) && !moreOpen.value && !route.query.open)
-const spaceOptions = computed(() => [
-  { group: 'Spaces', options: store.spaces.map((s) => ({ label: s.name, selected: s.name === store.space, onClick: () => (store.space = s.name) })) },
-  { group: store.fullName || store.user, options: [
-    { label: 'Settings', icon: 'lucide-settings', onClick: () => router.push('/settings') },
-    { label: 'Log out', icon: 'lucide-log-out', onClick: logout },
-  ] },
-])
+const projectFields = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'area', label: 'Area', required: true, options: areaOptions() },
+  { name: 'outcome', label: 'Outcome', type: 'textarea', help: 'What will be true when this is done.' }, { name: 'target_date', label: 'Target date', type: 'date' }])
+async function createNote(v) {
+  const note = await db.insert({ doctype: 'Life Note', space: store.space, title: v.title, content_md: '' })
+  store.newKind = ''
+  router.push(`/library/${note.name}?edit=1`)
+}
+async function createProject(v) {
+  const p = await db.insert({ doctype: 'Life Project', space: store.space, status: 'Active', ...v })
+  store.newKind = ''
+  await loadLookups(true)
+  router.push(`/projects/${p.name}`)
+}
+// the sidebar's areas come from the space's lookups, read again when the space changes or Settings changes them
+watch(() => [store.ready, store.space], ([ready]) => ready && loadLookups(true), { immediate: true })
 
 async function logout() {
   await fetch('/api/method/logout', { method: 'POST', headers: { 'X-Frappe-CSRF-Token': window.csrf_token || '' } })

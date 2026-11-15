@@ -1,5 +1,6 @@
 <template>
   <template v-if="d">
+    <template v-if="on('overview')">
     <div class="flex flex-wrap items-center gap-2">
       <Badge :theme="!p.is_archived && p.status === 'Active' ? 'green' : 'gray'" :label="p.is_archived ? `${p.status}, archived` : p.status === 'On Hold' ? 'On hold' : p.status" />
       <span class="text-sm text-ink-gray-6">{{ p.target_date ? 'Target ' + short(p.target_date, true) : 'No target date' }}</span>
@@ -14,7 +15,8 @@
       <NumLink :to="{ path: '/vault', query: { project: p.name, ...arch } }">{{ plural(d.counts.documents, 'document') }}</NumLink> ·
       <NumLink :to="{ path: '/chats', query: { project: p.name, ...arch } }">{{ plural(d.counts.chats, 'chat') }}</NumLink>
     </div>
-    <section>
+    </template>
+    <section v-if="on('tasks')">
       <SectionHead>Open tasks</SectionHead>
       <Card flush>
         <TaskRow v-for="t in d.tasks" :key="t.name" :task="t" :today="store.today" with-due :readonly="!writable" @toggle="toggle" />
@@ -37,7 +39,9 @@ import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { doneLink, plural } from '@/lib/tasks'
 
-const props = defineProps({ name: String, type: String })
+const props = defineProps({ name: String, type: String, tab: String })
+// the pane's tabs: Overview, Tasks
+const on = (t) => !props.tab || props.tab === t
 const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
 const d = ref(null)
 const p = computed(() => d.value.project)
@@ -48,7 +52,8 @@ async function load() {
   try {
     d.value = await api('projects.get', { project: props.name })
     emit('meta', { title: p.value.title, area: p.value.area, area_name: p.value.area_name, fullPage: `/projects/${p.value.name}`,
-      archived: !!p.value.is_archived, canRestore: canRestore.value })
+      archived: !!p.value.is_archived, canRestore: canRestore.value,
+      tabs: [{ value: 'overview', label: 'Overview' }, { value: 'tasks', label: 'Tasks', count: d.value.tasks.length, noun: 'open tasks' }] })
   } catch (e) {
     emit('missing')
   }

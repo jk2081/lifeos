@@ -1,5 +1,6 @@
 <template>
   <template v-if="doc">
+    <template v-if="on('details')">
     <Alert v-if="doc.badge" :theme="doc.badge.state === 'expired' ? 'red' : 'amber'"
       :title="`${doc.badge.state === 'expired' ? `Expired ${-doc.badge.days} days ago.` : doc.badge.days === 0 ? 'Expires today.' : `Expires in ${doc.badge.days} days.`} Time to renew.`" />
     <LifeFormLayout doctype="Life Vault Document" :values="form" :rows="[['title'], ['doc_type', 'holder', 'number_last4']]" :overrides="OVERRIDES" :titles="titles" :disabled="!writable" />
@@ -9,8 +10,9 @@
     <FormControl v-model="form.notes_md" type="textarea" label="Notes" :rows="3" :disabled="!writable" />
     <div v-if="writable" class="flex flex-wrap items-center gap-2"><Button variant="solid" :label="doc.name ? 'Save' : 'Add document'" @click="save" />
       <Button v-if="doc.name" label="Archive" @click="archive" /></div>
-    <section v-if="doc.name">
-      <SectionHead>File</SectionHead>
+    <Backlinks v-if="doc.name" doctype="Life Vault Document" :name="doc.name" />
+    </template>
+    <section v-if="doc.name && on('file')">
       <template v-if="doc.file">
         <img v-if="fileKind(doc.file_name) === 'image'" :src="doc.file" :alt="doc.title" class="block w-full rounded-5 border border-outline-gray-1" />
         <object v-else-if="fileKind(doc.file_name) === 'pdf'" :data="doc.file" type="application/pdf" class="block h-[420px] w-full rounded-5 border border-outline-gray-1">
@@ -20,7 +22,6 @@
       <div v-else class="text-sm text-ink-gray-6">No file yet.</div>
       <div v-if="writable" class="mt-2"><FileAttach doctype="Life Vault Document" :docname="doc.name" fieldname="file" :label="doc.file ? 'Replace file' : 'Attach a file'" @uploaded="attached" /></div>
     </section>
-    <Backlinks v-if="doc.name" doctype="Life Vault Document" :name="doc.name" />
   </template>
 </template>
 <script setup>
@@ -29,7 +30,6 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { Alert, Button, FormControl, dialog, toast } from 'frappe-ui'
 import LifeFormLayout from '@/framework/LifeFormLayout.vue'
 import FileAttach from '../FileAttach.vue'
-import SectionHead from '../ui/SectionHead.vue'
 import Backlinks from '../Backlinks.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
@@ -38,7 +38,9 @@ import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 
 const FIELDS = ['title', 'doc_type', 'holder', 'number_last4', 'issue_date', 'expiry_date', 'remind_days_before', 'area', 'notes_md']
-const props = defineProps({ name: String, type: String })
+const props = defineProps({ name: String, type: String, tab: String })
+// the pane's tabs: Details, File. The form for a new document has no tabs.
+const on = (t) => !props.tab || props.tab === t
 const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
 const doc = ref(null)
 const form = reactive({})
@@ -61,7 +63,8 @@ function fill(d) {
   for (const f of FIELDS) form[f] = d[f] ?? null
   emit('meta', d.name
     ? { title: d.title || 'Document', area: d.area, area_name: d.area_name, project: d.project, project_title: d.project_title,
-      sub: [d.doc_type, d.holder_name].filter(Boolean).join(' · '), archived: !!d.is_archived, canRestore: canRestore.value }
+      sub: [d.doc_type, d.holder_name].filter(Boolean).join(' · '), archived: !!d.is_archived, canRestore: canRestore.value,
+      tabs: [{ value: 'details', label: 'Details' }, { value: 'file', label: 'File' }] }
     : { title: 'Add document', sub: 'Only the last four characters of a number are stored.' })
 }
 async function save() {

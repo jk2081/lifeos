@@ -1,14 +1,9 @@
 <template>
   <template v-if="d">
     <PageHead :title="p.title" :crumb="{ to: `/areas/${p.area}`, label: p.area_name || 'Area', here: 'Project' }">
-      <template #sub>
-        <NumLink :to="door.tasks" data-door="project-open">{{ plural(d.counts.open_tasks, 'open task') }}</NumLink> ·
-        <NumLink :to="door.notes" data-door="project-notes">{{ plural(d.counts.notes, 'note') }}</NumLink> ·
-        <NumLink :to="door.documents" data-door="project-documents">{{ plural(d.counts.documents, 'document') }}</NumLink> ·
-        <NumLink :to="door.chats" data-door="project-chats">{{ plural(d.counts.chats, 'chat') }}</NumLink>
-      </template>
       <Badge :theme="!p.is_archived && p.status === 'Active' ? 'green' : 'gray'" :label="p.is_archived ? `${p.status}, archived` : p.status" />
       <template v-if="writable">
+        <Button v-if="!p.is_archived" label="New note" @click="noteOpen = true" />
         <Button v-if="p.is_archived" variant="solid" label="Restore" @click="setStatus('Active')" />
         <template v-else>
           <Button :label="p.status === 'On Hold' ? 'Resume' : 'Put on hold'" @click="setStatus(p.status === 'On Hold' ? 'Active' : 'On Hold')" />
@@ -17,7 +12,9 @@
         </template>
       </template>
     </PageHead>
-    <div class="page-body">
+    <!-- the project's tabs (tab=) -->
+    <TabBar class="flex-none" inset :tabs="tabs" :model-value="tab.current.value" label="Project sections" data-page-tabs @update:model-value="setTab" />
+    <div v-show="tab.current.value === 'overview'" class="page-body" data-tab-panel="overview">
       <Card class="flex flex-col gap-3">
         <TextInput v-model="p.outcome" label="Outcome" :disabled="!writable" placeholder="What will be true when this is done" @change="saveField('outcome')" />
         <div class="form-grid">
@@ -27,42 +24,21 @@
             <NumLink class="text-sm" :to="doneLink(p)" data-door="project-tasks">{{ p.tasks_done }} of {{ p.tasks_total }} tasks done</NumLink></div></div>
         </div>
       </Card>
-      <div class="cols">
-        <div class="half">
-          <section>
-            <SectionHead :count="d.counts.open_tasks" :to="door.tasks">Tasks</SectionHead>
-            <Card flush>
-              <TaskRow v-for="t in d.tasks" :key="t.name" :task="t" :today="store.today" with-due :readonly="!writable" @toggle="toggle" />
-              <Empty v-if="!d.tasks.length" title="No open tasks." hint="Add the next step below." />
-              <Row v-if="writable && !p.is_archived"><TextInput v-model="quick" class="flex-1" placeholder="Add a task to this project" aria-label="Add a task" @keydown.enter="addTask" /></Row>
-            </Card>
-          </section>
-          <section v-if="d.done_tasks.length">
-            <SectionHead>Done</SectionHead>
-            <Card flush><TaskRow v-for="t in d.done_tasks" :key="t.name" :task="t" :today="store.today" :readonly="!writable" @toggle="toggle" /></Card>
-          </section>
-        </div>
-        <div class="half">
-          <section>
-            <SectionHead :count="d.counts.notes" :to="door.notes">Notes
-              <template v-if="writable && !p.is_archived" #action><Button variant="ghost" size="sm" label="New note" @click="noteOpen = true" /></template>
-            </SectionHead>
-            <Card flush><IndexRow v-for="n in d.notes" :key="n.ref_name" :row="n">Added {{ short(n.record_date) }}</IndexRow>
-              <Empty v-if="!d.notes.length" title="No notes." hint="Notes filed under this project show here." /></Card>
-          </section>
-          <section>
-            <SectionHead :count="d.counts.documents" :to="door.documents">Documents</SectionHead>
-            <Card flush><IndexRow v-for="n in d.documents" :key="n.ref_name" :row="n" pill="Vault">Added {{ short(n.record_date) }}</IndexRow>
-              <Empty v-if="!d.documents.length" title="No documents." hint="Vault documents filed under this project show here." /></Card>
-          </section>
-          <section>
-            <SectionHead :count="d.counts.chats" :to="door.chats">Chats</SectionHead>
-            <Card flush><IndexRow v-for="c in d.chats" :key="c.ref_name" :row="c">{{ short(c.record_date) }} · {{ c.open_items ? `${c.open_items} open items` : 'no open items' }}</IndexRow>
-              <Empty v-if="!d.chats.length" title="No chats." hint="AI chats logged under this project show here." /></Card>
-          </section>
-          <Backlinks doctype="Life Project" :name="p.name" />
-        </div>
-      </div>
+      <section>
+        <SectionHead :count="d.tabs.tasks" :to="{ query: { tab: 'tasks' } }" door="project-overview-tasks">Open tasks</SectionHead>
+        <Card flush>
+          <TaskRow v-for="t in openTasks.slice(0, 5)" :key="t.name" :task="t" :today="store.today" with-due :readonly="!writable" @toggle="toggle" />
+          <Empty v-if="!openTasks.length" title="No open tasks." hint="Add the next step below." />
+          <Row v-if="writable && !p.is_archived"><TextInput v-model="quick" class="flex-1" placeholder="Add a task to this project" aria-label="Add a task" @keydown.enter="addTask" /></Row>
+        </Card>
+      </section>
+    </div>
+    <div :key="p.name" class="contents">
+      <div v-if="tab.shown('tasks')" v-show="tab.current.value === 'tasks'" class="contents" data-tab-panel="tasks"><Tasks :embed="embed('tasks')" /></div>
+      <div v-if="tab.shown('notes')" v-show="tab.current.value === 'notes'" class="contents" data-tab-panel="notes"><NotesList :embed="embed('notes')" /></div>
+      <div v-if="tab.shown('documents')" v-show="tab.current.value === 'documents'" class="contents" data-tab-panel="documents"><Vault :embed="embed('documents')" /></div>
+      <div v-if="tab.shown('chats')" v-show="tab.current.value === 'chats'" class="contents" data-tab-panel="chats"><Chats :embed="embed('chats')" /></div>
+      <div v-if="tab.shown('links')" v-show="tab.current.value === 'links'" class="page-body" data-tab-panel="links"><Backlinks tab doctype="Life Project" :name="p.name" :reload="stamp" /></div>
     </div>
     <Dialog v-model:open="confirmOpen" :title="confirmStatus === 'Done' ? 'Complete this project?' : 'Drop this project?'" size="md"
       :actions="[{ label: 'Cancel', onClick: ({ close }) => close() },
@@ -75,8 +51,8 @@
   <div v-else-if="missing" class="page-body"><Card><Empty title="This project was not found." hint="It may belong to another space." /></Card></div>
 </template>
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, DatePicker, Dialog, Progress, TextInput, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
@@ -85,18 +61,24 @@ import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
 import TaskRow from '@/components/TaskRow.vue'
-import IndexRow from '@/components/IndexRow.vue'
+import TabBar from '@/components/TabBar.vue'
+import Tasks from '@/pages/Tasks.vue'
+import Vault from '@/pages/Vault.vue'
+import Chats from '@/pages/Chats.vue'
+import NotesList from '@/components/lists/NotesList.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import { api, db, optimistic, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
-import { short } from '@/lib/dates'
 import { loadLookups } from '@/lib/lookups'
-import { doneLink, plural } from '@/lib/tasks'
+import { doneLink } from '@/lib/tasks'
 import { onRecordChanged } from '@/lib/pane'
+import { useUrlTab } from '@/lib/tabs'
 
 const props = defineProps({ id: String })
+const route = useRoute()
 const router = useRouter()
+const stamp = ref(0)
 const d = ref(null)
 const missing = ref(false)
 const quick = ref('')
@@ -105,16 +87,28 @@ const confirmStatus = ref('Done')
 const noteOpen = ref(false)
 const p = computed(() => d.value.project)
 const writable = computed(() => store.spaces.find((s) => s.name === d.value?.space)?.access === 'Write')
-// every number on this page leads to the list it counts, filtered to this project
-const door = computed(() => {
-  const q = { project: p.value.name, ...(p.value.is_archived ? { archived: '1' } : {}) }
-  return { tasks: { path: '/tasks', query: { ...q, view: 'list' } }, notes: { path: '/library', query: { view: 'list', ...q } },
-    documents: { path: '/vault', query: q }, chats: { path: '/chats', query: q } }
-})
+// The tabs. Each list tab is the main screen's list with this project fixed, its view remembered per tab across projects.
+const TABS = [['overview', 'Overview'], ['tasks', 'Tasks'], ['notes', 'Notes'], ['documents', 'Documents'], ['chats', 'Chats'], ['links', 'Links']]
+const NOUNS = { tasks: 'open tasks', notes: 'notes', documents: 'documents', chats: 'chats', links: 'linked records' }
+const tabs = computed(() => TABS.map(([value, label]) => ({ value, label, count: value === 'overview' ? undefined : d.value?.tabs?.[value], noun: NOUNS[value] })))
+const tab = useUrlTab('tab', tabs)
+// a tab change keeps only the tab and the open record: the list query in the URL belongs to the tab that was open
+function setTab(v) {
+  if (v === tab.current.value) return
+  router.push({ query: { tab: v === 'overview' ? undefined : v, open: route.query.open, ptab: route.query.ptab } })
+}
+// the Overview preview is Open and Doing, as the Tasks tab opens
+const openTasks = computed(() => d.value.tasks.filter((t) => ['Open', 'Doing'].includes(t.status)))
+function embed(t) {
+  const path = route.path
+  return { screen: 'project', space: d.value.space, fixed: { project: p.value.name, ...(p.value.is_archived ? { archived: '1' } : {}) }, writable: writable.value && !p.value.is_archived,
+    active: (r) => r.path === path && (r.query.tab || 'overview') === t }
+}
 
 async function load() {
   try {
     d.value = await api('projects.get', { project: props.id })
+    stamp.value++
   } catch (e) {
     missing.value = true
   }
@@ -151,4 +145,5 @@ async function createNote(v) {
 }
 onRecordChanged(load)
 onMounted(load)
+watch(() => props.id, load)
 </script>

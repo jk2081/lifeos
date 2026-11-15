@@ -75,12 +75,12 @@ const charts = computed(() => d.value.series.filter((s) => s.points.length))
 
 function reset() {
   editingName.value = ''
-  Object.assign(form, { date: store.today, reflection_md: '', scores: d.value.dimensions.map((x) => ({ dimension: x.name, dimension_name: x.dimension_name, habits: '', situation: '', note: '' })) })
+  Object.assign(form, { date: store.today, reflection_md: '', scores: d.value.dimensions.filter((x) => !x.is_archived).map((x) => ({ dimension: x.name, dimension_name: x.dimension_name, habits: '', situation: '', note: '' })) })
 }
 function edit(c) {
   editingName.value = c.name
   const val = (lo, hi) => (lo == null ? '' : range(lo, hi))
-  Object.assign(form, { date: c.date, reflection_md: c.reflection_md, scores: d.value.dimensions.map((x) => {
+  Object.assign(form, { date: c.date, reflection_md: c.reflection_md, scores: d.value.dimensions.filter((x) => !x.is_archived || c.scores.some((y) => y.dimension === x.name)).map((x) => {
     const s = c.scores.find((y) => y.dimension === x.name)
     return { dimension: x.name, dimension_name: x.dimension_name, habits: s ? val(s.habits_low, s.habits_high) : '', situation: s ? val(s.situation_low, s.situation_high) : '', note: s?.note || '' }
   }) })

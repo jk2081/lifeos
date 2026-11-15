@@ -15,7 +15,8 @@ SORTS = {"title": "p.title", "status": "field(p.status, 'Active', 'On Hold', 'Do
 
 
 # the state tabs of the Projects screen. Active and On hold leave archived projects out, as the list does
-TABS = {"Active": "p.status = 'Active' and p.is_archived = 0", "On Hold": "p.status = 'On Hold' and p.is_archived = 0",
+TABS = {"current": "p.status in ('Active', 'On Hold') and p.is_archived = 0",
+	"Active": "p.status = 'Active' and p.is_archived = 0", "On Hold": "p.status = 'On Hold' and p.is_archived = 0",
 	"Done": "p.status = 'Done'", "Dropped": "p.status = 'Dropped'", "all": None}
 
 
@@ -43,7 +44,8 @@ def count(space, **filters):
 def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None, start=0, page_length=100, filters=None, order_by=None, summary=None):
 	"""Projects of a space, as a flat list and grouped by area. With no status: active and on hold ones; include_done=1 for every status.
 	Filters: status (Active, On Hold, Done, Dropped), area (with its sub-areas). `total` is the number the filters match.
-	`tabs` counts the projects on each state tab of the Projects screen (Active, On Hold, Done, Dropped, all) under the same filters."""
+	`tabs` counts the projects on each state tab of the Projects screen (Active, On Hold, Done, Dropped, all) under the same filters,
+	and `current`, active and on hold together (the default of the area page's Projects tab)."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	if status and status not in ("Active", "On Hold", "Done", "Dropped"):
@@ -84,7 +86,7 @@ def get(project):
 		c["open_items"] = counts.get(c.ref_name, 0)
 	inc = 1 if doc.is_archived else 0
 	idx = lambda kind: frappe.db.sql(  # noqa: E731
-		f"select count(*) from `tabLife Index` where space=%(space)s and project=%(project)s and kind=%(kind)s {arch}",
+		f"select count(*) from `tabLife Index` where space=%(space)s and project=%(project)s and kind=%(kind)s {arch}{permissions.vault_guard(space)}",
 		{"space": space, "kind": kind, **v})[0][0]
 	return {
 		"counts": {"open_tasks": task_api.count(space, project=doc.name, include_archived=inc), "notes": idx("Note"),
@@ -96,6 +98,22 @@ def get(project):
 		"chats": chats,
 		"goals": frappe.get_all("Life Goal", filters={"project": doc.name}, fields=["name", "title", "cycle", "outcome"], limit=20),
 		"record_count": archive.project_record_count(doc.name),
+		"tabs": tab_counts_of(space, doc.name, inc),
+	}
+
+
+def tab_counts_of(space, project, include_archived=0):
+	"""The count on each tab of the project page: what that tab's list shows when it opens, asked of the same list method
+	the main screen uses, so the number equals the main screen filtered by this project."""
+	from lifeos.api import chats, library, links, vault
+
+	inc = include_archived
+	return {
+		"tasks": task_api.list(space=space, project=project, status="open_doing", include_archived=inc, page_length=1)["total"],
+		"notes": library.list(space=space, project=project, include_archived=inc, page_length=1)["total"],
+		"documents": vault.list(space=space, project=project, include_archived=inc, page_length=1)["total"],
+		"chats": chats.list(space=space, project=project, include_archived=inc, page_length=1)["total"],
+		"links": len(links.backlinks("Life Project", project)),
 	}
 
 

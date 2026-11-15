@@ -1,5 +1,6 @@
 <template>
-  <ListView title="Timeline" sub="Everything captured, by day, newest first" noun="records" screen="timeline" doctype="Life Index" mode="feed" :spec="SPEC"
+  <ListView :title="embed ? null : 'Timeline'" sub="Everything captured, by day, newest first" noun="records" :screen="embed ? embed.screen + '-timeline' : 'timeline'"
+    :fixed="embed?.fixed" :active="embed ? embed.active : true" doctype="Life Index" mode="feed" :spec="SPEC"
     :flag-labels="{ archived: 'Include archived' }" :quick="['ref_doctype', 'area', 'title']" :virtual="VIRTUAL" :hidden="HIDDEN" :fetch="fetch" :page-size="60"
     :row-ref="(r) => refOf(r.ref_doctype, r.ref_name)" :row-key="(r) => r.ref_doctype + r.ref_name + r.kind" :row-label="(r) => r.title || 'Untitled'"
     :group-by="(r) => `${weekday(r.record_date)}, ${long(r.record_date, true)}`" empty-title="Nothing on the timeline yet."
@@ -43,9 +44,11 @@ const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'doctype', fi
 const VIRTUAL = [{ fieldname: 'ref_doctype', label: 'Type', fieldtype: 'Select', options: TYPES.join('\n') },
   { fieldname: 'area', label: 'Area', fieldtype: 'Link', options: 'Life Area' }, { fieldname: 'project', label: 'Project', fieldtype: 'Link', options: 'Life Project' }]
 const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'tags_csv', 'is_archived', 'record_owner']
+// inside a record page's tab (the area page): { screen, space, fixed: { area }, active(route) }
+const props = defineProps({ embed: { type: Object, default: null } })
 const route = useRoute()
 async function fetch({ params: p, filters, summary, start, page_length }) {
-  const res = await api('timeline.get', { space: store.space, area: p.area, doctype: p.doctype, from_date: p.from, to_date: p.to, include_archived: p.archived ? 1 : 0,
+  const res = await api('timeline.get', { space: props.embed?.space || store.space, area: p.area, doctype: p.doctype, from_date: p.from, to_date: p.to, include_archived: p.archived ? 1 : 0,
     filters, summary, start, page_length })
   return summary ? res : { rows: res.days.flatMap((d) => d.entries), total: res.total }
 }

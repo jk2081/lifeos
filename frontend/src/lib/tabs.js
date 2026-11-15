@@ -15,17 +15,19 @@ import { useRoute, useRouter } from 'vue-router'
  * @returns { current, set, visited, shown }  `visited` is the set of tabs opened since the screen opened: load a tab
  *          when `shown(value)` first turns true and keep it loaded after that.
  */
-export function useUrlTab(key = 'tab', tabs = [], { replace = false } = {}) {
+export function useUrlTab(key = 'tab', tabs = [], { replace = false, fallback = null } = {}) {
   const route = useRoute()
   const router = useRouter()
   const all = () => toValue(tabs) || []
+  // the tab with nothing in the URL: the first, or `fallback` (a getter) where the default depends on the record
+  const first = () => (fallback && all().some((t) => t.value === toValue(fallback)) ? toValue(fallback) : all()[0]?.value)
   const current = computed(() => {
     const v = route.query[key] ? String(route.query[key]) : ''
-    return all().some((t) => t.value === v) ? v : all()[0]?.value
+    return all().some((t) => t.value === v) ? v : first()
   })
   function set(value) {
     if (value === current.value) return
-    const query = { ...route.query, [key]: value === all()[0]?.value ? undefined : value }
+    const query = { ...route.query, [key]: value === first() ? undefined : value }
     return replace ? router.replace({ query }) : router.push({ query })
   }
   const visited = reactive(new Set())
