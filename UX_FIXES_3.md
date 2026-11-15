@@ -1,4 +1,4 @@
-# UX fixes, set 3: tabbed navigation, Settings and the sidebar
+# UX fixes, set 3: tabbed navigation, Settings, the sidebar and permissions
 
 Frappe organises information with tabs in three ways: tabs on a record, tabs on a list that split it by state, and tabs on a page with sub-screens. This set applies the same three patterns to Life OS.
 
@@ -180,14 +180,47 @@ Today the sidebar is 13 items in one flat list at equal weight. Rebuild it in gr
 - **Phone.** The bottom bar is unchanged: Today, Inbox, Tasks, Journal, More. "More" opens this same grouped list, full screen, with Search and New at the top. The Tasks tab shows the same count as the sidebar.
 - **Access.** A member with view-only access sees no New button. Everyone sees only the areas of spaces they belong to.
 
-## 7. Leave as they are
+## 7. Permissions: three small tightenings
+
+The role design stays as it is: three roles (Life User, Life Admin, Life Agent) say what kind of user someone is, and space membership says which records they reach. Add no roles. These three items close gaps around that design.
+
+### Agents and the Vault
+
+- Add a check field to `Life Space`: `agents_can_read_vault`, off by default, with a patch that leaves it off for existing spaces.
+- While it is off, an agent (a user for whom `is_agent` is true) cannot read any `Life Vault Document` in that space or any file attached to one. Enforce this on the server in every path: the DocType permission hooks and list queries, the `lifeos.api` methods, `Life Index` rows of kind Vault (search, Timeline, area and project pages, counts), backlinks, and the file download check. An agent gets the same answer as for a record that does not exist. Counts shown to an agent leave these rows out.
+- An agent may still **propose** a vault document from an inbox item, because the owner accepts it. The agent cannot read it back after it is filed.
+- While the switch is on, agents read Vault documents under the normal space rules.
+- The switch is on the Agents section in Settings, one per space, with help text: "Let agents open documents in this space's Vault. Off by default." Only a Life Admin can change it.
+- People are not affected by this switch.
+
+### Desk access
+
+- A user whose only Life roles are Life User or Life Agent cannot open the back-office screens at `/app`. The install already creates those two roles without desk access; confirm it holds on the test site for the family and agent test users, including when the user also has roles Frappe adds by default. If Frappe's own default roles give desk access, record what was found and the fix in `DECISIONS.md`.
+- Such a user who goes to `/app` lands on `/life`.
+- The agent's API and MCP access must keep working without desk access. Run the fake agent end to end to confirm.
+- Do not give any Life role the System Manager role, and do not require it anywhere in the app.
+
+### Agent accounts stay agents
+
+- The code treats a user as an agent only when they have Life Agent and neither other Life role. Make the mix impossible: on saving a User, refuse the combination of Life Agent with Life User or Life Admin, with a clear message. Add a patch that reports (does not change) any existing user with the mix.
+- The Agents and the Spaces and members sections in Settings never offer an action that would create the mix.
+
+### Tests
+
+Unit tests, run as the agent, family and owner test users:
+
+- With the switch off, the agent cannot get, list, search, count or download a Vault document or its file, by any API method that returns records, and cannot see it in a Timeline, area or project result. With it on, the agent can. The owner and a family member with access are unaffected either way.
+- The family user and the agent user are refused at `/app` and the agent's `claim_next` and `submit_result` still work.
+- Saving a user with Life Agent plus Life User is refused.
+
+## 8. Leave as they are
 
 Today, Timeline, Areas, Library (now labelled Notes; Tree, List and Graph are a view switch), the Goal page, and everything inside the Journal tabs. Journal and Calendar already have tabs; check they meet the rules above (URL, phone scrolling, `[` and `]`) and change nothing else.
 
 ## What must not change
 
 - No record, field, filter or action is removed. Everything on a screen today is still reachable, at most one tab away.
-- The API and data model, apart from the tab counts added to list methods and the small additions the Settings section names.
+- The API and data model, apart from the tab counts added to list methods and the small additions the Settings and Permissions sections name.
 - Space rules, the pane behaviour, count links, shortcuts and remembered views from sets 1 and 2.
 
 ## Checks
@@ -208,6 +241,6 @@ Today, Timeline, Areas, Library (now labelled Notes; Tree, List and Graph are a 
 
 ## Working rules
 
-- Work in this order: shared tab helpers and the URL rule, list state tabs (Tasks first), record pane, Area page, Project page, phone-only tabs, Settings (layout first, then the shared list component, archive and the Archived section, members and agents), the sidebar, then the check on Journal and Calendar.
+- Work in this order: shared tab helpers and the URL rule, list state tabs (Tasks first), record pane, Area page, Project page, phone-only tabs, Settings (layout first, then the shared list component, archive and the Archived section, members and agents), the sidebar, permissions (section 7), then the check on Journal and Calendar.
 - Run the acceptance script after each step and commit once per step.
 - Record deviations in `DECISIONS.md`. Add a "UX fixes, set 3" section to `STATUS.md` when finished, then create an empty file named `UX_FIXES_3_DONE` and commit.
