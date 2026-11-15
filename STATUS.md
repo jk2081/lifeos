@@ -129,7 +129,7 @@ Nothing shows a placeholder. These are smaller than a reader of the spec might e
 
 ### Install on an existing bench
 
-Frappe v16, Node 20 or newer, yarn. Replace `SITE` with the site name and the address with the owner's login.
+Frappe v16, Node 20 or newer, yarn. The app must sit at `apps/lifeos` beside `apps/frappe` (which `bench get-app` does), because the front end links `@framework/ui` from `apps/frappe/ui`. Replace `SITE` with the site name and the address with the owner's login.
 
 ```
 cd ~/frappe-bench
@@ -144,12 +144,16 @@ bench restart
 
 Then: set the time zone to Asia/Kolkata in System Settings, make sure the scheduler is enabled, and open `https://SITE/life`. For agents, create one user per agent with the role `Life Agent`, add it to its spaces in Life OS Settings, generate its API key, and switch on Enable MCP in System Settings. `README.md` has the same steps with more detail. Take a backup of the live site before installing.
 
+## Upgrade notes
+
+- The front end compiles `@framework/ui` from `apps/frappe/ui` of the bench it is built on. That package is raw source at version 0.0.0 and can change with any Frappe update. **After any Frappe update, rebuild the front end (`bench build --app lifeos`) and run `node tools/acceptance.mjs` before using the site.** Only the files under `frontend/src/framework/` import it.
+
 ## How to run the local stack
 
 ```
 docker compose -f docker/docker-compose.yml up -d
 docker exec -d lifeos-bench bash -lc 'cd ~/frappe-bench && bench serve --port 8000'
-cd frontend && npx vite build        # rebuild the front end
+docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && yarn install && yarn build'   # rebuild the front end, inside the bench
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost run-tests --app lifeos'
 node tools/acceptance.mjs            # the acceptance list of section 13, against http://localhost:18000
 ```

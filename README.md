@@ -8,7 +8,7 @@ A personal operating system on Frappe v16: inbox and review, tasks, calendar, a 
 
 ## Install on an existing bench
 
-The bench must run Frappe v16 (built and tested on 16.56.0), with Node 20 or newer and yarn for the front-end build.
+The bench must run Frappe v16 (built and tested on 16.56.0), with Node 20 or newer and yarn for the front-end build. The front end uses `@framework/ui`, Frappe's own Vue package, straight from `apps/frappe/ui` in the same bench (`link:../../frappe/ui`), so it can only be built with the app at `apps/lifeos` beside `apps/frappe`. After any Frappe update, rebuild the front end (`bench build --app lifeos`) and run `node tools/acceptance.mjs` before using the site.
 
 ```
 cd ~/frappe-bench
@@ -70,7 +70,7 @@ The build used a small Docker stack, with the repo mounted into the bench as `ap
 ```
 docker compose -f docker/docker-compose.yml up -d
 docker exec -d lifeos-bench bash -lc 'cd ~/frappe-bench && bench serve --port 8000'    # http://localhost:18000/life
-cd frontend && npm install && npx vite build      # rebuild the front end
+docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && yarn install && yarn build'   # rebuild the front end, inside the bench
 scripts/test.sh                                   # the test suite, short summary
 node tools/shot.mjs today=/life --widths 1440,390 # screenshots into screenshots/
 node tools/acceptance.mjs                         # walks the acceptance list of SPEC.md section 13

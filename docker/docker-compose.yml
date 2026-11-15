@@ -22,7 +22,11 @@ services:
     working_dir: /home/frappe
     volumes:
       - lifeos-bench-home:/home/frappe
-      - ..:/workspace/lifeos
+      # The repo is the app, mounted where a bench keeps its apps, so relative links such as
+      # "@framework/ui": "link:../../frappe/ui" resolve here exactly as on a normal bench.
+      - ..:/home/frappe/frappe-bench/apps/lifeos
+      # Linux node_modules for the front end live in a volume: the build runs inside the container.
+      - lifeos-frontend-modules:/home/frappe/frappe-bench/apps/lifeos/frontend/node_modules
     ports: ["18000:8000", "19000:9000"]
     networks: [lifeos-net]
     depends_on: [db, redis]
@@ -32,6 +36,8 @@ volumes:
     name: lifeos-db-data
   lifeos-bench-home:
     name: lifeos-bench-home
+  lifeos-frontend-modules:
+    name: lifeos-frontend-modules
 networks:
   lifeos-net:
     name: lifeos-net

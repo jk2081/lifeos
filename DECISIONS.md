@@ -18,7 +18,7 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Docker stack.** `docker/docker-compose.yml` starts three containers: `lifeos-bench` (image `frappe/bench`), `lifeos-db` (MariaDB 11.8) and `lifeos-redis`. Volumes and the network are also prefixed `lifeos-`. Host ports are 18000 (web) and 19000 (socketio). The bench lives in the `lifeos-bench-home` volume, outside the repo.
 - **Frappe version.** The bench runs Frappe 16.56.0, the same as the live site.
 - **The repo is the app.** The repo root is the Frappe app root (`pyproject.toml`, `lifeos/`), so `bench get-app` works on it. The front end is in `frontend/` at the repo root, which is `lifeos/frontend` when the repo is cloned as `apps/lifeos`. This is the layout other `frappe-ui` apps use.
-- **Front-end build during this run.** The repo is bind-mounted into the container and the front end is built on the host with Node 24, because `node_modules` holds platform-specific binaries. On a real bench, `bench build --app lifeos` runs the same `yarn build`.
+- **Front-end build.** The repo is bind-mounted into the container at `apps/lifeos`, where a bench keeps its apps, and the front end is built inside the container with `yarn install && yarn build`. `frontend/node_modules` in the container is its own volume (`lifeos-frontend-modules`), so the Linux packages do not mix with anything on the host. On a real bench, `bench build --app lifeos` runs the same `yarn build`. (Until UX fixes set 2 the build ran on the host; see that section.)
 - **Built assets are not committed.** `lifeos/public/frontend/` and `lifeos/www/life.html` are produced by the build, as in other `frappe-ui` apps.
 - **Test users.** `lifeos.devtools.setup_users` creates three users on the test site. Their password is generated into the git-ignored `.env`.
 
@@ -81,3 +81,10 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Stepping through rows replaces the URL entry.** Opening a second record with the pane open, or moving with the arrows, replaces the history entry, so Back always closes the pane in one step.
 - **Old links still work.** `/tasks?open=NAME`, `/vault?open=NAME` and `/chats?open=NAME`, written before the pane existed, open the pane.
 - **Swipe down starts on the pane header.** The body of the sheet scrolls, so the swipe that closes it is taken on the header only.
+
+## UX fixes, set 2
+
+- **Step 0 passed: `@framework/ui` is used.** Proven on Frappe 16.56.0 (commit `49789a1` of 10 November 2026), with frappe-ui 1.2.0. `@framework/ui` declares `frappe-ui >= 1.0.0-rc.1` as a peer and Frappe's `ui/yarn.lock` pins no frappe-ui version, so 1.2.0 stays, pinned exactly. A throwaway page with `useListView`, `Filter`, `QuickFilter`, `SortBy`, `GroupBy` and `ColumnSettings` on `Life Task` and on `Life Index` built, rendered at 1440 px and 390 px with no horizontal scrolling, and produced wire filters and an `order_by` string. `frontend/scripts/check-singletons.mjs` confirms one copy each of vue, vue-router, frappe-ui and reka-ui in the bundle.
+- **One `package.json` for both places.** `"@framework/ui": "link:../../frappe/ui"` only resolves when the front end sits at `apps/lifeos/frontend`. The Docker bench used to reach the repo through a symlink to `/workspace/lifeos`, which broke the link, so the compose file now mounts the repo at `apps/lifeos` itself. The Python path file of the editable install was pointed at the same place.
+- **The build moved into the container.** `frontend/node_modules` there is the volume `lifeos-frontend-modules`. `frontend/package-lock.json` is gone; `yarn.lock` is the one lockfile, since bench installs with yarn. This replaces the "Two lockfiles" entry above.
+- **Tailwind scans `@framework/ui` through the link** (`./node_modules/@framework/ui/src/**`), leaving out its stories and tests. Without this its controls render without icons and spacing.
