@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Vault" noun="documents" screen="vault" doctype="Life Vault Document" :spec="SPEC" :flag-labels="{ archived: 'Include archived' }" :quiet="['archived']"
+  <ListView ref="list" title="Vault" noun="documents" screen="vault" doctype="Life Vault Document" :spec="SPEC" :tabs="TABS" :flag-labels="{ archived: 'Include archived' }" :quiet="['archived']"
     :quick="['doc_type', 'holder', 'area']" :synthetic="SYNTHETIC" :fetch="fetch" :row-ref="(r) => 'vault:' + r.name" empty-title="The vault is empty."
     empty-hint="Keep IDs, travel papers, insurance and tax documents here with their expiry dates. Add one, or drop a scan in the Inbox."
     @loaded="(res) => (counts = res)">
@@ -42,12 +42,14 @@ const SPEC = [
   { key: 'expiry', field: 'expiry_date', kind: 'preset', label: 'Expiry', presets: EXPIRY_PRESETS, labels: { expired: 'Expired', soon: 'Within 60 days', later: 'Later', none: 'No expiry date' } },
   { key: 'area', field: 'area', kind: 'link' }, { key: 'project', field: 'project', kind: 'link' }, { key: 'archived', kind: 'flag' },
 ]
+// the state tabs, on expiry=. All is the default; "Expiring soon" is the 60-day window of the expiry filter
+const TABS = { key: 'expiry', field: 'expiry_date', label: 'Expiry', items: [{ value: 'all', label: 'All' }, { value: 'soon', label: 'Expiring soon' }, { value: 'expired', label: 'Expired' }] }
 const SYNTHETIC = [{ key: '_badge', label: '', width: '9rem', align: 'right', place: 'end' }]
 const badgeText = (b) => (b.state === 'expired' ? 'Expired' : b.days === 0 ? 'Expires today' : `Expires in ${b.days} days`)
-async function fetch({ params: p, filters, order_by, fields, summary, start, page_length }) {
-  const res = await api('vault.list', { space: store.space, holder: p.holder, doc_type: p.type, expiry: p.expiry, area: p.area, project: p.project,
+async function fetch({ params: p, tab, filters, order_by, fields, summary, start, page_length }) {
+  const res = await api('vault.list', { space: store.space, holder: p.holder, doc_type: p.type, expiry: tab === 'all' ? p.expiry : tab, area: p.area, project: p.project,
     include_archived: p.archived ? 1 : 0, filters, order_by, fields, summary, start, page_length })
-  return summary ? res : { rows: res.documents, total: res.total, expired: res.expired, soon: res.soon }
+  return summary ? res : { rows: res.documents, total: res.total, expired: res.expired, soon: res.soon, tabs: res.tabs }
 }
 onMounted(loadLookups)
 </script>

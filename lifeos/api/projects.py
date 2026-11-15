@@ -6,12 +6,17 @@ from lifeos import archive, permissions
 from lifeos.api import tasks as task_api
 from lifeos.api.area import chat_open_counts, project_cards
 from lifeos.api.timeline import index_rows
-from lifeos.api.utils import area_filter, extra_columns, flag, page, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import area_filter, extra_columns, flag, page, std_clause, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 
 SORTS = {"title": "p.title", "status": "field(p.status, 'Active', 'On Hold', 'Done', 'Dropped')", "target_date": "p.target_date is null, p.target_date",
 	"area": "p.area", "creation": "p.creation"}
+
+
+# the state tabs of the Projects screen. Active and On hold leave archived projects out, as the list does
+TABS = {"Active": "p.status = 'Active' and p.is_archived = 0", "On Hold": "p.status = 'On Hold' and p.is_archived = 0",
+	"Done": "p.status = 'Done'", "Dropped": "p.status = 'Dropped'", "all": None}
 
 
 def where_clause(space, status=None, area=None, include_done=0):
@@ -37,7 +42,8 @@ def count(space, **filters):
 @frappe.whitelist()
 def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None, start=0, page_length=100, filters=None, order_by=None, summary=None):
 	"""Projects of a space, as a flat list and grouped by area. With no status: active and on hold ones; include_done=1 for every status.
-	Filters: status (Active, On Hold, Done, Dropped), area (with its sub-areas). `total` is the number the filters match."""
+	Filters: status (Active, On Hold, Done, Dropped), area (with its sub-areas). `total` is the number the filters match.
+	`tabs` counts the projects on each state tab of the Projects screen (Active, On Hold, Done, Dropped, all) under the same filters."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	if status and status not in ("Active", "On Hold", "Done", "Dropped"):
@@ -45,9 +51,11 @@ def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None
 	where, values = where_clause(space, status, area, include_done)
 	extra, values = std_clause("Life Project", filters, "p", values)
 	where += extra
+	t_where, t_values = where_clause(space, None, area, 1)
+	tabs = tab_counts(f"from `tabLife Project` p where p.space=%(space)s {t_where}{extra}", {**t_values, **values, "space": space}, TABS)
 	if summary:
 		return {"summary": summarise("Life Project", f"from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values},
-			"p", summary, start, page_length)}
+			"p", summary, start, page_length), "tabs": tabs}
 	order = std_order("Life Project", order_by, "p", SORTS) or sort_order(sort, dir, SORTS, None)
 	rows = project_cards(space, where, values, order, start, page_length)
 	groups = {}
@@ -55,7 +63,7 @@ def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None
 		groups.setdefault((r.area, r.area_name), []).append(r)
 	out = [{"area": k[0], "area_name": k[1], "projects": v} for k, v in groups.items()]
 	out.sort(key=lambda g: g["area_name"] or "")
-	return {"space": space, "groups": out, "projects": rows, "total": frappe.db.sql(f"select count(*) from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values})[0][0]}
+	return {"space": space, "groups": out, "projects": rows, "tabs": tabs, "total": frappe.db.sql(f"select count(*) from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values})[0][0]}
 
 
 @frappe.whitelist()

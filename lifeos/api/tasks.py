@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import datewords, journal, permissions
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_order, summarise
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 OPEN = ("Open", "Doing", "Waiting")
@@ -54,11 +54,24 @@ SORTS = {"due_date": "t.due_date is null, t.due_date", "priority": PRIORITY_ORDE
 	"creation": "t.creation", "completed_on": "t.completed_on"}
 
 
-def where_clause(space, status="open", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None,
+# The state tabs of the Tasks screen, as SQL on one task row. "Open" on the screen is Open and Doing; Waiting has its own tab.
+TABS = {
+	"open": "t.status in ('Open', 'Doing')",
+	"loops": "t.status in ('Open', 'Doing', 'Waiting') and t.due_date is null and t.creation < %(cutoff)s",
+	"Waiting": "t.status = 'Waiting'",
+	"Done": "t.status = 'Done'",
+	"all": None,
+}
+
+
+def where_clause(space, status="open_doing", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None,
 		include_archived=0, due=None, done=0, loops=0, completed_from=None, completed_to=None):
-	"""The WHERE of a task list. Every count in the app that leads to a task list is made with this, so the two agree."""
+	"""The WHERE of a task list. Every count in the app that leads to a task list is made with this, so the two agree.
+	The default status, open_doing, is what the Open tab of the Tasks screen shows; "open" also holds Waiting tasks."""
 	where, values = [], {}
-	if status == "open" and flag(done):
+	if status == "open_doing":
+		where.append("t.status in ('Open', 'Doing')")
+	elif status == "open" and flag(done):
 		where.append("t.status in ('Open', 'Doing', 'Waiting', 'Done', 'Dropped')")
 	elif status == "open":
 		where.append("t.status in ('Open', 'Doing', 'Waiting')")
@@ -114,28 +127,35 @@ def count(space, **filters):
 def list(space=None, status="open", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None,
 		include_archived=0, start=0, page_length=50, due=None, done=0, loops=0, completed_from=None, completed_to=None,
 		sort=None, dir=None, filters=None, order_by=None, fields=None, summary=None):
-	"""Tasks of a space. status: open, done, all, or one status; done=1 adds Done and Dropped to open.
+	"""Tasks of a space. status: open (Open, Doing and Waiting), open_doing, done, all, or one status; done=1 adds Done and Dropped to open.
 	area takes an area (its sub-areas and also-in count) or "none". due: overdue, today, week, none, or several with commas.
 	loops=1 keeps open tasks older than 14 days with no date. completed_from and completed_to bound completed_on.
 	Sorted by due date, then priority I first, unless sort (due_date, priority, title, status, creation, completed_on) and dir say otherwise.
 	filters is a standard Frappe filter list on Life Task fields, order_by a standard order string, fields extra columns to return;
-	every field name is checked against the DocType."""
+	every field name is checked against the DocType.
+	`tabs` in the answer counts the tasks on each state tab of the Tasks screen (open = Open and Doing, loops, Waiting, Done, all)
+	under the same filters, whatever status was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	clause, values = where_clause(space, status, area, project, tag, priority, goal, month_plan, include_archived, due, done, loops,
 		completed_from, completed_to)
 	extra, values = std_clause("Life Task", filters, "t", values)
 	clause += extra
+	# the tab counts: the same filters without the status and the open-loops switch, which are what a tab stands for
+	t_clause, t_values = where_clause(space, "all", area, project, tag, priority, goal, month_plan, include_archived, due, 0, 0,
+		completed_from, completed_to)
+	t_values = {**t_values, **values, "space": space, "cutoff": add_days(today(), -OPEN_LOOP_DAYS)}
+	tabs = tab_counts(f"from `tabLife Task` t where t.space=%(space)s {t_clause}{extra}", t_values, TABS)
 	if summary:
 		return {"summary": summarise("Life Task", f"from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values},
-			"t", summary, start, page_length), "today": today()}
+			"t", summary, start, page_length), "today": today(), "tabs": tabs}
 	default = "t.completed_on desc, t.modified desc" if status in ("done", "Done", "Carried", "Dropped") else None
 	order = std_order("Life Task", order_by, "t", SORTS) or sort_order(sort, dir, SORTS, default)
 	if order and order != default:
 		order += ", t.creation asc"
 	rows = query(space, clause, values, order, start, page_length, fields)
 	total = frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
-	return {"tasks": rows, "total": total, "start": start, "page_length": page_length, "today": today()}
+	return {"tasks": rows, "total": total, "start": start, "page_length": page_length, "today": today(), "tabs": tabs}
 
 
 @frappe.whitelist()

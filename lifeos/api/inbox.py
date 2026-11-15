@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import files, links, permissions, proposals
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, user_names
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts, user_names
 from lifeos.api.utils import order_by as sort_order
 
 CLAIM_MINUTES = 30
@@ -183,19 +183,21 @@ def retry(item):
 SORTS = {"received_on": "i.received_on", "title": "i.title", "status": "i.status", "source_type": "i.source_type"}
 
 
+TABS = {"To Review": "i.status = 'To Review'", "Waiting": "i.status in ('New', 'Processing')", "Failed": "i.status = 'Failed'",
+	"Done": "i.status = 'Done'", "all": None}
+
+
 @frappe.whitelist()
 def list(space=None, status=None, include_archived=0, start=0, page_length=30, source_type=None, area=None,
 		from_date=None, to_date=None, sort=None, dir=None, filters=None, order_by=None, summary=None):
 	"""Inbox items of a space, newest first, with proposal counts.
 	Filters: status (one status or a JSON list), source_type, area (with its sub-areas, or "none"), from_date and to_date on the day received.
-	`total` is the number of items the filters match; `pending_total` is the pending proposals of those items."""
+	`total` is the number of items the filters match; `pending_total` is the pending proposals of those items.
+	`tabs` counts the items on each state tab of the Inbox screen (To Review, Waiting = New and Processing, Failed, Done, all)
+	under the same filters, whatever status was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	where, values = ["i.space = %(space)s"], {"space": space}
-	if status:
-		statuses = parse(status) if str(status).startswith("[") else [status]
-		where.append("i.status in %(statuses)s")
-		values["statuses"] = statuses or [""]
 	if not flag(include_archived):
 		where.append("i.is_archived = 0")
 	if source_type:
@@ -210,9 +212,15 @@ def list(space=None, status=None, include_archived=0, start=0, page_length=30, s
 		where.append("date(i.received_on) <= %(to_date)s")
 		values["to_date"] = frappe.utils.getdate(to_date)
 	conds, values = std_filters("Life Inbox Item", filters, "i", values)
+	# the state tabs of the Inbox screen, counted under every filter but the status itself
+	tabs = tab_counts(f"from `tabLife Inbox Item` i where {' and '.join(where + conds)}", values, TABS)
+	if status:
+		statuses = parse(status) if str(status).startswith("[") else [status]
+		where.append("i.status in %(statuses)s")
+		values["statuses"] = statuses or [""]
 	clause = " and ".join(where + conds)
 	if summary:
-		return {"summary": summarise("Life Inbox Item", f"from `tabLife Inbox Item` i where {clause}", values, "i", summary, start, page_length)}
+		return {"summary": summarise("Life Inbox Item", f"from `tabLife Inbox Item` i where {clause}", values, "i", summary, start, page_length), "tabs": tabs}
 	order = std_order("Life Inbox Item", order_by, "i", SORTS) or sort_order(sort, dir, SORTS, "i.received_on desc")
 	rows = frappe.db.sql(
 		f"""select i.name, i.title, i.source_type, i.status, i.received_on, i.instruction, i.claimed_by, i.error, i.owner, i.area,
@@ -239,7 +247,7 @@ def list(space=None, status=None, include_archived=0, start=0, page_length=30, s
 		r["processed_by"] = users.get(r.claimed_by)
 		r["area_name"] = areas.get(r.area)
 	totals = dict(frappe.db.sql("select status, count(*) from `tabLife Inbox Item` where space=%s and is_archived=0 group by status", space))
-	return {"items": rows, "total": total, "pending_total": pending_total, "totals": totals, "start": start, "page_length": page_length}
+	return {"items": rows, "total": total, "pending_total": pending_total, "totals": totals, "tabs": tabs, "start": start, "page_length": page_length}
 
 
 @frappe.whitelist()

@@ -53,8 +53,10 @@ async function session(user, width = 1440) {
 }
 
 const ONLY_UX = process.argv.includes('--ux') // run only the UX checks (U1 and up)
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7) // run only the checks whose number ends with this: --only=.8
 async function check(n, title, fn) {
-  if (ONLY_UX && !String(n).startsWith('U')) return
+  if ((ONLY_UX || ONLY) && !String(n).startsWith('U')) return
+  if (ONLY && !String(n).endsWith(ONLY)) return
   try {
     const note = await fn()
     results.push([n, true, title, note || ''])
@@ -227,7 +229,7 @@ await check(8, 'Vault document expiring in 30 days shows a badge on Today', asyn
   must(t.coming_up.some((c) => c.kind === 'vault' && c.title === title), 'not in today.get')
   await owner.open('/life')
   must((await owner.page.locator('[data-main]').innerText()).includes(title), 'not shown on Today')
-  await owner.open('/life/vault')
+  await owner.open('/life/vault?expiry=soon') // the Expiring soon tab
   must((await owner.page.locator('[data-main]').innerText()).includes(title), 'not shown in the Vault')
 })
 
@@ -430,10 +432,19 @@ const LISTS = [
 ].map(([name, p]) => [name, p, ROW])
 // one filter for each ListView, set through the library's quick-filter strip: [screen, path, URL key, URL value, the control's label, the option to pick, text to type for a Link]
 const FILTERS = [
-  ['Inbox', '/life/inbox?all=1', 'status', 'Done', 'Status', 'Done'], ['Tasks', '/life/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
-  ['Tasks table', '/life/tasks?view=table', 'status', 'Waiting', 'Status', 'Waiting'], ['Projects', '/life/projects?all=1', 'status', 'On Hold', 'Status', 'On Hold'],
+  ['Inbox', '/life/inbox?status=all', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
+  ['Tasks table', '/life/tasks?view=table&status=all', 'priority', 'I', 'Priority', 'I'], ['Projects', '/life/projects?status=all', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
   ['Vault', '/life/vault?all=1', 'type', 'Travel', 'Doc Type', 'Travel'], ['Chats', '/life/chats?all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
-  ['Library list', '/life/library?view=list&all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'], ['Archive', '/life/archive?all=1', 'type', 'Life Task', 'Type', 'Life Task'],
+  ['Library list', '/life/library?view=list&all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'], ['Archive', '/life/archive?all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
+]
+// UX fixes, set 3: the state tabs of each list screen. [screen, path, the URL parameter of the tabs, the tab values in order (the first is the default), another filter]
+const STATE_TABS = [
+  ['Inbox', '/life/inbox', 'status', ['To Review', 'Waiting', 'Failed', 'Done', 'all'], 'source_type=Message'],
+  ['Tasks', '/life/tasks', 'status', ['open', 'loops', 'Waiting', 'Done', 'all'], `area=${uxArea}`],
+  ['Projects', '/life/projects', 'status', ['Active', 'On Hold', 'Done', 'Dropped', 'all'], `area=${uxArea}`],
+  ['Archive', '/life/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'Life Journal Page'], `area=${uxArea}`],
+  ['Chats', '/life/chats', 'open_items', ['all', '1'], `area=${uxArea}`],
+  ['Vault', '/life/vault', 'expiry', ['all', 'soon', 'expired'], 'type=Other'],
 ]
 
 for (const width of [1440, 390]) {
@@ -678,9 +689,9 @@ for (const width of [1440, 390]) {
       must(!new URL(pg.url()).searchParams.get(key), `${name}: Back did not undo the filter`)
     }
     // an empty result names the filters and offers Clear filters
-    await s.open('/life/vault?holder=none&type=Medical&expiry=expired')
+    await s.open('/life/vault?holder=none&type=Medical&expiry=later') // Expired is a tab now; "Later" is still a filter
     const empty = await pg.locator('[data-lv-empty]').innerText()
-    must(empty.includes('Type: Medical') && empty.includes('Expiry: Expired'), 'the empty state does not name the filters: ' + empty)
+    must(empty.includes('Type: Medical') && empty.includes('Expiry: Later'), 'the empty state does not name the filters: ' + empty)
     await pg.locator('[data-lv-empty] button', { hasText: 'Clear filters' }).click()
     await settle()
     must(!new URL(pg.url()).search.includes('type='), 'Clear filters did not clear')
@@ -764,6 +775,110 @@ for (const width of [1440, 390]) {
     const rest = await fam.page.request.get(base + '/api/resource/Life%20View%20State?limit_page_length=100&fields=["user"]')
     must(!JSON.stringify(await rest.json()).includes('owner@lifeos.test'), 'the REST list shows the owner\'s saved states')
     await fam.ctx.close()
+  })
+
+  await check(`${tag}.8`, `${width} px: state tabs: each count equals the rows its tab shows, with and without another filter; links land on their tab`, async () => {
+    const bar = pg.locator('[data-state-tabs]')
+    const current = () => bar.getAttribute('data-tab-current')
+    const tabCount = async (v) => num(await bar.locator(`[data-tab="${v}"] [data-tab-count]`).innerText())
+    const ownRows = () => pg.locator(`${ROW}:not([data-archived-projects] ${ROW})`).count()
+    let checked = 0
+    for (const [name, p, key, values, other] of STATE_TABS) {
+      for (const extra of ['', other]) {
+        const q = (v) => `${p}?${[v === values[0] ? '' : `${key}=${encodeURIComponent(v)}`, extra, name === 'Tasks' ? 'view=list' : '', !extra && v === values[0] ? 'all=1' : ''].filter(Boolean).join('&')}`
+        await s.open(q(values[0]))
+        must((await bar.locator('[role="tab"]').count()) === values.length, `${name}: ${await bar.locator('[role="tab"]').count()} tabs, not ${values.length}`)
+        must((await current()) === values[0], `${name}: the default tab is ${await current()}`)
+        const counts = {}
+        for (const v of values) counts[v] = await tabCount(v)
+        for (const v of values) {
+          if (v !== values[0]) { // by clicking, as a person does; the row scrolls sideways on a phone
+            await bar.locator(`[data-tab="${v}"]`).click()
+            await pg.waitForLoadState('networkidle')
+            await settle()
+          }
+          must((await current()) === v, `${name}: clicking ${v} selected ${await current()}`)
+          must((new URL(pg.url()).searchParams.get(key) || values[0]) === v, `${name}: the ${v} tab is not in the URL (${new URL(pg.url()).search})`)
+          const shown = await count()
+          must(shown === counts[v], `${name}${extra ? ' with ' + extra : ''}: the ${v} tab says ${counts[v]}, the list holds ${shown}`)
+          must((await tabCount(v)) === shown, `${name}: the count on the ${v} tab changed to ${await tabCount(v)} when it was opened`)
+          const rows = await ownRows()
+          must(rows === Math.min(shown, 50), `${name}${extra ? ' with ' + extra : ''}: the ${v} tab says ${shown} but ${rows} rows are shown`)
+          must((await overflow()) <= 0, `${name}: the page scrolls sideways on the ${v} tab`)
+          checked++
+        }
+        // the last tab survives a reload, and a tab is not counted as a filter
+        const last = values[values.length - 1]
+        await pg.reload({ waitUntil: 'networkidle' })
+        await settle()
+        must((await current()) === last, `${name}: reload left the ${last} tab`)
+        if (!extra) must(!(await pg.locator('[data-active-filters]:visible').count()) && !(phone && /\(\d/.test(await pg.locator('[data-filters-button]').innerText())), `${name}: a tab is counted as a filter`)
+      }
+    }
+    // links from sets 1 and 2 land on the tab they mean
+    const lands = async (from, name, want, optional) => {
+      await s.open(from)
+      const el = pg.locator(`[data-door="${name}"]:visible`).first()
+      if (!(await el.count())) { if (optional) return; throw new Error(`${name}: not on ${from}`) }
+      const n = num(await el.innerText())
+      await el.click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must((await current()) === want, `${name}: landed on the ${await current()} tab, not ${want}`)
+      must((await tabCount(want)) === n && (await count()) === n, `${name}: clicked ${n}, the ${want} tab says ${await tabCount(want)} and the list ${await count()}`)
+    }
+    await lands('/life', 'today-due', 'open')
+    await lands('/life', 'today-overdue', 'open', phone)
+    await lands('/life', 'today-loops', 'loops')
+    await lands('/life', 'today-review', 'To Review')
+    await lands('/life', 'today-vault', 'soon')
+    await lands('/life/areas/' + uxArea, 'area-projects', 'Active')
+    await lands('/life/areas/' + uxArea, 'area-tasks', 'open')
+    await lands('/life/vault?all=1', 'vault-expired', 'expired')
+    await lands('/life/chats?all=1', 'chats-open', '1')
+    // Tasks: Open loops is a tab with its explanation, the layout switch has three options, the board is not offered on Done
+    const layouts = async () => (await pg.locator('[role="radiogroup"]:visible [role="radio"]').allInnerTexts()).map((t) => t.trim())
+    await s.open('/life/tasks?status=loops')
+    must((await current()) === 'loops' && (await pg.locator('[data-tasks-sub]').innerText()).includes('older than 14 days'), 'Open loops is not a tab with its explanatory line')
+    must(JSON.stringify(await layouts()) === JSON.stringify(['List', 'Table']), `Open loops offers the layouts ${await layouts()}`)
+    await s.open('/life/tasks?view=loops') // a link from before the tabs
+    must((await current()) === 'loops' && new URL(pg.url()).searchParams.get('status') === 'loops', 'view=loops does not open the Open loops tab')
+    await s.open('/life/tasks?view=board')
+    must(JSON.stringify(await layouts()) === JSON.stringify(['List', 'Board', 'Table']), `the layout switch offers ${await layouts()}`)
+    must((await pg.locator('[data-list]').getAttribute('data-view')) === 'board' && (await pg.locator('[data-column]').count()) === 2, 'the board on the Open tab does not show Open and Doing')
+    await s.open('/life/tasks?view=board&status=all')
+    must((await pg.locator('[data-column]').count()) === 4, 'the board on the All tab does not show four columns')
+    await s.open('/life/tasks?view=board&status=Done')
+    must(JSON.stringify(await layouts()) === JSON.stringify(['List', 'Table']), `Done offers the layouts ${await layouts()}`)
+    must((await pg.locator('[data-list]').getAttribute('data-view')) === 'list', 'the board did not fall back to the list on Done')
+    // a status that is not a tab selects All and shows as a filter
+    await s.open('/life/tasks?view=list&status=Dropped')
+    must((await current()) === 'all', `status=Dropped selected the ${await current()} tab`)
+    if (phone) must((await pg.locator('[data-filters-button]').innerText()).includes('(1)'), 'status=Dropped is not shown as a filter')
+    else must((await pg.locator('[data-active-filters]').innerText()).includes('1 filter'), 'status=Dropped is not shown as a filter')
+    if (phone) {
+      // seven tabs are wider than a phone: the row scrolls sideways, the page does not, and the open tab is in view
+      await s.open('/life/archive?type=Life+Journal+Page')
+      const m = await bar.evaluate((el) => { const t = el.querySelector('[data-state="active"]').getBoundingClientRect(); return { wide: el.scrollWidth > el.clientWidth, inView: t.left >= 0 && t.right <= window.innerWidth, h: t.height } })
+      must(m.wide && m.inView, `the tab row does not scroll with the open tab in view: ${JSON.stringify(m)}`)
+      must(m.h >= 44, `a tab is ${m.h} px high on a phone`)
+      must((await overflow()) <= 0, 'the Archive scrolls sideways')
+    } else {
+      // [ and ] move between tabs; arrow keys move inside the tab row
+      await s.open('/life/projects?status=all&area=' + uxArea)
+      await pg.keyboard.press('[')
+      await settle()
+      must((await current()) === 'Dropped', '[ did not open the previous tab')
+      await pg.keyboard.press(']')
+      await settle()
+      must((await current()) === 'all', '] did not open the next tab')
+      await bar.locator('[data-tab="all"]').focus()
+      await pg.keyboard.press('ArrowLeft')
+      await settle()
+      must((await current()) === 'Dropped', 'the left arrow did not move to the previous tab')
+    }
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    return `${checked} tabs`
   })
   await s.ctx.close()
 }

@@ -108,3 +108,17 @@ test('counting active filters and the canonical form', () => {
   assert.deepEqual(canonical({ view: 'table', status: 'Done', open: 'task:1', area: '', sort: 'title', all: '1' }, TASKS, ['view']), { status: 'Done', sort: 'title', view: 'table' })
   assert.equal(JSON.stringify(canonical({ status: 'Done', area: 'a' }, TASKS)), JSON.stringify(canonical({ area: 'a', status: 'Done' }, TASKS)))
 })
+
+test('values that are state tabs are not conditions', () => {
+  const spec = [{ key: 'status', field: 'status', kind: 'value', skip: ['open', 'loops', 'Waiting', 'Done', 'all'] }, { key: 'area', field: 'area', kind: 'link' }]
+  // status=Done is the Done tab: no condition for the controls, not counted as a filter, not sent as a parameter, kept in the saved query
+  assert.deepEqual(queryToFilters({ status: 'Done', area: 'a1' }, spec, '2026-11-15').wire, [['area', '=', 'a1']])
+  assert.equal(activeCount({ status: 'Done' }, spec), 0)
+  assert.equal(activeCount({ status: 'Done', area: 'a1' }, spec), 1)
+  assert.deepEqual(queryToRequest({ status: 'Done', area: 'a1' }, spec).params, { area: 'a1' })
+  assert.deepEqual(canonical({ status: 'Done', open: 'task:x' }, spec), { status: 'Done' })
+  // a status that is not a tab is an ordinary condition
+  assert.deepEqual(queryToFilters({ status: 'Dropped' }, spec, '2026-11-15').wire, [['status', '=', 'Dropped']])
+  assert.equal(activeCount({ status: 'Dropped' }, spec), 1)
+  assert.deepEqual(queryToRequest({ status: 'Dropped' }, spec).params, { status: 'Dropped' })
+})

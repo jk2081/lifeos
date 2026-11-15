@@ -8,6 +8,9 @@
     <slot name="above" />
     <TabButtons v-if="views.length" class="md:hidden" :model-value="view" :options="viewOptions" @update:model-value="setView" />
 
+    <!-- State tabs: one field's presets, above the filter bar. They take the place of that field's quick filter. -->
+    <TabBar v-if="tabs" class="-mb-3" :tabs="tabItems" :model-value="tab" :label="tabs.label || 'State'" data-state-tabs @update:model-value="setTab" />
+
     <!-- The controls. Wide screens: a strip of quick filters with Filter, Sort, Group and Columns beside it.
          Below 640 px: one Filters button with the count of active filters, opening the same controls in a sheet. -->
     <div class="flex flex-wrap items-center gap-2" data-lv-bar>
@@ -111,6 +114,7 @@ import { useMediaQuery } from '@vueuse/core'
 import { Badge, BottomSheet, Button, Checkbox, Skeleton, TabButtons } from 'frappe-ui'
 import { List, ListCell, ListGroup, ListHeader, ListHeaderCell, ListHeaderCellSort, ListRow } from 'frappe-ui/list'
 import PageHead from './PageHead.vue'
+import TabBar from './TabBar.vue'
 import Empty from './Empty.vue'
 import Card from './ui/Card.vue'
 import LifeFilter from '@/framework/LifeFilter.vue'
@@ -126,7 +130,7 @@ import { store } from '@/lib/store'
 import { lookups } from '@/lib/lookups'
 import { dateTime, short } from '@/lib/dates'
 import { current, openRef, onRecordChanged, paneNav } from '@/lib/pane'
-import { activeCount, canonical, filtersToQuery, orderByToQuery, queryToFilters, queryToOrderBy, queryToRequest } from '@/lib/filterUrl'
+import { activeCount, canonical, filtersToQuery, orderByToQuery, parseWire, queryToFilters, queryToOrderBy, queryToRequest } from '@/lib/filterUrl'
 import { saveView, savedView, viewsLoaded, whenViewsLoaded } from '@/lib/views'
 
 const props = defineProps({
@@ -141,6 +145,9 @@ const props = defineProps({
   virtual: { type: Array, default: () => [] }, // filter fields with no column behind them, resolved by the server from a short parameter
   synthetic: { type: Array, default: () => [] }, // table columns the screen draws itself: { key: '_badge', label, width, align, place }
   hidden: { type: Array, default: () => [] }, // fields not offered in the filter
+  // state tabs: { key: 'status', field: 'status', label, items: [{ value, label }] }. The first item is the default and is not
+  // written to the URL; one item has the value 'all'. `key` is the short URL parameter, `field` the field it is a preset on.
+  tabs: { type: Object, default: null },
   views: { type: Array, default: () => [] }, // [{ key, label, mode }] with mode 'table' (columns), 'feed' (the #row slot) or 'custom' (the #body slot)
   mode: { type: String, default: 'table' }, // the mode when there is no view switch
   groupable: { type: Boolean, default: true },
@@ -177,33 +184,59 @@ const view = computed(() => {
   return props.views[0]?.key || ''
 })
 const mode = computed(() => props.views.find((v) => v.key === view.value)?.mode || props.mode)
-const keep = computed(() => [...(props.views.length ? ['view'] : []), ...props.watchKeys])
+const keep = computed(() => [...(props.views.length ? ['view'] : []), ...(props.tabs && !props.spec.some((e) => e.key === props.tabs.key) ? [props.tabs.key] : []), ...props.watchKeys])
 function setView(v) {
   touched = true
   router.push({ query: { ...route.query, view: v, all: undefined } })
 }
 
+// ---- state tabs ----
+// The tab is the value of one short parameter (status=Done). No value, or the first tab's, is the first tab. A value that
+// is not a tab, or a condition on the same field made in the Filter, selects All and shows as a condition in the filter bar.
+const tabValues = computed(() => (props.tabs ? props.tabs.items.map((t) => t.value) : []))
+const spec = computed(() => (props.tabs ? props.spec.map((e) => (e.key === props.tabs.key ? { ...e, skip: tabValues.value } : e)) : props.spec))
+const tabRaw = computed(() => (props.tabs && route.query[props.tabs.key] ? String(route.query[props.tabs.key]) : ''))
+const tab = computed(() => {
+  if (!props.tabs) return ''
+  if (parseWire(route.query.f).some((w) => w[0] === props.tabs.field)) return 'all'
+  if (!tabRaw.value) return tabValues.value[0]
+  return tabValues.value.includes(tabRaw.value) ? tabRaw.value : 'all'
+})
+const tabCounts = ref(null)
+const tabItems = computed(() => (props.tabs ? props.tabs.items.map((t) => ({ ...t, noun: props.noun, count: tabCounts.value ? tabCounts.value[t.value] ?? 0 : undefined })) : []))
+const tabParam = (v) => (v === tabValues.value[0] ? undefined : v)
+function setTab(v) {
+  const rest = parseWire(route.query.f).filter((w) => w[0] !== props.tabs.field)
+  push({ [props.tabs.key]: tabParam(v), f: rest.length ? JSON.stringify(rest) : undefined })
+}
+// the filter part of a query made by the controls keeps the tab, unless a condition on the tab's field takes its place
+function controlsQuery(wire, flags) {
+  const q = filtersToQuery(wire, flags, spec.value, store.today)
+  if (props.tabs && q[props.tabs.key] === undefined && !wire.some((w) => w[0] === props.tabs.field) && tabValues.value.includes(tabRaw.value)) q[props.tabs.key] = tabRaw.value
+  return q
+}
+
 // ---- filters: the URL, the controls, and what the server is asked ----
 const flagSpec = computed(() => props.spec.filter((e) => e.kind === 'flag'))
-const flagValues = computed(() => queryToFilters(route.query, props.spec, store.today).flags)
+const flagValues = computed(() => queryToFilters(route.query, spec.value, store.today).flags)
 const shownFlags = computed(() => flagSpec.value.filter((e) => props.flagLabels[e.key] && (!props.quiet.includes(e.key) || flagValues.value[e.key]))
   .map((e) => ({ key: e.key, label: props.flagLabels[e.key] })))
-const activeN = computed(() => activeCount(route.query, props.spec))
+const activeN = computed(() => activeCount(route.query, spec.value))
 const sorts = computed(() => list.view.sort.by.value)
 const grouped = computed(() => !!list.summary.value)
 const key = (w) => JSON.stringify([...w].map((x) => JSON.stringify(x)).sort())
-const urlWire = () => queryToFilters(route.query, props.spec, store.today).wire
+const urlWire = () => queryToFilters(route.query, spec.value, store.today).wire
 
 // the active filters in words, for the empty state: "Type: Medical · Expiry: Expired"
 const activeText = computed(() => {
   const parts = []
-  for (const e of props.spec) {
+  for (const e of spec.value) {
     const v = route.query[e.key] ? String(route.query[e.key]) : ''
-    if (!v) continue
+    if (!v || e.skip?.includes(v)) continue
     if (e.kind === 'flag') parts.push(props.flagLabels[e.key] || e.key)
     else parts.push(`${e.label || list.field(e.field)?.label || e.key}: ${e.labels?.[v] || nameOf(e.field, v)}`)
   }
-  for (const [field, op, value] of queryToRequest(route.query, props.spec).filters) {
+  for (const [field, op, value] of queryToRequest(route.query, spec.value).filters) {
     parts.push(`${list.field(field)?.label || field} ${op} ${Array.isArray(value) ? value.join(', ') : value}`)
   }
   return parts.join(' · ')
@@ -219,7 +252,7 @@ function push(patch) {
   router.push({ query: { ...route.query, ...patch, all: undefined } })
 }
 const setFlag = (k, on) => push({ [k]: on ? '1' : undefined })
-const clearFilters = () => push(filtersToQuery([], {}, props.spec, store.today))
+const clearFilters = () => push(controlsQuery([], {}))
 
 // URL -> controls. Skipped when the controls already say the same thing, so an edit in the Filter popover is not reset under the cursor.
 function applyUrl() {
@@ -233,7 +266,7 @@ function applyUrl() {
 watch(() => [key(list.wire.value), list.orderBy.value], () => {
   if (!list.ready.value) return
   const patch = {}
-  if (key(list.wire.value) !== key(urlWire())) Object.assign(patch, filtersToQuery(list.wire.value, flagValues.value, props.spec, store.today))
+  if (key(list.wire.value) !== key(urlWire())) Object.assign(patch, controlsQuery(list.wire.value, flagValues.value))
   if (list.orderBy.value !== queryToOrderBy(route.query)) Object.assign(patch, orderByToQuery(list.orderBy.value))
   if (Object.keys(patch).length) push(patch)
 })
@@ -279,8 +312,8 @@ const isOpen = (row) => !!current.value && current.value.ref === props.rowRef(ro
 const open = (row) => openRef(props.rowRef(row))
 
 function request(start, page_length) {
-  const { params, filters } = queryToRequest(route.query, props.spec)
-  return { params, filters: filters.length ? filters : undefined, order_by: queryToOrderBy(route.query) || undefined,
+  const { params, filters } = queryToRequest(route.query, spec.value)
+  return { params, tab: tab.value, filters: filters.length ? filters : undefined, order_by: queryToOrderBy(route.query) || undefined,
     fields: extraFields.value.length ? extraFields.value : undefined, start, page_length, view: view.value, query: route.query }
 }
 async function load(append = false) {
@@ -291,6 +324,7 @@ async function load(append = false) {
     if (mine !== seq) return
     loading.value = false
     if (!res) return
+    if (res.tabs) tabCounts.value = res.tabs
     groupRows.value = res.summary?.rows || []
     groupTotals.value = res.summary?.totals || null
     loaded.value = true
@@ -302,6 +336,7 @@ async function load(append = false) {
   if (!res) return
   rows.value = append ? [...rows.value, ...res.rows] : res.rows
   total.value = res.total
+  if (res.tabs) tabCounts.value = res.tabs
   loaded.value = true
   emit('loaded', res)
 }
@@ -320,12 +355,13 @@ async function refresh() {
   }
   rows.value = out
   total.value = res.total
+  if (res.tabs) tabCounts.value = res.tabs
   loaded.value = true
   emit('loaded', res)
 }
 
 // ---- remembered state: one per user, screen and space, kept on the server (lib/views.js) ----
-const listQuery = () => canonical(route.query, props.spec, keep.value)
+const listQuery = () => canonical(route.query, spec.value, keep.value)
 const hasQuery = () => Object.keys(listQuery()).length > 0 || route.query.all === '1'
 function remember() {
   const layout = { ...list.layout.value }
@@ -356,8 +392,9 @@ watch(() => JSON.stringify(listQuery()), () => { applyUrl(); if (viewsLoaded()) 
 watch(() => JSON.stringify(list.layout.value), () => { if (list.ready.value && viewsLoaded()) remember() })
 watch(() => list.ready.value, (ok) => {
   if (!ok) return
-  const quick = (savedView(props.screen) || initial)?.quick
-  if (quick?.length || props.quick.length) list.setQuickFields(quick?.length ? quick : props.quick)
+  // a state tab takes the place of its field in the strip, also in a strip saved before the tabs existed
+  const quick = ((savedView(props.screen) || initial)?.quick || []).filter((f) => f !== props.tabs?.field)
+  if (quick.length || props.quick.length) list.setQuickFields(quick.length ? quick : props.quick)
   quickReady = true
   applyUrl()
 }, { immediate: true })
@@ -368,5 +405,5 @@ onMounted(() => {
   if (viewsLoaded() && hasQuery()) remember()
 })
 onUnmounted(() => (paneNav.rows = []))
-defineExpose({ reload: refresh, rows, total, view, mode })
+defineExpose({ reload: refresh, rows, total, view, mode, tab, tabCounts })
 </script>

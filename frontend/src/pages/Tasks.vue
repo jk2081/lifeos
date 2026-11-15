@@ -1,10 +1,10 @@
 <template>
   <ListView ref="list" title="Tasks" noun="tasks" screen="tasks" doctype="Life Task" :spec="SPEC" :flag-labels="FLAGS" :quiet="['archived']" :quick="QUICK" :virtual="VIRTUAL"
-    :synthetic="SYNTHETIC" :views="VIEWS" :fetch="fetch" :row-ref="(r) => 'task:' + r.name" :group-by="dueGroup"
-    :empty-title="view === 'loops' ? 'No open loops.' : 'No tasks here.'"
-    :empty-hint="view === 'loops' ? 'Open tasks older than 14 days with no due date gather here.' : 'Type a title in the box above and press Enter, or accept a task proposal in the Inbox.'"
+    :synthetic="SYNTHETIC" :views="views" :tabs="TABS" :fetch="fetch" :row-ref="(r) => 'task:' + r.name" :group-by="dueGroup"
+    :empty-title="EMPTY[tab] || 'No tasks here.'"
+    :empty-hint="tab === 'loops' ? 'Open tasks older than 14 days with no due date gather here.' : tab === 'open' ? 'Type a title in the box above and press Enter, or accept a task proposal in the Inbox.' : ''"
     @loaded="(res) => (today = res.today)">
-    <template #sub>{{ view === 'loops' ? 'Open loops: open tasks older than 14 days with no due date. Give each a date, carry it, or drop it.' : `${store.space} · by due date, then priority` }}</template>
+    <template #sub><span data-tasks-sub>{{ tab === 'loops' ? 'Open loops: open tasks older than 14 days with no due date. Give each a date, carry it, or drop it.' : `${store.space} · by due date, then priority` }}</span></template>
     <template #above>
       <TextInput v-if="canWrite()" v-model="quick" size="md" placeholder="Add a task and press Enter. A date word such as tomorrow or fri sets the due date."
         aria-label="Quick add" @keydown.enter="add" />
@@ -36,8 +36,8 @@
 
     <!-- board -->
     <template #body="{ rows, loaded }">
-      <div class="grid items-start gap-4 md:grid-cols-4" data-board>
-        <div v-for="col in BOARD" :key="col" class="flex min-h-28 flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 p-3" :data-column="col" @dragover.prevent @drop="drop(col)">
+      <div class="grid items-start gap-4" :class="board.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-4'" data-board>
+        <div v-for="col in board" :key="col" class="flex min-h-28 flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 p-3" :data-column="col" @dragover.prevent @drop="drop(col)">
           <SectionHead :count="boardCounts[col] ?? null" :to="{ query: { ...route.query, view: 'table', status: col, done: undefined, open: undefined } }">{{ col }}</SectionHead>
           <div v-for="t in rows.filter((r) => r.status === col)" :key="t.name" class="relative cursor-grab rounded-4 border bg-surface-base px-3 py-2.5 hover:bg-surface-gray-1"
             :class="isOpen(t) ? 'border-outline-gray-4 !bg-surface-gray-3' : 'border-outline-gray-2'" draggable="true" data-row :data-active="isOpen(t) || undefined" @dragstart="dragging = t">
@@ -57,8 +57,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Badge, Checkbox, Select, TextInput } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
@@ -68,10 +68,14 @@ import { short, startOfWeek, addDays } from '@/lib/dates'
 import { OPEN, taskMeta, taskPill } from '@/lib/tasks'
 import { loadLookups } from '@/lib/lookups'
 import { current, openRef } from '@/lib/pane'
-import { DUE_PRESETS } from '@/lib/filterUrl'
+import { DUE_PRESETS, parseWire } from '@/lib/filterUrl'
 
-const VIEWS = [{ key: 'list', label: 'List', mode: 'feed' }, { key: 'board', label: 'Board', mode: 'custom' }, { key: 'table', label: 'Table', mode: 'table' },
-  { key: 'loops', label: 'Open loops', mode: 'feed' }]
+// the layout switch. The board is offered on the Open and All tabs only; on the other tabs a remembered board falls back to the list
+const VIEWS = [{ key: 'list', label: 'List', mode: 'feed' }, { key: 'board', label: 'Board', mode: 'custom' }, { key: 'table', label: 'Table', mode: 'table' }]
+// the state tabs, on the short parameter status=. "Open" is Open and Doing. A status that is not a tab (status=Dropped) shows under All as a filter
+const TABS = { key: 'status', field: 'status', label: 'Task state', items: [{ value: 'open', label: 'Open' }, { value: 'loops', label: 'Open loops' },
+  { value: 'Waiting', label: 'Waiting' }, { value: 'Done', label: 'Done' }, { value: 'all', label: 'All' }] }
+const EMPTY = { loops: 'No open loops.', Waiting: 'Nothing is waiting.', Done: 'No done tasks here.' }
 const BOARD = ['Open', 'Doing', 'Waiting', 'Done']
 // the short URL parameters of this list, as the count links write them (lib/filterUrl.js)
 const SPEC = [
@@ -80,25 +84,38 @@ const SPEC = [
   { key: 'due', field: 'due_date', kind: 'preset', label: 'Due', presets: DUE_PRESETS, labels: { overdue: 'overdue', today: 'today', 'today,overdue': 'today and overdue', week: 'this week', none: 'no date' } },
   { key: 'status', field: 'status', kind: 'value' },
   { key: 'completed_from', field: 'completed_on', kind: 'from' }, { key: 'completed_to', field: 'completed_on', kind: 'to' },
-  { key: 'done', kind: 'flag' }, { key: 'archived', kind: 'flag' },
+  { key: 'archived', kind: 'flag' },
 ]
-const FLAGS = { done: 'Show done', archived: 'Include archived' }
-const QUICK = ['status', 'area', 'project', 'priority', 'due_date']
+const FLAGS = { archived: 'Include archived' }
+const QUICK = ['area', 'project', 'priority', 'due_date']
 const VIRTUAL = [{ fieldname: 'tag', label: 'Tag', fieldtype: 'Link', options: 'Life Tag' }]
 const SYNTHETIC = [{ key: '_check', label: '', width: '2rem', place: 'start' }]
 const route = useRoute()
+const router = useRouter()
 const list = ref(null)
 const today = ref(store.today)
 const quick = ref('')
 const dragging = ref(null)
 const boardCounts = ref({})
 const view = computed(() => list.value?.view || 'list')
+const tab = computed(() => list.value?.tab || 'open')
+const views = computed(() => (['open', 'all'].includes(tab.value) ? VIEWS : VIEWS.filter((v) => v.key !== 'board')))
+const board = computed(() => (tab.value === 'open' ? ['Open', 'Doing'] : BOARD))
+
+// Links from before the tabs: view=loops was a layout and is now the Open loops tab; done=1 added closed tasks to the open ones.
+watch(() => [route.query.view, route.query.done], ([v, done]) => {
+  if (v !== 'loops' && !done) return
+  const query = { ...route.query, done: undefined }
+  if (v === 'loops') Object.assign(query, { view: undefined, status: 'loops' })
+  else if (!query.status) query.f = JSON.stringify([...parseWire(query.f).filter((w) => w[0] !== 'status'), ['status', '!=', 'Carried']])
+  router.replace({ query })
+}, { immediate: true })
 
 const struck = (t) => (t.status === 'Done' || t.status === 'Dropped' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9')
 const isOpen = (t) => current.value?.ref === 'task:' + t.name
 // the list view groups by due date while it is in its own order
 function dueGroup(t) {
-  if (view.value !== 'list' || route.query.sort) return ''
+  if (view.value !== 'list' || tab.value === 'loops' || route.query.sort) return ''
   const d = t.due_date
   if (!OPEN.includes(t.status)) return 'Closed'
   if (!d) return 'No date'
@@ -107,21 +124,24 @@ function dueGroup(t) {
   return d <= addDays(startOfWeek(today.value), 6) ? 'This week' : 'Later'
 }
 
-async function fetch({ params: p, filters, order_by, fields, summary, start, page_length, view: v }) {
+async function fetch({ params: p, tab: t, filters, order_by, fields, summary, start, page_length, view: v }) {
   const base = { space: store.space, area: p.area, project: p.project, tag: p.tag, priority: p.priority, goal: p.goal, due: p.due,
     include_archived: p.archived ? 1 : 0, completed_from: p.completed_from, completed_to: p.completed_to, filters }
+  // what each tab asks the server for; under All a status that is not a tab (status=Dropped) is passed as it is
+  const status = t === 'open' ? 'open_doing' : t === 'loops' ? 'open' : t === 'all' ? p.status || 'all' : t
   if (v === 'board' && !summary) {
-    // the board shows the four columns; each column's count is the number of tasks with that status under the same filters
-    const res = await api('tasks.list', { ...base, status: p.status || 'all', start, page_length: 100 })
-    const tasks = res.tasks.filter((t) => BOARD.includes(t.status))
-    const counts = await Promise.all(BOARD.map((s) => api('tasks.list', { ...base, status: s, page_length: 1 })))
-    boardCounts.value = Object.fromEntries(BOARD.map((s, i) => [s, counts[i].total]))
-    // the heading counts what the four columns hold, so it agrees with the column counts; Show more brings the next cards
-    return { rows: tasks, total: counts.reduce((n, c) => n + c.total, 0), today: res.today }
+    // the board shows its columns; each column's count is the number of tasks with that status under the same filters
+    const cols = t === 'open' ? ['Open', 'Doing'] : BOARD
+    const res = await api('tasks.list', { ...base, status, start, page_length: 100 })
+    const tasks = res.tasks.filter((x) => cols.includes(x.status))
+    const counts = await Promise.all(cols.map((s) => (status !== 'all' && status !== 'open_doing' && status !== s ? { total: 0 } : api('tasks.list', { ...base, status: s, page_length: 1 }))))
+    boardCounts.value = Object.fromEntries(cols.map((s, i) => [s, counts[i].total]))
+    // the heading counts what the columns hold, so it agrees with the column counts; Show more brings the next cards
+    return { rows: tasks, total: counts.reduce((n, c) => n + c.total, 0), today: res.today, tabs: res.tabs }
   }
-  const res = await api('tasks.list', { ...base, status: p.status || (v === 'board' ? 'all' : 'open'), done: p.done && v !== 'loops' ? 1 : 0, loops: v === 'loops' ? 1 : 0,
-    order_by: order_by || (v === 'loops' ? 'creation asc' : undefined), fields, summary, start, page_length })
-  return summary ? res : { rows: res.tasks, total: res.total, today: res.today }
+  const res = await api('tasks.list', { ...base, status, loops: t === 'loops' ? 1 : 0,
+    order_by: order_by || (t === 'loops' ? 'creation asc' : undefined), fields, summary, start, page_length })
+  return summary ? res : { rows: res.tasks, total: res.total, today: res.today, tabs: res.tabs }
 }
 async function add() {
   const text = quick.value.trim()

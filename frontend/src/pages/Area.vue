@@ -136,7 +136,7 @@ const areaTabs = computed(() => {
 const door = computed(() => {
   const area = d.value.area.name
   return {
-    projects: { path: '/projects', query: { area, status: 'Active' } }, allProjects: { path: '/projects', query: { area } },
+    projects: { path: '/projects', query: { area, status: 'Active' } }, allProjects: { path: '/projects', query: { area, f: JSON.stringify([['status', 'in', ['Active', 'On Hold']], ['is_archived', '=', 0]]) } },
     tasks: { path: '/tasks', query: { area, view: 'list' } }, notes: { path: '/library', query: { view: 'list', area } },
     reference: { path: '/library', query: { view: 'list', area, project: 'none' } }, documents: { path: '/vault', query: { area } },
     chats: { path: '/chats', query: { area } },

@@ -53,7 +53,7 @@ export function refOfRoute(path) {
 export function openRef(ref, extra = {}) {
   if (!ref) return
   const r = router.currentRoute.value
-  const query = { ...r.query, focus: undefined, ...extra, open: ref }
+  const query = { ...r.query, focus: undefined, ptab: undefined, ...extra, open: ref }
   return parseOpen(r) ? router.replace({ query }) : router.push({ query })
 }
 // Open the record a server route points to: in the pane when it has one, else by going there.
@@ -64,7 +64,7 @@ export function openRoute(path) {
 export function closePane() {
   const r = router.currentRoute.value
   if (!r.query.open) return
-  const target = router.resolve({ path: r.path, query: { ...r.query, open: undefined, focus: undefined } })
+  const target = router.resolve({ path: r.path, query: { ...r.query, open: undefined, focus: undefined, ptab: undefined } })
   if (window.history.state && window.history.state.back === target.fullPath) router.back()
   else router.replace(target)
 }

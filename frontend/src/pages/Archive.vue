@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Archive" noun="archived records" screen="archive" doctype="Life Index" :spec="SPEC" :quick="['ref_doctype', 'area', 'title']" :virtual="VIRTUAL"
+  <ListView ref="list" title="Archive" noun="archived records" screen="archive" doctype="Life Index" :spec="SPEC" :tabs="TABS" :quick="['area', 'title']" :virtual="VIRTUAL"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => refOf(r.ref_doctype, r.ref_name)" :row-key="(r) => r.ref_doctype + r.ref_name"
     :row-label="(r) => r.title || 'Untitled'" :group-by="(r) => (route.query.sort ? '' : r.area_name || 'Unfiled')" empty-title="Nothing is archived."
     empty-hint="Done tasks, finished inbox items and quiet chats move here after the number of days in Settings. Completed projects move here at once with their records."
@@ -59,15 +59,18 @@ const VIRTUAL = [
   { fieldname: 'archive_reason', label: 'Archived', fieldtype: 'Select', options: Object.keys(REASON).join('\n') },
   { fieldname: 'archived_on', label: 'Archived on', fieldtype: 'Date' },
 ]
+// the state tabs: one per record type, on type=. All is the default
+const TABS = { key: 'type', field: 'ref_doctype', label: 'Record type', items: [{ value: 'all', label: 'All' }, { value: 'Life Task', label: 'Tasks' }, { value: 'Life Note', label: 'Notes' },
+  { value: 'Life Chat Log', label: 'Chats' }, { value: 'Life Vault Document', label: 'Documents' }, { value: 'Life Inbox Item', label: 'Inbox items' }, { value: 'Life Journal Page', label: 'Journal pages' }] }
 const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'tags_csv', 'is_archived', 'record_owner', 'status']
 const SYNTHETIC = [{ key: '_archived', label: 'Archived', width: 'minmax(0, 1.4fr)', place: 'end' }, { key: '_restore', label: '', width: '6rem', align: 'right', place: 'end' }]
 const route = useRoute()
 const list = ref(null)
 const projects = ref([])
-async function fetch({ params: p, filters, order_by, summary, start, page_length }) {
-  const res = await api('archive.list', { space: store.space, doctype: p.type, area: p.area, reason: p.reason, archived_from: p.archived_from, archived_to: p.archived_to,
+async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
+  const res = await api('archive.list', { space: store.space, doctype: tab === 'all' ? undefined : tab, area: p.area, reason: p.reason, archived_from: p.archived_from, archived_to: p.archived_to,
     filters, order_by, summary, start, page_length })
-  return summary ? res : { rows: res.records, total: res.total, projects: res.projects }
+  return summary ? res : { rows: res.records, total: res.total, projects: res.projects, tabs: res.tabs }
 }
 async function restore(doctype, name) {
   if (await tryCall(() => api('archive.restore', { doctype, name }), 'Restored.')) list.value.reload()

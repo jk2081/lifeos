@@ -67,7 +67,7 @@ function step(n) {
   const i = paneNav.rows.indexOf(cur.value.ref)
   const next = paneNav.rows[i + n]
   if (i < 0 || !next) return
-  router.replace({ query: { ...router.currentRoute.value.query, open: next, focus: undefined } })
+  router.replace({ query: { ...router.currentRoute.value.query, open: next, focus: undefined, ptab: undefined } })
 }
 function onKey(e) {
   if (!cur.value || e.metaKey || e.ctrlKey || e.altKey) return

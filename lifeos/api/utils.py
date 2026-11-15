@@ -216,6 +216,15 @@ def extra_columns(doctype, fields, alias="", have=()):
 	return out[:30]
 
 
+def tab_counts(base, values, tabs):
+	"""The count on each state tab of a list, in one query. `base` is the SQL from "from" to the end of the WHERE the list
+	uses, without the condition on the tab's own field, so every count respects the other filters. `tabs` maps a tab to
+	its SQL condition; None counts every row."""
+	cols = ", ".join(("count(*)" if cond is None else f"ifnull(sum({cond}), 0)") + f" as `c{i}`" for i, cond in enumerate(tabs.values()))
+	row = frappe.db.sql(f"select {cols} {base}", values)[0]
+	return {key: int(n or 0) for key, n in zip(tabs, row)}
+
+
 AGGREGATES = ("count", "sum", "avg", "min", "max")
 
 

@@ -11,7 +11,7 @@
       <Stat label="Tasks done"><NumLink :to="door('Done')" data-door="review-done">{{ d.done.length }}</NumLink>
         <template #sub><NumLink class="max-md:hidden" :to="door('Carried')" data-door="review-carried"><span>{{ d.carried.length }}</span> carried forward</NumLink></template>
       </Stat>
-      <Stat label="Open loops"><NumLink :to="{ path: '/tasks', query: { view: 'loops' } }" data-door="review-loops">{{ d.open_loops_total }}</NumLink>
+      <Stat label="Open loops"><NumLink :to="{ path: '/tasks', query: { status: 'loops' } }" data-door="review-loops">{{ d.open_loops_total }}</NumLink>
         <template #sub><span class="max-md:hidden">Older than 14 days, no date</span></template>
       </Stat>
     </div>
@@ -30,7 +30,7 @@
         <section v-if="d.carried.length"><SectionHead>Carried forward</SectionHead>
           <Card flush><TaskRow v-for="t in d.carried" :key="t.name" :task="t" :today="store.today" readonly /></Card>
         </section>
-        <section><SectionHead :count="d.open_loops_total" :to="{ path: '/tasks', query: { view: 'loops' } }">Open loops</SectionHead>
+        <section><SectionHead :count="d.open_loops_total" :to="{ path: '/tasks', query: { status: 'loops' } }">Open loops</SectionHead>
           <Card flush><TaskRow v-for="t in d.open_loops.slice(0, 8)" :key="t.name" :task="t" :today="store.today" with-due :readonly="!canWrite()" @toggle="done" />
             <Empty v-if="!d.open_loops.length" title="No open loops." hint="Open tasks older than 14 days with no due date gather here." /></Card>
         </section>

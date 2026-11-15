@@ -1,7 +1,7 @@
 <template>
-  <ListView ref="list" title="Inbox" noun="inbox items" screen="inbox" doctype="Life Inbox Item" :spec="SPEC" :quick="['status', 'source_type', 'area']"
+  <ListView ref="list" title="Inbox" noun="inbox items" screen="inbox" doctype="Life Inbox Item" :spec="SPEC" :tabs="TABS" :quick="['source_type', 'area']"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => 'inbox:' + r.name"
-    empty-title="The Inbox is empty." empty-hint="Drop a file above or forward something to your agent. What it proposes waits here for you."
+    :empty-title="EMPTY[list?.tab] || 'The Inbox is empty.'" empty-hint="Drop a file above or forward something to your agent. What it proposes waits here for you."
     @loaded="(res) => (pendingTotal = res.pending_total)">
     <template #sub>{{ store.space }} · drop anything here, an agent proposes, you approve<template v-if="pendingTotal"> ·
       <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template></template>
@@ -78,6 +78,10 @@ import { loadLookups } from '@/lib/lookups'
 const SOURCES = ['Upload', 'Journal Photo', 'Voice Note', 'Email', 'Chat', 'Message', 'Web']
 // status=Waiting in the URL is two statuses, New and Processing: "waiting for the agent"
 const STATUS = { 'To Review': ['To Review'], Waiting: ['New', 'Processing'], Failed: ['Failed'], Done: ['Done'] }
+// the state tabs, on status=. The first is the default; "Waiting for the agent" is the two statuses New and Processing
+const TABS = { key: 'status', field: 'status', label: 'Inbox state', items: [{ value: 'To Review', label: 'To review' }, { value: 'Waiting', label: 'Waiting for the agent' },
+  { value: 'Failed', label: 'Failed' }, { value: 'Done', label: 'Done' }, { value: 'all', label: 'All' }] }
+const EMPTY = { 'To Review': 'Nothing to review.', Waiting: 'Nothing is waiting for the agent.', Failed: 'Nothing has failed.', Done: 'Nothing is done yet.' }
 const SPEC = [
   { key: 'status', field: 'status', kind: 'preset', labels: { Waiting: 'Waiting for the agent', 'To Review': 'To review' },
     presets: { 'To Review': () => ['status', '=', 'To Review'], Waiting: () => ['status', 'in', ['New', 'Processing']], Failed: () => ['status', '=', 'Failed'], Done: () => ['status', '=', 'Done'] } },
@@ -153,12 +157,12 @@ async function add() {
   }
 }
 
-async function fetch({ params: p, filters, order_by, summary, start, page_length }) {
-  const res = await api('inbox.list', { space: store.space, status: p.status ? JSON.stringify(STATUS[p.status] || [p.status]) : undefined,
+async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
+  const res = await api('inbox.list', { space: store.space, status: STATUS[tab] ? JSON.stringify(STATUS[tab]) : undefined,
     source_type: p.source_type, area: p.area, from_date: p.from, to_date: p.to, filters, order_by, summary, start, page_length })
   if (summary) return res
   refreshCounts()
-  return { rows: res.items, total: res.total, pending_total: res.pending_total }
+  return { rows: res.items, total: res.total, pending_total: res.pending_total, tabs: res.tabs }
 }
 async function retry(it) {
   if (await tryCall(() => api('inbox.retry', { item: it.name }), 'Sent back to the agent.')) list.value.reload()

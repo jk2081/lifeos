@@ -12,6 +12,8 @@
 //   { key, field, kind: 'from' | 'to' }      from=2026-11-01    <->  [date, '>=', '2026-11-01']   ('to' uses '<=')
 //   { key, field, kind: 'preset', presets }  due=overdue        <->  whatever presets.overdue(today) returns
 //   { key, kind: 'flag' }                    done=1             a switch that is not a condition on a field
+// An entry may carry `skip`, a list of values that are not conditions: the values of the list's state tabs
+// (status=Done selects the Done tab). They stay in the URL and in the saved view, and never reach the filter controls.
 // Conditions with no short form go, as they are, into one parameter: f=<JSON list of wire filters>.
 
 export const WIRE_KEY = 'f'
@@ -19,6 +21,7 @@ export const SORT_KEYS = ['sort', 'dir']
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 const text = (v) => (Array.isArray(v) ? v[0] : v) == null ? '' : String(Array.isArray(v) ? v[0] : v)
+const skipped = (entry, value) => Array.isArray(entry.skip) && entry.skip.includes(value)
 const isOn = (v) => ['1', 'true', 'yes', 'on'].includes(text(v).toLowerCase())
 
 function shortToWire(entry, value, today) {
@@ -54,7 +57,7 @@ export function queryToFilters(query = {}, spec = [], today = '') {
   const flags = {}
   for (const entry of spec) {
     const value = text(query[entry.key])
-    if (!value) continue
+    if (!value || skipped(entry, value)) continue
     if (entry.kind === 'flag') {
       if (isOn(value)) flags[entry.key] = true
       continue
@@ -89,7 +92,7 @@ export function queryToRequest(query = {}, spec = []) {
   const params = {}
   for (const entry of spec) {
     const value = text(query[entry.key])
-    if (!value) continue
+    if (!value || skipped(entry, value)) continue
     if (entry.kind === 'flag') {
       if (isOn(value)) params[entry.key] = 1
     } else if (entry.kind !== 'preset' || entry.presets[value]) params[entry.key] = value
@@ -124,10 +127,13 @@ export function orderByToQuery(orderBy = '') {
 
 /** How many filters a query holds: conditions and switches, by the spec. */
 export function activeCount(query = {}, spec = []) {
-  const { wire, flags } = queryToFilters(query, spec, '')
-  let n = Object.keys(flags).length + parseWire(query[WIRE_KEY]).length
-  for (const entry of spec) if (entry.kind !== 'flag' && text(query[entry.key])) n++
-  return wire.length || n ? n : 0
+  let n = parseWire(query[WIRE_KEY]).length
+  for (const entry of spec) {
+    const value = text(query[entry.key])
+    if (!value || skipped(entry, value)) continue
+    if (entry.kind === 'flag' ? isOn(value) : entry.kind !== 'preset' || entry.presets[value]) n++
+  }
+  return n
 }
 
 /** The filter and sort part of a query, with empty values dropped and the keys in a fixed order: two queries

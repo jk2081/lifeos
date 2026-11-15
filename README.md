@@ -97,7 +97,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | --- | --- | --- |
 | `archive.set` | `doctype, name, archived=1` | Archive or restore one record. For a project, its records follow. |
 | `archive.restore` | `doctype, name` | Bring an archived record back. Restoring a project restores the records archived with it. |
-| `archive.list` | `space=None, area=None, start=0, page_length=50` | Archived records by area, newest first, plus archived projects. |
+| `archive.list` | `space=None, area=None, start=0, page_length=50` | Archived records by area, newest first, plus archived projects. `tabs` in the answer counts the records of each type under the same filters. |
 
 **`lifeos.api.area`**
 
@@ -140,7 +140,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `inbox.submit_result` | `item, transcript_md=None, summary_md=None, proposals=None` | Store the transcript, summary and proposals, and set the item To Review. Each proposal is {kind, preview, payload, confidence}. An invalid proposal is refused with a clear error; the rest are kept. |
 | `inbox.fail_item` | `item, error=None` | Mark a claimed item Failed, with the reason. |
 | `inbox.retry` | `item` | Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed. |
-| `inbox.list` | `space=None, status=None, include_archived=0, start=0, page_length=30` | Inbox items of a space, newest first, with proposal counts. |
+| `inbox.list` | `space=None, status=None, include_archived=0, start=0, page_length=30` | Inbox items of a space, newest first, with proposal counts. `tabs` in the answer counts the items on each state tab (To Review, Waiting, Failed, Done, all) under the same filters. |
 | `inbox.get` | `item` | One inbox item with its files, proposals and the choices for the filing chips. |
 | `inbox.update_transcript` | `item, transcript_md` | Correct the transcript of an item, for example words marked [?]. |
 
@@ -206,7 +206,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `projects.list` | `space=None, include_done=0` | Every active project of a space, grouped by area. On hold projects are included; done ones on request. |
+| `projects.list` | `space=None, include_done=0` | Every active project of a space, grouped by area. On hold projects are included; done ones on request. `tabs` in the answer counts the projects on each state tab (Active, On Hold, Done, Dropped, all) under the same filters. |
 | `projects.get` | `project` | A project page: its tasks, notes, documents and chats. |
 | `projects.completion_info` | `project` | How many records will move to the Archive when the project is completed. Shown in the confirm dialog. |
 | `projects.set_status` | `project, status` | Change a project's status. Done or Dropped archives it at once with every record whose project points to it. |
@@ -246,7 +246,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `tasks.list` | `space=None, status='open', area=None, project=None, tag=None, priority=None, goal=None, month_plan=None, include_archived=0, start=0, page_length=50` | Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first. |
+| `tasks.list` | `space=None, status='open', area=None, project=None, tag=None, priority=None, goal=None, month_plan=None, include_archived=0, start=0, page_length=50` | Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first. `status=open_doing` leaves Waiting tasks out. `tabs` in the answer counts the tasks on each state tab (open = Open and Doing, loops, Waiting, Done, all) under the same filters. |
 | `tasks.get` | `task` |  |
 | `tasks.quick_add` | `text, space=None, area=None, project=None, goal=None, due_date=None, priority=None, month_plan=None` | Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date. |
 | `tasks.set_status` | `task, status, waiting_on=None` | Change a task's status. Done fills completed_on. Waiting needs waiting_on. |
@@ -271,7 +271,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `vault.list` | `space=None, include_archived=0, start=0, page_length=100` | Vault documents of a space, grouped by holder, soonest expiry first. |
+| `vault.list` | `space=None, include_archived=0, start=0, page_length=100` | Vault documents of a space, grouped by holder, soonest expiry first. `tabs` in the answer counts all documents, those expiring within 60 days and the expired ones under the same filters. |
 | `vault.get` | `document` |  |
 | `vault.save` | `document=None, space=None, values=None` | Create or change a vault document. Only the last four characters of a number are ever stored. |
 | `vault.set_file` | `document, file_url` | Point the document at a file already uploaded to it with upload_file. |

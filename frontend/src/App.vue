@@ -86,6 +86,7 @@ import QuickAdd from './components/QuickAdd.vue'
 import { NAV, SETTINGS } from './lib/nav'
 import { boot, store } from './lib/store'
 import { errorText } from './lib/api'
+import { stepTab } from './lib/tabs'
 
 const route = useRoute()
 const router = useRouter()
@@ -96,6 +97,7 @@ const TABS = NAV.filter((n) => ['Today', 'Inbox', 'Tasks', 'Journal'].includes(n
 const SHORTCUTS = [
   { title: 'Anywhere', shortcuts: [
     { label: 'Search', combo: 'Mod+K', altCombos: ['Slash'] }, { label: 'New task', combo: 'N' }, { label: 'Close the pane or dialog', combo: 'Escape' },
+    { label: 'Previous tab', combo: 'BracketLeft' }, { label: 'Next tab', combo: 'BracketRight' },
     { label: 'This list of shortcuts', combo: 'Shift+Slash' }] },
   { title: 'Go to: press G, then', shortcuts: [...NAV, SETTINGS].map((n) => ({ label: n.label, combo: n.key.toUpperCase() })) },
   { title: 'With a record open', shortcuts: [{ label: 'Next record in the list', combo: 'J', altCombos: ['ArrowDown'] },
@@ -148,6 +150,7 @@ function onKey(e) {
   else if (key === 'n') { e.preventDefault(); store.quickAdd = true }
   else if (key === '/') { e.preventDefault(); store.searchOpen = true }
   else if (e.key === '?') { e.preventDefault(); shortcutsOpen.value = true }
+  else if (e.key === '[' || e.key === ']') { if (stepTab(e.key === '[' ? -1 : 1)) e.preventDefault() }
 }
 
 onMounted(async () => {

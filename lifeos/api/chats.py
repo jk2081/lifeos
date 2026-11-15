@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 
@@ -115,7 +115,8 @@ def list(space=None, area=None, project=None, open_items=0, from_date=None, to_d
 		sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None):
 	"""Chat logs of a space as one list, newest first, ordered so that the groups of group_by (day, area, project) stay together.
 	Filters: area (with its sub-areas, or "none"), project, open_items=1 for chats that still have an open item, from_date, to_date.
-	`total` is the number of chats the filters match. `with_open_items` and `by_area` count inside the same filters."""
+	`total` is the number of chats the filters match. `with_open_items` and `by_area` count inside the same filters.
+	`tabs` counts all chats and those with open items under the same filters, whatever open_items was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	if group_by not in GROUP_ORDER:
@@ -124,8 +125,12 @@ def list(space=None, area=None, project=None, open_items=0, from_date=None, to_d
 	extra, values = std_clause("Life Chat Log", filters, "c", values)
 	clause += extra
 	values["space"] = space
+	# the state tabs of the Chats screen (all, open = with open items), counted under every filter but the open-items switch
+	t_clause, t_values = where_clause(space, area, project, 0, from_date, to_date, include_archived)
+	tabs = tab_counts(f"from `tabLife Chat Log` c where c.space=%(space)s {t_clause}{extra}", {**t_values, **values}, {"all": None, "open": OPEN_ITEM})
 	if summary:
-		return {"summary": summarise("Life Chat Log", f"from `tabLife Chat Log` c where c.space=%(space)s {clause}", values, "c", summary, start, page_length)}
+		return {"summary": summarise("Life Chat Log", f"from `tabLife Chat Log` c where c.space=%(space)s {clause}", values, "c", summary, start, page_length),
+			"tabs": tabs}
 	order = std_order("Life Chat Log", order_by, "c", SORTS) or sort_order(sort, dir, SORTS, None)
 	order = f"{order}, c.creation desc" if order else f"{GROUP_ORDER[group_by]}, c.modified desc"
 	rows = _chat_rows(frappe.db.sql(
@@ -137,7 +142,7 @@ def list(space=None, area=None, project=None, open_items=0, from_date=None, to_d
 	with_open = frappe.db.sql(f"select count(*) {base} and {OPEN_ITEM}", values)[0][0]
 	by_area = frappe.db.sql(f"select ifnull(c.area, ''), count(*) {base} group by ifnull(c.area, '') order by count(*) desc", values)
 	area_names = names_map("Life Area", [a for a, n in by_area], "area_name")
-	return {"space": space, "chats": rows, "total": total, "with_open_items": with_open, "group_by": group_by,
+	return {"space": space, "chats": rows, "total": total, "with_open_items": with_open, "group_by": group_by, "tabs": tabs,
 		"by_area": [{"area": a or "none", "area_name": area_names.get(a) or "No area", "count": n} for a, n in by_area]}
 
 

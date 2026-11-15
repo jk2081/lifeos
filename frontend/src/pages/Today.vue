@@ -120,7 +120,7 @@ const d = ref(null)
 const phone = useMediaQuery('(max-width: 767px)') // the header shows a three-letter weekday on a phone
 // each number on Today leads to the list it counts
 const DOOR = { review: { path: '/inbox', query: { status: 'To Review' } }, due: { path: '/tasks', query: { view: 'list', due: 'today,overdue' } },
-  overdue: { path: '/tasks', query: { view: 'list', due: 'overdue' } }, loops: { path: '/tasks', query: { view: 'loops' } }, vault: { path: '/vault', query: { expiry: 'soon' } },
+  overdue: { path: '/tasks', query: { view: 'list', due: 'overdue' } }, loops: { path: '/tasks', query: { status: 'loops' } }, vault: { path: '/vault', query: { expiry: 'soon' } },
   score: { path: '/journal', query: { all: '1' } } }
 const comingRef = (c) => (c.kind === 'vault' ? 'vault:' : 'date:') + c.name
 

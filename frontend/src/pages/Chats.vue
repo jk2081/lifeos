@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Chats" noun="chats" screen="chats" doctype="Life Chat Log" :spec="SPEC" :flag-labels="{ open_items: 'Has open items', archived: 'Include archived' }"
+  <ListView ref="list" title="Chats" noun="chats" screen="chats" doctype="Life Chat Log" :spec="SPEC" :tabs="TABS" :flag-labels="{ archived: 'Include archived' }"
     :quiet="['archived']" :quick="['area', 'project', 'assistant']" :synthetic="SYNTHETIC" :hidden="['summary_md', 'url']" :fetch="fetch" :row-ref="(r) => 'chat:' + r.name"
     :group-by="groupLabel" :watch-keys="['group']" empty-title="No chats yet."
     empty-hint="Your agent logs each AI chat here with a summary and open items. Nothing needs review; open items become tasks only when you press Make task."
@@ -44,7 +44,9 @@ import { loadLookups } from '@/lib/lookups'
 
 const GROUPS = [{ label: 'Day', value: 'day' }, { label: 'Area', value: 'area' }, { label: 'Project', value: 'project' }]
 const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'project', field: 'project', kind: 'link' },
-  { key: 'from', field: 'date', kind: 'from' }, { key: 'to', field: 'date', kind: 'to' }, { key: 'open_items', kind: 'flag' }, { key: 'archived', kind: 'flag' }]
+  { key: 'from', field: 'date', kind: 'from' }, { key: 'to', field: 'date', kind: 'to' }, { key: 'archived', kind: 'flag' }]
+// the state tabs, on open_items=. All is the default; open_items=1 is "With open items"
+const TABS = { key: 'open_items', field: '_open_items', label: 'Chats', items: [{ value: 'all', label: 'All' }, { value: '1', label: 'With open items' }] }
 const SYNTHETIC = [{ key: '_summary', label: 'Summary', width: 'minmax(0, 2fr)', place: 'end' }, { key: '_open', label: 'Open items', width: '8rem', align: 'right', place: 'end' }]
 const route = useRoute()
 const router = useRouter()
@@ -58,10 +60,11 @@ function groupLabel(c) {
   if (groupBy.value === 'day') return `${weekday(c.date)}, ${long(c.date, true)}`
   return groupBy.value === 'area' ? c.area_name || 'No area' : c.project_title || 'No project'
 }
-async function fetch({ params: p, filters, order_by, summary, start, page_length }) {
-  const res = await api('chats.list', { space: store.space, area: p.area, project: p.project, open_items: p.open_items ? 1 : 0, from_date: p.from, to_date: p.to,
+async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
+  const res = await api('chats.list', { space: store.space, area: p.area, project: p.project, open_items: tab === '1' ? 1 : 0, from_date: p.from, to_date: p.to,
     include_archived: p.archived ? 1 : 0, group_by: groupBy.value, filters, order_by, summary, start, page_length })
-  return summary ? res : { rows: res.chats, total: res.total, with_open_items: res.with_open_items, by_area: res.by_area }
+  const tabs = res.tabs && { all: res.tabs.all, 1: res.tabs.open }
+  return summary ? { ...res, tabs } : { rows: res.chats, total: res.total, with_open_items: res.with_open_items, by_area: res.by_area, tabs }
 }
 const setGroup = (g) => router.push({ query: { ...route.query, group: g, sort: undefined, dir: undefined, all: undefined } })
 onMounted(loadLookups)

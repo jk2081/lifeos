@@ -54,7 +54,7 @@ Before using a library component, read its source and types: `node_modules/frapp
 | `.ch` as a view switch | `TabButtons` (`v-model`, `:options="[{ label, value }]"`) |
 | `.ch` that only shows state | `Badge` |
 | `.ch` that picks a value | `Pick.vue` (a `Dropdown` on a `Button`) or `LifeLink` |
-| `.tb` page tabs | `Tabs` with `:tabs="[{ value, label, route }]"` |
+| `.tb` page tabs | `TabBar.vue` (see Tabs below) |
 | `PageHead`, `.hd`, `.crumb` | `PageHead.vue`: frappe-ui `PageHeader`, `PageHeaderTitle` and `Breadcrumbs` |
 | `.bd` | `<div class="page-body">` |
 | `.cd`, `.cd.list` | `Card`, `<Card flush>` |
@@ -138,6 +138,52 @@ Every number that leads to a list is a `NumLink` (or `SectionHead` with `:to`) a
 ### Remembered views
 
 `ListView` saves, per user, screen and space: the list's query (filters, sort, view), customised columns, the quick-filter fields and the grouping. Opening a list with no query restores it into the URL; opening with a query uses exactly that query, then saves it. The open record (`open=`) is never saved. Nothing else needs doing in a screen.
+
+## Tabs
+
+Frappe organises information with tabs in three ways, and so does Life OS. All three are one component, `components/TabBar.vue` (frappe-ui `Tabs`, `TabList` and `TabTrigger`, with a count after each label), with its state from `lib/tabs.js`. `TabButtons` is only for small view switches (List, Board, Table).
+
+| Pattern | Where the open tab lives | Used by |
+| --- | --- | --- |
+| Tabs on a record or page | `tab=` | (area page, project page and Settings, in later steps of set 3). Journal and Calendar keep their path form (`/journal/habits`) |
+| Tabs in the record pane | `ptab=`, so the pane and the page behind it do not collide. Changing it replaces the history entry; opening another record or closing the pane drops it (`lib/pane.js`) | (the record pane, in a later step of set 3) |
+| State tabs on a list | the short parameter of the field the tabs are a preset on: `status=`, `type=`, `expiry=`, `open_items=` | Inbox, Tasks, Projects, Archive, Chats, Vault |
+
+**The URL rule.** The open tab is always in the URL, so reload, Back, Forward and a copied link return to it. The first tab is the default and adds nothing to the URL.
+
+```vue
+<TabBar :tabs="[{ value: 'overview', label: 'Overview' }, { value: 'tasks', label: 'Tasks', count: 12 }]" :model-value="tab.current.value" label="Area sections" @update:model-value="tab.set" />
+```
+```js
+import { useUrlTab } from '@/lib/tabs'
+const tab = useUrlTab('tab', TABS)             // page tabs; useUrlTab('ptab', TABS, { replace: true }) in the pane, with :level="2" on its TabBar
+// tab.current: the open tab. tab.set(value): open one. tab.shown(value): true once the tab has been opened.
+```
+
+- **Counts.** A tab that holds a list shows its count as a quiet number after the label; pass `count` on the tab. Zero still shows. Counts come in one call with the screen.
+- **Load a tab when it is first opened.** Render a tab's content with `v-if="tab.shown('tasks')"` and `v-show="tab.current.value === 'tasks'"`: it loads on first opening and stays loaded while the screen is open.
+- **Phones.** `TabBar` is one row that scrolls sideways inside itself and brings the open tab into view; tabs are 44 px high below `md`. It never wraps and has no overflow menu. Pass `inset` when the bar sits outside `.page-body`.
+- **Keys.** Arrow keys move between tabs (the component's own). `[` and `]` open the previous and next tab from anywhere on the page: `App.vue` calls `stepTab()` from `lib/tabs.js`, which goes to the pane's bar (`level` 2) while the pane is open and to the page's otherwise.
+- **No tabs inside tabs**, except the pane's own tabs over a page that has tabs. **A tab never hides the only way to do something**: primary actions stay in the page header.
+
+### State tabs on a list
+
+A state tab is a preset on one field. Give `ListView` a `tabs` prop and return the counts from `fetch`:
+
+```js
+const TABS = { key: 'status', field: 'status', label: 'Task state',
+  items: [{ value: 'open', label: 'Open' }, { value: 'loops', label: 'Open loops' }, { value: 'Waiting', label: 'Waiting' }, { value: 'Done', label: 'Done' }, { value: 'all', label: 'All' }] }
+async function fetch({ params, tab, filters, ... }) {            // `tab` is the open tab's value
+  const res = await api('tasks.list', { status: tab === 'open' ? 'open_doing' : ..., ... })
+  return { rows: res.tasks, total: res.total, tabs: res.tabs }   // tabs: { open: 12, loops: 3, Waiting: 1, Done: 40, all: 60 }
+}
+```
+
+- `key` is the short URL parameter and `field` the field it stands for. The first item is the default (no parameter; its own value in the URL also selects it). One item has the value `all`.
+- The tab **replaces that field's control**: leave the field out of `quick`. It is still in the Filter popover. A URL value that is not a tab (`status=Dropped`), or a condition on the field made in the Filter, selects **All** and shows as a condition in the filter bar. A condition that equals a tab (`Status = Done`) selects that tab instead.
+- A tab is not counted as a filter, Clear keeps it, and it is saved with the remembered view like the rest of the query.
+- **Counts respect the other filters.** Each list method returns `tabs`, computed in one query (`lifeos.api.utils.tab_counts`) under every filter but the tab's own field. `ListView` exposes `tab` and `tabCounts`.
+- The values in use: Inbox `status=` To Review (default), Waiting, Failed, Done, all. Tasks `status=` open (default), loops, Waiting, Done, all. Projects `status=` Active (default), On Hold, Done, Dropped, all. Archive `type=` all (default) and the six DocTypes. Chats `open_items=` all (default), 1. Vault `expiry=` all (default), soon, expired.
 
 ## Checks
 

@@ -4,7 +4,7 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 FIELDS = ["name", "title", "doc_type", "holder", "file", "number_last4", "issue_date", "expiry_date", "remind_days_before", "area", "project", "is_archived", "inbox_item"]
@@ -83,15 +83,20 @@ def list(space=None, include_archived=0, start=0, page_length=100, holder=None, 
 		sort=None, dir=None, filters=None, order_by=None, fields=None, summary=None):
 	"""Vault documents of a space, soonest expiry first, as a flat list and grouped by holder.
 	Filters: holder (a person, or "none"), doc_type, expiry (expired, soon = within 60 days, later, none), area, project.
-	`total` is the number of documents the filters match."""
+	`total` is the number of documents the filters match.
+	`tabs` counts all documents, those expiring within 60 days and the expired ones, under the same filters."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	clause, values = where_clause(space, holder, doc_type, expiry, area, project, include_archived)
 	extra, values = std_clause("Life Vault Document", filters, "d", values)
 	clause += extra
+	# the state tabs of the Vault screen (all, soon = within 60 days, expired), counted under every filter but the expiry itself
+	t_clause, t_values = where_clause(space, holder, doc_type, None, area, project, include_archived)
+	tabs = tab_counts(f"from `tabLife Vault Document` d where d.space=%(space)s {t_clause}{extra}", {**t_values, **values, "space": space},
+		{"all": None, "soon": EXPIRY["soon"], "expired": EXPIRY["expired"]})
 	if summary:
 		return {"summary": summarise("Life Vault Document", f"from `tabLife Vault Document` d where d.space=%(space)s {clause}",
-			{"space": space, **values}, "d", summary, start, page_length), **expiry_counts(space)}
+			{"space": space, **values}, "d", summary, start, page_length), **expiry_counts(space), "tabs": tabs}
 	cols = ", ".join([f"d.`{f}`" for f in FIELDS] + extra_columns("Life Vault Document", fields, "d", FIELDS))
 	order = std_order("Life Vault Document", order_by, "d", SORTS) or sort_order(sort, dir, SORTS, "d.expiry_date is null, d.expiry_date asc")
 	rows = _decorate(frappe.db.sql(
@@ -105,7 +110,7 @@ def list(space=None, include_archived=0, start=0, page_length=100, holder=None, 
 	counts = expiry_counts(space)
 	return {"space": space, "documents": rows,
 		"groups": [{"holder": k, "documents": v} for k, v in sorted(groups.items(), key=lambda kv: (kv[0] == "No holder", kv[0]))],
-		"total": total, "people": people, "expiring": sum(1 for r in rows if r["badge"]), "expired": counts["expired"], "soon": counts["soon"]}
+		"total": total, "tabs": tabs, "people": people, "expiring": sum(1 for r in rows if r["badge"]), "expired": counts["expired"], "soon": counts["soon"]}
 
 
 @frappe.whitelist()

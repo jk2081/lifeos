@@ -4,7 +4,7 @@ import frappe
 from lifeos import archive as rules
 from lifeos import permissions
 from lifeos.api.timeline import index_rows
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 
@@ -31,15 +31,13 @@ def list(space=None, area=None, start=0, page_length=50, doctype=None, reason=No
 		filters=None, order_by=None, summary=None):
 	"""Archived records, grouped by area, plus archived projects.
 	Filters: doctype (the record type), area (with its sub-areas, or "none"), reason (Auto, Manual, Project),
-	archived_from and archived_to on the day it was archived. `total` is the number of records the filters match."""
+	archived_from and archived_to on the day it was archived. `total` is the number of records the filters match.
+	`tabs` counts the records of each type (and all) under the same filters."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	where, values = "and is_archived = 1 and kind != 'Task Done'", {}
 	if area:
 		where += " and " + area_filter(space, area, "area", values)
-	if doctype:
-		where += " and ref_doctype = %(doctype)s"
-		values["doctype"] = doctype
 	if reason or archived_from or archived_to:
 		# the reason and the day live on the records themselves, so each type is checked in its own table
 		parts = []
@@ -58,8 +56,15 @@ def list(space=None, area=None, start=0, page_length=50, doctype=None, reason=No
 		values.update({"reason": reason, "archived_from": archived_from, "archived_to": archived_to})
 	extra, values = std_clause("Life Index", filters, "", values)
 	where += extra
+	# the state tabs of the Archive screen: one per record type, counted under every filter but the type itself
+	tabs = tab_counts(f"from `tabLife Index` where space=%(space)s {where}", {"space": space, **values},
+		{"all": None, **{dt: f"ref_doctype = '{dt}'" for dt in TYPES}})
+	if doctype:
+		where += " and ref_doctype = %(doctype)s"
+		values["doctype"] = doctype
 	if summary:
-		return {"summary": summarise("Life Index", f"from `tabLife Index` where space=%(space)s {where}", {"space": space, **values}, "", summary, start, page_length)}
+		return {"summary": summarise("Life Index", f"from `tabLife Index` where space=%(space)s {where}", {"space": space, **values}, "", summary, start, page_length),
+			"tabs": tabs}
 	order = std_order("Life Index", order_by, "", SORTS) or sort_order(sort, dir, SORTS, None)
 	rows = index_rows(space, where, values, order=(order + ", modified desc") if order else "area asc, record_date desc, modified desc",
 		start=start, page_length=page_length)
@@ -81,4 +86,4 @@ def list(space=None, area=None, start=0, page_length=50, doctype=None, reason=No
 		p["area_name"] = areas.get(p.area)
 		p["archived_on"] = str(p.archived_on) if p.archived_on else None
 	return {"groups": [{"area": k[0], "area_name": k[1], "records": v} for k, v in groups.items()], "records": rows, "projects": projects,
-		"count": len(rows), "total": total, "has_more": start + len(rows) < total}
+		"count": len(rows), "total": total, "tabs": tabs, "has_more": start + len(rows) < total}
