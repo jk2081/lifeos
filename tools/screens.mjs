@@ -111,10 +111,21 @@ for (const scheme of schemes) {
       ['projects-cards', '/life/projects?view=cards'], ['project', `/life/projects/${project}`], ['library', `/life/library/${note}`], ['library-list', '/life/library?view=list&all=1'],
       ['note-pane', `/life/library?view=list&all=1&open=note:${note}`], ['vault', '/life/vault?all=1'], ['vault-pane', `/life/vault?all=1&open=vault:${vault}`],
       ['chats', '/life/chats?all=1'], ['chat-pane', `/life/chats?all=1&open=chat:${chat}`], ['graph', '/life/graph'], ['archive', '/life/archive?all=1'], ['settings', '/life/settings'],
+      // set 3: the tabs of the area and project pages, the pane's tabs, the review and journal page on a phone, Settings, Goals
+      ...['projects', 'tasks', 'notes', 'documents', 'chats', 'timeline'].map((t) => [`area-${t}`, `/life/areas/${area}?tab=${t}`]),
+      ...['tasks', 'notes', 'documents', 'chats', 'links'].map((t) => [`project-${t}`, `/life/projects/${project}?tab=${t}`]),
+      ['task-pane-notes', `/life/tasks?view=list&open=task:${task}&ptab=notes`], ['task-pane-links', `/life/tasks?view=list&open=task:${task}&ptab=links`],
+      ['goal-pane-tasks', `/life/goals?status=all&open=goal:${goal}&ptab=tasks`], ['goal-pane-history', `/life/goals?status=all&open=goal:${goal}&ptab=history`],
+      ['chat-pane-items', `/life/chats?all=1&open=chat:${chat}&ptab=items`], ['vault-pane-file', `/life/vault?all=1&open=vault:${vault}&ptab=file`],
+      ['page-pane', `/life/journal/pages?open=page:${jpage}&ptab=transcript`], ['project-pane', `/life/projects?status=all&open=project:${project}&ptab=tasks`],
+      ['review-original', `/life/inbox/${review}/review?tab=original`], ['jpage-transcript', `/life/journal/pages/${jpage}?tab=transcript`],
+      ...['appearance', 'default', 'review', 'areas', 'tags', 'habits', 'dimensions', 'archive', 'archived', 'members', 'agents'].map((t) => [`settings-${t}`, `/life/settings?tab=${t}`]),
+      ['goals', '/life/goals?status=all'], ['goals-progress', '/life/goals?all=1'], ['more', '/life'],
     ].filter(([n]) => !only.length || only.includes(n))
     for (const [name, p] of SCREENS) {
       await page.goto(base + p, { waitUntil: 'networkidle' })
       await page.waitForTimeout(700)
+      if (name === 'more' && width < 800) { await page.locator('[data-tabbar] [aria-label="More"]').click(); await page.waitForTimeout(600) }
       const file = path.join(root, 'screenshots', `s-${name}-${width}${scheme === 'dark' ? '-dark' : ''}.png`)
       await page.screenshot({ path: file })
       const overflow = await page.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width) // a phone page that is too wide enlarges innerWidth too

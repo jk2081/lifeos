@@ -114,6 +114,8 @@ import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
 import { MONTHS, addDays, iso, long, parse, short, startOfWeek, time, weekday } from '@/lib/dates'
+import { useTabKeys } from '@/lib/tabs'
+import routerInstance from '@/router'
 
 const props = defineProps({ view: String })
 const VIEWS = ['month', 'week', 'agenda', 'year']
@@ -126,6 +128,8 @@ const CHIP = {
 }
 const INK = { important: 'text-ink-blue-8', trip: 'text-ink-amber-9', vault: 'text-ink-red-8', task: 'text-ink-gray-7' }
 const mode = computed(() => (VIEWS.includes(props.view) ? props.view : window.innerWidth < 768 ? 'agenda' : 'month'))
+// set 3: the views keep their path form (/calendar/year); [ and ] open the previous and next view
+useTabKeys({ level: 1, step: (n) => { const next = VIEWS[VIEWS.indexOf(mode.value) + n]; if (next) routerInstance.push(`/calendar/${next}`) } })
 const cursor = ref(store.today)
 const data = ref(null)
 const yearData = ref(null)

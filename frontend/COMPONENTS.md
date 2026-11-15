@@ -145,8 +145,8 @@ Frappe organises information with tabs in three ways, and so does Life OS. All t
 
 | Pattern | Where the open tab lives | Used by |
 | --- | --- | --- |
-| Tabs on a record or page | `tab=` | (area page, project page and Settings, in later steps of set 3). Journal and Calendar keep their path form (`/journal/habits`) |
-| Tabs in the record pane | `ptab=`, so the pane and the page behind it do not collide. Changing it replaces the history entry; opening another record or closing the pane drops it (`lib/pane.js`) | (the record pane, in a later step of set 3) |
+| Tabs on a record or page | `tab=` | The area page (Overview, Projects, Tasks, Notes, Documents, Chats, Timeline), the project page (Overview, Tasks, Notes, Documents, Chats, Links), Settings (vertical, one section at a time), and on a phone only the review screen (Original, Transcript, Summary, Proposals) and the journal page (Page, Transcript). Journal and Calendar keep their path form (`/journal/habits`, `/calendar/year`) and answer `[` and `]` too |
+| Tabs in the record pane | `ptab=`, so the pane and the page behind it do not collide. Changing it replaces the history entry; opening another record or closing the pane drops it (`lib/pane.js`) | Task (Details, Notes, Links), note (Note, Notes under this one, Links), project (Overview, Tasks), goal (Actions, Tasks, History across cycles, Links; Tasks and Links for Annual and Open goals), chat (Summary, Open items, Links), journal page (Page, Transcript, Created from this page), vault document (Details, File), an inbox item on a phone. Day, entry and plain panes have none |
 | State tabs on a list | the short parameter of the field the tabs are a preset on: `status=`, `type=`, `expiry=`, `open_items=` | Inbox, Tasks, Projects, Archive, Chats, Vault |
 
 **The URL rule.** The open tab is always in the URL, so reload, Back, Forward and a copied link return to it. The first tab is the default and adds nothing to the URL.
@@ -183,7 +183,8 @@ async function fetch({ params, tab, filters, ... }) {            // `tab` is the
 - The tab **replaces that field's control**: leave the field out of `quick`. It is still in the Filter popover. A URL value that is not a tab (`status=Dropped`), or a condition on the field made in the Filter, selects **All** and shows as a condition in the filter bar. A condition that equals a tab (`Status = Done`) selects that tab instead.
 - A tab is not counted as a filter, Clear keeps it, and it is saved with the remembered view like the rest of the query.
 - **Counts respect the other filters.** Each list method returns `tabs`, computed in one query (`lifeos.api.utils.tab_counts`) under every filter but the tab's own field. `ListView` exposes `tab` and `tabCounts`.
-- The values in use: Inbox `status=` To Review (default), Waiting, Failed, Done, all. Tasks `status=` open (default), loops, Waiting, Done, all. Projects `status=` Active (default), On Hold, Done, Dropped, all. Archive `type=` all (default) and the six DocTypes. Chats `open_items=` all (default), 1. Vault `expiry=` all (default), soon, expired.
+- **Inside a page's tab** (the area and project pages) the state tabs are folded into the filter bar as one `Select` (`tabs-in-filter`), since there are no tabs inside tabs.
+- The values in use: Goals `status=` in_progress (default), achieved, closed, all. Inbox `status=` To Review (default), Waiting, Failed, Done, all. Tasks `status=` open (default), loops, Waiting, Done, all. Projects `status=` Active (default), On Hold, Done, Dropped, all. Archive `type=` all (default) and the six DocTypes. Chats `open_items=` all (default), 1. Vault `expiry=` all (default), soon, expired.
 
 ## Checks
 
@@ -193,3 +194,11 @@ docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && nod
 cd frontend && node --test tests/*.test.js                                                                     # the URL mapping
 node tools/screens.mjs                                                                                         # from the repo root: screenshots, overflow, script errors, contrast
 ```
+
+### Pane tabs
+
+A pane says its tabs in the meta it emits: `emit('meta', { title, …, tabs: [{ value, label, count, noun }] })`. `PaneBody` draws the bar (level 2) under the header and passes the open one as the `tab` prop; draw each part with `v-if="on('notes')"` where `on = (t) => !props.tab || props.tab === t`. Leave out a tab that can never be filled for this record; keep one that is empty but can be filled, with an empty state. One tab left means no bar. A count that opens a pane on a tab writes `ptab=` beside `open=`.
+
+### A list inside a page's tab
+
+The list screens take `embed`: `{ screen: 'area', space, fixed: { area }, active: (route) => …, writable }`. `fixed` short parameters are set by the page and left out of the URL and the controls; `screen` keys the remembered view (`area-tasks`, shared across areas); `active` is a function of the route so the hidden lists ignore a URL that belongs to the open tab. The page's tab switch keeps only `tab=` and the open record. See `pages/Area.vue`.

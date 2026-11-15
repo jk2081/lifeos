@@ -155,6 +155,12 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `journal.save_goal` | `goal=None, cycle=None, title=None, area=None, project=None, actions=None` | Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}. |
 | `journal.delete_goal` | `goal` |  |
 | `journal.goals` | `space=None, area=None` | Every goal across every cycle, grouped by cycle: planned, active, then closed, newest first. |
+| `goals.list` | `space=None, state='in_progress', goal_type=None, area=None, cycle=None, target_from=None, target_to=None, start=0, page_length=50, filters=None, order_by=None, summary=None` | Goals of every type with `tasks_done`, `tasks_counted` and `score` (12 Week Year only), the state `tabs` and a `summary_line`. |
+| `goals.create` | `title, goal_type='Open', space=None, area=None, project=None, target_date=None, cycle=None` | Create a goal. 12 Week Year needs a cycle, Annual a target date. Not for agents. |
+| `goals.close` | `goal, outcome, result_note=None` | Set the outcome of an Annual or Open goal. Not for agents. |
+| `goals.add_to_cycle` | `goal, cycle` | Move an Annual or Open goal into the active or a planned 12 Week Year, with its tasks. Not for agents. |
+| `goals.picker` | `space=None` | Every goal in progress, ordered by type, for the goal picker on a task. |
+| `goals.cycles` | `space=None` | The active and planned 12 Week Years of a space. |
 | `journal.goal` | `goal` | A goal page: the goal, its actions, and its history across cycles through the carried_from chain. |
 | `journal.close_cycle` | `cycle, outcomes=None` | Close an active cycle after its end date. `outcomes` is a list of {goal, outcome, result_note}. |
 | `journal.plan_next_cycle` | `cycle, goals=None, title=None` | Create the next cycle, starting the Monday after this one ends, and carry the chosen goals with their open actions. |
@@ -238,9 +244,12 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | --- | --- | --- |
 | `settings.get` | `space=None` | Everything the Settings screen shows for one space. |
 | `settings.save` | `values` | Change Life Settings. Owner only. |
-| `settings.save_item` | `kind, space=None, name=None, title=None, parent_area=None, relation=None, sort_order=None, is_archived=None, delete=0` | Add, rename, reorder or remove one area, tag, dimension, habit or person of a space. |
+| `settings.save_item` | `kind, space=None, name=None, title=None, parent_area=None, relation=None, sort_order=None, is_archived=None, delete=0, with_children=1` | Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person. Archiving sets `archived_on`; an area takes its sub-areas with it. `delete=1` is not offered on the screen. |
 | `settings.create_space` | `space_name, owner_user=None, starter_areas=1` | Create a space, for example a private space for a family member, with the starter areas. Owner only. |
 | `settings.set_member` | `space, user, access='Write', remove=0` | Add a user to a space, change their access, or remove them. Owner only. The user must already exist. |
+| `settings.reorder` | `kind, names, parent_area=None` | Put the areas or check-in dimensions in this order in one call; for areas, moving one into `parent_area`'s list nests it there. |
+| `settings.set_agent_vault` | `space, allowed` | Let agents open the documents of one space's Vault, or not. Off by default. Life Admin only. |
+| `settings.find_users` | `txt=''` | People who can be added to a space. Life Admin only. |
 
 **`lifeos.api.tasks`**
 

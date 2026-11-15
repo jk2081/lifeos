@@ -309,7 +309,8 @@ await check(13, 'Tea & Coffee area page shows projects, tasks, notes and chats t
   const a = await owner.api('area.get', { area: areaId('Tea & Coffee') })
   must(a.projects.length && a.tasks.length && a.notes.length && a.chats.length, `projects ${a.projects.length}, tasks ${a.tasks.length}, notes ${a.notes.length}, chats ${a.chats.length}`)
   // since set 3 each kind is a tab of the area page
-  for (const [tab, title] of [['overview', a.projects[0].title], ['tasks', a.tasks[0].title], ['notes', a.notes[0].title], ['chats', a.chats[0].title]]) {
+  const firstNote = (await owner.api('library.list', { space: SPACE, area: areaId('Tea & Coffee'), page_length: 1 })).notes[0].title // the Notes tab lists as the Notes screen does
+  for (const [tab, title] of [['overview', a.projects[0].title], ['tasks', a.tasks[0].title], ['notes', firstNote], ['chats', a.chats[0].title]]) {
     await owner.open(`/life/areas/${areaId('Tea & Coffee')}?tab=${tab}&all=1`)
     must((await owner.page.locator('[data-main]').innerText()).includes(title), `the ${tab} tab does not show ${title}`)
   }
@@ -356,7 +357,7 @@ frappe.db.set_value("Life Task", "${stale.name}", "last_touched_on", add_days(to
 from lifeos import archive, index
 index.update(frappe.get_doc("Life Task", "${done.name}"))
 archive.run_daily()`)
-  const arch = await owner.api('archive.list', { space: SPACE, page_length: 100 })
+  const arch = await owner.api('archive.list', { space: SPACE, page_length: 100, filters: [['title', 'like', `%${stamp}%`]] }) // earlier runs fill the Archive
   must(JSON.stringify(arch.groups).includes(done.name), 'the done task was not archived')
   must(!JSON.stringify(arch.groups).includes(stale.name), 'the stale open task was archived')
   const review = await owner.api('journal.weekly_review', { space: SPACE })
@@ -1163,7 +1164,7 @@ for (const width of [1440, 390]) {
       await s.open('/life')
       const n = await count()
       // tick it done in the Tasks list, as a person would; the sidebar follows without a reload
-      await s.open(`/life/tasks?view=list&due=today`)
+      await s.open(`/life/tasks?view=list&due=today&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%UX3 due today ${width} ${stamp}%`]]))}`)
       await pg.locator(`${ROW}`, { hasText: `UX3 due today ${width} ${stamp}` }).getByRole('checkbox').first().click()
       await pg.waitForTimeout(1500)
       must((await count()) === n - 1, `the count did not drop by one without a reload (${n} -> ${await count()})`)
@@ -1248,6 +1249,31 @@ for (const width of [1440, 390]) {
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${cycle ? 'cycle ' + active.title : ''}`
     } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) }
+  })
+
+  await check(`${tag}.15`, `${width} px: Journal and Calendar tabs: the path holds the tab, [ and ] move, the phone row scrolls`, async () => {
+    await s.open('/life/journal/habits')
+    const strip = pg.locator('[data-main] [data-tab-bar]').first()
+    must((await strip.getAttribute('data-tab-current')) === 'habits', 'the Journal did not open on Habits from its path')
+    if (!phone) {
+      await pg.locator('body').click({ position: { x: 600, y: 10 } })
+      await pg.keyboard.press(']')
+      await settle()
+      must(new URL(pg.url()).pathname === '/life/journal/checkins', `] went to ${new URL(pg.url()).pathname}`)
+      await pg.keyboard.press('[')
+      await settle()
+      must(new URL(pg.url()).pathname === '/life/journal/habits', `[ went to ${new URL(pg.url()).pathname}`)
+      await s.open('/life/calendar/week')
+      await pg.keyboard.press(']')
+      await settle()
+      must(new URL(pg.url()).pathname === '/life/calendar/agenda', `] on the calendar went to ${new URL(pg.url()).pathname}`)
+    } else {
+      await s.open('/life/journal/review')
+      const m = await pg.locator('[data-main] [data-tab-bar]').first().evaluate((el) => { const t = el.querySelector('[data-state="active"]').getBoundingClientRect(); return { inView: t.left >= 0 && t.right <= window.innerWidth, h: t.height } })
+      must(m.inView && m.h >= 44, `the Journal tab row on a phone: ${JSON.stringify(m)}`)
+      must((await overflow()) <= 0, 'the Journal scrolls sideways')
+    }
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
   })
 
   await check(`${tag}.9`, `${width} px: the record pane shows the tabs of its kind; ptab= survives a reload; a pane with one tab has no tab bar`, async () => {

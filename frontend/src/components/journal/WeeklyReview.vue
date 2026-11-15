@@ -8,8 +8,8 @@
       <Stat :label="d.cycle ? `Week ${d.cycle.week} score` : '12 Week Year'" :value="d.cycle ? Math.round(d.cycle.percent) + '%' : '—'">
         <template #sub><span class="max-md:hidden">{{ d.cycle ? `${d.cycle.done} of ${d.cycle.planned} ticks · ${d.cycle.title}` : 'No cycle in this week' }}</span></template>
       </Stat>
-      <Stat label="Tasks done"><NumLink :to="door('Done')" data-door="review-done">{{ d.done.length }}</NumLink>
-        <template #sub><NumLink class="max-md:hidden" :to="door('Carried')" data-door="review-carried"><span>{{ d.carried.length }}</span> carried forward</NumLink></template>
+      <Stat label="Tasks done"><NumLink :to="door('Done')" data-door="review-done">{{ d.done_total ?? d.done.length }}</NumLink>
+        <template #sub><NumLink class="max-md:hidden" :to="door('Carried')" data-door="review-carried"><span>{{ d.carried_total ?? d.carried.length }}</span> carried forward</NumLink></template>
       </Stat>
       <Stat label="Open loops"><NumLink :to="{ path: '/tasks', query: { status: 'loops' } }" data-door="review-loops">{{ d.open_loops_total }}</NumLink>
         <template #sub><span class="max-md:hidden">Older than 14 days, no date</span></template>

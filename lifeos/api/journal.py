@@ -479,6 +479,7 @@ def weekly_review(space=None, week_start=None):
 	note = frappe.db.get_value("Life Note", {"space": space, "title": title}, ["name", "content_md"], as_dict=True)
 	return {
 		"space": space, "week_start": str(start), "week_end": str(end), "cycle": cycle_out, "habits": habits,
+		"done_total": _count_tasks(space, "Done", start, end), "carried_total": _count_tasks(space, "Carried", start, end),
 		"done": done_tasks, "carried": carried, "open_loops": loops["tasks"], "open_loops_total": loops["total"],
 		"decide": task_api.stale_tasks(space, 30),
 		"archived": archive.archived_in_week(space, start, end),
@@ -508,3 +509,9 @@ def save_review_note(space=None, week_start=None, content_md=""):
 		doc = frappe.get_doc({"doctype": "Life Note", "space": space, "title": title, "parent_note": parent, "content_md": content_md,
 			"area": frappe.db.get_value("Life Note", parent, "area")}).insert()
 	return {"note": doc.name, "title": title}
+
+
+def _count_tasks(space, status, start, end):
+	"""How many tasks closed with this status in the week, for the numbers that lead to the Tasks screen (the lists show 100)."""
+	return frappe.db.sql("select count(*) from `tabLife Task` t where t.space=%s and t.status=%s and t.completed_on between %s and %s",
+		(space, status, start, end))[0][0]
