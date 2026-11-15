@@ -54,9 +54,21 @@ These components exist in frappe-ui 1.2.0 and must be used.
 | Markdown reader and editor | Ours. Toolbar buttons are `Button`. Editor theme uses token variables |
 | Review layout, month plan layout, check-in form | Ours for layout. Every control inside is frappe-ui |
 
+## One behaviour change in this set: lists remember their filters
+
+Today a list's filters survive a reload but are lost when the owner goes to another screen and comes back. Fix this in `ListView`, so every list gets it.
+
+- `ListView` saves its current filters, sort and view (list, board, table, cards) each time they change, keyed by screen and space, in `localStorage`.
+- Opening a list **with no query in the URL** (the sidebar, the phone tab bar, a `g` shortcut, the browser's Back to a bare route) restores the saved state and writes it into the URL.
+- Opening a list **with a query in the URL** (a count link, a link from another record, a bookmark) uses exactly that query and ignores the saved state. It then becomes the saved state. Every count link must carry at least one query parameter so this rule holds; a link that means "everything" carries `all=1`.
+- The open record (`open=`) is never saved or restored. Coming back to a list shows the list, not a pane.
+- Because a remembered filter can hide records, the filter bar always shows when filters are active: the count of active filters and a Clear button, on desktop and on the phone's Filters button. Clear removes the filters and the saved state.
+- Switching space uses that space's own saved state.
+- Checks to add to `tools/acceptance.mjs`, at both widths: set a filter on Tasks, go to Today through the sidebar, come back through the sidebar, and the filter is still set and is in the URL. Click the Open loops number on Today and Tasks shows only open loops, whatever was saved. Clear removes it, and it stays cleared after leaving and returning.
+
 ## What must not change
 
-- Behaviour. Every screen, route, filter, pane, shortcut and count link works as it does now.
+- Behaviour, apart from the remembered filters above. Every screen, route, filter, pane, shortcut and count link works as it does now.
 - Information on each screen. This set changes components and styling, not content or layout structure.
 - The API and the data model.
 
