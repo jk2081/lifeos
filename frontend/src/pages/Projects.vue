@@ -20,7 +20,7 @@
     <template #stack="{ row }">
       <div style="display: flex; gap: 10px; align-items: flex-start">
         <div style="flex: 1; min-width: 0"><div class="ttl">{{ row.title }}</div>
-          <div class="mt">{{ row.area_name }} · <RouterLink class="num" :to="doneLink(row)">{{ row.tasks_done }} of {{ row.tasks_total }} tasks done</RouterLink></div></div>
+          <div class="mt">{{ row.area_name }} · <RouterLink class="num" :to="doneLink(row)" data-door="project-tasks">{{ row.tasks_done }} of {{ row.tasks_total }} tasks done</RouterLink></div></div>
         <span class="pl" :class="pill(row)">{{ row.status === 'On Hold' ? 'On hold' : row.status }}</span>
       </div>
     </template>

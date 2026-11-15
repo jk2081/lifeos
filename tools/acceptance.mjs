@@ -440,7 +440,7 @@ for (const width of [1440, 390]) {
   const settle = () => pg.waitForTimeout(450)
   const overflow = () => pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   const count = async () => num(await pg.locator('[data-lv-count]').first().innerText())
-  const clickRow = async (sel) => { await pg.locator(sel).first().click({ position: { x: 24, y: 14 } }); await settle() }
+  const clickRow = async (sel) => { await pg.locator(sel).first().click({ position: { x: 90, y: 14 } }); await settle() }
 
   await check(`${tag}.1`, `${width} px: a row opens a pane on every list screen and the list stays in the page`, async () => {
     for (const [name, p, sel] of LISTS) {
@@ -511,7 +511,7 @@ for (const width of [1440, 390]) {
       await pg.keyboard.press('ArrowUp')
       await settle()
       must(new URL(pg.url()).searchParams.get('open') === first, 'the up arrow did not move back')
-      await pg.locator('.lv-row').nth(2).click({ position: { x: 24, y: 14 } }) // the list is still usable beside the pane
+      await pg.locator('.lv-row').nth(2).click({ position: { x: 90, y: 14 } }) // the list is still usable beside the pane
       await settle()
       const third = new URL(pg.url()).searchParams.get('open')
       must(third !== first, 'a second row could not be opened beside the pane')
@@ -545,7 +545,7 @@ for (const width of [1440, 390]) {
     // [where the number is, door, which number in its text, what to compare on the page it leads to]
     const door = async (from, name, { which = 0, target = '[data-lv-count]', path, nth = 0, optional = false } = {}) => {
       await s.open(from)
-      const el = pg.locator(`[data-door="${name}"]`).nth(nth)
+      const el = pg.locator(`[data-door="${name}"]:visible`).nth(nth)
       if (!(await el.count()) || !(await el.isVisible())) {
         if (optional) return
         throw new Error(`${name}: the number is not on ${from}`)
@@ -666,7 +666,7 @@ for (const width of [1440, 390]) {
       await s.open(p)
       await pg.locator('.rw[data-ref]').first().locator('.grow').click({ position: { x: 20, y: 10 } })
       await settle()
-      must(await pane.isVisible() && new URL(pg.url()).pathname === p, `${p}: a row did not open the pane in place`)
+      must(await pane.isVisible() && new URL(pg.url()).pathname.replace(/\/$/, '') === p, `${p}: a row did not open the pane in place`)
     }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${screens.length} screens`
