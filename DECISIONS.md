@@ -71,3 +71,13 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Two lockfiles.** `frontend/package-lock.json` is what the build used on the Mac. `frontend/yarn.lock` was produced by a clean `yarn install` on Linux, because bench installs with yarn.
 - **Acceptance script.** `tools/acceptance.mjs` walks section 13 with a browser and the fake agent. For the archive item it moves two dates back with a direct database write on the test site, since no screen lets a person back-date a task.
 - **Settings prompts.** Rename and Remove in Settings use the browser's prompt and confirm boxes, not `frappe-ui` dialogs. They are rare actions on a settings page.
+
+## UX fixes, set 1
+
+- **Some Today numbers are not on the phone.** The phone layout of Today, as in mockup 05, leaves out the lines "proposals waiting" and "overdue", the sidebar review count, and shows the week score in the heading. Those doors exist on desktop only; the acceptance check skips them at 390 px.
+- **Extra filters set by doors.** To make a list count equal the number clicked, some lists take filters that are not in the fix list: area and project on the Vault, Include archived, completed-date range on Tasks, archive reason and archived-date range on the Archive, and a "Today and overdue" choice in the Due filter. They appear in the filter bar only while they are on.
+- **Journal lists still navigate.** Goals, the 12 Week Year grid and the Pages gallery are not in the table of screens to convert, so their links still open the goal and page screens. Goals and journal pages open in the pane from every converted screen.
+- **The Library tree still opens the reader page.** The tree is the navigation of the full-page reader. The new list view beside it opens the pane.
+- **Stepping through rows replaces the URL entry.** Opening a second record with the pane open, or moving with the arrows, replaces the history entry, so Back always closes the pane in one step.
+- **Old links still work.** `/tasks?open=NAME`, `/vault?open=NAME` and `/chats?open=NAME`, written before the pane existed, open the pane.
+- **Swipe down starts on the pane header.** The body of the sheet scrolls, so the swipe that closes it is taken on the header only.

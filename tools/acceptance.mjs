@@ -551,7 +551,7 @@ for (const width of [1440, 390]) {
         throw new Error(`${name}: the number is not on ${from}`)
       }
       const n = num(await el.innerText(), which)
-      await el.click()
+      await el.click({ timeout: 8000 }).catch((e) => { throw new Error(`${name} on ${from}: the number cannot be clicked (${String(e).split('\n')[0]})`) })
       await pg.waitForLoadState('networkidle')
       await settle()
       if (path) must(new URL(pg.url()).pathname === path, `${name}: went to ${new URL(pg.url()).pathname}, not ${path}`)
@@ -579,7 +579,7 @@ for (const width of [1440, 390]) {
       const links = pg.locator('.sh a.num')
       if (i >= await links.count()) break
       const n = num(await links.nth(i).innerText())
-      await links.nth(i).click()
+      await links.nth(i).click({ timeout: 8000 }).catch((e) => { throw new Error(`area section ${i}: the count cannot be clicked`) })
       await pg.waitForLoadState('networkidle')
       await settle()
       const got = await count()
@@ -606,10 +606,10 @@ for (const width of [1440, 390]) {
     await door('/life/journal/review', 'review-archived', { path: '/life/archive' })
     // an inbox row: "4 of 13 proposals pending" opens that item in the pane at its pending proposals
     await s.open('/life/inbox?status=To+Review')
-    const link = pg.locator('.lv-row:visible a.num', { hasText: 'pending' }).first()
+    const link = pg.locator('.lv-row a.num:visible', { hasText: 'pending' }).first()
     const text = await link.innerText()
     must(/^\d+ of \d+ proposals pending$/.test(text.trim()), `an inbox row says "${text}"`)
-    await link.click()
+    await link.click({ timeout: 8000 }).catch(() => { throw new Error('the proposals count on an inbox row cannot be clicked') })
     await settle()
     must(await pane.isVisible(), 'the proposals count did not open the pane')
     const pendingShown = await pane.locator('[data-proposal="Pending"]').count()

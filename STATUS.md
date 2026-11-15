@@ -84,6 +84,17 @@ Build of Life OS v1. Updated at the end of every milestone. **The build is finis
 - Tests: `lifeos/tests/test_m9_load.py` passes (3 tests). The whole suite passes: 125 tests.
 - Changed in an earlier milestone's test: `test_event_from_a_user_takes_their_default_space` (M6) depended on what else was on the test site. It now sets the site default space itself.
 
+## UX fixes, set 1
+
+Everything in `UX_FIXES_1.md` is done.
+
+- **List, then pane.** `ListView` (filters held in the URL, a count of what the filters match, sortable columns on desktop, stacked rows and one Filters button on phones, Show more 50 at a time, an empty state that names the filters) and `RecordPane` (520 px from the right, 760 px for an inbox item, a full-screen sheet on phones with a close button and swipe down, `?open=<type>:<name>` in the URL, Esc, arrows and j/k, focus in and back, area and project chips, Open full page). Pane content exists for task, inbox item, note, vault document, project, goal, journal page, chat log, event, important date and calendar day. `TaskPanel`, the vault panel and the calendar day panel are gone; they use the pane.
+- **Screens converted:** Inbox, Timeline, Tasks (list and table, with the Due filter), Projects (list by default, cards as a second view), Vault, Chats, Library (list view beside the tree), Archive (read-only pane with Restore), the area and project pages, Today, and the search palette.
+- **Every number is a door.** The counts in the Pattern 2 table link to the list that produced them, with the filters set. Inbox items show "4 of 13 proposals pending" wherever they are listed.
+- **API:** the list methods take the new filters, a sort, and return the true total. Tests: `lifeos/tests/test_ux1_filters.py`. The whole suite passes: 135 tests.
+- **Checks:** `node tools/acceptance.mjs` passes 30 of 30: the 18 earlier items and the six UX checks at 1440 px and at 390 px (`--ux` runs only those). At 1440 px 34 numbers are clicked and compared with the list they lead to; at 390 px, 29.
+- Deviations are in `DECISIONS.md` under "UX fixes, set 1".
+
 ## Summary
 
 ### What works
