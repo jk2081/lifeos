@@ -16,8 +16,8 @@
         </section>
         <section v-if="d.goal.result_note"><h2 class="sh">Result</h2><div class="cd">{{ d.goal.result_note }}</div></section>
         <section><h2 class="sh">Tasks for this goal</h2>
-          <div class="cd list"><div v-for="t in d.tasks" :key="t.name" class="rw"><div class="grow">
-            <RouterLink class="ttl" :to="`/tasks?open=${t.name}`">{{ t.title }}</RouterLink><div class="mt">{{ t.status }}{{ t.due_date ? ' · due ' + short(t.due_date) : '' }}</div></div></div>
+          <div class="cd list"><div v-for="t in d.tasks" :key="t.name" class="rw rowlink" :data-ref="'task:' + t.name" @click="openRef('task:' + t.name)"><div class="grow">
+            <div class="ttl">{{ t.title }}</div><div class="mt">{{ t.status }}{{ t.due_date ? ' · due ' + short(t.due_date) : '' }}</div></div></div>
             <Empty v-if="!d.tasks.length" title="No tasks." hint="Link a task to this goal from the task's panel." /></div>
         </section>
       </div>
@@ -43,6 +43,7 @@ import Empty from '@/components/Empty.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import { api } from '@/lib/api'
 import { short } from '@/lib/dates'
+import { openRef } from '@/lib/pane'
 
 const props = defineProps({ id: String })
 const d = ref(null)

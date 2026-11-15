@@ -1,81 +1,75 @@
 <template>
-  <PageHead title="Chats" :sub="d ? `${d.total} AI chat${d.total === 1 ? '' : 's'} · ${long(d.from_date)} to ${long(d.to_date, true)}` : ''">
-    <button class="bt s ic" type="button" aria-label="Previous week" @click="step(-7)"><Ico d="m15 6-6 6 6 6" stroke="2" /></button>
-    <button class="bt s ic" type="button" aria-label="Next week" @click="step(7)"><Ico d="m9 6 6 6-6 6" stroke="2" /></button>
-  </PageHead>
-  <div v-if="d" class="bd">
-    <div class="chips">
+  <ListView ref="list" title="Chats" noun="chats" :filters="FILTERS" :columns="COLUMNS" :fetch="fetch" :row-ref="(r) => 'chat:' + r.name" :group-by="groupLabel"
+    :watch-keys="['group']" default-sort="newest first" empty-title="No chats yet."
+    empty-hint="Your agent logs each AI chat here with a summary and open items. Nothing needs review; open items become tasks only when you press Make task."
+    @loaded="(res) => (extra = res)">
+    <template #sub>AI chats in {{ store.space }}<template v-if="extra.with_open_items !== undefined"> ·
+      <RouterLink class="num" :to="{ query: { ...route.query, open_items: '1', open: undefined } }" data-door="chats-open">{{ extra.with_open_items }} with open items</RouterLink></template></template>
+    <template #bar>
       <span class="mt">Group by</span>
-      <button v-for="g in ['day', 'area', 'project']" :key="g" class="ch" :class="{ on: groupBy === g }" type="button" @click="setGroup(g)">{{ g[0].toUpperCase() + g.slice(1) }}</button>
-      <span style="flex: 1"></span>
-      <span v-for="c in d.counts_by_area" :key="c.area_name" class="pl n">{{ c.area_name }} {{ c.count }}</span>
-    </div>
-
-    <section v-if="d.open_items.length">
-      <h2 class="sh">Open items this week <span class="mt" style="font-weight: 400">{{ d.open_items.length }}</span></h2>
-      <div class="cd list">
-        <div v-for="i in d.open_items" :key="i.row" class="rw" style="align-items: center; flex-wrap: wrap">
-          <div class="grow" style="flex-basis: 220px"><div class="ttl">{{ i.text }}</div><div class="mt">{{ [i.chat_title, i.area_name].filter(Boolean).join(' · ') }}</div></div>
-          <div v-if="canWrite()" class="chips"><button class="bt s" type="button" @click="makeTask(i)">Make task</button><button class="bt t" type="button" @click="closeItem(i)">Close</button></div>
-        </div>
+      <button v-for="g in ['day', 'area', 'project']" :key="g" class="ch" :class="{ on: groupBy === g }" type="button" :data-group="g" @click="setGroup(g)">{{ g[0].toUpperCase() + g.slice(1) }}</button>
+    </template>
+    <template #above>
+      <div v-if="extra.by_area && extra.by_area.length" class="chips">
+        <RouterLink v-for="c in extra.by_area" :key="c.area" class="pl n" :to="{ query: { ...route.query, area: c.area, open: undefined } }" data-door="chats-area">{{ c.area_name }}&nbsp;<span>{{ c.count }}</span></RouterLink>
       </div>
-    </section>
-
-    <section v-for="g in d.groups" :key="g.key">
-      <h2 class="sh">{{ groupBy === 'day' ? `${weekday(g.label)}, ${long(g.label)}` : g.label }} <span class="mt" style="font-weight: 400">{{ g.chats.length }}</span></h2>
-      <div class="tblwrap"><div class="tblscroll"><table class="tbl">
-        <thead><tr><th style="width: 26%">Chat</th><th style="width: 14%">Area</th><th>Summary</th><th style="width: 28%">Open items</th></tr></thead>
-        <tbody><tr v-for="c in g.chats" :key="c.name" :id="'chat-' + c.name" :class="{ hl: c.name === route.query.open }">
-          <td><a v-if="c.url" :href="c.url" target="_blank" rel="noopener noreferrer" style="font-weight: 500">{{ c.title }}</a><b v-else style="font-weight: 500">{{ c.title }}</b>
-            <div class="mt">{{ [c.assistant, groupBy !== 'day' && short(c.date), c.project_title].filter(Boolean).join(' · ') }}</div></td>
-          <td><RouterLink v-if="c.area" :to="`/areas/${c.area}`">{{ c.area_name }}</RouterLink></td>
-          <td><Md :text="c.summary_md" style="font-size: 13.5px" /></td>
-          <td><ul v-if="c.open_items.length" class="items"><li v-for="i in c.open_items" :key="i.row" :class="{ shut: i.status !== 'Open' }">{{ i.text }}
-            <RouterLink v-if="i.task" :to="`/tasks?open=${i.task}`" class="mt">task</RouterLink></li></ul><span v-else class="mt">None</span></td>
-        </tr></tbody>
-      </table></div></div>
-    </section>
-    <div v-if="!d.groups.length" class="cd"><Empty title="No chats in this week." hint="Your agent logs each AI chat here with a summary and open items. Nothing needs review; open items become tasks only when you press Make task." /></div>
-  </div>
+    </template>
+    <template #cell-title="{ row }"><div class="ttl">{{ row.title }}</div><div class="mt">{{ [row.assistant, short(row.date), row.project_title].filter(Boolean).join(' · ') }}</div></template>
+    <template #cell-area="{ row }"><RouterLink v-if="row.area" :to="`/areas/${row.area}`">{{ row.area_name }}</RouterLink></template>
+    <template #cell-summary="{ row }"><div class="clamp">{{ plain(row.summary_md) }}</div></template>
+    <template #cell-open="{ row }"><span v-if="row.open_count" class="pl o">{{ row.open_count }} open item{{ row.open_count === 1 ? '' : 's' }}</span><span v-else class="mt">None</span></template>
+    <template #stack="{ row }">
+      <div style="display: flex; gap: 10px; align-items: flex-start">
+        <div style="flex: 1; min-width: 0"><div class="ttl">{{ row.title }}</div>
+          <div class="mt">{{ [row.assistant, short(row.date), row.area_name, row.project_title].filter(Boolean).join(' · ') }}</div>
+          <div class="mt clamp">{{ plain(row.summary_md) }}</div></div>
+        <span v-if="row.open_count" class="pl o">{{ row.open_count }} open</span>
+      </div>
+    </template>
+  </ListView>
 </template>
 <script setup>
-import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import PageHead from '@/components/PageHead.vue'
-import Ico from '@/components/Ico.vue'
-import Empty from '@/components/Empty.vue'
-import Md from '@/components/Md.vue'
-import { api, tryCall } from '@/lib/api'
-import { canWrite, store } from '@/lib/store'
-import { addDays, long, short, weekday } from '@/lib/dates'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import ListView from '@/components/ListView.vue'
+import { api } from '@/lib/api'
+import { store } from '@/lib/store'
+import { long, short, weekday } from '@/lib/dates'
+import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 
 const route = useRoute()
-const d = ref(null)
-const groupBy = ref(localStorage.getItem('lifeos-chat-group') || 'day')
-const to = ref(store.today)
-async function load() {
-  const res = await tryCall(() => api('chats.report', { space: store.space, from_date: addDays(to.value, -6), to_date: to.value, group_by: groupBy.value }))
-  if (res) d.value = res
+const router = useRouter()
+const list = ref(null)
+const extra = ref({})
+const groupBy = computed(() => (['day', 'area', 'project'].includes(route.query.group) ? route.query.group : localStorage.getItem('lifeos-chat-group') || 'day'))
+const FILTERS = computed(() => [
+  { key: 'area', label: 'Area', all: 'All areas', options: [...areaOptions(), { value: 'none', label: 'No area' }] },
+  { key: 'project', label: 'Project', all: 'All projects', options: [...lookups.projects.map((p) => ({ value: p.name, label: p.title })), { value: 'none', label: 'No project' }] },
+  { key: 'open_items', label: 'Has open items', type: 'check' },
+  { key: 'from', label: 'From', type: 'date' }, { key: 'to', label: 'To', type: 'date' },
+  { key: 'archived', label: 'Include archived', type: 'check', quiet: true },
+])
+const COLUMNS = [{ key: 'title', label: 'Chat', width: 'minmax(180px, 1.2fr)', sort: 'title' }, { key: 'area', label: 'Area', width: '130px' },
+  { key: 'summary', label: 'Summary', width: 'minmax(0, 2fr)' }, { key: 'open', label: 'Open items', width: '120px', align: 'right' }]
+const plain = (md) => String(md || '').replace(/[#*_`>\[\]]/g, '').replace(/\s+/g, ' ').trim()
+function groupLabel(c) {
+  if (route.query.sort) return null
+  if (groupBy.value === 'day') return `${weekday(c.date)}, ${long(c.date, true)}`
+  return groupBy.value === 'area' ? c.area_name || 'No area' : c.project_title || 'No project'
+}
+async function fetch({ filters: f, sort, dir, start, page_length }) {
+  const res = await api('chats.list', { space: store.space, area: f.area || undefined, project: f.project || undefined, open_items: f.open_items ? 1 : 0,
+    from_date: f.from || undefined, to_date: f.to || undefined, include_archived: f.archived ? 1 : 0, group_by: groupBy.value,
+    sort: sort || undefined, dir: dir || undefined, start, page_length })
+  return { rows: res.chats, total: res.total, with_open_items: res.with_open_items, by_area: res.by_area }
 }
 function setGroup(g) {
-  groupBy.value = g
   localStorage.setItem('lifeos-chat-group', g)
-  load()
+  router.push({ query: { ...route.query, group: g, sort: undefined, dir: undefined } })
 }
-function step(n) {
-  to.value = addDays(to.value, n)
-  load()
-}
-async function makeTask(i) {
-  if (await tryCall(() => api('chats.make_task', { chat: i.chat, row: i.row }), 'Task created.')) load()
-}
-async function closeItem(i) {
-  if (await tryCall(() => api('chats.close_item', { chat: i.chat, row: i.row }))) load()
-}
-onMounted(load)
+onMounted(loadLookups)
 </script>
 <style scoped>
-.items { margin: 0; padding-left: 18px; list-style: disc; }
-.items li.shut { color: var(--mut); text-decoration: line-through; }
-tr.hl td { background: var(--b-bg); }
+.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink2); font-size: 13.5px; }
+a.pl:hover { background: var(--line3); }
 </style>

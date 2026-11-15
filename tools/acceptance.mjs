@@ -52,7 +52,9 @@ async function session(user, width = 1440) {
   return { ctx, page, api, upload, open }
 }
 
+const ONLY_UX = process.argv.includes('--ux') // run only the UX checks (U1 and up)
 async function check(n, title, fn) {
+  if (ONLY_UX && !String(n).startsWith('U')) return
   try {
     const note = await fn()
     results.push([n, true, title, note || ''])
@@ -386,6 +388,291 @@ await check('S2', 'Security: the PWA manifest and icons are served; an agent can
   must(set.status() === 403, 'an agent could change members: ' + set.status())
   await ctx.close()
 })
+
+
+// ---------- UX fixes, set 1: list then pane, and every number is a door ----------
+// Run at 1440 px and at 390 px. `node tools/acceptance.mjs --ux` runs only these.
+const uxArea = areaId('Tea & Coffee')
+const ux = {}
+{
+  // records the checks need, made through the API as the owner
+  const project = (await owner.api('projects.list', { space: SPACE, area: uxArea })).projects[0]
+  ux.project = project.name
+  ux.task = (await owner.api('tasks.quick_add', { text: `UX door task ${stamp}`, space: SPACE, project: project.name, priority: 'I', due_date: addDays(-2) })).name
+  await owner.api('tasks.quick_add', { text: `UX due today ${stamp}`, space: SPACE, area: uxArea, due_date: today })
+  const doneTask = (await owner.api('tasks.quick_add', { text: `UX done ${stamp}`, space: SPACE, project: project.name })).name
+  await owner.api('tasks.set_status', { task: doneTask, status: 'Done' })
+  const carried = (await owner.api('tasks.quick_add', { text: `UX carried ${stamp}`, space: SPACE, area: uxArea })).name
+  await owner.api('tasks.carry_forward', { task: carried })
+  const old = (await owner.api('tasks.quick_add', { text: `UX archived by the job ${stamp}`, space: SPACE, area: uxArea })).name
+  await owner.api('tasks.set_status', { task: old, status: 'Done' })
+  bench(`from lifeos import archive\nfrappe.set_user("owner@lifeos.test")\narchive.set_archived("Life Task", "${old}", True, "Auto")`)
+  ux.note = (await owner.api('library.save', { space: SPACE, title: `UX note ${stamp}`, area: uxArea, content_md: 'A reference note for the UX checks.' })).name
+  ux.vault = (await owner.api('vault.save', { space: SPACE, values: { title: `UX permit ${stamp}`, doc_type: 'Other', expiry_date: addDays(20), area: uxArea } })).name
+  ux.chat = (await owner.api('chats.log', { space: SPACE, title: `UX chat ${stamp}`, area: uxArea, project: project.name, summary_md: 'Talked about the UX checks.',
+    open_items: ['Follow up on the UX checks'] })).name
+  const item = await owner.api('inbox.create_item', { title: `UX inbox ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'Buy a new kettle. Call the estate manager.' })
+  runAgent()
+  ux.inbox = item.name
+}
+
+const num = (text, which = 0) => { const m = String(text).match(/\d+/g); if (!m) throw new Error(`no number in "${text}"`); return Number(m[which]) }
+const LISTS = [
+  ['Inbox', '/life/inbox', '.lv-row'], ['Timeline', '/life/timeline', '.rw.rowlink'], ['Tasks', '/life/tasks?view=list', '.lv-row'],
+  ['Projects', '/life/projects', '.lv-row'], ['Vault', '/life/vault', '.lv-row'], ['Chats', '/life/chats', '.lv-row'],
+  ['Library list', '/life/library?view=list', '.lv-row'], ['Archive', '/life/archive', '.lv-row'],
+]
+// one filter for each ListView: [screen, path, filter key, value]
+const FILTERS = [
+  ['Inbox', '/life/inbox', 'status', 'Done'], ['Tasks', '/life/tasks?view=list', 'due', 'overdue'], ['Tasks table', '/life/tasks?view=table', 'priority', 'I'],
+  ['Projects', '/life/projects', 'area', uxArea], ['Vault', '/life/vault', 'expiry', 'soon'], ['Chats', '/life/chats', 'area', uxArea],
+  ['Library list', '/life/library?view=list', 'area', uxArea], ['Archive', '/life/archive', 'type', 'Life Task'],
+]
+
+for (const width of [1440, 390]) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e)))
+  const tag = `U${width}`
+  const pane = pg.locator('[data-pane]')
+  const settle = () => pg.waitForTimeout(450)
+  const overflow = () => pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  const count = async () => num(await pg.locator('[data-lv-count]').first().innerText())
+  const clickRow = async (sel) => { await pg.locator(sel).first().click({ position: { x: 24, y: 14 } }); await settle() }
+
+  await check(`${tag}.1`, `${width} px: a row opens a pane on every list screen and the list stays in the page`, async () => {
+    for (const [name, p, sel] of LISTS) {
+      await s.open(p)
+      must(await pg.locator(sel).count(), `${name}: no rows to click`)
+      const before = pg.url()
+      await clickRow(sel)
+      must(await pane.isVisible(), `${name}: no pane after clicking a row`)
+      must(pg.url().includes('open='), `${name}: the URL has no open=`)
+      must(new URL(pg.url()).pathname === new URL(before).pathname, `${name}: the page changed`)
+      must(await pg.locator(sel).count(), `${name}: the list left the page`)
+      must(await pg.locator(`${sel}.on`).count() >= 1, `${name}: the open row is not highlighted`)
+    }
+    return `${LISTS.length} screens`
+  })
+
+  await check(`${tag}.2`, `${width} px: the URL has open=, Back closes the pane, reload reopens it`, async () => {
+    for (const [name, p, sel] of LISTS) {
+      await s.open(p)
+      await pg.evaluate(() => window.scrollTo(0, 120))
+      await clickRow(sel)
+      const withPane = pg.url()
+      const title = await pg.locator('[data-pane-title]').innerText()
+      must(withPane.includes('open='), `${name}: no open= in the URL`)
+      await pg.goBack()
+      await settle()
+      must(!(await pane.isVisible()), `${name}: Back did not close the pane`)
+      must(!pg.url().includes('open='), `${name}: open= is still in the URL after Back`)
+      must(await pg.locator(sel).count(), `${name}: the list is gone after Back`)
+      if (!phone) must(Math.abs((await pg.evaluate(() => window.scrollY)) - 120) < 4 || (await pg.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 120)), `${name}: the list lost its scroll position`)
+      await pg.goto(withPane, { waitUntil: 'networkidle' })
+      await settle()
+      await pg.reload({ waitUntil: 'networkidle' })
+      await settle()
+      must(await pane.isVisible(), `${name}: reload did not reopen the pane`)
+      must((await pg.locator('[data-pane-title]').innerText()) === title, `${name}: reload opened another record`)
+    }
+    await s.open('/life/inbox/' + ux.inbox)
+    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/inbox' && await pg.locator('.lv-row').count(), '/inbox/:id does not show the list with the pane open')
+    must((await pg.locator('[data-pane-title]').innerText()).includes('UX inbox'), '/inbox/:id opened another item')
+  })
+
+  if (phone) {
+    await check(`${tag}.3`, '390 px: the pane covers the screen and closes with its close button', async () => {
+      for (const [name, p, sel] of LISTS) {
+        await s.open(p)
+        await clickRow(sel)
+        const box = await pane.boundingBox()
+        must(box && box.x === 0 && box.y === 0 && Math.round(box.width) === 390 && Math.round(box.height) === 844, `${name}: the pane is ${JSON.stringify(box)}`)
+        must((await overflow()) <= 0, `${name}: horizontal scrolling with the pane open`)
+        await pg.locator('[data-pane-close]').click()
+        await settle()
+        must(!(await pane.isVisible()), `${name}: the close button did not close the pane`)
+        must(await pg.locator(sel).count(), `${name}: the list is gone after closing`)
+      }
+    })
+  } else {
+    await check(`${tag}.3`, '1440 px: pane widths, Esc, j and k, focus, Open full page, search opens in the pane', async () => {
+      await s.open('/life/tasks?view=list')
+      await clickRow('.lv-row')
+      must(Math.round((await pane.boundingBox()).width) === 520, 'a task pane is not 520 px wide')
+      must(await pg.evaluate(() => document.activeElement?.hasAttribute('data-pane')), 'focus did not move into the pane')
+      const first = new URL(pg.url()).searchParams.get('open')
+      await pg.keyboard.press('j')
+      await settle()
+      const second = new URL(pg.url()).searchParams.get('open')
+      must(second && second !== first, 'j did not move to the next row')
+      await pg.keyboard.press('ArrowUp')
+      await settle()
+      must(new URL(pg.url()).searchParams.get('open') === first, 'the up arrow did not move back')
+      await pg.locator('.lv-row').nth(2).click({ position: { x: 24, y: 14 } }) // the list is still usable beside the pane
+      await settle()
+      const third = new URL(pg.url()).searchParams.get('open')
+      must(third !== first, 'a second row could not be opened beside the pane')
+      await pg.keyboard.press('Escape')
+      await settle()
+      must(!(await pane.isVisible()), 'Esc did not close the pane')
+      must((await pg.evaluate(() => document.activeElement?.getAttribute('data-ref'))) === third, 'focus did not return to the row')
+      await s.open('/life/inbox/' + ux.inbox)
+      must(Math.round((await pane.boundingBox()).width) === 760, 'an inbox pane is not 760 px wide')
+      await pg.locator('[data-pane-full]').click()
+      await settle()
+      must(new URL(pg.url()).pathname === `/life/inbox/${ux.inbox}/review` && !(await pane.isVisible()), 'Open full page did not open the review screen')
+      // every pane type opens from its reference
+      for (const ref of [`task:${ux.task}`, `note:${ux.note}`, `vault:${ux.vault}`, `project:${ux.project}`, `chat:${ux.chat}`, `day:${today}`]) {
+        await s.open('/life/areas?open=' + encodeURIComponent(ref))
+        must(await pane.isVisible() && !(await pg.locator('[data-pane-title]').innerText()).match(/Loading|Not found/), `the pane did not load ${ref}`)
+      }
+      await s.open('/life/timeline')
+      await pg.keyboard.press('Meta+k')
+      await pg.locator('input[aria-label="Search"]').fill(`UX note ${stamp}`)
+      await pg.waitForTimeout(900)
+      await pg.keyboard.press('Enter')
+      await settle()
+      must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/timeline', 'a search result did not open in the pane over the current screen')
+      must((await pg.locator('[data-pane-title]').innerText()).includes('UX note'), 'the search result opened another record')
+    })
+  }
+
+  await check(`${tag}.4`, `${width} px: every number is a door, and the list count equals the number clicked`, async () => {
+    const done = []
+    // [where the number is, door, which number in its text, what to compare on the page it leads to]
+    const door = async (from, name, { which = 0, target = '[data-lv-count]', path, nth = 0, optional = false } = {}) => {
+      await s.open(from)
+      const el = pg.locator(`[data-door="${name}"]`).nth(nth)
+      if (!(await el.count()) || !(await el.isVisible())) {
+        if (optional) return
+        throw new Error(`${name}: the number is not on ${from}`)
+      }
+      const n = num(await el.innerText(), which)
+      await el.click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      if (path) must(new URL(pg.url()).pathname === path, `${name}: went to ${new URL(pg.url()).pathname}, not ${path}`)
+      const got = num(await pg.locator(target).first().innerText())
+      must(got === n, `${name}: clicked ${n}, the list says ${got}`)
+      done.push(`${name} ${n}`)
+    }
+    const hidden = { optional: phone } // lines the phone layout leaves out
+    await door('/life', 'today-review', { path: '/life/inbox' })
+    await door('/life', 'today-proposals', { target: '[data-lv-sum]', path: '/life/inbox', ...hidden })
+    await door('/life', 'today-due', { path: '/life/tasks' })
+    await door('/life', 'today-overdue', { path: '/life/tasks', ...hidden })
+    await door('/life', 'today-loops', { path: '/life/tasks' })
+    await door('/life', 'today-score', { target: '[data-week-score]', path: '/life/journal', ...hidden })
+    await door('/life', 'today-vault', { path: '/life/vault' })
+    await door('/life', 'nav-review', { path: '/life/inbox', ...hidden })
+    const area = '/life/areas/' + uxArea
+    await door(area, 'area-projects', { path: '/life/projects' })
+    await door(area, 'area-tasks', { path: '/life/tasks' })
+    await door(area, 'area-notes', { path: '/life/library' })
+    await door(area, 'area-documents', { path: '/life/vault' })
+    await door(area, 'area-reference', { path: '/life/library' })
+    for (const i of [0, 1, 2, 3]) { // the section counts: projects, open tasks, chats, documents
+      await s.open(area)
+      const links = pg.locator('.sh a.num')
+      if (i >= await links.count()) break
+      const n = num(await links.nth(i).innerText())
+      await links.nth(i).click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      const got = await count()
+      must(got === n, `area section ${i}: clicked ${n}, the list says ${got}`)
+      done.push(`section ${n}`)
+    }
+    await door(area, 'project-tasks', { which: 1, path: '/life/tasks' }) // "4 of 10 tasks done" on a project card
+    await door('/life/projects', 'project-tasks', { which: 1, path: '/life/tasks' })
+    const proj = '/life/projects/' + ux.project
+    await door(proj, 'project-tasks', { which: 1, path: '/life/tasks' })
+    await door(proj, 'project-open', { path: '/life/tasks' })
+    await door(proj, 'project-notes', { path: '/life/library' })
+    await door(proj, 'project-documents', { path: '/life/vault' })
+    await door(proj, 'project-chats', { path: '/life/chats' })
+    await door('/life/chats?from=' + addDays(-6), 'chats-open', { path: '/life/chats' })
+    must(new URL(pg.url()).searchParams.get('from') === addDays(-6) && new URL(pg.url()).searchParams.get('open_items') === '1', 'chats: the date range was not kept')
+    await door('/life/chats', 'chats-area', { path: '/life/chats' })
+    await door('/life/vault', 'vault-soon', { path: '/life/vault' })
+    await door('/life/vault', 'vault-expired', { path: '/life/vault' })
+    await door('/life/library', 'library-notes', { path: '/life/library' })
+    await door('/life/journal/review', 'review-done', { path: '/life/tasks' })
+    await door('/life/journal/review', 'review-carried', { path: '/life/tasks', ...hidden })
+    await door('/life/journal/review', 'review-loops', { path: '/life/tasks' })
+    await door('/life/journal/review', 'review-archived', { path: '/life/archive' })
+    // an inbox row: "4 of 13 proposals pending" opens that item in the pane at its pending proposals
+    await s.open('/life/inbox?status=To+Review')
+    const link = pg.locator('.lv-row:visible a.num', { hasText: 'pending' }).first()
+    const text = await link.innerText()
+    must(/^\d+ of \d+ proposals pending$/.test(text.trim()), `an inbox row says "${text}"`)
+    await link.click()
+    await settle()
+    must(await pane.isVisible(), 'the proposals count did not open the pane')
+    const pendingShown = await pane.locator('[data-proposal="Pending"]').count()
+    must(pendingShown === num(text), `clicked ${num(text)} pending, the pane shows ${pendingShown}`)
+    const inView = await pane.locator('[data-proposal="Pending"]').first().evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight })
+    must(inView, 'the pane is not scrolled to the pending proposals')
+    await s.open('/life')
+    const rowText = await pg.locator('[data-door="today-row"]').first().innerText()
+    must(/^\d+ of \d+ proposals pending$/.test(rowText.trim()), `Today lists an inbox item as "${rowText}"`)
+    return `${done.length + 1} numbers`
+  })
+
+  await check(`${tag}.5`, `${width} px: filters on every ListView are in the URL and survive a reload`, async () => {
+    for (const [name, p, key, value] of FILTERS) {
+      await s.open(p)
+      if (phone) await pg.locator('.lv-fbtn').click()
+      await pg.locator(`[data-filter="${key}"]`).selectOption(value)
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must(new URL(pg.url()).searchParams.get(key) === value, `${name}: the filter is not in the URL`)
+      const filtered = await count()
+      const rows = await pg.locator('.lv-row').count()
+      must(rows === Math.min(filtered, 50), `${name}: the count says ${filtered} but ${rows} rows are shown`)
+      if (phone) must((await pg.locator('.lv-fbtn').innerText()).includes('(1)'), `${name}: the Filters button does not show one active filter`)
+      await pg.reload({ waitUntil: 'networkidle' })
+      await settle()
+      must((await pg.locator(`[data-filter="${key}"]`).inputValue()) === value, `${name}: the filter was lost on reload`)
+      must((await count()) === filtered, `${name}: the count changed on reload`)
+      await pg.goBack()
+      await settle()
+      must(!new URL(pg.url()).searchParams.get(key), `${name}: Back did not undo the filter`)
+    }
+    // an empty result names the filters and offers Clear filters
+    await s.open('/life/vault?holder=none&type=Medical&expiry=expired')
+    const empty = await pg.locator('[data-lv-empty]').innerText()
+    must(empty.includes('Type: Medical') && empty.includes('Expiry: Expired'), 'the empty state does not name the filters: ' + empty)
+    await pg.locator('[data-lv-empty] button', { hasText: 'Clear filters' }).click()
+    await settle()
+    must(!new URL(pg.url()).search.includes('type='), 'Clear filters did not clear')
+    return `${FILTERS.length} lists`
+  })
+
+  await check(`${tag}.6`, `${width} px: no horizontal scrolling and no script errors on any converted screen`, async () => {
+    const screens = [...LISTS.map(([n, p]) => [n, p]), ['Tasks table', '/life/tasks?view=table'], ['Tasks board', '/life/tasks?view=board'], ['Open loops', '/life/tasks?view=loops'],
+      ['Projects cards', '/life/projects?view=cards'], ['Library tree', '/life/library'], ['Area', '/life/areas/' + uxArea], ['Project', '/life/projects/' + ux.project],
+      ['Today', '/life'], ['Areas', '/life/areas'], ['Calendar', '/life/calendar/agenda'], ['Weekly review', '/life/journal/review']]
+    for (const [name, p] of screens) {
+      await s.open(p)
+      const over = await overflow()
+      must(over <= 0, `${name}: ${over} px of horizontal scrolling`)
+    }
+    // Area, Project and Today: a row opens the pane and the page does not change
+    for (const p of ['/life/areas/' + uxArea, '/life/projects/' + ux.project, '/life']) {
+      await s.open(p)
+      await pg.locator('.rw[data-ref]').first().locator('.grow').click({ position: { x: 20, y: 10 } })
+      await settle()
+      must(await pane.isVisible() && new URL(pg.url()).pathname === p, `${p}: a row did not open the pane in place`)
+    }
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    return `${screens.length} screens`
+  })
+  await s.ctx.close()
+}
 
 await browser.close()
 const failed = results.filter((r) => !r[1])

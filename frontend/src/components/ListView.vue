@@ -37,7 +37,7 @@
 
     <slot v-if="custom" name="body" :rows="rows" :loaded="loaded" :reload="refresh" />
     <div v-else-if="rows.length" class="cd list lv-list" role="list">
-      <div v-if="columns.some((c) => c.label)" class="lv-cells lv-head" :style="grid" aria-hidden="true">
+      <div v-if="!noHead && columns.some((c) => c.label)" class="lv-cells lv-head" :style="grid" aria-hidden="true">
         <span v-for="c in columns" :key="c.key" :class="{ r: c.align === 'right' }">
           <button v-if="c.sort" type="button" class="lv-th" @click="setSort(c.sort, sort === c.sort && dir !== 'desc' ? 'desc' : '')">{{ c.label }}<template v-if="sort === c.sort"> {{ dir === 'desc' ? '↓' : '↑' }}</template></button>
           <template v-else>{{ c.label }}</template>
@@ -92,6 +92,8 @@ const props = defineProps({
   watchKeys: { type: Array, default: () => [] }, // other query keys that change what is listed
   defaultSort: String, emptyTitle: String, emptyHint: String,
   pageSize: { type: Number, default: 50 },
+  sorts: { type: Array, default: null }, // [{ sort, label }] when the sort choices are not the column heads
+  noHead: Boolean,
   custom: Boolean, // the screen draws the rows itself (a board, cards) in the #body slot
 })
 const emit = defineEmits(['loaded'])
@@ -108,7 +110,7 @@ const values = computed(() => Object.fromEntries(props.filters.map((f) => [f.key
 const active = computed(() => props.filters.filter((f) => values.value[f.key]))
 // a quiet filter is set by a link from a count; it shows in the bar only while it is on
 const shown = computed(() => props.filters.filter((f) => !f.quiet || values.value[f.key]))
-const sortable = computed(() => props.columns.filter((c) => c.sort))
+const sortable = computed(() => props.sorts || props.columns.filter((c) => c.sort))
 const sort = computed(() => (route.query.sort ? String(route.query.sort) : ''))
 const dir = computed(() => (route.query.dir === 'desc' ? 'desc' : ''))
 const grid = computed(() => `grid-template-columns: ${props.columns.map((c) => c.width || 'minmax(0, 1fr)').join(' ')}`)

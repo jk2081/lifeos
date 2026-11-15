@@ -72,7 +72,7 @@
       <div class="wgrid">
         <div v-for="dte in weekDays" :key="dte" class="cd wcol" :class="{ tdcol: dte === data.today }">
           <button class="wkhd" type="button" @click="openDay(dte)"><b>{{ weekday(dte, 3) }}</b> {{ short(dte) }}</button>
-          <div v-for="(it, i) in itemsOn(dte)" :key="i" class="witem" :class="'s-' + chipType(it)">
+          <div v-for="(it, i) in itemsOn(dte)" :key="i" class="witem" :class="'s-' + chipType(it)" style="cursor: pointer" @click="openRef(itemRef(it))">
             <span v-if="!it.all_day" class="mt">{{ time(it.start) }}</span> {{ it.label || it.title }}</div>
           <div v-if="!itemsOn(dte).length" class="mt">Nothing</div>
         </div>
@@ -83,43 +83,27 @@
     <template v-else-if="mode === 'agenda' && data">
       <section v-for="dte in agendaDays" :key="dte">
         <h2 class="sh">{{ dte === data.today ? 'Today · ' : '' }}{{ weekday(dte) }}, {{ long(dte) }}</h2>
-        <div class="cd list"><div v-for="(it, i) in itemsOn(dte)" :key="i" class="rw">
+        <div class="cd list"><div v-for="(it, i) in itemsOn(dte)" :key="i" class="rw rowlink" :data-ref="itemRef(it)" tabindex="0" @click="openRef(itemRef(it))" @keydown.enter.self="openRef(itemRef(it))">
           <span class="when">{{ it.all_day ? 'All day' : time(it.start) }}</span>
-          <div class="grow"><div :class="'yt-' + chipType(it)">{{ it.label || it.title }}</div><div class="mt">{{ SOURCE[it.source] }}</div></div></div></div>
+          <div class="grow"><div class="ttl" :class="'yt-' + chipType(it)">{{ it.label || it.title }}</div><div class="mt">{{ SOURCE[it.source] }}</div></div></div></div>
       </section>
       <div v-if="!agendaDays.length" class="cd"><Empty title="Nothing in the next 30 days." hint="Events, important dates, tasks with a due date and expiring documents show here." /></div>
     </template>
   </div>
 
-  <Panel v-if="dayOpen" :title="`${weekday(dayOpen)}, ${long(dayOpen, true)}`" @close="dayOpen = ''">
-    <div class="cd list">
-      <div v-for="(it, i) in dayItems" :key="i" class="rw">
-        <span class="when">{{ it.all_day ? 'All day' : time(it.start) }}</span>
-        <div class="grow"><div>{{ it.label || it.title }}</div><div class="mt">{{ SOURCE[it.source] }}<template v-if="it.multi_day"> · {{ short(it.date) }} to {{ short(it.end_date) }}</template></div></div>
-        <RouterLink v-if="it.source === 'task'" class="bt t" :to="`/tasks?open=${it.name}`">Open</RouterLink>
-        <RouterLink v-else-if="it.source === 'vault'" class="bt t" :to="`/vault?open=${it.name}`">Open</RouterLink>
-        <button v-else-if="canWrite()" class="bt t" type="button" @click="remove(it)">Remove</button>
-      </div>
-      <Empty v-if="!dayItems.length" title="Nothing on this day." hint="Add an event or an important date below." />
-    </div>
-    <div v-if="canWrite()" class="chips">
-      <button class="bt s" type="button" @click="openDate(dayOpen)">Add important date</button>
-      <button class="bt p" type="button" @click="openEvent(dayOpen)">Add event</button>
-    </div>
-  </Panel>
-  <NewRecord v-model="eventOpen" title="Add event" action="Add event" :fields="EVENT_FIELDS" :initial="eventInitial" :save="saveEvent" @saved="reload" />
-  <NewRecord v-model="dateOpen" title="Add important date" action="Add date" :fields="DATE_FIELDS" :initial="dateInitial" :save="saveDate" @saved="reload" />
+  <NewRecord v-model="eventOpen" title="Add event" action="Add event" :fields="EVENT_FIELDS" :initial="eventInitial" :save="saveEvent" @saved="saved" />
+  <NewRecord v-model="dateOpen" title="Add important date" action="Add date" :fields="DATE_FIELDS" :initial="dateInitial" :save="saveDate" @saved="saved" />
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { toast } from 'frappe-ui'
 import Ico from '@/components/Ico.vue'
 import Empty from '@/components/Empty.vue'
-import Panel from '@/components/Panel.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import { api, db, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
+import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
 import { MONTHS, addDays, iso, long, parse, short, startOfWeek, time, weekday } from '@/lib/dates'
 
 const props = defineProps({ view: String })
@@ -130,8 +114,6 @@ const cursor = ref(store.today)
 const data = ref(null)
 const yearData = ref(null)
 const google = ref(null)
-const dayOpen = ref('')
-const dayItems = ref([])
 const eventOpen = ref(false)
 const dateOpen = ref(false)
 const eventInitial = ref({})
@@ -215,7 +197,6 @@ async function reload() {
       google.value = res.google
     }
   }
-  if (dayOpen.value) openDay(dayOpen.value)
 }
 function step(n) {
   const d = parse(cursor.value)
@@ -228,11 +209,14 @@ function step(n) {
 function goToday() {
   cursor.value = store.today
 }
-async function openDay(dte) {
-  dayOpen.value = dte
-  const res = await tryCall(() => api('calendar.get', { space: store.space, from_date: dte, to_date: dte }))
-  dayItems.value = res ? res.items : []
-}
+// a day opens in the record pane; its entries open their own records from there
+const openDay = (dte) => openRef('day:' + dte)
+const itemRef = (it) => ({ event: 'event', important: 'date', task: 'task', vault: 'vault' }[it.source] + ':' + it.name)
+const onAdd = (e) => (e.detail.kind === 'event' ? openEvent(e.detail.date) : openDate(e.detail.date))
+const saved = () => { reload(); recordChanged('day') }
+onRecordChanged((ref_) => { if (ref_ !== 'day') reload() })
+onMounted(() => window.addEventListener('lifeos-calendar-add', onAdd))
+onUnmounted(() => window.removeEventListener('lifeos-calendar-add', onAdd))
 function openEvent(dte) {
   eventInitial.value = { date: dte, all_day: 1 }
   eventOpen.value = true
@@ -254,12 +238,6 @@ async function saveDate(v) {
   const d = parse(v.date)
   await api('calendar.add_important_date', { space: store.space, title: v.title, kind: v.kind, day: d.getDate(), month: d.getMonth() + 1, year: v.year || null })
   toast.success('Added. It shows on this day every year.')
-}
-async function remove(it) {
-  if (!window.confirm(`Remove “${it.title}”?`)) return
-  const ok = it.source === 'event' ? await tryCall(() => api('calendar.delete_event', { event: it.name }), 'Removed.')
-    : await tryCall(() => db.delete('Life Important Date', it.name), 'Removed.')
-  if (ok !== undefined) reload()
 }
 watch([mode, cursor], reload, { immediate: true })
 </script>

@@ -20,7 +20,7 @@
               <div class="ttl" :style="g.status === 'Done' || g.status === 'Dropped' ? 'text-decoration: line-through; color: var(--mut)' : g.status === 'Carried' ? 'color: var(--mut)' : ''">
                 {{ g.title }}<span v-if="g.status === 'Carried'" title="Carried to next month"> →</span></div>
               <div class="mt">{{ [g.area_name, g.carried_from ? 'carried from last month' : '', g.status === 'Carried' ? 'carried forward' : '', g.status === 'Dropped' ? 'dropped' : ''].filter(Boolean).join(' · ') }}
-                <RouterLink v-if="g.task" :to="`/tasks?open=${g.task}`">{{ g.area_name || g.carried_from ? '· ' : '' }}task</RouterLink></div>
+                <a v-if="g.task" href="#" @click.prevent="openRef('task:' + g.task)">{{ g.area_name || g.carried_from ? '· ' : '' }}task</a></div>
             </div>
             <Dropdown v-if="canWrite()" :options="goalMenu(g)"><button class="bt t ic" type="button" :aria-label="'Actions for ' + g.title">⋯</button></Dropdown>
           </div>
@@ -63,6 +63,7 @@
   </div>
 </template>
 <script setup>
+import { openRef } from '@/lib/pane'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Dropdown, toast } from 'frappe-ui'
@@ -119,7 +120,7 @@ function goalMenu(g) {
     } })
     items.push({ label: g.task ? 'Open task' : 'Make task', onClick: async () => {
       const res = await tryCall(() => api('journal.make_task_from_goal', { plan: d.value.plan.name, row: g.row }))
-      if (res) { if (res.existing) router.push(`/tasks?open=${res.task}`); else { toast.success('Task created and linked.'); load() } }
+      if (res) { if (res.existing) openRef('task:' + res.task); else { toast.success('Task created and linked.'); load() } }
     } })
     items.push({ label: 'Drop', onClick: () => setGoal(g, { status: 'Dropped' }) })
   } else if (g.status !== 'Carried') items.push({ label: 'Open again', onClick: () => setGoal(g, { status: 'Open' }) })

@@ -1,7 +1,7 @@
 <template>
   <template v-if="d">
     <PageHead :title="d.page_number ? `Journal page ${d.page_number}` : 'Journal page'" :crumb="{ to: '/journal/pages', label: 'Pages', here: long(d.page_date, true) }" :sub="long(d.page_date, true)">
-      <RouterLink v-if="d.inbox_item" class="bt s" :to="`/inbox/${d.inbox_item}`">Open the inbox item</RouterLink>
+      <button v-if="d.inbox_item" class="bt s" type="button" @click="openRef('inbox:' + d.inbox_item)">Open the inbox item</button>
     </PageHead>
     <div class="bd"><div class="cols">
       <div class="half"><section><h2 class="sh">Page</h2>
@@ -17,7 +17,7 @@
             <Empty v-else title="No transcript." hint="Use Edit to type what the page says." />
           </div></section>
         <section><h2 class="sh">Created from this page</h2>
-          <div class="cd list"><div v-for="c in d.created" :key="c.route" class="rw"><div class="grow"><RouterLink class="ttl" :to="c.route">{{ c.title }}</RouterLink><div class="mt">{{ c.kind }}</div></div></div>
+          <div class="cd list"><div v-for="c in d.created" :key="c.route" class="rw rowlink" @click="openRoute(c.route)"><div class="grow"><div class="ttl">{{ c.title }}</div><div class="mt">{{ c.kind }}</div></div></div>
             <Empty v-if="!d.created.length" title="Nothing else was created from this page." hint="Tasks, ticks and check-ins accepted from the same photo are listed here." /></div></section>
       </div>
     </div></div>
@@ -32,6 +32,7 @@ import Empty from '@/components/Empty.vue'
 import { api, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { long } from '@/lib/dates'
+import { openRef, openRoute } from '@/lib/pane'
 
 const props = defineProps({ id: String })
 const d = ref(null)

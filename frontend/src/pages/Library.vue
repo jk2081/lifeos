@@ -1,5 +1,27 @@
 <template>
-  <PageHead title="Library" :sub="`${notes.length} note${notes.length === 1 ? '' : 's'} in ${store.space}`">
+  <ListView v-if="listView" ref="list" title="Library" noun="notes" :filters="FILTERS" :columns="COLUMNS" :fetch="fetchList" :row-ref="(r) => 'note:' + r.name"
+    default-sort="title" empty-title="No notes yet." empty-hint="Notes hold reference material and project notes, in Markdown. Add one with New note.">
+    <template #sub>Notes in {{ store.space }}</template>
+    <template #actions>
+      <div class="chips">
+        <RouterLink class="ch" to="/library" data-view="tree">Tree</RouterLink>
+        <span class="ch on" data-view="list">List</span>
+      </div>
+      <button v-if="canWrite()" class="bt p" type="button" @click="newOpen = true">New note</button>
+    </template>
+    <template #cell-title="{ row }"><div class="ttl">{{ row.title }}</div><div v-if="row.tags.length" class="mt">{{ row.tags.map((t) => '#' + t).join(' ') }}</div></template>
+    <template #cell-area_name="{ row }"><RouterLink v-if="row.area" :to="`/areas/${row.area}`">{{ row.area_name }}</RouterLink></template>
+    <template #cell-modified="{ row }"><span class="mt">{{ short(row.modified, true) }}</span></template>
+    <template #stack="{ row }"><div class="ttl">{{ row.title }}</div>
+      <div class="mt">{{ [row.area_name, row.project_title, 'edited ' + short(row.modified, true), ...row.tags.map((t) => '#' + t)].filter(Boolean).join(' · ') }}</div></template>
+  </ListView>
+  <template v-else>
+  <PageHead title="Library">
+    <template #sub><RouterLink class="num" :to="{ path: '/library', query: { view: 'list' } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</RouterLink> in {{ store.space }}</template>
+    <div class="chips">
+      <span class="ch on" data-view="tree">Tree</span>
+      <RouterLink class="ch" :to="{ path: '/library', query: { view: 'list' } }" data-view="list">List</RouterLink>
+    </div>
     <button v-if="canWrite()" class="bt p" type="button" @click="newOpen = true">New note</button>
   </PageHead>
   <div class="lib">
@@ -49,7 +71,7 @@
           <Md v-if="note.content_md" :text="note.content_md" :links="note.links" read style="margin-top: 16px" />
           <Empty v-else title="This note is empty." hint="Use Edit to write. Type [[ to link another record." />
           <div v-if="note.children.length" style="margin-top: 24px"><h2 class="sh">Notes under this one</h2>
-            <div class="cd list"><div v-for="c in note.children" :key="c.name" class="rw"><RouterLink class="ttl" :to="`/library/${c.name}`">{{ c.title }}</RouterLink></div></div></div>
+            <div class="cd list"><div v-for="c in note.children" :key="c.name" class="rw rowlink" @click="openRef('note:' + c.name)"><div class="ttl">{{ c.title }}</div></div></div></div>
           <div style="margin-top: 24px"><Backlinks doctype="Life Note" :name="note.name" :reload="reloadKey" /></div>
         </template>
       </template>
@@ -57,6 +79,7 @@
       <div v-else-if="!id" class="cd only-desktop"><Empty title="Pick a note." hint="Notes are listed on the left under their area. A note with no project is reference material for its area." /></div>
     </section>
   </div>
+  </template>
   <NewRecord v-model="newOpen" title="New note" action="Create note" :fields="NEW_FIELDS" :save="create" />
   <Dialog v-model="versionsOpen" title="Earlier versions" size="xl">
     <div v-for="v in versions" :key="v.name" class="rw" style="align-items: center">
@@ -71,6 +94,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Dialog, Dropdown } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
+import ListView from '@/components/ListView.vue'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
 import MdEditor from '@/components/MdEditor.vue'
@@ -81,9 +105,26 @@ import { api, db, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaName, areaOptions, loadLookups, lookups } from '@/lib/lookups'
+import { openRef } from '@/lib/pane'
 
 const props = defineProps({ id: String })
 const route = useRoute()
+// the list view sits beside the tree: /library?view=list, with its filters in the URL
+const listView = computed(() => !props.id && route.query.view === 'list')
+const list = ref(null)
+const FILTERS = computed(() => [
+  { key: 'area', label: 'Area', all: 'All areas', options: [...areaOptions(), { value: 'none', label: 'No area' }] },
+  { key: 'project', label: 'Project', all: 'All projects', options: [...lookups.projects.map((p) => ({ value: p.name, label: p.title })), { value: 'none', label: 'No project (reference notes)' }] },
+  { key: 'tag', label: 'Tag', all: 'All tags', options: lookups.tags.map((t) => ({ value: t.name, label: '#' + t.tag_name })) },
+  { key: 'archived', label: 'Include archived', type: 'check', quiet: true },
+])
+const COLUMNS = [{ key: 'title', label: 'Note', width: 'minmax(200px, 2fr)', sort: 'title' }, { key: 'area_name', label: 'Area' }, { key: 'project_title', label: 'Project' },
+  { key: 'modified', label: 'Edited', width: '110px', sort: 'modified' }]
+async function fetchList({ filters: f, sort, dir, start, page_length }) {
+  const res = await api('library.list', { space: store.space, area: f.area || undefined, project: f.project || undefined, tag: f.tag || undefined,
+    include_archived: f.archived ? 1 : 0, sort: sort || undefined, dir: dir || undefined, start, page_length })
+  return { rows: res.notes, total: res.total }
+}
 const router = useRouter()
 const notes = ref([])
 const areas = ref([])

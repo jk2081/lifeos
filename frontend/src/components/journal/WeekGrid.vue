@@ -12,7 +12,7 @@
   <div v-if="g" class="bd">
     <div class="stats three">
       <div class="cd st"><span class="mt">{{ g.current_week ? `This week, week ${g.current_week}` : g.cycle.status === 'Closed' ? 'Final score' : 'Week score' }}</span>
-        <b>{{ g.current_week ? pct(week.percent) : g.cycle.status === 'Closed' ? pct(g.cycle.final_score) : '—' }}</b>
+        <b data-week-score>{{ g.current_week ? pct(week.percent) : g.cycle.status === 'Closed' ? pct(g.cycle.final_score) : '—' }}</b>
         <span class="mt">{{ g.current_week ? `${week.done} of ${week.planned} ticks so far` : g.cycle.status }}</span></div>
       <div class="cd st"><span class="mt">{{ g.cycle.status === 'Closed' ? 'Cycle average' : 'Average so far' }}</span><b>{{ pct(g.average) }}</b><span class="mt">Target {{ g.target }}%</span></div>
       <div class="cd st"><span class="mt">Weeks left</span><b>{{ g.cycle.status === 'Closed' ? 0 : g.weeks_left }}</b><span class="mt">Cycle ends {{ long(g.cycle.end_date) }}</span></div>
