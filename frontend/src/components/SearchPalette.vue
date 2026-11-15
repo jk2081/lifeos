@@ -1,6 +1,6 @@
 <template>
   <CommandPalette v-model:open="open" v-model:query="text" :filterable="false" title="Search" @select="go">
-    <CommandPaletteInput placeholder="Search notes, tasks, inbox items, chats and the vault" aria-label="Search" />
+    <CommandPaletteInput ref="field" placeholder="Search notes, tasks, inbox items, chats and the vault" aria-label="Search" />
     <CommandPaletteList>
       <CommandPaletteItem v-for="r in results" :key="r.ref_name + r.kind" :value="r" :label="r.title || 'Untitled'" data-search-hit>
         <div class="flex min-w-0 flex-col gap-0.5 py-0.5">
@@ -27,7 +27,7 @@
 <script setup>
 // Search over everything the person can see. frappe-ui's experimental CommandPalette draws it; the results come from
 // our own search method, which applies the space rules. A result opens in the pane over the screen you are on.
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Checkbox, KeyboardShortcut } from 'frappe-ui'
 import { CommandPalette, CommandPaletteEmpty, CommandPaletteFooter, CommandPaletteInput, CommandPaletteItem, CommandPaletteList } from '@/experimental'
@@ -41,6 +41,7 @@ const open = defineModel('open', { type: Boolean, default: false })
 const KIND = { Inbox: 'Inbox item', 'Journal Page': 'Journal page', 'Month Plan': 'Month plan' }
 const router = useRouter()
 const text = ref('')
+const field = ref(null)
 const results = ref([])
 const searched = ref('')
 const archived = ref(false)
@@ -61,9 +62,16 @@ async function run() {
     if (mine !== seq) return
     results.value = res.results
     searched.value = q
+    highlightFirst()
   } catch (e) {
     results.value = []
   }
+}
+// The palette puts the keyboard on the first row when the query changes, which is before a server search has answered.
+// An input event on its field makes it do so again once the rows are drawn, so Enter opens the first result.
+async function highlightFirst() {
+  await nextTick()
+  field.value?.$el?.querySelector('input')?.dispatchEvent(new Event('input', { bubbles: true }))
 }
 watch([text, archived], () => {
   clearTimeout(timer)

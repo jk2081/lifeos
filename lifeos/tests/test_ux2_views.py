@@ -7,17 +7,26 @@ from lifeos.api.utils import std_filters, std_order
 from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED, LifeTestCase
 
 
+NO_SPACE_SCREEN = "ux2-test-screen"
+
+
 class TestViewState(LifeTestCase):
 	def tearDown(self):
 		frappe.set_user("Administrator")
-		frappe.db.delete("Life View State", {"user": ("in", [OWNER, FAMILY, AGENT])})
+		# only the rows these tests made: the test site also holds views saved through the browser by the same users
+		frappe.db.delete("Life View State", {"space": ("in", [PRIVATE, SHARED])})
+		frappe.db.delete("Life View State", {"screen": NO_SPACE_SCREEN})
 		super().tearDown()
+
+	def mine(self):
+		"""The session user's saved views in the test spaces."""
+		return {k: v for k, v in views.get_all().items() if k.split("|", 1)[1] in (PRIVATE, SHARED)}
 
 	def test_a_user_reads_and_writes_only_their_own_states(self):
 		views.save("tasks", PRIVATE, {"query": {"status": "Done"}, "view": "table"})
 		views.save("tasks", SHARED, {"query": {"priority": "I"}})
 		views.save("vault", PRIVATE, {"query": {}})
-		mine = views.get_all()
+		mine = self.mine()
 		self.assertEqual(mine[f"tasks|{PRIVATE}"], {"query": {"status": "Done"}, "view": "table"})
 		self.assertEqual(mine[f"tasks|{SHARED}"]["query"], {"priority": "I"})
 		self.assertEqual(len(mine), 3)
@@ -28,13 +37,15 @@ class TestViewState(LifeTestCase):
 		row = frappe.db.get_value("Life View State", {"user": OWNER, "screen": "tasks", "space": PRIVATE}, "name")
 
 		self.as_user(FAMILY)
-		self.assertEqual(views.get_all(), {})  # nothing of the owner's, although both are members of the shared space
+		self.assertEqual(self.mine(), {})  # nothing of the owner's, although both are members of the shared space
 		views.save("tasks", SHARED, {"query": {"status": "Waiting"}})
-		self.assertEqual(views.get_all(), {f"tasks|{SHARED}": {"query": {"status": "Waiting"}}})
+		self.assertEqual(self.mine(), {f"tasks|{SHARED}": {"query": {"status": "Waiting"}}})
+		self.assertFalse(any(k.endswith(f"|{PRIVATE}") for k in views.get_all()))
 		self.assertRaises(frappe.PermissionError, views.save, "tasks", PRIVATE, {"query": {}})  # not a member of that space
 		# the DocType itself is closed too: no listing, reading or changing another person's row
 		self.assertEqual(frappe.get_list("Life View State", filters={"user": OWNER}), [])
-		self.assertEqual(len(frappe.get_list("Life View State")), 1)
+		self.assertEqual(len(frappe.get_list("Life View State", filters={"space": ("in", [PRIVATE, SHARED])})), 1)
+		self.assertEqual({r.user for r in frappe.get_list("Life View State", fields=["user"])}, {FAMILY})
 		self.assertFalse(frappe.has_permission("Life View State", "read", frappe.get_doc("Life View State", row)))
 		self.assertFalse(frappe.has_permission("Life View State", "write", frappe.get_doc("Life View State", row)))
 		self.assertRaises(frappe.PermissionError, frappe.get_doc("Life View State", row).check_permission, "write")
@@ -58,8 +69,8 @@ class TestViewState(LifeTestCase):
 		self.assertRaises(frappe.ValidationError, views.save, "tasks", PRIVATE, [1, 2])
 		self.assertRaises(frappe.ValidationError, views.save, "tasks", PRIVATE, {"query": {"x": "y" * 30000}})
 		self.assertRaises(frappe.PermissionError, views.save, "tasks", "No such space", {})
-		views.save("settings", None, {"view": "a"})  # a screen that is not tied to a space
-		self.assertEqual(views.get_all()["settings|"], {"view": "a"})
+		views.save(NO_SPACE_SCREEN, None, {"view": "a"})  # a screen that is not tied to a space
+		self.assertEqual(views.get_all()[f"{NO_SPACE_SCREEN}|"], {"view": "a"})
 		frappe.set_user("Guest")
 		self.assertRaises(frappe.PermissionError, views.get_all)
 

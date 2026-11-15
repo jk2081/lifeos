@@ -124,7 +124,7 @@ await check(2, 'Journal photo: agent submits 5 proposals; accept 3, edit 1, reje
   must(made.length === 4 && made.every((p) => p.created_name), 'accepted proposals did not store their records')
   const links = await owner.api('links.backlinks', { doctype: 'Life Inbox Item', name: item.name })
   must(links.some((l) => l.doctype === 'Life Task') && links.some((l) => l.doctype === 'Life Journal Page'), 'records do not link back to the photo')
-  const tasks = await owner.api('tasks.list', { space: SPACE, page_length: 100 })
+  const tasks = await owner.api('tasks.list', { space: SPACE, page_length: 100, filters: [['title', 'like', stamp]] }) // this run's tasks: the site holds more than one page
   must(tasks.tasks.some((t) => t.title === `Promotion plan ${stamp}` && t.inbox_item === item.name), 'the edited task is not in Tasks')
   const pages = await owner.api('journal.pages', { space: SPACE })
   must(JSON.stringify(pages).includes(item.name), 'the journal page is not in Journal, Pages')
@@ -239,10 +239,10 @@ await check(9, 'Note with a [[link]]: the target shows the backlink, both are in
 })
 
 await check(10, 'Search for a word in a transcript finds the inbox item', async () => {
-  const res = await owner.api('search.query', { text: 'Nowrojee' })
+  const res = await owner.api('search.query', { text: `Nowrojee ${stamp}` }) // the word is in the transcript, the stamp in the title of this run's item
   must(res.results.some((r) => r.ref_doctype === 'Life Inbox Item' && r.ref_name === photoItem), 'the inbox item was not found')
   await owner.page.keyboard.press('Control+k')
-  await owner.page.keyboard.type('Nowrojee')
+  await owner.page.keyboard.type(`Nowrojee ${stamp}`)
   await owner.page.waitForTimeout(900)
   must((await owner.page.locator('body').innerText()).includes(`Journal photo ${stamp}`), 'the search palette does not show it')
   await owner.page.keyboard.press('Escape')
@@ -324,14 +324,14 @@ await check(15, 'Complete a project: it and its records move to Archive. Restore
   let arch = await owner.api('archive.list', { space: SPACE, page_length: 100 })
   must(arch.projects.some((p) => p.name === r.name), 'the project is not in Archive')
   must(JSON.stringify(arch.groups).includes(task.name), 'its task is not in Archive')
-  must(!(await owner.api('tasks.list', { space: SPACE, page_length: 100 })).tasks.some((t) => t.name === task.name), 'the task is still in Tasks')
+  must(!(await owner.api('tasks.list', { space: SPACE, page_length: 100, filters: [['title', 'like', stamp]] })).tasks.some((t) => t.name === task.name), 'the task is still in Tasks')
   must(!JSON.stringify(await owner.api('projects.list', { space: SPACE })).includes(r.name), 'the project is still in Projects')
   await owner.open('/life/archive')
   must((await owner.page.locator('[data-main]').innerText()).includes(`Project ${stamp}`), 'the Archive screen does not show it')
   await owner.api('archive.restore', { doctype: 'Life Project', name: r.name })
   arch = await owner.api('archive.list', { space: SPACE, page_length: 100 })
   must(!arch.projects.some((p) => p.name === r.name) && !JSON.stringify(arch.groups).includes(task.name), 'restore left it in Archive')
-  must((await owner.api('tasks.list', { space: SPACE, page_length: 100 })).tasks.some((t) => t.name === task.name), 'the task did not come back')
+  must((await owner.api('tasks.list', { space: SPACE, page_length: 100, filters: [['title', 'like', stamp]] })).tasks.some((t) => t.name === task.name), 'the task did not come back')
 })
 
 await check(16, 'Archive job archives done tasks; a stale open task is listed under Decide', async () => {
@@ -419,14 +419,14 @@ const ROW = '[data-row]'
 const LISTS = [
   ['Inbox', '/life/inbox?all=1'], ['Timeline', '/life/timeline?all=1'], ['Tasks', '/life/tasks?view=list'],
   ['Projects', '/life/projects?all=1'], ['Vault', '/life/vault?all=1'], ['Chats', '/life/chats?all=1'],
-  ['Library list', '/life/library?view=list'], ['Archive', '/life/archive?all=1'],
+  ['Library list', '/life/library?view=list&all=1'], ['Archive', '/life/archive?all=1'],
 ].map(([name, p]) => [name, p, ROW])
 // one filter for each ListView, set through the library's quick-filter strip: [screen, path, URL key, URL value, the control's label, the option to pick, text to type for a Link]
 const FILTERS = [
   ['Inbox', '/life/inbox?all=1', 'status', 'Done', 'Status', 'Done'], ['Tasks', '/life/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
   ['Tasks table', '/life/tasks?view=table', 'status', 'Waiting', 'Status', 'Waiting'], ['Projects', '/life/projects?all=1', 'status', 'On Hold', 'Status', 'On Hold'],
   ['Vault', '/life/vault?all=1', 'type', 'Travel', 'Doc Type', 'Travel'], ['Chats', '/life/chats?all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
-  ['Library list', '/life/library?view=list', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'], ['Archive', '/life/archive?all=1', 'type', 'Life Task', 'Type', 'Life Task'],
+  ['Library list', '/life/library?view=list&all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'], ['Archive', '/life/archive?all=1', 'type', 'Life Task', 'Type', 'Life Task'],
 ]
 
 for (const width of [1440, 390]) {
@@ -438,6 +438,11 @@ for (const width of [1440, 390]) {
   const tag = `U${width}`
   const pane = pg.locator('[data-pane]')
   const settle = () => pg.waitForTimeout(450)
+  const paneTitle = async () => { // the title once the record has loaded
+    const el = pg.locator('[data-pane-title]')
+    for (let i = 0; i < 20 && /^Loading/.test(await el.innerText()); i++) await pg.waitForTimeout(150)
+    return el.innerText()
+  }
   const overflow = () => pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   const count = async () => num(await pg.locator('[data-lv-count]').first().innerText())
   const clickRow = async (sel) => { await pg.locator(sel).first().click({ position: { x: 120, y: 14 } }); await settle() }
@@ -447,7 +452,7 @@ for (const width of [1440, 390]) {
   const closeControls = async () => { if (phone) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(400) } }
   const pickQuick = async (label, option, type) => {
     await openControls()
-    const box = controls().locator('[data-quick-filters], [data-filter-sheet]').first().locator(`[aria-label="${label}"]`).first()
+    const box = (phone ? controls() : controls().locator('[data-quick-filters]')).locator(`[aria-label="${label}"]`).first()
     const more = controls().getByRole('button', { name: /\d+ more/ })
     if (!(await box.count()) && await more.count()) { await more.first().click(); await pg.waitForTimeout(200) }
     await box.click()
@@ -486,7 +491,7 @@ for (const width of [1440, 390]) {
       await pg.evaluate(() => window.scrollTo(0, 120))
       await clickRow(sel)
       const withPane = pg.url()
-      const title = await pg.locator('[data-pane-title]').innerText()
+      const title = await paneTitle()
       must(withPane.includes('open='), `${name}: no open= in the URL`)
       await pg.goBack()
       await settle()
@@ -499,7 +504,7 @@ for (const width of [1440, 390]) {
       await pg.reload({ waitUntil: 'networkidle' })
       await settle()
       must(await pane.isVisible(), `${name}: reload did not reopen the pane`)
-      must((await pg.locator('[data-pane-title]').innerText()) === title, `${name}: reload opened another record`)
+      must((await paneTitle()) === title, `${name}: reload opened another record`)
     }
     await s.open('/life/inbox/' + ux.inbox)
     must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/inbox' && await pg.locator(ROW).count(), '/inbox/:id does not show the list with the pane open')
@@ -611,7 +616,7 @@ for (const width of [1440, 390]) {
       done.push(`section ${n}`)
     }
     await door(area, 'project-tasks', { which: 1, path: '/life/tasks' }) // "4 of 10 tasks done" on a project card
-    await door('/life/projects', 'project-tasks', { which: 1, path: '/life/tasks' })
+    await door('/life/projects?all=1', 'project-tasks', { which: 1, path: '/life/tasks' })
     const proj = '/life/projects/' + ux.project
     await door(proj, 'project-tasks', { which: 1, path: '/life/tasks' })
     await door(proj, 'project-open', { path: '/life/tasks' })
@@ -620,9 +625,9 @@ for (const width of [1440, 390]) {
     await door(proj, 'project-chats', { path: '/life/chats' })
     await door('/life/chats?from=' + addDays(-6), 'chats-open', { path: '/life/chats' })
     must(new URL(pg.url()).searchParams.get('from') === addDays(-6) && new URL(pg.url()).searchParams.get('open_items') === '1', 'chats: the date range was not kept')
-    await door('/life/chats', 'chats-area', { path: '/life/chats' })
-    await door('/life/vault', 'vault-soon', { path: '/life/vault' })
-    await door('/life/vault', 'vault-expired', { path: '/life/vault' })
+    await door('/life/chats?all=1', 'chats-area', { path: '/life/chats' })
+    await door('/life/vault?all=1', 'vault-soon', { path: '/life/vault' })
+    await door('/life/vault?all=1', 'vault-expired', { path: '/life/vault' })
     await door('/life/library', 'library-notes', { path: '/life/library' })
     await door('/life/journal/review', 'review-done', { path: '/life/tasks' })
     await door('/life/journal/review', 'review-carried', { path: '/life/tasks', ...hidden })
@@ -652,7 +657,7 @@ for (const width of [1440, 390]) {
       await pickQuick(label, option, type)
       must(new URL(pg.url()).searchParams.get(key) === value, `${name}: the filter is not in the URL (${new URL(pg.url()).search})`)
       const filtered = await count()
-      const rows = await pg.locator(ROW).count()
+      const rows = await pg.locator(`${ROW}:not([data-archived-projects] ${ROW})`).count() // the list's own rows, not the archived projects above it
       must(rows === Math.min(filtered, 50), `${name}: the count says ${filtered} but ${rows} rows are shown`)
       if (phone) must((await pg.locator('[data-filters-button]').innerText()).includes('(1)'), `${name}: the Filters button does not show one active filter`)
       else must((await pg.locator('[data-active-filters]').innerText()).includes('1 filter'), `${name}: the list does not say one filter is on`)

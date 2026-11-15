@@ -7,6 +7,7 @@ import { store } from './store'
 
 const views = reactive({ map: {}, loaded: false })
 const timers = {}
+const pending = {} // saves that are waiting for their second
 let waiting = []
 const lsKey = () => `lifeos-views:${store.user || ''}`
 const key = (screen, space = store.space) => `${screen}|${space || ''}`
@@ -58,8 +59,23 @@ export function saveView(screen, state) {
   writeLocal()
   const space = store.space
   clearTimeout(timers[k])
+  pending[k] = { screen, space, state }
   timers[k] = setTimeout(() => {
     delete timers[k]
+    delete pending[k]
     api('views.save', { screen, space, state }).catch(() => {}) // the next change tries again
   }, 1000)
+}
+
+// A change made in the last second before the tab closes or reloads is sent as the page goes, so it is not lost.
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    for (const k of Object.keys(pending)) {
+      clearTimeout(timers[k])
+      delete timers[k]
+      fetch('/api/method/lifeos.api.views.save', { method: 'POST', keepalive: true, credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Frappe-CSRF-Token': window.csrf_token || '' }, body: JSON.stringify(pending[k]) }).catch(() => {})
+      delete pending[k]
+    }
+  })
 }

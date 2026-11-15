@@ -6,7 +6,7 @@
     @loaded="(res) => (projects = res.projects)">
     <template #sub>Archived records by area. Nothing here is deleted.</template>
     <template #above>
-      <section v-if="projects.length">
+      <section v-if="projects.length" data-archived-projects>
         <SectionHead>Projects</SectionHead>
         <Card flush>
           <Row v-for="p in projects" :key="p.name" class="!items-center" :pane="'project:' + p.name" :label="p.title">

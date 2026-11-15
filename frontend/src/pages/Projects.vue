@@ -8,7 +8,7 @@
       <div v-if="row.outcome" class="text-sm text-ink-gray-6">Outcome: {{ row.outcome.replace(/^./, (c) => c.toLowerCase()) }}</div></div></template>
     <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="`/areas/${row.area}`">{{ row.area_name }}</RouterLink></template>
     <template #cell-_progress="{ row }">
-      <div class="flex min-w-0 items-center gap-2"><Progress class="w-16 shrink-0" size="sm" :value="pct(row)" />
+      <div class="flex min-w-0 items-center gap-2"><div class="w-16 shrink-0"><Progress size="sm" :value="pct(row)" /></div>
         <NumLink class="relative truncate" :to="doneLink(row)" data-door="project-tasks">{{ row.tasks_done }} of {{ row.tasks_total }} tasks done</NumLink></div>
     </template>
     <template #cell-status="{ row }"><Badge :theme="theme(row)" :label="row.status === 'On Hold' ? 'On hold' : row.status" /></template>
