@@ -75,6 +75,13 @@ function runAgent() {
 // a real one-page PDF, made by the test helpers on the bench
 const PDF = Buffer.from(bench('import base64\nfrom lifeos import devtools\nprint(base64.b64encode(devtools.pdf_bytes()).decode())').split('\n').pop(), 'base64')
 
+// Earlier runs leave their records on the test site. Today lists only the 20 documents that expire soonest, so the vault
+// documents of earlier runs are archived first; otherwise this run's document would not be among them.
+bench(`from lifeos import archive
+frappe.set_user("owner@lifeos.test")
+for name in frappe.get_all("Life Vault Document", filters={"space": "${SPACE}", "is_archived": 0}, or_filters=[["title", "like", "UX permit %"], ["title", "like", "Passport m%"]], pluck="name"):
+    archive.set_archived("Life Vault Document", name, True, "Manual")`)
+
 const owner = await session('owner@lifeos.test')
 const areas = (await owner.api('area.tree', { space: SPACE })).areas
 const areaId = (name) => areas.find((a) => a.area_name === name)?.name
@@ -443,7 +450,7 @@ for (const width of [1440, 390]) {
     for (let i = 0; i < 20 && /^Loading/.test(await el.innerText()); i++) await pg.waitForTimeout(150)
     return el.innerText()
   }
-  const overflow = () => pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+  const overflow = () => pg.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width) // a phone page that is too wide enlarges innerWidth too
   const count = async () => num(await pg.locator('[data-lv-count]').first().innerText())
   const clickRow = async (sel) => { await pg.locator(sel).first().click({ position: { x: 120, y: 14 } }); await settle() }
   // the list controls: the quick-filter strip on a wide screen, the same controls in a sheet behind the Filters button on a phone
@@ -683,7 +690,9 @@ for (const width of [1440, 390]) {
   await check(`${tag}.6`, `${width} px: no horizontal scrolling and no script errors on any converted screen`, async () => {
     const screens = [...LISTS.map(([n, p]) => [n, p]), ['Tasks table', '/life/tasks?view=table'], ['Tasks board', '/life/tasks?view=board'], ['Open loops', '/life/tasks?view=loops'],
       ['Projects cards', '/life/projects?view=cards'], ['Library tree', '/life/library'], ['Area', '/life/areas/' + uxArea], ['Project', '/life/projects/' + ux.project],
-      ['Today', '/life'], ['Areas', '/life/areas'], ['Calendar', '/life/calendar/agenda'], ['Weekly review', '/life/journal/review']]
+      ['Today', '/life'], ['Areas', '/life/areas'], ['Calendar', '/life/calendar/agenda'], ['Calendar month', '/life/calendar/month'], ['12 Week Year', '/life/journal'], ['Goals', '/life/journal/goals'],
+      ['Month', '/life/journal/month'], ['Habits', '/life/journal/habits'], ['Check-ins', '/life/journal/checkins'], ['Pages', '/life/journal/pages'], ['Weekly review', '/life/journal/review'],
+      ['Graph', '/life/graph'], ['Settings', '/life/settings']]
     for (const [name, p] of screens) {
       await s.open(p)
       const over = await overflow()

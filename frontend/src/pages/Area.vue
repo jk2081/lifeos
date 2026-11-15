@@ -13,7 +13,7 @@
       </template>
     </PageHead>
     <div class="page-body">
-      <div v-if="d.sub_areas.length || d.area.parent" class="chips">
+      <div v-if="d.sub_areas.length || d.area.parent" class="scroll-x">
         <TabButtons :model-value="d.area.name" :options="areaTabs" />
       </div>
 

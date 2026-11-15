@@ -96,7 +96,7 @@ const draft = ref([])
 const library = ref([])
 const WEEK = [1, 2, 3, 4, 5, 6, 7].map((n) => ({ label: `${n} a week`, value: n }))
 // the Button that draws each state of a day: done is solid, today is blue, missed is filled, untracked days are disabled
-const DAY = { d: { variant: 'solid' }, t: { variant: 'outline', theme: 'blue' }, m: { variant: 'subtle' }, f: { variant: 'outline' }, off: { variant: 'outline' } }
+const DAY = { d: { variant: 'solid' }, t: { variant: 'outline', theme: 'blue', class: '!text-ink-blue-8' }, m: { variant: 'subtle' }, f: { variant: 'outline' }, off: { variant: 'outline' } }
 const pad = (n) => String(n).padStart(2, '0')
 const iso = (day) => `${year.value}-${pad(month.value)}-${pad(day)}`
 const current = computed(() => d.value.habits.find((h) => h.habit === pick.value) || d.value.habits[0])

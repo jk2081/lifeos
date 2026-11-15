@@ -21,7 +21,7 @@
       <Card class="flex flex-col gap-3">
         <TextInput v-model="p.outcome" label="Outcome" :disabled="!writable" placeholder="What will be true when this is done" @change="saveField('outcome')" />
         <div class="form-grid">
-          <DatePicker v-model="p.target_date" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
+          <DatePicker format="D MMM YYYY" v-model="p.target_date" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
           <div class="space-y-1.5"><div class="text-sm text-ink-gray-6">Progress</div><div class="flex h-8 items-center gap-2">
             <div class="min-w-0 flex-1"><Progress size="sm" :value="p.tasks_total ? Math.round((100 * p.tasks_done) / p.tasks_total) : 0" /></div>
             <NumLink class="text-sm" :to="doneLink(p)" data-door="project-tasks">{{ p.tasks_done }} of {{ p.tasks_total }} tasks done</NumLink></div></div>

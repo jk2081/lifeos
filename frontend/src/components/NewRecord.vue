@@ -6,7 +6,7 @@
         <FormControl v-else-if="fld.options" v-model="values[fld.name]" type="select" :label="fld.label" :required="fld.required" :description="fld.help"
           :placeholder="fld.placeholder || 'Choose'" :options="options(fld)" />
         <FormControl v-else-if="fld.type === 'textarea'" v-model="values[fld.name]" type="textarea" :label="fld.label" :required="fld.required" :description="fld.help" :rows="3" />
-        <DatePicker v-else-if="fld.type === 'date'" v-model="values[fld.name]" :label="fld.label" :required="fld.required" :description="fld.help" />
+        <DatePicker format="D MMM YYYY" v-else-if="fld.type === 'date'" v-model="values[fld.name]" :label="fld.label" :required="fld.required" :description="fld.help" />
         <FormControl v-else v-model="values[fld.name]" :type="fld.type || 'text'" :label="fld.label" :required="fld.required" :description="fld.help" :maxlength="fld.maxlength"
           :placeholder="fld.placeholder" @keydown.enter="submit()" />
       </template>

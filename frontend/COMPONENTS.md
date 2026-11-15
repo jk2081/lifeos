@@ -18,6 +18,7 @@ Before using a library component, read its source and types: `node_modules/frapp
 
 - **No hand-written control.** No raw `<button>`, `<input>`, `<select>`, `<textarea>`, checkbox, switch, date input, tab bar, badge, dialog, dropdown, tooltip, progress bar, avatar, tree or breadcrumb. The one exception is a `<button class="absolute inset-0">` that makes a whole row clickable (see Rows).
 - **Tokens only.** Colours, type, radii, shadows and focus rings come from the frappe-ui preset's Tailwind classes. No hex colours, no `rgb()`, no colour variables of our own. Drawing code (the line chart, the graph) reads token variables such as `var(--ink-blue-7)`; a canvas library gets `tokenColor('--ink-blue-7')` from `lib/tokens.js`.
+- **4.5 to 1 for all text.** `styles.css` points three library text colours at darker tokens (`text-ink-gray-5`, and the amber and blue subtle `Badge`). Do not use `text-ink-gray-5` or lighter for text of our own. `node tools/screens.mjs` measures every screen in both themes.
 - **No `<style>` blocks with colours or sizes of our own.** Use Tailwind classes in the template. A scoped `<style>` is acceptable only for geometry that classes cannot say (a grid template built from data, an SVG).
 - **Lucide icons** by name: `icon="lucide-plus"` on a component, or `<span class="lucide-plus size-4" aria-hidden="true" />`. `node scripts/check-sfc.mjs` checks that every name exists.
 - **Dark mode** is frappe-ui's: `useColorScheme()` stamps `data-theme` on `<html>`. Never branch on the theme in a component; token classes switch by themselves.
@@ -144,4 +145,5 @@ Every number that leads to a list is a `NumLink` (or `SectionHead` with `:to`) a
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && node scripts/check-sfc.mjs'      # compiles every file, icon names, removed patterns
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && node scripts/check-singletons.mjs' # one copy of vue, frappe-ui, reka-ui
 cd frontend && node --test tests/*.test.js                                                                     # the URL mapping
+node tools/screens.mjs                                                                                         # from the repo root: screenshots, overflow, script errors, contrast
 ```

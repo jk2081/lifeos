@@ -26,7 +26,7 @@
           <Card flush><Row v-for="h in d.history" :key="h.name" class="!items-center">
             <div class="min-w-0 flex-1"><RouterLink class="break-words text-base-medium hover:underline focus-visible:focus-ring" :class="h.name === d.goal.name ? 'text-ink-gray-9' : 'text-ink-blue-8'" :to="`/journal/goals/${h.name}`">{{ h.cycle_title }}</RouterLink>
               <div class="text-sm text-ink-gray-6">{{ h.cycle_status }}{{ h.result_note ? ' · ' + h.result_note : '' }}</div></div>
-            <div class="w-full max-w-[120px]"><Progress size="sm" :value="Math.round(h.score)" /></div><span class="w-10 text-right tabular-nums">{{ Math.round(h.score) }}%</span>
+            <div class="w-24 shrink-0 max-md:w-12"><Progress size="sm" :value="Math.round(h.score)" /></div><span class="w-10 text-right tabular-nums">{{ Math.round(h.score) }}%</span>
             <Badge :label="h.outcome" /></Row></Card>
           <p class="mt-2 text-sm text-ink-gray-6">Every cycle this goal appeared in, followed through its carried-from links.</p>
         </section>

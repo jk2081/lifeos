@@ -5,7 +5,7 @@
         <section v-if="canWrite()">
           <SectionHead>{{ editingName ? 'Edit check-in' : 'New check-in' }}</SectionHead>
           <Card>
-            <DatePicker v-model="form.date" class="mb-3 max-w-[200px]" label="Date" />
+            <DatePicker format="D MMM YYYY" v-model="form.date" class="mb-3 max-w-[200px]" label="Date" />
             <div class="scores">
               <div></div><div class="text-sm text-ink-gray-6">Habits</div><div class="text-sm text-ink-gray-6">Situation</div><div class="note-head text-sm text-ink-gray-6">Note</div>
               <template v-for="s in form.scores" :key="s.dimension">

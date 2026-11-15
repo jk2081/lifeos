@@ -3,8 +3,9 @@
     <template #sub>{{ sub || ' ' }}</template>
     <div id="jr-actions" class="contents"></div>
   </PageHead>
-  <Tabs :model-value="current">
-    <TabList class="px-4 md:px-7" aria-label="Journal sections">
+  <!-- seven tabs are wider than a phone: the strip scrolls sideways in its own row, the page does not -->
+  <Tabs class="scroll-x" :model-value="current">
+    <TabList class="min-w-max px-4 md:px-7" aria-label="Journal sections">
       <TabTrigger v-for="t in TABS" :key="t.key" :value="t.key" :label="t.label" :route="t.key === 'year' ? '/journal' : `/journal/${t.key}`">
         <span class="max-md:hidden">{{ t.label }}</span><span class="md:hidden">{{ t.short || t.label }}</span>
       </TabTrigger>

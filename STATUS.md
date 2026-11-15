@@ -95,6 +95,25 @@ Everything in `UX_FIXES_1.md` is done.
 - **Checks:** `node tools/acceptance.mjs` passes 30 of 30: the 18 earlier items and the six UX checks at 1440 px and at 390 px (`--ux` runs only those). At 1440 px 34 numbers are clicked and compared with the list they lead to; at 390 px, 29.
 - Deviations are in `DECISIONS.md` under "UX fixes, set 1".
 
+## UX fixes, set 2
+
+Everything in `UX_FIXES_2.md` is done. The front end is now built the way Frappe builds its own apps: frappe-ui 1.2.0 for controls, shell, icons and tokens; `@framework/ui` (from `apps/frappe/ui` of the bench, proven on Frappe 16.56.0) for list controls, link fields and DocType forms; our own components only where neither has one. `frontend/COMPONENTS.md` is the rule book for new screens.
+
+- **Step 0 passed.** `@framework/ui` is linked with `link:../../frappe/ui`, built inside the bench container, with one copy each of vue, vue-router, frappe-ui and reka-ui in the bundle (`frontend/scripts/check-singletons.mjs`).
+- **Tokens and theme.** The Life OS colour variables, the `[data-theme]` block and the `.bt`, `.inp`, `.ch`, `.pl`, `.cd`, `.ck`, `.sh`, `.mt` classes are gone. `styles.css` is 30 lines: the frappe-ui import, three contrast rules, layout helpers and the reading typeface. Dark mode is frappe-ui's `useColorScheme`.
+- **Shell and controls.** frappe-ui `Sidebar`, `MobileNav`, `PageHeader`, `Breadcrumbs`, `Button`, `FormControl`, `Select`, `Checkbox`, `Switch`, `DatePicker`, `Badge`, `TabButtons`, `Tabs`, `Progress`, `Tree`, `Tooltip`, `Avatar`, `Skeleton`, `Alert`, `Dialog`, `BottomSheet`, `KeyboardShortcutsDialog`, Lucide icons. `Ico.vue` is removed. No `prompt()` or `confirm()`.
+- **Lists.** Every list screen is one `ListView` on `useListView`, with the library's `Filter`, `QuickFilter`, `SortBy`, `GroupBy` and `ColumnSettings` behind the wrappers in `frontend/src/framework/`. Rows are frappe-ui's `frappe-ui/list` parts. Fetching still goes through `lifeos.api`, whose list methods now take standard Frappe filters, `order_by`, extra `fields` and a `summary`, with every field name checked against the DocType on the server. The short URL parameters of set 1 still work (`frontend/src/lib/filterUrl.js`); other conditions go in `f=`.
+- **Remembered views.** `Life View State` holds one saved state per user, screen and space; `lifeos.api.views.get_all` and `views.save` read and write only the caller's rows, and refuse agents. A bare list URL restores the saved view into the URL; a URL with a query wins and becomes the saved view; `open=` is never saved; active filters always show a count and Clear.
+- **Other library parts.** Search is frappe-ui's experimental `CommandPalette`; the vault document form is `@framework/ui` `FormLayout`; uploads go through frappe-ui's `FileUploader`. Tried and not adopted, with reasons in `DECISIONS.md`: `DesktopShell` and `MobileShell`, both experimental lists, the experimental `Calendar`, `SettingsDialog` as a whole, `@framework/ui` `FileUpload`, `ActivityTimeline`.
+- **Fixed in the last pass:** Enter in the search palette opened nothing; the "x of y tasks done" link in the Projects list was squeezed to no width; a view changed less than a second before a reload was not saved on the server; secondary text and two badge colours from the library were below 4.5 to 1. On phones the Journal tabs and an area's sub-area switch were wider than the screen, which pushed the tab bar out of view. The Tasks board heading disagreed with its column counts. Smaller ones: the Google Calendar notice was cut to three letters on a phone, section headings with a button sat lower than those without, date fields showed ISO dates, graph links and the current-week box were hard to see in the dark theme.
+- **Checks.**
+  - Unit tests: 141 back-end tests pass (`lifeos/tests/test_ux2_views.py` covers `Life View State` permissions and the validation of filter, sort, field and summary names). 10 front-end tests pass for the URL mapping (`yarn test` in `frontend/`).
+  - `node tools/acceptance.mjs`: 32 of 32, the 18 earlier items and seven UX checks at 1440 px and at 390 px, including the remembered-view check (second browser, count link wins, Clear, the family user sees none of the owner's views).
+  - The greps of the brief find nothing in `frontend/src`; `node scripts/check-sfc.mjs` in `frontend/` runs them with every build check.
+  - A fresh clone built with `yarn install --frozen-lockfile && yarn build` inside the bench container, and `bench build --app lifeos` succeeds.
+  - `node tools/screens.mjs`: 38 screens at 1440 px and 390 px in light and dark (152 screenshots), with no horizontal scrolling, no script errors and no text below 4.5 to 1. Each screenshot was looked at; what was found is fixed, or listed in `DECISIONS.md` where it was left.
+- Deviations are in `DECISIONS.md` under "UX fixes, set 2".
+
 ## Summary
 
 ### What works
@@ -109,7 +128,6 @@ Nothing shows a placeholder. These are smaller than a reader of the spec might e
 - A starred mindsweep topic is a heading that starts with a star character. There is no star control.
 - The PWA has a manifest and icons, so it installs to a home screen. It has no service worker, so it does not work offline.
 - Install creates the spaces, areas and dimensions. The seed of section 11 (cycle, goals, October plan, habits) is loaded with `lifeos.seed.load`, not by the install itself.
-- Rename and Remove in Settings use the browser's own prompt and confirm boxes.
 
 ### What is untested
 
@@ -156,6 +174,7 @@ docker exec -d lifeos-bench bash -lc 'cd ~/frappe-bench && bench serve --port 80
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && yarn install && yarn build'   # rebuild the front end, inside the bench
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost run-tests --app lifeos'
 node tools/acceptance.mjs            # the acceptance list of section 13, against http://localhost:18000
+node tools/screens.mjs               # screenshots of every screen, both widths and themes, with overflow, error and contrast checks
 ```
 
 The test site is `lifeos.localhost`, at http://localhost:18000/life. The three test users are `owner@lifeos.test`, `family@lifeos.test` and `hermes@lifeos.test`; their password is in the git-ignored `.env`. The stack is three containers (`lifeos-bench`, `lifeos-db`, `lifeos-redis`) with volumes and a network that carry the same prefix. To remove it all:

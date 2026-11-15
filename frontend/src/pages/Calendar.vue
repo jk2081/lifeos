@@ -11,7 +11,7 @@
   </PageHead>
 
   <div class="page-body" data-calendar :data-view="mode">
-    <Alert v-if="google && !google.connected" title="Google Calendar is not connected, so events here stay on this site."
+    <Alert v-if="google && !google.connected" title="Google Calendar is not connected" description="Events added here stay on this site."
       :primary-action="{ label: 'Connect it in Frappe\'s Google settings', href: google.setup_url }" data-google-prompt />
 
     <!-- year: one column a month, one line a day, as in the journal -->

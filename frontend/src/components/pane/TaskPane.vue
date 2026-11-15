@@ -4,7 +4,7 @@
   <div class="form-grid">
     <FormControl type="select" label="Status" :model-value="task.status" :options="STATUSES" :disabled="!writable" @update:model-value="setStatus" />
     <FormControl type="select" label="Priority" :model-value="task.priority || ''" :options="PRIORITY_OPTIONS" :disabled="!writable" @update:model-value="(v) => save({ priority: v || null })" />
-    <DatePicker label="Due date" :model-value="task.due_date || ''" clearable :disabled="!writable" @update:model-value="(v) => save({ due_date: v || null })" />
+    <DatePicker format="D MMM YYYY" label="Due date" :model-value="task.due_date || ''" clearable :disabled="!writable" @update:model-value="(v) => save({ due_date: v || null })" />
   </div>
   <TextInput v-if="task.status === 'Waiting' || askWaiting" ref="waitInput" v-model="task.waiting_on" label="Waiting on" placeholder="Who or what is this waiting on?" :disabled="!writable"
     @change="askWaiting ? setStatus('Waiting') : save({ waiting_on: task.waiting_on })" />

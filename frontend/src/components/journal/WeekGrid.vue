@@ -66,7 +66,7 @@
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-ink-gray-6">
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3.5 rounded-1 bg-surface-gray-9"></i>Done</span>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3.5 rounded-1 bg-surface-gray-2"></i>Missed</span>
-      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3.5 rounded-1 border-2 border-outline-blue-4"></i>This week, tap to tick</span>
+      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3.5 rounded-1 border-2 border-outline-blue-6"></i>This week, tap to tick</span>
       <span>A struck-through action is finished and no longer counts. Tap an action's name to finish or drop it.</span>
     </div>
   </div>
@@ -104,7 +104,7 @@ const count = (a, w) => a.ticks[String(w)] || 0
 const showScore = (w) => g.value.cycle.status === 'Closed' || (g.value.current_week && w <= g.value.current_week)
 // the Button that draws each state of a cell: done is solid, this week is blue, missed or part done is filled, not yet is outlined
 const CELL = {
-  done: { variant: 'solid' }, curdone: { variant: 'solid', theme: 'blue' }, cur: { variant: 'outline', theme: 'blue' },
+  done: { variant: 'solid' }, curdone: { variant: 'solid', theme: 'blue' }, cur: { variant: 'outline', theme: 'blue', class: '!border-outline-blue-6 !text-ink-blue-8' },
   miss: { variant: 'subtle' }, part: { variant: 'subtle' }, na: { variant: 'outline' }, '': { variant: 'outline' },
 }
 

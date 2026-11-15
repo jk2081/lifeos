@@ -13,7 +13,7 @@
         <div v-if="!files.length" class="flex flex-col gap-0.5 pb-3 pt-1.5">
           <b class="text-base-medium text-ink-gray-9">Drop files here</b>
           <span class="text-sm text-ink-gray-6">A journal photo, a voice note, a PDF, anything. Or
-            <Button class="!inline-flex align-baseline" size="sm" variant="ghost" label="choose files" @click="picker.click()" /></span>
+            <Button class="!inline-flex !h-auto !px-0 align-baseline !text-sm underline" size="sm" variant="ghost" label="choose files" @click="picker.click()" /></span>
         </div>
         <div v-else class="chips">
           <Badge v-for="(f, i) in files" :key="i" size="lg">{{ f.name }} <span class="text-ink-gray-6">{{ fileSize(f.size) }}</span>
@@ -26,7 +26,7 @@
           <Button variant="solid" :loading="busy" loading-text="Adding…" :disabled="!files.length && !text.trim()" label="Add to Inbox" @click="add" />
         </div>
         <Textarea v-if="showText" v-model="text" class="mt-2" :rows="3" placeholder="Paste or type text to file" aria-label="Text to file" />
-        <Button v-else class="mt-2" size="sm" variant="ghost" label="Or paste text instead" @click="showText = true" />
+        <Button v-else class="-ml-2 mt-2" size="sm" variant="ghost" label="Or paste text instead" @click="showText = true" />
       </section>
     </template>
     <template #cell-title="{ row }">

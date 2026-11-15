@@ -116,7 +116,8 @@ async function fetch({ params: p, filters, order_by, fields, summary, start, pag
     const tasks = res.tasks.filter((t) => BOARD.includes(t.status))
     const counts = await Promise.all(BOARD.map((s) => api('tasks.list', { ...base, status: s, page_length: 1 })))
     boardCounts.value = Object.fromEntries(BOARD.map((s, i) => [s, counts[i].total]))
-    return { rows: tasks, total: tasks.length, today: res.today }
+    // the heading counts what the four columns hold, so it agrees with the column counts; Show more brings the next cards
+    return { rows: tasks, total: counts.reduce((n, c) => n + c.total, 0), today: res.today }
   }
   const res = await api('tasks.list', { ...base, status: p.status || (v === 'board' ? 'all' : 'open'), done: p.done && v !== 'loops' ? 1 : 0, loops: v === 'loops' ? 1 : 0,
     order_by: order_by || (v === 'loops' ? 'creation asc' : undefined), fields, summary, start, page_length })

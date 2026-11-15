@@ -104,7 +104,7 @@
                     </template>
                     <template v-if="p.kind === 'Task'">
                       <span v-if="p.payload.due_date || dueFor === p.name" class="inline-flex items-center gap-1.5 text-sm text-ink-gray-6">due
-                        <DatePicker class="w-36" size="sm" :model-value="p.payload.due_date || ''" clearable :disabled="!writable" aria-label="Due date"
+                        <DatePicker format="D MMM YYYY" class="w-36" size="sm" :model-value="p.payload.due_date || ''" clearable :disabled="!writable" aria-label="Due date"
                           @update:model-value="(v) => setField(p, 'due_date', v || null)" /></span>
                       <Button v-else size="sm" variant="outline" icon-left="lucide-plus" label="due date" :disabled="!writable" @click="dueFor = p.name" />
                     </template>
@@ -140,7 +140,7 @@
             :label="fieldLabel(field)" :required="spec.required" :description="spec.help" />
           <FormControl v-else-if="spec.type === 'link'" type="select" :model-value="draft[field] ?? ''" :options="[{ label: '—', value: '' }, ...linkOptions(spec.doctype)]"
             :label="fieldLabel(field)" :required="spec.required" :description="spec.help" @update:model-value="(v) => (draft[field] = v || undefined)" />
-          <DatePicker v-else-if="spec.type === 'date'" :model-value="draft[field] || ''" clearable :label="fieldLabel(field)" :required="spec.required" :description="spec.help"
+          <DatePicker format="D MMM YYYY" v-else-if="spec.type === 'date'" :model-value="draft[field] || ''" clearable :label="fieldLabel(field)" :required="spec.required" :description="spec.help"
             @update:model-value="(v) => (draft[field] = v)" />
           <DateTimePicker v-else-if="spec.type === 'datetime'" :model-value="draft[field] || ''" clearable :label="fieldLabel(field)" :required="spec.required" :description="spec.help"
             @update:model-value="(v) => (draft[field] = v)" />

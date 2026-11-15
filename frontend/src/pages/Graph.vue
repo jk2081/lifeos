@@ -58,7 +58,7 @@ function draw() {
       { selector: 'node', style: { 'background-color': 'data(color)', label: 'data(label)', color: css('--ink-gray-9'), 'font-size': 11, 'font-family': 'Inter, system-ui, sans-serif',
         'text-valign': 'bottom', 'text-margin-y': 5, 'text-wrap': 'ellipsis', 'text-max-width': 120, width: 16, height: 16, 'border-width': 2, 'border-color': css('--surface-base'), 'text-background-color': css('--surface-base'), 'text-background-opacity': 0.8, 'text-background-padding': 2 } },
       { selector: 'node:selected', style: { 'border-color': css('--ink-gray-9'), width: 20, height: 20 } },
-      { selector: 'edge', style: { width: 1.5, 'line-color': css('--outline-gray-3'), 'target-arrow-color': css('--outline-gray-3'), 'target-arrow-shape': 'triangle', 'arrow-scale': 0.8, 'curve-style': 'bezier' } },
+      { selector: 'edge', style: { width: 1.5, 'line-color': css('--ink-gray-4'), 'target-arrow-color': css('--ink-gray-4'), 'target-arrow-shape': 'triangle', 'arrow-scale': 0.8, 'curve-style': 'bezier' } },
       { selector: 'edge[kind = "parent"]', style: { 'line-style': 'dashed' } },
     ],
     layout: { name: 'preset' },

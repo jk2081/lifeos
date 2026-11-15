@@ -15,7 +15,8 @@
               <Select v-if="d.is_admin" class="w-24 shrink-0" :model-value="m.access" :options="['Write', 'Read']" :aria-label="`Access for ${m.user}`"
                 @update:model-value="(v) => v && v !== m.access && member(s.name, m.user, v)" />
               <Badge v-else :label="m.access" />
-              <Button v-if="d.is_admin && m.user !== s.owner_user" variant="ghost" label="Remove" @click="member(s.name, m.user, m.access, 1)" />
+              <Button v-if="d.is_admin" variant="ghost" label="Remove" :class="m.user === s.owner_user && 'invisible'" :disabled="m.user === s.owner_user" :aria-hidden="m.user === s.owner_user || undefined"
+                @click="member(s.name, m.user, m.access, 1)" />
             </Row>
             <div v-if="d.is_admin" class="mt-2 flex gap-2">
               <TextInput v-model="newMember[s.name]" class="flex-1" placeholder="Email of an existing user" :aria-label="`Add a member to ${s.name}`" @keydown.enter="member(s.name, newMember[s.name])" />

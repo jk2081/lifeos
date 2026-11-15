@@ -45,7 +45,7 @@ for (const width of widths) {
     if (script) { await page.evaluate(script); await page.waitForTimeout(600) }
     const file = path.join(root, 'screenshots', `${name}-${width}${scheme === 'dark' ? '-dark' : ''}.png`)
     await page.screenshot({ path: file, fullPage: flag('full') })
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    const overflow = await page.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width)
     console.log(`${file}  overflowX=${overflow}${errors.length ? '  ERRORS: ' + [...new Set(errors)].slice(0, 4).join(' | ') : ''}`)
     errors.length = 0
   }
