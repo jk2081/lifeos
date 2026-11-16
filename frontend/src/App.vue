@@ -64,6 +64,8 @@
       <NewRecord v-if="store.newKind === 'project'" :model-value="true" title="New project" action="Add project" :fields="projectFields" :save="createProject"
         @update:model-value="(v) => !v && (store.newKind = '')" />
 
+      <NewRecord v-if="store.newKind === 'idea'" :model-value="true" title="New idea" action="Park on Someday" :fields="ideaFields" :save="createIdea"
+        @update:model-value="(v) => !v && (store.newKind = '')" />
       <RecordPane />
       <SearchPalette v-model:open="store.searchOpen" />
       <QuickAdd v-model:open="store.quickAdd" />
@@ -89,13 +91,14 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Alert, Badge, BottomSheet, Button, Dropdown, FrappeUIProvider, KeyboardShortcut, KeyboardShortcutsDialog, LoadingIndicator, MobileNav, MobileNavItem,
-  TabButtons, useColorScheme } from 'frappe-ui'
+  TabButtons, toast, useColorScheme } from 'frappe-ui'
 import AppSidebar from './components/AppSidebar.vue'
 import NewRecord from './components/NewRecord.vue'
 import { BOTTOM, GROUPS } from './lib/nav'
 import { MAX_AREAS, activeKey, areaTree } from './lib/sidebar'
 import { navCount, newMenuItems } from './lib/newMenu'
-import { db } from './lib/api'
+import { api, db } from './lib/api'
+import { recordChanged } from './lib/pane'
 import { areaOptions, loadLookups } from './lib/lookups'
 import SearchPalette from './components/SearchPalette.vue'
 import RecordPane from './components/RecordPane.vue'
@@ -132,6 +135,14 @@ async function createNote(v) {
   const note = await db.insert({ doctype: 'Life Note', space: store.space, title: v.title, content_md: '' })
   store.newKind = ''
   router.push(`/library/${note.name}?edit=1`)
+}
+const ideaFields = computed(() => [{ name: 'title', label: 'Idea', required: true }, { name: 'area', label: 'Area', options: areaOptions() },
+  { name: 'body_md', label: 'More detail', type: 'textarea' }, { name: 'note', label: 'Why it can wait (optional)' }])
+async function createIdea(v) {
+  await api('someday.create_idea', { space: store.space, ...v })
+  store.newKind = ''
+  recordChanged('idea:new')
+  toast.success('Parked on the Someday list.')
 }
 async function createProject(v) {
   const p = await db.insert({ doctype: 'Life Project', space: store.space, status: 'Active', ...v })

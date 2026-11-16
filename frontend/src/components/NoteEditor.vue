@@ -142,5 +142,12 @@ async function saveMeta(values) {
 }
 watch(() => note.name, () => { saveState.value = 'Saved' })
 onBeforeUnmount(() => flush())
-defineExpose({ flush, focus: () => editor.value?.focus() })
+// the selected text, for "Selection to Someday" (an idea made from part of a note)
+function selection() {
+  const v = editor.value?.view?.()
+  if (!v) return ''
+  const r = v.state.selection.main
+  return v.state.sliceDoc(r.from, r.to)
+}
+defineExpose({ flush, focus: () => editor.value?.focus(), selection })
 </script>

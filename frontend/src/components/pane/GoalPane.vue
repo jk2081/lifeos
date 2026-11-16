@@ -66,7 +66,7 @@ import Empty from '../Empty.vue'
 import Backlinks from '../Backlinks.vue'
 import { api, tryCall } from '@/lib/api'
 import { loadBacklinks } from '@/lib/links'
-import { store } from '@/lib/store'
+import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 
 const OUTCOMES = ['Achieved', 'Partly Achieved', 'Not Achieved', 'Dropped']
@@ -100,7 +100,8 @@ async function load() {
           { value: 'history', label: 'History across cycles', count: x.history.length, noun: 'cycles' }]
       : [{ value: 'tasks', label: 'Tasks', count: x.tasks.length, noun: 'tasks' }]
     emit('meta', { title: g.title, area: g.area, area_name: g.area_name, project: g.project, fullPage: `/journal/goals/${g.name}`,
-      sub: x.cycle ? `${g.actions.length} action${g.actions.length === 1 ? '' : 's'}` : x.goal_type + ' goal',
+      sub: x.is_someday ? 'On the Someday list' : x.cycle ? `${g.actions.length} action${g.actions.length === 1 ? '' : 's'}` : x.goal_type + ' goal',
+      someday: canWrite() && g.outcome === 'In Progress' && !x.is_someday ? { doctype: 'Life Goal', name: g.name } : null,
       tabs: [...tabs, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
   } catch (e) {
     emit('missing')

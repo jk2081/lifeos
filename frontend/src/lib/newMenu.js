@@ -7,6 +7,7 @@ export function newMenuItems() {
     { label: 'Task', icon: 'lucide-square-check', onClick: () => (store.quickAdd = true) },
     { label: 'Note', icon: 'lucide-file-text', onClick: () => (store.newKind = 'note') },
     { label: 'Project', icon: 'lucide-chart-no-axes-column', onClick: () => (store.newKind = 'project') },
+    { label: 'Idea for Someday', icon: 'lucide-lightbulb', onClick: () => (store.newKind = 'idea') },
     { label: 'Add to Inbox', icon: 'lucide-inbox', onClick: () => router.push('/inbox') },
   ]
 }

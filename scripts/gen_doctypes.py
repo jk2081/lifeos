@@ -351,9 +351,9 @@ dt("Life Action Log", [
 # ---- UX fixes, set 5: Someday ideas, insights, Ask, AI usage ----
 dt("Life Idea", [
 	SPACE, f("title", reqd=1, in_list_view=1), md("body_md", label="Body"),
-	link("area", "Life Area", in_list_view=1, search_index=1), link("project", "Life Project"),
+	link("area", "Life Area", search_index=1), link("project", "Life Project"),
 	link("source_doctype", "DocType"), f("source_name", "Dynamic Link", "source_doctype"),
-	sel("status", ["Someday", "Brought Back"], default="Someday", in_list_view=1, search_index=1),
+	sel("status", ["Someday", "Brought Back"], default="Someday", search_index=1),
 	link("brought_to_doctype", "DocType"), f("brought_to_name", "Dynamic Link", "brought_to_doctype"),
 	*someday(),
 ], permissions=perms(agent_write=False), title_field="title", show_title=1, search_fields="title")

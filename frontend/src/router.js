@@ -18,6 +18,7 @@ const routes = [
   { path: '/areas/:id', name: 'Area', component: page('Area'), props: true },
   { path: '/goals', name: 'Goals', component: page('Goals') },
   { path: '/projects', name: 'Projects', component: page('Projects') },
+  { path: '/someday', name: 'Someday', component: page('Someday') },
   { path: '/projects/:id', name: 'Project', component: page('Project'), props: true },
   { path: '/library/:id?', name: 'Library', component: page('Library'), props: true },
   { path: '/vault', name: 'Vault', component: page('Vault') },

@@ -5,6 +5,7 @@
         <div class="text-sm text-ink-gray-6">{{ label }}</div>
         <h2 class="break-words text-lg-semibold text-ink-gray-9" data-pane-title>{{ meta.title || (missing ? 'Not found' : 'Loading…') }}</h2>
       </div>
+      <Button v-if="meta.someday" icon-left="lucide-clock" :label="phone ? 'Someday' : 'Move to Someday'" data-pane-someday @click="toSomeday" />
       <Button v-if="meta.fullPage" label="Open full page" :route="meta.fullPage" data-pane-full />
       <Button icon="lucide-x" label="Close" tooltip="Close" data-pane-close @click="closePane" />
     </div>
@@ -47,12 +48,16 @@ import SourcePane from './SourcePane.vue'
 import ChangePane from './ChangePane.vue'
 import PlainPane from './PlainPane.vue'
 import { closePane, openRef } from '@/lib/pane'
+import { park } from '@/lib/someday'
 
 const props = defineProps({ cur: Object, meta: Object, label: String, missing: Boolean, stamp: Number, phone: Boolean })
 // Each kind of record says its tabs in its meta: [{ value, label, count }]. The open one is ptab= in the URL; the first is the default.
 const tabs = computed(() => (props.missing ? [] : props.meta.tabs || []))
 const ptab = useUrlTab('ptab', tabs, { replace: true })
-defineEmits(['meta', 'missing', 'changed', 'restore'])
+const emit = defineEmits(['meta', 'missing', 'changed', 'restore', 'reload'])
+async function toSomeday() {
+  if (await park(props.meta.someday.doctype, props.meta.someday.name, props.meta.title)) emit('reload')
+}
 const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, project: ProjectPane,
-  goal: GoalPane, page: PagePane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, checkin: PlainPane, month: PlainPane }
+  goal: GoalPane, idea: defineAsyncComponent(() => import('./IdeaPane.vue')), page: PagePane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, checkin: PlainPane, month: PlainPane }
 </script>

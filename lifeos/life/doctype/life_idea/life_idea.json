@@ -47,7 +47,6 @@
    "fieldtype": "Link",
    "label": "Area",
    "options": "Life Area",
-   "in_list_view": 1,
    "search_index": 1
   },
   {
@@ -74,7 +73,6 @@
    "label": "Status",
    "options": "Someday\nBrought Back",
    "default": "Someday",
-   "in_list_view": 1,
    "search_index": 1
   },
   {

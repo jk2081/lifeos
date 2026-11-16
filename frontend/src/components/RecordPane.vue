@@ -4,13 +4,13 @@
     enter-from-class="translate-x-full" leave-to-class="translate-x-full">
     <aside v-if="cur" ref="el" class="fixed inset-y-0 right-0 z-40 flex flex-col border-l border-outline-gray-2 bg-surface-base shadow-2xl outline-none"
       :class="cur.type === 'inbox' ? 'w-[min(760px,100vw)]' : 'w-[min(520px,100vw)]'" role="dialog" :aria-label="meta.title || label" tabindex="-1" data-pane :data-pane-ref="cur.ref">
-      <PaneBody :cur="cur" :meta="meta" :label="label" :missing="missing" :stamp="stamp" @meta="(m) => (meta = m)" @missing="missing = true" @changed="changed" @restore="restore" />
+      <PaneBody :cur="cur" :meta="meta" :label="label" :missing="missing" :stamp="stamp" @meta="(m) => (meta = m)" @missing="missing = true" @changed="changed" @reload="stamp++; changed()" @restore="restore" />
     </aside>
   </Transition>
   <!-- Phone: frappe-ui's BottomSheet. Swipe down, tap outside or use the close button. -->
   <BottomSheet v-else :open="!!cur" @update:open="(v) => !v && closePane()">
     <div v-if="cur" ref="el" class="flex h-[82dvh] flex-col outline-none" role="group" :aria-label="meta.title || label" tabindex="-1" data-pane :data-pane-ref="cur.ref">
-      <PaneBody :cur="cur" :meta="meta" :label="label" :missing="missing" :stamp="stamp" phone @meta="(m) => (meta = m)" @missing="missing = true" @changed="changed" @restore="restore" />
+      <PaneBody :cur="cur" :meta="meta" :label="label" :missing="missing" :stamp="stamp" phone @meta="(m) => (meta = m)" @missing="missing = true" @changed="changed" @reload="stamp++; changed()" @restore="restore" />
     </div>
   </BottomSheet>
 </template>

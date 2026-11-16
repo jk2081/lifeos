@@ -68,7 +68,7 @@ const links = ref([])
 // the pane's tabs: Details (all fields and filing), Notes, Links
 const on = (t) => !props.tab || props.tab === t
 const isAgent = false
-const STATUSES = ['Open', 'Doing', 'Waiting', 'Done', 'Dropped', 'Carried']
+const STATUSES = ['Open', 'Doing', 'Waiting', 'Done', 'Dropped', 'Carried', 'Someday']
 // a Select has no empty row of its own: the dash is an option whose value is the empty string
 const PRIORITY_OPTIONS = [{ label: '—', value: '' }, ...PRIORITIES.map((p) => ({ label: p, value: p }))]
 // every goal in progress, grouped by type; a goal no longer in progress stays shown while the task points to it
@@ -83,7 +83,8 @@ const writable = computed(() => canRestore.value && !task.value?.is_archived)
 function tell() {
   const t = task.value
   emit('meta', { title: t.title, area: t.area, area_name: t.area_name, project: t.project, project_title: t.project_title,
-    sub: !t.area && !t.project ? 'Unfiled' : '', archived: !!t.is_archived, canRestore: canRestore.value,
+    sub: !t.area && !t.project ? 'Unfiled' : t.status === 'Someday' ? 'On the Someday list' : '', archived: !!t.is_archived, canRestore: canRestore.value,
+    someday: writable.value && OPEN.includes(t.status) ? { doctype: 'Life Task', name: t.name } : null,
     tabs: [{ value: 'details', label: 'Details' }, { value: 'notes', label: 'Notes' }, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
 }
 const tagName = (id) => lookups.tags.find((t) => t.name === id)?.tag_name || id

@@ -73,7 +73,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Dialog, Dropdown, TabButtons, TextInput, Tree, dialog } from 'frappe-ui'
+import { Button, Dialog, Dropdown, TabButtons, TextInput, Tree, dialog, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import NotesList from '@/components/lists/NotesList.vue'
 import { NOTES_VIEWS } from '@/lib/nav'
@@ -182,11 +182,20 @@ async function create(v) {
   await loadTree()
   router.push(`/library/${res.name}?edit=1`)
 }
+// Part of a note that can wait becomes an idea on the Someday list, linked back to the note
+async function selectionToIdea() {
+  const text = (editorRef.value?.selection?.() || '').trim()
+  if (!text) return toast.info('Select the text of the idea first.')
+  const [first, ...rest] = text.split('\n')
+  await tryCall(() => api('someday.create_idea', { space: note.value.space, title: first.replace(/^[-*#\s]+/, '').slice(0, 140), body_md: rest.join('\n').trim() || undefined,
+    area: note.value.area || undefined, source_doctype: 'Life Note', source_name: note.value.name }), 'Parked on the Someday list.')
+}
 const noteMenu = computed(() => [
   { label: raw.value ? 'Show formatted' : 'Show Markdown', icon: 'lucide-code', onClick: () => { raw.value = !raw.value } },
   ...(writable.value && !store.isAgent && !note.value?.is_rules ? [note.value?.collection === 'Wiki'
     ? { label: 'Keep in My notes', icon: 'lucide-lock', onClick: () => move('My notes') }
     : { label: 'Hand to the wiki', icon: 'lucide-book-open', onClick: () => move('Wiki') }] : []),
+  ...(writable.value && !store.isAgent ? [{ label: 'Selection to Someday', icon: 'lucide-lightbulb', onClick: selectionToIdea }] : []),
   { label: 'Earlier versions', icon: 'lucide-history', onClick: async () => { versions.value = (await tryCall(() => api('library.versions', { note: note.value.name }))) || []; versionsOpen.value = true } },
   { label: note.value?.is_archived ? 'Restore from archive' : 'Archive', icon: note.value?.is_archived ? 'lucide-archive-restore' : 'lucide-archive', onClick: async () => {
     if (await tryCall(() => api('archive.set', { doctype: 'Life Note', name: note.value.name, archived: note.value.is_archived ? 0 : 1 }), note.value.is_archived ? 'Restored.' : 'Archived.')) { await loadTree(); router.push('/library') } } },

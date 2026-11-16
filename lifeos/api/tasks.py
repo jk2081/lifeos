@@ -196,6 +196,11 @@ def quick_add(text, space=None, area=None, project=None, goal=None, due_date=Non
 def set_status(task, status, waiting_on=None):
 	"""Change a task's status. Done fills completed_on. Waiting needs waiting_on."""
 	doc = permissions.get_doc_checked("Life Task", task, "write")
+	if status == "Someday" and doc.status != "Someday":  # parking goes through Someday, which agents may not do
+		from lifeos.api import someday
+
+		someday.park("Life Task", task)
+		return get(task)
 	doc.status = status
 	if waiting_on is not None:
 		doc.waiting_on = waiting_on

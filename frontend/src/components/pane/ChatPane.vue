@@ -20,6 +20,7 @@
             <div v-if="i.status !== 'Open'" class="text-sm text-ink-gray-6">{{ i.status === 'Task Created' ? 'Made into a task' : 'Closed' }}</div></div>
           <Button v-if="i.task" variant="ghost" label="Open task" @click="openRef('task:' + i.task)" />
           <div v-else-if="writable && i.status === 'Open'" class="flex flex-wrap items-center gap-2"><Button label="Make task" @click="makeTask(i)" />
+            <Button variant="ghost" label="Someday" data-item-someday @click="toIdea(i)" />
             <Button variant="ghost" label="Close" @click="closeItem(i)" /></div>
         </Row>
         <Empty v-if="!c.open_items.length" title="No open items." hint="Nothing was left to follow up from this chat." />
@@ -66,6 +67,12 @@ async function load() {
 }
 async function makeTask(i) {
   if (await tryCall(() => api('chats.make_task', { chat: c.value.name, row: i.row }), 'Task created.')) { await load(); emit('changed') }
+}
+// an open item that should not weigh on the lists becomes an idea on the Someday list, and the item is closed
+async function toIdea(i) {
+  if (await tryCall(() => api('someday.create_idea', { space: c.value.space, title: i.text, area: c.value.area, source_doctype: 'Life Chat Log', source_name: c.value.name }), 'Parked on the Someday list.')) {
+    await closeItem(i)
+  }
 }
 async function closeItem(i) {
   if (await tryCall(() => api('chats.close_item', { chat: c.value.name, row: i.row }))) { await load(); emit('changed') }

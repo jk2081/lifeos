@@ -53,6 +53,7 @@ async function load() {
     d.value = await api('projects.get', { project: props.name })
     emit('meta', { title: p.value.title, area: p.value.area, area_name: p.value.area_name, fullPage: `/projects/${p.value.name}`,
       archived: !!p.value.is_archived, canRestore: canRestore.value,
+      someday: writable.value && ['Active', 'On Hold'].includes(p.value.status) && !p.value.is_archived ? { doctype: 'Life Project', name: p.value.name } : null,
       tabs: [{ value: 'overview', label: 'Overview' }, { value: 'tasks', label: 'Tasks', count: d.value.tasks.length, noun: 'open tasks' }] })
   } catch (e) {
     emit('missing')

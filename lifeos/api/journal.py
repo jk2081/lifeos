@@ -153,7 +153,8 @@ def goal(goal):
 		fields=["name", "title", "status", "due_date", "is_archived"], limit=200),
 		key=lambda t: (order.index(t.status) if t.status in order else 9, t.due_date is None, str(t.due_date or "")))
 	common = {"space": doc.space, "goal_type": doc.goal_type or "12 Week Year", "target_date": str(doc.target_date) if doc.target_date else None,
-		"closed_on": str(doc.closed_on) if doc.closed_on else None, "tasks": tasks, "tasks_done": done, "tasks_counted": counted}
+		"closed_on": str(doc.closed_on) if doc.closed_on else None, "tasks": tasks, "tasks_done": done, "tasks_counted": counted,
+		"is_someday": doc.is_someday, "someday_review_on": str(doc.someday_review_on) if doc.someday_review_on else None}
 	if not doc.cycle:
 		g = {"name": doc.name, "title": doc.title, "area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 			"project": doc.project, "actions": [], "percent": None, "outcome": doc.outcome, "result_note": doc.result_note, "carried_from": None}

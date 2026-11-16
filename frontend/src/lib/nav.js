@@ -8,6 +8,7 @@ export const NAV = [
   ['Journal', '/journal', 'lucide-notebook', 'j'],
   ['Goals', '/goals', 'lucide-target', 'o'],
   ['Projects', '/projects', 'lucide-chart-no-axes-column', 'p'],
+  ['Someday', '/someday', 'lucide-clock', 'y'],
   ['Areas', '/areas', 'lucide-folder', 'a'],
   ['Sources', '/sources', 'lucide-layers', 'u'],
   ['Notes', '/library', 'lucide-library', 'n'],
@@ -25,7 +26,7 @@ const by = (label) => NAV.find((n) => n.label === label)
 // the groups of the sidebar and of the phone's More list
 export const GROUPS = [
   { key: 'main', label: '', items: ['Today', 'Inbox', 'Tasks', 'Calendar'].map(by) },
-  { key: 'plan', label: 'Plan', items: ['Journal', 'Goals', 'Projects'].map(by) },
+  { key: 'plan', label: 'Plan', items: ['Journal', 'Goals', 'Projects', 'Someday'].map(by) },
   { key: 'areas', label: 'Areas', items: [] },
   { key: 'records', label: 'Records', items: ['Sources', 'Notes', 'Wiki', 'Vault', 'Timeline'].map(by) },
 ]
