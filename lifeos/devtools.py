@@ -165,7 +165,7 @@ DEBRIS_PREFIXES = [
 	"Project", "Old done task", "Stale open task", "Sanitise", "S3 agent item", "S3 secret", "UX door task", "UX due today",
 	"UX done", "UX carried", "UX archived by the job", "UX note", "UX permit", "UX chat", "UX inbox", "UX3 area A", "UX3 area B",
 	"UX3 filed under A", "UX3 due today", "UX3 open goal", "UX3 annual goal", "UX3 goal task", "UX parent", "UX child",
-	"Promotion plan", "Nowrojee", "S4 ",
+	"Promotion plan", "Nowrojee",
 ]
 DEBRIS_FILE_PREFIXES = ["journal-", "production-"]
 _TITLED = {
@@ -187,11 +187,14 @@ def find_test_debris(site_check=True):
 
 	Finds titles made by the scripts, then everything that hangs off them: proposals and the records they created,
 	records made from a debris inbox item, filed under a debris area, project, goal or parent note."""
+	import re
+
 	rx = _stamp_re()
+	s4 = re.compile(r"^S4 [^\n]*?\b(m[0-9a-z]{7})\b")  # set 4 checks: "S4 <what> [<width>] <stamp>"
 	stamps = set()
 	for dt, field in _TITLED.items():
 		for (title,) in frappe.db.sql(f"select `{field}` from `tab{dt}`"):
-			m = rx.match(title or "")
+			m = rx.match(title or "") or s4.match(title or "")
 			if m:
 				stamps.add(m.group(1))
 	for (fname,) in frappe.db.sql("select file_name from tabFile where attached_to_doctype like 'Life %%'"):

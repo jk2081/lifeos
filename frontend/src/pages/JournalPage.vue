@@ -12,13 +12,11 @@
           <img class="block h-auto" :class="zoom ? 'w-[220%] max-w-none' : 'w-full'" :src="d.image" alt="Photographed journal page" /></div>
         <Card v-else><Empty title="No image." hint="This page has a transcript but no photograph." /></Card></section></div>
       <div v-show="!phone || tab.current.value === 'transcript'" class="half">
-        <section><SectionHead>Transcript <template v-if="writable && !editing" #action><Button variant="ghost" size="sm" label="Edit" @click="start" /></template></SectionHead>
+        <section><SectionHead>Transcript</SectionHead>
           <Card>
-            <template v-if="editing"><Textarea v-model="draft" :rows="16" aria-label="Transcript" />
-              <div class="mt-2 flex justify-end gap-2"><Button label="Cancel" @click="editing = false" />
-                <Button variant="solid" label="Save transcript" @click="save" /></div></template>
-            <Md v-else-if="d.transcript_md" :text="d.transcript_md" read />
-            <Empty v-else title="No transcript." hint="Use Edit to type what the page says." />
+            <MdField v-if="writable || d.transcript_md" v-model="d.transcript_md" :save="save" :space="d.space" :readonly="!writable" doctype="Life Journal Page" :docname="d.name"
+              label="Transcript" placeholder="Type what the page says." />
+            <Empty v-else title="No transcript." hint="Only members who can write in this space can add one." />
           </Card></section>
         <section><SectionHead>Created from this page</SectionHead>
           <Card flush><Row v-for="c in d.created" :key="c.route" :pane="refOfRoute(c.route)" :label="c.title" :class="!refOfRoute(c.route) && 'cursor-pointer'" @click="!refOfRoute(c.route) && openRoute(c.route)">
@@ -31,7 +29,8 @@
 </template>
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Button, Textarea } from 'frappe-ui'
+import { Button } from 'frappe-ui'
+import MdField from '@/components/MdField.vue'
 import PageHead from '@/components/PageHead.vue'
 import Md from '@/components/Md.vue'
 import Empty from '@/components/Empty.vue'
@@ -55,18 +54,9 @@ const props = defineProps({ id: String })
 const d = ref(null)
 const missing = ref(false)
 const zoom = ref(false)
-const editing = ref(false)
-const draft = ref('')
 const writable = computed(() => store.spaces.find((s) => s.name === d.value?.space)?.access === 'Write')
-function start() {
-  draft.value = d.value.transcript_md
-  editing.value = true
-}
-async function save() {
-  if (await tryCall(() => api('journal.save_page_transcript', { page: d.value.name, transcript_md: draft.value }), 'Transcript saved.')) {
-    d.value.transcript_md = draft.value
-    editing.value = false
-  }
+async function save(text) {
+  await api('journal.save_page_transcript', { page: d.value.name, transcript_md: text })
 }
 onMounted(async () => {
   try {

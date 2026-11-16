@@ -74,6 +74,7 @@
       <div v-if="tab.shown('projects')" v-show="tab.current.value === 'projects'" class="contents" data-tab-panel="projects"><Projects :embed="embed('projects')" /></div>
       <div v-if="tab.shown('tasks')" v-show="tab.current.value === 'tasks'" class="contents" data-tab-panel="tasks"><Tasks :embed="embed('tasks')" /></div>
       <div v-if="tab.shown('notes')" v-show="tab.current.value === 'notes'" class="contents" data-tab-panel="notes"><NotesList :embed="embed('notes')" /></div>
+      <div v-if="tab.shown('wiki')" v-show="tab.current.value === 'wiki'" class="contents" data-tab-panel="wiki"><NotesList :embed="embed('wiki')" collection="Wiki" /></div>
       <div v-if="tab.shown('documents')" v-show="tab.current.value === 'documents'" class="contents" data-tab-panel="documents"><Vault :embed="embed('documents')" /></div>
       <div v-if="tab.shown('chats')" v-show="tab.current.value === 'chats'" class="contents" data-tab-panel="chats"><Chats :embed="embed('chats')" /></div>
       <div v-if="tab.shown('timeline')" v-show="tab.current.value === 'timeline'" class="contents" data-tab-panel="timeline"><Timeline :embed="embed('timeline')" /></div>
@@ -132,8 +133,8 @@ const areaTabs = computed(() => {
   return [{ label: 'All', value: all, route: `/areas/${all}` }, ...siblings.value.map((s) => ({ label: s.area_name, value: s.name, route: `/areas/${s.name}` }))]
 })
 // The tabs. Each list tab is the main screen's list with this area fixed, its view remembered per tab across areas.
-const TABS = [['overview', 'Overview'], ['projects', 'Projects'], ['tasks', 'Tasks'], ['notes', 'Notes'], ['documents', 'Documents'], ['chats', 'Chats'], ['timeline', 'Timeline']]
-const NOUNS = { projects: 'projects', tasks: 'open tasks', notes: 'notes', documents: 'documents', chats: 'chats', timeline: 'records' }
+const TABS = [['overview', 'Overview'], ['projects', 'Projects'], ['tasks', 'Tasks'], ['notes', 'Notes'], ['wiki', 'Wiki'], ['documents', 'Documents'], ['chats', 'Chats'], ['timeline', 'Timeline']]
+const NOUNS = { projects: 'projects', tasks: 'open tasks', notes: 'notes', wiki: 'wiki pages', documents: 'documents', chats: 'chats', timeline: 'records' }
 const tabs = computed(() => TABS.map(([value, label]) => ({ value, label, count: value === 'overview' ? undefined : d.value?.tabs?.[value], noun: NOUNS[value] })))
 const tab = useUrlTab('tab', tabs)
 // A tab change keeps only the tab: the list query in the URL belongs to the tab that was open, and the list of the new

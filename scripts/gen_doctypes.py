@@ -256,14 +256,14 @@ dt("Life Note", [
 	*org(),
 ], title_field="title", show_title=1, search_fields="title")
 dt("Life Wiki Change", [
-	SPACE, link("note", "Life Note", reqd=1, search_index=1, in_list_view=1),
+	SPACE, link("note", "Life Note", reqd=1, search_index=1, in_list_view=1, label="Page"),
 	sel("change_type", ["Created", "Edited", "Reverted", "Moved to My notes", "Moved to Wiki"], reqd=1, in_list_view=1),
 	link("changed_by", "User", in_list_view=1, label="By"), f("changed_on", "Datetime", search_index=1, in_list_view=1, label="On"),
 	f("change_note", "Small Text"),
 	link("source_doctype", "DocType"), f("source_name", "Dynamic Link", "source_doctype"),
 	md("before_md"), md("after_md"), f("reverted", "Check", default="0"),
 	link("reverts", "Life Wiki Change", description="The change this one undid"),
-], permissions=[{"role": r, "read": 1, "report": 1} for r in ("Life Admin", "Life User", "Life Agent")], in_create=1)
+], permissions=[{"role": r, "read": 1, "report": 1} for r in ("Life Admin", "Life User", "Life Agent")], in_create=1, title_field="note")
 dt("Life Connection", [
 	SPACE, f("system", reqd=1, in_list_view=1, length=40), f("label", in_list_view=1),
 	link("default_area", "Life Area"), link("default_project", "Life Project"),

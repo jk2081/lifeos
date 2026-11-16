@@ -166,6 +166,9 @@ def get(task):
 	row["also_in"] = [r.area for r in doc.also_in]
 	row["tag_ids"] = [r.tag for r in doc.tags]
 	row["space"] = doc.space
+	from lifeos import links
+
+	row["links"] = links.outgoing(doc)  # the [[links]] in its notes, for the editor's chips
 	return row
 
 

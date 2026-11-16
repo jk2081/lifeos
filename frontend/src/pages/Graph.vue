@@ -1,6 +1,6 @@
 <template>
-  <PageHead title="Notes" :sub="d ? `Graph: ${d.nodes.length} records · ${d.edges.length} links${center ? ' · two steps around one record' : ''}` : ''">
-    <TabButtons model-value="graph" :options="NOTES_VIEWS" data-library-views />
+  <PageHead :title="route.query.collection === 'Wiki' ? 'Wiki' : 'Notes'" :sub="d ? `Graph: ${d.nodes.length} records · ${d.edges.length} links${center ? ' · two steps around one record' : ''}` : ''">
+    <TabButtons model-value="graph" :options="route.query.collection === 'Wiki' ? WIKI_VIEWS : NOTES_VIEWS" data-library-views />
     <Button v-if="center" label="Show the whole space" @click="setCenter('')" />
   </PageHead>
   <div class="page-body flex-1">
@@ -38,6 +38,7 @@ import { store } from '@/lib/store'
 const LEGEND = [{ type: 'Note', label: 'Note', color: '--ink-blue-7' }, { type: 'Person', label: 'Person', color: '--ink-amber-7' },
   { type: 'Goal', label: 'Goal', color: '--ink-violet-6' }, { type: 'Document', label: 'Vault document', color: '--ink-green-7' }]
 const route = useRoute()
+const WIKI_VIEWS = [{ label: 'List', value: 'list', route: '/wiki' }, { label: 'Graph', value: 'graph', route: { path: '/graph', query: { collection: 'Wiki' } } }]
 const router = useRouter()
 const host = ref(null)
 const d = ref(null)
@@ -82,7 +83,7 @@ function draw() {
   cy.on('dbltap', 'node', (evt) => router.push(evt.target.data('route')))
 }
 async function load() {
-  const res = await tryCall(() => api('graph.get', { space: store.space, center: center.value || undefined }))
+  const res = await tryCall(() => api('graph.get', { space: store.space, center: center.value || undefined, collection: route.query.collection || undefined }))
   if (!res) return
   d.value = res
   picked.value = null
@@ -90,7 +91,7 @@ async function load() {
 }
 function setCenter(id) {
   center.value = id
-  router.replace({ query: id ? { center: id } : {} })
+  router.replace({ query: { ...(id ? { center: id } : {}), ...(route.query.collection ? { collection: route.query.collection } : {}) } })
   load()
 }
 onMounted(load)

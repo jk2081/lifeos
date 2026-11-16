@@ -127,7 +127,26 @@ def canned_text(item, context, today):
 	return None, summary, proposals
 
 
+def canned_digest(item, context, today):
+	"""An email digest: one reply task for the first item under "Needs your attention", carrying that thread's Gmail link."""
+	import re
+
+	text = item.get("raw_text") or ""
+	section = text.split("Needs your attention", 1)[-1].split("\n#", 1)[0]
+	line = next((l for l in section.splitlines() if l.strip().startswith(("-", "*"))), "")
+	link = re.search(r"https://mail\.google\.com/[^\s)]+", line)
+	who = re.sub(r"\[[^\]]*\]\([^)]*\)", "", line).strip(" -*").split(":")[0].strip() or "the sender"
+	summary = "The day's email, by what needs doing. One reply is due."
+	proposals = []
+	if link:
+		proposals.append({"kind": "Task", "preview": f"Reply to {who}", "confidence": 0.8,
+			"payload": _with({"title": f"Reply to {who}", "source_url": link.group(0)}, area=_area(context, "Business That Works", "Work", "Tea & Coffee"))})
+	return None, summary, proposals
+
+
 def canned_result(item, context, today):
+	if item.get("source_type") == "Email Digest":
+		return canned_digest(item, context, today)
 	names = [f["file_name"].lower() for f in item.get("files", [])]
 	instruction = (item.get("instruction") or "").lower()
 	if item.get("source_type") == "Journal Photo" or "journal" in instruction or (names and all(n.endswith(IMAGE_EXT) for n in names)):
@@ -137,6 +156,48 @@ def canned_result(item, context, today):
 	if any(n.endswith(".pdf") for n in names) or "to-do" in instruction or "todo" in instruction:
 		return canned_document(item, context, today)
 	return canned_text(item, context, today)
+
+
+def extracted_text(item):
+	"""What a real agent would get from the file (transcript, OCR, PDF text); here, the pasted text or a line naming the files."""
+	text = (item.get("raw_text") or "").strip()
+	if text:
+		return text
+	names = ", ".join(f["file_name"] for f in item.get("files", [])) or item["title"]
+	return f"Extracted text of {names}."
+
+
+WIKI_LOG = "Inbox log"
+
+
+def write_wiki(client, item, summary, log=print):
+	"""For an Add to wiki item: read the rules, create one page for the item and edit another (the Inbox log page), citing
+	the item, through lifeos.api.wiki."""
+	space = item["space"]
+	client.call("wiki.rules", space=space)
+	source = {"doctype": "Life Inbox Item", "name": item["name"]}
+	text = (item.get("raw_text") or "").strip() or summary or item["title"]
+	try:
+		page = client.call("wiki.create_page", space=space, title=item["title"], summary=f"What {item['title']} says, in one line.",
+			content_md=f"# {item['title']}\n\n{text}\n\nSee also [[{WIKI_LOG}]].", sources=[source], change_note="A page for a new source.", source=source)
+		log(f"  wiki: created {page['name']}")
+	except RuntimeError as e:
+		if "already has a page" not in str(e):
+			raise
+	found = [p for p in client.call("wiki.index", space=space, page_length=500)["pages"] if p["title"] == WIKI_LOG]
+	if not found:
+		client.call("wiki.create_page", space=space, title=WIKI_LOG, summary="Every source added to the wiki, newest last.",
+			content_md=f"# {WIKI_LOG}\n", change_note="The log of sources.")
+		found = [p for p in client.call("wiki.index", space=space, page_length=500)["pages"] if p["title"] == WIKI_LOG]
+	current = client.call("wiki.get_page", name=found[0]["name"])
+	body = current["content_md"].rstrip() + f"\n- [[{item['title']}]]\n"
+	res = client.call("wiki.update_page", name=current["name"], content_md=body, base_version=current["version"],
+		change_note=f"Added {item['title']} to the log.", source=source)
+	if res.get("conflict"):  # someone changed it meanwhile: read again and add the line once more
+		current = res["current"]
+		client.call("wiki.update_page", name=current["name"], content_md=current["content_md"].rstrip() + f"\n- [[{item['title']}]]\n",
+			base_version=current["version"], change_note=f"Added {item['title']} to the log.", source=source)
+	log(f"  wiki: edited {current['name']}")
 
 
 def process_one(client, fail=False, today=None, log=print):
@@ -153,6 +214,15 @@ def process_one(client, fail=False, today=None, log=print):
 			log(f"  downloaded {f['file_name']} ({len(data)} bytes)")
 			del data
 		transcript, summary, proposals = canned_result(item, item.get("context") or {}, today or time.strftime("%Y-%m-%d"))
+		intent = item.get("intent") or "Process"
+		if intent == "Just keep":
+			# only make it searchable: the text, no proposals
+			transcript = transcript or extracted_text(item)
+			proposals = []
+		elif intent == "Add to wiki":
+			transcript = transcript or extracted_text(item)
+			write_wiki(client, item, summary, log)
+			proposals = [p for p in proposals if p["kind"] != "Note"]  # pages are written directly; tasks and events still go to review
 		result = client.call("inbox.submit_result", item=item["name"], transcript_md=transcript, summary_md=summary, proposals=proposals)
 	except Exception as e:  # report the failure so the owner sees a Retry button
 		client.call("inbox.fail_item", item=item["name"], error=str(e)[:500])

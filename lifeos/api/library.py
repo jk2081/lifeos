@@ -8,11 +8,13 @@ from lifeos.api.utils import order_by as sort_order
 
 
 @frappe.whitelist()
-def tree(space=None, include_archived=0):
+def tree(space=None, include_archived=0, collection="My notes"):
 	"""Every note of a space with what the tree needs: title, parent, area and project. At most 100 per call would hide notes,
-	so the tree returns light rows only and is capped at 2,000."""
+	so the tree returns light rows only and is capped at 2,000. collection: My notes (default), Wiki, or "all"."""
 	space = permissions.resolve_space(space)
 	filters = {"space": space}
+	if collection and collection != "all":
+		filters["collection"] = collection
 	if not flag(include_archived):
 		filters["is_archived"] = 0
 	notes = frappe.get_all("Life Note", filters=filters, fields=["name", "title", "parent_note", "area", "project", "modified", "is_archived"],
@@ -29,13 +31,18 @@ SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modi
 
 
 @frappe.whitelist()
-def list(space=None, area=None, project=None, tag=None, include_archived=0, sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None):
-	"""Notes of a space as a flat list, by title. Reads Life Index.
-	Filters: area (with its sub-areas, or "none"), project (a project, or "none" for reference notes), tag.
+def list(space=None, area=None, project=None, tag=None, include_archived=0, sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None,
+		collection="My notes"):
+	"""Notes of a space as a flat list, newest first. Reads Life Index.
+	Filters: area (with its sub-areas, or "none"), project (a project, or "none" for reference notes), tag,
+	collection (My notes, the default; Wiki; or "all").
 	`total` is the number of notes the filters match."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	where, values = ["x.space = %(space)s", "x.kind = 'Note'"], {"space": space}
+	if collection and collection != "all":
+		where.append("x.collection = %(collection)s")
+		values["collection"] = collection
 	if not flag(include_archived):
 		where.append("x.is_archived = 0")
 	if area:
@@ -50,7 +57,7 @@ def list(space=None, area=None, project=None, tag=None, include_archived=0, sort
 	clause = " and ".join(where + conds)
 	if summary:
 		return {"summary": summarise("Life Index", f"from `tabLife Index` x where {clause}", values, "x", summary, start, page_length)}
-	order = std_order("Life Index", order_by, "x", SORTS) or sort_order(sort, dir, SORTS, "x.title asc")
+	order = std_order("Life Index", order_by, "x", SORTS) or sort_order(sort, dir, SORTS, "x.modified desc")
 	rows = frappe.db.sql(
 		f"""select x.ref_name as name, x.title, x.area, x.project, x.record_date, x.modified, x.is_archived from `tabLife Index` x
 		where {clause} order by {order}, x.ref_name limit %(start)s, %(len)s""",
@@ -81,18 +88,30 @@ def get(note):
 		"area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 		"project": doc.project, "project_title": frappe.db.get_value("Life Project", doc.project, "title") if doc.project else None,
 		"also_in": [r.area for r in doc.also_in], "tag_ids": [r.tag for r in doc.tags], "is_archived": doc.is_archived,
-		"inbox_item": doc.inbox_item, "modified": str(doc.modified)[:19], "owner": doc.owner,
+		"inbox_item": doc.inbox_item, "modified": str(doc.modified)[:19], "owner": doc.owner, "version": version_of(doc),
+		"collection": doc.collection or "My notes", "summary": doc.summary, "is_rules": doc.is_rules,
+		"sources": [{"doctype": r.source_doctype, "name": r.source_name, "title": links.title_of(r.source_doctype, r.source_name)} for r in doc.sources],
 		"links": links.outgoing(doc),
 		"children": frappe.get_all("Life Note", filters={"parent_note": doc.name, "is_archived": 0}, fields=["name", "title"], order_by="title", limit=100),
 		"versions": frappe.db.count("Version", {"ref_doctype": "Life Note", "docname": doc.name}),
 	}
 
 
+def version_of(doc):
+	"""A token that changes with every save: the modified timestamp to the microsecond."""
+	return str(doc.modified)
+
+
 @frappe.whitelist(methods=["POST"])
-def save(note=None, space=None, title=None, content_md=None, area=None, project=None, parent_note=None, also_in=None, tag_ids=None):
-	"""Create or change a note. On save its [[Title]] links are parsed and stored in Life Link."""
+def save(note=None, space=None, title=None, content_md=None, area=None, project=None, parent_note=None, also_in=None, tag_ids=None,
+		base_version=None, summary=None, collection=None):
+	"""Create or change a note. On save its [[Title]] links are parsed and stored in Life Link.
+	`base_version` is the `version` the editor started from. If the note changed since (an agent's edit, another device),
+	nothing is saved and the answer is {"conflict": true, "current": <the note as it is now>}."""
 	if note:
 		doc = permissions.get_doc_checked("Life Note", note, "write")
+		if base_version and base_version != version_of(doc):
+			return {"conflict": True, "current": get(doc.name)}
 	else:
 		space = permissions.resolve_space(space, write=True)
 		doc = frappe.get_doc({"doctype": "Life Note", "space": space})
@@ -100,8 +119,13 @@ def save(note=None, space=None, title=None, content_md=None, area=None, project=
 		if not title.strip():
 			frappe.throw(_("A note needs a title."))
 		doc.title = title.strip()
+	before_md = doc.content_md or ""
 	if content_md is not None:
 		doc.content_md = content_md
+	if summary is not None:
+		doc.summary = summary
+	if collection and not note:
+		doc.collection = collection  # a new page straight into the wiki; moving an existing page is wiki.move
 	for field, value in (("area", area), ("project", project), ("parent_note", parent_note)):
 		if value is not None:
 			doc.set(field, value or None)
@@ -112,6 +136,14 @@ def save(note=None, space=None, title=None, content_md=None, area=None, project=
 	if doc.parent_note and doc.parent_note == doc.name:
 		frappe.throw(_("A note cannot be its own parent."))
 	doc.save() if note else doc.insert()
+	if doc.collection == "Wiki":
+		# every change to a wiki page, by anyone, is logged with the text before and after (UX fixes, set 4)
+		from lifeos.api import wiki
+
+		if note:
+			wiki.person_edited(doc, before_md)
+		else:
+			wiki.log_change(doc, "Created", "", doc.content_md)
 	return get(doc.name)
 
 

@@ -193,3 +193,65 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Unit tests no longer leave files**: `devtools.purge_space` now deletes the files attached to the records it removes.
 - **The set 3 Settings check deletes its two test areas and its task** at the end, instead of leaving them archived. It also needs a user `stranger@lifeos.test`, which the script now makes on the acceptance site.
 - **Archived areas in filters: fixed on both sides.** frappe's link search (`frappe.desk.search.search_link`) is what every `@framework/ui` Filter, QuickFilter and Link calls, and the library's Filter and QuickFilter send no filters of their own. So (1) `standard_queries` in `hooks.py` sends link searches for Life Area, Tag, Habit, Dimension and Project to `lifeos/queries.py`, which leaves out archived rows (and Done or Dropped projects) and keeps to the space named in the filters; (2) `frontend/src/framework/linkScope.js` is the one helper that adds the current space to every such search. It wraps `window.fetch` for that one endpoint, because the library components cannot be given filters. A screen widens it with `useLinkScope()`: the Archive asks for archived records too, labelled "(archived)"; a list on a state tab of closed projects can ask for those statuses (`project_status`). An area's parent is shown under its name in the picker.
+
+### 1. Data
+
+- **`external_id` is unique per space and system**, not per space alone. The brief says "unique together with `space`" and, under Streams, matches "the same space, system and ID"; the second is what matching needs, and two systems' IDs could collide. A unique index on (`space`, `source_system`, `external_id`) backs the check (empty IDs do not collide). `source_system` is stored lower-case.
+- **`Life Wiki Change` fields `by` and `on` are `changed_by` and `changed_on`** (labelled By and On). `on` is an SQL keyword.
+- **`Life Wiki Change` also has `reverts`**, the change an undo undid. Every role has read only on it; the app writes it.
+- **`Life Inbox Item.vault_document`** (read only) is set when an accepted proposal makes a Vault document from the item, so the source follows Vault access. `Life Index` has a matching `vault_locked` flag, and every index query an agent makes leaves locked rows out while the space's switch is off (`permissions.vault_guard`, the list conditions and `has_permission`). "Shown as locked to people who cannot see the Vault": every member of a space sees its Vault, so for people nothing changes.
+- **`Life Index` gained `media_kind`, `source_system`, `intent`, `assistant`, `collection`, `thumbnail` and `vault_locked`**, so the Sources and Wiki lists need one query per page. The patch rebuilds the index.
+- **Search text is capped at 60,000 characters** per record (was 20,000): transcripts, extracted text, summaries and page Markdown. Pages are capped at 200,000 characters, so the end of a very long page is not searchable.
+- **`Life Connection.last_received_what`** holds a short label of the last thing that arrived ("Email digest, today 07:02" is that label and the time). A connection row is made the first time something arrives with a `source_system`.
+- **Thumbnails.** Photos get a 480 px JPEG copy on upload (Pillow). `pdftoppm` is not installed in the bench container, so PDFs have no thumbnail here; the code makes one when `pdftoppm` is on the path (the live server may have poppler). The Photos grid shows an icon where there is none.
+- **`media_kind`** comes from the source type where it says (Voice Note, Journal Photo, Email, Email Digest, Web), else from the first original file (audio, image, web page, other document), else Article for a bare link and Text for pasted text. It is set again when a file is attached.
+- **Agents and notes.** Agents could create and edit notes directly before this set. Now a note is refused to an agent unless it comes through `lifeos.api.wiki` (which only writes Wiki pages, never the rules page): `Life Note.validate` checks it, so the REST and MCP paths are covered too. The milestone 1 test that had the agent create a note now creates a task, and asserts the note is refused.
+
+### 3. The editor
+
+- **Built on our CodeMirror setup, not frappe-ui's `TextEditor`.** `TextEditor` (TipTap) edits HTML; notes, `[[links]]`, the index and the agents all work on Markdown. The editor is `components/LiveEditor.vue`, described in `frontend/COMPONENTS.md`. Its look lives in `styles.css` under `.lv-editor` (CodeMirror's DOM, which we do not template), in token variables only.
+- **The note pane is the same editor.** The pane used to be a reader with an Edit button that opened the full page; with no modes, the pane edits in place.
+- **Filing as one line** opens a `Popover` with the area, project, parent note and also-in pickers. The full-page title is a borderless `TextInput` at heading size.
+- **The title is saved with the text**, through the same conflict check.
+- **Earlier versions stay** in the ⋯ menu beside Show Markdown; Restore saves the old text as a new version.
+- **Project notes** had no editor on any screen, so none was added.
+
+### 2. Inbox and Sources
+
+- **`claim_next` skips a source a Vault document was made from while the Vault is closed to agents.** The agent could not save it, and the claim stopped the whole queue.
+- **The Inbox's Done and All tabs are gone**; `status=Done` and `status=all` links open Sources (`status=done`). `inbox.list` still accepts them for agents.
+- **The remembered intent** is kept with the other per-user view state (`Life View State`, screen `inbox-intent`, per space).
+- **An Add to wiki item refuses Note proposals** ("leaves no wiki proposals for review"); tasks and events still go to review.
+- **Sources leave archived sources out unless Include archived is on**, as every other list does, so its numbers match the Chats tab of an area page; the Archive lists them too.
+- **Sources rows open a `source:` pane** (Original, Text, Summary, Made from this, Details), the inbox item seen as a source; a chat row opens the chat pane. "Open in the Inbox" on Details goes to the review for an item that is not finished.
+- **"Made from this"** counts accepted proposals that created a record, tasks made from a chat's open items, and pages citing the source.
+- **Bulk re-filing** is a checkbox on each row and "Set area" in the header (`sources.refile`), people only, at most 500 at a time.
+- **`/chats` redirects** to `/sources?tab=chats` with its filters; `group=day` becomes the By day view. The Chats list stays inside the area and project pages. G then H still opens chats.
+- **The column order of the Sources table** comes from the index DocType's list fields (title, area, project, date, kind) with Status and Made from it added; Columns reorders them.
+
+### 4. Notes and the Wiki
+
+- **Notes opens on the List** (`/library`); the Tree is `view=tree`. Notes lists My notes only; the Wiki has its own screen. Search, links, backlinks, the graph (all notes unless `collection=` is given) and the area pages cover both.
+- **People's edits of a wiki page are one change per ten minutes.** Autosave writes every few seconds; a person's saves within ten minutes of their own last unreverted Edited change update that change's `after_md` instead of adding rows.
+- **The rules page is made the first time anyone opens the Wiki or calls `wiki.rules`**, by the app, owned by the session user; its Created change is "by Life OS".
+- **Undo** works on Created, Edited and Reverted changes. A move between collections is undone by moving back.
+- **A change opens in the pane** (`change:` refs), from the Changes tab and from a page's History.
+- **Health is cached** for 26 hours per space; it is computed by the nightly job (`wiki.refresh_all_health`) and by Check now. Broken links are `[[…]]` in a wiki page that resolved to nothing; ambiguous links are those with more than one wiki page of that title. Near-duplicates compare titles with case and punctuation removed, among wiki pages.
+- **Agent limits** beyond the brief: at most 50 sources per call; `index` returns at most 500 pages a call.
+- **Links prefer a Wiki page**, then a My notes page, then other records, as the brief says; a `[[Title#id]]` still pins one record.
+
+### 5. Streams
+
+- **The import runs in a background job** (`frappe.enqueue`, queue `long`). The bench used for the build runs no worker by itself, so `scripts/acceptance-site.sh` starts one; on a production bench the workers are already there. Progress is kept in the cache for a week, so the screen shows it after a reload or on another device.
+- **Everything is read before anything is written.** A file with no `conversations.json`, a file that is not a zip, or an export where more than half the conversations cannot be read as the chosen kind fails with the counts and writes nothing. Otherwise unreadable conversations are skipped and counted.
+- **conversations.json is read into memory.** A 1 GB export holds far less JSON than that, but a very large one needs the worker's memory. A transcript is cut at one million characters, with a note.
+- **Upload size.** Frappe refuses uploads above the site's `max_file_size` (10 MB by default). To import a large export, raise it: `bench --site SITE set-config max_file_size 1073741824`. The app does not change site config.
+- **An updated chat** is one whose title, link, summary, transcript or last activity changed, or that gained an open item. Importing the same export again changes nothing.
+- **Times** in exports are UTC; transcripts show them as written, the chat's date is the UTC date of its creation.
+
+### 7. Scale
+
+- **The larger text broke the milestone 9 timings, so the index was changed.** With 20,000 sources of 5,000 characters, `tabLife Index` is 340 MB, more than the test database's 256 MB buffer, and any query that read rows of a whole space took 0.5 to 2.6 seconds (the Sources counts, the Timeline, the area page). Four covering indexes now let counts and ordered pages read only the index (`life_index_counts`, `life_index_area_counts`, `life_index_area_refs`, `life_index_timeline`), and "also filed in" is matched through the indexed child table `Life Also In` (`index.also_in_sql`) instead of a `LIKE` over `also_in_csv`. Every timed read is now under 65 ms.
+- **Search no longer falls back to a plain `LIKE` when every word has three letters or more and the full-text index found nothing**: that fallback read the text of every row of the space and could only find words that do not start where a word starts. Short words still fall back. Unit tests keep the fallback, because InnoDB's full-text index only sees committed rows and a test's rows are never committed.
+- **The seed's sources** are bulk index rows plus real inbox items and chat logs; the big space also holds the milestone 9 index rows of kinds Inbox and Chat, so it has 35,000 sources in all.
+- **The unit test seeds 2,000 sources and 200 wiki pages**, not the brief's 20,000 and 2,000, so the suite stays a few minutes long. `LIFEOS_LOAD_SOURCES=20000` runs the full size in the test, and `bench execute lifeos.loadtest.run_sources` runs the full size with the milestone 9 load and prints both sets of timings (in `STATUS.md`).

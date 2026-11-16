@@ -25,9 +25,11 @@ def _counts(kind, space, names):
 		return {}
 	if kind == "area":
 		out = {}
+		from lifeos.index import also_in_sql
+
 		for n in names:  # as the Timeline counts an area: filed there or also filed there
-			out[n] = frappe.db.sql(f"""select count(*) from `tabLife Index` where space=%s and is_archived=0
-				and (area=%s or also_in_csv like %s){permissions.vault_guard(space)}""", (space, n, f"%,{n},%"))[0][0]
+			out[n] = frappe.db.sql(f"""select count(*) from `tabLife Index` where space=%(space)s and is_archived=0
+				and (area=%(area)s or {also_in_sql('area')}){permissions.vault_guard(space)}""", {"space": space, "area": n})[0][0]
 		return out
 	if kind == "tag":
 		return dict(frappe.db.sql("""select tag, count(distinct parenttype, parent) from `tabLife Tag Link`

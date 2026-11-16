@@ -9,12 +9,13 @@ from lifeos.api.utils import order_by as sort_order
 
 CLAIM_MINUTES = 30
 LIST = list  # this module defines its own `list` method below
-SOURCE_TYPES = ["Upload", "Journal Photo", "Voice Note", "Email", "Chat", "Message", "Web"]
+SOURCE_TYPES = ["Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web"]
 
 
 def _item_dict(item, with_files=True):
 	d = {k: item.get(k) for k in ("name", "space", "title", "source_type", "received_on", "instruction", "raw_text", "transcript_md",
-		"summary_md", "source_url", "status", "claimed_by", "claimed_on", "error", "area", "project", "is_archived", "owner", "preview_image")}
+		"summary_md", "source_url", "status", "claimed_by", "claimed_on", "error", "area", "project", "is_archived", "owner", "preview_image",
+		"intent", "media_kind", "source_system", "external_id", "thumbnail")}
 	d["received_on"] = str(d["received_on"]) if d["received_on"] else None
 	d["claimed_on"] = str(d["claimed_on"]) if d["claimed_on"] else None
 	if with_files:
@@ -22,16 +23,57 @@ def _item_dict(item, with_files=True):
 	return d
 
 
+INTENTS = ("Process", "Add to wiki", "Just keep")
+
+
 @frappe.whitelist(methods=["POST"])
-def create_item(title=None, source_type="Upload", space=None, raw_text=None, instruction=None, source_url=None):
-	"""Create an inbox item. Attach files afterwards with /api/method/upload_file (doctype, docname, is_private=1)."""
+def create_item(title=None, source_type="Upload", space=None, raw_text=None, instruction=None, source_url=None, intent=None,
+		source_system=None, external_id=None, area=None, project=None):
+	"""Create an inbox item. Attach files afterwards with /api/method/upload_file (doctype, docname, is_private=1).
+
+	intent: Process (the default), Add to wiki or Just keep. With source_system (gmail, claude, upload…) the space's connection for
+	that system gives the default intent, area and project. With source_system and external_id (the original's ID in that system)
+	an item that already exists is updated instead of created: its text changes, and a Done item whose content changed goes back
+	to New so the agent processes the change. The answer carries `created` (true or false)."""
+	from lifeos.api import connections
+
 	space = permissions.resolve_space(space, write=True)
 	if source_type not in SOURCE_TYPES:
 		frappe.throw(_("source_type must be one of: {0}.").format(", ".join(SOURCE_TYPES)))
+	if intent and intent not in INTENTS:
+		frappe.throw(_("intent must be one of: {0}.").format(", ".join(INTENTS)))
+	system = (source_system or "").strip().lower() or None
+	conn = connections.connection(space, system) if system else None
 	title = (title or "").strip() or f"{source_type}, {frappe.utils.format_datetime(now_datetime(), 'd MMM HH:mm')}"
+	existing = frappe.db.get_value("Life Inbox Item", {"space": space, "source_system": system, "external_id": external_id.strip()}) \
+		if system and (external_id or "").strip() else None
+	if existing:
+		item = permissions.get_doc_checked("Life Inbox Item", existing, "write")
+		before = (item.title, item.raw_text or "", item.source_url or "", item.instruction or "")
+		item.title, item.source_type = title[:140], source_type
+		for field, value in (("raw_text", raw_text), ("source_url", source_url), ("instruction", instruction)):
+			if value is not None:
+				item.set(field, value)
+		changed = before != (item.title, item.raw_text or "", item.source_url or "", item.instruction or "")
+		if changed and item.status == "Done":
+			item.status = "New"
+			item.add_comment("Info", _("Updated from {0}: the content changed, so it went back to the agent.").format(system))
+		elif changed:
+			item.add_comment("Info", _("Updated from {0}.").format(system))
+		item.save()
+		connections.touch(space, system, item.title)
+		return {**_item_dict(item), "created": False, "changed": changed}
 	item = frappe.get_doc({"doctype": "Life Inbox Item", "space": space, "title": title[:140], "source_type": source_type,
-		"raw_text": raw_text, "instruction": instruction, "source_url": source_url, "status": "New"}).insert()
-	return _item_dict(item)
+		"raw_text": raw_text, "instruction": instruction, "source_url": source_url, "status": "New",
+		"intent": intent or (conn.default_intent if conn and conn.active else None) or "Process",
+		"source_system": system, "external_id": (external_id or "").strip() or None,
+		"area": area or (conn.default_area if conn else None), "project": project or (conn.default_project if conn else None)})
+	if item.project and not item.area:
+		item.area = frappe.db.get_value("Life Project", item.project, "area")
+	item.insert()
+	if system:
+		connections.touch(space, system, item.title)
+	return {**_item_dict(item), "created": True}
 
 
 def release_stale_claims():
@@ -54,9 +96,12 @@ def claim_next(space=None):
 		spaces = [s for s, access in permissions.user_spaces().items() if access == "Write"]
 	if not spaces:
 		return None
+	# a source a Vault document was made from is hidden from an agent while that Vault is closed to it
+	closed = [sp for sp in spaces if permissions.vault_hidden(sp)] or [""]
 	rows = frappe.db.sql(
 		"select name from `tabLife Inbox Item` where status='New' and is_archived=0 and space in %s "
-		"order by received_on asc, creation asc limit 1 for update skip locked", (spaces,))
+		"and not (ifnull(vault_document, '') != '' and space in %s) "
+		"order by received_on asc, creation asc limit 1 for update skip locked", (spaces, closed))
 	if not rows:
 		return None
 	item = frappe.get_doc("Life Inbox Item", rows[0][0])
@@ -67,6 +112,16 @@ def claim_next(space=None):
 	item.save()
 	out = _item_dict(item)
 	out["context"] = space_context(item.space)
+	# what the agent must respect: the intent, and the filing defaults of the system it came from
+	from lifeos.api import connections
+
+	out["connection"] = connections.defaults(item.space, item.source_system) if item.source_system else None
+	out["rules"] = {
+		"Process": "Extract text, summarise and propose records for review.",
+		"Add to wiki": "Extract text, then create or edit wiki pages directly with lifeos.api.wiki (cite this item). Propose tasks or events "
+			"for review as usual; do not propose notes.",
+		"Just keep": "Extract text (transcript, OCR, PDF text) so it is searchable. Propose nothing.",
+	}[item.intent or "Process"]
 	return out
 
 
@@ -115,6 +170,10 @@ def submit_result(item, transcript_md=None, summary_md=None, proposals=None):
 	rows = parse(proposals, []) or []
 	if not isinstance(rows, LIST):
 		frappe.throw(_("proposals must be a list."))
+	if rows and doc.intent == "Just keep":
+		frappe.throw(_("This item is to be kept only (intent Just keep). Send its text with no proposals."))
+	if doc.intent == "Add to wiki" and any(isinstance(r, dict) and r.get("kind") == "Note" for r in rows):
+		frappe.throw(_("This item is for the wiki (intent Add to wiki). Write wiki pages with lifeos.api.wiki instead of proposing notes."))
 	created, errors, ctx = [], [], {}
 	for i, row in enumerate(rows):
 		try:
@@ -185,6 +244,8 @@ def retry(item):
 SORTS = {"received_on": "i.received_on", "title": "i.title", "status": "i.status", "source_type": "i.source_type"}
 
 
+# the Inbox is a queue (UX fixes, set 4): its tabs are what is not finished. Done items are in Sources; `Done` and `all` stay
+# here for agents and old links.
 TABS = {"To Review": "i.status = 'To Review'", "Waiting": "i.status in ('New', 'Processing')", "Failed": "i.status = 'Failed'",
 	"Done": "i.status = 'Done'", "all": None}
 

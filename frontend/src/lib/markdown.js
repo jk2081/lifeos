@@ -23,6 +23,7 @@ md.renderer.rules.wikilink = (tokens, idx, options, env) => {
   const { text, id } = tokens[idx].meta
   const links = (env && env.links) || []
   const hit = links.find((l) => (id ? l.name === id : (l.text || '').toLowerCase() === text.toLowerCase()))
+  if (hit && hit.ambiguous) return `<a class="wl ambiguous" href="/life${escapeHtml(hit.route)}" title="More than one wiki page has this title. This link goes to the oldest.">${escapeHtml(hit.title || text)} ⚠</a>`
   if (hit) return `<a class="wl" href="/life${escapeHtml(hit.route)}">${escapeHtml(hit.title || text)}</a>`
   return `<span class="wl missing" title="No record with this title yet">${escapeHtml(text)}</span>`
 }

@@ -14,7 +14,12 @@ ROUTES = {
 }
 
 
+NO_LINKS = {"Life Wiki Change"}  # the before and after copies of a page are history, not links
+
+
 def md_fields(doc):
+	if doc.doctype in NO_LINKS:
+		return []
 	return [df.fieldname for df in doc.meta.fields if df.fieldtype == "Long Text" and df.fieldname.endswith("_md")]
 
 
@@ -25,7 +30,13 @@ def find_target(space, title, name=None):
 		filters = {"space": space, field: title}
 		if name:
 			filters["name"] = name.strip()
-		found = frappe.db.get_value(dt, filters, "name", order_by="creation asc")
+		if dt == "Life Note":  # a Wiki page first, then a My notes page (UX fixes, set 4)
+			found = frappe.db.sql(f"""select name from `tabLife Note` where space=%(space)s and title=%(title)s
+				{'and name=%(name)s' if name else ''} order by (collection = 'Wiki') desc, creation asc limit 1""",
+				{"space": space, "title": title, "name": (name or "").strip()})
+			found = found[0][0] if found else None
+		else:
+			found = frappe.db.get_value(dt, filters, "name", order_by="creation asc")
 		if found:
 			return dt, found
 	if name:  # the title changed since the link was written; the name still pins it
@@ -125,13 +136,18 @@ def route_of(doctype, name):
 
 
 def outgoing(doc):
-	"""Links stored for this record: link text, target and the target's current title."""
+	"""Links stored for this record: link text, target and the target's current title. `ambiguous` is set when more than one
+	wiki page has the link's title (the link resolves to the oldest; the screen shows a warning)."""
 	rows = frappe.db.sql(
 		"select to_doctype, to_name, link_text from `tabLife Link` where from_doctype=%s and from_name=%s",
 		(doc.doctype, doc.name), as_dict=True,
 	)
+	pinned = {m.group(1).strip().lower() for m in LINK_RE.finditer("\n".join(doc.get(f) or "" for f in md_fields(doc))) if m.group(2)}
 	out = []
 	for r in rows:
-		out.append({"text": r.link_text, "doctype": r.to_doctype, "name": r.to_name,
+		ambiguous = False
+		if r.to_doctype == "Life Note" and (r.link_text or "").lower() not in pinned:
+			ambiguous = frappe.db.count("Life Note", {"space": doc.space, "collection": "Wiki", "title": r.link_text}) > 1
+		out.append({"text": r.link_text, "doctype": r.to_doctype, "name": r.to_name, "ambiguous": ambiguous,
 			"title": title_of(r.to_doctype, r.to_name), "route": route_of(r.to_doctype, r.to_name)})
 	return out

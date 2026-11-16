@@ -43,6 +43,8 @@ import ChatPane from './ChatPane.vue'
 import EntryPane from './EntryPane.vue'
 import DayPane from './DayPane.vue'
 import NotePane from './NotePane.vue'
+import SourcePane from './SourcePane.vue'
+import ChangePane from './ChangePane.vue'
 import PlainPane from './PlainPane.vue'
 import { closePane, openRef } from '@/lib/pane'
 
@@ -51,6 +53,6 @@ const props = defineProps({ cur: Object, meta: Object, label: String, missing: B
 const tabs = computed(() => (props.missing ? [] : props.meta.tabs || []))
 const ptab = useUrlTab('ptab', tabs, { replace: true })
 defineEmits(['meta', 'missing', 'changed', 'restore'])
-const VIEW = { task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, project: ProjectPane,
+const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, project: ProjectPane,
   goal: GoalPane, page: PagePane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, checkin: PlainPane, month: PlainPane }
 </script>

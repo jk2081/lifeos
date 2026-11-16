@@ -209,3 +209,85 @@ def remove():
 				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)
 	n = seed._remove(seed.DEMO_KEY)
 	return f"Demo data removed: {n} records."
+
+
+# ---------- UX fixes, set 4: sources and the wiki ----------
+DEMO4_KEY = "lifeos_demo_v4_records"
+DIGEST = """## Needs your attention
+- Mithun Sarkar: the December despatch dates need your yes [Open](https://mail.google.com/mail/u/0/#inbox/demo-mithun)
+- Vivek: two papers missing for the ITR [Open](https://mail.google.com/mail/u/0/#inbox/demo-vivek)
+
+## Waiting on others
+- The auditors: scope letter promised for Friday [Open](https://mail.google.com/mail/u/0/#inbox/demo-audit)
+
+## Dates and deadlines
+- 20 Nov: board meeting, Kolkata
+- 30 Nov: advance tax instalment
+
+## FYI from people
+- Anya: photos from the school trip
+
+## Company information
+- Q3 tea prices at the Kolkata auction are out
+
+## Left out
+- 23 newsletters and 6 notifications
+"""
+
+
+def load_v4(space="Private"):
+	"""Example sources and wiki pages for the Sources and Wiki screens. Remove with lifeos.demo.remove_v4."""
+	from lifeos.api import inbox, wiki
+
+	if frappe.parse_json(frappe.db.get_default(DEMO4_KEY) or "[]"):
+		return "The set 4 demo is already loaded. Run lifeos.demo.remove_v4 first."
+	owner, agent = _user(devtools.OWNER), _user(devtools.AGENT)
+	frappe.set_user(owner)
+	permissions.clear_cache()
+	t = seed.Tracker(DEMO4_KEY)
+	area = {a.area_name: a.name for a in frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set")}, fields=["name", "area_name"])}
+	made = []
+	for title, stype, text, intent, extra in (
+		("Email digest, 16 Nov", "Email Digest", DIGEST, "Process", {"source_system": "gmail", "external_id": "demo-digest-2026-11-16"}),
+		("Fair trade premium, explained", "Web", "What the fair trade premium is and how estates use it.", "Add to wiki", {"source_url": "https://example.com/fair-trade-premium"}),
+		("Mithun on the Ghatia factory", "Message", "Mithun Sarkar runs production at the Ghatia factory. He wants a second dryer before March.", "Add to wiki", {}),
+		("Receipt, nursery stock", "Message", "Receipt for 2,000 clone plants from the nursery.", "Just keep", {}),
+	):
+		item = inbox.create_item(title=title, source_type=stype, space=space, raw_text=text, intent=intent, **extra)
+		t.records.append(["Life Inbox Item", item["name"]])
+		made.append(item["name"])
+	frappe.set_user(agent)
+	permissions.clear_cache()
+	fake = devtools.load_fake_agent()
+	for _ in made:
+		fake.process_one(devtools.LocalClient(), log=lambda *a: None)
+	src = {"doctype": "Life Inbox Item", "name": made[2]}
+	for title, summary, body, a in (
+		("Mithun Sarkar", "Production manager at the Ghatia factory.", "# Mithun Sarkar\n\nRuns production at the [[Ghatia factory]]. Wants a second dryer before March.\n\nSee [[Dalmia Gold blend blueprint]].", "Tea & Coffee"),
+		("Ghatia factory", "The tea factory at the Ghatia estate.", "# Ghatia factory\n\nManaged by [[Mithun Sarkar]].\n\n## Machines\n\n- One dryer\n- Two rollers\n", "Tea & Coffee"),
+		("Fair trade premium", "A sum paid on top of the price for community projects.", "# Fair trade premium\n\nPaid per kilo on top of the price. Spent by a joint body on community projects.", "Business That Works"),
+	):
+		try:
+			p = wiki.create_page(space=space, title=title, summary=summary, content_md=body, area=area.get(a), sources=[src], change_note="From a demo source.", source=src)
+			t.records.append(["Life Note", p["name"]])
+		except frappe.DuplicateEntryError:
+			pass
+	frappe.set_user("Administrator")
+	for name in frappe.get_all("Life Note", filters={"space": space, "collection": "Wiki"}, pluck="name"):
+		if ["Life Note", name] not in t.records:
+			t.records.append(["Life Note", name])
+	t.save()
+	frappe.db.commit()
+	return f"Set 4 demo loaded into {space}: {len(t.records)} records."
+
+
+def remove_v4():
+	items = [n for dt, n in frappe.parse_json(frappe.db.get_default(DEMO4_KEY) or "[]") if dt == "Life Inbox Item"]
+	for item in items:
+		for dt in ("Life Task", "Life Note"):
+			for name in frappe.get_all(dt, filters={"inbox_item": item}, pluck="name"):
+				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)
+	notes = [n for dt, n in frappe.parse_json(frappe.db.get_default(DEMO4_KEY) or "[]") if dt == "Life Note"]
+	frappe.db.delete("Life Wiki Change", {"note": ("in", notes or [""])})
+	n = seed._remove(DEMO4_KEY)
+	return f"Set 4 demo removed: {n} records."

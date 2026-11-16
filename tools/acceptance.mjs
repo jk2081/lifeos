@@ -464,28 +464,28 @@ const num = (text, which = 0) => { const m = String(text).match(/\d+/g); if (!m)
 const ROW = '[data-row]'
 const LISTS = [
   ['Inbox', '/life/inbox?all=1'], ['Timeline', '/life/timeline?all=1'], ['Tasks', '/life/tasks?view=list'],
-  ['Projects', '/life/projects?all=1'], ['Vault', '/life/vault?all=1'], ['Chats', '/life/chats?all=1'],
+  ['Projects', '/life/projects?all=1'], ['Vault', '/life/vault?all=1'], ['Sources', '/life/sources?all=1'],
   ['Library list', '/life/library?view=list&all=1'], ['Archive', '/life/archive?all=1'],
 ].map(([name, p]) => [name, p, ROW])
 // one filter for each ListView, set through the library's quick-filter strip: [screen, path, URL key, URL value, the control's label, the option to pick, text to type for a Link]
 const FILTERS = [
-  ['Inbox', '/life/inbox?status=all', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
+  ['Inbox', '/life/inbox?all=1', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
   ['Tasks table', '/life/tasks?view=table&status=all', 'priority', 'I', 'Priority', 'I'], ['Projects', '/life/projects?status=all', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
-  ['Vault', '/life/vault?all=1', 'type', 'Travel', 'Doc Type', 'Travel'], ['Chats', '/life/chats?all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
+  ['Vault', '/life/vault?all=1', 'type', 'Travel', 'Doc Type', 'Travel'], ['Sources', '/life/sources?all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
   ['Library list', '/life/library?view=list&all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'], ['Archive', '/life/archive?all=1', 'area', uxArea, 'Area', 'Tea & Coffee', 'Tea'],
 ]
 // UX fixes, set 3: the state tabs of each list screen. [screen, path, the URL parameter of the tabs, the tab values in order (the first is the default), another filter]
 const STATE_TABS = [
-  ['Inbox', '/life/inbox', 'status', ['To Review', 'Waiting', 'Failed', 'Done', 'all'], 'source_type=Message'],
+  ['Inbox', '/life/inbox', 'status', ['To Review', 'Waiting', 'Failed'], 'source_type=Message'],
   ['Tasks', '/life/tasks', 'status', ['open', 'loops', 'Waiting', 'Done', 'all'], `area=${uxArea}`],
   ['Projects', '/life/projects', 'status', ['Active', 'On Hold', 'Done', 'Dropped', 'all'], `area=${uxArea}`],
   ['Archive', '/life/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'Life Journal Page'], `area=${uxArea}`],
-  ['Chats', '/life/chats', 'open_items', ['all', '1'], `area=${uxArea}`],
+  ['Sources', '/life/sources', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'articles', 'email', 'text'], `area=${uxArea}`],
   ['Vault', '/life/vault', 'expiry', ['all', 'soon', 'expired'], 'type=Other'],
 ]
 
 // UX fixes, set 4: the lists whose Area filter must offer only active areas of the current space
-const AREA_FILTER_SCREENS = ['/life/tasks?all=1', '/life/projects?all=1']
+const AREA_FILTER_SCREENS = ['/life/tasks?all=1', '/life/projects?all=1', '/life/sources?all=1', '/life/wiki']
 
 for (const width of [1440, 390]) {
   const phone = width < 800
@@ -668,12 +668,11 @@ for (const width of [1440, 390]) {
     await door('/life/projects?all=1', 'project-tasks', { which: 1, path: '/life/tasks' })
     await door(proj, 'project-tasks', { which: 1, path: '/life/tasks' })
     await door(proj, 'project-overview-tasks', { path: proj, target: tabList })
-    await door('/life/chats?from=' + addDays(-6), 'chats-open', { path: '/life/chats' })
+    await door('/life/sources?tab=chats&view=list&from=' + addDays(-6), 'chats-open', { path: '/life/sources' })
     must(new URL(pg.url()).searchParams.get('from') === addDays(-6) && new URL(pg.url()).searchParams.get('open_items') === '1', 'chats: the date range was not kept')
-    await door('/life/chats?all=1', 'chats-area', { path: '/life/chats' })
     await door('/life/vault?all=1', 'vault-soon', { path: '/life/vault' })
     await door('/life/vault?all=1', 'vault-expired', { path: '/life/vault' })
-    await door('/life/library', 'library-notes', { path: '/life/library' })
+    await door('/life/library?view=tree', 'library-notes', { path: '/life/library' })
     await door('/life/journal/review', 'review-done', { path: '/life/tasks' })
     await door('/life/journal/review', 'review-carried', { path: '/life/tasks', ...hidden })
     await door('/life/journal/review', 'review-loops', { path: '/life/tasks' })
@@ -727,7 +726,7 @@ for (const width of [1440, 390]) {
 
   await check(`${tag}.6`, `${width} px: no horizontal scrolling and no script errors on any converted screen`, async () => {
     const screens = [...LISTS.map(([n, p]) => [n, p]), ['Tasks table', '/life/tasks?view=table'], ['Tasks board', '/life/tasks?view=board'], ['Open loops', '/life/tasks?view=loops'],
-      ['Projects cards', '/life/projects?view=cards'], ['Library tree', '/life/library'], ['Area', '/life/areas/' + uxArea], ['Project', '/life/projects/' + ux.project],
+      ['Projects cards', '/life/projects?view=cards'], ['Library tree', '/life/library?view=tree'], ['Area', '/life/areas/' + uxArea], ['Project', '/life/projects/' + ux.project],
       ['Today', '/life'], ['Areas', '/life/areas'], ['Calendar', '/life/calendar/agenda'], ['Calendar month', '/life/calendar/month'], ['12 Week Year', '/life/journal'], ['Goals', '/life/journal/goals'],
       ['Month', '/life/journal/month'], ['Habits', '/life/journal/habits'], ['Check-ins', '/life/journal/checkins'], ['Pages', '/life/journal/pages'], ['Weekly review', '/life/journal/review'],
       ['Graph', '/life/graph'], ['Settings', '/life/settings']]
@@ -860,7 +859,6 @@ for (const width of [1440, 390]) {
     await lands('/life', 'today-review', 'To Review')
     await lands('/life', 'today-vault', 'soon')
     await lands('/life/vault?all=1', 'vault-expired', 'expired')
-    await lands('/life/chats?all=1', 'chats-open', '1')
     // Tasks: Open loops is a tab with its explanation, the layout switch has three options, the board is not offered on Done
     const layouts = async () => (await pg.locator('[role="radiogroup"]:visible [role="radio"]').allInnerTexts()).map((t) => t.trim())
     await s.open('/life/tasks?status=loops')
@@ -912,9 +910,9 @@ for (const width of [1440, 390]) {
     const f = JSON.stringify([['status', 'in', ['Active', 'On Hold']], ['is_archived', '=', 0]])
     const PAGES = [
       ['/life/areas/' + uxArea, [['projects', `/life/projects?area=${uxArea}&f=${encodeURIComponent(f)}`], ['tasks', `/life/tasks?area=${uxArea}&view=list`],
-        ['notes', `/life/library?view=list&area=${uxArea}`], ['documents', `/life/vault?area=${uxArea}`], ['chats', `/life/chats?area=${uxArea}`], ['timeline', `/life/timeline?area=${uxArea}`]]],
+        ['notes', `/life/library?view=list&area=${uxArea}`], ['wiki', `/life/wiki?area=${uxArea}`], ['documents', `/life/vault?area=${uxArea}`], ['chats', `/life/sources?tab=chats&view=list&area=${uxArea}`], ['timeline', `/life/timeline?area=${uxArea}`]]],
       ['/life/projects/' + ux.project, [['tasks', `/life/tasks?project=${ux.project}&view=list`], ['notes', `/life/library?view=list&project=${ux.project}`],
-        ['documents', `/life/vault?project=${ux.project}`], ['chats', `/life/chats?project=${ux.project}`], ['links', null]]],
+        ['documents', `/life/vault?project=${ux.project}`], ['chats', `/life/sources?tab=chats&view=list&project=${ux.project}`], ['links', null]]],
     ]
     let n = 0
     for (const [page, tabs] of PAGES) {
@@ -1118,7 +1116,7 @@ for (const width of [1440, 390]) {
     let step = 'start'
     try {
     await s.api('views.save', { screen: 'sidebar', space: SPACE, state: { closed: [], open_areas: [], rail: false } }) // start from the default state
-    const want = { main: ['Today', 'Inbox', 'Tasks', 'Calendar'], plan: ['Journal', 'Goals', 'Projects'], records: ['Notes', 'Vault', 'Chats', 'Timeline'] }
+    const want = { main: ['Today', 'Inbox', 'Tasks', 'Calendar'], plan: ['Journal', 'Goals', 'Projects'], records: ['Sources', 'Notes', 'Wiki', 'Vault', 'Timeline'] }
     const areas = (await s.api('area.tree', { space: SPACE })).areas
     const top = areas.filter((x) => !x.parent_area)
     if (phone) {
@@ -1303,7 +1301,7 @@ for (const width of [1440, 390]) {
       ['note:' + leaf, ['Note', 'Links']],
       ['project:' + one('Life Project', 'is_archived=0'), ['Overview', 'Tasks']],
       ['goal:' + one('Life Goal'), null], // Actions, Tasks, History across cycles, Links (Annual and Open goals have no History)
-      ['chat:' + one('Life Chat Log', 'is_archived=0'), ['Summary', 'Open items', 'Links']],
+      ['chat:' + one('Life Chat Log', "is_archived=0 and ifnull(transcript_md, '')=''"), ['Summary', 'Open items', 'Made from this', 'Links']],
       ['page:' + one('Life Journal Page'), ['Page', 'Transcript', 'Created from this page']],
       ['vault:' + one('Life Vault Document', 'is_archived=0'), ['Details', 'File']],
       ['day:' + today, []], ['vault:new', []],
@@ -1338,7 +1336,7 @@ for (const width of [1440, 390]) {
     await settle()
     must(!(await pane.isVisible()), 'Back after changing the pane tab did not close the pane')
     // a count of open items opens the chat on its Open items tab
-    await s.open('/life/chats?open_items=1&view=table')
+    await s.open('/life/sources?tab=chats&open_items=1&view=list')
     const door = pg.locator('[data-door="chat-items"]:visible').first()
     if (await door.count()) {
       const n = num(await door.innerText())
@@ -1424,10 +1422,16 @@ for (const width of [1440, 390]) {
         const box = (phone ? controls() : controls().locator('[data-quick-filters]')).locator('[aria-label="Area"]').first()
         const more = controls().getByRole('button', { name: /\d+ more/ })
         if (!(await box.count()) && await more.count()) { await more.first().click(); await pg.waitForTimeout(200) }
-        await box.click()
-        await pg.keyboard.type('S4 ', { delay: 20 })
-        await pg.waitForTimeout(1100)
-        const opts = await pg.getByRole('option').allInnerTexts()
+        await box.waitFor({ state: 'visible' })
+        await settle()
+        let opts = []
+        for (let attempt = 0; attempt < 2 && !opts.some((o) => o.includes(stamp)); attempt++) { // the list may still be drawing on a first visit
+          await box.click()
+          await pg.keyboard.press('ControlOrMeta+a')
+          await pg.keyboard.type('S4 ', { delay: 20 })
+          await pg.waitForTimeout(1100)
+          opts = await pg.getByRole('option').allInnerTexts()
+        }
         await pg.keyboard.press('Escape')
         await closeControls()
         return opts.filter((o) => o.includes(stamp))
@@ -1446,8 +1450,312 @@ for (const width of [1440, 390]) {
     }
   })
 
+
+  // Python on the acceptance site as the agent, answering JSON on its last line
+  const asAgent = (code) => JSON.parse(bench(`frappe.set_user("hermes@lifeos.test")\nimport json\nfrom lifeos.api import wiki, library, sources, inbox, chats\nfrom lifeos import permissions\npermissions.clear_cache()\n${code}`).split('\n').pop())
+  const editorEnd = async () => { await pg.locator('[data-live-editor] .cm-content').first().click(); await pg.keyboard.press('ControlOrMeta+End') }
+  const docOf = (name) => s.api('library.get', { note: name })
+
+  await check(`${tag}.21`, `${width} px: intent: Just keep is in Sources, not the Inbox, with text and no proposals; Add to wiki writes pages and leaves no wiki proposals`, async () => {
+    // Just keep, dropped through the box
+    await s.open('/life/inbox')
+    if (!(await pg.locator('[data-dropzone] textarea').count())) await pg.getByRole('button', { name: 'Or paste text instead' }).click()
+    await pg.locator('[data-dropzone] textarea').fill(`S4 keep ${width} ${stamp}\nA note to keep.`)
+    await pg.locator('[data-intent]').getByText('Just keep', { exact: true }).click()
+    await pg.getByRole('button', { name: 'Add to Inbox' }).click()
+    await pg.waitForTimeout(1200)
+    const kept = (await s.api('inbox.list', { space: SPACE, page_length: 5, filters: [['title', 'like', `S4 keep ${width} ${stamp}%`]] })).items[0]
+    must(kept, 'the Just keep item was not created')
+    runAgent()
+    const got = await s.api('inbox.get', { item: kept.name })
+    must(got.intent === 'Just keep' && got.status === 'Done', `Just keep: ${got.intent}, ${got.status}`)
+    must((got.transcript_md || '').includes('A note to keep'), 'Just keep: no text')
+    must(!got.proposals.length, 'Just keep: it has proposals')
+    const queue = await s.api('inbox.list', { space: SPACE, page_length: 100, status: JSON.stringify(['To Review', 'New', 'Processing', 'Failed']) })
+    must(!queue.items.some((i) => i.name === kept.name), 'the Just keep item is still in the Inbox')
+    await s.open(`/life/sources?tab=text`)
+    must((await pg.locator('[data-main]').innerText()).includes(`S4 keep ${width} ${stamp}`), 'the Just keep item is not in Sources')
+    // the intent is remembered
+    await s.open('/life/inbox')
+    await pg.waitForTimeout(1200)
+    await pg.reload({ waitUntil: 'networkidle' })
+    const keepBtn = pg.locator('[data-intent] button, [data-intent] [role="radio"]').filter({ hasText: 'Just keep' }).first()
+    must(await keepBtn.evaluate((e) => ['true'].includes(e.getAttribute('aria-checked')) || ['on', 'checked', 'active'].includes(e.getAttribute('data-state')) || e.getAttribute('aria-pressed') === 'true'),
+      'the last intent is not remembered')
+    await pg.locator('[data-intent]').getByText('Process', { exact: true }).click()
+    // Add to wiki: pages are created and edited directly; no wiki proposals for review
+    const w = await s.api('inbox.create_item', { title: `S4 wiki ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'Mithun runs the Ghatia factory.', intent: 'Add to wiki' })
+    runAgent()
+    const wi = await s.api('inbox.get', { item: w.name })
+    must(wi.status === 'Done' && !wi.proposals.some((p) => p.kind === 'Note'), `Add to wiki: ${wi.status}, ${wi.proposals.map((p) => p.kind)}`)
+    const pages = (await s.api('wiki.pages', { space: SPACE, page_length: 200 })).pages
+    const page = pages.find((p) => p.title === `S4 wiki ${width} ${stamp}`)
+    must(page, 'Add to wiki did not create a page')
+    const changes = (await s.api('wiki.changes', { space: SPACE, page_length: 50 })).changes
+    must(changes.some((c) => c.note === page.name && c.change_type === 'Created') && changes.some((c) => c.note_title === 'Inbox log' && c.change_type === 'Edited' && c.source_name === w.name),
+      'Add to wiki did not create one page and edit another')
+    return 'Just keep and Add to wiki'
+  })
+
+  await check(`${tag}.22`, `${width} px: Sources: each tab's count matches its rows; Photos shows thumbnails; Made from this lists the task and the wiki page; /chats lands on the Chats tab`, async () => {
+    // a photo with a thumbnail
+    const photo = await s.api('inbox.create_item', { title: `S4 photo ${width} ${stamp}`, source_type: 'Upload', space: SPACE, intent: 'Just keep' })
+    await s.upload('Life Inbox Item', photo.name, `s4-${stamp}.png`, 'image/png', await pg.screenshot())
+    // a source a task and a wiki page are made from
+    const src = await s.api('inbox.create_item', { title: `S4 source ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'Call the estate manager about drains.' })
+    runAgent()
+    const it = await s.api('inbox.get', { item: src.name })
+    const p = it.proposals.find((x) => x.status === 'Pending')
+    must(p, 'the agent proposed nothing for the source')
+    await s.api('review.decide', { proposal: p.name, decision: 'accept', payload: { ...p.payload, kind: undefined, title: `S4 made ${width} ${stamp}`, area: p.payload.area || areaId('Personal') } })
+    const made = await asAgent(`print(json.dumps(wiki.create_page(space="${SPACE}", title="S4 cites ${width} ${stamp}", summary="Cites a source", content_md="From a source.", sources=[{"doctype": "Life Inbox Item", "name": "${src.name}"}])))`)
+    // tab counts equal the rows each tab lists
+    const res = await s.api('sources.list', { space: SPACE, page_length: 200 })
+    for (const [t, n] of Object.entries(res.tabs)) {
+      await s.open(`/life/sources?tab=${t}&view=list`)
+      const shown = await pg.locator('[data-state-tabs] [role="tab"]').filter({ hasText: new RegExp('^\\s*' + { all: 'All', chats: 'Chats', voice: 'Voice', documents: 'Documents', photos: 'Photos', articles: 'Articles', email: 'Email', text: 'Text' }[t]) }).first().innerText()
+      must(num(shown) === n, `${t}: the tab says ${shown}, the server ${n}`)
+      const listed = (await s.api('sources.list', { space: SPACE, tab: t, page_length: 200 })).total
+      must(listed === n, `${t}: ${listed} rows, the tab says ${n}`)
+      if (n && n <= 50) must((await pg.locator(ROW).count()) === n, `${t}: ${await pg.locator(ROW).count()} rows on screen, the tab says ${n}`)
+    }
+    // the Photos grid shows thumbnails (the grid is the Photos tab's first view; the loop above left List remembered, so ask for it)
+    await s.open('/life/sources?tab=photos&view=grid')
+    const thumbs = await pg.locator('[data-source-grid] img[data-thumb]').evaluateAll((els) => els.map((e) => e.getAttribute('src')))
+    must(thumbs.length && thumbs.every((u) => /-thumb\.jpg$/.test(u)), `the Photos grid does not show thumbnails: ${thumbs.slice(0, 3)}`)
+    // Made from this
+    await s.open(`/life/sources?open=source:${src.name}&ptab=made`)
+    const madeText = await pg.locator('[data-source-made]').innerText()
+    must(madeText.includes(`S4 made ${width} ${stamp}`) && madeText.includes(`S4 cites ${width} ${stamp}`), 'Made from this does not list the task and the wiki page')
+    must(made.name, 'no page')
+    // /chats lands on the Chats tab, with its filters
+    await s.open(`/life/chats?area=${uxArea}`)
+    must(/\/life\/sources\?/.test(pg.url()) && pg.url().includes('tab=chats') && pg.url().includes(`area=${uxArea}`), `/chats went to ${pg.url()}`)
+    return `${Object.keys(res.tabs).length} tabs`
+  })
+
+  await check(`${tag}.23`, `${width} px: editor: headings, bold, checklists and [[links]] render; Cmd-B; the / menu inserts a table; a pasted image shows; Show Markdown; no Edit or Done`, async () => {
+    const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR4nGP8z8Dwn4GBgYGJAQoAADkVAgHaTGUJAAAAAElFTkSuQmCC'
+    const tryEditor = async (where) => {
+      await editorEnd()
+      await pg.keyboard.type(`\n## Title ${stamp}\nsome `, { delay: 5 })
+      await pg.keyboard.press('ControlOrMeta+b')
+      await pg.keyboard.type('boldword', { delay: 5 })
+      await pg.keyboard.press('End')
+      await pg.keyboard.type('\n- [ ] a check item\nsee [[Dalmia Gold blend', { delay: 5 })
+      await pg.waitForTimeout(1300)
+      await pg.keyboard.press('Enter') // pick the record
+      await pg.keyboard.type('\n\n', { delay: 5 })
+      await pg.keyboard.type('/tab', { delay: 80 })
+      await pg.waitForTimeout(700)
+      await pg.keyboard.press('Enter')
+      await pg.waitForTimeout(300)
+      await pg.keyboard.press('ControlOrMeta+End')
+      await pg.keyboard.type('\nend line', { delay: 5 })
+      // a pasted image
+      await pg.evaluate((b64) => {
+        const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+        const dt = new DataTransfer()
+        dt.items.add(new File([bin], 'pasted.png', { type: 'image/png' }))
+        document.querySelector('[data-live-editor] .cm-content').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+      }, PNG)
+      await pg.waitForTimeout(2500)
+      await pg.keyboard.press('ControlOrMeta+End')
+      const ed = pg.locator('[data-live-editor]').first()
+      must((await ed.locator('.cm-lp-h2').allInnerTexts()).some((t) => t.includes(`Title ${stamp}`)), `${where}: the heading does not render`)
+      must((await ed.locator('.cm-lp-strong').allInnerTexts()).includes('boldword'), `${where}: Cmd-B did not make bold`)
+      must(await ed.locator('.cm-lp-task').count(), `${where}: the checklist has no box`)
+      must((await ed.locator('.cm-lp-chip').allInnerTexts()).some((t) => t.includes('Dalmia Gold blend')), `${where}: the [[link]] is not a chip`)
+      must(await ed.locator('.cm-lp-table table').count(), `${where}: the / menu did not insert a table`)
+      must(await ed.locator('img.cm-lp-img[src*="/files/"]').count(), `${where}: the pasted image does not show`)
+      must(!(await pg.getByRole('button', { name: /^(Edit|Done|Hide preview)$/ }).count()), `${where}: an Edit, Done or Hide preview button`)
+      if (phone) {
+        const bar = await pg.locator('[data-editor-toolbar]').first().boundingBox()
+        const btn = await pg.locator('[data-editor-toolbar] [data-tool="bold"]').first().boundingBox()
+        must(bar && btn && btn.x >= 0 && btn.x + btn.width <= width && btn.height >= 28, `${where}: the toolbar is not usable at 390 px`)
+      }
+    }
+    await s.open('/life/dev/editor')
+    await tryEditor('dev page')
+    await pg.locator('[data-note-menu]').click()
+    await pg.getByRole('menuitem', { name: 'Show Markdown' }).click()
+    await settle()
+    must(await pg.locator('[data-live-editor][data-raw]').count() && !(await pg.locator('[data-live-editor] .cm-lp-h2').count()), 'Show Markdown did not show the plain text')
+    must((await pg.locator('[data-live-editor] .cm-content').innerText()).includes('# Estate visit, November'), 'the raw text is not shown')
+    // a real note
+    const note = await s.api('library.save', { space: SPACE, title: `S4 editor ${width} ${stamp}`, content_md: 'Start.', area: areaId('Learning') })
+    await s.open(`/life/library/${note.name}`)
+    await tryEditor('a note')
+    await pg.waitForTimeout(2200)
+    const saved = (await docOf(note.name)).content_md
+    must(saved.includes(`## Title ${stamp}`) && saved.includes('**boldword**') && saved.includes('- [ ] a check item') && saved.includes('[[Dalmia Gold blend blueprint') &&
+      saved.includes('| Column | Column |') && /!\[pasted\]\(\/private\/files\//.test(saved), 'the note did not save the Markdown: ' + saved.slice(0, 200))
+    return 'dev page and a note'
+  })
+
+  await check(`${tag}.24`, `${width} px: conflict: an agent edits the open page; typing then saving shows the conflict and nothing is lost`, async () => {
+    const page = await asAgent(`print(json.dumps(wiki.create_page(space="${SPACE}", title="S4 conflict ${width} ${stamp}", summary="A page", content_md="Agent text.")))`)
+    await s.open(`/life/library/${page.name}`)
+    await editorEnd()
+    await asAgent(`p = wiki.get_page("${page.name}")\nprint(json.dumps(wiki.update_page("${page.name}", content_md="Agent text, edited.", base_version=p["version"], change_note="edit")))`)
+    await pg.keyboard.type(' Mine too.', { delay: 10 })
+    await pg.waitForTimeout(2600)
+    must(await pg.locator('[data-conflict]').count(), 'no conflict message')
+    must((await pg.getByRole('dialog').filter({ has: pg.locator('[data-conflict]') }).innerText()).includes('This page changed while you were editing'), 'the conflict message is not the agreed one')
+    must((await docOf(page.name)).content_md === 'Agent text, edited.', 'the agent text was overwritten')
+    await pg.locator('[data-conflict-diff]').click()
+    must(await pg.locator('[data-conflict] [data-diff]').count(), 'View changes shows no diff')
+    await pg.locator('[data-conflict-keep]').click()
+    await pg.waitForTimeout(1500)
+    must((await docOf(page.name)).content_md.includes('Mine too.'), 'Keep mine did not save the typed text')
+    return 'kept'
+  })
+
+  await check(`${tag}.25`, `${width} px: wiki rules: the agent cannot edit My notes or the rules page; a stale version is a conflict; Undo restores and logs Reverted; Keep in My notes stops the agent`, async () => {
+    const mine = await s.api('library.save', { space: SPACE, title: `S4 mine ${width} ${stamp}`, content_md: 'mine', area: areaId('Learning') })
+    const refused = await asAgent(`out = {}
+for key, fn in (("mine", lambda: wiki.update_page("${mine.name}", content_md="x", base_version=wiki.get_page("${mine.name}")["version"])),
+		("rules", lambda: wiki.update_page(wiki.rules("${SPACE}")["name"], content_md="x", base_version=wiki.rules("${SPACE}")["version"]))):
+	try:
+		fn(); out[key] = "allowed"
+	except frappe.PermissionError:
+		out[key] = "refused"
+	frappe.db.rollback()
+p = wiki.create_page(space="${SPACE}", title="S4 rules ${width} ${stamp}", summary="r", content_md="One.")
+v = wiki.get_page(p["name"])["version"]
+wiki.update_page(p["name"], content_md="One. Two.", base_version=v, change_note="add two")
+out["stale"] = wiki.update_page(p["name"], content_md="Lost", base_version=v)["conflict"]
+out["page"] = p["name"]
+frappe.db.commit()
+print(json.dumps(out))`)
+    must(refused.mine === 'refused' && refused.rules === 'refused', `the agent could edit: ${JSON.stringify(refused)}`)
+    must(refused.stale === true, 'a stale base_version was not a conflict')
+    // Undo, from the page's History in the pane
+    const change = (await s.api('wiki.changes', { space: SPACE, note: refused.page })).changes[0]
+    await s.open(`/life/wiki?tab=changes&open=change:${change.name}`)
+    await pg.locator('[data-undo]').click()
+    await pg.waitForTimeout(1200)
+    must((await docOf(refused.page)).content_md === 'One.', 'Undo did not restore the previous text')
+    const latest = (await s.api('wiki.changes', { space: SPACE, note: refused.page })).changes[0]
+    must(latest.change_type === 'Reverted', 'Undo did not write a Reverted change')
+    // Keep in My notes, from the pane
+    await s.open(`/life/wiki?open=note:${refused.page}`)
+    await pg.locator('[data-move-collection]').click()
+    await pg.waitForTimeout(900)
+    const after = await asAgent(`try:
+	wiki.update_page("${refused.page}", content_md="x", base_version=wiki.get_page("${refused.page}")["version"])
+	print(json.dumps("allowed"))
+except frappe.PermissionError:
+	print(json.dumps("refused"))`)
+    must(after === 'refused', 'the agent can still edit a page kept in My notes')
+    return 'refused, conflict, undone, kept'
+  })
+
+  await check(`${tag}.26`, `${width} px: Health lists a broken [[link]] and an orphan page`, async () => {
+    const p = await s.api('wiki.create_page', { space: SPACE, title: `S4 orphan ${width} ${stamp}`, summary: 'An orphan', content_md: `Points to [[S4 nowhere ${width} ${stamp}]].` })
+    await s.open('/life/wiki?tab=health')
+    await pg.locator('[data-health-refresh]').click()
+    await pg.waitForTimeout(1500)
+    must((await pg.locator('[data-health="orphans"]').innerText()).includes(`S4 orphan ${width} ${stamp}`), 'the orphan is not under Health')
+    must((await pg.locator('[data-health="broken"]').innerText()).includes(`S4 nowhere ${width} ${stamp}`), 'the broken link is not under Health')
+    must(p.name, '')
+  })
+
+  if (!phone) await check(`${tag}.27`, 'streams: chats.log twice with one external_id leaves one log; importing the Claude and ChatGPT fixtures creates the expected logs, and again creates and updates none', async () => {
+    const ext = `s4-${stamp}`
+    const a = await s.api('chats.log', { space: SPACE, title: `S4 stream ${stamp}`, source_system: 'claude', external_id: ext, open_items: ['One'] })
+    const b = await s.api('chats.log', { space: SPACE, title: `S4 stream ${stamp}, renamed`, source_system: 'claude', external_id: ext, open_items: ['One', 'Two'] })
+    must(a.created && !b.created && a.name === b.name, 'the second log was not an update')
+    const got = await s.api('chats.get', { chat: a.name })
+    must(got.title.endsWith('renamed') && got.open_items.length === 2, 'the log was not updated')
+    const fixtures = path.join(root, 'lifeos/tests/fixtures')
+    const importOnce = async (system, file) => {
+      const up = await s.page.request.post(base + '/api/method/upload_file', { headers: { 'X-Frappe-CSRF-Token': await pg.evaluate(() => window.csrf_token) },
+        multipart: { is_private: '1', file: { name: file, mimeType: 'application/zip', buffer: fs.readFileSync(path.join(fixtures, file)) } } })
+      must(up.ok(), 'upload failed ' + up.status())
+      const url = (await up.json()).message.file_url
+      await s.api('connections.start_import', { space: SPACE, system, file_url: url })
+      for (let i = 0; i < 60; i++) {
+        const st = await s.api('connections.import_status', { space: SPACE, system })
+        if (st.status === 'Done' || st.status === 'Failed') return st
+        await pg.waitForTimeout(1000)
+      }
+      throw new Error(`${system}: the import did not finish (is a worker running?)`)
+    }
+    const c1 = await importOnce('claude', 'claude_export.zip')
+    must(c1.status === 'Done' && c1.created === 2 && c1.skipped === 1, `Claude: ${JSON.stringify(c1)}`)
+    const g1 = await importOnce('chatgpt', 'chatgpt_export.zip')
+    must(g1.status === 'Done' && g1.created === 2 && g1.skipped === 1, `ChatGPT: ${JSON.stringify(g1)}`)
+    const c2 = await importOnce('claude', 'claude_export.zip')
+    const g2 = await importOnce('chatgpt', 'chatgpt_export.zip')
+    must(!c2.created && !c2.updated && !g2.created && !g2.updated, `the second import changed something: ${JSON.stringify([c2, g2])}`)
+    await s.open('/life/sources?tab=chats')
+    must((await pg.locator('[data-main]').innerText()).includes('Blend sheet for Dalmia Gold'), 'the imported chat is not on the Chats tab')
+    return 'two systems'
+  })
+
+  await check(`${tag}.28`, `${width} px: an Email Digest renders its sections and Open in Gmail buttons; the proposed reply task shows Open in Gmail`, async () => {
+    const digest = `## Needs your attention\n- Mithun Sarkar: the despatch dates for December [Open](https://mail.google.com/mail/u/0/#inbox/s4${stamp}${width})\n- Ruchi: ITR papers [Open](https://mail.google.com/mail/u/0/#inbox/r${stamp})\n\n## Waiting on others\n- The auditor, scope letter [Open](https://mail.google.com/mail/u/0/#inbox/a${stamp})\n\n## Dates and deadlines\n- 20 Nov: board meeting\n\n## FYI from people\n- Anya: photos from the trip\n\n## Company information\n- Q3 numbers are out\n\n## Left out\n- 14 newsletters`
+    const item = await s.api('inbox.create_item', { title: `S4 digest ${width} ${stamp}`, source_type: 'Email Digest', space: SPACE, raw_text: digest, source_system: 'gmail', external_id: `digest-${width}-${stamp}` })
+    runAgent()
+    await s.open(`/life/sources?tab=email&open=source:${item.name}`)
+    must((await pg.locator('[data-digest-section]').count()) >= 6, 'the digest sections are not headed lists')
+    must((await pg.locator('[data-open-gmail]').count()) >= 3, 'no Open in Gmail buttons')
+    const got = await s.api('inbox.get', { item: item.name })
+    const p = got.proposals.find((x) => x.kind === 'Task')
+    must(p && /mail\.google\.com/.test(p.payload.source_url || ''), 'the reply task has no Gmail link')
+    const res = await s.api('review.decide', { proposal: p.name, decision: 'accept' })
+    const task = res.created_name || (await s.api('inbox.get', { item: item.name })).proposals.find((x) => x.name === p.name).created_name
+    await s.open(`/life/tasks?open=task:${task}`)
+    must((await pg.locator('[data-open-source]').innerText()).includes('Open in Gmail'), 'the task pane has no Open in Gmail')
+  })
+
+  await check(`${tag}.29`, `${width} px: the sidebar's Records are Sources, Notes, Wiki, Vault, Timeline`, async () => {
+    await s.open('/life')
+    if (phone) {
+      await pg.locator('[data-tabbar] [data-slot="mobile-nav-item"][aria-label="More"]').click()
+      await settle()
+    }
+    const text = await pg.locator(phone ? '[role="dialog"]' : '[data-sidebar], aside, nav').first().innerText()
+    const order = ['Sources', 'Notes', 'Wiki', 'Vault', 'Timeline'].map((l) => text.indexOf('\n' + l) >= 0 ? text.indexOf('\n' + l) : text.indexOf(l))
+    must(order.every((i) => i >= 0) && order.every((v, i) => !i || v > order[i - 1]), `Records: ${order}`)
+    must(!/\nChats\n/.test(text), 'Chats is still in the sidebar')
+    if (phone) await pg.keyboard.press('Escape')
+  })
+
+  if (!phone) await check(`${tag}.30`, 'access: the family user sees no Private sources, pages or changes; the agent cannot see a source behind a Vault document while the switch is off', async () => {
+    const item = await s.api('inbox.create_item', { title: `S4 passport scan ${stamp}`, source_type: 'Upload', space: SPACE })
+    const vault = await s.api('vault.save', { space: SPACE, values: { title: `S4 passport ${stamp}`, doc_type: 'ID', area: areaId('Money & Legal') } })
+    bench(`from lifeos import index\nfrappe.db.set_value("Life Inbox Item", "${item.name}", "vault_document", "${vault.name}")\nindex.update(frappe.get_doc("Life Inbox Item", "${item.name}"))\nfrappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", 0)`)
+    const seen = await asAgent(`rows = sources.list(space="${SPACE}", page_length=500)["sources"]
+try:
+	inbox.get("${item.name}"); got = "allowed"
+except Exception:
+	got = "refused"
+print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get": got}))`)
+    must(!seen.listed && seen.get === 'refused', `the agent sees the Vault source: ${JSON.stringify(seen)}`)
+    const fam = await session('family@lifeos.test')
+    try {
+      for (const m of [['sources.list', { space: SPACE }], ['wiki.changes', { space: SPACE }], ['wiki.pages', { space: SPACE }]]) {
+        const r = await fam.api(m[0], m[1], { raw: true })
+        must(r.status() >= 400, `the family member could call ${m[0]} on Private`)
+      }
+      const shared = await fam.api('sources.list', { space: 'Shared', page_length: 500 })
+      must(!shared.sources.some((r) => r.title.includes(stamp) && r.title.startsWith('S4')), 'the family member sees a Private source')
+      await fam.open('/life/sources')
+      must(!(await fam.page.locator('[data-main]').innerText()).includes(`S4 keep`), 'a Private source shows to the family member')
+      const ch = await fam.api('frappe.client.get_count', { doctype: 'Life Wiki Change', filters: { space: SPACE } }, { raw: true })
+      must(!ch.ok() || (await ch.json()).message === 0, 'the family member counts Private wiki changes')
+    } finally { await fam.ctx.close() }
+  })
   await s.ctx.close()
 }
+
+// every check cleans up: this run's records go from the acceptance site too, and none is left
+await check('S4.1', "This run's records are removed from the acceptance site", async () => {
+  const out = bench('from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))').split('\n').pop()
+  must(!Object.keys(JSON.parse(out)).length, 'left on the acceptance site: ' + out)
+})
 
 // lifeos.localhost is the owner's test site: no acceptance run may leave a record there
 await check('S4.0', 'No test debris on lifeos.localhost after the run', async () => {

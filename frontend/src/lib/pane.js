@@ -5,6 +5,8 @@ import router from '@/router'
 export const TYPES = {
   task: { label: 'Task', doctype: 'Life Task' },
   inbox: { label: 'Inbox item', doctype: 'Life Inbox Item' },
+  source: { label: 'Source' }, // an inbox item seen as a source, from the Sources screen
+  change: { label: 'Wiki change' },
   note: { label: 'Note', doctype: 'Life Note' },
   vault: { label: 'Vault document', doctype: 'Life Vault Document' },
   project: { label: 'Project', doctype: 'Life Project' },

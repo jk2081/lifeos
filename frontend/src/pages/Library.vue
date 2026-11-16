@@ -30,6 +30,7 @@
                 :to="`/library/${node.key}`" :aria-current="node.key === id ? 'page' : undefined">
                 <span class="truncate">{{ node.label }}<span v-if="node.note.project_title && node.top" class="text-sm font-normal text-ink-gray-6"> · {{ node.note.project_title }}</span></span>
               </RouterLink>
+              <Button v-else-if="node.more" variant="ghost" size="sm" class="!px-0 text-ink-gray-7" :label="node.label" data-tree-show-all @click.stop="showAll = [...showAll, node.more]" />
               <span v-else class="truncate text-sm-medium text-ink-gray-7">{{ node.label }}</span>
             </div>
           </template>
@@ -40,39 +41,17 @@
 
       <section class="min-w-0 flex-1 px-7 pb-12 pt-6 max-md:p-4" :class="!id && 'max-md:hidden'" data-library-reader>
         <template v-if="note">
-          <Button class="-ml-2 mb-2 md:hidden" variant="ghost" icon-left="lucide-arrow-left" label="All notes" route="/library" />
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0 flex-1">
-              <TextInput v-if="editing" v-model="note.title" size="lg" aria-label="Title" @update:model-value="queue" />
-              <h2 v-else class="read !text-2xl font-semibold !leading-tight text-ink-gray-9">{{ note.title }}</h2>
-              <div class="mt-1 text-sm text-ink-gray-6">{{ [note.area_name, note.project_title, note.parent_title && 'under ' + note.parent_title, 'edited ' + short(note.modified, true)].filter(Boolean).join(' · ') }}
-                <span v-if="editing" data-save-state> · {{ saveState }}</span></div>
-            </div>
-            <div v-if="writable" class="flex gap-2">
-              <Button v-if="editing" :icon-left="preview ? 'lucide-eye-off' : 'lucide-eye'" :label="preview ? 'Hide preview' : 'Preview'" @click="preview = !preview" />
-              <Button :variant="editing ? 'solid' : 'subtle'" :label="editing ? 'Done' : 'Edit'" data-edit @click="toggleEdit" />
-              <Dropdown :options="noteMenu"><Button icon="lucide-ellipsis" label="More" /></Dropdown>
-            </div>
+          <div class="flex items-start gap-2">
+            <Button class="-ml-2 md:hidden" variant="ghost" icon-left="lucide-arrow-left" label="All notes" route="/library" />
+            <div class="flex-1" />
+            <Dropdown :options="noteMenu"><Button icon="lucide-ellipsis" label="More" data-note-menu /></Dropdown>
           </div>
-          <div v-if="editing" class="my-2.5 flex flex-wrap items-center gap-2">
-            <Pick :model-value="note.area" :options="areaOptions()" placeholder="area" @update:model-value="(v) => saveMeta({ area: v || '' })" />
-            <Pick :model-value="note.project" :options="projectOptions" prefix="Project: " placeholder="project" @update:model-value="(v) => saveMeta({ project: v || '' })" />
-            <Pick :model-value="note.parent_note" :options="parentOptions" prefix="Under: " placeholder="parent note" @update:model-value="(v) => saveMeta({ parent_note: v || '' })" />
-            <Button v-for="a in note.also_in" :key="a" :label="`also in ${areaName(a)}`" icon-right="lucide-x" tooltip="Remove" @click="saveMeta({ also_in: note.also_in.filter((x) => x !== a) })" />
-            <Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== note.area && !note.also_in.includes(o.value))" placeholder="also in" :clearable="false"
-              @update:model-value="(v) => saveMeta({ also_in: [...note.also_in, v] })" />
-          </div>
-          <div v-if="editing" class="grid grid-cols-1 gap-4" :class="preview && 'md:grid-cols-2'">
-            <MdEditor v-model="note.content_md" class="min-w-0" :space="note.space" @update:model-value="queue" />
-            <Card v-if="preview" class="min-w-0 overflow-auto"><Md :text="note.content_md" :links="note.links" read /></Card>
-          </div>
-          <template v-else>
-            <Md v-if="note.content_md" class="mt-4" :text="note.content_md" :links="note.links" read />
-            <Empty v-else title="This note is empty." hint="Use Edit to write. Type [[ to link another record." />
+          <NoteEditor :key="note.name" ref="editorRef" :note="note" full :raw="raw" @saved="onSaved" />
+          <div class="mx-auto w-full max-w-[720px]">
             <div v-if="note.children.length" class="mt-6"><SectionHead>Notes under this one</SectionHead>
               <Card flush><Row v-for="c in note.children" :key="c.name" :pane="'note:' + c.name" :label="c.title"><div class="break-words text-base-medium text-ink-gray-9">{{ c.title }}</div></Row></Card></div>
             <div class="mt-6"><Backlinks doctype="Life Note" :name="note.name" :reload="reloadKey" /></div>
-          </template>
+          </div>
         </template>
         <Card v-else-if="missing"><Empty title="This note was not found." hint="It may be in another space, or it was removed." /></Card>
         <Card v-else-if="!id" class="max-md:hidden"><Empty title="Pick a note." hint="Notes are listed on the left under their area. A note with no project is reference material for its area." /></Card>
@@ -99,9 +78,7 @@ import PageHead from '@/components/PageHead.vue'
 import NotesList from '@/components/lists/NotesList.vue'
 import { NOTES_VIEWS } from '@/lib/nav'
 import Empty from '@/components/Empty.vue'
-import Md from '@/components/Md.vue'
-import MdEditor from '@/components/MdEditor.vue'
-import Pick from '@/components/Pick.vue'
+import NoteEditor from '@/components/NoteEditor.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import Card from '@/components/ui/Card.vue'
@@ -111,12 +88,13 @@ import SectionHead from '@/components/ui/SectionHead.vue'
 import { api, db, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
-import { areaName, areaOptions, loadLookups, lookups } from '@/lib/lookups'
+import { areaOptions, loadLookups } from '@/lib/lookups'
 
 const props = defineProps({ id: String })
 const route = useRoute()
 // the list view sits beside the tree: /library?view=list, with its filters in the URL
-const listView = computed(() => !props.id && route.query.view === 'list')
+// My notes only (the Wiki has its own screen). The List is the default view; the Tree is view=tree
+const listView = computed(() => !props.id && route.query.view !== 'tree')
 const list = ref(null)
 // Notes has three views: Tree, List and Graph (/graph, the graph of linked records)
 const SWITCH = NOTES_VIEWS
@@ -127,21 +105,18 @@ const loaded = ref(false)
 const filter = ref('')
 const note = ref(null)
 const missing = ref(false)
-const editing = ref(false)
-const preview = ref(window.innerWidth > 1100)
-const saveState = ref('Saved')
+const raw = ref(false) // "Show Markdown" in the menu: the plain text
+const editorRef = ref(null)
 const newOpen = ref(false)
 const versionsOpen = ref(false)
 const versions = ref([])
 const reloadKey = ref(0)
-let timer = null
-let dirty = false
 
 const writable = computed(() => store.spaces.find((s) => s.name === note.value?.space)?.access === 'Write')
 const NEW_FIELDS = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'area', label: 'Area', options: areaOptions() }])
-const projectOptions = computed(() => lookups.projects.filter((p) => [note.value.area, ...note.value.also_in].includes(p.area)).map((p) => ({ value: p.name, label: p.title })))
-const parentOptions = computed(() => notes.value.filter((n) => n.name !== note.value.name && n.parent_note !== note.value.name).map((n) => ({ value: n.name, label: n.title })))
 
+const TREE_CAP = 50
+const showAll = ref([])
 // The tree: notes under their area, then under their parent note. An area is a node with the key 'area:<id>'; a note's key is its id.
 const nodes = computed(() => {
   const q = filter.value.trim().toLowerCase()
@@ -154,7 +129,10 @@ const nodes = computed(() => {
   const label = (id) => { const a = areas.value.find((x) => x.name === id); if (!a) return 'Unfiled'; const p = areas.value.find((x) => x.name === a.parent_area); return (p ? p.area_name + ' / ' : '') + a.area_name }
   const by = {}
   for (const n of roots) (by[n.area || ''] = by[n.area || ''] || []).push(n)
-  return Object.entries(by).map(([area, rs]) => ({ key: 'area:' + area, area, label: label(area), children: rs.map((r) => node(r, true)) }))
+  // never more than 50 notes under one heading without a "Show all" row
+  const capped = (key, list_) => (list_.length > TREE_CAP && !showAll.value.includes(key)
+    ? [...list_.slice(0, TREE_CAP), { key: 'more:' + key, label: `Show all ${list_.length}`, more: key, children: [] }] : list_)
+  return Object.entries(by).map(([area, rs]) => ({ key: 'area:' + area, area, label: label(area), children: capped('area:' + area, rs.map((r) => node(r, true))) }))
     .sort((a, b) => (a.area === '' ? 1 : b.area === '' ? -1 : a.label.localeCompare(b.label)))
 })
 // Everything is open until the person closes it: a branch is opened the first time it is seen, and stays as it was left after that.
@@ -179,55 +157,25 @@ async function loadTree() {
     loaded.value = true
   }
 }
+async function flush() {
+  await editorRef.value?.flush()
+}
 async function loadNote() {
   await flush()
   note.value = null
   missing.value = false
-  editing.value = false
   if (!props.id) return
   try {
     note.value = await api('library.get', { note: props.id })
-    if (route.query.edit && writable.value) editing.value = true
+    if (route.query.edit) router.replace({ query: { ...route.query, edit: undefined } }) // old links: there are no modes now
   } catch (e) {
     missing.value = true
   }
 }
-function queue() {
-  dirty = true
-  saveState.value = 'Typing…'
-  clearTimeout(timer)
-  timer = setTimeout(flush, 2000) // autosave after two seconds of no typing
-}
-async function flush() {
-  clearTimeout(timer)
-  if (!dirty || !note.value) return
-  dirty = false
-  saveState.value = 'Saving…'
-  const n = note.value
-  const res = await tryCall(() => api('library.save', { note: n.name, title: n.title, content_md: n.content_md }))
-  if (res && note.value && note.value.name === res.name) {
-    note.value.links = res.links
-    note.value.modified = res.modified
-    saveState.value = 'Saved'
-    const row = notes.value.find((x) => x.name === res.name)
-    if (row) row.title = res.title
-  } else if (!res) saveState.value = 'Not saved'
-}
-async function toggleEdit() {
-  if (editing.value) {
-    await flush()
-    reloadKey.value++
-    if (route.query.edit) router.replace({ query: {} })
-  } else saveState.value = 'Saved'
-  editing.value = !editing.value
-}
-async function saveMeta(values) {
-  await flush()
-  const res = await tryCall(() => api('library.save', { note: note.value.name, ...values }))
-  if (res) {
-    Object.assign(note.value, res)
-    loadTree()
-  }
+function onSaved(res) {
+  const row = notes.value.find((x) => x.name === res.name)
+  if (row && (row.title !== res.title || row.area !== res.area || row.parent_note !== res.parent_note || row.project !== res.project)) loadTree()
+  reloadKey.value++
 }
 async function create(v) {
   const res = await api('library.save', { space: store.space, title: v.title, area: v.area || '', content_md: '' })
@@ -235,6 +183,10 @@ async function create(v) {
   router.push(`/library/${res.name}?edit=1`)
 }
 const noteMenu = computed(() => [
+  { label: raw.value ? 'Show formatted' : 'Show Markdown', icon: 'lucide-code', onClick: () => { raw.value = !raw.value } },
+  ...(writable.value && !store.isAgent && !note.value?.is_rules ? [note.value?.collection === 'Wiki'
+    ? { label: 'Keep in My notes', icon: 'lucide-lock', onClick: () => move('My notes') }
+    : { label: 'Hand to the wiki', icon: 'lucide-book-open', onClick: () => move('Wiki') }] : []),
   { label: 'Earlier versions', icon: 'lucide-history', onClick: async () => { versions.value = (await tryCall(() => api('library.versions', { note: note.value.name }))) || []; versionsOpen.value = true } },
   { label: note.value?.is_archived ? 'Restore from archive' : 'Archive', icon: note.value?.is_archived ? 'lucide-archive-restore' : 'lucide-archive', onClick: async () => {
     if (await tryCall(() => api('archive.set', { doctype: 'Life Note', name: note.value.name, archived: note.value.is_archived ? 0 : 1 }), note.value.is_archived ? 'Restored.' : 'Archived.')) { await loadTree(); router.push('/library') } } },
@@ -245,10 +197,15 @@ const noteMenu = computed(() => [
     },
   }) },
 ])
-async function restore(v) {
-  note.value.content_md = v.previous_content
-  dirty = true
+async function move(to) {
   await flush()
+  const res = await tryCall(() => api('wiki.move', { name: note.value.name, to }), to === 'Wiki' ? 'Handed to the wiki.' : 'Kept in My notes. Agents can no longer change it.')
+  if (res) { Object.assign(note.value, await api('library.get', { note: note.value.name })); loadTree() }
+}
+async function restore(v) {
+  await flush()
+  const res = await tryCall(() => api('library.save', { note: note.value.name, content_md: v.previous_content }), 'Restored.')
+  if (res) Object.assign(note.value, res)
   versionsOpen.value = false
 }
 watch(() => props.id, loadNote)

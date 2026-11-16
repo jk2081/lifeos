@@ -4,7 +4,8 @@
     :empty-title="EMPTY[list?.tab] || 'The Inbox is empty.'" empty-hint="Drop a file above or forward something to your agent. What it proposes waits here for you."
     @loaded="(res) => (pendingTotal = res.pending_total)">
     <template #sub>{{ store.space }} · drop anything here, an agent proposes, you approve<template v-if="pendingTotal"> ·
-      <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template></template>
+      <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template> ·
+      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/sources', query: { status: 'done' } }" data-finished-link>Finished items are in Sources</RouterLink></template>
     <template #above>
       <!-- The drop zone. Files wait here until Add to Inbox creates the item they belong to; then each is uploaded, private, to that item. -->
       <section v-if="canWrite()" class="rounded-5 border border-dashed p-4" :class="over ? 'border-outline-gray-5 bg-surface-gray-3' : 'border-outline-gray-3 bg-surface-gray-1'"
@@ -21,7 +22,8 @@
           <Button size="sm" variant="outline" icon-left="lucide-plus" label="more" @click="picker.click()" />
         </div>
         <div class="mt-2.5 flex flex-wrap gap-2">
-          <TextInput v-model="instruction" class="min-w-64 flex-1" placeholder="What should the agent do? For example: summarise and pull out to-dos" aria-label="Instruction" @keydown.enter="add" />
+          <TextInput v-model="instruction" class="min-w-64 flex-1" :placeholder="INTENT_HINT[intent]" aria-label="Instruction" @keydown.enter="add" />
+          <TabButtons v-model="intent" :options="INTENTS" aria-label="What to do with it" data-intent />
           <Select v-model="sourceType" class="w-36" :options="SOURCES" aria-label="Kind" />
           <Button variant="solid" :loading="busy" loading-text="Adding…" :disabled="!files.length && !text.trim()" label="Add to Inbox" @click="add" />
         </div>
@@ -64,9 +66,9 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Avatar, Badge, Button, Select, TextInput, Textarea, toast } from 'frappe-ui'
+import { Avatar, Badge, Button, Select, TabButtons, TextInput, Textarea, toast } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import NumLink from '@/components/ui/NumLink.vue'
 import { api, errorText, tryCall } from '@/lib/api'
@@ -74,14 +76,20 @@ import { canWrite, refreshCounts, store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { fileKind, fileSize, uploadFile } from '@/lib/upload'
 import { loadLookups } from '@/lib/lookups'
+import { saveView, savedView } from '@/lib/views'
 
-const SOURCES = ['Upload', 'Journal Photo', 'Voice Note', 'Email', 'Chat', 'Message', 'Web']
+const SOURCES = ['Upload', 'Journal Photo', 'Voice Note', 'Email', 'Email Digest', 'Chat', 'Message', 'Web']
+// what the agent does with it: propose records (Process), write the wiki (Add to wiki), or only make it searchable (Just keep)
+const INTENTS = [{ label: 'Process', value: 'Process' }, { label: 'Add to wiki', value: 'Add to wiki' }, { label: 'Just keep', value: 'Just keep' }]
+const INTENT_HINT = { Process: 'What should the agent do? For example: summarise and pull out to-dos', 'Add to wiki': 'Anything the agent should know for the wiki (optional)',
+  'Just keep': 'A note to keep with it (optional). It is made searchable; nothing is proposed' }
 // status=Waiting in the URL is two statuses, New and Processing: "waiting for the agent"
-const STATUS = { 'To Review': ['To Review'], Waiting: ['New', 'Processing'], Failed: ['Failed'], Done: ['Done'] }
+const STATUS = { 'To Review': ['To Review'], Waiting: ['New', 'Processing'], Failed: ['Failed'] }
 // the state tabs, on status=. The first is the default; "Waiting for the agent" is the two statuses New and Processing
+// The Inbox is a queue: what is not finished. Finished items are in Sources (status=Done and all go there).
 const TABS = { key: 'status', field: 'status', label: 'Inbox state', items: [{ value: 'To Review', label: 'To review' }, { value: 'Waiting', label: 'Waiting for the agent' },
-  { value: 'Failed', label: 'Failed' }, { value: 'Done', label: 'Done' }, { value: 'all', label: 'All' }] }
-const EMPTY = { 'To Review': 'Nothing to review.', Waiting: 'Nothing is waiting for the agent.', Failed: 'Nothing has failed.', Done: 'Nothing is done yet.' }
+  { value: 'Failed', label: 'Failed' }] }
+const EMPTY = { 'To Review': 'Nothing to review.', Waiting: 'Nothing is waiting for the agent.', Failed: 'Nothing has failed.' }
 const SPEC = [
   { key: 'status', field: 'status', kind: 'preset', labels: { Waiting: 'Waiting for the agent', 'To Review': 'To review' },
     presets: { 'To Review': () => ['status', '=', 'To Review'], Waiting: () => ['status', 'in', ['New', 'Processing']], Failed: () => ['status', '=', 'Failed'], Done: () => ['status', '=', 'Done'] } },
@@ -93,6 +101,10 @@ const HIDDEN = ['raw_text', 'transcript_md', 'summary_md', 'preview_image', 'cla
 const THEME = { 'To Review': 'amber', New: 'gray', Processing: 'blue', Failed: 'red', Done: 'green' }
 const route = useRoute()
 const router = useRouter()
+// old links to the Done and All tabs open Sources, where finished items are
+if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/sources', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
+const intent = ref(savedView('inbox-intent')?.intent || 'Process')
+watch(intent, (v) => saveView('inbox-intent', { intent: v }))
 const picker = ref(null)
 const files = ref([])
 const instruction = ref('')
@@ -139,10 +151,10 @@ async function add() {
     const title = files.value.length ? (files.value.length === 1 ? files.value[0].name : `${files.value[0].name} and ${files.value.length - 1} more`) : text.value.trim().split('\n')[0].slice(0, 80)
     const item = await api('inbox.create_item', {
       title, source_type: files.value.length ? sourceType.value : (sourceType.value === 'Upload' ? 'Message' : sourceType.value),
-      space: store.space, instruction: instruction.value, raw_text: text.value,
+      space: store.space, instruction: instruction.value, raw_text: text.value, intent: intent.value,
     })
     for (const f of files.value) await uploadFile(f, 'Life Inbox Item', item.name)
-    toast.success('Added to the Inbox. An agent will pick it up.')
+    toast.success(intent.value === 'Just keep' ? 'Added. The agent will make it searchable and file it in Sources.' : 'Added to the Inbox. An agent will pick it up.')
     files.value = []
     instruction.value = ''
     text.value = ''

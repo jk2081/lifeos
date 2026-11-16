@@ -19,6 +19,7 @@
     "@lezer/highlight": "^1.2.0",
     "@vueuse/core": "^14.1.0",
     "cytoscape": "^3.31.0",
+    "diff": "^8",
     "dompurify": "^3.2.0",
     "frappe-ui": "1.2.0",
     "markdown-it": "^14.1.0",

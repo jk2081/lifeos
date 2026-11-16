@@ -43,23 +43,14 @@
                 <span v-if="fileKind(f.file_name) === 'image'"> · click the image to zoom</span>
               </div>
             </div>
-            <Card v-if="item.raw_text" class="mt-2"><Md :text="item.raw_text" /></Card>
+            <Card v-if="item.raw_text" class="mt-2"><DigestView v-if="item.source_type === 'Email Digest'" :text="item.raw_text" /><Md v-else :text="item.raw_text" /></Card>
           </section>
-          <Card v-if="phone && part('transcript') && !item.transcript_md && !editingTranscript"><Empty title="No transcript." :hint="writable ? 'Add one if the original needs it.' : ''" />
-            <div v-if="writable" class="mt-2"><Button label="Write a transcript" @click="startTranscript" /></div></Card>
-          <section v-if="(item.transcript_md || editingTranscript) && part('transcript')">
-            <SectionHead>Transcript
-              <template v-if="writable && !editingTranscript" #action><Button variant="ghost" size="sm" label="Edit" @click="startTranscript" /></template>
-            </SectionHead>
+          <Card v-if="phone && part('transcript') && !item.transcript_md && !writable"><Empty title="No transcript." /></Card>
+          <section v-if="(item.transcript_md || writable) && part('transcript')">
+            <SectionHead>Transcript</SectionHead>
             <Card>
-              <template v-if="editingTranscript">
-                <Textarea v-model="transcriptDraft" :rows="12" aria-label="Transcript" />
-                <div class="mt-2 flex justify-end gap-2">
-                  <Button label="Cancel" @click="editingTranscript = false" />
-                  <Button variant="solid" label="Save transcript" @click="saveTranscript" />
-                </div>
-              </template>
-              <Md v-else :text="item.transcript_md" />
+              <MdField v-model="item.transcript_md" :save="saveTranscript" :space="item.space" :readonly="!writable" label="Transcript"
+                placeholder="Add a transcript if the original needs one." />
             </Card>
             <p v-if="(item.transcript_md || '').includes('[?]')" class="mt-2 text-sm text-ink-gray-6">Words marked [?] were hard to read. Edit the transcript to correct them.</p>
           </section>
@@ -163,11 +154,13 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Alert, Avatar, Badge, Button, Checkbox, DatePicker, DateTimePicker, Dialog, FormControl, Textarea, toast } from 'frappe-ui'
+import { Alert, Avatar, Badge, Button, Checkbox, DatePicker, DateTimePicker, Dialog, FormControl, toast } from 'frappe-ui'
 import PageHead from './PageHead.vue'
 import Card from './ui/Card.vue'
 import SectionHead from './ui/SectionHead.vue'
 import Md from './Md.vue'
+import MdField from './MdField.vue'
+import DigestView from './DigestView.vue'
 import Pick from './Pick.vue'
 import Empty from './Empty.vue'
 import Backlinks from './Backlinks.vue'
@@ -194,8 +187,6 @@ const missing = ref(false)
 const schema = ref({})
 const zoom = ref(false)
 const dueFor = ref('')
-const editingTranscript = ref(false)
-const transcriptDraft = ref('')
 const editOpen = ref(false)
 const editing = ref(null)
 const draft = ref({})
@@ -349,16 +340,8 @@ async function retry() {
     if (!props.page) recordChanged('inbox:' + item.value.name)
   }
 }
-function startTranscript() {
-  transcriptDraft.value = item.value.transcript_md || ''
-  editingTranscript.value = true
-}
-async function saveTranscript() {
-  const res = await tryCall(() => api('inbox.update_transcript', { item: item.value.name, transcript_md: transcriptDraft.value }), 'Transcript saved.')
-  if (res) {
-    item.value.transcript_md = transcriptDraft.value
-    editingTranscript.value = false
-  }
+async function saveTranscript(text) {
+  await api('inbox.update_transcript', { item: item.value.name, transcript_md: text })
 }
 
 const editFields = computed(() => {

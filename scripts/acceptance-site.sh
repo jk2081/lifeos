@@ -29,5 +29,8 @@ fi
 # `bench serve` on 8000 serves the default site only. Restarted each time so it runs the current code.
 $B "pkill -f 'serve --port [9]000' || true"
 docker exec -d lifeos-bench bash -lc "cd ~/frappe-bench && bench --site $SITE serve --port 9000 --noreload > /tmp/serve-acceptance.log 2>&1"
+# a background worker, for jobs such as the chat export import (it serves the queues of every site on the bench)
+$B "pkill -f 'frappe.utils.bench_helper frappe worke[r]' || true"
+docker exec -d lifeos-bench bash -lc "cd ~/frappe-bench && bench worker --queue long,default,short > /tmp/worker-acceptance.log 2>&1"
 for i in $(seq 1 60); do curl -s -o /dev/null -m 2 http://localhost:19000/api/method/ping && break; sleep 1; done
 echo "acceptance.localhost ready at http://localhost:19000"

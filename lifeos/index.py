@@ -129,6 +129,14 @@ def rebuild():
 	return total
 
 
+def also_in_sql(param="area", alias=""):
+	"""SQL for "this index row's record is also filed in the area(s) named by %(param)s" (one name, or a tuple with `in`).
+	It reads the indexed child table Life Also In, so it never scans the rows' text."""
+	op = "in" if param.endswith("ids") else "="
+	return (f"({alias}ref_doctype, {alias}ref_name) in (select ai.parenttype, ai.parent from `tabLife Also In` ai "
+		f"where ai.area {op} %({param})s)")
+
+
 def ensure_indexes():
 	"""Composite and FULLTEXT indexes that DocType JSON cannot describe."""
 	frappe.db.add_index("Life Index", ["space", "record_date"], "life_index_space_date")
@@ -146,6 +154,14 @@ def ensure_indexes():
 	frappe.db.add_unique("Life Chat Log", ["space", "source_system", "external_id"], "life_chat_external_id")
 	frappe.db.add_unique("Life Connection", ["space", "system"], "life_connection_system")
 	frappe.db.add_index("Life Index", ["space", "ref_doctype", "is_archived", "record_date"], "life_index_space_type_date")
+	# covering indexes for the counts (tab counts, totals, the timeline's and an area's counts): with text of up to 60,000
+	# characters a row, a count must not read the rows themselves
+	frappe.db.add_index("Life Index", ["space", "kind", "is_archived", "ref_doctype", "media_kind", "status", "vault_locked"], "life_index_counts")
+	frappe.db.add_index("Life Index", ["space", "area", "is_archived", "kind", "ref_doctype", "vault_locked"], "life_index_area_counts")
+	frappe.db.add_index("Life Index", ["space", "is_archived", "record_date", "modified"], "life_index_timeline")
+	frappe.db.add_index("Life Index", ["space", "is_archived", "area", "ref_doctype", "ref_name", "kind", "vault_locked"], "life_index_area_refs")
+	# "also filed in" is matched through the records' own child rows, not by scanning also_in_csv (see also_in_sql)
+	frappe.db.add_index("Life Also In", ["area", "parenttype", "parent"], "life_also_in_area")
 	frappe.db.add_index("Life Wiki Change", ["space", "changed_on"], "life_wiki_change_space_on")
 	if not frappe.db.sql("show index from `tabLife Index` where Key_name='life_index_fulltext'"):
 		frappe.db.sql_ddl("alter table `tabLife Index` add fulltext index `life_index_fulltext` (`title`, `search_text`)")

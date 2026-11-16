@@ -32,7 +32,7 @@ const el = ref(null)
 const meta = ref({})
 const missing = ref(false)
 const stamp = ref(0)
-const label = computed(() => (cur.value ? TYPES[cur.value.type].label : ''))
+const label = computed(() => (cur.value ? meta.value?.kind || TYPES[cur.value.type].label : ''))
 let lastRef = ''
 let opener = null
 
@@ -57,7 +57,7 @@ function changed() {
   if (cur.value) recordChanged(cur.value.ref)
 }
 async function restore() {
-  if (await tryCall(() => api('archive.restore', { doctype: TYPES[cur.value.type].doctype, name: cur.value.name }), 'Restored.')) {
+  if (await tryCall(() => api('archive.restore', { doctype: TYPES[cur.value.type].doctype || 'Life Inbox Item', name: cur.value.name }), 'Restored.')) {
     stamp.value++
     changed()
   }

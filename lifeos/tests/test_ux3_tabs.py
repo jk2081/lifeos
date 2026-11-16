@@ -198,10 +198,12 @@ class TestRecordPageTabs(LifeTestCase):
 		self.make("Life Note", title="ux3 area note", area=tea, project=p.name)
 		self.make("Life Vault Document", title="ux3 area doc", doc_type="Other", area=tea)
 		chats.log(space=PRIVATE, title="ux3 area chat", summary_md="s", area=tea)
+		self.make("Life Note", title="ux3 area wiki page", area=tea, collection="Wiki", summary="A page")  # set 4: the Wiki tab
 		tabs = area.get(tea)["tabs"]
 		self.assertEqual(tabs["projects"], projects.list(space=PRIVATE, area=tea)["total"])
 		self.assertEqual(tabs["tasks"], tasks.list(space=PRIVATE, area=tea, status="open_doing")["total"])
 		self.assertEqual(tabs["notes"], library.list(space=PRIVATE, area=tea)["total"])
+		self.assertEqual(tabs["wiki"], library.list(space=PRIVATE, area=tea, collection="Wiki")["total"])
 		self.assertEqual(tabs["documents"], vault.list(space=PRIVATE, area=tea)["total"])
 		self.assertEqual(tabs["chats"], chats.list(space=PRIVATE, area=tea)["total"])
 		self.assertEqual(tabs["timeline"], timeline.get(space=PRIVATE, area=tea)["total"])

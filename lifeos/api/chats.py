@@ -152,28 +152,75 @@ def get(chat):
 	doc = permissions.get_doc_checked("Life Chat Log", chat)
 	row = _chat_rows([frappe._dict({k: doc.get(k) for k in ("name", "title", "date", "url", "assistant", "summary_md", "area", "project", "is_archived")})])[0]
 	row["space"] = doc.space
+	row["transcript_md"] = doc.transcript_md or ""
+	row["updated_on"] = str(doc.updated_on) if doc.updated_on else None
+	row["source_system"] = doc.source_system
 	return row
 
 
+ASSISTANTS = ("Claude", "ChatGPT", "Codex", "Claude Code", "Other")
+
+
 @frappe.whitelist(methods=["POST"])
-def log(space=None, title=None, date=None, url=None, assistant="Claude", summary_md=None, open_items=None, area=None, project=None, tags=None, also_in=None):
+def log(space=None, title=None, date=None, url=None, assistant="Claude", summary_md=None, open_items=None, area=None, project=None, tags=None,
+		also_in=None, source_system=None, external_id=None, transcript_md=None, updated_on=None):
 	"""Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal.
-	open_items is a list of strings. area, project and tags take a name or a title."""
+	open_items is a list of strings. area, project and tags take a name or a title.
+
+	With source_system (claude, chatgpt…) and external_id (the chat's ID there), a chat already logged is updated instead of
+	logged twice: title, updated_on, url, summary and transcript change when given, and open items are merged by their text
+	(new ones are added, closed ones stay closed). The connection of that system gives the default area and project.
+	The answer is {name, created}."""
 	from lifeos import proposals
+	from lifeos.api import connections
 
 	space = permissions.resolve_space(space, write=True)
 	if not (title or "").strip():
 		frappe.throw(_("A chat log needs a title."))
-	if assistant not in ("Claude", "ChatGPT", "Other"):
+	if assistant not in ASSISTANTS:
 		assistant = "Other"
+	system = (source_system or "").strip().lower() or None
+	ext = (external_id or "").strip() or None
+	items = [str(t).strip()[:500] for t in parse(open_items, []) or [] if str(t).strip()]
+	existing = frappe.db.get_value("Life Chat Log", {"space": space, "source_system": system, "external_id": ext}) if system and ext else None
+	if existing:
+		doc = permissions.get_doc_checked("Life Chat Log", existing, "write")
+		fields = ("title", "url", "summary_md", "transcript_md", "updated_on")
+		before = {f: doc.get(f) for f in fields}
+		doc.title = title.strip()[:140]
+		for field, value in (("url", url), ("summary_md", summary_md), ("transcript_md", transcript_md)):
+			if value is not None:
+				doc.set(field, value)
+		if updated_on:
+			doc.updated_on = frappe.utils.get_datetime(updated_on).replace(microsecond=0)
+		have = {(i.text or "").strip().lower() for i in doc.open_items}
+		added = 0
+		for t in items:
+			if t.lower() not in have:
+				doc.append("open_items", {"text": t, "status": "Open"})
+				have.add(t.lower())
+				added += 1
+		same = lambda a, b: (a or "") == (b or "") if not hasattr(a, "year") and not hasattr(b, "year") else \
+			(frappe.utils.get_datetime(a) if a else None) == (frappe.utils.get_datetime(b) if b else None)
+		changed = added or any(not same(before[f], doc.get(f)) for f in fields)
+		if changed:
+			doc.save()
+		connections.touch(space, system, doc.title)
+		return {"name": doc.name, "created": False, "changed": bool(changed)}
+	conn = connections.connection(space, system) if system else None
 	doc = frappe.get_doc({"doctype": "Life Chat Log", "space": space, "title": title.strip()[:140], "date": getdate(date or today()), "url": url,
-		"assistant": assistant, "summary_md": summary_md,
-		"open_items": [{"text": str(t)[:500], "status": "Open"} for t in parse(open_items, []) if str(t).strip()]})
+		"assistant": assistant, "summary_md": summary_md, "transcript_md": transcript_md, "source_system": system, "external_id": ext,
+		"updated_on": frappe.utils.get_datetime(updated_on) if updated_on else None,
+		"open_items": [{"text": t, "status": "Open"} for t in items]})
 	try:
 		if area:
 			doc.area = proposals.resolve_link("Life Area", area, space)
+		elif conn and conn.default_area:
+			doc.area = conn.default_area
 		if project:
 			doc.project = proposals.resolve_link("Life Project", project, space)
+		elif conn and conn.default_project and not area:
+			doc.project = conn.default_project
 		for a in parse(also_in, []) or []:
 			doc.append("also_in", {"area": proposals.resolve_link("Life Area", a, space)})
 		for t in parse(tags, []) or []:
@@ -181,6 +228,46 @@ def log(space=None, title=None, date=None, url=None, assistant="Claude", summary
 	except proposals.PayloadError as e:
 		frappe.throw(str(e))
 	doc.insert()
+	if system:
+		connections.touch(space, system, doc.title)
+	return {"name": doc.name, "created": True}
+
+
+@frappe.whitelist()
+def needs_summary(space=None, start=0, page_length=50):
+	"""Chat logs with no summary yet (imported chats), oldest activity first, for an agent to summarise with
+	lifeos.api.chats.save_summary. Each row has name, title, date, updated_on, assistant, url and the transcript's length."""
+	space = permissions.resolve_space(space)
+	start, page_length = page(start, page_length)
+	rows = frappe.db.sql("""select name, title, date, updated_on, assistant, url, char_length(ifnull(transcript_md, '')) as transcript_length
+		from `tabLife Chat Log` where space=%(space)s and ifnull(summary_md, '') = '' order by ifnull(updated_on, date) desc
+		limit %(start)s, %(len)s""", {"space": space, "start": start, "len": page_length}, as_dict=True)
+	total = frappe.db.sql("select count(*) from `tabLife Chat Log` where space=%s and ifnull(summary_md, '') = ''", space)[0][0]
+	for r in rows:
+		r["date"] = str(r.date) if r.date else None
+		r["updated_on"] = str(r.updated_on) if r.updated_on else None
+	return {"space": space, "chats": rows, "total": total}
+
+
+@frappe.whitelist()
+def transcript(chat):
+	"""The full transcript of a chat log, for an agent writing its summary."""
+	doc = permissions.get_doc_checked("Life Chat Log", chat)
+	return {"name": doc.name, "title": doc.title, "transcript_md": doc.transcript_md or ""}
+
+
+@frappe.whitelist(methods=["POST"])
+def save_summary(chat, summary_md, open_items=None):
+	"""Write the summary of a chat log (and add open items found in it). Agents may call this."""
+	doc = permissions.get_doc_checked("Life Chat Log", chat, "write")
+	doc.summary_md = summary_md
+	have = {(i.text or "").strip().lower() for i in doc.open_items}
+	for t in parse(open_items, []) or []:
+		t = str(t).strip()[:500]
+		if t and t.lower() not in have:
+			doc.append("open_items", {"text": t, "status": "Open"})
+			have.add(t.lower())
+	doc.save()
 	return {"name": doc.name}
 
 

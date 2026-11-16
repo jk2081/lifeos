@@ -54,8 +54,10 @@ def get(space=None, from_date=None, to_date=None, area=None, doctype=None, inclu
 		where.append("record_date <= %(to_date)s")
 		values["to_date"] = getdate(to_date)
 	if area:
-		where.append("(area = %(area)s or also_in_csv like %(area_like)s)")  # this one area only; sub-areas have their own pages
-		values.update({"area": area, "area_like": f"%,{area},%"})
+		from lifeos.index import also_in_sql
+
+		where.append(f"(area = %(area)s or {also_in_sql('area')})")  # this one area only; sub-areas have their own pages
+		values.update({"area": area})
 	if doctype:
 		where.append("ref_doctype = %(doctype)s")
 		values["doctype"] = doctype

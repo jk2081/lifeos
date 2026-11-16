@@ -56,8 +56,10 @@ def query(text, limit=20, space=None, include_archived=0):
 			where {where} and match(title, search_text) against (%(q)s in boolean mode)
 			order by (title like %(starts)s) desc, score desc, record_date desc limit %(limit)s""",
 			{**values, "starts": f"%{words[0]}%"}, as_dict=True)
-	if not rows:
-		# short words, or text the full-text index does not tokenise: fall back to a plain match
+	if not rows and (len(long_words) < len(words) or not long_words or frappe.flags.in_test):
+		# short words the full-text index does not hold: fall back to a plain match. When every word is long enough and the
+		# full-text index found nothing, a plain match would read every row's text and find nothing more (UX fixes, set 4).
+		# Tests search rows of their own open transaction, which InnoDB's full-text index sees only after a commit.
 		likes = " and ".join(f"(title like %(w{i})s or search_text like %(w{i})s)" for i in range(len(words)))
 		like_values = {f"w{i}": f"%{w}%" for i, w in enumerate(words)}
 		rows = frappe.db.sql(

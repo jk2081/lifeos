@@ -4,8 +4,15 @@
     <div class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6"><Avatar v-if="c.assistant" size="xs" :label="c.assistant" /><span>{{ c.assistant }} · {{ long(c.date, true) }}</span>
       <a v-if="c.url" class="text-ink-blue-8 hover:underline" :href="c.url" target="_blank" rel="noopener noreferrer">Open the chat</a></div>
     <section>
-      <Card><Md v-if="c.summary_md" :text="c.summary_md" /><Empty v-else title="No summary." hint="The agent logged this chat without one." /></Card></section>
+      <Card><Md v-if="c.summary_md" :text="c.summary_md" /><Empty v-else title="Not summarised yet." :hint="c.transcript_md ? 'An agent writes the summary from the transcript.' : 'The agent logged this chat without one.'" data-not-summarised /></Card></section>
     </template>
+    <section v-if="on('transcript')" data-chat-transcript>
+      <Card><Md v-if="c.transcript_md" :text="c.transcript_md" read /><Empty v-else title="No transcript." hint="Chats logged by an agent carry a summary; imported chats carry their transcript." /></Card></section>
+    <section v-if="on('made')" data-source-made>
+      <Card flush>
+        <Row v-for="m in made" :key="m.doctype + m.name" :pane="refOfRoute(m.route)" :label="m.title"><div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ m.title }}</div><div class="text-sm text-ink-gray-6">{{ m.kind }}</div></div></Row>
+        <Empty v-if="!made.length" title="Nothing made from this chat yet." hint="Tasks made from its open items, and wiki pages that cite it, are listed here." />
+      </Card></section>
     <section v-if="on('items')">
       <Card flush>
         <Row v-for="i in c.open_items" :key="i.row" class="flex-wrap !items-center" data-open-item>
@@ -32,7 +39,7 @@ import { api, tryCall } from '@/lib/api'
 import { loadBacklinks } from '@/lib/links'
 import { store } from '@/lib/store'
 import { long } from '@/lib/dates'
-import { openRef } from '@/lib/pane'
+import { openRef, refOfRoute } from '@/lib/pane'
 
 const props = defineProps({ name: String, type: String, tab: String })
 // the pane's tabs: Summary, Open items, Links
@@ -40,15 +47,18 @@ const on = (t) => !props.tab || props.tab === t
 const links = ref([])
 const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
 const c = ref(null)
+const made = ref([])
 const canRestore = computed(() => store.spaces.find((s) => s.name === c.value?.space)?.access === 'Write')
 const writable = computed(() => canRestore.value && !c.value?.is_archived)
 async function load() {
   try {
-    ;[c.value, links.value] = await Promise.all([api('chats.get', { chat: props.name }), loadBacklinks('Life Chat Log', props.name)])
+    ;[c.value, links.value, made.value] = await Promise.all([api('chats.get', { chat: props.name }), loadBacklinks('Life Chat Log', props.name),
+      api('sources.made_from', { doctype: 'Life Chat Log', name: props.name })])
     const open = c.value.open_items.filter((i) => i.status === 'Open').length
     emit('meta', { title: c.value.title, area: c.value.area, area_name: c.value.area_name, project: c.value.project, project_title: c.value.project_title,
       archived: !!c.value.is_archived, canRestore: canRestore.value,
-      tabs: [{ value: 'summary', label: 'Summary' }, { value: 'items', label: 'Open items', count: open, noun: 'open items' },
+      tabs: [{ value: 'summary', label: 'Summary' }, ...(c.value.transcript_md ? [{ value: 'transcript', label: 'Transcript' }] : []),
+        { value: 'items', label: 'Open items', count: open, noun: 'open items' }, { value: 'made', label: 'Made from this', count: made.value.length, noun: 'records' },
         { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
   } catch (e) {
     emit('missing')

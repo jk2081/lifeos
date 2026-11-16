@@ -87,6 +87,7 @@
           </SettingRow>
           <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
         </Card>
+        <ConnectionsSection v-else-if="section === 'connections'" :space="spaceSel" :writable="canEdit && !store.isAgent" />
         <template v-else-if="section === 'archived'">
           <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/archive" data-archive-link>Archived records are on the Archive screen</RouterLink>.
             This list holds only the headings archived from Areas, Tags, Habits and Check-in dimensions.</p>
@@ -201,6 +202,7 @@ import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
 import SettingRow from '@/components/settings/SettingRow.vue'
 import SettingsList from '@/components/settings/SettingsList.vue'
+import ConnectionsSection from '@/components/settings/ConnectionsSection.vue'
 import LifeLink from '@/framework/LifeLink.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { boot, store } from '@/lib/store'
@@ -241,7 +243,7 @@ const memberSpace = ref('')
 const groups = computed(() => [
   { key: 'me', label: 'Me', items: [{ value: 'appearance', label: 'Appearance' }, { value: 'default', label: 'Default space' }, { value: 'review', label: 'Weekly review' }] },
   { key: 'space', label: 'This space', items: [{ value: 'areas', label: 'Areas' }, { value: 'tags', label: 'Tags' }, { value: 'habits', label: 'Habits' },
-    { value: 'dimensions', label: 'Check-in dimensions' }, { value: 'archive', label: 'Archive rules' }, { value: 'archived', label: 'Archived' }] },
+    { value: 'dimensions', label: 'Check-in dimensions' }, { value: 'connections', label: 'Connections' }, { value: 'archive', label: 'Archive rules' }, { value: 'archived', label: 'Archived' }] },
   ...(d.value?.is_admin ? [{ key: 'admin', label: 'Admin', items: [{ value: 'members', label: 'Spaces and members' }, { value: 'agents', label: 'Agents' }] }] : []),
 ])
 const sections = computed(() => groups.value.flatMap((g) => g.items))
@@ -260,7 +262,7 @@ function open(v) {
 // "This space": its own space picker, which does not change the space of the sidebar (space= in the URL)
 const spaceSel = computed(() => (route.query.space ? String(route.query.space) : store.space))
 const pickSpace = (v) => router.replace({ query: { ...route.query, space: v === store.space ? undefined : v } })
-const spaceGroup = ['areas', 'tags', 'habits', 'dimensions', 'archive', 'archived']
+const spaceGroup = ['areas', 'tags', 'habits', 'dimensions', 'connections', 'archive', 'archived']
 const heading = computed(() => {
   const label = sections.value.find((s) => s.value === section.value)?.label || ''
   return spaceGroup.includes(section.value) ? `${label} in ${spaceSel.value}` : label

@@ -21,10 +21,19 @@ const routes = [
   { path: '/projects/:id', name: 'Project', component: page('Project'), props: true },
   { path: '/library/:id?', name: 'Library', component: page('Library'), props: true },
   { path: '/vault', name: 'Vault', component: page('Vault') },
-  { path: '/chats', name: 'Chats', component: page('Chats') },
+  { path: '/sources', name: 'Sources', component: page('Sources') },
+  { path: '/wiki', name: 'Wiki', component: page('Wiki') },
+  // Chats is the Chats tab of Sources (UX fixes, set 4): filters carry over; the old report (group=day) is the By day view
+  { path: '/chats', name: 'Chats', redirect: (to) => {
+    const { group, open, view, ...rest } = to.query
+    return { path: '/sources', query: { ...rest, tab: 'chats', ...(group === 'day' || view === 'report' ? { view: 'day' } : {}),
+      ...(open ? { open: String(open).includes(':') ? open : 'chat:' + open } : {}) } }
+  } },
   { path: '/graph', name: 'Graph', component: page('Graph') },
   { path: '/archive', name: 'Archive', component: page('Archive') },
   { path: '/settings', name: 'Settings', component: page('Settings') },
+  // development only: the editor on a sample note (owner only, not in the sidebar)
+  { path: '/dev/editor', name: 'EditorDev', component: () => import('./pages/dev/EditorDev.vue') },
   { path: '/:rest(.*)*', redirect: '/' },
 ]
 

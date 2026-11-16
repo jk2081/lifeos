@@ -102,7 +102,14 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `Pick.vue` | One-tap change of a filing value | `Dropdown`, `Button` |
 | `FileAttach.vue` | Attach one private file to a record, in one step | frappe-ui `FileUploader`, `Button`, `ErrorMessage` |
 | `NewRecord.vue` | A small create dialog driven by a field list | `Dialog`, `FormControl`, `DatePicker`, `LifeLink` |
-| `Md.vue`, `MdEditor.vue` | Markdown with `[[links]]`, sanitised; a CodeMirror editor | `prose` classes of the preset, `.read` typeface, toolbar of `Button`s, token variables in the editor theme |
+| `Md.vue` | Markdown with `[[links]]`, sanitised, for reading | `prose` classes of the preset, `.read` typeface |
+| `LiveEditor.vue` (with `lib/editor/livePreview.js` and `lib/editor/commands.js`) | The Markdown editor: one pane, formatted as you type. frappe-ui's `TextEditor` is a rich-text (HTML) editor; notes are Markdown with `[[links]]` | CodeMirror 6 with decorations (see "The editor" below), toolbar of `Button`s, `FileUploader` for images, token variables in `styles.css` (`.lv-editor`) |
+| `NoteEditor.vue` | A note or wiki page ready to write in: title, the filing as one line with a `Popover` of pickers, the editor, autosave with a quiet "Saved", and the conflict dialog | `TextInput`, `Popover`, `Pick`, `Dialog`, `DiffView` |
+| `MdField.vue` | A Markdown field that saves by itself (transcripts) | `LiveEditor` |
+| `DiffView.vue` | A readable line diff of two Markdown texts (wiki changes, conflicts). Uses the `diff` package (`diffLines`, BSD-3-Clause) | token classes `bg-surface-green-2`/`red-2` with `text-ink-green-9`/`red-9`, a `+`/`−` mark and screen-reader text, so colour is never the only cue |
+| `ChangeView.vue` | One wiki change: who, when, why, the source, the diff, and Undo (with the "changed since" choice) | `Alert`, `Badge`, `Button`, `DiffView` |
+| `DigestView.vue` | An email digest as headed lists, each item's Gmail link an "Open in Gmail" button | `Md`, `Button` |
+| The Sources grid (in `pages/Sources.vue`, `ListView`'s `#body` slot) | Thumbnails of photos and scans as cards; the server's 480 px thumbnail, never the full image | `rounded-5 border-outline-gray-2` cards with the stretched-button pattern, `aspect-[4/3]` image, a Lucide icon when there is no thumbnail |
 | `ProjectCard.vue` | A project as a card | `Badge`, `Progress`, `NumLink` |
 | `HabitBoxes.vue`, the 12 Week Year grid, habit month boxes, the year calendar | Purpose-built journal grids | `Button`-sized cells; `bg-surface-gray-9 text-ink-base` done, `bg-surface-gray-2` missed, `border-outline-gray-4` current, `text-ink-gray-4` future |
 | `LineChart.vue`, the graph | Small SVG chart; Cytoscape canvas | token variables, `tokenColor()` |
@@ -146,8 +153,8 @@ Frappe organises information with tabs in three ways, and so does Life OS. All t
 | Pattern | Where the open tab lives | Used by |
 | --- | --- | --- |
 | Tabs on a record or page | `tab=` | The area page (Overview, Projects, Tasks, Notes, Documents, Chats, Timeline), the project page (Overview, Tasks, Notes, Documents, Chats, Links), Settings (vertical, one section at a time), and on a phone only the review screen (Original, Transcript, Summary, Proposals) and the journal page (Page, Transcript). Journal and Calendar keep their path form (`/journal/habits`, `/calendar/year`) and answer `[` and `]` too |
-| Tabs in the record pane | `ptab=`, so the pane and the page behind it do not collide. Changing it replaces the history entry; opening another record or closing the pane drops it (`lib/pane.js`) | Task (Details, Notes, Links), note (Note, Notes under this one, Links), project (Overview, Tasks), goal (Actions, Tasks, History across cycles, Links; Tasks and Links for Annual and Open goals), chat (Summary, Open items, Links), journal page (Page, Transcript, Created from this page), vault document (Details, File), an inbox item on a phone. Day, entry and plain panes have none |
-| State tabs on a list | the short parameter of the field the tabs are a preset on: `status=`, `type=`, `expiry=`, `open_items=` | Inbox, Tasks, Projects, Archive, Chats, Vault |
+| Tabs in the record pane | `ptab=`, so the pane and the page behind it do not collide. Changing it replaces the history entry; opening another record or closing the pane drops it (`lib/pane.js`) | Task (Details, Notes, Links), note (Note, Notes under this one, Links), wiki page (Page, Sources, Links, History), source (Original, Text, Summary, Made from this, Details), project (Overview, Tasks), goal (Actions, Tasks, History across cycles, Links; Tasks and Links for Annual and Open goals), chat (Summary, Open items, Links), journal page (Page, Transcript, Created from this page), vault document (Details, File), an inbox item on a phone. Day, entry and plain panes have none |
+| State tabs on a list | the short parameter of the field the tabs are a preset on: `status=`, `type=`, `expiry=`, `open_items=`, `tab=` | Inbox, Tasks, Projects, Archive, Sources (by kind), Vault, Chats (inside area pages) |
 
 **The URL rule.** The open tab is always in the URL, so reload, Back, Forward and a copied link return to it. The first tab is the default and adds nothing to the URL.
 
@@ -184,7 +191,7 @@ async function fetch({ params, tab, filters, ... }) {            // `tab` is the
 - A tab is not counted as a filter, Clear keeps it, and it is saved with the remembered view like the rest of the query.
 - **Counts respect the other filters.** Each list method returns `tabs`, computed in one query (`lifeos.api.utils.tab_counts`) under every filter but the tab's own field. `ListView` exposes `tab` and `tabCounts`.
 - **Inside a page's tab** (the area and project pages) the state tabs are folded into the filter bar as one `Select` (`tabs-in-filter`), since there are no tabs inside tabs.
-- The values in use: Goals `status=` in_progress (default), achieved, closed, all. Inbox `status=` To Review (default), Waiting, Failed, Done, all. Tasks `status=` open (default), loops, Waiting, Done, all. Projects `status=` Active (default), On Hold, Done, Dropped, all. Archive `type=` all (default) and the six DocTypes. Chats `open_items=` all (default), 1. Vault `expiry=` all (default), soon, expired.
+- The values in use: Goals `status=` in_progress (default), achieved, closed, all. Inbox `status=` To Review (default), Waiting, Failed (Done and all now open Sources). Sources `tab=` all (default), chats, voice, documents, photos, articles, email, text. The Wiki's page tabs are `tab=` pages (default), changes, health, rules. Tasks `status=` open (default), loops, Waiting, Done, all. Projects `status=` Active (default), On Hold, Done, Dropped, all. Archive `type=` all (default) and the six DocTypes. Chats `open_items=` all (default), 1. Vault `expiry=` all (default), soon, expired.
 
 ## Checks
 
@@ -202,3 +209,16 @@ A pane says its tabs in the meta it emits: `emit('meta', { title, …, tabs: [{ 
 ### A list inside a page's tab
 
 The list screens take `embed`: `{ screen: 'area', space, fixed: { area }, active: (route) => …, writable }`. `fixed` short parameters are set by the page and left out of the URL and the controls; `screen` keys the remembered view (`area-tasks`, shared across areas); `active` is a function of the route so the hidden lists ignore a URL that belongs to the open tab. The page's tab switch keeps only `tab=` and the open record. See `pages/Area.vue`.
+
+## The editor
+
+`components/LiveEditor.vue` is the only Markdown editor (notes, wiki pages, journal transcripts, task notes, inbox transcripts). `/life/dev/editor` (owner only, not in the sidebar) shows it on a sample note with every element.
+
+- **One pane, no modes.** CodeMirror 6 with `@codemirror/lang-markdown` (GFM). `lib/editor/livePreview.js` is one `StateField` of decorations, rebuilt when the text, the selection, the focus or the parse changes: headings at size, bold, italic, strike, inline code, bullets as dots, checklists as boxes you click, links as links, `[[links]]` as chips, images inline, rules, quotes, code blocks, and tables as tables (a block widget). The Markdown marks of a line show only while the cursor is on that line; a table shows as text while the cursor is inside it. A `StateField` and not a view plugin, because block widgets (the table) must come from state.
+- **Following links.** A `[[link]]` chip opens its record in the pane on click. A web link opens with Cmd or Ctrl held, or on a click while the editor does not have focus.
+- **Sanitising.** Nothing typed can run script: chips, images and links are DOM built with `textContent` and checked URLs (`safeUrl`: http, https, mailto, a path, a fragment); the table widget is markdown-it with raw HTML off, then DOMPurify, as `Md.vue`.
+- **Typeface and column.** The reading typeface of `.read` (17 px serif, headings in the interface font), in a column of at most 720 px, centred. "Show Markdown" (the `raw` prop, in the page's ⋯ menu) switches to the plain text in a monospace face.
+- **Toolbar** above the text (bold, italic, heading, lists, checklist, link, `[[`, image). On a phone, while the editor has focus, it is fixed above the keyboard (`visualViewport`).
+- **Keys.** ⌘B, ⌘I, ⌘K (link), ⌘⇧7 and ⌘⇧8 (lists), Tab and Shift-Tab indent. `/` at the start of a line opens a menu of blocks; `[[` the record picker (`links.suggest`).
+- **Images** pasted, dropped or chosen with the toolbar upload as private files attached to the record (`doctype`, `docname` props) and are inserted as `![name](/private/files/…)`.
+- **Saving** is the caller's: `NoteEditor` and `MdField` save a moment after typing stops and on blur, with a quiet "Saved". `NoteEditor` sends the `version` it started from; a conflict opens "This page changed while you were editing" with View changes, Keep mine and Reload.

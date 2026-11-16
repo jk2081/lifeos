@@ -61,9 +61,9 @@ def get(area, include_archived=0):
 		c["open_items"] = open_items.get(c.ref_name, 0)
 	timeline = index_rows(space, f"and area in %(ids)s {arch}", v, page_length=20)
 
-	like = " or ".join(f"also_in_csv like %(like{i})s" for i in range(len(ids)))
-	like_values = {f"like{i}": f"%,{a},%" for i, a in enumerate(ids)}
-	references = index_rows(space, f"and also_in_csv != '' and ({like}) and area not in %(ids)s and kind != 'Task Done' {arch}", {**v, **like_values}, page_length=20)
+	from lifeos.index import also_in_sql
+
+	references = index_rows(space, f"and {also_in_sql('ids')} and area not in %(ids)s and kind != 'Task Done' {arch}", v, page_length=20)
 
 	# every goal in progress for this area and its sub-areas, of every type, with its task figure and 12 Week Year score
 	from lifeos.api import goals as goals_api
@@ -92,6 +92,7 @@ def tab_counts(space, area):
 		"projects": projects.list(space=space, area=area, page_length=1)["total"],
 		"tasks": task_api.list(space=space, area=area, status="open_doing", page_length=1)["total"],
 		"notes": library.list(space=space, area=area, page_length=1)["total"],
+		"wiki": library.list(space=space, area=area, page_length=1, collection="Wiki")["total"],
 		"documents": vault.list(space=space, area=area, page_length=1)["total"],
 		"chats": chats.list(space=space, area=area, page_length=1)["total"],
 		"timeline": timeline.get(space=space, area=area, page_length=1)["total"],

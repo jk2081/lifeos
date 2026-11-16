@@ -26,7 +26,7 @@
    <FormControl type="select" label="Goal" :model-value="task.goal || ''" :options="goalOptions" :disabled="!writable" @update:model-value="(v) => save({ goal: v || null })" />
   <div class="text-sm text-ink-gray-6">
     <div v-if="task.inbox_item">From <a class="text-ink-blue-8 hover:underline" href="#" @click.prevent="openRef('inbox:' + task.inbox_item)">{{ task.source_title || 'an inbox item' }}</a></div>
-    <div v-if="task.source_url"><a class="text-ink-blue-8 hover:underline" :href="task.source_url" target="_blank" rel="noopener noreferrer">Source link</a></div>
+    <div v-if="safeSource" class="my-1"><Button size="sm" icon-left="lucide-external-link" :label="sourceLabel" data-open-source @click="openSource" /></div>
     <div v-if="task.month_plan">In the month plan {{ task.month_plan.split('-').slice(-2).join('-') }}</div>
     <div>Created {{ short(task.creation, true) }}<span v-if="task.completed_on"> · closed {{ short(task.completed_on, true) }}</span></div>
   </div>
@@ -37,18 +37,20 @@
   </div>
   </template>
   <template v-if="on('notes')">
-    <FormControl v-model="task.notes_md" type="textarea" label="Notes" :rows="12" placeholder="Markdown. Link a record with [[Title]]." :disabled="!writable" @change="save({ notes_md: task.notes_md })" />
-    <Md v-if="task.notes_md" :text="task.notes_md" />
+    <div class="flex items-center gap-2 text-sm text-ink-gray-6"><span class="text-sm-medium text-ink-gray-7">Notes</span><span v-if="writable" data-save-state aria-live="polite">{{ notesState }}</span></div>
+    <LiveEditor v-model="task.notes_md" compact :space="task.space" :links="task.links || []" :readonly="!writable" doctype="Life Task" :docname="task.name"
+      label="Task notes" placeholder="Notes. Type [[ to link a record, / for blocks." @update:model-value="queueNotes" @blur="saveNotes" />
   </template>
   <Backlinks v-if="on('links')" tab doctype="Life Task" :name="task.name" :items="links" />
   </template>
 </template>
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Badge, Button, DatePicker, FormControl, TextInput, dialog, toast } from 'frappe-ui'
 import Pick from '../Pick.vue'
 import Backlinks from '../Backlinks.vue'
-import Md from '../Md.vue'
+import LiveEditor from '../LiveEditor.vue'
+import { safeUrl } from '@/lib/editor/livePreview'
 import { loadBacklinks } from '@/lib/links'
 import { openRef } from '@/lib/pane'
 import { api, db, errorText, tryCall } from '@/lib/api'
@@ -98,6 +100,40 @@ async function load() {
     emit('missing')
   }
 }
+// the source of a task, such as the Gmail thread an email digest proposed it from (source_url)
+const safeSource = computed(() => /^https?:/i.test(task.value?.source_url || '') ? safeUrl(task.value.source_url) : '')
+const sourceLabel = computed(() => (/mail\.google\.com/i.test(safeSource.value) ? 'Open in Gmail' : 'Open source'))
+function openSource() { window.open(safeSource.value, '_blank', 'noopener,noreferrer') }
+
+// notes save by themselves a moment after typing stops, and when the editor loses focus; the text being typed is never replaced
+const notesState = ref('Saved')
+let notesTimer = null
+let notesDirty = false
+function queueNotes() {
+  notesDirty = true
+  notesState.value = 'Typing…'
+  clearTimeout(notesTimer)
+  notesTimer = setTimeout(saveNotes, 1500)
+}
+async function saveNotes() {
+  clearTimeout(notesTimer)
+  if (!notesDirty) return
+  notesDirty = false
+  notesState.value = 'Saving…'
+  const text = task.value.notes_md
+  try {
+    const res = await api('tasks.update', { task: props.name, values: { notes_md: text } })
+    task.value = { ...res, notes_md: task.value.notes_md }
+    notesState.value = 'Saved'
+    emit('changed', task.value)
+  } catch (e) {
+    notesState.value = 'Not saved'
+    notesDirty = true
+    toast.error(errorText(e))
+  }
+}
+onBeforeUnmount(saveNotes)
+
 async function save(values) {
   try {
     task.value = await api('tasks.update', { task: props.name, values })

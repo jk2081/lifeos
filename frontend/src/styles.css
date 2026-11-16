@@ -9,6 +9,8 @@ body { @apply bg-surface-base text-base text-ink-gray-8; }
 .text-ink-gray-5 { color: var(--ink-gray-6); }
 .text-ink-amber-7.bg-surface-amber-2 { color: var(--ink-amber-9); } /* the amber Badge */
 .text-ink-blue-7.bg-surface-blue-2 { color: var(--ink-blue-8); } /* the blue Badge */
+/* secondary text on the open (highlighted) row: gray-6 is 4.1 to 1 on surface-gray-3 in the dark theme */
+.bg-surface-gray-3 .text-ink-gray-6, .\!bg-surface-gray-3 .text-ink-gray-6 { color: var(--ink-gray-7); }
 
 /* ---- layout helpers ---- */
 .page-body { @apply flex flex-col gap-6 px-4 pb-10 pt-4 md:px-7 md:pt-6; }
@@ -35,4 +37,51 @@ body { @apply bg-surface-base text-base text-ink-gray-8; }
 /* [[links]] and the "unclear" marker inside rendered Markdown, which is HTML we do not template */
 .md a.wl { @apply rounded-1 bg-surface-blue-2 px-1 text-ink-blue-9 no-underline; }
 .md .wl.missing { @apply rounded-1 bg-surface-gray-2 px-1 text-ink-gray-6; }
+.md a.wl.ambiguous, .lv-editor .cm-lp-chip.ambiguous { @apply bg-surface-amber-2 text-ink-amber-9; }
 .md .unclear { @apply whitespace-nowrap rounded-full bg-surface-amber-2 px-2 py-px font-sans text-xs text-ink-amber-9; }
+
+/* ---- the Markdown editor (components/LiveEditor.vue): CodeMirror's DOM, which we do not template ----
+   One pane, formatted as you type, in the reading typeface, in a column of at most about 720 px. Colours are tokens. */
+.lv-editor { @apply relative flex flex-col; }
+.lv-toolbar { @apply sticky top-0 z-10 mx-auto w-full max-w-[720px] border-b border-outline-gray-1 bg-surface-base px-1 py-1; }
+.lv-toolbar.lv-floating { @apply fixed inset-x-0 z-50 max-w-none border-b-0 border-t px-2 shadow-lg; top: auto; }
+.lv-host { @apply w-full; }
+.lv-editor .cm-editor { @apply mx-auto w-full max-w-[720px] bg-transparent text-ink-gray-8; font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif; font-size: 17px; }
+.lv-editor .cm-editor.cm-focused { outline: none; }
+.lv-editor .cm-scroller { font-family: inherit; line-height: 1.65; min-height: 320px; }
+.lv-editor.lv-compact .cm-scroller { min-height: 120px; }
+.lv-editor .cm-content { padding: 14px 0 28px; caret-color: var(--ink-gray-9); }
+.lv-editor .cm-line { padding: 0 4px; }
+.lv-editor .cm-cursor { border-left-color: var(--ink-gray-9); }
+.lv-editor .cm-selectionBackground, .lv-editor .cm-focused .cm-selectionBackground { background-color: var(--surface-blue-2) !important; }
+.lv-editor .cm-placeholder { color: var(--ink-gray-6); }
+.lv-editor .cm-tooltip { @apply overflow-hidden rounded-4 border border-outline-gray-2 bg-surface-base text-ink-gray-8 shadow-lg; font-family: InterVar, Inter, system-ui, sans-serif; font-size: 14px; }
+.lv-editor .cm-tooltip-autocomplete ul li { padding: 5px 10px !important; }
+.lv-editor .cm-tooltip-autocomplete ul li[aria-selected] { @apply bg-surface-gray-2 text-ink-gray-9; }
+.lv-editor .cm-completionDetail { @apply ml-2 not-italic text-ink-gray-6; }
+.lv-editor.lv-raw .cm-editor { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+/* headings at size, in the interface typeface as in rendered notes */
+.lv-editor .cm-lp-h1, .lv-editor .cm-lp-h2, .lv-editor .cm-lp-h3, .lv-editor .cm-lp-h4, .lv-editor .cm-lp-h5, .lv-editor .cm-lp-h6 { @apply font-semibold text-ink-gray-9; font-family: InterVar, Inter, system-ui, sans-serif; }
+.lv-editor .cm-lp-h1 { font-size: 1.75em; line-height: 1.3; padding-top: 0.4em; }
+.lv-editor .cm-lp-h2 { font-size: 1.4em; line-height: 1.35; padding-top: 0.35em; }
+.lv-editor .cm-lp-h3 { font-size: 1.18em; line-height: 1.4; padding-top: 0.3em; }
+.lv-editor .cm-lp-strong { font-weight: 650; }
+.lv-editor .cm-lp-em { font-style: italic; }
+.lv-editor .cm-lp-strike, .lv-editor .cm-lp-done { @apply text-ink-gray-6 line-through; }
+.lv-editor .cm-lp-mark { @apply text-ink-gray-6; }
+.lv-editor .cm-lp-code { @apply rounded-1 bg-surface-gray-2 px-1 text-ink-gray-9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em; }
+.lv-editor .cm-lp-codeblock { @apply bg-surface-gray-1 text-ink-gray-9; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+.lv-editor .cm-lp-quote { @apply border-l-4 border-outline-gray-3 text-ink-gray-7; padding-left: 14px !important; }
+.lv-editor .cm-lp-link { @apply cursor-pointer text-ink-blue-8 underline decoration-1 underline-offset-2; }
+.lv-editor .cm-lp-link-src, .lv-editor .cm-lp-wiki-src { @apply text-ink-blue-8; }
+.lv-editor .cm-lp-chip { @apply cursor-pointer rounded-1 bg-surface-blue-2 px-1 text-ink-blue-9; }
+.lv-editor .cm-lp-chip.missing { @apply cursor-default bg-surface-gray-2 text-ink-gray-6; }
+.lv-editor .cm-lp-bullet { @apply inline-block w-3 text-ink-gray-7; }
+.lv-editor .cm-lp-task { @apply relative top-0.5 mr-1.5 inline-block size-4 cursor-pointer text-ink-gray-7; }
+.lv-editor .cm-lp-task[aria-checked="true"] { @apply text-ink-gray-9; }
+.lv-editor .cm-lp-hr { @apply my-2 block border-t border-outline-gray-3; }
+.lv-editor .cm-lp-img { @apply my-1 block max-h-[480px] max-w-full rounded-4 border border-outline-gray-1; }
+.lv-editor .cm-lp-table { @apply my-2 overflow-x-auto px-1; font-family: InterVar, Inter, system-ui, sans-serif; font-size: 14px; }
+.lv-editor .cm-lp-table-src { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+/* the title of a note or wiki page on its full page: a borderless field at heading size */
+.lv-title input { @apply h-auto py-1 font-semibold text-ink-gray-9; font-size: 1.75rem; line-height: 1.25; padding-left: 4px; }
