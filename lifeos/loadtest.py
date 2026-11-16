@@ -62,6 +62,8 @@ def seed(rows=100000, users=20, spaces=50, big_share=0.5):
 	task_cols = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "space", "title", "status", "priority",
 		"due_date", "area", "is_archived", "last_touched_on", "completed_on"]
 	index_cols = index.COLUMNS
+	# the columns set 4 added to the index, after the 21 these rows spell out
+	pad = tuple(0 if c == "vault_locked" else "" for c in index.COLUMNS[21:])
 	tasks, idx = [], []
 
 	def flush(force=False):
@@ -100,13 +102,13 @@ def seed(rows=100000, users=20, spaces=50, big_share=0.5):
 				tasks.append((name, created, created, owner, owner, 0, 0, space, title, status, rng.choice(["I", "II", "III", "IV", ""]),
 					due, area, archived, day, add_days(day, 3) if done else None))
 				idx.append((index.row_name("Life Task", name, "Task"), created, created, owner, owner, 0, 0, "Life Task", name, space,
-					area, also, "", "", day, title, text, archived, "Task", status, owner))
+					area, also, "", "", day, title, text, archived, "Task", status, owner) + pad)
 			else:
 				doctype, kind = KINDS[n % len(KINDS)]
 				name = f"load-x-{made:07d}"
 				archived = 1 if kind in ("Chat", "Inbox") and age > 90 else 0
 				idx.append((index.row_name(doctype, name, kind), created, created, owner, owner, 0, 0, doctype, name, space,
-					area, also, "", "", day, title, text, archived, kind, "", owner))
+					area, also, "", "", day, title, text, archived, kind, "", owner) + pad)
 			flush()
 	flush(force=True)
 	frappe.db.commit()
@@ -154,6 +156,154 @@ def measure(user=None, space=None):
 	out["target_ms"] = TARGET_MS
 	out["slowest_ms"] = max(v["median_ms"] for v in out.values() if isinstance(v, dict))
 	out["passed"] = out["slowest_ms"] < TARGET_MS
+	return out
+
+
+# ---------- UX fixes, set 4: sources and the wiki at scale ----------
+SOURCE_KINDS = [("Voice", "Voice Note"), ("Document", "Upload"), ("Photo", "Upload"), ("Article", "Web"), ("Email", "Email"),
+	("Email Digest", "Email Digest"), ("Text", "Message")]
+
+
+def seed_sources(sources=20000, pages=2000, space=None, text_chars=5000):
+	"""Add `sources` sources (nine in ten inbox items, one in ten chat logs) with about `text_chars` characters of text each, and
+	`pages` wiki pages with two changes each, to the big load space. Bulk SQL, like seed(). Run seed() first."""
+	frappe.set_user("Administrator")
+	rng = random.Random(11)
+	vocab = _vocabulary(rng)
+	space = space or space_names(1)[0]
+	areas = frappe.get_all("Life Area", filters={"space": space}, pluck="name") or [""]
+	owner = devtools.OWNER
+	ts, day0 = now(), getdate(today())
+	pad = {c: (0 if c == "vault_locked" else "") for c in index.COLUMNS[21:]}
+
+	def words(n):
+		out, size = [], 0
+		while size < n:
+			w = rng.choice(vocab)
+			out.append(w)
+			size += len(w) + 1
+		return " ".join(out)
+
+	item_cols = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "space", "title", "source_type", "received_on",
+		"transcript_md", "summary_md", "status", "intent", "media_kind", "area", "is_archived", "source_system", "thumbnail"]
+	chat_cols = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "space", "title", "date", "assistant",
+		"transcript_md", "area", "is_archived", "source_system", "external_id"]
+	items, chats, idx = [], [], []
+
+	def index_row(dt, name, kind, created, day, area, title, text, status, extra):
+		row = {**pad, **extra}
+		return (index.row_name(dt, name, kind), created, created, owner, owner, 0, 0, dt, name, space, area, "", "", "", day, title, text[:index.SEARCH_CAP],
+			0, kind, status, owner) + tuple(row[c] for c in index.COLUMNS[21:])
+
+	def flush(force=False):
+		nonlocal items, chats, idx
+		if items and (force or len(items) >= 500):
+			frappe.db.bulk_insert("Life Inbox Item", item_cols, items)
+			items = []
+		if chats and (force or len(chats) >= 500):
+			frappe.db.bulk_insert("Life Chat Log", chat_cols, chats)
+			chats = []
+		if idx and (force or len(idx) >= 500):
+			frappe.db.bulk_insert("Life Index", index.COLUMNS, idx)
+			idx = []
+
+	for n in range(int(sources)):
+		age = int(rng.random() ** 2 * 1500)
+		day = add_days(day0, -age)
+		created = f"{day} 09:00:00"
+		area = rng.choice(areas)
+		title = " ".join(rng.choice(vocab) for _ in range(rng.randint(3, 7))).capitalize()
+		text = words(text_chars) + (" " + RARE_WORD if n % 2000 == 0 else "")
+		if n % 10 == 9:
+			name = f"load-c-{n:07d}"
+			chats.append((name, created, created, owner, owner, 0, 0, space, title, day, rng.choice(["Claude", "ChatGPT"]), text, area, 0, "claude", name))
+			idx.append(index_row("Life Chat Log", name, "Chat", created, day, area, title, text, "", {"media_kind": "Chat", "source_system": "claude", "assistant": "Claude"}))
+		else:
+			kind, stype = SOURCE_KINDS[n % len(SOURCE_KINDS)]
+			name = f"load-s-{n:07d}"
+			status = "Done" if rng.random() < 0.9 else "To Review"
+			thumb = f"/private/files/{name}-thumb.jpg" if kind == "Photo" else ""
+			items.append((name, created, created, owner, owner, 0, 0, space, title, stype, created, text, words(300), status, "Process", kind, area, 0,
+				"gmail" if kind.startswith("Email") else "upload", thumb))
+			idx.append(index_row("Life Inbox Item", name, "Inbox", created, day, area, title, text, status,
+				{"media_kind": kind, "source_system": "gmail" if kind.startswith("Email") else "upload", "intent": "Process", "thumbnail": thumb}))
+		flush()
+	flush(force=True)
+
+	note_cols = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "space", "title", "content_md", "collection", "summary",
+		"area", "is_archived", "is_rules"]
+	change_cols = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "space", "note", "change_type", "changed_by", "changed_on",
+		"change_note", "before_md", "after_md", "reverted"]
+	notes, changes = [], []
+	for n in range(int(pages)):
+		name = f"load-w-{n:06d}"
+		day = add_days(day0, -int(rng.random() * 400))
+		created = f"{day} 11:00:00"
+		title = " ".join(rng.choice(vocab) for _ in range(rng.randint(2, 4))).title() + f" {n}"
+		body = words(2000) + " [[" + " ".join(rng.choice(vocab) for _ in range(2)).title() + "]]"
+		area = rng.choice(areas)
+		notes.append((name, created, created, owner, owner, 0, 0, space, title, body, "Wiki", "One line about " + title, area, 0, 0))
+		idx.append(index_row("Life Note", name, "Note", created, day, area, title, body, "", {"collection": "Wiki"}))
+		for k, (ctype, before, after) in enumerate((("Created", "", body[:1000]), ("Edited", body[:1000], body))):
+			changes.append((f"load-wc-{n:06d}-{k}", created, created, AGENT_USER, AGENT_USER, 0, 0, space, name, ctype, AGENT_USER,
+				f"{day} 11:0{k}:00", "Load test change", before, after, 0))
+		if len(notes) >= 500:
+			frappe.db.bulk_insert("Life Note", note_cols, notes)
+			frappe.db.bulk_insert("Life Wiki Change", change_cols, changes)
+			notes, changes = [], []
+		flush()
+	if notes:
+		frappe.db.bulk_insert("Life Note", note_cols, notes)
+		frappe.db.bulk_insert("Life Wiki Change", change_cols, changes)
+	flush(force=True)
+	frappe.db.commit()
+	return {"sources": frappe.db.count("Life Index", {"space": space, "kind": ("in", ["Inbox", "Chat"])}),
+		"wiki_pages": frappe.db.count("Life Note", {"space": space, "collection": "Wiki"})}
+
+
+AGENT_USER = "hermes@lifeos.test"
+
+
+def measure_sources(user=None, space=None):
+	"""Time the reads of the Sources and Wiki screens in the big load space: the Sources first page, a tab switch, a full-text
+	search (the app's search and the wiki's), the Wiki Pages list and the Changes list."""
+	from lifeos.api import search, sources, wiki
+
+	space = space or space_names(1)[0]
+	before = frappe.session.user
+	frappe.set_user(user or devtools.OWNER)
+	permissions.clear_cache()
+	try:
+		word = frappe.db.sql("select title from `tabLife Index` where space=%s and kind='Inbox' limit 1 offset 700", space)[0][0].split()[0].lower()
+		out = {
+			"sources": frappe.db.count("Life Index", {"space": space, "kind": ("in", ["Inbox", "Chat"])}),
+			"wiki_pages": frappe.db.count("Life Note", {"space": space, "collection": "Wiki"}),
+			"sources_first_page": _time(lambda: sources.list(space=space)),
+			"sources_tab_photos": _time(lambda: sources.list(space=space, tab="photos")),
+			"sources_tab_chats": _time(lambda: sources.list(space=space, tab="chats")),
+			"search_full_text": _time(lambda: search.query(word, space=space)),
+			"search_rare_word": _time(lambda: search.query(RARE_WORD, space=space)),
+			"wiki_search": _time(lambda: wiki.search(space, word, include_sources=1)),
+			"wiki_pages_list": _time(lambda: wiki.pages(space=space)),
+			"wiki_changes_list": _time(lambda: wiki.changes(space=space)),
+		}
+	finally:
+		frappe.set_user(before)
+	out["target_ms"] = TARGET_MS
+	out["slowest_ms"] = max(v["median_ms"] for v in out.values() if isinstance(v, dict))
+	out["passed"] = out["slowest_ms"] < TARGET_MS
+	return out
+
+
+def run_sources(rows=100000, sources=20000, pages=2000, keep=0):
+	"""The set 4 scale check: the milestone 9 load, plus sources and wiki pages, then the timings of both."""
+	out = {"seeded": seed(rows), "sources": seed_sources(sources, pages)}
+	try:
+		out["timings"] = measure()
+		out["timings_sources"] = measure_sources()
+	finally:
+		if not int(keep or 0):
+			remove()
 	return out
 
 
