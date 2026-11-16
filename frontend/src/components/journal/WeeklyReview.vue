@@ -4,7 +4,26 @@
     <Button icon="lucide-chevron-right" label="Next week" @click="step(7)" />
   </Teleport>
   <div v-if="d" class="page-body">
-    <div class="stats">
+    <!-- the weekly review starts with a short Reset (UX fixes, set 5); skipping it is remembered for the week -->
+    <Card v-if="reset && !resetDone" class="flex flex-col gap-3" data-review-reset>
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <div class="text-lg-semibold text-ink-gray-9">Step 1 · A short Reset</div>
+        <div class="text-sm text-ink-gray-6">Clear what is stuck before you plan the week.</div>
+      </div>
+      <div class="flex flex-wrap gap-x-6 gap-y-1 text-base text-ink-gray-8">
+        <span :class="reset.over_limit ? 'text-ink-amber-9' : ''"><CountLink :count="reset.stuck" :tone="reset.over_limit ? 'text-ink-amber-9 font-semibold' : undefined" count-key="review:stuck" /> tasks stuck<template v-if="reset.over_limit">, above your limit of {{ reset.rules.stuck_limit }}</template></span>
+        <span><CountLink :count="reset.someday_due" count-key="review:someday" /> Someday items due for review</span>
+      </div>
+      <ul v-if="reset.batches.length" class="flex flex-col gap-1 text-base text-ink-gray-8">
+        <li v-for="b in reset.batches" :key="b.key">· {{ b.count }} {{ b.title.charAt(0).toLowerCase() + b.title.slice(1) }}</li>
+      </ul>
+      <div class="flex flex-wrap gap-2">
+        <Button variant="solid" label="Open Reset" route="/reset" data-review-reset-open />
+        <Button label="Done, go on to the review" data-review-reset-done @click="finishReset" />
+        <Button variant="ghost" label="Skip for this week" data-review-reset-skip @click="finishReset" />
+      </div>
+    </Card>
+    <div v-if="!reset || resetDone" class="stats">
       <Stat :label="d.cycle ? `Week ${d.cycle.week} score` : '12 Week Year'" :value="d.cycle ? Math.round(d.cycle.percent) + '%' : '—'">
         <template #sub><span class="max-md:hidden">{{ d.cycle ? `${d.cycle.done} of ${d.cycle.planned} ticks · ${d.cycle.title}` : 'No cycle in this week' }}</span></template>
       </Stat>
@@ -15,7 +34,7 @@
         <template #sub><span class="max-md:hidden">Older than 14 days, no date</span></template>
       </Stat>
     </div>
-    <div class="cols">
+    <div v-if="!reset || resetDone" class="cols">
       <div class="half">
         <section><SectionHead>Habits this week</SectionHead>
           <Card flush><Row v-for="h in d.habits" :key="h.habit" class="!items-center !gap-3.5">
@@ -78,6 +97,7 @@ import Empty from '@/components/Empty.vue'
 import TaskRow from '@/components/TaskRow.vue'
 import Card from '@/components/ui/Card.vue'
 import NumLink from '@/components/ui/NumLink.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Stat from '@/components/ui/Stat.vue'
@@ -87,6 +107,18 @@ import { addDays, long, short, startOfWeek } from '@/lib/dates'
 import { onRecordChanged, openRef, refOf } from '@/lib/pane'
 
 const emit = defineEmits(['sub'])
+const reset = ref(null)
+const resetKey = () => `lifeos-review-reset:${store.space}:${weekStart.value}`
+const resetDone = ref(false)
+function finishReset() {
+  resetDone.value = true
+  localStorage.setItem(resetKey(), '1')
+}
+async function loadReset() {
+  resetDone.value = !!localStorage.getItem(resetKey())
+  if (resetDone.value || store.isAgent) return
+  try { reset.value = await api('reset.short', { space: store.space }) } catch (e) { reset.value = null }
+}
 const weekStart = ref(startOfWeek(store.today))
 const d = ref(null)
 const note = ref('')
@@ -131,5 +163,5 @@ async function undo(a) {
   if (await tryCall(() => api('archive.restore', { doctype: a.doctype, name: a.name }), 'Restored.')) load()
 }
 onRecordChanged(load)
-onMounted(load)
+onMounted(() => { load(); loadReset() })
 </script>

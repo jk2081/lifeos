@@ -18,6 +18,7 @@ export const NAV = [
   ['Chats', '/sources?tab=chats', 'lucide-message-square', 'h'],
   ['Timeline', '/timeline', 'lucide-clock', 'l'],
   ['Graph', '/graph', 'lucide-waypoints', 'g'],
+  ['Reset', '/reset', 'lucide-rotate-ccw', 'e'],
   ['Archive', '/archive', 'lucide-archive', 'r'],
 ].map(([label, to, icon, key]) => ({ label, to, icon, key }))
 
@@ -30,7 +31,7 @@ export const GROUPS = [
   { key: 'areas', label: 'Areas', items: [] },
   { key: 'records', label: 'Records', items: ['Sources', 'Notes', 'Wiki', 'Vault', 'Timeline'].map(by) },
 ]
-export const BOTTOM = [by('Archive'), SETTINGS]
+export const BOTTOM = [by('Reset'), by('Archive'), SETTINGS]
 export const TOOLTIPS = { Timeline: 'Everything, by date', Sources: 'Everything captured', Wiki: 'Pages an agent writes from your sources' }
 // the view switch of Notes
 // Notes opens on the List (UX fixes, set 4); Tree and Graph are view choices

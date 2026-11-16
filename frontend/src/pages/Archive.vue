@@ -1,6 +1,6 @@
 <template>
   <ListView ref="list" title="Archive" noun="archived records" screen="archive" doctype="Life Index" :spec="SPEC" :tabs="TABS" :quick="['area', 'title']" :virtual="VIRTUAL"
-    :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => refOf(r.ref_doctype, r.ref_name)" :row-key="(r) => r.ref_doctype + r.ref_name"
+    :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => (r.trash ? null : refOf(r.ref_doctype, r.ref_name))" :row-key="(r) => r.ref_doctype + r.ref_name"
     :row-label="(r) => r.title || 'Untitled'" :group-by="(r) => (route.query.sort ? '' : r.area_name || 'Unfiled')" empty-title="Nothing is archived."
     empty-hint="Done tasks, finished inbox items and quiet chats move here after the number of days in Settings. Completed projects move here at once with their records."
     @loaded="(res) => (projects = res.projects)">
@@ -21,13 +21,13 @@
     <template #cell-kind="{ row }"><span class="truncate text-ink-gray-6">{{ KIND[row.kind] || row.kind }}</span></template>
     <template #cell-area="{ row }"><span class="truncate">{{ row.area_name }}</span></template>
     <template #cell-project="{ row }"><span class="truncate">{{ row.project_title }}</span></template>
-    <template #cell-_archived="{ row }"><span class="truncate text-sm text-ink-gray-6">{{ [row.archived_on && short(row.archived_on, true), REASON[row.archive_reason]].filter(Boolean).join(', ') }}</span></template>
-    <template #cell-_restore="{ row }"><Button v-if="canWrite()" class="relative" size="sm" label="Restore" @click="restore(row.ref_doctype, row.ref_name)" /></template>
+    <template #cell-_archived="{ row }"><span class="truncate text-sm text-ink-gray-6">{{ row.trash ? `deleted ${short(row.deleted_on, true)} · ${row.days_left} days left` : [row.archived_on && short(row.archived_on, true), REASON[row.archive_reason]].filter(Boolean).join(', ') }}</span></template>
+    <template #cell-_restore="{ row }"><Button v-if="canWrite()" class="relative" size="sm" label="Restore" :data-trash-restore="row.trash || undefined" @click="row.trash ? restoreTrash(row) : restore(row.ref_doctype, row.ref_name)" /></template>
     <template #stack="{ row }">
       <div class="flex items-center gap-2.5">
         <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ row.title || 'Untitled' }}</div>
           <div class="text-sm text-ink-gray-6">{{ [KIND[row.kind] || row.kind, row.project_title, row.archived_on && 'archived ' + short(row.archived_on, true), REASON[row.archive_reason]].filter(Boolean).join(' · ') }}</div></div>
-        <Button v-if="canWrite()" class="relative" size="sm" label="Restore" @click="restore(row.ref_doctype, row.ref_name)" />
+        <Button v-if="canWrite()" class="relative" size="sm" label="Restore" :data-trash-restore="row.trash || undefined" @click="row.trash ? restoreTrash(row) : restore(row.ref_doctype, row.ref_name)" />
       </div>
     </template>
   </ListView>
@@ -64,16 +64,27 @@ const VIRTUAL = [
 ]
 // the state tabs: one per record type, on type=. All is the default
 const TABS = { key: 'type', field: 'ref_doctype', label: 'Record type', items: [{ value: 'all', label: 'All' }, { value: 'Life Task', label: 'Tasks' }, { value: 'Life Note', label: 'Notes' },
-  { value: 'Life Chat Log', label: 'Chats' }, { value: 'Life Vault Document', label: 'Documents' }, { value: 'Life Inbox Item', label: 'Inbox items' }, { value: 'Life Journal Page', label: 'Journal pages' }] }
+  { value: 'Life Chat Log', label: 'Chats' }, { value: 'Life Vault Document', label: 'Documents' }, { value: 'Life Inbox Item', label: 'Inbox items' }, { value: 'Life Journal Page', label: 'Journal pages' },
+  // Trash (UX fixes, set 5): records deleted in the last 30 days, with Restore; a daily job removes older ones for good
+  { value: 'trash', label: 'Trash' }] }
 const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'tags_csv', 'is_archived', 'record_owner', 'status']
 const SYNTHETIC = [{ key: '_archived', label: 'Archived', width: 'minmax(0, 1.4fr)', place: 'end' }, { key: '_restore', label: '', width: '6rem', align: 'right', place: 'end' }]
 const route = useRoute()
 const list = ref(null)
 const projects = ref([])
 async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
+  if (tab === 'trash') {
+    const [t, a] = await Promise.all([api('trash.list', { space: store.space, start, page_length }), api('archive.list', { space: store.space, page_length: 1 })])
+    const rows = t.rows.map((r) => ({ ...r, ref_doctype: r.doctype, ref_name: r.record, trash: r.name, kind: r.kind, archived_on: r.deleted_on, archive_reason: '' }))
+    return { rows, total: t.total, projects: [], tabs: { ...a.tabs, trash: t.total } }
+  }
+  const trashCount = api('trash.list', { space: store.space, page_length: 1 }).then((t) => t.total).catch(() => 0)
   const res = await api('archive.list', { space: store.space, doctype: tab === 'all' ? undefined : tab, area: p.area, reason: p.reason, archived_from: p.archived_from, archived_to: p.archived_to,
     filters, order_by, summary, start, page_length })
-  return summary ? res : { rows: res.records, total: res.total, projects: res.projects, tabs: res.tabs }
+  return summary ? res : { rows: res.records, total: res.total, projects: res.projects, tabs: { ...res.tabs, trash: await trashCount } }
+}
+async function restoreTrash(row) {
+  if (await tryCall(() => api('trash.restore', { name: row.trash }), 'Restored.')) list.value.reload()
 }
 async function restore(doctype, name) {
   if (await tryCall(() => api('archive.restore', { doctype, name }), 'Restored.')) list.value.reload()

@@ -180,10 +180,10 @@ async function archive() {
   }
 }
 function remove() {
-  dialog.danger({ title: 'Delete task', message: 'Delete this task for good?', onConfirm: doRemove })
+  dialog.danger({ title: 'Delete task', message: 'Move this task to the trash? It can be restored from Archive, Trash, for 30 days.', onConfirm: doRemove })
 }
 async function doRemove() {
-  if ((await tryCall(() => db.delete('Life Task', props.name), 'Deleted.')) !== undefined) {
+  if ((await tryCall(() => api('trash.delete', { doctype: 'Life Task', name: props.name }), 'Moved to the trash. Restore it from Archive, Trash, within 30 days.')) !== undefined) {
     emit('changed', null)
     emit('close')
   }

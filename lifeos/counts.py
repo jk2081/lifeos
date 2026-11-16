@@ -267,7 +267,6 @@ def _chats(space, lo, hi):
 	return _door(n, "/sources", {"tab": "chats", "open_items": 1, "f": _f(*conds)}, "Chats with open items")
 
 
-@frappe.whitelist()
 def get(space=None, which="open_band"):
 	"""The counts of one screen: open_band (Today), sidebar, inventory (Reset)."""
 	from lifeos import permissions

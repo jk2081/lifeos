@@ -200,9 +200,9 @@ const noteMenu = computed(() => [
   { label: note.value?.is_archived ? 'Restore from archive' : 'Archive', icon: note.value?.is_archived ? 'lucide-archive-restore' : 'lucide-archive', onClick: async () => {
     if (await tryCall(() => api('archive.set', { doctype: 'Life Note', name: note.value.name, archived: note.value.is_archived ? 0 : 1 }), note.value.is_archived ? 'Restored.' : 'Archived.')) { await loadTree(); router.push('/library') } } },
   { label: 'Delete', icon: 'lucide-trash-2', onClick: () => dialog.danger({
-    title: 'Delete this note for good?', message: `“${note.value.title}” will be removed. This cannot be undone.`,
+    title: 'Delete this note?', message: `“${note.value.title}” moves to the trash. Restore it from Archive, Trash, within 30 days.`,
     onConfirm: async () => {
-      if ((await tryCall(() => db.delete('Life Note', note.value.name), 'Deleted.')) !== undefined) { await loadTree(); router.push('/library') }
+      if ((await tryCall(() => api('trash.delete', { doctype: 'Life Note', name: note.value.name }), 'Moved to the trash.')) !== undefined) { await loadTree(); router.push('/library') }
     },
   }) },
 ])

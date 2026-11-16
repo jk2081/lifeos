@@ -19,6 +19,7 @@ const routes = [
   { path: '/goals', name: 'Goals', component: page('Goals') },
   { path: '/projects', name: 'Projects', component: page('Projects') },
   { path: '/someday', name: 'Someday', component: page('Someday') },
+  { path: '/reset', name: 'Reset', component: page('Reset') },
   { path: '/projects/:id', name: 'Project', component: page('Project'), props: true },
   { path: '/library/:id?', name: 'Library', component: page('Library'), props: true },
   { path: '/vault', name: 'Vault', component: page('Vault') },

@@ -63,7 +63,6 @@ def _rows(space=None):
 	return out
 
 
-@frappe.whitelist()
 def list(space=None, start=0, page_length=50, kind=None):
 	"""The Archive's Trash tab: Life OS records deleted in the last 30 days, in spaces the user belongs to."""
 	space = permissions.resolve_space(space)
@@ -80,7 +79,6 @@ def list(space=None, start=0, page_length=50, kind=None):
 	return {"rows": part, "total": len(rows)}
 
 
-@frappe.whitelist(methods=["POST"])
 def restore(name):
 	"""Put a deleted record back as it was, with its original name and creation date. Needs Write access to its space."""
 	if permissions.is_agent():

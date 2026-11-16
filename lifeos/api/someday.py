@@ -271,15 +271,22 @@ def undo(snapshot):
 
 def restore_snapshot(snap):
 	doc = permissions.get_doc_checked(snap["doctype"], snap["name"], "write")
+	if doc.get("is_archived") and not cint(snap.get("is_archived")) and snap.get("is_archived") is not None:
+		from lifeos import archive
+
+		archive.set_archived(doc.doctype, doc.name, False)
+		doc.reload()
 	if doc.doctype == "Life Goal":
 		doc.is_someday = cint(snap.get("is_someday"))
 	elif snap.get("status"):
 		doc.status = snap["status"]
 	if "due_date" in snap and doc.doctype == "Life Task":
 		doc.due_date = snap.get("due_date") or None
-	if snap.get("is_archived") is not None and doc.meta.has_field("is_archived"):
-		doc.is_archived = cint(snap["is_archived"])
 	doc.save()
+	if snap.get("is_archived") is not None and doc.meta.has_field("is_archived") and cint(doc.is_archived) != cint(snap["is_archived"]):
+		from lifeos import archive
+
+		archive.set_archived(doc.doctype, doc.name, bool(cint(snap["is_archived"])))
 	for t in snap.get("tasks") or []:
 		td = permissions.get_doc_checked("Life Task", t["name"], "write")
 		td.status = t["status"]
