@@ -57,10 +57,13 @@ def query_conditions(user=None, doctype=None):
 	if not spaces:
 		return "1=0"
 	cond = f"`tab{doctype}`.`space` in ({_in_list(spaces)})"
-	if doctype == "Life Index" and is_agent(user):
+	if doctype in ("Life Index", "Life Inbox Item") and is_agent(user):
 		closed = [s for s in spaces if s not in vault_open_spaces()]
-		if closed:
-			cond += f" and not (`tabLife Index`.`ref_doctype` = 'Life Vault Document' and `tabLife Index`.`space` in ({_in_list(closed)}))"
+		if closed and doctype == "Life Index":
+			# Vault documents, and the sources a Vault document was made from (UX fixes, set 4)
+			cond += f" and not (`tabLife Index`.`vault_locked` = 1 and `tabLife Index`.`space` in ({_in_list(closed)}))"
+		elif closed:
+			cond += f" and not (ifnull(`tabLife Inbox Item`.`vault_document`, '') != '' and `tabLife Inbox Item`.`space` in ({_in_list(closed)}))"
 	return cond
 
 
@@ -94,9 +97,21 @@ def vault_hidden(space, user=None) -> bool:
 	return is_agent(user) and space not in vault_open_spaces()
 
 
+def vault_locked(doc) -> bool:
+	"""A Vault document, an index row of one, or a source a Vault document was made from (UX fixes, set 4)."""
+	if doc.doctype == VAULT:
+		return True
+	if doc.doctype == "Life Index":
+		return bool(doc.get("vault_locked")) or doc.get("ref_doctype") == VAULT
+	if doc.doctype == "Life Inbox Item":
+		return bool(doc.get("vault_document"))
+	return False
+
+
 def vault_guard(space, alias="", user=None) -> str:
-	"""SQL for a query on Life Index rows of one space: leaves Vault rows out when they are closed to the user."""
-	return f" and {alias}ref_doctype != 'Life Vault Document'" if vault_hidden(space, user) else ""
+	"""SQL for a query on Life Index rows of one space: leaves Vault rows, and sources of Vault documents, out when the
+	Vault is closed to the user."""
+	return f" and {alias}vault_locked = 0 and {alias}ref_doctype != 'Life Vault Document'" if vault_hidden(space, user) else ""
 
 
 def has_permission(doc, ptype=None, user=None, debug=False):
@@ -105,7 +120,7 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 		return True
 	if ptype == "delete" and is_agent(user):
 		return False
-	if doc.get("space") and (doc.doctype == VAULT or (doc.doctype == "Life Index" and doc.get("ref_doctype") == VAULT)) and vault_hidden(doc.space, user):
+	if doc.get("space") and vault_locked(doc) and vault_hidden(doc.space, user):
 		return False
 	space = doc.get("space")
 	if not space:

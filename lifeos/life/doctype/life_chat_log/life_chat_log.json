@@ -10,9 +10,13 @@
   "title",
   "url",
   "assistant",
+  "updated_on",
   "summary_md",
+  "transcript_md",
   "open_items",
   "inbox_item",
+  "source_system",
+  "external_id",
   "organisation_section",
   "area",
   "also_in",
@@ -57,14 +61,26 @@
    "fieldname": "assistant",
    "fieldtype": "Select",
    "label": "Assistant",
-   "options": "Claude\nChatGPT\nOther",
+   "options": "Claude\nChatGPT\nCodex\nClaude Code\nOther",
    "default": "Claude",
    "in_list_view": 1
+  },
+  {
+   "fieldname": "updated_on",
+   "fieldtype": "Datetime",
+   "label": "Updated On",
+   "search_index": 1,
+   "description": "The chat's last activity"
   },
   {
    "fieldname": "summary_md",
    "fieldtype": "Long Text",
    "label": "Summary"
+  },
+  {
+   "fieldname": "transcript_md",
+   "fieldtype": "Long Text",
+   "label": "Transcript"
   },
   {
    "fieldname": "open_items",
@@ -77,6 +93,19 @@
    "fieldtype": "Link",
    "label": "Inbox Item",
    "options": "Life Inbox Item"
+  },
+  {
+   "fieldname": "source_system",
+   "fieldtype": "Data",
+   "label": "Source System",
+   "length": 40,
+   "search_index": 1
+  },
+  {
+   "fieldname": "external_id",
+   "fieldtype": "Data",
+   "label": "External Id",
+   "length": 255
   },
   {
    "fieldname": "organisation_section",

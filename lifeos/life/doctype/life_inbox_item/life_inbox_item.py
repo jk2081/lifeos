@@ -9,6 +9,11 @@ class LifeInboxItem(Document):
 			self.received_on = now_datetime()
 
 	def validate(self):
+		from lifeos import sources
+
+		self.intent = self.intent or "Process"
+		sources.set_media_kind(self)
+		sources.check_external_id(self)
 		if self.status == "Done" and not self.finished_on:
 			self.finished_on = today()
 		if self.status != "Done":

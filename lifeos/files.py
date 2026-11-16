@@ -15,6 +15,9 @@ def after_insert(doc, method=None):
 		frappe.throw("Files attached to Life OS records must be private.")
 	if doc.attached_to_doctype != "Life Inbox Item" or frappe.flags.lifeos_making_preview:
 		return
+	from lifeos import sources
+
+	sources.on_file_attached(doc)
 	if not (doc.file_name or "").lower().endswith(IMAGE_EXT):
 		return
 	if frappe.db.get_value("Life Inbox Item", doc.attached_to_name, "preview_image"):
@@ -53,10 +56,11 @@ def make_preview(file_doc):
 	return preview.file_url
 
 
-def attachments(doctype, name, exclude_field="preview_image"):
-	"""Files attached to a record, with sizes."""
+def attachments(doctype, name, exclude_field=("preview_image", "thumbnail")):
+	"""Files attached to a record, with sizes. The preview and thumbnail the app made are left out."""
 	rows = frappe.get_all(
 		"File", filters={"attached_to_doctype": doctype, "attached_to_name": name},
 		fields=["name", "file_name", "file_url", "file_size", "attached_to_field", "creation"], order_by="creation asc",
 	)
-	return [r for r in rows if r.attached_to_field != exclude_field]
+	exclude = (exclude_field,) if isinstance(exclude_field, str) else tuple(exclude_field or ())
+	return [r for r in rows if r.attached_to_field not in exclude]

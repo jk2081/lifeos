@@ -12,7 +12,10 @@ KINDS = {
 	"Life Chat Log": "Chat", "Life Journal Page": "Journal Page", "Life Check-in": "Check-in", "Life Month Plan": "Month Plan",
 }
 COLUMNS = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "ref_doctype", "ref_name", "space",
-	"area", "also_in_csv", "project", "tags_csv", "record_date", "title", "search_text", "is_archived", "kind", "status", "record_owner"]
+	"area", "also_in_csv", "project", "tags_csv", "record_date", "title", "search_text", "is_archived", "kind", "status", "record_owner",
+	"media_kind", "source_system", "intent", "assistant", "collection", "thumbnail", "vault_locked"]
+# Characters of a record's text kept for search: transcripts, extracted text, summaries and page Markdown (UX fixes, set 4)
+SEARCH_CAP = 60000
 
 
 def row_name(doctype, name, kind):
@@ -25,7 +28,7 @@ def _csv(values):
 
 
 def _text(*parts):
-	return "\n".join(p for p in parts if p)[:20000]
+	return "\n".join(p for p in parts if p)[:SEARCH_CAP]
 
 
 def build_rows(doc) -> list[dict]:
@@ -39,22 +42,28 @@ def build_rows(doc) -> list[dict]:
 		"is_archived": 1 if doc.get("is_archived") else 0,
 		"status": doc.get("status") or "", "record_owner": doc.owner,
 		"record_date": getdate(doc.creation), "title": (doc.get("title") or "")[:255], "search_text": "",
+		"media_kind": "", "source_system": "", "intent": "", "assistant": "", "collection": "", "thumbnail": "",
+		"vault_locked": 1 if dt == "Life Vault Document" else 0,
 	}
 	rows = [base]
 	if dt == "Life Inbox Item":
 		base["record_date"] = getdate(doc.received_on or doc.creation)
-		base["search_text"] = _text(doc.instruction, doc.summary_md, doc.transcript_md, doc.raw_text)
+		base["search_text"] = _text(doc.title, doc.instruction, doc.summary_md, doc.transcript_md, doc.raw_text)
+		base.update({"media_kind": doc.media_kind or "", "source_system": doc.source_system or "", "intent": doc.intent or "",
+			"thumbnail": doc.thumbnail or "", "vault_locked": 1 if doc.vault_document else 0})
 	elif dt == "Life Task":
 		base["search_text"] = _text(doc.notes_md, doc.waiting_on)
 		if doc.status == "Done" and doc.completed_on:
 			rows.append({**base, "kind": "Task Done", "record_date": getdate(doc.completed_on), "search_text": ""})
 	elif dt == "Life Note":
-		base["search_text"] = _text(doc.content_md)
+		base["search_text"] = _text(doc.summary, doc.content_md)
+		base["collection"] = doc.collection or "My notes"
 	elif dt == "Life Vault Document":
 		base["search_text"] = _text(doc.doc_type, doc.notes_md)
 	elif dt == "Life Chat Log":
 		base["record_date"] = getdate(doc.date)
-		base["search_text"] = _text(doc.summary_md, *[r.text for r in doc.open_items or []])
+		base["search_text"] = _text(doc.summary_md, *[r.text for r in doc.open_items or []], doc.transcript_md)
+		base.update({"media_kind": "Chat", "source_system": doc.source_system or "", "assistant": doc.assistant or ""})
 		base["status"] = "Open" if any(r.status == "Open" for r in doc.open_items or []) else ""
 	elif dt == "Life Journal Page":
 		base["record_date"] = getdate(doc.page_date)
@@ -77,11 +86,8 @@ def _write(rows):
 	ts = now()
 	values = []
 	for r in rows:
-		values.append((
-			row_name(r["ref_doctype"], r["ref_name"], r["kind"]), ts, ts, frappe.session.user, r["record_owner"] or frappe.session.user, 0, 0,
-			r["ref_doctype"], r["ref_name"], r["space"], r["area"], r["also_in_csv"], r["project"], r["tags_csv"],
-			r["record_date"], r["title"], r["search_text"], r["is_archived"], r["kind"], r["status"], r["record_owner"],
-		))
+		head = (row_name(r["ref_doctype"], r["ref_name"], r["kind"]), ts, ts, frappe.session.user, r["record_owner"] or frappe.session.user, 0, 0)
+		values.append(head + tuple(r.get(c) if r.get(c) is not None else "" for c in COLUMNS[7:]))
 	cols = ", ".join(f"`{c}`" for c in COLUMNS)
 	updates = ", ".join(f"`{c}`=values(`{c}`)" for c in COLUMNS if c not in ("name", "creation", "owner"))
 	placeholders = ", ".join(["(" + ", ".join(["%s"] * len(COLUMNS)) + ")"] * len(values))
@@ -135,5 +141,11 @@ def ensure_indexes():
 	frappe.db.add_index("Life Task", ["space", "status", "due_date"], "life_task_space_status_due")
 	frappe.db.add_unique("Life Action Log", ["action_id", "date"], "life_action_log_unique")
 	frappe.db.add_unique("Life Habit Log", ["habit", "date"], "life_habit_log_unique")
+	# UX fixes, set 4: original IDs are unique per space and system; one connection per space and system
+	frappe.db.add_unique("Life Inbox Item", ["space", "source_system", "external_id"], "life_inbox_external_id")
+	frappe.db.add_unique("Life Chat Log", ["space", "source_system", "external_id"], "life_chat_external_id")
+	frappe.db.add_unique("Life Connection", ["space", "system"], "life_connection_system")
+	frappe.db.add_index("Life Index", ["space", "ref_doctype", "is_archived", "record_date"], "life_index_space_type_date")
+	frappe.db.add_index("Life Wiki Change", ["space", "changed_on"], "life_wiki_change_space_on")
 	if not frappe.db.sql("show index from `tabLife Index` where Key_name='life_index_fulltext'"):
 		frappe.db.sql_ddl("alter table `tabLife Index` add fulltext index `life_index_fulltext` (`title`, `search_text`)")

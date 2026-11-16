@@ -10,6 +10,10 @@
   "parent_note",
   "content_md",
   "inbox_item",
+  "collection",
+  "summary",
+  "sources",
+  "is_rules",
   "organisation_section",
   "area",
   "also_in",
@@ -54,6 +58,33 @@
    "label": "Inbox Item",
    "options": "Life Inbox Item",
    "search_index": 1
+  },
+  {
+   "fieldname": "collection",
+   "fieldtype": "Select",
+   "label": "Collection",
+   "options": "My notes\nWiki",
+   "default": "My notes",
+   "search_index": 1
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Small Text",
+   "label": "Summary",
+   "description": "One line. Required for wiki pages"
+  },
+  {
+   "fieldname": "sources",
+   "fieldtype": "Table",
+   "label": "Sources",
+   "options": "Life Note Source"
+  },
+  {
+   "fieldname": "is_rules",
+   "fieldtype": "Check",
+   "label": "Is Rules",
+   "default": "0",
+   "description": "The wiki's rules page; one per space"
   },
   {
    "fieldname": "organisation_section",

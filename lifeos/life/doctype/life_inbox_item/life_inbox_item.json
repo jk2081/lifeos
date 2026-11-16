@@ -9,6 +9,10 @@
   "title",
   "source_type",
   "received_on",
+  "intent",
+  "media_kind",
+  "source_system",
+  "external_id",
   "instruction",
   "raw_text",
   "transcript_md",
@@ -20,6 +24,8 @@
   "error",
   "finished_on",
   "preview_image",
+  "thumbnail",
+  "vault_document",
   "organisation_section",
   "area",
   "also_in",
@@ -50,7 +56,7 @@
    "fieldname": "source_type",
    "fieldtype": "Select",
    "label": "Source Type",
-   "options": "Upload\nJournal Photo\nVoice Note\nEmail\nChat\nMessage\nWeb",
+   "options": "Upload\nJournal Photo\nVoice Note\nEmail\nEmail Digest\nChat\nMessage\nWeb",
    "default": "Upload"
   },
   {
@@ -59,6 +65,36 @@
    "label": "Received On",
    "search_index": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "intent",
+   "fieldtype": "Select",
+   "label": "Intent",
+   "options": "Process\nAdd to wiki\nJust keep",
+   "default": "Process",
+   "search_index": 1
+  },
+  {
+   "fieldname": "media_kind",
+   "fieldtype": "Select",
+   "label": "Media Kind",
+   "options": "\nVoice\nDocument\nPhoto\nArticle\nEmail\nEmail Digest\nText",
+   "search_index": 1,
+   "read_only": 1,
+   "description": "Set on save from the file or the source type"
+  },
+  {
+   "fieldname": "source_system",
+   "fieldtype": "Data",
+   "label": "Source System",
+   "length": 40,
+   "search_index": 1
+  },
+  {
+   "fieldname": "external_id",
+   "fieldtype": "Data",
+   "label": "External Id",
+   "length": 255
   },
   {
    "fieldname": "instruction",
@@ -120,6 +156,20 @@
    "fieldname": "preview_image",
    "fieldtype": "Attach Image",
    "label": "Preview Image"
+  },
+  {
+   "fieldname": "thumbnail",
+   "fieldtype": "Attach Image",
+   "label": "Thumbnail",
+   "description": "About 480 px wide, made on upload"
+  },
+  {
+   "fieldname": "vault_document",
+   "fieldtype": "Link",
+   "label": "Vault Document",
+   "options": "Life Vault Document",
+   "read_only": 1,
+   "description": "Set when a Vault document is made from this item"
   },
   {
    "fieldname": "organisation_section",

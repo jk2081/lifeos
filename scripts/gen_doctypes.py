@@ -84,6 +84,8 @@ def dt(name, fields, **kw):
 
 
 PRIORITY = ["", "I", "II", "III", "IV"]
+INTENTS = ["Process", "Add to wiki", "Just keep"]
+MEDIA_KINDS = ["", "Voice", "Document", "Photo", "Article", "Email", "Email Digest", "Text"]
 
 # ---- child tables ----
 dt("Life Space Member", [link("user", "User", reqd=1, in_list_view=1), sel("access", ["Read", "Write"], default="Write", reqd=1, in_list_view=1)], istable=1)
@@ -116,6 +118,10 @@ dt("Life Check-in Score", [
 	f("habits_low", "Float", in_list_view=1), f("habits_high", "Float", in_list_view=1),
 	f("situation_low", "Float", in_list_view=1), f("situation_high", "Float", in_list_view=1),
 	f("note", "Small Text"),
+], istable=1)
+dt("Life Note Source", [
+	link("source_doctype", "DocType", reqd=1, in_list_view=1),
+	f("source_name", "Dynamic Link", "source_doctype", reqd=1, in_list_view=1),
 ], istable=1)
 dt("Life Chat Open Item", [
 	f("text", "Small Text", reqd=1, in_list_view=1),
@@ -161,13 +167,17 @@ dt("Life Settings", [
 # ---- capture ----
 dt("Life Inbox Item", [
 	SPACE, f("title", reqd=1, in_list_view=1),
-	sel("source_type", ["Upload", "Journal Photo", "Voice Note", "Email", "Chat", "Message", "Web"], default="Upload"),
+	sel("source_type", ["Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web"], default="Upload"),
 	f("received_on", "Datetime", search_index=1, in_list_view=1),
+	sel("intent", INTENTS, default="Process", search_index=1),
+	sel("media_kind", MEDIA_KINDS, search_index=1, read_only=1, description="Set on save from the file or the source type"),
+	f("source_system", length=40, search_index=1), f("external_id", length=255),
 	f("instruction", "Small Text"), md("raw_text"), md("transcript_md"), md("summary_md"),
 	f("source_url", length=500),
 	sel("status", ["New", "Processing", "To Review", "Done", "Failed"], default="New", in_list_view=1, search_index=1),
 	link("claimed_by", "User"), f("claimed_on", "Datetime"), f("error", "Small Text"), f("finished_on", "Date"),
-	f("preview_image", "Attach Image"),
+	f("preview_image", "Attach Image"), f("thumbnail", "Attach Image", description="About 480 px wide, made on upload"),
+	link("vault_document", "Life Vault Document", read_only=1, description="Set when a Vault document is made from this item"),
 	*org(),
 ], title_field="title", show_title=1)
 dt("Life Proposal", [
@@ -239,8 +249,27 @@ dt("Life Journal Page", [
 dt("Life Note", [
 	SPACE, f("title", reqd=1, in_list_view=1), link("parent_note", "Life Note", search_index=1), md("content_md"),
 	link("inbox_item", "Life Inbox Item", search_index=1),
+	sel("collection", ["My notes", "Wiki"], default="My notes", search_index=1),
+	f("summary", "Small Text", description="One line. Required for wiki pages"),
+	f("sources", "Table", "Life Note Source"),
+	f("is_rules", "Check", default="0", description="The wiki's rules page; one per space"),
 	*org(),
 ], title_field="title", show_title=1, search_fields="title")
+dt("Life Wiki Change", [
+	SPACE, link("note", "Life Note", reqd=1, search_index=1, in_list_view=1),
+	sel("change_type", ["Created", "Edited", "Reverted", "Moved to My notes", "Moved to Wiki"], reqd=1, in_list_view=1),
+	link("changed_by", "User", in_list_view=1, label="By"), f("changed_on", "Datetime", search_index=1, in_list_view=1, label="On"),
+	f("change_note", "Small Text"),
+	link("source_doctype", "DocType"), f("source_name", "Dynamic Link", "source_doctype"),
+	md("before_md"), md("after_md"), f("reverted", "Check", default="0"),
+	link("reverts", "Life Wiki Change", description="The change this one undid"),
+], permissions=[{"role": r, "read": 1, "report": 1} for r in ("Life Admin", "Life User", "Life Agent")], in_create=1)
+dt("Life Connection", [
+	SPACE, f("system", reqd=1, in_list_view=1, length=40), f("label", in_list_view=1),
+	link("default_area", "Life Area"), link("default_project", "Life Project"),
+	sel("default_intent", INTENTS, default="Process"), f("active", "Check", default="1", in_list_view=1),
+	f("last_received_on", "Datetime", read_only=1, in_list_view=1), f("last_received_what", read_only=1),
+], permissions=perms(agent_write=False), title_field="label")
 dt("Life Vault Document", [
 	SPACE, f("title", reqd=1, in_list_view=1),
 	sel("doc_type", ["ID", "Travel", "Insurance", "Property", "Tax", "Medical", "Other"], default="Other", in_list_view=1),
@@ -251,8 +280,10 @@ dt("Life Vault Document", [
 ], title_field="title", show_title=1, search_fields="title")
 dt("Life Chat Log", [
 	SPACE, f("date", "Date", reqd=1, in_list_view=1, search_index=1), f("title", reqd=1, in_list_view=1),
-	f("url", length=500), sel("assistant", ["Claude", "ChatGPT", "Other"], default="Claude", in_list_view=1),
-	md("summary_md"), f("open_items", "Table", "Life Chat Open Item"), link("inbox_item", "Life Inbox Item"),
+	f("url", length=500), sel("assistant", ["Claude", "ChatGPT", "Codex", "Claude Code", "Other"], default="Claude", in_list_view=1),
+	f("updated_on", "Datetime", search_index=1, description="The chat's last activity"),
+	md("summary_md"), md("transcript_md"), f("open_items", "Table", "Life Chat Open Item"), link("inbox_item", "Life Inbox Item"),
+	f("source_system", length=40, search_index=1), f("external_id", length=255),
 	*org(),
 ], title_field="title", show_title=1, search_fields="title")
 dt("Life Link", [
@@ -264,6 +295,11 @@ dt("Life Index", [
 	f("area", in_list_view=1), f("also_in_csv", "Small Text"), f("project", in_list_view=1), f("tags_csv", "Small Text"),
 	f("record_date", "Date", in_list_view=1, label="Date"), f("title", length=255, in_list_view=1), f("search_text", "Long Text"),
 	f("is_archived", "Check", default="0"), f("kind", in_list_view=1), f("status"), f("record_owner"),
+	# UX fixes, set 4: what the Sources and Wiki screens filter on, so they need no second query
+	sel("media_kind", ["", "Voice", "Document", "Photo", "Article", "Email", "Email Digest", "Text", "Chat"], label="Kind of source"),
+	f("source_system", length=40), sel("intent", ["", *INTENTS]), f("assistant", length=40),
+	sel("collection", ["", "My notes", "Wiki"]), f("thumbnail", length=255),
+	f("vault_locked", "Check", default="0", description="A Vault document, or a source a Vault document was made from"),
 ], permissions=perms(agent_write=False), in_create=1, title_field="title")
 dt("Life Action Log", [
 	SPACE, link("goal", "Life Goal", reqd=1, search_index=1), f("action_id", reqd=1, search_index=1),

@@ -1,0 +1,131 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "note",
+  "change_type",
+  "changed_by",
+  "changed_on",
+  "change_note",
+  "source_doctype",
+  "source_name",
+  "before_md",
+  "after_md",
+  "reverted",
+  "reverts"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Link",
+   "label": "Note",
+   "options": "Life Note",
+   "reqd": 1,
+   "search_index": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "change_type",
+   "fieldtype": "Select",
+   "label": "Change Type",
+   "options": "Created\nEdited\nReverted\nMoved to My notes\nMoved to Wiki",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "changed_by",
+   "fieldtype": "Link",
+   "label": "By",
+   "options": "User",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "changed_on",
+   "fieldtype": "Datetime",
+   "label": "On",
+   "search_index": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "change_note",
+   "fieldtype": "Small Text",
+   "label": "Change Note"
+  },
+  {
+   "fieldname": "source_doctype",
+   "fieldtype": "Link",
+   "label": "Source Doctype",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Source Name",
+   "options": "source_doctype"
+  },
+  {
+   "fieldname": "before_md",
+   "fieldtype": "Long Text",
+   "label": "Before Md"
+  },
+  {
+   "fieldname": "after_md",
+   "fieldtype": "Long Text",
+   "label": "After Md"
+  },
+  {
+   "fieldname": "reverted",
+   "fieldtype": "Check",
+   "label": "Reverted",
+   "default": "0"
+  },
+  {
+   "fieldname": "reverts",
+   "fieldtype": "Link",
+   "label": "Reverts",
+   "options": "Life Wiki Change",
+   "description": "The change this one undid"
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Wiki Change",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -18,7 +18,14 @@
   "is_archived",
   "kind",
   "status",
-  "record_owner"
+  "record_owner",
+  "media_kind",
+  "source_system",
+  "intent",
+  "assistant",
+  "collection",
+  "thumbnail",
+  "vault_locked"
  ],
  "fields": [
   {
@@ -103,6 +110,49 @@
    "fieldname": "record_owner",
    "fieldtype": "Data",
    "label": "Record Owner"
+  },
+  {
+   "fieldname": "media_kind",
+   "fieldtype": "Select",
+   "label": "Kind of source",
+   "options": "\nVoice\nDocument\nPhoto\nArticle\nEmail\nEmail Digest\nText\nChat"
+  },
+  {
+   "fieldname": "source_system",
+   "fieldtype": "Data",
+   "label": "Source System",
+   "length": 40
+  },
+  {
+   "fieldname": "intent",
+   "fieldtype": "Select",
+   "label": "Intent",
+   "options": "\nProcess\nAdd to wiki\nJust keep"
+  },
+  {
+   "fieldname": "assistant",
+   "fieldtype": "Data",
+   "label": "Assistant",
+   "length": 40
+  },
+  {
+   "fieldname": "collection",
+   "fieldtype": "Select",
+   "label": "Collection",
+   "options": "\nMy notes\nWiki"
+  },
+  {
+   "fieldname": "thumbnail",
+   "fieldtype": "Data",
+   "label": "Thumbnail",
+   "length": 255
+  },
+  {
+   "fieldname": "vault_locked",
+   "fieldtype": "Check",
+   "label": "Vault Locked",
+   "default": "0",
+   "description": "A Vault document, or a source a Vault document was made from"
   }
  ],
  "in_create": 1,

@@ -7,6 +7,7 @@ SPACE_DOCTYPES = [
 	"Life Cycle", "Life Goal", "Life Month Plan", "Life Habit", "Life Habit Log",
 	"Life Check-in", "Life Journal Page", "Life Note", "Life Vault Document",
 	"Life Chat Log", "Life Link", "Life Index", "Life Action Log",
+	"Life Wiki Change", "Life Connection",
 ]
 
 # DocTypes that carry the organisation fields of section 4a.

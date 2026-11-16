@@ -348,6 +348,10 @@ def apply(kind, payload, item) -> tuple:
 			"remind_days_before": p.get("remind_days_before") if p.get("remind_days_before") is not None else 60, **_org(p, space)}).insert()
 		if file_url:
 			doc.db_set("file", _attach_copy(file_url, doc.doctype, doc.name, "file"), update_modified=False)
+		# the source now follows Vault access (UX fixes, set 4)
+		frappe.db.set_value("Life Inbox Item", item.name, "vault_document", doc.name, update_modified=False)
+		from lifeos import index
+		index.update(frappe.get_doc("Life Inbox Item", item.name))
 	elif kind == "Month Goal":
 		plan = journal.get_month_plan(space, p["year"], p["month"], create=True)
 		plan.check_permission("write")

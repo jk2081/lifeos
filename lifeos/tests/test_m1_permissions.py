@@ -83,10 +83,12 @@ class TestSpacePermissions(LifeTestCase):
 class TestAgentLimits(LifeTestCase):
 	def test_agent_can_create_and_edit(self):
 		self.as_user(AGENT)
-		note = self.make("Life Note", title="Filed by Hermes")
-		self.assertEqual(note.owner, AGENT)
-		note.content_md = "more"
-		note.save()
+		task = self.make("Life Task", title="Filed by Hermes")
+		self.assertEqual(task.owner, AGENT)
+		task.notes_md = "more"
+		task.save()
+		# UX fixes, set 4: notes are the exception. Agents write wiki pages through lifeos.api.wiki and only propose notes
+		self.assertRaises(frappe.PermissionError, self.make, "Life Note", title="Filed by Hermes")
 
 	def test_agent_cannot_delete(self):
 		note = self.make("Life Note", title="Keep me")
