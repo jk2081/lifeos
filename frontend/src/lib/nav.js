@@ -5,6 +5,7 @@ export const NAV = [
   ['Inbox', '/inbox', 'lucide-inbox', 'i'],
   ['Tasks', '/tasks', 'lucide-list-checks', 'k'],
   ['Calendar', '/calendar', 'lucide-calendar', 'c'],
+  ['Ask', '/ask', 'lucide-sparkles', 'q'],
   ['Journal', '/journal', 'lucide-notebook', 'j'],
   ['Goals', '/goals', 'lucide-target', 'o'],
   ['Projects', '/projects', 'lucide-chart-no-axes-column', 'p'],
@@ -26,13 +27,13 @@ export const SETTINGS = { label: 'Settings', to: '/settings', key: 's', icon: 'l
 const by = (label) => NAV.find((n) => n.label === label)
 // the groups of the sidebar and of the phone's More list
 export const GROUPS = [
-  { key: 'main', label: '', items: ['Today', 'Inbox', 'Tasks', 'Calendar'].map(by) },
+  { key: 'main', label: '', items: ['Today', 'Inbox', 'Tasks', 'Calendar', 'Ask'].map(by) },
   { key: 'plan', label: 'Plan', items: ['Journal', 'Goals', 'Projects', 'Someday'].map(by) },
   { key: 'areas', label: 'Areas', items: [] },
   { key: 'records', label: 'Records', items: ['Sources', 'Notes', 'Wiki', 'Vault', 'Timeline'].map(by) },
 ]
 export const BOTTOM = [by('Reset'), by('Archive'), SETTINGS]
-export const TOOLTIPS = { Timeline: 'Everything, by date', Sources: 'Everything captured', Wiki: 'Pages an agent writes from your sources' }
+export const TOOLTIPS = { Ask: 'Questions about your own records, and insights', Someday: 'Parked, not forgotten', Reset: 'Clear the backlog', Timeline: 'Everything, by date', Sources: 'Everything captured', Wiki: 'Pages an agent writes from your sources' }
 // the view switch of Notes
 // Notes opens on the List (UX fixes, set 4); Tree and Graph are view choices
 export const NOTES_VIEWS = [{ label: 'List', value: 'list', route: { path: '/library', query: { view: 'list' } } }, { label: 'Tree', value: 'tree', route: { path: '/library', query: { view: 'tree' } } },

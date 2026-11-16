@@ -114,11 +114,14 @@ def backend():
 	"""The object that talks to the model: the fake for tests and the acceptance site, else the Anthropic SDK."""
 	if frappe.flags.lifeos_ai_backend:
 		return frappe.flags.lifeos_ai_backend
-	if frappe.conf.get("lifeos_fake_ai"):
+	key = api_key()
+	# the acceptance site: the flag is read from the site config file itself (a long-running server keeps an old copy of
+	# frappe.conf), and a key that starts with "fake-" is never sent anywhere
+	if frappe.get_site_config().get("lifeos_fake_ai") or str(key).startswith("fake-"):
 		from lifeos.ai import fake
 
 		return fake.SiteFake()
-	return AnthropicBackend(api_key())
+	return AnthropicBackend(key)
 
 
 class AnthropicBackend:

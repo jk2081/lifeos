@@ -86,7 +86,12 @@ def list(space=None, status="New", kind=None, area=None, start=0, page_length=50
 	total = frappe.db.sql(f"select count(*) from `tabLife Insight` where {clause}", values)[0][0]
 	kinds = frappe.db.sql_list(f"select distinct kind from `tabLife Insight` where {base}", values)
 	return {"rows": _out(rows), "total": total, "tabs": tabs, "kinds": kinds,
-		"run_on": str(frappe.db.get_single_value("Life Settings", "insights_run_on") or "")[:16]}
+		"run_on": _run_on()}
+
+
+def _run_on():
+	v = frappe.db.get_single_value("Life Settings", "insights_run_on")
+	return str(v)[:16] if v and getattr(v, "year", 0) > 1900 else None
 
 
 @frappe.whitelist(methods=["POST"])

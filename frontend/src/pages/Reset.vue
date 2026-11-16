@@ -1,6 +1,5 @@
 <template>
   <PageHead title="Reset" :sub="sub">
-    <AskBox />
   </PageHead>
   <div class="page-body" data-reset>
     <template v-if="d">
@@ -53,7 +52,6 @@ import { useRouter } from 'vue-router'
 import { Button, Skeleton, dialog, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import TabBar from '@/components/TabBar.vue'
-import AskBox from '@/components/ask/AskBox.vue'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'

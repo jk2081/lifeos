@@ -6,7 +6,6 @@
         <template v-else-if="d.cycle">{{ d.cycle.title }} {{ d.cycle.ended ? 'has ended' : 'has not started' }} · </template>
         {{ d.days_left }} day{{ d.days_left === 1 ? '' : 's' }} left<span class="max-md:hidden"> this week</span></span>
       </template>
-      <AskBox />
     </PageHead>
 
     <div class="page-body !gap-5">
@@ -153,7 +152,6 @@ import { useMediaQuery } from '@vueuse/core'
 import { RouterLink, useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, Dialog, Dropdown, Skeleton, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
-import AskBox from '@/components/ask/AskBox.vue'
 import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'

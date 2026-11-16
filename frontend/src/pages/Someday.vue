@@ -43,6 +43,7 @@ import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { onRecordChanged } from '@/lib/pane'
 import { askBringBack, bringBack, doBringBack, keep, purge } from '@/lib/someday'
+import { askScope } from '@/lib/ask'
 
 // state tabs on tab=: All (default), Due for review, and one per kind
 const TABS = { key: 'tab', field: 'status', label: 'Someday kind', items: [{ value: 'all', label: 'All' }, { value: 'due', label: 'Due for review' },
@@ -84,4 +85,6 @@ async function fetch({ params: p, tab: t, filters, order_by, start, page_length 
 }
 onRecordChanged(() => list.value?.reload())
 onMounted(() => {})
+// Ask from Someday: the items on screen
+askScope(() => ({ kind: 'items', label: 'Items on Someday', items: (list.value?.rows || []).map((r) => ({ doctype: r.doctype, name: r.name })) }))
 </script>

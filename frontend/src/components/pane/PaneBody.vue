@@ -5,6 +5,8 @@
         <div class="text-sm text-ink-gray-6">{{ label }}</div>
         <h2 class="break-words text-lg-semibold text-ink-gray-9" data-pane-title>{{ meta.title || (missing ? 'Not found' : 'Loading…') }}</h2>
       </div>
+      <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" icon-left="lucide-sparkles" :label="phone ? 'Ask' : 'Ask about this'" data-pane-ask
+        @click="askAbout(ASKABLE[cur.type], cur.name, meta.title)" />
       <Button v-if="meta.someday" icon-left="lucide-clock" :label="phone ? 'Someday' : 'Move to Someday'" data-pane-someday @click="toSomeday" />
       <Button v-if="meta.fullPage" label="Open full page" :route="meta.fullPage" data-pane-full />
       <Button icon="lucide-x" label="Close" tooltip="Close" data-pane-close @click="closePane" />
@@ -49,12 +51,17 @@ import ChangePane from './ChangePane.vue'
 import PlainPane from './PlainPane.vue'
 import { closePane, openRef } from '@/lib/pane'
 import { park } from '@/lib/someday'
+import { askAbout } from '@/lib/ask'
+import { store } from '@/lib/store'
 
 const props = defineProps({ cur: Object, meta: Object, label: String, missing: Boolean, stamp: Number, phone: Boolean })
 // Each kind of record says its tabs in its meta: [{ value, label, count }]. The open one is ptab= in the URL; the first is the default.
 const tabs = computed(() => (props.missing ? [] : props.meta.tabs || []))
 const ptab = useUrlTab('ptab', tabs, { replace: true })
 const emit = defineEmits(['meta', 'missing', 'changed', 'restore', 'reload'])
+// "Ask about this": the record and the records linked to it are the question's scope
+const ASKABLE = { task: 'Life Task', note: 'Life Note', project: 'Life Project', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
+  inbox: 'Life Inbox Item', page: 'Life Journal Page', idea: 'Life Idea', vault: 'Life Vault Document' }
 async function toSomeday() {
   if (await park(props.meta.someday.doctype, props.meta.someday.name, props.meta.title)) emit('reload')
 }

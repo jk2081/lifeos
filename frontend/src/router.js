@@ -20,6 +20,7 @@ const routes = [
   { path: '/projects', name: 'Projects', component: page('Projects') },
   { path: '/someday', name: 'Someday', component: page('Someday') },
   { path: '/reset', name: 'Reset', component: page('Reset') },
+  { path: '/ask', name: 'Ask', component: page('Ask') },
   { path: '/projects/:id', name: 'Project', component: page('Project'), props: true },
   { path: '/library/:id?', name: 'Library', component: page('Library'), props: true },
   { path: '/vault', name: 'Vault', component: page('Vault') },

@@ -27,6 +27,22 @@ md.renderer.rules.wikilink = (tokens, idx, options, env) => {
   if (hit) return `<a class="wl" href="/life${escapeHtml(hit.route)}">${escapeHtml(hit.title || text)}</a>`
   return `<span class="wl missing" title="No record with this title yet">${escapeHtml(text)}</span>`
 }
+// Ask's citations (UX fixes, set 5): [3] after a claim is a numbered marker that opens the cited record, when the
+// renderer is given the list of cited records (env.cites). Elsewhere [3] stays text.
+md.inline.ruler.before('link', 'cite', (state, silent) => {
+  const cites = state.env && state.env.cites
+  if (!cites || state.src.charCodeAt(state.pos) !== 0x5b) return false
+  const m = /^\[(\d{1,2})\]/.exec(state.src.slice(state.pos))
+  if (!m || !cites.some((c) => String(c.n) === m[1])) return false
+  if (!silent) state.push('cite', '', 0).meta = { n: m[1] }
+  state.pos += m[0].length
+  return true
+})
+md.renderer.rules.cite = (tokens, idx, options, env) => {
+  const n = tokens[idx].meta.n
+  const c = env.cites.find((x) => String(x.n) === n)
+  return `<sup><a class="cite" href="#" data-cite="${escapeHtml(n)}" title="${escapeHtml(c ? c.title : '')}">${escapeHtml(n)}</a></sup>`
+}
 // Open outside links in a new tab.
 const defaultLinkOpen = md.renderer.rules.link_open || ((tokens, idx, options, env, self) => self.renderToken(tokens, idx, options))
 md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
@@ -38,8 +54,8 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   return defaultLinkOpen(tokens, idx, options, env, self)
 }
 
-export function renderMarkdown(text, { links = [], sanitize = null } = {}) {
-  let html = md.render(String(text || ''), { links })
+export function renderMarkdown(text, { links = [], sanitize = null, cites = null } = {}) {
+  let html = md.render(String(text || ''), { links, cites })
   html = html.replace(/\[\?\]/g, '<span class="unclear">[?] unclear</span>')
   return sanitize ? sanitize(html) : html
 }

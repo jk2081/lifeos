@@ -5,7 +5,9 @@ from frappe import _
 from lifeos import permissions
 from lifeos.api.utils import parse
 
-SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "score_target", "archive_after_days", "stale_task_days")
+SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "score_target", "archive_after_days", "stale_task_days",
+	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
+	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd")
 LISTS = {
 	"area": ("Life Area", "area_name"), "tag": ("Life Tag", "tag_name"), "dimension": ("Life Dimension", "dimension_name"),
 	"habit": ("Life Habit", "title"), "person": ("Life Person", "full_name"),
@@ -102,10 +104,65 @@ def get(space=None):
 	docs = [frappe.get_doc("Life Space", n) for n in sorted(names)]
 	for doc in docs:
 		out["spaces"].append({"name": doc.name, "owner_user": doc.owner_user, "owner_name": frappe.utils.get_fullname(doc.owner_user),
-			"access": permissions.user_spaces().get(doc.name), "agents_can_read_vault": int(doc.agents_can_read_vault or 0), "members": _member_rows(doc)})
+			"access": permissions.user_spaces().get(doc.name), "agents_can_read_vault": int(doc.agents_can_read_vault or 0), "members": _member_rows(doc),
+			"ask_enabled": int(doc.ask_enabled or 0), "ask_can_read_vault": int(doc.ask_can_read_vault or 0)})
 	if permissions.is_admin():
 		out["agents"] = _agents(docs)
+		out["ai"] = ai_settings()
 	return out
+
+
+def ai_settings():
+	"""Settings, Admin, AI: whether a key is set (never the key), the models, the cap, the prices, and this month's spend by
+	purpose and by user."""
+	from lifeos.ai import client
+
+	s = frappe.get_cached_doc("Life Settings")
+	month = client.month()
+	by_purpose = frappe.db.sql("select purpose, sum(cost), sum(input_tokens), sum(output_tokens) from `tabLife AI Usage` where month=%s group by purpose", month)
+	by_user = frappe.db.sql("select user, sum(cost) from `tabLife AI Usage` where month=%s group by user", month)
+	return {"key_set": client.is_set_up(), "ask_model": s.get("ask_model") or client.DEFAULT_ASK_MODEL, "short_model": s.get("short_model") or client.DEFAULT_SHORT_MODEL,
+		"monthly_cap_usd": client.cap(), "spend": client.spend_status(),
+		"prices": [{"model": m, "input_per_mtok": p[0], "output_per_mtok": p[1]} for m, p in client.prices().items()],
+		"by_purpose": [{"purpose": p, "cost": round(c or 0, 2), "input_tokens": int(i or 0), "output_tokens": int(o or 0)} for p, c, i, o in by_purpose],
+		"by_user": [{"user": u, "full_name": frappe.utils.get_fullname(u), "cost": round(c or 0, 2)} for u, c in by_user]}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_ai_key(key=None):
+	"""Store or clear the Anthropic API key (a Password field, encrypted by Frappe). The key is never returned."""
+	_admin_only()
+	doc = frappe.get_doc("Life Settings")
+	doc.anthropic_api_key = (key or "").strip() or None
+	doc.save()
+	from lifeos.ai import client
+
+	return {"key_set": client.is_set_up()}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_ai_price(model, input_per_mtok, output_per_mtok):
+	_admin_only()
+	doc = frappe.get_doc("Life Settings")
+	row = next((r for r in doc.ai_prices if r.model == model), None) or doc.append("ai_prices", {"model": model})
+	row.input_per_mtok, row.output_per_mtok = float(input_per_mtok), float(output_per_mtok)
+	if row.input_per_mtok < 0 or row.output_per_mtok < 0:
+		frappe.throw(_("Prices cannot be negative."))
+	doc.save()
+	return {"saved": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_space_ask(space, ask_enabled=None, ask_can_read_vault=None):
+	"""Ask on or off for a space, and whether Ask may read its Vault documents. Owner only."""
+	_admin_only()
+	doc = frappe.get_doc("Life Space", space)
+	if ask_enabled is not None:
+		doc.ask_enabled = 1 if str(ask_enabled) in ("1", "true", "True") else 0
+	if ask_can_read_vault is not None:
+		doc.ask_can_read_vault = 1 if str(ask_can_read_vault) in ("1", "true", "True") else 0
+	doc.save()
+	return {"ask_enabled": doc.ask_enabled, "ask_can_read_vault": doc.ask_can_read_vault}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -118,9 +175,14 @@ def save(values):
 		if k not in SETTING_FIELDS:
 			frappe.throw(_("Unknown setting {0}.").format(k))
 		doc.set(k, v)
-	for f in ("score_target", "archive_after_days", "stale_task_days"):
+	for f in ("score_target", "archive_after_days", "stale_task_days", "stuck_after_days", "someday_review_months"):
 		if int(doc.get(f) or 0) <= 0:
 			frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label(f)))
+	for f in ("stuck_limit", "open_task_goal"):
+		if int(doc.get(f) or 0) < 0:
+			frappe.throw(_("{0} cannot be negative.").format(doc.meta.get_label(f)))
+	if float(doc.get("monthly_cap_usd") or 0) < 0:
+		frappe.throw(_("The monthly cap cannot be negative."))
 	if int(doc.score_target) > 100:
 		frappe.throw(_("The score target is a percentage."))
 	doc.save()

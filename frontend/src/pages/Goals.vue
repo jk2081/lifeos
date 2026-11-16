@@ -39,6 +39,7 @@ import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
+import { askScope } from '@/lib/ask'
 
 // The state tabs, on status=: In progress (default), Achieved, Closed (Partly Achieved, Not Achieved, Carried, Dropped), All
 const TABS = { key: 'status', field: 'outcome', label: 'Goal state', items: [{ value: 'in_progress', label: 'In progress' }, { value: 'achieved', label: 'Achieved' },
@@ -92,4 +93,5 @@ onMounted(async () => {
   loadLookups()
   cycles.value = (await api('goals.cycles', { space: store.space })) || []
 })
+askScope({ kind: 'goals', label: 'All goals' })
 </script>

@@ -1,7 +1,13 @@
 <template>
-  <CommandPalette v-model:open="open" v-model:query="text" :filterable="false" title="Search" @select="go">
-    <CommandPaletteInput ref="field" placeholder="Search notes, tasks, inbox items, chats and the vault" aria-label="Search" />
+  <CommandPalette v-model:open="open" v-model:query="text" :filterable="false" title="Search or ask" @select="go">
+    <CommandPaletteInput ref="field" placeholder="Search or ask anything" aria-label="Search or ask anything" />
     <CommandPaletteList>
+      <!-- Ask (UX fixes, set 5): first when the text reads as a question, so Enter asks; last otherwise -->
+      <CommandPaletteItem v-if="askFirst" :value="ASK" :label="'Ask: ' + text" data-search-ask>
+        <div class="flex min-w-0 items-center gap-2 py-0.5"><span class="lucide-sparkles size-4 text-ink-gray-7" aria-hidden="true" />
+          <span class="truncate text-base-medium text-ink-gray-9">Ask: {{ text.trim() }}</span></div>
+        <template #suffix><Badge theme="blue" :label="askScopeLabel" /></template>
+      </CommandPaletteItem>
       <CommandPaletteItem v-for="r in results" :key="r.ref_name + r.kind" :value="r" :label="r.title || 'Untitled'" data-search-hit>
         <div class="flex min-w-0 flex-col gap-0.5 py-0.5">
           <span class="truncate text-base-medium text-ink-gray-9">{{ r.title || 'Untitled' }}</span>
@@ -9,6 +15,11 @@
           <span v-if="r.snippet" class="truncate text-sm text-ink-gray-6">{{ r.snippet }}</span>
         </div>
         <template #suffix><Badge :label="KIND[r.kind] || r.kind" /></template>
+      </CommandPaletteItem>
+      <CommandPaletteItem v-if="text.trim() && !askFirst" :value="ASK" :label="'Ask: ' + text" data-search-ask>
+        <div class="flex min-w-0 items-center gap-2 py-0.5"><span class="lucide-sparkles size-4 text-ink-gray-7" aria-hidden="true" />
+          <span class="truncate text-base-medium text-ink-gray-9">Ask: {{ text.trim() }}</span></div>
+        <template #suffix><Badge theme="blue" :label="askScopeLabel" /></template>
       </CommandPaletteItem>
     </CommandPaletteList>
     <CommandPaletteEmpty>
@@ -19,7 +30,7 @@
       <div class="flex w-full flex-wrap items-center justify-between gap-2">
         <Checkbox v-model="archived" label="Include archived" />
         <span class="flex items-center gap-1 text-sm text-ink-gray-6"><KeyboardShortcut bg combo="ArrowUp" use-icons /><KeyboardShortcut bg combo="ArrowDown" use-icons /> to move,
-          <KeyboardShortcut bg combo="Enter" use-icons /> to open</span>
+          <KeyboardShortcut bg combo="Enter" use-icons /> to open<template v-if="askFirst">, or to ask</template></span>
       </div>
     </CommandPaletteFooter>
   </CommandPalette>
@@ -36,6 +47,7 @@ import { api } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { openRef, refOf } from '@/lib/pane'
+import { isQuestion, scopeFromRoute, startAsk } from '@/lib/ask'
 
 const open = defineModel('open', { type: Boolean, default: false })
 const KIND = { Inbox: 'Inbox item', 'Journal Page': 'Journal page', 'Month Plan': 'Month plan' }
@@ -46,6 +58,9 @@ const results = ref([])
 const searched = ref('')
 const archived = ref(false)
 const multi = computed(() => store.spaces.length > 1)
+const ASK = { ask: true, ref_name: '__ask', kind: 'ask' }
+const askFirst = computed(() => isQuestion(text.value) && !store.isAgent)
+const askScopeLabel = computed(() => (open.value ? scopeFromRoute().label : ''))
 let timer = null
 let seq = 0
 
@@ -80,6 +95,12 @@ watch([text, archived], () => {
 watch(open, (on) => { if (!on) { results.value = []; searched.value = '' } })
 function go(r) {
   if (!r) return
+  if (r.ask) {
+    const q = text.value.trim()
+    open.value = false
+    text.value = ''
+    return startAsk(q)
+  }
   if (r.space && r.space !== store.space) store.space = r.space
   const ref = refOf(r.ref_doctype, r.ref_name)
   ref ? openRef(ref) : router.push(r.route)

@@ -87,6 +87,25 @@
           </SettingRow>
           <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
         </Card>
+        <Card v-else-if="section === 'reset'" flush data-reset-rules>
+          <SettingRow label="Stuck after" help="An open task, project or inbox item untouched for this many days counts as stuck: on Today, in Reset and in the insights." :error="errors.stuck_after_days">
+            <TextInput class="w-28" type="number" min="1" :model-value="d.settings.stuck_after_days" :disabled="!d.is_admin" data-setting="stuck_after_days"
+              @change="(e) => setOne('stuck_after_days', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">days</span></template></TextInput>
+          </SettingRow>
+          <SettingRow label="Stuck limit" help="Above this many stuck tasks, Today's Open band turns amber and Reset is highlighted." :error="errors.stuck_limit">
+            <TextInput class="w-28" type="number" min="0" :model-value="d.settings.stuck_limit" :disabled="!d.is_admin" data-setting="stuck_limit"
+              @change="(e) => setOne('stuck_limit', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">tasks</span></template></TextInput>
+          </SettingRow>
+          <SettingRow label="Open task goal" help="Reset's goal bar: keep open tasks under this number." :error="errors.open_task_goal">
+            <TextInput class="w-28" type="number" min="0" :model-value="d.settings.open_task_goal" :disabled="!d.is_admin" data-setting="open_task_goal"
+              @change="(e) => setOne('open_task_goal', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">tasks</span></template></TextInput>
+          </SettingRow>
+          <SettingRow label="Someday review after" help="A parked item comes back for review this long after it was parked." :error="errors.someday_review_months">
+            <TextInput class="w-28" type="number" min="1" :model-value="d.settings.someday_review_months" :disabled="!d.is_admin" data-setting="someday_review_months"
+              @change="(e) => setOne('someday_review_months', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">months</span></template></TextInput>
+          </SettingRow>
+          <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
+        </Card>
         <ConnectionsSection v-else-if="section === 'connections'" :space="spaceSel" :writable="canEdit && !store.isAgent" />
         <template v-else-if="section === 'archived'">
           <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/archive" data-archive-link>Archived records are on the Archive screen</RouterLink>.
@@ -125,6 +144,53 @@
             </Card>
           </div>
           <p class="text-sm text-ink-gray-6">A person sees a record only if they are a member of its space. Can view lets them read; Can edit lets them add and change records. Agents are under Agents.</p>
+        </template>
+        <template v-else-if="section === 'ai' && d.ai">
+          <Card flush data-ai-settings>
+            <SettingRow label="Anthropic API key" :help="d.ai.key_set ? 'A key is set. It is stored encrypted and never shown again.' : 'No key yet: Ask says it is not set up, and only rule insights run. Or set it with bench set-config anthropic_api_key.'">
+              <div class="flex items-center gap-2">
+                <TextInput v-model="aiKey" class="w-56" type="password" :placeholder="d.ai.key_set ? 'Replace the key' : 'sk-ant-…'" aria-label="Anthropic API key" autocomplete="off" data-ai-key />
+                <Button label="Save" :disabled="!aiKey" data-ai-key-save @click="saveKey" />
+                <Button v-if="d.ai.key_set" variant="ghost" theme="red" label="Remove" @click="saveKey(true)" />
+              </div>
+            </SettingRow>
+            <SettingRow label="Ask model" help="Writes Ask's answers and the AI insights.">
+              <TextInput class="w-56" :model-value="d.settings.ask_model" data-setting="ask_model" @change="(e) => setOne('ask_model', e.target.value.trim())" /></SettingRow>
+            <SettingRow label="Short-task model" help="For short wording jobs.">
+              <TextInput class="w-56" :model-value="d.settings.short_model" data-setting="short_model" @change="(e) => setOne('short_model', e.target.value.trim())" /></SettingRow>
+            <SettingRow label="Monthly cap" help="Ask and the AI insights stop for the month when the spend reaches this." :error="errors.monthly_cap_usd">
+              <TextInput class="w-28" type="number" min="0" :model-value="d.settings.monthly_cap_usd" data-setting="monthly_cap_usd"
+                @change="(e) => setOne('monthly_cap_usd', Number(e.target.value))"><template #prefix><span class="text-sm text-ink-gray-6">$</span></template></TextInput></SettingRow>
+          </Card>
+          <section>
+            <SectionHead>This month</SectionHead>
+            <Card flush data-ai-spend>
+              <Row><span class="flex-1 text-base text-ink-gray-9">{{ d.ai.spend.text }}</span></Row>
+              <Row v-for="p in d.ai.by_purpose" :key="p.purpose"><span class="flex-1 text-base text-ink-gray-8">{{ p.purpose }}</span>
+                <span class="text-sm tabular-nums text-ink-gray-6">{{ (p.input_tokens + p.output_tokens).toLocaleString() }} tokens · ${{ p.cost.toFixed(2) }}</span></Row>
+              <Row v-for="u in d.ai.by_user" :key="u.user"><span class="flex-1 text-base text-ink-gray-8">{{ u.full_name }}</span><span class="text-sm tabular-nums text-ink-gray-6">${{ u.cost.toFixed(2) }}</span></Row>
+            </Card>
+          </section>
+          <section>
+            <SectionHead>Prices per model</SectionHead>
+            <Card flush>
+              <Row v-for="pr in d.ai.prices" :key="pr.model" class="flex-wrap !items-center"><span class="min-w-40 flex-1 text-base text-ink-gray-8">{{ pr.model }}</span>
+                <TextInput class="w-28" type="number" min="0" step="0.01" :model-value="pr.input_per_mtok" :aria-label="`${pr.model} input price`" @change="(e) => setPrice(pr, 'input_per_mtok', e.target.value)"><template #suffix><span class="text-sm text-ink-gray-6">in</span></template></TextInput>
+                <TextInput class="w-28" type="number" min="0" step="0.01" :model-value="pr.output_per_mtok" :aria-label="`${pr.model} output price`" @change="(e) => setPrice(pr, 'output_per_mtok', e.target.value)"><template #suffix><span class="text-sm text-ink-gray-6">out</span></template></TextInput></Row>
+            </Card>
+            <p class="mt-1 text-sm text-ink-gray-6">US dollars per million tokens.</p>
+          </section>
+          <section>
+            <SectionHead>Ask in each space</SectionHead>
+            <Card flush>
+              <template v-for="sp in d.spaces" :key="sp.name">
+                <SettingRow :label="`Ask in ${sp.name}`" help="People in this space can ask about its records.">
+                  <Switch :model-value="!!sp.ask_enabled" :aria-label="`Ask in ${sp.name}`" :data-ask-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_enabled', v)" /></SettingRow>
+                <SettingRow :label="`Ask may read Vault documents in ${sp.name}`" help="Off by default. Separate from the agents' switch.">
+                  <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="`Ask may read Vault documents in ${sp.name}`" :data-ask-vault-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_can_read_vault', v)" /></SettingRow>
+              </template>
+            </Card>
+          </section>
         </template>
         <template v-else-if="section === 'agents'">
           <Card flush data-agents>
@@ -198,6 +264,7 @@ import { useMediaQuery } from '@vueuse/core'
 import { Avatar, Badge, Button, Dialog, Dropdown, Select, Skeleton, Switch, TabButtons, TabList, Tabs, TabTrigger, TextInput, TimePicker, dialog, toast, useColorScheme } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
+import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
 import SettingRow from '@/components/settings/SettingRow.vue'
@@ -243,8 +310,8 @@ const memberSpace = ref('')
 const groups = computed(() => [
   { key: 'me', label: 'Me', items: [{ value: 'appearance', label: 'Appearance' }, { value: 'default', label: 'Default space' }, { value: 'review', label: 'Weekly review' }] },
   { key: 'space', label: 'This space', items: [{ value: 'areas', label: 'Areas' }, { value: 'tags', label: 'Tags' }, { value: 'habits', label: 'Habits' },
-    { value: 'dimensions', label: 'Check-in dimensions' }, { value: 'connections', label: 'Connections' }, { value: 'archive', label: 'Archive rules' }, { value: 'archived', label: 'Archived' }] },
-  ...(d.value?.is_admin ? [{ key: 'admin', label: 'Admin', items: [{ value: 'members', label: 'Spaces and members' }, { value: 'agents', label: 'Agents' }] }] : []),
+    { value: 'dimensions', label: 'Check-in dimensions' }, { value: 'connections', label: 'Connections' }, { value: 'archive', label: 'Archive rules' }, { value: 'reset', label: 'Reset rules' }, { value: 'archived', label: 'Archived' }] },
+  ...(d.value?.is_admin ? [{ key: 'admin', label: 'Admin', items: [{ value: 'members', label: 'Spaces and members' }, { value: 'agents', label: 'Agents' }, { value: 'ai', label: 'AI' }] }] : []),
 ])
 const sections = computed(() => groups.value.flatMap((g) => g.items))
 // the open section is tab= in the URL. On a wide screen the first section is the default; on a phone the menu is.
@@ -294,6 +361,21 @@ async function changed() {
 }
 
 // ---- plain settings: each saves on its own; an error shows under the field and the old value comes back ----
+const aiKey = ref('')
+async function saveKey(clear = false) {
+  const res = await tryCall(() => api('settings.set_ai_key', { key: clear === true ? '' : aiKey.value }), clear === true ? 'Key removed' : 'Key saved')
+  aiKey.value = ''
+  if (res) await load()
+}
+async function setPrice(pr, field, value) {
+  pr[field] = Number(value)
+  if (await tryCall(() => api('settings.set_ai_price', { model: pr.model, input_per_mtok: pr.input_per_mtok, output_per_mtok: pr.output_per_mtok }), 'Saved')) await load()
+}
+async function setSpaceAsk(sp, field, value) {
+  const before = sp[field]
+  sp[field] = value ? 1 : 0
+  if (!(await tryCall(() => api('settings.set_space_ask', { space: sp.name, [field]: value ? 1 : 0 }), 'Saved'))) sp[field] = before
+}
 async function setOne(field, value) {
   const before = d.value.settings[field]
   if (value === before) return

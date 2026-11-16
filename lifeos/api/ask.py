@@ -1,7 +1,23 @@
-"""Ask (UX fixes, set 5). Filled in at step 7; status is used by Reset and the Ask page."""
+"""Ask (UX fixes, set 5): questions about the owner's own records, answered by an AI model through tools that run as
+the asking user. Threads and messages are private to their user; agents cannot use Ask."""
+import json
+import time
+
 import frappe
+from frappe import _
+from frappe.utils import cint, now_datetime
 
 from lifeos import permissions
+from lifeos.api.utils import page, parse
+
+SUGGESTED = ["What did I promise people this week?", "What is stuck, and what should I do about it?",
+	"How am I doing on my 12 Week Year goals this cycle?", "What came in this week that I have not acted on?"]
+
+
+def _person():
+	permissions.require_login()
+	if permissions.is_agent():
+		frappe.throw(_("Agents cannot use Ask."), frappe.PermissionError)
 
 
 @frappe.whitelist()
@@ -13,4 +29,219 @@ def status(space=None):
 	on = bool(frappe.db.get_value("Life Space", space, "ask_enabled"))
 	st = client.spend_status()
 	return {"ready": on and st["set_up"] and not st["reached"] and not permissions.is_agent(), "enabled": on, **st,
-		"vault": bool(frappe.db.get_value("Life Space", space, "ask_can_read_vault"))}
+		"vault": bool(frappe.db.get_value("Life Space", space, "ask_can_read_vault")), "suggested": SUGGESTED,
+		"is_admin": permissions.is_admin()}
+
+
+def _thread(name):
+	doc = frappe.get_doc("Life Ask Thread", name)
+	if doc.user != frappe.session.user:
+		raise frappe.DoesNotExistError(_("Thread not found."))
+	return doc
+
+
+def _scope(scope, space):
+	"""A scope from the screen, checked: the record it names must be in the space and readable."""
+	s = parse(scope, {}) or {}
+	s = {k: s.get(k) for k in ("kind", "label", "doctype", "name", "items") if s.get(k) not in (None, "")}
+	s.setdefault("kind", "space")
+	if s.get("name") and not s.get("doctype"):
+		s["doctype"] = {"area": "Life Area", "project": "Life Project", "goal": "Life Goal"}.get(s["kind"])
+		if not s["doctype"]:
+			s.pop("name")
+	if s.get("doctype") and s.get("name"):
+		doc = permissions.get_doc_checked(s["doctype"], s["name"])
+		if doc.get("space") and doc.space != space:
+			frappe.throw(_("That record is in another space."))
+	if s.get("kind") == "area" and s.get("name"):
+		if frappe.db.get_value("Life Area", s["name"], "space") != space:
+			frappe.throw(_("That area is in another space."))
+	if s.get("items"):
+		s["items"] = [{"doctype": i.get("doctype"), "name": i.get("name")} for i in s["items"][:200] if isinstance(i, dict)]
+	return s
+
+
+def _message_out(m):
+	out = {"name": m.name, "thread": m.thread, "role": m.role, "text": m.text or "", "status": m.status, "error": m.error,
+		"cited": parse(m.cited, []) or [], "actions": parse(m.actions, []) or [], "read": parse(m.records_read, []) or [],
+		"cost": m.cost, "created": str(m.creation)[:19]}
+	return out
+
+
+@frappe.whitelist(methods=["POST"])
+def ask(question, space=None, thread=None, scope=None, client_id=None):
+	"""Ask a question, or a follow-up in a thread (same scope unless `scope` changes it). Returns the thread and the
+	answer. While it is written, `message` returns the text so far (and realtime events go to the asking user)."""
+	from lifeos.ai import ask as engine
+	from lifeos.ai import client
+
+	_person()
+	question = " ".join((question or "").split())
+	if not question:
+		frappe.throw(_("Type a question."))
+	if thread:
+		t = _thread(thread)
+		space = t.space
+		permissions.require_space(space)
+		if scope:
+			sc = _scope(scope, space)
+			t.scope_kind, t.scope_label, t.scope_doctype, t.scope_name = sc.get("kind"), sc.get("label"), sc.get("doctype"), sc.get("name")
+		sc = _scope(scope, space) if scope else {"kind": t.scope_kind or "space", "label": t.scope_label, "doctype": t.scope_doctype, "name": t.scope_name,
+			**({"items": parse(frappe.cache.hget("lifeos_ask_items", t.name), None) or []} if t.scope_kind == "items" else {})}
+	else:
+		space = permissions.resolve_space(space)
+		sc = _scope(scope, space)
+		t = frappe.get_doc({"doctype": "Life Ask Thread", "space": space, "user": frappe.session.user, "title": question[:140],
+			"scope_kind": sc.get("kind"), "scope_label": sc.get("label"), "scope_doctype": sc.get("doctype"), "scope_name": sc.get("name")})
+		t.insert(ignore_permissions=True)
+	if sc.get("items"):
+		frappe.cache.hset("lifeos_ask_items", t.name, json.dumps(sc["items"]))
+	if not frappe.db.get_value("Life Space", space, "ask_enabled"):
+		return _refuse(t, question, "off", _("Ask is turned off for this space."))
+	try:
+		client.check("Ask")
+	except client.NotSetUp:
+		return _refuse(t, question, "not_set_up", _("Ask is not set up yet."))
+	except client.CapReached as e:
+		return _refuse(t, question, "cap", str(e))
+	history = engine.history_messages(t.name)
+	frappe.get_doc({"doctype": "Life Ask Message", "thread": t.name, "role": "user", "text": question, "status": "Done"}).insert(ignore_permissions=True)
+	msg = frappe.get_doc({"doctype": "Life Ask Message", "thread": t.name, "role": "assistant", "text": "", "status": "Working"}).insert(ignore_permissions=True)
+	t.last_message_on = now_datetime()
+	t.save(ignore_permissions=True)
+	if client_id:  # the screen polls `progress` with its own id while the answer is written
+		frappe.cache.set_value(f"lifeos_ask_req:{frappe.session.user}:{client_id}", msg.name, expires_in_sec=900)
+	frappe.db.commit()
+	buf, last = [], [0.0]
+
+	def on_text(delta):
+		buf.append(delta)
+		frappe.publish_realtime("lifeos_ask", {"thread": t.name, "message": msg.name, "delta": delta}, user=frappe.session.user)
+		if time.monotonic() - last[0] > 0.6:
+			last[0] = time.monotonic()
+			frappe.db.set_value("Life Ask Message", msg.name, "text", "".join(buf), update_modified=False)
+			frappe.db.commit()
+
+	try:
+		res = engine.answer(space, question, sc, history, on_text)
+	except client.AIError as e:
+		msg.reload()
+		msg.status, msg.error, msg.text = "Error", str(e), ""
+		msg.save(ignore_permissions=True)
+		return {"thread": t.name, "message": _message_out(msg), "error": "ai", "error_text": str(e)}
+	msg.reload()
+	msg.update({"text": res["text"], "cited": json.dumps(res["cited"]), "actions": json.dumps(res["actions"]),
+		"records_read": json.dumps(res["read"]), "input_tokens": res["input_tokens"], "output_tokens": res["output_tokens"],
+		"cost": res["cost"], "status": "Done"})
+	msg.save(ignore_permissions=True)
+	frappe.publish_realtime("lifeos_ask", {"thread": t.name, "message": msg.name, "done": 1}, user=frappe.session.user)
+	return {"thread": t.name, "message": _message_out(msg), "scope": sc}
+
+
+def _refuse(t, question, code, text):
+	from lifeos.ai import client
+
+	return {"thread": t.name, "error": code, "error_text": text, "spend": client.spend_status(), "question": question}
+
+
+@frappe.whitelist()
+def progress(client_id):
+	"""The answer so far for a question still being written (polling, when realtime is not available)."""
+	_person()
+	name = frappe.cache.get_value(f"lifeos_ask_req:{frappe.session.user}:{client_id}")
+	if not name:
+		return {"status": "Waiting", "text": ""}
+	m = frappe.db.get_value("Life Ask Message", name, ["name", "thread", "text", "status"], as_dict=True)
+	return {"status": m.status, "text": m.text or "", "thread": m.thread, "message": m.name} if m else {"status": "Waiting", "text": ""}
+
+
+@frappe.whitelist()
+def message(name):
+	"""One message, for polling while an answer is written."""
+	_person()
+	m = frappe.get_doc("Life Ask Message", name)
+	_thread(m.thread)
+	return _message_out(m)
+
+
+@frappe.whitelist()
+def thread(name):
+	_person()
+	t = _thread(name)
+	msgs = frappe.get_all("Life Ask Message", filters={"thread": t.name}, fields=["*"], order_by="creation asc")
+	return {"name": t.name, "title": t.title, "space": t.space, "scope": {"kind": t.scope_kind or "space", "label": t.scope_label,
+		"doctype": t.scope_doctype, "name": t.scope_name}, "messages": [_message_out(frappe._dict(m)) for m in msgs]}
+
+
+@frappe.whitelist()
+def threads(space=None, q=None, start=0, page_length=30):
+	"""The History tab: this person's threads in a space, newest first, searchable by their questions and answers."""
+	_person()
+	space = permissions.resolve_space(space)
+	start, page_length = page(start, page_length)
+	where, values = "t.user=%(user)s and t.space=%(space)s", {"user": frappe.session.user, "space": space}
+	if q:
+		where += " and (t.title like %(q)s or exists (select 1 from `tabLife Ask Message` m where m.thread=t.name and m.text like %(q)s))"
+		values["q"] = f"%{q}%"
+	rows = frappe.db.sql(f"""select t.name, t.title, t.scope_label, t.last_message_on, t.creation,
+		(select count(*) from `tabLife Ask Message` m where m.thread=t.name and m.role='user') as questions
+		from `tabLife Ask Thread` t where {where} order by ifnull(t.last_message_on, t.creation) desc limit %(s)s, %(l)s""",
+		{**values, "s": start, "l": page_length}, as_dict=True)
+	total = frappe.db.sql(f"select count(*) from `tabLife Ask Thread` t where {where}", values)[0][0]
+	for r in rows:
+		r["last_message_on"] = str(r.last_message_on or r.creation)[:16]
+		r.pop("creation", None)
+	return {"rows": rows, "total": total}
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_thread(name):
+	_person()
+	t = _thread(name)
+	frappe.db.delete("Life Ask Message", {"thread": t.name})
+	frappe.delete_doc("Life Ask Thread", t.name, ignore_permissions=True, delete_permanently=True)
+	return {"deleted": name}
+
+
+@frappe.whitelist(methods=["POST"])
+def run_action(message, index):
+	"""Run one suggested action of an answer, with the person's own permissions, through the normal methods.
+	Returns what the screen needs: a route, the record made, or the Undo log."""
+	_person()
+	m = frappe.get_doc("Life Ask Message", message)
+	t = _thread(m.thread)
+	actions = parse(m.actions, []) or []
+	try:
+		a = actions[int(index)]
+	except (IndexError, ValueError, TypeError):
+		frappe.throw(_("No such action."))
+	kind = a.get("kind")
+	if kind == "make_task":
+		from lifeos.api import tasks
+
+		task = tasks.quick_add(a.get("title") or a.get("label"), space=t.space, area=a.get("area"), due_date=a.get("due_date"))
+		return {"kind": kind, "task": task["name"], "title": task["title"]}
+	if kind == "move_someday":
+		from lifeos.api import reset
+
+		res = reset.apply_batch("someday", a.get("items") or [], space=t.space)
+		return {"kind": kind, "done": res["done"], "undo": res["undo"]}
+	if kind == "open_reset":
+		return {"kind": kind, "to": {"path": "/reset"}, "names": [i["name"] for i in a.get("items") or []]}
+	if kind == "open_list":
+		return {"kind": kind, "to": a.get("to")}
+	if kind in ("snooze_insight", "dismiss_insight"):
+		from lifeos.api import insights
+
+		(insights.snooze if kind == "snooze_insight" else insights.dismiss)(a["insight"])
+		return {"kind": kind, "insight": a["insight"]}
+	frappe.throw(_("Unknown action."))
+
+
+@frappe.whitelist(methods=["POST"])
+def undo_made_task(task):
+	"""Undo of a suggested Make task: the task goes to the trash."""
+	_person()
+	from lifeos import trash
+
+	return trash.delete("Life Task", task)

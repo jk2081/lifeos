@@ -105,6 +105,7 @@ import IndexRow from '@/components/IndexRow.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import { api, db, optimistic, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
+import { askScope } from '@/lib/ask'
 import { short } from '@/lib/dates'
 import { loadLookups } from '@/lib/lookups'
 import { onRecordChanged } from '@/lib/pane'
@@ -182,4 +183,6 @@ async function createNote(v) {
 onRecordChanged(load)
 onMounted(load)
 watch(() => props.id, load)
+// Ask from an area page: that area and its sub-areas
+askScope(() => (d.value ? { kind: 'area', label: d.value.area.area_name, doctype: 'Life Area', name: d.value.area.name } : { kind: 'space', label: 'Everything in this space' }))
 </script>

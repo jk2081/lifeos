@@ -70,6 +70,7 @@ import Backlinks from '@/components/Backlinks.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import { api, db, optimistic, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
+import { askScope } from '@/lib/ask'
 import { loadLookups } from '@/lib/lookups'
 import { doneLink } from '@/lib/tasks'
 import { onRecordChanged } from '@/lib/pane'
@@ -146,4 +147,6 @@ async function createNote(v) {
 onRecordChanged(load)
 onMounted(load)
 watch(() => props.id, load)
+// Ask from a project page: that project
+askScope(() => (d.value ? { kind: 'project', label: d.value.project.title, doctype: 'Life Project', name: d.value.project.name } : { kind: 'space', label: 'Everything in this space' }))
 </script>

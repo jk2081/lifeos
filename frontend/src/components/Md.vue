@@ -9,13 +9,19 @@ import DOMPurify from 'dompurify'
 import { renderMarkdown } from '@/lib/markdown'
 import { openRoute } from '@/lib/pane'
 
-const props = defineProps({ text: String, links: { type: Array, default: () => [] }, read: Boolean })
+const props = defineProps({ text: String, links: { type: Array, default: () => [] }, read: Boolean, cites: { type: Array, default: null } })
+const emit = defineEmits(['cite'])
 const sanitize = (html) => DOMPurify.sanitize(html, { ADD_ATTR: ['target'], FORBID_TAGS: ['style', 'form', 'input', 'iframe'] })
-const html = computed(() => renderMarkdown(props.text, { links: props.links, sanitize }))
+const html = computed(() => renderMarkdown(props.text, { links: props.links, sanitize, cites: props.cites }))
 
 function onClick(e) {
   const a = e.target.closest('a')
   if (!a) return
+  if (a.dataset.cite) {
+    e.preventDefault()
+    emit('cite', Number(a.dataset.cite)) // an Ask citation: the screen opens the cited record
+    return
+  }
   const href = a.getAttribute('href') || ''
   if (href.startsWith('/life')) {
     e.preventDefault()

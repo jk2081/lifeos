@@ -67,6 +67,7 @@
       <NewRecord v-if="store.newKind === 'idea'" :model-value="true" title="New idea" action="Park on Someday" :fields="ideaFields" :save="createIdea"
         @update:model-value="(v) => !v && (store.newKind = '')" />
       <RecordPane />
+      <AskPanel />
       <SearchPalette v-model:open="store.searchOpen" />
       <QuickAdd v-model:open="store.quickAdd" />
       <KeyboardShortcutsDialog v-model:open="shortcutsOpen">
@@ -102,6 +103,7 @@ import { recordChanged } from './lib/pane'
 import { areaOptions, loadLookups } from './lib/lookups'
 import SearchPalette from './components/SearchPalette.vue'
 import RecordPane from './components/RecordPane.vue'
+import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'
 import { NAV, SETTINGS } from './lib/nav'
 import { boot, canWrite, store } from './lib/store'
