@@ -1,0 +1,154 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-15 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "kind",
+  "title",
+  "body",
+  "evidence",
+  "actions",
+  "status",
+  "snooze_until",
+  "fingerprint",
+  "source",
+  "area",
+  "found_on",
+  "rank",
+  "dismiss_reason",
+  "acted_note"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Stuck\nWaiting on you\nPromise\n12 Week Year\nHabit\nCheck-in\nTheme\nSomeday",
+   "reqd": 1,
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "in_list_view": 1,
+   "length": 255
+  },
+  {
+   "fieldname": "body",
+   "fieldtype": "Small Text",
+   "label": "Body"
+  },
+  {
+   "fieldname": "evidence",
+   "fieldtype": "Table",
+   "label": "Evidence",
+   "options": "Life Insight Evidence"
+  },
+  {
+   "fieldname": "actions",
+   "fieldtype": "JSON",
+   "label": "Suggested Actions"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "New\nSnoozed\nActed\nDismissed",
+   "default": "New",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "snooze_until",
+   "fieldtype": "Date",
+   "label": "Snooze Until"
+  },
+  {
+   "fieldname": "fingerprint",
+   "fieldtype": "Data",
+   "label": "Fingerprint",
+   "length": 140,
+   "search_index": 1
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Rule\nAI",
+   "default": "Rule",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Life Area"
+  },
+  {
+   "fieldname": "found_on",
+   "fieldtype": "Date",
+   "label": "Found On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "rank",
+   "fieldtype": "Int",
+   "label": "Rank"
+  },
+  {
+   "fieldname": "dismiss_reason",
+   "fieldtype": "Select",
+   "label": "Dismiss Reason",
+   "options": "\nNot relevant\nAlready done\nWrong"
+  },
+  {
+   "fieldname": "acted_note",
+   "fieldtype": "Small Text",
+   "label": "Acted Note"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-15 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Insight",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

@@ -31,6 +31,10 @@ has_permission["Life Space"] = "lifeos.permissions.space_has_permission"
 has_permission["Event"] = "lifeos.permissions.event_has_permission"
 has_permission["Life View State"] = "lifeos.permissions.view_state_has_permission"
 has_permission["File"] = "lifeos.permissions.file_has_permission"
+# Ask's threads and messages belong to the person who asked; agents never read them (UX fixes, set 5)
+for _dt in ("Life Ask Thread", "Life Ask Message"):
+	permission_query_conditions[_dt] = "lifeos.permissions.ask_query_conditions"
+	has_permission[_dt] = "lifeos.permissions.ask_has_permission"
 
 doc_events = {
 	dt: {"validate": "lifeos.org.validate_common", "on_update": "lifeos.org.on_update", "on_trash": "lifeos.org.on_trash"}
@@ -42,8 +46,10 @@ doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
 before_request = ["lifeos.permissions.no_desk_redirect"]
 
 scheduler_events = {
-	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health"],
-	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims"]},
+	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.trash.purge_old"],
+	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims"],
+		# insights: nightly at 06:00 site time (the owner's time zone is the site's, Asia/Kolkata)
+		"0 6 * * *": ["lifeos.insights.run_nightly"]},
 }
 
 fixtures = []

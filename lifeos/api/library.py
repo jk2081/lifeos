@@ -78,10 +78,22 @@ def list(space=None, area=None, project=None, tag=None, include_archived=0, sort
 	return {"space": space, "notes": rows, "total": total}
 
 
+def mark_opened(doc):
+	"""Record that a person opened a note: on the note and its index row, without touching `modified`."""
+	if permissions.is_agent():
+		return
+	day = frappe.utils.getdate(frappe.utils.today())
+	if doc.get("last_opened_on") and frappe.utils.getdate(doc.last_opened_on) == day:
+		return
+	frappe.db.set_value("Life Note", doc.name, "last_opened_on", day, update_modified=False)
+	frappe.db.sql("update `tabLife Index` set last_opened_on=%s where ref_doctype='Life Note' and ref_name=%s", (day, doc.name))
+
+
 @frappe.whitelist()
 def get(note):
-	"""One note with its links resolved to current titles."""
+	"""One note with its links resolved to current titles. A person opening it sets its last_opened_on (UX fixes, set 5)."""
 	doc = permissions.get_doc_checked("Life Note", note)
+	mark_opened(doc)
 	return {
 		"name": doc.name, "space": doc.space, "title": doc.title, "content_md": doc.content_md or "", "parent_note": doc.parent_note,
 		"parent_title": frappe.db.get_value("Life Note", doc.parent_note, "title") if doc.parent_note else None,

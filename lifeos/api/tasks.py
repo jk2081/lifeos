@@ -60,7 +60,9 @@ TABS = {
 	"loops": "t.status in ('Open', 'Doing', 'Waiting') and t.due_date is null and t.creation < %(cutoff)s",
 	"Waiting": "t.status = 'Waiting'",
 	"Done": "t.status = 'Done'",
-	"all": None,
+	"Someday": "t.status = 'Someday'",
+	# All leaves out tasks parked on the Someday list (UX fixes, set 5); the Someday tab lists them
+	"all": "t.status != 'Someday'",
 }
 
 
@@ -77,7 +79,9 @@ def where_clause(space, status="open_doing", area=None, project=None, tag=None, 
 		where.append("t.status in ('Open', 'Doing', 'Waiting')")
 	elif status == "done":
 		where.append("t.status in ('Done', 'Dropped', 'Carried')")
-	elif status and status != "all":
+	elif status == "all":
+		where.append("t.status != 'Someday'")
+	elif status and status != "any":
 		where.append("t.status = %(status)s")
 		values["status"] = status
 	if not flag(include_archived):
@@ -142,7 +146,7 @@ def list(space=None, status="open", area=None, project=None, tag=None, priority=
 	extra, values = std_clause("Life Task", filters, "t", values)
 	clause += extra
 	# the tab counts: the same filters without the status and the open-loops switch, which are what a tab stands for
-	t_clause, t_values = where_clause(space, "all", area, project, tag, priority, goal, month_plan, include_archived, due, 0, 0,
+	t_clause, t_values = where_clause(space, "any", area, project, tag, priority, goal, month_plan, include_archived, due, 0, 0,
 		completed_from, completed_to)
 	t_values = {**t_values, **values, "space": space, "cutoff": add_days(today(), -OPEN_LOOP_DAYS)}
 	tabs = tab_counts(f"from `tabLife Task` t where t.space=%(space)s {t_clause}{extra}", t_values, TABS)

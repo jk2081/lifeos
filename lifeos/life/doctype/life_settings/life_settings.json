@@ -9,7 +9,18 @@
   "weekly_review_time",
   "score_target",
   "archive_after_days",
-  "stale_task_days"
+  "stale_task_days",
+  "stuck_after_days",
+  "stuck_limit",
+  "open_task_goal",
+  "someday_review_months",
+  "ai_section",
+  "anthropic_api_key",
+  "ask_model",
+  "short_model",
+  "monthly_cap_usd",
+  "ai_prices",
+  "insights_run_on"
  ],
  "fields": [
   {
@@ -48,6 +59,70 @@
    "fieldtype": "Int",
    "label": "Stale Task Days",
    "default": "90"
+  },
+  {
+   "fieldname": "stuck_after_days",
+   "fieldtype": "Int",
+   "label": "Stuck After (Days)",
+   "default": "30"
+  },
+  {
+   "fieldname": "stuck_limit",
+   "fieldtype": "Int",
+   "label": "Stuck Limit",
+   "default": "50"
+  },
+  {
+   "fieldname": "open_task_goal",
+   "fieldtype": "Int",
+   "label": "Open Task Goal",
+   "default": "100"
+  },
+  {
+   "fieldname": "someday_review_months",
+   "fieldtype": "Int",
+   "label": "Someday Review After (Months)",
+   "default": "3"
+  },
+  {
+   "fieldname": "ai_section",
+   "fieldtype": "Section Break",
+   "label": "AI"
+  },
+  {
+   "fieldname": "anthropic_api_key",
+   "fieldtype": "Password",
+   "label": "Anthropic API Key"
+  },
+  {
+   "fieldname": "ask_model",
+   "fieldtype": "Data",
+   "label": "Ask Model",
+   "default": "claude-sonnet-5-5"
+  },
+  {
+   "fieldname": "short_model",
+   "fieldtype": "Data",
+   "label": "Short-task Model",
+   "default": "claude-haiku-5-5"
+  },
+  {
+   "fieldname": "monthly_cap_usd",
+   "fieldtype": "Float",
+   "label": "Monthly Cap (USD)",
+   "default": "30"
+  },
+  {
+   "fieldname": "ai_prices",
+   "fieldtype": "Table",
+   "label": "Prices per Model",
+   "options": "Life AI Price"
+  },
+  {
+   "fieldname": "insights_run_on",
+   "fieldtype": "Datetime",
+   "label": "Insights Last Run",
+   "read_only": 1
   }
  ],
  "issingle": 1,

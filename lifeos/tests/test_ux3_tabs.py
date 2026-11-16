@@ -24,7 +24,7 @@ class TestTabCounts(LifeTestCase):
 		def check(**f):
 			get = lambda **a: tasks.list(space=PRIVATE, **f, **a)  # noqa: E731
 			tabs = get()["tabs"]
-			self.assertEqual(set(tabs), {"open", "loops", "Waiting", "Done", "all"})
+			self.assertEqual(set(tabs), {"open", "loops", "Waiting", "Done", "Someday", "all"})
 			self.assertEqual(tabs["open"], get(status="open_doing")["total"])
 			self.assertEqual(tabs["loops"], get(status="open", loops=1)["total"])
 			self.assertEqual(tabs["Waiting"], get(status="Waiting")["total"])
@@ -92,8 +92,8 @@ class TestTabCounts(LifeTestCase):
 
 		mine = [["title", "like", "ux3 p %"]]
 		check()
-		self.assertEqual(check(filters=mine), {"current": 3, "Active": 2, "On Hold": 1, "Done": 1, "Dropped": 1, "all": 5})
-		self.assertEqual(check(area=tea, filters=mine), {"current": 2, "Active": 1, "On Hold": 1, "Done": 1, "Dropped": 0, "all": 3})
+		self.assertEqual(check(filters=mine), {"current": 3, "Active": 2, "On Hold": 1, "Done": 1, "Dropped": 1, "Someday": 0, "all": 5})
+		self.assertEqual(check(area=tea, filters=mine), {"current": 2, "Active": 1, "On Hold": 1, "Done": 1, "Dropped": 0, "Someday": 0, "all": 3})
 
 	def test_archive(self):
 		tea = self.areas["Tea"]

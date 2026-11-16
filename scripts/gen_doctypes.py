@@ -61,6 +61,16 @@ def org():
 	]
 
 
+
+def someday():
+	"""UX fixes, set 5: parked on the Someday list. Parking keeps `creation`."""
+	return [
+		f("someday_section", "Section Break", label="Someday"),
+		f("someday_on", "Date", search_index=1, label="Parked On"),
+		f("someday_review_on", "Date", search_index=1, label="Review On"),
+		f("someday_note", "Small Text", label="Why It Was Parked"),
+	]
+
 def perms(admin_only_write=False, agent_write=True):
 	full = {"read": 1, "write": 1, "create": 1, "delete": 1, "report": 1, "export": 1, "print": 1, "email": 1, "share": 1}
 	ro = {"read": 1, "report": 1}
@@ -123,6 +133,14 @@ dt("Life Note Source", [
 	link("source_doctype", "DocType", reqd=1, in_list_view=1),
 	f("source_name", "Dynamic Link", "source_doctype", reqd=1, in_list_view=1),
 ], istable=1)
+dt("Life AI Price", [
+	f("model", reqd=1, in_list_view=1), f("input_per_mtok", "Float", in_list_view=1, label="Input, $ per million tokens"),
+	f("output_per_mtok", "Float", in_list_view=1, label="Output, $ per million tokens"),
+], istable=1)
+dt("Life Insight Evidence", [
+	link("ref_doctype", "DocType", reqd=1, in_list_view=1), f("ref_name", "Dynamic Link", "ref_doctype", reqd=1, in_list_view=1),
+	f("label", in_list_view=1),
+], istable=1)
 dt("Life Chat Open Item", [
 	f("text", "Small Text", reqd=1, in_list_view=1),
 	sel("status", ["Open", "Task Created", "Closed"], default="Open", in_list_view=1),
@@ -136,6 +154,9 @@ dt("Life Space", [
 	f("members", "Table", "Life Space Member"),
 	f("agents_can_read_vault", "Check", default="0", label="Agents Can Read Vault",
 		description="Let agents open documents in this space's Vault. Off by default."),
+	f("ask_enabled", "Check", default="1", label="Ask Is On", description="People in this space can use Ask (UX fixes, set 5)."),
+	f("ask_can_read_vault", "Check", default="0", label="Ask May Read Vault Documents",
+		description="Let Ask send this space's Vault documents to the AI model. Off by default; separate from the agent switch."),
 ], autoname="field:space_name", permissions=perms(admin_only_write=True), title_field="space_name")
 dt("Life Area", [
 	SPACE, f("area_name", reqd=1, in_list_view=1), link("parent_area", "Life Area"),
@@ -143,9 +164,11 @@ dt("Life Area", [
 ], title_field="area_name", show_title=1, search_fields="area_name")
 dt("Life Project", [
 	SPACE, f("title", reqd=1, in_list_view=1), link("area", "Life Area", reqd=1, in_list_view=1, search_index=1),
-	sel("status", ["Active", "On Hold", "Done", "Dropped"], default="Active", in_list_view=1, search_index=1),
+	sel("status", ["Active", "On Hold", "Done", "Dropped", "Someday"], default="Active", in_list_view=1, search_index=1),
 	f("outcome", "Small Text"), f("target_date", "Date", in_list_view=1), f("completed_on", "Date"), md("notes_md"),
 	f("is_archived", "Check", default="0", search_index=1), f("archived_on", "Date"),
+	f("last_activity_on", "Date", search_index=1, description="The last day the project or one of its tasks changed"),
+	*someday(),
 ], title_field="title", show_title=1, search_fields="title")
 dt("Life Tag", [SPACE, f("tag_name", reqd=1, in_list_view=1), f("is_archived", "Check", default="0"), f("archived_on", "Date")], title_field="tag_name", show_title=1, search_fields="tag_name")
 dt("Life Dimension", [SPACE, f("dimension_name", reqd=1, in_list_view=1), f("sort_order", "Int"),
@@ -160,6 +183,18 @@ dt("Life Settings", [
 	f("score_target", "Int", default="85"),
 	f("archive_after_days", "Int", default="90"),
 	f("stale_task_days", "Int", default="90"),
+	# UX fixes, set 5: Reset rules
+	f("stuck_after_days", "Int", default="30", label="Stuck After (Days)"),
+	f("stuck_limit", "Int", default="50"),
+	f("open_task_goal", "Int", default="100"),
+	f("someday_review_months", "Int", default="3", label="Someday Review After (Months)"),
+	# UX fixes, set 5: the AI model behind Ask and the insights
+	f("ai_section", "Section Break", label="AI"),
+	f("anthropic_api_key", "Password", label="Anthropic API Key"),
+	f("ask_model", default="claude-sonnet-5-5"), f("short_model", default="claude-haiku-5-5", label="Short-task Model"),
+	f("monthly_cap_usd", "Float", default="30", label="Monthly Cap (USD)"),
+	f("ai_prices", "Table", "Life AI Price", label="Prices per Model"),
+	f("insights_run_on", "Datetime", read_only=1, label="Insights Last Run"),
 ], issingle=1, permissions=[
 	{"role": "Life Admin", "read": 1, "write": 1, "create": 1},
 	{"role": "Life User", "read": 1}, {"role": "Life Agent", "read": 1}])
@@ -182,7 +217,7 @@ dt("Life Inbox Item", [
 ], title_field="title", show_title=1)
 dt("Life Proposal", [
 	SPACE, link("inbox_item", "Life Inbox Item", reqd=1, search_index=1, in_list_view=1),
-	sel("kind", ["Task", "Event", "Important Date", "Note", "Vault Document", "Month Goal", "Habit Log", "Check-in", "Week Tick", "Journal Page"], reqd=1, in_list_view=1),
+	sel("kind", ["Task", "Event", "Important Date", "Note", "Vault Document", "Month Goal", "Habit Log", "Check-in", "Week Tick", "Journal Page", "Someday"], reqd=1, in_list_view=1),
 	f("preview", "Small Text", in_list_view=1), f("payload", "JSON"), f("confidence", "Float"),
 	sel("status", ["Pending", "Accepted", "Rejected"], default="Pending", in_list_view=1, search_index=1),
 	link("created_doctype", "DocType"), f("created_name", "Dynamic Link", "created_doctype"),
@@ -192,13 +227,14 @@ dt("Life Proposal", [
 # ---- tasks and dates ----
 dt("Life Task", [
 	SPACE, f("title", reqd=1, in_list_view=1),
-	sel("status", ["Open", "Doing", "Waiting", "Done", "Dropped", "Carried"], default="Open", in_list_view=1, search_index=1),
+	sel("status", ["Open", "Doing", "Waiting", "Done", "Dropped", "Carried", "Someday"], default="Open", in_list_view=1, search_index=1),
 	sel("priority", PRIORITY, in_list_view=1),
 	f("due_date", "Date", in_list_view=1, search_index=1),
 	link("goal", "Life Goal"), link("month_plan", "Life Month Plan"), link("inbox_item", "Life Inbox Item", search_index=1),
 	f("source_url", length=500), md("notes_md"), f("waiting_on"), f("completed_on", "Date"),
-	link("carried_from", "Life Task"), f("last_touched_on", "Date"),
-	*org(),
+	link("carried_from", "Life Task"), f("last_touched_on", "Date", search_index=1),
+	*org(), *someday(),
+	link("someday_with", "Life Project", description="Parked together with this project"),
 ], title_field="title", show_title=1, search_fields="title")
 dt("Life Important Date", [
 	SPACE, f("title", reqd=1, in_list_view=1), link("person", "Life Person"),
@@ -222,6 +258,9 @@ dt("Life Goal", [
 	f("actions", "Table", "Life Goal Action"),
 	sel("outcome", ["In Progress", "Achieved", "Partly Achieved", "Not Achieved", "Carried", "Dropped"], default="In Progress"),
 	f("result_note", "Small Text"), link("carried_from", "Life Goal", search_index=1), f("final_score", "Float", read_only=1),
+	f("is_someday", "Check", default="0", search_index=1, label="On the Someday List",
+		description="Parked, whatever its outcome; the 12 Week Year history is not changed"),
+	*someday(),
 ], title_field="title", show_title=1, search_fields="title")
 dt("Life Month Plan", [
 	SPACE, f("year", "Int", reqd=1, in_list_view=1), f("month", "Int", reqd=1, in_list_view=1),
@@ -253,6 +292,7 @@ dt("Life Note", [
 	f("summary", "Small Text", description="One line. Required for wiki pages"),
 	f("sources", "Table", "Life Note Source"),
 	f("is_rules", "Check", default="0", description="The wiki's rules page; one per space"),
+	f("last_opened_on", "Date", search_index=1, description="The last day a person opened it (its creation counts)"),
 	*org(),
 ], title_field="title", show_title=1, search_fields="title")
 dt("Life Wiki Change", [
@@ -300,12 +340,53 @@ dt("Life Index", [
 	f("source_system", length=40), sel("intent", ["", *INTENTS]), f("assistant", length=40),
 	sel("collection", ["", "My notes", "Wiki"]), f("thumbnail", length=255),
 	f("vault_locked", "Check", default="0", description="A Vault document, or a source a Vault document was made from"),
+	f("last_opened_on", "Date", description="Notes: the last day a person opened it (UX fixes, set 5)"),
 ], permissions=perms(agent_write=False), in_create=1, title_field="title")
 dt("Life Action Log", [
 	SPACE, link("goal", "Life Goal", reqd=1, search_index=1), f("action_id", reqd=1, search_index=1),
 	link("cycle", "Life Cycle", reqd=1, search_index=1), f("week", "Int", reqd=1), f("date", "Date", reqd=1, search_index=1),
 	f("count", "Int", default="1"), link("inbox_item", "Life Inbox Item"),
 ], autoname="prompt")
+
+# ---- UX fixes, set 5: Someday ideas, insights, Ask, AI usage ----
+dt("Life Idea", [
+	SPACE, f("title", reqd=1, in_list_view=1), md("body_md", label="Body"),
+	link("area", "Life Area", in_list_view=1, search_index=1), link("project", "Life Project"),
+	link("source_doctype", "DocType"), f("source_name", "Dynamic Link", "source_doctype"),
+	sel("status", ["Someday", "Brought Back"], default="Someday", in_list_view=1, search_index=1),
+	link("brought_to_doctype", "DocType"), f("brought_to_name", "Dynamic Link", "brought_to_doctype"),
+	*someday(),
+], permissions=perms(agent_write=False), title_field="title", show_title=1, search_fields="title")
+NO_AGENT = [{"role": "Life Admin", "read": 1, "write": 1, "create": 1, "delete": 1, "report": 1},
+	{"role": "Life User", "read": 1, "write": 1, "create": 1, "delete": 1, "report": 1}]
+dt("Life Insight", [
+	SPACE, sel("kind", ["Stuck", "Waiting on you", "Promise", "12 Week Year", "Habit", "Check-in", "Theme", "Someday"], reqd=1,
+		in_list_view=1, search_index=1),
+	f("title", reqd=1, in_list_view=1, length=255), f("body", "Small Text"),
+	f("evidence", "Table", "Life Insight Evidence"), f("actions", "JSON", label="Suggested Actions"),
+	sel("status", ["New", "Snoozed", "Acted", "Dismissed"], default="New", in_list_view=1, search_index=1),
+	f("snooze_until", "Date"), f("fingerprint", length=140, search_index=1),
+	sel("source", ["Rule", "AI"], default="Rule", in_list_view=1), link("area", "Life Area"),
+	f("found_on", "Date", search_index=1), f("rank", "Int"),
+	sel("dismiss_reason", ["", "Not relevant", "Already done", "Wrong"]), f("acted_note", "Small Text"),
+], permissions=NO_AGENT, title_field="title")
+dt("Life Ask Thread", [
+	SPACE, link("user", "User", reqd=1, search_index=1), f("title", in_list_view=1, length=255),
+	link("scope_doctype", "DocType"), f("scope_name", "Dynamic Link", "scope_doctype"), f("scope_label"),
+	f("scope_kind", description="space, area, project, goal, goals, journal, items, record, notes"),
+	f("last_message_on", "Datetime", search_index=1, in_list_view=1),
+], permissions=NO_AGENT, title_field="title")
+dt("Life Ask Message", [
+	link("thread", "Life Ask Thread", reqd=1, search_index=1), sel("role", ["user", "assistant"], reqd=1, in_list_view=1),
+	md("text"), f("cited", "JSON"), f("actions", "JSON", label="Suggested Actions"), f("records_read", "JSON"),
+	sel("status", ["Done", "Working", "Error"], default="Done"), f("error", "Small Text"),
+	f("input_tokens", "Int"), f("output_tokens", "Int"), f("cost", "Float"),
+], permissions=NO_AGENT)
+dt("Life AI Usage", [
+	link("user", "User", search_index=1, in_list_view=1), f("month", search_index=1, in_list_view=1, length=7),
+	f("model", in_list_view=1), f("input_tokens", "Int"), f("output_tokens", "Int"), f("cost", "Float", in_list_view=1),
+	sel("purpose", ["Ask", "Insights", "Batches", "Wording", "Test"], in_list_view=1), link("space", "Life Space"),
+], permissions=[{"role": "Life Admin", "read": 1, "report": 1}], in_create=1)
 
 # ---- per-user screen state (UX fixes, set 2): one row per user, screen and space ----
 OWN_ROWS = {"read": 1, "write": 1, "create": 1, "delete": 1}

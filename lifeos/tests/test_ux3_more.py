@@ -174,11 +174,11 @@ class TestGoals(LifeTestCase):
 	def test_list_tabs_and_close(self):
 		g = goals.create("ux3 closable", "Open", space=PRIVATE)["name"]
 		mine = frappe.as_json([["title", "like", "ux3 closable"]])
-		self.assertEqual(goals.list(space=PRIVATE, filters=mine)["tabs"], {"in_progress": 1, "achieved": 0, "closed": 0, "all": 1})
+		self.assertEqual(goals.list(space=PRIVATE, filters=mine)["tabs"], {"in_progress": 1, "achieved": 0, "closed": 0, "someday": 0, "all": 1})
 		goals.close(g, "Dropped", "not now")
 		self.assertEqual(str(frappe.db.get_value("Life Goal", g, "closed_on")), today())
 		tabs = goals.list(space=PRIVATE, filters=mine)["tabs"]
-		self.assertEqual(tabs, {"in_progress": 0, "achieved": 0, "closed": 1, "all": 1})
+		self.assertEqual(tabs, {"in_progress": 0, "achieved": 0, "closed": 1, "someday": 0, "all": 1})
 		self.assertEqual(goals.list(space=PRIVATE, state="closed", filters=mine)["total"], 1)
 
 	def test_add_to_cycle_keeps_tasks(self):

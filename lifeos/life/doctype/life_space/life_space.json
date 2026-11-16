@@ -8,7 +8,9 @@
   "space_name",
   "owner_user",
   "members",
-  "agents_can_read_vault"
+  "agents_can_read_vault",
+  "ask_enabled",
+  "ask_can_read_vault"
  ],
  "fields": [
   {
@@ -38,6 +40,20 @@
    "label": "Agents Can Read Vault",
    "default": "0",
    "description": "Let agents open documents in this space's Vault. Off by default."
+  },
+  {
+   "fieldname": "ask_enabled",
+   "fieldtype": "Check",
+   "label": "Ask Is On",
+   "default": "1",
+   "description": "People in this space can use Ask (UX fixes, set 5)."
+  },
+  {
+   "fieldname": "ask_can_read_vault",
+   "fieldtype": "Check",
+   "label": "Ask May Read Vault Documents",
+   "default": "0",
+   "description": "Let Ask send this space's Vault documents to the AI model. Off by default; separate from the agent switch."
   }
  ],
  "links": [],

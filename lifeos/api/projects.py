@@ -17,7 +17,9 @@ SORTS = {"title": "p.title", "status": "field(p.status, 'Active', 'On Hold', 'Do
 # the state tabs of the Projects screen. Active and On hold leave archived projects out, as the list does
 TABS = {"current": "p.status in ('Active', 'On Hold') and p.is_archived = 0",
 	"Active": "p.status = 'Active' and p.is_archived = 0", "On Hold": "p.status = 'On Hold' and p.is_archived = 0",
-	"Done": "p.status = 'Done'", "Dropped": "p.status = 'Dropped'", "all": None}
+	"Done": "p.status = 'Done'", "Dropped": "p.status = 'Dropped'", "Someday": "p.status = 'Someday'",
+	# All leaves out projects parked on the Someday list (UX fixes, set 5); they have their own tab
+	"all": "p.status != 'Someday'"}
 
 
 def where_clause(space, status=None, area=None, include_done=0):
@@ -30,6 +32,8 @@ def where_clause(space, status=None, area=None, include_done=0):
 			where.append("p.is_archived = 0")
 	elif not flag(include_done):
 		where.append("p.is_archived = 0 and p.status in ('Active', 'On Hold')")
+	else:
+		where.append("p.status != 'Someday'")
 	if area:
 		where.append(area_filter(space, area, "p.area", values))
 	return "".join(" and " + w for w in where), values
@@ -48,12 +52,13 @@ def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None
 	and `current`, active and on hold together (the default of the area page's Projects tab)."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	if status and status not in ("Active", "On Hold", "Done", "Dropped"):
+	if status and status not in ("Active", "On Hold", "Done", "Dropped", "Someday"):
 		frappe.throw(_("Unknown status."))
 	where, values = where_clause(space, status, area, include_done)
 	extra, values = std_clause("Life Project", filters, "p", values)
 	where += extra
 	t_where, t_values = where_clause(space, None, area, 1)
+	t_where = t_where.replace(" and p.status != 'Someday'", "")
 	tabs = tab_counts(f"from `tabLife Project` p where p.space=%(space)s {t_where}{extra}", {**t_values, **values, "space": space}, TABS)
 	if summary:
 		return {"summary": summarise("Life Project", f"from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values},

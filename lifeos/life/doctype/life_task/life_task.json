@@ -26,7 +26,12 @@
   "tags",
   "is_archived",
   "archived_on",
-  "archive_reason"
+  "archive_reason",
+  "someday_section",
+  "someday_on",
+  "someday_review_on",
+  "someday_note",
+  "someday_with"
  ],
  "fields": [
   {
@@ -49,7 +54,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Open\nDoing\nWaiting\nDone\nDropped\nCarried",
+   "options": "Open\nDoing\nWaiting\nDone\nDropped\nCarried\nSomeday",
    "default": "Open",
    "in_list_view": 1,
    "search_index": 1
@@ -117,7 +122,8 @@
   {
    "fieldname": "last_touched_on",
    "fieldtype": "Date",
-   "label": "Last Touched On"
+   "label": "Last Touched On",
+   "search_index": 1
   },
   {
    "fieldname": "organisation_section",
@@ -169,6 +175,35 @@
    "fieldtype": "Select",
    "label": "Archive Reason",
    "options": "\nManual\nAuto\nProject"
+  },
+  {
+   "fieldname": "someday_section",
+   "fieldtype": "Section Break",
+   "label": "Someday"
+  },
+  {
+   "fieldname": "someday_on",
+   "fieldtype": "Date",
+   "label": "Parked On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_review_on",
+   "fieldtype": "Date",
+   "label": "Review On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_note",
+   "fieldtype": "Small Text",
+   "label": "Why It Was Parked"
+  },
+  {
+   "fieldname": "someday_with",
+   "fieldtype": "Link",
+   "label": "Someday With",
+   "options": "Life Project",
+   "description": "Parked together with this project"
   }
  ],
  "links": [],

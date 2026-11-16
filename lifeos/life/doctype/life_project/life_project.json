@@ -14,7 +14,12 @@
   "completed_on",
   "notes_md",
   "is_archived",
-  "archived_on"
+  "archived_on",
+  "last_activity_on",
+  "someday_section",
+  "someday_on",
+  "someday_review_on",
+  "someday_note"
  ],
  "fields": [
   {
@@ -46,7 +51,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Active\nOn Hold\nDone\nDropped",
+   "options": "Active\nOn Hold\nDone\nDropped\nSomeday",
    "default": "Active",
    "in_list_view": 1,
    "search_index": 1
@@ -83,6 +88,35 @@
    "fieldname": "archived_on",
    "fieldtype": "Date",
    "label": "Archived On"
+  },
+  {
+   "fieldname": "last_activity_on",
+   "fieldtype": "Date",
+   "label": "Last Activity On",
+   "search_index": 1,
+   "description": "The last day the project or one of its tasks changed"
+  },
+  {
+   "fieldname": "someday_section",
+   "fieldtype": "Section Break",
+   "label": "Someday"
+  },
+  {
+   "fieldname": "someday_on",
+   "fieldtype": "Date",
+   "label": "Parked On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_review_on",
+   "fieldtype": "Date",
+   "label": "Review On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_note",
+   "fieldtype": "Small Text",
+   "label": "Why It Was Parked"
   }
  ],
  "links": [],

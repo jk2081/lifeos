@@ -25,7 +25,8 @@
   "assistant",
   "collection",
   "thumbnail",
-  "vault_locked"
+  "vault_locked",
+  "last_opened_on"
  ],
  "fields": [
   {
@@ -153,6 +154,12 @@
    "label": "Vault Locked",
    "default": "0",
    "description": "A Vault document, or a source a Vault document was made from"
+  },
+  {
+   "fieldname": "last_opened_on",
+   "fieldtype": "Date",
+   "label": "Last Opened On",
+   "description": "Notes: the last day a person opened it (UX fixes, set 5)"
   }
  ],
  "in_create": 1,

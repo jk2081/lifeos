@@ -17,6 +17,8 @@ class LifeGoal(Document):
 			self.space = frappe.db.get_value("Life Cycle", self.cycle, "space")
 
 	def validate(self):
+		if not self.is_someday:
+			self.someday_on = self.someday_review_on = None
 		self.goal_type = self.goal_type or "12 Week Year"
 		if self.goal_type == "12 Week Year" and not self.cycle:
 			frappe.throw(_("A 12 Week Year goal belongs to a cycle."))

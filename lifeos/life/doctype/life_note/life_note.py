@@ -11,6 +11,8 @@ class LifeNote(Document):
 		from lifeos import permissions
 
 		self.collection = self.collection or "My notes"
+		if self.is_new() and not self.last_opened_on:
+			self.last_opened_on = frappe.utils.today()  # a new note counts as opened the day it is made
 		# agents write wiki pages through lifeos.api.wiki only (which logs every change); My notes pages are people's own
 		agent = permissions.is_agent() and not frappe.flags.lifeos_app_write
 		if agent and not frappe.flags.lifeos_wiki_api:

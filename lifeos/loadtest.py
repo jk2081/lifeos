@@ -63,7 +63,7 @@ def seed(rows=100000, users=20, spaces=50, big_share=0.5):
 		"due_date", "area", "is_archived", "last_touched_on", "completed_on"]
 	index_cols = index.COLUMNS
 	# the columns set 4 added to the index, after the 21 these rows spell out
-	pad = tuple(0 if c == "vault_locked" else "" for c in index.COLUMNS[21:])
+	pad = tuple(0 if c == "vault_locked" else None if c in index.NULLABLE else "" for c in index.COLUMNS[21:])
 	tasks, idx = [], []
 
 	def flush(force=False):
@@ -174,7 +174,7 @@ def seed_sources(sources=20000, pages=2000, space=None, text_chars=5000):
 	areas = frappe.get_all("Life Area", filters={"space": space}, pluck="name") or [""]
 	owner = devtools.OWNER
 	ts, day0 = now(), getdate(today())
-	pad = {c: (0 if c == "vault_locked" else "") for c in index.COLUMNS[21:]}
+	pad = {c: (0 if c == "vault_locked" else None if c in index.NULLABLE else "") for c in index.COLUMNS[21:]}
 
 	def words(n):
 		out, size = [], 0

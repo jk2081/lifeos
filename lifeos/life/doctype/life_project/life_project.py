@@ -10,6 +10,9 @@ class LifeProject(Document):
 				self.completed_on = today()
 		else:
 			self.completed_on = None
+		self.last_activity_on = today()
+		if self.status != "Someday" and not self.flags.keep_someday:
+			self.someday_on = self.someday_review_on = None
 
 	def on_update(self):
 		from lifeos import archive

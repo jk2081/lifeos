@@ -104,6 +104,19 @@ SCHEMA = {
 		"fields": {"page_date": F("date", True), "page_number": F("text", help="For example 187 or 187-188."), "transcript_md": F("markdown"), **ORG},
 		"example": {"page_date": "2026-11-14", "page_number": "187-188", "transcript_md": "Goal Oct to Dec ..."},
 	},
+	# UX fixes, set 5: an agent may propose parking something; only a person's Accept parks it
+	"Someday": {
+		"target": "Life Idea", "filed": False,
+		"fields": {
+			"record_type": F("text", True, "Task, Project, Goal, or Idea for a new idea."),
+			"record": F("text", help="For Task, Project and Goal: the name (id) or exact title of the record to park."),
+			"title": F("text", help="For Idea: the idea in one line.", max_length=140),
+			"body_md": F("markdown", help="For Idea: more detail."),
+			"area": F("link", help="For Idea: the area it belongs to.", doctype="Life Area"),
+			"note": F("text", help="Why it can wait. Shown on the Someday list."),
+		},
+		"example": {"record_type": "Task", "record": "Get quotes for a solar dryer pilot", "note": "Not before the monsoon."},
+	},
 }
 AREA_REQUIRED = ("Task", "Note", "Vault Document")
 
@@ -376,6 +389,8 @@ def apply(kind, payload, item) -> tuple:
 		if p.get("mark_done"):
 			journal.set_action_status(p["action"], "Done")
 		return "Life Goal", goal.name
+	elif kind == "Someday":
+		return _apply_someday(p, item)
 	elif kind == "Journal Page":
 		doc = frappe.get_doc({"doctype": "Life Journal Page", **base, "page_date": p["page_date"], "page_number": p.get("page_number"),
 			"transcript_md": p.get("transcript_md") or item.transcript_md, **_org(p, space)}).insert()
@@ -383,3 +398,31 @@ def apply(kind, payload, item) -> tuple:
 		if images:
 			doc.db_set("image", _attach_copy(images[0].file_url, doc.doctype, doc.name, "image"), update_modified=False)
 	return doc.doctype, doc.name
+
+
+SOMEDAY_TYPES = {"Task": "Life Task", "Project": "Life Project", "Goal": "Life Goal"}
+
+
+def _apply_someday(p, item):
+	"""Accepting a Someday proposal parks the record it names, or makes a new idea."""
+	from lifeos import permissions
+	from lifeos.api import someday
+
+	kind = str(p.get("record_type") or "").strip().title()
+	if kind == "Idea":
+		if not p.get("title"):
+			raise PayloadError(_("An idea needs a title."))
+		doc = frappe.get_doc({"doctype": "Life Idea", "space": item.space, "title": p["title"], "body_md": p.get("body_md"),
+			"area": p.get("area"), "source_doctype": "Life Inbox Item", "source_name": item.name, "status": "Someday",
+			"someday_on": today(), "someday_review_on": someday.review_date(), "someday_note": p.get("note")}).insert()
+		return doc.doctype, doc.name
+	doctype = SOMEDAY_TYPES.get(kind)
+	if not doctype or not p.get("record"):
+		raise PayloadError(_("Say which task, project or goal to park."))
+	value = str(p["record"]).strip()
+	name = value if frappe.db.exists(doctype, {"name": value, "space": item.space}) else frappe.db.get_value(doctype, {"title": value, "space": item.space})
+	if not name:
+		raise PayloadError(_("{0} '{1}' was not found in this space.").format(kind, value))
+	doc = permissions.get_doc_checked(doctype, name, "write")
+	someday.park_doc(doc, p.get("note"))
+	return doctype, name

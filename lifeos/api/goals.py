@@ -13,8 +13,9 @@ TYPES = ("12 Week Year", "Annual", "Open")
 CLOSED = ("Partly Achieved", "Not Achieved", "Carried", "Dropped")
 OUTCOMES = ("In Progress", "Achieved", *CLOSED)
 # the state tabs of the Goals screen
-TABS = {"in_progress": "g.outcome = 'In Progress'", "achieved": "g.outcome = 'Achieved'",
-	"closed": "g.outcome in ('Partly Achieved', 'Not Achieved', 'Carried', 'Dropped')", "all": None}
+# Someday goals (UX fixes, set 5) leave In progress and have their own tab; their outcome is not changed
+TABS = {"in_progress": "g.outcome = 'In Progress' and g.is_someday = 0", "achieved": "g.outcome = 'Achieved'",
+	"closed": "g.outcome in ('Partly Achieved', 'Not Achieved', 'Carried', 'Dropped')", "someday": "g.is_someday = 1", "all": "g.is_someday = 0"}
 COUNTED = ("Open", "Doing", "Waiting", "Done")
 SORTS = {"title": "g.title", "target_date": "g.target_date is null, g.target_date", "completion": "_completion",
 	"creation": "g.creation"}
@@ -45,7 +46,7 @@ def with_tasks(rows, key="name"):
 
 def where_clause(space, state=None, goal_type=None, area=None, cycle=None, target_from=None, target_to=None):
 	where, values = [], {}
-	if state and state != "all":
+	if state:
 		if state not in TABS:
 			frappe.throw(_("Unknown state."))
 		where.append(TABS[state])

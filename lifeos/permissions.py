@@ -2,6 +2,8 @@
 import frappe
 from frappe import _
 
+from lifeos.constants import NO_AGENT_DOCTYPES
+
 
 def user_spaces(user=None) -> dict:
 	"""Return {space: access} for the user. access is 'Read' or 'Write'."""
@@ -52,6 +54,8 @@ def query_conditions(user=None, doctype=None):
 	if user == "Administrator":
 		return ""
 	spaces = user_spaces(user)
+	if doctype in NO_AGENT_DOCTYPES and is_agent(user):
+		return "1=0"
 	if doctype == VAULT and is_agent(user):
 		spaces = [s for s in spaces if s in vault_open_spaces()]
 	if not spaces:
@@ -119,6 +123,8 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 	if user == "Administrator":
 		return True
 	if ptype == "delete" and is_agent(user):
+		return False
+	if doc.doctype in NO_AGENT_DOCTYPES and is_agent(user):
 		return False
 	if doc.get("space") and vault_locked(doc) and vault_hidden(doc.space, user):
 		return False
@@ -194,6 +200,28 @@ def view_state_has_permission(doc, ptype=None, user=None, debug=False):
 	if is_agent(user):
 		return False
 	return not doc.get("user") or doc.user == user
+
+
+def ask_query_conditions(user=None, doctype=None):
+	"""Ask's threads and messages are private to the person who asked, the site owner included. Agents see none."""
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return ""
+	if is_agent(user):
+		return "1=0"
+	if doctype == "Life Ask Message":
+		return f"`tabLife Ask Message`.`thread` in (select name from `tabLife Ask Thread` where `user` = {frappe.db.escape(user)})"
+	return f"`tabLife Ask Thread`.`user` = {frappe.db.escape(user)}"
+
+
+def ask_has_permission(doc, ptype=None, user=None, debug=False):
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	if is_agent(user):
+		return False
+	owner = doc.get("user") if doc.doctype == "Life Ask Thread" else frappe.db.get_value("Life Ask Thread", doc.get("thread"), "user")
+	return not owner or owner == user
 
 
 # ---- helpers for API methods ----

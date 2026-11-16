@@ -41,7 +41,7 @@
    "fieldname": "kind",
    "fieldtype": "Select",
    "label": "Kind",
-   "options": "Task\nEvent\nImportant Date\nNote\nVault Document\nMonth Goal\nHabit Log\nCheck-in\nWeek Tick\nJournal Page",
+   "options": "Task\nEvent\nImportant Date\nNote\nVault Document\nMonth Goal\nHabit Log\nCheck-in\nWeek Tick\nJournal Page\nSomeday",
    "reqd": 1,
    "in_list_view": 1
   },

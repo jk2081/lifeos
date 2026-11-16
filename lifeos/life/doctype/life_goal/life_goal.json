@@ -18,7 +18,12 @@
   "outcome",
   "result_note",
   "carried_from",
-  "final_score"
+  "final_score",
+  "is_someday",
+  "someday_section",
+  "someday_on",
+  "someday_review_on",
+  "someday_note"
  ],
  "fields": [
   {
@@ -113,6 +118,36 @@
    "fieldtype": "Float",
    "label": "Final Score",
    "read_only": 1
+  },
+  {
+   "fieldname": "is_someday",
+   "fieldtype": "Check",
+   "label": "On the Someday List",
+   "default": "0",
+   "search_index": 1,
+   "description": "Parked, whatever its outcome; the 12 Week Year history is not changed"
+  },
+  {
+   "fieldname": "someday_section",
+   "fieldtype": "Section Break",
+   "label": "Someday"
+  },
+  {
+   "fieldname": "someday_on",
+   "fieldtype": "Date",
+   "label": "Parked On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_review_on",
+   "fieldtype": "Date",
+   "label": "Review On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_note",
+   "fieldtype": "Small Text",
+   "label": "Why It Was Parked"
   }
  ],
  "links": [],

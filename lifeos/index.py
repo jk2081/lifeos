@@ -13,7 +13,8 @@ KINDS = {
 }
 COLUMNS = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "ref_doctype", "ref_name", "space",
 	"area", "also_in_csv", "project", "tags_csv", "record_date", "title", "search_text", "is_archived", "kind", "status", "record_owner",
-	"media_kind", "source_system", "intent", "assistant", "collection", "thumbnail", "vault_locked"]
+	"media_kind", "source_system", "intent", "assistant", "collection", "thumbnail", "vault_locked", "last_opened_on"]
+NULLABLE = ("last_opened_on",)
 # Characters of a record's text kept for search: transcripts, extracted text, summaries and page Markdown (UX fixes, set 4)
 SEARCH_CAP = 60000
 
@@ -58,6 +59,7 @@ def build_rows(doc) -> list[dict]:
 	elif dt == "Life Note":
 		base["search_text"] = _text(doc.summary, doc.content_md)
 		base["collection"] = doc.collection or "My notes"
+		base["last_opened_on"] = doc.get("last_opened_on") or getdate(doc.creation)
 	elif dt == "Life Vault Document":
 		base["search_text"] = _text(doc.doc_type, doc.notes_md)
 	elif dt == "Life Chat Log":
@@ -87,7 +89,7 @@ def _write(rows):
 	values = []
 	for r in rows:
 		head = (row_name(r["ref_doctype"], r["ref_name"], r["kind"]), ts, ts, frappe.session.user, r["record_owner"] or frappe.session.user, 0, 0)
-		values.append(head + tuple(r.get(c) if r.get(c) is not None else "" for c in COLUMNS[7:]))
+		values.append(head + tuple(r.get(c) if r.get(c) is not None or c in NULLABLE else "" for c in COLUMNS[7:]))
 	cols = ", ".join(f"`{c}`" for c in COLUMNS)
 	updates = ", ".join(f"`{c}`=values(`{c}`)" for c in COLUMNS if c not in ("name", "creation", "owner"))
 	placeholders = ", ".join(["(" + ", ".join(["%s"] * len(COLUMNS)) + ")"] * len(values))
