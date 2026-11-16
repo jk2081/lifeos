@@ -68,6 +68,8 @@ class SiteFake:
 
 	def run(self, params, on_text=None):
 		_record(params)
+		if (params.get("output_config") or {}).get("format"):
+			return self._structured(params)
 		msgs = params["messages"]
 		last = msgs[-1]
 		results = []  # every tool result since the question
@@ -109,6 +111,23 @@ class SiteFake:
 		act = tool_use("suggest_actions", {"actions": [{"kind": "make_task", "label": f"Make task: follow up {first[1][:40]}",
 			"title": f"Follow up: {first[1][:100]}", "area_ref": first[0]}]})
 		return self._out(params, on_text, text, [act], "tool_use")
+
+	def _structured(self, params):
+		"""The AI insight detector and the batch suggester: one finding over the first records given."""
+		try:
+			data = json.loads(params["messages"][-1]["content"])
+		except (ValueError, TypeError, KeyError):
+			data = {}
+		if isinstance(data, dict) and "records" in data:
+			recs = [r for r in data["records"] if r.get("ref")]
+			out = {"candidates": [{"kind": "Promise", "title": f"You said you would follow up on {recs[0]['title'][:80]}. No task covers it.",
+				"evidence": [recs[0]["ref"]], "task_title": f"Follow up on {recs[0]['title'][:80]}"}]} if recs else {"candidates": []}
+		else:
+			rows = data if isinstance(data, list) else []
+			out = {"batches": [{"title": "Oldest tasks nobody has touched", "reason": "They have waited longest and nothing links them to this week's plan.",
+				"action": "someday", "items": [r["ref"] for r in rows[:3]]}]} if len(rows) >= 3 else {"batches": []}
+		text = json.dumps(out)
+		return {"content": [{"type": "text", "text": text}], "stop_reason": "end_turn", "model": params["model"], "usage": _usage(params, text)}
 
 	def _out(self, params, on_text, text, tools, stop):
 		_stream(on_text, text)

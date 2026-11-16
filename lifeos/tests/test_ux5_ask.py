@@ -171,3 +171,56 @@ class TestLiveSmoke(AskCase):
 		frappe.set_user(OWNER)
 		res = ask.ask("What tasks are open?", space=PRIVATE)
 		self.assertEqual(res["message"]["status"], "Done")
+
+
+class TestAIInsightsAndBatches(AskCase):
+	def test_ai_insight_candidates_keep_only_visible_evidence(self):
+		from lifeos import insights
+
+		frappe.db.delete("Life Insight", {"space": PRIVATE})
+		chat = self.make("Life Chat Log", title="ux5ai Mithun blend sheets", date=today(), summary_md="I will send six questions to Mithun.",
+			area=self.areas["Tea"])
+		frappe.get_doc({"doctype": "Life Insight", "space": PRIVATE, "kind": "Theme", "title": "ux5ai old theme", "status": "Dismissed",
+			"dismiss_reason": "Not relevant", "fingerprint": "x", "evidence": [{"ref_doctype": "Life Chat Log", "ref_name": chat.name}]}).insert(ignore_permissions=True)
+
+		def answer(params):
+			data = json.loads(params["messages"][-1]["content"])
+			ref = next(r["ref"] for r in data["records"] if r["title"] == "ux5ai Mithun blend sheets")
+			self.assertEqual(data["dismissed"][0]["reason"], "Not relevant")
+			return {"content": [text(json.dumps({"candidates": [
+				{"kind": "Promise", "title": "You said you would send six questions to Mithun.", "evidence": [ref], "task_title": "Send six questions to Mithun"},
+				{"kind": "Theme", "title": "Made up", "evidence": ["R999"]}]}))], "stop_reason": "end_turn"}
+
+		fk = self.script(answer)
+		stats = insights.run(PRIVATE, ai=True)
+		self.assertEqual(fk.received[0]["output_config"]["format"]["type"], "json_schema")
+		rows = frappe.get_all("Life Insight", filters={"space": PRIVATE, "source": "AI"}, fields=["name", "kind", "title"])
+		self.assertEqual([(r.kind, r.title) for r in rows], [("Promise", "You said you would send six questions to Mithun.")])
+		self.assertEqual(frappe.db.get_value("Life AI Usage", {"purpose": "Insights"}, "user"), OWNER)
+		self.assertIsNone(stats["ai"])
+
+	def test_no_key_skips_ai_and_rules_still_run(self):
+		from lifeos import insights
+
+		set_key("")
+		frappe.set_user(OWNER)
+		stats = insights.run(PRIVATE, ai=True)
+		self.assertIn("no API key", stats["ai"])
+
+	def test_ai_batches_only_over_candidates(self):
+		from lifeos.api import reset
+
+		ts = [self.make("Life Task", title=f"ux5aib task {i}", area=self.areas["Tea"]) for i in range(4)]
+
+		def answer(params):
+			rows = json.loads(params["messages"][-1]["content"])
+			mine = [r["ref"] for r in rows if r["title"].startswith("ux5aib")]
+			return {"content": [text(json.dumps({"batches": [{"title": "ux5 AI batch", "reason": "They go together.", "action": "someday",
+				"items": mine[:3] + ["C9999"]}]}))], "stop_reason": "end_turn"}
+
+		self.script(answer)
+		got = reset.get(space=PRIVATE, ai=1)
+		ai = [b for b in got["batches"] if b["source"] == "AI"]
+		self.assertEqual(len(ai), 1)
+		self.assertEqual(ai[0]["count"], 3)
+		self.assertTrue({i["name"] for i in ai[0]["items"]} <= {t.name for t in ts})

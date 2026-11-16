@@ -158,7 +158,7 @@ class AnthropicBackend:
 			"usage": {"input_tokens": inp, "output_tokens": int(u.output_tokens or 0)}}
 
 
-def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_text=None, space=None, effort=None):
+def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_text=None, space=None, effort=None, schema=None):
 	"""One request to the model, after the cap check, with its usage recorded. Returns
 	{content: [blocks as dicts], stop_reason, usage, cost, model}. `kind` picks the Ask model or the short-task model."""
 	check(purpose)
@@ -167,6 +167,8 @@ def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_
 		"output_config": {"effort": effort or ("low" if kind == "short" else "medium")}}
 	if tools:
 		params["tools"] = tools
+	if schema:  # structured output: the answer is JSON that matches the schema
+		params["output_config"]["format"] = {"type": "json_schema", "schema": schema}
 	out = backend().run(params, on_text)
 	out["cost"] = record(out.get("model") or model, out["usage"]["input_tokens"], out["usage"]["output_tokens"], purpose, space)
 	out["model"] = out.get("model") or model
@@ -175,3 +177,21 @@ def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_
 
 def text_of(content):
 	return "".join(b.get("text", "") for b in content if b.get("type") == "text")
+
+
+def json_of(content):
+	"""The JSON object of a structured answer, or None."""
+	import json
+	import re
+
+	text = text_of(content).strip()
+	if text.startswith("```"):
+		text = re.sub(r"^```\w*\n?|```$", "", text).strip()
+	try:
+		return json.loads(text)
+	except ValueError:
+		m = re.search(r"\{.*\}", text, re.S)
+		try:
+			return json.loads(m.group(0)) if m else None
+		except ValueError:
+			return None
