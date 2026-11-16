@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Insights</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3;text-decoration:none}a:hover{color:#004F91}
+.app{display:flex;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:none;width:232px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px}
+.sp{display:flex;align-items:center;gap:8px;padding:4px 8px 10px}
+.lg{width:28px;height:28px;border-radius:7px;background:#EDEDED;color:#383838;display:grid;place-items:center;font-size:12px;font-weight:600}
+.sr{display:flex;gap:6px;padding:0 4px 8px}
+.sx{flex:1;height:30px;border-radius:7px;background:#EDEDED;display:flex;align-items:center;gap:6px;padding:0 8px;color:#525252;font-size:13px}
+.nb{height:30px;border-radius:7px;background:#171717;color:#fff;display:flex;align-items:center;padding:0 10px;font-size:13px;font-weight:500}
+.nv{display:flex;align-items:center;gap:10px;min-height:30px;padding:0 8px;border-radius:6px;color:#383838}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv i{width:15px;height:15px;border:1.6px solid #8A8A8A;border-radius:4px;flex:none}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.gh{font-size:12px;color:#6B6B6B;padding:12px 8px 3px}
+.new{margin-left:auto;font-size:11px;font-weight:600;color:#0062B3;background:#E6F4FF;border-radius:999px;padding:0 6px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #EDEDED}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:30px;padding:0 11px;border-radius:7px;border:0;font:500 13px Inter,system-ui,sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}.bt.g{background:transparent;color:#525252;padding:0 6px}
+.bd{padding:20px 28px 32px;display:flex;flex-direction:column;gap:22px}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px;background:#fff}
+.sh{font-size:13px;font-weight:600;color:#383838;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+.sh .mt{font-weight:400}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:11.5px;font-weight:500;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}.v{background:#F1ECFF;color:#5B3CC4}
+.rw{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #F2F2F2}
+.rw:last-child{border-bottom:0}
+.ck{width:17px;height:17px;margin:2px 0 0;accent-color:#171717;flex:none}
+.bar{position:relative;height:8px;border-radius:4px;background:#EDEDED}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#171717}
+.bar u{position:absolute;top:-4px;width:2px;height:16px;background:#0062B3}
+.hb{width:42px;height:42px;border-radius:10px;border:1px solid #DADADA;background:#fff;font:600 14px Inter,system-ui,sans-serif;display:inline-grid;place-items:center}
+.hb.on{background:#171717;color:#fff;border-color:#171717}
+.ins{border:1px solid #EDEDED;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.ins p{margin:0;font-weight:500;line-height:1.45}
+.ev{font-size:12.5px;color:#6B6B6B;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ev a{background:#F5F5F5;border-radius:6px;padding:0 6px;color:#383838}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tb{display:flex;gap:20px;padding:0 28px;border-bottom:1px solid #EDEDED}
+.tb span{padding:10px 0;color:#525252;border-bottom:2px solid transparent}
+.tb span.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.tb b{font-weight:400;color:#8A8A8A;margin-left:4px}
+.note{font-size:12px;color:#8A8A8A;margin:0}
+</style>
+</helmet>
+<div class="app">
+<nav class="sb" aria-label="Sections">
+  <div class="sp"><div class="lg">P</div><div style="line-height:1.2"><div style="font-weight:600">Private</div><div class="mt">Jai</div></div></div>
+  <div class="sr"><span class="sx">Search <span style="margin-left:auto;font-size:11px">⌘K</span></span><span class="nb">+ New</span></div>
+  <span class="nv"><i></i>Today</span><span class="nv on"><i></i>Ask<span class="new">New</span></span><span class="nv"><i></i>Inbox<span class="ct">4</span></span><span class="nv"><i></i>Tasks<span class="ct">5</span></span><span class="nv"><i></i>Calendar</span>
+  <div class="gh">Plan</div><span class="nv"><i></i>Journal</span><span class="nv"><i></i>Goals</span><span class="nv"><i></i>Projects</span>
+  <div class="gh">Areas</div><span class="nv"><i></i>Business That Works</span><span class="nv"><i></i>Family</span><span class="nv"><i></i>Learning</span><span class="nv"><i></i>Money &amp; Legal</span><span class="nv"><i></i>Personal</span><span class="nv"><i></i>Tea &amp; Coffee</span><span class="nv"><i></i>Unstoppable &amp; Content</span>
+  <div class="gh">Records</div><span class="nv"><i></i>Sources</span><span class="nv"><i></i>Notes</span><span class="nv"><i></i>Wiki</span><span class="nv"><i></i>Vault</span><span class="nv"><i></i>Timeline</span>
+  <div style="flex:1"></div><span class="nv"><i></i>Archive</span><span class="nv"><i></i>Settings</span>
+</nav>
+<main class="main">
+  <header class="hd"><div><h1 class="h1">Ask</h1><div class="sub">Insights are written every morning at 06:00 and when you click Refresh</div></div><button class="bt s" type="button">Refresh insights</button></header>
+  <div class="tb"><span>Ask</span><span class="on">Insights<b>12</b></span><span>History</span></div>
+  <div class="bd">
+    <div style="display:flex;gap:6px"><span class="pl n" style="background:#171717;color:#fff">New 5</span><span class="pl n">Snoozed 1</span><span class="pl n">Acted on 4</span><span class="pl n">Dismissed 2</span><span style="flex:1"></span><span class="pl n">Kind: all</span><span class="pl n">Area: all</span></div>
+    <div class="cd" style="padding:2px 16px"><div class="rw" style="align-items:center"><span style="width:110px;flex:none"><span class="pl o">Commitment</span></span><div style="flex:1;min-width:0;font-weight:500">Ruchi has been waiting 5 days for your reply about the ITR-U documents.<div class="mt" style="font-weight:400">Based on Email digest, 11 Nov</div></div><span class="mt" style="width:150px;flex:none">New</span><button class="bt s" type="button">Open</button></div><div class="rw" style="align-items:center"><span style="width:110px;flex:none"><span class="pl b">12 Week Year</span></span><div style="flex:1;min-width:0;font-weight:500">Week 7 is at 7% against your 85% target. Three goals have had no ticks for three weeks.<div class="mt" style="font-weight:400">Based on 3 goals</div></div><span class="mt" style="width:150px;flex:none">New</span><button class="bt s" type="button">Open</button></div><div class="rw" style="align-items:center"><span style="width:110px;flex:none"><span class="pl v">Theme</span></span><div style="flex:1;min-width:0;font-weight:500">Ghatia mandir came up in 4 chats this month and has no project or task.<div class="mt" style="font-weight:400">Based on 4 chats, 1 note</div></div><span class="mt" style="width:150px;flex:none">New</span><button class="bt s" type="button">Open</button></div><div class="rw" style="align-items:center"><span style="width:110px;flex:none"><span class="pl o">Commitment</span></span><div style="flex:1;min-width:0;font-weight:500">You said you would send six questions to Mithun on the blend sheets. No task exists.<div class="mt" style="font-weight:400">Based on Chat, 12 Nov</div></div><span class="mt" style="width:150px;flex:none">New</span><button class="bt s" type="button">Open</button></div><div class="rw" style="align-items:center"><span style="width:110px;flex:none"><span class="pl g">Habit</span></span><div style="flex:1;min-width:0;font-weight:500">Workout slipped from 5 days a week in October to 2 so far in November.<div class="mt" style="font-weight:400">Based on Habit log</div></div><span class="mt" style="width:150px;flex:none">New</span><button class="bt s" type="button">Open</button></div><div class="rw" style="align-items:center"><span style="width:110px;flex:none"><span class="pl g">Check-in</span></span><div style="flex:1;min-width:0;font-weight:500">Health has scored below 5 in three check-ins in a row.<div class="mt" style="font-weight:400">Based on Check-ins</div></div><span class="mt" style="width:150px;flex:none">Snoozed to 20 Nov</span><button class="bt s" type="button">Open</button></div><div class="rw" style="align-items:center"><span style="width:110px;flex:none"><span class="pl o">Commitment</span></span><div style="flex:1;min-width:0;font-weight:500">Kunal asked for bought-leaf rates on 9 Nov.<div class="mt" style="font-weight:400">Based on Email digest, 9 Nov</div></div><span class="mt" style="width:150px;flex:none">Acted · task made</span><button class="bt s" type="button">Open</button></div><div class="rw" style="align-items:center"><span style="width:110px;flex:none"><span class="pl v">Theme</span></span><div style="flex:1;min-width:0;font-weight:500">The Tally-to-ERPNext product idea has come up in 6 chats since September.<div class="mt" style="font-weight:400">Based on 6 chats</div></div><span class="mt" style="width:150px;flex:none">Dismissed</span><button class="bt s" type="button">Open</button></div></div>
+    <div class="cd" style="background:#FAFAFA">
+      <div style="font-weight:600;margin-bottom:4px">How insights are made</div>
+      <div class="mt">Rules find the exact ones: overdue tasks, people waiting on you, the 12 Week Year score, goals with no ticks, habits and check-ins trending down. The AI reads your chats, email digests and notes for promises with no task, recurring themes and decisions. Every insight links to the records behind it. Dismissing one tells it what you do not care about; the same insight is not shown again unless something changes.</div>
+    </div>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ask</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3;text-decoration:none}a:hover{color:#004F91}
+.app{display:flex;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:none;width:232px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px}
+.sp{display:flex;align-items:center;gap:8px;padding:4px 8px 10px}
+.lg{width:28px;height:28px;border-radius:7px;background:#EDEDED;color:#383838;display:grid;place-items:center;font-size:12px;font-weight:600}
+.sr{display:flex;gap:6px;padding:0 4px 8px}
+.sx{flex:1;height:30px;border-radius:7px;background:#EDEDED;display:flex;align-items:center;gap:6px;padding:0 8px;color:#525252;font-size:13px}
+.nb{height:30px;border-radius:7px;background:#171717;color:#fff;display:flex;align-items:center;padding:0 10px;font-size:13px;font-weight:500}
+.nv{display:flex;align-items:center;gap:10px;min-height:30px;padding:0 8px;border-radius:6px;color:#383838}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv i{width:15px;height:15px;border:1.6px solid #8A8A8A;border-radius:4px;flex:none}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.gh{font-size:12px;color:#6B6B6B;padding:12px 8px 3px}
+.new{margin-left:auto;font-size:11px;font-weight:600;color:#0062B3;background:#E6F4FF;border-radius:999px;padding:0 6px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #EDEDED}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:30px;padding:0 11px;border-radius:7px;border:0;font:500 13px Inter,system-ui,sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}.bt.g{background:transparent;color:#525252;padding:0 6px}
+.bd{padding:20px 28px 32px;display:flex;flex-direction:column;gap:22px}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px;background:#fff}
+.sh{font-size:13px;font-weight:600;color:#383838;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+.sh .mt{font-weight:400}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:11.5px;font-weight:500;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}.v{background:#F1ECFF;color:#5B3CC4}
+.rw{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #F2F2F2}
+.rw:last-child{border-bottom:0}
+.ck{width:17px;height:17px;margin:2px 0 0;accent-color:#171717;flex:none}
+.bar{position:relative;height:8px;border-radius:4px;background:#EDEDED}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#171717}
+.bar u{position:absolute;top:-4px;width:2px;height:16px;background:#0062B3}
+.hb{width:42px;height:42px;border-radius:10px;border:1px solid #DADADA;background:#fff;font:600 14px Inter,system-ui,sans-serif;display:inline-grid;place-items:center}
+.hb.on{background:#171717;color:#fff;border-color:#171717}
+.ins{border:1px solid #EDEDED;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.ins p{margin:0;font-weight:500;line-height:1.45}
+.ev{font-size:12.5px;color:#6B6B6B;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ev a{background:#F5F5F5;border-radius:6px;padding:0 6px;color:#383838}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tb{display:flex;gap:20px;padding:0 28px;border-bottom:1px solid #EDEDED}
+.tb span{padding:10px 0;color:#525252;border-bottom:2px solid transparent}
+.tb span.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.tb b{font-weight:400;color:#8A8A8A;margin-left:4px}
+.note{font-size:12px;color:#8A8A8A;margin:0}
+</style>
+</helmet>
+<div class="app">
+<nav class="sb" aria-label="Sections">
+  <div class="sp"><div class="lg">P</div><div style="line-height:1.2"><div style="font-weight:600">Private</div><div class="mt">Jai</div></div></div>
+  <div class="sr"><span class="sx">Search <span style="margin-left:auto;font-size:11px">⌘K</span></span><span class="nb">+ New</span></div>
+  <span class="nv"><i></i>Today</span><span class="nv on"><i></i>Ask<span class="new">New</span></span><span class="nv"><i></i>Inbox<span class="ct">4</span></span><span class="nv"><i></i>Tasks<span class="ct">5</span></span><span class="nv"><i></i>Calendar</span>
+  <div class="gh">Plan</div><span class="nv"><i></i>Journal</span><span class="nv"><i></i>Goals</span><span class="nv"><i></i>Projects</span>
+  <div class="gh">Areas</div><span class="nv"><i></i>Business That Works</span><span class="nv"><i></i>Family</span><span class="nv"><i></i>Learning</span><span class="nv"><i></i>Money &amp; Legal</span><span class="nv"><i></i>Personal</span><span class="nv"><i></i>Tea &amp; Coffee</span><span class="nv"><i></i>Unstoppable &amp; Content</span>
+  <div class="gh">Records</div><span class="nv"><i></i>Sources</span><span class="nv"><i></i>Notes</span><span class="nv"><i></i>Wiki</span><span class="nv"><i></i>Vault</span><span class="nv"><i></i>Timeline</span>
+  <div style="flex:1"></div><span class="nv"><i></i>Archive</span><span class="nv"><i></i>Settings</span>
+</nav>
+<main class="main">
+  <header class="hd"><div><h1 class="h1">Ask</h1><div class="sub">Answers come from your records in Private · Vault excluded</div></div><div class="mt">This month: $4.20 of $30</div></header>
+  <div class="tb"><span class="on">Ask</span><span>Insights<b>12</b></span><span>History</span></div>
+  <div style="display:flex;flex:1;min-height:0">
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:20px 28px 20px;gap:18px">
+      <div style="align-self:flex-end;max-width:620px;background:#F3F3F3;border-radius:12px;padding:10px 14px">What did I decide about the Dalmia Gold blend sheets, and what is still open?</div>
+      <div style="max-width:760px;display:flex;flex-direction:column;gap:10px">
+        <div><b>Decided</b></div>
+        <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
+          <li>Blend sheets live in ERPNext as their own DocType, one sheet per blend, versioned rather than overwritten.<sup style="font-size:11px;background:#E6F4FF;color:#0062B3;border-radius:4px;padding:0 4px;margin-left:2px">1</sup></li>
+          <li>Mithun's team enters actual quantities at the line; the sheet holds the target recipe.<sup style="font-size:11px;background:#E6F4FF;color:#0062B3;border-radius:4px;padding:0 4px;margin-left:2px">1</sup><sup style="font-size:11px;background:#E6F4FF;color:#0062B3;border-radius:4px;padding:0 4px;margin-left:2px">2</sup></li>
+          <li>The desk screens follow the swimlane flow you approved on 12 November.<sup style="font-size:11px;background:#E6F4FF;color:#0062B3;border-radius:4px;padding:0 4px;margin-left:2px">3</sup></li>
+        </ul>
+        <div><b>Still open</b></div>
+        <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
+          <li>Six questions to Mithun on the sheets. There is no task for this yet.<sup style="font-size:11px;background:#E6F4FF;color:#0062B3;border-radius:4px;padding:0 4px;margin-left:2px">1</sup></li>
+          <li>Who signs off a change to a recipe: you or the blender.<sup style="font-size:11px;background:#E6F4FF;color:#0062B3;border-radius:4px;padding:0 4px;margin-left:2px">2</sup></li>
+        </ul>
+        <div class="cd" style="display:flex;gap:10px;align-items:center;padding:10px 12px;background:#FAFAFA">
+          <span style="flex:1"><span class="mt">Suggested</span><br><span style="font-weight:500">Task: Send six questions to Mithun on the blend sheets</span> <span class="mt">· Business That Works · Dalmia Gold</span></span>
+          <button class="bt p" type="button">Make task</button><button class="bt g" type="button">Edit</button>
+        </div>
+      </div>
+      <div style="align-self:flex-end;max-width:620px;background:#F3F3F3;border-radius:12px;padding:10px 14px">And what's open on Ghillidary?</div>
+      <div style="max-width:760px" class="mt">Reading 14 records…</div>
+      <div style="flex:1"></div>
+      <div style="border:1px solid #DADADA;border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+        <span style="color:#8A8A8A">Ask about anything in Life OS…</span>
+        <div style="display:flex;gap:6px;align-items:center"><span class="pl n">Private</span><span class="pl n">All areas</span><span class="pl n">Any date</span><span style="flex:1"></span><span class="bt p">Ask</span></div>
+      </div>
+    </div>
+    <aside style="flex:0 0 330px;border-left:1px solid #EDEDED;padding:20px 20px;display:flex;flex-direction:column;gap:10px;background:#FCFCFC">
+      <div class="sh" style="margin:0">Records used for this answer</div>
+      <div class="rw"><span class="pl b">1</span><div><a href="#" style="font-weight:500">Dalmia Gold blending production architecture</a><div class="mt">Chat · 12 Nov · Business That Works</div></div></div>
+      <div class="rw"><span class="pl b">2</span><div><a href="#" style="font-weight:500">Dalmia Gold blend blueprint</a><div class="mt">Note · edited 13 Nov</div></div></div>
+      <div class="rw"><span class="pl b">3</span><div><a href="#" style="font-weight:500">Blend Swimlanes.pdf</a><div class="mt">Source · Document · 12 Nov</div></div></div>
+      <p class="note" style="margin-top:6px">Ask reads only what you can see. It never changes anything until you click a suggested action.</p>
+      <div class="sh" style="margin:14px 0 0">Try asking</div>
+      <span class="mt">What did I promise people this week?</span>
+      <span class="mt">How am I doing on golf this cycle?</span>
+      <span class="mt">Summarise everything on Ghatia since October.</span>
+    </aside>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
