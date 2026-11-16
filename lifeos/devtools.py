@@ -172,6 +172,8 @@ _TITLED = {
 	"Life Area": "area_name", "Life Project": "title", "Life Inbox Item": "title", "Life Task": "title", "Life Note": "title",
 	"Life Important Date": "title", "Life Goal": "title", "Life Vault Document": "title", "Life Chat Log": "title",
 	"Life Person": "full_name", "Life Proposal": "preview",
+	# UX fixes, set 5
+	"Life Idea": "title", "Life Habit": "title", "Life Ask Thread": "title",
 }
 
 
@@ -190,7 +192,7 @@ def find_test_debris(site_check=True):
 	import re
 
 	rx = _stamp_re()
-	s4 = re.compile(r"^S4 [^\n]*?\b(m[0-9a-z]{7})\b")  # set 4 checks: "S4 <what> [<width>] <stamp>"
+	s4 = re.compile(r"^S[45] [^\n]*?\b(m[0-9a-z]{7})\b")  # sets 4 and 5: "S4 <what> [<width>] <stamp>"
 	stamps = set()
 	for dt, field in _TITLED.items():
 		for (title,) in frappe.db.sql(f"select `{field}` from `tab{dt}`"):
@@ -271,6 +273,8 @@ def purge_test_debris(dry_run=True):
 		files += frappe.get_all("File", filters={"attached_to_doctype": dt, "attached_to_name": ["in", names]}, fields=["name", "file_url", "is_private"])
 		frappe.db.sql("delete from `tabVersion` where ref_doctype=%s and docname in %s", (dt, names))
 		frappe.db.sql("delete from `tabComment` where reference_doctype=%s and reference_name in %s", (dt, names))
+		if dt == "Life Ask Thread":
+			frappe.db.sql("delete from `tabLife Ask Message` where thread in %s", (names,))
 		frappe.db.sql(f"delete from `tab{dt}` where name in %s", (names,))
 	if month_goals:
 		frappe.db.sql("delete from `tabLife Month Plan Goal` where name in %s", ([m[0] for m in month_goals],))

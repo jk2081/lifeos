@@ -28,7 +28,12 @@ def ago(days):
 
 
 def _door(n, path, query, label):
-	return {"n": int(n or 0), "to": {"path": path, "query": {k: v for k, v in query.items() if v not in (None, "")}}, "label": label}
+	"""A count and its list. A link with no condition of its own carries all=1, so the list shows exactly that and not a
+	view remembered from before (the rule of UX fixes, set 1)."""
+	query = {k: v for k, v in query.items() if v not in (None, "")}
+	if "f" not in query:
+		query["all"] = 1
+	return {"n": int(n or 0), "to": {"path": path, "query": query}, "label": label}
 
 
 def _f(*conds):
@@ -180,8 +185,7 @@ def someday(space, tab="all", conds=(), label="Someday"):
 	from lifeos.api import someday as someday_api
 
 	n = someday_api.list(space=space, tab=tab, filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/someday", {"tab": None if tab == "all" else tab, "all": 1 if tab == "all" and not conds else None,
-		"f": _f(*conds)}, label)
+	return _door(n, "/someday", {"tab": None if tab == "all" else tab, "f": _f(*conds)}, label)
 
 
 def someday_due(space):

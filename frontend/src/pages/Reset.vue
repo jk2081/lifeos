@@ -18,7 +18,7 @@
       </Card>
 
       <TabBar v-if="phone" class="mt-3" :tabs="phoneTabs" :model-value="tab.current.value" label="Reset sections" @update:model-value="tab.set" />
-      <div class="mt-4 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,32rem)]">
+      <div class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,32rem)]">
         <section v-show="!phone || tab.current.value === 'batches'" data-reset-batches>
           <SectionHead class="max-md:hidden">Suggested batches <span class="ml-1 font-normal text-ink-gray-6">{{ shown.length }} batch{{ shown.length === 1 ? '' : 'es' }} · {{ shown.reduce((n, b) => n + b.count, 0) }} items</span></SectionHead>
           <div class="flex flex-col gap-3">

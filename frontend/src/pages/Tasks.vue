@@ -76,8 +76,8 @@ import { DUE_PRESETS, parseWire } from '@/lib/filterUrl'
 const VIEWS = [{ key: 'list', label: 'List', mode: 'feed' }, { key: 'board', label: 'Board', mode: 'custom' }, { key: 'table', label: 'Table', mode: 'table' }]
 // the state tabs, on the short parameter status=. "Open" is Open and Doing. A status that is not a tab (status=Dropped) shows under All as a filter
 const TABS = { key: 'status', field: 'status', label: 'Task state', items: [{ value: 'open', label: 'Open' }, { value: 'loops', label: 'Open loops' },
-  { value: 'Waiting', label: 'Waiting' }, { value: 'Done', label: 'Done' }, { value: 'all', label: 'All' }] }
-const EMPTY = { loops: 'No open loops.', Waiting: 'Nothing is waiting.', Done: 'No done tasks here.' }
+  { value: 'Waiting', label: 'Waiting' }, { value: 'Done', label: 'Done' }, { value: 'Someday', label: 'Someday' }, { value: 'all', label: 'All' }] }
+const EMPTY = { loops: 'No open loops.', Waiting: 'Nothing is waiting.', Done: 'No done tasks here.', Someday: 'No tasks are parked on the Someday list.' }
 const BOARD = ['Open', 'Doing', 'Waiting', 'Done']
 // the short URL parameters of this list, as the count links write them (lib/filterUrl.js)
 const SPEC = [

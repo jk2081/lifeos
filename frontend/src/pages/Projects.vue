@@ -50,7 +50,7 @@ const SPEC = [{ key: 'status', field: 'status', kind: 'value' }, { key: 'area', 
 const SYNTHETIC = [{ key: '_progress', label: 'Progress', width: '15rem', place: 'end' }]
 // the state tabs, on status=. Active is the default
 const TABS = { key: 'status', field: 'status', label: 'Project state', items: [{ value: 'Active', label: 'Active' }, { value: 'On Hold', label: 'On hold' },
-  { value: 'Done', label: 'Done' }, { value: 'Dropped', label: 'Dropped' }, { value: 'all', label: 'All' }] }
+  { value: 'Done', label: 'Done' }, { value: 'Dropped', label: 'Dropped' }, { value: 'Someday', label: 'Someday' }, { value: 'all', label: 'All' }] }
 // inside the area page's Projects tab the states are one control in the filter bar, and the list opens on active and on hold together
 const EMBED_TABS = { ...TABS, items: [{ value: 'current', label: 'Active and on hold' }, ...TABS.items] }
 const props = defineProps({ embed: { type: Object, default: null } })

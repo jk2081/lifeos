@@ -43,7 +43,7 @@ import { askScope } from '@/lib/ask'
 
 // The state tabs, on status=: In progress (default), Achieved, Closed (Partly Achieved, Not Achieved, Carried, Dropped), All
 const TABS = { key: 'status', field: 'outcome', label: 'Goal state', items: [{ value: 'in_progress', label: 'In progress' }, { value: 'achieved', label: 'Achieved' },
-  { value: 'closed', label: 'Closed' }, { value: 'all', label: 'All' }] }
+  { value: 'closed', label: 'Closed' }, { value: 'someday', label: 'Someday' }, { value: 'all', label: 'All' }] }
 const EMPTY = { in_progress: 'No goals in progress.', achieved: 'No achieved goals.', closed: 'No closed goals.' }
 const SPEC = [{ key: 'status', field: 'outcome', kind: 'value' }, { key: 'type', field: 'goal_type', kind: 'value', label: 'Type' }, { key: 'area', field: 'area', kind: 'link' },
   { key: 'cycle', field: 'cycle', kind: 'link' }, { key: 'target_from', field: 'target_date', kind: 'from' }, { key: 'target_to', field: 'target_date', kind: 'to' }]

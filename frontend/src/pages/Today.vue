@@ -36,7 +36,7 @@
         </div>
       </section>
 
-      <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_18.5rem]">
+      <div class="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_18.5rem]">
         <!-- Next: one list in a fixed order, the order written at the top -->
         <section data-next>
           <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base"><span class="font-semibold text-ink-gray-9">Next</span>
