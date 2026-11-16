@@ -92,7 +92,13 @@ def get(space=None):
 		coming.append({"kind": "important", "name": d["name"], "title": d["label"], "date": d["date"], "date_kind": d["kind"],
 			"days": (getdate(d["date"]) - now).days})
 
+	from lifeos import counts
+
+	band = counts.open_band(space)
+	nxt = next_list(space, now, cycle_out, events)
+	rail = rail_of(space, now, events)
 	return {
+		"band": band, "next": nxt, "rail": rail, "days_left": 6 - now.weekday(),
 		"date": str(now), "space": space,
 		"cycle": cycle_out, "target": frappe.db.get_single_value("Life Settings", "score_target") or 85,
 		"to_review": {"count": to_review, "proposals": proposals_waiting, "items": review_items},
@@ -103,3 +109,78 @@ def get(space=None):
 		"coming_up": coming,
 		"vault_soon": vault_api.expiry_counts(space)["soon"],
 	}
+
+
+# ---- UX fixes, set 5: the Next list and the right rail ----
+NEXT_ROWS = 8  # rows shown before "N more"
+GROUP_MAX = 30
+
+
+def next_list(space, now, cycle, events):
+	"""One list in a fixed order: Overdue, Today (events at their times and tasks due today), 12 Week Year this week
+	(planned actions not yet ticked), Needs a decision (actionable insights). Someday items never appear."""
+	from lifeos import counts
+	from lifeos.api import insights as insight_api
+
+	open_due = "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date "
+	overdue = task_api.query(space, open_due + "< %(today)s", {"today": now}, "t.due_date asc, t.creation asc", 0, GROUP_MAX)
+	for t in overdue:
+		t["why"] = "Overdue"
+		t["lead"] = f"{(now - getdate(t.due_date)).days} day{'s' if (now - getdate(t.due_date)).days != 1 else ''}"
+	due_today = task_api.query(space, open_due + "= %(today)s", {"today": now}, None, 0, GROUP_MAX)
+	today_rows = []
+	for e in events:
+		if e.get("date") and str(e["date"]) != str(now):
+			continue
+		today_rows.append({"type": "event", "name": e["name"], "title": e["title"], "why": "Event", "all_day": e.get("all_day"),
+			"start": e.get("start"), "end": e.get("end"), "lead": "All day" if e.get("all_day") else str(e.get("start") or "")[11:16]})
+	today_rows.sort(key=lambda r: (not r["all_day"], r["start"] or ""))
+	for t in due_today:
+		t["why"] = "Due today"
+		t["type"] = "task"
+		today_rows.append(t)
+	twy = []
+	if cycle and cycle.get("week"):
+		for a in cycle["actions"]:
+			if a["status"] == "Open" and a["count"] < a["per_week"]:
+				twy.append({**a, "type": "action", "why": "12WY", "week": cycle["week"]})
+	ins = insight_api.list(space=space, status="New", actionable=1, page_length=GROUP_MAX)
+	for r in ins["rows"]:
+		r["type"] = "insight"
+		r["why"] = r.kind
+	return {
+		"order": ["overdue", "today", "twy", "decisions"],
+		"groups": [
+			{"key": "overdue", "label": "Overdue", "rows": overdue, "total": counts.overdue_tasks(space)["n"], "door": counts.overdue_tasks(space)},
+			{"key": "today", "label": "Today", "rows": today_rows, "total": len(today_rows), "tasks": counts.due_today_tasks(space),
+				"events": len(today_rows) - len(due_today)},
+			{"key": "twy", "label": "12 Week Year · this week", "rows": twy, "total": len(twy)},
+			{"key": "decisions", "label": "Needs a decision", "rows": ins["rows"], "total": ins["total"],
+				"door": {"n": ins["total"], "to": {"path": "/ask", "query": {"tab": "insights", "actionable": 1}}, "label": "need a decision"}},
+		],
+		"show": NEXT_ROWS,
+	}
+
+
+def rail_of(space, now, events):
+	"""Today's events as a timeline, this week's important dates, renewals and the weekly review, and the other insights."""
+	from lifeos.api import insights as insight_api
+
+	week_end = add_days(now, 6 - now.weekday())
+	week = []
+	for d in calendar_data.important_dates_between(space, now, add_days(now, 7)):
+		week.append({"kind": "important", "name": d["name"], "title": d["label"], "date": d["date"], "when": str(d["date"])})
+	for d in calendar_data.expiring_documents(space, now):
+		days = d.get("days")
+		if days is not None and days <= 45:
+			week.append({"kind": "vault", "name": d["name"], "title": d.get("title"), "date": d.get("expiry_date"), "days": days})
+	s = frappe.get_cached_doc("Life Settings")
+	day = s.weekly_review_day or "Sunday"
+	names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+	review_on = add_days(now, (names.index(day) - now.weekday()) % 7)
+	week.append({"kind": "review", "title": "Weekly review", "date": str(review_on), "time": str(s.weekly_review_time or "18:00:00")[:5],
+		"day": day[:3]})
+	week.sort(key=lambda x: str(x.get("date") or ""))
+	other = insight_api.list(space=space, status="New", actionable=0, page_length=5)
+	timeline = [e for e in events if not e.get("date") or str(e["date"]) == str(now)]
+	return {"events": timeline, "week": week, "insights": other["rows"], "insights_total": other["total"]}

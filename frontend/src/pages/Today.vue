@@ -1,260 +1,291 @@
 <template>
   <template v-if="d">
     <PageHead :title="`${weekday(d.date, phone ? 3 : 0)}, ${long(d.date)}`">
-      <template #sub>
-        <template v-if="d.cycle && d.cycle.week">Week {{ d.cycle.week }} of {{ d.cycle.weeks }}
-          <span class="max-md:hidden"> · {{ d.cycle.title }}</span><span class="md:hidden"> · score {{ Math.round(d.cycle.score) }}%</span></template>
-        <template v-else-if="d.cycle">{{ d.cycle.title }} {{ d.cycle.ended ? 'has ended' : 'has not started' }}</template>
-        <template v-else>No active 12 Week Year</template>
+      <template #sub><span data-today-sub>
+        <template v-if="d.cycle && d.cycle.week">Week {{ d.cycle.week }} of {{ d.cycle.weeks }} · </template>
+        <template v-else-if="d.cycle">{{ d.cycle.title }} {{ d.cycle.ended ? 'has ended' : 'has not started' }} · </template>
+        {{ d.days_left }} day{{ d.days_left === 1 ? '' : 's' }} left<span class="max-md:hidden"> this week</span></span>
       </template>
-      <Button class="max-md:hidden" label="New task" @click="store.quickAdd = true" />
-      <Button class="max-md:hidden" variant="solid" label="Add to Inbox" route="/inbox" />
-      <Button class="md:hidden" icon="lucide-search" label="Search" @click="store.searchOpen = true" />
+      <AskBox />
     </PageHead>
 
-    <div class="page-body">
-      <div class="stats stats-row">
-        <Stat label="To review" compact>
-          <NumLink :to="DOOR.review" data-door="today-review" :aria-label="`${d.to_review.count} to review`">{{ d.to_review.count }}</NumLink>
-          <template #sub><NumLink :to="DOOR.review" data-door="today-proposals"><span>{{ d.to_review.proposals }}</span> proposal{{ d.to_review.proposals === 1 ? '' : 's' }} waiting</NumLink></template>
-        </Stat>
-        <Stat label="Due today" compact>
-          <NumLink :to="DOOR.due" data-door="today-due" :aria-label="`${d.tasks.due} due today or overdue`">{{ d.tasks.due }}</NumLink>
-          <template #sub><NumLink :to="DOOR.overdue" data-door="today-overdue"><span>{{ d.tasks.overdue }}</span> overdue</NumLink></template>
-        </Stat>
-        <Stat class="max-md:hidden" :label="d.cycle && d.cycle.week ? `Week ${d.cycle.week} score` : 'Week score'">
-          <NumLink :to="DOOR.score" data-door="today-score">{{ d.cycle && d.cycle.week ? Math.round(d.cycle.score) + '%' : '—' }}</NumLink>
-          <template #sub>
-            <div v-if="d.cycle && d.cycle.week" class="mt-1.5" data-score-bar>
-              <div class="relative h-1.5 rounded-full bg-surface-gray-3" role="img" :aria-label="`${Math.round(d.cycle.score)}% of the ${d.target}% target`">
-                <div class="h-full rounded-full" :class="d.cycle.score >= d.target ? 'bg-surface-green-7' : 'bg-surface-gray-7'" :style="{ width: Math.min(d.cycle.score, 100) + '%' }" />
-                <div class="absolute -top-1 h-3.5 w-0.5 rounded-full bg-surface-gray-9" :style="{ left: `calc(${d.target}% - 1px)` }" aria-hidden="true" />
-              </div>
-              <div class="mt-1.5">{{ d.cycle.done }} of {{ d.cycle.planned }} ticks · target {{ d.target }}%</div>
+    <div class="page-body !gap-5">
+      <!-- the Open band: everything still open, each number a door; amber when the stuck count is over the limit -->
+      <section data-open-band :data-over-limit="band.over_limit || undefined">
+        <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base" data-band-head>
+          <span class="font-semibold text-ink-gray-9">Open</span>
+          <span class="text-sm text-ink-gray-6 max-md:hidden">everything still open in {{ store.space }} · each number opens its list</span>
+          <span v-if="band.over_limit" class="text-sm text-ink-amber-9" data-band-amber> · <CountLink :count="band.stuck" tone="text-ink-amber-9 font-medium" count-key="band:stuck-head" /> tasks stuck<span class="max-md:hidden">, above your limit of {{ band.rules.stuck_limit }}</span></span>
+          <Button class="ml-auto md:hidden" size="sm" :variant="band.over_limit ? 'subtle' : 'ghost'" :class="band.over_limit && '!bg-surface-amber-2 !text-ink-amber-9'" label="Reset" route="/reset" data-band-reset-phone />
+        </h2>
+        <!-- desktop: one row of tiles and the Reset button; phone: the four most important as a grid, the rest scroll sideways -->
+        <div class="overflow-hidden rounded-5 border border-outline-gray-2 max-md:hidden" data-band-row>
+          <div class="grid grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.1fr)_minmax(0,1.25fr)_auto]">
+            <Tile v-for="t in tiles" :key="t.key" :tile="t" class="border-r border-outline-gray-1" />
+            <div class="flex items-center px-4" :class="band.over_limit ? 'bg-surface-amber-1' : ''">
+              <Button :variant="band.over_limit ? 'solid' : 'subtle'" label="Reset" route="/reset" data-band-reset />
             </div>
-            <template v-else>Target {{ d.target }}%</template>
-          </template>
-        </Stat>
-        <Stat label="Open loops" compact>
-          <NumLink :to="DOOR.loops" data-door="today-loops" :aria-label="`${d.open_loops} open loops`">{{ d.open_loops }}</NumLink>
-          <template #sub>Older than 14 days, no date</template>
-        </Stat>
-      </div>
-
-      <!-- on a phone the two columns become one, in this order: habits, to review, tasks, this week, calendar, coming up -->
-      <div class="cols today-cols">
-        <div class="wide">
-          <section class="max-md:order-3" data-today-tasks>
-            <SectionHead>Tasks</SectionHead>
-            <Card flush>
-              <template v-if="d.tasks.today.length || d.tasks.overdue_items.length">
-                <div class="group-head">
-                  <span>Due today</span><NumLink :to="DOOR.today" data-door="today-group-today">{{ d.tasks.today_count }}</NumLink>
-                </div>
-                <div v-if="!d.tasks.today.length" class="pb-2.5 text-base text-ink-gray-6">Nothing is due today.</div>
-                <TaskRow v-for="t in d.tasks.today" :key="t.name" :task="t" :today="d.date" :readonly="!canWrite()" @toggle="done" />
-                <MoreLink v-if="d.tasks.today_count > d.tasks.today.length" :to="DOOR.today" :n="d.tasks.today_count" />
-
-                <template v-if="d.tasks.overdue_items.length">
-                  <div class="group-head border-t border-outline-gray-1">
-                    <span>Overdue</span><NumLink :to="DOOR.overdue" data-door="today-group-overdue">{{ d.tasks.overdue }}</NumLink>
-                    <Button v-if="canWrite()" class="ml-auto" variant="ghost" size="sm" label="Move all to today" data-move-all @click="moveAllOpen = true" />
-                  </div>
-                  <div v-if="overdueFolded" class="flex items-center gap-3 border-b border-outline-gray-1 py-2.5 last:border-b-0" data-overdue-summary>
-                    <span class="min-w-0 flex-1 text-base text-ink-gray-7"><template v-if="oldestDays">The oldest is {{ oldestDays }} day{{ oldestDays === 1 ? '' : 's' }} late.</template> Show them to move or drop one at a time.</span>
-                    <Button size="sm" label="Show" icon-right="lucide-chevron-down" data-overdue-show @click="showOverdue = true" />
-                  </div>
-                  <template v-else>
-                    <TaskRow v-for="t in d.tasks.overdue_items" :key="t.name" class="group" :task="t" :today="d.date" :readonly="!canWrite()" @toggle="done">
-                      <template v-if="canWrite()" #end>
-                        <Dropdown :options="triage(t)"><Button class="relative md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100" variant="ghost" size="sm"
-                          icon="lucide-calendar-clock" :label="'Reschedule ' + t.title" data-triage /></Dropdown>
-                      </template>
-                    </TaskRow>
-                    <MoreLink v-if="d.tasks.overdue > d.tasks.overdue_items.length" :to="DOOR.overdue" :n="d.tasks.overdue" />
-                  </template>
-                </template>
-              </template>
-              <Empty v-else title="Nothing is due today." hint="Tasks due today or overdue show here. Press n to add one." />
-            </Card>
-          </section>
-          <section class="max-md:order-2" data-today-review>
-            <SectionHead>To review
-              <template v-if="d.to_review.count > reviewRows.length" #action><NumLink :to="DOOR.review" data-door="today-review-all">All {{ d.to_review.count }} in Inbox</NumLink></template>
-            </SectionHead>
-            <Card flush>
-              <Row v-for="it in reviewRows" :key="it.name" :pane="'inbox:' + it.name" :label="it.title">
-                <div class="min-w-0 flex-1">
-                  <div class="break-words text-base-medium text-ink-gray-9">{{ it.title }}</div>
-                  <div class="text-sm text-ink-gray-6"><span class="max-md:hidden">{{ it.state }} · </span><NumLink class="relative" data-door="today-row"
-                    :to="{ query: { ...$route.query, open: 'inbox:' + it.name, focus: 'pending' } }">{{ it.pending }} of {{ it.proposals }} proposals pending</NumLink><span
-                    v-if="it.processed_by" class="max-md:hidden"> · filed by {{ it.processed_by }}, {{ time(it.received_on) }}</span></div>
-                </div>
-                <Badge theme="amber"><span class="max-md:hidden">To review</span><span class="md:hidden">Review</span></Badge>
-              </Row>
-              <Empty v-if="!reviewRows.length" title="Nothing to review." hint="Drop a file in the Inbox. What the agent proposes waits here for you." />
-            </Card>
-          </section>
+          </div>
         </div>
+        <div class="md:hidden" data-band-phone>
+          <div class="grid grid-cols-2 gap-2">
+            <Tile v-for="t in phoneMain" :key="t.key" :tile="t" class="rounded-5 border border-outline-gray-2" />
+          </div>
+          <div class="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1" data-band-scroll>
+            <Tile v-for="t in phoneRest" :key="t.key" :tile="t" class="w-40 flex-none rounded-5 border border-outline-gray-2" />
+          </div>
+        </div>
+      </section>
 
-        <div class="side">
-          <section class="max-md:order-1" data-today-habits>
-            <SectionHead>Habits today
-              <template v-if="d.habits.length" #action><span class="font-normal tabular-nums text-ink-gray-6" data-habit-count>{{ habitsDone === d.habits.length ? 'All done' : `${habitsDone} of ${d.habits.length}` }}</span></template>
-            </SectionHead>
-            <HabitBoxes v-if="d.habits.length" variant="pill" bare :habits="d.habits" @toggle="toggleHabit" />
-            <Card v-else><Empty title="No habits this month." hint="Add habits in Journal, Habits, Manage habits." /></Card>
-          </section>
-          <section v-if="d.cycle && d.cycle.week" class="max-md:order-4" data-today-week>
-            <SectionHead>This week · Week {{ d.cycle.week }}
-              <template #action><NumLink to="/journal">Open grid</NumLink></template>
-            </SectionHead>
-            <Card flush>
-              <div v-for="a in weekRows" :key="a.name" :data-action="a.name" class="flex items-center gap-3 border-b border-outline-gray-1 py-2 last:border-b-0" data-week-action>
-                <div class="min-w-0 flex-1">
-                  <div class="break-words text-base" :class="a.count >= a.per_week ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
-                  <div class="truncate text-sm text-ink-gray-6">{{ a.goal_title }}</div>
-                </div>
-                <Button class="!size-10 shrink-0 !p-0 tabular-nums" :variant="a.count >= a.per_week ? 'solid' : a.count ? 'subtle' : 'outline'" :theme="a.count ? 'blue' : 'gray'"
-                  :disabled="!canWrite()" :aria-pressed="a.count >= a.per_week" :aria-label="`${a.title}, ${a.count} of ${a.per_week} this week`" data-week-tick @click="tick(a)">
-                  <span v-if="a.per_week === 1 && a.count" class="lucide-check size-4" aria-hidden="true" />
-                  <span v-else-if="a.per_week > 1" class="text-sm">{{ a.count }}/{{ a.per_week }}</span>
-                </Button>
+      <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_18.5rem]">
+        <!-- Next: one list in a fixed order, the order written at the top -->
+        <section data-next>
+          <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base"><span class="font-semibold text-ink-gray-9">Next</span>
+            <span class="text-sm text-ink-gray-6 max-md:hidden">in this order: overdue, today, this week's 12 Week Year actions, then decisions</span></h2>
+          <Card flush class="!px-4">
+            <template v-for="g in visibleGroups" :key="g.key">
+              <div class="flex items-center gap-2 border-b border-outline-gray-1 pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-gray-6" :data-next-group="g.key">
+                <span>{{ g.label }} ·</span>
+                <CountLink v-if="g.door" :count="g.door" tone="text-ink-gray-6" :aria-label="`${g.door.n} ${g.label.toLowerCase()}`" :count-key="'next:' + g.key" />
+                <template v-else-if="g.key === 'today'"><span class="tabular-nums">{{ g.total }}</span></template>
+                <span v-else class="tabular-nums">{{ g.total }}</span>
+                <Button v-if="g.key === 'overdue' && g.total > 1 && canWrite()" class="ml-auto !normal-case !tracking-normal" variant="ghost" size="sm" label="Move all to today" data-move-all @click="moveAllOpen = true" />
+                <span v-if="g.key === 'today' && g.tasks.n" class="ml-auto font-normal normal-case tracking-normal max-md:hidden"><CountLink :count="g.tasks" :aria-label="`${g.tasks.n} tasks due today`" count-key="next:today-tasks">{{ g.tasks.n }} task{{ g.tasks.n === 1 ? '' : 's' }} due</CountLink></span>
               </div>
-              <button v-if="weekRows.length < d.cycle.actions.length" type="button" class="flex items-center gap-1 py-2.5 text-sm-medium text-ink-gray-7 hover:text-ink-gray-9"
-                data-week-more @click="showWeek = true">Show all {{ d.cycle.actions.length }}<span class="lucide-chevron-down size-4" aria-hidden="true" /></button>
-              <Empty v-if="!d.cycle.actions.length" title="No actions planned this week." hint="Add goals and their weekly actions in Journal, 12 Week Year." />
-            </Card>
+              <template v-for="r in g.shown" :key="r.type + r.name">
+                <!-- an overdue or due task -->
+                <Row v-if="!r.type || r.type === 'task'" :pane="'task:' + r.name" :label="r.title" class="group !items-center" data-next-row :data-why="r.why" data-task-row>
+                  <Checkbox class="relative" :model-value="r.status === 'Done'" :disabled="!canWrite()" :aria-label="'Done: ' + r.title" @update:model-value="done(r)" />
+                  <span v-if="!phone" class="w-14 shrink-0 text-sm tabular-nums text-ink-gray-7">{{ r.lead || '' }}</span>
+                  <div class="min-w-0 flex-1">
+                    <div class="break-words text-base text-ink-gray-9" :class="r._done && 'text-ink-gray-6 line-through'">{{ r.title }}</div>
+                    <div class="truncate text-sm text-ink-gray-6">{{ taskLine(r) }}</div>
+                  </div>
+                  <Dropdown v-if="r.why === 'Overdue' && canWrite()" :options="triage(r)"><Button class="relative md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100" variant="ghost" size="sm"
+                    icon="lucide-calendar-clock" :label="'Reschedule ' + r.title" data-triage /></Dropdown>
+                  <Badge :theme="r.why === 'Overdue' ? 'red' : 'gray'" :label="phone && r.why === 'Due today' ? 'Today' : r.why" data-why />
+                </Row>
+                <Row v-else-if="r.type === 'event'" :pane="'event:' + r.name" :label="r.title" class="!items-center" data-next-row data-why="Event">
+                  <span class="w-5 shrink-0 md:hidden" />
+                  <span v-if="!phone" class="w-[4.75rem] shrink-0 text-right text-sm tabular-nums text-ink-gray-7">{{ r.lead }}</span>
+                  <div class="min-w-0 flex-1">
+                    <div class="break-words text-base text-ink-gray-9">{{ r.title }}</div>
+                    <div class="text-sm text-ink-gray-6">{{ phone ? r.lead + (duration(r) ? ' · ' + duration(r) : '') : 'Calendar' + (duration(r) ? ' · ' + duration(r) : '') }}</div>
+                  </div>
+                  <Badge label="Event" data-why />
+                </Row>
+                <Row v-else-if="r.type === 'action'" class="!items-center" data-next-row data-why="12WY" :data-action="r.name">
+                  <Checkbox :model-value="r.count >= r.per_week" :disabled="!canWrite()" :aria-label="`Tick ${r.title}, ${r.count} of ${r.per_week} this week`" data-week-tick @update:model-value="tick(r)" />
+                  <span v-if="!phone" class="w-14 shrink-0" />
+                  <div class="min-w-0 flex-1">
+                    <div class="break-words text-base text-ink-gray-9" :class="r.count >= r.per_week && 'text-ink-gray-6 line-through'">{{ r.title }}</div>
+                    <div class="truncate text-sm text-ink-gray-6">{{ r.goal_title }} · {{ r.count }} of {{ r.per_week }} this week</div>
+                  </div>
+                  <Badge theme="blue" label="12WY" data-why />
+                </Row>
+                <Row v-else-if="r.type === 'insight'" :pane="r.evidence[0]?.ref || null" :label="r.title" class="flex-wrap !items-center" data-next-row :data-why="r.why" :data-insight="r.name">
+                  <span v-if="!phone" class="w-[4.75rem] shrink-0" />
+                  <div class="min-w-0 flex-[1_1_16rem]">
+                    <div class="break-words text-base text-ink-gray-9">{{ r.title }}</div>
+                    <div class="text-sm text-ink-gray-6">Insight · {{ r.based_on.replace(/^Based on /, 'based on ') }}</div>
+                  </div>
+                  <Badge :theme="KIND_THEME[r.kind] || 'gray'" :label="phone && r.kind === 'Waiting on you' ? 'Waiting' : r.kind" data-why />
+                  <div v-if="canWrite() && !phone" class="relative flex items-center gap-1">
+                    <Button v-for="(a, i) in r.actions.slice(0, 2)" :key="i" :variant="i === 0 ? 'subtle' : 'ghost'" :label="a.label" :data-insight-action="a.kind" @click="runAction(r, i)" />
+                    <Button variant="ghost" label="Dismiss" data-insight-dismiss @click="dismiss(r)" />
+                  </div>
+                </Row>
+              </template>
+            </template>
+            <div v-if="hidden > 0" class="py-2.5"><Button variant="ghost" class="!px-0 !text-ink-blue-8" :label="`${hidden} more`" data-next-more @click="showAll = true" /></div>
+            <Empty v-if="!visibleGroups.length" title="Nothing is next." hint="No overdue tasks, nothing today, every action of the week ticked and no decision waiting." />
+          </Card>
+        </section>
+
+        <!-- the right rail; on a phone it moves below Next -->
+        <aside class="flex flex-col gap-5" data-rail>
+          <section data-rail-today>
+            <h2 class="mb-2 text-base font-semibold text-ink-gray-9">Today</h2>
+            <ol class="flex flex-col" aria-label="Today's events">
+              <li v-for="e in railItems" :key="e.key" class="flex items-stretch gap-2.5" :data-rail-event="e.kind">
+                <span class="w-12 shrink-0 pt-1.5 text-right text-sm tabular-nums" :class="e.kind === 'now' ? 'text-ink-red-8' : 'text-ink-gray-6'">{{ e.time }}</span>
+                <div class="relative min-w-0 flex-1 border-l border-outline-gray-2 py-1 pl-2.5">
+                  <span v-if="e.kind === 'now'" class="absolute -left-[5px] top-3 size-2 rounded-full bg-surface-red-7" aria-hidden="true" />
+                  <Button v-if="e.kind === 'event'" class="!h-auto min-h-8 w-full !justify-start !whitespace-normal !bg-surface-blue-1 py-1.5 text-left !text-ink-blue-8" :label="e.title" @click="openRef('event:' + e.name)" />
+                  <span v-else class="block pt-0.5 text-sm text-ink-gray-6">{{ e.title }}</span>
+                </div>
+              </li>
+            </ol>
+            <div v-if="!d.rail.events.length" class="mt-1 text-sm text-ink-gray-6">Nothing on the calendar today.</div>
           </section>
-          <section class="max-md:order-5">
-            <SectionHead>Calendar</SectionHead>
-            <Card flush>
-              <Row v-for="e in d.events" :key="e.name + e.start" :pane="'event:' + e.name" :label="e.title">
-                <span class="w-14 shrink-0 tabular-nums text-ink-gray-7">{{ e.date !== d.date ? weekday(e.date, 3) : e.all_day ? 'All day' : time(e.start) }}</span>
-                <div class="min-w-0 flex-1 break-words text-ink-gray-8">{{ e.title }}</div>
+          <section data-rail-week>
+            <h2 class="mb-2 text-base font-semibold text-ink-gray-9">This week</h2>
+            <Card flush class="!px-4">
+              <Row v-for="w in d.rail.week" :key="w.kind + (w.name || w.title)" :pane="weekRef(w)" :label="w.title" class="!items-center">
+                <span class="min-w-0 flex-1 break-words text-base text-ink-gray-8">{{ w.title }}</span>
+                <Badge v-if="w.kind === 'vault'" theme="amber" :label="`${w.days} days`" />
+                <span v-else class="text-sm tabular-nums text-ink-gray-6">{{ w.kind === 'review' ? `${w.day} ${w.time}` : short(w.date) }}</span>
               </Row>
-              <Empty v-if="!d.events.length" title="Nothing on the calendar today." hint="Events from the calendar show here." />
             </Card>
           </section>
-          <section class="max-md:order-6">
-            <SectionHead>Coming up
-              <template v-if="d.vault_soon" #action><NumLink :to="DOOR.vault" data-door="today-vault"><span>{{ d.vault_soon }}</span> document{{ d.vault_soon === 1 ? '' : 's' }} expiring within 60 days</NumLink></template>
-            </SectionHead>
-            <Card flush>
-              <Row v-for="c in d.coming_up" :key="c.kind + c.name" :pane="comingRef(c)" :label="c.title">
-                <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ c.title }}</div>
-                  <div v-if="c.kind === 'vault'" class="text-sm text-ink-gray-6">Vault · {{ c.days < 0 ? `expired ${-c.days} days ago` : c.days === 0 ? 'expires today' : `expires in ${c.days} days` }}</div>
-                  <div v-else class="text-sm text-ink-gray-6">Important date · {{ long(c.date) }}</div></div>
-                <Badge v-if="c.kind === 'vault'" :theme="c.days < 0 ? 'red' : 'amber'" :label="c.days < 0 ? 'Expired' : 'Renew'" />
-                <Badge v-else :label="c.days === 0 ? 'Today' : `${c.days} day${c.days === 1 ? '' : 's'}`" />
-              </Row>
-              <Empty v-if="!d.coming_up.length" title="Nothing coming up." hint="Expiring documents and important dates in the next two weeks show here." />
-            </Card>
+          <section v-if="d.rail.insights_total" data-rail-insights>
+            <h2 class="mb-1 flex items-baseline gap-2 text-base"><span class="font-semibold text-ink-gray-9">Insights</span>
+              <span class="text-sm text-ink-gray-6">{{ d.rail.insights_total }} more · <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/ask', query: { tab: 'insights' } }">see all</RouterLink></span></h2>
+            <p class="text-sm text-ink-gray-6">{{ d.rail.insights.map((i) => i.title).join(' · ') }}</p>
           </section>
-        </div>
+        </aside>
       </div>
     </div>
-
-    <Dialog v-model:open="moveAllOpen" title="Move overdue tasks to today?" size="md"
-      :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Move to today', variant: 'solid', onClick: moveAll }]">
-      <p class="text-base text-ink-gray-8">Every open overdue task in this space gets today as its due date. Their old due dates are not kept.</p>
+    <Dialog v-model:open="moveAllOpen" title="Move all overdue tasks to today?" size="sm"
+      :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: `Move ${overdueGroup?.total || 0} to today`, variant: 'solid', onClick: moveAll }]">
+      <p class="text-base text-ink-gray-8">Each overdue task gets today's date. Tasks you would rather drop or move further can be done one at a time.</p>
     </Dialog>
   </template>
+  <div v-else class="page-body"><Skeleton class="h-24 w-full" /><Skeleton class="h-72 w-full" /></div>
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, onUnmounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
+// Today (UX fixes, set 5): three questions. What is open (the Open band, each number a door), what is next (one list in
+// a fixed order: overdue, today, this week's 12 Week Year actions, decisions), and what is around it (today's events,
+// this week's dates, the other insights). Someday items never appear.
+import { computed, h, onMounted, onUnmounted, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
-import { Badge, Button, Dialog, Dropdown, toast } from 'frappe-ui'
+import { RouterLink, useRouter } from 'vue-router'
+import { Badge, Button, Checkbox, Dialog, Dropdown, Skeleton, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
-import Card from '@/components/ui/Card.vue'
-import NumLink from '@/components/ui/NumLink.vue'
-import Row from '@/components/ui/Row.vue'
-import SectionHead from '@/components/ui/SectionHead.vue'
-import Stat from '@/components/ui/Stat.vue'
+import AskBox from '@/components/ask/AskBox.vue'
 import Empty from '@/components/Empty.vue'
-import TaskRow from '@/components/TaskRow.vue'
-import HabitBoxes from '@/components/HabitBoxes.vue'
-import { api, optimistic, tryCall } from '@/lib/api'
+import Card from '@/components/ui/Card.vue'
+import CountLink from '@/components/ui/CountLink.vue'
+import Row from '@/components/ui/Row.vue'
+import { api, errorText, optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
-import { addDays, diffDays, long, startOfWeek, time, weekday } from '@/lib/dates'
-import { onRecordChanged, paneNav } from '@/lib/pane'
+import { addDays, long, short, startOfWeek, weekday } from '@/lib/dates'
+import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
+import { askScope } from '@/lib/ask'
 
+const router = useRouter()
+const phone = useMediaQuery('(max-width: 767px)')
 const d = ref(null)
-const phone = useMediaQuery('(max-width: 767px)') // the header shows a three-letter weekday on a phone
-// each number on Today leads to the list it counts
-const DOOR = { review: { path: '/inbox', query: { status: 'To Review' } }, due: { path: '/tasks', query: { view: 'list', due: 'today,overdue' } },
-  today: { path: '/tasks', query: { view: 'list', due: 'today' } },
-  overdue: { path: '/tasks', query: { view: 'list', due: 'overdue' } }, loops: { path: '/tasks', query: { status: 'loops' } }, vault: { path: '/vault', query: { expiry: 'soon' } },
-  score: { path: '/journal', query: { all: '1' } } }
-const comingRef = (c) => (c.kind === 'vault' ? 'vault:' : 'date:') + c.name
-const REVIEW_ROWS = 3
-const OVERDUE_FOLD = 3 // more overdue rows than this fold into one line until Show is pressed
-
-// the last line of a capped group: "Show all N", leading to the same list as the group's count
-const MoreLink = defineComponent({
-  props: { to: Object, n: Number },
-  setup: (p) => () => h(RouterLink, { to: p.to, class: 'flex items-center gap-1 py-2.5 text-sm-medium text-ink-gray-7 hover:text-ink-gray-9', 'data-show-all': '' },
-    () => [`Show all ${p.n}`, h('span', { class: 'lucide-arrow-right size-4', 'aria-hidden': 'true' })]),
-})
-
-const reviewRows = computed(() => d.value.to_review.items.slice(0, REVIEW_ROWS))
-const showOverdue = ref(false)
-const overdueFolded = computed(() => !showOverdue.value && d.value.tasks.overdue_items.length > OVERDUE_FOLD)
-const oldestDays = computed(() => d.value.tasks.oldest_overdue ? diffDays(d.value.date, d.value.tasks.oldest_overdue) : 0)
-const habitsDone = computed(() => d.value.habits.filter((x) => x.done).length)
+const showAll = ref(false)
 const moveAllOpen = ref(false)
-// this week's actions, at most WEEK_ROWS until Show all. The ones still to do come first, sorted once on load so a
-// row does not jump away when it is ticked.
-const WEEK_ROWS = 6
-const showWeek = ref(false)
-const weekRows = computed(() => (showWeek.value ? d.value.cycle.actions : d.value.cycle.actions.slice(0, WEEK_ROWS)))
+const KIND_THEME = { Stuck: 'red', 'Waiting on you': 'amber', Promise: 'amber', Someday: 'violet' }
+askScope({ kind: 'space', label: 'Everything in this space' })
+
+const band = computed(() => d.value.band)
+// a tile: label, the big number (a door), the line under it (a door too, amber when it is a warning)
+const tiles = computed(() => {
+  const b = band.value
+  const c = d.value.cycle
+  const goalLine = b.goals_no_ticks.n ? { count: b.goals_no_ticks, text: 'with no ticks for 3 weeks' } : { count: b.goals_no_tasks, text: 'with no tasks' }
+  return [
+    { key: 'open', label: 'Open tasks', count: b.open_tasks, sub: { count: b.stuck, text: `untouched ${b.rules.stuck_after_days}+ days`, warn: b.stuck.n > 0 } },
+    { key: 'projects', label: 'Projects', count: b.projects, pre: 'active · ', sub: { count: b.idle_projects, text: `idle ${b.rules.stuck_after_days}+ days` } },
+    { key: 'goals', label: 'Goals', count: b.goals, pre: 'in progress · ', sub: goalLine },
+    { key: 'inbox', label: 'Inbox', count: b.inbox, pre: 'to review · ', sub: { count: b.inbox_old, text: 'older than a week', warn: b.inbox_old.n > 0 } },
+    { key: 'notes', label: 'Notes and sources', count: b.notes_sources, sub: { count: b.notes_unopened, text: 'notes not opened in 90 days' } },
+    { key: 'week', label: c && c.week ? `Week ${c.week} of 12` : 'Week score', week: true },
+    { key: 'habits', label: `Habits today · ${d.value.habits.filter((x) => x.done).length} of ${d.value.habits.length}`, habits: true },
+  ]
+})
+const phoneMain = computed(() => tiles.value.filter((t) => ['open', 'inbox', 'week', 'habits'].includes(t.key)))
+const phoneRest = computed(() => tiles.value.filter((t) => !['open', 'inbox', 'week', 'habits'].includes(t.key)))
+
+const Tile = (props) => {
+  const t = props.tile
+  const box = 'flex min-w-0 flex-col gap-0.5 px-4 py-3'
+  if (t.week) {
+    const c = d.value.cycle
+    const pct = c && c.week ? Math.round(c.score) : null
+    return h('div', { class: box, 'data-tile': t.key }, [
+      h('div', { class: 'truncate text-sm text-ink-gray-7' }, t.label),
+      h('div', { class: 'flex items-baseline gap-2' }, [
+        h(RouterLinkNum, { to: { path: '/journal' }, text: pct === null ? '—' : pct + '%', aria: `Week score ${pct}%` }),
+        h('span', { class: 'text-sm text-ink-gray-6' }, phone.value ? `/ ${d.value.target}%` : `target ${d.value.target}%`)]),
+      pct === null ? null : h('div', { class: 'relative mt-1.5 h-1.5 rounded-full bg-surface-gray-3', role: 'img', 'aria-label': `${pct}% of the ${d.value.target}% target`, 'data-score-bar': '' }, [
+        h('div', { class: 'h-full rounded-full ' + (pct >= d.value.target ? 'bg-surface-green-7' : 'bg-surface-gray-9'), style: { width: Math.min(pct, 100) + '%' } }),
+        h('div', { class: 'absolute -top-1 h-3.5 w-0.5 rounded-full bg-surface-blue-7', style: { left: `calc(${d.value.target}% - 1px)` }, 'aria-hidden': 'true' })]),
+    ])
+  }
+  if (t.habits) {
+    return h('div', { class: box, 'data-tile': t.key, 'data-today-habits': '' }, [
+      h('div', { class: 'truncate text-sm text-ink-gray-7', 'data-habit-count': '' }, t.label),
+      h('div', { class: 'mt-1 flex flex-wrap gap-1' }, d.value.habits.map((x) => h(Button, {
+        class: '!size-6 !p-0 text-xs', variant: x.done ? 'solid' : 'outline', disabled: !canWrite(), 'aria-pressed': x.done, 'aria-label': `${x.title}, ${x.done ? 'done' : 'not done'} today`,
+        tooltip: x.title, 'data-habit': x.habit, onClick: () => toggleHabit(x) }, () => x.title.charAt(0).toUpperCase()))),
+    ])
+  }
+  return h('div', { class: box, 'data-tile': t.key }, [
+    h('div', { class: 'truncate text-sm text-ink-gray-7' }, t.label),
+    h(CountLink, { count: t.count, tone: 'text-2xl-semibold text-ink-gray-9', countKey: 'band:' + t.key }),
+    h('div', { class: 'text-sm ' + (t.sub.warn ? 'text-ink-amber-9' : 'text-ink-gray-6') }, [
+      phone.value ? null : t.pre || null,
+      h(CountLink, { count: t.sub.count, tone: t.sub.warn ? 'text-ink-amber-9' : 'text-ink-gray-6', countKey: 'band:' + t.key + ':sub', ariaLabel: `${t.sub.count.n} ${t.sub.text}` }),
+      ' ' + (phone.value && t.key === 'open' ? 'stuck' : t.sub.text)]),
+  ])
+}
+Tile.props = ['tile']
+const RouterLinkNum = (p) => h(RouterLink, { to: p.to, class: 'rounded-1 text-2xl-semibold tabular-nums text-ink-gray-9 hover:underline focus-visible:focus-ring', 'aria-label': p.aria, 'data-week-score': '' }, () => p.text)
+RouterLinkNum.props = ['to', 'text', 'aria']
+
+// Next: about 8 rows across the groups in order, then "N more"
+const groups = computed(() => d.value.next.groups.filter((g) => g.rows.length))
+const overdueGroup = computed(() => d.value.next.groups.find((g) => g.key === 'overdue'))
+const visibleGroups = computed(() => {
+  let room = showAll.value ? Infinity : d.value.next.show
+  return groups.value.map((g) => {
+    const shown = g.rows.slice(0, Math.max(room, 0))
+    room -= shown.length
+    return { ...g, shown }
+  }).filter((g) => g.shown.length)
+})
+const hidden = computed(() => groups.value.reduce((n, g) => n + g.rows.length, 0) - visibleGroups.value.reduce((n, g) => n + g.shown.length, 0))
+const taskLine = (r) => [r.area_name, r.project_title, r.source_title && 'from ' + r.source_title, r.status === 'Waiting' && r.waiting_on && 'waiting on ' + r.waiting_on].filter(Boolean).join(' · ') || 'Unfiled'
+function duration(e) {
+  if (e.all_day || !e.start || !e.end) return ''
+  const m = Math.round((new Date(e.end.replace(' ', 'T')) - new Date(e.start.replace(' ', 'T'))) / 60000)
+  return m <= 0 ? '' : m < 60 ? `${m} min` : `${Math.round(m / 6) / 10} h`
+}
+
+// the rail's timeline: events at their times, with a now marker between them
+const nowTime = ref(new Date().toTimeString().slice(0, 5))
+const railItems = computed(() => {
+  const ev = d.value.rail.events.map((e) => ({ key: 'e' + e.name + e.start, kind: 'event', name: e.name, title: e.title, time: e.all_day ? 'All day' : String(e.start || '').slice(11, 16) }))
+  const out = []
+  let placed = false
+  for (const e of ev) {
+    if (!placed && e.time !== 'All day' && e.time > nowTime.value) { out.push({ key: 'now', kind: 'now', title: 'Now', time: nowTime.value }); placed = true }
+    out.push(e)
+  }
+  if (!placed) out.push({ key: 'now', kind: 'now', title: 'Now', time: nowTime.value })
+  return out
+})
+const weekRef = (w) => (w.kind === 'vault' ? 'vault:' + w.name : w.kind === 'important' ? 'date:' + w.name : null)
 
 async function load() {
   const res = await tryCall(() => api('today.get', { space: store.space }))
   if (!res) return
-  if (res.cycle?.actions) {
-    const left = (a) => a.count < a.per_week
-    res.cycle.actions = [...res.cycle.actions.filter(left), ...res.cycle.actions.filter((a) => !left(a))]
-  }
   d.value = res
-  paneNav.rows = [...res.tasks.today.map((t) => 'task:' + t.name), ...res.tasks.overdue_items.map((t) => 'task:' + t.name),
-    ...res.to_review.items.slice(0, REVIEW_ROWS).map((i) => 'inbox:' + i.name), ...res.events.map((e) => 'event:' + e.name), ...res.coming_up.map(comingRef)]
+  paneNav.rows = res.next.groups.flatMap((g) => g.rows.map((r) => (r.type === 'event' ? 'event:' + r.name : !r.type || r.type === 'task' ? 'task:' + r.name : null)).filter(Boolean))
 }
-onRecordChanged(load)
+onRecordChanged(() => load())
 async function done(t) {
   await optimistic(() => { t.status = 'Done'; t._done = true }, () => { t.status = 'Open'; t._done = false },
     () => api('tasks.set_status', { task: t.name, status: 'Done' })).catch(() => {})
-  setTimeout(load, 600)
+  setTimeout(load, 700)
 }
-
-// an overdue task gets a new date or is dropped; it leaves the overdue group at once
 function triage(t) {
-  const list = d.value.tasks.overdue_items
-  const leave = (request, message) => async () => {
-    const at = list.indexOf(t)
-    await optimistic(() => list.splice(at, 1), () => list.splice(at, 0, t), request).then(() => toast.success(message)).catch(() => {})
-    load()
-  }
+  const leave = (request, message) => async () => { if (await tryCall(request, message)) load() }
   const move = (label, date) => ({ label, onClick: leave(() => api('tasks.update', { task: t.name, values: { due_date: date } }), `Moved to ${long(date)}`) })
-  return [
-    move('Today', d.value.date),
-    move('Tomorrow', addDays(d.value.date, 1)),
-    move('Next week', addDays(startOfWeek(d.value.date), 7)),
-    { label: 'Drop', onClick: leave(() => api('tasks.set_status', { task: t.name, status: 'Dropped' }), 'Dropped') },
-  ]
+  return [move('Today', d.value.date), move('Tomorrow', addDays(d.value.date, 1)), move('Next week', addDays(startOfWeek(d.value.date), 7)),
+    { label: 'Drop', onClick: leave(() => api('tasks.set_status', { task: t.name, status: 'Dropped' }), 'Dropped') }]
 }
 async function moveAll({ close }) {
   const out = await tryCall(() => api('tasks.reschedule_overdue', { space: store.space, to_date: d.value.date }))
   close()
-  if (!out) return
-  toast.success(`${out.moved} task${out.moved === 1 ? '' : 's'} moved to today`)
-  showOverdue.value = false
-  load()
+  if (out) { toast.success(`${out.moved} task${out.moved === 1 ? '' : 's'} moved to today`); load() }
 }
-
-// a tap on this week's action: once a week toggles, more than once counts up and wraps to zero, as on the grid
+// ticking a 12 Week Year action records the week's tick; the week score follows
 async function tick(a) {
   const c = d.value.cycle
   const before = a.count
@@ -270,6 +301,27 @@ function toggleHabit(x) {
   optimistic(() => (x.done = !x.done), () => (x.done = !x.done),
     () => api('journal.toggle_habit', { habit: x.habit, date: d.value.date, done: x.done ? 1 : 0 })).catch(() => {})
 }
-onMounted(load)
-onUnmounted(() => (paneNav.rows = []))
+// an insight's buttons: nothing changes until clicked; a click calls the normal API and offers Undo where it can
+async function runAction(r, i) {
+  const a = r.actions[i]
+  if (a.kind === 'open_reset') return router.push({ path: '/reset' })
+  if (a.kind === 'open_list') return router.push(a.to)
+  if (a.kind === 'open_record') return openRef(a.ref)
+  try {
+    const out = await api('insights.act', { insight: r.name, index: i })
+    if (out.undo) toast.success(`${a.label}: done.`, { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('reset.undo', { log: JSON.stringify(out.undo) }); await api('insights.restore', { insight: r.name }); load() } } })
+    else toast.success(a.kind === 'make_task' ? 'Task made.' : 'Done.')
+    load()
+  } catch (e) { toast.error(errorText(e)) }
+}
+async function dismiss(r) {
+  try {
+    await api('insights.dismiss', { insight: r.name })
+    toast.success('Dismissed. It will not come back unless something changes.', { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('insights.restore', { insight: r.name }); load() } } })
+    load()
+  } catch (e) { toast.error(errorText(e)) }
+}
+let clock = null
+onMounted(() => { load(); clock = setInterval(() => (nowTime.value = new Date().toTimeString().slice(0, 5)), 60000) })
+onUnmounted(() => { paneNav.rows = []; clearInterval(clock) })
 </script>
