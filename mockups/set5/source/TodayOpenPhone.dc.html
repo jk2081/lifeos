@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Today on a phone</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3;text-decoration:none}a:hover{color:#004F91}
+.app{display:flex;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:none;width:232px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px}
+.sp{display:flex;align-items:center;gap:8px;padding:4px 8px 10px}
+.lg{width:28px;height:28px;border-radius:7px;background:#EDEDED;color:#383838;display:grid;place-items:center;font-size:12px;font-weight:600}
+.sr{display:flex;gap:6px;padding:0 4px 8px}
+.sx{flex:1;height:30px;border-radius:7px;background:#EDEDED;display:flex;align-items:center;gap:6px;padding:0 8px;color:#525252;font-size:13px}
+.nb{height:30px;border-radius:7px;background:#171717;color:#fff;display:flex;align-items:center;padding:0 10px;font-size:13px;font-weight:500}
+.nv{display:flex;align-items:center;gap:10px;min-height:30px;padding:0 8px;border-radius:6px;color:#383838}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv i{width:15px;height:15px;border:1.6px solid #8A8A8A;border-radius:4px;flex:none}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.gh{font-size:12px;color:#6B6B6B;padding:12px 8px 3px}
+.new{margin-left:auto;font-size:11px;font-weight:600;color:#0062B3;background:#E6F4FF;border-radius:999px;padding:0 6px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #EDEDED}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:30px;padding:0 11px;border-radius:7px;border:0;font:500 13px Inter,system-ui,sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}.bt.g{background:transparent;color:#525252;padding:0 6px}
+.bd{padding:20px 28px 32px;display:flex;flex-direction:column;gap:22px}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px;background:#fff}
+.sh{font-size:13px;font-weight:600;color:#383838;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+.sh .mt{font-weight:400}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:11.5px;font-weight:500;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}.v{background:#F1ECFF;color:#5B3CC4}
+.rw{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #F2F2F2}
+.rw:last-child{border-bottom:0}
+.ck{width:17px;height:17px;margin:2px 0 0;accent-color:#171717;flex:none}
+.bar{position:relative;height:8px;border-radius:4px;background:#EDEDED}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#171717}
+.bar u{position:absolute;top:-4px;width:2px;height:16px;background:#0062B3}
+.hb{width:42px;height:42px;border-radius:10px;border:1px solid #DADADA;background:#fff;font:600 14px Inter,system-ui,sans-serif;display:inline-grid;place-items:center}
+.hb.on{background:#171717;color:#fff;border-color:#171717}
+.ins{border:1px solid #EDEDED;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.ins p{margin:0;font-weight:500;line-height:1.45}
+.ev{font-size:12.5px;color:#6B6B6B;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ev a{background:#F5F5F5;border-radius:6px;padding:0 6px;color:#383838}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tb{display:flex;gap:20px;padding:0 28px;border-bottom:1px solid #EDEDED}
+.tb span{padding:10px 0;color:#525252;border-bottom:2px solid transparent}
+.tb span.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.tb b{font-weight:400;color:#8A8A8A;margin-left:4px}
+.note{font-size:12px;color:#8A8A8A;margin:0}
+</style>
+</helmet>
+<style>
+.app{min-height:900px}
+.plate{display:flex;align-items:stretch;border:1px solid #EDEDED;border-radius:10px;overflow:hidden}
+.pt{flex:1;padding:10px 14px;border-right:1px solid #EDEDED;display:flex;flex-direction:column;gap:1px;min-width:0}
+.pt:last-child{border-right:0}
+.pt .k{font-size:12px;color:#6B6B6B}
+.pt .num{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25}
+.pt .h{font-size:12px;color:#6B6B6B;line-height:1.35}
+.pt .h.w{color:#A8480A}
+.cu{display:flex;align-items:center;padding:0 14px;background:#FFF8F2}
+.nx .rw{align-items:center;padding:8px 0}
+.gp{font-size:11.5px;font-weight:600;color:#8A8A8A;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 2px}
+.why{font-size:12px;white-space:nowrap}
+.tl{position:relative;border-left:1px solid #E2E2E2;margin-left:44px;display:flex;flex-direction:column}
+.tl div{position:relative;padding:4px 0 14px 12px}
+.tl b{position:absolute;left:-46px;top:4px;width:38px;text-align:right;font-weight:400;font-size:12px;color:#8A8A8A}
+.tl .ev{display:block;background:#E6F4FF;color:#0062B3;border-radius:6px;padding:4px 8px;font-size:13px}
+.tl .now{position:absolute;left:-4px;top:9px;width:7px;height:7px;border-radius:50%;background:#B42525}
+.ask{display:flex;align-items:center;gap:8px;height:34px;border:1px solid #DADADA;border-radius:9px;padding:0 10px;color:#8A8A8A;width:420px}
+.kbd{font-size:11px;border:1px solid #DADADA;border-radius:4px;padding:0 4px;color:#6B6B6B}
+.mini{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;border:1px solid #DADADA;font-size:11px;font-weight:600}
+.mini.on{background:#171717;color:#fff;border-color:#171717}
+.grid th{font-weight:500;color:#6B6B6B;font-size:12px;text-align:right;padding:6px 10px}
+.grid td{padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid #F2F2F2}
+.grid td:first-child,.grid th:first-child{text-align:left}
+.hot{background:#FFF1E7;color:#A8480A;font-weight:600}
+.key{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:8px;border:1px solid #DADADA;background:#fff;font-weight:500}
+.key .kbd{margin-left:2px}
+
+.ph{width:390px;height:844px;box-sizing:border-box;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:15px;line-height:1.45;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.phd{display:flex;align-items:center;gap:8px;padding:14px 16px 8px}
+.ib{width:38px;height:38px;border-radius:10px;background:#F3F3F3;display:grid;place-items:center;font-size:13px;font-weight:600;flex:none}
+.bbar{display:flex;border-top:1px solid #EDEDED;background:#FCFCFC}
+.bbar span{flex:1;text-align:center;padding:11px 0 14px;font-size:11.5px;color:#525252}
+.bbar span.on{color:#171717;font-weight:600}
+.tile{border:1px solid #EDEDED;border-radius:10px;padding:8px 10px}
+.tile .k{font-size:11.5px;color:#6B6B6B}.tile .val{font-size:18px;font-weight:600;line-height:1.2}.tile .h{font-size:11.5px;color:#6B6B6B}
+.w{color:#A8480A !important}
+.panel{position:absolute;top:0;right:0;bottom:0;width:480px;background:#fff;border-left:1px solid #E2E2E2;box-shadow:-12px 0 32px rgba(0,0,0,.08);display:flex;flex-direction:column}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:#E6F4FF;color:#0062B3;border-radius:999px;padding:2px 9px}
+.sup{font-size:11px;background:#E6F4FF;color:#0062B3;border-radius:4px;padding:0 4px;margin-left:2px;vertical-align:super}
+.big{height:48px;border-radius:10px;border:1px solid #DADADA;background:#fff;font:500 15px Inter,system-ui,sans-serif;display:grid;place-items:center}
+</style><div class="ph">
+  <div class="phd"><div style="flex:1"><div style="font-size:19px;font-weight:600">Monday, 16 Nov</div><div class="mt">Week 7 of 12 · 5 days left</div></div><span class="ib">⌕</span><span class="ib" style="background:#171717;color:#fff">Ask</span></div>
+  <div style="flex:1;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:baseline;gap:8px"><b style="font-size:13px">Open</b><span class="mt w">312 tasks stuck</span><span style="flex:1"></span><span class="pl o">Reset</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="tile"><div class="k">Open tasks</div><div class="val">401</div><div class="h w">312 stuck</div></div>
+      <div class="tile"><div class="k">Inbox</div><div class="val">71</div><div class="h w">66 older than a week</div></div>
+      <div class="tile"><div class="k">Week 7</div><div class="val">7% <span class="mt" style="font-weight:400">/ 85%</span></div><div class="bar" style="height:5px;margin-top:4px"><i style="width:7%"></i></div></div>
+      <div class="tile"><div class="k">Habits · 1 of 4</div><div style="display:flex;gap:5px;margin-top:5px"><span class="mini on">J</span><span class="mini">M</span><span class="mini">J</span><span class="mini">W</span></div></div>
+    </div>
+    <div><b style="font-size:13px">Next</b></div>
+    <div class="cd" style="padding:0 12px">
+      <div class="gp">Overdue · 3</div>
+      <div class="rw"><input class="ck" type="checkbox"><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14.5px">Download Merrill statements for Ruchi ITR</div><div class="mt">Money &amp; Legal · 2 days</div></div><span class="pl r">Overdue</span></div>
+      <div class="gp">Today · 5</div>
+      <div class="rw"><span style="width:17px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14.5px">Call with Vivek on the ITR</div><div class="mt">16:30 · 30 min</div></div><span class="pl n">Event</span></div>
+      <div class="rw"><input class="ck" type="checkbox"><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14.5px">Reply to Kunal on bought-leaf rates</div><div class="mt">Tea &amp; Coffee · Ghillidary</div></div><span class="pl n">Today</span></div>
+      <div class="gp">Needs a decision · 3</div>
+      <div class="rw"><span style="width:17px;flex:none"></span><div style="flex:1;min-width:0"><div style="font-weight:500;font-size:14.5px">Ruchi waiting 5 days for your reply</div><div class="mt">Insight · email digest, 11 Nov</div></div><span class="pl o">Waiting</span></div>
+    </div>
+  </div>
+  <div class="bbar"><span class="on">Today</span><span>Inbox</span><span>Tasks</span><span>Journal</span><span>More</span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

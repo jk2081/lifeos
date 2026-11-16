@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Reset</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3;text-decoration:none}a:hover{color:#004F91}
+.app{display:flex;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:none;width:232px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px}
+.sp{display:flex;align-items:center;gap:8px;padding:4px 8px 10px}
+.lg{width:28px;height:28px;border-radius:7px;background:#EDEDED;color:#383838;display:grid;place-items:center;font-size:12px;font-weight:600}
+.sr{display:flex;gap:6px;padding:0 4px 8px}
+.sx{flex:1;height:30px;border-radius:7px;background:#EDEDED;display:flex;align-items:center;gap:6px;padding:0 8px;color:#525252;font-size:13px}
+.nb{height:30px;border-radius:7px;background:#171717;color:#fff;display:flex;align-items:center;padding:0 10px;font-size:13px;font-weight:500}
+.nv{display:flex;align-items:center;gap:10px;min-height:30px;padding:0 8px;border-radius:6px;color:#383838}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv i{width:15px;height:15px;border:1.6px solid #8A8A8A;border-radius:4px;flex:none}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.gh{font-size:12px;color:#6B6B6B;padding:12px 8px 3px}
+.new{margin-left:auto;font-size:11px;font-weight:600;color:#0062B3;background:#E6F4FF;border-radius:999px;padding:0 6px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #EDEDED}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:30px;padding:0 11px;border-radius:7px;border:0;font:500 13px Inter,system-ui,sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}.bt.g{background:transparent;color:#525252;padding:0 6px}
+.bd{padding:20px 28px 32px;display:flex;flex-direction:column;gap:22px}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px;background:#fff}
+.sh{font-size:13px;font-weight:600;color:#383838;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+.sh .mt{font-weight:400}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:11.5px;font-weight:500;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}.v{background:#F1ECFF;color:#5B3CC4}
+.rw{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #F2F2F2}
+.rw:last-child{border-bottom:0}
+.ck{width:17px;height:17px;margin:2px 0 0;accent-color:#171717;flex:none}
+.bar{position:relative;height:8px;border-radius:4px;background:#EDEDED}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#171717}
+.bar u{position:absolute;top:-4px;width:2px;height:16px;background:#0062B3}
+.hb{width:42px;height:42px;border-radius:10px;border:1px solid #DADADA;background:#fff;font:600 14px Inter,system-ui,sans-serif;display:inline-grid;place-items:center}
+.hb.on{background:#171717;color:#fff;border-color:#171717}
+.ins{border:1px solid #EDEDED;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.ins p{margin:0;font-weight:500;line-height:1.45}
+.ev{font-size:12.5px;color:#6B6B6B;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ev a{background:#F5F5F5;border-radius:6px;padding:0 6px;color:#383838}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tb{display:flex;gap:20px;padding:0 28px;border-bottom:1px solid #EDEDED}
+.tb span{padding:10px 0;color:#525252;border-bottom:2px solid transparent}
+.tb span.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.tb b{font-weight:400;color:#8A8A8A;margin-left:4px}
+.note{font-size:12px;color:#8A8A8A;margin:0}
+</style>
+</helmet>
+<style>
+.app{min-height:900px}
+.plate{display:flex;align-items:stretch;border:1px solid #EDEDED;border-radius:10px;overflow:hidden}
+.pt{flex:1;padding:10px 14px;border-right:1px solid #EDEDED;display:flex;flex-direction:column;gap:1px;min-width:0}
+.pt:last-child{border-right:0}
+.pt .k{font-size:12px;color:#6B6B6B}
+.pt .num{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25}
+.pt .h{font-size:12px;color:#6B6B6B;line-height:1.35}
+.pt .h.w{color:#A8480A}
+.cu{display:flex;align-items:center;padding:0 14px;background:#FFF8F2}
+.nx .rw{align-items:center;padding:8px 0}
+.gp{font-size:11.5px;font-weight:600;color:#8A8A8A;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 2px}
+.why{font-size:12px;white-space:nowrap}
+.tl{position:relative;border-left:1px solid #E2E2E2;margin-left:44px;display:flex;flex-direction:column}
+.tl div{position:relative;padding:4px 0 14px 12px}
+.tl b{position:absolute;left:-46px;top:4px;width:38px;text-align:right;font-weight:400;font-size:12px;color:#8A8A8A}
+.tl .ev{display:block;background:#E6F4FF;color:#0062B3;border-radius:6px;padding:4px 8px;font-size:13px}
+.tl .now{position:absolute;left:-4px;top:9px;width:7px;height:7px;border-radius:50%;background:#B42525}
+.ask{display:flex;align-items:center;gap:8px;height:34px;border:1px solid #DADADA;border-radius:9px;padding:0 10px;color:#8A8A8A;width:420px}
+.kbd{font-size:11px;border:1px solid #DADADA;border-radius:4px;padding:0 4px;color:#6B6B6B}
+.mini{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;border:1px solid #DADADA;font-size:11px;font-weight:600}
+.mini.on{background:#171717;color:#fff;border-color:#171717}
+.grid th{font-weight:500;color:#6B6B6B;font-size:12px;text-align:right;padding:6px 10px}
+.grid td{padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid #F2F2F2}
+.grid td:first-child,.grid th:first-child{text-align:left}
+.hot{background:#FFF1E7;color:#A8480A;font-weight:600}
+.key{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:8px;border:1px solid #DADADA;background:#fff;font-weight:500}
+.key .kbd{margin-left:2px}
+</style><div class="app">
+<nav class="sb" aria-label="Sections">
+  <div class="sp"><div class="lg">P</div><div style="line-height:1.2"><div style="font-weight:600">Private</div><div class="mt">Jai</div></div></div>
+  <div class="sr"><span class="nb" style="flex:1;justify-content:center">+ New</span></div>
+  <span class="nv"><i></i>Today</span><span class="nv"><i></i>Inbox<span class="ct">71</span></span><span class="nv"><i></i>Tasks<span class="ct">8</span></span><span class="nv"><i></i>Calendar</span><span class="nv"><i></i>Ask</span>
+  <div class="gh">Plan</div><span class="nv"><i></i>Journal</span><span class="nv"><i></i>Goals</span><span class="nv"><i></i>Projects</span><span class="nv"><i></i>Someday<span class="ct">42</span></span>
+  <div class="gh">Areas</div><span class="nv"><i></i>Business That Works</span><span class="nv"><i></i>Family</span><span class="nv"><i></i>Learning</span><span class="nv"><i></i>Money &amp; Legal</span><span class="nv"><i></i>Personal</span><span class="nv"><i></i>Tea &amp; Coffee</span><span class="nv"><i></i>Unstoppable &amp; Content</span>
+  <div class="gh">Records</div><span class="nv"><i></i>Sources</span><span class="nv"><i></i>Notes</span><span class="nv"><i></i>Wiki</span><span class="nv"><i></i>Vault</span><span class="nv"><i></i>Timeline</span>
+  <div style="flex:1"></div><span class="nv on"><i></i>Reset</span><span class="nv"><i></i>Archive</span><span class="nv"><i></i>Settings</span>
+</nav>
+<main class="main">
+  <header class="hd"><div><h1 class="h1">Reset</h1><div class="sub">Private · last reset 14 days ago · also the first step of your weekly review</div></div>
+  <div class="ask">Search or ask anything <span style="flex:1"></span><span class="kbd">⌘K</span></div></header>
+  <div class="bd" style="gap:18px">
+    <div class="cd" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+      <div style="flex:1 1 360px"><div style="display:flex;align-items:baseline;gap:10px"><b>Goal: open tasks under 100</b><span class="mt">401 now · 0 decided this session</span></div>
+       <div class="bar" style="margin-top:8px"><i style="width:0%"></i><u style="left:25%"></u></div></div>
+      <div class="mt" style="flex:1 1 300px">Most of the weight is old: 312 open tasks have not been touched for 30 days or more.</div>
+    </div>
+    <div style="display:flex;gap:24px;align-items:flex-start">
+      <div style="flex:1.25;min-width:0;display:flex;flex-direction:column;gap:12px">
+        <h2 class="sh" style="margin:0">Suggested batches <span class="mt">5 batches · 265 items</span></h2>
+        <div class="cd" style="display:flex;flex-direction:column;gap:6px">
+  <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:18px;font-weight:600">140</span><span style="font-weight:600;flex:1">Test and duplicate tasks</span></div>
+  <div class="mt">Why: titles match test patterns ("UX done", "UX3 due today") or repeat another open task word for word.</div><div class="mt">· UX done mwi4ljaq</div><div class="mt">· UX3 due today 1440 mwi492v2</div><div class="mt">· …and 138 more</div>
+  <div class="acts"><button class="bt p" type="button">Delete 140</button><button class="bt s" type="button">Review one by one</button><button class="bt g" type="button">Skip</button></div></div><div class="cd" style="display:flex;flex-direction:column;gap:6px">
+  <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:18px;font-weight:600">38</span><span style="font-weight:600;flex:1">Ghillidary tasks from the 2025 plan</span></div>
+  <div class="mt">Why: created before April 2026, untouched for 180+ days, and the 2025 drainage project is marked Done.</div><div class="mt">· Survey section 4 drains</div><div class="mt">· Order 2,000 infill plants</div><div class="mt">· …and 36 more</div>
+  <div class="acts"><button class="bt p" type="button">Move 38 to Someday</button><button class="bt s" type="button">Review one by one</button><button class="bt g" type="button">Skip</button></div></div><div class="cd" style="display:flex;flex-direction:column;gap:6px">
+  <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:18px;font-weight:600">66</span><span style="font-weight:600;flex:1">Inbox items older than a week</span></div>
+  <div class="mt">Why: still waiting for your review; most hold notes only, no tasks.</div><div class="mt">· Voice note, 2 Nov</div><div class="mt">· Journal photo, pages 171 to 172</div><div class="mt">· …and 64 more</div>
+  <div class="acts"><button class="bt s" type="button">Accept notes, review the rest</button><button class="bt s" type="button">Review one by one</button><button class="bt g" type="button">Skip</button></div></div><div class="cd" style="display:flex;flex-direction:column;gap:6px">
+  <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:18px;font-weight:600">12</span><span style="font-weight:600;flex:1">Notes that repeat wiki pages</span></div>
+  <div class="mt">Why: the same title and mostly the same text as a wiki page.</div><div class="mt">· Dalmia Gold blend blueprint (also in the Wiki)</div><div class="mt">· …and 11 more</div>
+  <div class="acts"><button class="bt p" type="button">Merge 12</button><button class="bt s" type="button">Review one by one</button><button class="bt g" type="button">Skip</button></div></div><div class="cd" style="display:flex;flex-direction:column;gap:6px">
+  <div style="display:flex;align-items:baseline;gap:10px"><span style="font-size:18px;font-weight:600">9</span><span style="font-weight:600;flex:1">Someday items due for review</span></div>
+  <div class="mt">Why: parked more than 3 months ago. Bring back, keep for 3 more months, or purge.</div><div class="mt">· Tilla land to robusta coffee (idea, parked 2 Aug)</div><div class="mt">· Chai Trails campaign (project, parked 8 Aug)</div><div class="mt">· …and 7 more</div>
+  <div class="acts"><button class="bt p" type="button">Review 9</button><button class="bt s" type="button">Review one by one</button><button class="bt g" type="button">Skip</button></div></div>
+      </div>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px">
+        <h2 class="sh" style="margin:0">Inventory <span class="mt">by how long untouched · click a number to open those items</span></h2>
+        <div class="cd" style="padding:4px 6px"><table class="grid" style="width:100%;border-collapse:collapse">
+<tr><th>Untouched for</th><th>Under 30 days</th><th>30 to 90</th><th>90 to 180</th><th>Over 180</th><th>Total</th></tr>
+<tr><td>Open tasks</td><td>89</td><td class="hot">146</td><td class="hot">118</td><td class="hot">48</td><td><b>401</b></td></tr>
+<tr><td>Projects</td><td>8</td><td>3</td><td>1</td><td>0</td><td><b>12</b></td></tr>
+<tr><td>Goals</td><td>6</td><td>3</td><td>0</td><td>0</td><td><b>9</b></td></tr>
+<tr><td>Inbox items</td><td>5</td><td class="hot">66</td><td>0</td><td>0</td><td><b>71</b></td></tr>
+<tr><td>Notes never reopened</td><td>12</td><td>21</td><td>7</td><td>0</td><td><b>40</b></td></tr>
+<tr><td>Chat open items</td><td>14</td><td>9</td><td>0</td><td>0</td><td><b>23</b></td></tr>
+<tr><td>Someday (since parked)</td><td>11</td><td>22</td><td class="hot">7</td><td class="hot">2</td><td><b>42</b></td></tr>
+</table></div>
+        <h2 class="sh" style="margin:6px 0 0">One by one</h2>
+        <div class="cd" style="display:flex;flex-direction:column;gap:12px">
+  <div class="mt">Item 1 of 179 left after the batches</div>
+  <div><div style="font-size:16px;font-weight:600">Get quotes for a solar dryer pilot</div>
+   <div class="mt">Task · Tea &amp; Coffee · Ghatia · created 3 Aug · untouched 105 days · no project</div></div>
+  <div class="mt" style="background:#FAFAFA;border-radius:8px;padding:8px 10px">From chat "Replacing coal in the VFBD dryers", 2 Aug. The Ghatia solar project has had no activity since September.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+   <span class="key">Do <span class="kbd">D</span></span><span class="key">Waiting <span class="kbd">W</span></span><span class="key">Someday <span class="kbd">S</span></span><span class="key">Archive <span class="kbd">A</span></span><span class="key" style="color:#B42525">Delete <span class="kbd">X</span></span>
+  </div>
+  <div class="mt">Do asks for a date. Waiting asks for whom. Someday moves it to the Someday list with its creation date kept; it comes back for review in 3 months. Deleted items stay in the trash for 30 days.</div>
+</div>
+      </div>
+    </div>
+    <p class="note">Proposed design, example data.</p>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

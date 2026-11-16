@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Someday</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3;text-decoration:none}a:hover{color:#004F91}
+.app{display:flex;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:none;width:232px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px}
+.sp{display:flex;align-items:center;gap:8px;padding:4px 8px 10px}
+.lg{width:28px;height:28px;border-radius:7px;background:#EDEDED;color:#383838;display:grid;place-items:center;font-size:12px;font-weight:600}
+.sr{display:flex;gap:6px;padding:0 4px 8px}
+.sx{flex:1;height:30px;border-radius:7px;background:#EDEDED;display:flex;align-items:center;gap:6px;padding:0 8px;color:#525252;font-size:13px}
+.nb{height:30px;border-radius:7px;background:#171717;color:#fff;display:flex;align-items:center;padding:0 10px;font-size:13px;font-weight:500}
+.nv{display:flex;align-items:center;gap:10px;min-height:30px;padding:0 8px;border-radius:6px;color:#383838}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv i{width:15px;height:15px;border:1.6px solid #8A8A8A;border-radius:4px;flex:none}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.gh{font-size:12px;color:#6B6B6B;padding:12px 8px 3px}
+.new{margin-left:auto;font-size:11px;font-weight:600;color:#0062B3;background:#E6F4FF;border-radius:999px;padding:0 6px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #EDEDED}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:30px;padding:0 11px;border-radius:7px;border:0;font:500 13px Inter,system-ui,sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}.bt.g{background:transparent;color:#525252;padding:0 6px}
+.bd{padding:20px 28px 32px;display:flex;flex-direction:column;gap:22px}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px;background:#fff}
+.sh{font-size:13px;font-weight:600;color:#383838;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+.sh .mt{font-weight:400}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:11.5px;font-weight:500;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}.v{background:#F1ECFF;color:#5B3CC4}
+.rw{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #F2F2F2}
+.rw:last-child{border-bottom:0}
+.ck{width:17px;height:17px;margin:2px 0 0;accent-color:#171717;flex:none}
+.bar{position:relative;height:8px;border-radius:4px;background:#EDEDED}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#171717}
+.bar u{position:absolute;top:-4px;width:2px;height:16px;background:#0062B3}
+.hb{width:42px;height:42px;border-radius:10px;border:1px solid #DADADA;background:#fff;font:600 14px Inter,system-ui,sans-serif;display:inline-grid;place-items:center}
+.hb.on{background:#171717;color:#fff;border-color:#171717}
+.ins{border:1px solid #EDEDED;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.ins p{margin:0;font-weight:500;line-height:1.45}
+.ev{font-size:12.5px;color:#6B6B6B;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ev a{background:#F5F5F5;border-radius:6px;padding:0 6px;color:#383838}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tb{display:flex;gap:20px;padding:0 28px;border-bottom:1px solid #EDEDED}
+.tb span{padding:10px 0;color:#525252;border-bottom:2px solid transparent}
+.tb span.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.tb b{font-weight:400;color:#8A8A8A;margin-left:4px}
+.note{font-size:12px;color:#8A8A8A;margin:0}
+</style>
+</helmet>
+<style>
+.app{min-height:900px}
+.plate{display:flex;align-items:stretch;border:1px solid #EDEDED;border-radius:10px;overflow:hidden}
+.pt{flex:1;padding:10px 14px;border-right:1px solid #EDEDED;display:flex;flex-direction:column;gap:1px;min-width:0}
+.pt:last-child{border-right:0}
+.pt .k{font-size:12px;color:#6B6B6B}
+.pt .num{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25}
+.pt .h{font-size:12px;color:#6B6B6B;line-height:1.35}
+.pt .h.w{color:#A8480A}
+.cu{display:flex;align-items:center;padding:0 14px;background:#FFF8F2}
+.nx .rw{align-items:center;padding:8px 0}
+.gp{font-size:11.5px;font-weight:600;color:#8A8A8A;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 2px}
+.why{font-size:12px;white-space:nowrap}
+.tl{position:relative;border-left:1px solid #E2E2E2;margin-left:44px;display:flex;flex-direction:column}
+.tl div{position:relative;padding:4px 0 14px 12px}
+.tl b{position:absolute;left:-46px;top:4px;width:38px;text-align:right;font-weight:400;font-size:12px;color:#8A8A8A}
+.tl .ev{display:block;background:#E6F4FF;color:#0062B3;border-radius:6px;padding:4px 8px;font-size:13px}
+.tl .now{position:absolute;left:-4px;top:9px;width:7px;height:7px;border-radius:50%;background:#B42525}
+.ask{display:flex;align-items:center;gap:8px;height:34px;border:1px solid #DADADA;border-radius:9px;padding:0 10px;color:#8A8A8A;width:420px}
+.kbd{font-size:11px;border:1px solid #DADADA;border-radius:4px;padding:0 4px;color:#6B6B6B}
+.mini{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;border:1px solid #DADADA;font-size:11px;font-weight:600}
+.mini.on{background:#171717;color:#fff;border-color:#171717}
+.grid th{font-weight:500;color:#6B6B6B;font-size:12px;text-align:right;padding:6px 10px}
+.grid td{padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid #F2F2F2}
+.grid td:first-child,.grid th:first-child{text-align:left}
+.hot{background:#FFF1E7;color:#A8480A;font-weight:600}
+.key{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:8px;border:1px solid #DADADA;background:#fff;font-weight:500}
+.key .kbd{margin-left:2px}
+</style><div class="app">
+<nav class="sb" aria-label="Sections">
+  <div class="sp"><div class="lg">P</div><div style="line-height:1.2"><div style="font-weight:600">Private</div><div class="mt">Jai</div></div></div>
+  <div class="sr"><span class="nb" style="flex:1;justify-content:center">+ New</span></div>
+  <span class="nv"><i></i>Today</span><span class="nv"><i></i>Inbox<span class="ct">71</span></span><span class="nv"><i></i>Tasks<span class="ct">8</span></span><span class="nv"><i></i>Calendar</span><span class="nv"><i></i>Ask</span>
+  <div class="gh">Plan</div><span class="nv"><i></i>Journal</span><span class="nv"><i></i>Goals</span><span class="nv"><i></i>Projects</span><span class="nv on"><i></i>Someday<span class="ct">42</span></span>
+  <div class="gh">Areas</div><span class="nv"><i></i>Business That Works</span><span class="nv"><i></i>Family</span><span class="nv"><i></i>Learning</span><span class="nv"><i></i>Money &amp; Legal</span><span class="nv"><i></i>Personal</span><span class="nv"><i></i>Tea &amp; Coffee</span><span class="nv"><i></i>Unstoppable &amp; Content</span>
+  <div class="gh">Records</div><span class="nv"><i></i>Sources</span><span class="nv"><i></i>Notes</span><span class="nv"><i></i>Wiki</span><span class="nv"><i></i>Vault</span><span class="nv"><i></i>Timeline</span>
+  <div style="flex:1"></div><span class="nv"><i></i>Reset</span><span class="nv"><i></i>Archive</span><span class="nv"><i></i>Settings</span>
+</nav>
+<main class="main">
+  <header class="hd"><div><h1 class="h1">Someday</h1><div class="sub">Private · parked, not forgotten · each item comes back for review 3 months after it was parked</div></div>
+  <div class="ask">Search or ask anything <span style="flex:1"></span><span class="kbd">⌘K</span></div></header>
+  <div class="tb"><span class="on">All<b>42</b></span><span>Due for review<b>9</b></span><span>Tasks<b>24</b></span><span>Projects<b>4</b></span><span>Goals<b>3</b></span><span>Ideas<b>11</b></span></div>
+  <div class="bd" style="gap:14px">
+    <div style="display:flex;gap:8px;align-items:center"><span class="pl n">Area: all</span><span class="pl n">Parked: any time</span><span style="flex:1"></span><span class="mt">Sorted by review date, oldest first</span></div>
+    <div class="cd" style="padding:2px 16px">
+      <div class="rw mt" style="font-size:12px"><span style="flex:1">Item</span><span style="width:150px">Type</span><span style="width:90px">Created</span><span style="width:90px">Parked</span><span style="width:110px">Review</span><span style="width:150px"></span></div>
+      <div class="rw" style="align-items:center"><div style="flex:1;min-width:0"><div style="font-weight:500">Tilla land to robusta coffee at Chandighat</div><div class="mt">Tea &amp; Coffee · Chandighat</div></div>
+<span style="width:150px;flex:none"><span class="pl v">Idea</span></span><span class="mt" style="width:90px;flex:none">12 Jun</span><span class="mt" style="width:90px;flex:none">2 Aug</span>
+<span style="width:110px;flex:none"><span class="pl r">Review due</span></span><span style="display:flex;gap:4px"><button class="bt s" type="button">Bring back</button><button class="bt g" type="button">Purge</button></span></div><div class="rw" style="align-items:center"><div style="flex:1;min-width:0"><div style="font-weight:500">Chai Trails awareness campaign</div><div class="mt">Unstoppable &amp; Content</div></div>
+<span style="width:150px;flex:none"><span class="pl b">Project · 6 tasks</span></span><span class="mt" style="width:90px;flex:none">2 Jul</span><span class="mt" style="width:90px;flex:none">8 Aug</span>
+<span style="width:110px;flex:none"><span class="pl r">Review due</span></span><span style="display:flex;gap:4px"><button class="bt s" type="button">Bring back</button><button class="bt g" type="button">Purge</button></span></div><div class="rw" style="align-items:center"><div style="flex:1;min-width:0"><div style="font-weight:500">Finish the accounting course, sessions 7 to 12</div><div class="mt">Learning</div></div>
+<span style="width:150px;flex:none"><span class="pl g">Goal</span></span><span class="mt" style="width:90px;flex:none">20 Jun</span><span class="mt" style="width:90px;flex:none">16 Aug</span>
+<span style="width:110px;flex:none"><span class="pl r">Review due</span></span><span style="display:flex;gap:4px"><button class="bt s" type="button">Bring back</button><button class="bt g" type="button">Purge</button></span></div><div class="rw" style="align-items:center"><div style="flex:1;min-width:0"><div style="font-weight:500">Get quotes for a solar dryer pilot</div><div class="mt">Tea &amp; Coffee · Ghatia</div></div>
+<span style="width:150px;flex:none"><span class="pl n">Task</span></span><span class="mt" style="width:90px;flex:none">3 Aug</span><span class="mt" style="width:90px;flex:none">16 Nov</span>
+<span style="width:110px;flex:none"><span class="pl n">In 3 months</span></span><span style="display:flex;gap:4px"><button class="bt s" type="button">Bring back</button><button class="bt g" type="button">Purge</button></span></div><div class="rw" style="align-items:center"><div style="flex:1;min-width:0"><div style="font-weight:500">Garden studio: shortlist architects</div><div class="mt">Family</div></div>
+<span style="width:150px;flex:none"><span class="pl n">Task</span></span><span class="mt" style="width:90px;flex:none">25 Oct</span><span class="mt" style="width:90px;flex:none">12 Nov</span>
+<span style="width:110px;flex:none"><span class="pl n">In 3 months</span></span><span style="display:flex;gap:4px"><button class="bt s" type="button">Bring back</button><button class="bt g" type="button">Purge</button></span></div><div class="rw" style="align-items:center"><div style="flex:1;min-width:0"><div style="font-weight:500">Family reserve tea as an annual subscription</div><div class="mt">Tea &amp; Coffee</div></div>
+<span style="width:150px;flex:none"><span class="pl v">Idea · from chat</span></span><span class="mt" style="width:90px;flex:none">17 Sep</span><span class="mt" style="width:90px;flex:none">10 Nov</span>
+<span style="width:110px;flex:none"><span class="pl n">In 3 months</span></span><span style="display:flex;gap:4px"><button class="bt s" type="button">Bring back</button><button class="bt g" type="button">Purge</button></span></div><div class="rw" style="align-items:center"><div style="flex:1;min-width:0"><div style="font-weight:500">Biometric attendance bridge as a BTW product</div><div class="mt">Business That Works</div></div>
+<span style="width:150px;flex:none"><span class="pl v">Idea · from chat</span></span><span class="mt" style="width:90px;flex:none">3 Oct</span><span class="mt" style="width:90px;flex:none">5 Nov</span>
+<span style="width:110px;flex:none"><span class="pl n">In 3 months</span></span><span style="display:flex;gap:4px"><button class="bt s" type="button">Bring back</button><button class="bt g" type="button">Purge</button></span></div><div class="rw" style="align-items:center"><div style="flex:1;min-width:0"><div style="font-weight:500">Learn the Chikmagalur export paperwork</div><div class="mt">Tea &amp; Coffee · Chikmagalur</div></div>
+<span style="width:150px;flex:none"><span class="pl n">Task</span></span><span class="mt" style="width:90px;flex:none">23 Oct</span><span class="mt" style="width:90px;flex:none">1 Nov</span>
+<span style="width:110px;flex:none"><span class="pl n">In 3 months</span></span><span style="display:flex;gap:4px"><button class="bt s" type="button">Bring back</button><button class="bt g" type="button">Purge</button></span></div>
+    </div>
+    <div class="cd" style="background:#FAFAFA"><div style="font-weight:600;margin-bottom:4px">How Someday works</div>
+      <div class="mt">Anything can be parked here: a task, a project with its tasks, a goal, or an idea from a note, chat or digest. It leaves Today, Tasks and the Open counts, keeps its original creation date, and records the day it was parked. Three months later it comes up in Reset for a decision: <b>Bring back</b> (pick a date, project or cycle), <b>Keep</b> for three more months, or <b>Purge</b> (to the trash, 30 days to undo).</div></div>
+    <p class="note">Proposed design, example data.</p>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
