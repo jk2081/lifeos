@@ -140,6 +140,40 @@ Everything in `UX_FIXES_3.md` is done. Frappe's three tab patterns are applied w
 - **Checks:** unit tests 170 pass (new: `test_today_groups_and_reschedule`, `TestTodayThisWeek`). Acceptance adds U.16 at both widths (caps, folding, To review placement on a phone, habit and week ticks survive a reload and are put back) and three new number doors in U.4. Screenshots `screenshots/today4-*` at 1440 and 390 px, light and dark, with no horizontal scrolling.
 - Deviations are in `DECISIONS.md` under "Today, four enhancements".
 
+## UX fixes, set 4
+
+Everything in `UX_FIXES_4.md` is done: Sources, the Wiki, a live-preview editor, and streams.
+
+- **Clean-up.** Acceptance runs on its own site, `acceptance.localhost` (http://localhost:19000), restored from a snapshot before every run by `scripts/acceptance-site.sh`; its last checks remove the run's records there and assert that `lifeos.localhost` holds no test record. 1,516 test records, 109 month goals and 533 stray files were removed from `lifeos.localhost` (`devtools.purge_test_debris`). Link searches for areas, tags, habits, dimensions and projects keep to the current space and to active records everywhere (`lifeos/queries.py`, `framework/linkScope.js`); the Archive offers archived areas, marked. The two stray DocType folders are gone.
+- **Data.** Inbox items have `intent`, `media_kind`, `source_system`, `external_id`, `thumbnail` (480 px, photos) and `vault_document`; chat logs have `source_system`, `external_id`, `transcript_md`, `updated_on` and two more assistants; notes have `collection` (My notes, Wiki), `summary`, `sources` and `is_rules`. New DocTypes `Life Wiki Change`, `Life Connection`, `Life Note Source`. The index carries the new fields and up to 60,000 characters of text per record. A patch keeps every existing row valid.
+- **Editor.** One pane, formatted as you type (CodeMirror 6 decorations), in the reading typeface, at most 720 px wide, with a small toolbar (above the keyboard on a phone), ⌘B, ⌘I, ⌘K, ⌘⇧7, ⌘⇧8, Tab, the `/` menu, `[[` chips, inline images uploaded on paste or drop, tables, and Show Markdown. No Edit or Done anywhere: notes, wiki pages (full page and pane), task notes, journal and inbox transcripts. Filing is one line with a popover. Saves send the version they started from; a conflict says "This page changed while you were editing" with View changes, Keep mine and Reload. `/life/dev/editor` shows every element.
+- **Inbox and Sources.** The Inbox is a queue (To review, Waiting for the agent, Failed) with the intent beside the instruction (Process, Add to wiki, Just keep; the last choice is remembered). Sources (`/sources`) lists every capture with tabs by kind and their counts, List, a thumbnail Grid (the Photos default) and By day (the old chats report), filters for area, project, dates, status, intent, system and assistant, bulk re-filing, and a pane with Original, Text, Summary, Made from this and Details. `/chats` redirects to its Chats tab.
+- **Notes and the Wiki.** Notes shows My notes, opening on the List. The Wiki (`/wiki`) has Pages, Changes, Health and Rules; a wiki page's pane has Page, Sources, Links and History. Agents write the wiki through `lifeos.api.wiki` (rules, index, get_page, search, create_page, update_page with conflicts, cite) and can no longer write notes directly. Every change is logged with a line diff and one-click Undo; Keep in My notes and Hand to the wiki move pages between collections. Health lists orphans, broken links (with Create this page), pages without sources, near-duplicates, ambiguous links and agent reports. Area pages have a Wiki tab.
+- **Streams.** `inbox.create_item` and `chats.log` update instead of duplicating by `source_system` and `external_id`. Settings, This space, Connections shows each system's defaults, last arrival and a warning when it has been quiet; agents read the defaults from `claim_next` and `connections.defaults`. Email digests render as headed lists with Open in Gmail buttons, and their reply tasks carry the Gmail link. Claude and ChatGPT exports import in a background job with progress, creating or updating chat logs (`chats.needs_summary` lists them for an agent).
+- **Sidebar.** Records: Sources, Notes, Wiki, Vault, Timeline.
+- **Scale** (`bench execute lifeos.loadtest.run_sources`: the milestone 9 load of 100,000 index rows, plus 20,000 sources with about 5,000 characters each and 2,000 wiki pages with two changes each; 35,000 sources in the big space in all; medians of five in-process calls, warm, on the Docker bench at 1440 px data):
+
+  | Read | Median |
+  | --- | --- |
+  | Sources, first page | 19 ms |
+  | Sources, Photos tab | 17 ms |
+  | Sources, Chats tab | 15 ms |
+  | Full-text search, a common word | 45 ms |
+  | Full-text search, a rare word | 36 ms |
+  | Wiki search (pages and sources) | 45 ms |
+  | Wiki Pages list | 3 ms |
+  | Wiki Changes list | 9 ms |
+  | Milestone 9 reads with the same data: Today, Timeline, an area page, search | 12, 8, 51, 40 to 61 ms |
+
+  The first measurement found the Sources counts at 1.7 s and the Timeline and area page at 0.5 and 2.6 s: the index no longer fit the database's memory and those reads scanned whole rows. Covering indexes and an indexed "also filed in" match fixed them (see `DECISIONS.md`). The Photos grid loads the 480 px thumbnails only.
+- **Checks.**
+  - Unit tests: 210 pass (`test_ux4_data.py`: the field rules, thumbnails, original IDs, the Vault rule for sources, the link search; `test_ux4_flows.py`: intents, updates by original ID, Sources tabs and Made from this, the wiki methods, conflicts, undo, moves, health, search, the fake agent's Add to wiki, and both chat imports from the fixtures in `lifeos/tests/fixtures/`; the load test now also seeds sources and wiki pages). Two older tests were changed for set 4's rules: the agent creates a task, not a note (M1), and the area page's tabs include Wiki (set 3).
+  - `node tools/acceptance.mjs`: 73 of 73 pass on `acceptance.localhost`, at 1440 px and 390 px. New: U.20 (Area filters on Tasks, Projects, Sources and the Wiki; the Archive), U.21 to U.30 (intents, Sources, the editor on the dev page and a real note, conflicts, wiki rules and undo, health, streams and imports, the digest, the sidebar, access), S4.1 (the run's records are removed) and S4.0 (no test record on `lifeos.localhost`). Older checks were moved from the Chats screen to the Chats tab of Sources and from the Inbox's Done tab, and follow the List as the default of Notes.
+  - Front-end: 11 tests pass; `check-sfc.mjs` and `check-singletons.mjs` pass.
+  - `node tools/screens.mjs`: 102 screens at 1440 px and 390 px in light and dark (408 screenshots), with each new screen, tab and pane. No horizontal scrolling and no text below 4.5 to 1 after two fixes to older screens it found (the done habit pill on Today; secondary text on the open row in the dark theme). The only script errors are three journal-page screens, because `lifeos.localhost` has no journal page left: all 27 were test debris. The editor's dev page was checked by eye at both widths and themes before the editor replaced the old one; Sources, the source pane, the Wiki's tabs and pane, the Changes list, Settings > Connections and the Inbox were looked at by eye; the rest passed the automatic checks.
+- **Commits.** Steps 0 and 1 have their own commits. Steps 2 to 6 share files (the router, the panes, the API modules), so they are one commit, and step 7 another. The acceptance script was run in full after step 0 and after everything; in between, the new checks were run on their own.
+- Deviations are in `DECISIONS.md` under "UX fixes, set 4".
+
 ## Summary
 
 ### What works
@@ -168,7 +202,7 @@ Nothing shows a placeholder. These are smaller than a reader of the spec might e
 
 ### Known limits
 
-- The test site holds records left by the acceptance runs (tasks, notes and inbox items with a random suffix in the title) on top of the seed and demo data.
+- Acceptance runs no longer leave records on the test site: they run on `acceptance.localhost` (UX fixes, set 4). `lifeos.localhost` holds the seed and demo data (`lifeos.demo.load`, and `lifeos.demo.load_v4` for sources and wiki pages).
 - `tools/acceptance.mjs` and `tools/shot.mjs` expect Google Chrome at its macOS path.
 
 ### Install on an existing bench
@@ -186,7 +220,7 @@ bench --site SITE execute lifeos.seed.load
 bench restart
 ```
 
-Then: set the time zone to Asia/Kolkata in System Settings, make sure the scheduler is enabled, and open `https://SITE/life`. For agents, create one user per agent with the role `Life Agent`, add it to its spaces in Life OS Settings, generate its API key, and switch on Enable MCP in System Settings. `README.md` has the same steps with more detail. Take a backup of the live site before installing.
+Then: set the time zone to Asia/Kolkata in System Settings, make sure the scheduler and the background workers are running (the chat export import is a background job), raise the upload limit if Claude or ChatGPT exports will be imported (`bench --site SITE set-config max_file_size 1073741824`), and open `https://SITE/life`. For agents, create one user per agent with the role `Life Agent`, add it to its spaces in Life OS Settings, generate its API key, and switch on Enable MCP in System Settings. `README.md` has the same steps with more detail. Take a backup of the live site before installing.
 
 ## Upgrade notes
 
@@ -199,7 +233,8 @@ docker compose -f docker/docker-compose.yml up -d
 docker exec -d lifeos-bench bash -lc 'cd ~/frappe-bench && bench serve --port 8000'
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && yarn install && yarn build'   # rebuild the front end, inside the bench
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost run-tests --app lifeos'
-node tools/acceptance.mjs            # the acceptance list of section 13, against http://localhost:18000
+node tools/acceptance.mjs            # the acceptance list, on its own site acceptance.localhost (http://localhost:19000), rebuilt from a snapshot first
+scripts/acceptance-site.sh --new     # rebuild that site and its snapshot from scratch (after a schema change); also starts its server and a worker
 node tools/screens.mjs               # screenshots of every screen, both widths and themes, with overflow, error and contrast checks
 ```
 
