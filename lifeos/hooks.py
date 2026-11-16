@@ -17,6 +17,9 @@ after_migrate = "lifeos.install.after_migrate"
 
 website_route_rules = [{"from_route": "/life/<path:app_path>", "to_route": "life"}]
 
+# Link search for the filing DocTypes: the current space and active records only (lifeos/queries.py)
+standard_queries = {dt: "lifeos.queries.link_query" for dt in ("Life Area", "Life Tag", "Life Habit", "Life Dimension", "Life Project")}
+
 permission_query_conditions = {dt: "lifeos.permissions.query_conditions" for dt in SPACE_DOCTYPES}
 permission_query_conditions["Life Space"] = "lifeos.permissions.space_query_conditions"
 permission_query_conditions["Event"] = "lifeos.permissions.event_query_conditions"
@@ -39,7 +42,7 @@ doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
 before_request = ["lifeos.permissions.no_desk_redirect"]
 
 scheduler_events = {
-	"daily": ["lifeos.archive.run_daily"],
+	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health"],
 	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims"]},
 }
 

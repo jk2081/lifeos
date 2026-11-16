@@ -1,7 +1,7 @@
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
 const env = Object.fromEntries(fs.readFileSync('.env', 'utf8').split('\n').filter(Boolean).map((l) => l.split('=')))
-const base = 'http://localhost:18000'
+const base = process.env.LIFEOS_URL || 'http://localhost:18000'
 const width = Number(process.argv[2] || 1440)
 const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true })
 const ctx = await browser.newContext({ viewport: { width, height: width < 800 ? 844 : 1000 }, isMobile: width < 800, hasTouch: width < 800 })

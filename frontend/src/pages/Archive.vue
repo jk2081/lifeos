@@ -42,6 +42,7 @@ import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
+import { useLinkScope } from '@/framework/linkScope'
 import { short } from '@/lib/dates'
 import { loadLookups } from '@/lib/lookups'
 import { refOf } from '@/lib/pane'
@@ -50,6 +51,8 @@ const REASON = { Auto: 'by the daily job', Manual: 'by hand', Project: 'with its
 const KIND = { Inbox: 'Inbox item', 'Journal Page': 'Journal page', Document: 'Vault document', Chat: 'AI chat' }
 const TYPES = ['Life Task', 'Life Note', 'Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Journal Page']
 // the archive is a cross-type list: its filters are columns of Life Index, plus two the server reads from the records themselves
+// the Archive is the one screen whose area filter offers archived areas, marked "(archived)"
+useLinkScope({ archived: true })
 const SPEC = [{ key: 'type', field: 'ref_doctype', kind: 'value', label: 'Type' }, { key: 'area', field: 'area', kind: 'link' }, { key: 'reason', field: 'archive_reason', kind: 'value' },
   { key: 'archived_from', field: 'archived_on', kind: 'from' }, { key: 'archived_to', field: 'archived_on', kind: 'to' }]
 const VIRTUAL = [

@@ -1,8 +1,10 @@
 // Walks the acceptance list in section 13 of SPEC.md against the local test site, as a person would:
 // a logged-in browser for the owner and for a second user, and agent/fake_agent.py over HTTP with an API key.
 //   node tools/acceptance.mjs
-// Needs the Docker bench running with seed and demo data loaded, and .env with LIFEOS_DEV_PASSWORD.
-// It leaves its records on the test site. It prints one line per acceptance item and exits 1 if any fails.
+// It runs against the throwaway site acceptance.localhost (http://localhost:19000), which scripts/acceptance-site.sh
+// rebuilds from a snapshot with seed and demo data before every run, so lifeos.localhost stays clean for the owner.
+// Needs the Docker bench running and .env with LIFEOS_DEV_PASSWORD. `--no-reset` keeps the acceptance site as it is.
+// It prints one line per acceptance item and exits 1 if any fails.
 import { chromium } from 'playwright-core'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -10,7 +12,10 @@ import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
 const env = Object.fromEntries(fs.readFileSync(path.join(root, '.env'), 'utf8').split('\n').filter(Boolean).map((l) => l.split('=')))
-const base = process.env.LIFEOS_URL || 'http://localhost:18000'
+const base = process.env.LIFEOS_URL || 'http://localhost:19000'
+const SITE = process.env.LIFEOS_SITE || 'acceptance.localhost'
+if (SITE === 'lifeos.localhost') throw new Error('acceptance runs on its own site, never on lifeos.localhost')
+if (!process.argv.includes('--no-reset')) execFileSync(path.join(root, 'scripts/acceptance-site.sh'), { stdio: 'inherit' })
 const SPACE = 'Private'
 const stamp = Date.now().toString(36)
 const results = []
@@ -18,9 +23,9 @@ const iso = (d) => new Date(d.getTime() + 5.5 * 3600e3).toISOString().slice(0, 1
 const today = iso(new Date())
 const addDays = (n) => iso(new Date(Date.now() + n * 86400e3))
 
-function bench(code) {
-  // run Python on the test site, for the two steps that need the clock moved (the archive job)
-  const script = `import frappe; frappe.init("lifeos.localhost"); frappe.connect()\n${code}\nfrappe.db.commit()\n`
+function bench(code, site = SITE) {
+  // run Python on the acceptance site, for the steps that need the clock moved (the archive job)
+  const script = `import frappe; frappe.init("${site}"); frappe.connect()\n${code}\nfrappe.db.commit()\n`
   return execFileSync('docker', ['exec', '-i', 'lifeos-bench', 'bash', '-lc', 'cd ~/frappe-bench/sites && ../env/bin/python -W ignore -'],
     { input: script, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim()
 }
@@ -77,6 +82,8 @@ function runAgent() {
 // a real one-page PDF, made by the test helpers on the bench
 const PDF = Buffer.from(bench('import base64\nfrom lifeos import devtools\nprint(base64.b64encode(devtools.pdf_bytes()).decode())').split('\n').pop(), 'base64')
 
+// the Settings check adds and removes this person as a member; they exist on the acceptance site with no space
+bench(`from lifeos import devtools\nfrappe.set_user("Administrator")\ndevtools.make_user("stranger@lifeos.test", "Stranger", ["Life User"])`)
 // Earlier runs leave their records on the test site. Today lists only the 20 documents that expire soonest, so the vault
 // documents of earlier runs are archived first; otherwise this run's document would not be among them.
 bench(`from lifeos import archive
@@ -476,6 +483,9 @@ const STATE_TABS = [
   ['Chats', '/life/chats', 'open_items', ['all', '1'], `area=${uxArea}`],
   ['Vault', '/life/vault', 'expiry', ['all', 'soon', 'expired'], 'type=Other'],
 ]
+
+// UX fixes, set 4: the lists whose Area filter must offer only active areas of the current space
+const AREA_FILTER_SCREENS = ['/life/tasks?all=1', '/life/projects?all=1']
 
 for (const width of [1440, 390]) {
   const phone = width < 800
@@ -1053,7 +1063,10 @@ for (const width of [1440, 390]) {
     await pg.waitForTimeout(1200)
     const back = await got()
     must(!back.find((x) => x.name === b).is_archived && !back.find((x) => x.name === a).is_archived && back.find((x) => x.name === a).parent_area === b, 'Restore did not bring both back in place')
-    await s.api('settings.save_item', { kind: 'area', name: b, is_archived: 1 }) // tidy: leave the test areas archived
+    // tidy: the task and both test areas go (the site is rebuilt before each run, but nothing is left behind anyway)
+    await s.api('frappe.client.delete', { doctype: 'Life Task', name: task.name })
+    await s.api('settings.save_item', { kind: 'area', name: a, delete: 1 })
+    await s.api('settings.save_item', { kind: 'area', name: b, delete: 1 })
     // a changed setting says Saved and survives a reload
     step = 'a changed setting says Saved and survives a reload'
     const before = (await s.api('settings.get', { space: SPACE })).settings.score_target
@@ -1391,8 +1404,57 @@ for (const width of [1440, 390]) {
       }
     }
   })
+
+  // ---------- UX fixes, set 4 ----------
+  // Area filters: no archived area and no area of another space, on every list with an Area filter; the Archive lists archived ones
+  await check(`${tag}.20`, `${width} px: the Area filter lists only active areas of this space; the Archive also lists archived ones, marked`, async () => {
+    const made = []
+    try {
+      const mk = async (space, title, archived) => {
+        const a = (await s.api('settings.save_item', { kind: 'area', space, title: `${title} ${width} ${stamp}` })).name
+        made.push(a)
+        if (archived) await s.api('settings.save_item', { kind: 'area', name: a, is_archived: 1 })
+      }
+      await mk(SPACE, 'S4 active area', false)
+      await mk(SPACE, 'S4 archived area', true)
+      await mk('Shared', 'S4 shared area', false)
+      const optionsOn = async (p) => {
+        await s.open(p)
+        await openControls()
+        const box = (phone ? controls() : controls().locator('[data-quick-filters]')).locator('[aria-label="Area"]').first()
+        const more = controls().getByRole('button', { name: /\d+ more/ })
+        if (!(await box.count()) && await more.count()) { await more.first().click(); await pg.waitForTimeout(200) }
+        await box.click()
+        await pg.keyboard.type('S4 ', { delay: 20 })
+        await pg.waitForTimeout(1100)
+        const opts = await pg.getByRole('option').allInnerTexts()
+        await pg.keyboard.press('Escape')
+        await closeControls()
+        return opts.filter((o) => o.includes(stamp))
+      }
+      for (const p of AREA_FILTER_SCREENS) {
+        const opts = await optionsOn(p)
+        must(opts.some((o) => o.startsWith('S4 active area')), `${p}: the active area is not offered (${opts})`)
+        must(!opts.some((o) => /S4 (archived|shared) area/.test(o)), `${p}: offers ${opts.join(', ')}`)
+      }
+      const arch = await optionsOn('/life/archive?all=1')
+      must(arch.some((o) => /^S4 archived area .*\(archived\)/.test(o)), `the Archive does not offer the archived area marked (archived): ${arch}`)
+      must(!arch.some((o) => o.startsWith('S4 shared area')), 'the Archive offers an area of another space')
+      return `${AREA_FILTER_SCREENS.length} screens`
+    } finally {
+      for (const a of made) await s.api('settings.save_item', { kind: 'area', name: a, delete: 1 }).catch(() => {})
+    }
+  })
+
   await s.ctx.close()
 }
+
+// lifeos.localhost is the owner's test site: no acceptance run may leave a record there
+await check('S4.0', 'No test debris on lifeos.localhost after the run', async () => {
+  const out = bench('from lifeos import devtools\nimport json\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))', 'lifeos.localhost').split('\n').pop()
+  const d = JSON.parse(out)
+  must(!Object.keys(d).length, 'debris on lifeos.localhost: ' + out)
+})
 
 await browser.close()
 const failed = results.filter((r) => !r[1])

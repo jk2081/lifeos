@@ -57,6 +57,10 @@ def purge_space(space, drop=False):
 
 	for dt in SPACE_DOCTYPES:
 		meta = frappe.get_meta(dt)
+		# their files too, so a test leaves no file behind (UX fixes, set 4)
+		for f in frappe.db.sql(f"""select f.name, f.file_url, f.is_private from tabFile f join `tab{dt}` r on r.name = f.attached_to_name
+				where f.attached_to_doctype = %s and r.space = %s""", (dt, space), as_dict=True):
+			_delete_file(f)
 		for tf in meta.get_table_fields():
 			frappe.db.sql(
 				f"delete c from `tab{tf.options}` c join `tab{dt}` p on p.name = c.parent where c.parenttype=%s and p.space=%s", (dt, space))
@@ -65,6 +69,17 @@ def purge_space(space, drop=False):
 	if drop:
 		frappe.db.sql("delete from `tabLife Space Member` where parent=%s", space)
 		frappe.db.sql("delete from `tabLife Space` where name=%s", space)
+
+
+def _delete_file(f):
+	"""Remove a File row, and the stored file when no other row points at it."""
+	import os
+
+	frappe.db.sql("delete from tabFile where name=%s", f.name)
+	if f.file_url and not frappe.db.exists("File", {"file_url": f.file_url}):
+		path = frappe.get_site_path("private" if f.is_private else "public", "files", os.path.basename(f.file_url))
+		if os.path.exists(path):
+			os.remove(path)
 
 
 def load_fake_agent():
@@ -125,3 +140,147 @@ def journal_png(lines=None):
 	buf = io.BytesIO()
 	img.save(buf, format="PNG")
 	return buf.getvalue()
+
+
+def prepare_site(time_zone="Asia/Kolkata"):
+	"""Make a fresh test site match lifeos.localhost: setup done, the time zone set and MCP on. Writes the singles directly,
+	since the setup wizard (which would ask for language and country) never runs on a test site."""
+	for field, value in {"time_zone": time_zone, "setup_complete": 1, "enable_mcp": 1, "date_format": "yyyy-mm-dd"}.items():
+		frappe.db.set_single_value("System Settings", field, value)
+	frappe.db.set_value("Installed Application", {"app_name": "frappe"}, "is_setup_complete", 1)
+	# a new site has no encryption key until something needs one; write it now, before a web server caches the site config
+	from frappe.utils.password import get_encryption_key
+
+	get_encryption_key()
+	frappe.db.commit()
+	frappe.clear_cache()
+	return "Site prepared."
+
+
+# ---------- test debris ----------
+# Title prefixes the acceptance scripts (tools/*.mjs) give their records, each followed by the run's stamp: Date.now() in
+# base 36, eight characters starting with "m" in 2026. Some carry the screen width or a number before the stamp.
+DEBRIS_PREFIXES = [
+	"Journal photo", "Production note", "October goal", "Birthday", "Passport", "Target note", "Source note", "Project task",
+	"Project", "Old done task", "Stale open task", "Sanitise", "S3 agent item", "S3 secret", "UX door task", "UX due today",
+	"UX done", "UX carried", "UX archived by the job", "UX note", "UX permit", "UX chat", "UX inbox", "UX3 area A", "UX3 area B",
+	"UX3 filed under A", "UX3 due today", "UX3 open goal", "UX3 annual goal", "UX3 goal task", "UX parent", "UX child",
+	"Promotion plan", "Nowrojee", "S4 ",
+]
+DEBRIS_FILE_PREFIXES = ["journal-", "production-"]
+_TITLED = {
+	"Life Area": "area_name", "Life Project": "title", "Life Inbox Item": "title", "Life Task": "title", "Life Note": "title",
+	"Life Important Date": "title", "Life Goal": "title", "Life Vault Document": "title", "Life Chat Log": "title",
+	"Life Person": "full_name", "Life Proposal": "preview",
+}
+
+
+def _stamp_re():
+	import re
+
+	prefixes = "|".join(re.escape(p.strip()) for p in sorted(DEBRIS_PREFIXES, key=len, reverse=True))
+	return re.compile(rf"^(?:{prefixes})(?: \d)?(?: \d{{3,4}})? (m[0-9a-z]{{7}})(?:$|[ .])")
+
+
+def find_test_debris(site_check=True):
+	"""Every record the acceptance scripts left, by DocType: {doctype: set(names)}, plus the run stamps found.
+
+	Finds titles made by the scripts, then everything that hangs off them: proposals and the records they created,
+	records made from a debris inbox item, filed under a debris area, project, goal or parent note."""
+	rx = _stamp_re()
+	stamps = set()
+	for dt, field in _TITLED.items():
+		for (title,) in frappe.db.sql(f"select `{field}` from `tab{dt}`"):
+			m = rx.match(title or "")
+			if m:
+				stamps.add(m.group(1))
+	for (fname,) in frappe.db.sql("select file_name from tabFile where attached_to_doctype like 'Life %%'"):
+		for p in DEBRIS_FILE_PREFIXES:
+			if (fname or "").startswith(p) and len(fname.split(".")[0]) == len(p) + 8:
+				stamps.add(fname[len(p):len(p) + 8])
+	debris = {dt: set() for dt in _TITLED}
+	for dt, field in _TITLED.items():
+		for s in stamps:
+			debris[dt].update(frappe.get_all(dt, filters={field: ["like", f"%{s}%"]}, pluck="name"))
+	# follow what hangs off them until nothing new turns up
+	follow = [("inbox_item", "Life Inbox Item"), ("area", "Life Area"), ("project", "Life Project"), ("goal", "Life Goal"),
+		("parent_note", "Life Note"), ("parent_area", "Life Area")]
+	from lifeos.constants import SPACE_DOCTYPES
+
+	for _ in range(5):
+		grew = False
+		for dt in SPACE_DOCTYPES:
+			if dt in ("Life Index", "Life Link"):
+				continue
+			meta = frappe.get_meta(dt)
+			for field, target in follow:
+				names = debris.get(target)
+				if names and meta.has_field(field):
+					found = set(frappe.get_all(dt, filters={field: ["in", list(names)]}, pluck="name"))
+					if found - debris.setdefault(dt, set()):
+						debris[dt] |= found
+						grew = True
+		props = debris.get("Life Proposal") or set()
+		for p in frappe.get_all("Life Proposal", filters={"name": ["in", list(props) or [""]]}, fields=["created_doctype", "created_name"]):
+			if p.created_doctype and p.created_name and p.created_doctype.startswith("Life ") and frappe.db.exists(p.created_doctype, p.created_name):
+				if p.created_name not in debris.setdefault(p.created_doctype, set()):
+					debris[p.created_doctype].add(p.created_name)
+					grew = True
+		if not grew:
+			break
+	# keystrokes of the rename check ("…renamed") that reached quick add when the field lost focus: "n" opened it
+	debris.setdefault("Life Task", set()).update(frappe.get_all("Life Task", filters={"title": "amed", "area": ["is", "not set"]}, pluck="name"))
+	return {dt: names for dt, names in debris.items() if names}, sorted(stamps)
+
+
+def _orphan_files():
+	"""Files attached to a lifeos record that no longer exists (tests that delete their records leave these)."""
+	out = []
+	for (dt,) in frappe.db.sql("select distinct attached_to_doctype from tabFile where attached_to_doctype like 'Life %%'"):
+		if not frappe.db.table_exists(dt):
+			continue
+		out += frappe.db.sql(f"""select f.name, f.file_url, f.is_private from tabFile f left join `tab{dt}` r on r.name = f.attached_to_name
+			where f.attached_to_doctype = %s and r.name is null""", dt, as_dict=True)
+	return out
+
+
+def purge_test_debris(dry_run=True):
+	"""Delete the acceptance scripts' records with their proposals, links, index rows, files, child rows, versions and
+	comments. With dry_run (the default) only report counts.
+
+	Run: bench --site lifeos.localhost execute lifeos.devtools.purge_test_debris --kwargs "{'dry_run': 0}" """
+	debris, stamps = find_test_debris()
+	report = {dt: len(n) for dt, n in debris.items()}
+	pairs = [(dt, n) for dt, names in debris.items() for n in names]
+	if dry_run or not (pairs or _orphan_files()):
+		return {"stamps": len(stamps), "records": report, "orphan_files": len(_orphan_files()), "dry_run": bool(dry_run)}
+	month_goals = frappe.db.sql("select name from `tabLife Month Plan Goal` where " +
+		" or ".join(["title like %s"] * len(stamps)), [f"%{s}%" for s in stamps]) if stamps else []
+	files = []
+	for dt, names in debris.items():
+		names = list(names)
+		meta = frappe.get_meta(dt)
+		for tf in meta.get_table_fields():
+			frappe.db.sql(f"delete from `tab{tf.options}` where parenttype=%s and parent in %s", (dt, names))
+		frappe.db.sql("delete from `tabLife Index` where ref_doctype=%s and ref_name in %s", (dt, names))
+		frappe.db.sql("delete from `tabLife Link` where (from_doctype=%s and from_name in %s) or (to_doctype=%s and to_name in %s)",
+			(dt, names, dt, names))
+		files += frappe.get_all("File", filters={"attached_to_doctype": dt, "attached_to_name": ["in", names]}, fields=["name", "file_url", "is_private"])
+		frappe.db.sql("delete from `tabVersion` where ref_doctype=%s and docname in %s", (dt, names))
+		frappe.db.sql("delete from `tabComment` where reference_doctype=%s and reference_name in %s", (dt, names))
+		frappe.db.sql(f"delete from `tab{dt}` where name in %s", (names,))
+	if month_goals:
+		frappe.db.sql("delete from `tabLife Month Plan Goal` where name in %s", ([m[0] for m in month_goals],))
+	files += _orphan_files()
+	for f in files:
+		_delete_file(f)
+	# saved views that point at a debris record or a run's search
+	removed_views = 0
+	for v in frappe.get_all("Life View State", fields=["name", "state"]):
+		state = v.state or ""
+		if any(s in state for s in stamps) or any(n in state for _, n in pairs if len(n) > 6):
+			frappe.db.sql("delete from `tabLife View State` where name=%s", v.name)
+			removed_views += 1
+	frappe.db.commit()
+	frappe.clear_cache()
+	return {"stamps": len(stamps), "records": report, "month_goals": len(month_goals), "files": len(files), "views": removed_views}
