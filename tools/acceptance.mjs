@@ -644,6 +644,9 @@ for (const width of [1440, 390]) {
     await door('/life', 'today-loops', { path: '/life/tasks' })
     await door('/life', 'today-score', { target: '[data-week-score]', path: '/life/journal', ...hidden })
     await door('/life', 'today-vault', { path: '/life/vault' })
+    await door('/life', 'today-group-today', { path: '/life/tasks', optional: true })
+    await door('/life', 'today-group-overdue', { path: '/life/tasks', optional: true })
+    await door('/life', 'today-review-all', { path: '/life/inbox', optional: true })
     await door('/life', 'nav-review', { path: '/life/inbox', ...hidden })
     // the area and project pages: the preview headings of Overview lead to their tab (set 3), whose list holds that number
     const area = '/life/areas/' + uxArea
@@ -1334,6 +1337,59 @@ for (const width of [1440, 390]) {
     }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${KINDS.length} kinds`
+  })
+
+  await check(`${tag}.16`, `${width} px: Today: task groups are capped, overdue folds, To review comes early on a phone, habit and week ticks persist`, async () => {
+    await s.open('/life')
+    const tasks = pg.locator('[data-today-tasks] [data-task-row]')
+    const folded = await pg.locator('[data-overdue-summary]').count()
+    if (folded) {
+      must((await tasks.count()) <= 7, 'more than 7 rows in Due today')
+      await pg.locator('[data-overdue-show]').click()
+      await settle()
+    }
+    must((await tasks.count()) <= 14, `${await tasks.count()} task rows on Today, more than two groups of 7`)
+    must((await pg.locator('[data-today-review] [data-row]').count()) <= 3, 'more than 3 rows under To review')
+    if (phone) {
+      const top = (await pg.locator('[data-today-review]').boundingBox()).y
+      must(top < 2 * 844, `To review starts ${Math.round(top)} px down, past the second screen`)
+    }
+    // a habit tick survives a reload; it is put back after
+    const habit = pg.locator('[data-today-habits] [data-habit]').first()
+    if (await habit.count()) {
+      const name = await habit.getAttribute('aria-label')
+      const was = await habit.getAttribute('aria-pressed')
+      await habit.click()
+      await pg.waitForTimeout(800)
+      await pg.reload({ waitUntil: 'networkidle' })
+      await settle()
+      const again = pg.locator(`[data-today-habits] [data-habit][aria-label^="${name.split(',')[0]},"]`)
+      must((await again.getAttribute('aria-pressed')) !== was, 'a habit tick on Today did not survive a reload')
+      await again.click()
+      await pg.waitForTimeout(800)
+    }
+    // a tick on this week's action survives a reload and moves the score; it is put back after
+    const row = pg.locator('[data-week-action]').first()
+    if (await row.count() && !(await row.locator('[data-week-tick]').isDisabled())) {
+      const action = await row.getAttribute('data-action')
+      const data = await s.api('today.get', {})
+      const a = data.cycle.actions.find((x) => x.name === action)
+      try {
+        await row.locator('[data-week-tick]').click()
+        await pg.waitForTimeout(800)
+        const after = (await s.api('today.get', {})).cycle
+        const want = a.count >= a.per_week ? 0 : a.count + 1
+        must(after.actions.find((x) => x.name === action).count === want, 'a tick on This week was not saved')
+        must(after.done - data.cycle.done === Math.min(want, a.per_week) - Math.min(a.count, a.per_week), 'a tick on This week did not move the week score')
+        await pg.reload({ waitUntil: 'networkidle' })
+        await settle()
+        // a finished action sorts after the ones still to do, so it may be past the first rows
+        if (await pg.locator('[data-week-more]').count()) { await pg.locator('[data-week-more]').click(); await settle() }
+        must((await pg.locator(`[data-action="${action}"] [data-week-tick]`).getAttribute('aria-label', { timeout: 5000 })).includes(`${want} of ${a.per_week}`), 'a tick on This week did not survive a reload')
+      } finally {
+        await s.api('journal.tick', { action, week: data.cycle.week, count: a.count })
+      }
+    }
   })
   await s.ctx.close()
 }

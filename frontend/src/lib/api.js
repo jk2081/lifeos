@@ -8,7 +8,7 @@ export function api(method, args = {}) {
   if (CHANGES.test(method)) out.then(() => window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))).catch(() => {})
   return out
 }
-const CHANGES = /^(tasks\.(set_status|update|quick_add|carry_forward)|archive\.|inbox\.|review\.|chats\.make_task|journal\.(month_plan_make_task|decide))/
+const CHANGES = /^(tasks\.(set_status|update|quick_add|carry_forward|reschedule_overdue)|archive\.|inbox\.|review\.|chats\.make_task|journal\.(month_plan_make_task|decide))/
 
 export function errorText(e) {
   const messages = e?.messages || e?.exc_messages

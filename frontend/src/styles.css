@@ -17,6 +17,14 @@ body { @apply bg-surface-base text-base text-ink-gray-8; }
 .cols > .side { @apply flex min-w-0 flex-col gap-6; flex: 1 1 300px; }
 .cols > .half { @apply flex min-w-0 flex-col gap-6; flex: 1 1 380px; }
 .stats { @apply grid gap-3 max-md:grid-cols-3 max-md:gap-2; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+/* Today: the small heading of a group inside the Tasks card (Due today, Overdue) */
+.group-head { @apply flex min-h-10 items-center gap-2 pt-2.5 text-sm-medium text-ink-gray-7; }
+/* Today: three compact numbers in one row on a phone; its sections become one column in their own order (order-*) */
+@media (max-width: 767px) {
+  .stats.stats-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .today-cols { flex-direction: column; }
+  .today-cols > .wide, .today-cols > .side { display: contents; }
+}
 .chips { @apply flex flex-wrap items-center gap-2; }
 .form-grid { @apply grid gap-3; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
 .scroll-x { @apply overflow-x-auto; }

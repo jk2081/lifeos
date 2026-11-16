@@ -6,6 +6,7 @@
       <div class="text-sm text-ink-gray-6">{{ taskMeta(task, today, { withDue }) }}</div>
     </div>
     <Badge v-if="pill" :theme="pill.theme"><span class="max-md:hidden">{{ pill.text }}</span><span class="md:hidden">{{ pill.shortText || pill.text }}</span></Badge>
+    <slot name="end" />
   </Row>
 </template>
 <script setup>

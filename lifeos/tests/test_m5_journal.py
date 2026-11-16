@@ -3,6 +3,7 @@ from frappe.utils import add_days, getdate, today
 
 from lifeos import journal as rules
 from lifeos.api import journal
+from lifeos.api import today as today_api
 from lifeos.tests.base import AGENT, FAMILY, PRIVATE, SHARED, LifeTestCase
 
 
@@ -322,3 +323,19 @@ class TestCheckinsPagesReview(JournalCase):
 		self.assertEqual(journal.weekly_review(space=PRIVATE)["note"]["content_md"], "Good week. Updated.")
 		from lifeos.api import tasks
 		self.assertEqual(tasks.decide_stale(stale.name, "drop")["status"], "Dropped")
+
+
+class TestTodayThisWeek(JournalCase):
+	def test_today_lists_this_weeks_actions_and_a_tick_moves_the_score(self):
+		cycle, (goal,) = self.make_cycle(status="Active", goals=[("Fit", [("Walk", 1), ("Workout", 3), ("Dropped one", 1)])])
+		walk, workout, dropped = goal.actions
+		journal.set_action_status(dropped.name, "Dropped")
+		data = today_api.get(space=PRIVATE)["cycle"]
+		self.assertEqual(data["week"], 4)
+		acts = {a["name"]: a for a in data["actions"]}
+		self.assertEqual(set(acts), {walk.name, workout.name})
+		self.assertEqual((acts[workout.name]["per_week"], acts[workout.name]["count"], acts[workout.name]["goal_title"]), (3, 0, "Fit"))
+		journal.tick(workout.name, 4, 2)
+		data = today_api.get(space=PRIVATE)["cycle"]
+		self.assertEqual({a["name"]: a["count"] for a in data["actions"]}[workout.name], 2)
+		self.assertEqual((data["done"], data["planned"]), (2, 4))

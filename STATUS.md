@@ -134,6 +134,12 @@ Everything in `UX_FIXES_3.md` is done. Frappe's three tab patterns are applied w
   - `node tools/screens.mjs`: 73 screens at 1440 px and 390 px in light and dark (292 screenshots), including each new tab, every Settings section, the Goals screen and the phone's More list, with no horizontal scrolling, script errors or text below 4.5 to 1. About thirty of them, at least one of each new kind of screen (area and project tabs, pane tabs, the phone review and journal page, Settings sections, Goals, the More list), were looked at by eye; the rest passed the automatic checks only. What was found (double padding in Settings rows, the Settings phone menu jumping to Appearance, the sidebar remembering the library's own collapse on a phone, the Goals columns) is fixed.
 - Deviations are in `DECISIONS.md` under "UX fixes, set 3".
 
+## Today, four enhancements (16 Nov 2026)
+
+- **Works:** Tasks on Today are two groups, Due today and Overdue, each capped at 7 rows with "Show all N". Overdue folds into one line when long, and each overdue row has a Reschedule menu (Today, Tomorrow, Next week, Drop) plus a confirmed "Move all to today" (`tasks.reschedule_overdue`). The week score card has a progress bar against the target. A new "This week" card ticks the current week's 12 Week Year actions in place. Habits are named pills with "n of m". On a phone the stats are one compact row and the order is Habits, To review, Tasks, This week, Calendar, Coming up.
+- **Checks:** unit tests 170 pass (new: `test_today_groups_and_reschedule`, `TestTodayThisWeek`). Acceptance adds U.16 at both widths (caps, folding, To review placement on a phone, habit and week ticks survive a reload and are put back) and three new number doors in U.4. Screenshots `screenshots/today4-*` at 1440 and 390 px, light and dark, with no horizontal scrolling.
+- Deviations are in `DECISIONS.md` under "Today, four enhancements".
+
 ## Summary
 
 ### What works

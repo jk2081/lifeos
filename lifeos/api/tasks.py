@@ -264,3 +264,22 @@ def decide_stale(task, decision):
 	else:
 		frappe.throw(_("decision must be do, carry or drop."))
 	return get(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def reschedule_overdue(space=None, to_date=None):
+	"""Move every open overdue task of a space (Open, Doing or Waiting, not archived, due before today) to `to_date`,
+	today by default. Each task is saved on its own, with the same write check as `update`. Returns how many moved."""
+	space = permissions.resolve_space(space, write=True)
+	now = getdate(today())
+	to = getdate(to_date) if to_date else now
+	if to < now:
+		frappe.throw(_("Overdue tasks can only be moved to today or later."))
+	names = frappe.db.sql_list(
+		"select name from `tabLife Task` where space=%s and status in ('Open', 'Doing', 'Waiting') and is_archived=0 and due_date < %s",
+		(space, now))
+	for name in names:
+		doc = permissions.get_doc_checked("Life Task", name, "write")
+		doc.due_date = to
+		doc.save()
+	return {"moved": len(names), "due_date": str(to)}

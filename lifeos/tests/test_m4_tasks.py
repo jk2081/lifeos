@@ -144,6 +144,31 @@ class TestToday(LifeTestCase):
 		self.assertNotIn("Golf round m4", [e["title"] for e in shared["events"]])
 		self.assertEqual(shared["tasks"]["items"], [])
 
+	def test_today_groups_and_reschedule(self):
+		now = getdate(today())
+		mine = [self.make("Life Task", title=f"Today group {i}", due_date=now) for i in range(2)]
+		old = [self.make("Life Task", title=f"Overdue group {i}", due_date=add_days(now, -3 - i)) for i in range(9)]
+		data = today_api.get(space=PRIVATE)["tasks"]
+		self.assertEqual(data["group_rows"], 7)
+		self.assertTrue({t.name for t in mine} <= {t["name"] for t in data["today"]})
+		self.assertTrue(all(t["due_date"] == str(now) for t in data["today"]))
+		self.assertLessEqual(len(data["overdue_items"]), 7)
+		self.assertTrue(all(t["due_date"] < str(now) for t in data["overdue_items"]))
+		self.assertGreaterEqual(data["overdue"], 9)
+		self.assertLessEqual(data["oldest_overdue"], str(add_days(now, -11)))
+		# the counts are the ones the Tasks list gives for the same filters
+		self.assertEqual(data["today_count"], tasks.count(PRIVATE, due="today"))
+		# the family member cannot move the owner's tasks; a date in the past is refused
+		self.as_user(FAMILY)
+		self.assertRaises(frappe.PermissionError, tasks.reschedule_overdue, space=PRIVATE)
+		self.as_user("Administrator")
+		self.assertRaises(frappe.ValidationError, tasks.reschedule_overdue, space=PRIVATE, to_date=add_days(now, -1))
+		out = tasks.reschedule_overdue(space=PRIVATE, to_date=add_days(now, 1))
+		self.assertGreaterEqual(out["moved"], 9)
+		self.assertEqual({str(frappe.db.get_value("Life Task", t.name, "due_date")) for t in old}, {str(add_days(now, 1))})
+		after = today_api.get(space=PRIVATE)["tasks"]
+		self.assertEqual((after["overdue"], after["overdue_items"], after["oldest_overdue"]), (0, [], None))
+
 
 class TestAreasProjectsTimeline(LifeTestCase):
 	def test_also_in_shows_on_both_area_pages(self):
