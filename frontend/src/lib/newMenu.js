@@ -12,13 +12,15 @@ export function newMenuItems() {
   ]
 }
 
-// Inbox: items to review. Tasks: open tasks due today or overdue, the same number as Today's "Due today".
+// The navigation's numbers come from the count helper with the list each opens (UX fixes, set 5): Inbox, Tasks (due
+// today or overdue) and Someday. Reset shows an amber dot when the stuck count is over the limit.
+const DOORS = { Inbox: ['inbox', 'nav-review', 'to review'], Tasks: ['tasks', 'nav-due', 'due today or overdue'], Someday: ['someday', 'nav-someday', 'on the Someday list'] }
 export function navCount(label) {
-  if (label === 'Inbox' && store.counts.to_review) {
-    return { n: store.counts.to_review, to: { path: '/inbox', query: { status: 'To Review' } }, label: `${store.counts.to_review} to review`, door: 'nav-review' }
-  }
-  if (label === 'Tasks' && store.counts.due) {
-    return { n: store.counts.due, to: { path: '/tasks', query: { due: 'today,overdue', view: 'list' } }, label: `${store.counts.due} due today or overdue`, door: 'nav-due' }
-  }
-  return null
+  const d = DOORS[label]
+  const c = d && store.counts.doors?.[d[0]]
+  if (!c || !c.n) return null
+  return { n: c.n, to: c.to, label: `${c.n} ${d[2]}`, door: d[1], count: c }
+}
+export function navDot(label) {
+  return label === 'Reset' && store.counts.over_limit ? { label: `${store.counts.doors?.stuck?.n} tasks stuck, above your limit` } : null
 }

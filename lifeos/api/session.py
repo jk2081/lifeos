@@ -37,6 +37,10 @@ def counts(space=None):
 	space = permissions.resolve_space(space)
 	from lifeos.api import tasks as task_api
 
-	# due: open tasks due today or overdue, the same number as Today's "Due today" and the list it opens
-	return {"to_review": frappe.db.count("Life Inbox Item", {"space": space, "status": "To Review", "is_archived": 0}),
-		"due": task_api.list(space=space, status="open_doing", due="today,overdue", page_length=1)["total"]}
+	from lifeos import counts as count_rules
+
+	# every number comes with the list it opens (UX fixes, set 5): Inbox items to review, Tasks due today or overdue
+	# (Open, Doing and Waiting), the Someday list, and the stuck count behind Reset's amber dot
+	c = count_rules.sidebar(space)
+	return {"to_review": c["inbox"]["n"], "due": c["tasks"]["n"], "doors": {k: c[k] for k in ("inbox", "tasks", "someday", "stuck")},
+		"over_limit": c["over_limit"]}

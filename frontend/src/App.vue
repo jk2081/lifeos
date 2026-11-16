@@ -29,7 +29,7 @@
       <BottomSheet v-model:open="moreOpen" title="Life OS">
         <div class="flex h-[86dvh] flex-col gap-4 overflow-y-auto px-4 pb-6" data-more>
           <div class="flex gap-2">
-            <Button class="flex-1" size="lg" icon-left="lucide-search" label="Search" @click="moreOpen = false; store.searchOpen = true" />
+            <Button class="flex-1" size="lg" icon-left="lucide-search" label="Search or ask" @click="moreOpen = false; store.searchOpen = true" />
             <Dropdown v-if="canWrite()" :options="newMenuItems().map((o) => ({ ...o, onClick: () => { moreOpen = false; o.onClick() } }))">
               <Button size="lg" variant="solid" icon-left="lucide-plus" label="New" data-more-new />
             </Dropdown>
@@ -50,11 +50,14 @@
               <Button v-if="areaTree.length > MAX_AREAS" class="!justify-start" size="lg" variant="ghost" icon-left="lucide-folders" label="All areas" route="/areas" />
             </template>
             <Button v-for="n in g.items" v-else :key="n.to" class="!justify-start" size="lg" :variant="activeKey === n.to ? 'subtle' : 'ghost'" :icon-left="n.icon" :label="n.label" :route="n.to">
-              <template v-if="navCount(n.label)" #suffix><Badge :label="navCount(n.label).n" /></template>
+              <template v-if="navCount(n.label)" #suffix><RouterLink class="rounded-full" :to="navCount(n.label).to" :aria-label="navCount(n.label).label" data-count-door
+                :data-count-n="navCount(n.label).n" :data-count-label="navCount(n.label).count.label" :data-count-key="'more:' + n.label" @click.stop="moreOpen = false"><Badge :label="navCount(n.label).n" /></RouterLink></template>
             </Button>
           </section>
           <section class="flex flex-col gap-0.5 border-t border-outline-gray-1 pt-3">
-            <Button v-for="n in BOTTOM" :key="n.to" class="!justify-start" size="lg" :variant="activeKey === n.to ? 'subtle' : 'ghost'" :icon-left="n.icon" :label="n.label" :route="n.to" />
+            <Button v-for="n in BOTTOM" :key="n.to" class="!justify-start" size="lg" :variant="activeKey === n.to ? 'subtle' : 'ghost'" :icon-left="n.icon" :label="n.label" :route="n.to">
+              <template v-if="navDot(n.label)" #suffix><span class="size-2 rounded-full bg-surface-amber-7" role="img" :aria-label="navDot(n.label).label" data-reset-dot /></template>
+            </Button>
             <Button class="!justify-start" size="lg" variant="ghost" icon-left="lucide-log-out" label="Log out" @click="logout" />
           </section>
         </div>
@@ -97,7 +100,7 @@ import AppSidebar from './components/AppSidebar.vue'
 import NewRecord from './components/NewRecord.vue'
 import { BOTTOM, GROUPS } from './lib/nav'
 import { MAX_AREAS, activeKey, areaTree } from './lib/sidebar'
-import { navCount, newMenuItems } from './lib/newMenu'
+import { navCount, navDot, newMenuItems } from './lib/newMenu'
 import { api, db } from './lib/api'
 import { recordChanged } from './lib/pane'
 import { areaOptions, loadLookups } from './lib/lookups'

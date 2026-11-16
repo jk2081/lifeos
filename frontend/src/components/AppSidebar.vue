@@ -4,14 +4,11 @@
        collapses to an icon rail. Which groups and parent areas are open, and the rail, are remembered per user. -->
   <Sidebar :collapsible="true" :collapsed="nav.rail" width="232px" aria-label="Sections" data-sidebar @update:collapsed="onCollapse">
     <SidebarHeader :title="store.space || 'No space'" :subtitle="store.fullName || store.user" :menu-items="spaceMenu" />
-    <div class="flex gap-1.5 px-2 pb-1 pt-1" :class="nav.rail && 'flex-col items-center'">
-      <Button v-if="nav.rail" icon="lucide-search" label="Search" tooltip="Search" data-nav-search @click="store.searchOpen = true" />
-      <Button v-else class="flex-1 !justify-start" icon-left="lucide-search" label="Search" data-nav-search @click="store.searchOpen = true">
-        <template #suffix><KeyboardShortcut class="ml-auto" combo="Mod+K" /></template>
-      </Button>
+    <!-- + New; Search moved to the Search or ask box in every screen's header (UX fixes, set 5) -->
+    <div class="px-2 pb-1 pt-1" :class="nav.rail && 'flex flex-col items-center'">
       <Dropdown v-if="canWrite()" :options="newMenu">
         <Button v-if="nav.rail" icon="lucide-plus" label="New" variant="solid" tooltip="New" data-nav-new />
-        <Button v-else icon-left="lucide-plus" label="New" variant="solid" data-nav-new />
+        <Button v-else class="w-full" icon-left="lucide-plus" label="New" variant="solid" data-nav-new />
       </Dropdown>
     </div>
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2" data-nav-groups>
@@ -54,7 +51,7 @@
             <SidebarItem :label="n.label" :icon="n.icon" :route="n.to" :active="activeKey === n.to" :data-nav-item="n.label">
               <template v-if="countOf(n)" #suffix>
                 <RouterLink class="relative mr-1.5 rounded-full focus-visible:focus-ring" :to="countOf(n).to" :aria-label="countOf(n).label" :data-door="countOf(n).door"
-                  :data-nav-count="n.label"><Badge :label="countOf(n).n" /></RouterLink>
+                  :data-nav-count="n.label" data-count-door :data-count-n="countOf(n).n" :data-count-label="countOf(n).count.label" :data-count-key="'nav:' + n.label"><Badge :label="countOf(n).n" /></RouterLink>
               </template>
             </SidebarItem>
           </component>
@@ -62,7 +59,9 @@
       </template>
     </div>
     <div class="flex flex-col gap-0.5 border-t border-outline-gray-1 px-2 pb-3 pt-2" data-nav-bottom>
-      <SidebarItem v-for="n in BOTTOM" :key="n.to" :label="n.label" :icon="n.icon" :route="n.to" :active="activeKey === n.to" :data-nav-item="n.label" />
+      <SidebarItem v-for="n in BOTTOM" :key="n.to" :label="n.label" :icon="n.icon" :route="n.to" :active="activeKey === n.to" :data-nav-item="n.label">
+        <template v-if="navDot(n.label)" #suffix><span class="mr-2 size-2 rounded-full bg-surface-amber-7" role="img" :aria-label="navDot(n.label).label" data-reset-dot /></template>
+      </SidebarItem>
       <SidebarCollapseToggle />
     </div>
   </Sidebar>
@@ -70,11 +69,11 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, KeyboardShortcut, Sidebar, SidebarCollapseToggle, SidebarHeader, SidebarItem, SidebarSection, Tooltip } from 'frappe-ui'
+import { Badge, Button, Dropdown, Sidebar, SidebarCollapseToggle, SidebarHeader, SidebarItem, SidebarSection, Tooltip } from 'frappe-ui'
 import { BOTTOM, GROUPS, TOOLTIPS } from '@/lib/nav'
 import { MAX_AREAS, activeKey, areaTree, nav, setAreaOpen, setGroup, setRail } from '@/lib/sidebar'
 import { canWrite, store } from '@/lib/store'
-import { newMenuItems, navCount } from '@/lib/newMenu'
+import { newMenuItems, navCount, navDot } from '@/lib/newMenu'
 
 const emit = defineEmits(['logout', 'shortcuts'])
 const router = useRouter()
