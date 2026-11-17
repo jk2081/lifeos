@@ -96,52 +96,53 @@ for (const scheme of schemes) {
       return r.message[0]?.name
     }
     const area = await first('Life Area', { space: 'Private', area_name: 'Tea & Coffee' })
-    const project = await first('Life Project', { space: 'Private', title: 'Ghillidary turnaround' })
-    const goal = await first('Life Goal'), jpage = await first('Life Journal Page'), note = await first('Life Note'), task = await first('Life Task', { space: 'Private', status: 'Open' })
+    const openGoal = await first('Life Goal', { space: 'Private', title: 'Ghillidary turnaround' })
+    const goal = await first('Life Goal', { goal_type: '12 Week Year' }), jpage = await first('Life Journal Page'), note = await first('Life Note'), task = await first('Life Task', { space: 'Private', status: 'Open' })
     const vault = await first('Life Vault Document'), chat = await first('Life Chat Log')
     const review = await first('Life Inbox Item', { space: 'Private', status: 'To Review' })
     const wikiPage = await first('Life Note', { space: 'Private', collection: 'Wiki', is_rules: 0 }).catch(() => null)
     const wikiChange = await first('Life Wiki Change').catch(() => null)
+    const lens = `area=${area}`
+    // UX fixes, set 6: the four places, every Plan and Library tab and their views, the goal page, Settings' sections,
+    // the lens (picker, chip, phone sheet), Today's banner; then the panes and screens kept from earlier sets
     const SCREENS = [
-      ['today', '/life'], ['inbox', '/life/inbox?all=1'], ['inbox-pane', `/life/inbox?all=1&open=inbox:${review}`], ['review', `/life/inbox/${review}/review`],
-      ['timeline', '/life/timeline?all=1'], ['tasks', '/life/tasks?view=list'], ['tasks-board', '/life/tasks?view=board'], ['tasks-table', '/life/tasks?view=table'],
-      ['tasks-loops', '/life/tasks?view=loops'], ['tasks-pane', `/life/tasks?view=list&open=task:${task}`],
-      ['cal-month', '/life/calendar/month'], ['cal-week', '/life/calendar/week'], ['cal-agenda', '/life/calendar/agenda'], ['cal-year', '/life/calendar/year'],
-      ['j-12wy', '/life/journal'], ['j-goals', '/life/journal/goals'], ['j-month', '/life/journal/month'], ['j-habits', '/life/journal/habits'],
-      ['j-checkins', '/life/journal/checkins'], ['j-pages', '/life/journal/pages'], ['j-review', '/life/journal/review'], ['goal', `/life/journal/goals/${goal}`],
-      ['jpage', `/life/journal/pages/${jpage}`], ['areas', '/life/areas'], ['area', `/life/areas/${area}`], ['projects', '/life/projects?view=list'],
-      ['projects-cards', '/life/projects?view=cards'], ['project', `/life/projects/${project}`], ['library', `/life/library/${note}`], ['library-list', '/life/library?view=list&all=1'],
-      ['note-pane', `/life/library?view=list&all=1&open=note:${note}`], ['vault', '/life/vault?all=1'], ['vault-pane', `/life/vault?all=1&open=vault:${vault}`],
-      ['chats', '/life/sources?tab=chats&all=1'], ['chat-pane', `/life/sources?tab=chats&all=1&open=chat:${chat}`], ['graph', '/life/graph'], ['archive', '/life/archive?all=1'], ['settings', '/life/settings'],
-      // set 3: the tabs of the area and project pages, the pane's tabs, the review and journal page on a phone, Settings, Goals
-      ...['projects', 'tasks', 'notes', 'wiki', 'documents', 'chats', 'timeline'].map((t) => [`area-${t}`, `/life/areas/${area}?tab=${t}`]),
-      ...['tasks', 'notes', 'documents', 'chats', 'links'].map((t) => [`project-${t}`, `/life/projects/${project}?tab=${t}`]),
-      ['task-pane-notes', `/life/tasks?view=list&open=task:${task}&ptab=notes`], ['task-pane-links', `/life/tasks?view=list&open=task:${task}&ptab=links`],
-      ['goal-pane-tasks', `/life/goals?status=all&open=goal:${goal}&ptab=tasks`], ['goal-pane-history', `/life/goals?status=all&open=goal:${goal}&ptab=history`],
-      ['chat-pane-items', `/life/sources?tab=chats&all=1&open=chat:${chat}&ptab=items`], ['vault-pane-file', `/life/vault?all=1&open=vault:${vault}&ptab=file`],
-      ['page-pane', `/life/journal/pages?open=page:${jpage}&ptab=transcript`], ['project-pane', `/life/projects?status=all&open=project:${project}&ptab=tasks`],
-      ['review-original', `/life/inbox/${review}/review?tab=original`], ['jpage-transcript', `/life/journal/pages/${jpage}?tab=transcript`],
-      ...['appearance', 'default', 'review', 'areas', 'tags', 'habits', 'dimensions', 'connections', 'archive', 'archived', 'members', 'agents'].map((t) => [`settings-${t}`, `/life/settings?tab=${t}`]),
-      // UX fixes, set 4: Sources, the Wiki, the editor
-      ...['all', 'chats', 'voice', 'documents', 'photos', 'articles', 'email', 'text'].map((t) => [`sources-${t}`, `/life/sources?tab=${t}&all=1`]),
-      ['sources-grid', '/life/sources?view=grid&all=1'], ['sources-chats-day', '/life/sources?tab=chats&view=day&all=1'],
-      ...['original', 'text', 'summary', 'made', 'details'].map((t) => [`source-pane-${t}`, `/life/sources?all=1&open=source:${review}&ptab=${t}`]),
-      ...['pages', 'changes', 'health', 'rules'].map((t) => [`wiki-${t}`, `/life/wiki?tab=${t}`]),
-      ...(wikiPage ? ['note', 'sources', 'links', 'history'].map((t) => [`wiki-pane-${t}`, `/life/wiki?open=note:${wikiPage}&ptab=${t}`]) : []),
-      ...(wikiChange ? [['wiki-change', `/life/wiki?tab=changes&open=change:${wikiChange}`]] : []),
-      ['wiki-graph', '/life/graph?collection=Wiki'], ['dev-editor', '/life/dev/editor'], ['library-tree', '/life/library?view=tree'],
-      ['goals', '/life/goals?status=all'], ['goals-progress', '/life/goals?all=1'], ['more', '/life'],
-      // UX fixes, set 5: Today, Someday, Reset, Ask (page and panel), the Archive's Trash, the weekly review's Reset step
-      ...['all', 'due', 'tasks', 'projects', 'goals', 'ideas'].map((t) => [`someday-${t}`, `/life/someday${t === 'all' ? '' : '?tab=' + t}`]),
-      ['reset', '/life/reset'], ...['inventory', 'one'].map((t) => [`reset-${t}`, `/life/reset?tab=${t}`]),
+      ['today', '/life/?area='], ['today-lens', `/life/?${lens}`], ['today-banner', '/life/?area=&at=2026-11-22%2019:00:00'],
+      ['inbox', '/life/inbox?all=1&area='], ['inbox-lens', `/life/inbox?all=1&${lens}`], ['inbox-pane', `/life/inbox?all=1&area=&open=inbox:${review}`], ['review', `/life/inbox/${review}/review`],
+      ...['review', 'calendar', 'agenda'].map((v) => [`plan-week-${v}`, `/life/plan/week?view=${v}&area=`]),
+      ...['plan', 'habits', 'checkins', 'calendar'].map((v) => [`plan-month-${v}`, `/life/plan/month?view=${v}&area=`]),
+      ['plan-12-weeks', '/life/plan/12-weeks?area='], ['plan-12-weeks-lens', `/life/plan/12-weeks?${lens}`],
+      ...['calendar', 'goals'].map((v) => [`plan-year-${v}`, `/life/plan/year?view=${v}&area=`]),
+      ['plan-goals', '/life/plan/goals?status=all&area='], ['plan-goals-lens', `/life/plan/goals?${lens}`], ['plan-tasks', '/life/plan/tasks?view=list&area='],
+      ['plan-tasks-board', '/life/plan/tasks?view=board&area='], ['plan-tasks-pane', `/life/plan/tasks?view=list&area=&open=task:${task}`],
+      ['plan-someday', '/life/plan/someday?area='], ['plan-reset', '/life/plan/reset?area='], ...['inventory', 'one'].map((t) => [`plan-reset-${t}`, `/life/plan/reset?tab=${t}&area=`]),
+      ['goal-open', `/life/plan/goals/${openGoal}`], ...['tasks', 'notes', 'captures', 'links'].map((t) => [`goal-open-${t}`, `/life/plan/goals/${openGoal}?tab=${t}`]),
+      ['goal-12wy', `/life/plan/goals/${goal}`], ['goal-pane', `/life/plan/goals?status=all&area=&open=goal:${openGoal}`],
+      ['library-all', '/life/library?all=1&area='], ['library-all-lens', `/life/library?all=1&${lens}`], ['library-all-grid', '/life/library?view=grid&all=1&area='],
+      ...['list', 'tree', 'graph', 'changes', 'health'].map((v) => [`library-notes-${v}`, `/life/library/notes?view=${v}&area=`]),
+      ['library-notes-assistant', '/life/library/notes?by=assistant&area='],
+      ...['all', 'chats', 'documents', 'photos', 'pages'].map((t) => [`library-captures-${t}`, `/life/library/captures?tab=${t}&all=1&area=`]),
+      ['library-captures-sensitive', '/life/library/captures?tab=documents&sensitive=1&area='], ['library-captures-chats-day', '/life/library/captures?tab=chats&view=day&all=1&area='],
+      ['library-timeline', '/life/library/timeline?all=1&area='], ['library-archive', '/life/library/archive?all=1&area='], ['library-archive-trash', '/life/library/archive?type=trash&all=1&area='],
+      ['note', `/life/library/${note}`], ['note-pane', `/life/library/notes?view=list&all=1&area=&open=note:${note}`],
+      ['vault-pane', `/life/library/captures?tab=documents&all=1&area=&open=vault:${vault}`], ['chat-pane', `/life/library/captures?tab=chats&all=1&area=&open=chat:${chat}`],
+      ...(jpage ? [['page-pane', `/life/library/captures?tab=pages&area=&open=page:${jpage}&ptab=transcript`]] : []),
+      ...['original', 'text', 'summary', 'made', 'details'].map((t) => [`source-pane-${t}`, `/life/library/captures?all=1&area=&open=source:${review}&ptab=${t}`]),
+      ...(wikiPage ? ['note', 'sources', 'links', 'history'].map((t) => [`assistant-pane-${t}`, `/life/library/notes?by=assistant&area=&open=note:${wikiPage}&ptab=${t}`]) : []),
+      ...(wikiChange ? [['assistant-change', `/life/library/notes?view=changes&area=&open=change:${wikiChange}`]] : []),
+      ['task-pane-notes', `/life/plan/tasks?view=list&area=&open=task:${task}&ptab=notes`], ['goal-pane-history', `/life/plan/goals?status=all&area=&open=goal:${goal}&ptab=history`],
       ['ask', '/life/ask'], ['ask-insights', '/life/ask?tab=insights'], ['ask-history', '/life/ask?tab=history'],
-      ['ask-panel', '/life'], ['ask-pane', `/life/tasks?view=list&open=task:${task}`], ['archive-trash', '/life/archive?type=trash&all=1'],
-      ['settings-reset', '/life/settings?tab=reset'], ['settings-ai', '/life/settings?tab=ai'],
+      ['ask-panel', '/life/?area='], ['ask-pane', `/life/plan/tasks?view=list&area=&open=task:${task}`],
+      ['lens-picker', '/life/?area='], ['dev-editor', '/life/dev/editor'],
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai', 'sensitive',
+        'note-rules', 'spaces', 'members', 'archive', 'import', 'backups'].map((t) => [`settings-${t}`, `/life/settings?tab=${t}&area=`]),
     ].filter(([n]) => !only.length || only.includes(n))
     for (const [name, p] of SCREENS) {
       await page.goto(base + p, { waitUntil: 'networkidle' })
       await page.waitForTimeout(700)
-      if (name === 'more' && width < 800) { await page.locator('[data-tabbar] [aria-label="More"]').click(); await page.waitForTimeout(600) }
+      if (name === 'lens-picker') { // the lens's picker: the sidebar's dropdown, or the sheet from the phone's title bar
+        await page.locator(width < 800 ? '[data-lens-title]' : '[data-slot="sidebar-header"] button').first().click()
+        await page.waitForTimeout(600)
+      }
       if (name === 'ask-panel' || name === 'ask-pane') { // a question asked from the screen, in the panel (a sheet on a phone)
         if (name === 'ask-pane') await page.locator('[data-pane-ask]').first().click()
         else if (width < 800) await page.locator('[data-phone-ask]').first().click()

@@ -102,7 +102,9 @@ The wiki is the space's pages about people, organisations, places, concepts and 
 5. **Cite** without changing the text: `wiki.cite(name, sources)`.
 6. Always give a `change_note`: one line saying why, for the owner's Changes list.
 
-Rules: link pages with plain `[[Title]]` (it resolves in the page's space, a wiki page first, then My notes, then other records). One call changes one page. A page holds at most 200,000 characters; at most 50 sources per call. You cannot edit My notes pages, the rules page, or a page the owner moved to My notes ("Keep in My notes"). Never copy secrets or full account numbers into a page. A source a Vault document was made from is hidden from you while the Vault is closed to agents.
+Rules: link pages with plain `[[Title]]` (it resolves in the page's space, a wiki page first, then My notes, then other records). One call changes one page. A page holds at most 200,000 characters; at most 50 sources per call. You cannot edit My notes pages, the rules page, or a page the owner moved to My notes ("Keep in My notes"). Never copy secrets or full account numbers into a page. Sensitive items are hidden from you while the space keeps them from agents (see "Sensitive items").
+
+In the app the wiki's pages are "the assistant's notes", shown among the owner's notes with a "Kept by the assistant" badge. The methods and the rules above are unchanged.
 
 Health: the owner sees orphans, broken links, pages without sources and near-duplicate titles. You may file your own findings (contradictions, stale claims) as a wiki page tagged `health-report`; it shows at the top of the Health tab.
 
@@ -110,11 +112,15 @@ Health: the owner sees orphans, broken links, pages without sources and near-dup
 
 After a working chat with the owner, record it with `lifeos.api.chats.log`: `title`, `date`, `url`, `assistant` (Claude, ChatGPT, Codex, Claude Code or Other), `summary_md`, `open_items` (a list of short strings), `area`, `goal`, and `source_system` with `external_id` (the chat's ID) so a second log of the same chat updates the first. You may add `transcript_md` and `updated_on` (the chat's last activity). This needs no review, because it is a record of what happened. Open items do not become tasks until the owner presses Make task. Do not create the tasks yourself.
 
+## Sensitive items
+
+A **sensitive item** is a Vault document, a source a Vault document was made from, or a capture or note the owner marked sensitive (`is_sensitive`). Each space has a switch, "Agents may open sensitive items". While it is off, sensitive items do not exist for you: lists, search, the graph, the [[ picker and `claim_next` leave them out, and opening one or its files is refused. Do not try another way; ask the owner if you need one. You cannot mark or unmark an item sensitive (`library.set_sensitive` refuses agents).
+
 ## Retrieval requests
 
 When the owner asks for something, such as "send me my PAN card":
 
-1. Search the vault: `lifeos.api.vault.list`, or `lifeos.api.search.query` with `text`.
+1. Search the vault: `lifeos.api.vault.list`, `lifeos.api.sources.list` with `tab=documents`, or `lifeos.api.search.query` with `text`. Vault documents are sensitive: you see them only while the space's switch allows it.
 2. If more than one document fits, ask which one. If none fits, say so.
 3. Download the private file with your own credentials, from the document's file URL.
 4. Send it to the owner in the chat they asked from, and to nobody else.
@@ -124,7 +130,7 @@ Send vault files only to the owner or to the family member whose space holds the
 
 ## The weekly review and daily questions
 
-- `lifeos.api.today.get` gives today's tasks, events, habits, items waiting for review, the current week of the 12 Week Year and expiring documents.
+- `lifeos.api.today.get` gives today's tasks, events, habits, items waiting for review, the current week of the 12 Week Year and expiring documents (an agent's answer has no insights and no reminder banner). With `area` it keeps to one area and its sub-areas.
 - `lifeos.api.journal.week_score` (`cycle`, `week`) gives ticks done over ticks planned.
 - `lifeos.api.journal.weekly_review` gathers the week: score, habits, tasks done and carried, open loops, stale tasks to decide, and what the archive job archived.
 - Use these to run the review in chat. If the owner tells you a habit or an action was done, you may record it with `lifeos.api.journal.toggle_habit` or `lifeos.api.journal.tick`, because he told you directly. Do not do so from something you read in a document; propose it.

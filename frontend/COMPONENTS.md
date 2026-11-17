@@ -82,7 +82,7 @@ Before using a library component, read its source and types: `node_modules/frapp
 | `LifeGroupBy.vue`, `LifeGroupTable.vue` | `GroupBy`, `GroupByTable` | Group a list into one summary row per value |
 | `LifeColumnSettings.vue` | `ColumnSettings` | Columns of the table view, with Reset |
 | `columnResize.js` | `useColumnResize`, `directionFor`, `nextSort` from the experimental `List` | Drag-resize and header sort, written into the same columns |
-| `LifeLink.vue` | `Link` | A picker for a Link field: area, project, person, goal, space |
+| `LifeLink.vue` | `Link` | A picker for a Link field: area, person, goal, space |
 | `LifeFormLayout.vue` | `FormLayout`, `buildLayoutFromMeta`, `useDoctypeMeta` | A form of plain DocType fields drawn from the DocType's meta, bound to our own values object and saved through `lifeos.api` (the vault document form) |
 
 Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the `CommandPalette` family (the search palette).
@@ -110,14 +110,13 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `ChangeView.vue` | One wiki change: who, when, why, the source, the diff, and Undo (with the "changed since" choice) | `Alert`, `Badge`, `Button`, `DiffView` |
 | `DigestView.vue` | An email digest as headed lists, each item's Gmail link an "Open in Gmail" button | `Md`, `Button` |
 | The Sources grid (in `pages/Sources.vue`, `ListView`'s `#body` slot) | Thumbnails of photos and scans as cards; the server's 480 px thumbnail, never the full image | `rounded-5 border-outline-gray-2` cards with the stretched-button pattern, `aspect-[4/3]` image, a Lucide icon when there is no thumbnail |
-| `ProjectCard.vue` | A project as a card | `Badge`, `Progress`, `NumLink` |
 | `HabitBoxes.vue`, the 12 Week Year grid, habit month boxes, the year calendar | Purpose-built journal grids | `Button`-sized cells; `bg-surface-gray-9 text-ink-base` done, `bg-surface-gray-2` missed, `border-outline-gray-4` current, `text-ink-gray-4` future |
 | `LineChart.vue`, the graph | Small SVG chart; Cytoscape canvas | token variables, `tokenColor()` |
 | `SearchPalette.vue`, `QuickAdd.vue`, `Backlinks.vue` | App features | `CommandPalette` family, `Dialog`, `TextInput`, `Row` |
 
 ## How a list screen is written
 
-A list screen is one `ListView` with a spec. `pages/Tasks.vue` and `pages/Vault.vue` are the reference.
+A list screen is one `ListView` with a spec. `pages/Tasks.vue` and `pages/Sources.vue` are the reference.
 
 ```vue
 <ListView title="Vault" noun="documents" screen="vault" doctype="Life Vault Document" :spec="SPEC"
@@ -152,9 +151,10 @@ Frappe organises information with tabs in three ways, and so does Life OS. All t
 
 | Pattern | Where the open tab lives | Used by |
 | --- | --- | --- |
-| Tabs on a record or page | `tab=` | The area page (Overview, Projects, Tasks, Notes, Documents, Chats, Timeline), the project page (Overview, Tasks, Notes, Documents, Chats, Links), Settings (vertical, one section at a time), and on a phone only the review screen (Original, Transcript, Summary, Proposals) and the journal page (Page, Transcript). Journal and Calendar keep their path form (`/journal/habits`, `/calendar/year`) and answer `[` and `]` too |
-| Tabs in the record pane | `ptab=`, so the pane and the page behind it do not collide. Changing it replaces the history entry; opening another record or closing the pane drops it (`lib/pane.js`) | Task (Details, Notes, Links), note (Note, Notes under this one, Links), wiki page (Page, Sources, Links, History), source (Original, Text, Summary, Made from this, Details), project (Overview, Tasks), goal (Actions, Tasks, History across cycles, Links; Tasks and Links for Annual and Open goals), chat (Summary, Open items, Links), journal page (Page, Transcript, Created from this page), vault document (Details, File), an inbox item on a phone. Day, entry and plain panes have none |
-| State tabs on a list | the short parameter of the field the tabs are a preset on: `status=`, `type=`, `expiry=`, `open_items=`, `tab=` | Inbox, Tasks, Projects, Archive, Sources (by kind), Vault, Chats (inside area pages) |
+| Tabs on a record or page | `tab=` | The goal page (Overview, Tasks, Notes, Captures, Links), Settings (vertical, one section at a time), and on a phone only the review screen (Original, Transcript, Summary, Proposals) |
+| A place's tabs | the path | Plan (`/plan/week` … `/plan/someday`) and Library (`/library`, `/library/notes` …). The place provides them and `PageHead` draws them under the header of whichever screen is open there (see "The four places" below) |
+| Tabs in the record pane | `ptab=`, so the pane and the page behind it do not collide. Changing it replaces the history entry; opening another record or closing the pane drops it (`lib/pane.js`) | Task (Details, Notes, Links), note (Note, Notes under this one, Links), the assistant's note (Page, Sources, Links, History), source (Original, Text, Summary, Made from this, Details), goal (Actions, Tasks, History across cycles, Links; Tasks and Links for Annual and Open goals), chat (Summary, Open items, Links), journal page (Page, Transcript, Created from this page), vault document (Details, File), an inbox item on a phone. Day, entry and plain panes have none |
+| State tabs on a list | the short parameter of the field the tabs are a preset on: `status=`, `type=`, `expiry=`, `open_items=`, `tab=` | Inbox, Tasks, Goals, Someday, Archive, Captures and All (by kind) |
 
 **The URL rule.** The open tab is always in the URL, so reload, Back, Forward and a copied link return to it. The first tab is the default and adds nothing to the URL.
 
@@ -190,8 +190,8 @@ async function fetch({ params, tab, filters, ... }) {            // `tab` is the
 - The tab **replaces that field's control**: leave the field out of `quick`. It is still in the Filter popover. A URL value that is not a tab (`status=Dropped`), or a condition on the field made in the Filter, selects **All** and shows as a condition in the filter bar. A condition that equals a tab (`Status = Done`) selects that tab instead.
 - A tab is not counted as a filter, Clear keeps it, and it is saved with the remembered view like the rest of the query.
 - **Counts respect the other filters.** Each list method returns `tabs`, computed in one query (`lifeos.api.utils.tab_counts`) under every filter but the tab's own field. `ListView` exposes `tab` and `tabCounts`.
-- **Inside a page's tab** (the area and project pages) the state tabs are folded into the filter bar as one `Select` (`tabs-in-filter`), since there are no tabs inside tabs.
-- The values in use: Goals `status=` in_progress (default), achieved, closed, all. Inbox `status=` To Review (default), Waiting, Failed (Done and all now open Sources). Sources `tab=` all (default), chats, voice, documents, photos, articles, email, text. The Wiki's page tabs are `tab=` pages (default), changes, health, rules. Tasks `status=` open (default), loops, Waiting, Done, all. Projects `status=` Active (default), On Hold, Done, Dropped, all. Archive `type=` all (default) and the six DocTypes. Chats `open_items=` all (default), 1. Vault `expiry=` all (default), soon, expired.
+- **Inside a page's tab** (the goal page) the state tabs are folded into the filter bar as one `Select` (`tabs-in-filter`), since there are no tabs inside tabs.
+- The values in use: Goals `status=` in_progress (default), achieved, closed, someday, all. Inbox `status=` To Review (default), Waiting, Failed (Done and all open Library > Captures). Captures `tab=` all (default), chats, voice, documents (with the sensitive documents of the Vault), photos, pages (journal pages), articles, email, text; All adds notes. Tasks `status=` open (default), loops, Waiting, Done, Someday, all. Someday `tab=` all, due, tasks, goals, ideas. Archive `type=` all (default), the DocTypes and trash.
 
 ## Checks
 
@@ -208,7 +208,7 @@ A pane says its tabs in the meta it emits: `emit('meta', { title, …, tabs: [{ 
 
 ### A list inside a page's tab
 
-The list screens take `embed`: `{ screen: 'area', space, fixed: { area }, active: (route) => …, writable }`. `fixed` short parameters are set by the page and left out of the URL and the controls; `screen` keys the remembered view (`area-tasks`, shared across areas); `active` is a function of the route so the hidden lists ignore a URL that belongs to the open tab. The page's tab switch keeps only `tab=` and the open record. See `pages/Area.vue`.
+The list screens take `embed`: `{ screen: 'goal', space, fixed: { goal }, active: (route) => …, writable }`. `fixed` short parameters are set by the page and left out of the URL and the controls; `screen` keys the remembered view (`goal-tasks`, shared across goals); `active` is a function of the route so the hidden lists ignore a URL that belongs to the open tab. The page's tab switch keeps only `tab=` and the open record. A list with `fixed` ignores the lens: it lists what is filed under the record. See `pages/Goal.vue`.
 
 ## The editor
 
@@ -244,3 +244,38 @@ Both live in `pages/Today.vue` and read `today.get`. The band (`data-open-band`)
 ### Reset decisions
 
 `pages/Reset.vue` with `components/reset/BatchCard.vue`, `Inventory.vue` and `OneByOne.vue`. On a phone, Batches, One by one and Inventory are `TabBar` tabs (`tab=`); on desktop they are one page. A batch action asks for confirmation (`dialog.confirm`) with the exact count, applies to exactly the listed names, and toasts Undo for one minute. One by one shows the oldest untouched item with Do (D, asks for a date), Waiting (W, asks for whom), Someday (S), Archive (A) and Delete (X): keys on desktop (ignored while typing in a field), large buttons on a phone (`data-obo`). Delete moves the record to the trash (Frappe's Deleted Document), restorable from the Archive's Trash tab for 30 days.
+
+## UX fixes, set 6: the lens, the four places, Plan and Library
+
+### The lens
+
+`lib/lens.js` holds the space and area every place narrows to. It is `space=` and `area=` on every URL: a router guard adds them to any navigation that has none, and a URL that names them (a copied link, Back) sets the lens. It is remembered per user in the view state `lens` (no space). Change it only with `setLens({ space, area })` or `clearArea()`, which empty the state first so the guard does not put the old area back.
+
+- **The picker** is frappe-ui's `SidebarHeader` with the menu from `components/lens/lensMenu.js` (spaces, All of life, every active area with sub-areas indented and a colour dot, "Pin areas to the sidebar", "Manage areas"). On a phone the lens is the title bar at the top of every screen (`App.vue`, `data-lens-bar`), and tapping it opens `components/lens/LensSheet.vue`, which also holds Settings, the shortcuts and Log out.
+- **The header** (`PageHead`) shows the lens as its breadcrumb and, while an area is chosen, a removable chip beside the title (`data-lens-chip`).
+- **Lists** need nothing: `ListView` treats `area=` as the lens. A list whose spec has an `area` entry passes the lens's area to its list method, and the area leaves its controls, its remembered view and its Clear. A list with `fixed` ignores the lens.
+- **Other screens** pass `store.lensArea` to their method (`today.get`, `calendar.get`, `journal.grid`, `journal.month`, `library.tree`, `graph.get`, `search.query`). The page component is keyed on the lens, so a new lens mounts the screen again; no screen watches it.
+- **Area colours** are frappe-ui surface tokens, chosen with `dotClass(area)`; never write a colour class from data.
+
+### The four places
+
+The sidebar (`components/AppSidebar.vue`) is the lens, + New, Today, Inbox, Plan (open to its tabs), Library, "Focus on an area" with the pinned areas, then Settings and the user with Help. The phone's bar is Today, Inbox, Plan, Library and Ask. `lib/nav.js` lists the places, Plan's and Library's tabs and the G shortcuts (`GO`).
+
+A place's tabs are paths (`/plan/goals`, `/library/notes`). The place page (`pages/Plan.vue`, `pages/LibraryPlace.vue`) provides `placeTabs` (`{ tabs, current, label, set }`) and renders the screen of the open tab; that screen's `PageHead` draws the tabs under its header (`data-place-tabs`), so each screen keeps its own title, count and actions. Plan's tabs carry `group` (time, lists): `TabBar` puts a gap between groups.
+
+### Plan
+
+- **Rhythm tabs** (Week, Month, 12 Weeks, Year) are `components/plan/PlanRhythm.vue`: a view switch (`view=`, `TabButtons`) between the journal's screens (`components/journal/*`, which teleport their buttons into `#jr-actions` in the header) and the calendar (`components/plan/Calendar.vue`, with `place` and `switch-options`). Week: Review, Calendar, Agenda, with `WeekScore` above the calendar and the Reset button. Month: Plan, Habits, Check-ins, Calendar. 12 Weeks: the cycle grid. Year: Calendar, Goals across cycles.
+- **List tabs** are the Goals, Tasks and Someday screens as before.
+- **A goal's page** is `/plan/goals/<id>` (`pages/Goal.vue`): what a project page and a goal page each had, with "Serves" and "Served by". Reset is `/plan/reset`.
+
+### Library
+
+- **All** and **Captures** are `pages/Sources.vue` (`place`), over `sources.list` (`scope`, `sensitive`, `by`). Kinds are state tabs; Photos and All keep the grid. Vault documents show as Documents with their holder, number and expiry; "Add document" is on the Documents tab.
+- **Notes** is the notes list with "Written by" (`by=me|assistant`), the "Kept by the assistant" badge and the rules pinned above the assistant's notes; its views (`view=`) are List, Tree, Graph, Changes and Health (`NOTES_VIEWS`).
+- **Timeline** and **Archive** (with Trash) are as before.
+- **Sensitive items** carry `lucide-lock` (`data-sensitive-lock`). The pane header's lock button marks and unmarks (`meta.sensitive`), through `library.set_sensitive`.
+
+### Today's rhythm banner
+
+At most one line above the Open band (`data-rhythm-banner`), from `today.get`'s `banner`, with its action and Skip (`today.skip_banner`).

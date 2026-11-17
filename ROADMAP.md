@@ -13,7 +13,8 @@ Life OS keeps its owner moving forward: everything that lands on him goes in one
 | 4 | Sources, the Wiki, the live-preview editor, streams, test-site clean-up | Done |
 | 5 | Count rule, Someday, Reset, Today with Open and Next, AI client with spend cap, Ask from any screen, insights | Done |
 | Pre-step 6 | Frappe's official conventions, scan, audit and review | Done |
-| 6 | Simplify: four places, the lens, Projects into Goals, Library, Settings, rhythm banners (`UX_FIXES_6.md`) | Next |
+| 6 | Simplify: four places, the lens, Projects into Goals, Library, Settings, rhythm banners (`UX_FIXES_6.md`) | Done |
+| 7 | Moving forward: Outbox, old Inbox items, the weekly review's goal work, Done when (see below) | Next |
 
 ## The target design in one paragraph
 
@@ -44,6 +45,11 @@ Restructure the app around the four places. No AI work.
 - Settings regrouped: Me; Your life (Areas, Rhythms, Habits, Check-ins, Reset rules, Tags); Assistant; People and agents; Data. New Rhythms section; one rhythm banner at a time on Today.
 - Every old route redirects to its new home.
 - Mockups: `mockups/set5/` boards 13 to 19 and the Simplify boards 20 to 22 (to be added to `mockups/set6/`).
+
+### Pending from set 6
+
+- **Remove Life Project.** Every project became an open-ended goal; the old DocType stays read-only and hidden so the migration can be checked (`migrated_to` on each project). Once the owner has checked it, a patch can drop the DocType and its table, and the old `project` columns left in the tables of Life Task, Note, Inbox Item, Chat Log, Journal Page, Vault Document, Idea, Goal and Index (`bench trim-tables`).
+- **Drop the `project` aliases.** For one set, methods take `project` and map it to the goal it became, Someday proposals accept record type Project, and `connections.defaults` answers `default_project`. Remove them in set 7 and say so in `agent/SKILL.md`.
 
 ### Set 7: Moving forward
 
