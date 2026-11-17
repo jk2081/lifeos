@@ -73,6 +73,8 @@ def suggest(space: str | None = None, text: str | None = "", limit: int | None =
 		if dt == permissions.VAULT and permissions.vault_hidden(space):
 			continue
 		filters = {"space": space}
+		if dt in permissions.SENSITIVE_DOCTYPES and permissions.vault_hidden(space):
+			filters["is_sensitive"] = 0  # sensitive items are closed to the agent while the space's switch is off
 		if text:
 			filters[field] = ("like", f"%{text}%")
 		for r in frappe.get_all(dt, filters=filters, fields=["name", f"{field} as title"], order_by="modified desc", limit=limit):

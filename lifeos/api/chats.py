@@ -77,6 +77,8 @@ GROUP_ORDER = {
 
 def where_clause(space, area=None, goal=None, open_items=0, from_date=None, to_date=None, include_archived=0):
 	where, values = [], {}
+	if permissions.vault_hidden(space):  # sensitive chats are closed to an agent while the space's switch is off (set 6)
+		where.append("c.is_sensitive = 0")
 	if not flag(include_archived):
 		where.append("c.is_archived = 0")
 	if area:
@@ -164,6 +166,7 @@ def get(chat: str):
 	"""One chat log with its summary and open items."""
 	doc = permissions.get_doc_checked("Life Chat Log", chat)
 	row = _chat_rows([frappe._dict({k: doc.get(k) for k in ("name", "title", "date", "url", "assistant", "summary_md", "area", "goal", "is_archived")})])[0]
+	row["is_sensitive"] = doc.is_sensitive
 	row["space"] = doc.space
 	row["transcript_md"] = doc.transcript_md or ""
 	row["updated_on"] = str(doc.updated_on) if doc.updated_on else None
@@ -256,10 +259,12 @@ def needs_summary(space: str | None = None, start: int | None = 0, page_length: 
 	lifeos.api.chats.save_summary. Each row has name, title, date, updated_on, assistant, url and the transcript's length."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	rows = frappe.db.sql("""select name, title, date, updated_on, assistant, url, char_length(ifnull(transcript_md, '')) as transcript_length
-		from `tabLife Chat Log` where space=%(space)s and ifnull(summary_md, '') = '' order by ifnull(updated_on, date) desc
+	guard = permissions.sensitive_guard(space)
+	# nosemgrep: frappe-sql-format-injection -- sensitive_guard is a constant fragment; values are parameters
+	rows = frappe.db.sql(f"""select name, title, date, updated_on, assistant, url, char_length(ifnull(transcript_md, '')) as transcript_length
+		from `tabLife Chat Log` where space=%(space)s and ifnull(summary_md, '') = ''{guard} order by ifnull(updated_on, date) desc
 		limit %(start)s, %(len)s""", {"space": space, "start": start, "len": page_length}, as_dict=True)
-	total = frappe.db.sql("select count(*) from `tabLife Chat Log` where space=%s and ifnull(summary_md, '') = ''", space)[0][0]
+	total = frappe.db.sql("select count(*) from `tabLife Chat Log` where space=%s and ifnull(summary_md, '') = ''" + permissions.sensitive_guard(space), space)[0][0]  # nosemgrep: frappe-sql-format-injection -- as above
 	for r in rows:
 		r["date"] = str(r.date) if r.date else None
 		r["updated_on"] = str(r.updated_on) if r.updated_on else None

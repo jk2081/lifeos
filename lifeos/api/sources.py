@@ -8,17 +8,26 @@ from frappe import _
 
 from lifeos import links, permissions
 from lifeos.proposals import goal_for_project
+from lifeos.api.utils import flag
 from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 SOURCE_DOCTYPES = ("Life Inbox Item", "Life Chat Log")
-BASE = "x.ref_doctype in ('Life Inbox Item', 'Life Chat Log') and x.kind in ('Inbox', 'Chat')"
-# the tabs of the Sources screen, each a condition on the index row
+# Library > Captures (UX fixes, set 6): every source, with Vault documents (kind Document, always sensitive) and journal
+# pages; Library > All adds the notes
+CAPTURE_DOCTYPES = ("Life Inbox Item", "Life Chat Log", "Life Vault Document", "Life Journal Page")
+BASE = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Journal Page') "
+	"and x.kind in ('Inbox', 'Chat', 'Document', 'Journal Page')")
+BASE_ALL = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Journal Page', 'Life Note') "
+	"and x.kind in ('Inbox', 'Chat', 'Document', 'Journal Page', 'Note')")
+# the kind tabs of Captures and All, each a condition on the index row
 TABS = {
 	"all": None,
+	"notes": "x.ref_doctype = 'Life Note'",
 	"chats": "x.ref_doctype = 'Life Chat Log'",
 	"voice": "x.media_kind = 'Voice'",
-	"documents": "x.media_kind = 'Document'",
+	"documents": "(x.media_kind = 'Document' or x.ref_doctype = 'Life Vault Document')",
+	"pages": "x.ref_doctype = 'Life Journal Page'",
 	"photos": "x.media_kind = 'Photo'",
 	"articles": "x.media_kind = 'Article'",
 	"email": "x.media_kind in ('Email', 'Email Digest')",
@@ -27,16 +36,16 @@ TABS = {
 # where a source is: In Inbox (not finished), Done (finished; every chat log), Failed
 STATUSES = {
 	"inbox": "x.ref_doctype = 'Life Inbox Item' and x.status in ('New', 'Processing', 'To Review')",
-	"done": "(x.ref_doctype = 'Life Chat Log' or x.status = 'Done')",
+	"done": "(x.ref_doctype != 'Life Inbox Item' or x.status = 'Done')",
 	"failed": "x.status = 'Failed'",
 }
 SORTS = {"record_date": "x.record_date", "title": "x.title", "modified": "x.modified"}
 FIELDS = """x.ref_doctype, x.ref_name, x.title, x.record_date, x.area, x.goal, x.status, x.media_kind, x.source_system, x.intent,
-	x.assistant, x.thumbnail, x.is_archived, x.vault_locked, x.modified"""
+	x.assistant, x.thumbnail, x.is_archived, x.vault_locked, x.modified, x.collection, x.record_owner"""
 
 
 def status_label(doctype, status):
-	if doctype == "Life Chat Log":
+	if doctype != "Life Inbox Item":
 		return "Done"
 	return {"New": "In Inbox", "Processing": "In Inbox", "To Review": "In Inbox"}.get(status, status or "In Inbox")
 
@@ -63,9 +72,21 @@ def made_counts(rows):
 	return out
 
 
+def agent_users():
+	return frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent") or ["-"]
+
+
 def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, status=None, intent=None, system=None, assistant=None,
-		include_archived=0, open_items=0):
-	where, values = ["x.space = %(space)s", BASE], {"space": space}
+		include_archived=0, open_items=0, scope="captures", sensitive=0, by=None):
+	where, values = ["x.space = %(space)s", BASE_ALL if scope == "all" else BASE], {"space": space}
+	if flag(sensitive):
+		where.append("x.vault_locked = 1")
+	if by == "me":  # written by me: not by an agent, and not one of the assistant's notes
+		where.append("x.record_owner not in %(agents)s and ifnull(x.collection, '') != 'Wiki'")
+		values["agents"] = agent_users()
+	elif by == "assistant":
+		where.append("(x.record_owner in %(agents)s or x.collection = 'Wiki')")
+		values["agents"] = agent_users()
 	if int(open_items or 0):
 		where.append("x.ref_doctype = 'Life Chat Log' and x.status = 'Open'")
 	if not int(include_archived or 0):
@@ -101,9 +122,13 @@ def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, 
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, tab: str | None = None, area: str | None = None, goal: str | None = None, from_date: str | None = None, to_date: str | None = None, status: str | None = None, intent: str | None = None,
 		system: str | None = None, assistant: str | None = None, include_archived: bool | int | None = 0, open_items: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
-		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, project: str | None = None):
-	"""Every source of a space, newest first: inbox items and chat logs.
-	tab: all (default), chats, voice, documents, photos, articles, email (emails and email digests), text.
+		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, project: str | None = None,
+		scope: str | None = "captures", sensitive: bool | int | None = 0, by: str | None = None):
+	"""Every capture of a space, newest first: inbox items, chat logs, Vault documents (kind Document, always sensitive)
+	and journal pages (Library > Captures). scope="all" adds the notes (Library > All).
+	tab: all (default), notes (scope all), chats, voice, documents (with Vault documents), pages (journal pages), photos,
+	articles, email (emails and email digests), text. sensitive=1 keeps the sensitive items; by=me or assistant keeps
+	what a person or an agent wrote (the assistant's notes count as the assistant's).
 	Filters: area (with its sub-areas, or "none"), goal (`project` names the goal a project became), from_date and to_date (received), status (inbox, done, failed),
 	intent (Process, Add to wiki, Just keep), system (gmail, claude…), assistant (for chats), open_items=1 (chats with an open item),
 	include_archived=1 (archived sources too; they are left out otherwise, as on every list).
@@ -114,12 +139,18 @@ def list(space: str | None = None, tab: str | None = None, area: str | None = No
 	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
 		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	tab = tab or "all"
+	scope = "all" if scope == "all" else "captures"
 	if tab not in TABS:
 		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)))
-	where, values = _where(space, tab, area, goal, from_date, to_date, status, intent, system, assistant, include_archived, open_items)
+	if by not in (None, "", "me", "assistant"):
+		frappe.throw(_("by must be me or assistant."))
+	where, values = _where(space, tab, area, goal, from_date, to_date, status, intent, system, assistant, include_archived, open_items, scope,
+		sensitive, by)
 	where.append("1=1" + permissions.vault_guard(space, "x."))
 	conds, values = std_filters("Life Index", filters, "x", values)
 	tabs = tab_counts(f"from `tabLife Index` x where {' and '.join(where + conds)}", values, TABS)
+	if scope != "all":
+		tabs.pop("notes", None)
 	if TABS[tab]:
 		where.append(TABS[tab])
 	clause = " and ".join(where + conds)
@@ -145,17 +176,42 @@ def decorate(rows):
 		and status = 'Open' group by parent""", (chats,))) if chats else {}
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows], "title")
+	vault = _vault_fields([r.ref_name for r in rows if r.ref_doctype == "Life Vault Document"])
+	agents = set(agent_users())
 	out = []
 	for r in rows:
-		kind = "Chat" if r.ref_doctype == "Life Chat Log" else (r.media_kind or "Text")
+		kind = KIND_OF.get(r.ref_doctype) or (r.media_kind or "Text")
 		out.append({
 			"doctype": r.ref_doctype, "name": r.ref_name, "title": r.title, "kind": kind, "received": str(r.record_date) if r.record_date else None,
 			"area": r.area or None, "area_name": areas.get(r.area), "goal": r.goal or None, "goal_title": goals.get(r.goal),
 			"status": status_label(r.ref_doctype, r.status), "intent": r.intent or None, "source_system": r.source_system or None,
 			"assistant": r.assistant or None, "thumbnail": r.thumbnail or None, "is_archived": r.is_archived,
-			"made": made.get((r.ref_doctype, r.ref_name), 0), "ref": ("chat:" if r.ref_doctype == "Life Chat Log" else "source:") + r.ref_name,
-			"open_count": open_items.get(r.ref_name, 0),
+			"made": made.get((r.ref_doctype, r.ref_name), 0), "ref": REF_OF.get(r.ref_doctype, "source:") + r.ref_name,
+			"open_count": open_items.get(r.ref_name, 0), "sensitive": 1 if r.vault_locked or r.ref_doctype == "Life Vault Document" else 0,
+			"by_assistant": 1 if r.collection == "Wiki" or r.record_owner in agents else 0,
+			**vault.get(r.ref_name, {}),
 		})
+	return out
+
+
+KIND_OF = {"Life Chat Log": "Chat", "Life Vault Document": "Document", "Life Journal Page": "Journal page", "Life Note": "Note"}
+REF_OF = {"Life Chat Log": "chat:", "Life Vault Document": "vault:", "Life Journal Page": "page:", "Life Note": "note:", "Life Inbox Item": "source:"}
+
+
+def _vault_fields(names):
+	"""What a Vault document keeps as a capture: its holder, last four characters, issue and expiry dates, reminder and badge."""
+	if not names:
+		return {}
+	from lifeos.api.vault import badge
+
+	rows = frappe.get_all("Life Vault Document", filters={"name": ("in", names)},
+		fields=["name", "doc_type", "holder", "number_last4", "issue_date", "expiry_date", "remind_days_before"])
+	holders = names_map("Life Person", [r.holder for r in rows], "full_name")
+	out = {}
+	for r in rows:
+		out[r.name] = {"doc_type": r.doc_type, "holder": r.holder, "holder_name": holders.get(r.holder), "number_last4": r.number_last4,
+			"issue_date": str(r.issue_date) if r.issue_date else None, "expiry_date": str(r.expiry_date) if r.expiry_date else None,
+			"remind_days_before": r.remind_days_before, "expiry": badge(r.expiry_date, r.remind_days_before)}
 	return out
 
 

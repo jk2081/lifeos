@@ -218,6 +218,8 @@ def t_get_record(ctx, ref=None, doctype=None, name=None):
 		return {"error": "That record is in another space."}
 	if doctype == "Life Inbox Item" and doc.get("vault_document") and not ctx.vault_ok:
 		return {"error": "This source belongs to a Vault document, which Ask may not read in this space."}
+	if doc.get("is_sensitive") and not ctx.vault_ok:
+		return {"error": "This item is marked sensitive, and Ask may not read sensitive items in this space."}
 	title = doc.get(frappe.get_meta(doctype).title_field or "title") or doc.name
 	rid = ctx.ref(doctype, name, title, doctype.replace("Life ", ""), doc.get("creation"), doc.get("area"))
 	ctx.mark_read(rid)

@@ -31,7 +31,7 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 		if a in nodes and b in nodes and a != b:
 			edges.append({"source": a, "target": b, "kind": kind})
 
-	note_filters = {"space": space, "is_archived": 0}
+	note_filters = {"space": space, "is_archived": 0, **({"is_sensitive": 0} if permissions.vault_hidden(space) else {})}
 	if collection in ("Wiki", "My notes"):
 		note_filters["collection"] = collection
 	notes = frappe.get_all("Life Note", filters=note_filters, fields=["name", "title", "parent_note"], order_by="modified desc", limit=300)
@@ -59,6 +59,11 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 	ends = [(dt, name) for r in link_rows for dt, name in ((r.from_doctype, r.from_name), (r.to_doctype, r.to_name))
 		if dt in TYPES and dt not in hidden and key(dt, name) not in nodes]
 	found = titles(ends)
+	if hidden:  # sensitive items join an agent's graph only when the space's switch allows it (set 6)
+		for dt in permissions.SENSITIVE_DOCTYPES:
+			names = [n for d, n in found if d == dt]
+			for n in frappe.get_all(dt, filters={"name": ("in", names or ["-"]), "is_sensitive": 1}, pluck="name"):
+				found.pop((dt, n), None)
 	for r in link_rows:  # a task or chat joins the graph when a link touches it
 		for dt, name in ((r.from_doctype, r.from_name), (r.to_doctype, r.to_name)):
 			if key(dt, name) not in nodes and (dt, name) in found:

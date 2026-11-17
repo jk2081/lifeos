@@ -2,7 +2,7 @@
   <Sources v-if="current === 'all' || current === 'captures'" :key="current" :place="current" />
   <template v-else-if="current === 'notes'">
     <Graph v-if="route.query.view === 'graph'" />
-    <Wiki v-else-if="route.query.by === 'assistant'" />
+    <Wiki v-else-if="['changes', 'health', 'rules'].includes(route.query.view)" :section="route.query.view" />
     <Library v-else />
   </template>
   <Timeline v-else-if="current === 'timeline'" />

@@ -186,8 +186,8 @@
               <template v-for="sp in d.spaces" :key="sp.name">
                 <SettingRow :label="`Ask in ${sp.name}`" help="People in this space can ask about its records.">
                   <Switch :model-value="!!sp.ask_enabled" :aria-label="`Ask in ${sp.name}`" :data-ask-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_enabled', v)" /></SettingRow>
-                <SettingRow :label="`Ask may read Vault documents in ${sp.name}`" help="Off by default. Separate from the agents' switch.">
-                  <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="`Ask may read Vault documents in ${sp.name}`" :data-ask-vault-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_can_read_vault', v)" /></SettingRow>
+                <SettingRow :label="`Ask may read sensitive items in ${sp.name}`" help="Off by default. Separate from the agents' switch.">
+                  <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="`Ask may read sensitive items in ${sp.name}`" :data-ask-vault-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_can_read_vault', v)" /></SettingRow>
               </template>
             </Card>
           </section>
@@ -209,8 +209,8 @@
           <section>
             <SectionHead>Vault</SectionHead>
             <Card flush>
-              <SettingRow v-for="s in d.spaces" :key="s.name" :label="`Agents can open the Vault in ${s.name}`" help="Let agents open documents in this space's Vault. Off by default.">
-                <Switch :model-value="!!s.agents_can_read_vault" :aria-label="`Agents can open the Vault in ${s.name}`" :data-vault-switch="s.name" @update:model-value="(v) => setVault(s, v)" />
+              <SettingRow v-for="s in d.spaces" :key="s.name" :label="`Agents may open sensitive items in ${s.name}`" help="Let agents open documents in this space's Vault. Off by default.">
+                <Switch :model-value="!!s.agents_can_read_vault" :aria-label="`Agents may open sensitive items in ${s.name}`" :data-vault-switch="s.name" @update:model-value="(v) => setVault(s, v)" />
               </SettingRow>
             </Card>
           </section>

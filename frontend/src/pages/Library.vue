@@ -1,8 +1,10 @@
 <template>
   <!-- the list: /library?view=list, on the cross-type index -->
-  <NotesList v-if="listView" ref="list">
+  <NotesList v-if="listView" ref="list" collection="all">
     <template #actions>
       <TabButtons model-value="list" :options="SWITCH" data-library-views />
+      <Select class="w-48" :model-value="route.query.by || ''" :options="WRITTEN_BY" aria-label="Written by" data-notes-by
+        @update:model-value="(v) => router.push({ query: { ...route.query, by: v || undefined } })" />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
     </template>
   </NotesList>
@@ -73,10 +75,10 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Dialog, Dropdown, TabButtons, TextInput, Tree, dialog, toast } from 'frappe-ui'
+import { Button, Dialog, Dropdown, Select, TabButtons, TextInput, Tree, dialog, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import NotesList from '@/components/lists/NotesList.vue'
-import { NOTES_VIEWS } from '@/lib/nav'
+import { NOTES_VIEWS, WRITTEN_BY } from '@/lib/nav'
 import Empty from '@/components/Empty.vue'
 import NoteEditor from '@/components/NoteEditor.vue'
 import Backlinks from '@/components/Backlinks.vue'
@@ -95,6 +97,7 @@ const route = useRoute()
 // the list view sits beside the tree: /library?view=list, with its filters in the URL
 // My notes only (the Wiki has its own screen). The List is the default view; the Tree is view=tree
 const listView = computed(() => !props.id && route.query.view !== 'tree')
+// on a note's own page, its place's tabs are not shown
 const list = ref(null)
 // Notes has three views: Tree, List and Graph (/graph, the graph of linked records)
 const SWITCH = NOTES_VIEWS

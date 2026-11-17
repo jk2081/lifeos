@@ -21,6 +21,8 @@ def tree(space: str | None = None, include_archived: bool | int | None = 0, coll
 		filters["collection"] = collection
 	if not flag(include_archived):
 		filters["is_archived"] = 0
+	if permissions.vault_hidden(space):
+		filters["is_sensitive"] = 0
 	notes = frappe.get_all("Life Note", filters=filters, fields=["name", "title", "parent_note", "area", "goal", "modified", "is_archived"],
 		order_by="title asc", limit=2000)
 	area = lens_area(area)
@@ -47,7 +49,7 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 	`total` is the number of notes the filters match."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = ["x.space = %(space)s", "x.kind = 'Note'"], {"space": space}
+	where, values = ["x.space = %(space)s", "x.kind = 'Note'" + permissions.vault_guard(space, "x.")], {"space": space}
 	if collection and collection != "all":
 		where.append("x.collection = %(collection)s")
 		values["collection"] = collection
@@ -70,7 +72,7 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 	order = std_order("Life Index", order_by, "x", SORTS) or sort_order(sort, dir, SORTS, "x.modified desc")
 	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	rows = frappe.db.sql(
-		f"""select x.ref_name as name, x.title, x.area, x.goal, x.record_date, x.modified, x.is_archived from `tabLife Index` x
+		f"""select x.ref_name as name, x.title, x.area, x.goal, x.record_date, x.modified, x.is_archived, x.collection, x.vault_locked from `tabLife Index` x
 		where {clause} order by {order}, x.ref_name limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True)
 	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
@@ -108,6 +110,7 @@ def get(note: str):
 	mark_opened(doc)
 	return {
 		"name": doc.name, "space": doc.space, "title": doc.title, "content_md": doc.content_md or "", "parent_note": doc.parent_note,
+		"is_sensitive": doc.is_sensitive,
 		"parent_title": frappe.db.get_value("Life Note", doc.parent_note, "title") if doc.parent_note else None,
 		"area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 		"goal": doc.goal, "goal_title": frappe.db.get_value("Life Goal", doc.goal, "title") if doc.goal else None,
@@ -184,3 +187,18 @@ def versions(note: str):
 		old = next((c[1] for c in data.get("changed", []) if c[0] == "content_md"), None)
 		out.append({"name": r.name, "by": r.owner, "on": str(r.creation)[:16], "changed": changed, "previous_content": old})
 	return out
+
+
+@frappe.whitelist(methods=["POST"])
+def set_sensitive(doctype: str, name: str, sensitive: bool | int = 1):
+	"""Mark a capture or note sensitive, or unmark it (UX fixes, set 6). Anyone who may edit it may mark it; only the space's
+	owner may unmark it. A sensitive item follows the Vault rules. People only: an agent cannot change who sees what."""
+	if permissions.is_agent():
+		frappe.throw(_("Agents cannot mark or unmark sensitive items."), frappe.PermissionError)
+	if doctype not in permissions.SENSITIVE_DOCTYPES:
+		frappe.throw(_("Only captures and notes can be marked sensitive."))
+	doc = permissions.get_doc_checked(doctype, name, "write")
+	doc.is_sensitive = 1 if flag(sensitive) else 0
+	doc.flags.keep_touched = True
+	doc.save()
+	return {"doctype": doctype, "name": doc.name, "is_sensitive": doc.is_sensitive}

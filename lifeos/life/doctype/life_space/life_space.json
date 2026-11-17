@@ -37,7 +37,7 @@
   {
    "fieldname": "agents_can_read_vault",
    "fieldtype": "Check",
-   "label": "Agents Can Read Vault",
+   "label": "Agents may open sensitive items",
    "default": "0",
    "description": "Let agents open documents in this space's Vault. Off by default."
   },
@@ -51,13 +51,13 @@
   {
    "fieldname": "ask_can_read_vault",
    "fieldtype": "Check",
-   "label": "Ask May Read Vault Documents",
+   "label": "Ask may read sensitive items",
    "default": "0",
    "description": "Let Ask send this space's Vault documents to the AI model. Off by default; separate from the agent switch."
   }
  ],
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-17 18:48:35.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Space",

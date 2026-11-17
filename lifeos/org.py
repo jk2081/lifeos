@@ -42,7 +42,19 @@ def validate_common(doc, method=None):
 		validate_org(doc)
 
 
+def check_sensitive(doc):
+	"""Anyone who may edit an item may mark it sensitive; only the space's owner may unmark it (UX fixes, set 6)."""
+	if not doc.meta.has_field("is_sensitive") or doc.is_new() or doc.is_sensitive:
+		return
+	if not frappe.db.get_value(doc.doctype, doc.name, "is_sensitive"):
+		return
+	user = frappe.session.user
+	if user != "Administrator" and frappe.db.get_value("Life Space", doc.space, "owner_user") != user:
+		frappe.throw(_("Only the owner of the space can unmark a sensitive item."), frappe.PermissionError)
+
+
 def validate_org(doc):
+	check_sensitive(doc)
 	also = [r.area for r in doc.get("also_in") or [] if r.area]
 	if doc.area:
 		# an area is never also its own reference

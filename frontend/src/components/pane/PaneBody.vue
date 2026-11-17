@@ -7,6 +7,10 @@
       </div>
       <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" icon-left="lucide-sparkles" :label="phone ? 'Ask' : 'Ask about this'" data-pane-ask
         @click="askAbout(ASKABLE[cur.type], cur.name, meta.title)" />
+      <!-- the sensitive mark (UX fixes, set 6): a lock while it is on; anyone who may edit marks it, only the space's owner unmarks it -->
+      <Button v-if="meta.sensitive && !store.isAgent" :icon-left="meta.sensitive.on ? 'lucide-lock' : 'lucide-lock-open'" :variant="meta.sensitive.on ? 'subtle' : 'ghost'"
+        :label="phone ? '' : meta.sensitive.on ? 'Sensitive' : 'Mark sensitive'" :tooltip="meta.sensitive.on ? 'Sensitive: follows the Vault rules. Click to unmark (the space owner only).' : 'Mark sensitive'"
+        :aria-pressed="meta.sensitive.on" data-pane-sensitive @click="toggleSensitive" />
       <Button v-if="meta.someday" icon-left="lucide-clock" :label="phone ? 'Someday' : 'Move to Someday'" data-pane-someday @click="toSomeday" />
       <Button v-if="meta.fullPage" label="Open full page" :route="meta.fullPage" data-pane-full />
       <Button icon="lucide-x" label="Close" tooltip="Close" data-pane-close @click="closePane" />
@@ -53,6 +57,7 @@ import { closePane, openRef } from '@/lib/pane'
 import { park } from '@/lib/someday'
 import { askAbout } from '@/lib/ask'
 import { store } from '@/lib/store'
+import { api, tryCall } from '@/lib/api'
 
 const props = defineProps({ cur: Object, meta: Object, label: String, missing: Boolean, stamp: Number, phone: Boolean })
 // Each kind of record says its tabs in its meta: [{ value, label, count }]. The open one is ptab= in the URL; the first is the default.
@@ -62,6 +67,10 @@ const emit = defineEmits(['meta', 'missing', 'changed', 'restore', 'reload'])
 // "Ask about this": the record and the records linked to it are the question's scope
 const ASKABLE = { task: 'Life Task', note: 'Life Note', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
   inbox: 'Life Inbox Item', page: 'Life Journal Page', idea: 'Life Idea', vault: 'Life Vault Document' }
+async function toggleSensitive() {
+  const s = props.meta.sensitive
+  if (await tryCall(() => api('library.set_sensitive', { doctype: s.doctype, name: s.name, sensitive: s.on ? 0 : 1 }), s.on ? 'No longer sensitive.' : 'Marked sensitive.')) emit('reload')
+}
 async function toSomeday() {
   if (await park(props.meta.someday.doctype, props.meta.someday.name, props.meta.title)) emit('reload')
 }

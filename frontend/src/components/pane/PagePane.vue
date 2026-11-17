@@ -35,7 +35,7 @@ onMounted(async () => {
     d.value = await api('journal.page_detail', { page: props.name })
     await loadLookups()
     emit('meta', { title: d.value.page_number ? `Journal page ${d.value.page_number}` : 'Journal page', sub: long(d.value.page_date, true),
-      area: d.value.area, area_name: areaName(d.value.area), fullPage: null,
+      area: d.value.area, area_name: areaName(d.value.area), fullPage: null, sensitive: { doctype: 'Life Journal Page', name: d.value.name, on: !!d.value.is_sensitive },
       tabs: [{ value: 'page', label: 'Page' }, { value: 'transcript', label: 'Transcript' }, { value: 'created', label: 'Created from this page', count: d.value.created.length, noun: 'records' }] })
   } catch (e) {
     emit('missing')

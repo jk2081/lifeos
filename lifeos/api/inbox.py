@@ -18,7 +18,7 @@ SOURCE_TYPES = ["Upload", "Journal Photo", "Voice Note", "Email", "Email Digest"
 def _item_dict(item, with_files=True):
 	d = {k: item.get(k) for k in ("name", "space", "title", "source_type", "received_on", "instruction", "raw_text", "transcript_md",
 		"summary_md", "source_url", "status", "claimed_by", "claimed_on", "error", "area", "goal", "is_archived", "owner", "preview_image",
-		"intent", "media_kind", "source_system", "external_id", "thumbnail")}
+		"intent", "media_kind", "source_system", "external_id", "thumbnail", "is_sensitive")}
 	d["received_on"] = str(d["received_on"]) if d["received_on"] else None
 	d["claimed_on"] = str(d["claimed_on"]) if d["claimed_on"] else None
 	if with_files:
@@ -105,7 +105,7 @@ def claim_next(space: str | None = None):
 	closed = [sp for sp in spaces if permissions.vault_hidden(sp)] or [""]
 	rows = frappe.db.sql(
 		"select name from `tabLife Inbox Item` where status='New' and is_archived=0 and space in %s "
-		"and not (ifnull(vault_document, '') != '' and space in %s) "
+		"and not ((ifnull(vault_document, '') != '' or is_sensitive = 1) and space in %s) "
 		"order by received_on asc, creation asc limit 1 for update skip locked", (spaces, closed))
 	if not rows:
 		return None
@@ -270,7 +270,7 @@ def list(space: str | None = None, status: str | builtins.list | None = None, in
 	start, page_length = page(start, page_length)
 	where, values = ["i.space = %(space)s"], {"space": space}
 	if permissions.vault_hidden(space):  # an agent never lists the source a Vault document was made from (pre-step 6 audit)
-		where.append("ifnull(i.vault_document, '') = ''")
+		where.append("ifnull(i.vault_document, '') = '' and i.is_sensitive = 0")
 	if not flag(include_archived):
 		where.append("i.is_archived = 0")
 	if source_type:

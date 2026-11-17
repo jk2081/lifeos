@@ -265,7 +265,8 @@ async function load() {
   try {
     const it = (item.value = await api('inbox.get', { item: itemName.value }))
     emit('meta', { title: it.title, area: it.area, area_name: it.area_name, goal: it.goal, goal_title: it.goal_title, sub: headSub.value,
-      fullPage: `/inbox/${it.name}/review`, archived: !!it.is_archived, canRestore: canRestore.value })
+      fullPage: `/inbox/${it.name}/review`, archived: !!it.is_archived, canRestore: canRestore.value,
+      sensitive: { doctype: 'Life Inbox Item', name: it.name, on: !!it.is_sensitive } })
   } catch (e) {
     missing.value = true
     emit('missing')

@@ -44,14 +44,14 @@ def build_rows(doc) -> list[dict]:
 		"status": doc.get("status") or "", "record_owner": doc.owner,
 		"record_date": getdate(doc.creation), "title": (doc.get("title") or "")[:255], "search_text": "",
 		"media_kind": "", "source_system": "", "intent": "", "assistant": "", "collection": "", "thumbnail": "",
-		"vault_locked": 1 if dt == "Life Vault Document" else 0,
+		"vault_locked": 1 if dt == "Life Vault Document" or doc.get("is_sensitive") else 0,
 	}
 	rows = [base]
 	if dt == "Life Inbox Item":
 		base["record_date"] = getdate(doc.received_on or doc.creation)
 		base["search_text"] = _text(doc.title, doc.instruction, doc.summary_md, doc.transcript_md, doc.raw_text)
 		base.update({"media_kind": doc.media_kind or "", "source_system": doc.source_system or "", "intent": doc.intent or "",
-			"thumbnail": doc.thumbnail or "", "vault_locked": 1 if doc.vault_document else 0})
+			"thumbnail": doc.thumbnail or "", "vault_locked": 1 if doc.vault_document or doc.get("is_sensitive") else 0})
 	elif dt == "Life Task":
 		base["search_text"] = _text(doc.notes_md, doc.waiting_on)
 		if doc.status == "Done" and doc.completed_on:

@@ -61,13 +61,16 @@ def query_conditions(user=None, doctype=None):
 	if not spaces:
 		return "1=0"
 	cond = f"`tab{doctype}`.`space` in ({_in_list(spaces)})"
-	if doctype in ("Life Index", "Life Inbox Item") and is_agent(user):
+	if doctype in ("Life Index", *SENSITIVE_DOCTYPES) and is_agent(user):
 		closed = [s for s in spaces if s not in vault_open_spaces()]
 		if closed and doctype == "Life Index":
-			# Vault documents, and the sources a Vault document was made from (UX fixes, set 4)
+			# Vault documents, sources a Vault document was made from (UX fixes, set 4), and sensitive items (set 6)
 			cond += f" and not (`tabLife Index`.`vault_locked` = 1 and `tabLife Index`.`space` in ({_in_list(closed)}))"
 		elif closed:
-			cond += f" and not (ifnull(`tabLife Inbox Item`.`vault_document`, '') != '' and `tabLife Inbox Item`.`space` in ({_in_list(closed)}))"
+			sensitive = f"`tab{doctype}`.`is_sensitive` = 1"
+			if doctype == "Life Inbox Item":
+				sensitive = f"({sensitive} or ifnull(`tabLife Inbox Item`.`vault_document`, '') != '')"
+			cond += f" and not ({sensitive} and `tab{doctype}`.`space` in ({_in_list(closed)}))"
 	return cond
 
 
@@ -80,6 +83,11 @@ def file_has_permission(doc, ptype=None, user=None, debug=False):
 	if doc.get("attached_to_doctype") == VAULT and doc.get("attached_to_name"):
 		space = frappe.db.get_value(VAULT, doc.attached_to_name, "space")
 		if space and vault_hidden(space, user):
+			return False
+	if doc.get("attached_to_doctype") in SENSITIVE_DOCTYPES and doc.get("attached_to_name"):
+		# a file of an item marked sensitive (set 6); the agent processing an inbox item claimed it before it was marked
+		row = frappe.db.get_value(doc.attached_to_doctype, doc.attached_to_name, ["space", "is_sensitive"], as_dict=True)
+		if row and row.is_sensitive and vault_hidden(row.space, user):
 			return False
 	return True
 
@@ -101,15 +109,28 @@ def vault_hidden(space, user=None) -> bool:
 	return is_agent(user) and space not in vault_open_spaces()
 
 
+# Captures and notes a person can mark sensitive (UX fixes, set 6); Vault documents always are
+SENSITIVE_DOCTYPES = ("Life Note", "Life Inbox Item", "Life Chat Log", "Life Journal Page")
+
+
 def vault_locked(doc) -> bool:
-	"""A Vault document, an index row of one, or a source a Vault document was made from (UX fixes, set 4)."""
+	"""A sensitive item: a Vault document, an index row of one, a source a Vault document was made from (UX fixes,
+	set 4), or a capture or note marked sensitive (set 6). Each follows the Vault rules."""
 	if doc.doctype == VAULT:
 		return True
 	if doc.doctype == "Life Index":
 		return bool(doc.get("vault_locked")) or doc.get("ref_doctype") == VAULT
+	if doc.doctype in SENSITIVE_DOCTYPES and doc.get("is_sensitive"):
+		return True
 	if doc.doctype == "Life Inbox Item":
 		return bool(doc.get("vault_document"))
 	return False
+
+
+def sensitive_guard(space, alias="", user=None) -> str:
+	"""SQL for a query on a capture or note table of one space: leaves sensitive rows out when the space's switch keeps
+	sensitive items from the user (an agent)."""
+	return f" and {alias}is_sensitive = 0" if vault_hidden(space, user) else ""
 
 
 def vault_guard(space, alias="", user=None) -> str:

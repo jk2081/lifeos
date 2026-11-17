@@ -165,7 +165,7 @@ def pages(space: str | None = None, area: str | None = None, goal: str | None = 
 	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
 		goal = project if project == "none" else (goal_for_project(project, space) or project)
 
-	where, values = ["n.space = %(space)s", "n.collection = 'Wiki'"], {"space": space}
+	where, values = ["n.space = %(space)s", "n.collection = 'Wiki'" + permissions.sensitive_guard(space, "n.")], {"space": space}
 	if not int(include_archived or 0):
 		where.append("n.is_archived = 0")
 	if area:
@@ -205,7 +205,7 @@ def index(space: str | None = None, area: str | None = None, start: int | None =
 	space = permissions.resolve_space(space)
 	start, page_length = int(start or 0), min(max(int(page_length or 100), 1), 500)
 	values = {"space": space}
-	where = ["n.space = %(space)s", "n.collection = 'Wiki'", "n.is_archived = 0"]
+	where = ["n.space = %(space)s", "n.collection = 'Wiki'", "n.is_archived = 0" + permissions.sensitive_guard(space, "n.")]
 	if area:
 		where.append(area_filter(space, area, "n.area", values, also_in="Life Note"))
 	order = {"updated": "n.modified desc", "title": "n.title asc"}.get(order_by or "title", "n.title asc")

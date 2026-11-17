@@ -16,6 +16,7 @@
   "also_in",
   "goal",
   "tags",
+  "is_sensitive",
   "is_archived",
   "archived_on",
   "archive_reason"
@@ -95,6 +96,14 @@
    "options": "Life Tag Link"
   },
   {
+   "default": "0",
+   "fieldname": "is_sensitive",
+   "fieldtype": "Check",
+   "label": "Sensitive",
+   "search_index": 1,
+   "description": "Follows the Vault rules: hidden from agents unless the space allows it, read by Ask only if the space allows it. Only the space's owner can unmark it."
+  },
+  {
    "fieldname": "is_archived",
    "fieldtype": "Check",
    "label": "Is Archived",
@@ -114,7 +123,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-17 18:19:36.000000",
+ "modified": "2026-11-17 18:48:35.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Journal Page",

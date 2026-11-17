@@ -57,7 +57,7 @@ onMounted(async () => {
     links.value = l
     const wiki = n.collection === 'Wiki'
     if (wiki) history.value = (await api('wiki.changes', { space: n.space, note: n.name, page_length: 100 })).changes
-    emit('meta', { title: n.title, kind: wiki ? 'Wiki page' : 'Note', fullPage: `/library/${n.name}`, archived: !!n.is_archived, canRestore: canRestore.value,
+    emit('meta', { title: n.title, kind: wiki ? 'Wiki page' : 'Note', fullPage: `/library/${n.name}`, archived: !!n.is_archived, canRestore: canRestore.value, sensitive: { doctype: 'Life Note', name: n.name, on: !!n.is_sensitive },
       tabs: wiki
         ? [{ value: 'note', label: 'Page' }, { value: 'sources', label: 'Sources', count: n.sources.length, noun: 'sources' },
           { value: 'links', label: 'Links', count: l.length, noun: 'linked records' }, { value: 'history', label: 'History', count: history.value.length, noun: 'changes' }]

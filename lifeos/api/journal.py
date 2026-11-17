@@ -446,7 +446,7 @@ def pages(space: str | None = None, start: int = 0, page_length: int = 24):
 	"""Photographed journal pages by date, newest first."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	rows = frappe.get_all("Life Journal Page", filters={"space": space, "is_archived": 0},
+	rows = frappe.get_all("Life Journal Page", filters={"space": space, "is_archived": 0, **({"is_sensitive": 0} if permissions.vault_hidden(space) else {})},
 		fields=["name", "page_date", "page_number", "image", "inbox_item"], order_by="page_date desc, creation desc", limit_start=start, limit=page_length)
 	for r in rows:
 		r["page_date"] = str(r.page_date)
@@ -467,7 +467,7 @@ def page_detail(page: str):
 				continue
 			if p.created_name and frappe.db.exists(p.created_doctype, p.created_name):
 				created.append({"kind": p.kind, "title": p.preview, "route": links.route_of(p.created_doctype, p.created_name)})
-	return {"name": doc.name, "space": doc.space, "page_date": str(doc.page_date), "page_number": doc.page_number, "image": doc.image,
+	return {"name": doc.name, "space": doc.space, "page_date": str(doc.page_date), "page_number": doc.page_number, "image": doc.image, "is_sensitive": doc.is_sensitive,
 		"transcript_md": doc.transcript_md or "", "inbox_item": doc.inbox_item, "area": doc.area, "created": created}
 
 

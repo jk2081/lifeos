@@ -1,13 +1,14 @@
 <template>
-  <PageHead title="Wiki">
-    <template #sub>Pages an agent writes from your sources, in {{ store.space }}. Every change is logged and can be undone.</template>
-    <TabButtons v-if="tab.current.value === 'pages'" model-value="list" :options="VIEWS" data-wiki-views />
+  <PageHead :title="section ? 'Notes' : 'Wiki'">
+    <template #sub>{{ section ? "The assistant's notes" : 'Pages an agent writes from your sources' }}, in {{ store.space }}. Every change the assistant makes is logged and can be undone.</template>
+    <TabButtons v-if="section" :model-value="section" :options="NOTES_VIEWS" data-library-views />
+    <TabButtons v-else-if="active === 'pages'" model-value="list" :options="VIEWS" data-wiki-views />
     <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New page" data-new-wiki-page @click="newOpen = true" />
   </PageHead>
-  <TabBar inset :tabs="TABS" :model-value="tab.current.value" label="Wiki sections" data-wiki-tabs @update:model-value="tab.set" />
+  <TabBar v-if="!section" inset :tabs="TABS" :model-value="active" label="Wiki sections" data-wiki-tabs @update:model-value="tab.set" />
 
   <!-- Pages -->
-  <div v-if="tab.shown('pages') && counts.rules" v-show="tab.current.value === 'pages'">
+  <div v-if="shown('pages') && counts.rules" v-show="active === 'pages'">
     <ListView ref="pagesList" :title="null" noun="pages" screen="wiki" doctype="Life Note" :spec="PAGE_SPEC" :virtual="PAGE_VIRTUAL" :hidden="PAGE_HIDDEN"
       :quick="['title', 'area']" :synthetic="PAGE_SYNTHETIC" :fetch="fetchPages" :row-ref="(r) => 'note:' + r.name" :active="(r) => (r.query.tab || 'pages') === 'pages'"
       empty-title="No wiki pages yet." empty-hint="Add something to the Inbox with Add to wiki, and the agent writes pages from it. Or make one with New page.">
@@ -22,10 +23,10 @@
   </div>
 
   <!-- Changes -->
-  <div v-if="tab.shown('changes')" v-show="tab.current.value === 'changes'">
+  <div v-if="shown('changes')" v-show="active === 'changes'">
     <ListView ref="changesList" :title="null" noun="changes" screen="wiki-changes" doctype="Life Wiki Change" :spec="CHANGE_SPEC" :virtual="CHANGE_VIRTUAL" :hidden="CHANGE_HIDDEN"
       :quick="['note', 'changed_by', 'changed_on']" :synthetic="CHANGE_SYNTHETIC" :fetch="fetchChanges" :row-ref="(r) => 'change:' + r.name" :row-label="(r) => r.note_title"
-      :active="(r) => r.query.tab === 'changes'" :group-by="(r) => (r.changed_on ? long(r.changed_on.slice(0, 10), true) : '')" :groupable="false"
+      :active="(r) => section === 'changes' || r.query.tab === 'changes'" :group-by="(r) => (r.changed_on ? long(r.changed_on.slice(0, 10), true) : '')" :groupable="false"
       empty-title="No changes yet." empty-hint="Each time a page is created, edited, undone or moved, a change is listed here.">
       <template #cell-note="{ row }"><div class="min-w-0"><div class="break-words font-medium text-ink-gray-9">{{ row.note_title }}</div>
         <div class="line-clamp-1 text-sm text-ink-gray-6">{{ row.change_note || '' }}</div></div></template>
@@ -40,7 +41,7 @@
   </div>
 
   <!-- Health -->
-  <div v-if="tab.shown('health')" v-show="tab.current.value === 'health'" class="page-body" data-wiki-health>
+  <div v-if="shown('health')" v-show="active === 'health'" class="page-body" data-wiki-health>
     <div class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6">
       <span v-if="health">Checked {{ dateTime(health.computed_on) }} · {{ health.pages }} pages</span>
       <Button size="sm" icon-left="lucide-refresh-cw" label="Check now" :loading="healthBusy" data-health-refresh @click="loadHealth(1)" />
@@ -72,7 +73,7 @@
   </div>
 
   <!-- Rules -->
-  <div v-if="tab.shown('rules')" v-show="tab.current.value === 'rules'" class="page-body" data-wiki-rules>
+  <div v-if="shown('rules')" v-show="active === 'rules'" class="page-body" data-wiki-rules>
     <p class="mx-auto w-full max-w-[720px] text-sm text-ink-gray-6">The agent reads this page before writing. People edit it; agents cannot.</p>
     <NoteEditor v-if="rules" :key="rules.name" :note="rules" />
   </div>
@@ -98,6 +99,7 @@ import { canWrite, store } from '@/lib/store'
 import { dateTime, long, short } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
 import { useUrlTab } from '@/lib/tabs'
+import { NOTES_VIEWS } from '@/lib/nav'
 import { onRecordChanged, openRef } from '@/lib/pane'
 
 const router = useRouter()
@@ -105,6 +107,10 @@ const counts = ref({})
 const TABS = computed(() => [{ value: 'pages', label: 'Pages', count: counts.value.pages }, { value: 'changes', label: 'Changes', count: counts.value.changes },
   { value: 'health', label: 'Health', count: counts.value.health_issues ?? undefined }, { value: 'rules', label: 'Rules' }])
 const tab = useUrlTab('tab', TABS)
+// In Library > Notes (UX fixes, set 6) the assistant's Changes, Health and Rules are views of the notes: `section` picks one
+const props = defineProps({ section: { type: String, default: '' } })
+const active = computed(() => props.section || tab.current.value)
+const shown = (v) => (props.section ? props.section === v : tab.shown(v))
 const VIEWS = [{ label: 'List', value: 'list' }, { label: 'Graph', value: 'graph', route: { path: '/library/notes', query: { by: 'assistant', view: 'graph', collection: 'Wiki' } } }]
 
 const PAGE_SPEC = [{ key: 'area', field: 'area', kind: 'link', none: true }, { key: 'goal', field: 'goal', kind: 'link', none: true }]
@@ -157,11 +163,11 @@ async function createFromLink(title) {
   if (res) { await loadHealth(1); openRef('note:' + res.name) }
 }
 
-watch(() => tab.current.value, (t) => {
+watch(() => active.value, (t) => {
   if (t === 'health' && !health.value) loadHealth(0)
   if (t === 'rules' && !rules.value && counts.value.rules) loadRules()
 }, { immediate: true })
-watch(() => counts.value.rules, (r) => { if (r && tab.current.value === 'rules' && !rules.value) loadRules() })
+watch(() => counts.value.rules, (r) => { if (r && active.value === 'rules' && !rules.value) loadRules() })
 watch(() => store.space, () => { health.value = null; rules.value = null; loadOverview() })
 onRecordChanged?.(() => loadOverview())
 onMounted(() => { loadLookups(); loadOverview() })

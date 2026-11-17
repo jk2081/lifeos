@@ -35,7 +35,8 @@ export const GO = [
   SETTINGS,
 ]
 export const TOOLTIPS = { Today: 'What to do now', Inbox: 'What came in', Plan: 'Where you are going', Library: 'What you have and know' }
-// the view switch of Library > Notes: List (the default), Tree and Graph
-export const NOTES_VIEWS = [{ label: 'List', value: 'list', route: { path: '/library/notes', query: { view: 'list' } } },
-  { label: 'Tree', value: 'tree', route: { path: '/library/notes', query: { view: 'tree' } } },
-  { label: 'Graph', value: 'graph', route: { path: '/library/notes', query: { view: 'graph' } } }]
+// the view switch of Library > Notes: List (the default), Tree and Graph, and the assistant's Changes and Health
+export const NOTES_VIEWS = ['list', 'tree', 'graph', 'changes', 'health'].map((v) => ({ label: v[0].toUpperCase() + v.slice(1), value: v,
+  route: { path: '/library/notes', query: { view: v } } }))
+// "Written by" on Library > Notes
+export const WRITTEN_BY = [{ label: 'Written by anyone', value: '' }, { label: 'Written by me', value: 'me' }, { label: 'Kept by the assistant', value: 'assistant' }]
