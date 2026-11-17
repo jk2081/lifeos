@@ -333,3 +333,7 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **The nightly insights job no longer switches to each space's owner.** It passes the owner to `insights.run(..., user=)`. The AI tools read every record through `permissions.get_doc_checked(..., user=)`, which checks that user's permission (and the Vault rule) without changing the session. AI usage is recorded against that user, and a record the user may not read is skipped, not an error.
 - **The chat import job never switches user.** Frappe already runs a queued job as the person who queued it. `chat_import.run` now refuses to run as anyone else, and every chat goes through `chats.log`, which checks that person's write access to the space.
 - **Demo data and the load test keep `frappe.set_user`**, with a reason on each line: they act as the owner, the agent or a member on purpose.
+
+### 5. File paths
+
+- **Every read of an original goes through `files.read` / `files.local_path`**, which resolves the File record's real path and refuses anything outside the site's private or public files folder: thumbnails, previews and the chat export import. A `../` path or a symbolic link out of the folder reads nothing (Frappe's own path check let a symbolic link through). The two `open()` calls on pdftoppm's temporary folder carry a reasoned exception.

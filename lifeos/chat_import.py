@@ -180,6 +180,7 @@ def parse(system, data):
 
 def run(space, system, file_url, user):
 	"""The background job. Progress is in the cache under the space and system, so the screen can show it after a reload."""
+	from lifeos import files
 	from lifeos.api import chats, connections
 
 	# Frappe runs a queued job as the user who queued it, and chats.log checks that user's access to the space; the job
@@ -190,7 +191,7 @@ def run(space, system, file_url, user):
 		started_on=str(now_datetime())[:19], finished_on=None, user=user)
 	try:
 		f = frappe.get_doc("File", {"file_url": file_url})
-		data = conversations_from_zip(f.get_full_path())
+		data = conversations_from_zip(files.local_path(f))
 		convs, bad = parse(system, data)
 	except ImportFailed as e:
 		_set(space, system, status="Failed", error=str(e), finished_on=str(now_datetime())[:19])

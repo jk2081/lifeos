@@ -7,19 +7,28 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | Rule | Exceptions |
 | --- | --- |
 | frappe-manual-commit | 5 |
+| frappe-security-file-traversal | 3 |
 | frappe-setuser | 13 |
 | frappe-sql-format-injection | 68 |
-| Total | 86 |
+| Total | 89 |
 
 ## frappe-manual-commit
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/chat_import.py` | 220 | long background job: progress is saved every 25 conversations |
+| `lifeos/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
 | `lifeos/install.py` | 27 | after_install: the spaces and index DDL must be kept before install-app goes on |
 | `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 259 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 318 | load test: its removal must stick even when run inside a test |
+
+## frappe-security-file-traversal
+
+| File | Line | Reason |
+| --- | --- | --- |
+| `lifeos/files.py` | 74 | local_path keeps the path inside the site's files folders |
+| `lifeos/sources.py` | 102 | a fixed name in a temporary folder made here |
+| `lifeos/sources.py` | 112 | pdftoppm's own output in a temporary folder made here |
 
 ## frappe-setuser
 

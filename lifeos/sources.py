@@ -8,6 +8,8 @@ import tempfile
 import frappe
 from frappe import _
 
+from lifeos import files
+
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic")
 AUDIO_EXT = (".mp3", ".m4a", ".wav", ".ogg", ".opus", ".aac", ".flac", ".webm", ".amr")
 DOC_EXT = (".pdf", ".doc", ".docx", ".odt", ".rtf", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".txt", ".md", ".epub")
@@ -18,8 +20,6 @@ OWN_FIELDS = ("preview_image", "thumbnail")  # files the app made from the origi
 
 
 def original_files(item_name):
-	from lifeos import files
-
 	return [f for f in files.attachments("Life Inbox Item", item_name) if f.attached_to_field not in OWN_FIELDS]
 
 
@@ -70,9 +70,9 @@ def make_thumbnail(file_doc):
 	low = (file_doc.file_name or "").lower()
 	content = None
 	if low.endswith(IMAGE_EXT) and not low.endswith(".heic"):
-		content = file_doc.get_content()
+		content = files.read(file_doc)
 	elif low.endswith(".pdf") and shutil.which("pdftoppm"):
-		content = _pdf_first_page(file_doc.get_content())
+		content = _pdf_first_page(files.read(file_doc))
 	if not content:
 		return None
 	from PIL import Image, ImageOps
@@ -99,7 +99,7 @@ def make_thumbnail(file_doc):
 def _pdf_first_page(pdf_bytes):
 	with tempfile.TemporaryDirectory() as tmp:
 		src = os.path.join(tmp, "in.pdf")
-		with open(src, "wb") as fh:
+		with open(src, "wb") as fh:  # nosemgrep: frappe-security-file-traversal -- a fixed name in a temporary folder made here
 			fh.write(pdf_bytes)
 		try:
 			subprocess.run(["pdftoppm", "-png", "-f", "1", "-l", "1", "-scale-to", str(THUMB_WIDTH * 2), src, os.path.join(tmp, "p")],
@@ -109,7 +109,7 @@ def _pdf_first_page(pdf_bytes):
 		pages = sorted(n for n in os.listdir(tmp) if n.startswith("p") and n.endswith(".png"))
 		if not pages:
 			return None
-		with open(os.path.join(tmp, pages[0]), "rb") as fh:
+		with open(os.path.join(tmp, pages[0]), "rb") as fh:  # nosemgrep: frappe-security-file-traversal -- pdftoppm's own output in a temporary folder made here
 			return fh.read()
 
 

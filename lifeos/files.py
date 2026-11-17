@@ -34,7 +34,7 @@ def after_insert(doc, method=None):
 def make_preview(file_doc):
 	from PIL import Image, ImageOps
 
-	content = file_doc.get_content()
+	content = read(file_doc)
 	img = Image.open(io.BytesIO(content))
 	img = ImageOps.exif_transpose(img)
 	if max(img.size) <= PREVIEW_MAX and (file_doc.file_name or "").lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
@@ -54,6 +54,25 @@ def make_preview(file_doc):
 	finally:
 		frappe.flags.lifeos_making_preview = False
 	return preview.file_url
+
+
+def local_path(file_doc) -> str:
+	"""The real path of a File record on disk, refused unless it lies inside the site's private or public files folder.
+	Every read of an original goes through here, so a crafted file_url (`../`, a link out of the folder) reads nothing."""
+	from frappe import _
+
+	path = os.path.realpath(file_doc.get_full_path())
+	for folder in (frappe.get_site_path("private", "files"), frappe.get_site_path("public", "files")):
+		root = os.path.realpath(folder)
+		if os.path.commonpath([path, root]) == root and path != root:
+			return path
+	frappe.throw(_("{0} is not a file of this site.").format(file_doc.file_url or file_doc.name), frappe.PermissionError)
+
+
+def read(file_doc) -> bytes:
+	"""The bytes of a File record, from inside the site's files folders only."""
+	with open(local_path(file_doc), "rb") as fh:  # nosemgrep: frappe-security-file-traversal -- local_path keeps the path inside the site's files folders
+		return fh.read()
 
 
 def attachments(doctype, name, exclude_field=("preview_image", "thumbnail")):

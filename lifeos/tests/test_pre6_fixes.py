@@ -134,3 +134,36 @@ class TestChatImportUser(LifeTestCase):
 		chat_import.run(PRIVATE, "claude", url, FAMILY)
 		self.assertFalse(frappe.db.exists("Life Chat Log", {"space": PRIVATE, "source_system": "claude"}))
 		self.assertEqual(chat_import.progress(PRIVATE, "claude")["created"], 0)
+
+
+class TestFilePaths(LifeTestCase):
+	def _file(self, url, name="x.png"):
+		return frappe.get_doc({"doctype": "File", "file_url": url, "file_name": name, "is_private": 1})
+
+	def test_a_dot_dot_path_reads_nothing(self):
+		from lifeos import files
+
+		for url in ("/private/files/../../site_config.json", "/files/../../../common_site_config.json"):
+			self.assertRaises((frappe.PermissionError, frappe.ValidationError), files.read, self._file(url, "site_config.json"))
+
+	def test_a_link_out_of_the_files_folder_reads_nothing(self):
+		from lifeos import files, sources
+
+		link = frappe.get_site_path("private", "files", "pre6-link.png")
+		if os.path.lexists(link):
+			os.remove(link)
+		os.symlink(os.path.realpath(frappe.get_site_path("site_config.json")), link)
+		try:
+			doc = self._file("/private/files/pre6-link.png", "pre6-link.png")
+			self.assertRaises(frappe.PermissionError, files.read, doc)
+			self.assertRaises(frappe.PermissionError, sources.make_thumbnail, doc)
+		finally:
+			os.remove(link)
+
+	def test_a_real_file_is_read(self):
+		from frappe.utils.file_manager import save_file
+
+		from lifeos import files
+
+		f = save_file("pre6.txt", b"hello", None, None, is_private=1)
+		self.assertEqual(files.read(f), b"hello")
