@@ -138,10 +138,14 @@ def space_context(space):
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)
 	# every goal in progress, of every type, for filing a task under it; 12 Week Year goals of the active cycle carry their actions
 	goals = []
-	for g in frappe.db.sql("""select g.name, g.title, g.area, g.goal_type, g.cycle from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
+	for g in frappe.db.sql("""select g.name, g.title, g.area, g.goal_type, g.cycle, g.measure_kind, g.measure, g.unit, g.start_value,
+			g.target_value, g.current_value, g.current_on from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
 			where g.space=%s and g.outcome='In Progress' and (ifnull(g.cycle, '') = '' or c.status in ('Active', 'Planned'))
 			order by field(g.goal_type, '12 Week Year', 'Annual', 'Open'), g.sort_order, g.title""", space, as_dict=True):
 		g["actions"] = frappe.get_all("Life Goal Action", filters={"parent": g.name}, fields=["name", "title", "status", "per_week"], order_by="idx") if g.cycle else []
+		if g.measure_kind == "Number":  # a number goal: what a Reading proposal reports (set 7)
+			g["measure"] = {"measure": g.measure, "unit": g.unit, "start": g.start_value, "target": g.target_value, "current": g.current_value if g.current_on else None}
+		g.pop("unit", None), g.pop("start_value", None), g.pop("target_value", None), g.pop("current_value", None), g.pop("current_on", None)
 		goals.append(g)
 	return {
 		"space": space,
@@ -180,7 +184,7 @@ def submit_result(item: str, transcript_md: str | None = None, summary_md: str |
 		frappe.throw(_("This item is to be kept only (intent Just keep). Send its text with no proposals."))
 	if doc.intent == "Add to wiki" and any(isinstance(r, dict) and r.get("kind") == "Note" for r in rows):
 		frappe.throw(_("This item is for the wiki (intent Add to wiki). Write wiki pages with lifeos.api.wiki instead of proposing notes."))
-	created, errors, ctx = [], [], {}
+	created, errors, ctx, readings_made = [], [], {}, []
 	for i, row in enumerate(rows):
 		try:
 			if not isinstance(row, dict):
@@ -191,6 +195,10 @@ def submit_result(item: str, transcript_md: str | None = None, summary_md: str |
 			confidence = 0.5 if confidence is None else float(confidence)
 			if not 0 <= confidence <= 1:
 				raise rules.PayloadError(_("confidence must be between 0 and 1."))
+			if kind in rules.DIRECT:  # a Reading is stored at once as a Suggested reading for the weekly review (set 7)
+				r = rules.store_reading(payload, doc)
+				readings_made.append({"index": i, "name": r.name, "kind": kind})
+				continue
 			preview = (row.get("preview") or payload.get("title") or payload.get("subject") or kind)[:500]
 			p = frappe.get_doc({"doctype": "Life Proposal", "space": doc.space, "inbox_item": doc.name, "kind": kind, "preview": preview,
 				"payload": frappe.as_json(payload), "confidence": confidence, "status": "Pending", "sort_order": i}).insert()
@@ -200,13 +208,13 @@ def submit_result(item: str, transcript_md: str | None = None, summary_md: str |
 				"preview": row.get("preview") if isinstance(row, dict) else None, "error": str(e)})
 	doc.transcript_md = transcript_md if transcript_md is not None else doc.transcript_md
 	doc.summary_md = summary_md if summary_md is not None else doc.summary_md
-	doc.status = "To Review" if created or not rows or doc.summary_md or doc.transcript_md else "Failed"
+	doc.status = "To Review" if created or readings_made or not rows or doc.summary_md or doc.transcript_md else "Failed"
 	if doc.status == "Failed":
 		doc.error = _("Every proposal was invalid.")
 	doc.save()
 	if doc.status == "To Review" and not created:
 		_finish_if_decided(doc)
-	return {"item": doc.name, "status": doc.status, "created": created, "errors": errors}
+	return {"item": doc.name, "status": doc.status, "created": created, "errors": errors, "readings": readings_made}
 
 
 def _finish_if_decided(doc):

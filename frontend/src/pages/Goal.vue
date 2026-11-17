@@ -20,7 +20,7 @@
       <div class="cols">
         <div class="half">
           <Card class="flex flex-col gap-3" data-goal-overview>
-            <TextInput v-model="g.done_when" label="Done when" :disabled="!writable" placeholder="What will be true when this goal is reached" @change="saveField('done_when')" />
+            <GoalMeasure :g="g" :readings="d.readings" :suggested="d.suggested" :space="d.space" :writable="writable && !g.is_archived" @changed="changed" />
             <div class="form-grid">
               <DatePicker v-if="g.goal_type !== '12 Week Year'" v-model="g.target_date" format="D MMM YYYY" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
               <div class="space-y-1.5"><div class="text-sm text-ink-gray-6">Progress</div><div class="flex h-8 items-center gap-2" data-goal-figure>
@@ -33,12 +33,18 @@
               <Pick :model-value="g.serves || null" :options="servesOptions" placeholder="Choose a longer goal" :disabled="!writable" @update:model-value="(v) => saveServes(v)" />
               <NumLink v-if="g.serves" :to="{ path: `/plan/goals/${g.serves}` }" class="text-sm">Open {{ g.serves_title }}</NumLink>
             </div>
+            <div v-if="d.serves" class="flex items-center gap-2" data-goal-serves-progress>
+              <div class="w-24 shrink-0"><Progress size="sm" :value="Math.round(d.serves.progress.percent || 0)" /></div>
+              <span class="min-w-0 truncate text-sm text-ink-gray-6">{{ d.serves.title }}: {{ d.serves.progress.label }}</span>
+            </div>
           </Card>
           <section v-if="d.served_by.length" data-goal-served-by>
             <SectionHead :count="d.served_by.length">Served by</SectionHead>
             <Card flush><Row v-for="s in d.served_by" :key="s.name" :pane="'goal:' + s.name" :label="s.title">
               <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ s.title }}</div>
-                <div class="text-sm text-ink-gray-6">{{ s.goal_type }} goal</div></div><Badge :theme="themeOf(s)" :label="s.status" /></Row></Card>
+                <div class="text-sm text-ink-gray-6" data-served-by-line>{{ [s.goal_type === '12 Week Year' ? s.cycle_title || '12 Week Year' : s.goal_type + ' goal', s.progress.label].filter(Boolean).join(' · ') }}</div></div>
+              <div class="w-20 shrink-0 self-center max-md:w-12"><Progress size="sm" :value="Math.round(s.progress.percent || 0)" /></div>
+              <Badge :theme="themeOf(s)" :label="s.status" /></Row></Card>
           </section>
           <section v-if="d.cycle"><SectionHead>Actions</SectionHead>
             <Card flush><Row v-for="a in j.goal.actions" :key="a.name">
@@ -111,6 +117,7 @@ import Sources from '@/pages/Sources.vue'
 import NotesList from '@/components/lists/NotesList.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import NewRecord from '@/components/NewRecord.vue'
+import GoalMeasure from '@/components/goals/GoalMeasure.vue'
 import { api, db, optimistic, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
@@ -199,6 +206,10 @@ async function addTask() {
 async function createNote(v) {
   const note = await db.insert({ doctype: 'Life Note', space: d.value.space, area: g.value.area, goal: g.value.name, title: v.title, content_md: '' })
   router.push(`/library/${note.name}?edit=1`)
+}
+function changed() {
+  load()
+  loadLookups(true)
 }
 onRecordChanged(load)
 onMounted(() => { load(); loadLookups() })

@@ -33,6 +33,9 @@
           <div class="group flex flex-wrap items-center gap-2 px-3 pb-1.5 pt-3 max-md:px-2" :class="gi && 'border-t border-outline-gray-1'">
             <RouterLink class="font-semibold text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/plan/goals/${goal.name}`">{{ goal.title }}</RouterLink>
             <Badge v-if="goal.area_name" :label="goal.area_name" />
+            <span v-if="goal.result && goal.result.kind === 'number'" class="text-sm tabular-nums text-ink-gray-7" data-grid-result>{{ goal.result.label }}</span>
+            <RouterLink v-if="goal.serves_title" class="min-w-0 truncate text-sm text-ink-gray-6 hover:underline focus-visible:focus-ring" :to="`/plan/goals/${goal.serves}`"
+              data-grid-serves>Serves {{ goal.serves_title }}{{ goal.serves_progress ? ' · ' + goal.serves_progress.label : '' }}</RouterLink>
             <Button v-if="canEdit" class="opacity-0 focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100" variant="ghost" size="sm" label="Edit" :aria-label="`Edit ${goal.title}`" @click="editGoal(goal)" />
           </div>
           <div v-for="a in goal.actions" :key="a.name" class="gr">

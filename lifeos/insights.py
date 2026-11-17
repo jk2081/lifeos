@@ -274,6 +274,10 @@ def run_nightly():
 		frappe.db.savepoint("lifeos_insights")
 		try:
 			run(s.name, ai=bool(s.ask_enabled), user=s.owner_user)
+			if s.ask_enabled:  # set 7: values of number goals read from the week's captures and chat logs, as Suggested readings
+				from lifeos import readings
+
+				readings.run_for_space(s.name, s.owner_user)
 		except Exception:
 			frappe.db.rollback(save_point="lifeos_insights")
 			frappe.log_error(title=f"Life OS insights for {s.name}")

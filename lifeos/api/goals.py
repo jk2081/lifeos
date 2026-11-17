@@ -7,8 +7,8 @@ from frappe import _
 from frappe.utils import getdate
 
 from lifeos import journal as rules
-from lifeos import permissions
-from lifeos.api.utils import area_filter, page, std_clause, std_order, summarise, tab_counts
+from lifeos import permissions, readings
+from lifeos.api.utils import area_filter, names_map, page, std_clause, std_order, summarise, tab_counts
 from lifeos.proposals import goal_for_project
 from lifeos.api.utils import order_by as sort_order
 
@@ -21,7 +21,7 @@ TABS = {"in_progress": "g.outcome = 'In Progress' and g.is_someday = 0 and g.is_
 	"closed": "g.outcome in ('Partly Achieved', 'Not Achieved', 'Carried', 'Dropped')", "someday": "g.is_someday = 1", "all": "g.is_someday = 0"}
 COUNTED = ("Open", "Doing", "Waiting", "Done")
 SORTS = {"title": "g.title", "target_date": "g.target_date is null, g.target_date", "completion": "_completion",
-	"creation": "g.creation"}
+	"creation": "g.creation", "serves": "s.title is null, s.title, g.serves, g.goal_type, g.title"}
 
 
 def task_counts(goals):
@@ -105,6 +105,7 @@ def list(space: str | None = None, state: str | None = "in_progress", goal_type:
 	# nosemgrep: frappe-sql-format-injection -- WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order
 	rows = frappe.db.sql(f"""select g.name, g.title, g.goal_type, g.area, g.serves, g.cycle, g.target_date, g.outcome, g.closed_on,
 		g.result_note, g.final_score, g.on_hold, g.done_when, g.last_activity_on, g.is_archived, g.is_someday,
+		g.measure_kind, g.measure, g.unit, g.start_value, g.target_value, g.current_value, g.current_on,
 		a.area_name, c.title as cycle_title, c.status as cycle_status, s.title as serves_title
 		from `tabLife Goal` g left join `tabLife Area` a on a.name = g.area left join `tabLife Cycle` c on c.name = g.cycle
 		left join `tabLife Goal` s on s.name = g.serves
@@ -121,6 +122,9 @@ def list(space: str | None = None, state: str | None = "in_progress", goal_type:
 		r["closed_on"] = str(r.closed_on) if r.closed_on else None
 		r["last_activity_on"] = str(r.last_activity_on) if r.last_activity_on else None
 		r["score"] = scores.get(r.name) if r.goal_type == "12 Week Year" else None
+		r["current_on"] = str(r.current_on) if r.current_on else None
+		r["progress"] = readings.summary(r)
+		r["reached"] = readings.reached(r)
 	return {"goals": rows, "total": len(names), "tabs": tabs,
 		"summary_line": {"in_progress": tabs["in_progress"], "tasks_done": total_done, "tasks_counted": total_counted}}
 
@@ -141,11 +145,39 @@ def _person_only():
 		frappe.throw(_("Agents cannot create, close or move goals. Propose a task under a goal instead."), frappe.PermissionError)
 
 
+MEASURE_FIELDS = ("measure_kind", "measure", "unit", "start_value", "target_value")
+
+
+def measure_values(measure_kind=None, done_when=None, measure=None, unit=None, start_value=None, target_value=None):
+	"""The key-result fields of a new or edited goal (set 7). A finish line given without a kind is a milestone."""
+	if measure_kind and measure_kind not in ("Milestone", "Number"):
+		frappe.throw(_("Choose a finish line or a number."))
+	if not measure_kind and (done_when or "").strip():
+		measure_kind = "Milestone"
+	out = {"measure_kind": measure_kind or None}
+	if measure_kind == "Number":
+		out.update({"measure": (measure or "").strip() or None, "unit": (unit or "").strip() or None,
+			"start_value": _float(start_value), "target_value": _float(target_value)})
+	return out
+
+
+def _float(v):
+	if v is None or v == "":
+		return None
+	try:
+		return float(v)
+	except (TypeError, ValueError):
+		frappe.throw(_("{0} is not a number.").format(v))
+
+
 @frappe.whitelist(methods=["POST"])
 def create(title: str, goal_type: str = "Open", space: str | None = None, area: str | None = None, project: str | None = None, target_date: str | None = None,
-		cycle: str | None = None, serves: str | None = None, done_when: str | None = None, notes_md: str | None = None):
+		cycle: str | None = None, serves: str | None = None, done_when: str | None = None, notes_md: str | None = None,
+		measure_kind: str | None = None, measure: str | None = None, unit: str | None = None, start_value: float | str | None = None,
+		target_value: float | str | None = None):
 	"""Create a goal. A 12 Week Year goal needs a cycle; an Annual goal needs a target date. `serves` is the longer goal it
-	serves; `project` is read as the goal that project became, for one set (set 6)."""
+	serves; `project` is read as the goal that project became, for one set (set 6). Key results (set 7): `measure_kind`
+	Milestone needs `done_when`; Number needs `measure`, `start_value` and `target_value` (with `unit`)."""
 	_person_only()
 	if goal_type not in TYPES:
 		frappe.throw(_("Unknown goal type."))
@@ -158,7 +190,8 @@ def create(title: str, goal_type: str = "Open", space: str | None = None, area: 
 	last = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s", space)[0][0]
 	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": (title or "").strip(), "goal_type": goal_type, "area": area or None,
 		"serves": serves or (project and goal_for_project(project, space)) or None, "done_when": done_when or None, "notes_md": notes_md or None,
-		"target_date": target_date or None, "cycle": cycle if goal_type == "12 Week Year" else None, "sort_order": last + 1})
+		"target_date": target_date or None, "cycle": cycle if goal_type == "12 Week Year" else None, "sort_order": last + 1,
+		**measure_values(measure_kind, done_when, measure, unit, start_value, target_value)})
 	doc.insert()
 	return {"name": doc.name, "title": doc.title}
 
@@ -248,14 +281,38 @@ def get(goal: str):
 	g["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
 	g["serves_title"] = frappe.db.get_value("Life Goal", doc.serves, "title") if doc.serves else None
 	g["cycle_title"] = frappe.db.get_value("Life Cycle", doc.cycle, "title") if doc.cycle else None
-	served_by = frappe.get_all("Life Goal", filters={"serves": doc.name, "space": space}, fields=["name", "title", "goal_type", "outcome", "is_someday", "on_hold"],
-		order_by="creation asc", limit=100)
+	served_by = frappe.get_all("Life Goal", filters={"serves": doc.name, "space": space}, fields=["name", "title", "goal_type", "outcome", "is_someday", "on_hold",
+		"cycle", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"], order_by="creation asc", limit=100)
 	served_by.sort(key=lambda r: TYPES.index(r.goal_type) if r.goal_type in TYPES else 9)
+	cycles = names_map("Life Cycle", [r.cycle for r in served_by], "title")
 	for r in served_by:
 		r["status"] = status_of(r)
+		r["cycle_title"] = cycles.get(r.cycle) if r.cycle else None
+	with_progress(served_by)
+	serves = None
+	if doc.serves:  # always in the goal's own space (check_serves)
+		serves = frappe.db.get_value("Life Goal", doc.serves, ["name", "title", "goal_type", "cycle", "measure_kind", "measure", "unit", "start_value",
+			"target_value", "current_value", "current_on"], as_dict=True)
+		with_progress([serves])
+	g["progress"] = with_progress([frappe._dict(doc.as_dict())])[0]["progress"]
+	g["has_finish_line"] = readings.has_finish_line(doc)
+	confirmed, suggested = readings.for_goal(doc.name) if doc.measure_kind == "Number" else ([], [])
 	inc = 1 if doc.is_archived else 0
-	return {"goal": g, "space": space, "served_by": served_by, "record_count": archive.goal_record_count(doc.name),
-		"tabs": tab_counts_of(space, doc.name, inc)}
+	return {"goal": g, "space": space, "served_by": served_by, "serves": serves, "readings": confirmed, "suggested": suggested,
+		"record_count": archive.goal_record_count(doc.name), "tabs": tab_counts_of(space, doc.name, inc)}
+
+
+def with_progress(rows):
+	"""Add `progress` to goal rows: a number goal's result against its target, a 12 Week Year goal's score, else the share
+	of its tasks done (readings.summary). Rows need name, goal_type, cycle and the measure fields."""
+	if not rows:
+		return rows
+	with_tasks(rows)
+	scores = _scores([r for r in rows if r.get("goal_type") == "12 Week Year" and r.get("cycle")])
+	for r in rows:
+		score = r.get("score") if r.get("score") is not None else scores.get(r["name"])
+		r["progress"] = readings.summary({**r, "score": score if r.get("goal_type") == "12 Week Year" else None})
+	return rows
 
 
 def tab_counts_of(space, goal, include_archived=0):
@@ -308,17 +365,20 @@ def set_status(goal: str, status: str):
 
 @frappe.whitelist(methods=["POST"])
 def update(goal: str, values: str | dict):
-	"""Change the fields of a goal a person edits: title, area, serves, done_when, notes_md, target_date, result_note."""
+	"""Change the fields of a goal a person edits: title, area, serves, done_when, notes_md, target_date, result_note, and its
+	key result (measure_kind, measure, unit, start_value, target_value). Changing the key result applies the rule of a new goal."""
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	values = frappe.parse_json(values) or {}
 	if not isinstance(values, dict):
 		frappe.throw(_("values must be an object of fields."))
-	allowed = {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note"}
+	allowed = {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note", *MEASURE_FIELDS}
 	for k, v in values.items():
 		if k not in allowed:
 			frappe.throw(_("Field {0} cannot be changed here.").format(k))
-		doc.set(k, v or None)
+		doc.set(k, _float(v) if k in ("start_value", "target_value") else (v if v == 0 else v or None))
+	if "measure_kind" not in values and values.get("done_when") and not doc.measure_kind:
+		doc.measure_kind = "Milestone"
 	doc.save()
 	return get(doc.name)
 
@@ -331,3 +391,82 @@ def for_project(project: str):
 	if not doc.migrated_to:
 		frappe.throw(_("This project has not been moved to a goal yet."), frappe.DoesNotExistError)
 	return {"project": doc.name, "goal": doc.migrated_to}
+
+
+# ---- key results (set 7): suggestions, habits, readings ----
+
+@frappe.whitelist(methods=["POST"])
+def suggest_measure(title: str, notes: str | None = None, space: str | None = None):
+	"""Propose how a goal will be known to be done: Milestone (a finish line) or Number (measure, unit, target), from its
+	title and notes. The assistant answers within the spend cap; without a key, simple rules do. `habit` is set when the
+	title reads as a frequency ("daily", "3 times a week"): it is a habit, not a goal."""
+	_person_only()
+	space = permissions.resolve_space(space, write=True)
+	return readings.suggest_measure((title or "").strip()[:300], notes, space)
+
+
+@frappe.whitelist(methods=["POST"])
+def make_habit(title: str, space: str | None = None, area: str | None = None, days_per_week: int | None = None):
+	"""Make a frequency a habit instead of a goal: the habit is created (or reused by title) and added to the current month's
+	plan. No goal is created."""
+	from lifeos import journal
+
+	_person_only()
+	space = permissions.resolve_space(space, write=True)
+	title = (title or "").strip()[:140]
+	if not title:
+		frappe.throw(_("Name the habit."))
+	guess = readings.habit_of(title)
+	days = int(days_per_week or (guess and guess["days_per_week"]) or 7)
+	name = frappe.db.get_value("Life Habit", {"space": space, "title": title}) or frappe.get_doc(
+		{"doctype": "Life Habit", "space": space, "title": title, "area": area or None}).insert().name
+	now = getdate()
+	plan = journal.habits_month(space, now.year, now.month)
+	rows = [{"habit": h["habit"], "days_per_week": h["days_per_week"]} for h in plan["habits"] if not h["removed"] and h["habit"] != name]
+	journal.set_month_habits(space, now.year, now.month, [*rows, {"habit": name, "days_per_week": max(1, min(7, days))}])
+	return {"habit": name, "title": title, "days_per_week": days, "month": f"{now.year}-{now.month:02d}"}
+
+
+@frappe.whitelist(methods=["GET"])
+def goal_readings(goal: str):
+	"""A number goal's Confirmed readings (oldest first, for the chart) and its Suggested ones waiting (newest first)."""
+	doc = permissions.get_doc_checked("Life Goal", goal)
+	confirmed, suggested = readings.for_goal(doc.name)
+	return {"goal": doc.name, "confirmed": confirmed, "suggested": suggested}
+
+
+@frappe.whitelist(methods=["POST"])
+def add_reading(goal: str, value: float | str, date: str | None = None, note: str | None = None):
+	"""A person records a number goal's value by hand. It is Confirmed at once and becomes the current value when latest."""
+	_person_only()
+	doc = permissions.get_doc_checked("Life Goal", goal, "write")
+	if doc.measure_kind != "Number":
+		frappe.throw(_("Readings belong to a goal measured by a number."))
+	r = frappe.get_doc({"doctype": "Life Goal Reading", "space": doc.space, "goal": doc.name, "date": date or frappe.utils.today(),
+		"value": _float(value), "status": "Confirmed", "suggested_by": "Owner", "excerpt": (note or "").strip()[:1000] or None}).insert()
+	return _goal_now(doc.name, r.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def confirm_reading(reading: str, value: float | str | None = None, date: str | None = None):
+	"""Confirm a Suggested reading, optionally with the value or date edited first. People only."""
+	_person_only()
+	r = readings.confirm(reading, _float(value), date)
+	return _goal_now(r.goal, r.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def reject_reading(reading: str):
+	"""Reject a Suggested reading. It stays as Rejected, so the same suggestion is not stored again."""
+	_person_only()
+	r = permissions.get_doc_checked("Life Goal Reading", reading, "write")
+	r.status = "Rejected"
+	r.save()
+	return _goal_now(r.goal, r.name)
+
+
+def _goal_now(goal, reading):
+	g = frappe.db.get_value("Life Goal", goal, ["name", "title", "goal_type", "measure_kind", "measure", "unit", "start_value", "target_value",
+		"current_value", "current_on"], as_dict=True)
+	return {"reading": reading, "goal": goal, "current_value": g.current_value if g.current_on else None, "current_on": str(g.current_on) if g.current_on else None,
+		"progress": readings.summary(g), "reached": readings.reached(g)}

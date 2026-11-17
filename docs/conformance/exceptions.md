@@ -9,8 +9,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-manual-commit | 5 |
 | frappe-security-file-traversal | 4 |
 | frappe-setuser | 13 |
-| frappe-sql-format-injection | 75 |
-| Total | 97 |
+| frappe-sql-format-injection | 76 |
+| Total | 98 |
 
 ## frappe-manual-commit
 
@@ -71,9 +71,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/goals.py` | 36 | `sp` is one of two constant fragments; values are parameters |
 | `lifeos/api/goals.py` | 96 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
 | `lifeos/api/goals.py` | 105 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
-| `lifeos/api/inbox.py` | 298 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 303 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/inbox.py` | 305 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 306 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
+| `lifeos/api/inbox.py` | 311 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 313 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |
@@ -127,4 +127,5 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/patches/v7/projects_into_goals.py` | 170 | `end` is "from" or "to" |
 | `lifeos/patches/v7/projects_into_goals.py` | 180 | DocType and field names come from the constant DYNAMIC |
 | `lifeos/patches/v7/projects_into_goals.py` | 250 | `dt` comes from index.KINDS, a constant |
+| `lifeos/readings.py` | 254 | only the code-owned vault fragment of the tool context is inserted; values are parameters |
 | `lifeos/tests/test_ux6_goals.py` | 24 | `doctype` comes from the constant OLD_COLUMNS |

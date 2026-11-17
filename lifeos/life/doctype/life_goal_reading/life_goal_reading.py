@@ -18,6 +18,10 @@ class LifeGoalReading(Document):
 			frappe.throw(_("A reading needs a value."))
 		unit = f" {goal.unit}" if goal.unit else ""
 		self.title = f"{goal.title}: {_num(self.value)}{unit}"[:140]
+		from lifeos.permissions import is_agent
+
+		if self.status != "Suggested" and is_agent() and (self.is_new() or self.has_value_changed("status")):
+			frappe.throw(_("Agents suggest readings; only a person confirms or rejects them."), frappe.PermissionError)
 		if self.status == "Confirmed" and not self.confirmed_on:
 			self.confirmed_by = self.confirmed_by or frappe.session.user
 			self.confirmed_on = frappe.utils.now_datetime()

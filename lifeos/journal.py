@@ -106,7 +106,7 @@ def grid(cycle_name) -> dict:
 	for g in frappe.get_all(
 		"Life Goal", filters={"cycle": cycle.name},
 		fields=["name", "title", "area", "serves", "outcome", "result_note", "carried_from", "final_score", "sort_order",
-			"measure_kind", "done_when", "measure", "unit", "start_value", "target_value", "current_value"],
+			"measure_kind", "done_when", "measure", "unit", "start_value", "target_value", "current_value", "current_on"],
 		order_by="sort_order asc, creation asc",
 	):
 		acts = by_goal.get(g.name, [])
@@ -122,7 +122,7 @@ def grid(cycle_name) -> dict:
 	from lifeos import readings
 
 	served = {r.name: r for r in frappe.get_all("Life Goal", filters={"name": ("in", [g.serves for g in goals if g.serves] or ["-"])},
-		fields=["name", "title", "goal_type", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value"])}
+		fields=["name", "title", "goal_type", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"])}
 	for g in goals:
 		s = served.get(g.serves)
 		g["serves_title"] = s.title if s else None
@@ -271,7 +271,7 @@ def plan_next_cycle(cycle_name, goals=None, title=None) -> dict:
 			"start_value": old.start_value, "target_value": old.target_value,
 			"actions": [{"title": a.title, "per_week": a.per_week, "status": "Open"} for a in old.actions if a.status == "Open"],
 		}).insert(ignore_permissions=True)
-		if old.measure_kind == "Number" and old.current_value is not None:
+		if old.measure_kind == "Number" and old.current_on:
 			# the carried goal starts from where the old one got to
 			frappe.get_doc({"doctype": "Life Goal Reading", "space": copy.space, "goal": copy.name, "date": old.current_on or today(),
 				"value": old.current_value, "status": "Confirmed", "suggested_by": "Owner",

@@ -3,6 +3,7 @@
     <div class="flex flex-col gap-3">
       <FormControl v-model="form.title" label="Goal" placeholder="For example: Golf: hit 5 birdies" />
       <FormControl v-model="form.area" type="select" label="Area" :options="[{ label: '—', value: '' }, ...areaOptions()]" />
+      <DoneWhen :model-value="m" :title="form.title" @habit="toHabit" />
       <div>
         <div class="mb-1.5 text-sm text-ink-gray-6">Actions, and how many times a week</div>
         <div v-for="(a, i) in form.actions" :key="i" class="mb-1.5 flex gap-2">
@@ -21,29 +22,41 @@
 </template>
 <script setup>
 import { reactive, ref, watch } from 'vue'
-import { Button, Dialog, FormControl, TextInput, dialog } from 'frappe-ui'
+import { Button, Dialog, FormControl, TextInput, dialog, toast } from 'frappe-ui'
 import { api, tryCall } from '@/lib/api'
 import { areaOptions, loadLookups } from '@/lib/lookups'
+import DoneWhen from '@/components/goals/DoneWhen.vue'
+import { emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
 
 const props = defineProps({ modelValue: Boolean, cycle: String, goal: Object })
 const emit = defineEmits(['update:modelValue', 'saved'])
 const open = ref(false)
 const form = reactive({ title: '', area: '', actions: [] })
+const m = reactive(emptyMeasure())
 watch(() => props.modelValue, (v) => {
   open.value = v
   if (v) {
     loadLookups()
     const g = props.goal
+    Object.assign(m, emptyMeasure(g || {}))
     Object.assign(form, { title: g?.title || '', area: g?.area || '', actions: g ? g.actions.map((a) => ({ name: a.name, title: a.title, per_week: a.per_week })) : [{ title: '', per_week: 1 }] })
   }
 })
 watch(open, (v) => emit('update:modelValue', v))
 async function save() {
-  const res = await tryCall(() => api('journal.save_goal', { goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area || '', actions: form.actions }), 'Goal saved.')
+  // a new goal needs its finish line or number; an older goal without one may be saved as it is (it shows in the weekly review)
+  const problem = measureProblem(m, !props.goal || !!props.goal.measure_kind)
+  if (problem) return toast.error(problem)
+  const measure = m.measure_kind ? measureArgs(m) : {}
+  const res = await tryCall(() => api('journal.save_goal', { goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area || '', actions: form.actions,
+    ...measure, measure_kind: m.measure_kind || undefined }), 'Goal saved.')
   if (res) {
     open.value = false
     emit('saved')
   }
+}
+async function toHabit(h) {
+  if (await tryCall(() => makeHabit(h, { area: form.area }))) open.value = false
 }
 function remove() {
   dialog.danger({

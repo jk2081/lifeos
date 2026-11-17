@@ -118,7 +118,9 @@ class SiteFake:
 			data = json.loads(params["messages"][-1]["content"])
 		except (ValueError, TypeError, KeyError):
 			data = {}
-		if isinstance(data, dict) and "records" in data:
+		if isinstance(data, dict) and data.get("task") in TASKS:
+			out = TASKS[data["task"]](data)
+		elif isinstance(data, dict) and "records" in data:
 			recs = [r for r in data["records"] if r.get("ref")]
 			out = {"candidates": [{"kind": "Promise", "title": f"You said you would follow up on {recs[0]['title'][:80]}. No task covers it.",
 				"evidence": [recs[0]["ref"]], "task_title": f"Follow up on {recs[0]['title'][:80]}"}]} if recs else {"candidates": []}
@@ -138,3 +140,42 @@ class SiteFake:
 		_stream(on_text, text)
 		return {"content": [{"type": "text", "text": text}] if text else [], "stop_reason": "end_turn", "model": params["model"],
 			"usage": _usage(params, text)}
+
+
+# ---- set 7: the structured tasks of key results, the weekly review and old Inbox items, answered by the same rules the
+# app uses without a key, so the acceptance site exercises the assistant's path deterministically ----
+
+def _goal_measure(data):
+	from lifeos import readings
+
+	r = readings.rule_measure(data.get("title"), data.get("notes"))
+	if r["kind"] == "Milestone":
+		return {"kind": "Milestone", "done_when": f"{(data.get('title') or '').strip()} is done"}
+	return {k: r[k] for k in ("kind", "measure", "unit", "target_value", "start_value") if r.get(k) is not None}
+
+
+def _goal_readings(data):
+	"""A value is "<measure> ... <number>" within 60 characters in a record's text."""
+	out = []
+	for g in data.get("goals") or []:
+		if not g.get("measure"):
+			continue
+		pat = re.escape(g["measure"]) + r"[^0-9\n]{0,60}?(\d+(?:\.\d+)?)"
+		for r in data.get("records") or []:
+			m = re.search(pat, r.get("text") or "", re.I)
+			if m:
+				out.append({"goal": g["goal"], "value": float(m.group(1)), "record": r.get("ref"), "excerpt": m.group(0)[:200]})
+	return {"readings": out}
+
+
+def _rules_of(name):
+	def run(data):
+		import importlib
+
+		mod, fn = name.rsplit(".", 1)
+		return getattr(importlib.import_module(mod), fn)(data)
+	return run
+
+
+TASKS = {"goal_measure": _goal_measure, "goal_readings": _goal_readings,
+	"goal_plan": _rules_of("lifeos.weekplan.fake_plan"), "inbox_decisions": _rules_of("lifeos.old_inbox.fake_decisions")}

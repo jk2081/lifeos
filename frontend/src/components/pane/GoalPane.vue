@@ -7,10 +7,18 @@
     <div v-if="info" class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6" data-pane-serves>
       <span>Serves</span>
       <Pick :model-value="info.goal.serves || null" :options="servesOptions" placeholder="Choose a longer goal" :disabled="!writable" @update:model-value="saveServes" />
-      <template v-if="info.served_by.length"><span>· Served by</span>
-        <Button v-for="s in info.served_by" :key="s.name" size="sm" variant="ghost" :label="s.title" data-pane-served-by @click="openRef('goal:' + s.name)" /></template>
+      <span v-if="info.serves" class="tabular-nums" data-pane-serves-progress>{{ info.serves.progress.label }}</span>
     </div>
-    <div v-if="info?.goal.done_when" class="text-base text-ink-gray-8" data-pane-done-when><span class="text-sm text-ink-gray-6">Done when </span>{{ info.goal.done_when }}</div>
+    <div v-if="info?.served_by.length" class="flex flex-col gap-1" data-pane-served-by-list>
+      <span class="text-sm text-ink-gray-6">Served by</span>
+      <div v-for="s in info.served_by" :key="s.name" class="flex min-w-0 items-center gap-2">
+        <Button class="min-w-0" size="sm" variant="ghost" :label="s.title" data-pane-served-by @click="openRef('goal:' + s.name)" />
+        <span class="min-w-0 flex-1 truncate text-sm text-ink-gray-6">{{ [s.goal_type === '12 Week Year' ? s.cycle_title || '12 Week Year' : s.goal_type, s.progress.label].join(' · ') }}</span>
+        <div class="w-14 shrink-0"><Progress size="sm" :value="Math.round(s.progress.percent || 0)" /></div>
+      </div>
+    </div>
+    <GoalMeasure v-if="info" :g="info.goal" :readings="info.readings" :suggested="info.suggested" :space="info.space" :writable="writable && !info.goal.is_archived"
+      data-pane-measure @changed="async () => { await load(); emit('changed') }" />
     <div v-if="writable && !d.cycle" class="flex flex-wrap items-center gap-2" data-goal-actions>
       <Button v-if="d.goal.outcome === 'In Progress' && d.goal_type === 'Open'" :label="info?.goal.on_hold ? 'Resume' : 'Put on hold'" data-goal-hold
         @click="setStatus(info?.goal.on_hold ? 'Active' : 'On Hold')" />
@@ -76,6 +84,7 @@ import SectionHead from '../ui/SectionHead.vue'
 import Empty from '../Empty.vue'
 import Backlinks from '../Backlinks.vue'
 import Pick from '../Pick.vue'
+import GoalMeasure from '../goals/GoalMeasure.vue'
 import { api, tryCall } from '@/lib/api'
 import { loadBacklinks } from '@/lib/links'
 import { canWrite, store } from '@/lib/store'

@@ -40,7 +40,7 @@
 
       <NewRecord v-if="store.newKind === 'note'" :model-value="true" title="New note" action="Create note" :fields="[{ name: 'title', label: 'Title', required: true }]"
         :save="createNote" @update:model-value="(v) => !v && (store.newKind = '')" />
-      <NewRecord v-if="store.newKind === 'goal'" :model-value="true" title="New goal" action="Add goal" :fields="goalFields" :initial="{ goal_type: 'Open' }" :save="createGoal"
+      <NewGoalDialog v-if="store.newKind === 'goal'" :model-value="true" :types="['Open', 'Annual']" area-required @saved="goalCreated" @habit="store.newKind = ''"
         @update:model-value="(v) => !v && (store.newKind = '')" />
 
       <NewRecord v-if="store.newKind === 'idea'" :model-value="true" title="New idea" action="Park on Someday" :fields="ideaFields" :save="createIdea"
@@ -75,6 +75,7 @@ import { Alert, Badge, Button, Dropdown, FrappeUIProvider, KeyboardShortcut, Key
   toast, useColorScheme } from 'frappe-ui'
 import AppSidebar from './components/AppSidebar.vue'
 import NewRecord from './components/NewRecord.vue'
+import NewGoalDialog from './components/goals/NewGoalDialog.vue'
 import { GO, PLACES } from './lib/nav'
 import { activePlace } from './lib/sidebar'
 import { navCount, newMenuItems } from './lib/newMenu'
@@ -111,9 +112,6 @@ useColorScheme() // light and dark come from frappe-ui: it follows the system se
 
 const showFab = computed(() => ['/', '/plan/tasks', '/inbox'].includes(route.path) && !route.query.open)
 // a new goal from the New menu: open-ended by default (what a project was before set 6); a 12 Week Year goal is added on the grid
-const goalFields = computed(() => [{ name: 'title', label: 'Goal', required: true }, { name: 'goal_type', label: 'Type', required: true, options: ['Open', 'Annual'] },
-  { name: 'area', label: 'Area', required: true, options: areaOptions() },
-  { name: 'done_when', label: 'Done when', type: 'textarea', help: 'What will be true when this goal is reached.' }, { name: 'target_date', label: 'Target date', type: 'date', help: 'Needed for an annual goal.' }])
 async function createNote(v) {
   const note = await db.insert({ doctype: 'Life Note', space: store.space, title: v.title, content_md: '' })
   store.newKind = ''
@@ -127,10 +125,8 @@ async function createIdea(v) {
   recordChanged('idea:new')
   toast.success('Parked on the Someday list.')
 }
-async function createGoal(v) {
-  const g = await api('goals.create', { space: store.space, ...v })
+function goalCreated(g) {
   store.newKind = ''
-  await loadLookups(true)
   router.push(`/plan/goals/${g.name}`)
 }
 // the sidebar's areas come from the space's lookups, read again when the space changes or Settings changes them

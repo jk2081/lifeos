@@ -58,7 +58,7 @@ class LifeGoal(Document):
 			self.measure = self.unit = None
 			self.start_value = self.target_value = None
 		if self.is_new() and not self.flags.from_restore:
-			self.current_value = self.current_on = None
+			self.current_value, self.current_on = 0, None
 		readings.check_goal(self)
 
 	def check_serves(self):

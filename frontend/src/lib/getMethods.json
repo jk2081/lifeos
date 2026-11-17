@@ -24,6 +24,7 @@
  "lifeos.api.goals.get",
  "lifeos.api.goals.completion_info",
  "lifeos.api.goals.for_project",
+ "lifeos.api.goals.goal_readings",
  "lifeos.api.graph.get",
  "lifeos.api.inbox.list",
  "lifeos.api.inbox.get",

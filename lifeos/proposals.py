@@ -117,8 +117,23 @@ SCHEMA = {
 		},
 		"example": {"record_type": "Task", "record": "Get quotes for a solar dryer pilot", "note": "Not before the monsoon."},
 	},
+	# set 7: a value of a number goal's measure, read from the item. It does not wait in the Inbox: it is stored at once as a
+	# Suggested reading, which the owner confirms or rejects in the weekly review or on the goal
+	"Reading": {
+		"target": "Life Goal Reading", "filed": False, "direct": True,
+		"fields": {
+			"goal": F("link", True, "Name or exact title of a goal measured by a number (measure_kind Number in the context).", doctype="Life Goal"),
+			"value": F("float", True, "The value, in the goal's unit."),
+			"date": F("date", help="ISO date the value is for. Defaults to the item's date."),
+			"excerpt": F("text", True, "The exact words the value was read from, at most 300 characters.", max_length=300),
+			"source": F("text", help="Optional. The record it came from as Doctype:name; defaults to this inbox item."),
+		},
+		"example": {"goal": "Ghillidary yield to 1,800 kg/ha", "value": 1640, "date": "2026-11-14", "excerpt": "Yield this flush came to 1,640 kg/ha"},
+	},
 }
 AREA_REQUIRED = ("Task", "Note", "Vault Document")
+# kinds stored straight away instead of waiting in the Inbox for review
+DIRECT = tuple(k for k, s in SCHEMA.items() if s.get("direct"))
 
 
 class PayloadError(frappe.ValidationError):
@@ -166,6 +181,14 @@ def _coerce(name, spec, value, space, ctx):
 			return str(get_datetime(str(value)).replace(microsecond=0))
 		except Exception:
 			raise PayloadError(_("{0} must be a date and time in ISO form.").format(name))
+	if t == "float":
+		try:
+			value = float(value)
+		except (TypeError, ValueError):
+			raise PayloadError(_("{0} must be a number.").format(name))
+		if value != value or value in (float("inf"), float("-inf")):
+			raise PayloadError(_("{0} must be a number.").format(name))
+		return value
 	if t == "int":
 		try:
 			return int(value)
@@ -297,6 +320,8 @@ def _cross_checks(kind, p, space):
 		p["action"] = _find_action(p["goal"], p["action"])
 		if p.get("week") is not None and not 1 <= p["week"] <= 12:
 			raise PayloadError(_("week must be 1 to 12."))
+	if kind == "Reading" and frappe.db.get_value("Life Goal", p["goal"], "measure_kind") != "Number":
+		raise PayloadError(_("goal must be a goal measured by a number."))
 	if kind == "Event" and p.get("ends_on") and p["ends_on"] < p["starts_on"]:
 		raise PayloadError(_("ends_on is before starts_on."))
 
@@ -449,3 +474,17 @@ def _apply_someday(p, item):
 	doc = permissions.get_doc_checked(doctype, name, "write")
 	someday.park_doc(doc, p.get("note"))
 	return doctype, name
+
+
+def store_reading(p, item):
+	"""A Reading proposal: stored at once as a Suggested reading of the goal, citing the inbox item (or the record named in
+	`source` when it is in the same space). Returns the reading."""
+	from lifeos import readings
+
+	src_dt, src_name = "Life Inbox Item", item.name
+	if p.get("source") and ":" in p["source"]:
+		dt, name = (x.strip() for x in p["source"].split(":", 1))
+		if dt in ("Life Inbox Item", "Life Chat Log", "Life Note") and frappe.db.get_value(dt, name, "space") == item.space:
+			src_dt, src_name = dt, name
+	on = p.get("date") or str(item.get("received_on") or item.creation or today())[:10]
+	return readings.suggest(p["goal"], p["value"], min(getdate(on), getdate(today())), p["excerpt"], src_dt, src_name, by="Agent")

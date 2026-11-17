@@ -136,9 +136,29 @@ def canned_voice(item, context, today):
 	return transcript, summary, proposals
 
 
+def readings_in(text, context, today):
+	"""Reading proposals (set 7): for each goal measured by a number, "<measure> ... <number>" in the text. A Reading does not
+	wait in the Inbox; it is stored as a Suggested reading for the owner to confirm in the weekly review."""
+	import re
+
+	out = []
+	for g in context.get("goals", []):
+		m = g.get("measure") if isinstance(g.get("measure"), dict) else None
+		if g.get("measure_kind") != "Number" or not m or not m.get("measure"):
+			continue
+		hit = re.search(re.escape(m["measure"]) + r"[^0-9\n]{0,60}?(\d+(?:\.\d+)?)", text, re.I)
+		if hit:
+			out.append({"kind": "Reading", "preview": f"{m['measure']}: {hit.group(1)} {m.get('unit') or ''}".strip(), "confidence": 0.8,
+				"payload": {"goal": g["name"], "value": float(hit.group(1)), "date": today, "excerpt": hit.group(0)[:300]}})
+	return out
+
+
 def canned_text(item, context, today):
 	text = (item.get("raw_text") or "").strip()
 	summary = "Summary: " + (text[:280] + ("…" if len(text) > 280 else "") if text else f"{item['title']} was received with no text.")
+	readings = readings_in(text, context, today)
+	if readings:  # a progress update: the values only, no note
+		return None, summary, readings
 	proposals = [{"kind": "Note", "preview": item["title"], "confidence": 0.6,
 		"payload": _with({"title": item["title"], "content_md": text or summary}, area=_area(context, "Personal", "Personal & Health", "Work"))}]
 	return None, summary, proposals
@@ -244,7 +264,7 @@ def process_one(client, fail=False, today=None, log=print):
 	except Exception as e:  # report the failure so the owner sees a Retry button
 		client.call("inbox.fail_item", item=item["name"], error=str(e)[:500])
 		raise
-	log(f"  submitted: {len(result['created'])} proposals, {len(result['errors'])} refused, item is {result['status']}")
+	log(f"  submitted: {len(result['created'])} proposals, {len(result.get('readings') or [])} readings, {len(result['errors'])} refused, item is {result['status']}")
 	for err in result["errors"]:
 		log(f"  refused #{err['index']}: {err['error']}")
 	return result
