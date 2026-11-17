@@ -6,7 +6,7 @@
   <div class="page-body flex-1">
     <div class="chips">
       <span v-for="t in LEGEND" :key="t.type" class="inline-flex items-center gap-1.5 text-sm text-ink-gray-7"><span class="inline-block size-2.5 rounded-full" :style="`background: var(${t.color})`" />{{ t.label }}</span>
-      <span class="inline-flex items-center gap-1.5 text-sm text-ink-gray-7"><span class="inline-block size-2.5 rounded-full" style="background: var(--ink-gray-6)" />Task, chat or project that is linked</span>
+      <span class="inline-flex items-center gap-1.5 text-sm text-ink-gray-7"><span class="inline-block size-2.5 rounded-full" style="background: var(--ink-gray-6)" />Task or chat that is linked</span>
       <span class="flex-1" />
       <span v-if="picked" class="chips">
         <b class="text-base-medium text-ink-gray-9">{{ picked.label }}</b>

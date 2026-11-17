@@ -13,8 +13,8 @@
           <div class="flex w-72 flex-col gap-3 p-3" data-filing-popover>
             <div class="flex flex-col gap-1"><span class="text-sm-medium text-ink-gray-7">Area</span>
               <Pick :model-value="note.area" :options="areaOptions()" placeholder="area" @update:model-value="(v) => saveMeta({ area: v || '' })" /></div>
-            <div class="flex flex-col gap-1"><span class="text-sm-medium text-ink-gray-7">Project</span>
-              <Pick :model-value="note.project" :options="projectOptions" placeholder="no project" @update:model-value="(v) => saveMeta({ project: v || '' })" /></div>
+            <div class="flex flex-col gap-1"><span class="text-sm-medium text-ink-gray-7">Goal</span>
+              <Pick :model-value="note.goal" :options="goalPick" placeholder="no goal" @update:model-value="(v) => saveMeta({ goal: v || '' })" /></div>
             <div class="flex flex-col gap-1"><span class="text-sm-medium text-ink-gray-7">Under the note</span>
               <Pick :model-value="note.parent_note" :options="parentOptions" placeholder="no parent note" @update:model-value="(v) => saveMeta({ parent_note: v || '' })" /></div>
             <div class="flex flex-col gap-1"><span class="text-sm-medium text-ink-gray-7">Also in</span>
@@ -79,10 +79,11 @@ let dirty = false
 let saving = null
 
 const writable = computed(() => !props.readonly && !note.is_archived && store.spaces.find((s) => s.name === note.space)?.access === 'Write')
-const filingLine = computed(() => [note.area_name || 'Unfiled', note.project_title || 'no project',
+const filingLine = computed(() => [note.area_name || 'Unfiled', note.goal_title || 'no goal',
   note.parent_title && 'in ' + note.parent_title, ...(note.also_in || []).map((a) => 'also in ' + areaName(a)),
   note.modified && 'edited ' + short(note.modified, true)].filter(Boolean).join(' · '))
-const projectOptions = computed(() => lookups.projects.filter((p) => [note.area, ...(note.also_in || [])].includes(p.area)).map((p) => ({ value: p.name, label: p.title })))
+const goalPick = computed(() => [{ label: 'No goal', value: '' }, ...(lookups.goals || []).map((g) => ({ value: g.name, label: `${g.goal_type} · ${g.title}` })),
+  ...(note.goal && !(lookups.goals || []).some((g) => g.name === note.goal) ? [{ value: note.goal, label: note.goal_title || note.goal }] : [])])
 const parentOptions = computed(() => allNotes.value.filter((n) => n.name !== note.name && n.parent_note !== note.name).map((n) => ({ value: n.name, label: n.title })))
 
 async function loadNotes() {

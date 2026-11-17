@@ -1,5 +1,6 @@
 <template>
-  <ListView ref="list" title="Sources" noun="sources" screen="sources" doctype="Life Index" :spec="SPEC" :tabs="TABS" :views="views" :quick="['area', 'project', 'status']"
+  <ListView ref="list" :title="embed ? null : 'Sources'" noun="sources" :screen="embed ? embed.screen + '-captures' : 'sources'" :fixed="embed?.fixed" :active="embed ? embed.active : true"
+    :tabs-in-filter="!!embed" doctype="Life Index" :spec="SPEC" :tabs="TABS" :views="views" :quick="['area', 'goal', 'status']"
     :virtual="VIRTUAL" :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => r.ref" :row-key="(r) => r.ref" :row-label="(r) => r.title || 'Untitled'"
     :quiet="['open_items', 'archived']" :flag-labels="{ open_items: 'With open items', archived: 'Include archived' }" :group-by="groupBy" :empty-title="EMPTY[list?.tab] || 'No sources yet.'" :watch-keys="['view']" @loaded="(res) => (extra = res)"
     empty-hint="Everything captured lands here: files, voice notes, photos, pasted text, links, emails and AI chats. Add some from the Inbox.">
@@ -19,7 +20,7 @@
     <template #cell-kind="{ row }"><span class="flex min-w-0 items-center gap-1.5 text-ink-gray-7" :data-kind="row.kind"><span :class="ICON[row.kind] || 'lucide-file'" class="size-4 flex-none" aria-hidden="true" /><span class="truncate">{{ KIND_LABEL[row.kind] || row.kind }}</span></span></template>
     <template #cell-record_date="{ row }"><span class="whitespace-nowrap text-ink-gray-6">{{ short(row.received) }}</span></template>
     <template #cell-area="{ row }"><span class="truncate text-ink-gray-7">{{ row.area_name || '' }}</span></template>
-    <template #cell-project="{ row }"><span class="truncate text-ink-gray-7">{{ row.project_title || '' }}</span></template>
+    <template #cell-goal="{ row }"><span class="truncate text-ink-gray-7">{{ row.goal_title || '' }}</span></template>
     <template #cell-_status="{ row }"><Badge :theme="STATUS_THEME[row.status]" :label="row.status" data-source-status /></template>
     <template #cell-_made="{ row }">
       <NumLink v-if="row.open_count" class="relative text-sm" :to="{ query: { ...route.query, open: row.ref, ptab: 'items' } }" data-door="chat-items">{{ row.open_count }} open item{{ row.open_count === 1 ? '' : 's' }}</NumLink>
@@ -63,7 +64,7 @@
     <template #default>
       <div class="flex flex-col gap-3" data-refile-dialog>
         <FormControl v-model="refileArea" type="select" label="Area" :options="[{ label: 'Unfiled', value: '' }, ...areaOptions()]" />
-        <p class="text-sm text-ink-gray-6">A project that does not belong to the new area is taken off.</p>
+        <p class="text-sm text-ink-gray-6">A goal that does not belong to the new area is taken off.</p>
       </div>
     </template>
   </Dialog>
@@ -89,7 +90,7 @@ const TABS = { key: 'tab', field: 'media_kind', label: 'Kind of source', items: 
   { value: 'email', label: 'Email' }, { value: 'text', label: 'Text' }] }
 const SPEC = [
   { key: 'tab', field: 'media_kind', kind: 'value' },
-  { key: 'area', field: 'area', kind: 'link', none: true }, { key: 'project', field: 'project', kind: 'link', none: true },
+  { key: 'area', field: 'area', kind: 'link', none: true }, { key: 'goal', field: 'goal', kind: 'link', none: true },
   { key: 'from', field: 'record_date', kind: 'from' }, { key: 'to', field: 'record_date', kind: 'to' },
   { key: 'status', field: 'status', kind: 'value' }, { key: 'intent', field: 'intent', kind: 'value' },
   { key: 'system', field: 'source_system', kind: 'value' }, { key: 'assistant', field: 'assistant', kind: 'value' },
@@ -98,7 +99,7 @@ const SPEC = [
 ]
 const VIRTUAL = [
   { fieldname: 'area', label: 'Area', fieldtype: 'Link', options: 'Life Area' },
-  { fieldname: 'project', label: 'Project', fieldtype: 'Link', options: 'Life Project' },
+  { fieldname: 'goal', label: 'Goal', fieldtype: 'Link', options: 'Life Goal' },
   { fieldname: 'status', label: 'Status', fieldtype: 'Select', options: 'In Inbox\nDone\nFailed' },
   { fieldname: 'intent', label: 'Intent', fieldtype: 'Select', options: 'Process\nAdd to wiki\nJust keep' },
   { fieldname: 'source_system', label: 'System', fieldtype: 'Data' },
@@ -114,6 +115,8 @@ const STATUS_THEME = { 'In Inbox': 'amber', Done: 'green', Failed: 'red' }
 const EMPTY = { chats: 'No chats yet.', voice: 'No voice notes yet.', documents: 'No documents yet.', photos: 'No photos yet.', articles: 'No articles yet.',
   email: 'No emails yet.', text: 'No text yet.' }
 
+// inside a record page's tab (the goal page): { screen, space, fixed: { goal }, active(route), writable }
+const props = defineProps({ embed: { type: Object, default: null } })
 const route = useRoute()
 const list = ref(null)
 const selected = ref([])
@@ -132,14 +135,14 @@ const groupBy = (r) => (route.query.view === 'day' && !route.query.sort ? `${wee
 
 function describe(r) {
   const what = r.kind === 'Chat' ? r.assistant : r.source_system && r.source_system !== 'upload' ? `from ${r.source_system}` : ''
-  return [KIND_LABEL[r.kind] || r.kind, what, r.intent && r.intent !== 'Process' ? r.intent : '', r.project_title].filter(Boolean).join(' · ')
+  return [KIND_LABEL[r.kind] || r.kind, what, r.intent && r.intent !== 'Process' ? r.intent : '', r.goal_title].filter(Boolean).join(' · ')
 }
 function select(row, on) {
   selected.value = on ? [...new Set([...selected.value, row.ref])] : selected.value.filter((x) => x !== row.ref)
 }
 let shown = []
 async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
-  const res = await api('sources.list', { space: store.space, tab: tab || 'all', area: p.area, project: p.project, from_date: p.from, to_date: p.to,
+  const res = await api('sources.list', { space: props.embed?.space || store.space, tab: tab || 'all', area: p.area, goal: p.goal, from_date: p.from, to_date: p.to,
     status: p.status, intent: p.intent, system: p.system, assistant: p.assistant, open_items: p.open_items ? 1 : 0, include_archived: p.archived ? 1 : 0, filters, order_by, summary, start, page_length })
   if (summary) return res
   const rows = res.sources.map((r) => ({ ...r, record_date: r.received }))

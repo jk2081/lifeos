@@ -80,23 +80,24 @@ def due_today_tasks(space, area=None):
 	return tasks(space, area, "Due today", due="today")
 
 
-# ---- projects ----
+# ---- open-ended goals (projects before set 6) ----
 
-def projects(space, area, label, conds=(), status="Active"):
-	from lifeos.api import projects as project_api
+def open_goals(space, area, label, conds=()):
+	"""Open-ended goals in progress and not on hold: what "active projects" counted before set 6."""
+	from lifeos.api import goals as goal_api
 
-	n = project_api.list(space=space, area=area, status=None if status == "all" else status, include_done=1 if status == "all" else 0,
-		filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/projects", {"status": status, "view": "list", "f": _f(*conds)}, label, area)
-
-
-def active_projects(space, area=None):
-	return projects(space, area, "Active projects")
+	conds = [("on_hold", "=", 0), *conds]
+	n = goal_api.list(space=space, area=area, state="in_progress", goal_type="Open", filters=_f(*conds), page_length=1)["total"]
+	return _door(n, "/goals", {"status": "in_progress", "type": "Open", "f": _f(*conds)}, label, area)
 
 
-def idle_projects(space, area=None):
+def active_open_goals(space, area=None):
+	return open_goals(space, area, "Open-ended goals")
+
+
+def idle_open_goals(space, area=None):
 	d = rules()["stuck_after_days"]
-	return projects(space, area, f"idle {d}+ days", untouched(d, field="last_activity_on"))
+	return open_goals(space, area, f"idle {d}+ days", untouched(d, field="last_activity_on"))
 
 
 # ---- goals ----
@@ -204,7 +205,7 @@ def open_band(space, area=None):
 	no_ticks, no_tasks = goal_sets(space, area)
 	return {
 		"open_tasks": open_tasks(space, area), "stuck": stuck, "over_limit": stuck["n"] > r["stuck_limit"], "rules": r,
-		"projects": active_projects(space, area), "idle_projects": idle_projects(space, area),
+		"open_goals": active_open_goals(space, area), "idle_goals": idle_open_goals(space, area),
 		"goals": goals_in_progress(space, area),
 		"goals_no_ticks": goals(space, area, "with no ticks for 3 weeks", no_ticks), "goals_no_tasks": goals(space, area, "with no tasks", no_tasks),
 		"inbox": inbox_to_review(space, area), "inbox_old": inbox_old(space, area),
@@ -230,7 +231,7 @@ def inventory(space, area=None):
 	def row(key, label, make):
 		rows.append({"key": key, "label": label, "cells": {b: make(lo, hi) for b, lo, hi in BUCKETS}})
 	row("tasks", "Open tasks", lambda lo, hi: tasks(space, area, "Open tasks", untouched(lo, hi)))
-	row("projects", "Projects", lambda lo, hi: projects(space, area, "Active projects", untouched(lo, hi, "last_activity_on")))
+	row("open_goals", "Open-ended goals", lambda lo, hi: open_goals(space, area, "Open-ended goals", untouched(lo, hi, "last_activity_on")))
 	row("goals", "Goals", lambda lo, hi: _goal_cell(space, area, lo, hi))
 	row("inbox", "Inbox items", lambda lo, hi: inbox(space, area, "Items to review", _received(lo, hi)))
 	row("notes", "Notes not opened", lambda lo, hi: notes(space, area, "Notes", untouched(lo, hi, "last_opened_on")))

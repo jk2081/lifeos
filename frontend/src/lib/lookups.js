@@ -2,13 +2,13 @@ import { reactive } from 'vue'
 import { api } from './api'
 import { store } from './store'
 
-// Areas, tags and projects of the current space, shared by pickers and filters.
-export const lookups = reactive({ space: '', areas: [], tags: [], projects: [], goals: [], loaded: false })
+// Areas, tags and goals in progress of the current space, shared by pickers and filters.
+export const lookups = reactive({ space: '', areas: [], tags: [], goals: [], loaded: false })
 
 export async function loadLookups(force = false) {
   if (!force && lookups.loaded && lookups.space === store.space) return lookups
   const ctx = await api('meta.space_context', { space: store.space })
-  Object.assign(lookups, { space: store.space, areas: ctx.areas, tags: ctx.tags, projects: ctx.projects, goals: ctx.goals,
+  Object.assign(lookups, { space: store.space, areas: ctx.areas, tags: ctx.tags, goals: ctx.goals,
     people: ctx.people, habits: ctx.habits, dimensions: ctx.dimensions, cycle: ctx.cycle, loaded: true })
   return lookups
 }

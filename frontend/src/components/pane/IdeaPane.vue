@@ -35,13 +35,13 @@ import { askBringBack, bringBack, doBringBack, keep, purge } from '@/lib/someday
 
 const props = defineProps({ name: String, type: String, tab: String })
 const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
-const MADE = { 'Life Task': 'task', 'Life Project': 'project', 'Life Note': 'note' }
+const MADE = { 'Life Task': 'task', 'Life Goal': 'goal', 'Life Note': 'note' }
 const d = ref(null)
 const writable = computed(() => store.spaces.find((s) => s.name === d.value?.space)?.access === 'Write' && !store.isAgent)
 async function load() {
   try {
     d.value = await api('someday.get_idea', { idea: props.name })
-    emit('meta', { title: d.value.title, area: d.value.area, area_name: d.value.area_name, project: d.value.project })
+    emit('meta', { title: d.value.title, area: d.value.area, area_name: d.value.area_name, goal: d.value.goal })
   } catch (e) {
     emit('missing')
   }

@@ -285,7 +285,7 @@ def summarise(doctype, base, values, alias, summary, start=0, page_length=20):
 	meta = frappe.get_meta(doctype)
 	for f in fields:  # a Link shows the title of the record it points to
 		field = meta.get_field(f)
-		target = field.options if field and field.fieldtype == "Link" else {"area": "Life Area", "project": "Life Project"}.get(f) if doctype == "Life Index" else None
+		target = field.options if field and field.fieldtype == "Link" else {"area": "Life Area", "goal": "Life Goal"}.get(f) if doctype == "Life Index" else None
 		title = target and frappe.get_meta(target).title_field
 		if title:
 			names = names_map(target, [r[f] for r in rows], title)
@@ -307,7 +307,7 @@ def in_area(space, area, doctype, names):
 	names = [n for n in set(names or []) if n]
 	if not area or not names:
 		return set(names)
-	if doctype not in ALSO_IN and doctype not in ("Life Goal", "Life Project", "Life Idea", "Life Habit", "Life Insight"):
+	if doctype not in ALSO_IN and doctype not in ("Life Goal", "Life Idea", "Life Habit", "Life Insight"):
 		frappe.throw(frappe._("Unknown filed DocType {0}.").format(doctype))
 	values = {"names": names}
 	cond = area_filter(space, area, "x.area", values, also_in=doctype if doctype in ALSO_IN else None)

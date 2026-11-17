@@ -23,8 +23,7 @@ export function taskPill(t, today) {
 export function taskMeta(t, today, { withDue = false } = {}) {
   const parts = []
   if (t.area_name) parts.push(t.area_name)
-  if (t.project_title) parts.push(t.project_title)
-  else if (t.goal_title) parts.push(t.goal_title)
+  if (t.goal_title) parts.push(t.goal_title)
   else if (t.source_title) parts.push('from ' + t.source_title)
   else if (t.carried_from) parts.push('carried forward')
   if (!t.area_name && !parts.length) parts.push('Unfiled')
@@ -46,6 +45,6 @@ export function groupByDue(tasks, today) {
 
 export const VAULT_TYPES = ['ID', 'Travel', 'Insurance', 'Property', 'Tax', 'Medical', 'Other']
 export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
-// "4 of 10 tasks done" leads to the tasks of the project with Show done on. Archived ones are counted, so they are listed too.
-// "x of y tasks done" counts every task of the project but the carried ones: the All tab with that one condition
-export const doneLink = (p) => ({ path: '/tasks', query: { project: p.name, archived: '1', f: JSON.stringify([['status', '!=', 'Carried']]) } })
+// "4 of 10 tasks done" leads to the tasks of the goal with Show done on. Archived ones are counted, so they are listed too.
+// "x of y tasks done" counts every task of the goal but the carried ones: the All tab with that one condition
+export const doneLink = (g) => ({ path: '/tasks', query: { goal: g.name, archived: '1', f: JSON.stringify([['status', '!=', 'Carried']]) } })

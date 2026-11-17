@@ -126,6 +126,8 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 		return False
 	if doc.doctype in NO_AGENT_DOCTYPES and is_agent(user):
 		return False
+	if doc.doctype == "Life Project" and ptype not in ("read", "select", "report", "print", "export"):
+		return False  # read-only since projects became goals (set 6); only the migration patch writes, as Administrator
 	if doc.get("space") and vault_locked(doc) and vault_hidden(doc.space, user):
 		return False
 	space = doc.get("space")

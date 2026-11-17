@@ -12,7 +12,7 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <Pick :model-value="c.default_area" :options="areaOptions()" prefix="Area: " placeholder="default area" :disabled="!writable" @update:model-value="(v) => save(c, { default_area: v || '' })" />
-          <Pick :model-value="c.default_project" :options="projectOptions(c)" prefix="Project: " placeholder="default project" :disabled="!writable" @update:model-value="(v) => save(c, { default_project: v || '' })" />
+          <Pick :model-value="c.default_goal" :options="goalPick(c)" prefix="Goal: " placeholder="default goal" :disabled="!writable" @update:model-value="(v) => save(c, { default_goal: v || '' })" />
           <Select class="w-36" :model-value="c.default_intent" :options="INTENTS" :disabled="!writable" aria-label="Default intent" @update:model-value="(v) => save(c, { default_intent: v })" />
         </div>
       </div>
@@ -23,7 +23,7 @@
       <SectionHead>Import chat history</SectionHead>
       <Card class="flex flex-col gap-3">
         <p class="text-sm text-ink-gray-6">Upload a data export from Claude or ChatGPT (a .zip, up to 1 GB). Each chat becomes an AI chat in Sources, with its transcript;
-          a chat imported before is updated, not repeated. Summaries are left for the agent. Area and project come from the connection above.</p>
+          a chat imported before is updated, not repeated. Summaries are left for the agent. Area and goal come from the connection above.</p>
         <div v-for="k in KINDS" :key="k.system" class="flex flex-wrap items-center gap-2" :data-import="k.system">
           <FileUploader v-if="writable" file-types=".zip,application/zip" :private="true" @success="(f) => start(k.system, f)" @failure="(e) => toast.error(errorText(e))">
             <template #default="{ openFileSelector, uploading, progress: p }">
@@ -59,7 +59,7 @@ const loaded = ref(false)
 const status = ref({})
 let timer = null
 
-const projectOptions = (c) => lookups.projects.filter((p) => !c.default_area || p.area === c.default_area).map((p) => ({ value: p.name, label: p.title }))
+const goalPick = (c) => (lookups.goals || []).filter((g) => !c.default_area || g.area === c.default_area).map((g) => ({ value: g.name, label: g.title }))
 function lastReceived(c) {
   if (!c.last_received_on) return c.quiet ? 'Nothing has arrived yet' : 'Nothing yet'
   const what = c.last_received_what ? `${c.last_received_what}, ` : ''

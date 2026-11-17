@@ -62,7 +62,7 @@ function fill(d) {
   doc.value = d
   for (const f of FIELDS) form[f] = d[f] ?? null
   emit('meta', d.name
-    ? { title: d.title || 'Document', area: d.area, area_name: d.area_name, project: d.project, project_title: d.project_title,
+    ? { title: d.title || 'Document', area: d.area, area_name: d.area_name, goal: d.goal, goal_title: d.goal_title,
       sub: [d.doc_type, d.holder_name].filter(Boolean).join(' · '), archived: !!d.is_archived, canRestore: canRestore.value,
       tabs: [{ value: 'details', label: 'Details' }, { value: 'file', label: 'File' }] }
     : { title: 'Add document', sub: 'Only the last four characters of a number are stored.' })

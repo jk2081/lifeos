@@ -9,12 +9,12 @@ KIND_DOCTYPES = {
 	"Life Inbox Item": ["Inbox"], "Life Task": ["Task", "Task Done"], "Life Note": ["Note"], "Life Vault Document": ["Document"],
 	"Life Chat Log": ["Chat"], "Life Journal Page": ["Journal Page"], "Life Check-in": ["Check-in"], "Life Month Plan": ["Month Plan"],
 }
-ROW_FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, project, is_archived, status, record_owner, also_in_csv"
+ROW_FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, goal, is_archived, status, record_owner, also_in_csv"
 
 
 def decorate(rows):
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
-	projects = names_map("Life Project", [r.project for r in rows], "title")
+	goals = names_map("Life Goal", [r.goal for r in rows], "title")
 	users = user_names([r.record_owner for r in rows])
 	inbox = [r.ref_name for r in rows if r.ref_doctype == "Life Inbox Item"]
 	proposals = {}
@@ -26,7 +26,7 @@ def decorate(rows):
 		if r.ref_doctype == "Life Inbox Item":
 			c = proposals.get(r.ref_name, {})
 			r["proposals"], r["pending"] = sum(c.values()), c.get("Pending", 0)
-		r["area_name"], r["project_title"] = areas.get(r.area), projects.get(r.project)
+		r["area_name"], r["goal_title"] = areas.get(r.area), goals.get(r.goal)
 		r["route"] = links.route_of(r.ref_doctype, r.ref_name)
 		r["filed_by"] = users.get(r.record_owner)
 		r["record_date"] = str(r.record_date) if r.record_date else None

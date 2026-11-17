@@ -74,7 +74,7 @@
     </Card>
     <Card class="bg-surface-gray-1" data-insights-how>
       <div class="text-base-medium text-ink-gray-9">How insights are made</div>
-      <p class="mt-1 text-base text-ink-gray-7">Rules find the exact ones: tasks, projects and inbox items that have not moved, chat items people are waiting on, the 12 Week Year
+      <p class="mt-1 text-base text-ink-gray-7">Rules find the exact ones: tasks, open-ended goals and inbox items that have not moved, chat items people are waiting on, the 12 Week Year
         score, goals with no ticks or no tasks, habits and check-ins trending down, and Someday items due for review. When an API key is set, the AI also reads the last two weeks
         of chats, email digests, source summaries and notes for promises with no task, people waiting on you and recurring themes. Every insight links to the records behind it.
         Dismissing one tells the AI what you do not care about; the same insight is not shown again unless something changes. At most 12 new ones a day.</p>

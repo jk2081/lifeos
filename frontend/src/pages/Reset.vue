@@ -128,7 +128,7 @@ async function undo(log, n) {
 }
 function review(b) {
   if (b.review) return router.push(b.review)
-  const names = b.items.filter((i) => ['Life Task', 'Life Project'].includes(i.doctype)).map((i) => i.name)
+  const names = b.items.filter((i) => ['Life Task', 'Life Goal'].includes(i.doctype)).map((i) => i.name)
   if (!names.length) return router.push({ path: '/inbox', query: { status: 'To Review' } })
   only.value = { title: b.title, names }
   if (phone.value) tab.set('one')

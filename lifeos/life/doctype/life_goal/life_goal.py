@@ -33,6 +33,13 @@ class LifeGoal(Document):
 			self.closed_on = None
 		elif not self.closed_on:
 			self.closed_on = today()
+		# an open-ended goal carries what a project did (set 6): when it was completed and when it last moved
+		self.completed_on = self.closed_on if (self.outcome or "In Progress") != "In Progress" else None
+		if not self.flags.keep_touched:
+			self.last_activity_on = today()
+		if self.goal_type != "Open":
+			self.on_hold = 0
+		self.check_serves()
 		check_cycle_open(self.cycle, self.flags)
 		for a in self.actions:
 			a.per_week = max(1, int(a.per_week or 1))
@@ -40,6 +47,32 @@ class LifeGoal(Document):
 				a.done_on = today()
 			if a.status != "Done":
 				a.done_on = None
+
+	def check_serves(self):
+		"""A goal serves a longer goal of the same space, never itself and never in a loop."""
+		if not self.serves:
+			return
+		if self.serves == self.name:
+			frappe.throw(_("A goal cannot serve itself."), frappe.ValidationError)
+		if frappe.db.get_value("Life Goal", self.serves, "space") != self.space:
+			frappe.throw(_("A goal can only serve a goal of the same space."), frappe.ValidationError)
+		seen, cur = {self.name}, self.serves
+		while cur:
+			if cur in seen:
+				frappe.throw(_("{0} already serves this goal, so this goal cannot serve it.").format(
+					frappe.bold(frappe.db.get_value("Life Goal", self.serves, "title"))), frappe.ValidationError)
+			seen.add(cur)
+			cur = frappe.db.get_value("Life Goal", cur, "serves")
+
+	def on_update(self):
+		# an open-ended goal that is finished archives itself and what is filed under it, as a project did
+		from lifeos import archive
+
+		before = self.get_doc_before_save()
+		closed = (self.outcome or "In Progress") not in ("In Progress", "Carried")
+		was_closed = before and (before.outcome or "In Progress") not in ("In Progress", "Carried")
+		if self.goal_type == "Open" and closed and not was_closed and not self.is_archived and not self.flags.no_archive:
+			archive.archive_goal(self)
 
 	def on_trash(self):
 		check_cycle_open(self.cycle, self.flags)

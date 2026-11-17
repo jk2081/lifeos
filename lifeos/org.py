@@ -54,10 +54,6 @@ def validate_org(doc):
 			seen.add(r.area)
 			rows.append(r)
 	doc.set("also_in", rows)
-	if doc.project:
-		project_area = frappe.db.get_value("Life Project", doc.project, "area")
-		if project_area not in [doc.area, *also]:
-			frappe.throw(_("The project must belong to the record's area or to one of its other areas."), frappe.ValidationError)
 	if doc.is_archived and not doc.archived_on:
 		doc.archived_on = frappe.utils.today()
 	if not doc.is_archived:
@@ -86,7 +82,7 @@ def on_trash(doc, method=None):
 
 # Rows that only record history and point at another record by a Dynamic Link: they must not stop that record's delete
 # (pre-step 6 audit, Q-B26), so their pointer is cleared when it goes. Frappe runs on_trash before its link check, and the
-# clearing is part of the delete's transaction. Real filing links (an idea's area or project, a wiki change's page) still
+# clearing is part of the delete's transaction. Real filing links (an idea's area or goal, a wiki change's page) still
 # stop a delete, and so does a wiki page's cited source (Life Note Source).
 BOOKKEEPING = (
 	("Life Proposal", "created_doctype", "created_name"),

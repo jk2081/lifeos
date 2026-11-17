@@ -34,7 +34,7 @@ class TestLoad(IntegrationTestCase):
 
 	def test_reads_meet_the_target(self):
 		out = loadtest.measure()
-		for key in ("today", "timeline", "area_page", "search_common_word", "search_rare_word", "search_all_spaces"):
+		for key in ("today", "timeline", "today_lens", "search_common_word", "search_rare_word", "search_all_spaces"):
 			self.assertLess(out[key]["median_ms"], loadtest.TARGET_MS, f"{key}: {out[key]}")
 
 	def test_sources_and_wiki_reads_meet_the_target(self):

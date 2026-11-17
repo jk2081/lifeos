@@ -195,15 +195,15 @@ class TestLinkQuery(LifeTestCase):
 		names = [r[0] for r in queries.link_query("Life Area", "ux4", "area_name", 0, 20, {"space": PRIVATE})]
 		self.assertEqual(names, [])
 
-	def test_projects_leave_out_done_and_dropped(self):
-		area = self.areas["Tea"] if isinstance(self.areas, dict) else self.areas[0]
-		area = getattr(area, "name", area)
-		live = self.make("Life Project", title="ux4 live project", area=area, status="Active")
-		done = self.make("Life Project", title="ux4 done project", area=area, status="Done")
-		names = [r[0] for r in queries.link_query("Life Project", "ux4", "title", 0, 20, {"space": PRIVATE})]
+	def test_goals_leave_out_achieved_and_dropped(self):
+		# set 6: the project picker became the goal picker; open-ended goals that are finished leave it
+		area = self.areas["Tea"]
+		live = self.make("Life Goal", title="ux4 live goal", goal_type="Open", area=area)
+		done = self.make("Life Goal", title="ux4 done goal", goal_type="Open", area=area, outcome="Achieved")
+		names = [r[0] for r in queries.link_query("Life Goal", "ux4", "title", 0, 20, {"space": PRIVATE})]
 		self.assertIn(live.name, names)
 		self.assertNotIn(done.name, names)
-		names = [r[0] for r in queries.link_query("Life Project", "ux4", "title", 0, 20, {"space": PRIVATE, "project_status": ["Done"]})]
+		names = [r[0] for r in queries.link_query("Life Goal", "ux4", "title", 0, 20, {"space": PRIVATE, "goal_outcome": ["Achieved"]})]
 		self.assertEqual(names, [done.name])
 
 	def test_search_link_uses_the_query(self):

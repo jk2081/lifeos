@@ -11,8 +11,9 @@ SPACE_DOCTYPES = [
 	"Life Idea", "Life Insight",
 ]
 
-# DocTypes an agent never reads or writes (UX fixes, set 5): insights, and Ask's threads, which belong to one person.
-NO_AGENT_DOCTYPES = ["Life Insight", "Life Ask Thread", "Life Ask Message", "Life AI Usage"]
+# DocTypes an agent never reads or writes (UX fixes, set 5): insights, and Ask's threads, which belong to one person;
+# and projects, kept read-only after they became goals (set 6).
+NO_AGENT_DOCTYPES = ["Life Insight", "Life Ask Thread", "Life Ask Message", "Life AI Usage", "Life Project"]
 
 # DocTypes that carry the organisation fields of section 4a.
 ORG_DOCTYPES = [
@@ -25,7 +26,7 @@ INDEXED_DOCTYPES = [*ORG_DOCTYPES, "Life Check-in", "Life Month Plan"]
 # Records a [[Title]] link can point to, with their title field. Order is the match priority.
 LINKABLE = {
 	"Life Note": "title", "Life Task": "title", "Life Person": "full_name",
-	"Life Vault Document": "title", "Life Chat Log": "title", "Life Goal": "title", "Life Project": "title",
+	"Life Vault Document": "title", "Life Chat Log": "title", "Life Goal": "title",
 }
 
 ROLES = ["Life Admin", "Life User", "Life Agent"]

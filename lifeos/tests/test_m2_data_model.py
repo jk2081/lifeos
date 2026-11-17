@@ -8,7 +8,7 @@ from lifeos.tests.base import PRIVATE, SHARED, LifeTestCase
 
 def index_rows(doctype, name):
 	return frappe.db.sql(
-		"select kind, space, area, also_in_csv, project, tags_csv, record_date, title, search_text, is_archived, status "
+		"select kind, space, area, also_in_csv, goal, tags_csv, record_date, title, search_text, is_archived, status "
 		"from `tabLife Index` where ref_doctype=%s and ref_name=%s order by kind", (doctype, name), as_dict=True)
 
 
@@ -28,7 +28,7 @@ class TestModel(LifeTestCase):
 
 	def test_database_indexes(self):
 		keys = {r[2] for r in frappe.db.sql("show index from `tabLife Index`")}
-		for key in ("life_index_space_date", "life_index_space_area", "life_index_space_project", "life_index_fulltext"):
+		for key in ("life_index_space_date", "life_index_space_area", "life_index_space_goal", "life_index_fulltext"):
 			self.assertIn(key, keys)
 		link_keys = {r[2] for r in frappe.db.sql("show index from `tabLife Link`")}
 		self.assertIn("life_link_from", link_keys)
@@ -97,7 +97,7 @@ class TestModel(LifeTestCase):
 		self.assertRaises(frappe.DuplicateEntryError, dup.insert)
 
 
-class TestAreasAndProjects(LifeTestCase):
+class TestAreasAndGoals(LifeTestCase):
 	def test_area_from_another_space_is_refused(self):
 		task = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "Wrong area", "area": self.shared_areas["Family"]})
 		self.assertRaises(frappe.ValidationError, task.insert)
@@ -110,14 +110,15 @@ class TestAreasAndProjects(LifeTestCase):
 		note = frappe.get_doc({"doctype": "Life Note", "space": PRIVATE, "title": "Tagged", "tags": [{"tag": tag.name}]})
 		self.assertRaises(frappe.ValidationError, note.insert)
 
-	def test_project_must_belong_to_area_or_also_in(self):
-		project = self.make("Life Project", title="Ghillidary turnaround", area=self.areas["Tea"])
-		ok = self.make("Life Task", title="In the project's area", area=self.areas["Tea"], project=project.name)
-		self.assertEqual(ok.project, project.name)
-		also = self.make("Life Task", title="Via also in", area=self.areas["Money"], also_in=[{"area": self.areas["Tea"]}], project=project.name)
-		self.assertEqual(also.project, project.name)
-		bad = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "Elsewhere", "area": self.areas["Personal"], "project": project.name})
-		self.assertRaises(frappe.ValidationError, bad.insert)
+	def test_goal_of_a_record_may_sit_in_any_area_of_its_space(self):
+		# set 6: projects became goals; a goal is not tied to the record's area (the old area check went with projects)
+		goal = self.make("Life Goal", title="Ghillidary turnaround", goal_type="Open", area=self.areas["Tea"])
+		ok = self.make("Life Task", title="In the goal's area", area=self.areas["Tea"], goal=goal.name)
+		self.assertEqual(ok.goal, goal.name)
+		elsewhere = self.make("Life Task", title="Elsewhere", area=self.areas["Personal"], goal=goal.name)
+		self.assertEqual(elsewhere.goal, goal.name)
+		other = frappe.get_doc({"doctype": "Life Task", "space": SHARED, "title": "Other space", "goal": goal.name})
+		self.assertRaises(frappe.ValidationError, other.insert)
 
 	def test_area_names_are_unique_per_space(self):
 		dup = frappe.get_doc({"doctype": "Life Area", "space": PRIVATE, "area_name": "Tea"})
@@ -188,7 +189,7 @@ class TestIndex(LifeTestCase):
 		done.status = "Done"
 		done.save()
 		self.make("Life Chat Log", title="Rebuild chat", date=add_days(today(), -3))
-		query = ("select name, ref_doctype, ref_name, space, area, also_in_csv, project, tags_csv, record_date, title, "
+		query = ("select name, ref_doctype, ref_name, space, area, also_in_csv, goal, tags_csv, record_date, title, "
 			"search_text, is_archived, kind, status, record_owner from `tabLife Index` order by name")
 		before = frappe.db.sql(query)
 		self.assertTrue(before)

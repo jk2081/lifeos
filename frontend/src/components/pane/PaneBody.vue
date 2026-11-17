@@ -11,9 +11,9 @@
       <Button v-if="meta.fullPage" label="Open full page" :route="meta.fullPage" data-pane-full />
       <Button icon="lucide-x" label="Close" tooltip="Close" data-pane-close @click="closePane" />
     </div>
-    <div v-if="meta.area || meta.project || meta.sub" class="flex flex-wrap items-center gap-2">
+    <div v-if="meta.area || meta.goal || meta.sub" class="flex flex-wrap items-center gap-2">
       <Button v-if="meta.area" size="sm" variant="outline" icon-left="lucide-folder" :label="meta.area_name || 'Area'" :route="`/areas/${meta.area}`" />
-      <Button v-if="meta.project" size="sm" variant="outline" icon-left="lucide-chart-no-axes-column" :label="meta.project_title || meta.project" @click="openRef('project:' + meta.project)" />
+      <Button v-if="meta.goal" size="sm" variant="outline" icon-left="lucide-target" :label="meta.goal_title || meta.goal" data-pane-goal @click="openRef('goal:' + meta.goal)" />
       <span v-if="meta.sub" class="text-sm text-ink-gray-6">{{ meta.sub }}</span>
     </div>
   </header>
@@ -60,11 +60,11 @@ const tabs = computed(() => (props.missing ? [] : props.meta.tabs || []))
 const ptab = useUrlTab('ptab', tabs, { replace: true })
 const emit = defineEmits(['meta', 'missing', 'changed', 'restore', 'reload'])
 // "Ask about this": the record and the records linked to it are the question's scope
-const ASKABLE = { task: 'Life Task', note: 'Life Note', project: 'Life Project', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
+const ASKABLE = { task: 'Life Task', note: 'Life Note', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
   inbox: 'Life Inbox Item', page: 'Life Journal Page', idea: 'Life Idea', vault: 'Life Vault Document' }
 async function toSomeday() {
   if (await park(props.meta.someday.doctype, props.meta.someday.name, props.meta.title)) emit('reload')
 }
-const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, project: ProjectPane,
+const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, project: ProjectPane, // ProjectPane hands over to the goal the project became
   goal: GoalPane, idea: defineAsyncComponent(() => import('./IdeaPane.vue')), page: PagePane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, checkin: PlainPane, month: PlainPane }
 </script>

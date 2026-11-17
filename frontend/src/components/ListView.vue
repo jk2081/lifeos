@@ -173,9 +173,11 @@ const route = useRoute()
 const router = useRouter()
 const phone = useMediaQuery('(max-width: 639px)')
 // The lens (lib/lens.js) owns `area=`: a list whose spec has an area filter takes the lens's area, and the area is left
-// out of its controls, its remembered view and its Clear (UX fixes, set 6).
-const lensKey = props.spec.some((e) => e.key === 'area') && !(props.fixed && 'area' in props.fixed) ? 'area' : null
-const fixedKeys = [...(props.fixed ? Object.keys(props.fixed) : []), ...(lensKey ? [lensKey] : [])]
+// out of its controls, its remembered view and its Clear (UX fixes, set 6). A list inside a record page's tab (`fixed`)
+// lists what is filed under that record, whatever the lens.
+const hasArea = props.spec.some((e) => e.key === 'area')
+const lensKey = hasArea && !props.fixed ? 'area' : null
+const fixedKeys = [...new Set([...(props.fixed ? Object.keys(props.fixed) : []), ...(hasArea ? ['area'] : [])])]
 const fixedFields = props.spec.filter((e) => fixedKeys.includes(e.key)).map((e) => e.field)
 const list = useLifeListView(props.doctype, { virtual: props.virtual.filter((v) => !fixedFields.includes(v.fieldname)), synthetic: props.synthetic, hidden: [...props.hidden, ...fixedFields] })
 // the query this list reads: the URL while it is the open tab, what it last saw while another tab is open
@@ -271,7 +273,7 @@ const activeText = computed(() => {
 })
 function nameOf(field, value) {
   if (value === 'none') return 'none'
-  const hit = lookups.areas.find((a) => a.name === value) || lookups.projects.find((x) => x.name === value) || (lookups.people || []).find((x) => x.name === value)
+  const hit = lookups.areas.find((a) => a.name === value) || (lookups.goals || []).find((x) => x.name === value) || (lookups.people || []).find((x) => x.name === value)
   return hit ? hit.area_name || hit.title || hit.full_name : value
 }
 
@@ -318,7 +320,7 @@ function display(row, c) {
   const f = c.fieldname
   const v = row[f]
   const type = list.fieldMeta(f)?.fieldtype
-  if (type === 'Link' || f === 'area' || f === 'project') return row[f + '_name'] ?? row[f + '_title'] ?? row[f + '_label'] ?? v ?? ''
+  if (type === 'Link' || f === 'area' || f === 'goal') return row[f + '_name'] ?? row[f + '_title'] ?? row[f + '_label'] ?? v ?? ''
   if (type === 'Date') return v ? short(v, true) : ''
   if (type === 'Datetime' || f === 'creation' || f === 'modified') return v ? dateTime(v) : ''
   if (type === 'Check') return v ? 'Yes' : 'No'

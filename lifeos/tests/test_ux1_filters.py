@@ -3,7 +3,7 @@ import frappe
 from frappe.utils import add_days, getdate, today
 
 from lifeos import archive as archive_rules
-from lifeos.api import archive, chats, inbox, library, projects, tasks, vault
+from lifeos.api import archive, chats, goals, inbox, library, tasks, vault
 from lifeos.api import area as area_api
 from lifeos.api import calendar as calendar_api
 from lifeos.api import today as today_api
@@ -39,23 +39,23 @@ class TestListFilters(LifeTestCase):
 		self.assertEqual(t["open_loops"], tasks.list(space=PRIVATE, loops=1)["total"])
 
 	def test_task_done_loops_sort_and_completed(self):
-		project = self.make("Life Project", title="ux1 project", area=self.areas["Tea"])
-		a = self.make("Life Task", title="ux1 b open", project=project.name, area=self.areas["Tea"])
-		b = self.make("Life Task", title="ux1 a done", project=project.name, area=self.areas["Tea"], status="Done")
-		c = self.make("Life Task", title="ux1 c carried", project=project.name, area=self.areas["Tea"], status="Carried")
-		get = lambda **f: tasks.list(space=PRIVATE, project=project.name, page_length=100, **f)  # noqa: E731
+		goal = self.make("Life Goal", title="ux1 goal", goal_type="Open", area=self.areas["Tea"])
+		a = self.make("Life Task", title="ux1 b open", goal=goal.name, area=self.areas["Tea"])
+		b = self.make("Life Task", title="ux1 a done", goal=goal.name, area=self.areas["Tea"], status="Done")
+		c = self.make("Life Task", title="ux1 c carried", goal=goal.name, area=self.areas["Tea"], status="Carried")
+		get = lambda **f: tasks.list(space=PRIVATE, goal=goal.name, page_length=100, **f)  # noqa: E731
 		self.assertEqual(self.names(get()["tasks"]), {a.name})
 		self.assertEqual(self.names(get(done=1)["tasks"]), {a.name, b.name})
 		self.assertEqual(self.names(get(status="Carried")["tasks"]), {c.name})
-		# "4 of 10 tasks done" on a project card: the total equals the list with Show done and archived records
-		card = projects.get(project.name)["project"]
-		self.assertEqual(card["tasks_total"], get(done=1, include_archived=1)["total"])
+		# "4 of 10 tasks done" on a goal card: the total equals the list with Show done and archived records
+		card = next(g for g in goals.list(space=PRIVATE, goal_type="Open")["goals"] if g["name"] == goal.name)
+		self.assertEqual(card["tasks_counted"], get(done=1, include_archived=1)["total"])
 		self.assertEqual([t["title"] for t in get(done=1, sort="title")["tasks"]], ["ux1 a done", "ux1 b open"])
 		self.assertEqual([t["title"] for t in get(done=1, sort="title", dir="desc")["tasks"]], ["ux1 b open", "ux1 a done"])
 		self.assertEqual([t["title"] for t in get(done=1, sort="title; drop table x")["tasks"]][:0], [])  # an unknown sort is ignored
 		self.assertEqual(self.names(get(status="Done", completed_from=today(), completed_to=today())["tasks"]), {b.name})
 		self.assertEqual(get(status="Done", completed_from=add_days(today(), 1))["total"], 0)
-		old = self.make("Life Task", title="ux1 loop", project=project.name, area=self.areas["Tea"])
+		old = self.make("Life Task", title="ux1 loop", goal=goal.name, area=self.areas["Tea"])
 		frappe.db.set_value("Life Task", old.name, "creation", add_days(today(), -30), update_modified=False)
 		self.assertEqual(self.names(get(loops=1)["tasks"]), {old.name})
 		self.assertEqual(tasks.list(space=PRIVATE, loops=1)["total"], tasks.open_loops(space=PRIVATE)["total"])
@@ -69,10 +69,8 @@ class TestListFilters(LifeTestCase):
 		none = self.names(tasks.list(space=PRIVATE, area="none", page_length=100)["tasks"])
 		self.assertIn(unfiled.name, none)
 		self.assertNotIn(t.name, none)
-		page = area_api.get(self.areas["Tea"])
-		self.assertEqual(page["counts"]["open_tasks"], tasks.list(space=PRIVATE, area=self.areas["Tea"])["total"])
 		tree = {a["name"]: a for a in area_api.tree(space=PRIVATE)["areas"]}
-		self.assertEqual(tree[self.areas["Tea"]]["open_tasks"], page["counts"]["open_tasks"])
+		self.assertEqual(tree[self.areas["Tea"]]["open_tasks"], tasks.list(space=PRIVATE, area=self.areas["Tea"])["total"])
 
 	def test_inbox_filters(self):
 		a = self.make("Life Inbox Item", title="ux1 voice", source_type="Voice Note", status="New", area=self.areas["Tea"])
@@ -94,18 +92,18 @@ class TestListFilters(LifeTestCase):
 		self.assertEqual((row["pending"], row["proposals"], row["area_name"]), (1, 1, "Tea"))
 		self.assertEqual(res["pending_total"], sum(r["pending"] for r in res["items"]))
 
-	def test_project_filters(self):
+	def test_open_goal_filters(self):
 		sub = self.make("Life Area", area_name="ux1 Garden", parent_area=self.areas["Money"])
-		a = self.make("Life Project", title="ux1 active", area=sub.name)
-		h = self.make("Life Project", title="ux1 hold", area=self.areas["Money"], status="On Hold")
-		get = lambda **f: projects.list(space=PRIVATE, **f)  # noqa: E731
-		self.assertEqual(self.names(get(area=self.areas["Money"])["projects"]), {a.name, h.name})
-		self.assertEqual(self.names(get(area=self.areas["Money"], status="Active")["projects"]), {a.name})
-		self.assertEqual(get(area=self.areas["Money"], status="On Hold")["total"], 1)
-		self.assertEqual(get(area=self.areas["Money"], status="Done")["total"], 0)
-		self.assertEqual(area_api.get(self.areas["Money"])["counts"]["projects"], get(area=self.areas["Money"], status="Active")["total"])
-		self.assertRaises(frappe.ValidationError, projects.list, space=PRIVATE, status="Nope")
-		self.assertEqual(sum(len(g["projects"]) for g in get()["groups"]), len(get()["projects"]))
+		a = self.make("Life Goal", title="ux1 active", goal_type="Open", area=sub.name)
+		h = self.make("Life Goal", title="ux1 hold", goal_type="Open", area=self.areas["Money"], on_hold=1)
+		get = lambda **f: goals.list(space=PRIVATE, goal_type="Open", **f)  # noqa: E731
+		self.assertEqual(self.names(get(area=self.areas["Money"])["goals"]), {a.name, h.name})
+		self.assertEqual(self.names(get(area=self.areas["Money"], filters=[["on_hold", "=", 0]])["goals"]), {a.name})
+		self.assertEqual(get(area=self.areas["Money"], filters=[["on_hold", "=", 1]])["total"], 1)
+		self.assertEqual(get(area=self.areas["Money"], state="achieved")["total"], 0)
+		tree = {r["name"]: r for r in area_api.tree(space=PRIVATE)["areas"]}
+		self.assertEqual(tree[self.areas["Money"]]["goals"], goals.list(space=PRIVATE, area=self.areas["Money"])["total"])
+		self.assertRaises(frappe.ValidationError, goals.list, space=PRIVATE, state="Nope")
 
 	def test_vault_filters(self):
 		person = self.make("Life Person", full_name="ux1 Holder")
@@ -132,15 +130,15 @@ class TestListFilters(LifeTestCase):
 		self.assertEqual(vault.list(space=PRIVATE)["expired"], vault.list(space=PRIVATE, expiry="expired")["total"])
 
 	def test_chat_filters(self):
-		project = self.make("Life Project", title="ux1 chat project", area=self.areas["Tea"])
-		a = chats.log(space=PRIVATE, title="ux1 chat open", area=self.areas["Tea"], project=project.name, open_items=["Follow up"])["name"]
+		goal = self.make("Life Goal", title="ux1 chat goal", goal_type="Open", area=self.areas["Tea"])
+		a = chats.log(space=PRIVATE, title="ux1 chat open", area=self.areas["Tea"], goal=goal.name, open_items=["Follow up"])["name"]
 		b = chats.log(space=PRIVATE, title="ux1 chat old", date=add_days(today(), -20))["name"]
 		mine = {a, b}
 		get = lambda **f: chats.list(space=PRIVATE, **f)  # noqa: E731
 		self.assertEqual(mine & self.names(get(open_items=1)["chats"]), {a})
 		self.assertEqual(mine & self.names(get(area=self.areas["Tea"])["chats"]), {a})
 		self.assertEqual(mine & self.names(get(area="none")["chats"]), {b})
-		self.assertEqual(mine & self.names(get(project=project.name)["chats"]), {a})
+		self.assertEqual(mine & self.names(get(goal=goal.name)["chats"]), {a})
 		self.assertEqual(mine & self.names(get(from_date=add_days(today(), -2))["chats"]), {a})
 		self.assertEqual(mine & self.names(get(to_date=add_days(today(), -10))["chats"]), {b})
 		res = get()
@@ -148,7 +146,7 @@ class TestListFilters(LifeTestCase):
 		tea = next(x for x in res["by_area"] if x["area"] == self.areas["Tea"])
 		self.assertEqual(tea["count"], get(area=self.areas["Tea"])["total"])
 		self.assertEqual(sum(x["count"] for x in res["by_area"]), res["total"])
-		for g in ("day", "area", "project"):
+		for g in ("day", "area", "goal"):
 			self.assertEqual(get(group_by=g)["total"], res["total"])
 		one = chats.get(a)
 		self.assertEqual((one["title"], one["open_count"], one["area_name"]), ("ux1 chat open", 1, "Tea"))
@@ -157,21 +155,18 @@ class TestListFilters(LifeTestCase):
 
 	def test_library_list(self):
 		tag = self.make("Life Tag", tag_name="ux1tag")
-		project = self.make("Life Project", title="ux1 note project", area=self.areas["Tea"])
+		goal = self.make("Life Goal", title="ux1 note goal", goal_type="Open", area=self.areas["Tea"])
 		a = self.make("Life Note", title="ux1 reference", area=self.areas["Tea"], content_md="a", tags=[{"tag": tag.name}])
-		b = self.make("Life Note", title="ux1 project note", area=self.areas["Tea"], project=project.name, content_md="b")
+		b = self.make("Life Note", title="ux1 goal note", area=self.areas["Tea"], goal=goal.name, content_md="b")
 		c = self.make("Life Note", title="ux1 loose", content_md="c")
 		mine = {a.name, b.name, c.name}
 		get = lambda **f: library.list(space=PRIVATE, page_length=100, **f)  # noqa: E731
 		self.assertEqual(mine & self.names(get(area=self.areas["Tea"])["notes"]), {a.name, b.name})
-		self.assertEqual(mine & self.names(get(area=self.areas["Tea"], project="none")["notes"]), {a.name})
-		self.assertEqual(mine & self.names(get(project=project.name)["notes"]), {b.name})
+		self.assertEqual(mine & self.names(get(area=self.areas["Tea"], goal="none")["notes"]), {a.name})
+		self.assertEqual(mine & self.names(get(goal=goal.name)["notes"]), {b.name})
 		self.assertEqual(mine & self.names(get(tag=tag.name)["notes"]), {a.name})
 		self.assertEqual(mine & self.names(get(area="none")["notes"]), {c.name})
-		page = area_api.get(self.areas["Tea"])
-		self.assertEqual(page["counts"]["notes"], get(area=self.areas["Tea"])["total"])
-		self.assertEqual(page["counts"]["reference_notes"], get(area=self.areas["Tea"], project="none")["total"])
-		self.assertEqual(projects.get(project.name)["counts"]["notes"], get(project=project.name)["total"])
+		self.assertEqual(goals.get(goal.name)["tabs"]["notes"], get(goal=goal.name, collection="all")["total"])
 
 	def test_archive_filters(self):
 		t = self.make("Life Task", title="ux1 archived task", area=self.areas["Tea"], status="Done")

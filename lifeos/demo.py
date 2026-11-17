@@ -46,8 +46,9 @@ def load(space="Private"):
 		people[name] = t.insert({"doctype": "Life Person", "space": space, "full_name": name, "relation": relation}).name
 
 	def project(title, area_name, status="Active", outcome=None, target=None):
-		return t.insert({"doctype": "Life Project", "space": space, "title": title, "area": area[area_name], "status": status,
-			"outcome": outcome, "target_date": target}).name
+		# what were projects before set 6 are open-ended goals
+		return t.insert({"doctype": "Life Goal", "space": space, "title": title, "area": area[area_name], "goal_type": "Open",
+			"on_hold": 1 if status == "On Hold" else 0, "done_when": outcome, "target_date": target}).name
 
 	ghl = project("Ghillidary turnaround", "Tea & Coffee", outcome="A drainage and replanting plan for the poor sections", target="2026-12-31")
 	mandir = project("Ghatia mandir", "Tea & Coffee", outcome="Contractor appointed within the budget")
@@ -68,20 +69,20 @@ def load(space="Private"):
 		return doc
 
 	task("Download Merrill statements for Ruchi ITR", "Money & Legal", due_date=add_days(now, -2), tags=[{"tag": frappe.db.get_value("Life Tag", {"space": space, "tag_name": "tax"})}])
-	task("Send quote request to data vendors", "Business That Works", due_date=now, priority="I", project=funnel)
-	task("Six questions to Mithun on the blend sheets", "Business That Works", due_date=now, priority="I", project=dalmia)
+	task("Send quote request to data vendors", "Business That Works", due_date=now, priority="I", goal=funnel)
+	task("Six questions to Mithun on the blend sheets", "Business That Works", due_date=now, priority="I", goal=dalmia)
 	task("Practise 5-footers, 30 minutes", "Personal", due_date=now, goal=goals.get("Golf: hit 5 birdies"))
-	task("Make detailed plan for poor sections", "Tea & Coffee", due_date=add_days(now, 5), priority="I", project=ghl)
-	task("Visit leased gardens", "Tea & Coffee", age=20, priority="I", project=ghl)
-	task("Decide the main deity for the sanctum", "Tea & Coffee", age=7, project=mandir)
+	task("Make detailed plan for poor sections", "Tea & Coffee", due_date=add_days(now, 5), priority="I", goal=ghl)
+	task("Visit leased gardens", "Tea & Coffee", age=20, priority="I", goal=ghl)
+	task("Decide the main deity for the sanctum", "Tea & Coffee", age=7, goal=mandir)
 	task("Start RMT newsletter", "Tea & Coffee", age=30)
-	task("Shortlist three contractors", "Tea & Coffee", due_date=add_days(now, 9), project=mandir)
-	task("Agree audit scope with the auditor", "Tea & Coffee", age=40, project=audit, status="Waiting", waiting_on="Auditor to confirm dates")
+	task("Shortlist three contractors", "Tea & Coffee", due_date=add_days(now, 9), goal=mandir)
+	task("Agree audit scope with the auditor", "Tea & Coffee", age=40, goal=audit, status="Waiting", waiting_on="Auditor to confirm dates")
 	for title, a in (("Renew club membership", "Personal"), ("Fix the study bookshelf", "Family"), ("Read the PMS term sheet", "Money & Legal"),
 			("Back up the photo library", "Personal")):
 		task(title, a, age=25)
 	for title, days in (("Soil test report for section 7", 3), ("Drainage survey, lower division", 6), ("Replanting budget draft", 12), ("Nursery stock count", 16)):
-		doc = task(title, "Tea & Coffee", project=ghl, age=days + 5)
+		doc = task(title, "Tea & Coffee", goal=ghl, age=days + 5)
 		doc.status = "Done"
 		doc.save()
 		frappe.db.set_value("Life Task", doc.name, "completed_on", add_days(now, -days), update_modified=False)
@@ -95,12 +96,12 @@ def load(space="Private"):
 		"content_md": "## Aim\n\nTrained manpower and a formal training programme for every estate.\n\n## First steps\n\n- Supervisors first, then field staff\n- One module a month\n- See [[New crops by estate]] for the crop side\n"})
 	crops = t.insert({"doctype": "Life Note", "space": space, "title": "New crops by estate", "area": tea,
 		"content_md": "Pepper and avocado trials.\n\n| Estate | Crop |\n| --- | --- |\n| Ghatia | Pepper |\n| Chikmagalur | Avocado |\n"})
-	t.insert({"doctype": "Life Note", "space": space, "title": "Recreation area layout, pickleball and pavilion", "area": tea, "project": mandir,
+	t.insert({"doctype": "Life Note", "space": space, "title": "Recreation area layout, pickleball and pavilion", "area": tea, "goal": mandir,
 		"content_md": "Court next to the pavilion. Links to [[Estate training programme outline]] for the staff welfare part and to [[Ruchi]]."})
 	t.insert({"doctype": "Life Note", "space": space, "title": "Land ceiling writ, labour lines", "area": area["Money & Legal"],
 		"also_in": [{"area": tea}], "content_md": "Notes on the writ. Relevant to the estates as well.\n\nSee [[New crops by estate]]."})
 	t.insert({"doctype": "Life Note", "space": space, "title": "Dalmia Gold blend blueprint", "area": area["Business That Works"],
-		"also_in": [{"area": tea}], "project": dalmia, "content_md": "Blend sheet questions for Mithun."})
+		"also_in": [{"area": tea}], "goal": dalmia, "content_md": "Blend sheet questions for Mithun."})
 	reviews = t.insert({"doctype": "Life Note", "space": space, "title": "Reviews", "area": area["Personal"], "content_md": "Weekly review notes live under this note."})
 
 	licence = t.insert({"doctype": "Life Vault Document", "space": space, "title": "Driving licence", "doc_type": "ID", "holder": people["Jai"],
@@ -108,13 +109,13 @@ def load(space="Private"):
 	t.insert({"doctype": "Life Vault Document", "space": space, "title": "Anya passport", "doc_type": "Travel", "holder": people["Anya"],
 		"number_last4": "7730", "issue_date": "2026-10-20", "expiry_date": "2031-10-19", "area": area["Family"]})
 	brief = t.insert({"doctype": "Life Vault Document", "space": space, "title": "Ghatia Mandir, Contractor Brief", "doc_type": "Property",
-		"area": tea, "project": mandir})
+		"area": tea, "goal": mandir})
 	f = devtools.attach("Life Vault Document", brief.name, "Ghatia Mandir, Contractor Brief.pdf", devtools.pdf_bytes(), "file")
 	brief.db_set("file", f.file_url, update_modified=False)
 
-	def chat(title, days_ago, area_name, items, project=None, assistant="Claude", summary=""):
+	def chat(title, days_ago, area_name, items, goal=None, assistant="Claude", summary=""):
 		return t.insert({"doctype": "Life Chat Log", "space": space, "title": title, "date": add_days(now, -days_ago), "assistant": assistant,
-			"url": "https://claude.ai/chat/example", "area": area[area_name], "project": project, "summary_md": summary,
+			"url": "https://claude.ai/chat/example", "area": area[area_name], "goal": goal, "summary_md": summary,
 			"open_items": [{"text": x} for x in items]})
 
 	chat("Mandir size and budget planning", 6, "Tea & Coffee", ["Decide the main deity for the sanctum", "Get two contractor quotes",

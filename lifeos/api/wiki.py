@@ -11,6 +11,7 @@ from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import links, permissions
+from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 from lifeos.life.doctype.life_note.life_note import MAX_MD, SOURCE_DOCTYPES
@@ -137,7 +138,7 @@ def _page_out(doc, with_text=True):
 	srcs = [{"doctype": r.source_doctype, "name": r.source_name, "title": links.title_of(r.source_doctype, r.source_name)} for r in doc.sources]
 	out = {"name": doc.name, "space": doc.space, "title": doc.title, "summary": doc.summary, "collection": doc.collection, "is_rules": doc.is_rules,
 		"area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
-		"project": doc.project, "parent_note": doc.parent_note, "sources": srcs, "links": links.outgoing(doc), "version": version_of(doc),
+		"goal": doc.goal, "parent_note": doc.parent_note, "sources": srcs, "links": links.outgoing(doc), "version": version_of(doc),
 		"modified": str(doc.modified)[:19]}
 	if with_text:
 		out["content_md"] = doc.content_md or ""
@@ -155,27 +156,30 @@ PAGE_SORTS = {"title": "n.title", "modified": "n.modified", "creation": "n.creat
 
 
 @frappe.whitelist(methods=["GET"])
-def pages(space: str | None = None, area: str | None = None, project: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0, page_length: int | None = 50,
-		filters: str | list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None):
-	"""The Wiki screen's Pages list: title, summary, area, sources count, updated. Newest first. Filters: area (with its
-	sub-areas, or "none"), project, and standard filters on Life Note."""
+def pages(space: str | None = None, area: str | None = None, goal: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0, page_length: int | None = 50,
+		filters: str | list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, project: str | None = None):
+	"""The assistant's notes (the Wiki before set 6): title, summary, area, sources count, updated. Newest first. Filters: area
+	(with its sub-areas, or "none"), goal (`project` names the goal a project became), and standard filters on Life Note."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
+	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
+		goal = project if project == "none" else (goal_for_project(project, space) or project)
+
 	where, values = ["n.space = %(space)s", "n.collection = 'Wiki'"], {"space": space}
 	if not int(include_archived or 0):
 		where.append("n.is_archived = 0")
 	if area:
 		where.append(area_filter(space, area, "n.area", values, also_in="Life Note"))
-	if project:
-		where.append("ifnull(n.project, '') = %(project)s")
-		values["project"] = "" if project == "none" else project
+	if goal:
+		where.append("ifnull(n.goal, '') = %(goal)s")
+		values["goal"] = "" if goal == "none" else goal
 	conds, values = std_filters("Life Note", filters, "n", values)
 	clause = " and ".join(where + conds)
 	if summary:
 		return {"summary": summarise("Life Note", f"from `tabLife Note` n where {clause}", values, "n", summary, start, page_length)}
 	order = std_order("Life Note", order_by, "n", PAGE_SORTS) or sort_order(sort, dir, PAGE_SORTS, "n.modified desc")
 	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	rows = frappe.db.sql(f"""select n.name, n.title, n.summary, n.area, n.project, n.is_rules, n.modified, n.is_archived,
+	rows = frappe.db.sql(f"""select n.name, n.title, n.summary, n.area, n.goal, n.is_rules, n.modified, n.is_archived,
 		(select count(*) from `tabLife Note Source` s where s.parent = n.name and s.parenttype = 'Life Note') as sources_count
 		from `tabLife Note` n where {clause} order by n.is_rules desc, {order}, n.name limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True)
@@ -264,11 +268,12 @@ def search(space: str | None = None, query: str | None = None, collection: str |
 # ---------- writing (agents and people) ----------
 
 @frappe.whitelist(methods=["POST"])
-def create_page(space: str | None = None, title: str | None = None, content_md: str | None = None, summary: str | None = None, area: str | None = None, project: str | None = None,
-		parent_note: str | None = None, sources: str | list | None = None, change_note: str | None = None, source: str | dict | None = None):
+def create_page(space: str | None = None, title: str | None = None, content_md: str | None = None, summary: str | None = None, area: str | None = None, goal: str | None = None,
+		parent_note: str | None = None, sources: str | list | None = None, change_note: str | None = None, source: str | dict | None = None, project: str | None = None):
 	"""Create a Wiki page and a Created change. Refuses a title that already exists in the space's Wiki (edit that page instead).
 	sources: [{doctype, name}] the page cites. source: the one source that prompted this change, if any."""
 	space = permissions.resolve_space(space, write=True)
+	goal = goal or (project and goal_for_project(project, space)) or None
 	title = (title or "").strip()
 	if not title:
 		frappe.throw(_("A page needs a title."))
@@ -283,7 +288,7 @@ def create_page(space: str | None = None, title: str | None = None, content_md: 
 	frappe.flags.lifeos_wiki_api = True
 	try:
 		doc = frappe.get_doc({"doctype": "Life Note", "space": space, "title": title[:140], "collection": "Wiki", "summary": summary,
-			"content_md": content_md or "", "area": area or None, "project": project or None, "parent_note": parent_note or None,
+			"content_md": content_md or "", "area": area or None, "goal": goal or None, "parent_note": parent_note or None,
 			"sources": [{"source_doctype": d, "source_name": n} for d, n in srcs]})
 		doc.insert()
 	finally:

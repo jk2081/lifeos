@@ -46,7 +46,7 @@ def _scope(scope, space):
 	s = {k: s.get(k) for k in ("kind", "label", "doctype", "name", "items") if s.get(k) not in (None, "")}
 	s.setdefault("kind", "space")
 	if s.get("name") and not s.get("doctype"):
-		s["doctype"] = {"area": "Life Area", "project": "Life Project", "goal": "Life Goal"}.get(s["kind"])
+		s["doctype"] = {"area": "Life Area", "goal": "Life Goal"}.get(s["kind"])
 		if not s["doctype"]:
 			s.pop("name")
 	if s.get("doctype") and s.get("name"):

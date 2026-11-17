@@ -240,11 +240,10 @@ class TestReview(InboxCase):
 		person = self.make("Life Person", full_name="Ruchi")
 		cycle = self.make("Life Cycle", title="Kinds cycle", start_date=today(), status="Active")
 		goal = self.make("Life Goal", cycle=cycle.name, title="Close open loops", actions=[{"title": "Anya passport"}, {"title": "Ruchi ITR"}])
-		project = self.make("Life Project", title="Ghillidary turnaround", area=self.areas["Tea"])
 		claimed = self.claim(title="Everything", source_type="Journal Photo")
 		attach("Life Inbox Item", claimed["name"], "page-187.png", b"\x89PNG fake")
 		out = inbox.submit_result(claimed["name"], transcript_md="Goal Oct to Dec", summary_md="s", proposals=[
-			{"kind": "Task", "payload": {"title": "Visit leased gardens", "area": "Tea", "project": "Ghillidary turnaround", "goal": "Close open loops", "priority": "I", "tags": ["estate"]}},
+			{"kind": "Task", "payload": {"title": "Visit leased gardens", "area": "Tea", "goal": "Close open loops", "priority": "I", "tags": ["estate"]}},
 			{"kind": "Event", "payload": {"subject": "Golf round", "starts_on": "2026-11-14 07:00:00"}},
 			{"kind": "Important Date", "payload": {"title": "Ruchi", "day": 14, "month": 1, "kind": "Birthday", "person": "Ruchi"}},
 			{"kind": "Note", "payload": {"title": "New crops by estate", "content_md": "pepper", "area": "Tea", "also_in": ["Money"]}},
@@ -263,7 +262,7 @@ class TestReview(InboxCase):
 		self.assertTrue(all(p.status == "Accepted" and p.decided_by == OWNER for p in made.values()))
 
 		task = frappe.get_doc("Life Task", made["Task"].created_name)
-		self.assertEqual((task.project, task.goal, task.priority, task.inbox_item), (project.name, goal.name, "I", claimed["name"]))
+		self.assertEqual((task.goal, task.priority, task.inbox_item), (goal.name, "I", claimed["name"]))
 		self.assertEqual(frappe.db.get_value("Life Tag", task.tags[0].tag, "tag_name"), "estate")
 		event = frappe.get_doc("Event", made["Event"].created_name)
 		self.assertEqual((event.subject, event.life_space, event.event_type), ("Golf round", PRIVATE, "Public"))

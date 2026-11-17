@@ -1,11 +1,11 @@
 """Link search for the filing DocTypes, used by every picker and filter (`standard_queries` in hooks.py).
 
-Frappe's own link search lists archived areas, finished projects and the areas of every space the person belongs to.
+Frappe's own link search lists archived areas, finished goals and the areas of every space the person belongs to.
 This one keeps to active records, and to one space when the filters name it. The front end (framework/linkScope.js)
 adds the current space to every search for these DocTypes. Filters it understands:
   space             only this space
-  include_archived  also archived records (and finished projects), labelled "(archived)"; the Archive screen asks for it
-  project_status    projects: a list of statuses to allow instead of "not Done or Dropped"
+  include_archived  also archived records (and finished goals), labelled "(archived)" or with their outcome
+  goal_outcome      goals: a list of outcomes to allow instead of "In Progress" (projects became goals in set 6)
 Any other plain filter on a real field is applied as given.
 """
 import json
@@ -14,9 +14,8 @@ import frappe
 
 SCOPED = {
 	"Life Area": "area_name", "Life Tag": "tag_name", "Life Habit": "title", "Life Dimension": "dimension_name",
-	"Life Project": "title",
+	"Life Goal": "title",
 }
-CLOSED_PROJECT = ("Done", "Dropped")
 
 
 @frappe.whitelist(methods=["GET"])
@@ -31,18 +30,18 @@ def link_query(doctype: str, txt: str, searchfield: str | None, start: int, page
 		filters = {f[1] if len(f) > 3 else f[0]: (f[-1] if (f[-2] if len(f) > 2 else "=") == "=" else [f[-2], f[-1]]) for f in filters}
 	filters = dict(filters or {})
 	include_archived = frappe.utils.cint(filters.pop("include_archived", 0))
-	statuses = filters.pop("project_status", None)
+	outcomes = filters.pop("goal_outcome", None)
 	meta = frappe.get_meta(doctype)
 	where = {k: v for k, v in filters.items() if meta.has_field(k) or k == "name"}
-	if doctype == "Life Project" and statuses:
-		# a list on a state tab that holds closed projects: exactly those statuses, archived or not
-		where["status"] = ["in", statuses]
+	if doctype == "Life Goal" and outcomes:
+		# a list on a state tab that holds closed goals: exactly those outcomes, archived or not
+		where["outcome"] = ["in", outcomes]
 	elif not include_archived:
 		where["is_archived"] = 0
-		if doctype == "Life Project":
-			where["status"] = ["not in", CLOSED_PROJECT]
+		if doctype == "Life Goal":
+			where["outcome"] = "In Progress"
 	or_filters = {field: ["like", f"%{txt}%"], "name": ["like", f"%{txt}%"]} if txt else None
-	extra = ["parent_area"] if doctype == "Life Area" else (["status"] if doctype == "Life Project" else [])
+	extra = ["parent_area"] if doctype == "Life Area" else (["outcome", "goal_type"] if doctype == "Life Goal" else [])
 	rows = frappe.get_list(doctype, filters=where, or_filters=or_filters, fields=["name", field, "is_archived", "space", *extra],
 		order_by=f"is_archived asc, {'sort_order asc, ' if meta.has_field('sort_order') else ''}{field} asc",
 		start=start, page_length=page_len)
@@ -53,9 +52,9 @@ def link_query(doctype: str, txt: str, searchfield: str | None, start: int, page
 	out = []
 	for r in rows:
 		label = r.get(field) or r.name
-		closed = r.is_archived or (doctype == "Life Project" and r.status in CLOSED_PROJECT)
+		closed = r.is_archived or (doctype == "Life Goal" and r.outcome != "In Progress")
 		if include_archived and closed:
-			label += " (archived)" if r.is_archived else f" ({r.status.lower()})"
-		desc = parents.get(r.parent_area) or "" if doctype == "Life Area" else ""
+			label += " (archived)" if r.is_archived else f" ({(r.outcome or '').lower()})"
+		desc = (parents.get(r.parent_area) or "") if doctype == "Life Area" else (r.goal_type or "") if doctype == "Life Goal" else ""
 		out.append((r.name, label, desc) if desc else (r.name, label))
 	return out

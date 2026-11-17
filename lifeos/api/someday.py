@@ -1,5 +1,6 @@
-"""Someday (UX fixes, set 5): park tasks, projects (with their open tasks), goals and ideas out of the way, and bring
-them back, keep them for longer, or purge them. Parking keeps `creation`. Agents may only propose parking."""
+"""Someday (UX fixes, set 5): park tasks, goals and ideas out of the way, and bring them back, keep them for longer, or
+purge them. An open-ended goal (what a project was before set 6) takes its open tasks with it. Parking keeps `creation`.
+Agents may only propose parking."""
 import builtins
 from datetime import date
 
@@ -10,14 +11,16 @@ from frappe.utils import add_months, cint, getdate, today
 from lifeos import permissions
 from lifeos.api.utils import names_map, page, parse, std_filters
 from lifeos.counts import rules
+from lifeos.proposals import goal_for_project
 
-PARKABLE = ("Life Task", "Life Project", "Life Goal", "Life Idea")
-TYPE_OF = {"Life Task": "Task", "Life Project": "Project", "Life Goal": "Goal", "Life Idea": "Idea"}
-TAB_TYPE = {"tasks": "Life Task", "projects": "Life Project", "goals": "Life Goal", "ideas": "Life Idea"}
-TABS = ("all", "due", "tasks", "projects", "goals", "ideas")
+PARKABLE = ("Life Task", "Life Goal", "Life Idea")
+TYPE_OF = {"Life Task": "Task", "Life Goal": "Goal", "Life Idea": "Idea"}
+# "projects" is read as "goals" for one set (projects became goals in set 6)
+TAB_TYPE = {"tasks": "Life Task", "goals": "Life Goal", "projects": "Life Goal", "ideas": "Life Idea"}
+TABS = ("all", "due", "tasks", "goals", "ideas")
 # the SQL that says "parked" for each kind
-PARKED = {"Life Task": "x.status = 'Someday' and x.is_archived = 0", "Life Project": "x.status = 'Someday'",
-	"Life Goal": "x.is_someday = 1", "Life Idea": "x.status = 'Someday'"}
+PARKED = {"Life Task": "x.status = 'Someday' and x.is_archived = 0", "Life Goal": "x.is_someday = 1 and x.is_archived = 0",
+	"Life Idea": "x.status = 'Someday'"}
 
 
 def _person():
@@ -39,12 +42,12 @@ def _sub(doctype, space, filters, values, i, area=None):
 
 		where.append(area_filter(space, area, "x.area", values, also_in="Life Task" if doctype == "Life Task" else None))
 	extra = "''"
-	if doctype == "Life Project":
+	if doctype == "Life Goal":
 		extra = "(select count(*) from `tabLife Task` t where t.someday_with = x.name and t.status = 'Someday')"
 	elif doctype == "Life Idea":
 		extra = "ifnull(x.source_doctype, '')"
 	elif doctype == "Life Task":
-		extra = "ifnull(x.project, '')"
+		extra = "ifnull(x.goal, '')"
 	return (f"select '{doctype}' as doctype, x.name, x.title, x.area, x.creation, x.someday_on, x.someday_review_on, "
 		f"x.someday_note, {extra} as extra from `tab{doctype}` x where {' and '.join(where + conds)}"), values
 
@@ -52,11 +55,11 @@ def _sub(doctype, space, filters, values, i, area=None):
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, tab: str | None = "all", area: str | None = None, filters: str | builtins.list | dict | None = None,
 		order_by: str | None = None, start: int | str | None = 0, page_length: int | str | None = 50):
-	"""Parked items of a space, oldest review first. tab: all, due (review date reached), tasks, projects, goals, ideas.
+	"""Parked items of a space, oldest review first. tab: all, due (review date reached), tasks, goals, ideas.
 	filters: standard filters on the fields every parked kind has (title, area, someday_on, someday_review_on, name,
 	creation). `tabs` counts each tab under the same filters."""
 	space = permissions.resolve_space(space)
-	tab = tab if tab in TABS else "all"
+	tab = "goals" if tab == "projects" else tab if tab in TABS else "all"
 	start, page_length = page(start, page_length)
 	filters = parse(filters, [])
 	values = {"space": space, "today": getdate(today())}
@@ -70,7 +73,7 @@ def list(space: str | None = None, tab: str | None = "all", area: str | None = N
 		from ({union}) u group by doctype""", values)
 	by = {r[0]: int(r[1]) for r in counts}
 	due = sum(int(r[2] or 0) for r in counts)
-	tabs = {"all": sum(by.values()), "due": due, **{k: by.get(dt, 0) for k, dt in TAB_TYPE.items()}}
+	tabs = {"all": sum(by.values()), "due": due, **{k: by.get(TAB_TYPE[k], 0) for k in TABS if k in TAB_TYPE}}
 	where = ""
 	if tab == "due":
 		where = "where ifnull(someday_review_on, '2999-01-01') <= %(today)s"
@@ -92,9 +95,9 @@ def list(space: str | None = None, tab: str | None = "all", area: str | None = N
 		r["area_name"] = areas.get(r.area)
 		r["area_path"] = " · ".join(x for x in (parent_names.get(parents.get(r.area)), areas.get(r.area)) if x)
 		r["due"] = bool(r.someday_review_on and getdate(r.someday_review_on) <= now)
-		r["tasks"] = cint(r.extra) if r.doctype == "Life Project" else None
+		r["tasks"] = cint(r.extra) if r.doctype == "Life Goal" else None
 		r["from_source"] = r.extra if r.doctype == "Life Idea" and r.extra else None
-		r["ref"] = {"Life Task": "task", "Life Project": "project", "Life Goal": "goal", "Life Idea": "idea"}[r.doctype] + ":" + r.name
+		r["ref"] = {"Life Task": "task", "Life Goal": "goal", "Life Idea": "idea"}[r.doctype] + ":" + r.name
 		for k in ("creation", "someday_on", "someday_review_on"):
 			r[k] = str(r[k])[:10] if r.get(k) else None
 		r.pop("extra", None)
@@ -107,22 +110,22 @@ def count(space):
 
 def _check(doctype):
 	if doctype not in PARKABLE:
-		frappe.throw(_("Only tasks, projects, goals and ideas can go on the Someday list."))
+		frappe.throw(_("Only tasks, goals and ideas can go on the Someday list."))
+
+
+def _goal_tasks(goal):
+	"""The open tasks an open-ended goal takes with it to Someday."""
+	return frappe.get_all("Life Task", filters={"goal": goal, "status": ["in", ["Open", "Doing", "Waiting"]], "is_archived": 0}, pluck="name")
 
 
 def park_doc(doc, note=None):
-	"""Park one record. Its creation is untouched; a project takes its open tasks with it."""
+	"""Park one record. Its creation is untouched; an open-ended goal takes its open tasks with it."""
 	day = today()
 	rev = review_date(day)
 	if doc.doctype == "Life Task":
 		if doc.status not in ("Open", "Doing", "Waiting", "Someday"):
 			frappe.throw(_("Only an open task can go on the Someday list."))
 		doc.status = "Someday"
-	elif doc.doctype == "Life Project":
-		if doc.status not in ("Active", "On Hold", "Someday"):
-			frappe.throw(_("Only an active or on-hold project can go on the Someday list."))
-		doc.status = "Someday"
-		doc.flags.keep_someday = True
 	elif doc.doctype == "Life Goal":
 		if (doc.outcome or "In Progress") != "In Progress":
 			frappe.throw(_("Only a goal in progress can go on the Someday list."))
@@ -131,8 +134,8 @@ def park_doc(doc, note=None):
 	if note is not None:
 		doc.someday_note = note
 	doc.save()
-	if doc.doctype == "Life Project":
-		for name in frappe.get_all("Life Task", filters={"project": doc.name, "status": ["in", ["Open", "Doing", "Waiting"]], "is_archived": 0}, pluck="name"):
+	if doc.doctype == "Life Goal" and doc.goal_type == "Open":
+		for name in _goal_tasks(doc.name):
 			t = frappe.get_doc("Life Task", name)
 			t.check_permission("write")
 			t.status, t.someday_on, t.someday_review_on, t.someday_with = "Someday", day, rev, doc.name
@@ -142,7 +145,7 @@ def park_doc(doc, note=None):
 
 @frappe.whitelist(methods=["POST"])
 def park(doctype: str, name: str, note: str | None = None):
-	"""Move a task, project (with its open tasks) or goal to Someday. Returns what changed, for Undo."""
+	"""Move a task or goal (an open-ended goal with its open tasks) to Someday. Returns what changed, for Undo."""
 	_person()
 	_check(doctype)
 	doc = permissions.get_doc_checked(doctype, name, "write")
@@ -152,20 +155,20 @@ def park(doctype: str, name: str, note: str | None = None):
 
 
 def _snapshot(doc):
-	"""What Undo needs to put a record back: its status fields, and for a project the open tasks it took."""
+	"""What Undo needs to put a record back: its status fields, and for an open-ended goal the open tasks it took."""
 	out = {"doctype": doc.doctype, "name": doc.name, "status": doc.get("status"), "is_someday": doc.get("is_someday"),
-		"due_date": doc.get("due_date")}
-	if doc.doctype == "Life Project":
-		out["tasks"] = frappe.get_all("Life Task", filters={"project": doc.name, "status": ["in", ["Open", "Doing", "Waiting"]], "is_archived": 0},
-			fields=["name", "status"])
+		"due_date": doc.get("due_date"), "on_hold": doc.get("on_hold"), "outcome": doc.get("outcome")}
+	if doc.doctype == "Life Goal" and doc.goal_type == "Open":
+		out["tasks"] = frappe.get_all("Life Task", filters={"name": ["in", _goal_tasks(doc.name) or ["-"]]}, fields=["name", "status"])
 	return out
 
 
 @frappe.whitelist(methods=["POST"])
 def bring_back(doctype: str, name: str, due_date: str | date | None = None, status: str | None = None, cycle: str | None = None,
 		target_date: str | date | None = None, make: str | None = None, area: str | None = None):
-	"""Make a parked item live again. A task: an optional due date. A project: a status (Active or On Hold); the tasks
-	it took come back as Open. A goal: a cycle (12 Week Year goals) or a target date. An idea: make a task, project or note."""
+	"""Make a parked item live again. A task: an optional due date. A goal: a cycle (12 Week Year goals) or a target date;
+	an open-ended goal also a status (Active or On Hold), and the tasks it took come back as Open. An idea: make a task,
+	a goal (open-ended) or a note; "project" is read as "goal" for one set."""
 	_person()
 	_check(doctype)
 	doc = permissions.get_doc_checked(doctype, name, "write")
@@ -174,34 +177,33 @@ def bring_back(doctype: str, name: str, due_date: str | date | None = None, stat
 		doc.status = "Open"
 		doc.due_date = due_date or None
 		doc.save()
-	elif doctype == "Life Project":
-		doc.status = status if status in ("Active", "On Hold") else "Active"
-		doc.someday_on = doc.someday_review_on = None
-		doc.save()
-		for t in frappe.get_all("Life Task", filters={"someday_with": doc.name, "status": "Someday"}, pluck="name"):
-			td = frappe.get_doc("Life Task", t)
-			td.status = "Open"
-			td.save()
 	elif doctype == "Life Goal":
 		doc.is_someday = 0
 		if cycle and doc.goal_type == "12 Week Year":
 			doc.cycle = cycle
 		if target_date:
 			doc.target_date = target_date
+		if doc.goal_type == "Open":
+			doc.on_hold = 1 if status == "On Hold" else 0
 		doc.save()
+		for t in frappe.get_all("Life Task", filters={"someday_with": doc.name, "status": "Someday"}, pluck="name"):
+			td = frappe.get_doc("Life Task", t)
+			td.status = "Open"
+			td.save()
 	else:
-		if make not in ("task", "project", "note"):
-			frappe.throw(_("Choose what the idea becomes: a task, a project or a note."))
+		make = "goal" if make == "project" else make
+		if make not in ("task", "goal", "note"):
+			frappe.throw(_("Choose what the idea becomes: a task, a goal or a note."))
 		target_area = area or doc.area
 		if make == "task":
 			new = frappe.get_doc({"doctype": "Life Task", "space": doc.space, "title": doc.title[:140], "area": target_area,
-				"project": doc.project if doc.project and target_area == doc.area else None, "notes_md": doc.body_md, "due_date": due_date or None,
+				"goal": doc.goal if doc.goal and target_area == doc.area else None, "notes_md": doc.body_md, "due_date": due_date or None,
 				"status": "Open"}).insert()
-		elif make == "project":
+		elif make == "goal":
 			if not target_area:
-				frappe.throw(_("A project needs an area."))
-			new = frappe.get_doc({"doctype": "Life Project", "space": doc.space, "title": doc.title, "area": target_area,
-				"notes_md": doc.body_md, "status": "Active"}).insert()
+				frappe.throw(_("A goal made from an idea needs an area."))
+			new = frappe.get_doc({"doctype": "Life Goal", "space": doc.space, "title": doc.title, "area": target_area, "goal_type": "Open",
+				"notes_md": doc.body_md, "outcome": "In Progress"}).insert()
 		else:
 			new = frappe.get_doc({"doctype": "Life Note", "space": doc.space, "title": doc.title, "area": target_area,
 				"content_md": doc.body_md or ""}).insert()
@@ -226,21 +228,21 @@ def keep(doctype: str, name: str, months: int | str | None = None):
 
 @frappe.whitelist(methods=["POST"])
 def purge(doctype: str, name: str):
-	"""Move a parked item to the trash. A project takes the tasks it was parked with."""
+	"""Move a parked item to the trash. An open-ended goal takes the tasks it was parked with."""
 	_person()
 	_check(doctype)
 	from lifeos import trash
 
 	doc = permissions.get_doc_checked(doctype, name, "write")
-	if doctype == "Life Project":
+	if doctype == "Life Goal":
 		for t in frappe.get_all("Life Task", filters={"someday_with": name, "status": "Someday"}, pluck="name"):
 			trash.delete("Life Task", t)
 	return trash.delete(doctype, name)
 
 
 @frappe.whitelist(methods=["POST"])
-def create_idea(title: str, space: str | None = None, body_md: str | None = None, area: str | None = None, project: str | None = None,
-		source_doctype: str | None = None, source_name: str | None = None, note: str | None = None):
+def create_idea(title: str, space: str | None = None, body_md: str | None = None, area: str | None = None, goal: str | None = None,
+		source_doctype: str | None = None, source_name: str | None = None, note: str | None = None, project: str | None = None):
 	"""A new idea on the Someday list, from the New menu, a note selection, a chat open item or a digest item."""
 	_person()
 	space = permissions.resolve_space(space, write=True)
@@ -252,7 +254,7 @@ def create_idea(title: str, space: str | None = None, body_md: str | None = None
 		if src.get("space") != space:
 			frappe.throw(_("The source belongs to another space."))
 	doc = frappe.get_doc({"doctype": "Life Idea", "space": space, "title": title, "body_md": body_md, "area": area or None,
-		"project": project or None, "source_doctype": source_doctype if source_name else None, "source_name": source_name or None,
+		"goal": goal or (project and goal_for_project(project, space)) or None, "source_doctype": source_doctype if source_name else None, "source_name": source_name or None,
 		"status": "Someday", "someday_on": today(), "someday_review_on": review_date(), "someday_note": note}).insert()
 	return {"name": doc.name, "title": doc.title, "review_on": doc.someday_review_on}
 
@@ -289,6 +291,9 @@ def restore_snapshot(snap):
 		doc.reload()
 	if doc.doctype == "Life Goal":
 		doc.is_someday = cint(snap.get("is_someday"))
+		doc.on_hold = cint(snap.get("on_hold"))
+		if snap.get("outcome"):
+			doc.outcome = snap["outcome"]
 	elif snap.get("status"):
 		doc.status = snap["status"]
 	if "due_date" in snap and doc.doctype == "Life Task":

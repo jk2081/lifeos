@@ -35,21 +35,21 @@ import { loadLookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 import { EXPIRY_PRESETS } from '@/lib/filterUrl'
 
-// inside a record page's tab (the area or project page): { screen, space, fixed: { area } or { project }, active(route) }
+// inside a record page's tab (the goal page): { screen, space, fixed: { goal }, active(route) }
 const props = defineProps({ embed: { type: Object, default: null } })
 const list = ref(null)
 const counts = ref({ expired: 0, soon: 0 })
 const SPEC = [
   { key: 'holder', field: 'holder', kind: 'link' }, { key: 'type', field: 'doc_type', kind: 'value', label: 'Type' },
   { key: 'expiry', field: 'expiry_date', kind: 'preset', label: 'Expiry', presets: EXPIRY_PRESETS, labels: { expired: 'Expired', soon: 'Within 60 days', later: 'Later', none: 'No expiry date' } },
-  { key: 'area', field: 'area', kind: 'link' }, { key: 'project', field: 'project', kind: 'link' }, { key: 'archived', kind: 'flag' },
+  { key: 'area', field: 'area', kind: 'link' }, { key: 'goal', field: 'goal', kind: 'link' }, { key: 'archived', kind: 'flag' },
 ]
 // the state tabs, on expiry=. All is the default; "Expiring soon" is the 60-day window of the expiry filter
 const TABS = { key: 'expiry', field: 'expiry_date', label: 'Expiry', items: [{ value: 'all', label: 'All' }, { value: 'soon', label: 'Expiring soon' }, { value: 'expired', label: 'Expired' }] }
 const SYNTHETIC = [{ key: '_badge', label: '', width: '9rem', align: 'right', place: 'end' }]
 const badgeText = (b) => (b.state === 'expired' ? 'Expired' : b.days === 0 ? 'Expires today' : `Expires in ${b.days} days`)
 async function fetch({ params: p, tab, filters, order_by, fields, summary, start, page_length }) {
-  const res = await api('vault.list', { space: props.embed?.space || store.space, holder: p.holder, doc_type: p.type, expiry: tab === 'all' ? p.expiry : tab, area: p.area, project: p.project,
+  const res = await api('vault.list', { space: props.embed?.space || store.space, holder: p.holder, doc_type: p.type, expiry: tab === 'all' ? p.expiry : tab, area: p.area, goal: p.goal,
     include_archived: p.archived ? 1 : 0, filters, order_by, fields, summary, start, page_length })
   return summary ? res : { rows: res.documents, total: res.total, expired: res.expired, soon: res.soon, tabs: res.tabs }
 }

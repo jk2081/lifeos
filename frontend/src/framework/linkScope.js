@@ -1,30 +1,30 @@
-// The one place that narrows link searches for the filing DocTypes: areas, tags, habits, dimensions and projects.
+// The one place that narrows link searches for the filing DocTypes: areas, tags, habits, dimensions and goals.
 // Every picker, Filter and QuickFilter of @framework/ui searches with frappe.desk.search.search_link, and the library's
 // Filter and QuickFilter send no filters of their own. So this helper adds them to that one request: the current space,
-// and (on the server, lifeos/queries.py) only active records: not archived; projects not Done or Dropped.
+// and (on the server, lifeos/queries.py) only active records: not archived; goals in progress.
 // A screen that needs more says so with useLinkScope(): the Archive asks for archived records too, marked "(archived)",
-// and a list on a project state tab that holds closed projects asks for those statuses.
+// and a list on a goal state tab that holds closed goals asks for those outcomes.
 import { onBeforeUnmount, onMounted } from 'vue'
 import { store } from '@/lib/store'
 
-export const SCOPED_DOCTYPES = ['Life Area', 'Life Tag', 'Life Habit', 'Life Dimension', 'Life Project']
+export const SCOPED_DOCTYPES = ['Life Area', 'Life Tag', 'Life Habit', 'Life Dimension', 'Life Goal']
 const overrides = [] // a stack: the innermost screen wins
 
-/** The filters a link search for `doctype` gets: { space, include_archived?, project_status? } */
+/** The filters a link search for `doctype` gets: { space, include_archived?, goal_outcome? } */
 export function linkFilters(doctype, extra = {}) {
   if (!SCOPED_DOCTYPES.includes(doctype)) return extra
   const top = overrides[overrides.length - 1] || {}
   const out = { space: store.space }
   if (top.archived) out.include_archived = 1
-  if (doctype === 'Life Project' && top.projectStatus?.length) out.project_status = top.projectStatus
+  if (doctype === 'Life Goal' && top.goalOutcome?.length) out.goal_outcome = top.goalOutcome
   return { ...out, ...extra }
 }
 
-/** Widen the link searches while the calling component is on screen: { archived: true } or { projectStatus: ['Done'] }.
+/** Widen the link searches while the calling component is on screen: { archived: true } or { goalOutcome: ['Achieved'] }.
  *  `get` may be a function, read at each search. */
 export function useLinkScope(get) {
   const entry = { get archived() { return (typeof get === 'function' ? get() : get).archived },
-    get projectStatus() { return (typeof get === 'function' ? get() : get).projectStatus } }
+    get goalOutcome() { return (typeof get === 'function' ? get() : get).goalOutcome } }
   onMounted(() => overrides.push(entry))
   onBeforeUnmount(() => { const i = overrides.indexOf(entry); if (i >= 0) overrides.splice(i, 1) })
 }

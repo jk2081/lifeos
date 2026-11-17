@@ -40,35 +40,35 @@ def ev(doctype, name, label=""):
 # ---- rule detectors ----
 
 def detect_stuck(space):
-	"""Open tasks untouched past the stuck threshold, grouped by project (or area); idle projects; old inbox items."""
+	"""Open tasks untouched past the stuck threshold, grouped by goal (or area); idle open-ended goals; old inbox items."""
 	r = counts.rules()
 	days = r["stuck_after_days"]
 	cutoff = add_days(today(), -days)
-	rows = frappe.db.sql("""select t.name, t.title, t.area, t.project, ifnull(t.last_touched_on, date(t.creation)) as touched
+	rows = frappe.db.sql("""select t.name, t.title, t.area, t.goal, ifnull(t.last_touched_on, date(t.creation)) as touched
 		from `tabLife Task` t where t.space=%s and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived=0
 		and ifnull(t.last_touched_on, date(t.creation)) <= %s order by touched""", (space, cutoff), as_dict=True)
 	groups = {}
 	for t in rows:
-		key = ("Life Project", t.project) if t.project else ("Life Area", t.area or "")
+		key = ("Life Goal", t.goal) if t.goal else ("Life Area", t.area or "")
 		groups.setdefault(key, []).append(t)
 	out = []
 	for (dt, name), items in groups.items():
 		if len(items) < STUCK_GROUP_MIN:
 			continue
-		label = (frappe.db.get_value(dt, name, "title" if dt == "Life Project" else "area_name") if name else None) or "Unfiled"
+		label = (frappe.db.get_value(dt, name, "title" if dt == "Life Goal" else "area_name") if name else None) or "Unfiled"
 		oldest = min(getdate(i.touched) for i in items)
 		names = [i.name for i in items]
-		area = items[0].area if dt == "Life Area" else frappe.db.get_value("Life Project", name, "area") if name else None
+		area = items[0].area if dt == "Life Area" else frappe.db.get_value("Life Goal", name, "area") if name else None
 		out.append(candidate("Stuck", f"{len(items)} {label} tasks have not moved in {days} days",
 			[ev("Life Task", i.name, i.title) for i in items[:200]], body=f"The oldest has not changed since {oldest.strftime('%-d %b %Y')}.",
 			actions=[{"kind": "open_reset", "label": "Open in Reset", "names": names}, {"kind": "move_someday", "label": "Move all to Someday",
 				"items": [{"doctype": "Life Task", "name": n} for n in names]}], area=area))
-	idle = frappe.db.sql("""select name, title, area from `tabLife Project` where space=%s and status='Active' and is_archived=0
-		and ifnull(last_activity_on, date(modified)) <= %s""", (space, cutoff), as_dict=True)
+	idle = frappe.db.sql("""select name, title, area from `tabLife Goal` where space=%s and goal_type='Open' and outcome='In Progress'
+		and on_hold=0 and is_someday=0 and is_archived=0 and ifnull(last_activity_on, date(modified)) <= %s""", (space, cutoff), as_dict=True)
 	for p in idle:
-		out.append(candidate("Stuck", f"The project {p.title} has had no activity for {days} days", [ev("Life Project", p.name, p.title)],
-			actions=[{"kind": "open_record", "label": "Open project", "ref": "project:" + p.name},
-				{"kind": "move_someday", "label": "Move to Someday", "items": [{"doctype": "Life Project", "name": p.name}]}], area=p.area))
+		out.append(candidate("Stuck", f"The goal {p.title} has had no activity for {days} days", [ev("Life Goal", p.name, p.title)],
+			actions=[{"kind": "open_record", "label": "Open goal", "ref": "goal:" + p.name},
+				{"kind": "move_someday", "label": "Move to Someday", "items": [{"doctype": "Life Goal", "name": p.name}]}], area=p.area))
 	old_inbox = frappe.db.sql("""select name, title from `tabLife Inbox Item` where space=%s and status='To Review' and is_archived=0
 		and received_on < %s order by received_on""", (space, add_days(today(), -7)), as_dict=True)
 	if len(old_inbox) >= STUCK_GROUP_MIN:

@@ -5,8 +5,8 @@ from frappe.utils import add_days, add_to_date, getdate, now_datetime, today
 
 from lifeos import datewords, index
 from lifeos.api import area as area_api
-from lifeos.api import projects as project_api
-from lifeos.api import tasks, timeline
+from lifeos.api import goals as goal_api
+from lifeos.api import library, tasks, timeline
 from lifeos.api import today as today_api
 from lifeos.tests.base import FAMILY, PRIVATE, SHARED, LifeTestCase
 
@@ -46,8 +46,8 @@ class TestTasks(LifeTestCase):
 		tag = self.make("Life Tag", tag_name="m4tag")
 		goal_cycle = self.make("Life Cycle", title="M4 cycle", start_date=today())
 		goal = self.make("Life Goal", cycle=goal_cycle.name, title="M4 goal")
-		project = self.make("Life Project", title="M4 project", area=self.areas["Tea"])
-		a = self.make("Life Task", title="A later IV", due_date=add_days(today(), 9), priority="IV", area=self.areas["Tea"], project=project.name)
+		open_goal = self.make("Life Goal", title="M4 open goal", goal_type="Open", area=self.areas["Tea"])
+		a = self.make("Life Task", title="A later IV", due_date=add_days(today(), 9), priority="IV", area=self.areas["Tea"], goal=open_goal.name)
 		b = self.make("Life Task", title="B today II", due_date=today(), priority="II", area=self.areas["Tea"], tags=[{"tag": tag.name}])
 		c = self.make("Life Task", title="C today I", due_date=today(), priority="I", area=self.areas["Money"], also_in=[{"area": self.areas["Tea"]}], goal=goal.name)
 		d = self.make("Life Task", title="D no date", area=self.areas["Personal"])
@@ -59,7 +59,7 @@ class TestTasks(LifeTestCase):
 		self.assertNotIn(done.name, names)
 		in_tea = {t["name"] for t in tasks.list(space=PRIVATE, area=self.areas["Tea"])["tasks"]}
 		self.assertTrue({a.name, b.name, c.name} <= in_tea and d.name not in in_tea)
-		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, project=project.name)["tasks"]], [a.name])
+		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, goal=open_goal.name)["tasks"]], [a.name])
 		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, tag=tag.name)["tasks"]], [b.name])
 		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, goal=goal.name)["tasks"]], [c.name])
 		self.assertIn(c.name, [t["name"] for t in tasks.list(space=PRIVATE, priority="I")["tasks"]])
@@ -170,62 +170,44 @@ class TestToday(LifeTestCase):
 		self.assertEqual((after["overdue"], after["overdue_items"], after["oldest_overdue"]), (0, [], None))
 
 
-class TestAreasProjectsTimeline(LifeTestCase):
-	def test_also_in_shows_on_both_area_pages(self):
-		note = self.make("Life Note", title="Land ceiling writ m4", area=self.areas["Money"], also_in=[{"area": self.areas["Tea"]}])
-		home = area_api.get(self.areas["Money"])
-		other = area_api.get(self.areas["Tea"])
-		self.assertIn(note.name, [n["ref_name"] for n in home["notes"]])
-		self.assertNotIn(note.name, [n["ref_name"] for n in home["references"]])
-		self.assertIn(note.name, [n["ref_name"] for n in other["references"]])
-		self.assertNotIn(note.name, [n["ref_name"] for n in other["notes"]])
-
-	def test_area_page_gathers_everything(self):
+class TestAreasGoalsTimeline(LifeTestCase):
+	# set 6: area pages went (the lens shows an area on every place, see test_ux6_lens); the area tree keeps the counts
+	def test_area_tree_counts_with_sub_areas(self):
 		tea = self.areas["Tea"]
 		sub = self.make("Life Area", area_name="Ghatia m4", parent_area=tea)
-		project = self.make("Life Project", title="Mandir m4", area=tea)
-		task = self.make("Life Task", title="Area task m4", area=tea, project=project.name)
-		sub_task = self.make("Life Task", title="Sub-area task m4", area=sub.name)
-		note = self.make("Life Note", title="Reference note m4", area=tea)
-		project_note = self.make("Life Note", title="Project note m4", area=tea, project=project.name)
-		doc = self.make("Life Vault Document", title="Contractor brief m4", area=tea)
-		chat = self.make("Life Chat Log", title="Mandir chat m4", date=today(), area=tea, open_items=[{"text": "one"}, {"text": "two", "status": "Closed"}])
-		archived = self.make("Life Note", title="Archived note m4", area=tea, is_archived=1)
-		page = area_api.get(tea)
-		self.assertIn(sub.name, [s["name"] for s in page["sub_areas"]])
-		self.assertIn(project.name, [p["name"] for p in page["projects"]])
-		task_names = [t["name"] for t in page["tasks"]]
-		self.assertTrue(page["counts"]["open_tasks"] >= 2)
-		notes = [n["ref_name"] for n in page["notes"]]
-		self.assertIn(note.name, notes)
-		self.assertNotIn(project_note.name, notes)  # a note with a project is not reference material
-		self.assertNotIn(archived.name, notes)
-		self.assertIn(doc.name, [d["ref_name"] for d in page["documents"]])
-		self.assertEqual([c["open_items"] for c in page["chats"] if c["ref_name"] == chat.name], [1])
-		self.assertTrue(len(page["timeline"]) <= 20 and task.name in [t["ref_name"] for t in page["timeline"]])
-		self.assertIn(sub_task.name, [t["ref_name"] for t in page["timeline"]])
-		self.assertIn(archived.name, [n["ref_name"] for n in area_api.get(tea, include_archived=1)["notes"]])
+		goal = self.make("Life Goal", title="Mandir m4", goal_type="Open", area=sub.name)
+		self.make("Life Goal", title="Mandir m4 done", goal_type="Open", area=tea, outcome="Achieved")
+		self.make("Life Task", title="Area task m4", area=tea, goal=goal.name)
+		self.make("Life Task", title="Sub-area task m4", area=sub.name)
+		self.make("Life Note", title="Reference note m4", area=sub.name)
+		self.make("Life Note", title="Archived note m4", area=tea, is_archived=1)
 		tree = area_api.tree(space=PRIVATE)
-		self.assertEqual([a["parent_area"] for a in tree["areas"] if a["name"] == sub.name], [tea])
+		row = {a["name"]: a for a in tree["areas"]}
+		self.assertEqual(row[sub.name]["parent_area"], tea)
+		# each number equals the list it opens: the area with its sub-areas
+		self.assertEqual(row[tea]["open_tasks"], tasks.list(space=PRIVATE, area=tea, page_length=1)["total"])
+		self.assertEqual(row[tea]["goals"], goal_api.list(space=PRIVATE, area=tea, page_length=1)["total"])
+		self.assertEqual(row[sub.name]["goals"], 1)
+		self.assertEqual(row[tea]["notes"], library.list(space=PRIVATE, area=tea, collection="all", page_length=1)["total"])
+		self.assertGreaterEqual(row[tea]["open_tasks"], 2)
 		self.as_user(FAMILY)
-		self.assertRaises(frappe.PermissionError, area_api.get, tea)
 		self.assertRaises(frappe.PermissionError, area_api.tree, space=PRIVATE)
 
-	def test_projects_list_and_page(self):
-		project = self.make("Life Project", title="Turnaround m4", area=self.areas["Tea"], outcome="A plan")
-		t1 = self.make("Life Task", title="P task 1", area=self.areas["Tea"], project=project.name)
-		t2 = self.make("Life Task", title="P task 2", area=self.areas["Tea"], project=project.name, status="Done")
-		note = self.make("Life Note", title="P note", area=self.areas["Tea"], project=project.name)
-		groups = project_api.list(space=PRIVATE)["groups"]
-		card = next(p for g in groups for p in g["projects"] if p["name"] == project.name)
-		self.assertEqual((card["tasks_total"], card["tasks_done"], card["area_name"]), (2, 1, "Tea"))
-		page = project_api.get(project.name)
-		self.assertEqual([t["name"] for t in page["tasks"]], [t1.name])
-		self.assertEqual([t["name"] for t in page["done_tasks"]], [t2.name])
-		self.assertEqual([n["ref_name"] for n in page["notes"]], [note.name])
-		self.assertEqual(project_api.completion_info(project.name)["records"], 3)
+	def test_open_goals_list_and_page(self):
+		goal = self.make("Life Goal", title="Turnaround m4", goal_type="Open", area=self.areas["Tea"], done_when="A plan")
+		t1 = self.make("Life Task", title="P task 1", area=self.areas["Tea"], goal=goal.name)
+		self.make("Life Task", title="P task 2", area=self.areas["Tea"], goal=goal.name, status="Done")
+		self.make("Life Note", title="P note", area=self.areas["Tea"], goal=goal.name)
+		card = next(g for g in goal_api.list(space=PRIVATE, goal_type="Open")["goals"] if g["name"] == goal.name)
+		self.assertEqual((card["tasks_counted"], card["tasks_done"], card["area_name"], card["done_when"]), (2, 1, "Tea", "A plan"))
+		page = goal_api.get(goal.name)
+		self.assertEqual((page["goal"]["status"], page["goal"]["done_when"]), ("Active", "A plan"))
+		self.assertEqual((page["tabs"]["tasks"], page["tabs"]["notes"]), (1, 1))
+		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, goal=goal.name)["tasks"]], [t1.name])
+		self.assertEqual(page["record_count"], 3)
+		self.assertEqual(goal_api.completion_info(goal.name)["records"], 3)
 		self.as_user(FAMILY)
-		self.assertRaises(frappe.PermissionError, project_api.get, project.name)
+		self.assertRaises(frappe.PermissionError, goal_api.get, goal.name)
 
 	def test_timeline_by_day_and_archive_switch(self):
 		note = self.make("Life Note", title="Timeline note m4", area=self.areas["Tea"])

@@ -47,10 +47,10 @@ def run_daily(on=None) -> dict:
 def set_archived(doctype, name, archived=True, reason="Manual"):
 	doc = frappe.get_doc(doctype, name)
 	doc.check_permission("write")
-	if doctype == "Life Project":
+	if doctype == "Life Goal":
 		if archived:
-			return archive_project(doc)
-		return restore_project(doc)
+			return archive_goal(doc)
+		return restore_goal(doc)
 	if doctype not in ORG_DOCTYPES:
 		frappe.throw(f"{doctype} cannot be archived.")
 	doc.is_archived = 1 if archived else 0
@@ -61,40 +61,41 @@ def set_archived(doctype, name, archived=True, reason="Manual"):
 	return {"doctype": doctype, "name": name, "is_archived": doc.is_archived}
 
 
-def project_record_count(project) -> int:
+def goal_record_count(goal) -> int:
 	total = 0
 	for dt in ORG_DOCTYPES:
-		total += frappe.db.count(dt, {"project": project, "is_archived": 0})
+		total += frappe.db.count(dt, {"goal": goal, "is_archived": 0})
 	return total
 
 
-def archive_project(project) -> dict:
-	"""Archive a project and every record whose `project` points to it."""
+def archive_goal(goal) -> dict:
+	"""Archive a goal and every record filed under it (`goal` points to it), as a project was archived before set 6.
+	The records keep the reason code "Project" ("with its goal"), so older archives restore the same way."""
 	count = 0
 	for dt in ORG_DOCTYPES:
 		frappe.db.sql(  # nosemgrep: frappe-sql-format-injection -- `dt` comes from the constant ORG_DOCTYPES
-			f"update `tab{dt}` set is_archived=1, archived_on=%s, archive_reason='Project' where project=%s and is_archived=0",
-			(today(), project.name))
+			f"update `tab{dt}` set is_archived=1, archived_on=%s, archive_reason='Project' where goal=%s and is_archived=0",
+			(today(), goal.name))
 		count += frappe.db.sql("select row_count()")[0][0]
-		_sync_index(dt, "t.project = %s", (project.name,))
-	frappe.db.set_value("Life Project", project.name, {"is_archived": 1, "archived_on": today()}, update_modified=False)
-	project.is_archived = 1
-	return {"doctype": "Life Project", "name": project.name, "is_archived": 1, "records": count}
+		_sync_index(dt, "t.goal = %s", (goal.name,))
+	frappe.db.set_value("Life Goal", goal.name, {"is_archived": 1, "archived_on": today()}, update_modified=False)
+	goal.is_archived = 1
+	return {"doctype": "Life Goal", "name": goal.name, "is_archived": 1, "records": count}
 
 
-def restore_project(project) -> dict:
+def restore_goal(goal) -> dict:
 	count = 0
 	for dt in ORG_DOCTYPES:
 		frappe.db.sql(  # nosemgrep: frappe-sql-format-injection -- `dt` comes from the constant ORG_DOCTYPES
-			f"update `tab{dt}` set is_archived=0, archived_on=null, archive_reason='' where project=%s and is_archived=1 and archive_reason='Project'",
-			project.name)
+			f"update `tab{dt}` set is_archived=0, archived_on=null, archive_reason='' where goal=%s and is_archived=1 and archive_reason='Project'",
+			goal.name)
 		count += frappe.db.sql("select row_count()")[0][0]
-		_sync_index(dt, "t.project = %s", (project.name,))
+		_sync_index(dt, "t.goal = %s", (goal.name,))
 	values = {"is_archived": 0, "archived_on": None}
-	if project.status in ("Done", "Dropped"):
-		values.update({"status": "Active", "completed_on": None})
-	frappe.db.set_value("Life Project", project.name, values, update_modified=False)
-	return {"doctype": "Life Project", "name": project.name, "is_archived": 0, "records": count}
+	if goal.goal_type == "Open" and (goal.outcome or "In Progress") != "In Progress":
+		values.update({"outcome": "In Progress", "closed_on": None, "completed_on": None})
+	frappe.db.set_value("Life Goal", goal.name, values, update_modified=False)
+	return {"doctype": "Life Goal", "name": goal.name, "is_archived": 0, "records": count}
 
 
 def archived_in_week(space, from_date, to_date) -> list:

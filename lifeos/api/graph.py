@@ -6,7 +6,7 @@ from lifeos import permissions
 from lifeos.api.utils import in_area, lens_area
 
 TYPES = {"Life Note": "Note", "Life Person": "Person", "Life Goal": "Goal", "Life Vault Document": "Document",
-	"Life Task": "Task", "Life Chat Log": "Chat", "Life Project": "Project"}
+	"Life Task": "Task", "Life Chat Log": "Chat"}
 MAX_NODES = 600
 VAULT = "Life Vault Document"
 
@@ -43,7 +43,7 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 		add("Life Note", n.name, n.title)
 	for p in ([] if collection or area else frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name"], limit=100)):
 		add("Life Person", p.name, p.full_name)
-	goals = [] if collection else frappe.get_all("Life Goal", filters={"space": space}, fields=["name", "title", "carried_from", "project"], order_by="creation desc", limit=100)
+	goals = [] if collection else frappe.get_all("Life Goal", filters={"space": space}, fields=["name", "title", "carried_from", "serves"], order_by="creation desc", limit=100)
 	if area:
 		keep = in_area(space, area, "Life Goal", [g.name for g in goals])
 		goals = [g for g in goals if g.name in keep]
@@ -59,7 +59,7 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 	ends = [(dt, name) for r in link_rows for dt, name in ((r.from_doctype, r.from_name), (r.to_doctype, r.to_name))
 		if dt in TYPES and dt not in hidden and key(dt, name) not in nodes]
 	found = titles(ends)
-	for r in link_rows:  # a task, chat or project joins the graph when a link touches it
+	for r in link_rows:  # a task or chat joins the graph when a link touches it
 		for dt, name in ((r.from_doctype, r.from_name), (r.to_doctype, r.to_name)):
 			if key(dt, name) not in nodes and (dt, name) in found:
 				add(dt, name, found[(dt, name)])
@@ -70,13 +70,13 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 	for d in docs:
 		if d.holder:
 			edge(key("Life Vault Document", d.name), key("Life Person", d.holder), "holder")
-	projects = titles([("Life Project", g.project) for g in goals if g.project])
+	served = titles([("Life Goal", g.serves) for g in goals if g.serves])
 	for g in goals:
 		if g.carried_from:
 			edge(key("Life Goal", g.name), key("Life Goal", g.carried_from), "carried")
-		if g.project and ("Life Project", g.project) in projects:
-			add("Life Project", g.project, projects[("Life Project", g.project)])
-			edge(key("Life Goal", g.name), key("Life Project", g.project), "project")
+		if g.serves and ("Life Goal", g.serves) in served:
+			add("Life Goal", g.serves, served[("Life Goal", g.serves)])
+			edge(key("Life Goal", g.name), key("Life Goal", g.serves), "serves")
 
 	if center:
 		if center not in nodes:

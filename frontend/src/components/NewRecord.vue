@@ -14,7 +14,7 @@
   </Dialog>
 </template>
 <script setup>
-// A small form dialog used for "New project", "New note", "Add event" and the like. Every control is a library control:
+// A small form dialog used for "New goal", "New note", "Add event" and the like. Every control is a library control:
 // frappe-ui FormControl and DatePicker, and @framework/ui's Link (through LifeLink) for a field that points to a record.
 // A field is { name, label, required, help, placeholder } plus one of: options (a select), type ('textarea', 'date', 'number'), link (a DocType).
 import { reactive, ref, watch } from 'vue'

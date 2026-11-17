@@ -1,8 +1,19 @@
 <template>
   <template v-if="d">
-    <div class="flex flex-wrap items-center gap-2"><Badge :theme="d.goal.outcome === 'In Progress' ? 'blue' : 'gray'" :label="d.goal.outcome" />
+    <div class="flex flex-wrap items-center gap-2"><Badge :theme="info?.goal.on_hold && d.goal.outcome === 'In Progress' ? 'amber' : d.goal.outcome === 'In Progress' ? 'blue' : 'gray'"
+      :label="info?.goal.on_hold && d.goal.outcome === 'In Progress' ? 'On hold' : d.goal.outcome" />
       <span class="text-sm text-ink-gray-6">{{ headline }}</span></div>
+    <!-- what this goal serves and what serves it (UX fixes, set 6) -->
+    <div v-if="info" class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6" data-pane-serves>
+      <span>Serves</span>
+      <Pick :model-value="info.goal.serves || null" :options="servesOptions" placeholder="no longer goal" :disabled="!writable" @update:model-value="saveServes" />
+      <template v-if="info.served_by.length"><span>· Served by</span>
+        <Button v-for="s in info.served_by" :key="s.name" size="sm" variant="ghost" :label="s.title" data-pane-served-by @click="openRef('goal:' + s.name)" /></template>
+    </div>
+    <div v-if="info?.goal.done_when" class="text-base text-ink-gray-8" data-pane-done-when><span class="text-sm text-ink-gray-6">Done when </span>{{ info.goal.done_when }}</div>
     <div v-if="writable && !d.cycle" class="flex flex-wrap items-center gap-2" data-goal-actions>
+      <Button v-if="d.goal.outcome === 'In Progress' && d.goal_type === 'Open'" :label="info?.goal.on_hold ? 'Resume' : 'Put on hold'" data-goal-hold
+        @click="setStatus(info?.goal.on_hold ? 'Active' : 'On Hold')" />
       <Button v-if="d.goal.outcome === 'In Progress'" label="Close goal" data-close-goal @click="closeOpen = true" />
       <Button v-else label="Reopen" @click="reopen" />
       <Button v-if="d.goal.outcome === 'In Progress' && d.cycles.length" label="Add to a 12 Week Year" data-add-to-cycle @click="moveOpen = true" />
@@ -64,10 +75,13 @@ import NumLink from '../ui/NumLink.vue'
 import SectionHead from '../ui/SectionHead.vue'
 import Empty from '../Empty.vue'
 import Backlinks from '../Backlinks.vue'
+import Pick from '../Pick.vue'
 import { api, tryCall } from '@/lib/api'
 import { loadBacklinks } from '@/lib/links'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
+import { loadLookups, lookups } from '@/lib/lookups'
+import { openRef } from '@/lib/pane'
 
 const OUTCOMES = ['Achieved', 'Partly Achieved', 'Not Achieved', 'Dropped']
 const props = defineProps({ name: String, type: String, tab: String })
@@ -76,6 +90,7 @@ const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
 // have no weekly actions and no cycles, so they have Tasks and Links only.
 const on = (t) => !props.tab || props.tab === t
 const d = ref(null)
+const info = ref(null) // goals.get: serves, served by, on hold, done when
 const links = ref([])
 const quick = ref('')
 const closeOpen = ref(false)
@@ -91,7 +106,9 @@ const headline = computed(() => {
 })
 async function load() {
   try {
-    ;[d.value, links.value] = await Promise.all([api('journal.goal', { goal: props.name }), loadBacklinks('Life Goal', props.name)])
+    ;[d.value, links.value, info.value] = await Promise.all([api('journal.goal', { goal: props.name }), loadBacklinks('Life Goal', props.name),
+      api('goals.get', { goal: props.name })])
+    loadLookups()
     const x = d.value
     const g = x.goal
     if (x.cycles?.length && !cycle.value) cycle.value = x.cycles[0].name
@@ -99,13 +116,22 @@ async function load() {
       ? [{ value: 'actions', label: 'Actions', count: g.actions.length, noun: 'actions' }, { value: 'tasks', label: 'Tasks', count: x.tasks.length, noun: 'tasks' },
           { value: 'history', label: 'History across cycles', count: x.history.length, noun: 'cycles' }]
       : [{ value: 'tasks', label: 'Tasks', count: x.tasks.length, noun: 'tasks' }]
-    emit('meta', { title: g.title, area: g.area, area_name: g.area_name, project: g.project, fullPage: `/journal/goals/${g.name}`,
+    emit('meta', { title: g.title, area: g.area, area_name: g.area_name, fullPage: `/journal/goals/${g.name}`,
       sub: x.is_someday ? 'On the Someday list' : x.cycle ? `${g.actions.length} action${g.actions.length === 1 ? '' : 's'}` : x.goal_type + ' goal',
       someday: canWrite() && g.outcome === 'In Progress' && !x.is_someday ? { doctype: 'Life Goal', name: g.name } : null,
       tabs: [...tabs, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
   } catch (e) {
     emit('missing')
   }
+}
+const servesOptions = computed(() => [{ label: 'No longer goal', value: '' },
+  ...(lookups.goals || []).filter((x) => x.name !== props.name).map((x) => ({ label: `${x.goal_type} · ${x.title}`, value: x.name })),
+  ...(info.value?.goal.serves && !(lookups.goals || []).some((x) => x.name === info.value.goal.serves) ? [{ label: info.value.goal.serves_title, value: info.value.goal.serves }] : [])])
+async function saveServes(v) {
+  if (await tryCall(() => api('goals.update', { goal: props.name, values: { serves: v || null } }))) { await load(); emit('changed') }
+}
+async function setStatus(status) {
+  if (await tryCall(() => api('goals.set_status', { goal: props.name, status }), status === 'On Hold' ? 'On hold' : 'Resumed')) { await load(); emit('changed') }
 }
 async function addTask() {
   const text = quick.value.trim()

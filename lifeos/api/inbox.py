@@ -6,6 +6,7 @@ from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import files, links, permissions, proposals
+from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts, user_names
 from lifeos.api.utils import order_by as sort_order
 
@@ -16,7 +17,7 @@ SOURCE_TYPES = ["Upload", "Journal Photo", "Voice Note", "Email", "Email Digest"
 
 def _item_dict(item, with_files=True):
 	d = {k: item.get(k) for k in ("name", "space", "title", "source_type", "received_on", "instruction", "raw_text", "transcript_md",
-		"summary_md", "source_url", "status", "claimed_by", "claimed_on", "error", "area", "project", "is_archived", "owner", "preview_image",
+		"summary_md", "source_url", "status", "claimed_by", "claimed_on", "error", "area", "goal", "is_archived", "owner", "preview_image",
 		"intent", "media_kind", "source_system", "external_id", "thumbnail")}
 	d["received_on"] = str(d["received_on"]) if d["received_on"] else None
 	d["claimed_on"] = str(d["claimed_on"]) if d["claimed_on"] else None
@@ -31,11 +32,11 @@ INTENTS = ("Process", "Add to wiki", "Just keep")
 @frappe.whitelist(methods=["POST"])
 def create_item(title: str | None = None, source_type: str = "Upload", space: str | None = None, raw_text: str | None = None,
 		instruction: str | None = None, source_url: str | None = None, intent: str | None = None, source_system: str | None = None,
-		external_id: str | None = None, area: str | None = None, project: str | None = None):
+		external_id: str | None = None, area: str | None = None, goal: str | None = None, project: str | None = None):
 	"""Create an inbox item. Attach files afterwards with /api/method/upload_file (doctype, docname, is_private=1).
 
 	intent: Process (the default), Add to wiki or Just keep. With source_system (gmail, claude, upload…) the space's connection for
-	that system gives the default intent, area and project. With source_system and external_id (the original's ID in that system)
+	that system gives the default intent, area and goal (`project` names the goal a project became). With source_system and external_id (the original's ID in that system)
 	an item that already exists is updated instead of created: its text changes, and a Done item whose content changed goes back
 	to New so the agent processes the change. The answer carries `created` (true or false)."""
 	from lifeos.api import connections
@@ -70,9 +71,10 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 		"raw_text": raw_text, "instruction": instruction, "source_url": source_url, "status": "New",
 		"intent": intent or (conn.default_intent if conn and conn.active else None) or "Process",
 		"source_system": system, "external_id": (external_id or "").strip() or None,
-		"area": area or (conn.default_area if conn else None), "project": project or (conn.default_project if conn else None)})
-	if item.project and not item.area:
-		item.area = frappe.db.get_value("Life Project", item.project, "area")
+		"area": area or (conn.default_area if conn else None),
+		"goal": goal or (project and goal_for_project(project, space)) or (conn.default_goal if conn else None)})
+	if item.goal and not item.area:
+		item.area = frappe.db.get_value("Life Goal", item.goal, "area")
 	item.insert()
 	if system:
 		connections.touch(space, system, item.title)
@@ -129,7 +131,8 @@ def claim_next(space: str | None = None):
 
 
 def space_context(space):
-	"""What an agent needs to file proposals: the space's areas, projects, tags, people, habits, dimensions and active goals."""
+	"""What an agent needs to file proposals: the space's areas, tags, people, habits, dimensions and goals in progress (projects
+	became open-ended goals in set 6)."""
 	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour", "is_pinned"],
 		order_by="sort_order, area_name", limit=500)
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)
@@ -143,7 +146,6 @@ def space_context(space):
 	return {
 		"space": space,
 		"areas": areas,
-		"projects": frappe.get_all("Life Project", filters={"space": space, "is_archived": 0, "status": ("in", ["Active", "On Hold"])}, fields=["name", "title", "area"], limit=500),
 		"tags": frappe.get_all("Life Tag", filters={"space": space, "is_archived": 0}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
 		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], limit=500),
 		"habits": frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title"], limit=200),
@@ -332,7 +334,7 @@ def get(item: str):
 	users = user_names([doc.owner, doc.claimed_by])
 	out["filed_by"], out["processed_by"] = users.get(doc.owner), users.get(doc.claimed_by)
 	out["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
-	out["project_title"] = frappe.db.get_value("Life Project", doc.project, "title") if doc.project else None
+	out["goal_title"] = frappe.db.get_value("Life Goal", doc.goal, "title") if doc.goal else None
 	props = frappe.get_all("Life Proposal", filters={"inbox_item": doc.name},
 		fields=["name", "kind", "preview", "payload", "confidence", "status", "created_doctype", "created_name", "decided_on"],
 		order_by="sort_order asc, creation asc", limit=100)

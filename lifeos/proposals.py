@@ -9,7 +9,7 @@ from lifeos import journal
 from lifeos.life.doctype.life_check_in.life_check_in import parse_range
 
 TITLE_FIELDS = {
-	"Life Area": "area_name", "Life Project": "title", "Life Tag": "tag_name", "Life Goal": "title",
+	"Life Area": "area_name", "Life Tag": "tag_name", "Life Goal": "title",
 	"Life Person": "full_name", "Life Habit": "title", "Life Dimension": "dimension_name", "Life Note": "title",
 }
 PRIORITY = ["", "I", "II", "III", "IV"]
@@ -22,7 +22,7 @@ def F(type_, required=False, help="", **kw):
 ORG = {
 	"area": F("link", help="The one area where the record lives. Name or title of a Life Area in the item's space.", doctype="Life Area"),
 	"also_in": F("links", help="Other areas where the record is relevant.", doctype="Life Area"),
-	"project": F("link", help="Optional. Must belong to area or to one of also_in.", doctype="Life Project"),
+	"goal": F("link", help="Optional. The goal the record belongs to (projects became open-ended goals in set 6).", doctype="Life Goal"),
 	"tags": F("tags", help="Reuse existing tags. At most one new tag per inbox item.", doctype="Life Tag"),
 }
 
@@ -108,8 +108,8 @@ SCHEMA = {
 	"Someday": {
 		"target": "Life Idea", "filed": False,
 		"fields": {
-			"record_type": F("text", True, "Task, Project, Goal, or Idea for a new idea."),
-			"record": F("text", help="For Task, Project and Goal: the name (id) or exact title of the record to park."),
+			"record_type": F("text", True, "Task, Goal, or Idea for a new idea. Project is read as Goal for one set."),
+			"record": F("text", help="For Task and Goal: the name (id) or exact title of the record to park."),
 			"title": F("text", help="For Idea: the idea in one line.", max_length=140),
 			"body_md": F("markdown", help="For Idea: more detail."),
 			"area": F("link", help="For Idea: the area it belongs to.", doctype="Life Area"),
@@ -242,6 +242,7 @@ def validate(kind, payload, space, ctx=None) -> dict:
 			raise PayloadError(_("payload is not valid JSON."))
 	if not isinstance(payload, dict):
 		raise PayloadError(_("payload must be an object of field values."))
+	payload = project_alias(payload, space)
 	fields = SCHEMA[kind]["fields"]
 	if "owner" in payload:
 		raise PayloadError(_("A payload cannot set owner."))
@@ -264,11 +265,30 @@ def validate(kind, payload, space, ctx=None) -> dict:
 	return out
 
 
+def project_alias(payload, space):
+	"""For one set after projects became goals (set 6): a payload's `project` is taken as its `goal`. A project's name or
+	title maps to the goal it became; anything else is read as a goal's name or title."""
+	if not payload.get("project"):
+		payload.pop("project", None)
+		return payload
+	payload = dict(payload)
+	value = payload.pop("project")
+	if not payload.get("goal"):
+		payload["goal"] = goal_for_project(value, space) or value
+	return payload
+
+
+def goal_for_project(value, space=None):
+	"""The goal a project became, from the project's name or title; None when `value` names no project."""
+	value = str(value or "").strip()
+	if not value or not frappe.db.table_exists("Life Project"):
+		return None
+	filters = {"space": space} if space else {}
+	name = value if frappe.db.exists("Life Project", {"name": value, **filters}) else frappe.db.get_value("Life Project", {"title": value, **filters})
+	return frappe.db.get_value("Life Project", name, "migrated_to") if name else None
+
+
 def _cross_checks(kind, p, space):
-	if p.get("project"):
-		project_area = frappe.db.get_value("Life Project", p["project"], "area")
-		if project_area not in [p.get("area"), *(p.get("also_in") or [])]:
-			raise PayloadError(_("The project must belong to the proposal's area or to one of its other areas."))
 	if kind in ("Important Date", "Month Goal") and not 1 <= p["month"] <= 12:
 		raise PayloadError(_("month must be 1 to 12."))
 	if kind == "Important Date" and not 1 <= p["day"] <= 31:
@@ -305,7 +325,7 @@ def _tag_names(tags, space):
 
 def _org(p, space):
 	return {
-		"area": p.get("area"), "project": p.get("project"),
+		"area": p.get("area"), "goal": p.get("goal"),
 		"also_in": [{"area": a} for a in p.get("also_in") or []],
 		"tags": [{"tag": t} for t in _tag_names(p.get("tags"), space)],
 	}
@@ -400,7 +420,8 @@ def apply(kind, payload, item) -> tuple:
 	return doc.doctype, doc.name
 
 
-SOMEDAY_TYPES = {"Task": "Life Task", "Project": "Life Project", "Goal": "Life Goal"}
+# "Project" is still accepted for one set: projects are open-ended goals now (set 6)
+SOMEDAY_TYPES = {"Task": "Life Task", "Project": "Life Goal", "Goal": "Life Goal"}
 
 
 def _apply_someday(p, item):
@@ -418,8 +439,10 @@ def _apply_someday(p, item):
 		return doc.doctype, doc.name
 	doctype = SOMEDAY_TYPES.get(kind)
 	if not doctype or not p.get("record"):
-		raise PayloadError(_("Say which task, project or goal to park."))
+		raise PayloadError(_("Say which task or goal to park."))
 	value = str(p["record"]).strip()
+	if kind == "Project":
+		value = goal_for_project(value, item.space) or value
 	name = value if frappe.db.exists(doctype, {"name": value, "space": item.space}) else frappe.db.get_value(doctype, {"title": value, "space": item.space})
 	if not name:
 		raise PayloadError(_("{0} '{1}' was not found in this space.").format(kind, value))

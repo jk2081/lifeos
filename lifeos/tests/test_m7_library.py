@@ -3,9 +3,8 @@ from frappe.utils import add_days, getdate, today
 
 from lifeos import archive, index
 from lifeos.api import archive as archive_api
-from lifeos.api import area as area_api
 from lifeos.api import chats, library, links, timeline, vault
-from lifeos.api import projects as project_api
+from lifeos.api import goals as goal_api
 from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED, LifeTestCase
 
 
@@ -147,11 +146,11 @@ class TestChats(LifeTestCase):
 		for name in frappe.get_all("Life Chat Log", filters={"space": PRIVATE}, pluck="name"):
 			frappe.delete_doc("Life Chat Log", name, force=True)
 		frappe.set_user(OWNER)
-		self.project = self.make("Life Project", title="Mandir m7", area=self.areas["Tea"])
+		self.goal = self.make("Life Goal", title="Mandir m7", goal_type="Open", area=self.areas["Tea"])
 
 	def test_agent_logs_a_chat_directly_and_report_groups(self):
 		self.as_user(AGENT)
-		a = chats.log(space=PRIVATE, title="Mandir budget m7", area="Tea", project="Mandir m7", summary_md="Sized it", url="https://claude.ai/chat/1",
+		a = chats.log(space=PRIVATE, title="Mandir budget m7", area="Tea", goal="Mandir m7", summary_md="Sized it", url="https://claude.ai/chat/1",
 			open_items=["Decide the deity", "Get two quotes"])["name"]
 		b = chats.log(space=PRIVATE, title="ITR papers m7", area="Money", date=str(add_days(getdate(today()), -1)), open_items=["Download statements"], assistant="ChatGPT")["name"]
 		c = chats.log(space=PRIVATE, title="No area m7", date=str(add_days(getdate(today()), -2)))["name"]
@@ -159,14 +158,14 @@ class TestChats(LifeTestCase):
 		self.assertEqual(frappe.db.get_value("Life Chat Log", a, "owner"), AGENT)
 		self.as_user(OWNER)
 		seen = {}
-		for group_by in ("day", "area", "project"):
+		for group_by in ("day", "area", "goal"):
 			r = chats.report(space=PRIVATE, group_by=group_by)
 			seen[group_by] = sorted(ch["name"] for g in r["groups"] for ch in g["chats"])
 			self.assertEqual(r["total"], 3)
 			self.assertEqual(len(r["open_items"]), 3)
 		self.assertEqual(seen["day"], sorted([a, b, c]))
 		self.assertEqual(seen["day"], seen["area"])
-		self.assertEqual(seen["day"], seen["project"])  # the same records under each group_by
+		self.assertEqual(seen["day"], seen["goal"])  # the same records under each group_by
 		by_area = chats.report(space=PRIVATE, group_by="area")
 		self.assertEqual({g["label"]: g["open_items"] for g in by_area["groups"]}, {"Money": 1, "Tea": 2, "No area": 0})
 		self.assertEqual(by_area["groups"][-1]["label"], "No area")
@@ -247,7 +246,7 @@ class TestArchive(LifeTestCase):
 		from lifeos.api import today as today_api
 		self.assertNotIn(task.name, [t["name"] for t in tasks.list(space=PRIVATE, page_length=100)["tasks"]])
 		self.assertNotIn(task.name, [t["name"] for t in today_api.get(space=PRIVATE)["tasks"]["items"]])
-		self.assertNotIn(task.name, [t["name"] for t in area_api.get(self.areas["Tea"])["tasks"]])
+		self.assertNotIn(task.name, [t["name"] for t in tasks.list(space=PRIVATE, area=self.areas["Tea"], page_length=100)["tasks"]])
 		self.assertNotIn(task.name, [e["ref_name"] for d in timeline.get(space=PRIVATE, page_length=100)["days"] for e in d["entries"]])
 		self.assertIn(task.name, [e["ref_name"] for d in timeline.get(space=PRIVATE, page_length=100, include_archived=1)["days"] for e in d["entries"]])
 		listed = archive_api.list(space=PRIVATE)
@@ -258,27 +257,27 @@ class TestArchive(LifeTestCase):
 		self.assertRaises(frappe.PermissionError, archive_api.list, space=PRIVATE)
 		self.assertRaises(frappe.PermissionError, archive_api.restore, "Life Task", task.name)
 
-	def test_completing_a_project_archives_its_records_and_restore_brings_them_back(self):
-		project = self.make("Life Project", title="Finish me m7", area=self.areas["Tea"])
-		task = self.make("Life Task", title="Project task m7", area=self.areas["Tea"], project=project.name)
-		note = self.make("Life Note", title="Project note m7", area=self.areas["Tea"], project=project.name)
-		chat = self.make("Life Chat Log", title="Project chat m7", date=today(), area=self.areas["Tea"], project=project.name)
-		outside = self.make("Life Task", title="Not in the project m7", area=self.areas["Tea"])
-		already = self.make("Life Note", title="Archived before m7", area=self.areas["Tea"], project=project.name, is_archived=1, archive_reason="Manual")
-		self.assertEqual(project_api.completion_info(project.name)["records"], 3)
-		out = project_api.set_status(project.name, "Done")
+	def test_completing_an_open_goal_archives_its_records_and_restore_brings_them_back(self):
+		goal = self.make("Life Goal", title="Finish me m7", goal_type="Open", area=self.areas["Tea"])
+		task = self.make("Life Task", title="Goal task m7", area=self.areas["Tea"], goal=goal.name)
+		note = self.make("Life Note", title="Goal note m7", area=self.areas["Tea"], goal=goal.name)
+		chat = self.make("Life Chat Log", title="Goal chat m7", date=today(), area=self.areas["Tea"], goal=goal.name)
+		outside = self.make("Life Task", title="Not under the goal m7", area=self.areas["Tea"])
+		already = self.make("Life Note", title="Archived before m7", area=self.areas["Tea"], goal=goal.name, is_archived=1, archive_reason="Manual")
+		self.assertEqual(goal_api.completion_info(goal.name)["records"], 3)
+		out = goal_api.set_status(goal.name, "Done")
 		self.assertEqual((out["is_archived"], out["archived_records"]), (1, 3))
 		for doc in (task, note, chat):
 			self.assertEqual(frappe.db.get_value(doc.doctype, doc.name, ["is_archived", "archive_reason"]), (1, "Project"))
 			self.assertEqual(frappe.db.get_value("Life Index", {"ref_name": doc.name}, "is_archived"), 1)
 		self.assertEqual(frappe.db.get_value("Life Task", outside.name, "is_archived"), 0)
-		self.assertNotIn(project.name, [p["name"] for g in project_api.list(space=PRIVATE)["groups"] for p in g["projects"]])
-		self.assertNotIn(project.name, [p["name"] for p in area_api.get(self.areas["Tea"])["projects"]])
-		self.assertIn(project.name, [p["name"] for p in archive_api.list(space=PRIVATE)["projects"]])
-		archive_api.restore("Life Project", project.name)
-		self.assertEqual(frappe.db.get_value("Life Project", project.name, ["is_archived", "status"]), (0, "Active"))
+		self.assertNotIn(goal.name, [g["name"] for g in goal_api.list(space=PRIVATE)["goals"]])
+		self.assertNotIn(goal.name, [g["name"] for g in goal_api.list(space=PRIVATE, area=self.areas["Tea"])["goals"]])
+		self.assertIn(goal.name, [g["name"] for g in archive_api.list(space=PRIVATE)["goals"]])
+		archive_api.restore("Life Goal", goal.name)
+		self.assertEqual(frappe.db.get_value("Life Goal", goal.name, ["is_archived", "outcome"]), (0, "In Progress"))
 		for doc in (task, note, chat):
 			self.assertEqual(frappe.db.get_value(doc.doctype, doc.name, "is_archived"), 0)
 			self.assertEqual(frappe.db.get_value("Life Index", {"ref_name": doc.name}, "is_archived"), 0)
 		self.assertEqual(frappe.db.get_value("Life Note", already.name, ["is_archived", "archive_reason"]), (1, "Manual"))  # it was archived by hand before
-		self.assertIn(project.name, [p["name"] for g in project_api.list(space=PRIVATE)["groups"] for p in g["projects"]])
+		self.assertIn(goal.name, [g["name"] for g in goal_api.list(space=PRIVATE)["goals"]])

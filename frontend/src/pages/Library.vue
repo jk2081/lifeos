@@ -28,14 +28,14 @@
               <span v-else-if="node.note" class="size-5 shrink-0" aria-hidden="true" />
               <RouterLink v-if="node.note" class="flex min-w-0 flex-1 items-center self-stretch rounded-4 text-base focus-visible:focus-ring" :class="node.key === id ? 'font-medium text-ink-gray-9' : 'text-ink-gray-8'"
                 :to="`/library/${node.key}`" :aria-current="node.key === id ? 'page' : undefined">
-                <span class="truncate">{{ node.label }}<span v-if="node.note.project_title && node.top" class="text-sm font-normal text-ink-gray-6"> · {{ node.note.project_title }}</span></span>
+                <span class="truncate">{{ node.label }}<span v-if="node.note.goal_title && node.top" class="text-sm font-normal text-ink-gray-6"> · {{ node.note.goal_title }}</span></span>
               </RouterLink>
               <Button v-else-if="node.more" variant="ghost" size="sm" class="!px-0 text-ink-gray-7" :label="node.label" data-tree-show-all @click.stop="showAll = [...showAll, node.more]" />
               <span v-else class="truncate text-sm-medium text-ink-gray-7">{{ node.label }}</span>
             </div>
           </template>
         </Tree>
-        <Empty v-if="loaded && !notes.length" title="No notes yet." hint="Notes hold reference material and project notes, in Markdown. Add one with New note." />
+        <Empty v-if="loaded && !notes.length" title="No notes yet." hint="Notes hold reference material and notes on your goals, in Markdown. Add one with New note." />
         <Empty v-else-if="loaded && !nodes.length" title="No note matches." hint="Clear the filter to see every note." />
       </aside>
 
@@ -54,7 +54,7 @@
           </div>
         </template>
         <Card v-else-if="missing"><Empty title="This note was not found." hint="It may be in another space, or it was removed." /></Card>
-        <Card v-else-if="!id" class="max-md:hidden"><Empty title="Pick a note." hint="Notes are listed on the left under their area. A note with no project is reference material for its area." /></Card>
+        <Card v-else-if="!id" class="max-md:hidden"><Empty title="Pick a note." hint="Notes are listed on the left under their area. A note with no goal is reference material for its area." /></Card>
       </section>
     </div>
   </template>
@@ -174,7 +174,7 @@ async function loadNote() {
 }
 function onSaved(res) {
   const row = notes.value.find((x) => x.name === res.name)
-  if (row && (row.title !== res.title || row.area !== res.area || row.parent_note !== res.parent_note || row.project !== res.project)) loadTree()
+  if (row && (row.title !== res.title || row.area !== res.area || row.parent_note !== res.parent_note || row.goal !== res.goal)) loadTree()
   reloadKey.value++
 }
 async function create(v) {

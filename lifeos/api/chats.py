@@ -7,22 +7,24 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
+from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 
 @frappe.whitelist(methods=["GET"])
 def report(space: str | None = None, from_date: str | None = None, to_date: str | None = None, group_by: str = "day", start: int | None = 0, page_length: int | None = 100):
-	"""Chat logs between two dates (default: the last seven days), grouped by day, area or project, with their open items rolled up.
+	"""Chat logs between two dates (default: the last seven days), grouped by day, area or goal, with their open items rolled up.
 	The same records come back under each group_by."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	if group_by not in ("day", "area", "project"):
-		frappe.throw(_("group_by must be day, area or project."))
+	group_by = "goal" if group_by == "project" else group_by
+	if group_by not in ("day", "area", "goal"):
+		frappe.throw(_("group_by must be day, area or goal."))
 	end = getdate(to_date or today())
 	begin = getdate(from_date) if from_date else add_days(end, -6)
 	index = frappe.db.sql(
-		"""select ref_name, title, record_date, area, project from `tabLife Index`
+		"""select ref_name, title, record_date, area, goal from `tabLife Index`
 		where space=%s and kind='Chat' and is_archived=0 and record_date between %s and %s
 		order by record_date desc, modified desc limit %s, %s""", (space, begin, end, start, page_length), as_dict=True)
 	names = [r.ref_name for r in index]
@@ -35,12 +37,12 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 			(names,), as_dict=True):
 			items.setdefault(r.parent, []).append({"row": r.name, "text": r.text, "status": r.status, "task": r.task})
 	areas = names_map("Life Area", [r.area for r in index], "area_name")
-	projects = names_map("Life Project", [r.project for r in index], "title")
+	goals = names_map("Life Goal", [r.goal for r in index], "title")
 	chats = []
 	for r in index:
 		d = details.get(r.ref_name) or {}
 		chats.append({"name": r.ref_name, "title": r.title, "date": str(r.record_date), "area": r.area or None, "area_name": areas.get(r.area),
-			"project": r.project or None, "project_title": projects.get(r.project), "url": d.get("url"), "assistant": d.get("assistant"),
+			"goal": r.goal or None, "goal_title": goals.get(r.goal), "url": d.get("url"), "assistant": d.get("assistant"),
 			"summary_md": d.get("summary_md") or "", "open_items": items.get(r.ref_name, [])})
 
 	def key(c):
@@ -48,7 +50,7 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 			return c["date"], c["date"]
 		if group_by == "area":
 			return c["area"] or "", c["area_name"] or "No area"
-		return c["project"] or "", c["project_title"] or "No project"
+		return c["goal"] or "", c["goal_title"] or "No goal"
 
 	groups = {}
 	for c in chats:
@@ -69,19 +71,19 @@ SORTS = {"date": "c.date", "title": "c.title", "assistant": "c.assistant"}
 GROUP_ORDER = {
 	"day": "c.date desc",
 	"area": "(c.area is null or c.area = ''), (select area_name from `tabLife Area` a where a.name = c.area), c.area, c.date desc",
-	"project": "(c.project is null or c.project = ''), (select title from `tabLife Project` p where p.name = c.project), c.project, c.date desc",
+	"goal": "(c.goal is null or c.goal = ''), (select title from `tabLife Goal` p where p.name = c.goal), c.goal, c.date desc",
 }
 
 
-def where_clause(space, area=None, project=None, open_items=0, from_date=None, to_date=None, include_archived=0):
+def where_clause(space, area=None, goal=None, open_items=0, from_date=None, to_date=None, include_archived=0):
 	where, values = [], {}
 	if not flag(include_archived):
 		where.append("c.is_archived = 0")
 	if area:
 		where.append(area_filter(space, area, "c.area", values, also_in="Life Chat Log"))
-	if project:
-		where.append("ifnull(c.project, '') = %(project)s")
-		values["project"] = "" if project == "none" else project
+	if goal:
+		where.append("ifnull(c.goal, '') = %(goal)s")
+		values["goal"] = "" if goal == "none" else goal
 	if flag(open_items):
 		where.append(OPEN_ITEM)
 	if from_date:
@@ -102,11 +104,11 @@ def _chat_rows(rows):
 			(names,), as_dict=True):
 			items.setdefault(r.parent, []).append({"row": r.name, "text": r.text, "status": r.status, "task": r.task})
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
-	projects = names_map("Life Project", [r.project for r in rows], "title")
+	goals = names_map("Life Goal", [r.goal for r in rows], "title")
 	for r in rows:
 		r["date"] = str(r.date) if r.date else None
-		r["area"], r["project"] = r.area or None, r.project or None
-		r["area_name"], r["project_title"] = areas.get(r.area), projects.get(r.project)
+		r["area"], r["goal"] = r.area or None, r.goal or None
+		r["area_name"], r["goal_title"] = areas.get(r.area), goals.get(r.goal)
 		r["summary_md"] = r.summary_md or ""
 		r["open_items"] = items.get(r.name, [])
 		r["open_count"] = sum(1 for i in r["open_items"] if i["status"] == "Open")
@@ -114,23 +116,26 @@ def _chat_rows(rows):
 
 
 @frappe.whitelist(methods=["GET"])
-def list(space: str | None = None, area: str | None = None, project: str | None = None, open_items: bool | int | None = 0, from_date: str | None = None, to_date: str | None = None, include_archived: bool | int | None = 0,
+def list(space: str | None = None, area: str | None = None, goal: str | None = None, open_items: bool | int | None = 0, from_date: str | None = None, to_date: str | None = None, include_archived: bool | int | None = 0,
 		group_by: str = "day", sort: str | None = None, dir: str | None = None, start: int | None = 0, page_length: int | None = 50, filters: str | builtins.list | dict | None = None,
-		order_by: str | None = None, summary: str | dict | None = None):
-	"""Chat logs of a space as one list, newest first, ordered so that the groups of group_by (day, area, project) stay together.
-	Filters: area (with its sub-areas, or "none"), project, open_items=1 for chats that still have an open item, from_date, to_date.
+		order_by: str | None = None, summary: str | dict | None = None, project: str | None = None):
+	"""Chat logs of a space as one list, newest first, ordered so that the groups of group_by (day, area, goal) stay together.
+	Filters: area (with its sub-areas, or "none"), goal (`project` names the goal a project became), open_items=1 for chats that still have an open item, from_date, to_date.
 	`total` is the number of chats the filters match. `with_open_items` and `by_area` count inside the same filters.
 	`tabs` counts all chats and those with open items under the same filters, whatever open_items was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
+	group_by = "goal" if group_by == "project" else group_by
+	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
+		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	if group_by not in GROUP_ORDER:
-		frappe.throw(_("group_by must be day, area or project."))
-	clause, values = where_clause(space, area, project, open_items, from_date, to_date, include_archived)
+		frappe.throw(_("group_by must be day, area or goal."))
+	clause, values = where_clause(space, area, goal, open_items, from_date, to_date, include_archived)
 	extra, values = std_clause("Life Chat Log", filters, "c", values)
 	clause += extra
 	values["space"] = space
 	# the state tabs of the Chats screen (all, open = with open items), counted under every filter but the open-items switch
-	t_clause, t_values = where_clause(space, area, project, 0, from_date, to_date, include_archived)
+	t_clause, t_values = where_clause(space, area, goal, 0, from_date, to_date, include_archived)
 	tabs = tab_counts(f"from `tabLife Chat Log` c where c.space=%(space)s {t_clause}{extra}", {**t_values, **values}, {"all": None, "open": OPEN_ITEM})
 	if summary:
 		return {"summary": summarise("Life Chat Log", f"from `tabLife Chat Log` c where c.space=%(space)s {clause}", values, "c", summary, start, page_length),
@@ -139,7 +144,7 @@ def list(space: str | None = None, area: str | None = None, project: str | None 
 	order = f"{order}, c.creation desc" if order else f"{GROUP_ORDER[group_by]}, c.modified desc"
 	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	rows = _chat_rows(frappe.db.sql(
-		f"""select c.name, c.title, c.date, c.url, c.assistant, c.summary_md, c.area, c.project, c.is_archived
+		f"""select c.name, c.title, c.date, c.url, c.assistant, c.summary_md, c.area, c.goal, c.is_archived
 		from `tabLife Chat Log` c where c.space=%(space)s {clause} order by {order} limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True))
 	base = f"from `tabLife Chat Log` c where c.space=%(space)s {clause}"
@@ -158,7 +163,7 @@ def list(space: str | None = None, area: str | None = None, project: str | None 
 def get(chat: str):
 	"""One chat log with its summary and open items."""
 	doc = permissions.get_doc_checked("Life Chat Log", chat)
-	row = _chat_rows([frappe._dict({k: doc.get(k) for k in ("name", "title", "date", "url", "assistant", "summary_md", "area", "project", "is_archived")})])[0]
+	row = _chat_rows([frappe._dict({k: doc.get(k) for k in ("name", "title", "date", "url", "assistant", "summary_md", "area", "goal", "is_archived")})])[0]
 	row["space"] = doc.space
 	row["transcript_md"] = doc.transcript_md or ""
 	row["updated_on"] = str(doc.updated_on) if doc.updated_on else None
@@ -171,15 +176,15 @@ ASSISTANTS = ("Claude", "ChatGPT", "Codex", "Claude Code", "Other")
 
 @frappe.whitelist(methods=["POST"])
 def log(space: str | None = None, title: str | None = None, date: str | datetime.date | None = None, url: str | None = None, assistant: str | None = "Claude",
-		summary_md: str | None = None, open_items: str | builtins.list | None = None, area: str | None = None, project: str | None = None, tags: str | builtins.list | None = None,
+		summary_md: str | None = None, open_items: str | builtins.list | None = None, area: str | None = None, goal: str | None = None, tags: str | builtins.list | None = None,
 		also_in: str | builtins.list | None = None, source_system: str | None = None, external_id: str | None = None, transcript_md: str | None = None,
-		updated_on: str | datetime.datetime | None = None):
+		updated_on: str | datetime.datetime | None = None, project: str | None = None):
 	"""Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal.
-	open_items is a list of strings. area, project and tags take a name or a title.
+	open_items is a list of strings. area, goal and tags take a name or a title; `project` names the goal a project became.
 
 	With source_system (claude, chatgpt…) and external_id (the chat's ID there), a chat already logged is updated instead of
 	logged twice: title, updated_on, url, summary and transcript change when given, and open items are merged by their text
-	(new ones are added, closed ones stay closed). The connection of that system gives the default area and project.
+	(new ones are added, closed ones stay closed). The connection of that system gives the default area and goal.
 	The answer is {name, created}."""
 	from lifeos import proposals
 	from lifeos.api import connections
@@ -227,10 +232,12 @@ def log(space: str | None = None, title: str | None = None, date: str | datetime
 			doc.area = proposals.resolve_link("Life Area", area, space)
 		elif conn and conn.default_area:
 			doc.area = conn.default_area
-		if project:
-			doc.project = proposals.resolve_link("Life Project", project, space)
-		elif conn and conn.default_project and not area:
-			doc.project = conn.default_project
+		if project and not goal:
+			goal = goal_for_project(project, space) or project
+		if goal:
+			doc.goal = proposals.resolve_link("Life Goal", goal, space)
+		elif conn and conn.default_goal and not area:
+			doc.goal = conn.default_goal
 		for a in parse(also_in, []) or []:
 			doc.append("also_in", {"area": proposals.resolve_link("Life Area", a, space)})
 		for t in parse(tags, []) or []:
@@ -297,7 +304,7 @@ def make_task(chat: str, row: str):
 	doc, item = _row(chat, row)
 	if item.status == "Task Created" and item.task:
 		return {"task": item.task}
-	task = frappe.get_doc({"doctype": "Life Task", "space": doc.space, "title": item.text[:140], "area": doc.area, "project": doc.project,
+	task = frappe.get_doc({"doctype": "Life Task", "space": doc.space, "title": item.text[:140], "area": doc.area, "goal": doc.goal,
 		"source_url": doc.url, "notes_md": f"From the chat [[{doc.title}#{doc.name}]].", "status": "Open"}).insert()
 	item.status, item.task = "Task Created", task.name
 	doc.save()

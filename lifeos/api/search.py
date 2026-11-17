@@ -8,7 +8,7 @@ from lifeos.api.timeline import decorate
 from lifeos.api.utils import area_filter, flag, lens_area
 
 WORD = re.compile(r"[\w][\w'’-]*", re.UNICODE)
-FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, project, is_archived, status, record_owner, also_in_csv, space, search_text"
+FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, goal, is_archived, status, record_owner, also_in_csv, space, search_text"
 
 
 def _snippet(text, words, width=140):

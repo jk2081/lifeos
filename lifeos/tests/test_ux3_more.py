@@ -98,8 +98,9 @@ class TestAgentsAndTheVault(LifeTestCase):
 		seen["search"] = any(r.ref_name == self.doc.name for r in search.query("ux3vaultword")["results"])
 		entries = [e for d in timeline.get(space=PRIVATE, page_length=200)["days"] for e in d["entries"]]
 		seen["timeline"] = any(e.ref_name == self.doc.name for e in entries)
-		a = area.get(self.areas["Tea"])
-		seen["area"] = any(r.ref_name == self.doc.name for r in a["documents"] + a["timeline"]) or a["tabs"]["documents"] > 0
+		# area pages went in set 6: the lens narrows the timeline to the area instead
+		lens = [e for d in timeline.get(space=PRIVATE, area=self.areas["Tea"], page_length=200)["days"] for e in d["entries"]]
+		seen["area"] = any(e.ref_name == self.doc.name for e in lens)
 		seen["file"] = bool(frappe.has_permission("File", "read", self.file))
 		seen["suggest"] = any(r["name"] == self.doc.name for r in links.suggest(space=PRIVATE, text="ux3 secret"))
 		return seen

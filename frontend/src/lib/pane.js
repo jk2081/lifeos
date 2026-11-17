@@ -9,7 +9,7 @@ export const TYPES = {
   change: { label: 'Wiki change' },
   note: { label: 'Note', doctype: 'Life Note' },
   vault: { label: 'Vault document', doctype: 'Life Vault Document' },
-  project: { label: 'Project', doctype: 'Life Project' },
+  project: { label: 'Goal' }, // a link to a project from before set 6: the pane opens the goal it became
   goal: { label: 'Goal', doctype: 'Life Goal' },
   idea: { label: 'Idea', doctype: 'Life Idea' },
   page: { label: 'Journal page', doctype: 'Life Journal Page' },
@@ -47,7 +47,7 @@ export function refOfRoute(path) {
   if ((m = /^\/library\/([^/?]+)$/.exec(p))) return `note:${m[1]}`
   if ((m = /^\/inbox\/([^/?]+)$/.exec(p))) return `inbox:${m[1]}`
   if ((m = /^\/projects\/([^/?]+)$/.exec(p))) return `project:${m[1]}`
-  if ((m = /^\/journal\/goals\/([^/?]+)$/.exec(p))) return `goal:${m[1]}`
+  if ((m = /^\/(?:journal|plan)\/goals\/([^/?]+)$/.exec(p))) return `goal:${m[1]}`
   if ((m = /^\/journal\/pages\/([^/?]+)$/.exec(p))) return `page:${m[1]}`
   return null
 }

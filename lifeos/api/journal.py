@@ -63,8 +63,10 @@ def set_action_status(action: str, status: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_goal(goal: str | None = None, cycle: str | None = None, title: str | None = None, area: str | None = None, project: str | None = None, actions: str | list | None = None):
-	"""Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}."""
+def save_goal(goal: str | None = None, cycle: str | None = None, title: str | None = None, area: str | None = None, serves: str | None = None,
+		actions: str | list | None = None, project: str | None = None):
+	"""Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}. `serves` is the longer goal
+	it serves; `project` is read as the goal that project became, for one set (set 6)."""
 	permissions.require_login()
 	actions = parse(actions)
 	if goal:
@@ -77,8 +79,12 @@ def save_goal(goal: str | None = None, cycle: str | None = None, title: str | No
 		doc.title = title
 	if area is not None:
 		doc.area = area or None
-	if project is not None:
-		doc.project = project or None
+	if serves is None and project is not None:
+		from lifeos.proposals import goal_for_project
+
+		serves = goal_for_project(project, doc.space) or project
+	if serves is not None:
+		doc.serves = serves or None
 	if actions is not None:
 		existing = {a.name: a for a in doc.actions}
 		rows = []
@@ -108,7 +114,7 @@ def delete_goal(goal: str):
 
 
 def _goal_links(goals):
-	"""Titles a goal row shows, for many goals in four queries: its project, and the cycles it was carried from and into."""
+	"""Titles a goal row shows, for many goals in four queries: the goal it serves, and the cycles it was carried from and into."""
 	names = [g["name"] for g in goals]
 	carried_from = [g["carried_from"] for g in goals if g["carried_from"]]
 	into = {}
@@ -116,8 +122,8 @@ def _goal_links(goals):
 		into.setdefault(r.carried_from, r.cycle)
 	from_cycle = dict(frappe.get_all("Life Goal", filters={"name": ("in", carried_from or ["-"])}, fields=["name", "cycle"], as_list=True))
 	cycles = names_map("Life Cycle", [*into.values(), *from_cycle.values()], "title")
-	projects = names_map("Life Project", [g["project"] for g in goals], "title")
-	return {"into_cycle": into, "from_cycle": from_cycle, "cycles": cycles, "projects": projects}
+	serves = names_map("Life Goal", [g["serves"] for g in goals], "title")
+	return {"into_cycle": into, "from_cycle": from_cycle, "cycles": cycles, "serves": serves}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -132,15 +138,18 @@ def goals(space: str | None = None, area: str | None = None):
 	out = []
 	grids = {c.name: rules.grid(c.name) for c in cycles}
 	links = _goal_links([goal for g in grids.values() for goal in g["goals"]])
+	from lifeos.api.utils import descendants
+
+	ids = set(descendants(space, area)) if area else None  # the area with its sub-areas, as under the lens
 	for c in cycles:
 		g = grids[c.name]
 		rows = []
 		for goal in g["goals"]:
-			if area and goal["area"] != area:
+			if ids is not None and goal["area"] not in ids:
 				continue
 			rows.append({
-				"name": goal["name"], "title": goal["title"], "area": goal["area"], "area_name": goal["area_name"], "project": goal["project"],
-				"project_title": links["projects"].get(goal["project"]) if goal["project"] else None,
+				"name": goal["name"], "title": goal["title"], "area": goal["area"], "area_name": goal["area_name"], "serves": goal["serves"],
+				"serves_title": links["serves"].get(goal["serves"]) if goal["serves"] else None,
 				"actions": len([a for a in goal["actions"] if a["status"] != "Dropped"]),
 				"actions_done": len([a for a in goal["actions"] if a["status"] == "Done"]),
 				"percent": goal["final_score"] if c.status == "Closed" else goal["percent"],
@@ -177,7 +186,7 @@ def goal(goal: str):
 		"is_someday": doc.is_someday, "someday_review_on": str(doc.someday_review_on) if doc.someday_review_on else None}
 	if not doc.cycle:
 		g = {"name": doc.name, "title": doc.title, "area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
-			"project": doc.project, "actions": [], "percent": None, "outcome": doc.outcome, "result_note": doc.result_note, "carried_from": None}
+			"serves": doc.serves, "actions": [], "percent": None, "outcome": doc.outcome, "result_note": doc.result_note, "carried_from": None}
 		cycles = frappe.get_all("Life Cycle", filters={"space": doc.space, "status": ("in", ["Active", "Planned"])}, fields=["name", "title", "status"], order_by="start_date")
 		return {"goal": g, "cycle": None, "cycles": cycles, "history": [], **common}
 	g = next((x for x in rules.grid(doc.cycle)["goals"] if x["name"] == doc.name), None)

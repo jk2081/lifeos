@@ -4,7 +4,7 @@
   </Dropdown>
 </template>
 <script setup>
-// A value that changes with one tap: tap the button, pick from the menu. Used for the filing of a record (area, project, tags).
+// A value that changes with one tap: tap the button, pick from the menu. Used for the filing of a record (area, goal, tags).
 import { computed } from 'vue'
 import { Button, Dropdown } from 'frappe-ui'
 

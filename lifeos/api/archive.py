@@ -12,14 +12,14 @@ from lifeos.api.utils import order_by as sort_order
 
 @frappe.whitelist(methods=["POST"])
 def set(doctype: str, name: str, archived: bool | int = 1):
-	"""Archive or restore one record. For a project, its records follow."""
+	"""Archive or restore one record. For a goal, the records filed under it follow (as for a project before set 6)."""
 	permissions.require_login()
 	return rules.set_archived(doctype, name, flag(archived), "Manual")
 
 
 @frappe.whitelist(methods=["POST"])
 def restore(doctype: str, name: str):
-	"""Bring an archived record back. Restoring a project restores the records archived with it."""
+	"""Bring an archived record back. Restoring a goal restores the records archived with it."""
 	permissions.require_login()
 	return rules.set_archived(doctype, name, False)
 
@@ -32,7 +32,7 @@ SORTS = {"title": "title", "kind": "kind", "record_date": "record_date", "area":
 def list(space: str | None = None, area: str | None = None, start: int = 0, page_length: int = 50, doctype: str | None = None,
 		reason: str | None = None, archived_from: str | None = None, archived_to: str | None = None, sort: str | None = None,
 		dir: str | None = None, filters: str | builtins.list | builtins.dict | None = None, order_by: str | None = None, summary: str | builtins.dict | None = None):
-	"""Archived records, grouped by area, plus archived projects.
+	"""Archived records, grouped by area, plus archived goals.
 	Filters: doctype (the record type), area (with its sub-areas, or "none"), reason (Auto, Manual, Project),
 	archived_from and archived_to on the day it was archived. `total` is the number of records the filters match.
 	`tabs` counts the records of each type (and all) under the same filters."""
@@ -83,11 +83,14 @@ def list(space: str | None = None, area: str | None = None, start: int = 0, page
 	for r in rows:
 		r["archive_reason"], r["archived_on"] = reasons.get((r.ref_doctype, r.ref_name), ("", None))
 		groups.setdefault((r.area or "", r.area_name or "Unfiled"), []).append(r)
-	projects = frappe.get_all("Life Project", filters={"space": space, "is_archived": 1},
-		fields=["name", "title", "area", "status", "archived_on"], order_by="archived_on desc", limit=100)
-	areas = names_map("Life Area", [p.area for p in projects], "area_name")
-	for p in projects:
-		p["area_name"] = areas.get(p.area)
-		p["archived_on"] = str(p.archived_on) if p.archived_on else None
-	return {"groups": [{"area": k[0], "area_name": k[1], "records": v} for k, v in groups.items()], "records": rows, "projects": projects,
+	goals = frappe.get_all("Life Goal", filters={"space": space, "is_archived": 1},
+		fields=["name", "title", "area", "goal_type", "outcome", "on_hold", "is_someday", "archived_on"], order_by="archived_on desc", limit=100)
+	areas = names_map("Life Area", [g.area for g in goals], "area_name")
+	from lifeos.api.goals import status_of
+
+	for g in goals:
+		g["area_name"] = areas.get(g.area)
+		g["archived_on"] = str(g.archived_on) if g.archived_on else None
+		g["status"] = status_of(g)
+	return {"groups": [{"area": k[0], "area_name": k[1], "records": v} for k, v in groups.items()], "records": rows, "goals": goals,
 		"count": len(rows), "total": total, "tabs": tabs, "has_more": start + len(rows) < total}

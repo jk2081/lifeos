@@ -4,11 +4,12 @@ import { store } from './store'
 
 export function newMenuItems() {
   return [
-    { label: 'Task', icon: 'lucide-square-check', onClick: () => (store.quickAdd = true) },
-    { label: 'Note', icon: 'lucide-file-text', onClick: () => (store.newKind = 'note') },
-    { label: 'Project', icon: 'lucide-chart-no-axes-column', onClick: () => (store.newKind = 'project') },
-    { label: 'Idea for Someday', icon: 'lucide-lightbulb', onClick: () => (store.newKind = 'idea') },
-    { label: 'Add to Inbox', icon: 'lucide-inbox', onClick: () => router.push('/inbox') },
+    // the four things (UX fixes, set 6): Capture, Task, Goal, Note; an idea is a capture parked on Someday
+    { label: 'Capture', icon: 'lucide-inbox', onClick: () => router.push({ path: '/inbox', query: { capture: 1 } }), 'data-new': 'capture' },
+    { label: 'Task', icon: 'lucide-square-check', onClick: () => (store.quickAdd = true), 'data-new': 'task' },
+    { label: 'Goal', icon: 'lucide-target', onClick: () => (store.newKind = 'goal'), 'data-new': 'goal' },
+    { label: 'Note', icon: 'lucide-file-text', onClick: () => (store.newKind = 'note'), 'data-new': 'note' },
+    { label: 'Idea for Someday', icon: 'lucide-lightbulb', onClick: () => (store.newKind = 'idea'), 'data-new': 'idea' },
   ]
 }
 

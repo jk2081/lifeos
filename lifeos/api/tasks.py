@@ -7,20 +7,20 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import datewords, journal, permissions
+from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 OPEN = ("Open", "Doing", "Waiting")
-FIELDS = ["name", "title", "status", "priority", "due_date", "area", "project", "goal", "inbox_item", "carried_from", "waiting_on",
+FIELDS = ["name", "title", "status", "priority", "due_date", "area", "goal", "inbox_item", "carried_from", "waiting_on",
 	"month_plan", "creation", "completed_on", "source_url", "is_archived", "notes_md", "last_touched_on", "owner"]
 PRIORITY_ORDER = "case t.priority when 'I' then 1 when 'II' then 2 when 'III' then 3 when 'IV' then 4 else 5 end"
 OPEN_LOOP_DAYS = 14
 
 
 def decorate(rows):
-	"""Add the names a list row shows: area, project, goal, tags."""
+	"""Add the names a list row shows: area, goal, tags."""
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
-	projects = names_map("Life Project", [r.project for r in rows], "title")
 	goals = names_map("Life Goal", [r.goal for r in rows], "title")
 	sources = names_map("Life Inbox Item", [r.inbox_item for r in rows], "title")
 	tags = {}
@@ -30,7 +30,7 @@ def decorate(rows):
 			([r.name for r in rows],)):
 			tags.setdefault(parent, []).append(tag)
 	for r in rows:
-		r["area_name"], r["project_title"], r["goal_title"] = areas.get(r.area), projects.get(r.project), goals.get(r.goal)
+		r["area_name"], r["goal_title"] = areas.get(r.area), goals.get(r.goal)
 		r["source_title"] = sources.get(r.inbox_item)
 		r["tags"] = tags.get(r.name, [])
 		for k in ("due_date", "creation", "completed_on", "last_touched_on"):
@@ -93,9 +93,8 @@ def where_clause(space, status="open_doing", area=None, project=None, tag=None, 
 		where.append("t.is_archived = 0")
 	if area:
 		where.append(area_filter(space, area, "t.area", values, also_in="Life Task"))
-	if project:
-		where.append("ifnull(t.project, '') = %(project)s")
-		values["project"] = "" if project == "none" else project
+	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
+		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	if tag:
 		where.append("exists (select 1 from `tabLife Tag Link` tl where tl.parent = t.name and tl.parenttype='Life Task' and tl.tag = %(tag)s)")
 		values["tag"] = tag
@@ -103,8 +102,8 @@ def where_clause(space, status="open_doing", area=None, project=None, tag=None, 
 		where.append("ifnull(t.priority, '') = %(priority)s")
 		values["priority"] = "" if priority == "none" else priority
 	if goal:
-		where.append("t.goal = %(goal)s")
-		values["goal"] = goal
+		where.append("ifnull(t.goal, '') = %(goal)s")
+		values["goal"] = "" if goal == "none" else goal
 	if month_plan:
 		where.append("t.month_plan = %(month_plan)s")
 		values["month_plan"] = month_plan
@@ -210,12 +209,12 @@ def quick_add(text: str, space: str | None = None, area: str | None = None, proj
 	title, when = datewords.parse(text)
 	if not title:
 		frappe.throw(_("Type a title for the task."))
-	if project and not area:
-		area = frappe.db.get_value("Life Project", project, "area")
+	if project and not goal:
+		goal = goal_for_project(project, space) or project
 	if goal and not area:
 		area = frappe.db.get_value("Life Goal", goal, "area")
 	doc = frappe.get_doc({"doctype": "Life Task", "space": space, "title": title[:140], "due_date": due_date or when, "area": area,
-		"project": project, "goal": goal, "priority": priority, "month_plan": month_plan, "status": "Open"}).insert()
+		"goal": goal, "priority": priority, "month_plan": month_plan, "status": "Open"}).insert()
 	return get(doc.name)
 
 
@@ -240,7 +239,10 @@ def update(task: str, values: str | dict):
 	"""Change fields of a task. Only task fields a person edits are accepted."""
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	values = frappe.parse_json(values) or {}
-	allowed = {"title", "status", "priority", "due_date", "goal", "notes_md", "waiting_on", "area", "project", "source_url", "month_plan"}
+	allowed = {"title", "status", "priority", "due_date", "goal", "notes_md", "waiting_on", "area", "source_url", "month_plan"}
+	if values.get("project") and not values.get("goal"):  # for one set: a project names the goal it became
+		values["goal"] = goal_for_project(values["project"], doc.space) or values["project"]
+	values.pop("project", None)
 	for k, v in values.items():
 		if k == "also_in":
 			doc.set("also_in", [{"area": a} for a in v or []])

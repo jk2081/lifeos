@@ -16,9 +16,9 @@ class TestResetBatches(LifeTestCase):
 		tea = self.areas["Tea"]
 		a = self.make("Life Task", title="ux5 Call Kunal!", area=tea)
 		b = self.make("Life Task", title="ux5 call kunal", area=tea)
-		done = self.make("Life Project", title="ux5 done project", area=tea, status="Active")
-		orphan = self.make("Life Task", title="ux5 orphan", area=tea, project=done.name)
-		frappe.db.set_value("Life Project", done.name, "status", "Done")
+		done = self.make("Life Goal", title="ux5 done goal", goal_type="Open", area=tea)
+		orphan = self.make("Life Task", title="ux5 orphan", area=tea, goal=done.name)
+		frappe.db.set_value("Life Goal", done.name, "outcome", "Achieved")  # finished without archiving what is filed under it
 		old = self.make("Life Task", title="ux5 ancient", area=self.areas["Money"])
 		frappe.db.set_value("Life Task", old.name, "last_touched_on", add_days(today(), -400))
 		page = wiki.create_page(space=PRIVATE, title="ux5 Blend blueprint", content_md="Wiki text.", summary="s", area=tea) if False else None

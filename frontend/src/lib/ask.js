@@ -1,5 +1,5 @@
 // Ask from any screen (UX fixes, set 5): the state of the Ask panel and the scope each screen gives a question.
-// A screen calls askScope({...}) in its setup; the pane's "Ask about this" and the area, project and goal pages give
+// A screen calls askScope({...}) in its setup; the pane's "Ask about this" and the goal pages give
 // their own. With none, the scope comes from the route (see scopeFromRoute).
 import { onMounted, onUnmounted, reactive } from 'vue'
 import router from '@/router'

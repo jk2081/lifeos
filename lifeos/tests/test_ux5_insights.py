@@ -13,7 +13,7 @@ class TestRuleInsights(LifeTestCase):
 		frappe.db.delete("Life Insight", {"space": PRIVATE})
 		# what earlier tests left is fresh again, so each test sees only what it seeds
 		frappe.db.sql("update `tabLife Task` set last_touched_on=%s where space=%s", (today(), PRIVATE))
-		frappe.db.sql("update `tabLife Project` set last_activity_on=%s where space=%s", (today(), PRIVATE))
+		frappe.db.sql("update `tabLife Goal` set last_activity_on=%s where space=%s", (today(), PRIVATE))
 
 	def _stuck_tasks(self, n=4, area="Tea"):
 		out = []
@@ -86,8 +86,8 @@ class TestRuleInsights(LifeTestCase):
 
 	def test_at_most_twelve_new_a_day(self):
 		for i in range(15):
-			p = self.make("Life Project", title=f"ux5 idle {i}", area=self.areas["Tea"], status="Active")
-			frappe.db.set_value("Life Project", p.name, "last_activity_on", add_days(today(), -100))
+			p = self.make("Life Goal", title=f"ux5 idle {i}", goal_type="Open", area=self.areas["Tea"])
+			frappe.db.set_value("Life Goal", p.name, "last_activity_on", add_days(today(), -100))
 		stats = insights.run(PRIVATE, ai=False)
 		self.assertEqual(stats["created"], 12)
 		self.assertEqual(frappe.db.count("Life Insight", {"space": PRIVATE, "found_on": today()}), 12)

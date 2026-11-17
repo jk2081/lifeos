@@ -9,7 +9,7 @@
   "system",
   "label",
   "default_area",
-  "default_project",
+  "default_goal",
   "default_intent",
   "active",
   "last_received_on",
@@ -46,10 +46,10 @@
    "options": "Life Area"
   },
   {
-   "fieldname": "default_project",
+   "fieldname": "default_goal",
    "fieldtype": "Link",
-   "label": "Default Project",
-   "options": "Life Project"
+   "label": "Default Goal",
+   "options": "Life Goal"
   },
   {
    "fieldname": "default_intent",
@@ -80,7 +80,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-17 18:19:36.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Connection",

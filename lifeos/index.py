@@ -12,7 +12,7 @@ KINDS = {
 	"Life Chat Log": "Chat", "Life Journal Page": "Journal Page", "Life Check-in": "Check-in", "Life Month Plan": "Month Plan",
 }
 COLUMNS = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "ref_doctype", "ref_name", "space",
-	"area", "also_in_csv", "project", "tags_csv", "record_date", "title", "search_text", "is_archived", "kind", "status", "record_owner",
+	"area", "also_in_csv", "goal", "tags_csv", "record_date", "title", "search_text", "is_archived", "kind", "status", "record_owner",
 	"media_kind", "source_system", "intent", "assistant", "collection", "thumbnail", "vault_locked", "last_opened_on"]
 NULLABLE = ("last_opened_on",)
 # Characters of a record's text kept for search: transcripts, extracted text, summaries and page Markdown (UX fixes, set 4)
@@ -37,7 +37,7 @@ def build_rows(doc) -> list[dict]:
 	dt = doc.doctype
 	base = {
 		"ref_doctype": dt, "ref_name": doc.name, "space": doc.space, "kind": KINDS[dt],
-		"area": doc.get("area") or "", "project": doc.get("project") or "",
+		"area": doc.get("area") or "", "goal": doc.get("goal") or "",
 		"also_in_csv": _csv([r.area for r in doc.get("also_in") or []]),
 		"tags_csv": _csv([r.tag for r in doc.get("tags") or []]),
 		"is_archived": 1 if doc.get("is_archived") else 0,
@@ -143,7 +143,7 @@ def ensure_indexes():
 	"""Composite and FULLTEXT indexes that DocType JSON cannot describe."""
 	frappe.db.add_index("Life Index", ["space", "record_date"], "life_index_space_date")
 	frappe.db.add_index("Life Index", ["space", "area", "is_archived"], "life_index_space_area")
-	frappe.db.add_index("Life Index", ["space", "project"], "life_index_space_project")
+	frappe.db.add_index("Life Index", ["space", "goal"], "life_index_space_goal")
 	frappe.db.add_index("Life Index", ["ref_doctype", "ref_name"], "life_index_ref")
 	frappe.db.add_index("Life Link", ["from_doctype", "from_name"], "life_link_from")
 	frappe.db.add_index("Life Link", ["to_doctype", "to_name"], "life_link_to")

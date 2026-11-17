@@ -12,7 +12,6 @@
   <div><div class="mb-1.5 text-sm text-ink-gray-6">Filed under</div>
     <div class="flex flex-wrap items-center gap-2">
       <Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" />
-      <Pick :model-value="task.project" :options="projectOptions" prefix="Project: " placeholder="project" :disabled="!writable" @update:model-value="(v) => save({ project: v })" />
       <Badge v-for="a in task.also_in" :key="a" size="lg">also in {{ areaName(a) }}
         <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)" @click="save({ also_in: task.also_in.filter((x) => x !== a) })" /></template></Badge>
       <Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== task.area && !task.also_in.includes(o.value))" placeholder="also in"
@@ -82,16 +81,12 @@ const canRestore = computed(() => store.spaces.find((s) => s.name === task.value
 const writable = computed(() => canRestore.value && !task.value?.is_archived)
 function tell() {
   const t = task.value
-  emit('meta', { title: t.title, area: t.area, area_name: t.area_name, project: t.project, project_title: t.project_title,
-    sub: !t.area && !t.project ? 'Unfiled' : t.status === 'Someday' ? 'On the Someday list' : '', archived: !!t.is_archived, canRestore: canRestore.value,
+  emit('meta', { title: t.title, area: t.area, area_name: t.area_name, goal: t.goal, goal_title: t.goal_title,
+    sub: !t.area && !t.goal ? 'Unfiled' : t.status === 'Someday' ? 'On the Someday list' : '', archived: !!t.is_archived, canRestore: canRestore.value,
     someday: writable.value && OPEN.includes(t.status) ? { doctype: 'Life Task', name: t.name } : null,
     tabs: [{ value: 'details', label: 'Details' }, { value: 'notes', label: 'Notes' }, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
 }
 const tagName = (id) => lookups.tags.find((t) => t.name === id)?.tag_name || id
-const projectOptions = computed(() => {
-  const areas = [task.value.area, ...task.value.also_in]
-  return lookups.projects.filter((p) => areas.includes(p.area)).map((p) => ({ value: p.name, label: p.title }))
-})
 
 async function load() {
   try {

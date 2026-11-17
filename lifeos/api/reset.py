@@ -40,21 +40,21 @@ def _batch(key, title, reason, items, action, label, review=None):
 def rule_batches(space):
 	"""The rule batches of section 6, each over the exact items it lists."""
 	out = []
-	tasks = frappe.db.sql("""select name, title, area, project, creation, ifnull(last_touched_on, date(creation)) as touched
+	tasks = frappe.db.sql("""select name, title, area, goal, creation, ifnull(last_touched_on, date(creation)) as touched
 		from `tabLife Task` where space=%s and status in ('Open', 'Doing', 'Waiting') and is_archived=0 order by creation asc""", space, as_dict=True)
-	# 1. exact duplicates: same normalised title, area and project; the oldest of each group stays
+	# 1. exact duplicates: same normalised title, area and goal; the oldest of each group stays
 	groups = {}
 	for t in tasks:
-		groups.setdefault((norm(t.title), t.area or "", t.project or ""), []).append(t)
+		groups.setdefault((norm(t.title), t.area or "", t.goal or ""), []).append(t)
 	dupes = [_item("Life Task", t.name, t.title) for g in groups.values() if len(g) > 1 and g[0].title for t in g[1:]]
 	if dupes:
-		out.append(_batch("duplicates", "Duplicate open tasks", "Each has the same title, area and project as an older open task, which is kept.",
+		out.append(_batch("duplicates", "Duplicate open tasks", "Each has the same title, area and goal as an older open task, which is kept.",
 			dupes, "delete", "Delete {n}"))
-	# 2. open tasks whose project is Done or Dropped
-	closed = set(frappe.get_all("Life Project", filters={"space": space, "status": ["in", ["Done", "Dropped"]]}, pluck="name"))
-	orphans = [_item("Life Task", t.name, t.title) for t in tasks if t.project in closed]
+	# 2. open tasks whose open-ended goal (a project before set 6) is achieved or dropped
+	closed = set(frappe.get_all("Life Goal", filters={"space": space, "goal_type": "Open", "outcome": ["not in", ["In Progress", "Carried"]]}, pluck="name"))
+	orphans = [_item("Life Task", t.name, t.title) for t in tasks if t.goal in closed]
 	if orphans:
-		out.append(_batch("closed_project", "Open tasks of finished projects", "Their project is marked Done or Dropped, but they are still open.",
+		out.append(_batch("closed_project", "Open tasks of finished goals", "Their open-ended goal is achieved or dropped, but they are still open.",
 			orphans, "drop", "Drop {n}"))
 	# 3. untouched for more than 180 days, by area
 	cutoff = getdate(add_days(today(), -OLD_DAYS))
@@ -115,23 +115,24 @@ def get(space: str | None = None, ai: bool | int = 0):
 # ---- one by one ----
 
 def _queue(space, skip=(), only=None):
-	"""Open tasks and active projects, the oldest untouched first. `only` keeps to the items of one batch."""
+	"""Open tasks and open-ended goals in progress, the oldest untouched first. `only` keeps to the items of one batch."""
 	if only is not None:
 		only = [n for n in only if n not in skip]
 		if not only:
 			return None, 0
 	rows = frappe.db.sql("""select * from (
-		select 'Life Task' as doctype, name, title, area, project, creation, ifnull(last_touched_on, date(creation)) as touched, inbox_item, status
+		select 'Life Task' as doctype, name, title, area, goal, creation, ifnull(last_touched_on, date(creation)) as touched, inbox_item, status
 			from `tabLife Task` where space=%(space)s and status in ('Open', 'Doing', 'Waiting') and is_archived=0
 		union all
-		select 'Life Project', name, title, area, '' as project, creation, ifnull(last_activity_on, date(modified)), '' as inbox_item, status
-			from `tabLife Project` where space=%(space)s and status in ('Active', 'On Hold') and is_archived=0
+		select 'Life Goal', name, title, area, '' as goal, creation, ifnull(last_activity_on, date(modified)), '' as inbox_item,
+			if(on_hold, 'On Hold', 'Active') from `tabLife Goal` where space=%(space)s and goal_type='Open' and outcome='In Progress' and is_someday=0 and is_archived=0
 		) q where name not in %(skip)s {only} order by touched asc, creation asc limit 1""".replace("{only}", "and name in %(only)s" if only else ""),
 		{"space": space, "skip": list(skip) or [""], "only": only or [""]}, as_dict=True)
 	if only is not None:
 		return (rows[0] if rows else None), len(only)
 	total = frappe.db.sql("""select (select count(*) from `tabLife Task` where space=%(space)s and status in ('Open', 'Doing', 'Waiting') and is_archived=0)
-		+ (select count(*) from `tabLife Project` where space=%(space)s and status in ('Active', 'On Hold') and is_archived=0)""", {"space": space})[0][0]
+		+ (select count(*) from `tabLife Goal` where space=%(space)s and goal_type='Open' and outcome='In Progress' and is_someday=0 and is_archived=0)""",
+		{"space": space})[0][0]
 	return (rows[0] if rows else None), int(total) - len(skip)
 
 
@@ -144,14 +145,14 @@ def next_item(space: str | None = None, skip: str | list | None = None, only: st
 	row, left = _queue(space, parse(skip, []) or [], only if isinstance(only, list) else None)
 	if not row:
 		return {"item": None, "left": 0}
-	row["type"] = "Task" if row.doctype == "Life Task" else "Project"
+	row["type"] = "Task" if row.doctype == "Life Task" else "Goal"
 	row["area_name"] = frappe.db.get_value("Life Area", row.area, "area_name") if row.area else None
-	row["project_title"] = frappe.db.get_value("Life Project", row.project, "title") if row.project else None
+	row["goal_title"] = frappe.db.get_value("Life Goal", row.goal, "title") if row.goal else None
 	row["days"] = date_diff(today(), row.touched)
 	row["created"] = str(row.creation)[:10]
 	row["touched"] = str(row.touched)
 	row["source"] = _origin(row)
-	row["ref"] = ("task:" if row.doctype == "Life Task" else "project:") + row.name
+	row["ref"] = ("task:" if row.doctype == "Life Task" else "goal:") + row.name
 	row.pop("creation", None)
 	return {"item": row, "left": left}
 
@@ -189,8 +190,11 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 	_person()
 	if decision not in DECISIONS:
 		frappe.throw(_("decision must be one of: {0}.").format(", ".join(DECISIONS)))
-	if doctype not in ("Life Task", "Life Project"):
-		frappe.throw(_("Reset decides on tasks and projects."))
+	doctype = "Life Goal" if doctype == "Life Project" else doctype  # for one set: a project is the goal it became
+	if doctype == "Life Goal" and frappe.db.exists("Life Project", name):
+		name = frappe.db.get_value("Life Project", name, "migrated_to") or name
+	if doctype not in ("Life Task", "Life Goal"):
+		frappe.throw(_("Reset decides on tasks and goals."))
 	doc = permissions.get_doc_checked(doctype, name, "delete" if decision == "delete" else "write")
 	undo = [_snap(doc)]
 	if decision == "do":
@@ -200,7 +204,7 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 			doc.status = "Open" if doc.status == "Waiting" else doc.status
 			doc.due_date = date
 		else:
-			doc.status, doc.target_date = "Active", date
+			doc.on_hold, doc.target_date = 0, date
 		doc.save()
 	elif decision == "waiting":
 		if not (waiting_on or "").strip():
@@ -208,7 +212,7 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 		if doctype == "Life Task":
 			doc.status, doc.waiting_on = "Waiting", waiting_on.strip()
 		else:
-			doc.status = "On Hold"
+			doc.on_hold = 1
 			doc.notes_md = ((doc.notes_md or "") + f"\n\nWaiting on {waiting_on.strip()} ({today()})").strip()
 		doc.save()
 	elif decision == "someday":
@@ -227,7 +231,7 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 def _snap(doc):
 	s = someday._snapshot(doc)
 	s.update({"is_archived": doc.get("is_archived"), "waiting_on": doc.get("waiting_on"), "target_date": doc.get("target_date"),
-		"notes_md": doc.get("notes_md") if doc.doctype == "Life Project" else None})
+		"notes_md": doc.get("notes_md") if doc.doctype == "Life Goal" else None})
 	return s
 
 
@@ -246,7 +250,7 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 		doctype, name = it.get("doctype"), it.get("name")
 		if not isinstance(name, str):  # a name sent as a dict would act as a filter
 			continue
-		if doctype not in ("Life Task", "Life Project", "Life Goal", "Life Idea", "Life Inbox Item", "Life Note"):
+		if doctype not in ("Life Task", "Life Goal", "Life Idea", "Life Inbox Item", "Life Note"):
 			continue
 		if not frappe.db.exists(doctype, name) or frappe.db.get_value(doctype, name, "space") != space:
 			continue

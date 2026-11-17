@@ -81,7 +81,7 @@ onMounted(async () => {
     const [item, m] = await Promise.all([api('inbox.get', { item: props.name }), api('sources.made_from', { doctype: 'Life Inbox Item', name: props.name })])
     s.value = item
     made.value = m
-    emit('meta', { title: item.title, area: item.area, area_name: item.area_name, project: item.project, project_title: item.project_title,
+    emit('meta', { title: item.title, area: item.area, area_name: item.area_name, goal: item.goal, goal_title: item.goal_title,
       sub: [item.media_kind === 'Email Digest' ? 'Email digest' : item.media_kind, dateTime(item.received_on)].filter(Boolean).join(' · '),
       archived: !!item.is_archived, canRestore: writable.value,
       tabs: [{ value: 'original', label: 'Original' }, { value: 'text', label: 'Text' }, { value: 'summary', label: 'Summary' },

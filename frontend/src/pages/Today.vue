@@ -179,7 +179,7 @@ const tiles = computed(() => {
   const goalLine = b.goals_no_ticks.n ? { count: b.goals_no_ticks, text: 'with no ticks for 3 weeks' } : { count: b.goals_no_tasks, text: 'with no tasks' }
   return [
     { key: 'open', label: 'Open tasks', count: b.open_tasks, sub: { count: b.stuck, text: `untouched ${b.rules.stuck_after_days}+ days`, warn: b.stuck.n > 0 } },
-    { key: 'projects', label: 'Projects', count: b.projects, pre: 'active · ', sub: { count: b.idle_projects, text: `idle ${b.rules.stuck_after_days}+ days` } },
+    { key: 'open_goals', label: 'Open-ended goals', count: b.open_goals, pre: 'active · ', sub: { count: b.idle_goals, text: `idle ${b.rules.stuck_after_days}+ days` } },
     { key: 'goals', label: 'Goals', count: b.goals, pre: 'in progress · ', sub: goalLine },
     { key: 'inbox', label: 'Inbox', count: b.inbox, pre: 'to review · ', sub: { count: b.inbox_old, text: 'older than a week', warn: b.inbox_old.n > 0 } },
     { key: 'notes', label: 'Notes and sources', count: b.notes_sources, sub: { count: b.notes_unopened, text: 'notes not opened in 90 days' } },
@@ -239,7 +239,7 @@ const visibleGroups = computed(() => {
   }).filter((g) => g.shown.length)
 })
 const hidden = computed(() => groups.value.reduce((n, g) => n + g.rows.length, 0) - visibleGroups.value.reduce((n, g) => n + g.shown.length, 0))
-const taskLine = (r) => [r.area_name, r.project_title, r.source_title && 'from ' + r.source_title, r.status === 'Waiting' && r.waiting_on && 'waiting on ' + r.waiting_on].filter(Boolean).join(' · ') || 'Unfiled'
+const taskLine = (r) => [r.area_name, r.goal_title, r.source_title && 'from ' + r.source_title, r.status === 'Waiting' && r.waiting_on && 'waiting on ' + r.waiting_on].filter(Boolean).join(' · ') || 'Unfiled'
 function duration(e) {
   if (e.all_day || !e.start || !e.end) return ''
   const m = Math.round((new Date(e.end.replace(' ', 'T')) - new Date(e.start.replace(' ', 'T'))) / 60000)

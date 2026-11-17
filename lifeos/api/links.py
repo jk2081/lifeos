@@ -13,9 +13,9 @@ FIELD_TIES = {
 		("Life Check-in", "inbox_item", "created from this item"), ("Life Important Date", "inbox_item", "created from this item"),
 		("Life Chat Log", "inbox_item", "created from this item"),
 	],
-	"Life Goal": [("Life Task", "goal", "task for this goal"), ("Life Goal", "carried_from", "carried into the next cycle")],
-	"Life Project": [("Life Task", "project", "in this project"), ("Life Note", "project", "in this project"),
-		("Life Vault Document", "project", "in this project"), ("Life Chat Log", "project", "in this project"), ("Life Goal", "project", "goal for this project")],
+	"Life Goal": [("Life Task", "goal", "task for this goal"), ("Life Goal", "carried_from", "carried into the next cycle"),
+		("Life Note", "goal", "filed under this goal"), ("Life Vault Document", "goal", "filed under this goal"),
+		("Life Chat Log", "goal", "filed under this goal"), ("Life Goal", "serves", "serves this goal")],
 	"Life Note": [("Life Note", "parent_note", "sub-note")],
 	"Life Task": [("Life Task", "carried_from", "carried forward from this task")],
 	"Life Person": [("Life Vault Document", "holder", "document held"), ("Life Important Date", "person", "important date")],
@@ -23,7 +23,7 @@ FIELD_TIES = {
 }
 KIND = {"Life Task": "Task", "Life Note": "Note", "Life Vault Document": "Document", "Life Journal Page": "Journal page",
 	"Life Check-in": "Check-in", "Life Important Date": "Important date", "Life Chat Log": "Chat", "Life Goal": "Goal",
-	"Life Project": "Project", "Life Person": "Person", "Life Inbox Item": "Inbox item"}
+	"Life Person": "Person", "Life Inbox Item": "Inbox item"}
 
 
 def _title(doctype, name):
@@ -64,7 +64,7 @@ def backlinks(doctype: str, name: str):
 
 @frappe.whitelist(methods=["GET"])
 def suggest(space: str | None = None, text: str | None = "", limit: int | None = 12):
-	"""Records for the [[ picker: notes, tasks, people, vault documents, chat logs, goals and projects whose title matches."""
+	"""Records for the [[ picker: notes, tasks, people, vault documents, chat logs and goals whose title matches."""
 	space = permissions.resolve_space(space)
 	text = (text or "").strip()
 	limit = min(int(limit or 12), 30)

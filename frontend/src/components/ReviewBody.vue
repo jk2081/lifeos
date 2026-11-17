@@ -83,10 +83,10 @@
                       <Pick :model-value="p.payload.area || null" :options="areaOptions" placeholder="area" :disabled="!writable"
                         @update:model-value="(v) => setField(p, 'area', v)" />
                     </template>
-                    <Badge v-if="p.payload.goal" size="lg" :label="'Goal: ' + goalTitle(p.payload.goal)" />
+                    <Badge v-if="p.payload.goal && !p.filed" size="lg" :label="'Goal: ' + goalTitle(p.payload.goal)" />
                     <template v-if="p.filed">
-                      <Pick v-if="p.payload.project || projectOptions(p).length" :model-value="p.payload.project || null" :options="projectOptions(p)"
-                        prefix="Project: " placeholder="project" :disabled="!writable" @update:model-value="(v) => setField(p, 'project', v)" />
+                      <Pick v-if="p.payload.goal || ctx.goals.length" :model-value="p.payload.goal || null" :options="goalOptions(ctx.goals, { empty: null })"
+                        prefix="Goal: " placeholder="goal" :disabled="!writable" @update:model-value="(v) => setField(p, 'goal', v)" />
                       <Badge v-for="a in p.payload.also_in || []" :key="a" size="lg">also in {{ areaName(a) }}
                         <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)"
                           @click="setField(p, 'also_in', p.payload.also_in.filter((x) => x !== a))" /></template></Badge>
@@ -192,7 +192,7 @@ const editing = ref(null)
 const draft = ref({})
 const reloadKey = ref(0)
 
-const ctx = computed(() => item.value?.context || { areas: [], projects: [], tags: [], goals: [], people: [], habits: [], dimensions: [] })
+const ctx = computed(() => item.value?.context || { areas: [], tags: [], goals: [], people: [], habits: [], dimensions: [] })
 const canRestore = computed(() => store.spaces.find((s) => s.name === item.value?.space)?.access === 'Write')
 const writable = computed(() => canRestore.value && !item.value?.is_archived)
 const pending = computed(() => item.value.proposals.filter((p) => p.status === 'Pending'))
@@ -228,10 +228,6 @@ const areaName = (id) => ctx.value.areas.find((a) => a.name === id)?.area_name |
 const goalTitle = (id) => ctx.value.goals.find((g) => g.name === id)?.title || id
 const tagKey = (t) => (typeof t === 'string' ? t : 'new:' + t.new)
 const tagName = (t) => (typeof t === 'string' ? ctx.value.tags.find((x) => x.name === t)?.tag_name || t : t.new + ' (new)')
-function projectOptions(p) {
-  const areas = [p.payload.area, ...(p.payload.also_in || [])].filter(Boolean)
-  return ctx.value.projects.filter((x) => areas.includes(x.area)).map((x) => ({ value: x.name, label: x.title }))
-}
 function tagOptions(p) {
   const have = (p.payload.tags || []).map(tagKey)
   return ctx.value.tags.filter((t) => !have.includes(t.name)).map((t) => ({ value: t.name, label: '#' + t.tag_name }))
@@ -239,7 +235,7 @@ function tagOptions(p) {
 function linkOptions(doctype) {
   const c = ctx.value
   const map = {
-    'Life Area': areaOptions.value, 'Life Project': c.projects.map((x) => ({ value: x.name, label: x.title })),
+    'Life Area': areaOptions.value,
     'Life Goal': goalOptions(c.goals, { empty: null }), 'Life Person': c.people.map((x) => ({ value: x.name, label: x.full_name })),
     'Life Habit': c.habits.map((x) => ({ value: x.name, label: x.title })),
   }
@@ -268,7 +264,7 @@ function factChips(p) {
 async function load() {
   try {
     const it = (item.value = await api('inbox.get', { item: itemName.value }))
-    emit('meta', { title: it.title, area: it.area, area_name: it.area_name, project: it.project, project_title: it.project_title, sub: headSub.value,
+    emit('meta', { title: it.title, area: it.area, area_name: it.area_name, goal: it.goal, goal_title: it.goal_title, sub: headSub.value,
       fullPage: `/inbox/${it.name}/review`, archived: !!it.is_archived, canRestore: canRestore.value })
   } catch (e) {
     missing.value = true
@@ -282,9 +278,6 @@ async function setField(p, field, value) {
   const next = { ...p.payload, [field]: value }
   if (value === null || value === '' || (Array.isArray(value) && !value.length)) delete next[field]
   if (field === 'area' || field === 'also_in') {
-    const areas = [next.area, ...(next.also_in || [])]
-    const proj = ctx.value.projects.find((x) => x.name === next.project)
-    if (proj && !areas.includes(proj.area)) delete next.project
     if (next.also_in) next.also_in = next.also_in.filter((a) => a !== next.area)
   }
   p.payload = next

@@ -66,6 +66,12 @@ def _goal(context, title):
 	return next((g for g in context.get("goals", []) if g["title"] == title), None)
 
 
+def _open_goal(context, area_name):
+	"""An open-ended goal in progress filed under the area, if the space has one: what a project was before set 6."""
+	ids = {a["name"] for a in context.get("areas", []) if a["area_name"] == area_name}
+	return next((g["name"] for g in context.get("goals", []) if g.get("goal_type") == "Open" and g.get("area") in ids), None)
+
+
 def _with(d, **optional):
 	d.update({k: v for k, v in optional.items() if v})
 	return d
@@ -107,8 +113,11 @@ def canned_document(item, context, today):
 	summary = (f"**{item['title']}** summarised. The document lists three follow-ups, extracted below as to-dos. "
 		"No dates were stated, so none were set.")
 	area = _area(context, "Tea & Coffee", "Business That Works", "Work", "Tea")
+	# file the follow-ups under an open-ended goal of that area when there is one (projects became goals in set 6);
+	# `goal` takes the goal's name, as every filing field does
+	goal = _open_goal(context, area) or (item.get("connection") or {}).get("default_goal")
 	titles = ["Review the production figures with Mithun", "Send six questions on the blend sheets", "Confirm the despatch schedule"]
-	proposals = [{"kind": "Task", "preview": t, "confidence": c, "payload": _with({"title": t}, area=area)}
+	proposals = [{"kind": "Task", "preview": t, "confidence": c, "payload": _with({"title": t}, area=area, goal=goal)}
 		for t, c in zip(titles, (0.9, 0.84, 0.77))]
 	return None, summary, proposals
 

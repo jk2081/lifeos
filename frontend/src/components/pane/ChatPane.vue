@@ -56,7 +56,7 @@ async function load() {
     ;[c.value, links.value, made.value] = await Promise.all([api('chats.get', { chat: props.name }), loadBacklinks('Life Chat Log', props.name),
       api('sources.made_from', { doctype: 'Life Chat Log', name: props.name })])
     const open = c.value.open_items.filter((i) => i.status === 'Open').length
-    emit('meta', { title: c.value.title, area: c.value.area, area_name: c.value.area_name, project: c.value.project, project_title: c.value.project_title,
+    emit('meta', { title: c.value.title, area: c.value.area, area_name: c.value.area_name, goal: c.value.goal, goal_title: c.value.goal_title,
       archived: !!c.value.is_archived, canRestore: canRestore.value,
       tabs: [{ value: 'summary', label: 'Summary' }, ...(c.value.transcript_md ? [{ value: 'transcript', label: 'Transcript' }] : []),
         { value: 'items', label: 'Open items', count: open, noun: 'open items' }, { value: 'made', label: 'Made from this', count: made.value.length, noun: 'records' },

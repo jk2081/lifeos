@@ -24,6 +24,6 @@ class LifeTask(Document):
 			self.someday_with = None
 
 	def on_update(self):
-		# a project's last activity follows its tasks (UX fixes, set 5: idle projects)
-		if self.project and not self.flags.keep_touched:
-			frappe.db.set_value("Life Project", self.project, "last_activity_on", today(), update_modified=False)
+		# a goal's last activity follows its tasks (UX fixes, set 5: idle projects, now open-ended goals)
+		if self.goal and not self.flags.keep_touched:
+			frappe.db.set_value("Life Goal", self.goal, "last_activity_on", today(), update_modified=False)

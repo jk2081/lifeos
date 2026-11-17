@@ -128,7 +128,6 @@ def _time(fn, runs=5):
 
 def measure(user=None, space=None):
 	"""Time the four reads the spec names, as a member of the largest space."""
-	from lifeos.api import area as area_api
 	from lifeos.api import search, timeline
 	from lifeos.api import today as today_api
 
@@ -145,7 +144,7 @@ def measure(user=None, space=None):
 			"today": _time(lambda: today_api.get(space=space)),
 			"timeline": _time(lambda: timeline.get(space=space)),
 			"timeline_page_20": _time(lambda: timeline.get(space=space, start=1000, page_length=50)),
-			"area_page": _time(lambda: area_api.get(area)),
+			"today_lens": _time(lambda: today_api.get(space=space, area=area)),  # an area page before set 6: Today under the lens
 			"search_common_word": _time(lambda: search.query(word, space=space)),
 			"search_rare_word": _time(lambda: search.query(RARE_WORD, space=space)),
 			"search_all_spaces": _time(lambda: search.query(word)),

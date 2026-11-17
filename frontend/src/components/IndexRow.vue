@@ -25,7 +25,7 @@ const meta = computed(() => {
   const parts = []
   if (props.showKind) parts.push(KIND[r.kind] || r.kind)
   if (props.showArea && r.area_name) parts.push(r.area_name)
-  if (r.project_title) parts.push(r.project_title)
+  if (r.goal_title) parts.push(r.goal_title)
   parts.push(short(r.record_date))
   if (r.is_archived) parts.push('archived')
   return parts.join(' · ')

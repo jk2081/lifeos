@@ -2,7 +2,7 @@
 insight evidence and Ask's citations open in the pane)."""
 
 PANE_TYPES = {
-	"Life Task": "task", "Life Inbox Item": "source", "Life Note": "note", "Life Vault Document": "vault", "Life Project": "project",
+	"Life Task": "task", "Life Inbox Item": "source", "Life Note": "note", "Life Vault Document": "vault",
 	"Life Goal": "goal", "Life Idea": "idea", "Life Journal Page": "page", "Life Chat Log": "chat", "Event": "event",
 	"Life Important Date": "date", "Life Check-in": "checkin", "Life Month Plan": "month",
 }

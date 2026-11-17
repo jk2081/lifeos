@@ -19,7 +19,8 @@
   "someday_section",
   "someday_on",
   "someday_review_on",
-  "someday_note"
+  "someday_note",
+  "migrated_to"
  ],
  "fields": [
   {
@@ -117,10 +118,18 @@
    "fieldname": "someday_note",
    "fieldtype": "Small Text",
    "label": "Why It Was Parked"
+  },
+  {
+   "fieldname": "migrated_to",
+   "fieldtype": "Link",
+   "label": "Migrated To",
+   "options": "Life Goal",
+   "read_only": 1,
+   "description": "The goal this project became in set 6."
   }
  ],
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-17 18:19:36.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Project",

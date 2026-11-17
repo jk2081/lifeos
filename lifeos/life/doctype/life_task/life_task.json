@@ -22,7 +22,6 @@
   "organisation_section",
   "area",
   "also_in",
-  "project",
   "tags",
   "is_archived",
   "archived_on",
@@ -146,13 +145,6 @@
    "options": "Life Also In"
   },
   {
-   "fieldname": "project",
-   "fieldtype": "Link",
-   "label": "Project",
-   "options": "Life Project",
-   "search_index": 1
-  },
-  {
    "fieldname": "tags",
    "fieldtype": "Table MultiSelect",
    "label": "Tags",
@@ -202,12 +194,12 @@
    "fieldname": "someday_with",
    "fieldtype": "Link",
    "label": "Someday With",
-   "options": "Life Project",
+   "options": "Life Goal",
    "description": "Parked together with this project"
   }
  ],
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-17 18:19:36.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Task",

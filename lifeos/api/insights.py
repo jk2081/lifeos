@@ -40,7 +40,7 @@ def _out(rows):
 	return rows
 
 
-LABEL = {"Life Task": ("task", "tasks"), "Life Project": ("project", "projects"), "Life Goal": ("goal", "goals"), "Life Chat Log": ("chat", "chats"),
+LABEL = {"Life Task": ("task", "tasks"), "Life Goal": ("goal", "goals"), "Life Chat Log": ("chat", "chats"),
 	"Life Inbox Item": ("source", "sources"), "Life Note": ("note", "notes"), "Life Check-in": ("check-in", "check-ins"),
 	"Life Habit": ("habit log", "habit logs"), "Life Cycle": ("12 Week Year", "12 Week Years"), "Life Idea": ("idea", "ideas")}
 

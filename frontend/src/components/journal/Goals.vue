@@ -91,7 +91,7 @@ function cycleNote(c) {
 function goalNote(g, c) {
   if (g.carried_from_cycle) return `Carried from ${g.carried_from_cycle}`
   if (g.carried_into_cycle) return `Carried into ${g.carried_into_cycle}`
-  if (g.project_title) return `Linked to project ${g.project_title}`
+  if (g.serves_title) return `Serves ${g.serves_title}`
   if (g.actions_done) return `${g.actions_done} of ${g.actions} actions finished`
   return c.status === 'Closed' ? g.result_note : ''
 }

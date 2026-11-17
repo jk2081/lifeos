@@ -2,7 +2,7 @@
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos.api import archive, chats, inbox, library, projects, tasks, timeline, vault, views
+from lifeos.api import archive, chats, goals, inbox, library, tasks, timeline, vault, views
 from lifeos.api.utils import std_filters, std_order
 from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED, LifeTestCase
 
@@ -141,8 +141,8 @@ class TestStandardFilters(LifeTestCase):
 
 	def test_every_list_takes_standard_filters(self):
 		tea = self.areas["Tea"]
-		project = self.make("Life Project", title="ux2 project", area=tea)
-		self.make("Life Project", title="ux2 other", area=tea)
+		goal = self.make("Life Goal", title="ux2 goal", goal_type="Open", area=tea)
+		self.make("Life Goal", title="ux2 other", goal_type="Open", area=tea)
 		note = self.make("Life Note", title="ux2 note", area=tea, content_md="x")
 		self.make("Life Note", title="ux2 second", area=tea, content_md="x")
 		doc = self.make("Life Vault Document", title="ux2 passport", doc_type="Travel", area=tea, number_last4="1234")
@@ -152,9 +152,9 @@ class TestStandardFilters(LifeTestCase):
 		item = self.make("Life Inbox Item", title="ux2 item", source_type="Email")
 		self.make("Life Inbox Item", title="ux2 item two")
 		like = [["title", "like", "ux2"]]
-		self.assertEqual(self.names(projects.list(space=PRIVATE, filters=[*like, ["title", "=", "ux2 project"]])["projects"]), {project.name})
-		self.assertEqual(projects.list(space=PRIVATE, filters=like)["total"], 2)
-		self.assertEqual([p["title"] for p in projects.list(space=PRIVATE, filters=like, order_by="title desc")["projects"]], ["ux2 project", "ux2 other"])
+		self.assertEqual(self.names(goals.list(space=PRIVATE, filters=[*like, ["title", "=", "ux2 goal"]])["goals"]), {goal.name})
+		self.assertEqual(goals.list(space=PRIVATE, filters=like)["total"], 2)
+		self.assertEqual([p["title"] for p in goals.list(space=PRIVATE, filters=like, order_by="title desc")["goals"]], ["ux2 other", "ux2 goal"])
 		self.assertEqual(self.names(vault.list(space=PRIVATE, filters=[*like, ["number_last4", "=", "1234"]])["documents"]), {doc.name})
 		self.assertEqual(vault.list(space=PRIVATE, filters=like)["total"], 2)
 		self.assertEqual(vault.list(space=PRIVATE, filters=like, fields=["issue_date"])["documents"][0].keys() >= {"issue_date"}, True)
@@ -170,11 +170,11 @@ class TestStandardFilters(LifeTestCase):
 		frappe.db.set_value("Life Note", note.name, {"is_archived": 1, "archived_on": today(), "archive_reason": "Manual"})
 		frappe.get_doc("Life Note", note.name).save()
 		self.assertEqual({r["ref_name"] for r in archive.list(space=PRIVATE, filters=[["kind", "=", "Note"], *like])["records"]}, {note.name})
-		for method in (projects.list, vault.list, chats.list, inbox.list, library.list, archive.list):
+		for method in (goals.list, vault.list, chats.list, inbox.list, library.list, archive.list):
 			self.assertRaises(frappe.ValidationError, method, space=PRIVATE, filters=[["no_such_field", "=", 1]])
 			self.assertRaises(frappe.ValidationError, method, space=PRIVATE, order_by="no_such_field desc")
 		self.assertRaises(frappe.ValidationError, timeline.get, space=PRIVATE, filters=[["no_such_field", "=", 1]])
 		# a second user still sees nothing from a private space, whatever the filters say
 		self.as_user(FAMILY)
-		for method in (tasks.list, projects.list, vault.list, chats.list, inbox.list, library.list, archive.list, timeline.get):
+		for method in (tasks.list, goals.list, vault.list, chats.list, inbox.list, library.list, archive.list, timeline.get):
 			self.assertRaises(frappe.PermissionError, method, space=PRIVATE, filters=[["space", "=", PRIVATE]])

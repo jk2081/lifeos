@@ -7,6 +7,7 @@ import frappe
 from frappe import _
 
 from lifeos import links, permissions
+from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
@@ -30,7 +31,7 @@ STATUSES = {
 	"failed": "x.status = 'Failed'",
 }
 SORTS = {"record_date": "x.record_date", "title": "x.title", "modified": "x.modified"}
-FIELDS = """x.ref_doctype, x.ref_name, x.title, x.record_date, x.area, x.project, x.status, x.media_kind, x.source_system, x.intent,
+FIELDS = """x.ref_doctype, x.ref_name, x.title, x.record_date, x.area, x.goal, x.status, x.media_kind, x.source_system, x.intent,
 	x.assistant, x.thumbnail, x.is_archived, x.vault_locked, x.modified"""
 
 
@@ -62,7 +63,7 @@ def made_counts(rows):
 	return out
 
 
-def _where(space, tab=None, area=None, project=None, from_date=None, to_date=None, status=None, intent=None, system=None, assistant=None,
+def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, status=None, intent=None, system=None, assistant=None,
 		include_archived=0, open_items=0):
 	where, values = ["x.space = %(space)s", BASE], {"space": space}
 	if int(open_items or 0):
@@ -71,9 +72,9 @@ def _where(space, tab=None, area=None, project=None, from_date=None, to_date=Non
 		where.append("x.is_archived = 0")
 	if area:
 		where.append(area_filter(space, area, "x.area", values, also_in="index"))
-	if project:
-		where.append("x.project = %(project)s")
-		values["project"] = "" if project == "none" else project
+	if goal:
+		where.append("x.goal = %(goal)s")
+		values["goal"] = "" if goal == "none" else goal
 	if from_date:
 		where.append("x.record_date >= %(from_date)s")
 		values["from_date"] = frappe.utils.getdate(from_date)
@@ -98,22 +99,24 @@ def _where(space, tab=None, area=None, project=None, from_date=None, to_date=Non
 
 
 @frappe.whitelist(methods=["GET"])
-def list(space: str | None = None, tab: str | None = None, area: str | None = None, project: str | None = None, from_date: str | None = None, to_date: str | None = None, status: str | None = None, intent: str | None = None,
+def list(space: str | None = None, tab: str | None = None, area: str | None = None, goal: str | None = None, from_date: str | None = None, to_date: str | None = None, status: str | None = None, intent: str | None = None,
 		system: str | None = None, assistant: str | None = None, include_archived: bool | int | None = 0, open_items: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
-		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None):
+		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, project: str | None = None):
 	"""Every source of a space, newest first: inbox items and chat logs.
 	tab: all (default), chats, voice, documents, photos, articles, email (emails and email digests), text.
-	Filters: area (with its sub-areas, or "none"), project, from_date and to_date (received), status (inbox, done, failed),
+	Filters: area (with its sub-areas, or "none"), goal (`project` names the goal a project became), from_date and to_date (received), status (inbox, done, failed),
 	intent (Process, Add to wiki, Just keep), system (gmail, claude…), assistant (for chats), open_items=1 (chats with an open item),
 	include_archived=1 (archived sources too; they are left out otherwise, as on every list).
 	Each row has: doctype, name, title, kind, received, area, status (In Inbox, Done, Failed), made (records made from it), thumbnail.
 	`tabs` counts each tab under the same filters."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
+	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
+		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	tab = tab or "all"
 	if tab not in TABS:
 		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)))
-	where, values = _where(space, tab, area, project, from_date, to_date, status, intent, system, assistant, include_archived, open_items)
+	where, values = _where(space, tab, area, goal, from_date, to_date, status, intent, system, assistant, include_archived, open_items)
 	where.append("1=1" + permissions.vault_guard(space, "x."))
 	conds, values = std_filters("Life Index", filters, "x", values)
 	tabs = tab_counts(f"from `tabLife Index` x where {' and '.join(where + conds)}", values, TABS)
@@ -141,13 +144,13 @@ def decorate(rows):
 	open_items = dict(frappe.db.sql("""select parent, count(*) from `tabLife Chat Open Item` where parenttype = 'Life Chat Log' and parent in %s
 		and status = 'Open' group by parent""", (chats,))) if chats else {}
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
-	projects = names_map("Life Project", [r.project for r in rows], "title")
+	goals = names_map("Life Goal", [r.goal for r in rows], "title")
 	out = []
 	for r in rows:
 		kind = "Chat" if r.ref_doctype == "Life Chat Log" else (r.media_kind or "Text")
 		out.append({
 			"doctype": r.ref_doctype, "name": r.ref_name, "title": r.title, "kind": kind, "received": str(r.record_date) if r.record_date else None,
-			"area": r.area or None, "area_name": areas.get(r.area), "project": r.project or None, "project_title": projects.get(r.project),
+			"area": r.area or None, "area_name": areas.get(r.area), "goal": r.goal or None, "goal_title": goals.get(r.goal),
 			"status": status_label(r.ref_doctype, r.status), "intent": r.intent or None, "source_system": r.source_system or None,
 			"assistant": r.assistant or None, "thumbnail": r.thumbnail or None, "is_archived": r.is_archived,
 			"made": made.get((r.ref_doctype, r.ref_name), 0), "ref": ("chat:" if r.ref_doctype == "Life Chat Log" else "source:") + r.ref_name,
@@ -185,8 +188,8 @@ def made_from(doctype: str, name: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def refile(sources: str | builtins.list, area: str | None = None, project: str | None = None):
-	"""Set the area (and project) of many sources at once, from the Sources list. `sources` is a list of
+def refile(sources: str | builtins.list, area: str | None = None, goal: str | None = None):
+	"""Set the area (and goal) of many sources at once, from the Sources list. `sources` is a list of
 	{doctype, name}. People only."""
 	if permissions.is_agent():
 		frappe.throw(_("Only a person can re-file sources in bulk."), frappe.PermissionError)
@@ -200,10 +203,10 @@ def refile(sources: str | builtins.list, area: str | None = None, project: str |
 		doc = permissions.get_doc_checked(r["doctype"], r["name"], "write")
 		if area is not None:
 			doc.area = area or None
-			if doc.project and frappe.db.get_value("Life Project", doc.project, "area") != doc.area:
-				doc.project = None
-		if project is not None:
-			doc.project = project or None
+			if doc.goal and frappe.db.get_value("Life Goal", doc.goal, "area") != doc.area:
+				doc.goal = None
+		if goal is not None:
+			doc.goal = goal or None
 		doc.save()
 		done += 1
 	return {"updated": done}

@@ -105,7 +105,7 @@ def grid(cycle_name) -> dict:
 	goals = []
 	for g in frappe.get_all(
 		"Life Goal", filters={"cycle": cycle.name},
-		fields=["name", "title", "area", "project", "outcome", "result_note", "carried_from", "final_score", "sort_order"],
+		fields=["name", "title", "area", "serves", "outcome", "result_note", "carried_from", "final_score", "sort_order"],
 		order_by="sort_order asc, creation asc",
 	):
 		acts = by_goal.get(g.name, [])
@@ -255,7 +255,7 @@ def plan_next_cycle(cycle_name, goals=None, title=None) -> dict:
 			continue
 		copy = frappe.get_doc({
 			"doctype": "Life Goal", "space": old.space, "cycle": new.name, "title": old.title, "area": old.area,
-			"project": old.project, "sort_order": old.sort_order, "carried_from": old.name, "outcome": "In Progress",
+			"serves": old.serves, "sort_order": old.sort_order, "carried_from": old.name, "outcome": "In Progress",
 			"actions": [{"title": a.title, "per_week": a.per_week, "status": "Open"} for a in old.actions if a.status == "Open"],
 		}).insert(ignore_permissions=True)
 		old.outcome = "Carried"

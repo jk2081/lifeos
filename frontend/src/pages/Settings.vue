@@ -88,7 +88,7 @@
           <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
         </Card>
         <Card v-else-if="section === 'reset'" flush data-reset-rules>
-          <SettingRow label="Stuck after" help="An open task, project or inbox item untouched for this many days counts as stuck: on Today, in Reset and in the insights." :error="errors.stuck_after_days">
+          <SettingRow label="Stuck after" help="An open task, open-ended goal or inbox item untouched for this many days counts as stuck: on Today, in Reset and in the insights." :error="errors.stuck_after_days">
             <TextInput class="w-28" type="number" min="1" :model-value="d.settings.stuck_after_days" :disabled="!d.is_admin" data-setting="stuck_after_days"
               @change="(e) => setOne('stuck_after_days', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">days</span></template></TextInput>
           </SettingRow>
