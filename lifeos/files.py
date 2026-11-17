@@ -12,7 +12,7 @@ def after_insert(doc, method=None):
 	if not (doc.attached_to_doctype or "").startswith("Life ") or doc.is_folder:
 		return
 	if not doc.is_private:
-		frappe.throw("Files attached to Life OS records must be private.")
+		frappe.throw(frappe._("Files attached to Life OS records must be private."))
 	if doc.attached_to_doctype != "Life Inbox Item" or frappe.flags.lifeos_making_preview:
 		return
 	from lifeos import sources

@@ -7,7 +7,7 @@ import frappe
 from lifeos import permissions
 from lifeos.ai import fake
 from lifeos.api import ask, chats, connections
-from lifeos.tests.base import FAMILY, OWNER, PRIVATE, SHARED, LifeTestCase
+from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED, LifeTestCase
 from lifeos.tests.test_ux5_ask import AskCase, text
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -167,3 +167,84 @@ class TestFilePaths(LifeTestCase):
 
 		f = save_file("pre6.txt", b"hello", None, None, is_private=1)
 		self.assertEqual(files.read(f), b"hello")
+
+
+class TestPermissionHooksAnswerTrueOrFalse(LifeTestCase):
+	"""Frappe reads None from a has_permission hook as a refusal, so every hook answers True or False on every path."""
+
+	USERS = ("Administrator", OWNER, FAMILY, AGENT)
+	PTYPES = ("read", "write", "create", "delete", "select")
+
+	def _doc(self, values):
+		return frappe.get_doc(values)
+
+	def _all(self, hook, doc):
+		out = {}
+		for user in self.USERS:
+			for ptype in self.PTYPES:
+				permissions.clear_cache()
+				got = hook(doc, ptype=ptype, user=user)
+				self.assertIn(got, (True, False), f"{hook.__name__} answered {got!r} for {user} {ptype}")
+				self.assertIsInstance(got, bool, f"{hook.__name__} for {user} {ptype}")
+				out[(user, ptype)] = got
+		return out
+
+	def test_space_records(self):
+		h = permissions.has_permission
+		private = self._all(h, self._doc({"doctype": "Life Task", "space": PRIVATE, "title": "pre6"}))
+		self.assertTrue(private[(OWNER, "write")])
+		self.assertFalse(private[(FAMILY, "read")])
+		self.assertFalse(private[(AGENT, "delete")])
+		self.assertTrue(private[(AGENT, "read")])
+		no_space = self._all(h, self._doc({"doctype": "Life Task", "title": "pre6"}))
+		self.assertTrue(no_space[(FAMILY, "create")])
+		vault = self._all(h, self._doc({"doctype": "Life Vault Document", "space": PRIVATE, "title": "pre6"}))
+		self.assertEqual(vault[(AGENT, "read")], PRIVATE in permissions.vault_open_spaces())
+		insight = self._all(h, self._doc({"doctype": "Life Insight", "space": PRIVATE, "title": "pre6"}))
+		self.assertFalse(insight[(AGENT, "read")])
+
+	def test_spaces(self):
+		got = self._all(permissions.space_has_permission, self._doc({"doctype": "Life Space", "name": PRIVATE, "space_name": PRIVATE}))
+		self.assertTrue(got[(OWNER, "write")])  # a Life Admin
+		self.assertTrue(got[(AGENT, "read")])
+		self.assertFalse(got[(AGENT, "write")])
+		self.assertFalse(got[(FAMILY, "read")])
+
+	def test_events(self):
+		got = self._all(permissions.event_has_permission, self._doc({"doctype": "Event", "subject": "pre6", "life_space": PRIVATE}))
+		self.assertTrue(got[(OWNER, "delete")])
+		self.assertFalse(got[(AGENT, "delete")])
+		self.assertFalse(got[(FAMILY, "read")])
+		free = self._all(permissions.event_has_permission, self._doc({"doctype": "Event", "subject": "pre6"}))
+		self.assertTrue(free[(FAMILY, "read")])
+
+	def test_view_states(self):
+		got = self._all(permissions.view_state_has_permission, self._doc({"doctype": "Life View State", "user": OWNER}))
+		self.assertTrue(got[(OWNER, "write")])
+		self.assertFalse(got[(FAMILY, "read")])
+		self.assertFalse(got[(AGENT, "read")])
+
+	def test_ask(self):
+		thread = self._doc({"doctype": "Life Ask Thread", "user": OWNER, "space": PRIVATE})
+		got = self._all(permissions.ask_has_permission, thread)
+		self.assertTrue(got[(OWNER, "read")])
+		self.assertFalse(got[(FAMILY, "read")])
+		self.assertFalse(got[(AGENT, "read")])
+		message = self._all(permissions.ask_has_permission, self._doc({"doctype": "Life Ask Message", "thread": "no-such-thread"}))
+		self.assertTrue(message[(FAMILY, "read")])  # no thread, no owner to protect
+
+	def test_files(self):
+		vault = self.make("Life Vault Document", title="pre6 permit")
+		got = self._all(permissions.file_has_permission, self._doc({"doctype": "File", "file_name": "p.pdf",
+			"attached_to_doctype": "Life Vault Document", "attached_to_name": vault.name}))
+		self.assertTrue(got[(FAMILY, "read")])  # the space rules apply elsewhere; this hook only closes the Vault to agents
+		self.assertEqual(got[(AGENT, "read")], PRIVATE in permissions.vault_open_spaces())
+		other = self._all(permissions.file_has_permission, self._doc({"doctype": "File", "file_name": "n.txt"}))
+		self.assertTrue(other[(AGENT, "read")])
+
+	def test_app(self):
+		for user in self.USERS:
+			frappe.set_user(user)
+			self.assertIs(permissions.has_app_permission(), True)
+		frappe.set_user("Guest")
+		self.assertIs(permissions.has_app_permission(), False)

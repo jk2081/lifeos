@@ -15,7 +15,7 @@ class LifeVaultDocument(Document):
 		# a full identity, card or account number must never sit in a field
 		for field in ("title", "notes_md"):
 			if LONG_NUMBER.search(self.get(field) or ""):
-				frappe.throw(_("{0} looks like it holds a full number. Keep only the last four characters.").format(self.meta.get_label(field)), frappe.ValidationError)
+				frappe.throw(_("{0} looks like it holds a full number. Keep only the last four characters.").format(_(self.meta.get_label(field))), frappe.ValidationError)
 		if self.remind_days_before is None:
 			self.remind_days_before = 60
 		if self.is_archived and self.archive_reason == "Auto":
