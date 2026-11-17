@@ -7,10 +7,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | Rule | Exceptions |
 | --- | --- |
 | frappe-manual-commit | 5 |
-| frappe-security-file-traversal | 3 |
+| frappe-security-file-traversal | 4 |
 | frappe-setuser | 13 |
 | frappe-sql-format-injection | 73 |
-| Total | 94 |
+| Total | 95 |
 
 ## frappe-manual-commit
 
@@ -26,6 +26,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
+| `lifeos/api/settings.py` | 182 | the site's own backup folder, names only |
 | `lifeos/files.py` | 74 | local_path keeps the path inside the site's files folders |
 | `lifeos/sources.py` | 102 | a fixed name in a temporary folder made here |
 | `lifeos/sources.py` | 112 | pdftoppm's own output in a temporary folder made here |
@@ -79,7 +80,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/library.py` | 78 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/search.py` | 58 | FIELDS and WHERE are fixed fragments; the search text is the %(q)s parameter |
 | `lifeos/api/search.py` | 70 | FIELDS, WHERE and the LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
-| `lifeos/api/settings.py` | 33 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |
+| `lifeos/api/settings.py` | 36 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |
 | `lifeos/api/someday.py` | 71 | each branch is _sub's fixed SQL over a PARKABLE table, with std_filters columns checked against meta |
 | `lifeos/api/someday.py` | 85 | the union as above; `order` and `way` come from fixed allowlists; values are parameters |
 | `lifeos/api/sources.py` | 160 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters (TABS and STATUSES are fixed maps |

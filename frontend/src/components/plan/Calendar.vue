@@ -57,7 +57,7 @@
     <!-- month -->
     <template v-else-if="mode === 'month' && data">
       <div class="overflow-hidden rounded-5 border border-outline-gray-2" data-month-grid><div class="grid grid-cols-7">
-        <div v-for="w in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']" :key="w"
+        <div v-for="w in DAY_HEADS" :key="w"
           class="border-b border-outline-gray-1 bg-surface-gray-1 p-2 text-xs font-semibold text-ink-gray-7 max-md:px-1 max-md:py-1.5">{{ w }}</div>
         <div v-for="c in monthCells" :key="c.date" class="relative flex min-h-[104px] min-w-0 flex-col gap-[3px] border-b border-r border-outline-gray-1 p-1.5 text-left hover:bg-surface-gray-2 max-md:min-h-16 max-md:p-1 [&:nth-child(7n)]:border-r-0"
           :class="[c.weekend ? 'bg-surface-gray-1' : 'bg-surface-base', c.date === data.today && '!border-2 !border-outline-gray-5']" :data-day="c.date" :data-today="c.date === data.today || undefined">
@@ -116,13 +116,17 @@ import SectionHead from '@/components/ui/SectionHead.vue'
 import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
-import { MONTHS, addDays, iso, long, parse, short, startOfWeek, time, weekday } from '@/lib/dates'
+import { MONTHS, addDays, iso, long, parse, short, startOfWeek as mondayOf, time, weekday } from '@/lib/dates'
 import { useTabKeys } from '@/lib/tabs'
 import routerInstance from '@/router'
 
 // In Plan (UX fixes, set 6) the calendar is a view of the Week, Month and Year tabs: `place` is the tab's title (the
 // calendar's own title becomes the line under it) and `switchOptions` the tab's view switch, which replaces the calendar's.
 const props = defineProps({ view: String, place: String, switchOptions: Array, switchValue: String })
+// Settings > Rhythms: the week of the calendar starts on Monday or Sunday (week scores keep the cycle's Monday weeks)
+const sunday = store.settings?.week_starts_on === 'Sunday'
+const startOfWeek = (s) => (sunday ? addDays(mondayOf(addDays(s, 1)), -1) : mondayOf(s))
+const DAY_HEADS = sunday ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const VIEWS = ['month', 'week', 'agenda', 'year']
 const VIEW_OPTIONS = VIEWS.map((v) => ({ label: v[0].toUpperCase() + v.slice(1), value: v, route: `/calendar/${v}` }))
 const SOURCE = { event: 'Event', important: 'Important date', task: 'Task due', vault: 'Vault document' }

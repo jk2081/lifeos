@@ -25,6 +25,9 @@ def boot():
 			"score_target": s.score_target or 85, "weekly_review_day": s.weekly_review_day or "Sunday",
 			"weekly_review_time": str(s.weekly_review_time or "18:00:00"), "archive_after_days": s.archive_after_days or 90,
 			"stale_task_days": s.stale_task_days or 90,
+			# Settings > Rhythms (set 6)
+			"start_of_day": str(s.start_of_day or "06:00:00"), "week_starts_on": s.week_starts_on or "Monday",
+			"month_plan_enabled": int(s.month_plan_enabled if s.month_plan_enabled is not None else 1),
 		},
 		"today": today(),
 		"time_zone": frappe.utils.get_system_timezone(),

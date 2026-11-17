@@ -7,7 +7,10 @@ from lifeos.api.utils import parse
 
 SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "score_target", "archive_after_days", "stale_task_days",
 	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
-	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd")
+	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
+	# UX fixes, set 6: Rhythms
+	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week")
+TIME_FIELDS = ("weekly_review_time", "start_of_day")
 LISTS = {
 	"area": ("Life Area", "area_name"), "tag": ("Life Tag", "tag_name"), "dimension": ("Life Dimension", "dimension_name"),
 	"habit": ("Life Habit", "title"), "person": ("Life Person", "full_name"),
@@ -115,7 +118,7 @@ def get(space: str | None = None):
 	s = frappe.get_cached_doc("Life Settings")
 	lists = {}
 	for kind, (doctype, field, key, extra, order) in {
-		"area": ("Life Area", "area_name", "areas", ["parent_area", "sort_order"], "sort_order, area_name"),
+		"area": ("Life Area", "area_name", "areas", ["parent_area", "sort_order", "colour", "is_pinned"], "sort_order, area_name"),
 		"tag": ("Life Tag", "tag_name", "tags", [], "tag_name"),
 		"habit": ("Life Habit", "title", "habits", [], "title"),
 		"dimension": ("Life Dimension", "dimension_name", "dimensions", ["sort_order"], "sort_order, dimension_name"),
@@ -128,8 +131,9 @@ def get(space: str | None = None):
 		lists[key] = rows
 	out = {
 		"space": space, "is_admin": permissions.is_admin(), "user": frappe.session.user,
-		"settings": {f: (str(s.get(f)) if f == "weekly_review_time" and s.get(f) else s.get(f)) for f in SETTING_FIELDS},
+		"settings": {f: (str(s.get(f)) if f in TIME_FIELDS and s.get(f) else s.get(f)) for f in SETTING_FIELDS},
 		**lists,
+		"cycle": _cycle_info(space), "rules_note": frappe.db.get_value("Life Note", {"space": space, "collection": "Wiki", "is_rules": 1}),
 		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], order_by="full_name", limit=500),
 		"spaces": [], "agents": [],
 	}
@@ -145,7 +149,42 @@ def get(space: str | None = None):
 	if permissions.is_admin():
 		out["agents"] = _agents(docs, people)
 		out["ai"] = ai_settings()
+		out["backups"] = backups()
 	return out
+
+
+def _cycle_info(space):
+	"""The current 12 Week cycle for Settings > Rhythms: its dates and this week's number (read-only there)."""
+	from lifeos import journal
+
+	c = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date", "end_date"], as_dict=True)
+	if not c:
+		return None
+	return {"name": c.name, "title": c.title, "start_date": str(c.start_date), "end_date": str(c.end_date), "week": journal.week_of(c)}
+
+
+BACKUP_KEYS = ("backup_frequency", "backup_with_files", "backup_path", "encrypt_backup", "keep_backups_for_hours", "backup_limit")
+
+
+def backups():
+	"""What is backed up and when, read from the site's configuration (Settings > Data > Backups). Never a secret: only the
+	keys above, whether S3 backups are switched on, and the dates and sizes of the latest backup files on this server."""
+	conf = frappe.get_site_config() or {}
+	keys = {k: conf.get(k) for k in BACKUP_KEYS if conf.get(k) not in (None, "")}
+	s3 = bool(frappe.db.table_exists("S3 Backup Settings") and frappe.db.get_single_value("S3 Backup Settings", "enabled"))
+	files = []
+	try:
+		from frappe.utils.backups import get_backup_path
+
+		import os
+
+		folder = get_backup_path()
+		for f in sorted(os.listdir(folder), reverse=True)[:6]:  # nosemgrep: frappe-security-file-traversal -- the site's own backup folder, names only
+			if f.endswith((".sql.gz", ".tar", ".json")):
+				files.append({"name": f, "size": os.path.getsize(os.path.join(folder, f))})
+	except Exception:
+		files = []
+	return {"configured": bool(keys.get("backup_frequency") or s3), "settings": keys, "s3": s3, "latest": files}
 
 
 def ai_settings():
@@ -231,7 +270,7 @@ ARCHIVABLE = ("area", "tag", "habit", "dimension")
 @frappe.whitelist(methods=["POST"])
 def save_item(kind: str, space: str | None = None, name: str | None = None, title: str | None = None, parent_area: str | None = None,
 		relation: str | None = None, sort_order: int | None = None, is_archived: bool | int | None = None, delete: bool | int = 0,
-		with_children: bool | int = 1):
+		with_children: bool | int = 1, colour: str | None = None, is_pinned: bool | int | None = None):
 	"""Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person.
 	Archiving sets archived_on to today; records filed under the heading are not changed. Archiving an area archives its
 	sub-areas with it. Restoring an area puts it back under its old parent if that parent is active, otherwise at the top
@@ -265,6 +304,10 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 			if name and frappe.db.exists("Life Area", {"parent_area": name}):
 				frappe.throw(_("An area with sub-areas stays at the top level."))
 		doc.parent_area = parent_area
+	if kind == "area" and colour is not None:  # the dot in the lens and the sidebar (set 6)
+		doc.colour = colour or None
+	if kind == "area" and is_pinned is not None:  # "Focus on an area" in the sidebar (set 6)
+		doc.is_pinned = 1 if int(is_pinned or 0) else 0
 	if kind == "person" and relation is not None:
 		doc.relation = relation
 	if sort_order is not None and doc.meta.has_field("sort_order"):

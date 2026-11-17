@@ -7,7 +7,7 @@
       <Tabs v-if="!phone && d" vertical :model-value="section" @update:model-value="open">
         <TabList variant="ghost" class="w-full">
           <template v-for="g in groups" :key="g.key">
-            <div class="px-2 pb-1 pt-4 text-sm-medium text-ink-gray-6 first:pt-0" :data-settings-group="g.key">{{ g.label }}</div>
+            <div class="px-2 pb-1 pt-4 text-sm-medium text-ink-gray-6 first:pt-0" :data-settings-group="g.key">{{ g.key === 'space' ? `${g.label} · ${spaceSel}` : g.label }}</div>
             <div v-if="g.key === 'space' && d" class="mb-1.5 px-1" @keydown.stop>
               <Select :model-value="spaceSel" :options="d.spaces.map((s) => ({ label: s.name, value: s.name }))" aria-label="Space for these settings" data-settings-space
                 @update:model-value="pickSpace" />
@@ -46,34 +46,144 @@
             <TabButtons :model-value="colorScheme" :options="SCHEMES" aria-label="Theme" data-theme-switch @update:model-value="setColorScheme" />
           </SettingRow>
         </Card>
-        <Card v-else-if="section === 'default'" flush>
+        <Card v-else-if="section === 'profile'" flush data-settings-profile>
+          <SettingRow label="Name" help="How Life OS greets you and labels what you write. It comes from your Frappe user.">
+            <span class="text-base text-ink-gray-9">{{ store.fullName || store.user }}</span></SettingRow>
+          <SettingRow label="Email" help="You sign in with this address."><span class="break-all text-base text-ink-gray-8">{{ store.user }}</span></SettingRow>
           <SettingRow label="Default space" help="The space the app opens in, and where new records go when no space is chosen." :error="errors.default_space">
             <Select class="w-44" :model-value="d.settings.default_space" :options="d.spaces.map((s) => s.name)" :disabled="!d.is_admin" data-setting="default_space"
               @update:model-value="(v) => setOne('default_space', v)" />
           </SettingRow>
           <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change this.</p>
         </Card>
-        <Card v-else-if="section === 'review'" flush>
-          <SettingRow label="Review day" help="The day the weekly review is due. Today shows a reminder on that day." :error="errors.weekly_review_day">
-            <Select class="w-44" :model-value="d.settings.weekly_review_day" :options="DAYS" :disabled="!d.is_admin" data-setting="weekly_review_day"
-              @update:model-value="(v) => setOne('weekly_review_day', v)" />
-          </SettingRow>
-          <SettingRow label="Review time" help="The time of day the reminder appears." :error="errors.weekly_review_time">
-            <TimePicker class="w-44" :model-value="d.settings.weekly_review_time" :disabled="!d.is_admin" data-setting="weekly_review_time"
-              @update:model-value="(v) => setOne('weekly_review_time', v)" />
-          </SettingRow>
-          <SettingRow label="Score target" help="The 12 Week Year score, in per cent, that counts as a good week." :error="errors.score_target">
-            <TextInput class="w-44" type="number" min="1" max="100" :model-value="d.settings.score_target" :disabled="!d.is_admin" data-setting="score_target"
-              @change="(e) => setOne('score_target', Number(e.target.value))" />
-          </SettingRow>
-          <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
+        <Card v-else-if="section === 'notifications'" flush data-settings-notifications>
+          <SettingRow label="Reminders on Today" help="The weekly review, the month plan and the 12 Week cycle show as one line at the top of Today when they are due. Each has Skip.">
+            <Badge theme="green" label="On" /></SettingRow>
+          <SettingRow label="Email and phone" help="Life OS sends no email or push messages. Your agents may write to you in their own chats.">
+            <Badge label="None" /></SettingRow>
+          <p class="pb-3 text-sm text-ink-gray-6">When each rhythm happens is set under Your life, Rhythms.</p>
         </Card>
+        <template v-else-if="section === 'shortcuts'">
+          <Card flush data-settings-shortcuts>
+            <SettingRow v-for="g in GO" :key="g.key" :label="g.label" :help="'Press G, then ' + g.key.toUpperCase()"><KeyboardShortcut bg :combo="'G ' + g.key.toUpperCase()" /></SettingRow>
+          </Card>
+          <p class="text-sm text-ink-gray-6">Press ? anywhere for every shortcut, or Help at the foot of the sidebar.</p>
+        </template>
+
+        <!-- Your life: Rhythms -->
+        <template v-else-if="section === 'rhythms'">
+          <p class="text-sm text-ink-gray-6">When each rhythm happens. Today, Plan and the reminders follow these.</p>
+          <SectionHead>Daily</SectionHead>
+          <Card flush data-settings-rhythms>
+            <SettingRow label="Start of day" help="When Today begins and the morning insights are ready." :error="errors.start_of_day">
+              <TimePicker class="w-36" :model-value="hm(d.settings.start_of_day)" :disabled="!d.is_admin" data-setting="start_of_day" @update:model-value="(v) => setOne('start_of_day', v)" />
+            </SettingRow>
+          </Card>
+          <SectionHead>Weekly</SectionHead>
+          <Card flush>
+            <SettingRow label="Weekly review" help="The day and time your review opens, starting with Reset." :error="errors.weekly_review_day || errors.weekly_review_time">
+              <div class="flex flex-wrap gap-2">
+                <Select class="w-36" :model-value="d.settings.weekly_review_day" :options="DAYS" :disabled="!d.is_admin" aria-label="Review day" data-setting="weekly_review_day"
+                  @update:model-value="(v) => setOne('weekly_review_day', v)" />
+                <TimePicker class="w-28" :model-value="d.settings.weekly_review_time" :disabled="!d.is_admin" aria-label="Review time" data-setting="weekly_review_time"
+                  @update:model-value="(v) => setOne('weekly_review_time', v)" />
+              </div>
+            </SettingRow>
+            <SettingRow label="Week starts on" help="Used for the week calendar." :error="errors.week_starts_on">
+              <Select class="w-36" :model-value="d.settings.week_starts_on || 'Monday'" :options="['Monday', 'Sunday']" :disabled="!d.is_admin" data-setting="week_starts_on"
+                @update:model-value="(v) => setOne('week_starts_on', v)" />
+            </SettingRow>
+          </Card>
+          <SectionHead>Monthly</SectionHead>
+          <Card flush>
+            <SettingRow label="Month plan" help="Plan each month: Today reminds you in its first three days until the plan exists." :error="errors.month_plan_enabled">
+              <TabButtons :model-value="d.settings.month_plan_enabled ? 1 : 0" :options="[{ label: 'On', value: 1 }, { label: 'Off', value: 0 }]" aria-label="Month plan"
+                data-setting="month_plan_enabled" @update:model-value="(v) => d.is_admin && setOne('month_plan_enabled', v)" />
+            </SettingRow>
+          </Card>
+          <SectionHead>12 Weeks</SectionHead>
+          <Card flush>
+            <SettingRow label="Current cycle" :help="d.cycle ? `Week ${d.cycle.week} of 12. The next cycle can be planned from week 11.` : 'No cycle is running. Start one on Plan, 12 Weeks.'">
+              <span class="text-sm text-ink-gray-7" data-current-cycle>{{ d.cycle ? `${short(d.cycle.start_date)} to ${short(d.cycle.end_date, true)}` : '—' }}</span>
+            </SettingRow>
+            <SettingRow label="Score target" help="The weekly share of planned actions you aim to complete, in per cent." :error="errors.score_target">
+              <TextInput class="w-28" type="number" min="1" max="100" :model-value="d.settings.score_target" :disabled="!d.is_admin" data-setting="score_target"
+                @change="(e) => setOne('score_target', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">%</span></template></TextInput>
+            </SettingRow>
+            <SettingRow label="Break week" help="A week between cycles for review and planning." :error="errors.cycle_break_week">
+              <TabButtons :model-value="d.settings.cycle_break_week ? 1 : 0" :options="[{ label: 'Yes', value: 1 }, { label: 'No', value: 0 }]" aria-label="Break week"
+                data-setting="cycle_break_week" @update:model-value="(v) => d.is_admin && setOne('cycle_break_week', v)" />
+            </SettingRow>
+          </Card>
+          <p class="text-sm text-ink-gray-6">{{ d.is_admin ? 'Changes save as you make them.' : 'Only the owner can change these.' }}</p>
+        </template>
+
+        <!-- Assistant: Sensitive items and Note rules -->
+        <template v-else-if="section === 'sensitive'">
+          <p class="text-sm text-ink-gray-6">A sensitive item is a document from the Vault, or a capture or note marked sensitive. Each space decides who may read them. Anyone who can edit an item may mark it; only the space's owner may unmark it.</p>
+          <Card v-for="sp in d.spaces" :key="sp.name" flush :data-sensitive-space="sp.name">
+            <SettingRow :label="`Agents may open sensitive items in ${sp.name}`" help="Off by default. With it off, agents cannot list, read or download them.">
+              <Switch :model-value="!!sp.agents_can_read_vault" :aria-label="`Agents may open sensitive items in ${sp.name}`" :data-vault-switch="sp.name" :disabled="!d.is_admin"
+                @update:model-value="(v) => setVault(sp, v)" /></SettingRow>
+            <SettingRow :label="`Ask may read sensitive items in ${sp.name}`" help="Off by default. Separate from the agents' switch.">
+              <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="`Ask may read sensitive items in ${sp.name}`" :data-ask-vault-switch="sp.name" :disabled="!d.is_admin"
+                @update:model-value="(v) => setSpaceAsk(sp, 'ask_can_read_vault', v)" /></SettingRow>
+          </Card>
+        </template>
+        <template v-else-if="section === 'note-rules'">
+          <p class="text-sm text-ink-gray-6">The assistant reads this page before it writes its notes. People edit it; agents cannot. It is also pinned at the top of the assistant's notes in the Library.</p>
+          <NoteEditor v-if="rulesDoc" :key="rulesDoc.name" :note="rulesDoc" data-settings-rules />
+          <Card v-else><Empty title="No rules page yet in this space." hint="It is made the first time the assistant reads the rules." /></Card>
+        </template>
+
+        <!-- People and agents: Spaces -->
+        <template v-else-if="section === 'spaces'">
+          <Card flush data-settings-spaces>
+            <Row v-for="sp in d.spaces" :key="sp.name"><div class="min-w-0 flex-1"><div class="text-base-medium text-ink-gray-9">{{ sp.name }}</div>
+              <div class="text-sm text-ink-gray-6">Owner {{ sp.owner_name || '—' }} · {{ sp.members.length }} member{{ sp.members.length === 1 ? '' : 's' }}</div></div>
+              <Button size="sm" label="Members" @click="memberSpace = sp.name; open('members')" /></Row>
+          </Card>
+          <p class="text-sm text-ink-gray-6">Each record lives in one space. A person sees a space's records only as its member.</p>
+        </template>
+
+        <!-- Data -->
+        <template v-else-if="section === 'import'">
+          <ConnectionsSection :space="spaceSel" :writable="canEdit && !store.isAgent" import-only />
+        </template>
+        <template v-else-if="section === 'backups' && d.backups">
+          <Card flush data-settings-backups>
+            <SettingRow label="Scheduled backups" :help="d.backups.configured ? 'From this site\'s configuration.' : 'Not set up on this site. Ask whoever runs the server to switch on backups.'">
+              <Badge :theme="d.backups.configured ? 'green' : 'amber'" :label="d.backups.configured ? (d.backups.settings.backup_frequency || 'On') : 'Not set up on this site'" data-backups-state />
+            </SettingRow>
+            <SettingRow v-for="(v, k) in d.backups.settings" :key="k" :label="k.replace(/_/g, ' ')" help="Site configuration"><span class="text-base text-ink-gray-8">{{ v }}</span></SettingRow>
+            <SettingRow label="Copies to S3" help="Frappe's S3 backup settings."><Badge :label="d.backups.s3 ? 'On' : 'Off'" /></SettingRow>
+          </Card>
+          <section v-if="d.backups.latest.length"><SectionHead>Latest backup files on this server</SectionHead>
+            <Card flush><Row v-for="f in d.backups.latest" :key="f.name"><span class="min-w-0 flex-1 break-all text-sm text-ink-gray-8">{{ f.name }}</span>
+              <span class="text-sm tabular-nums text-ink-gray-6">{{ (f.size / 1024).toFixed(0) }} KB</span></Row></Card></section>
+          <p class="text-sm text-ink-gray-6">Backups hold the database (every record, including Life OS) and, when files are included, the uploaded files.</p>
+        </template>
 
         <!-- This space -->
         <template v-else-if="listOf(section)">
           <SettingsList :kind="listOf(section).kind" :rows="active(listOf(section))" :noun="listOf(section).noun" :hint="listOf(section).hint" :ordered="listOf(section).ordered"
             :writable="canEdit" :count-noun="listOf(section).countNoun" :link="listOf(section).link" @rename="rename" @reorder="reorder" @archive="askArchive" />
           <p class="text-sm text-ink-gray-6">{{ listOf(section).footer }}</p>
+          <!-- the sidebar's "Focus on an area": which areas are pinned there, and each area's dot -->
+          <section v-if="section === 'areas'" id="pins" data-area-pins>
+            <SectionHead>In the sidebar</SectionHead>
+            <Card flush>
+              <SettingRow v-for="a in active(LISTS[0])" :key="a.name" :label="(a.parent_area ? '· ' : '') + a.title" :help="a.parent_area ? 'Sub-area' : 'Pinned areas are one-click lenses, in this order.'">
+                <div class="flex items-center gap-2">
+                  <span class="size-2.5 rounded-full" :class="dotClass(a)" aria-hidden="true" />
+                  <Select class="w-28" :model-value="a.colour || 'gray'" :options="COLOURS" :disabled="!canEdit" :aria-label="`Colour of ${a.title}`" :data-area-colour="a.name"
+                    @update:model-value="(v) => saveArea(a, { colour: v })" />
+                  <Switch :model-value="!!a.is_pinned" :disabled="!canEdit" :aria-label="`Pin ${a.title} to the sidebar`" :data-area-pin="a.name"
+                    @update:model-value="(v) => saveArea(a, { is_pinned: v ? 1 : 0 })" />
+                </div>
+              </SettingRow>
+            </Card>
+          </section>
         </template>
         <Card v-else-if="section === 'archive'" flush>
           <SettingRow label="Archive after" help="Done and dropped tasks, and inbox items that are done, move to the Archive this many days after they were closed. Notes, documents, chats, journal pages and projects are never archived automatically."
@@ -186,8 +296,6 @@
               <template v-for="sp in d.spaces" :key="sp.name">
                 <SettingRow :label="`Ask in ${sp.name}`" help="People in this space can ask about its records.">
                   <Switch :model-value="!!sp.ask_enabled" :aria-label="`Ask in ${sp.name}`" :data-ask-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_enabled', v)" /></SettingRow>
-                <SettingRow :label="`Ask may read sensitive items in ${sp.name}`" help="Off by default. Separate from the agents' switch.">
-                  <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="`Ask may read sensitive items in ${sp.name}`" :data-ask-vault-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_can_read_vault', v)" /></SettingRow>
               </template>
             </Card>
           </section>
@@ -206,14 +314,7 @@
             </div>
             <Empty v-if="!d.agents.length" title="No agents." hint="An agent is a user with the Life OS agent role and no other Life OS role. Create one in Frappe, then give it access here." />
           </Card>
-          <section>
-            <SectionHead>Vault</SectionHead>
-            <Card flush>
-              <SettingRow v-for="s in d.spaces" :key="s.name" :label="`Agents may open sensitive items in ${s.name}`" help="Let agents open documents in this space's Vault. Off by default.">
-                <Switch :model-value="!!s.agents_can_read_vault" :aria-label="`Agents may open sensitive items in ${s.name}`" :data-vault-switch="s.name" @update:model-value="(v) => setVault(s, v)" />
-              </SettingRow>
-            </Card>
-          </section>
+          <p class="text-sm text-ink-gray-6">Whether agents may open sensitive items is set under <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'sensitive' } }">Sensitive items</RouterLink>.</p>
           <p class="text-sm text-ink-gray-6">Keys for agents are made in Frappe, never on this screen.</p>
         </template>
       </div>
@@ -261,7 +362,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 // A routed page, not frappe-ui's SettingsDialog: that family's panels only work inside the dialog. The menu is frappe-ui
 // Tabs in its vertical form, with the open section in the URL (tab=).
-import { Avatar, Badge, Button, Dialog, Dropdown, Select, Skeleton, Switch, TabButtons, TabList, Tabs, TabTrigger, TextInput, TimePicker, dialog, toast, useColorScheme } from 'frappe-ui'
+import { Avatar, Badge, Button, Dialog, Dropdown, KeyboardShortcut, Select, Skeleton, Switch, TabButtons, TabList, Tabs, TabTrigger, TextInput, TimePicker, dialog, toast, useColorScheme } from 'frappe-ui'
+import NoteEditor from '@/components/NoteEditor.vue'
+import { GO } from '@/lib/nav'
+import { dotClass } from '@/lib/lens'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
@@ -276,6 +380,8 @@ import { boot, store } from '@/lib/store'
 import { loadLookups } from '@/lib/lookups'
 import { dateTime, short } from '@/lib/dates'
 
+const COLOURS = ['blue', 'green', 'amber', 'red', 'violet', 'teal', 'orange', 'pink', 'cyan', 'gray'].map((c) => ({ label: c[0].toUpperCase() + c.slice(1), value: c }))
+const hm = (t) => (t ? String(t).padStart(8, '0').slice(0, 5) : '06:00')
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const SCHEMES = [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }, { label: 'System', value: 'system' }]
 const ACCESS = [{ label: 'Can view', value: 'Read' }, { label: 'Can edit', value: 'Write' }]
@@ -307,29 +413,38 @@ const spaceOpen = ref(false)
 const newSpace = reactive({ name: '', owner: null })
 const memberSpace = ref('')
 
+// The menu (UX fixes, set 6): Me; Your life (in the space picked here); Assistant; People and agents; Data.
 const groups = computed(() => [
-  { key: 'me', label: 'Me', items: [{ value: 'appearance', label: 'Appearance' }, { value: 'default', label: 'Default space' }, { value: 'review', label: 'Weekly review' }] },
-  { key: 'space', label: 'This space', items: [{ value: 'areas', label: 'Areas' }, { value: 'tags', label: 'Tags' }, { value: 'habits', label: 'Habits' },
-    { value: 'dimensions', label: 'Check-in dimensions' }, { value: 'connections', label: 'Connections' }, { value: 'archive', label: 'Archive rules' }, { value: 'reset', label: 'Reset rules' }, { value: 'archived', label: 'Archived' }] },
-  ...(d.value?.is_admin ? [{ key: 'admin', label: 'Admin', items: [{ value: 'members', label: 'Spaces and members' }, { value: 'agents', label: 'Agents' }, { value: 'ai', label: 'AI' }] }] : []),
+  { key: 'me', label: 'Me', items: [{ value: 'profile', label: 'Profile' }, { value: 'appearance', label: 'Appearance' }, { value: 'notifications', label: 'Notifications' },
+    { value: 'shortcuts', label: 'Shortcuts' }] },
+  { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas' }, { value: 'rhythms', label: 'Rhythms' }, { value: 'habits', label: 'Habits' },
+    { value: 'dimensions', label: 'Check-ins' }, { value: 'reset', label: 'Reset rules' }, { value: 'tags', label: 'Tags' }] },
+  { key: 'assistant', label: 'Assistant', items: [...(d.value?.is_admin ? [{ value: 'agents', label: 'Assistants' }] : []), { value: 'connections', label: 'Connections' },
+    ...(d.value?.is_admin ? [{ value: 'ai', label: 'Ask and AI' }] : []), { value: 'sensitive', label: 'Sensitive items' }, { value: 'note-rules', label: 'Note rules' }] },
+  ...(d.value?.is_admin ? [{ key: 'people', label: 'People and agents', items: [{ value: 'spaces', label: 'Spaces' }, { value: 'members', label: 'Members' }] }] : []),
+  { key: 'data', label: 'Data', items: [{ value: 'archive', label: 'Archive and trash' }, { value: 'import', label: 'Import and export' },
+    ...(d.value?.is_admin ? [{ value: 'backups', label: 'Backups' }] : [])] },
 ])
+// sections from before set 6, by their new names
+const MOVED = { default: 'profile', review: 'rhythms', archived: 'archive' }
 const sections = computed(() => groups.value.flatMap((g) => g.items))
 // the open section is tab= in the URL. On a wide screen the first section is the default; on a phone the menu is.
-const ADMIN_ONLY = ['members', 'agents']
+const ADMIN_ONLY = ['members', 'spaces', 'agents', 'ai', 'backups']
 const section = computed(() => {
-  const v = route.query.tab ? String(route.query.tab) : ''
+  const asked = route.query.tab ? String(route.query.tab) : ''
+  const v = MOVED[asked] || asked
   // an Admin section asked for before the settings have loaded is kept; once loaded, only a Life Admin has it
   if (sections.value.some((s) => s.value === v) || (!d.value && ADMIN_ONLY.includes(v))) return v
-  return phone.value ? '' : 'appearance'
+  return phone.value ? '' : 'profile'
 })
 function open(v) {
   if (v === section.value) return
-  router.push({ query: { ...route.query, tab: v && (phone.value || v !== 'appearance') ? v : undefined } })
+  router.push({ query: { ...route.query, tab: v && (phone.value || v !== 'profile') ? v : undefined } })
 }
 // "This space": its own space picker, which does not change the space of the sidebar (space= in the URL)
 const spaceSel = computed(() => (route.query.space ? String(route.query.space) : store.space))
 const pickSpace = (v) => router.replace({ query: { ...route.query, space: v === store.space ? undefined : v } })
-const spaceGroup = ['areas', 'tags', 'habits', 'dimensions', 'connections', 'archive', 'archived']
+const spaceGroup = ['areas', 'tags', 'habits', 'dimensions', 'connections', 'note-rules', 'import']
 const heading = computed(() => {
   const label = sections.value.find((s) => s.value === section.value)?.label || ''
   return spaceGroup.includes(section.value) ? `${label} in ${spaceSel.value}` : label
@@ -346,6 +461,18 @@ const kidsOf = (r) => active(LISTS[0]).filter((x) => x.parent_area === r.name)
 const parentOptions = computed(() => [{ label: 'Top level', value: '' }, ...active(LISTS[0]).filter((x) => !x.parent_area).map((a) => ({ label: 'Inside ' + a.title, value: a.name }))])
 const mSpace = computed(() => d.value?.spaces.find((s) => s.name === memberSpace.value))
 
+// Note rules: the rules page of the assistant's notes in this space
+const rulesDoc = ref(null)
+watch(() => [section.value, d.value?.rules_note], async ([sec, name]) => {
+  if (sec === 'note-rules' && name && rulesDoc.value?.name !== name) rulesDoc.value = await tryCall(() => api('library.get', { note: name }))
+}, { immediate: true })
+// an area's dot and its pin in the sidebar
+async function saveArea(a, values) {
+  const before = { colour: a.colour, is_pinned: a.is_pinned }
+  Object.assign(a, values)
+  if (await tryCall(() => api('settings.save_item', { kind: 'area', name: a.name, ...values }), 'Saved')) changed()
+  else Object.assign(a, before)
+}
 async function load() {
   const res = await tryCall(() => api('settings.get', { space: spaceSel.value }))
   if (!res) return
@@ -382,7 +509,7 @@ async function setOne(field, value) {
   errors[field] = ''
   d.value.settings[field] = value
   let v = value
-  if (field === 'weekly_review_time' && v && v.length === 5) v += ':00'
+  if (['weekly_review_time', 'start_of_day'].includes(field) && v && v.length === 5) v += ':00'
   try {
     await api('settings.save', { values: { [field]: v } })
     toast.success('Saved')

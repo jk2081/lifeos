@@ -8,6 +8,10 @@
   "weekly_review_day",
   "weekly_review_time",
   "score_target",
+  "start_of_day",
+  "week_starts_on",
+  "month_plan_enabled",
+  "cycle_break_week",
   "archive_after_days",
   "stale_task_days",
   "stuck_after_days",
@@ -47,6 +51,35 @@
    "fieldtype": "Int",
    "label": "Score Target",
    "default": "85"
+  },
+  {
+   "fieldname": "start_of_day",
+   "fieldtype": "Time",
+   "label": "Start of day",
+   "default": "06:00:00",
+   "description": "When Today begins and the morning insights are ready."
+  },
+  {
+   "fieldname": "week_starts_on",
+   "fieldtype": "Select",
+   "label": "Week starts on",
+   "options": "Monday\nSunday",
+   "default": "Monday",
+   "description": "Used for the week calendar."
+  },
+  {
+   "default": "1",
+   "fieldname": "month_plan_enabled",
+   "fieldtype": "Check",
+   "label": "Month plan",
+   "description": "Plan each month; Today reminds you in its first three days."
+  },
+  {
+   "default": "1",
+   "fieldname": "cycle_break_week",
+   "fieldtype": "Check",
+   "label": "Break week",
+   "description": "A week between 12 Week cycles for review and planning."
   },
   {
    "fieldname": "archive_after_days",
@@ -127,7 +160,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-17 18:56:16.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Settings",

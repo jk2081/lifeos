@@ -1,5 +1,6 @@
 <template>
   <div class="flex flex-col gap-4" data-connections>
+    <template v-if="!importOnly">
     <p class="text-sm text-ink-gray-6">Each outside system an agent brings things in from: where its items are filed and what the agent does with them.
       No passwords or keys are kept here; the agents hold their own access.</p>
     <Card flush>
@@ -18,12 +19,13 @@
       </div>
       <Empty v-if="loaded && !rows.length" title="No connections yet." hint="A connection appears when an agent first brings something in with a source_system, or when you import a chat export below." />
     </Card>
+    </template>
 
-    <section data-chat-import>
+    <section v-if="importOnly" data-chat-import>
       <SectionHead>Import chat history</SectionHead>
       <Card class="flex flex-col gap-3">
-        <p class="text-sm text-ink-gray-6">Upload a data export from Claude or ChatGPT (a .zip, up to 1 GB). Each chat becomes an AI chat in Sources, with its transcript;
-          a chat imported before is updated, not repeated. Summaries are left for the agent. Area and goal come from the connection above.</p>
+        <p class="text-sm text-ink-gray-6">Upload a data export from Claude or ChatGPT (a .zip, up to 1 GB). Each chat becomes an AI chat in Library, Captures, with its transcript;
+          a chat imported before is updated, not repeated. Summaries are left for the agent. Area and goal come from the connection in Assistant, Connections.</p>
         <div v-for="k in KINDS" :key="k.system" class="flex flex-wrap items-center gap-2" :data-import="k.system">
           <FileUploader v-if="writable" file-types=".zip,application/zip" :private="true" @success="(f) => start(k.system, f)" @failure="(e) => toast.error(errorText(e))">
             <template #default="{ openFileSelector, uploading, progress: p }">
@@ -51,7 +53,8 @@ import { api, errorText, tryCall } from '@/lib/api'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { dateTime } from '@/lib/dates'
 
-const props = defineProps({ space: String, writable: Boolean })
+// importOnly: Settings > Data > Import and export shows the chat import alone (UX fixes, set 6)
+const props = defineProps({ space: String, writable: Boolean, importOnly: Boolean })
 const INTENTS = [{ label: 'Process', value: 'Process' }, { label: 'Add to wiki', value: 'Add to wiki' }, { label: 'Just keep', value: 'Just keep' }]
 const KINDS = [{ system: 'claude', label: 'Claude' }, { system: 'chatgpt', label: 'ChatGPT' }]
 const rows = ref([])

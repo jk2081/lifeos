@@ -398,3 +398,13 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **`is_sensitive` is on notes, inbox items, chats and journal pages.** It sets the index's `vault_locked`, so every rule that hid Vault rows hides sensitive ones: the permission hooks, agents' list queries, search, the timeline, the graph, the link picker, files attached to a sensitive item, and Ask (its index queries, and `get_record`, which now refuses a sensitive record when Ask may not read sensitive items). An agent cannot claim a sensitive inbox item while its switch is off.
 - **Marking** is a button in each pane's header (a lock while on). Anyone with write access marks; only the space's owner (or Administrator) unmarks, checked on save so no path around it exists. Agents can do neither: an agent cannot change who sees what.
 - **The two switches are renamed** "Agents may open sensitive items" and "Ask may read sensitive items"; their fields keep their names (`agents_can_read_vault`, `ask_can_read_vault`).
+
+### 6. Settings
+
+- **The menu** is Me (Profile, Appearance, Notifications, Shortcuts), Your life in the space picked there (Areas, Rhythms, Habits, Check-ins, Reset rules, Tags), Assistant (Assistants, Connections, Ask and AI, Sensitive items, Note rules), People and agents (Spaces, Members) and Data (Archive and trash, Import and export, Backups). Links to the old sections (`tab=default`, `review`, `archived`) open their new homes.
+- **Profile** shows the name and email from the Frappe user, read-only, with the default space. Changing a name or password stays in Frappe: Life OS has no screen for the user record.
+- **Notifications** states what exists: the reminder line on Today. Life OS sends no email or push, so there is nothing to switch.
+- **Rhythms** are four new Life Settings fields (start of day, week starts on, month plan on or off, break week) beside the moved review day and time and score target, which keep their values. A patch gives the new fields their defaults on an existing site. "Week starts on" sets the first day of the week and month calendars; week scores and "this week" lists keep the 12 Week Year's Monday weeks, since a cycle's weeks are fixed. The current cycle shows read-only.
+- **Areas** keep their list and order; under it, "In the sidebar" sets each area's colour and its pin.
+- **Backups** reads only backup keys from the site configuration, whether Frappe's S3 backups are on, and the names and sizes of the latest backup files; it says "Not set up on this site" when no schedule is configured.
+- **Import and export** is the chat import, moved out of Connections. Export is Frappe's own backup; Life OS has no export of its own.
