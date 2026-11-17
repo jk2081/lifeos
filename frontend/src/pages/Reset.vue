@@ -97,7 +97,7 @@ async function loadAI() {
   try { aiAsked.value = true; await load(true) } catch (e) { toast.error(errorText(e)) } finally { aiLoading.value = false }
 }
 function askApply(b) {
-  if (b.action === 'review_someday') return router.push(b.review)
+  if (b.action.startsWith('review_')) return router.push(b.review) // review_someday, review_inbox_decisions (set 7)
   dialog.confirm({
     title: `${b.action_label}?`,
     message: `This changes exactly the ${b.count} item${b.count === 1 ? '' : 's'} listed in “${b.title}”. You can undo it from the message that follows, for one minute.`,

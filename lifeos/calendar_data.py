@@ -53,8 +53,24 @@ def important_dates_between(space, start, end):
 
 def task_dues_between(space, start, end):
 	rows = frappe.get_all("Life Task", filters={"space": space, "is_archived": 0, "status": ("in", ["Open", "Doing", "Waiting"]),
-		"due_date": ("between", [start, end])}, fields=["name", "title", "due_date", "priority"], limit=1000)
-	return [{"source": "task", "name": r.name, "title": r.title, "date": str(r.due_date), "priority": r.priority, "all_day": 1} for r in rows]
+		"due_date": ("between", [start, end])}, fields=["name", "title", "due_date", "priority", "scheduled_at"], limit=1000)
+	# a task planned at a time on its due day shows once, at its time (task_slots_between)
+	return [{"source": "task", "name": r.name, "title": r.title, "date": str(r.due_date), "priority": r.priority, "all_day": 1} for r in rows
+		if not (r.scheduled_at and str(r.scheduled_at)[:10] == str(r.due_date))]
+
+
+def task_slots_between(space, start, end):
+	"""Open tasks planned at a time (set 7): on the calendar at that time, for their length."""
+	rows = frappe.get_all("Life Task", filters={"space": space, "is_archived": 0, "status": ("in", ["Open", "Doing", "Waiting"]),
+		"scheduled_at": ("between", [get_datetime(start), get_datetime(add_days(end, 1))])},
+		fields=["name", "title", "scheduled_at", "duration_min", "priority", "status"], limit=1000)
+	out = []
+	for r in rows:
+		s = get_datetime(r.scheduled_at)
+		e = s + timedelta(minutes=r.duration_min or 60)
+		out.append({"source": "task", "name": r.name, "title": r.title, "date": str(s.date()), "start": str(s)[:19], "end": str(e)[:19],
+			"end_date": str(e.date()), "all_day": 0, "scheduled": 1, "priority": r.priority, "status": r.status})
+	return out
 
 
 def vault_expiries_between(space, start, end):

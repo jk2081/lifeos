@@ -4,37 +4,54 @@
     <Button icon="lucide-chevron-right" label="Next week" @click="step(7)" />
   </Teleport>
   <div v-if="d" class="page-body">
-    <!-- the weekly review starts with a short Reset (UX fixes, set 5); skipping it is remembered for the week -->
-    <Card v-if="reset && !resetDone" class="flex flex-col gap-3" data-review-reset>
-      <div class="flex flex-wrap items-baseline justify-between gap-2">
-        <div class="text-lg-semibold text-ink-gray-9">Step 1 · A short Reset</div>
-        <div class="text-sm text-ink-gray-6">Clear what is stuck before you plan the week.</div>
+    <!-- set 7: the review is four steps on one page: score and results, Reset, goal work for the coming week, then the look back -->
+    <section class="flex flex-col gap-3" data-review-step="results">
+      <h2 class="text-lg-semibold text-ink-gray-9">1 · Score and results</h2>
+      <div class="stats">
+        <Stat :label="d.cycle ? `Week ${d.cycle.week} score` : '12 Week Year'" :value="d.cycle ? Math.round(d.cycle.percent) + '%' : '—'" data-review-score>
+          <template #sub><span>{{ d.cycle ? `Target ${target}% · ${d.cycle.done} of ${d.cycle.planned} ticks` : 'No cycle in this week' }}</span></template>
+        </Stat>
+        <Stat label="Tasks done"><NumLink :to="door('Done')" data-door="review-done">{{ d.done_total ?? d.done.length }}</NumLink>
+          <template #sub><NumLink class="max-md:hidden" :to="door('Carried')" data-door="review-carried"><span>{{ d.carried_total ?? d.carried.length }}</span> carried forward</NumLink></template>
+        </Stat>
+        <Stat label="Open loops"><NumLink :to="{ path: '/plan/tasks', query: { status: 'loops' } }" data-door="review-loops">{{ d.open_loops_total }}</NumLink>
+          <template #sub><span class="max-md:hidden">Older than 14 days, no date</span></template>
+        </Stat>
       </div>
-      <div class="flex flex-wrap gap-x-6 gap-y-1 text-base text-ink-gray-8">
-        <span :class="reset.over_limit ? 'text-ink-amber-9' : ''"><CountLink :count="reset.stuck" :tone="reset.over_limit ? 'text-ink-amber-9 font-semibold' : undefined" count-key="review:stuck" /> tasks stuck<template v-if="reset.over_limit">, above your limit of {{ reset.rules.stuck_limit }}</template></span>
-        <span><CountLink :count="reset.someday_due" count-key="review:someday" /> Someday items due for review</span>
+      <KeyResults v-if="kr && current" :k="kr" @changed="loadKeyResults" />
+    </section>
+    <!-- step 2: the short Reset (set 5); done or skipped, it folds to one line for the week -->
+    <section data-review-step="reset">
+      <Card v-if="reset && !resetDone" class="flex flex-col gap-3" data-review-reset>
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <div class="text-lg-semibold text-ink-gray-9">2 · Reset</div>
+          <div class="text-sm text-ink-gray-6">Clear what is stuck before you plan the week.</div>
+        </div>
+        <div class="flex flex-wrap gap-x-6 gap-y-1 text-base text-ink-gray-8">
+          <span :class="reset.over_limit ? 'text-ink-amber-9' : ''"><CountLink :count="reset.stuck" :tone="reset.over_limit ? 'text-ink-amber-9 font-semibold' : undefined" count-key="review:stuck" /> tasks stuck<template v-if="reset.over_limit">, above your limit of {{ reset.rules.stuck_limit }}</template></span>
+          <span><CountLink :count="reset.someday_due" count-key="review:someday" /> Someday items due for review</span>
+        </div>
+        <ul v-if="reset.batches.length" class="flex flex-col gap-1 text-base text-ink-gray-8">
+          <li v-for="b in reset.batches" :key="b.key">· {{ b.count }} {{ b.title.charAt(0).toLowerCase() + b.title.slice(1) }}</li>
+        </ul>
+        <div class="flex flex-wrap gap-2">
+          <Button variant="solid" label="Open Reset" route="/plan/reset" data-review-reset-open />
+          <Button label="Done, go on to the review" data-review-reset-done @click="finishReset" />
+          <Button variant="ghost" label="Skip for this week" data-review-reset-skip @click="finishReset" />
+        </div>
+      </Card>
+      <div v-else class="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 class="text-lg-semibold text-ink-gray-9">2 · Reset</h2>
+        <span class="text-sm text-ink-gray-6">{{ resetDone ? 'Done for this week.' : 'Nothing to reset.' }}</span>
+        <Button size="sm" variant="ghost" label="Open Reset" route="/plan/reset" />
       </div>
-      <ul v-if="reset.batches.length" class="flex flex-col gap-1 text-base text-ink-gray-8">
-        <li v-for="b in reset.batches" :key="b.key">· {{ b.count }} {{ b.title.charAt(0).toLowerCase() + b.title.slice(1) }}</li>
-      </ul>
-      <div class="flex flex-wrap gap-2">
-        <Button variant="solid" label="Open Reset" route="/plan/reset" data-review-reset-open />
-        <Button label="Done, go on to the review" data-review-reset-done @click="finishReset" />
-        <Button variant="ghost" label="Skip for this week" data-review-reset-skip @click="finishReset" />
-      </div>
-    </Card>
-    <div v-if="!reset || resetDone" class="stats">
-      <Stat :label="d.cycle ? `Week ${d.cycle.week} score` : '12 Week Year'" :value="d.cycle ? Math.round(d.cycle.percent) + '%' : '—'">
-        <template #sub><span class="max-md:hidden">{{ d.cycle ? `${d.cycle.done} of ${d.cycle.planned} ticks · ${d.cycle.title}` : 'No cycle in this week' }}</span></template>
-      </Stat>
-      <Stat label="Tasks done"><NumLink :to="door('Done')" data-door="review-done">{{ d.done_total ?? d.done.length }}</NumLink>
-        <template #sub><NumLink class="max-md:hidden" :to="door('Carried')" data-door="review-carried"><span>{{ d.carried_total ?? d.carried.length }}</span> carried forward</NumLink></template>
-      </Stat>
-      <Stat label="Open loops"><NumLink :to="{ path: '/plan/tasks', query: { status: 'loops' } }" data-door="review-loops">{{ d.open_loops_total }}</NumLink>
-        <template #sub><span class="max-md:hidden">Older than 14 days, no date</span></template>
-      </Stat>
-    </div>
-    <div v-if="!reset || resetDone" class="cols">
+    </section>
+    <section v-if="current && canWrite()" class="flex flex-col gap-3" data-review-step="goals">
+      <h2 class="text-lg-semibold text-ink-gray-9">3 · Goal work for the coming week</h2>
+      <GoalWork />
+    </section>
+    <h2 class="text-lg-semibold text-ink-gray-9" data-review-step="look-back">{{ current && canWrite() ? '4' : '3' }} · Look back</h2>
+    <div class="cols">
       <div class="half">
         <section><SectionHead>Habits this week</SectionHead>
           <Card flush><Row v-for="h in d.habits" :key="h.habit" class="!items-center !gap-3.5">
@@ -93,7 +110,7 @@
   </div>
 </template>
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Button, Progress, Textarea } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
 import TaskRow from '@/components/TaskRow.vue'
@@ -103,6 +120,8 @@ import CountLink from '@/components/ui/CountLink.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Stat from '@/components/ui/Stat.vue'
+import KeyResults from '@/components/review/KeyResults.vue'
+import GoalWork from '@/components/review/GoalWork.vue'
 import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { addDays, long, short, startOfWeek } from '@/lib/dates'
@@ -122,6 +141,14 @@ async function loadReset() {
   try { reset.value = await api('reset.short', { space: store.space }) } catch (e) { reset.value = null }
 }
 const weekStart = ref(startOfWeek(store.today))
+// steps 1 and 3 are about now: the readings and goals as they are, and the coming week; they show on the current week only
+const current = computed(() => weekStart.value === startOfWeek(store.today))
+const kr = ref(null)
+const target = ref(85)
+async function loadKeyResults() {
+  if (store.isAgent) return
+  kr.value = await tryCall(() => api('week.key_results', { space: store.space, area: store.lensArea || undefined }))
+}
 const d = ref(null)
 const note = ref('')
 const state = ref('')
@@ -134,6 +161,7 @@ async function load() {
   const res = await tryCall(() => api('journal.weekly_review', { space: store.space, week_start: weekStart.value }))
   if (!res) return
   d.value = res
+  target.value = res.target || 85
   note.value = res.note.content_md
   state.value = ''
   emit('sub', `Week of ${long(res.week_start)} to ${long(res.week_end, true)}`)
@@ -164,6 +192,6 @@ async function done(t) {
 async function undo(a) {
   if (await tryCall(() => api('archive.restore', { doctype: a.doctype, name: a.name }), 'Restored.')) load()
 }
-onRecordChanged(load)
-onMounted(() => { load(); loadReset() })
+onRecordChanged(() => { load(); loadKeyResults() })
+onMounted(() => { load(); loadReset(); loadKeyResults() })
 </script>

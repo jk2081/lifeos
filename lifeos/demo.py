@@ -202,7 +202,29 @@ def load(space="Private"):
 		fake.process_one(devtools.LocalClient(), log=lambda *a: None)
 	frappe.set_user("Administrator")  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	t.save()
+	load_set7(space)
 	return f"Demo data loaded into {space}: {len(t.records)} records."
+
+
+def load_set7(space="Private"):
+	"""Set 7: a number goal with confirmed readings and one suggested by an agent, served by the open-ended Ghillidary goal."""
+	t = seed.Tracker(seed.DEMO_KEY)
+	if frappe.db.exists("Life Goal", {"space": space, "title": "Ghillidary yield to 1,800 kg/ha"}):
+		return "Already loaded."
+	area = frappe.db.get_value("Life Area", {"space": space, "area_name": "Tea & Coffee"})
+	g = t.insert({"doctype": "Life Goal", "space": space, "title": "Ghillidary yield to 1,800 kg/ha", "goal_type": "Annual", "area": area,
+		"target_date": f"{getdate(today()).year + 1}-12-31", "measure_kind": "Number", "measure": "Ghillidary yield", "unit": "kg/ha",
+		"start_value": 1200, "target_value": 1800, "notes_md": "Made tea per hectare, a rolling twelve months."})
+	for weeks, value in ((9, 1250), (5, 1320), (2, 1410)):
+		t.insert({"doctype": "Life Goal Reading", "space": space, "goal": g.name, "date": add_days(today(), -7 * weeks), "value": value,
+			"status": "Confirmed", "suggested_by": "Owner"})
+	t.insert({"doctype": "Life Goal Reading", "space": space, "goal": g.name, "date": add_days(today(), -1), "value": 1460, "status": "Suggested",
+		"suggested_by": "Agent", "excerpt": "Ghillidary yield for the last twelve months is now 1,460 kg/ha."})
+	turnaround = frappe.db.get_value("Life Goal", {"space": space, "title": "Ghillidary turnaround"})
+	if turnaround:
+		frappe.db.set_value("Life Goal", turnaround, "serves", g.name)
+	t.save()
+	return "Set 7 demo data loaded."
 
 
 def remove():

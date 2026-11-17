@@ -13,7 +13,7 @@ from lifeos.api.utils import order_by as sort_order
 
 OPEN = ("Open", "Doing", "Waiting")
 FIELDS = ["name", "title", "status", "priority", "due_date", "area", "goal", "inbox_item", "carried_from", "waiting_on",
-	"month_plan", "creation", "completed_on", "source_url", "is_archived", "notes_md", "last_touched_on", "owner"]
+	"month_plan", "creation", "completed_on", "source_url", "is_archived", "notes_md", "last_touched_on", "owner", "scheduled_at", "duration_min"]
 PRIORITY_ORDER = "case t.priority when 'I' then 1 when 'II' then 2 when 'III' then 3 when 'IV' then 4 else 5 end"
 OPEN_LOOP_DAYS = 14
 
@@ -239,7 +239,7 @@ def update(task: str, values: str | dict):
 	"""Change fields of a task. Only task fields a person edits are accepted."""
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	values = frappe.parse_json(values) or {}
-	allowed = {"title", "status", "priority", "due_date", "goal", "notes_md", "waiting_on", "area", "source_url", "month_plan"}
+	allowed = {"title", "status", "priority", "due_date", "goal", "notes_md", "waiting_on", "area", "source_url", "month_plan", "scheduled_at", "duration_min"}
 	if values.get("project") and not values.get("goal"):  # for one set: a project names the goal it became
 		values["goal"] = goal_for_project(values["project"], doc.space) or values["project"]
 	values.pop("project", None)

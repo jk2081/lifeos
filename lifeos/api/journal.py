@@ -537,6 +537,7 @@ def weekly_review(space: str | None = None, week_start: str | None = None):
 		"latest_checkin": _checkin_dict(frappe.get_doc("Life Check-in", latest[0])) if latest else None,
 		"note": {"title": title, "name": note.name if note else None, "content_md": note.content_md if note else ""},
 		"stale_days": frappe.db.get_single_value("Life Settings", "stale_task_days") or 90,
+		"target": frappe.db.get_single_value("Life Settings", "score_target") or 85,
 	}
 
 

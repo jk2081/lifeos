@@ -113,6 +113,12 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `HabitBoxes.vue`, the 12 Week Year grid, habit month boxes, the year calendar | Purpose-built journal grids | `Button`-sized cells; `bg-surface-gray-9 text-ink-base` done, `bg-surface-gray-2` missed, `border-outline-gray-4` current, `text-ink-gray-4` future |
 | `LineChart.vue`, the graph | Small SVG chart; Cytoscape canvas | token variables, `tokenColor()` |
 | `SearchPalette.vue`, `QuickAdd.vue`, `Backlinks.vue` | App features | `CommandPalette` family, `Dialog`, `TextInput`, `Row` |
+| `goals/DoneWhen.vue` (set 7) | "Done when…": a finish line or a number, Suggest, and the habit check, in every place a goal's measure is set | `TabButtons`, `FormControl`, `Button`, `Alert` |
+| `goals/NewGoalDialog.vue` | New goal with its measure (Plan > Goals and the New menu) | `Dialog`, `FormControl`, `DatePicker`, `DoneWhen` |
+| `goals/GoalMeasure.vue`, `goals/ResultBar.vue`, `goals/ReadingChart.vue`, `goals/SuggestedReadings.vue` | A goal's key result on its page and pane: the result bar, the chart of confirmed readings, readings to confirm, a reading by hand, Mark achieved | `Progress`, `Badge`, `Alert`, `FormControl`, `DatePicker`, `Row`; the chart is SVG with token variables |
+| `outbox/InOutChart.vue`, `pages/Outbox.vue` | Library > Outbox: four piles, All out and Came in as state tabs, the period switch, the 8-week chart, Bring back | `ListView`, `TabButtons`, `Badge`, `Button`; SVG bars with token variables |
+| `review/KeyResults.vue`, `review/GoalWork.vue` | The weekly review's step 1 (readings to confirm, finish lines, "Where is X now?") and step 3 (goal cards) | `Card`, `Row`, `FormControl`, `DateTimePicker`, `Skeleton`, `SuggestedReadings`, `DoneWhen` |
+| `inbox/OldItems.vue` | The Inbox's banner of old items and its batch screen of suggested decisions | `Alert`, `Dialog`, `Checkbox`, `Select` |
 
 ## How a list screen is written
 
@@ -279,3 +285,28 @@ A place's tabs are paths (`/plan/goals`, `/library/notes`). The place page (`pag
 ### Today's rhythm banner
 
 At most one line above the Open band (`data-rhythm-banner`), from `today.get`'s `banner`, with its action and Skip (`today.skip_banner`).
+
+## Set 7: Moving forward
+
+### Key results
+
+- **One editor for a goal's measure**: `goals/DoneWhen.vue`, bound to a reactive object from `lib/goals.js` (`emptyMeasure`, `measureProblem`, `measureArgs`). New goal, the 12 Weeks Add goal, the goal page and pane ("Change how it is measured") and the weekly review's "Needs a finish line" all use it, so the rule and its messages are the same everywhere. A title or finish line that reads as a frequency shows "This looks like a habit" (`data-habit-hint`) with Make it a habit (`goals.make_habit`).
+- **A number goal's result** is `goals/ResultBar.vue` from the `progress` object every goal method returns (`readings.summary`: kind, percent, label, start, current, target, unit, current_on). No reading yet is `current_on` empty: Frappe stores floats as never null.
+- **Readings waiting** are `goals/SuggestedReadings.vue` (Confirm, Edit and confirm, Reject; `data-reading`), on the goal and in the weekly review.
+
+### The Outbox
+
+- `pages/Outbox.vue` is a `ListView` over `outbox.list` with state tabs on `pile=` (Done, Delegated, Parked, Discarded, all, in) and the period on `period=` (week, month, 12weeks) as `TabButtons` in the bar. Its rows open the record's pane while the record exists; Bring back (`data-outbox-bring-back`) is the only action.
+- Today's line under the Open band (`data-inout`) is two `CountLink`s from `counts.outbox`, opening the Outbox on `pile=in` and `pile=all`.
+
+### The weekly review
+
+`components/journal/WeeklyReview.vue` is four steps on one page, each a `section[data-review-step]`: `results` (the score with its target, then `KeyResults`), `reset` (the Reset card; done or skipped it folds to one line), `goals` (`GoalWork`, current week only, people only) and `look-back`. Goal cards (`data-goal-card`) carry `data-card-state` (open, added, skipped); the footer (`data-goal-work-footer`) carries the planned and free minutes.
+
+### Scheduled tasks
+
+A task with `scheduled_at` shows at its time in Today's Next (why "Scheduled") and on the rail's timeline (`data-rail-task`), and on the calendar as a timed item for `duration_min`.
+
+### Inbox items left too long
+
+The Inbox's `#above` slot starts with `inbox/OldItems.vue`: an amber `Alert` (`data-old-items-banner`) and a `Dialog` batch (`data-old-item`, Confirm selected with an Undo toast). `?decisions=1` opens the batch; Reset's batch with action `review_inbox_decisions` routes there. What the rule parked or discarded on its own is one line on Today (`data-auto-inbox`) with Undo for seven days; it is separate from the rhythm banner, which stays one line.

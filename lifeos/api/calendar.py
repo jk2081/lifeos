@@ -41,7 +41,8 @@ def get(space: str | None = None, from_date: str | None = None, to_date: str | N
 	if (end - start).days > MAX_RANGE_DAYS:
 		end = add_days(start, MAX_RANGE_DAYS)
 	items = (data.events_between(space, start, end) + data.important_dates_between(space, start, end)
-		+ lens_items(space, area, data.task_dues_between(space, start, end) + data.vault_expiries_between(space, start, end)))
+		+ lens_items(space, area, data.task_dues_between(space, start, end) + data.task_slots_between(space, start, end)
+		+ data.vault_expiries_between(space, start, end)))
 	items.sort(key=lambda i: (i["date"], 0 if i.get("all_day") else 1, i.get("start") or "", i["title"]))
 	return {"space": space, "from_date": str(start), "to_date": str(end), "today": today(), "items": items,
 		"cycles": data.cycles_between(space, start, end), "google": google_status()}

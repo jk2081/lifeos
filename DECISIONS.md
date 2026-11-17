@@ -461,3 +461,26 @@ Fixed: sensitive items reached agents through paths that did not use the Vault r
 - **The backfill** (`lifeos.patches.v8.outbox_backfill`, last 12 weeks) uses `completed_on`, `someday_on`, a goal's `closed_on`, an item's `finished_on` and the trash's deletion time. Not reconstructable: when a task became Waiting or Dropped, and when an idea was brought back; those exits are dated by the record's last change and say so in their note. Deletions older than the trash's 30 days, and captures parked before step 4, cannot be recovered. Records already reopened leave no exit.
 - **Indexes**: `(space, creation, area)` on tasks, goals, inbox items and ideas, and two on Life Exit, keep Today's in-and-out line within the load target (Today under the lens went to 525 ms without them).
 - **The acceptance site's demo data** now keeps a read-only Life Project beside each open-ended goal that stands for a project, as the set 6 migration leaves them. A site built from scratch has no projects, and the acceptance checks of old project links need them.
+
+### 3. Working hours and the weekly review
+
+- **The review is one page of four steps**, not a wizard: 1 Score and results, 2 Reset, 3 Goal work for the coming week, 4 Look back, each a section. Reset folds to one line once done or skipped for the week, as before. Steps 1 and 3 show on the current week only, since they are about readings and goals as they are now and the week ahead; older weeks show their score and look back. Step 3 is for people with write access.
+- **"The coming week" is the next seven days from now**, not the calendar week after the reviewed one, so a review held on a Tuesday plans the rest of the week and a task added for today shows on Today at once. Slots start on the half hour, inside the working days and hours, and never overlap a timed event or another task with a time; the cards of one review do not overlap each other either. Without a free slot a card offers "No set time".
+- **Next action**: the goal's oldest open task (Open or Doing, with no time yet); otherwise the assistant's suggestion (one call for all cards, short model, within the cap, only where Ask is switched on for the space). Without a key the box is empty and the length is 60 minutes.
+- **The footer** counts goal work already given a time in the next seven days, plus what is added on the page, against the free working time: working hours less timed events and less tasks with a time that are not goal work.
+- **Who**: Me, a person of the space (Life Person, not the one marked Self), or "Someone else…" typed. Anyone but the owner makes the task Waiting on them, which the Outbox records as Delegated.
+- **Working hours** are three settings (`work_days`, `work_start`, `work_end`) under Your life > Rhythms, default Monday to Saturday, 09:00 to 19:00. The days are saved in week order.
+- **Scheduled tasks** show in Today's Today group with why "Scheduled" and their time, on the rail's timeline (opening the task), and on the calendar as timed items for their length. A task due and scheduled on the same day shows once, at its time. `scheduled_at` and `duration_min` can also be set through `tasks.update`.
+
+### 4. Inbox items left too long
+
+- **Which items**: To Review items, and New items no agent has claimed, received more than N days ago. Items being processed (claimed) and Failed items are never touched; the brief's "Waiting for the agent" is read as claimed and being processed.
+- **Accept** accepts the pending proposals as they are; an item with none leaves the Inbox as kept (Done). **Park** makes an idea in Someday from the item (its title, its summary or the start of its text, citing it), rejects its pending proposals, and marks it Done; the Outbox records it as Parked. **Discard** moves it to the trash (30 days). The rules without a key: tasks or dates → Accept; notes only → Park; nothing extracted → Discard; other records → Accept.
+- **The batch screen is a dialog on the Inbox** (`?decisions=1`), opened from the banner and from Reset's batch. Confirm selected acts on exactly the ticked items and toasts Undo for a minute. Suggestions are made once per item and kept until it is dealt with.
+- **Park and Discard modes** act each night at 05:30 as the scheduler. What they did shows as its own line on Today, not the rhythm banner, so a due weekly review and an automatic clean-up can both show; Undo there brings back everything the rule parked or discarded in the last seven days. Exits written by the rule carry `auto_rule` = old_inbox, which is how that line finds them.
+- **Changing the mode** brings its default days (7 for Suggest, 14 for Park and Discard) unless the days were changed by hand.
+
+### Process
+
+- **Steps 3 and 4 were committed together.** They change the same files (Life Settings, Today, Settings, the acceptance script), so one commit holds both; steps 1 and 2 have their own.
+- **The acceptance site is now built from scratch.** Its old snapshot was dropped to take set 7's schema, and a fresh site showed two gaps that only the set 6 migration had filled on older sites: no former projects (now kept beside the demo's open-ended goals) and no pinned areas (the seed and a new install now apply the set 6 lens defaults). Life Exit is listed in `ignore_links_on_delete`, so an exit naming an area never stops the area being deleted.

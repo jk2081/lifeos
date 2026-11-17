@@ -127,6 +127,10 @@ def load(space="Private", key=SEED_KEY):
 		return "Seed is already loaded. Run lifeos.seed.remove first to reload it."
 	ensure_structure()
 	areas = make_areas(space, SHARED_AREAS if space == "Shared" else PRIVATE_AREAS)
+	# the lens's defaults (set 6): a colour for every area and the top-level areas pinned, as the migration gives older sites
+	from lifeos.patches.v7 import lens_areas
+
+	lens_areas.execute()
 	t = Tracker(key)
 
 	habits = []

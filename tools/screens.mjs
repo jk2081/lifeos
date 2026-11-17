@@ -102,6 +102,7 @@ for (const scheme of schemes) {
     const review = await first('Life Inbox Item', { space: 'Private', status: 'To Review' })
     const wikiPage = await first('Life Note', { space: 'Private', collection: 'Wiki', is_rules: 0 }).catch(() => null)
     const wikiChange = await first('Life Wiki Change').catch(() => null)
+    const numberGoal = await first('Life Goal', { space: 'Private', measure_kind: 'Number' }).catch(() => null)
     const lens = `area=${area}`
     // UX fixes, set 6: the four places, every Plan and Library tab and their views, the goal page, Settings' sections,
     // the lens (picker, chip, phone sheet), Today's banner; then the panes and screens kept from earlier sets
@@ -133,6 +134,10 @@ for (const scheme of schemes) {
       ['ask', '/life/ask'], ['ask-insights', '/life/ask?tab=insights'], ['ask-history', '/life/ask?tab=history'],
       ['ask-panel', '/life/?area='], ['ask-pane', `/life/plan/tasks?view=list&area=&open=task:${task}`],
       ['lens-picker', '/life/?area='], ['dev-editor', '/life/dev/editor'],
+      // set 7: the Outbox, a number goal, New goal with "Done when…", the old Inbox items' batch
+      ['library-outbox', '/life/library/outbox?area='], ['library-outbox-in', '/life/library/outbox?pile=in&period=12weeks&area='],
+      ...(numberGoal ? [['goal-number', `/life/plan/goals/${numberGoal}`], ['goal-number-pane', `/life/plan/goals?status=all&area=&open=goal:${numberGoal}`]] : []),
+      ['new-goal', '/life/plan/goals?area='], ['inbox-old', '/life/inbox?all=1&area=&decisions=1'],
       ...['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai', 'sensitive',
         'note-rules', 'spaces', 'members', 'archive', 'import', 'backups'].map((t) => [`settings-${t}`, `/life/settings?tab=${t}&area=`]),
     ].filter(([n]) => !only.length || only.includes(n))
@@ -142,6 +147,13 @@ for (const scheme of schemes) {
       if (name === 'lens-picker') { // the lens's picker: the sidebar's dropdown, or the sheet from the phone's title bar
         await page.locator(width < 800 ? '[data-lens-title]' : '[data-slot="sidebar-header"] button').first().click()
         await page.waitForTimeout(600)
+      }
+      if (name === 'new-goal') { // the New goal dialog on a number
+        await page.locator('[data-new-goal]').first().click()
+        await page.waitForTimeout(500)
+        await page.locator('[data-goal-title] input, input[data-goal-title]').first().fill('Ghillidary yield 1800 kg/ha')
+        await page.locator('[data-measure-kind]').getByText('A number').click()
+        await page.waitForTimeout(400)
       }
       if (name === 'ask-panel' || name === 'ask-pane') { // a question asked from the screen, in the panel (a sheet on a phone)
         if (name === 'ask-pane') await page.locator('[data-pane-ask]').first().click()

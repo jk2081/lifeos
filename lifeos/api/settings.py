@@ -9,8 +9,11 @@ SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "s
 	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
 	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
 	# UX fixes, set 6: Rhythms
-	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week")
-TIME_FIELDS = ("weekly_review_time", "start_of_day")
+	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week",
+	# set 7: working hours, for the weekly review's goal work
+	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days")
+TIME_FIELDS = ("weekly_review_time", "start_of_day", "work_start", "work_end")
+WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 LISTS = {
 	"area": ("Life Area", "area_name"), "tag": ("Life Tag", "tag_name"), "dimension": ("Life Dimension", "dimension_name"),
 	"habit": ("Life Habit", "title"), "person": ("Life Person", "full_name"),
@@ -258,6 +261,17 @@ def save(values: str | dict):
 			frappe.throw(_("{0} cannot be negative.").format(doc.meta.get_label(f)))
 	if float(doc.get("monthly_cap_usd") or 0) < 0:
 		frappe.throw(_("The monthly cap cannot be negative."))
+	if doc.get("old_inbox_mode") not in (None, "", "Suggest", "Park", "Discard"):
+		frappe.throw(_("Choose Suggest, Park or Discard."))
+	if "old_inbox_days" in values and int(doc.get("old_inbox_days") or 0) <= 0:
+		frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label("old_inbox_days")))
+	if "work_days" in values:
+		days = [d.strip() for d in str(doc.work_days or "").split(",") if d.strip()]
+		if not days or any(d not in WEEKDAYS for d in days):
+			frappe.throw(_("Choose at least one working day."))
+		doc.work_days = ",".join(d for d in WEEKDAYS if d in days)
+	if doc.work_start and doc.work_end and str(doc.work_end).zfill(8) <= str(doc.work_start).zfill(8):
+		frappe.throw(_("The working day must end after it starts."))
 	if int(doc.score_target) > 100:
 		frappe.throw(_("The score target is a percentage."))
 	doc.save()

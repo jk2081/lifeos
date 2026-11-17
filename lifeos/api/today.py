@@ -1,10 +1,11 @@
 """One call for the Today screen."""
 import re
+from datetime import timedelta
 
 import frappe
-from frappe.utils import add_days, getdate, today
+from frappe.utils import add_days, get_datetime, getdate, today
 
-from lifeos import calendar_data, journal, permissions, rhythms
+from lifeos import calendar_data, journal, old_inbox, permissions, rhythms
 from lifeos.api import tasks as task_api
 from lifeos.api import vault as vault_api
 from lifeos.api.utils import area_filter, descendants, in_area, lens_area, user_names
@@ -138,6 +139,7 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		"open_loops": task_api.open_loops_count(space), "area": area,
 		"banner": None if permissions.is_agent() else rhythms.banner(space, at),
 		"inout": None if permissions.is_agent() else _inout(space, area),
+		"auto_inbox": None if permissions.is_agent() else old_inbox.recent_auto(space, area),
 		"coming_up": coming,
 		"vault_soon": vault_api.expiry_counts(space)["soon"],
 	}
@@ -167,10 +169,19 @@ def next_list(space, now, cycle, events, area=None):
 			continue
 		today_rows.append({"type": "event", "name": e["name"], "title": e["title"], "why": "Event", "all_day": e.get("all_day"),
 			"start": e.get("start"), "end": e.get("end"), "lead": "All day" if e.get("all_day") else str(e.get("start") or "")[11:16]})
+	# tasks planned at a time today (set 7, the weekly review's goal work) sit among the events at their time
+	due_names = {t.name for t in due_today}
+	for t in scheduled_today(space, now, area):
+		if t.name in due_names:
+			continue
+		t.update({"why": "Scheduled", "type": "task", "all_day": 0, "start": str(t.scheduled_at)[:19], "lead": str(t.scheduled_at)[11:16]})
+		today_rows.append(t)
 	today_rows.sort(key=lambda r: (not r["all_day"], r["start"] or ""))
 	for t in due_today:
 		t["why"] = "Due today"
 		t["type"] = "task"
+		if t.get("scheduled_at") and str(t.scheduled_at)[:10] == str(now):
+			t["lead"] = str(t.scheduled_at)[11:16]
 		today_rows.append(t)
 	twy = []
 	if cycle and cycle.get("week"):
@@ -220,6 +231,11 @@ def rail_of(space, now, events, area=None):
 	week.sort(key=lambda x: str(x.get("date") or ""))
 	other = {"rows": [], "total": 0} if permissions.is_agent() else insight_api.list(space=space, status="New", actionable=0, area=area, page_length=5)
 	timeline = [e for e in events if not e.get("date") or str(e["date"]) == str(now)]
+	for t in scheduled_today(space, now, area):  # planned tasks on the timeline too (set 7)
+		start = get_datetime(t.scheduled_at)
+		timeline.append({"source": "task", "name": t.name, "title": t.title, "start": str(start)[:19], "all_day": 0, "date": str(now),
+			"end": str(start + timedelta(minutes=t.duration_min or 60))[:19]})
+	timeline.sort(key=lambda e: (not e.get("all_day"), str(e.get("start") or "")))
 	return {"events": timeline, "week": week, "insights": other["rows"], "insights_total": other["total"]}
 
 
@@ -242,3 +258,10 @@ def _inout(space, area):
 	from lifeos.api import outbox
 
 	return outbox.week_line(space, area)
+
+
+def scheduled_today(space, now, area=None):
+	"""Open tasks planned at a time today, in the lens, earliest first."""
+	lens, lens_values = task_lens(space, area)
+	return task_api.query(space, lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.scheduled_at >= %(a)s and t.scheduled_at < %(b)s",
+		{"a": str(now), "b": str(add_days(now, 1)), **lens_values}, "t.scheduled_at asc", 0, 50)

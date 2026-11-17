@@ -16,7 +16,8 @@
   "exited_by",
   "reversed",
   "reversed_on",
-  "note"
+  "note",
+  "auto_rule"
  ],
  "fields": [
   {
@@ -102,6 +103,12 @@
    "fieldtype": "Small Text",
    "label": "Note",
    "description": "How the exit happened, when it is not plain (a backfilled date)."
+  },
+  {
+   "fieldname": "auto_rule",
+   "fieldtype": "Data",
+   "label": "Automatic Rule",
+   "description": "Set when a rule acted on its own (old_inbox: the rule for Inbox items not dealt with)."
   }
  ],
  "links": [],

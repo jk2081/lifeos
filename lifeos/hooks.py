@@ -54,7 +54,12 @@ scheduler_events = {
 	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.trash.purge_old"],
 	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims"],
 		# insights: nightly at 06:00 site time (the owner's time zone is the site's, Asia/Kolkata)
-		"0 6 * * *": ["lifeos.insights.run_nightly"]},
+		"0 6 * * *": ["lifeos.insights.run_nightly"],
+		# set 7: Inbox items left too long, before the morning
+		"30 5 * * *": ["lifeos.old_inbox.run_nightly"]},
 }
+
+# the Outbox (set 7) is a record of what happened: an exit naming an area or a record never stops that area from being deleted
+ignore_links_on_delete = ["Life Exit"]
 
 fixtures = []

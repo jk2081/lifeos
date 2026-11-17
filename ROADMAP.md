@@ -14,7 +14,8 @@ Life OS keeps its owner moving forward: everything that lands on him goes in one
 | 5 | Count rule, Someday, Reset, Today with Open and Next, AI client with spend cap, Ask from any screen, insights | Done |
 | Pre-step 6 | Frappe's official conventions, scan, audit and review | Done |
 | 6 | Simplify: four places, the lens, Projects into Goals, Library, Settings, rhythm banners (`UX_FIXES_6.md`) | Done |
-| 7 | Moving forward: Outbox, old Inbox items, the weekly review's goal work, Done when (see below) | Next |
+| 7 | Moving forward: Outbox, old Inbox items, the weekly review's goal work, Done when (`UX_FIXES_7.md`) | Done |
+| 8 | Calendar (see below) | Next |
 
 ## The target design in one paragraph
 
@@ -49,9 +50,11 @@ Restructure the app around the four places. No AI work.
 ### Pending from set 6
 
 - **Remove Life Project.** Every project became an open-ended goal; the old DocType stays read-only and hidden so the migration can be checked (`migrated_to` on each project). Once the owner has checked it, a patch can drop the DocType and its table, and the old `project` columns left in the tables of Life Task, Note, Inbox Item, Chat Log, Journal Page, Vault Document, Idea, Goal and Index (`bench trim-tables`).
-- **Drop the `project` aliases.** For one set, methods take `project` and map it to the goal it became, Someday proposals accept record type Project, and `connections.defaults` answers `default_project`. Remove them in set 7 and say so in `agent/SKILL.md`.
+- **Drop the `project` aliases.** For one set, methods take `project` and map it to the goal it became, Someday proposals accept record type Project, and `connections.defaults` answers `default_project`. Set 7's brief did not include their removal, so they are still there; remove them in a later set and say so in `agent/SKILL.md`.
 
-### Set 7: Moving forward
+### Set 7: Moving forward (done, 18 November 2026)
+
+Built as `UX_FIXES_7.md` describes; `STATUS.md` ("Set 7: Moving forward") says what works and `DECISIONS.md` what differs.
 
 - Outbox: everything that leaves the plate (captures, tasks, goals), in four piles: Done, Delegated, Parked, Discarded. A flow line on Today's Open band ("This week: 64 in, 81 out") and the full Outbox as a Library tab.
 - Old Inbox items: a setting. Default: after 7 days the assistant suggests a decision for each item, confirmed in batches. Options: auto-discard or auto-park after 14 days, with undo.

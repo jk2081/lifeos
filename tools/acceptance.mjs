@@ -1408,7 +1408,7 @@ for (const width of [1440, 390]) {
     must(await bar.locator('[data-tab-gap]').count() === 1, 'the rhythms and the lists are not set apart')
     await s.open('/life/library/notes')
     const lib = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
-    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'captures', 'timeline', 'archive']), `Library's tabs are ${lib}`)
+    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'captures', 'outbox', 'timeline', 'archive']), `Library's tabs are ${lib}`)
     if (!phone) {
       await s.open('/life/plan/month')
       await pg.locator('body').click({ position: { x: 600, y: 10 } })
@@ -1799,7 +1799,7 @@ while d <= last:
     return 'task, open-ended goal with tasks, goal, idea'
   })
 
-  await check(`${tag}.36`, `${width} px: Reset: each rule batch finds its seeded items; a batch changes exactly those and Undo reverts; one by one with ${phone ? 'the buttons' : 'the keys'}; Delete then Restore from the trash; the weekly review opens on its Reset step`, async () => {
+  await check(`${tag}.36`, `${width} px: Reset: each rule batch finds its seeded items; a batch changes exactly those and Undo reverts; one by one with ${phone ? 'the buttons' : 'the keys'}; Delete then Restore from the trash; Reset is the weekly review's second step`, async () => {
     const a = await s.api('tasks.quick_add', { text: S5('dupe'), space: SPACE, area: uxArea })
     const b = await s.api('tasks.quick_add', { text: S5('dupe'), space: SPACE, area: uxArea })
     const old = []
@@ -1847,10 +1847,12 @@ while d <= last:
     await pg.locator(ROW, { hasText: S5('delete me') }).locator('[data-trash-restore]:visible').first().click()
     await pg.waitForTimeout(1000)
     must(await s.api('frappe.client.get_count', { doctype: 'Life Task', filters: { name: del.name } }), 'Restore from the trash did not bring it back')
-    // the weekly review opens on its Reset step
+    // the weekly review's Reset step (set 5), second after Score and results since set 7
     await pg.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('lifeos-review-reset')).forEach((k) => localStorage.removeItem(k)))
     await s.open('/life/plan/week?view=review')
-    must(await pg.locator('[data-review-reset]').isVisible(), 'the weekly review does not start with Reset')
+    must(await pg.locator('[data-review-reset]').isVisible(), 'the weekly review has no Reset step')
+    const order = await pg.locator('[data-review-step]').evaluateAll((els) => els.map((e) => e.getAttribute('data-review-step')))
+    must(order[0] === 'results' && order[1] === 'reset', `the review's steps are ${order}`)
     return 'batches, undo, one by one, trash, weekly review'
   })
 
@@ -2153,13 +2155,13 @@ except frappe.PermissionError:
     must((await pg.locator('[data-open-source]').innerText()).includes('Open in Gmail'), 'the task pane has no Open in Gmail')
   })
 
-  await check(`${tag}.29`, `${width} px: Library's tabs are All, Notes, Captures, Timeline and Archive; each opens from its tab and its path`, async () => {
+  await check(`${tag}.29`, `${width} px: Library's tabs are All, Notes, Captures, Outbox, Timeline and Archive; each opens from its tab and its path`, async () => {
     // set 6: the sidebar's Records (Sources, Notes, Wiki, Vault, Timeline) became Library's tabs
     await s.open('/life')
     await nav('Library')
     must(new URL(pg.url()).pathname === '/life/library', `Library opened ${new URL(pg.url()).pathname}`)
     const bar = pg.locator('[data-place-tabs]').first()
-    for (const [t, p] of [['notes', '/life/library/notes'], ['captures', '/life/library/captures'], ['timeline', '/life/library/timeline'], ['archive', '/life/library/archive'], ['all', '/life/library']]) {
+    for (const [t, p] of [['notes', '/life/library/notes'], ['captures', '/life/library/captures'], ['outbox', '/life/library/outbox'], ['timeline', '/life/library/timeline'], ['archive', '/life/library/archive'], ['all', '/life/library']]) {
       await bar.locator(`[data-tab="${t}"]`).click()
       await pg.waitForLoadState('networkidle')
       await settle()
@@ -2623,6 +2625,298 @@ await check('S6.6', 'The fake agent runs end to end with the goal-based API: tas
   must(ps >= 400, 'an agent can read a project')
   return `3 tasks under ${goal}`
 })
+
+// ---------- Set 7: Moving forward, at 1440 px and 390 px ----------
+// Key results, the Outbox and the weekly review's goal step. Every record carries "S7 … <width> <stamp>" and is removed by S4.1.
+const s7Settings = await owner.api('settings.get', { space: SPACE })
+for (const width of [1440, 390]) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e)))
+  const tag = `S7.${width}`
+  const settle = () => pg.waitForTimeout(450)
+  const W = `${width} ${stamp}`
+  const field = (root, attr) => root.locator(`[${attr}] input, input[${attr}], [${attr}] textarea, textarea[${attr}]`).first()
+  const pick = async (root, label, option, attr = 'data-card-who') => {
+    let box = root.getByRole('combobox', { name: label }).first()
+    if (!(await box.count())) box = root.locator(`[${attr}][role="combobox"], [${attr}] [role="combobox"], [${attr}] button`).first()
+    await box.click()
+    await pg.getByRole('option', { name: option, exact: true }).first().click()
+    await settle()
+  }
+  const skipReset = async () => { if (await pg.locator('[data-review-reset-skip]:visible').count()) { await pg.locator('[data-review-reset-skip]').click(); await settle() } }
+  const cycle = (await owner.api('journal.grid', { space: SPACE })).cycle
+
+  await check(`${tag}.1`, `${width} px: New goal asks "Done when…": a milestone goal and a number goal through the dialog; a frequency offers Make it a habit`, async () => {
+    const make = async (title, fill) => {
+      await s.open('/life/plan/goals')
+      await pg.locator('[data-new-goal]').first().click()
+      await settle()
+      const dlg = pg.locator('[role="dialog"]').last()
+      await field(dlg, 'data-goal-title').fill(title)
+      await fill(dlg)
+      await dlg.getByRole('button', { name: 'Add goal' }).click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      return (await s.api('goals.list', { space: SPACE, state: 'all', filters: [['title', '=', title]] })).goals[0]
+    }
+    const m = await make(`S7 milestone ${W}`, async (dlg) => {
+      await dlg.locator('[data-measure-kind]').getByText('A finish line').click()
+      await field(dlg, 'data-measure-done-when').fill('The plan is signed')
+    })
+    must(m && m.measure_kind === 'Milestone' && m.done_when === 'The plan is signed', 'the milestone goal was not made: ' + JSON.stringify(m))
+    const n = await make(`S7 number ${W}`, async (dlg) => {
+      await dlg.locator('[data-measure-kind]').getByText('A number').click()
+      await field(dlg, 'data-measure-name').fill('Weight')
+      await field(dlg, 'data-measure-unit').fill('kg')
+      await field(dlg, 'data-measure-start').fill('84')
+      await field(dlg, 'data-measure-target').fill('78')
+    })
+    must(n && n.measure_kind === 'Number' && n.start_value === 84 && n.target_value === 78 && n.progress.kind === 'number', 'the number goal was not made: ' + JSON.stringify(n))
+    // a frequency is a habit
+    await s.open('/life/plan/goals')
+    await pg.locator('[data-new-goal]').first().click()
+    await settle()
+    const dlg = pg.locator('[role="dialog"]').last()
+    await field(dlg, 'data-goal-title').fill(`S7 walk 3 times a week ${W}`)
+    await settle()
+    must(await dlg.locator('[data-habit-hint]').isVisible(), 'no "This looks like a habit"')
+    await dlg.locator('[data-make-habit]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    const habits = await s.api('journal.habits', { space: SPACE })
+    must(habits.habits.some((h) => h.title === `S7 walk 3 times a week ${W}` && h.days_per_week === 3), 'the habit is not in this month')
+    must(!(await s.api('goals.list', { space: SPACE, state: 'all', filters: [['title', 'like', `S7 walk%${stamp}%`]] })).goals.length, 'a goal was made for the habit')
+    return 'milestone, number 84 → 78 kg, habit 3 a week'
+  })
+
+  await check(`${tag}.2`, `${width} px: the fake agent submits a Reading; it waits in the weekly review; Confirm updates the goal's current value and result bar`, async () => {
+    const measure = `Yield ${W}`
+    const g = (await s.api('goals.create', { space: SPACE, title: `S7 yield goal ${W}`, goal_type: 'Open', area: areaId('Tea & Coffee'), measure_kind: 'Number',
+      measure, unit: 'kg/ha', start_value: 1200, target_value: 1800 })).name
+    await s.api('inbox.create_item', { space: SPACE, title: `S7 reading ${W}`, source_type: 'Message', raw_text: `${measure} this flush: 1640 kg/ha, up from last month.` })
+    runAgent()
+    const waiting = (await s.api('goals.goal_readings', { goal: g })).suggested
+    must(waiting.length === 1 && waiting[0].value === 1640 && waiting[0].excerpt.includes('1640'), 'the agent did not leave a Suggested reading: ' + JSON.stringify(waiting))
+    await s.open('/life/plan/week?view=review')
+    const row = pg.locator(`[data-review-readings] [data-reading="${waiting[0].name}"]`)
+    must(await row.isVisible(), 'the reading is not in the weekly review')
+    must((await row.innerText()).includes(`S7 yield goal ${W}`), 'the reading does not name its goal')
+    await row.locator('[data-reading-confirm]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    const got = await s.api('goals.get', { goal: g })
+    must(got.goal.current_value === 1640 && got.goal.progress.percent === 73.3, `current ${got.goal.current_value}, ${got.goal.progress.percent}%`)
+    await s.open(`/life/plan/goals/${g}`)
+    const bar = pg.locator('[data-result-bar]').first()
+    must((await bar.getAttribute('data-result-percent')) === '73.3' && (await bar.innerText()).includes('1640'), 'the result bar does not show 1640: ' + (await bar.innerText()))
+    return '1640 kg/ha, 73.3%'
+  })
+
+  let action
+  await check(`${tag}.3`, `${width} px: a 12-week goal serving a longer goal shows on both`, async () => {
+    must(cycle, 'no active cycle')
+    const long = (await s.api('goals.create', { space: SPACE, title: `S7 long goal ${W}`, goal_type: 'Annual', target_date: addDays(200), area: areaId('Tea & Coffee'),
+      done_when: 'A new client signed' })).name
+    const g = (await s.api('journal.save_goal', { cycle: cycle.name, title: `S7 cycle goal ${W}`, area: areaId('Tea & Coffee'), serves: long, measure_kind: 'Milestone',
+      done_when: 'Ten pitches made', actions: [{ title: `S7 calls ${W}`, per_week: 4 }] })).goal
+    action = (await s.api('journal.goal', { goal: g })).goal.actions[0]
+    await s.open('/life/plan/12-weeks')
+    const line = pg.locator('[data-grid-serves]', { hasText: `S7 long goal ${W}` })
+    must(await line.count(), 'the 12 Weeks tab does not show the goal it serves')
+    await s.open(`/life/plan/goals/${long}`)
+    const served = pg.locator('[data-goal-served-by]')
+    must((await served.innerText()).includes(`S7 cycle goal ${W}`) && (await served.innerText()).includes(cycle.title), 'the longer goal does not show the cycle goal with its cycle')
+    await s.open(`/life/plan/goals/${g}`)
+    must((await pg.locator('[data-goal-serves-progress]').innerText()).includes(`S7 long goal ${W}`), "the cycle goal's page does not show what it serves")
+    return `${cycle.title}`
+  })
+
+  await check(`${tag}.4`, `${width} px: ticking a 4-a-week action once shows 1 of 4 and raises the week score`, async () => {
+    must(action, 'no action from the check before')
+    const g = await s.api('journal.grid', { space: SPACE })
+    const wk = g.current_week
+    const before = await s.api('journal.week_score', { cycle: cycle.name, week: wk })
+    await s.open('/life/plan/12-weeks')
+    const cell = pg.locator(`button[aria-label^="S7 calls ${W}, week ${wk},"]`).first()
+    must(await cell.count(), 'the action is not on the grid')
+    await cell.click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must((await cell.getAttribute('aria-label')).endsWith('1 of 4'), 'the cell says ' + (await cell.getAttribute('aria-label')))
+    const after = await s.api('journal.week_score', { cycle: cycle.name, week: wk })
+    must(after.done === before.done + 1 && after.percent > before.percent, `score ${before.percent}% → ${after.percent}%`)
+    await s.open('/life')
+    const row = pg.locator('[data-next] [data-why="12WY"]', { hasText: `S7 calls ${W}` })
+    if (await row.count()) must((await row.innerText()).includes('1 of 4 this week'), 'Today does not say 1 of 4')
+    return `${before.percent}% → ${after.percent}%`
+  })
+
+  await check(`${tag}.5`, `${width} px: completing, delegating, parking and dropping a task each add to the right Outbox pile; Bring back reverses; Today's in and out open lists of that many rows`, async () => {
+    const mk = async (what) => (await s.api('tasks.quick_add', { text: `S7 out ${what} ${W}`, space: SPACE, area: areaId('Tea & Coffee') })).name
+    const t = { Done: await mk('done'), Delegated: await mk('delegate'), Parked: await mk('park'), Discarded: await mk('drop') }
+    await s.api('tasks.set_status', { task: t.Done, status: 'Done' })
+    await s.api('tasks.set_status', { task: t.Delegated, status: 'Waiting', waiting_on: 'Mithun' })
+    await s.api('someday.park', { doctype: 'Life Task', name: t.Parked })
+    await s.api('tasks.set_status', { task: t.Discarded, status: 'Dropped' })
+    for (const [pile, name] of Object.entries(t)) {
+      await s.open(`/life/library/outbox?pile=${pile}`)
+      const row = pg.locator('[data-row]', { hasText: `S7 out` }).filter({ hasText: W })
+      must(await row.count() === 1, `${pile}: ${await row.count()} rows of this run`)
+      const listed = await s.api('outbox.list', { space: SPACE, pile, page_length: 500 })
+      must(listed.rows.some((r) => r.record === name) && listed.total === listed.tabs[pile], `${pile}: not in its pile`)
+    }
+    // Bring back the done one: it is open again and leaves the pile
+    await s.open('/life/library/outbox?pile=Done')
+    const row = pg.locator('[data-row]', { hasText: `S7 out done ${W}` })
+    await row.locator('[data-outbox-bring-back]:visible').first().click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must((await s.api('tasks.get', { task: t.Done })).status === 'Open', 'Bring back did not reopen the task')
+    must(!(await s.api('outbox.list', { space: SPACE, pile: 'Done', page_length: 500 })).rows.some((r) => r.record === t.Done), 'the exit still counts')
+    // Today's line: each number opens a list with that many rows
+    await s.open('/life')
+    const doors = pg.locator('[data-inout] [data-count-door]')
+    must(await doors.count() === 2, 'no in-and-out line on Today')
+    const seen = []
+    for (let i = 0; i < 2; i++) {
+      await s.open('/life')
+      const d = pg.locator('[data-inout] [data-count-door]').nth(i)
+      const n = Number(await d.getAttribute('data-count-n'))
+      await d.click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must(new URL(pg.url()).pathname === '/life/library/outbox', 'the number went to ' + new URL(pg.url()).pathname)
+      const got = Number((await pg.locator('[data-lv-count]').first().innerText()).replace(/\D/g, '') || 0)
+      must(got === n, `clicked ${n}, the Outbox lists ${got}`)
+      seen.push(n)
+    }
+    must(errors.length === 0, 'script errors: ' + errors.join(' | ').slice(0, 300))
+    return `in ${seen[0]}, out ${seen[1]}`
+  })
+
+  await check(`${tag}.6`, `${width} px: the weekly review's goal step makes a scheduled task that shows on Today and in the week calendar, and a delegated one that shows as Waiting`, async () => {
+    // working hours of every day, all day long, so the first free slot is today whatever the time of the run
+    await owner.api('settings.save', { values: { work_days: 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', work_start: '00:00:00', work_end: '23:59:00' } })
+    try {
+      const a = (await s.api('goals.create', { space: SPACE, title: `S7 plan goal ${W}`, goal_type: 'Open', area: areaId('Tea & Coffee'), done_when: 'Planned' })).name
+      const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, goal_type: 'Open', area: areaId('Tea & Coffee'), done_when: 'Handed over' })).name
+      await s.open('/life/plan/week?view=review')
+      await skipReset()
+      const card = pg.locator(`[data-goal-card][data-goal="${a}"]`)
+      await card.waitFor({ timeout: 15000 })
+      await field(card, 'data-card-action').fill(`S7 plan step ${W}`)
+      await field(card, 'data-card-note').fill('the soil report')
+      await card.locator('[data-card-add]').click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must((await card.getAttribute('data-card-state')) === 'added', 'the card was not added')
+      const task = (await s.api('tasks.list', { space: SPACE, goal: a, status: 'all' })).tasks.find((x) => x.title === `S7 plan step ${W}`)
+      must(task && task.scheduled_at && String(task.scheduled_at).slice(0, 10) === today, 'no task scheduled today: ' + JSON.stringify(task))
+      const footer = pg.locator('[data-goal-work-footer]')
+      must(Number(await footer.getAttribute('data-planned-minutes')) >= 60, 'the footer did not add the hour')
+      const other = pg.locator(`[data-goal-card][data-goal="${b}"]`)
+      await field(other, 'data-card-action').fill(`S7 handoff step ${W}`)
+      await pick(other, 'Who', 'Vivek')
+      await other.locator('[data-card-add]').click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      const handed = (await s.api('tasks.list', { space: SPACE, goal: b, status: 'all' })).tasks.find((x) => x.title === `S7 handoff step ${W}`)
+      must(handed && handed.status === 'Waiting' && handed.waiting_on === 'Vivek', 'the delegated task is not Waiting on Vivek: ' + JSON.stringify(handed))
+      must((await s.api('outbox.list', { space: SPACE, pile: 'Delegated', page_length: 500 })).rows.some((r) => r.record === handed.name), 'not in Delegated')
+      await s.open('/life')
+      const next = pg.locator('[data-next] [data-why="Scheduled"]', { hasText: `S7 plan step ${W}` })
+      const rail = pg.locator('[data-rail-task]', { hasText: `S7 plan step ${W}` })
+      must(await next.count() || await rail.count(), 'the scheduled task is not on Today')
+      must(await rail.count(), "the scheduled task is not on the rail's timeline")
+      await s.open('/life/plan/week?view=calendar')
+      must((await pg.locator('[data-week-grid], [data-main]').first().innerText()).includes(`S7 plan step ${W}`), 'not in the week calendar')
+      await s.open(`/life/plan/tasks?status=Waiting`)
+      must((await pg.locator('[data-main]').innerText()).includes(`S7 handoff step ${W}`), 'the delegated task is not under Waiting')
+      return `scheduled ${String(task.scheduled_at).slice(11, 16)}, waiting on Vivek`
+    } finally {
+      await owner.api('settings.save', { values: { work_days: s7Settings.settings.work_days || 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+        work_start: s7Settings.settings.work_start || '09:00:00', work_end: s7Settings.settings.work_end || '19:00:00' } })
+    }
+  })
+
+  await check(`${tag}.7`, `${width} px: Inbox items left too long: on Suggest an old item gets a suggested decision and the batch confirms it; on Park and Discard the job acts and Today's Undo restores`, async () => {
+    const age = (name, days) => bench(`frappe.db.set_value("Life Inbox Item", "${name}", "received_on", frappe.utils.add_days(frappe.utils.now_datetime(), -${days}), update_modified=False)`)
+    const run = () => JSON.parse(bench(`import json\nfrom lifeos import old_inbox\nfrappe.clear_document_cache("Life Settings", "Life Settings")\nprint(json.dumps(old_inbox.run_for_space("${SPACE}")))`).split('\n').pop())
+    const setRule = (mode, days) => owner.api('settings.save', { values: { old_inbox_mode: mode, old_inbox_days: days } })
+    try {
+      // Suggest
+      await setRule('Suggest', 7)
+      const a = (await s.api('inbox.create_item', { space: SPACE, title: `S7 old suggest ${W}`, source_type: 'Message', raw_text: 'An old message.' })).name
+      age(a, 10)
+      run()
+      const got = (await s.api('old_items.suggested', { space: SPACE, page_length: 500 })).rows.find((r) => r.name === a)
+      must(got && got.decision && got.reason, 'no suggested decision: ' + JSON.stringify(got))
+      await s.open('/life/inbox')
+      const banner = pg.locator('[data-old-items-banner]')
+      must(await banner.isVisible(), 'no banner on the Inbox')
+      await banner.locator('[data-old-items-open]').click()
+      await settle()
+      const dlg = pg.locator('[data-old-items-dialog], [role="dialog"]').last()
+      await dlg.getByRole('checkbox', { name: 'Select all' }).click() // untick every item, then tick this run's only
+      await settle()
+      const row = dlg.locator(`[data-old-item][data-item="${a}"]`)
+      await row.getByRole('checkbox').click()
+      await pick(row, `Decision for S7 old suggest ${W}`, 'Park as an idea', 'data-old-item-decision')
+      await dlg.locator('[data-old-items-confirm]').click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must((await s.api('inbox.get', { item: a })).status === 'Done', 'the batch did not act on the item')
+      must((await s.api('outbox.list', { space: SPACE, pile: 'Parked', page_length: 500 })).rows.some((r) => r.record === a), 'the item is not Parked in the Outbox')
+      // Park: the job acts, Today says so, Undo restores
+      await setRule('Park', 14)
+      const b = (await s.api('inbox.create_item', { space: SPACE, title: `S7 old park ${W}`, source_type: 'Message', raw_text: 'Old.' })).name
+      age(b, 20)
+      const parked = run()
+      must(parked.parked >= 1 && (await s.api('inbox.get', { item: b })).status === 'Done', 'the job did not park it: ' + JSON.stringify(parked))
+      await s.open('/life')
+      const line = pg.locator('[data-auto-inbox]')
+      must(await line.isVisible() && (await line.innerText()).includes('parked'), "Today does not say what the job parked")
+      await line.locator('[data-auto-inbox-undo]').click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must((await s.api('inbox.get', { item: b })).status !== 'Done', 'Undo did not bring it back')
+      // Discard: to the trash, Undo restores
+      await setRule('Discard', 14)
+      const c = (await s.api('inbox.create_item', { space: SPACE, title: `S7 old discard ${W}`, source_type: 'Message', raw_text: 'Old.' })).name
+      age(c, 20)
+      age(b, 1) // the parked one is young again, so this run discards only what is old
+      run()
+      must(!(await s.api('inbox.get', { item: c }, { raw: true })).ok(), 'the job did not discard it')
+      await s.open('/life')
+      must((await pg.locator('[data-auto-inbox]').innerText()).includes('trash'), "Today does not say what the job discarded")
+      await pg.locator('[data-auto-inbox-undo]').click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must((await s.api('inbox.get', { item: c }, { raw: true })).ok(), 'Undo did not restore it')
+      return `${got.decision} suggested, parked and discarded, both undone`
+    } finally {
+      await setRule('Suggest', 7)
+    }
+  })
+
+  if (phone) {
+    await check(`${tag}.8`, `${width} px: no set 7 screen scrolls sideways`, async () => {
+      const bad = []
+      for (const p of ['/life', '/life/plan/goals', '/life/plan/week?view=review', '/life/library/outbox', '/life/library/outbox?pile=in&period=12weeks',
+        '/life/plan/12-weeks', '/life/settings?tab=rhythms', '/life/settings?tab=reset']) {
+        await s.open(p)
+        const o = await pg.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width)
+        if (o > 0) bad.push(`${p} by ${o} px`)
+      }
+      must(!bad.length, bad.join('; '))
+      return '8 screens'
+    })
+  }
+  await s.ctx.close()
+}
 
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {

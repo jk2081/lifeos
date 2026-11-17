@@ -17,6 +17,12 @@
         <Button size="sm" variant="solid" :label="d.banner.action" :route="d.banner.to" />
         <Button size="sm" variant="ghost" label="Skip" data-banner-skip @click="skipBanner" />
       </div>
+      <!-- set 7: what the rule for Inbox items left too long parked or discarded on its own, with Undo for seven days -->
+      <div v-if="d.auto_inbox" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-4 py-2.5" role="status" data-auto-inbox>
+        <span class="lucide-inbox size-4 text-ink-gray-7" aria-hidden="true" />
+        <span class="min-w-0 flex-1 text-base text-ink-gray-9">{{ autoText }}</span>
+        <Button size="sm" label="Undo" data-auto-inbox-undo @click="undoAuto" />
+      </div>
       <!-- the Open band: everything still open, each number a door; amber when the stuck count is over the limit -->
       <section data-open-band :data-over-limit="band.over_limit || undefined">
         <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base" data-band-head>
@@ -125,6 +131,8 @@
                 <div class="relative min-w-0 flex-1 border-l border-outline-gray-2 py-1 pl-2.5">
                   <span v-if="e.kind === 'now'" class="absolute -left-[5px] top-3 size-2 rounded-full bg-surface-red-7" aria-hidden="true" />
                   <Button v-if="e.kind === 'event'" class="!h-auto min-h-8 w-full !justify-start !whitespace-normal !bg-surface-blue-1 py-1.5 text-left !text-ink-blue-8" :label="e.title" @click="openRef('event:' + e.name)" />
+                  <Button v-else-if="e.kind === 'task'" class="!h-auto min-h-8 w-full !justify-start !whitespace-normal !bg-surface-gray-2 py-1.5 text-left !text-ink-gray-9" icon-left="lucide-circle-check"
+                    :label="e.title" data-rail-task @click="openRef('task:' + e.name)" />
                   <span v-else class="block pt-0.5 text-sm text-ink-gray-6">{{ e.title }}</span>
                 </div>
               </li>
@@ -264,7 +272,8 @@ function duration(e) {
 // the rail's timeline: events at their times, with a now marker between them
 const nowTime = ref(new Date().toTimeString().slice(0, 5))
 const railItems = computed(() => {
-  const ev = d.value.rail.events.map((e) => ({ key: 'e' + e.name + e.start, kind: 'event', name: e.name, title: e.title, time: e.all_day ? 'All day' : String(e.start || '').slice(11, 16) }))
+  const ev = d.value.rail.events.map((e) => ({ key: 'e' + e.name + e.start, kind: e.source === 'task' ? 'task' : 'event', name: e.name, title: e.title,
+    time: e.all_day ? 'All day' : String(e.start || '').slice(11, 16) }))
   const out = []
   let placed = false
   for (const e of ev) {
@@ -276,6 +285,14 @@ const railItems = computed(() => {
 })
 const weekRef = (w) => (w.kind === 'vault' ? 'vault:' + w.name : w.kind === 'important' ? 'date:' + w.name : null)
 
+const autoText = computed(() => {
+  const a = d.value.auto_inbox
+  const parts = [a.parked && `parked ${a.parked} as idea${a.parked === 1 ? '' : 's'} in Someday`, a.discarded && `moved ${a.discarded} to the trash`].filter(Boolean)
+  return `Inbox items older than ${a.days} days: ${parts.join(' and ')}. Undo until ${short(a.undo_until)}.`
+})
+async function undoAuto() {
+  if (await tryCall(() => api('old_items.undo_auto', { space: store.space }), 'Back in the Inbox')) load()
+}
 async function skipBanner() {
   const occ = d.value.banner.occurrence
   d.value.banner = null

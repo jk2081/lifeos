@@ -123,21 +123,23 @@ def _decorate(rows):
 	trashed = {(d.deleted_doctype, d.deleted_name) for d in frappe.get_all("Deleted Document", filters={
 		"deleted_name": ("in", [r.record for r in rows] or ["-"]), "restored": 0, "creation": (">=", add_days(now_datetime(), -30))},
 		fields=["deleted_doctype", "deleted_name"])}
+	closed = set(frappe.get_all("Life Cycle", filters={"name": ("in", [x.cycle for x in live.values() if x.get("cycle")] or ["-"]), "status": "Closed"},
+		pluck="name"))
 	for r in rows:
 		x = live.get((r.doctype, r.record))
 		r["exists"] = bool(x)
 		r["sensitive"] = bool(x and x.get("is_sensitive"))
-		r["can_bring_back"] = _can_bring_back(r, x, (r.doctype, r.record) in trashed)
+		r["can_bring_back"] = _can_bring_back(r, x, (r.doctype, r.record) in trashed, closed)
 
 
-def _can_bring_back(row, live, trashed):
+def _can_bring_back(row, live, trashed, closed_cycles):
 	if not live:
 		return trashed
 	if row.doctype == "Life Task":
 		return True
 	if row.doctype == "Life Goal":
 		if live.get("goal_type") == "12 Week Year" and row.pile != "Parked":
-			return frappe.db.get_value("Life Cycle", live.get("cycle"), "status") != "Closed"
+			return live.get("cycle") not in closed_cycles
 		return True
 	return False  # a capture done or parked, an idea brought back: their result is elsewhere
 

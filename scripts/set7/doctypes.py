@@ -82,6 +82,59 @@ def step1():
 	], sort_field="date")
 
 
+def step2():
+	new_doctype("Life Exit", [
+		SPACE,
+		{"fieldname": "area", "fieldtype": "Link", "label": "Area", "options": "Life Area", "in_standard_filter": 1},
+		{"fieldname": "record_doctype", "fieldtype": "Link", "label": "Record Type", "options": "DocType", "reqd": 1},
+		{"fieldname": "record_name", "fieldtype": "Data", "label": "Record", "reqd": 1, "search_index": 1,
+			"description": "Plain data, not a link: the record may be deleted while its exit stays."},
+		{"fieldname": "title", "fieldtype": "Data", "label": "Title", "in_list_view": 1},
+		{"fieldname": "kind", "fieldtype": "Select", "label": "Kind", "options": "Capture\nTask\nGoal\nIdea", "reqd": 1, "in_list_view": 1},
+		{"fieldname": "pile", "fieldtype": "Select", "label": "Pile", "options": "Done\nDelegated\nParked\nDiscarded", "reqd": 1, "in_list_view": 1,
+			"in_standard_filter": 1},
+		{"fieldname": "exited_on", "fieldtype": "Datetime", "label": "When", "reqd": 1, "in_list_view": 1},
+		{"fieldname": "exited_by", "fieldtype": "Link", "label": "By", "options": "User"},
+		{"fieldname": "reversed", "fieldtype": "Check", "label": "Reversed", "default": "0"},
+		{"fieldname": "reversed_on", "fieldtype": "Datetime", "label": "Reversed On"},
+		{"fieldname": "note", "fieldtype": "Small Text", "label": "Note", "description": "How the exit happened, when it is not plain (a backfilled date)."},
+	], sort_field="exited_on", perms=[
+		{"role": "Life Admin", "read": 1, "report": 1, "export": 1},
+		{"role": "Life User", "read": 1, "report": 1},
+	])
+
+
+def step3():
+	add_fields("Life Task", "due_date", [
+		{"fieldname": "scheduled_at", "fieldtype": "Datetime", "label": "Scheduled At", "search_index": 1,
+			"description": "When the task is planned to be done (the weekly review's goal step)."},
+		{"fieldname": "duration_min", "fieldtype": "Int", "label": "Length (minutes)"},
+	])
+	add_fields("Life Settings", "week_starts_on", [
+		{"fieldname": "work_days", "fieldtype": "Data", "label": "Working Days", "default": "Monday,Tuesday,Wednesday,Thursday,Friday,Saturday",
+			"description": "Comma-separated day names. Goal work is suggested on these days."},
+		{"fieldname": "work_start", "fieldtype": "Time", "label": "Working Day Starts", "default": "09:00:00"},
+		{"fieldname": "work_end", "fieldtype": "Time", "label": "Working Day Ends", "default": "19:00:00"},
+	])
+
+
+def step4():
+	add_fields("Life Settings", "someday_review_months", [
+		{"fieldname": "old_inbox_mode", "fieldtype": "Select", "label": "Inbox Items Not Dealt With", "options": "Suggest\nPark\nDiscard", "default": "Suggest",
+			"description": "Suggest decisions, park them as ideas in Someday, or move them to the trash, after the number of days below."},
+		{"fieldname": "old_inbox_days", "fieldtype": "Int", "label": "After Days", "default": "7"},
+	])
+	add_fields("Life Inbox Item", "error", [
+		{"fieldname": "suggested_decision", "fieldtype": "Select", "label": "Suggested Decision", "options": "\nAccept\nPark\nDiscard", "read_only": 1},
+		{"fieldname": "suggested_reason", "fieldtype": "Small Text", "label": "Suggested Reason", "read_only": 1},
+		{"fieldname": "suggested_on", "fieldtype": "Date", "label": "Suggested On", "read_only": 1},
+	])
+	add_fields("Life Exit", "note", [
+		{"fieldname": "auto_rule", "fieldtype": "Data", "label": "Automatic Rule",
+			"description": "Set when a rule acted on its own (old_inbox: the rule for Inbox items not dealt with)."},
+	])
+
+
 if __name__ == "__main__":
 	for s in sys.argv[1:] or ["step1"]:
 		globals()[s]()

@@ -84,6 +84,15 @@ def rule_batches(space):
 	if twins:
 		out.append(_batch("wiki_twins", "Notes that repeat wiki pages", "A wiki page has the same title. Merging adds the note's text to the page, keeps both texts in the page's history, and archives the note.",
 			twins, "merge", "Merge {n}"))
+	# set 7: Inbox items left too long, each with its suggested decision, confirmed on the Inbox's batch screen
+	from lifeos import old_inbox
+
+	rule = old_inbox.rule()
+	waiting = [i for i in old_inbox.candidates(space, rule["days"], limit=1000) if i.suggested_decision]
+	if waiting:
+		out.append(_batch("inbox_decisions", f"Inbox items older than {rule['days']} days", "Each has a suggested decision and a reason: accept its proposals, park it as an idea, or discard it.",
+			[_item("Life Inbox Item", i.name, f"{i.title} ({i.suggested_decision.lower()})") for i in waiting], "review_inbox_decisions", "Review {n}",
+			review={"path": "/inbox", "query": {"decisions": "1"}}))
 	# 6. Someday items due for review
 	due = someday.list(space=space, tab="due", page_length=100)
 	if due["total"]:

@@ -10,6 +10,8 @@
   "status",
   "priority",
   "due_date",
+  "scheduled_at",
+  "duration_min",
   "goal",
   "month_plan",
   "inbox_item",
@@ -71,6 +73,18 @@
    "label": "Due Date",
    "in_list_view": 1,
    "search_index": 1
+  },
+  {
+   "fieldname": "scheduled_at",
+   "fieldtype": "Datetime",
+   "label": "Scheduled At",
+   "search_index": 1,
+   "description": "When the task is planned to be done (the weekly review's goal step)."
+  },
+  {
+   "fieldname": "duration_min",
+   "fieldtype": "Int",
+   "label": "Length (minutes)"
   },
   {
    "fieldname": "goal",
@@ -199,7 +213,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-17 18:19:36.000000",
+ "modified": "2026-11-18 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Task",

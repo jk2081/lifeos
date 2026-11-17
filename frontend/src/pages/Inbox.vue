@@ -7,6 +7,8 @@
       <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template> ·
       <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/library/captures', query: { status: 'done' } }" data-finished-link>Finished items are in Sources</RouterLink></template>
     <template #above>
+      <!-- set 7: items left too long, with suggested decisions to confirm -->
+      <OldItems @changed="list?.reload()" />
       <!-- The drop zone. Files wait here until Add to Inbox creates the item they belong to; then each is uploaded, private, to that item. -->
       <section v-if="canWrite()" class="rounded-5 border border-dashed p-4" :class="over ? 'border-outline-gray-5 bg-surface-gray-3' : 'border-outline-gray-3 bg-surface-gray-1'"
         data-dropzone @dragover.prevent="over = true" @dragleave.prevent="over = false" @drop.prevent="onDrop">
@@ -70,6 +72,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Avatar, Badge, Button, Select, TabButtons, TextInput, Textarea, toast } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
+import OldItems from '@/components/inbox/OldItems.vue'
 import NumLink from '@/components/ui/NumLink.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { canWrite, refreshCounts, store } from '@/lib/store'

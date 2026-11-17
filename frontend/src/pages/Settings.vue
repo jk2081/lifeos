@@ -94,6 +94,24 @@
                 @update:model-value="(v) => setOne('week_starts_on', v)" />
             </SettingRow>
           </Card>
+          <SectionHead>Working hours</SectionHead>
+          <Card flush data-settings-work-hours>
+            <SettingRow label="Working days" help="The weekly review suggests times for goal work on these days only." :error="errors.work_days">
+              <div class="flex flex-wrap gap-1.5" role="group" aria-label="Working days">
+                <Button v-for="day in WEEKDAYS" :key="day" size="sm" :variant="workDays.includes(day) ? 'solid' : 'subtle'" :label="day.slice(0, 3)" :aria-label="day"
+                  :aria-pressed="workDays.includes(day)" :disabled="!d.is_admin" :data-work-day="day" @click="toggleDay(day)" />
+              </div>
+            </SettingRow>
+            <SettingRow label="Working day" help="When a working day starts and ends." :error="errors.work_start || errors.work_end">
+              <div class="flex flex-wrap items-center gap-2">
+                <TimePicker class="w-28" :model-value="hm(d.settings.work_start || '09:00')" :disabled="!d.is_admin" aria-label="Working day starts" data-setting="work_start"
+                  @update:model-value="(v) => setOne('work_start', v)" />
+                <span class="text-sm text-ink-gray-6">to</span>
+                <TimePicker class="w-28" :model-value="hm(d.settings.work_end || '19:00')" :disabled="!d.is_admin" aria-label="Working day ends" data-setting="work_end"
+                  @update:model-value="(v) => setOne('work_end', v)" />
+              </div>
+            </SettingRow>
+          </Card>
           <SectionHead>Monthly</SectionHead>
           <Card flush>
             <SettingRow label="Month plan" help="Plan each month: Today reminds you in its first three days until the plan exists." :error="errors.month_plan_enabled">
@@ -229,6 +247,16 @@
           <SettingRow label="Someday review after" help="A parked item comes back for review this long after it was parked." :error="errors.someday_review_months">
             <TextInput class="w-28" type="number" min="1" :model-value="d.settings.someday_review_months" :disabled="!d.is_admin" data-setting="someday_review_months"
               @change="(e) => setOne('someday_review_months', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">months</span></template></TextInput>
+          </SettingRow>
+          <SettingRow label="Inbox items not dealt with" help="What happens to items left in the Inbox, and after how many days. Items an agent is working on, and failed items, are never touched."
+            :error="errors.old_inbox_mode || errors.old_inbox_days" data-old-inbox-rule>
+            <div class="flex flex-wrap items-center gap-2">
+              <Select class="w-56" :model-value="d.settings.old_inbox_mode || 'Suggest'" :options="OLD_INBOX" :disabled="!d.is_admin" aria-label="Inbox items not dealt with"
+                data-setting="old_inbox_mode" @update:model-value="setOldInboxMode" />
+              <span class="text-sm text-ink-gray-6">after</span>
+              <TextInput class="w-24" type="number" min="1" :model-value="d.settings.old_inbox_days || 7" :disabled="!d.is_admin" data-setting="old_inbox_days"
+                @change="(e) => setOne('old_inbox_days', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">days</span></template></TextInput>
+            </div>
           </SettingRow>
           <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
         </Card>
@@ -384,6 +412,21 @@ import { dateTime, short } from '@/lib/dates'
 const COLOURS = ['blue', 'green', 'amber', 'red', 'violet', 'teal', 'orange', 'pink', 'cyan', 'gray'].map((c) => ({ label: c[0].toUpperCase() + c.slice(1), value: c }))
 const hm = (t) => (t ? String(t).padStart(8, '0').slice(0, 5) : '06:00')
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+// set 7: Inbox items not dealt with. Each choice brings its own default number of days, unless the days were changed by hand
+const OLD_INBOX = [{ label: 'Suggest decisions', value: 'Suggest' }, { label: 'Park them as ideas', value: 'Park' }, { label: 'Discard them to the trash', value: 'Discard' }]
+const OLD_INBOX_DAYS = { Suggest: 7, Park: 14, Discard: 14 }
+async function setOldInboxMode(v) {
+  const was = d.value.settings.old_inbox_mode || 'Suggest'
+  const days = Number(d.value.settings.old_inbox_days || 7)
+  await setOne('old_inbox_mode', v)
+  if (days === OLD_INBOX_DAYS[was] && days !== OLD_INBOX_DAYS[v]) await setOne('old_inbox_days', OLD_INBOX_DAYS[v])
+}
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const workDays = computed(() => String(d.value?.settings.work_days || 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday').split(',').filter(Boolean))
+function toggleDay(day) {
+  const set = workDays.value.includes(day) ? workDays.value.filter((x) => x !== day) : [...workDays.value, day]
+  if (set.length) setOne('work_days', WEEKDAYS.filter((x) => set.includes(x)).join(','))
+}
 const SCHEMES = [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }, { label: 'System', value: 'system' }]
 const ACCESS = [{ label: 'Can view', value: 'Read' }, { label: 'Can edit', value: 'Write' }]
 const AGENT_ACCESS = [{ label: 'No access', value: '' }, ...ACCESS]
@@ -510,7 +553,7 @@ async function setOne(field, value) {
   errors[field] = ''
   d.value.settings[field] = value
   let v = value
-  if (['weekly_review_time', 'start_of_day'].includes(field) && v && v.length === 5) v += ':00'
+  if (['weekly_review_time', 'start_of_day', 'work_start', 'work_end'].includes(field) && v && v.length === 5) v += ':00'
   try {
     await api('settings.save', { values: { [field]: v } })
     toast.success('Saved')

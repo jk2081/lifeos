@@ -9,15 +9,15 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-manual-commit | 5 |
 | frappe-security-file-traversal | 4 |
 | frappe-setuser | 13 |
-| frappe-sql-format-injection | 80 |
-| Total | 102 |
+| frappe-sql-format-injection | 81 |
+| Total | 103 |
 
 ## frappe-manual-commit
 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
-| `lifeos/install.py` | 27 | after_install: the spaces and index DDL must be kept before install-app goes on |
+| `lifeos/install.py` | 30 | after_install: the spaces and index DDL must be kept before install-app goes on |
 | `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 258 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 317 | load test: its removal must stick even when run inside a test |
@@ -26,7 +26,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/settings.py` | 182 | the site's own backup folder, names only |
+| `lifeos/api/settings.py` | 185 | the site's own backup folder, names only |
 | `lifeos/files.py` | 74 | local_path keeps the path inside the site's files folders |
 | `lifeos/sources.py` | 102 | a fixed name in a temporary folder made here |
 | `lifeos/sources.py` | 112 | pdftoppm's own output in a temporary folder made here |
@@ -38,9 +38,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/demo.py` | 32 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/demo.py` | 199 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/demo.py` | 203 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 249 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 263 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 279 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 271 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 285 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 301 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/loadtest.py` | 44 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 136 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 154 | load test: reads are timed as a member of the space, the way a request runs |
@@ -85,7 +85,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/outbox.py` | 105 | the parts are constant SQL; the area condition comes from area_filter; values are parameters |
 | `lifeos/api/search.py` | 58 | FIELDS and WHERE are fixed fragments; the search text is the %(q)s parameter |
 | `lifeos/api/search.py` | 70 | FIELDS, WHERE and the LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
-| `lifeos/api/settings.py` | 36 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |
+| `lifeos/api/settings.py` | 39 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |
 | `lifeos/api/someday.py` | 71 | each branch is _sub's fixed SQL over a PARKABLE table, with std_filters columns checked against meta |
 | `lifeos/api/someday.py` | 85 | the union as above; `order` and `way` come from fixed allowlists; values are parameters |
 | `lifeos/api/sources.py` | 160 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters (TABS and STATUSES are fixed maps |
@@ -99,7 +99,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/tasks.py` | 271 | open_loops_where() is a constant fragment |
 | `lifeos/api/timeline.py` | 38 | ROW_FIELDS and vault_guard are constants; callers pass fixed WHERE and ORDER fragments; values are parameters |
 | `lifeos/api/timeline.py` | 71 | fixed fragments, std_filters columns checked against meta; values are parameters |
-| `lifeos/api/today.py` | 57 | `lens` is area_filter's fixed SQL; values are parameters |
+| `lifeos/api/today.py` | 58 | `lens` is area_filter's fixed SQL; values are parameters |
 | `lifeos/api/utils.py` | 242 | `base` and the tab conditions are fixed SQL from the list methods; values are parameters |
 | `lifeos/api/utils.py` | 281 | columns pass column() (DocType meta), aggregates an allowlist, `base` is fixed SQL; values are parameters |
 | `lifeos/api/utils.py` | 284 | as above |
@@ -122,11 +122,12 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/devtools.py` | 59 | development tool: dt comes from the SPACE_DOCTYPES constant; values are parameters |
 | `lifeos/devtools.py` | 64 | development tool: table names from SPACE_DOCTYPES and their meta's table fields; values are parameters |
 | `lifeos/devtools.py` | 67 | development tool: dt comes from the SPACE_DOCTYPES constant; space is a parameter |
-| `lifeos/devtools.py` | 198 | development tool: DocType and field from the _TITLED constant |
-| `lifeos/devtools.py` | 248 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
-| `lifeos/devtools.py` | 273 | development tool: child table names from the meta of a checked DocType; values are parameters |
-| `lifeos/devtools.py` | 283 | development tool: dt is checked to be an existing DocType; names are a parameter |
+| `lifeos/devtools.py` | 200 | development tool: DocType and field from the _TITLED constant |
+| `lifeos/devtools.py` | 250 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
+| `lifeos/devtools.py` | 275 | development tool: child table names from the meta of a checked DocType; values are parameters |
+| `lifeos/devtools.py` | 288 | development tool: dt is checked to be an existing DocType; names are a parameter |
 | `lifeos/index.py` | 97 | column names come from the fixed COLUMNS list; every value is a %s parameter |
+| `lifeos/old_inbox.py` | 259 | WHERE is constant SQL plus area_filter's fixed fragment; values are parameters |
 | `lifeos/patches/v7/projects_into_goals.py` | 151 | `dt` comes from the constant RENAMED |
 | `lifeos/patches/v7/projects_into_goals.py` | 170 | `end` is "from" or "to" |
 | `lifeos/patches/v7/projects_into_goals.py` | 180 | DocType and field names come from the constant DYNAMIC |

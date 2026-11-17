@@ -174,6 +174,8 @@ _TITLED = {
 	"Life Person": "full_name", "Life Proposal": "preview",
 	# UX fixes, set 5
 	"Life Idea": "title", "Life Habit": "title", "Life Ask Thread": "title",
+	# set 7
+	"Life Exit": "title", "Life Goal Reading": "title",
 }
 
 
@@ -192,7 +194,7 @@ def find_test_debris(site_check=True):
 	import re
 
 	rx = _stamp_re()
-	s4 = re.compile(r"^S[45] [^\n]*?\b(m[0-9a-z]{7})\b")  # sets 4 and 5: "S4 <what> [<width>] <stamp>"
+	s4 = re.compile(r"^S[457] [^\n]*?\b(m[0-9a-z]{7})\b")  # sets 4, 5 and 7: "S4 <what> [<width>] <stamp>"
 	stamps = set()
 	for dt, field in _TITLED.items():
 		# nosemgrep: frappe-sql-format-injection -- development tool: DocType and field from the _TITLED constant
@@ -273,6 +275,9 @@ def purge_test_debris(dry_run=True):
 			# nosemgrep: frappe-sql-format-injection -- development tool: child table names from the meta of a checked DocType; values are parameters
 			frappe.db.sql(f"delete from `tab{tf.options}` where parenttype=%s and parent in %s", (dt, names))
 		frappe.db.sql("delete from `tabLife Index` where ref_doctype=%s and ref_name in %s", (dt, names))
+		frappe.db.sql("delete from `tabLife Exit` where record_doctype=%s and record_name in %s", (dt, names))  # set 7
+		if dt == "Life Habit":
+			frappe.db.sql("delete from `tabLife Month Plan Habit` where habit in %s", (names,))
 		frappe.db.sql("delete from `tabLife Link` where (from_doctype=%s and from_name in %s) or (to_doctype=%s and to_name in %s)",
 			(dt, names, dt, names))
 		files += frappe.get_all("File", filters={"attached_to_doctype": dt, "attached_to_name": ["in", names]}, fields=["name", "file_url", "is_private"])
