@@ -158,7 +158,7 @@ class AnthropicBackend:
 			"usage": {"input_tokens": inp, "output_tokens": int(u.output_tokens or 0)}}
 
 
-def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_text=None, space=None, effort=None, schema=None):
+def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_text=None, space=None, effort=None, schema=None, user=None):
 	"""One request to the model, after the cap check, with its usage recorded. Returns
 	{content: [blocks as dicts], stop_reason, usage, cost, model}. `kind` picks the Ask model or the short-task model."""
 	check(purpose)
@@ -170,7 +170,7 @@ def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_
 	if schema:  # structured output: the answer is JSON that matches the schema
 		params["output_config"]["format"] = {"type": "json_schema", "schema": schema}
 	out = backend().run(params, on_text)
-	out["cost"] = record(out.get("model") or model, out["usage"]["input_tokens"], out["usage"]["output_tokens"], purpose, space)
+	out["cost"] = record(out.get("model") or model, out["usage"]["input_tokens"], out["usage"]["output_tokens"], purpose, space, user)
 	out["model"] = out.get("model") or model
 	return out
 

@@ -39,7 +39,10 @@ def window(ctx, space):
 		and x.kind in ('Chat', 'Inbox', 'Note') and x.modified >= %s{ctx.vault_sql()} order by x.modified desc limit %s""", (space, since, MAX_RECORDS), as_dict=True)
 	out = []
 	for r in rows:
-		got = t_get_record(ctx, doctype=r.ref_doctype, name=r.ref_name)
+		try:
+			got = t_get_record(ctx, doctype=r.ref_doctype, name=r.ref_name)
+		except (frappe.PermissionError, frappe.DoesNotExistError):
+			continue  # a record the user may not read is never sent
 		if got.get("error"):
 			continue
 		got["text"] = (got.get("text") or "")[:CHARS_PER_RECORD]
@@ -67,7 +70,7 @@ def candidates(space, user):
 		pluck="title", limit=300)
 	prompt = json.dumps({"today": today(), "records": records, "open_task_titles": open_tasks, "dismissed": guidance(space)}, default=str)
 	try:
-		out = client.call("Insights", SYSTEM, [{"role": "user", "content": prompt}], space=space, schema=SCHEMA, max_tokens=4000)
+		out = client.call("Insights", SYSTEM, [{"role": "user", "content": prompt}], space=space, schema=SCHEMA, max_tokens=4000, user=user)
 	except client.AIError as e:
 		return [], f"AI insights skipped: {e}"
 	data = client.json_of(out["content"]) or {}

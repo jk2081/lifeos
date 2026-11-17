@@ -7,18 +7,37 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | Rule | Exceptions |
 | --- | --- |
 | frappe-manual-commit | 5 |
+| frappe-setuser | 13 |
 | frappe-sql-format-injection | 68 |
-| Total | 73 |
+| Total | 86 |
 
 ## frappe-manual-commit
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/chat_import.py` | 217 | long background job: progress is saved every 25 conversations |
+| `lifeos/chat_import.py` | 220 | long background job: progress is saved every 25 conversations |
 | `lifeos/install.py` | 27 | after_install: the spaces and index DDL must be kept before install-app goes on |
 | `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 259 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 318 | load test: its removal must stick even when run inside a test |
+
+## frappe-setuser
+
+| File | Line | Reason |
+| --- | --- | --- |
+| `lifeos/demo.py` | 32 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 194 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 198 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 244 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 258 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 274 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/loadtest.py` | 44 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/loadtest.py` | 137 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/loadtest.py` | 155 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/loadtest.py` | 170 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/loadtest.py` | 274 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/loadtest.py` | 291 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/loadtest.py` | 312 | load test: reads are timed as a member of the space, the way a request runs |
 
 ## frappe-sql-format-injection
 

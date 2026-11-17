@@ -267,14 +267,18 @@ def resolve_space(space=None, write=False):
 	return require_space(space, write=write)
 
 
-def get_doc_checked(doctype, name, ptype="read"):
-	"""Load a record and stop unless the session user may `ptype` it. A Vault document closed to an agent is answered
-	as if it did not exist."""
-	require_login()
+def get_doc_checked(doctype, name, ptype="read", user=None):
+	"""Load a record and stop unless the user (the session user by default) may `ptype` it. A Vault document closed to
+	an agent is answered as if it did not exist. Jobs pass `user` instead of switching the session to it."""
+	if user is None:
+		require_login()
 	doc = frappe.get_doc(doctype, name)
-	if doctype == VAULT and vault_hidden(doc.space):
+	if doctype == VAULT and vault_hidden(doc.space, user):
 		raise frappe.DoesNotExistError(_("{0} {1} not found").format(_(doctype), name))
-	doc.check_permission(ptype)
+	if user is None:
+		doc.check_permission(ptype)
+	elif not frappe.has_permission(doctype, ptype, doc=doc, user=user):
+		raise frappe.PermissionError(_("{0} may not {1} {2} {3}").format(user, _(ptype), _(doctype), name))
 	return doc
 
 

@@ -327,3 +327,9 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Chat import undoes one bad conversation alone** (a savepoint per conversation). Before, a failure rolled back to the last commit, so up to 24 conversations counted as imported could be lost. Progress is still committed every 25 conversations, but only inside a worker job.
 - **The nightly insights job uses a savepoint per space** instead of a commit per space; the scheduler commits at the end.
 - **Removed:** the commits in `archive.run_daily` and `index.rebuild` (the scheduler, migrate and `bench execute` commit), in `install.set_owner` and `add_member`, `seed`, `demo` and `devtools` (all run through `bench execute`, which commits). **Kept with a reason:** `after_install`, and the load test's seed and removal.
+
+### 4. Switching user
+
+- **The nightly insights job no longer switches to each space's owner.** It passes the owner to `insights.run(..., user=)`. The AI tools read every record through `permissions.get_doc_checked(..., user=)`, which checks that user's permission (and the Vault rule) without changing the session. AI usage is recorded against that user, and a record the user may not read is skipped, not an error.
+- **The chat import job never switches user.** Frappe already runs a queued job as the person who queued it. `chat_import.run` now refuses to run as anyone else, and every chat goes through `chats.log`, which checks that person's write access to the space.
+- **Demo data and the load test keep `frappe.set_user`**, with a reason on each line: they act as the owner, the agent or a member on purpose.

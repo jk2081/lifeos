@@ -265,17 +265,15 @@ def run(space, ai=True, user=None):
 
 
 def run_nightly():
-	"""06:00 every day: each space, as its owner (so the AI reads only what the owner may read)."""
+	"""06:00 every day: each space for its owner. The session is not switched: `run` reads and checks every record as
+	that user, so the AI sees only what the owner may read."""
 	for s in frappe.get_all("Life Space", fields=["name", "owner_user", "ask_enabled"]):
 		if not s.owner_user:
 			continue
-		frappe.set_user(s.owner_user)
 		# a space that fails is undone alone; the scheduler commits the rest when the job ends
 		frappe.db.savepoint("lifeos_insights")
 		try:
-			run(s.name, ai=bool(s.ask_enabled))
+			run(s.name, ai=bool(s.ask_enabled), user=s.owner_user)
 		except Exception:
 			frappe.db.rollback(save_point="lifeos_insights")
 			frappe.log_error(title=f"Life OS insights for {s.name}")
-		finally:
-			frappe.set_user("Administrator")

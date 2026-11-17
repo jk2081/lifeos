@@ -215,7 +215,7 @@ def t_get_record(ctx, ref=None, doctype=None, name=None):
 		return {"error": "That kind of record cannot be read here."}
 	if doctype == "Life Vault Document" and not ctx.vault_ok:
 		return {"error": "Vault documents are not available to Ask in this space."}
-	doc = permissions.get_doc_checked(doctype, name)
+	doc = permissions.get_doc_checked(doctype, name, user=ctx.user)
 	if doc.get("space") != ctx.space:
 		return {"error": "That record is in another space."}
 	if doctype == "Life Inbox Item" and doc.get("vault_document") and not ctx.vault_ok:

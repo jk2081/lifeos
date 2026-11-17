@@ -41,7 +41,7 @@ def space_names(spaces=50):
 def seed(rows=100000, users=20, spaces=50, big_share=0.5):
 	"""Create the spaces, users and rows. Safe to run again: it removes an earlier load first."""
 	remove()
-	frappe.set_user("Administrator")
+	frappe.set_user("Administrator")  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs
 	rng = random.Random(7)
 	vocab = _vocabulary(rng)
 	rows, users, spaces = int(rows), int(users), int(spaces)
@@ -134,7 +134,7 @@ def measure(user=None, space=None):
 
 	space = space or space_names(1)[0]
 	before = frappe.session.user
-	frappe.set_user(user or devtools.OWNER)
+	frappe.set_user(user or devtools.OWNER)  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs
 	permissions.clear_cache()
 	try:
 		area = frappe.db.get_value("Life Area", {"space": space}, "name", order_by="sort_order asc, creation asc")
@@ -152,7 +152,7 @@ def measure(user=None, space=None):
 			"search_two_words": _time(lambda: search.query(word + " " + RARE_WORD[:5], space=space)),
 		}
 	finally:
-		frappe.set_user(before)
+		frappe.set_user(before)  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs
 	out["target_ms"] = TARGET_MS
 	out["slowest_ms"] = max(v["median_ms"] for v in out.values() if isinstance(v, dict))
 	out["passed"] = out["slowest_ms"] < TARGET_MS
@@ -167,7 +167,7 @@ SOURCE_KINDS = [("Voice", "Voice Note"), ("Document", "Upload"), ("Photo", "Uplo
 def seed_sources(sources=20000, pages=2000, space=None, text_chars=5000):
 	"""Add `sources` sources (nine in ten inbox items, one in ten chat logs) with about `text_chars` characters of text each, and
 	`pages` wiki pages with two changes each, to the big load space. Bulk SQL, like seed(). Run seed() first."""
-	frappe.set_user("Administrator")
+	frappe.set_user("Administrator")  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs
 	rng = random.Random(11)
 	vocab = _vocabulary(rng)
 	space = space or space_names(1)[0]
@@ -271,7 +271,7 @@ def measure_sources(user=None, space=None):
 
 	space = space or space_names(1)[0]
 	before = frappe.session.user
-	frappe.set_user(user or devtools.OWNER)
+	frappe.set_user(user or devtools.OWNER)  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs
 	permissions.clear_cache()
 	try:
 		word = frappe.db.sql("select title from `tabLife Index` where space=%s and kind='Inbox' limit 1 offset 700", space)[0][0].split()[0].lower()
@@ -288,7 +288,7 @@ def measure_sources(user=None, space=None):
 			"wiki_changes_list": _time(lambda: wiki.changes(space=space)),
 		}
 	finally:
-		frappe.set_user(before)
+		frappe.set_user(before)  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs
 	out["target_ms"] = TARGET_MS
 	out["slowest_ms"] = max(v["median_ms"] for v in out.values() if isinstance(v, dict))
 	out["passed"] = out["slowest_ms"] < TARGET_MS
@@ -309,7 +309,7 @@ def run_sources(rows=100000, sources=20000, pages=2000, keep=0):
 
 def remove():
 	"""Remove the load spaces, their rows and the load users."""
-	frappe.set_user("Administrator")
+	frappe.set_user("Administrator")  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs
 	for name in frappe.get_all("Life Space", filters={"name": ("like", PREFIX + "%")}, pluck="name"):
 		devtools.purge_space(name, drop=True)
 	for email in frappe.get_all("User", filters={"name": ("like", "load%@lifeos.test")}, pluck="name"):

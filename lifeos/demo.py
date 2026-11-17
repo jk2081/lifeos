@@ -29,7 +29,7 @@ def load(space="Private"):
 	if not frappe.db.exists("Life Cycle", {"space": space, "title": seed.CYCLE_TITLE}):
 		seed.load(space)
 	owner, agent = _user(devtools.OWNER), _user(devtools.AGENT)
-	frappe.set_user(owner)
+	frappe.set_user(owner)  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	permissions.clear_cache()
 	t = seed.Tracker(seed.DEMO_KEY)
 	now = getdate(today())
@@ -191,11 +191,11 @@ def load(space="Private"):
 		if file_name:
 			devtools.attach("Life Inbox Item", item["name"], file_name, content)
 		made.append(item["name"])
-	frappe.set_user(agent)
+	frappe.set_user(agent)  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	permissions.clear_cache()
 	for _ in made:
 		fake.process_one(devtools.LocalClient(), log=lambda *a: None)
-	frappe.set_user("Administrator")
+	frappe.set_user("Administrator")  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	t.save()
 	return f"Demo data loaded into {space}: {len(t.records)} records."
 
@@ -241,7 +241,7 @@ def load_v4(space="Private"):
 	if frappe.parse_json(frappe.db.get_default(DEMO4_KEY) or "[]"):
 		return "The set 4 demo is already loaded. Run lifeos.demo.remove_v4 first."
 	owner, agent = _user(devtools.OWNER), _user(devtools.AGENT)
-	frappe.set_user(owner)
+	frappe.set_user(owner)  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	permissions.clear_cache()
 	t = seed.Tracker(DEMO4_KEY)
 	area = {a.area_name: a.name for a in frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set")}, fields=["name", "area_name"])}
@@ -255,7 +255,7 @@ def load_v4(space="Private"):
 		item = inbox.create_item(title=title, source_type=stype, space=space, raw_text=text, intent=intent, **extra)
 		t.records.append(["Life Inbox Item", item["name"]])
 		made.append(item["name"])
-	frappe.set_user(agent)
+	frappe.set_user(agent)  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	permissions.clear_cache()
 	fake = devtools.load_fake_agent()
 	for _ in made:
@@ -271,7 +271,7 @@ def load_v4(space="Private"):
 			t.records.append(["Life Note", p["name"]])
 		except frappe.DuplicateEntryError:
 			pass
-	frappe.set_user("Administrator")
+	frappe.set_user("Administrator")  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	for name in frappe.get_all("Life Note", filters={"space": space, "collection": "Wiki"}, pluck="name"):
 		if ["Life Note", name] not in t.records:
 			t.records.append(["Life Note", name])

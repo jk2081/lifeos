@@ -182,7 +182,10 @@ def run(space, system, file_url, user):
 	"""The background job. Progress is in the cache under the space and system, so the screen can show it after a reload."""
 	from lifeos.api import chats, connections
 
-	frappe.set_user(user)
+	# Frappe runs a queued job as the user who queued it, and chats.log checks that user's access to the space; the job
+	# never switches users, so it can only write what its user may.
+	if frappe.session.user != user:
+		frappe.throw(_("A chat import runs as the person who started it."), frappe.PermissionError)
 	_set(space, system, status="Reading", done=0, total=0, created=0, updated=0, unchanged=0, skipped=0, error=None,
 		started_on=str(now_datetime())[:19], finished_on=None, user=user)
 	try:
