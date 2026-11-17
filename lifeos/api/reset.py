@@ -320,12 +320,7 @@ def undo(log: str | list):
 			if dd:
 				trash.restore(dd)
 		elif kind == "unaccept":
-			frappe.db.set_value("Life Proposal", op["proposal"], {"status": "Pending", "created_doctype": None, "created_name": None,
-				"decided_by": None, "decided_on": None})
-			if op.get("doctype") and op.get("name") and frappe.db.exists(op["doctype"], op["name"]):
-				permissions.get_doc_checked(op["doctype"], op["name"], "delete")
-				frappe.delete_doc(op["doctype"], op["name"], ignore_permissions=True, delete_permanently=True)
-			frappe.db.set_value("Life Inbox Item", op["item"], {"status": "To Review", "finished_on": None})
+			_unaccept(op.get("proposal"))
 		elif kind == "unmerge":
 			from lifeos import archive
 			from lifeos.api import wiki
@@ -345,6 +340,26 @@ def undo(log: str | list):
 			if changed:
 				doc.save()
 	return {"ok": True}
+
+
+def _unaccept(proposal):
+	"""Undo an accepted note proposal. The undo log comes from the browser, so only the proposal's name is taken from it:
+	the item and the record made are read from the proposal, and each is checked for this user."""
+	from lifeos import index
+
+	if not isinstance(proposal, str) or not proposal:
+		frappe.throw(_("Nothing to undo."))
+	prop = permissions.get_doc_checked("Life Proposal", proposal, "write")
+	if prop.status != "Accepted":
+		return
+	item = permissions.get_doc_checked("Life Inbox Item", prop.inbox_item, "write")
+	if prop.created_doctype and prop.created_name and frappe.db.exists(prop.created_doctype, prop.created_name):
+		permissions.get_doc_checked(prop.created_doctype, prop.created_name, "delete")
+		frappe.delete_doc(prop.created_doctype, prop.created_name, ignore_permissions=True, delete_permanently=True)
+	frappe.db.set_value("Life Proposal", prop.name, {"status": "Pending", "created_doctype": None, "created_name": None,
+		"decided_by": None, "decided_on": None})
+	frappe.db.set_value("Life Inbox Item", item.name, {"status": "To Review", "finished_on": None})
+	index.update(frappe.get_doc("Life Inbox Item", item.name))
 
 
 @frappe.whitelist(methods=["GET"])

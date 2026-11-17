@@ -55,6 +55,9 @@ def _rows(space=None):
 			continue
 		if space and data.get("space") != space:
 			continue
+		if data.get("space") and permissions.vault_hidden(data["space"]) and (
+				r.deleted_doctype == permissions.VAULT or data.get("vault_document")):
+			continue  # a closed Vault stays closed to agents in the trash too (pre-step 6 audit)
 		meta = frappe.get_meta(r.deleted_doctype)
 		out.append({"name": r.name, "doctype": r.deleted_doctype, "kind": LABELS.get(r.deleted_doctype, r.deleted_doctype),
 			"record": r.deleted_name, "title": data.get(meta.title_field or "title") or data.get("title") or r.deleted_name,

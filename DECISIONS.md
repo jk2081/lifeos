@@ -337,3 +337,9 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 ### 5. File paths
 
 - **Every read of an original goes through `files.read` / `files.local_path`**, which resolves the File record's real path and refuses anything outside the site's private or public files folder: thumbnails, previews and the chat export import. A `../` path or a symbolic link out of the folder reads nothing (Frappe's own path check let a symbolic link through). The two `open()` calls on pdftoppm's temporary folder carry a reasoned exception.
+
+### 6. Audit fixes (behaviour that changed)
+
+- **A record that only bookkeeping rows point at can now be deleted**: the record a proposal made, an insight's evidence, an Ask thread's scope, an idea's source or target, the source of a wiki change (`ignore_links_on_delete`). Before, every task accepted from review was refused with "still used by other records". Those rows keep the old name and simply stop resolving. A wiki page's cited source still blocks a delete.
+- **Agents no longer see** the sources Vault documents were made from in `inbox.list`, or deleted Vault documents and their sources in `trash.list`, while the space's Vault switch is off. The pages and REST already refused them one by one.
+- **Reset's undo trusts only the proposal's name from the browser** and checks the proposal, its item and the record made for the user.

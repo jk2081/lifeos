@@ -248,3 +248,79 @@ class TestPermissionHooksAnswerTrueOrFalse(LifeTestCase):
 			self.assertIs(permissions.has_app_permission(), True)
 		frappe.set_user("Guest")
 		self.assertIs(permissions.has_app_permission(), False)
+
+
+class TestAuditFixes(LifeTestCase):
+	"""The findings of the pre-step 6 audit that were High (and the trash, of the same kind as the inbox list)."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.sql("update `tabLife Inbox Item` set status='Done' where space in %s and status in ('New', 'Processing')", ((PRIVATE, SHARED),))
+
+	def _accepted_task(self, title="pre6 accepted"):
+		from lifeos.api import inbox, review
+
+		item = inbox.create_item(space=PRIVATE, title=f"{title} item", source_type="Message")
+		self.as_user(AGENT)
+		claimed = inbox.claim_next(space=PRIVATE)
+		self.assertEqual(claimed["name"], item["name"])
+		out = inbox.submit_result(claimed["name"], transcript_md="t", summary_md="s",
+			proposals=[{"kind": "Task", "payload": {"title": title, "area": "Tea"}}])
+		self.as_user(OWNER)
+		prop = out["created"][0]["name"]
+		res = review.decide(prop, "accept")
+		return item["name"], prop, res["created_name"]
+
+	def test_undo_takes_only_a_proposal_this_user_may_change(self):
+		from lifeos.api import reset
+
+		item, prop, task = self._accepted_task()
+		self.as_user(FAMILY)  # only in the Shared space
+		self.assertRaises(frappe.PermissionError, reset.undo, [{"op": "unaccept", "proposal": prop, "item": item}])
+		self.assertRaises(frappe.ValidationError, reset.undo, [{"op": "unaccept", "proposal": {"name": ["like", "%"]}}])
+		self.assertEqual(frappe.db.get_value("Life Proposal", prop, "status"), "Accepted")
+		self.assertEqual(frappe.db.get_value("Life Inbox Item", item, "status"), "Done")
+		self.as_user(OWNER)  # the owner's undo still works, and the index follows the item
+		reset.undo([{"op": "unaccept", "proposal": prop, "item": "ignored", "doctype": "Life Task", "name": "ignored"}])
+		self.assertEqual(frappe.db.get_value("Life Proposal", prop, "status"), "Pending")
+		self.assertFalse(frappe.db.exists("Life Task", task))
+		self.assertEqual(frappe.db.get_value("Life Index", {"ref_doctype": "Life Inbox Item", "ref_name": item}, "status"), "To Review")
+
+	def test_a_task_made_from_a_proposal_can_be_deleted(self):
+		from lifeos.api import trash
+
+		_item, prop, task = self._accepted_task("pre6 delete me")
+		trash.delete("Life Task", task)
+		self.assertFalse(frappe.db.exists("Life Task", task))
+		self.assertTrue(frappe.db.exists("Life Proposal", prop))
+
+	def _vault_source(self):
+		frappe.db.set_value("Life Space", PRIVATE, "agents_can_read_vault", 0)
+		permissions.clear_cache()
+		doc = self.make("Life Vault Document", title="pre6 passport", doc_type="ID")
+		item = self.make("Life Inbox Item", title="pre6 passport scan", source_type="Upload", transcript_md="pre6 SECRET")
+		frappe.db.set_value("Life Inbox Item", item.name, "vault_document", doc.name)
+		return doc, item
+
+	def test_an_agent_never_lists_the_source_of_a_closed_vault(self):
+		from lifeos.api import inbox
+
+		_doc, item = self._vault_source()
+		self.as_user(OWNER)
+		self.assertIn(item.name, [r.name for r in inbox.list(space=PRIVATE, include_archived=1, page_length=100)["items"]])
+		self.as_user(AGENT)
+		got = inbox.list(space=PRIVATE, include_archived=1, page_length=100)
+		self.assertNotIn(item.name, [r.name for r in got["items"]])
+		summary = inbox.list(space=PRIVATE, include_archived=1, summary={"fields": ["transcript_md"]})["summary"]
+		self.assertNotIn("pre6 SECRET", [r["transcript_md"] for r in summary["rows"]])
+
+	def test_an_agent_never_sees_a_deleted_vault_document_in_the_trash(self):
+		from lifeos.api import trash
+
+		doc, item = self._vault_source()
+		self.as_user(OWNER)
+		trash.delete("Life Inbox Item", item.name)  # the source refers to the document, so it goes first
+		trash.delete("Life Vault Document", doc.name)
+		self.assertTrue({doc.name, item.name} <= {r["record"] for r in trash.list(space=PRIVATE)["rows"]})
+		self.as_user(AGENT)
+		self.assertFalse({doc.name, item.name} & {r["record"] for r in trash.list(space=PRIVATE)["rows"]})

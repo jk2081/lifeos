@@ -266,6 +266,8 @@ def list(space: str | None = None, status: str | builtins.list | None = None, in
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	where, values = ["i.space = %(space)s"], {"space": space}
+	if permissions.vault_hidden(space):  # an agent never lists the source a Vault document was made from (pre-step 6 audit)
+		where.append("ifnull(i.vault_document, '') = ''")
 	if not flag(include_archived):
 		where.append("i.is_archived = 0")
 	if source_type:
