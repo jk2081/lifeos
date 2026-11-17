@@ -97,6 +97,14 @@ Needs a decision first: what read, propose and act mean per kind of record, and 
 
 Coach role (numbers only), cohort dashboard, setup template and first-week onboarding. Parked on 17 November 2026; not scheduled.
 
+### Parked: framework gaps
+
+Found when comparing Life OS with GTD, timeboxing, OKRs and Atomic Habits on 17 November 2026. Parked; revisit after two weeks of daily use.
+
+- Time for life beyond goals: a habit gets an optional time and days; the weekly review offers private calendar slots for it alongside goal work.
+- Doing the right thing for the moment: the assistant sets a size on each task it proposes (Quick, About an hour, Half a day); Next gets a "Quick wins" filter.
+- Out of scope: distraction (phone, attention) and habit design (better suited to coaching).
+
 ## Open decisions
 
 1. The agents' permission model (before set 11).
