@@ -13,6 +13,13 @@
   "closed_on",
   "area",
   "done_when",
+  "measure_kind",
+  "measure",
+  "unit",
+  "start_value",
+  "target_value",
+  "current_value",
+  "current_on",
   "serves",
   "on_hold",
   "sort_order",
@@ -89,6 +96,48 @@
    "fieldtype": "Small Text",
    "label": "Done when",
    "description": "What will be true when this goal is reached."
+  },
+  {
+   "fieldname": "measure_kind",
+   "fieldtype": "Select",
+   "label": "Measure Kind",
+   "options": "\nMilestone\nNumber",
+   "description": "How you will know it is done: a finish line (Milestone) or a number against a target (Number)."
+  },
+  {
+   "fieldname": "measure",
+   "fieldtype": "Data",
+   "label": "Measure",
+   "description": "What is measured, for example Ghillidary yield."
+  },
+  {
+   "fieldname": "unit",
+   "fieldtype": "Data",
+   "label": "Unit",
+   "description": "For example kg/ha."
+  },
+  {
+   "fieldname": "start_value",
+   "fieldtype": "Float",
+   "label": "Start Value"
+  },
+  {
+   "fieldname": "target_value",
+   "fieldtype": "Float",
+   "label": "Target Value"
+  },
+  {
+   "fieldname": "current_value",
+   "fieldtype": "Float",
+   "label": "Current Value",
+   "read_only": 1,
+   "description": "The latest confirmed reading."
+  },
+  {
+   "fieldname": "current_on",
+   "fieldtype": "Date",
+   "label": "Current On",
+   "read_only": 1
   },
   {
    "fieldname": "serves",
@@ -202,7 +251,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-17 18:19:36.000000",
+ "modified": "2026-11-18 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Goal",

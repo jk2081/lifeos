@@ -105,7 +105,8 @@ def grid(cycle_name) -> dict:
 	goals = []
 	for g in frappe.get_all(
 		"Life Goal", filters={"cycle": cycle.name},
-		fields=["name", "title", "area", "serves", "outcome", "result_note", "carried_from", "final_score", "sort_order"],
+		fields=["name", "title", "area", "serves", "outcome", "result_note", "carried_from", "final_score", "sort_order",
+			"measure_kind", "done_when", "measure", "unit", "start_value", "target_value", "current_value"],
 		order_by="sort_order asc, creation asc",
 	):
 		acts = by_goal.get(g.name, [])
@@ -117,6 +118,16 @@ def grid(cycle_name) -> dict:
 			"ticks": {str(w): n for w, n in ticks.get(a.name, {}).items()},
 		} for a in acts]
 		goals.append(g)
+	# the longer goal each cycle goal serves, with its progress, shown beside it on the 12 Weeks tab (set 7)
+	from lifeos import readings
+
+	served = {r.name: r for r in frappe.get_all("Life Goal", filters={"name": ("in", [g.serves for g in goals if g.serves] or ["-"])},
+		fields=["name", "title", "goal_type", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value"])}
+	for g in goals:
+		s = served.get(g.serves)
+		g["serves_title"] = s.title if s else None
+		g["serves_progress"] = readings.summary(s) if s and s.measure_kind == "Number" else None
+		g["result"] = readings.summary({**g, "goal_type": "12 Week Year", "score": g["percent"]})
 	weeks = [week_score(cycle, w, actions, ticks) for w in range(1, WEEKS + 1)]
 	started = week_of(cycle) >= 1
 	return {
@@ -256,8 +267,15 @@ def plan_next_cycle(cycle_name, goals=None, title=None) -> dict:
 		copy = frappe.get_doc({
 			"doctype": "Life Goal", "space": old.space, "cycle": new.name, "title": old.title, "area": old.area,
 			"serves": old.serves, "sort_order": old.sort_order, "carried_from": old.name, "outcome": "In Progress",
+			"done_when": old.done_when, "measure_kind": old.measure_kind, "measure": old.measure, "unit": old.unit,
+			"start_value": old.start_value, "target_value": old.target_value,
 			"actions": [{"title": a.title, "per_week": a.per_week, "status": "Open"} for a in old.actions if a.status == "Open"],
 		}).insert(ignore_permissions=True)
+		if old.measure_kind == "Number" and old.current_value is not None:
+			# the carried goal starts from where the old one got to
+			frappe.get_doc({"doctype": "Life Goal Reading", "space": copy.space, "goal": copy.name, "date": old.current_on or today(),
+				"value": old.current_value, "status": "Confirmed", "suggested_by": "Owner",
+				"excerpt": "Carried from the previous cycle"}).insert(ignore_permissions=True)
 		old.outcome = "Carried"
 		old.flags.allow_closed = True
 		old.save(ignore_permissions=True)

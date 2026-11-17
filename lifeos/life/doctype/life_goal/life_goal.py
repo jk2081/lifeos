@@ -40,6 +40,7 @@ class LifeGoal(Document):
 		if self.goal_type != "Open":
 			self.on_hold = 0
 		self.check_serves()
+		self.check_measure()
 		check_cycle_open(self.cycle, self.flags)
 		for a in self.actions:
 			a.per_week = max(1, int(a.per_week or 1))
@@ -47,6 +48,18 @@ class LifeGoal(Document):
 				a.done_on = today()
 			if a.status != "Done":
 				a.done_on = None
+
+	def check_measure(self):
+		"""Key results (set 7): a milestone goal needs its finish line, a number goal its measure, start and target. The
+		current value is the latest confirmed reading and is never typed."""
+		from lifeos import readings
+
+		if self.measure_kind != "Number":
+			self.measure = self.unit = None
+			self.start_value = self.target_value = None
+		if self.is_new() and not self.flags.from_restore:
+			self.current_value = self.current_on = None
+		readings.check_goal(self)
 
 	def check_serves(self):
 		"""A goal serves a longer goal of the same space, never itself and never in a loop."""
@@ -77,3 +90,4 @@ class LifeGoal(Document):
 	def on_trash(self):
 		check_cycle_open(self.cycle, self.flags)
 		frappe.db.delete("Life Action Log", {"goal": self.name})
+		frappe.db.delete("Life Goal Reading", {"goal": self.name})
