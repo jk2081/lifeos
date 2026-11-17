@@ -60,10 +60,12 @@ def list(space: str | None = None, area: str | None = None, project: str | None 
 	if summary:
 		return {"summary": summarise("Life Index", f"from `tabLife Index` x where {clause}", values, "x", summary, start, page_length)}
 	order = std_order("Life Index", order_by, "x", SORTS) or sort_order(sort, dir, SORTS, "x.modified desc")
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	rows = frappe.db.sql(
 		f"""select x.ref_name as name, x.title, x.area, x.project, x.record_date, x.modified, x.is_archived from `tabLife Index` x
 		where {clause} order by {order}, x.ref_name limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True)
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {clause}", values)[0][0]
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	projects = names_map("Life Project", [r.project for r in rows], "title")

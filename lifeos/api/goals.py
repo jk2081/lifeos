@@ -32,6 +32,7 @@ def task_counts(goals):
 	if not goals or spaces == []:
 		return {}
 	sp = "and t.space in %(spaces)s" if spaces is not None else ""
+	# nosemgrep: frappe-sql-format-injection -- `sp` is one of two constant fragments; values are parameters
 	rows = frappe.db.sql(f"""select t.goal, sum(t.status = 'Done'), count(*) from `tabLife Task` t
 		where t.goal in %(goals)s and t.status in %(counted)s {sp} group by t.goal""",
 		{"goals": goals, "counted": COUNTED, "spaces": spaces or [""]})
@@ -87,6 +88,7 @@ def list(space: str | None = None, state: str | None = "in_progress", goal_type:
 	tabs = tab_counts(f"from `tabLife Goal` g where g.space=%(space)s {t_where}{extra}", {**t_values, **values, **base}, TABS)
 	if summary:
 		return {"summary": summarise("Life Goal", f"from `tabLife Goal` g where g.space=%(space)s {where}", {**base, **values}, "g", summary, start, page_length), "tabs": tabs}
+	# nosemgrep: frappe-sql-format-injection -- WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters
 	names = frappe.db.sql(f"select g.name from `tabLife Goal` g where g.space=%(space)s {where}", {**base, **values}, pluck=True)
 	counts = task_counts(names)
 	total_done = sum(counts.get(n, (0, 0))[0] for n in names)

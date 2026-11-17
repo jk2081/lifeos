@@ -76,6 +76,7 @@ def list(space: str | None = None, status: str | None = "New", kind: str | None 
 		values["act"] = rules.ACTIONABLE
 	base = " and ".join(where)
 	tabs = {s: 0 for s in STATUSES}
+	# nosemgrep: frappe-sql-format-injection -- WHERE is joined from fixed fragments; every value is a parameter
 	for s, n in frappe.db.sql(f"select status, count(*) from `tabLife Insight` where {base} group by status", values):
 		tabs[s] = n
 	tabs["all"] = sum(tabs.values())
@@ -83,8 +84,10 @@ def list(space: str | None = None, status: str | None = "New", kind: str | None 
 		where.append("status=%(status)s")
 		values["status"] = status
 	clause = " and ".join(where)
+	# nosemgrep: frappe-sql-format-injection -- WHERE is joined from fixed fragments; every value is a parameter
 	rows = frappe.db.sql(f"""select name, kind, title, body, status, snooze_until, source, area, found_on, actions, dismiss_reason, acted_note, creation
 		from `tabLife Insight` where {clause} order by rank asc, creation desc limit %(start)s, %(len)s""", {**values, "start": start, "len": page_length}, as_dict=True)
+	# nosemgrep: frappe-sql-format-injection -- WHERE is joined from fixed fragments; every value is a parameter
 	total = frappe.db.sql(f"select count(*) from `tabLife Insight` where {clause}", values)[0][0]
 	kinds = frappe.db.sql_list(f"select distinct kind from `tabLife Insight` where {base}", values)
 	return {"rows": _out(rows), "total": total, "tabs": tabs, "kinds": kinds,

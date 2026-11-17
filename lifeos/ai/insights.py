@@ -34,6 +34,7 @@ SCHEMA = {"type": "object", "additionalProperties": False, "required": ["candida
 def window(ctx, space):
 	"""The records of the last 14 days the detector reads, through get_record (space, Vault and permission rules)."""
 	since = add_days(today(), -WINDOW_DAYS)
+	# nosemgrep: frappe-sql-format-injection -- only the code-owned vault fragment of the tool context is inserted; space, date and limit are parameters
 	rows = frappe.db.sql(f"""select ref_doctype, ref_name from `tabLife Index` x where x.space=%s and x.is_archived=0
 		and x.kind in ('Chat', 'Inbox', 'Note') and x.modified >= %s{ctx.vault_sql()} order by x.modified desc limit %s""", (space, since, MAX_RECORDS), as_dict=True)
 	out = []

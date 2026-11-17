@@ -174,10 +174,12 @@ def pages(space: str | None = None, area: str | None = None, project: str | None
 	if summary:
 		return {"summary": summarise("Life Note", f"from `tabLife Note` n where {clause}", values, "n", summary, start, page_length)}
 	order = std_order("Life Note", order_by, "n", PAGE_SORTS) or sort_order(sort, dir, PAGE_SORTS, "n.modified desc")
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	rows = frappe.db.sql(f"""select n.name, n.title, n.summary, n.area, n.project, n.is_rules, n.modified, n.is_archived,
 		(select count(*) from `tabLife Note Source` s where s.parent = n.name and s.parenttype = 'Life Note') as sources_count
 		from `tabLife Note` n where {clause} order by n.is_rules desc, {order}, n.name limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True)
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Note` n where {clause}", values)[0][0]
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	for r in rows:
@@ -203,9 +205,11 @@ def index(space: str | None = None, area: str | None = None, start: int | None =
 	if area:
 		where.append(area_filter(space, area, "n.area", values))
 	order = {"updated": "n.modified desc", "title": "n.title asc"}.get(order_by or "title", "n.title asc")
+	# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments and area_filter; the order comes from a fixed map; values are parameters
 	rows = frappe.db.sql(f"""select n.name, n.title, n.summary, n.area, n.is_rules, n.modified,
 		(select count(*) from `tabLife Note Source` s where s.parent = n.name and s.parenttype = 'Life Note') as sources
 		from `tabLife Note` n where {' and '.join(where)} order by {order} limit %(start)s, %(len)s""", {**values, "start": start, "len": page_length}, as_dict=True)
+	# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments and area_filter; values are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Note` n where {' and '.join(where)}", values)[0][0]
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	for r in rows:
@@ -243,10 +247,12 @@ def search(space: str | None = None, query: str | None = None, collection: str |
 	rows = []
 	if long_words:
 		values["q"] = " ".join(f"+{w}*" for w in long_words if w)
+		# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments and vault_guard; the search text is the %(q)s parameter
 		rows = frappe.db.sql(f"""select ref_doctype, ref_name, title, collection, search_text from `tabLife Index`
 			where {' and '.join(where)} and match(title, search_text) against (%(q)s in boolean mode) order by (title like %(w0)s) desc,
 			match(title, search_text) against (%(q)s in boolean mode) desc limit %(limit)s""", values, as_dict=True)
 	if not rows:
+		# nosemgrep: frappe-sql-format-injection -- WHERE and LIKE placeholders are fixed fragments; each word is a %(wN)s parameter
 		rows = frappe.db.sql(f"""select ref_doctype, ref_name, title, collection, search_text from `tabLife Index`
 			where {' and '.join(where)} and {likes} order by record_date desc limit %(limit)s""", values, as_dict=True)
 	summaries = dict(frappe.get_all("Life Note", filters={"name": ["in", [r.ref_name for r in rows if r.ref_doctype == "Life Note"] or [""]]},
@@ -420,8 +426,10 @@ def changes(space: str | None = None, note: str | None = None, by: str | None = 
 	if summary:
 		return {"summary": summarise("Life Wiki Change", f"from `tabLife Wiki Change` c where {clause}", values, "c", summary, start, page_length)}
 	order = std_order("Life Wiki Change", order_by, "c", {"changed_on": "c.changed_on"}) or "c.changed_on desc"
+	# nosemgrep: frappe-sql-format-injection -- CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	rows = frappe.db.sql(f"""select {', '.join('c.' + f for f in CHANGE_FIELDS)} from `tabLife Wiki Change` c where {clause}
 		order by {order}, c.creation desc limit %(start)s, %(len)s""", {**values, "start": start, "len": page_length}, as_dict=True)
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Wiki Change` c where {clause}", values)[0][0]
 	people = frappe.db.sql("select distinct changed_by from `tabLife Wiki Change` where space=%s limit 50", space, pluck=True)
 	return {"space": space, "changes": _decorate_changes(rows), "total": total, "people": [{"user": u, "name": n} for u, n in

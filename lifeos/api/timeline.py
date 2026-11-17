@@ -35,6 +35,7 @@ def decorate(rows):
 
 
 def index_rows(space, where="", values=None, order="record_date desc, modified desc", start=0, page_length=50):
+	# nosemgrep: frappe-sql-format-injection -- ROW_FIELDS and vault_guard are constants; callers pass fixed WHERE and ORDER fragments; values are parameters
 	rows = frappe.db.sql(
 		f"select {ROW_FIELDS} from `tabLife Index` where space=%(space)s {where}{permissions.vault_guard(space)} order by {order} limit %(start)s, %(len)s",
 		{"space": space, "start": start, "len": page_length, **(values or {})}, as_dict=True)
@@ -70,6 +71,7 @@ def get(space: str | None = None, from_date: str | None = None, to_date: str | N
 	if summary:
 		return {"summary": summarise("Life Index", f"from `tabLife Index` where space=%(space)s {clause}", {"space": space, **values}, "", summary, start, page_length)}
 	rows = index_rows(space, clause, values, start=start, page_length=page_length)
+	# nosemgrep: frappe-sql-format-injection -- fixed fragments, std_filters columns checked against meta; values are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Index` where space=%(space)s {clause}", {"space": space, **values})[0][0]
 	days = []
 	for r in rows:

@@ -41,6 +41,8 @@ def decorate(rows):
 def query(space, where="", values=None, order=None, start=0, page_length=50, fields=None):
 	cols = ", ".join([f"t.`{f}`" for f in FIELDS] + extra_columns("Life Task", fields, "t", FIELDS))
 	order = order or f"t.due_date is null, t.due_date asc, {PRIORITY_ORDER}, t.creation asc"
+	# columns are FIELDS or pass column() (DocType meta); WHERE comes from where_clause and ORDER from SORTS or std_order
+	# nosemgrep: frappe-sql-format-injection -- fixed SQL and meta-checked columns only; values are parameters
 	rows = frappe.db.sql(
 		f"select {cols} from `tabLife Task` t where t.space=%(space)s {where} order by {order} limit %(start)s, %(len)s",
 		{"space": space, "start": start, "len": page_length, **(values or {})}, as_dict=True)
@@ -127,6 +129,7 @@ def where_clause(space, status="open_doing", area=None, project=None, tag=None, 
 
 def count(space, **filters):
 	clause, values = where_clause(space, **filters)
+	# nosemgrep: frappe-sql-format-injection -- the WHERE comes from where_clause (fixed fragments); values are parameters
 	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 
 
@@ -164,6 +167,7 @@ def list(space: str | None = None, status: str | None = "open", area: str | None
 	if order and order != default:
 		order += ", t.creation asc"
 	rows = query(space, clause, values, order, start, page_length, fields)
+	# nosemgrep: frappe-sql-format-injection -- where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 	return {"tasks": rows, "total": total, "start": start, "page_length": page_length, "today": today(), "tabs": tabs}
 
@@ -246,7 +250,7 @@ def open_loops_where():
 
 
 def open_loops_count(space):
-	return frappe.db.sql(
+	return frappe.db.sql(  # nosemgrep: frappe-sql-format-injection -- open_loops_where() is a constant fragment
 		f"select count(*) from `tabLife Task` t where t.space=%(space)s {open_loops_where()}",
 		{"space": space, "cutoff": add_days(today(), -OPEN_LOOP_DAYS)})[0][0]
 

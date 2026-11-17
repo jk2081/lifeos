@@ -221,6 +221,7 @@ def tab_counts(base, values, tabs):
 	uses, without the condition on the tab's own field, so every count respects the other filters. `tabs` maps a tab to
 	its SQL condition; None counts every row."""
 	cols = ", ".join(("count(*)" if cond is None else f"ifnull(sum({cond}), 0)") + f" as `c{i}`" for i, cond in enumerate(tabs.values()))
+	# nosemgrep: frappe-sql-format-injection -- `base` and the tab conditions are fixed SQL from the list methods; values are parameters
 	row = frappe.db.sql(f"select {cols} {base}", values)[0]
 	return {key: int(n or 0) for key, n in zip(tabs, row)}
 
@@ -259,9 +260,10 @@ def summarise(doctype, base, values, alias, summary, start=0, page_length=20):
 	select = ", ".join([f"{c} as `{f}`" for c, f in zip(cols, fields)] + aggs)
 	group = ", ".join(cols)
 	start, page_length = page(start, page_length)
+	# nosemgrep: frappe-sql-format-injection -- columns pass column() (DocType meta), aggregates an allowlist, `base` is fixed SQL; values are parameters
 	rows = frappe.db.sql(f"select {select} {base} group by {group} order by {', '.join(order)} limit %(g_start)s, %(g_len)s",
 		{**values, "g_start": start, "g_len": page_length}, as_dict=True)
-	total = frappe.db.sql(f"select count(*) from (select 1 as one {base} group by {group}) g", values)[0][0]
+	total = frappe.db.sql(f"select count(*) from (select 1 as one {base} group by {group}) g", values)[0][0]  # nosemgrep: frappe-sql-format-injection -- as above
 	meta = frappe.get_meta(doctype)
 	for f in fields:  # a Link shows the title of the record it points to
 		field = meta.get_field(f)
@@ -277,5 +279,5 @@ def summarise(doctype, base, values, alias, summary, start=0, page_length=20):
 				r[k] = str(v)
 	totals = None
 	if aggs and flag(summary.get("totals")):
-		totals = frappe.db.sql(f"select {', '.join(aggs)} {base}", values, as_dict=True)[0]
+		totals = frappe.db.sql(f"select {', '.join(aggs)} {base}", values, as_dict=True)[0]  # nosemgrep: frappe-sql-format-injection -- allowlisted aggregates over meta-checked columns
 	return {"rows": rows, "total": total, "totals": totals}

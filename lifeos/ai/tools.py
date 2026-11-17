@@ -175,6 +175,7 @@ def t_search(ctx, query, kinds=None, date_from=None, date_to=None, limit=15):
 	likes = " or ".join(f"x.title like %(w{i})s or x.search_text like %(w{i})s" for i in range(len(words)))
 	values.update({f"w{i}": f"%{w}%" for i, w in enumerate(words)})
 	score = " + ".join(f"(x.title like %(w{i})s) * 3 + (x.search_text like %(w{i})s)" for i in range(len(words)))
+	# nosemgrep: frappe-sql-format-injection -- WHERE, LIKE and score are fixed fragments with numbered placeholders; the model's words, kinds and dates are parameters
 	rows = frappe.db.sql(f"""select x.ref_doctype, x.ref_name, x.title, x.kind, x.record_date, x.area, x.status, x.search_text, ({score}) as score
 		from `tabLife Index` x where {where} and ({likes}) order by score desc, x.record_date desc limit %(limit)s""", values, as_dict=True)
 	from lifeos.api.search import _snippet
@@ -316,8 +317,10 @@ def t_list(ctx, kind, filters=None, order=None, limit=20):
 	if area and ctx.scope.get("kind") != "area":
 		values["areas"] = descendants(ctx.space, area)
 		where += " and x.area in %(areas)s"
+	# nosemgrep: frappe-sql-format-injection -- fixed fragments (vault and scope SQL from the tool context, code-owned); every value, including model-chosen ones, is a parameter; order is 'asc' or 'desc' only
 	rows = frappe.db.sql(f"""select x.ref_doctype, x.ref_name, x.title, x.record_date, x.area, x.status from `tabLife Index` x where {where}
 		order by x.record_date {'asc' if order == 'oldest' else 'desc'} limit %(limit)s""", values, as_dict=True)
+	# nosemgrep: frappe-sql-format-injection -- fixed fragments (vault and scope SQL from the tool context, code-owned); every value, including model-chosen ones, is a parameter
 	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {where}", values)[0][0]
 	return {"total": total, "rows": [{"ref": ctx.ref(r.ref_doctype, r.ref_name, r.title, index_kind, r.record_date, r.area), "title": r.title,
 		"date": str(r.record_date), "area": _area(r.area), "status": r.status or None} for r in rows]}
@@ -371,6 +374,7 @@ def t_timeline(ctx, date_from, date_to=None):
 	sql, v = ctx.scope_sql()
 	where += sql
 	values.update(v)
+	# nosemgrep: frappe-sql-format-injection -- fixed fragments (vault and scope SQL from the tool context, code-owned); every value, including model-chosen ones, is a parameter
 	rows = frappe.db.sql(f"""select x.ref_doctype, x.ref_name, x.title, x.kind, x.record_date, x.area from `tabLife Index` x where {where}
 		order by x.record_date desc limit 60""", values, as_dict=True)
 	return {"from": str(values["a"]), "to": str(values["b"]), "rows": [{"ref": ctx.ref(r.ref_doctype, r.ref_name, r.title, r.kind, r.record_date, r.area),

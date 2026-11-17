@@ -43,6 +43,7 @@ def where_clause(space, status=None, area=None, include_done=0):
 
 def count(space, **filters):
 	clause, values = where_clause(space, **filters)
+	# nosemgrep: frappe-sql-format-injection -- the WHERE comes from where_clause (fixed fragments); values are parameters
 	return frappe.db.sql(f"select count(*) from `tabLife Project` p where p.space=%(space)s {clause}", {"space": space, **values})[0][0]
 
 
@@ -74,7 +75,9 @@ def list(space: str | None = None, include_done: bool | int = 0, status: str | N
 		groups.setdefault((r.area, r.area_name), []).append(r)
 	out = [{"area": k[0], "area_name": k[1], "projects": v} for k, v in groups.items()]
 	out.sort(key=lambda g: g["area_name"] or "")
-	return {"space": space, "groups": out, "projects": rows, "tabs": tabs, "total": frappe.db.sql(f"select count(*) from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values})[0][0]}
+	# nosemgrep: frappe-sql-format-injection -- where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters
+	total = frappe.db.sql(f"select count(*) from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values})[0][0]
+	return {"space": space, "groups": out, "projects": rows, "tabs": tabs, "total": total}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -94,7 +97,7 @@ def get(project: str):
 	for c in chats:
 		c["open_items"] = counts.get(c.ref_name, 0)
 	inc = 1 if doc.is_archived else 0
-	idx = lambda kind: frappe.db.sql(  # noqa: E731
+	idx = lambda kind: frappe.db.sql(  # noqa: E731  # nosemgrep: frappe-sql-format-injection -- `arch` and vault_guard are constant fragments
 		f"select count(*) from `tabLife Index` where space=%(space)s and project=%(project)s and kind=%(kind)s {arch}{permissions.vault_guard(space)}",
 		{"space": space, "kind": kind, **v})[0][0]
 	return {

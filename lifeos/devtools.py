@@ -58,12 +58,15 @@ def purge_space(space, drop=False):
 	for dt in SPACE_DOCTYPES:
 		meta = frappe.get_meta(dt)
 		# their files too, so a test leaves no file behind (UX fixes, set 4)
+		# nosemgrep: frappe-sql-format-injection -- development tool: dt comes from the SPACE_DOCTYPES constant; values are parameters
 		for f in frappe.db.sql(f"""select f.name, f.file_url, f.is_private from tabFile f join `tab{dt}` r on r.name = f.attached_to_name
 				where f.attached_to_doctype = %s and r.space = %s""", (dt, space), as_dict=True):
 			_delete_file(f)
 		for tf in meta.get_table_fields():
+			# nosemgrep: frappe-sql-format-injection -- development tool: table names from SPACE_DOCTYPES and their meta's table fields; values are parameters
 			frappe.db.sql(
 				f"delete c from `tab{tf.options}` c join `tab{dt}` p on p.name = c.parent where c.parenttype=%s and p.space=%s", (dt, space))
+		# nosemgrep: frappe-sql-format-injection -- development tool: dt comes from the SPACE_DOCTYPES constant; space is a parameter
 		frappe.db.sql(f"delete from `tab{dt}` where space=%s", space)
 	frappe.db.sql("delete from `tabEvent` where life_space=%s", space)
 	if drop:
@@ -195,6 +198,7 @@ def find_test_debris(site_check=True):
 	s4 = re.compile(r"^S[45] [^\n]*?\b(m[0-9a-z]{7})\b")  # sets 4 and 5: "S4 <what> [<width>] <stamp>"
 	stamps = set()
 	for dt, field in _TITLED.items():
+		# nosemgrep: frappe-sql-format-injection -- development tool: DocType and field from the _TITLED constant
 		for (title,) in frappe.db.sql(f"select `{field}` from `tab{dt}`"):
 			m = rx.match(title or "") or s4.match(title or "")
 			if m:
@@ -242,8 +246,9 @@ def _orphan_files():
 	"""Files attached to a lifeos record that no longer exists (tests that delete their records leave these)."""
 	out = []
 	for (dt,) in frappe.db.sql("select distinct attached_to_doctype from tabFile where attached_to_doctype like 'Life %%'"):
-		if not frappe.db.table_exists(dt):
+		if not frappe.db.exists("DocType", dt) or not frappe.db.table_exists(dt):
 			continue
+		# nosemgrep: frappe-sql-format-injection -- development tool: dt is checked to be an existing DocType with a table; values are parameters
 		out += frappe.db.sql(f"""select f.name, f.file_url, f.is_private from tabFile f left join `tab{dt}` r on r.name = f.attached_to_name
 			where f.attached_to_doctype = %s and r.name is null""", dt, as_dict=True)
 	return out
@@ -264,8 +269,11 @@ def purge_test_debris(dry_run=True):
 	files = []
 	for dt, names in debris.items():
 		names = list(names)
+		if not frappe.db.exists("DocType", dt):  # created_doctype comes from proposal rows: only a real DocType names a table
+			continue
 		meta = frappe.get_meta(dt)
 		for tf in meta.get_table_fields():
+			# nosemgrep: frappe-sql-format-injection -- development tool: child table names from the meta of a checked DocType; values are parameters
 			frappe.db.sql(f"delete from `tab{tf.options}` where parenttype=%s and parent in %s", (dt, names))
 		frappe.db.sql("delete from `tabLife Index` where ref_doctype=%s and ref_name in %s", (dt, names))
 		frappe.db.sql("delete from `tabLife Link` where (from_doctype=%s and from_name in %s) or (to_doctype=%s and to_name in %s)",
@@ -275,6 +283,7 @@ def purge_test_debris(dry_run=True):
 		frappe.db.sql("delete from `tabComment` where reference_doctype=%s and reference_name in %s", (dt, names))
 		if dt == "Life Ask Thread":
 			frappe.db.sql("delete from `tabLife Ask Message` where thread in %s", (names,))
+		# nosemgrep: frappe-sql-format-injection -- development tool: dt is checked to be an existing DocType; names are a parameter
 		frappe.db.sql(f"delete from `tab{dt}` where name in %s", (names,))
 	if month_goals:
 		frappe.db.sql("delete from `tabLife Month Plan Goal` where name in %s", ([m[0] for m in month_goals],))

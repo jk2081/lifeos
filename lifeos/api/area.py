@@ -9,6 +9,7 @@ from lifeos.api.utils import descendants, flag, names_map
 
 
 def project_cards(space, where, values, order=None, start=0, page_length=100):
+	# nosemgrep: frappe-sql-format-injection -- callers pass fixed WHERE fragments; values are parameters
 	rows = frappe.db.sql(
 		f"""select p.name, p.title, p.status, p.outcome, p.target_date, p.area, p.is_archived, p.completed_on,
 			(select count(*) from `tabLife Task` t where t.project = p.name and t.status != 'Carried') as tasks_total,
@@ -49,10 +50,10 @@ def get(area: str, include_archived: bool | int = 0):
 	tasks = task_api.query(space, t_clause, t_values, None, 0, 8)
 	open_tasks = task_api.count(space, area=doc.name)
 
-	counts = dict(frappe.db.sql(
+	counts = dict(frappe.db.sql(  # nosemgrep: frappe-sql-format-injection -- `arch` and vault_guard are constant fragments
 		f"select kind, count(*) from `tabLife Index` where space=%(space)s and area in %(ids)s {arch}{permissions.vault_guard(space)} group by kind", {"space": space, **v}))
 	notes = index_rows(space, f"and area in %(ids)s and kind = 'Note' and project = '' {arch}", v, page_length=6)
-	reference_notes = frappe.db.sql(
+	reference_notes = frappe.db.sql(  # nosemgrep: frappe-sql-format-injection -- `arch` is a constant fragment
 		f"select count(*) from `tabLife Index` where space=%(space)s and area in %(ids)s and kind='Note' and project = '' {arch}", {"space": space, **v})[0][0]
 	documents = index_rows(space, f"and area in %(ids)s and kind = 'Document' {arch}", v, page_length=6)
 	chats = index_rows(space, f"and area in %(ids)s and kind = 'Chat' {arch}", v, page_length=5)

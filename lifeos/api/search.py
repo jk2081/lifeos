@@ -51,6 +51,7 @@ def query(text: str, limit: int | None = 20, space: str | None = None, include_a
 	if long_words:
 		clean = [re.sub(r"[^\w]", "", w) for w in long_words]
 		values["q"] = " ".join(f"+{w}*" for w in clean if w)
+		# nosemgrep: frappe-sql-format-injection -- FIELDS and WHERE are fixed fragments; the search text is the %(q)s parameter
 		rows = frappe.db.sql(
 			f"""select {FIELDS}, match(title, search_text) against (%(q)s in boolean mode) as score from `tabLife Index`
 			where {where} and match(title, search_text) against (%(q)s in boolean mode)
@@ -62,6 +63,7 @@ def query(text: str, limit: int | None = 20, space: str | None = None, include_a
 		# Tests search rows of their own open transaction, which InnoDB's full-text index sees only after a commit.
 		likes = " and ".join(f"(title like %(w{i})s or search_text like %(w{i})s)" for i in range(len(words)))
 		like_values = {f"w{i}": f"%{w}%" for i, w in enumerate(words)}
+		# nosemgrep: frappe-sql-format-injection -- FIELDS, WHERE and the LIKE placeholders are fixed fragments; each word is a %(wN)s parameter
 		rows = frappe.db.sql(
 			f"select {FIELDS}, 0 as score from `tabLife Index` where {where} and {likes} order by record_date desc limit %(limit)s",
 			{**values, **like_values}, as_dict=True)

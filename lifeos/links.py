@@ -31,8 +31,8 @@ def find_target(space, title, name=None):
 		if name:
 			filters["name"] = name.strip()
 		if dt == "Life Note":  # a Wiki page first, then a My notes page (UX fixes, set 4)
-			found = frappe.db.sql(f"""select name from `tabLife Note` where space=%(space)s and title=%(title)s
-				{'and name=%(name)s' if name else ''} order by (collection = 'Wiki') desc, creation asc limit 1""",
+			found = frappe.db.sql("""select name from `tabLife Note` where space=%(space)s and title=%(title)s
+				and (%(name)s = '' or name=%(name)s) order by (collection = 'Wiki') desc, creation asc limit 1""",
 				{"space": space, "title": title, "name": (name or "").strip()})
 			found = found[0][0] if found else None
 		else:

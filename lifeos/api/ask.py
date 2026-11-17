@@ -183,10 +183,12 @@ def threads(space: str | None = None, q: str | None = None, start: int | str | N
 	if q:
 		where += " and (t.title like %(q)s or exists (select 1 from `tabLife Ask Message` m where m.thread=t.name and m.text like %(q)s))"
 		values["q"] = f"%{q}%"
+	# nosemgrep: frappe-sql-format-injection -- WHERE is one of two fixed fragments; user, space and the search text are parameters
 	rows = frappe.db.sql(f"""select t.name, t.title, t.scope_label, t.last_message_on, t.creation,
 		(select count(*) from `tabLife Ask Message` m where m.thread=t.name and m.role='user') as questions
 		from `tabLife Ask Thread` t where {where} order by ifnull(t.last_message_on, t.creation) desc limit %(s)s, %(l)s""",
 		{**values, "s": start, "l": page_length}, as_dict=True)
+	# nosemgrep: frappe-sql-format-injection -- WHERE is one of two fixed fragments; user, space and the search text are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Ask Thread` t where {where}", values)[0][0]
 	for r in rows:
 		r["last_message_on"] = str(r.last_message_on or r.creation)[:16]

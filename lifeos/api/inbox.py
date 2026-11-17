@@ -290,11 +290,14 @@ def list(space: str | None = None, status: str | builtins.list | None = None, in
 	if summary:
 		return {"summary": summarise("Life Inbox Item", f"from `tabLife Inbox Item` i where {clause}", values, "i", summary, start, page_length), "tabs": tabs}
 	order = std_order("Life Inbox Item", order_by, "i", SORTS) or sort_order(sort, dir, SORTS, "i.received_on desc")
+	# nosemgrep: frappe-sql-format-injection -- clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist
 	rows = frappe.db.sql(
 		f"""select i.name, i.title, i.source_type, i.status, i.received_on, i.instruction, i.claimed_by, i.error, i.owner, i.area,
 			i.summary_md, i.transcript_md from `tabLife Inbox Item` i where {clause} order by {order}, i.creation desc limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True)
+	# nosemgrep: frappe-sql-format-injection -- clause from fixed fragments and std_filters (columns checked against meta, values as parameters)
 	total = frappe.db.sql(f"select count(*) from `tabLife Inbox Item` i where {clause}", values)[0][0]
+	# nosemgrep: frappe-sql-format-injection -- clause from fixed fragments and std_filters (columns checked against meta, values as parameters)
 	pending_total = frappe.db.sql(
 		f"select count(*) from `tabLife Proposal` p join `tabLife Inbox Item` i on i.name = p.inbox_item where p.status = 'Pending' and {clause}", values)[0][0]
 	counts = {}

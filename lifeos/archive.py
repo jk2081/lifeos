@@ -1,5 +1,6 @@
 """Archive rules of section 4a. Nothing is ever deleted here."""
 import frappe
+from frappe import _
 from frappe.utils import add_days, cint, today
 
 from lifeos.constants import ORG_DOCTYPES
@@ -8,6 +9,9 @@ AUTO_DOCTYPES = ("Life Task", "Life Inbox Item", "Life Chat Log")
 
 
 def _sync_index(doctype, where="1=1", values=()):
+	if doctype not in ORG_DOCTYPES:
+		frappe.throw(_("Not an archivable DocType: {0}").format(doctype))
+	# nosemgrep: frappe-sql-format-injection -- the table is one of ORG_DOCTYPES (checked above) and `where` a fixed fragment; values are parameters
 	frappe.db.sql(
 		f"""update `tabLife Index` i join `tab{doctype}` t on t.name = i.ref_name
 		set i.is_archived = t.is_archived where i.ref_doctype = %s and i.is_archived != t.is_archived and {where}""",
@@ -69,7 +73,7 @@ def archive_project(project) -> dict:
 	"""Archive a project and every record whose `project` points to it."""
 	count = 0
 	for dt in ORG_DOCTYPES:
-		frappe.db.sql(
+		frappe.db.sql(  # nosemgrep: frappe-sql-format-injection -- `dt` comes from the constant ORG_DOCTYPES
 			f"update `tab{dt}` set is_archived=1, archived_on=%s, archive_reason='Project' where project=%s and is_archived=0",
 			(today(), project.name))
 		count += frappe.db.sql("select row_count()")[0][0]
@@ -82,7 +86,7 @@ def archive_project(project) -> dict:
 def restore_project(project) -> dict:
 	count = 0
 	for dt in ORG_DOCTYPES:
-		frappe.db.sql(
+		frappe.db.sql(  # nosemgrep: frappe-sql-format-injection -- `dt` comes from the constant ORG_DOCTYPES
 			f"update `tab{dt}` set is_archived=0, archived_on=null, archive_reason='' where project=%s and is_archived=1 and archive_reason='Project'",
 			project.name)
 		count += frappe.db.sql("select row_count()")[0][0]

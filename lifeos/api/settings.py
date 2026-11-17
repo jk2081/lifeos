@@ -30,6 +30,7 @@ def _counts(kind, space, names):
 		from lifeos.index import also_in_sql
 
 		for n in names:  # as the Timeline counts an area: filed there or also filed there
+			# nosemgrep: frappe-sql-format-injection -- also_in_sql and vault_guard return fixed fragments; space and area are parameters
 			out[n] = frappe.db.sql(f"""select count(*) from `tabLife Index` where space=%(space)s and is_archived=0
 				and (area=%(area)s or {also_in_sql('area')}){permissions.vault_guard(space)}""", {"space": space, "area": n})[0][0]
 		return out

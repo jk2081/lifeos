@@ -65,6 +65,7 @@ def list(space: str | None = None, tab: str | None = "all", area: str | None = N
 		sql, values = _sub(dt, space, filters, values, i, area)
 		parts.append(sql)
 	union = " union all ".join(parts)
+	# nosemgrep: frappe-sql-format-injection -- each branch is _sub's fixed SQL over a PARKABLE table, with std_filters columns checked against meta
 	counts = frappe.db.sql(f"""select doctype, count(*), sum(ifnull(someday_review_on, '2999-01-01') <= %(today)s)
 		from ({union}) u group by doctype""", values)
 	by = {r[0]: int(r[1]) for r in counts}
@@ -74,9 +75,11 @@ def list(space: str | None = None, tab: str | None = "all", area: str | None = N
 	if tab == "due":
 		where = "where ifnull(someday_review_on, '2999-01-01') <= %(today)s"
 	elif tab in TAB_TYPE:
-		where = f"where doctype = '{TAB_TYPE[tab]}'"
+		where = "where doctype = %(tab_type)s"
+		values["tab_type"] = TAB_TYPE[tab]
 	order = {"creation": "creation", "someday_on": "someday_on", "title": "title"}.get(str(order_by or "").split(" ")[0], "someday_review_on")
 	way = "desc" if " desc" in str(order_by or "") else "asc"
+	# nosemgrep: frappe-sql-format-injection -- the union as above; `order` and `way` come from fixed allowlists; values are parameters
 	rows = frappe.db.sql(f"select * from ({union}) u {where} order by {order} {way}, creation asc limit %(start)s, %(len)s",
 		{**values, "start": start, "len": page_length}, as_dict=True)
 	total = tabs[tab]

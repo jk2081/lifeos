@@ -71,6 +71,7 @@ def list(space: str | None = None, area: str | None = None, start: int = 0, page
 	order = std_order("Life Index", order_by, "", SORTS) or sort_order(sort, dir, SORTS, None)
 	rows = index_rows(space, where, values, order=(order + ", modified desc") if order else "area asc, record_date desc, modified desc",
 		start=start, page_length=page_length)
+	# nosemgrep: frappe-sql-format-injection -- fixed fragments, std_clause columns checked against meta, vault_guard constant; values are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Index` where space=%(space)s {where}", {"space": space, **values})[0][0]
 	reasons = {}
 	for dt in {r.ref_doctype for r in rows}:

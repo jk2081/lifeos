@@ -137,13 +137,17 @@ def list(space: str | None = None, area: str | None = None, project: str | None 
 			"tabs": tabs}
 	order = std_order("Life Chat Log", order_by, "c", SORTS) or sort_order(sort, dir, SORTS, None)
 	order = f"{order}, c.creation desc" if order else f"{GROUP_ORDER[group_by]}, c.modified desc"
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	rows = _chat_rows(frappe.db.sql(
 		f"""select c.name, c.title, c.date, c.url, c.assistant, c.summary_md, c.area, c.project, c.is_archived
 		from `tabLife Chat Log` c where c.space=%(space)s {clause} order by {order} limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True))
 	base = f"from `tabLife Chat Log` c where c.space=%(space)s {clause}"
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	total = frappe.db.sql(f"select count(*) {base}", values)[0][0]
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	with_open = frappe.db.sql(f"select count(*) {base} and {OPEN_ITEM}", values)[0][0]
+	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	by_area = frappe.db.sql(f"select ifnull(c.area, ''), count(*) {base} group by ifnull(c.area, '') order by count(*) desc", values)
 	area_names = names_map("Life Area", [a for a, n in by_area], "area_name")
 	return {"space": space, "chats": rows, "total": total, "with_open_items": with_open, "group_by": group_by, "tabs": tabs,

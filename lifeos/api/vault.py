@@ -72,6 +72,7 @@ def where_clause(space, holder=None, doc_type=None, expiry=None, area=None, proj
 
 def count(space, **filters):
 	clause, values = where_clause(space, **filters)
+	# nosemgrep: frappe-sql-format-injection -- clause from where_clause: fixed fragments, the EXPIRY allowlist and area_filter; every value is a parameter
 	return frappe.db.sql(f"select count(*) from `tabLife Vault Document` d where d.space=%(space)s {clause}", {"space": space, **values})[0][0]
 
 
@@ -111,9 +112,11 @@ def list(space: str | None = None, include_archived: bool | int = 0, start: int 
 			{"space": space, **values}, "d", summary, start, page_length), **expiry_counts(space), "tabs": tabs}
 	cols = ", ".join([f"d.`{f}`" for f in FIELDS] + extra_columns("Life Vault Document", fields, "d", FIELDS))
 	order = std_order("Life Vault Document", order_by, "d", SORTS) or sort_order(sort, dir, SORTS, "d.expiry_date is null, d.expiry_date asc")
+	# nosemgrep: frappe-sql-format-injection -- columns and filters checked against the DocType meta, order from std_order or the SORTS allowlist; values are parameters
 	rows = _decorate(frappe.db.sql(
 		f"select {cols} from `tabLife Vault Document` d where d.space=%(space)s {clause} order by {order}, d.title asc limit %(start)s, %(len)s",
 		{"space": space, "start": start, "len": page_length, **values}, as_dict=True))
+	# nosemgrep: frappe-sql-format-injection -- clause from fixed fragments and std_filters (columns checked against meta, values as parameters)
 	total = frappe.db.sql(f"select count(*) from `tabLife Vault Document` d where d.space=%(space)s {clause}", {"space": space, **values})[0][0]
 	groups = {}
 	for r in rows:

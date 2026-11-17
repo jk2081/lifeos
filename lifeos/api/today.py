@@ -36,7 +36,8 @@ def get(space: str | None = None):
 	# the screen shows two groups of at most GROUP_ROWS: due today first, then overdue (oldest first)
 	due_today = task_api.query(space, open_due + "= %(today)s", {"today": now}, None, 0, GROUP_ROWS)
 	overdue_rows = task_api.query(space, open_due + "< %(today)s", {"today": now}, None, 0, GROUP_ROWS)
-	oldest = frappe.db.sql(f"select min(t.due_date) from `tabLife Task` t where t.space=%(space)s {open_due}< %(today)s",
+	oldest = frappe.db.sql("select min(t.due_date) from `tabLife Task` t where t.space=%(space)s and t.status in ('Open', 'Doing', 'Waiting') "
+		"and t.is_archived = 0 and t.due_date < %(today)s",
 		{"space": space, "today": now})[0][0]
 	# the numbers are counted with the filters their links lead to, not from the rows shown
 	due_count = task_api.count(space, due="today,overdue")

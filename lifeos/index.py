@@ -94,6 +94,7 @@ def _write(rows):
 	updates = ", ".join(f"`{c}`=values(`{c}`)" for c in COLUMNS if c not in ("name", "creation", "owner"))
 	placeholders = ", ".join(["(" + ", ".join(["%s"] * len(COLUMNS)) + ")"] * len(values))
 	flat = [v for row in values for v in row]
+	# nosemgrep: frappe-sql-format-injection -- column names come from the fixed COLUMNS list; every value is a %s parameter
 	frappe.db.sql(f"insert into `tabLife Index` ({cols}) values {placeholders} on duplicate key update {updates}", flat)
 
 
