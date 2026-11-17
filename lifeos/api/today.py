@@ -69,6 +69,8 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 	review_filter = {"space": space, "status": "To Review", "is_archived": 0}
 	if inbox_lens is not None:
 		review_filter["name"] = ("in", [r.name for r in inbox_lens["items"]] or ["-"])
+	if permissions.vault_hidden(space):  # an agent: no sensitive item, and no source of a Vault document
+		review_filter.update({"is_sensitive": 0, "vault_document": ("is", "not set")})
 	review_items = frappe.get_all("Life Inbox Item", filters=review_filter,
 		fields=["name", "title", "source_type", "received_on", "owner", "claimed_by", "transcript_md", "summary_md"], order_by="received_on desc", limit=5)
 	pending = {}

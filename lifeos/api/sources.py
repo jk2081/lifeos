@@ -229,6 +229,9 @@ def made_from(doctype: str, name: str):
 				continue
 			if p.created_doctype == permissions.VAULT and permissions.vault_hidden(doc.space):
 				continue
+			if (p.created_doctype in permissions.SENSITIVE_DOCTYPES and permissions.vault_hidden(doc.space)
+					and frappe.db.get_value(p.created_doctype, p.created_name, "is_sensitive")):
+				continue
 			out.append({"kind": p.kind, "doctype": p.created_doctype, "name": p.created_name, "title": links.title_of(p.created_doctype, p.created_name) or p.preview,
 				"route": links.route_of(p.created_doctype, p.created_name)})
 	else:
@@ -236,8 +239,10 @@ def made_from(doctype: str, name: str):
 			if i.task and frappe.db.exists("Life Task", i.task):
 				out.append({"kind": "Task", "doctype": "Life Task", "name": i.task, "title": links.title_of("Life Task", i.task),
 					"route": links.route_of("Life Task", i.task)})
-	for n in frappe.db.sql("""select distinct n.name, n.title, n.collection from `tabLife Note Source` s join `tabLife Note` n on n.name = s.parent
-			where s.parenttype = 'Life Note' and s.source_doctype = %s and s.source_name = %s order by n.title""", (doctype, doc.name), as_dict=True):
+	guard = permissions.sensitive_guard(doc.space, "n.")
+	# nosemgrep: frappe-sql-format-injection -- sensitive_guard is a constant fragment; values are parameters
+	for n in frappe.db.sql(f"""select distinct n.name, n.title, n.collection from `tabLife Note Source` s join `tabLife Note` n on n.name = s.parent
+			where s.parenttype = 'Life Note' and s.source_doctype = %s and s.source_name = %s{guard} order by n.title""", (doctype, doc.name), as_dict=True):
 		out.append({"kind": "Wiki page" if n.collection == "Wiki" else "Note", "doctype": "Life Note", "name": n.name, "title": n.title,
 			"route": links.route_of("Life Note", n.name)})
 	return out
@@ -259,8 +264,6 @@ def refile(sources: str | builtins.list, area: str | None = None, goal: str | No
 		doc = permissions.get_doc_checked(r["doctype"], r["name"], "write")
 		if area is not None:
 			doc.area = area or None
-			if doc.goal and frappe.db.get_value("Life Goal", doc.goal, "area") != doc.area:
-				doc.goal = None
 		if goal is not None:
 			doc.goal = goal or None
 		doc.save()

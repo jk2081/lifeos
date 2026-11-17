@@ -61,6 +61,11 @@ def query_conditions(user=None, doctype=None):
 	if not spaces:
 		return "1=0"
 	cond = f"`tab{doctype}`.`space` in ({_in_list(spaces)})"
+	if doctype == "Life Wiki Change" and is_agent(user):
+		closed = [s for s in spaces if s not in vault_open_spaces()]
+		if closed:  # the before and after text of a sensitive page (set 6)
+			cond += (f" and not (`tabLife Wiki Change`.`space` in ({_in_list(closed)}) and exists (select 1 from `tabLife Note` sn"
+				" where sn.name = `tabLife Wiki Change`.`note` and sn.is_sensitive = 1))")
 	if doctype in ("Life Index", *SENSITIVE_DOCTYPES) and is_agent(user):
 		closed = [s for s in spaces if s not in vault_open_spaces()]
 		if closed and doctype == "Life Index":
@@ -149,6 +154,9 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 		return False
 	if doc.doctype == "Life Project" and ptype not in ("read", "select", "report", "print", "export"):
 		return False  # read-only since projects became goals (set 6); only the migration patch writes, as Administrator
+	if doc.doctype == "Life Wiki Change" and doc.get("note") and vault_hidden(doc.get("space"), user) \
+			and frappe.db.get_value("Life Note", doc.note, "is_sensitive"):
+		return False
 	if doc.get("space") and vault_locked(doc) and vault_hidden(doc.space, user):
 		return False
 	space = doc.get("space")

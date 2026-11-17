@@ -23,9 +23,11 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 		frappe.throw(_("group_by must be day, area or goal."))
 	end = getdate(to_date or today())
 	begin = getdate(from_date) if from_date else add_days(end, -6)
+	guard = permissions.vault_guard(space)
+	# nosemgrep: frappe-sql-format-injection -- vault_guard is a constant fragment; values are parameters
 	index = frappe.db.sql(
-		"""select ref_name, title, record_date, area, goal from `tabLife Index`
-		where space=%s and kind='Chat' and is_archived=0 and record_date between %s and %s
+		f"""select ref_name, title, record_date, area, goal from `tabLife Index`
+		where space=%s and kind='Chat' and is_archived=0 and record_date between %s and %s{guard}
 		order by record_date desc, modified desc limit %s, %s""", (space, begin, end, start, page_length), as_dict=True)
 	names = [r.ref_name for r in index]
 	details, items = {}, {}

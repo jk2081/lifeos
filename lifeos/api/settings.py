@@ -171,7 +171,7 @@ def backups():
 	keys above, whether S3 backups are switched on, and the dates and sizes of the latest backup files on this server."""
 	conf = frappe.get_site_config() or {}
 	keys = {k: conf.get(k) for k in BACKUP_KEYS if conf.get(k) not in (None, "")}
-	s3 = bool(frappe.db.table_exists("S3 Backup Settings") and frappe.db.get_single_value("S3 Backup Settings", "enabled"))
+	s3 = bool(frappe.db.exists("DocType", "S3 Backup Settings") and frappe.db.get_single_value("S3 Backup Settings", "enabled"))
 	files = []
 	try:
 		from frappe.utils.backups import get_backup_path

@@ -9,8 +9,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-manual-commit | 5 |
 | frappe-security-file-traversal | 4 |
 | frappe-setuser | 13 |
-| frappe-sql-format-injection | 73 |
-| Total | 95 |
+| frappe-sql-format-injection | 75 |
+| Total | 97 |
 
 ## frappe-manual-commit
 
@@ -61,12 +61,13 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/archive.py` | 74 | fixed fragments, std_clause columns checked against meta, vault_guard constant; values are parameters |
 | `lifeos/api/ask.py` | 195 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
 | `lifeos/api/ask.py` | 200 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
-| `lifeos/api/chats.py` | 147 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
-| `lifeos/api/chats.py` | 153 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/chats.py` | 27 | vault_guard is a constant fragment; values are parameters |
+| `lifeos/api/chats.py` | 149 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 155 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 157 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
-| `lifeos/api/chats.py` | 263 | sensitive_guard is a constant fragment; values are parameters |
-| `lifeos/api/chats.py` | 267 | as above |
+| `lifeos/api/chats.py` | 159 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/chats.py` | 265 | sensitive_guard is a constant fragment; values are parameters |
+| `lifeos/api/chats.py` | 269 | as above |
 | `lifeos/api/goals.py` | 36 | `sp` is one of two constant fragments; values are parameters |
 | `lifeos/api/goals.py` | 96 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
 | `lifeos/api/goals.py` | 105 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
@@ -86,6 +87,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/sources.py` | 160 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters (TABS and STATUSES are fixed maps |
 | `lifeos/api/sources.py` | 163 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/sources.py` | 167 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/sources.py` | 243 | sensitive_guard is a constant fragment; values are parameters |
 | `lifeos/api/tasks.py` | 45 | fixed SQL and meta-checked columns only; values are parameters |
 | `lifeos/api/tasks.py` | 131 | the WHERE comes from where_clause (fixed fragments); values are parameters |
 | `lifeos/api/tasks.py` | 149 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
@@ -108,8 +110,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/wiki.py` | 216 | WHERE from fixed fragments and area_filter; values are parameters |
 | `lifeos/api/wiki.py` | 254 | WHERE from fixed fragments and vault_guard; the search text is the %(q)s parameter |
 | `lifeos/api/wiki.py` | 259 | WHERE and LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
-| `lifeos/api/wiki.py` | 434 | CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
-| `lifeos/api/wiki.py` | 437 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/wiki.py` | 436 | CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/wiki.py` | 439 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/archive.py` | 14 | the table is one of ORG_DOCTYPES (checked above) and `where` a fixed fragment; values are parameters |
 | `lifeos/archive.py` | 76 | `dt` comes from the constant ORG_DOCTYPES |
 | `lifeos/archive.py` | 89 | `dt` comes from the constant ORG_DOCTYPES |
@@ -124,5 +126,5 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/patches/v7/projects_into_goals.py` | 151 | `dt` comes from the constant RENAMED |
 | `lifeos/patches/v7/projects_into_goals.py` | 170 | `end` is "from" or "to" |
 | `lifeos/patches/v7/projects_into_goals.py` | 180 | DocType and field names come from the constant DYNAMIC |
-| `lifeos/patches/v7/projects_into_goals.py` | 248 | `dt` comes from index.KINDS, a constant |
+| `lifeos/patches/v7/projects_into_goals.py` | 250 | `dt` comes from index.KINDS, a constant |
 | `lifeos/tests/test_ux6_goals.py` | 24 | `doctype` comes from the constant OLD_COLUMNS |

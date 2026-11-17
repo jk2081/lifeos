@@ -243,6 +243,8 @@ def reindex(changed):
 			index.update(frappe.get_doc(dt, name))
 	# every row's goal column: rows written before set 6 had none
 	frappe.db.sql("update `tabLife Index` set goal = '' where goal is null")
+	# open-ended goals made before set 6 had no last activity: count it from their last change, as a project's was
+	frappe.db.sql("update `tabLife Goal` set last_activity_on = date(modified) where goal_type = 'Open' and last_activity_on is null")
 	for dt in index.KINDS:
 		if dt == "Life Task" or has(dt, "goal"):
 			# nosemgrep: frappe-sql-format-injection -- `dt` comes from index.KINDS, a constant

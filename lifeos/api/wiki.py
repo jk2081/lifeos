@@ -410,6 +410,8 @@ def changes(space: str | None = None, note: str | None = None, by: str | None = 
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	where, values = ["c.space = %(space)s"], {"space": space}
+	if permissions.vault_hidden(space):  # changes to a sensitive page are closed to an agent (set 6)
+		where.append("not exists (select 1 from `tabLife Note` sn where sn.name = c.note and sn.is_sensitive = 1)")
 	conds, values = std_filters("Life Wiki Change", filters, "c", values)
 	where += conds
 	if note:
@@ -536,9 +538,26 @@ def health(space: str | None = None, refresh: bool | int | None = 0):
 	if not data:
 		data = compute_health(space)
 		frappe.cache.set_value(_health_key(space), data, expires_in_sec=26 * 3600)
-	if permissions.vault_hidden(space):
-		data = dict(data)
+	if permissions.vault_hidden(space):  # the cache is everyone's: leave the sensitive pages out of an agent's copy
+		closed = set(frappe.get_all("Life Note", filters={"space": space, "is_sensitive": 1}, pluck="name"))
+		if closed:
+			data = {k: _without(v, closed) for k, v in data.items()}
 	return data
+
+
+def _without(value, closed):
+	"""A health list without the entries that name a sensitive page (as `name` or `page`, or a group of them)."""
+	if not isinstance(value, list):
+		return value
+	out = []
+	for v in value:
+		if isinstance(v, list):
+			v = [x for x in v if not (isinstance(x, dict) and x.get("name") in closed)]
+			if len(v) > 1:
+				out.append(v)
+		elif not (isinstance(v, dict) and (v.get("name") in closed or v.get("page") in closed)):
+			out.append(v)
+	return out
 
 
 def refresh_all_health():

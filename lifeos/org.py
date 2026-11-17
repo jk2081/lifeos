@@ -44,7 +44,14 @@ def validate_common(doc, method=None):
 
 def check_sensitive(doc):
 	"""Anyone who may edit an item may mark it sensitive; only the space's owner may unmark it (UX fixes, set 6)."""
-	if not doc.meta.has_field("is_sensitive") or doc.is_new() or doc.is_sensitive:
+	if not doc.meta.has_field("is_sensitive"):
+		return
+	stored = 0 if doc.is_new() else frappe.db.get_value(doc.doctype, doc.name, "is_sensitive")
+	from lifeos.permissions import is_agent
+
+	if is_agent() and int(doc.is_sensitive or 0) != int(stored or 0):
+		frappe.throw(_("Agents cannot mark or unmark sensitive items."), frappe.PermissionError)
+	if doc.is_new() or doc.is_sensitive:
 		return
 	if not frappe.db.get_value(doc.doctype, doc.name, "is_sensitive"):
 		return

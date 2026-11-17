@@ -49,7 +49,7 @@ def set_archived(doctype, name, archived=True, reason="Manual"):
 	doc.check_permission("write")
 	if doctype == "Life Goal":
 		if archived:
-			return archive_goal(doc)
+			return archive_goal(doc, with_records=doc.goal_type == "Open")
 		return restore_goal(doc)
 	if doctype not in ORG_DOCTYPES:
 		frappe.throw(f"{doctype} cannot be archived.")
@@ -68,11 +68,11 @@ def goal_record_count(goal) -> int:
 	return total
 
 
-def archive_goal(goal) -> dict:
+def archive_goal(goal, with_records=True) -> dict:
 	"""Archive a goal and every record filed under it (`goal` points to it), as a project was archived before set 6.
 	The records keep the reason code "Project" ("with its goal"), so older archives restore the same way."""
 	count = 0
-	for dt in ORG_DOCTYPES:
+	for dt in ORG_DOCTYPES if with_records else ():  # a 12 Week Year or annual goal archived by hand goes alone
 		frappe.db.sql(  # nosemgrep: frappe-sql-format-injection -- `dt` comes from the constant ORG_DOCTYPES
 			f"update `tab{dt}` set is_archived=1, archived_on=%s, archive_reason='Project' where goal=%s and is_archived=0",
 			(today(), goal.name))

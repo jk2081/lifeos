@@ -260,7 +260,12 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 		elif action == "drop":
 			doc = permissions.get_doc_checked(doctype, name, "write")
 			undo.append(_snap(doc))
-			doc.status = "Dropped"
+			if doctype == "Life Goal":  # a goal has an outcome, not a status
+				doc.outcome = "Dropped"
+			elif doc.meta.has_field("status"):
+				doc.status = "Dropped"
+			else:
+				continue
 			doc.save()
 		elif action == "someday":
 			doc = permissions.get_doc_checked(doctype, name, "write")

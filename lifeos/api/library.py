@@ -103,6 +103,14 @@ def mark_opened(doc):
 	frappe.db.sql("update `tabLife Index` set last_opened_on=%s where ref_doctype='Life Note' and ref_name=%s", (day, doc.name))
 
 
+def _visible_title(note, space):
+	"""A related note's title, unless it is sensitive and the user is kept from sensitive items."""
+	row = frappe.db.get_value("Life Note", note, ["title", "is_sensitive"], as_dict=True)
+	if not row or (row.is_sensitive and permissions.vault_hidden(space)):
+		return None
+	return row.title
+
+
 @frappe.whitelist(methods=["POST"])
 def get(note: str):
 	"""One note with its links resolved to current titles. A person opening it sets its last_opened_on (UX fixes, set 5)."""
@@ -111,7 +119,7 @@ def get(note: str):
 	return {
 		"name": doc.name, "space": doc.space, "title": doc.title, "content_md": doc.content_md or "", "parent_note": doc.parent_note,
 		"is_sensitive": doc.is_sensitive,
-		"parent_title": frappe.db.get_value("Life Note", doc.parent_note, "title") if doc.parent_note else None,
+		"parent_title": _visible_title(doc.parent_note, doc.space) if doc.parent_note else None,
 		"area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 		"goal": doc.goal, "goal_title": frappe.db.get_value("Life Goal", doc.goal, "title") if doc.goal else None,
 		"also_in": [r.area for r in doc.also_in], "tag_ids": [r.tag for r in doc.tags], "is_archived": doc.is_archived,
@@ -119,7 +127,8 @@ def get(note: str):
 		"collection": doc.collection or "My notes", "summary": doc.summary, "is_rules": doc.is_rules,
 		"sources": [{"doctype": r.source_doctype, "name": r.source_name, "title": links.title_of(r.source_doctype, r.source_name)} for r in doc.sources],
 		"links": links.outgoing(doc),
-		"children": frappe.get_all("Life Note", filters={"parent_note": doc.name, "is_archived": 0}, fields=["name", "title"], order_by="title", limit=100),
+		"children": frappe.get_all("Life Note", filters={"parent_note": doc.name, "is_archived": 0,
+			**({"is_sensitive": 0} if permissions.vault_hidden(doc.space) else {})}, fields=["name", "title"], order_by="title", limit=100),
 		"versions": frappe.db.count("Version", {"ref_doctype": "Life Note", "docname": doc.name}),
 	}
 

@@ -312,6 +312,8 @@ def update(goal: str, values: str | dict):
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	values = frappe.parse_json(values) or {}
+	if not isinstance(values, dict):
+		frappe.throw(_("values must be an object of fields."))
 	allowed = {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note"}
 	for k, v in values.items():
 		if k not in allowed:

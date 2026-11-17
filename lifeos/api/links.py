@@ -46,6 +46,10 @@ def backlinks(doctype: str, name: str):
 			return
 		if dt == permissions.VAULT and permissions.vault_hidden(frappe.db.get_value(dt, n, "space")):
 			return
+		if dt in permissions.SENSITIVE_DOCTYPES:  # a sensitive item is closed to an agent while its space's switch is off (set 6)
+			row = frappe.db.get_value(dt, n, ["space", "is_sensitive"], as_dict=True)
+			if row.is_sensitive and permissions.vault_hidden(row.space):
+				return
 		seen.add((dt, n))
 		out.append({"doctype": dt, "name": n, "title": _title(dt, n), "kind": KIND.get(dt, dt.replace("Life ", "")),
 			"why": why, "route": rules.route_of(dt, n)})

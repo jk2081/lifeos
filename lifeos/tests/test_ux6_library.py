@@ -100,3 +100,33 @@ class TestCaptures(LifeTestCase):
 		self.assertNotIn("notes", sources.list(space=PRIVATE, page_length=1)["tabs"])
 		self.assertEqual({r.name for r in library.list(space=PRIVATE, collection="all", page_length=200)["notes"]} & {mine.name, kept.name},
 			{mine.name, kept.name})
+
+
+class TestSensitiveEverywhere(LifeTestCase):
+	"""The review of set 6: every agent read leaves sensitive items out while the space's switch is off."""
+
+	def test_agent_reads_leave_sensitive_items_out(self):
+		from frappe.utils import today as day
+
+		from lifeos.api import chats, goals, links
+		from lifeos.api import today as today_api
+
+		goal = self.make("Life Goal", space=SHARED, title="ux6 review goal", goal_type="Open")
+		parent = self.make("Life Note", space=SHARED, title="ux6 parent", content_md="x", goal=goal.name)
+		child = self.make("Life Note", space=SHARED, title="ux6 secret child", content_md="x", parent_note=parent.name, goal=goal.name, is_sensitive=1)
+		item = self.make("Life Inbox Item", space=SHARED, title="ux6 secret item", status="To Review", is_sensitive=1)
+		chat = self.make("Life Chat Log", space=SHARED, title="ux6 secret chat", date=day(), is_sensitive=1)
+		self.as_user(AGENT)
+		self.assertNotIn(child.name, [c.name for c in library.get(parent.name)["children"]])
+		self.assertNotIn(child.name, [r["name"] for r in links.backlinks("Life Goal", goal.name)])
+		self.assertNotIn(item.name, [r.name for r in today_api.get(space=SHARED)["to_review"]["items"]])
+		self.assertNotIn(chat.name, [c["name"] for g in chats.report(space=SHARED)["groups"] for c in g["chats"]])
+		self.assertRaises(frappe.PermissionError, library.get, child.name)
+		self.assertIsNotNone(goals)
+
+	def test_agent_cannot_mark_through_a_plain_save(self):
+		note = self.make("Life Note", space=SHARED, title="ux6 agent save", content_md="x")
+		self.as_user(AGENT)
+		doc = frappe.get_doc("Life Note", note.name)
+		doc.is_sensitive = 1
+		self.assertRaises(frappe.PermissionError, doc.save)

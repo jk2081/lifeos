@@ -87,8 +87,10 @@ def save(space: str | None = None, system: str | None = None, name: str | None =
 		doc.label = label
 	if default_area is not None:
 		doc.default_area = default_area or None
-	if default_goal is None and default_project is not None:  # the old name, for one set
-		default_goal = default_project
+	if default_goal is None and default_project is not None:  # the old name, for one set: a project names the goal it became
+		from lifeos.proposals import goal_for_project
+
+		default_goal = (goal_for_project(default_project, doc.space) or default_project) if default_project else ""
 	if default_goal is not None:
 		doc.default_goal = default_goal or None
 	if default_intent is not None:
