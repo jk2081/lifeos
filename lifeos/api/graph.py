@@ -73,7 +73,7 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 	if center:
 		if center not in nodes:
 			dt, _, name = center.partition("/")
-			if dt in TYPES and frappe.db.get_value(dt, {"name": name, "space": space}):
+			if dt in TYPES and dt not in hidden and frappe.db.get_value(dt, {"name": name, "space": space}):
 				add(dt, name, rules.title_of(dt, name))
 		keep, frontier = {center}, {center}
 		for _step in range(2):

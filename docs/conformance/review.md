@@ -118,3 +118,12 @@ Checked: messages name the record or field (`{0} looks like it holds a full numb
 | R3.5 Today's "goals with no tasks" per-goal `exists`, `Life Task.goal` unindexed (low) | **Fixed.** One query for the ticked goals; index on (`goal`, `status`) of Life Task. |
 
 The new indexes are added by `index.ensure_indexes` on install and by the patch `v6.conformance_indexes` on existing sites. The STYLE points above are left as they are: they do not break anything, and changing working code for style alone is not this set's job.
+
+## The set's own diff
+
+Before closing the set, its whole diff (`eef9700..HEAD`) was reviewed again against the skill by a fresh reviewer. It found two defects, both fixed:
+
+- The first fix for Q-B26 used `ignore_links_on_delete`, which frees *every* link of a DocType. A project or area that an idea or insight is filed under could then be deleted, and the idea could no longer be saved. The fix now clears only the bookkeeping pointers in `org.on_trash`.
+- The graph still showed an agent a closed Vault document when that document was the graph's centre. Fixed.
+
+Its style notes, not acted on: long signatures since the hints (`wiki.pages`, `sources.list`, `chats.list`, `goals.create`); repeated `nosemgrep` reasons on consecutive lines; `ask.ask` catches every exception, so after a deadlock `msg.reload()` can still end in a 500; and `wiki.health`'s `vault_hidden` branch copies the data without filtering it (older than this set).

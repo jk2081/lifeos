@@ -340,7 +340,7 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 
 ### 6. Audit fixes (behaviour that changed)
 
-- **A record that only bookkeeping rows point at can now be deleted**: the record a proposal made, an insight's evidence, an Ask thread's scope, an idea's source or target, the source of a wiki change (`ignore_links_on_delete`). Before, every task accepted from review was refused with "still used by other records". Those rows keep the old name and simply stop resolving. A wiki page's cited source still blocks a delete.
+- **A record that only bookkeeping rows point at can now be deleted**: the record a proposal made, an insight's evidence, an Ask thread's scope, an idea's source or target, the source of a wiki change. Before, every task accepted from review was refused with "still used by other records". `org.on_trash` clears those pointers (and removes the insight's evidence row) as part of the delete, so a restore from the trash does not bring them back. Real filing links still block a delete: an idea's area or project, a wiki change's page, a wiki page's cited source. (`ignore_links_on_delete` was tried first and dropped: Frappe applies it to every link of a DocType, so a project an idea is filed under could be deleted and the idea could then not be saved.)
 - **Agents no longer see** the sources Vault documents were made from in `inbox.list`, or deleted Vault documents and their sources in `trash.list`, while the space's Vault switch is off. The pages and REST already refused them one by one.
 - **Reset's undo trusts only the proposal's name from the browser** and checks the proposal, its item and the record made for the user.
 

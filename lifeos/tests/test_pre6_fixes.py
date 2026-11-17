@@ -293,6 +293,15 @@ class TestAuditFixes(LifeTestCase):
 		trash.delete("Life Task", task)
 		self.assertFalse(frappe.db.exists("Life Task", task))
 		self.assertTrue(frappe.db.exists("Life Proposal", prop))
+		self.assertIsNone(frappe.db.get_value("Life Proposal", prop, "created_name"))
+
+	def test_a_project_an_idea_is_filed_under_still_cannot_be_deleted(self):
+		from lifeos.api import trash
+
+		project = self.make("Life Project", title="pre6 project with an idea", area=self.areas["Tea"])
+		self.make("Life Idea", title="pre6 idea", project=project.name)
+		self.assertRaises(frappe.ValidationError, trash.delete, "Life Project", project.name)
+		self.assertTrue(frappe.db.exists("Life Project", project.name))
 
 	def _vault_source(self):
 		frappe.db.set_value("Life Space", PRIVATE, "agents_can_read_vault", 0)
@@ -351,3 +360,5 @@ class TestReviewFixes(LifeTestCase):
 		got = graph.get(space=PRIVATE)
 		self.assertNotIn(f"Life Vault Document/{doc.name}", {n["id"] for n in got["nodes"]})
 		self.assertNotIn("pre6 graph passport", [n["label"] for n in got["nodes"]])
+		centred = graph.get(space=PRIVATE, center=f"Life Vault Document/{doc.name}")
+		self.assertNotIn("pre6 graph passport", [n["label"] for n in centred["nodes"]])

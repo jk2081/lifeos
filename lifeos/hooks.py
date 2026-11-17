@@ -43,10 +43,6 @@ doc_events = {
 doc_events["Event"] = {"validate": "lifeos.events.validate_event"}
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
 doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
-# Rows that only record history point at other records: the record a proposal made, an insight's evidence, an Ask
-# thread's scope, where an idea came from or went, the source of a wiki change. They must not stop a delete (pre-step 6
-# audit, Q-B26). A wiki page's cited source (Life Note Source) is a real reference and still does.
-ignore_links_on_delete = ["Life Proposal", "Life Insight", "Life Ask Thread", "Life Idea", "Life Wiki Change"]
 before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.strict_get.before_request"]
 
 scheduler_events = {

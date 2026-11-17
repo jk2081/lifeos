@@ -223,7 +223,7 @@ Brought up to Frappe's official skills and scanning rules, with no change on any
   | Wiki Pages, Wiki Changes | 3, 9 ms | 3, 9 ms |
 
 - **Checks:**
-  - Unit tests: 263 run, 262 pass and 1 is skipped (the live AI test). New: `test_pre6_conventions` (methods, hints, the GET list) and `test_pre6_fixes`. `test_pre6_fixes` covers: Ask's progress and failures; chat import savepoints and user; insights for a user without switching; `../` paths and links; every permission hook over every user and permission type; the audit and review fixes.
+  - Unit tests: 264 run, 263 pass and 1 is skipped (the live AI test). New: `test_pre6_conventions` (methods, hints, the GET list) and `test_pre6_fixes`. `test_pre6_fixes` covers: Ask's progress and failures; chat import savepoints and user; insights for a user without switching; `../` paths and links; every permission hook over every user and permission type; the audit and review fixes.
   - `node tools/acceptance.mjs`: 86 of 86 at 1440 px and 390 px, the fake agent end to end, and the scan.
   - `tools/scan.sh`: 0 findings.
 

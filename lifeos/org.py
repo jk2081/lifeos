@@ -81,3 +81,23 @@ def on_trash(doc, method=None):
 	if doc.doctype in INDEXED_DOCTYPES:
 		index.remove(doc.doctype, doc.name)
 	links.remove(doc.doctype, doc.name)
+	forget_bookkeeping(doc.doctype, doc.name)
+
+
+# Rows that only record history and point at another record by a Dynamic Link: they must not stop that record's delete
+# (pre-step 6 audit, Q-B26), so their pointer is cleared when it goes. Frappe runs on_trash before its link check, and the
+# clearing is part of the delete's transaction. Real filing links (an idea's area or project, a wiki change's page) still
+# stop a delete, and so does a wiki page's cited source (Life Note Source).
+BOOKKEEPING = (
+	("Life Proposal", "created_doctype", "created_name"),
+	("Life Ask Thread", "scope_doctype", "scope_name"),
+	("Life Idea", "source_doctype", "source_name"),
+	("Life Idea", "brought_to_doctype", "brought_to_name"),
+	("Life Wiki Change", "source_doctype", "source_name"),
+)
+
+
+def forget_bookkeeping(doctype, name):
+	for table, type_field, name_field in BOOKKEEPING:
+		frappe.db.set_value(table, {type_field: doctype, name_field: name}, {type_field: None, name_field: None}, update_modified=False)
+	frappe.db.delete("Life Insight Evidence", {"ref_doctype": doctype, "ref_name": name})
