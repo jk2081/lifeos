@@ -12,7 +12,8 @@ Life OS keeps its owner moving forward: everything that lands on him goes in one
 | 3 | Tabs, Settings, sidebar, permissions, goals outside the 12 Week Year | Done |
 | 4 | Sources, the Wiki, the live-preview editor, streams, test-site clean-up | Done |
 | 5 | Count rule, Someday, Reset, Today with Open and Next, AI client with spend cap, Ask from any screen, insights | Done |
-| Pre-step 6 | Frappe's official conventions, scan, audit and review | Next |
+| Pre-step 6 | Frappe's official conventions, scan, audit and review | Done |
+| 6 | Simplify: four places, the lens, Projects into Goals, Library, Settings, rhythm banners (`UX_FIXES_6.md`) | Next |
 
 ## The target design in one paragraph
 
