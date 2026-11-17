@@ -133,6 +133,24 @@ def count(space, **filters):
 	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 
 
+def list_clause(space, status="open", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None, include_archived=0,
+		due=None, done=0, loops=0, completed_from=None, completed_to=None, filters=None):
+	"""The WHERE of `list`, its values, and the part that came from `filters`."""
+	clause, values = where_clause(space, status, area, project, tag, priority, goal, month_plan, include_archived, due, done, loops,
+		completed_from, completed_to)
+	extra, values = std_clause("Life Task", filters, "t", values)
+	return clause + extra, values, extra
+
+
+def total(space, status="open", due=None, filters=None):
+	"""The `total` that `list` answers for these arguments, without its rows or tab counts: the counts on Today, Reset and
+	the sidebar (lifeos/counts.py) use it, and the same WHERE keeps the number and the list in step."""
+	space = permissions.resolve_space(space)
+	clause, values, _extra = list_clause(space, status, due=due, filters=filters)
+	# nosemgrep: frappe-sql-format-injection -- where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters
+	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
+
+
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, status: str | None = "open", area: str | None = None, project: str | None = None,
 		tag: str | None = None, priority: str | None = None, goal: str | None = None, month_plan: str | None = None,
@@ -150,10 +168,8 @@ def list(space: str | None = None, status: str | None = "open", area: str | None
 	under the same filters, whatever status was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	clause, values = where_clause(space, status, area, project, tag, priority, goal, month_plan, include_archived, due, done, loops,
-		completed_from, completed_to)
-	extra, values = std_clause("Life Task", filters, "t", values)
-	clause += extra
+	clause, values, extra = list_clause(space, status, area, project, tag, priority, goal, month_plan, include_archived, due, done,
+		loops, completed_from, completed_to, filters)
 	# the tab counts: the same filters without the status and the open-loops switch, which are what a tab stands for
 	t_clause, t_values = where_clause(space, "any", area, project, tag, priority, goal, month_plan, include_archived, due, 0, 0,
 		completed_from, completed_to)

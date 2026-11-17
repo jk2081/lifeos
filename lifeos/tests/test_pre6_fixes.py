@@ -324,3 +324,30 @@ class TestAuditFixes(LifeTestCase):
 		self.assertTrue({doc.name, item.name} <= {r["record"] for r in trash.list(space=PRIVATE)["rows"]})
 		self.as_user(AGENT)
 		self.assertFalse({doc.name, item.name} & {r["record"] for r in trash.list(space=PRIVATE)["rows"]})
+
+
+class TestReviewFixes(LifeTestCase):
+	def test_task_counts_match_the_task_list(self):
+		from lifeos.api import tasks
+
+		self.make("Life Task", title="pre6 count due", area=self.areas["Tea"], due_date=frappe.utils.today())
+		self.make("Life Task", title="pre6 count waiting", area=self.areas["Tea"], status="Waiting", waiting_on="Mr Rao")
+		for args in ({"status": "all"}, {"status": "all", "due": "today,overdue"}, {"status": "open"},
+				{"status": "all", "filters": '[["title", "like", "pre6 count%"]]'}):
+			self.assertEqual(tasks.total(PRIVATE, **args), tasks.list(space=PRIVATE, page_length=1, **args)["total"], args)
+
+	def test_the_graph_keeps_a_closed_vault_off_an_agents_graph(self):
+		from lifeos.api import graph
+
+		frappe.db.set_value("Life Space", PRIVATE, "agents_can_read_vault", 0)
+		permissions.clear_cache()
+		doc = self.make("Life Vault Document", title="pre6 graph passport", doc_type="ID")
+		task = self.make("Life Task", title="pre6 graph task", area=self.areas["Tea"])
+		frappe.get_doc({"doctype": "Life Link", "space": PRIVATE, "from_doctype": "Life Task", "from_name": task.name,
+			"to_doctype": "Life Vault Document", "to_name": doc.name, "link_text": "pre6"}).insert(ignore_permissions=True)
+		ids = {n["id"] for n in graph.get(space=PRIVATE)["nodes"]}
+		self.assertIn(f"Life Vault Document/{doc.name}", ids)
+		self.as_user(AGENT)
+		got = graph.get(space=PRIVATE)
+		self.assertNotIn(f"Life Vault Document/{doc.name}", {n["id"] for n in got["nodes"]})
+		self.assertNotIn("pre6 graph passport", [n["label"] for n in got["nodes"]])

@@ -6,3 +6,4 @@ lifeos.patches.v3.agents_cannot_read_vault
 lifeos.patches.v3.report_agent_role_mix
 lifeos.patches.v4.sources_and_wiki
 lifeos.patches.v5.someday_and_reset
+lifeos.patches.v6.conformance_indexes

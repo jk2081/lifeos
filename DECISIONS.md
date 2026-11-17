@@ -343,3 +343,10 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **A record that only bookkeeping rows point at can now be deleted**: the record a proposal made, an insight's evidence, an Ask thread's scope, an idea's source or target, the source of a wiki change (`ignore_links_on_delete`). Before, every task accepted from review was refused with "still used by other records". Those rows keep the old name and simply stop resolving. A wiki page's cited source still blocks a delete.
 - **Agents no longer see** the sources Vault documents were made from in `inbox.list`, or deleted Vault documents and their sources in `trash.list`, while the space's Vault switch is off. The pages and REST already refused them one by one.
 - **Reset's undo trusts only the proposal's name from the browser** and checks the proposal, its item and the record made for the user.
+
+### 7. Review fixes
+
+- **Counts of tasks come from `tasks.total`**, which builds the same WHERE as `tasks.list` (`list_clause`) and only counts. The rule of set 5 still holds: a number and its list are made from one WHERE. Everything else in `counts.py` still calls the list method itself.
+- **New indexes** (in `index.ensure_indexes`, and the patch `v6.conformance_indexes` for existing sites): Life Index (space, kind, collection, is_archived, last_opened_on, modified); Life Inbox Item (space, is_archived, status, received_on); Life Task (goal, status); Life Proposal and Life Chat Log (owner, creation). No field changed.
+- **An agent's graph leaves out Vault documents while the Vault is closed to it**, also when a link points at one.
+- **The load test's full-text timings depend on the index being compact.** On this bench, many seed-and-remove cycles had bloated InnoDB's full-text index until a bare `MATCH` took 135 ms. `OPTIMIZE TABLE` (a rebuild) brought it back to under 10 ms. A real site does not delete 100,000 rows at a time; the load test's numbers in STATUS were taken after a rebuild.

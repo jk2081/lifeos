@@ -1,7 +1,8 @@
 """One rule for every number (UX fixes, set 5): each count is paired with the list that shows exactly those rows.
 
 A count is {"n", "to": {"path", "query"}, "label"}. `n` is worked out by calling the same list method, with the same
-arguments, that the screen at `to` calls for that query, so the number and the rows cannot disagree. Today's Open band,
+arguments, that the screen at `to` calls for that query, so the number and the rows cannot disagree. Tasks, the most
+counted, use `tasks.total`, which builds the same WHERE as `tasks.list` without fetching rows. Today's Open band,
 Reset, Someday and the sidebar take every number from here; Ask's `counts` tool does too.
 """
 import json
@@ -46,7 +47,7 @@ def tasks(space, label, conds=(), due=None):
 	conds = [("status", "in", OPEN), *conds]
 	from lifeos.api import tasks as task_api
 
-	n = task_api.list(space=space, status="all", due=due, filters=_f(*conds), page_length=1)["total"]
+	n = task_api.total(space, status="all", due=due, filters=_f(*conds))
 	return _door(n, "/tasks", {"status": "all", "due": due, "view": "list", "f": _f(*conds)}, label)
 
 
@@ -123,9 +124,10 @@ def goal_sets(space):
 		week = journal.week_of(cycle, getdate(today()))
 		if week >= 4:
 			since = add_days(getdate(today()), -21)
-			for g in frappe.get_all("Life Goal", filters={"cycle": cycle.name, "outcome": "In Progress", "is_someday": 0}, pluck="name"):
-				if not frappe.db.exists("Life Action Log", {"goal": g, "date": [">=", since], "count": [">", 0]}):
-					no_ticks.append(g)
+			in_progress = frappe.get_all("Life Goal", filters={"cycle": cycle.name, "outcome": "In Progress", "is_someday": 0}, pluck="name")
+			ticked = set(frappe.get_all("Life Action Log", filters={"goal": ("in", in_progress or ["-"]), "date": [">=", since],
+				"count": [">", 0]}, pluck="goal", distinct=True))
+			no_ticks = [g for g in in_progress if g not in ticked]
 	no_tasks = frappe.db.sql_list("""select g.name from `tabLife Goal` g where g.space=%s and g.outcome='In Progress' and g.is_someday=0
 		and not exists (select 1 from `tabLife Task` t where t.goal = g.name and t.status in ('Open', 'Doing', 'Waiting', 'Done'))
 		and not exists (select 1 from `tabLife Goal Action` a where a.parent = g.name and a.status = 'Open')""", space)

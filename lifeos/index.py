@@ -165,5 +165,12 @@ def ensure_indexes():
 	# "also filed in" is matched through the records' own child rows, not by scanning also_in_csv (see also_in_sql)
 	frappe.db.add_index("Life Also In", ["area", "parenttype", "parent"], "life_also_in_area")
 	frappe.db.add_index("Life Wiki Change", ["space", "changed_on"], "life_wiki_change_space_on")
+	# pre-step 6: the Notes list and its "not opened in 90 days" count on Today; the Inbox's state tabs and totals
+	frappe.db.add_index("Life Index", ["space", "kind", "collection", "is_archived", "last_opened_on", "modified"], "life_index_notes")
+	frappe.db.add_index("Life Inbox Item", ["space", "is_archived", "status", "received_on"], "life_inbox_space_state")
+	# goals with no tasks (Today), and when each agent last filed something (Settings)
+	frappe.db.add_index("Life Task", ["goal", "status"], "life_task_goal_status")
+	frappe.db.add_index("Life Proposal", ["owner", "creation"], "life_proposal_owner_creation")
+	frappe.db.add_index("Life Chat Log", ["owner", "creation"], "life_chat_owner_creation")
 	if not frappe.db.sql("show index from `tabLife Index` where Key_name='life_index_fulltext'"):
 		frappe.db.sql_ddl("alter table `tabLife Index` add fulltext index `life_index_fulltext` (`title`, `search_text`)")

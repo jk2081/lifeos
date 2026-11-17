@@ -50,18 +50,37 @@ def _visible_user(user):
 	return user not in ("Administrator", "Guest")
 
 
-def _member_rows(doc):
-	return [{"user": m.user, "access": m.access, "full_name": frappe.utils.get_fullname(m.user),
-		"image": frappe.db.get_value("User", m.user, "user_image"), "is_owner": m.user == doc.owner_user}
-		for m in doc.members if _visible_user(m.user) and not permissions.is_agent(m.user)]
+def _people(users):
+	"""{user: {full_name, image, is_agent}} for many users, in two queries. An agent has Life Agent and no other Life role,
+	as permissions.is_agent decides."""
+	users = sorted({u for u in users if u})
+	if not users:
+		return {}
+	out = {r.name: {"full_name": r.full_name or r.name, "image": r.user_image, "roles": set()}
+		for r in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "full_name", "user_image"])}
+	for r in frappe.get_all("Has Role", filters={"parent": ("in", users), "parenttype": "User",
+			"role": ("in", ["Life Agent", "Life Admin", "Life User"])}, fields=["parent", "role"]):
+		if r.parent in out:
+			out[r.parent]["roles"].add(r.role)
+	for p in out.values():
+		roles = p.pop("roles")
+		p["is_agent"] = "Life Agent" in roles and not roles & {"Life Admin", "Life User"}
+	return out
 
 
-def _agents(spaces):
+def _member_rows(space, people):
+	return [{"user": m.user, "access": m.access, "full_name": people.get(m.user, {}).get("full_name", m.user),
+		"image": people.get(m.user, {}).get("image"), "is_owner": m.user == space.owner_user}
+		for m in space.members if _visible_user(m.user) and not people.get(m.user, {}).get("is_agent")]
+
+
+def _agents(spaces, people):
 	"""Users who are agents (Life Agent and no other Life role), with the spaces each reaches and when each last filed something."""
 	users = frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent", distinct=True)
+	people = {**_people([u for u in users if u not in people]), **people}
 	out = []
 	for u in sorted(set(users)):
-		if not _visible_user(u) or not permissions.is_agent(u):
+		if not _visible_user(u) or not people.get(u, {}).get("is_agent"):
 			continue
 		reach = []
 		for s in spaces:
@@ -70,8 +89,21 @@ def _agents(spaces):
 		last = frappe.db.sql("""select max(creation) from `tabLife Proposal` where owner=%s""", u)[0][0]
 		last_chat = frappe.db.sql("""select max(creation) from `tabLife Chat Log` where owner=%s""", u)[0][0]
 		last = max([d for d in (last, last_chat) if d], default=None)
-		out.append({"user": u, "full_name": frappe.utils.get_fullname(u), "spaces": reach, "last_filed": str(last) if last else None})
+		out.append({"user": u, "full_name": people[u]["full_name"], "spaces": reach, "last_filed": str(last) if last else None})
 	return out
+
+
+def _spaces(names):
+	"""The spaces with their members, in three queries whatever their number."""
+	rows = frappe.get_all("Life Space", filters={"name": ("in", names or ["-"])},
+		fields=["name", "owner_user", "agents_can_read_vault", "ask_enabled", "ask_can_read_vault"], order_by="name asc")
+	members = {}
+	for m in frappe.get_all("Life Space Member", filters={"parent": ("in", names or ["-"]), "parenttype": "Life Space"},
+			fields=["parent", "user", "access"], order_by="idx asc"):
+		members.setdefault(m.parent, []).append(m)
+	for r in rows:
+		r["members"] = members.get(r.name, [])
+	return rows
 
 
 @frappe.whitelist(methods=["GET"])
@@ -102,13 +134,16 @@ def get(space: str | None = None):
 		"spaces": [], "agents": [],
 	}
 	names = frappe.get_all("Life Space", pluck="name") if permissions.is_admin() else list(permissions.user_spaces())
-	docs = [frappe.get_doc("Life Space", n) for n in sorted(names)]
+	docs = _spaces(names)
+	people = _people([m.user for d in docs for m in d.members] + [d.owner_user for d in docs])
+	access = permissions.user_spaces()
 	for doc in docs:
-		out["spaces"].append({"name": doc.name, "owner_user": doc.owner_user, "owner_name": frappe.utils.get_fullname(doc.owner_user),
-			"access": permissions.user_spaces().get(doc.name), "agents_can_read_vault": int(doc.agents_can_read_vault or 0), "members": _member_rows(doc),
+		out["spaces"].append({"name": doc.name, "owner_user": doc.owner_user,
+			"owner_name": people.get(doc.owner_user, {}).get("full_name", doc.owner_user) if doc.owner_user else None,
+			"access": access.get(doc.name), "agents_can_read_vault": int(doc.agents_can_read_vault or 0), "members": _member_rows(doc, people),
 			"ask_enabled": int(doc.ask_enabled or 0), "ask_can_read_vault": int(doc.ask_can_read_vault or 0)})
 	if permissions.is_admin():
-		out["agents"] = _agents(docs)
+		out["agents"] = _agents(docs, people)
 		out["ai"] = ai_settings()
 	return out
 

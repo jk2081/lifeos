@@ -101,6 +101,19 @@ def delete_goal(goal: str):
 	return {"deleted": goal}
 
 
+def _goal_links(goals):
+	"""Titles a goal row shows, for many goals in four queries: its project, and the cycles it was carried from and into."""
+	names = [g["name"] for g in goals]
+	carried_from = [g["carried_from"] for g in goals if g["carried_from"]]
+	into = {}
+	for r in frappe.get_all("Life Goal", filters={"carried_from": ("in", names or ["-"])}, fields=["carried_from", "cycle"], order_by="creation asc"):
+		into.setdefault(r.carried_from, r.cycle)
+	from_cycle = dict(frappe.get_all("Life Goal", filters={"name": ("in", carried_from or ["-"])}, fields=["name", "cycle"], as_list=True))
+	cycles = names_map("Life Cycle", [*into.values(), *from_cycle.values()], "title")
+	projects = names_map("Life Project", [g["project"] for g in goals], "title")
+	return {"into_cycle": into, "from_cycle": from_cycle, "cycles": cycles, "projects": projects}
+
+
 @frappe.whitelist(methods=["GET"])
 def goals(space: str | None = None, area: str | None = None):
 	"""Every goal across every cycle, grouped by cycle: planned, active, then closed, newest first."""
@@ -111,22 +124,23 @@ def goals(space: str | None = None, area: str | None = None):
 	cycles.sort(key=lambda c: order.get(c.status, 3))
 	target = frappe.db.get_single_value("Life Settings", "score_target") or 85
 	out = []
+	grids = {c.name: rules.grid(c.name) for c in cycles}
+	links = _goal_links([goal for g in grids.values() for goal in g["goals"]])
 	for c in cycles:
-		g = rules.grid(c.name)
+		g = grids[c.name]
 		rows = []
 		for goal in g["goals"]:
 			if area and goal["area"] != area:
 				continue
-			carried_into = frappe.db.get_value("Life Goal", {"carried_from": goal["name"]}, "cycle")
 			rows.append({
 				"name": goal["name"], "title": goal["title"], "area": goal["area"], "area_name": goal["area_name"], "project": goal["project"],
-				"project_title": frappe.db.get_value("Life Project", goal["project"], "title") if goal["project"] else None,
+				"project_title": links["projects"].get(goal["project"]) if goal["project"] else None,
 				"actions": len([a for a in goal["actions"] if a["status"] != "Dropped"]),
 				"actions_done": len([a for a in goal["actions"] if a["status"] == "Done"]),
 				"percent": goal["final_score"] if c.status == "Closed" else goal["percent"],
 				"outcome": goal["outcome"], "result_note": goal["result_note"], "carried_from": goal["carried_from"],
-				"carried_from_cycle": frappe.db.get_value("Life Cycle", frappe.db.get_value("Life Goal", goal["carried_from"], "cycle"), "title") if goal["carried_from"] else None,
-				"carried_into_cycle": frappe.db.get_value("Life Cycle", carried_into, "title") if carried_into else None,
+				"carried_from_cycle": links["cycles"].get(links["from_cycle"].get(goal["carried_from"])) if goal["carried_from"] else None,
+				"carried_into_cycle": links["cycles"].get(links["into_cycle"].get(goal["name"])),
 			})
 		out.append({"name": c.name, "title": c.title, "status": c.status, "start_date": str(c.start_date), "end_date": str(c.end_date),
 			"current_week": g["current_week"], "average": g["average"], "past_end": g["past_end"], "goals": rows})

@@ -244,6 +244,8 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 	undo, done = [], 0
 	for it in items:
 		doctype, name = it.get("doctype"), it.get("name")
+		if not isinstance(name, str):  # a name sent as a dict would act as a filter
+			continue
 		if doctype not in ("Life Task", "Life Project", "Life Goal", "Life Idea", "Life Inbox Item", "Life Note"):
 			continue
 		if not frappe.db.exists(doctype, name) or frappe.db.get_value(doctype, name, "space") != space:

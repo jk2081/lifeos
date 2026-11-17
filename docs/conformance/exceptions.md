@@ -9,8 +9,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-manual-commit | 5 |
 | frappe-security-file-traversal | 3 |
 | frappe-setuser | 13 |
-| frappe-sql-format-injection | 68 |
-| Total | 89 |
+| frappe-sql-format-injection | 69 |
+| Total | 90 |
 
 ## frappe-manual-commit
 
@@ -69,9 +69,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/chats.py` | 150 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/goals.py` | 35 | `sp` is one of two constant fragments; values are parameters |
 | `lifeos/api/goals.py` | 91 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
-| `lifeos/api/inbox.py` | 293 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 298 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 295 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
 | `lifeos/api/inbox.py` | 300 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 302 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |
@@ -90,8 +90,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/sources.py` | 133 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/tasks.py` | 45 | fixed SQL and meta-checked columns only; values are parameters |
 | `lifeos/api/tasks.py` | 132 | the WHERE comes from where_clause (fixed fragments); values are parameters |
-| `lifeos/api/tasks.py` | 170 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
-| `lifeos/api/tasks.py` | 253 | open_loops_where() is a constant fragment |
+| `lifeos/api/tasks.py` | 150 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
+| `lifeos/api/tasks.py` | 186 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
+| `lifeos/api/tasks.py` | 269 | open_loops_where() is a constant fragment |
 | `lifeos/api/timeline.py` | 38 | ROW_FIELDS and vault_guard are constants; callers pass fixed WHERE and ORDER fragments; values are parameters |
 | `lifeos/api/timeline.py` | 74 | fixed fragments, std_filters columns checked against meta; values are parameters |
 | `lifeos/api/utils.py` | 224 | `base` and the tab conditions are fixed SQL from the list methods; values are parameters |

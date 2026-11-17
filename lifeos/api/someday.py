@@ -279,6 +279,8 @@ def undo(snapshot: str | dict):
 
 
 def restore_snapshot(snap):
+	if not isinstance(snap.get("doctype"), str) or not isinstance(snap.get("name"), str):  # a dict name would act as a filter
+		frappe.throw(frappe._("Nothing to undo."))
 	doc = permissions.get_doc_checked(snap["doctype"], snap["name"], "write")
 	if doc.get("is_archived") and not cint(snap.get("is_archived")) and snap.get("is_archived") is not None:
 		from lifeos import archive
