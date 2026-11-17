@@ -31,7 +31,7 @@
         </div>
         <template v-for="(goal, gi) in g.goals" :key="goal.name">
           <div class="group flex flex-wrap items-center gap-2 px-3 pb-1.5 pt-3 max-md:px-2" :class="gi && 'border-t border-outline-gray-1'">
-            <RouterLink class="font-semibold text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/journal/goals/${goal.name}`">{{ goal.title }}</RouterLink>
+            <RouterLink class="font-semibold text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/plan/goals/${goal.name}`">{{ goal.title }}</RouterLink>
             <Badge v-if="goal.area_name" :label="goal.area_name" />
             <Button v-if="canEdit" class="opacity-0 focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100" variant="ghost" size="sm" label="Edit" :aria-label="`Edit ${goal.title}`" @click="editGoal(goal)" />
           </div>

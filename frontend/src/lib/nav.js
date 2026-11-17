@@ -1,40 +1,41 @@
-// The places of the app. Icons are Lucide names, drawn by frappe-ui's icon plugin. `key` is the letter after G.
-// The sidebar groups them (components/AppSidebar.vue); Graph is a view of Notes and not in the sidebar, but keeps its key.
-export const NAV = [
-  ['Today', '/', 'lucide-house', 't'],
-  ['Inbox', '/inbox', 'lucide-inbox', 'i'],
-  ['Tasks', '/tasks', 'lucide-list-checks', 'k'],
-  ['Calendar', '/calendar', 'lucide-calendar', 'c'],
-  ['Ask', '/ask', 'lucide-sparkles', 'q'],
-  ['Journal', '/journal', 'lucide-notebook', 'j'],
-  ['Goals', '/goals', 'lucide-target', 'o'],
-  ['Projects', '/projects', 'lucide-chart-no-axes-column', 'p'],
-  ['Someday', '/someday', 'lucide-clock', 'y'],
-  ['Areas', '/areas', 'lucide-folder', 'a'],
-  ['Sources', '/sources', 'lucide-layers', 'u'],
-  ['Notes', '/library', 'lucide-library', 'n'],
-  ['Wiki', '/wiki', 'lucide-book-open', 'w'],
-  ['Vault', '/vault', 'lucide-lock', 'v'],
-  // Chats is the Chats tab of Sources (UX fixes, set 4); G then H still opens it
-  ['Chats', '/sources?tab=chats', 'lucide-message-square', 'h'],
-  ['Timeline', '/timeline', 'lucide-clock', 'l'],
-  ['Graph', '/graph', 'lucide-waypoints', 'g'],
-  ['Reset', '/reset', 'lucide-rotate-ccw', 'e'],
-  ['Archive', '/archive', 'lucide-archive', 'r'],
-].map(([label, to, icon, key]) => ({ label, to, icon, key }))
-
-export const SETTINGS = { label: 'Settings', to: '/settings', key: 's', icon: 'lucide-settings' }
-const by = (label) => NAV.find((n) => n.label === label)
-// the groups of the sidebar and of the phone's More list
-export const GROUPS = [
-  { key: 'main', label: '', items: ['Today', 'Inbox', 'Tasks', 'Calendar', 'Ask'].map(by) },
-  { key: 'plan', label: 'Plan', items: ['Journal', 'Goals', 'Projects', 'Someday'].map(by) },
-  { key: 'areas', label: 'Areas', items: [] },
-  { key: 'records', label: 'Records', items: ['Sources', 'Notes', 'Wiki', 'Vault', 'Timeline'].map(by) },
+// The places of the app (UX fixes, set 6): four places, Plan's and Library's tabs, Settings, and the letters after G.
+// Icons are Lucide names, drawn by frappe-ui's icon plugin.
+export const PLACES = [
+  { label: 'Today', to: '/', icon: 'lucide-house', key: 't' },
+  { label: 'Inbox', to: '/inbox', icon: 'lucide-inbox', key: 'i' },
+  { label: 'Plan', to: '/plan/week', base: '/plan', icon: 'lucide-compass', key: 'p' },
+  { label: 'Library', to: '/library', icon: 'lucide-library', key: 'l' },
 ]
-export const BOTTOM = [by('Reset'), by('Archive'), SETTINGS]
-export const TOOLTIPS = { Ask: 'Questions about your own records, and insights', Someday: 'Parked, not forgotten', Reset: 'Clear the backlog', Timeline: 'Everything, by date', Sources: 'Everything captured', Wiki: 'Pages an agent writes from your sources' }
-// the view switch of Notes
-// Notes opens on the List (UX fixes, set 4); Tree and Graph are view choices
-export const NOTES_VIEWS = [{ label: 'List', value: 'list', route: { path: '/library', query: { view: 'list' } } }, { label: 'Tree', value: 'tree', route: { path: '/library', query: { view: 'tree' } } },
-  { label: 'Graph', value: 'graph', route: '/graph' }]
+// Plan's tabs: the rhythms first, then the lists (a gap between the two groups)
+export const PLAN_TABS = [
+  { value: 'week', label: 'Week', group: 'time' }, { value: 'month', label: 'Month', group: 'time' },
+  { value: '12-weeks', label: '12 Weeks', group: 'time' }, { value: 'year', label: 'Year', group: 'time' },
+  { value: 'goals', label: 'Goals', group: 'lists' }, { value: 'tasks', label: 'Tasks', group: 'lists' }, { value: 'someday', label: 'Someday', group: 'lists' },
+]
+export const LIBRARY_TABS = [
+  { value: 'all', label: 'All' }, { value: 'notes', label: 'Notes' }, { value: 'captures', label: 'Captures' },
+  { value: 'timeline', label: 'Timeline' }, { value: 'archive', label: 'Archive' },
+]
+export const planPath = (tab) => `/plan/${tab}`
+export const libraryPath = (tab) => (tab === 'all' ? '/library' : `/library/${tab}`)
+export const SETTINGS = { label: 'Settings', to: '/settings', key: 's', icon: 'lucide-settings' }
+
+// G then a letter. The four places first, then the shortcuts kept from before set 6, pointing at the new homes.
+export const GO = [
+  ...PLACES,
+  { label: 'Plan: Week', to: '/plan/week', key: 'w' }, { label: 'Plan: Month', to: '/plan/month', key: 'm' },
+  { label: 'Plan: 12 Weeks', to: '/plan/12-weeks', key: 'j' }, { label: 'Plan: Year', to: '/plan/year', key: 'c' },
+  { label: 'Plan: Goals', to: '/plan/goals', key: 'o' }, { label: 'Plan: Tasks', to: '/plan/tasks', key: 'k' },
+  { label: 'Plan: Someday', to: '/plan/someday', key: 'y' }, { label: 'Reset', to: '/plan/reset', key: 'e' },
+  { label: 'Library: Notes', to: '/library/notes', key: 'n' }, { label: 'Library: Captures', to: '/library/captures', key: 'u' },
+  { label: 'Library: Chats', to: '/library/captures?tab=chats', key: 'h' }, { label: 'Library: Sensitive documents', to: '/library/captures?tab=documents&sensitive=1', key: 'v' },
+  { label: "Library: The assistant's notes", to: '/library/notes?by=assistant', key: 'x' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
+  { label: 'Library: Archive', to: '/library/archive', key: 'r' },
+  { label: 'Ask: history and insights', to: '/ask', key: 'q' }, { label: 'Settings: Areas', to: '/settings?tab=areas', key: 'a' },
+  SETTINGS,
+]
+export const TOOLTIPS = { Today: 'What to do now', Inbox: 'What came in', Plan: 'Where you are going', Library: 'What you have and know' }
+// the view switch of Library > Notes: List (the default), Tree and Graph
+export const NOTES_VIEWS = [{ label: 'List', value: 'list', route: { path: '/library/notes', query: { view: 'list' } } },
+  { label: 'Tree', value: 'tree', route: { path: '/library/notes', query: { view: 'tree' } } },
+  { label: 'Graph', value: 'graph', route: { path: '/library/notes', query: { view: 'graph' } } }]

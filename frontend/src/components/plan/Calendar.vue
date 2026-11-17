@@ -1,9 +1,11 @@
 <template>
-  <PageHead :title="title">
+  <PageHead :title="place || title" :sub="place ? title : undefined">
+    <TabButtons v-if="switchOptions" :model-value="switchValue" :options="switchOptions" aria-label="Views" data-plan-views />
+    <slot name="actions" />
     <Button icon="lucide-chevron-left" label="Previous" tooltip="Previous" data-cal-prev @click="step(-1)" />
     <Button icon="lucide-chevron-right" label="Next" tooltip="Next" data-cal-next @click="step(1)" />
     <Button class="max-md:hidden" variant="ghost" label="Today" data-cal-today @click="goToday" />
-    <TabButtons :model-value="mode" :options="VIEW_OPTIONS" aria-label="Calendar views" data-views />
+    <TabButtons v-if="!switchOptions" :model-value="mode" :options="VIEW_OPTIONS" aria-label="Calendar views" data-views />
     <template v-if="canWrite()">
       <Button label="Add important date" @click="openDate(cursor)" />
       <Button variant="solid" icon-left="lucide-plus" label="Add event" @click="openEvent(cursor)" />
@@ -11,6 +13,7 @@
   </PageHead>
 
   <div class="page-body" data-calendar :data-view="mode">
+    <slot name="above" />
     <Alert v-if="google && !google.connected" title="Google Calendar is not connected" description="Events added here stay on this site."
       :primary-action="{ label: 'Connect it in Frappe\'s Google settings', href: google.setup_url }" data-google-prompt />
 
@@ -117,7 +120,9 @@ import { MONTHS, addDays, iso, long, parse, short, startOfWeek, time, weekday } 
 import { useTabKeys } from '@/lib/tabs'
 import routerInstance from '@/router'
 
-const props = defineProps({ view: String })
+// In Plan (UX fixes, set 6) the calendar is a view of the Week, Month and Year tabs: `place` is the tab's title (the
+// calendar's own title becomes the line under it) and `switchOptions` the tab's view switch, which replaces the calendar's.
+const props = defineProps({ view: String, place: String, switchOptions: Array, switchValue: String })
 const VIEWS = ['month', 'week', 'agenda', 'year']
 const VIEW_OPTIONS = VIEWS.map((v) => ({ label: v[0].toUpperCase() + v.slice(1), value: v, route: `/calendar/${v}` }))
 const SOURCE = { event: 'Event', important: 'Important date', task: 'Task due', vault: 'Vault document' }
@@ -129,7 +134,7 @@ const CHIP = {
 const INK = { important: 'text-ink-blue-8', trip: 'text-ink-amber-9', vault: 'text-ink-red-8', task: 'text-ink-gray-7' }
 const mode = computed(() => (VIEWS.includes(props.view) ? props.view : window.innerWidth < 768 ? 'agenda' : 'month'))
 // set 3: the views keep their path form (/calendar/year); [ and ] open the previous and next view
-useTabKeys({ level: 1, step: (n) => { const next = VIEWS[VIEWS.indexOf(mode.value) + n]; if (next) routerInstance.push(`/calendar/${next}`) } })
+if (!props.place) useTabKeys({ level: 1, step: (n) => { const next = VIEWS[VIEWS.indexOf(mode.value) + n]; if (next) routerInstance.push(`/calendar/${next}`) } })
 const cursor = ref(store.today)
 const data = ref(null)
 const yearData = ref(null)

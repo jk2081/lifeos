@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" :title="embed ? null : 'Sources'" noun="sources" :screen="embed ? embed.screen + '-captures' : 'sources'" :fixed="embed?.fixed" :active="embed ? embed.active : true"
+  <ListView ref="list" :title="embed ? null : place === 'all' ? 'All' : 'Captures'" noun="sources" :screen="embed ? embed.screen + '-captures' : 'sources'" :fixed="embed?.fixed" :active="embed ? embed.active : true"
     :tabs-in-filter="!!embed" doctype="Life Index" :spec="SPEC" :tabs="TABS" :views="views" :quick="['area', 'goal', 'status']"
     :virtual="VIRTUAL" :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => r.ref" :row-key="(r) => r.ref" :row-label="(r) => r.title || 'Untitled'"
     :quiet="['open_items', 'archived']" :flag-labels="{ open_items: 'With open items', archived: 'Include archived' }" :group-by="groupBy" :empty-title="EMPTY[list?.tab] || 'No sources yet.'" :watch-keys="['view']" @loaded="(res) => (extra = res)"
@@ -116,7 +116,7 @@ const EMPTY = { chats: 'No chats yet.', voice: 'No voice notes yet.', documents:
   email: 'No emails yet.', text: 'No text yet.' }
 
 // inside a record page's tab (the goal page): { screen, space, fixed: { goal }, active(route), writable }
-const props = defineProps({ embed: { type: Object, default: null } })
+const props = defineProps({ embed: { type: Object, default: null }, place: { type: String, default: 'captures' } })
 const route = useRoute()
 const list = ref(null)
 const selected = ref([])

@@ -105,7 +105,7 @@ const counts = ref({})
 const TABS = computed(() => [{ value: 'pages', label: 'Pages', count: counts.value.pages }, { value: 'changes', label: 'Changes', count: counts.value.changes },
   { value: 'health', label: 'Health', count: counts.value.health_issues ?? undefined }, { value: 'rules', label: 'Rules' }])
 const tab = useUrlTab('tab', TABS)
-const VIEWS = [{ label: 'List', value: 'list' }, { label: 'Graph', value: 'graph', route: { path: '/graph', query: { collection: 'Wiki' } } }]
+const VIEWS = [{ label: 'List', value: 'list' }, { label: 'Graph', value: 'graph', route: { path: '/library/notes', query: { by: 'assistant', view: 'graph', collection: 'Wiki' } } }]
 
 const PAGE_SPEC = [{ key: 'area', field: 'area', kind: 'link', none: true }, { key: 'goal', field: 'goal', kind: 'link', none: true }]
 const PAGE_VIRTUAL = []

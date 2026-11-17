@@ -38,7 +38,7 @@ import { store } from '@/lib/store'
 const LEGEND = [{ type: 'Note', label: 'Note', color: '--ink-blue-7' }, { type: 'Person', label: 'Person', color: '--ink-amber-7' },
   { type: 'Goal', label: 'Goal', color: '--ink-violet-6' }, { type: 'Document', label: 'Vault document', color: '--ink-green-7' }]
 const route = useRoute()
-const WIKI_VIEWS = [{ label: 'List', value: 'list', route: '/wiki' }, { label: 'Graph', value: 'graph', route: { path: '/graph', query: { collection: 'Wiki' } } }]
+const WIKI_VIEWS = [{ label: 'List', value: 'list', route: { path: '/library/notes', query: { by: 'assistant' } } }, { label: 'Graph', value: 'graph', route: { path: '/library/notes', query: { by: 'assistant', view: 'graph', collection: 'Wiki' } } }]
 const router = useRouter()
 const host = ref(null)
 const d = ref(null)

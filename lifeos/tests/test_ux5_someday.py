@@ -13,13 +13,13 @@ def _call_door(door, space=PRIVATE):
 	"""Run the list a count links to, with the arguments that screen sends, and return its total."""
 	q = door["to"]["query"]
 	path = door["to"]["path"]
-	if path == "/tasks":
+	if path == "/plan/tasks":
 		return tasks.list(space=space, status=q.get("status"), due=q.get("due"), filters=q.get("f"), page_length=1)["total"]
-	if path == "/goals":
+	if path == "/plan/goals":
 		return goals.list(space=space, state=q.get("status"), goal_type=q.get("type"), filters=q.get("f"), page_length=1)["total"]
 	if path == "/inbox":
 		return inbox.list(space=space, status=json.dumps([q["status"]]), filters=q.get("f"), page_length=1)["total"]
-	if path == "/someday":
+	if path == "/plan/someday":
 		return someday.list(space=space, tab=q.get("tab") or "all", filters=q.get("f"), page_length=1)["total"]
 	raise AssertionError(path)
 

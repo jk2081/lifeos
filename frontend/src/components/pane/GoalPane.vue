@@ -34,7 +34,7 @@
         <template v-if="d.tasks_counted"><div class="min-w-0 flex-1"><Progress size="sm" :value="Math.round((100 * d.tasks_done) / d.tasks_counted)" /></div>
           <span class="text-sm tabular-nums text-ink-gray-8">{{ d.tasks_done }} of {{ d.tasks_counted }} tasks</span></template>
         <span v-else class="text-sm text-ink-gray-6">No tasks yet</span>
-        <NumLink class="ml-auto text-sm" :to="{ path: '/tasks', query: { goal: d.goal.name, status: 'all', view: 'list' } }" data-door="goal-tasks">Open in Tasks</NumLink>
+        <NumLink class="ml-auto text-sm" :to="{ path: '/plan/tasks', query: { goal: d.goal.name, status: 'all', view: 'list' } }" data-door="goal-tasks">Open in Tasks</NumLink>
       </div>
       <Card flush>
         <Row v-for="t in d.tasks" :key="t.name" :pane="'task:' + t.name" :label="t.title"><div class="min-w-0 flex-1">
@@ -116,7 +116,7 @@ async function load() {
       ? [{ value: 'actions', label: 'Actions', count: g.actions.length, noun: 'actions' }, { value: 'tasks', label: 'Tasks', count: x.tasks.length, noun: 'tasks' },
           { value: 'history', label: 'History across cycles', count: x.history.length, noun: 'cycles' }]
       : [{ value: 'tasks', label: 'Tasks', count: x.tasks.length, noun: 'tasks' }]
-    emit('meta', { title: g.title, area: g.area, area_name: g.area_name, fullPage: `/journal/goals/${g.name}`,
+    emit('meta', { title: g.title, area: g.area, area_name: g.area_name, fullPage: `/plan/goals/${g.name}`,
       sub: x.is_someday ? 'On the Someday list' : x.cycle ? `${g.actions.length} action${g.actions.length === 1 ? '' : 's'}` : x.goal_type + ' goal',
       someday: canWrite() && g.outcome === 'In Progress' && !x.is_someday ? { doctype: 'Life Goal', name: g.name } : null,
       tabs: [...tabs, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })

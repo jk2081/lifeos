@@ -1,5 +1,5 @@
 <template>
-  <PageHead title="Reset" :sub="sub">
+  <PageHead title="Reset" :sub="sub" :crumb="{ to: '/plan/week', label: 'Plan', here: 'Week' }">
   </PageHead>
   <div class="page-body" data-reset>
     <template v-if="d">

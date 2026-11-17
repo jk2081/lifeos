@@ -108,7 +108,7 @@
         </Card>
         <ConnectionsSection v-else-if="section === 'connections'" :space="spaceSel" :writable="canEdit && !store.isAgent" />
         <template v-else-if="section === 'archived'">
-          <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/archive" data-archive-link>Archived records are on the Archive screen</RouterLink>.
+          <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/library/archive" data-archive-link>Archived records are on the Archive screen</RouterLink>.
             This list holds only the headings archived from Areas, Tags, Habits and Check-in dimensions.</p>
           <section v-for="l in LISTS" :key="l.kind" :data-archived-group="l.kind">
             <SectionHead :count="archived(l).length">{{ l.label }}</SectionHead>
@@ -282,7 +282,7 @@ const ACCESS = [{ label: 'Can view', value: 'Read' }, { label: 'Can edit', value
 const AGENT_ACCESS = [{ label: 'No access', value: '' }, ...ACCESS]
 const LISTS = [
   { kind: 'area', section: 'areas', label: 'Areas', one: 'area', noun: 'areas', key: 'areas', field: 'area_name', ordered: true, placeholder: 'For example Health',
-    hint: 'Areas are your own filing headings.', countNoun: ['record', 'records'], link: (r) => ({ path: '/timeline', query: { area: r.name } }),
+    hint: 'Areas are your own filing headings.', countNoun: ['record', 'records'], link: (r) => ({ path: '/library/timeline', query: { area: r.name } }),
     footer: 'Drag the handle to reorder, or to the middle of another area to put it under that one. Alt and the arrow keys move a focused row.' },
   { kind: 'tag', section: 'tags', label: 'Tags', one: 'tag', noun: 'tags', key: 'tags', field: 'tag_name', placeholder: 'For example tax',
     hint: 'Tags are themes that cut across areas.', countNoun: ['tagged record', 'tagged records'], footer: 'Tags are listed by name.' },

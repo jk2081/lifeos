@@ -18,7 +18,7 @@
         <li v-for="b in reset.batches" :key="b.key">· {{ b.count }} {{ b.title.charAt(0).toLowerCase() + b.title.slice(1) }}</li>
       </ul>
       <div class="flex flex-wrap gap-2">
-        <Button variant="solid" label="Open Reset" route="/reset" data-review-reset-open />
+        <Button variant="solid" label="Open Reset" route="/plan/reset" data-review-reset-open />
         <Button label="Done, go on to the review" data-review-reset-done @click="finishReset" />
         <Button variant="ghost" label="Skip for this week" data-review-reset-skip @click="finishReset" />
       </div>
@@ -30,7 +30,7 @@
       <Stat label="Tasks done"><NumLink :to="door('Done')" data-door="review-done">{{ d.done_total ?? d.done.length }}</NumLink>
         <template #sub><NumLink class="max-md:hidden" :to="door('Carried')" data-door="review-carried"><span>{{ d.carried_total ?? d.carried.length }}</span> carried forward</NumLink></template>
       </Stat>
-      <Stat label="Open loops"><NumLink :to="{ path: '/tasks', query: { status: 'loops' } }" data-door="review-loops">{{ d.open_loops_total }}</NumLink>
+      <Stat label="Open loops"><NumLink :to="{ path: '/plan/tasks', query: { status: 'loops' } }" data-door="review-loops">{{ d.open_loops_total }}</NumLink>
         <template #sub><span class="max-md:hidden">Older than 14 days, no date</span></template>
       </Stat>
     </div>
@@ -49,7 +49,7 @@
         <section v-if="d.carried.length"><SectionHead>Carried forward</SectionHead>
           <Card flush><TaskRow v-for="t in d.carried" :key="t.name" :task="t" :today="store.today" readonly /></Card>
         </section>
-        <section><SectionHead :count="d.open_loops_total" :to="{ path: '/tasks', query: { status: 'loops' } }">Open loops</SectionHead>
+        <section><SectionHead :count="d.open_loops_total" :to="{ path: '/plan/tasks', query: { status: 'loops' } }">Open loops</SectionHead>
           <Card flush><TaskRow v-for="t in d.open_loops.slice(0, 8)" :key="t.name" :task="t" :today="store.today" with-due :readonly="!canWrite()" @toggle="done" />
             <Empty v-if="!d.open_loops.length" title="No open loops." hint="Open tasks older than 14 days with no due date gather here." /></Card>
         </section>
@@ -65,7 +65,7 @@
             <Empty v-if="!d.decide.length" title="Nothing to decide." :hint="`Open tasks not touched for ${d.stale_days} days are listed here. They are never archived for you.`" />
           </Card>
         </section>
-        <section v-if="d.archived.length"><SectionHead :count="d.archived.length" :to="{ path: '/archive', query: { reason: 'Auto', archived_from: d.week_start, archived_to: d.week_end } }" door="review-archived">Archived this week by the daily job</SectionHead>
+        <section v-if="d.archived.length"><SectionHead :count="d.archived.length" :to="{ path: '/library/archive', query: { reason: 'Auto', archived_from: d.week_start, archived_to: d.week_end } }" door="review-archived">Archived this week by the daily job</SectionHead>
           <Card flush><Row v-for="a in d.archived" :key="a.name" class="!items-center" :pane="refOf(a.doctype, a.name)" :label="a.title">
             <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ a.title }}</div><div class="text-sm text-ink-gray-6">{{ a.doctype.replace('Life ', '') }} · archived {{ short(a.archived_on) }}</div></div>
             <Button v-if="canWrite()" class="relative" label="Undo" @click="undo(a)" /></Row></Card>
@@ -124,7 +124,7 @@ const d = ref(null)
 const note = ref('')
 const state = ref('')
 // the week's numbers lead to the tasks they count: this status, completed inside this week, archived ones included
-const door = (status) => ({ path: '/tasks', query: { view: 'table', status, completed_from: d.value.week_start, completed_to: d.value.week_end, archived: '1' } })
+const door = (status) => ({ path: '/plan/tasks', query: { view: 'table', status, completed_from: d.value.week_start, completed_to: d.value.week_end, archived: '1' } })
 let timer = null
 const range = (lo, hi) => (lo == null ? '—' : lo === hi ? String(lo) : `${lo}-${hi}`)
 

@@ -5,7 +5,7 @@
     @loaded="(res) => (pendingTotal = res.pending_total)">
     <template #sub>{{ store.space }} · drop anything here, an agent proposes, you approve<template v-if="pendingTotal"> ·
       <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template> ·
-      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/sources', query: { status: 'done' } }" data-finished-link>Finished items are in Sources</RouterLink></template>
+      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/library/captures', query: { status: 'done' } }" data-finished-link>Finished items are in Sources</RouterLink></template>
     <template #above>
       <!-- The drop zone. Files wait here until Add to Inbox creates the item they belong to; then each is uploaded, private, to that item. -->
       <section v-if="canWrite()" class="rounded-5 border border-dashed p-4" :class="over ? 'border-outline-gray-5 bg-surface-gray-3' : 'border-outline-gray-3 bg-surface-gray-1'"
@@ -102,7 +102,7 @@ const THEME = { 'To Review': 'amber', New: 'gray', Processing: 'blue', Failed: '
 const route = useRoute()
 const router = useRouter()
 // old links to the Done and All tabs open Sources, where finished items are
-if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/sources', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
+if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/library/captures', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
 const intent = ref(savedView('inbox-intent')?.intent || 'Process')
 watch(intent, (v) => saveView('inbox-intent', { intent: v }))
 const picker = ref(null)
@@ -180,4 +180,11 @@ async function retry(it) {
   if (await tryCall(() => api('inbox.retry', { item: it.name }), 'Sent back to the agent.')) list.value.reload()
 }
 onMounted(loadLookups)
+// New > Capture opens the Inbox ready to take text or files (UX fixes, set 6)
+watch(() => route.query.capture, (on) => {
+  if (!on) return
+  showText.value = true
+  router.replace({ query: { ...route.query, capture: undefined } })
+  setTimeout(() => document.querySelector('[aria-label="Text to file"] textarea, textarea[aria-label="Text to file"]')?.focus(), 50)
+}, { immediate: true })
 </script>

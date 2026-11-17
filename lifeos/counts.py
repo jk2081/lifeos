@@ -50,7 +50,7 @@ def tasks(space, area, label, conds=(), due=None):
 	from lifeos.api import tasks as task_api
 
 	n = task_api.total(space, status="all", area=area, due=due, filters=_f(*conds))
-	return _door(n, "/tasks", {"status": "all", "due": due, "view": "list", "f": _f(*conds)}, label, area)
+	return _door(n, "/plan/tasks", {"status": "all", "due": due, "view": "list", "f": _f(*conds)}, label, area)
 
 
 def untouched(lo=None, hi=None, field="last_touched_on"):
@@ -88,7 +88,7 @@ def open_goals(space, area, label, conds=()):
 
 	conds = [("on_hold", "=", 0), *conds]
 	n = goal_api.list(space=space, area=area, state="in_progress", goal_type="Open", filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/goals", {"status": "in_progress", "type": "Open", "f": _f(*conds)}, label, area)
+	return _door(n, "/plan/goals", {"status": "in_progress", "type": "Open", "f": _f(*conds)}, label, area)
 
 
 def active_open_goals(space, area=None):
@@ -107,9 +107,9 @@ def goals(space, area, label, names=None, state="in_progress"):
 
 	conds = [("name", "in", sorted(names))] if names is not None else []
 	if names is not None and not names:
-		return _door(0, "/goals", {"status": state, "f": _f(("name", "in", ["-"]))}, label, area)
+		return _door(0, "/plan/goals", {"status": state, "f": _f(("name", "in", ["-"]))}, label, area)
 	n = goal_api.list(space=space, area=area, state=state, filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/goals", {"status": state, "f": _f(*conds)}, label, area)
+	return _door(n, "/plan/goals", {"status": state, "f": _f(*conds)}, label, area)
 
 
 def goals_in_progress(space, area=None):
@@ -169,7 +169,7 @@ def notes_and_sources(space, area=None):
 
 	cond = ("kind", "in", ["Note", "Inbox", "Chat"])
 	n = timeline.get(space=space, area=area, filters=_f(cond), page_length=1)["total"]
-	return _door(n, "/timeline", {"f": _f(cond)}, "Notes and sources", area)
+	return _door(n, "/library/timeline", {"f": _f(cond)}, "Notes and sources", area)
 
 
 def notes(space, area, label, conds=()):
@@ -177,7 +177,7 @@ def notes(space, area, label, conds=()):
 
 	# My notes, as the Notes screen lists them; wiki pages are kept by the agent and the Wiki's Health tab
 	n = library.list(space=space, area=area, filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/library", {"view": "list", "f": _f(*conds)}, label, area)
+	return _door(n, "/library/notes", {"view": "list", "f": _f(*conds)}, label, area)
 
 
 def notes_unopened(space, area, days=90):
@@ -190,7 +190,7 @@ def someday(space, area, tab="all", conds=(), label="Someday"):
 	from lifeos.api import someday as someday_api
 
 	n = someday_api.list(space=space, area=area, tab=tab, filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/someday", {"tab": None if tab == "all" else tab, "f": _f(*conds)}, label, area)
+	return _door(n, "/plan/someday", {"tab": None if tab == "all" else tab, "f": _f(*conds)}, label, area)
 
 
 def someday_due(space, area=None):
@@ -261,7 +261,7 @@ def _goal_cell(space, area, lo, hi):
 	from lifeos.api import goals as goal_api
 
 	n = goal_api.list(space=space, area=area, state="in_progress", filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/goals", {"status": "in_progress", "f": _f(*conds)}, "Goals in progress", area)
+	return _door(n, "/plan/goals", {"status": "in_progress", "f": _f(*conds)}, "Goals in progress", area)
 
 
 def _chats(space, area, lo, hi):
@@ -273,7 +273,7 @@ def _chats(space, area, lo, hi):
 	if hi:
 		conds.append(("record_date", ">", ago(hi)))
 	n = sources.list(space=space, area=area, tab="chats", open_items=1, filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/sources", {"tab": "chats", "open_items": 1, "f": _f(*conds)}, "Chats with open items", area)
+	return _door(n, "/library/captures", {"tab": "chats", "open_items": 1, "f": _f(*conds)}, "Chats with open items", area)
 
 
 def get(space=None, which="open_band", area=None):

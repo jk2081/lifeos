@@ -7,10 +7,10 @@ from lifeos.constants import LINKABLE
 
 LINK_RE = re.compile(r"\[\[([^\[\]#|\n]+?)(?:#([^\[\]\n]+?))?\]\]")
 ROUTES = {
-	"Life Note": "/library/{0}", "Life Task": "/tasks?open={0}", "Life Person": "/settings?person={0}",
-	"Life Vault Document": "/vault?open={0}", "Life Chat Log": "/chats?open={0}", "Life Goal": "/journal/goals/{0}",
-	"Life Inbox Item": "/inbox/{0}", "Life Journal Page": "/journal/pages/{0}",
-	"Life Check-in": "/journal/checkins", "Life Month Plan": "/journal/month",
+	"Life Note": "/library/{0}", "Life Task": "/plan/tasks?open=task:{0}", "Life Person": "/settings?person={0}",
+	"Life Vault Document": "/library/captures?open=vault:{0}", "Life Chat Log": "/library/captures?open=chat:{0}", "Life Goal": "/plan/goals/{0}",
+	"Life Inbox Item": "/inbox/{0}", "Life Journal Page": "/library/captures?open=page:{0}",
+	"Life Check-in": "/plan/month?view=checkins", "Life Month Plan": "/plan/month",
 }
 
 

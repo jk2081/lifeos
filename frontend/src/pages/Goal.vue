@@ -1,6 +1,6 @@
 <template>
   <template v-if="d">
-    <PageHead :title="g.title" :crumb="{ to: '/goals', label: 'Goals', here: d.cycle ? d.cycle.title : g.goal_type }" :sub="sub">
+    <PageHead :title="g.title" :crumb="{ to: '/plan/goals', label: 'Goals', here: d.cycle ? d.cycle.title : g.goal_type }" :sub="sub">
       <Badge :theme="themeOf(g)" :label="g.is_archived ? `${g.status}, archived` : g.status === 'On Hold' ? 'On hold' : g.status" data-goal-status />
       <Button v-if="d.cycle" label="Open grid" :route="`/journal?cycle=${d.cycle.name}`" />
       <template v-if="writable && g.goal_type !== '12 Week Year'">
@@ -25,13 +25,13 @@
               <DatePicker v-if="g.goal_type !== '12 Week Year'" v-model="g.target_date" format="D MMM YYYY" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
               <div class="space-y-1.5"><div class="text-sm text-ink-gray-6">Progress</div><div class="flex h-8 items-center gap-2" data-goal-figure>
                 <div class="min-w-0 flex-1"><Progress size="sm" :value="j.tasks_counted ? Math.round((100 * j.tasks_done) / j.tasks_counted) : 0" /></div>
-                <NumLink class="text-sm" :to="{ path: '/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</NumLink></div></div>
+                <NumLink class="text-sm" :to="{ path: '/plan/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</NumLink></div></div>
             </div>
             <!-- what this goal serves, and what serves it (a goal can point to the longer goal it serves) -->
             <div class="flex flex-wrap items-center gap-2" data-goal-serves>
               <span class="text-sm text-ink-gray-6">Serves</span>
               <Pick :model-value="g.serves || null" :options="servesOptions" placeholder="no longer goal" :disabled="!writable" @update:model-value="(v) => saveServes(v)" />
-              <NumLink v-if="g.serves" :to="{ path: `/journal/goals/${g.serves}` }" class="text-sm">Open {{ g.serves_title }}</NumLink>
+              <NumLink v-if="g.serves" :to="{ path: `/plan/goals/${g.serves}` }" class="text-sm">Open {{ g.serves_title }}</NumLink>
             </div>
           </Card>
           <section v-if="d.served_by.length" data-goal-served-by>
@@ -65,7 +65,7 @@
           </section>
           <section v-if="d.cycle && j.history?.length"><SectionHead>History across cycles</SectionHead>
             <Card flush><Row v-for="h in j.history" :key="h.name" class="!items-center">
-              <div class="min-w-0 flex-1"><RouterLink class="break-words text-base-medium hover:underline focus-visible:focus-ring" :class="h.name === g.name ? 'text-ink-gray-9' : 'text-ink-blue-8'" :to="`/journal/goals/${h.name}`">{{ h.cycle_title }}</RouterLink>
+              <div class="min-w-0 flex-1"><RouterLink class="break-words text-base-medium hover:underline focus-visible:focus-ring" :class="h.name === g.name ? 'text-ink-gray-9' : 'text-ink-blue-8'" :to="`/plan/goals/${h.name}`">{{ h.cycle_title }}</RouterLink>
                 <div class="text-sm text-ink-gray-6">{{ h.cycle_status }}{{ h.result_note ? ' · ' + h.result_note : '' }}</div></div>
               <div class="w-24 shrink-0 max-md:w-12"><Progress size="sm" :value="Math.round(h.score)" /></div><span class="w-10 text-right tabular-nums">{{ Math.round(h.score) }}%</span>
               <Badge :label="h.outcome" /></Row></Card>

@@ -43,6 +43,7 @@ export const refOf = (doctype, name) => (BY_DOCTYPE[doctype] ? `${BY_DOCTYPE[doc
 export function refOfRoute(path) {
   const p = String(path || '').replace(/^\/life/, '')
   let m
+  if ((m = /[?&]open=([a-z]+(?:%3A|:)[^&]+)/.exec(p))) return decodeURIComponent(m[1])
   if ((m = /^\/(tasks|vault|chats)\?open=([^&]+)/.exec(p))) return `${{ tasks: 'task', vault: 'vault', chats: 'chat' }[m[1]]}:${decodeURIComponent(m[2])}`
   if ((m = /^\/library\/([^/?]+)$/.exec(p))) return `note:${m[1]}`
   if ((m = /^\/inbox\/([^/?]+)$/.exec(p))) return `inbox:${m[1]}`

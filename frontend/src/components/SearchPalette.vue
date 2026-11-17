@@ -28,7 +28,12 @@
     </CommandPaletteEmpty>
     <CommandPaletteFooter>
       <div class="flex w-full flex-wrap items-center justify-between gap-2">
-        <Checkbox v-model="archived" label="Include archived" />
+        <div class="flex flex-wrap items-center gap-2">
+          <Checkbox v-model="archived" label="Include archived" />
+          <!-- Ask's own page (threads and insights) left the sidebar in set 6: it is reached from here and from Today -->
+          <Button size="sm" variant="ghost" icon-left="lucide-history" label="History" data-search-history @click="toAsk('history')" />
+          <Button size="sm" variant="ghost" icon-left="lucide-lightbulb" label="Insights" data-search-insights @click="toAsk('insights')" />
+        </div>
         <span class="flex items-center gap-1 text-sm text-ink-gray-6"><KeyboardShortcut bg combo="ArrowUp" use-icons /><KeyboardShortcut bg combo="ArrowDown" use-icons /> to move,
           <KeyboardShortcut bg combo="Enter" use-icons /> to open<template v-if="askFirst">, or to ask</template></span>
       </div>
@@ -40,7 +45,7 @@
 // our own search method, which applies the space rules. A result opens in the pane over the screen you are on.
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Badge, Checkbox, KeyboardShortcut } from 'frappe-ui'
+import { Badge, Button, Checkbox, KeyboardShortcut } from 'frappe-ui'
 import { CommandPalette, CommandPaletteEmpty, CommandPaletteFooter, CommandPaletteInput, CommandPaletteItem, CommandPaletteList } from '@/experimental'
 import Empty from './Empty.vue'
 import { api } from '@/lib/api'
@@ -93,6 +98,10 @@ watch([text, archived], () => {
   timer = setTimeout(run, 180)
 })
 watch(open, (on) => { if (!on) { results.value = []; searched.value = '' } })
+function toAsk(tab) {
+  open.value = false
+  router.push({ path: '/ask', query: { tab } })
+}
 function go(r) {
   if (!r) return
   if (r.ask) {

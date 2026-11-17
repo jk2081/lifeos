@@ -89,7 +89,7 @@ def rule_batches(space):
 	if due["total"]:
 		out.append(_batch("someday_due", "Someday items due for review", "Parked long enough to look at again: bring back, keep for longer, or purge.",
 			[_item(r.doctype, r.name, f"{r.title} ({r.type.lower()}, parked {r.someday_on})") for r in due["rows"]], "review_someday", "Review {n}",
-			review={"path": "/someday", "query": {"tab": "due"}}))
+			review={"path": "/plan/someday", "query": {"tab": "due"}}))
 	return out
 
 

@@ -18,16 +18,23 @@
       <div class="flex flex-wrap items-center gap-2"><slot /><AskBox v-if="!store.isAgent" /></div>
     </div>
   </PageHeader>
+  <!-- a place's tabs (Plan, Library) under the header of whichever screen is open in it -->
+  <TabBar v-if="place" class="flex-none border-b border-outline-gray-1" inset :tabs="place.tabs" :model-value="place.current" :label="place.label" data-place-tabs
+    @update:model-value="place.set" />
 </template>
 <script setup>
 // The header of a screen: frappe-ui's PageHeader with the lens and any parent screen as Breadcrumbs, its title, the lens's
 // area as a removable chip, the count of what a list matches, a line of context, and the screen's actions.
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { Badge, Breadcrumbs, Button, PageHeader, PageHeaderTitle } from 'frappe-ui'
 import AskBox from './ask/AskBox.vue'
+import TabBar from './TabBar.vue'
 import { store } from '@/lib/store'
 import { clearArea, dotClass, lensArea, lensAreaName } from '@/lib/lens'
 const props = defineProps({ title: String, sub: String, crumb: Object, count: { type: Number, default: null } })
+// Plan and Library provide their tabs ({ tabs, current, set, label }); any screen open in them shows the tabs under its header
+const placeTabs = inject('placeTabs', null)
+const place = computed(() => (placeTabs ? placeTabs.value : null))
 const crumbs = computed(() => [
   { label: `${store.space || 'No space'} · ${lensAreaName.value}` },
   ...(props.crumb ? [{ label: props.crumb.label, route: props.crumb.to }, { label: props.crumb.here }] : []),

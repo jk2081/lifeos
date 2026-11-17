@@ -28,17 +28,16 @@ export function askScope(scope) {
   onUnmounted(() => { if (ask.pageScope === scope) ask.pageScope = null })
 }
 
-/** The scope a question starts with, from where the owner is (the table in UX_FIXES_5.md, section 2). */
+/** The scope a question starts with, from where the owner is (UX_FIXES_5.md, section 2), and the lens (set 6). */
 export function scopeFromRoute(route = router.currentRoute.value) {
   const p = route.path
-  const first = '/' + (p.split('/')[1] || '')
   if (ask.pageScope) return typeof ask.pageScope === 'function' ? ask.pageScope() : { ...ask.pageScope }
-  if (p.startsWith('/journal/goals/')) return { kind: 'goal', label: 'This goal', doctype: 'Life Goal', name: p.split('/')[3] }
-  if (first === '/library' && route.params.id) return { kind: 'record', label: 'This page', doctype: 'Life Note', name: route.params.id }
+  if (p.startsWith('/plan/goals/')) return { kind: 'goal', label: 'This goal', doctype: 'Life Goal', name: p.split('/')[3] }
+  if (route.name === 'Note' && route.params.id) return { kind: 'record', label: 'This page', doctype: 'Life Note', name: route.params.id }
   if (store.lensArea) return lensScope() // a place narrowed to an area: questions start in that area
-  if (first === '/journal') return { kind: 'journal', label: 'This cycle and month' }
-  if (first === '/goals') return { kind: 'goals', label: 'All goals' }
-  if (first === '/library' || first === '/wiki' || first === '/graph') return { kind: 'notes', label: first === '/wiki' ? 'All wiki pages' : 'All notes' }
+  if (['/plan/week', '/plan/month', '/plan/12-weeks', '/plan/year'].includes(p)) return { kind: 'journal', label: 'This cycle and month' }
+  if (p === '/plan/goals') return { kind: 'goals', label: 'All goals' }
+  if (p === '/library/notes') return { kind: 'notes', label: route.query.by === 'assistant' ? "The assistant's notes" : 'All notes' }
   return lensScope()
 }
 /** The scope of the lens (UX fixes, set 6): the lens's area with its sub-areas, or everything in the space. */
