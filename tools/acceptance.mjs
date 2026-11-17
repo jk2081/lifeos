@@ -96,6 +96,14 @@ const must = (cond, message) => { if (!cond) throw new Error(message) }
 
 // the agent's key is made for this run and passed in the environment; it is never printed or stored
 const [agentKey, agentSecret] = bench('from lifeos import devtools\nprint(devtools.agent_api_key())').split('\n').pop().split(':')
+// the agent over HTTP with its key: GET for the methods that declare GET (frontend/src/lib/getMethods.json), POST for the rest,
+// so a refusal is the permission rule and not the wrong HTTP method
+function agentFetch(m, args = {}) {
+  const headers = { Authorization: `token ${agentKey}:${agentSecret}` }
+  const url = `${base}/api/method/lifeos.api.${m}`
+  if (GET_METHODS.has(`lifeos.api.${m}`)) return fetch(`${url}?${new URLSearchParams(args)}`, { headers })
+  return fetch(url, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(args) })
+}
 function runAgent() {
   return execFileSync('python3', [path.join(root, 'agent/fake_agent.py'), '--url', base],
     { env: { ...process.env, LIFEOS_API_KEY: agentKey, LIFEOS_API_SECRET: agentSecret }, encoding: 'utf8' })
@@ -454,7 +462,7 @@ await check('S3', 'Security: the family and agent users land on /life from /app;
   must((await owner.api('inbox.get', { item: item.name })).status === 'To Review', 'the agent did not process the item without desk access')
   // with the switch off the agent's key cannot read a Vault document
   const doc = await owner.api('vault.save', { space: SPACE, values: { title: `S3 secret ${stamp}`, doc_type: 'ID' } })
-  const asAgent = (m, args) => fetch(`${base}/api/method/lifeos.api.${m}?${new URLSearchParams(args)}`, { headers: { Authorization: `token ${agentKey}:${agentSecret}` } })
+  const asAgent = agentFetch
   const vaultOpen = (await owner.api('settings.get', { space: SPACE })).spaces.find((x) => x.name === SPACE).agents_can_read_vault
   if (!vaultOpen) {
     must((await asAgent('vault.get', { document: doc.name })).status === 404, 'the agent read a Vault document with the switch off')
@@ -787,9 +795,10 @@ for (const width of [1440, 390]) {
       must(!new URL(pg.url()).searchParams.get(key), `${name}: Back did not undo the filter`)
     }
     // an empty result names the filters and offers Clear filters
-    await s.open('/life/inbox?status=Failed&source_type=Email+Digest&intent=Just+keep') // set 6: the Vault's own list became Captures
+    await s.open('/life/inbox?status=Failed&source_type=Email+Digest') // set 6: the Vault's own list became Captures; the Inbox has no intent filter
+    await pg.locator('[data-lv-empty] button', { hasText: 'Clear filters' }).waitFor({ timeout: 8000 }).catch(() => {})
     const empty = await pg.locator('[data-lv-empty]').innerText()
-    must(/Email Digest/.test(empty) && /Just keep/.test(empty), 'the empty state does not name the filters: ' + empty.replace(/\s*\n\s*/g, ' | '))
+    must(/Email Digest/.test(empty), 'the empty state does not name the filters: ' + empty.replace(/\s*\n\s*/g, ' | '))
     await pg.locator('[data-lv-empty] button', { hasText: 'Clear filters' }).click()
     await settle()
     must(!new URL(pg.url()).search.includes('source_type='), 'Clear filters did not clear')
@@ -1279,6 +1288,7 @@ for (const width of [1440, 390]) {
       }
       // Plan opened by hand on another place stays open after a reload, and closed again stays closed
       step = 'Plan open or closed is remembered'
+      await s.api('views.save', { screen: 'sidebar', space: '', state: { plan_open: false, rail: false } }) // start closed (the default is open)
       await s.open('/life/inbox')
       must(!(await pg.locator('[data-nav-plan]').count()), "Plan's tabs show on Inbox before it was opened")
       await pg.locator('[data-nav-toggle="plan"]').click()
@@ -2201,7 +2211,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
     const L = [
       ['Inbox', '/life/inbox?all=1', 'inbox.list', null],
       ['Plan > Goals', '/life/plan/goals?all=1', 'goals.list', (a) => total('goals.list', { area: a })],
-      ['Plan > Tasks', '/life/plan/tasks?view=list&all=1', 'tasks.list', (a) => total('tasks.list', { area: a })],
+      ['Plan > Tasks', '/life/plan/tasks?view=list&all=1', 'tasks.list', (a) => total('tasks.list', { area: a, status: 'open_doing' })], // the Open tab: Open and Doing
       ['Plan > Someday', '/life/plan/someday?all=1', 'someday.list', (a) => total('someday.list', { area: a })],
       ['Library > All', '/life/library?view=list&all=1', 'sources.list', (a) => total('sources.list', { scope: 'all', area: a })],
       ['Library > Notes', '/life/library/notes?view=list&all=1', 'library.list', (a) => total('library.list', { collection: 'all', area: a })],
@@ -2217,7 +2227,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
     try {
       step = 'the counts on All of life'
       const before = {}
-      for (const [name, p] of L) { await s.open(p); before[name] = await count() }
+      for (const [name, p] of L) { step = `the counts on All of life: ${name}`; await s.open(p); before[name] = await count() }
       await s.open('/life')
       const band0 = await band()
       step = 'choose the area in the lens'
@@ -2511,7 +2521,7 @@ await check('S6.4', 'A Vault document is a capture of kind Document, marked sens
   // the agent, with the switch off
   const vaultOpen = (await owner.api('settings.get', { space: SPACE })).spaces.find((x) => x.name === SPACE).agents_can_read_vault
   must(!vaultOpen, '"Agents may open sensitive items" is on for Private')
-  const asAgentHttp = (m, args) => fetch(`${base}/api/method/lifeos.api.${m}?${new URLSearchParams(args)}`, { headers: { Authorization: `token ${agentKey}:${agentSecret}` } })
+  const asAgentHttp = agentFetch
   must((await asAgentHttp('vault.get', { document: doc.name })).status >= 400, 'the agent read the Vault document')
   must((await asAgentHttp('library.get', { note })).status >= 400, 'the agent read the sensitive note')
   const listed = JSON.stringify(await (await asAgentHttp('sources.list', { space: SPACE, scope: 'all', page_length: 500 })).json())
@@ -2603,7 +2613,7 @@ await check('S6.6', 'The fake agent runs end to end with the goal-based API: tas
   const under = (await owner.api('tasks.list', { space: SPACE, goal, status: 'all', page_length: 200 })).tasks.map((t) => t.name)
   must(made.length === 3 && made.every((n) => under.includes(n)), 'the accepted tasks are not under the goal')
   // the agent's own reads with its key: Today, the goal's tasks, and project= mapped to its goal
-  const asAgentHttp = (m, args) => fetch(`${base}/api/method/lifeos.api.${m}?${new URLSearchParams(args)}`, { headers: { Authorization: `token ${agentKey}:${agentSecret}` } }).then(async (r) => [r.status, await r.json().catch(() => ({}))])
+  const asAgentHttp = (m, args) => agentFetch(m, args).then(async (r) => [r.status, await r.json().catch(() => ({}))])
   const [ts] = await asAgentHttp('today.get', { space: SPACE })
   must(ts === 200, `today.get answered the agent ${ts}`)
   const [, byGoal] = await asAgentHttp('tasks.list', { space: SPACE, goal: ux.goal, status: 'all', page_length: 1 })

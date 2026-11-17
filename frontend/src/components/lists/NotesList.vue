@@ -1,5 +1,5 @@
 <template>
-  <!-- the notes as a list, on the cross-type index: /library?view=list, and the Notes tab of the goal page -->
+  <!-- the notes as a list, on the cross-type index: /library/notes?view=list, and the Notes tab of the goal page -->
   <ListView ref="list" :title="embed ? null : 'Notes'" noun="notes" :screen="embed ? embed.screen + (collection === 'Wiki' ? '-wiki' : '-notes') : 'library'" :fixed="embed?.fixed" :active="embed ? embed.active : true" doctype="Life Index" :spec="SPEC" :flag-labels="embed?.fixed?.goal ? { archived: 'Include archived' } : { archived: 'Include archived', reference: 'Reference only' }" :quiet="['archived']"
     :virtual="VIRTUAL" :hidden="HIDDEN" :quick="['title', 'area', 'goal']" :synthetic="SYNTHETIC" :fetch="fetchList" :row-ref="(r) => 'note:' + r.name" :watch-keys="embed ? [] : ['by']"
     :empty-title="collection === 'Wiki' ? 'No wiki pages here yet.' : 'No notes yet.'"

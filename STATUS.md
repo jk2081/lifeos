@@ -1,6 +1,6 @@
 # Status
 
-Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** UX fixes sets 1 to 5 are done, and so is pre-step 6 (Frappe conventions). The summary at the end says what works, what is stubbed, what is untested, and how to install.
+Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** UX fixes sets 1 to 6 are done, and so is pre-step 6 (Frappe conventions). The summary at the end says what works, what is stubbed, what is untested, and how to install.
 
 ## Milestones
 
@@ -226,6 +226,26 @@ Brought up to Frappe's official skills and scanning rules, with no change on any
   - Unit tests: 264 run, 263 pass and 1 is skipped (the live AI test). New: `test_pre6_conventions` (methods, hints, the GET list) and `test_pre6_fixes`. `test_pre6_fixes` covers: Ask's progress and failures; chat import savepoints and user; insights for a user without switching; `../` paths and links; every permission hook over every user and permission type; the audit and review fixes.
   - `node tools/acceptance.mjs`: 86 of 86 at 1440 px and 390 px, the fake agent end to end, and the scan.
   - `tools/scan.sh`: 0 findings.
+
+## Set 6: Simplify
+
+Everything in `UX_FIXES_6.md` is done: four places (Today, Inbox, Plan, Library), four things (Goal, Task, Note, Capture) and one lens. No capability was removed. Deviations are in `DECISIONS.md` under "Set 6: Simplify".
+
+- **The lens.** A space and area picker at the top of the sidebar (a title bar and bottom sheet on a phone), in the URL as `space=` and `area=` and remembered per user. Today, Inbox, every Plan and Library tab, the sidebar counts, Search and Ask narrow to it. An area includes its sub-areas and records that list it in "also in". A removable chip beside the title shows the area. Pinned areas sit under "Focus on an area", each with its colour (set in Settings > Areas). Area pages are gone: `/areas/:id` opens Today under that area, and `/areas` opens Settings > Areas.
+- **Navigation.** Sidebar: lens, New (Capture, Task, Goal, Note, and Idea for Someday), Today, Inbox with its count, Plan with its tabs, Library, pinned areas, Settings and the user with Help. Phone bar: Today, Inbox, Plan, Library, Ask. G then T, I, P or L opens a place. Every old route redirects with its query.
+- **Plan.** Week, Month, 12 Weeks and Year (the rhythms, each with a view switch), then Goals, Tasks and Someday (the lists). Reset is a full screen reached from Plan > Week and Today. The Journal and Calendar screens are gone; their parts live in these tabs.
+- **Projects became goals.** Patch `v7.projects_into_goals` turns each project into an open-ended goal and keeps every record and link. Every `project` link was renamed to `goal`, and Goal's own `project` became `serves` (with "Served by", and no cycles). `migrated_to` on each project makes the patch safe to rerun. Life Project stays read-only and hidden; removing it is pending in `ROADMAP.md`. Agents may still send `project` for one set, which maps through `migrated_to`.
+- **Library.** All, Notes (List, Tree, Graph, Changes, Health; the assistant's notes carry "Kept by the assistant", with the rules page pinned on top), Captures (every source by kind, including journal pages and Vault documents as kind Document), Timeline and Archive with its Trash. Filters: kind, Written by, Sensitive only, and the lens.
+- **The sensitive mark.** Notes, inbox items, chats and journal pages have `is_sensitive`; Vault documents are always sensitive. Sensitive items follow the Vault rules on every path: agents, Ask, search, the graph, files and the wiki. They show a lock. Anyone with write access can mark an item; only the owner can unmark it; agents can do neither. The switches are now called "Agents may open sensitive items" and "Ask may read sensitive items".
+- **Settings** is grouped into Me, Your life, Assistant, People and agents, and Data, with help text on each setting. The new Rhythms section holds start of day, review day and time, week start, month plan, the current cycle, score target and break week. Archived areas, tags, habits and check-ins are restored from Data > Archive and trash.
+- **Rhythm banners** on Today, at most one at a time: the weekly review, Plan [Month], Plan your next 12 weeks, Close this cycle. Each has Skip, which lasts until its next occurrence and is remembered per user.
+- **Fixed in the final checks round:** Ask from Today ignored the lens. Settings' Archived section had been redirected to Archive and trash but its list was left behind, so archived headings could not be restored. "Notes not opened" counted only My notes, but its door opens every note. The Notes tree showed only My notes. Reloading Library > All in its list view jumped to Notes. The acceptance script called the agent's POST-only reads with GET, so its "agent cannot read" checks passed without testing the rule.
+- **Checks.**
+  - Unit tests: 294 run, 293 pass, 1 skipped (the live AI test). New in set 6: the migration on the seeded data (every project has a goal, every link moved, counts unchanged, a second run changes nothing), the lens filter on each list method (sub-areas, "also in"), sensitive items, Settings and rhythm banners. Front end: 11 tests pass, and `check-sfc.mjs` and `check-singletons.mjs` pass.
+  - `node tools/acceptance.mjs`: 99 of 99 pass at 1440 px and 390 px. The script was rewritten for the new structure, keeping every check's intent. New checks cover the sidebar and phone bar, the G keys, the lens on every place with counts against rows and the server, the old routes, a former project as a goal with "serves", the assistant's notes with Changes and Health, a Vault document in Captures, the agent refused while the switch is off (only the owner unmarks), the rhythm banners with the clock moved, Settings sections, and no sideways scrolling. The fake agent runs end to end with the goal-based API.
+  - `./tools/scan.sh`: 0 findings.
+  - `node tools/screens.mjs`: 96 screens (every place, Plan and Library tab and view, each Settings section, a goal and a note page, the lens picker, and the main screens under an area) at 1440 px and 390 px in light and dark, 384 screenshots, with no sideways scrolling, script errors or text below 4.5 to 1. Plan > Goals with the lens open was compared by eye with `mockups/set6/21-sidebar-lens-plan.png`; the screens changed in the final round (Settings > Archive and trash, Library > All as a list, the Notes tree) were looked at by eye at both widths.
+- `frontend/COMPONENTS.md` (lens, places, Plan and Library tabs), `agent/SKILL.md` (goal-based API, sensitive items) and `ROADMAP.md` (set 6 done; Life Project removal pending) are updated.
 
 ## Summary
 

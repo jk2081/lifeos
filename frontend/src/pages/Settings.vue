@@ -185,18 +185,34 @@
             </Card>
           </section>
         </template>
-        <Card v-else-if="section === 'archive'" flush>
-          <SettingRow label="Archive after" help="Done and dropped tasks, and inbox items that are done, move to the Archive this many days after they were closed. Notes, documents, chats, journal pages and projects are never archived automatically."
-            :error="errors.archive_after_days">
-            <TextInput class="w-28" type="number" min="1" :model-value="d.settings.archive_after_days" :disabled="!d.is_admin" data-setting="archive_after_days"
-              @change="(e) => setOne('archive_after_days', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">days</span></template></TextInput>
-          </SettingRow>
-          <SettingRow label="Task is stale after" help="An open task untouched for this many days is listed under Decide in the weekly review. Nothing is archived or changed by this." :error="errors.stale_task_days">
-            <TextInput class="w-28" type="number" min="1" :model-value="d.settings.stale_task_days" :disabled="!d.is_admin" data-setting="stale_task_days"
-              @change="(e) => setOne('stale_task_days', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">days</span></template></TextInput>
-          </SettingRow>
-          <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
-        </Card>
+        <template v-else-if="section === 'archive'">
+          <Card flush>
+            <SettingRow label="Archive after" help="Done and dropped tasks, and inbox items that are done, move to the Archive this many days after they were closed. Notes, documents, chats, journal pages and goals are never archived automatically."
+              :error="errors.archive_after_days">
+              <TextInput class="w-28" type="number" min="1" :model-value="d.settings.archive_after_days" :disabled="!d.is_admin" data-setting="archive_after_days"
+                @change="(e) => setOne('archive_after_days', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">days</span></template></TextInput>
+            </SettingRow>
+            <SettingRow label="Task is stale after" help="An open task untouched for this many days is listed under Decide in the weekly review. Nothing is archived or changed by this." :error="errors.stale_task_days">
+              <TextInput class="w-28" type="number" min="1" :model-value="d.settings.stale_task_days" :disabled="!d.is_admin" data-setting="stale_task_days"
+                @change="(e) => setOne('stale_task_days', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">days</span></template></TextInput>
+            </SettingRow>
+            <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
+          </Card>
+          <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/library/archive" data-archive-link>Archived records are in Library, Archive</RouterLink>,
+            and deleted ones in its <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/library/archive', query: { type: 'trash' } }" data-trash-link>Trash</RouterLink>.
+            Below are the headings archived from Areas, Tags, Habits and Check-ins in {{ spaceSel }}.</p>
+          <section v-for="l in LISTS" :key="l.kind" :data-archived-group="l.kind">
+            <SectionHead :count="archived(l).length">{{ l.label }}</SectionHead>
+            <Card flush>
+              <div v-for="r in archived(l)" :key="r.name" class="flex min-h-11 flex-wrap items-center gap-2 border-b border-outline-gray-1 py-1.5 last:border-b-0" :data-archived-row="r.name">
+                <div class="min-w-0 flex-1"><div class="break-words text-base text-ink-gray-9">{{ r.title }}<span v-if="r.parentTitle" class="text-ink-gray-6"> · under {{ r.parentTitle }}</span></div>
+                  <div class="text-sm text-ink-gray-6">{{ r.archived_on ? 'Archived ' + short(r.archived_on, true) : 'Archived before the date was kept' }} · {{ r.count }} {{ r.count === 1 ? l.countNoun[0] : l.countNoun[1] }}</div></div>
+                <Button v-if="canEdit" label="Restore" :data-restore="r.name" @click="askRestore(l, r)" />
+              </div>
+              <Empty v-if="!archived(l).length" :title="`No archived ${l.noun}.`" />
+            </Card>
+          </section>
+        </template>
         <Card v-else-if="section === 'reset'" flush data-reset-rules>
           <SettingRow label="Stuck after" help="An open task, open-ended goal or inbox item untouched for this many days counts as stuck: on Today, in Reset and in the insights." :error="errors.stuck_after_days">
             <TextInput class="w-28" type="number" min="1" :model-value="d.settings.stuck_after_days" :disabled="!d.is_admin" data-setting="stuck_after_days"
@@ -217,21 +233,6 @@
           <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change these.</p>
         </Card>
         <ConnectionsSection v-else-if="section === 'connections'" :space="spaceSel" :writable="canEdit && !store.isAgent" />
-        <template v-else-if="section === 'archived'">
-          <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/library/archive" data-archive-link>Archived records are on the Archive screen</RouterLink>.
-            This list holds only the headings archived from Areas, Tags, Habits and Check-in dimensions.</p>
-          <section v-for="l in LISTS" :key="l.kind" :data-archived-group="l.kind">
-            <SectionHead :count="archived(l).length">{{ l.label }}</SectionHead>
-            <Card flush>
-              <div v-for="r in archived(l)" :key="r.name" class="flex min-h-11 flex-wrap items-center gap-2 border-b border-outline-gray-1 py-1.5 last:border-b-0" :data-archived-row="r.name">
-                <div class="min-w-0 flex-1"><div class="break-words text-base text-ink-gray-9">{{ r.title }}<span v-if="r.parentTitle" class="text-ink-gray-6"> · under {{ r.parentTitle }}</span></div>
-                  <div class="text-sm text-ink-gray-6">{{ r.archived_on ? 'Archived ' + short(r.archived_on, true) : 'Archived before the date was kept' }} · {{ r.count }} {{ r.count === 1 ? l.countNoun[0] : l.countNoun[1] }}</div></div>
-                <Button v-if="canEdit" label="Restore" :data-restore="r.name" @click="askRestore(l, r)" />
-              </div>
-              <Empty v-if="!archived(l).length" :title="`No archived ${l.noun}.`" />
-            </Card>
-          </section>
-        </template>
 
         <!-- Admin -->
         <template v-else-if="section === 'members'">

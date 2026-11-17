@@ -1,5 +1,5 @@
 <template>
-  <!-- the list: /library?view=list, on the cross-type index -->
+  <!-- the list: /library/notes?view=list, on the cross-type index -->
   <NotesList v-if="listView" ref="list" collection="all">
     <template #actions>
       <TabButtons model-value="list" :options="SWITCH" data-library-views />
@@ -12,7 +12,7 @@
   <!-- the tree with the reader: /library and /library/<id> -->
   <template v-else>
     <PageHead title="Notes">
-      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1' } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink> in {{ store.space }}</template>
+      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink> in {{ store.space }}</template>
       <TabButtons model-value="tree" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
     </PageHead>
@@ -94,8 +94,8 @@ import { areaOptions, loadLookups } from '@/lib/lookups'
 
 const props = defineProps({ id: String })
 const route = useRoute()
-// the list view sits beside the tree: /library?view=list, with its filters in the URL
-// My notes only (the Wiki has its own screen). The List is the default view; the Tree is view=tree
+// the list view sits beside the tree: /library/notes?view=list, with its filters in the URL
+// Every note, the assistant's too (set 6); Written by (by=) narrows. The List is the default view; the Tree is view=tree
 const listView = computed(() => !props.id && route.query.view !== 'tree')
 // on a note's own page, its place's tabs are not shown
 const list = ref(null)
@@ -153,7 +153,7 @@ watch(nodes, (list_) => {
 }, { immediate: true })
 
 async function loadTree() {
-  const res = await tryCall(() => api('library.tree', { space: store.space, area: store.lensArea || undefined }))
+  const res = await tryCall(() => api('library.tree', { space: store.space, area: store.lensArea || undefined, collection: { me: 'My notes', assistant: 'Wiki' }[route.query.by] || 'all' }))
   if (res) {
     notes.value = res.notes
     areas.value = res.areas

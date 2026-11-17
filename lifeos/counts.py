@@ -175,8 +175,8 @@ def notes_and_sources(space, area=None):
 def notes(space, area, label, conds=()):
 	from lifeos.api import library
 
-	# My notes, as the Notes screen lists them; wiki pages are kept by the agent and the Wiki's Health tab
-	n = library.list(space=space, area=area, filters=_f(*conds), page_length=1)["total"]
+	# every note, as the Notes screen lists them since set 6 (the assistant's notes too)
+	n = library.list(space=space, area=area, filters=_f(*conds), page_length=1, collection="all")["total"]
 	return _door(n, "/library/notes", {"view": "list", "f": _f(*conds)}, label, area)
 
 

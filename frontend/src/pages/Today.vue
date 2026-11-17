@@ -169,7 +169,7 @@ import { api, errorText, optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { addDays, long, short, startOfWeek, weekday } from '@/lib/dates'
 import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
-import { askScope } from '@/lib/ask'
+import { askScope, lensScope } from '@/lib/ask'
 
 const router = useRouter()
 const route = useRoute() // at=: a test site moves the banners' clock (site config lifeos_test_clock)
@@ -178,7 +178,7 @@ const d = ref(null)
 const showAll = ref(false)
 const moveAllOpen = ref(false)
 const KIND_THEME = { Stuck: 'red', 'Waiting on you': 'amber', Promise: 'amber', Someday: 'violet' }
-askScope({ kind: 'space', label: 'Everything in this space' })
+askScope(lensScope) // the lens's area, or everything in the space (set 6)
 
 const band = computed(() => d.value.band)
 // a tile: label, the big number (a door), the line under it (a door too, amber when it is a warning)

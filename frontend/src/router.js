@@ -30,9 +30,9 @@ const routes = [
   { path: `/plan/:tab(${PLAN_TABS.join('|')})`, name: 'Plan', component: page('Plan'), props: true },
 
   // ---- Library ----
-  // /library?view=list and ?view=tree were the Notes screen before set 6
+  // /library?view=tree was the Notes screen's tree before set 6. ?view=list is now Library > All's own list view, so it stays.
   { path: `/library/:tab(${LIBRARY_TABS.join('|')})?`, name: 'Library', component: page('LibraryPlace'), props: true,
-    beforeEnter: (r) => (!r.params.tab && ['list', 'tree'].includes(r.query.view) ? { path: '/library/notes', query: r.query } : true) },
+    beforeEnter: (r) => (!r.params.tab && r.query.view === 'tree' ? { path: '/library/notes', query: r.query } : true) },
   { path: '/library/:id', name: 'Note', component: page('Library'), props: true },
 
   { path: '/ask', name: 'Ask', component: page('Ask') },
