@@ -222,3 +222,25 @@ The list screens take `embed`: `{ screen: 'area', space, fixed: { area }, active
 - **Keys.** ⌘B, ⌘I, ⌘K (link), ⌘⇧7 and ⌘⇧8 (lists), Tab and Shift-Tab indent. `/` at the start of a line opens a menu of blocks; `[[` the record picker (`links.suggest`).
 - **Images** pasted, dropped or chosen with the toolbar upload as private files attached to the record (`doctype`, `docname` props) and are inserted as `![name](/private/files/…)`.
 - **Saving** is the caller's: `NoteEditor` and `MdField` save a moment after typing stops and on blur, with a quiet "Saved". `NoteEditor` sends the `version` it started from; a conflict opens "This page changed while you were editing" with View changes, Keep mine and Reload.
+
+## UX fixes, set 5: counts, Today, Ask, Reset
+
+### Count doors
+
+Every number on Today, Reset, Someday, the sidebar and the weekly review's Reset step comes from the count helper (`lifeos/counts.py`): `{ n, to: { path, query }, label }`, where `n` is worked out by calling the same list method, with the same arguments, that the screen at `to` calls. Show it with `components/ui/CountLink.vue` (`:count`, optional `count-key` and `tone`), never by formatting a number and building a link by hand. It carries `data-count-door`, `data-count-n` and `data-count-label`, which the acceptance check U.31 clicks and compares with the rows shown. A count with no condition of its own carries `all=1`, so a remembered view cannot change what the list shows. Ask's `counts` tool returns the same objects.
+
+### The Search or ask box
+
+`components/ask/AskBox.vue` sits in every page header (through `PageHead`): on desktop one outline button, "Search or ask anything" with ⌘K, that opens the search palette; on a phone a search icon and a solid Ask button. In the palette, Enter on text that reads as a question (`lib/ask.js` `isQuestion`: ends with "?", starts with a question word, or is more than six words) or the "Ask" row asks. The sidebar has no Search item.
+
+### The Ask panel
+
+`components/ask/AskPanel.vue`, mounted once in `App.vue` and driven by the `ask` store in `lib/ask.js` (`startAsk(question, scope)`, `askAbout(doctype, name, title)`). Desktop: a 480 px panel from the right over the screen; phone: frappe-ui `BottomSheet` at 82 dvh. The screen underneath is not navigated; closing leaves it as it was. The scope is taken from the route (`scopeFromRoute`, the table of the brief) and shown as a removable chip (`data-ask-scope`); every record pane has "Ask about this" (`data-pane-ask`) in its header. `AskThread.vue` renders a thread: the answer as Markdown with numbered citation chips (`data-ask-cite`, opening the record in the pane), the sources list, and suggested actions (`data-ask-action`), which call the normal API only when clicked and toast an Undo where the action has one. `AskComposer.vue` is the text box with Send. Answers stream: the screen polls `ask.progress` with its own id while the answer is written (the server also publishes each piece as a `lifeos_ask` realtime event to the asking user; see `DECISIONS.md`). "Expand" opens the thread on the Ask page (`/ask?thread=`).
+
+### The Open band and the Next list (Today)
+
+Both live in `pages/Today.vue` and read `today.get`. The band (`data-open-band`) is one row of `Stat`-like tiles at 1440 px; on a phone the four most important tiles are a 2-column grid and the rest scroll sideways. Every big number and every line under it is a `CountLink`. When the stuck count is over the limit the heading turns amber (`data-over-limit`) and the Reset button becomes solid. The Next list (`data-next`) is one list in the fixed order written at its top: Overdue, Today, 12 Week Year this week, Needs a decision (`data-next-group`); each row has a label for why it is there (`data-why`); about 8 rows show, then "N more". A 12 Week Year row ticks through `journal.tick`. The rail (`data-rail`) moves below Next on a phone.
+
+### Reset decisions
+
+`pages/Reset.vue` with `components/reset/BatchCard.vue`, `Inventory.vue` and `OneByOne.vue`. On a phone, Batches, One by one and Inventory are `TabBar` tabs (`tab=`); on desktop they are one page. A batch action asks for confirmation (`dialog.confirm`) with the exact count, applies to exactly the listed names, and toasts Undo for one minute. One by one shows the oldest untouched item with Do (D, asks for a date), Waiting (W, asks for whom), Someday (S), Archive (A) and Delete (X): keys on desktop (ignored while typing in a field), large buttons on a phone (`data-obo`). Delete moves the record to the trash (Frappe's Deleted Document), restorable from the Archive's Trash tab for 30 days.

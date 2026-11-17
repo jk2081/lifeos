@@ -131,11 +131,27 @@ for (const scheme of schemes) {
       ...(wikiChange ? [['wiki-change', `/life/wiki?tab=changes&open=change:${wikiChange}`]] : []),
       ['wiki-graph', '/life/graph?collection=Wiki'], ['dev-editor', '/life/dev/editor'], ['library-tree', '/life/library?view=tree'],
       ['goals', '/life/goals?status=all'], ['goals-progress', '/life/goals?all=1'], ['more', '/life'],
+      // UX fixes, set 5: Today, Someday, Reset, Ask (page and panel), the Archive's Trash, the weekly review's Reset step
+      ...['all', 'due', 'tasks', 'projects', 'goals', 'ideas'].map((t) => [`someday-${t}`, `/life/someday${t === 'all' ? '' : '?tab=' + t}`]),
+      ['reset', '/life/reset'], ...['inventory', 'one'].map((t) => [`reset-${t}`, `/life/reset?tab=${t}`]),
+      ['ask', '/life/ask'], ['ask-insights', '/life/ask?tab=insights'], ['ask-history', '/life/ask?tab=history'],
+      ['ask-panel', '/life'], ['ask-pane', `/life/tasks?view=list&open=task:${task}`], ['archive-trash', '/life/archive?type=trash&all=1'],
+      ['settings-reset', '/life/settings?tab=reset'], ['settings-ai', '/life/settings?tab=ai'],
     ].filter(([n]) => !only.length || only.includes(n))
     for (const [name, p] of SCREENS) {
       await page.goto(base + p, { waitUntil: 'networkidle' })
       await page.waitForTimeout(700)
       if (name === 'more' && width < 800) { await page.locator('[data-tabbar] [aria-label="More"]').click(); await page.waitForTimeout(600) }
+      if (name === 'ask-panel' || name === 'ask-pane') { // a question asked from the screen, in the panel (a sheet on a phone)
+        if (name === 'ask-pane') await page.locator('[data-pane-ask]').first().click()
+        else if (width < 800) await page.locator('[data-phone-ask]').first().click()
+        else { await page.keyboard.press('Meta+k'); await page.waitForTimeout(300); await page.keyboard.type('What is stuck in Ghillidary?'); await page.keyboard.press('Enter') }
+        await page.waitForTimeout(500)
+        const box = page.locator('[data-ask-panel] textarea')
+        if (await box.count() && !(await page.locator('[data-ask-answer]').count())) { await box.first().fill('What is stuck in Ghillidary?'); await page.locator('[data-ask-send]:visible').first().click() }
+        for (let i = 0; i < 40 && await page.locator('[data-ask-answer][data-status="Working"]').count(); i++) await page.waitForTimeout(250)
+        await page.waitForTimeout(500)
+      }
       const file = path.join(root, 'screenshots', `s-${name}-${width}${scheme === 'dark' ? '-dark' : ''}.png`)
       await page.screenshot({ path: file })
       const overflow = await page.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width) // a phone page that is too wide enlarges innerWidth too

@@ -19,6 +19,7 @@ export const ask = reactive({
   draft: '',
   scopeChanged: false,
   seq: 0, // bumped to send `draft` as soon as the panel opens
+  returnTo: null, // phone: the path to reopen the Ask sheet on once the cited record is closed
 })
 
 export function askScope(scope) {
@@ -44,6 +45,7 @@ export function scopeFromRoute(route = router.currentRoute.value) {
 /** Open the panel with a question, in a scope (the screen's by default). An empty question just opens the panel. */
 export function startAsk(question = '', scope = null) {
   ask.scope = scope || scopeFromRoute()
+  ask.returnTo = null
   ask.thread = null
   ask.messages = []
   ask.refusal = null
@@ -121,8 +123,15 @@ export async function runAction(message, index) {
 
 export function openCite(message, n) {
   const c = (message.cited || []).find((x) => x.n === n)
-  if (c && c.pane) openRef(c.pane)
-  else if (c) toast.info(`${c.kind}: ${c.title}`)
+  if (c && c.pane) {
+    // On a phone both are bottom sheets and the record's would open under the Ask sheet: hand over to the record, and
+    // bring the Ask sheet back, with its thread, when the record is closed on the same screen (AskPanel watches this).
+    if (window.matchMedia('(max-width: 767px)').matches && ask.open) {
+      ask.returnTo = router.currentRoute.value.path
+      ask.open = false
+    }
+    openRef(c.pane)
+  } else if (c) toast.info(`${c.kind}: ${c.title}`)
 }
 
 /** The record pane's "Ask about this": the record and the records linked to it. */

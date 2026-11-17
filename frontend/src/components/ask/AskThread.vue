@@ -11,7 +11,7 @@
           <div v-if="m.actions && m.actions.length" class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5" data-ask-actions>
             <div class="text-sm text-ink-gray-6">Suggested</div>
             <div class="flex flex-wrap gap-2" :class="phone && 'flex-col'">
-              <Button v-for="(a, j) in m.actions" :key="j" class="!h-auto min-h-8 !whitespace-normal py-1.5 text-left" :size="phone ? 'lg' : 'md'" :variant="j === 0 ? 'solid' : 'subtle'" :label="a.done ? a.label + ' · done' : a.label"
+              <Button v-for="(a, j) in m.actions" :key="j" class="!h-auto min-h-8 min-w-0 max-w-full !whitespace-normal py-1.5 text-left [&_.truncate]:!whitespace-normal" :size="phone ? 'lg' : 'md'" :variant="j === 0 ? 'solid' : 'subtle'" :label="a.done ? a.label + ' · done' : a.label"
                 :disabled="a.done || !canWrite()" :data-ask-action="a.kind" @click="runAction(m, j)" />
             </div>
           </div>

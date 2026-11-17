@@ -47,6 +47,14 @@ function expand() {
   router.push({ path: '/ask', query: ask.thread ? { thread: ask.thread } : {} })
 }
 watch(() => ask.open, async (v) => { if (v) { await nextTick(); composer.value?.focus() } })
+// phone: a citation closed the sheet to show its record; closing the record brings the thread back (lib/ask.js openCite)
+watch(() => router.currentRoute.value.fullPath, () => {
+  const r = router.currentRoute.value
+  if (!ask.returnTo || r.query.open) return
+  const back = r.path === ask.returnTo
+  ask.returnTo = null
+  if (back) ask.open = true
+})
 // keep the newest text in view while it is written
 watch(() => [ask.messages.length, ask.messages[ask.messages.length - 1]?.text], async () => {
   await nextTick()

@@ -31,10 +31,12 @@ This spec is for a coding agent building one Frappe app, `lifeos`, in a single l
 | Editor | CodeMirror 6 in Markdown mode with a rendered preview (`markdown-it`). Sanitise rendered HTML |
 | Calendar | Frappe's core `Event` DocType. Google Calendar stays the master and syncs through Frappe's built-in Google Calendar integration |
 | Agents | Hermes (on the same server) and Claude reach the site through Frappe's built-in MCP server at `/api/v2/mcp`, each as its own user |
-| AI processing | Done by the agent, outside the app. The app stores files, results and proposals. It calls no model itself |
+| AI processing | Done by the agent, outside the app. The app stores files, results and proposals. It calls no model itself (changed in set 5, see the note under this table) |
 | Files | Private by default, always attached to a `lifeos` record |
 | Time zone | Asia/Kolkata for all dates shown |
 | Licence | MIT |
+
+> **Changed in UX fixes, set 5.** Ask and the insights call a model from inside the app: the Anthropic API through the pinned `anthropic` package, one client module (`lifeos/ai/client.py`), a key in Life Settings, a monthly spend cap and a usage record per call. Ingest, wiki upkeep, chat logs and digests stay with the agents outside the app. See `DECISIONS.md`, "UX fixes, set 5".
 
 The live site also runs Folio. `lifeos` must install beside it and must not touch its DocTypes.
 

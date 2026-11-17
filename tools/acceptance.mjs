@@ -61,12 +61,14 @@ const ONLY_UX = process.argv.includes('--ux') // run only the UX checks (U1 and 
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7) // run only the checks whose number ends with this: --only=.8
 async function check(n, title, fn) {
   if (ONLY_UX && !String(n).startsWith('U')) return
-  if (ONLY && !String(n).endsWith(ONLY)) return
+  if (ONLY && !ONLY.split(',').some((o) => String(n).endsWith(o))) return // --only=.3,.32 runs several
   try {
     const note = await fn()
     results.push([n, true, title, note || ''])
   } catch (e) {
-    results.push([n, false, title, String(e.message || e).split('\n')[0].slice(0, 300)])
+    const lines = String(e.message || e).split('\n')
+    const at = lines.find((l) => /waiting for (locator|getBy)/.test(l)) // which element Playwright waited for
+    results.push([n, false, title, (lines[0] + (at ? ' ' + at.trim() : '')).slice(0, 400)])
   }
   const [, ok, t, note] = results[results.length - 1]
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${String(n).padStart(2)}. ${t}${note ? '  — ' + note : ''}`)
@@ -379,6 +381,8 @@ archive.run_daily()`)
   must(review.decide.some((t) => t.name === stale.name), 'the stale task is not under Decide')
   must(JSON.stringify(review).includes(done.name), 'the weekly review does not list what the job archived')
   await owner.open('/life/journal/review')
+  // the weekly review starts with a short Reset (set 5); skip it for this week to reach Decide
+  if (await owner.page.locator('[data-review-reset-skip]').count()) { await owner.page.locator('[data-review-reset-skip]').click(); await owner.page.waitForTimeout(400) }
   must((await owner.page.locator('[data-main]').innerText()).includes(`Stale open task ${stamp}`), 'the screen does not show it under Decide')
 })
 
@@ -627,7 +631,7 @@ for (const width of [1440, 390]) {
       }
       await s.open('/life/timeline')
       await pg.keyboard.press('Meta+k')
-      await pg.locator('input[aria-label="Search"]').fill(`UX note ${stamp}`)
+      await pg.locator('input[aria-label="Search or ask anything"]').fill(`UX note ${stamp}`)
       await pg.waitForTimeout(900)
       await pg.keyboard.press('Enter')
       await settle()
@@ -641,6 +645,8 @@ for (const width of [1440, 390]) {
     // [where the number is, door, which number in its text, what to compare on the page it leads to]
     const door = async (from, name, { which = 0, target = '[data-lv-count]', path, nth = 0, optional = false } = {}) => {
       await s.open(from)
+      // the weekly review starts with a short Reset (set 5): skip it for this week to reach its numbers
+      if (await pg.locator('[data-review-reset-skip]:visible').count()) { await pg.locator('[data-review-reset-skip]').click(); await settle() }
       const el = pg.locator(`[data-door="${name}"]:visible`).nth(nth)
       if (!(await el.count()) || !(await el.isVisible())) {
         if (optional) return
@@ -773,7 +779,8 @@ for (const width of [1440, 390]) {
     const loopsQuery = new URL(pg.url()).search
     await nav('Today')
     await nav('Tasks')
-    must(new URL(pg.url()).search === loopsQuery, `the list did not remember the link's query: ${new URL(pg.url()).search} instead of ${loopsQuery}`)
+    const sameQuery = (a, b) => { const k = (q) => [...new URLSearchParams(q)].map(([x, y]) => x + '=' + y).sort().join('&'); return k(a) === k(b) } // the order of parameters does not matter
+    must(sameQuery(new URL(pg.url()).search, loopsQuery), `the list did not remember the link's query: ${new URL(pg.url()).search} instead of ${loopsQuery}`)
     // Clear removes the filters and the cleared state is what is remembered
     await s.open('/life/tasks?view=list')
     await pickQuick('Priority', 'II')
@@ -886,14 +893,14 @@ for (const width of [1440, 390]) {
       await s.open('/life/projects?status=all&area=' + uxArea)
       await pg.keyboard.press('[')
       await settle()
-      must((await current()) === 'Dropped', '[ did not open the previous tab')
+      must((await current()) === 'Someday', '[ did not open the previous tab') // set 5 put Someday before All
       await pg.keyboard.press(']')
       await settle()
       must((await current()) === 'all', '] did not open the next tab')
       await bar.locator('[data-tab="all"]').focus()
       await pg.keyboard.press('ArrowLeft')
       await settle()
-      must((await current()) === 'Dropped', 'the left arrow did not move to the previous tab')
+      must((await current()) === 'Someday', 'the left arrow did not move to the previous tab')
     }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${checked} tabs`
@@ -1622,7 +1629,7 @@ while d <= last:
     must((await pg.locator('[data-main]').innerText()).includes(S5('someday task')), 'not under Due for review')
     must((await s.api('reset.get', { space: SPACE })).batches.some((b) => b.key === 'someday_due' && b.items.some((i) => i.name === t.name)), 'not in Reset')
     // Bring back through the row's dialog; then a second parked task comes back with a date and is in Tasks with it
-    await pg.locator(ROW, { hasText: S5('someday task') }).locator('[data-bring-back]').first().click()
+    await pg.locator(ROW, { hasText: S5('someday task') }).locator('[data-bring-back]:visible').first().click()
     await settle()
     await pg.getByRole('dialog').getByRole('button', { name: 'Bring back' }).click()
     await pg.waitForTimeout(900)
@@ -1636,13 +1643,13 @@ while d <= last:
     must(dated.length === 1 && dated[0].due_date === addDays(3), 'a task brought back with a date is not in Tasks with that date')
     // Purge the idea to the trash, then Restore it from the Archive's Trash tab
     await s.open('/life/someday?tab=ideas')
-    await pg.locator(ROW, { hasText: S5('someday idea') }).locator('[data-purge]').first().click()
+    await pg.locator(ROW, { hasText: S5('someday idea') }).locator('[data-purge]:visible').first().click()
     await settle()
     await pg.getByRole('dialog').getByRole('button', { name: 'Purge' }).click()
     await pg.waitForTimeout(900)
     must(!(await s.api('frappe.client.get_count', { doctype: 'Life Idea', filters: { name: idea.name } })), 'Purge did not remove the idea')
     await s.open('/life/archive?type=trash')
-    await pg.locator(ROW, { hasText: S5('someday idea') }).locator('[data-trash-restore]').first().click()
+    await pg.locator(ROW, { hasText: S5('someday idea') }).locator('[data-trash-restore]:visible').first().click()
     await pg.waitForTimeout(900)
     must(await s.api('frappe.client.get_count', { doctype: 'Life Idea', filters: { name: idea.name } }), 'Restore did not bring the idea back')
     return 'task, project, goal, idea'
@@ -1693,7 +1700,7 @@ while d <= last:
     await pg.waitForTimeout(1200)
     must(!(await s.api('frappe.client.get_count', { doctype: 'Life Task', filters: { name: del.name } })), 'Delete did not delete')
     await s.open('/life/archive?type=trash')
-    await pg.locator(ROW, { hasText: S5('delete me') }).locator('[data-trash-restore]').first().click()
+    await pg.locator(ROW, { hasText: S5('delete me') }).locator('[data-trash-restore]:visible').first().click()
     await pg.waitForTimeout(1000)
     must(await s.api('frappe.client.get_count', { doctype: 'Life Task', filters: { name: del.name } }), 'Restore from the trash did not bring it back')
     // the weekly review opens on its Reset step

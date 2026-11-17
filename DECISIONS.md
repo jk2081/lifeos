@@ -255,3 +255,53 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Search no longer falls back to a plain `LIKE` when every word has three letters or more and the full-text index found nothing**: that fallback read the text of every row of the space and could only find words that do not start where a word starts. Short words still fall back. Unit tests keep the fallback, because InnoDB's full-text index only sees committed rows and a test's rows are never committed.
 - **The seed's sources** are bulk index rows plus real inbox items and chat logs; the big space also holds the milestone 9 index rows of kinds Inbox and Chat, so it has 35,000 sources in all.
 - **The unit test seeds 2,000 sources and 200 wiki pages**, not the brief's 20,000 and 2,000, so the suite stays a few minutes long. `LIFEOS_LOAD_SOURCES=20000` runs the full size in the test, and `bench execute lifeos.loadtest.run_sources` runs the full size with the milestone 9 load and prints both sets of timings (in `STATUS.md`).
+
+## UX fixes, set 5
+
+### 1. Ask calls a model from inside the app
+
+- **The owner's decision, recorded here.** Section 1 of the spec said the app calls no model itself. From set 5, Ask and the AI insights (and Reset's AI batches) call the Anthropic API from the server, through the official `anthropic` package (pinned in `pyproject.toml`). Ingest, wiki upkeep, chat logs and digests stay with the agents outside the app. `SPEC.md` has a note under its table.
+- **One client** (`lifeos/ai/client.py`): the key (Life Settings, a Password field, or `anthropic_api_key` in site config), the monthly cap checked before every call, a `Life AI Usage` row after every call, a 60-second timeout, and three retries left to the SDK (it retries 408, 409, 429 and 5xx). The key is read only on the server and never logged or sent to the browser.
+- **Default prices** per million tokens are in the code (`DEFAULT_PRICES`) and are overridden by the price table in Settings > Admin > AI. They are placeholders to be checked against the real price list before the cap is relied on.
+- **The short-task model** (`claude-haiku-5-5` by default) is a setting and the client supports it, but no job in this set uses it: thread titles are the first 140 characters of the question, which needs no model.
+- **Tests never call the API.** Unit tests set a scripted fake (`ScriptedFake`); the acceptance site sets the site config `lifeos_fake_ai` and a key starting with `fake-`, which selects a small deterministic fake (`SiteFake`) that searches with the question and cites what it finds. Both record what they were sent, so the checks assert that no Vault document reaches the model while the switch is off. The optional live smoke test is skipped when no real key is set (it was skipped in this build).
+
+### 2. Ask from any screen
+
+- **Streaming is polled.** The server publishes each piece of the answer as a `lifeos_ask` realtime event to the asking user, but the screen reads the answer by polling `ask.progress` every few hundred milliseconds while it is written. The local bench runs no socket.io server, so realtime could not be tested; polling works everywhere and is what the brief allows as the fallback.
+- **Limits:** at most 8 tool calls, an 80,000-token budget per question across its turns, 12 turns, record text capped at 6,000 characters, 50 rows a list. When a limit is reached the model is asked to answer with what it has and to say what it did not check.
+- **Records are named to the model as R1, R2, …**, not by their ids; the server maps the references back to records for the numbered citations and stores the cited records on the message.
+- **Ask on or off and "Ask may read Vault documents"** are fields on `Life Space` (`ask_enabled`, on by default; `ask_can_read_vault`, off), edited in Settings > Admin > AI.
+- **A citation on a phone hands over to the record.** Both the Ask sheet and the record pane are frappe-ui bottom sheets, which cannot be stacked (the record's opened underneath). Tapping a citation closes the Ask sheet and opens the record; closing the record on the same screen brings the Ask sheet back with its thread. On desktop the pane opens beside the 480 px panel as before.
+- **The Search or ask box** opens the existing search palette (frappe-ui `CommandPalette`) rather than being a text field in the header; the palette has the "Ask" row and asks on Enter for a question. This keeps one search UI.
+
+### 3. Insights
+
+- **06:00 in the site's time zone** (Asia/Kolkata, the owner's), by a cron entry in `hooks.py`.
+- **Waiting on you is found by a rule as well as by the AI**: the rule takes chat open items still open after 3 days, one insight per chat. People waiting in email digests are left to the AI detector, which reads the digests' text.
+- **Thresholds** not set by the brief: a Stuck group needs at least 3 tasks; a habit "falls" when its rate is 20 points lower than last month; a check-in is low at 5 or less three times in a row.
+- **The daily cap of 12** is per space.
+
+### 4. Today
+
+- The old four cards and their definitions are gone. The Open band, the Next list and the rail are built from one call, `today.get`; every number on the band comes from the count helper.
+- **"Notes and sources"** counts the Timeline's rows of kind Note, Inbox and Chat, and opens the Timeline with that filter, so the number and the list agree. Its line counts My notes not opened in 90 days (`last_opened_on`, set when a person opens a note; set to the creation date for existing notes by the patch, since no opening was recorded before).
+- **Projects "idle"** uses a new `last_activity_on` on `Life Project`, moved by a change to the project or to one of its tasks (the patch sets it from the later of the two for existing projects).
+
+### 5. Someday
+
+- **Goals** get an `is_someday` flag rather than a status, so the 12 Week Year outcome and history are not changed. Tasks and projects get the `Someday` status. An idea is always parked until brought back, so its status starts at `Someday`.
+- Parking a project parks its open tasks with it (`someday_with` on each task); bringing it back makes only those tasks Open again.
+
+### 6. Reset and the trash
+
+- **Reset rules are site-wide** (Life Settings), shown under This space > Reset rules like the Archive rules of set 3, because the owner has one backlog goal, not one per space.
+- **The trash is Frappe's Deleted Document.** Delete refuses a record other records still point to, with a plain message (archive it instead). The daily purge removes Deleted Document rows of `Life ` DocTypes older than 30 days and nothing else.
+- **The weekly review's Reset step** is skipped for the rest of the week once "Skip for this week" or "Done" is clicked; the choice is kept in the browser (local storage), not on the server.
+- Acceptance item 16 and the review's number doors in U.4 now skip that step first, as a person would.
+
+### 7. Checks
+
+- **Older checks brought in line with set 5:** the search palette's field is now labelled "Search or ask anything" (U.3); Projects has a Someday tab before All, so `[` from All lands on Someday (U.8); a remembered list may restore its query parameters in another order, so U.7 compares them as a set; the Someday and Trash buttons are looked for among visible ones, since a phone row also holds the hidden desktop cells.
+
+- **U.33 (no key, the cap, the family user, the Vault payload) and U.34 (the insight rules) run once, at 1440 px**, because they test the server, not the layout. Every other set 5 check (U.16, U.31, U.32, U.35, U.36, U.37) runs at 1440 px and at 390 px.
