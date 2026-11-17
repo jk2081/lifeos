@@ -70,6 +70,9 @@ class TestSlots(WeekCase):
 		frappe.clear_document_cache("Life Settings", "Life Settings")
 		self.assertEqual(weekplan.hours(), {"days": ["Monday", "Tuesday"], "start": (10, 0), "end": (16, 0)})
 		self.assertRaises(frappe.ValidationError, settings.save, {"work_end": "08:00:00"})
+		settings.save({"work_start": "00:00:00", "work_end": "23:59:00"})  # midnight is a start, not "not set"
+		frappe.clear_document_cache("Life Settings", "Life Settings")
+		self.assertEqual((weekplan.hours()["start"], weekplan.hours()["end"]), ((0, 0), (23, 59)))
 		self.assertRaises(frappe.ValidationError, settings.save, {"work_days": ""})
 
 

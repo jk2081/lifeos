@@ -28,7 +28,7 @@ export async function boot({ beforeReady } = {}) {
   if (!data.spaces.find((s) => s.name === store.space)) store.space = data.default_space || data.spaces[0]?.name || ''
   // saved list views: the local copy is used at once, and the server copy for at most a moment before the first screen draws
   await Promise.race([loadViews(), new Promise((r) => setTimeout(r, 1200))])
-  if (beforeReady) beforeReady() // the lens: from the URL or remembered (lib/lens.js)
+  if (beforeReady) await beforeReady() // the lens: from the URL or remembered (lib/lens.js)
   store.ready = true
   refreshCounts()
 }

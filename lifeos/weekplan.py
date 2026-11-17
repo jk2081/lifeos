@@ -21,7 +21,9 @@ def hours():
 	"""The working days and the start and end of a working day."""
 	s = frappe.get_cached_doc("Life Settings")
 	days = [d.strip() for d in (s.get("work_days") or DEFAULT_DAYS).split(",") if d.strip() in DAYS]
-	start, end = _hm(s.get("work_start") or "09:00"), _hm(s.get("work_end") or "19:00")
+	# a Time of 00:00 is a zero timedelta, which is falsy: test for "not set", not for truth
+	start = _hm("09:00" if s.get("work_start") in (None, "") else s.get("work_start"))
+	end = _hm("19:00" if s.get("work_end") in (None, "") else s.get("work_end"))
 	if end <= start:
 		start, end = (9, 0), (19, 0)
 	return {"days": days, "start": start, "end": end}

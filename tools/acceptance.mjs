@@ -2801,9 +2801,12 @@ for (const width of [1440, 390]) {
     // working hours of every day, all day long, so the first free slot is today whatever the time of the run
     await owner.api('settings.save', { values: { work_days: 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', work_start: '00:00:00', work_end: '23:59:00' } })
     try {
-      const a = (await s.api('goals.create', { space: SPACE, title: `S7 plan goal ${W}`, goal_type: 'Open', area: areaId('Tea & Coffee'), done_when: 'Planned' })).name
-      const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, goal_type: 'Open', area: areaId('Tea & Coffee'), done_when: 'Handed over' })).name
-      await s.open('/life/plan/week?view=review')
+      // an area of their own, so under the lens the cards are only these two and the first gets the first free slot
+      await s.api('settings.save_item', { kind: 'area', space: SPACE, title: `S7 area ${W}` })
+      const own = (await s.api('area.tree', { space: SPACE })).areas.find((x) => x.area_name === `S7 area ${W}`).name
+      const a = (await s.api('goals.create', { space: SPACE, title: `S7 plan goal ${W}`, goal_type: 'Open', area: own, done_when: 'Planned' })).name
+      const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, goal_type: 'Open', area: own, done_when: 'Handed over' })).name
+      await s.open(`/life/plan/week?view=review&area=${own}`)
       await skipReset()
       const card = pg.locator(`[data-goal-card][data-goal="${a}"]`)
       await card.waitFor({ timeout: 15000 })
@@ -2814,7 +2817,8 @@ for (const width of [1440, 390]) {
       await settle()
       must((await card.getAttribute('data-card-state')) === 'added', 'the card was not added')
       const task = (await s.api('tasks.list', { space: SPACE, goal: a, status: 'all' })).tasks.find((x) => x.title === `S7 plan step ${W}`)
-      must(task && task.scheduled_at && String(task.scheduled_at).slice(0, 10) === today, 'no task scheduled today: ' + JSON.stringify(task))
+      const now = iso(new Date()) // the run may cross midnight
+      must(task && task.scheduled_at && String(task.scheduled_at).slice(0, 10) === now, 'no task scheduled today: ' + JSON.stringify(task))
       const footer = pg.locator('[data-goal-work-footer]')
       must(Number(await footer.getAttribute('data-planned-minutes')) >= 60, 'the footer did not add the hour')
       const other = pg.locator(`[data-goal-card][data-goal="${b}"]`)

@@ -54,7 +54,10 @@ export function setLens({ space, area } = {}) {
 export const clearArea = () => setLens({ area: '' })
 
 /** Once the session is known: take the lens from the URL, or the remembered one, and write it into the URL. */
-export function initLens() {
+export async function initLens() {
+  // the first navigation must be resolved first: before it, the current route is the start route "/", and replacing with
+  // it sent a deep link (a reload, a copied URL) to Today
+  await router.isReady()
   const q = router.currentRoute.value.query
   const saved = savedView('lens', '') || {}
   const known = (s) => s && store.spaces.some((x) => x.name === s)

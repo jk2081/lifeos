@@ -23,7 +23,7 @@
           <div class="text-sm text-ink-gray-6">{{ [row.kind, row.area_name, dateTime(row.on)].filter(Boolean).join(' · ') }}</div>
         </div>
         <Badge :theme="THEME[row.pile] || 'gray'" :label="row.pile === 'In' ? 'Came in' : row.pile" />
-        <Button v-if="row.can_bring_back && canWrite()" class="relative" size="sm" label="Bring back" @click="bringBack(row)" />
+        <Button v-if="row.can_bring_back && canWrite()" class="relative" size="sm" label="Bring back" data-outbox-bring-back @click="bringBack(row)" />
       </div>
     </template>
   </ListView>
