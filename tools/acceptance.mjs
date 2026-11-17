@@ -2083,6 +2083,16 @@ await check('S4.0', 'No test debris on lifeos.localhost after the run', async ()
   must(!Object.keys(d).length, 'debris on lifeos.localhost: ' + out)
 })
 
+// Pre-step 6: Frappe's semgrep rules find nothing in the app, apart from the inline exceptions in docs/conformance/exceptions.md
+await check('C.1', "Frappe's semgrep rules report no finding (tools/scan.sh)", async () => {
+  try {
+    execFileSync(path.join(root, 'tools/scan.sh'), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (e) {
+    const lines = String(e.stdout || '').trim().split('\n')
+    throw new Error('findings: ' + lines.slice(-3).join(' ').replace(/\s+/g, ' '))
+  }
+})
+
 await browser.close()
 const failed = results.filter((r) => !r[1])
 console.log(`\n${results.length - failed.length} of ${results.length} acceptance items pass.`)
