@@ -6,7 +6,7 @@
     <!-- what this goal serves and what serves it (UX fixes, set 6) -->
     <div v-if="info" class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6" data-pane-serves>
       <span>Serves</span>
-      <Pick :model-value="info.goal.serves || null" :options="servesOptions" placeholder="no longer goal" :disabled="!writable" @update:model-value="saveServes" />
+      <Pick :model-value="info.goal.serves || null" :options="servesOptions" placeholder="Choose a longer goal" :disabled="!writable" @update:model-value="saveServes" />
       <template v-if="info.served_by.length"><span>· Served by</span>
         <Button v-for="s in info.served_by" :key="s.name" size="sm" variant="ghost" :label="s.title" data-pane-served-by @click="openRef('goal:' + s.name)" /></template>
     </div>
@@ -124,7 +124,7 @@ async function load() {
     emit('missing')
   }
 }
-const servesOptions = computed(() => [{ label: 'No longer goal', value: '' },
+const servesOptions = computed(() => [{ label: 'None', value: '' },
   ...(lookups.goals || []).filter((x) => x.name !== props.name).map((x) => ({ label: `${x.goal_type} · ${x.title}`, value: x.name })),
   ...(info.value?.goal.serves && !(lookups.goals || []).some((x) => x.name === info.value.goal.serves) ? [{ label: info.value.goal.serves_title, value: info.value.goal.serves }] : [])])
 async function saveServes(v) {

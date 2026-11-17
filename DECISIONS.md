@@ -428,3 +428,8 @@ Fixed: sensitive items reached agents through paths that did not use the Vault r
 - **Ask from Today follows the lens.** Today gave Ask "Everything in this space" even with an area in the lens; it now gives the lens's area.
 - **The acceptance script calls the agent's methods with their declared HTTP method** (GET for those in `getMethods.json`, POST for the rest). Before, a POST-only read such as `library.get` was always refused for the wrong reason, so "the agent cannot read it" passed without testing the rule.
 - **`/library?view=list` is Library > All in its list view**, not the old Notes list. Set 6 redirected it to Notes, but All's own List view writes `view=list`, so a reload of All in its list jumped to Notes. Only `/library?view=tree` (the old Notes tree) still redirects to Notes.
+
+## After set 6: pane header and the Serves picker (17 Nov 2026)
+
+- **The record pane's buttons have their own row.** The title used to share a row with every header button (Ask about this, Sensitive, Move to Someday, Open full page, Close). On a goal, which has four of them, the title column shrank to one letter per line. Now the buttons sit on the first row, wrapping if they must, with Close pinned at the end. The kind ("Goal", "Task") and the title come below, at the pane's full width. The buttons are small on a desktop and full size (40 px) on a phone.
+- **The Serves picker reads "Choose a longer goal", and its empty choice is "None".** It read "no longer goal", a garbled form of "a longer goal", on the goal pane and the goal page.

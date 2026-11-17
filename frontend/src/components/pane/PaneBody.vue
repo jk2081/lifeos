@@ -1,19 +1,23 @@
 <template>
   <header class="flex flex-none flex-col gap-2.5 border-outline-gray-1 px-4 pb-3 md:px-5" :class="[phone ? 'pt-0' : 'pt-3.5', tabs.length > 1 ? '' : 'border-b']">
-    <div class="flex items-start gap-2">
-      <div class="min-w-0 flex-1">
-        <div class="text-sm text-ink-gray-6">{{ label }}</div>
-        <h2 class="break-words text-lg-semibold text-ink-gray-9" data-pane-title>{{ meta.title || (missing ? 'Not found' : 'Loading…') }}</h2>
-      </div>
-      <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" icon-left="lucide-sparkles" :label="phone ? 'Ask' : 'Ask about this'" data-pane-ask
+    <!-- the actions on their own line with Close pinned at the end; the kind and title below at the pane's full width,
+         so the title never shares a row with buttons -->
+    <div class="flex items-start gap-1.5">
+      <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5" data-pane-actions>
+      <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" :size="btnSize" icon-left="lucide-sparkles" :label="phone ? 'Ask' : 'Ask about this'" data-pane-ask
         @click="askAbout(ASKABLE[cur.type], cur.name, meta.title)" />
       <!-- the sensitive mark (UX fixes, set 6): a lock while it is on; anyone who may edit marks it, only the space's owner unmarks it -->
-      <Button v-if="meta.sensitive && !store.isAgent" :icon-left="meta.sensitive.on ? 'lucide-lock' : 'lucide-lock-open'" :variant="meta.sensitive.on ? 'subtle' : 'ghost'"
+      <Button v-if="meta.sensitive && !store.isAgent" :size="btnSize" :icon-left="meta.sensitive.on ? 'lucide-lock' : 'lucide-lock-open'" :variant="meta.sensitive.on ? 'subtle' : 'ghost'"
         :label="phone ? '' : meta.sensitive.on ? 'Sensitive' : 'Mark sensitive'" :tooltip="meta.sensitive.on ? 'Sensitive: follows the Vault rules. Click to unmark (the space owner only).' : 'Mark sensitive'"
         :aria-pressed="meta.sensitive.on" data-pane-sensitive @click="toggleSensitive" />
-      <Button v-if="meta.someday" icon-left="lucide-clock" :label="phone ? 'Someday' : 'Move to Someday'" data-pane-someday @click="toSomeday" />
-      <Button v-if="meta.fullPage" label="Open full page" :route="meta.fullPage" data-pane-full />
-      <Button icon="lucide-x" label="Close" tooltip="Close" data-pane-close @click="closePane" />
+      <Button v-if="meta.someday" :size="btnSize" icon-left="lucide-clock" :label="phone ? 'Someday' : 'Move to Someday'" data-pane-someday @click="toSomeday" />
+      <Button v-if="meta.fullPage" :size="btnSize" label="Open full page" :route="meta.fullPage" data-pane-full />
+      </div>
+      <Button class="shrink-0" :size="btnSize" icon="lucide-x" label="Close" tooltip="Close" data-pane-close @click="closePane" />
+    </div>
+    <div class="min-w-0">
+      <div class="text-sm text-ink-gray-6">{{ label }}</div>
+      <h2 class="break-words text-lg-semibold text-ink-gray-9" data-pane-title>{{ meta.title || (missing ? 'Not found' : 'Loading…') }}</h2>
     </div>
     <div v-if="meta.area || meta.goal || meta.sub" class="flex flex-wrap items-center gap-2">
       <Button v-if="meta.area" size="sm" variant="outline" icon-left="lucide-folder" :label="meta.area_name || 'Area'" :route="`/areas/${meta.area}`" />
@@ -62,6 +66,8 @@ import { api, tryCall } from '@/lib/api'
 const props = defineProps({ cur: Object, meta: Object, label: String, missing: Boolean, stamp: Number, phone: Boolean })
 // Each kind of record says its tabs in its meta: [{ value, label, count }]. The open one is ptab= in the URL; the first is the default.
 const tabs = computed(() => (props.missing ? [] : props.meta.tabs || []))
+// the header's buttons: small beside a desktop pane's title, full size (40 px) to tap on a phone
+const btnSize = computed(() => (props.phone ? 'md' : 'sm'))
 const ptab = useUrlTab('ptab', tabs, { replace: true })
 const emit = defineEmits(['meta', 'missing', 'changed', 'restore', 'reload'])
 // "Ask about this": the record and the records linked to it are the question's scope

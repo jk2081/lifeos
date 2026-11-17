@@ -247,6 +247,10 @@ Everything in `UX_FIXES_6.md` is done: four places (Today, Inbox, Plan, Library)
   - `node tools/screens.mjs`: 96 screens (every place, Plan and Library tab and view, each Settings section, a goal and a note page, the lens picker, and the main screens under an area) at 1440 px and 390 px in light and dark, 384 screenshots, with no sideways scrolling, script errors or text below 4.5 to 1. Plan > Goals with the lens open was compared by eye with `mockups/set6/21-sidebar-lens-plan.png`; the screens changed in the final round (Settings > Archive and trash, Library > All as a list, the Notes tree) were looked at by eye at both widths.
 - `frontend/COMPONENTS.md` (lens, places, Plan and Library tabs), `agent/SKILL.md` (goal-based API, sensitive items) and `ROADMAP.md` (set 6 done; Life Project removal pending) are updated.
 
+## After set 6: pane header fix (17 Nov 2026)
+
+- The record pane's title no longer shares a row with its buttons. On a goal it had been squeezed to one letter per line. The Serves picker reads "Choose a longer goal" (it read "no longer goal"). Checked at 1440 px and 390 px, light and dark, on a goal and a task pane. `./tools/scan.sh` reports 0 findings. See `DECISIONS.md`, "After set 6".
+
 ## Summary
 
 ### What works

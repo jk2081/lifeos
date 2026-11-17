@@ -30,7 +30,7 @@
             <!-- what this goal serves, and what serves it (a goal can point to the longer goal it serves) -->
             <div class="flex flex-wrap items-center gap-2" data-goal-serves>
               <span class="text-sm text-ink-gray-6">Serves</span>
-              <Pick :model-value="g.serves || null" :options="servesOptions" placeholder="no longer goal" :disabled="!writable" @update:model-value="(v) => saveServes(v)" />
+              <Pick :model-value="g.serves || null" :options="servesOptions" placeholder="Choose a longer goal" :disabled="!writable" @update:model-value="(v) => saveServes(v)" />
               <NumLink v-if="g.serves" :to="{ path: `/plan/goals/${g.serves}` }" class="text-sm">Open {{ g.serves_title }}</NumLink>
             </div>
           </Card>
@@ -137,7 +137,7 @@ const themeOf = (x) => (x.is_archived ? 'gray' : { Active: 'green', 'On Hold': '
 const sub = computed(() => [g.value.area_name, g.value.goal_type + ' goal', g.value.target_date && 'by ' + short(g.value.target_date, true),
   g.value.serves_title && 'serves ' + g.value.serves_title, d.value.served_by.length && `served by ${d.value.served_by.length}`].filter(Boolean).join(' · '))
 // a goal can serve any other goal in progress of the space, never itself
-const servesOptions = computed(() => [{ label: 'No longer goal', value: '' },
+const servesOptions = computed(() => [{ label: 'None', value: '' },
   ...(lookups.goals || []).filter((x) => x.name !== g.value.name).map((x) => ({ label: `${x.goal_type} · ${x.title}`, value: x.name })),
   ...(g.value.serves && !(lookups.goals || []).some((x) => x.name === g.value.serves) ? [{ label: g.value.serves_title || g.value.serves, value: g.value.serves }] : [])])
 // The tabs. Each list tab is the main screen's list with this goal fixed, its view remembered per tab across goals.
