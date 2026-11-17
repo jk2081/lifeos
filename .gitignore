@@ -15,3 +15,10 @@ lifeos/www/life.html
 # screenshots taken during the build
 screenshots/
 tools/node_modules/
+# Frappe's official skills, fetched by scripts/get-frappe-skills.sh
+.cache/
+.claude/skills/frappe-app-dev/
+.claude/skills/frappe-code-review/
+.claude/skills/code-style/
+.claude/skills/ui-design/
+.claude/skills/deep-app-audit/
