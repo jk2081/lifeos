@@ -198,7 +198,10 @@ def run(space, system, file_url, user):
 		return
 	counts = {"created": 0, "updated": 0, "unchanged": 0, "skipped": bad}
 	_set(space, system, status="Importing", total=len(convs), skipped=bad)
+	in_worker = bool(getattr(frappe.local, "job", None))
 	for i, c in enumerate(convs, 1):
+		# one conversation that fails is undone alone; the ones before it stay
+		frappe.db.savepoint("lifeos_chat_import")
 		try:
 			res = chats.log(space=space, title=c["title"], date=(c["created"] or now_datetime()).date(), url=c["url"], assistant=c["assistant"],
 				source_system=system, external_id=c["external_id"], transcript_md=c["transcript_md"],
@@ -206,12 +209,12 @@ def run(space, system, file_url, user):
 			counts["created" if res["created"] else ("updated" if res.get("changed") else "unchanged")] += 1
 		except Exception:
 			counts["skipped"] += 1
-			frappe.db.rollback()
+			frappe.db.rollback(save_point="lifeos_chat_import")
 			frappe.log_error(title="Life OS chat import: one conversation failed")
 			continue
 		if i % 25 == 0 or i == len(convs):
-			frappe.db.commit()
+			if in_worker:  # a long job keeps what it has done, so a timeout does not lose an hour of import
+				frappe.db.commit()  # nosemgrep: frappe-manual-commit -- long background job: progress is saved every 25 conversations
 			_set(space, system, done=i, **counts)
 	connections.touch(space, system, _("Import of {0} chats").format(len(convs)))
-	frappe.db.commit()
 	_set(space, system, status="Done", done=len(convs), finished_on=str(now_datetime())[:19], **counts)

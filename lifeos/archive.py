@@ -41,7 +41,6 @@ def run_daily(on=None) -> dict:
 	out["Life Chat Log"] = frappe.db.sql("select row_count()")[0][0]
 	for dt in AUTO_DOCTYPES:
 		_sync_index(dt)
-	frappe.db.commit()
 	return out
 
 

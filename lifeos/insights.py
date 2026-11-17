@@ -270,11 +270,12 @@ def run_nightly():
 		if not s.owner_user:
 			continue
 		frappe.set_user(s.owner_user)
+		# a space that fails is undone alone; the scheduler commits the rest when the job ends
+		frappe.db.savepoint("lifeos_insights")
 		try:
 			run(s.name, ai=bool(s.ask_enabled))
-			frappe.db.commit()
 		except Exception:
-			frappe.db.rollback()
+			frappe.db.rollback(save_point="lifeos_insights")
 			frappe.log_error(title=f"Life OS insights for {s.name}")
 		finally:
 			frappe.set_user("Administrator")

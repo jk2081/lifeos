@@ -116,7 +116,6 @@ def _remove(key):
 			except frappe.LinkExistsError:
 				frappe.clear_messages()
 	frappe.db.set_default(key, "[]")
-	frappe.db.commit()
 	return removed
 
 
@@ -157,7 +156,6 @@ def load(space="Private", key=SEED_KEY):
 		"habits": [dict(r, tracked_from="2026-11-01") for r in habit_rows],
 	})
 	t.save()
-	frappe.db.commit()
 	return f"Seed loaded into {space}: {len(t.records)} records."
 
 

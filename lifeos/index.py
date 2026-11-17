@@ -128,7 +128,6 @@ def rebuild():
 				_write(rows[i : i + 200])
 			total += len(rows)
 			start += 500
-	frappe.db.commit()
 	return total
 
 

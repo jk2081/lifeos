@@ -109,31 +109,43 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 	msg = frappe.get_doc({"doctype": "Life Ask Message", "thread": t.name, "role": "assistant", "text": "", "status": "Working"}).insert(ignore_permissions=True)
 	t.last_message_on = now_datetime()
 	t.save(ignore_permissions=True)
-	if client_id:  # the screen polls `progress` with its own id while the answer is written
-		frappe.cache.set_value(f"lifeos_ask_req:{frappe.session.user}:{client_id}", msg.name, expires_in_sec=900)
-	frappe.db.commit()
+	# The screen polls `progress` with its own id while the answer is written. The text so far goes to the cache, not the
+	# database, so the request commits once, at its end, and a failure leaves no half-written message behind.
+	key = f"lifeos_ask_req:{frappe.session.user}:{client_id}" if client_id else None
 	buf, last = [], [0.0]
+
+	def show_progress(status="Working"):
+		if key:
+			frappe.cache.set_value(key, {"status": status, "text": "".join(buf), "thread": t.name, "message": msg.name}, expires_in_sec=900)
 
 	def on_text(delta):
 		buf.append(delta)
 		frappe.publish_realtime("lifeos_ask", {"thread": t.name, "message": msg.name, "delta": delta}, user=frappe.session.user)
 		if time.monotonic() - last[0] > 0.6:
 			last[0] = time.monotonic()
-			frappe.db.set_value("Life Ask Message", msg.name, "text", "".join(buf), update_modified=False)
-			frappe.db.commit()
+			show_progress()
 
+	show_progress()
 	try:
 		res = engine.answer(space, question, sc, history, on_text)
-	except client.AIError as e:
+	except Exception as e:
+		# an unexpected failure is logged and answered like a model error, so the usage already recorded is kept
+		if not isinstance(e, client.AIError):
+			frappe.log_error(title="Life OS Ask failed")
+		text = str(e) if isinstance(e, client.AIError) else _("Something went wrong while answering. It has been logged.")
 		msg.reload()
-		msg.status, msg.error, msg.text = "Error", str(e), ""
+		msg.status, msg.error, msg.text = "Error", text, ""
 		msg.save(ignore_permissions=True)
-		return {"thread": t.name, "message": _message_out(msg), "error": "ai", "error_text": str(e)}
+		buf.clear()
+		show_progress("Error")
+		return {"thread": t.name, "message": _message_out(msg), "error": "ai", "error_text": text}
 	msg.reload()
 	msg.update({"text": res["text"], "cited": json.dumps(res["cited"]), "actions": json.dumps(res["actions"]),
 		"records_read": json.dumps(res["read"]), "input_tokens": res["input_tokens"], "output_tokens": res["output_tokens"],
 		"cost": res["cost"], "status": "Done"})
 	msg.save(ignore_permissions=True)
+	buf[:] = [msg.text or ""]
+	show_progress("Done")
 	frappe.publish_realtime("lifeos_ask", {"thread": t.name, "message": msg.name, "done": 1}, user=frappe.session.user)
 	return {"thread": t.name, "message": _message_out(msg), "scope": sc}
 
@@ -148,11 +160,8 @@ def _refuse(t, question, code, text):
 def progress(client_id: str):
 	"""The answer so far for a question still being written (polling, when realtime is not available)."""
 	_person()
-	name = frappe.cache.get_value(f"lifeos_ask_req:{frappe.session.user}:{client_id}")
-	if not name:
-		return {"status": "Waiting", "text": ""}
-	m = frappe.db.get_value("Life Ask Message", name, ["name", "thread", "text", "status"], as_dict=True)
-	return {"status": m.status, "text": m.text or "", "thread": m.thread, "message": m.name} if m else {"status": "Waiting", "text": ""}
+	got = frappe.cache.get_value(f"lifeos_ask_req:{frappe.session.user}:{client_id}")
+	return got if isinstance(got, dict) else {"status": "Waiting", "text": ""}
 
 
 @frappe.whitelist(methods=["GET"])

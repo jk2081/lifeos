@@ -35,7 +35,6 @@ def setup_users(password=None):
 	install.add_member("Private", AGENT, "Write", "Life Agent")
 	install.add_member("Shared", AGENT, "Write", "Life Agent")
 	permissions.clear_cache()
-	frappe.db.commit()
 	return "Users ready."
 
 
@@ -47,7 +46,6 @@ def agent_api_key(user=AGENT):
 		doc.api_key = frappe.generate_hash(length=15)
 	doc.api_secret = secret
 	doc.save(ignore_permissions=True)
-	frappe.db.commit()
 	return f"{doc.api_key}:{secret}"
 
 
@@ -155,7 +153,6 @@ def prepare_site(time_zone="Asia/Kolkata"):
 	from frappe.utils.password import get_encryption_key
 
 	get_encryption_key()
-	frappe.db.commit()
 	frappe.clear_cache()
 	return "Site prepared."
 
@@ -297,6 +294,5 @@ def purge_test_debris(dry_run=True):
 		if any(s in state for s in stamps) or any(n in state for _, n in pairs if len(n) > 6):
 			frappe.db.sql("delete from `tabLife View State` where name=%s", v.name)
 			removed_views += 1
-	frappe.db.commit()
 	frappe.clear_cache()
 	return {"stamps": len(stamps), "records": report, "month_goals": len(month_goals), "files": len(files), "views": removed_views}

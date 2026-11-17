@@ -24,7 +24,7 @@ def setup():
 	from lifeos import index
 	index.ensure_indexes()
 	make_spaces()
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- after_install: the spaces and index DDL must be kept before install-app goes on
 
 
 def make_roles():
@@ -72,7 +72,6 @@ def set_owner(user):
 		if user not in [m.user for m in space.members]:
 			space.append("members", {"user": user, "access": "Write"})
 		space.save(ignore_permissions=True)
-	frappe.db.commit()
 
 
 def add_member(space, user, access="Write", role="Life User"):
@@ -89,7 +88,6 @@ def add_member(space, user, access="Write", role="Life User"):
 	else:
 		doc.append("members", {"user": user, "access": access})
 	doc.save(ignore_permissions=True)
-	frappe.db.commit()
 
 
 def make_personal_space(user, space_name=None):

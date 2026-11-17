@@ -316,3 +316,14 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **A read that writes now fails loudly on the acceptance site.** `lifeos/strict_get.py` runs every GET to a `lifeos.` method in a read-only transaction when the site config has `lifeos_strict_get`. `scripts/acceptance-site.sh` sets it on that site. It is off everywhere else.
 - **Type hints accept what callers send.** Lists and objects are `str | list` or `str | dict`, parsed as before, because GET and REST send JSON strings while MCP sends objects. Flags are `bool | int`. Date arguments also accept `date` objects where Python callers pass them. Modules that define their own `list()` use `builtins.list` in hints, because Python 3.14 resolves annotations lazily.
 - **Changed test:** `test_ux2_views.test_what_is_saved` now accepts `FrappeTypeError` as well as `ValidationError` for a list passed as a view state. The list is still refused, but Frappe's type check now refuses it first.
+
+### 2. SQL
+
+- **Composed SQL stays, with a reason.** Every interpolated piece of SQL was traced; none came from a caller or the model. Lists build their WHERE from fixed fragments (tab and due maps, the area filter) and columns checked against the DocType meta, with every value a parameter. Rewriting those queries into `frappe.qb` would change working, measured SQL, so they carry `# nosemgrep: frappe-sql-format-injection -- <reason>` instead; `docs/conformance/exceptions.md` lists them, written from the comments by `tools/scan_exceptions.py`. Three queries now need no interpolation, and DocType names written into SQL are checked first (`archive._sync_index`, devtools).
+
+### 3. Manual commits
+
+- **Ask commits once.** The answer so far is kept in the cache for `ask.progress`, not committed to the database while the answer streams. An unexpected failure while answering becomes an error answer ("Something went wrong while answering. It has been logged."), saved with the usage already recorded, instead of a message left "Working".
+- **Chat import undoes one bad conversation alone** (a savepoint per conversation). Before, a failure rolled back to the last commit, so up to 24 conversations counted as imported could be lost. Progress is still committed every 25 conversations, but only inside a worker job.
+- **The nightly insights job uses a savepoint per space** instead of a commit per space; the scheduler commits at the end.
+- **Removed:** the commits in `archive.run_daily` and `index.rebuild` (the scheduler, migrate and `bench execute` commit), in `install.set_owner` and `add_member`, `seed`, `demo` and `devtools` (all run through `bench execute`, which commits). **Kept with a reason:** `after_install`, and the load test's seed and removal.

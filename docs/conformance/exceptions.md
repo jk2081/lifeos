@@ -6,8 +6,19 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | Rule | Exceptions |
 | --- | --- |
+| frappe-manual-commit | 5 |
 | frappe-sql-format-injection | 68 |
-| Total | 68 |
+| Total | 73 |
+
+## frappe-manual-commit
+
+| File | Line | Reason |
+| --- | --- | --- |
+| `lifeos/chat_import.py` | 217 | long background job: progress is saved every 25 conversations |
+| `lifeos/install.py` | 27 | after_install: the spaces and index DDL must be kept before install-app goes on |
+| `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
+| `lifeos/loadtest.py` | 259 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
+| `lifeos/loadtest.py` | 318 | load test: its removal must stick even when run inside a test |
 
 ## frappe-sql-format-injection
 
@@ -22,8 +33,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/area.py` | 12 | callers pass fixed WHERE fragments; values are parameters |
 | `lifeos/api/area.py` | 53 | `arch` and vault_guard are constant fragments |
 | `lifeos/api/area.py` | 56 | `arch` is a constant fragment |
-| `lifeos/api/ask.py` | 186 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
-| `lifeos/api/ask.py` | 191 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
+| `lifeos/api/ask.py` | 195 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
+| `lifeos/api/ask.py` | 200 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
 | `lifeos/api/chats.py` | 140 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 146 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 148 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
@@ -71,13 +82,13 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/wiki.py` | 429 | CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/wiki.py` | 432 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/archive.py` | 14 | the table is one of ORG_DOCTYPES (checked above) and `where` a fixed fragment; values are parameters |
-| `lifeos/archive.py` | 76 | `dt` comes from the constant ORG_DOCTYPES |
-| `lifeos/archive.py` | 89 | `dt` comes from the constant ORG_DOCTYPES |
-| `lifeos/devtools.py` | 61 | development tool: dt comes from the SPACE_DOCTYPES constant; values are parameters |
-| `lifeos/devtools.py` | 66 | development tool: table names from SPACE_DOCTYPES and their meta's table fields; values are parameters |
-| `lifeos/devtools.py` | 69 | development tool: dt comes from the SPACE_DOCTYPES constant; space is a parameter |
-| `lifeos/devtools.py` | 201 | development tool: DocType and field from the _TITLED constant |
-| `lifeos/devtools.py` | 251 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
-| `lifeos/devtools.py` | 276 | development tool: child table names from the meta of a checked DocType; values are parameters |
-| `lifeos/devtools.py` | 286 | development tool: dt is checked to be an existing DocType; names are a parameter |
+| `lifeos/archive.py` | 75 | `dt` comes from the constant ORG_DOCTYPES |
+| `lifeos/archive.py` | 88 | `dt` comes from the constant ORG_DOCTYPES |
+| `lifeos/devtools.py` | 59 | development tool: dt comes from the SPACE_DOCTYPES constant; values are parameters |
+| `lifeos/devtools.py` | 64 | development tool: table names from SPACE_DOCTYPES and their meta's table fields; values are parameters |
+| `lifeos/devtools.py` | 67 | development tool: dt comes from the SPACE_DOCTYPES constant; space is a parameter |
+| `lifeos/devtools.py` | 198 | development tool: DocType and field from the _TITLED constant |
+| `lifeos/devtools.py` | 248 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
+| `lifeos/devtools.py` | 273 | development tool: child table names from the meta of a checked DocType; values are parameters |
+| `lifeos/devtools.py` | 283 | development tool: dt is checked to be an existing DocType; names are a parameter |
 | `lifeos/index.py` | 97 | column names come from the fixed COLUMNS list; every value is a %s parameter |

@@ -197,7 +197,6 @@ def load(space="Private"):
 		fake.process_one(devtools.LocalClient(), log=lambda *a: None)
 	frappe.set_user("Administrator")
 	t.save()
-	frappe.db.commit()
 	return f"Demo data loaded into {space}: {len(t.records)} records."
 
 
@@ -277,7 +276,6 @@ def load_v4(space="Private"):
 		if ["Life Note", name] not in t.records:
 			t.records.append(["Life Note", name])
 	t.save()
-	frappe.db.commit()
 	return f"Set 4 demo loaded into {space}: {len(t.records)} records."
 
 

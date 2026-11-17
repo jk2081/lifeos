@@ -111,7 +111,7 @@ def seed(rows=100000, users=20, spaces=50, big_share=0.5):
 					area, also, "", "", day, title, text, archived, kind, "", owner) + pad)
 			flush()
 	flush(force=True)
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- load test: 100,000 seeded rows are committed so the timed reads see them as a real site would
 	return {"rows": frappe.db.count("Life Index", {"space": ("like", PREFIX + "%")}), "users": len(emails), "spaces": len(names)}
 
 
@@ -256,7 +256,7 @@ def seed_sources(sources=20000, pages=2000, space=None, text_chars=5000):
 		frappe.db.bulk_insert("Life Note", note_cols, notes)
 		frappe.db.bulk_insert("Life Wiki Change", change_cols, changes)
 	flush(force=True)
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would
 	return {"sources": frappe.db.count("Life Index", {"space": space, "kind": ("in", ["Inbox", "Chat"])}),
 		"wiki_pages": frappe.db.count("Life Note", {"space": space, "collection": "Wiki"})}
 
@@ -315,7 +315,7 @@ def remove():
 	for email in frappe.get_all("User", filters={"name": ("like", "load%@lifeos.test")}, pluck="name"):
 		frappe.delete_doc("User", email, force=True, ignore_permissions=True)
 	permissions.clear_cache()
-	frappe.db.commit()
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- load test: its removal must stick even when run inside a test
 	return "Load data removed."
 
 
