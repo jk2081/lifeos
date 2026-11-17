@@ -11,7 +11,7 @@ Life OS keeps its owner moving forward: everything that lands on him goes in one
 | 2 | frappe-ui and `@framework/ui` components; remembered views | Done |
 | 3 | Tabs, Settings, sidebar, permissions, goals outside the 12 Week Year | Done |
 | 4 | Sources, the Wiki, the live-preview editor, streams, test-site clean-up | Done |
-| 5 | Count rule, Someday, Reset, Today with Open and Next, AI client with spend cap, Ask from any screen, insights | Steps 1 to 9 built; final checks pending |
+| 5 | Count rule, Someday, Reset, Today with Open and Next, AI client with spend cap, Ask from any screen, insights | Done |
 
 ## The target design in one paragraph
 
@@ -35,7 +35,7 @@ Restructure the app around the four places. No AI work.
 
 ### Set 7: Moving forward
 
-- Outbox: everything that leaves the plate (captures, tasks, goals), in four piles: Done, Delegated, Parked, Discarded. A flow line on Today's Open band ("This week: 64 in, 81 out") and the full Outbox as a Library tab. *(Placement assumed; confirm before the brief.)*
+- Outbox: everything that leaves the plate (captures, tasks, goals), in four piles: Done, Delegated, Parked, Discarded. A flow line on Today's Open band ("This week: 64 in, 81 out") and the full Outbox as a Library tab.
 - Old Inbox items: a setting. Default: after 7 days the assistant suggests a decision for each item, confirmed in batches. Options: auto-discard or auto-park after 14 days, with undo.
 - Weekly review in Plan > Week: score, then Reset, then goal work. For each goal: next action, when, who, what is needed. Each becomes a task; if "who" is someone else, it is Delegated. Working hours as a setting.
 
@@ -77,15 +77,10 @@ Needs a decision first: what read, propose and act mean per kind of record, and 
 - Agent Host on the server: creates, updates, pauses and retires Hermes profiles, each in its own container, from a form in Life OS. The current Hermes becomes the first registered profile.
 - Skills library with approval of skills agents write; corrections sent back as lessons; scorecards; versions; clone.
 
-### Set 12: Coaching
+### Parked: Coaching
 
-- Coach role: sees numbers (review streak, 12-week score, Inbox age, stuck count), never content.
-- Cohort dashboard across participants.
-- Setup template: areas, starter goals, weekly review checklist.
-- First-week onboarding that shows only Today, Inbox and Areas, then unlocks Plan.
+Coach role (numbers only), cohort dashboard, setup template and first-week onboarding. Parked on 17 November 2026; not scheduled.
 
 ## Open decisions
 
-1. Outbox placement (assumed above: flow line on Today, full Outbox in Library).
-2. The agents' permission model (before set 11).
-3. Whether the coaching programme goes ahead (set 12).
+1. The agents' permission model (before set 11).
