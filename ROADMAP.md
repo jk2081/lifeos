@@ -12,12 +12,23 @@ Life OS keeps its owner moving forward: everything that lands on him goes in one
 | 3 | Tabs, Settings, sidebar, permissions, goals outside the 12 Week Year | Done |
 | 4 | Sources, the Wiki, the live-preview editor, streams, test-site clean-up | Done |
 | 5 | Count rule, Someday, Reset, Today with Open and Next, AI client with spend cap, Ask from any screen, insights | Done |
+| Pre-step 6 | Frappe's official conventions, scan, audit and review | Next |
 
 ## The target design in one paragraph
 
 Four places (Today, Inbox, Plan, Library), four things (Goal, Task, Note, Capture), and a lens at the top of the sidebar that narrows everything to a space and an area. Ask on every screen. Plan holds the rhythms (Week, Month, 12 Weeks, Year) and the lists (Goals, Tasks, Someday). The weekly review runs score, Reset, then goal work for the coming week, which becomes tasks and private calendar slots. An Outbox shows what left the plate (Done, Delegated, Parked, Discarded). All model calls go through one gateway that tracks cost against a $30 monthly cap. People and agents are members of Life OS with a sponsor, scope and rights; agents are created from Life OS and run as Hermes profiles.
 
 ## The sets
+
+### Pre-step 6: Frappe conventions
+
+Bring the app up to Frappe's official conventions before restructuring it (brief: `PRE_STEP_6.md`).
+
+- Fetch Frappe's official agent skills (`frappe-app-dev`, `frappe-code-review`, `code-style`, `ui-design`, `deep-app-audit`) into `.claude/skills/` at the start of every run; `CLAUDE.md` requires them from now on.
+- A scan tool with Frappe's semgrep rules, run at the end of every set. Today's scan: 732 findings.
+- Fix them: declared HTTP methods and type hints on every public method, parameterised SQL, no stray commits, no user switching in live code, safe file paths, translations.
+- Run Frappe's deep app audit and code review over the whole app and fix what they confirm.
+- No screen or feature changes.
 
 ### Set 6: Simplify
 

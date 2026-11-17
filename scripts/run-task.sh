@@ -12,6 +12,7 @@ say() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG_DIR/build.log"; }
 command -v claude >/dev/null || { echo "Claude Code is not installed."; exit 1; }
 docker info >/dev/null 2>&1 || { echo "Docker is not running. Open Docker Desktop first."; exit 1; }
 if command -v caffeinate >/dev/null; then caffeinate -i -w $$ & fi
+./scripts/get-frappe-skills.sh || echo "Could not fetch Frappe skills; continuing with any copy already in .claude/skills."
 PROMPT="Nobody is watching this run. Do not ask questions and do not wait for input.
 
 Read CLAUDE.md, STATUS.md and DECISIONS.md. Start the local stack as STATUS.md describes and check that the site and the tests work. Then carry out every item in $TASK, in order, following its working rules. If part of it is already done, check it and continue with the rest. When everything in it is finished and its checks pass, create an empty file named $DONE and commit. If you cannot go further, write the reason to BUILD_BLOCKED, commit, and stop.
