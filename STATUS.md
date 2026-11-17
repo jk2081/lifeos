@@ -1,6 +1,6 @@
 # Status
 
-Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** UX fixes sets 1 to 5 are done. The summary at the end says what works, what is stubbed, what is untested, and how to install.
+Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** UX fixes sets 1 to 5 are done, and so is pre-step 6 (Frappe conventions). The summary at the end says what works, what is stubbed, what is untested, and how to install.
 
 ## Milestones
 
@@ -196,6 +196,37 @@ Everything in `UX_FIXES_5.md` is done: Today around what is open and what is nex
 - **Not tested against the real service:** the Anthropic API. Every call in tests and acceptance went to the fakes. Realtime streaming was not available on the bench; the screen polls.
 - Deviations are in `DECISIONS.md` under "UX fixes, set 5".
 
+## Pre-step 6: Frappe conventions
+
+Brought up to Frappe's official skills and scanning rules, with no change on any screen. Full write-up: `docs/conformance/README.md`; behaviour that changed: `DECISIONS.md`, "Pre-step 6".
+
+- **Scan:** `tools/scan.sh` (Frappe's semgrep rules, pinned, run inside `lifeos-bench`) went from 732 findings to 0. 90 inline `nosemgrep` exceptions remain, each with a reason, listed in `docs/conformance/exceptions.md`. The acceptance run ends with the scan (C.1).
+- **Whitelisted methods:** all 171 declare GET (78) or POST (93) and hint every argument. The front end, the acceptance script and the fake agent send reads as GET (`frontend/src/lib/getMethods.json`, from `scripts/http-methods.py`). On the acceptance site, GETs run read-only, so a read that writes fails the run.
+- **Fixed on the way:**
+  - SQL: none was injectable; three queries were rewritten and identifiers are checked.
+  - Commits: Ask commits once. Chat import and the nightly insights use savepoints, which also fixed an import that could lose up to 24 conversations.
+  - User switching: the nightly insights and the chat import check records for the user they work for, without switching.
+  - Files: originals are read only from inside the site's files folders.
+  - Strings: four translated with `_()`.
+- **Deep audit** (the skill's checklists by hand; its script cannot reach the Docker bench): fixed Reset's undo, which trusted the browser; agents listing the sources of closed Vault documents and seeing deleted ones in the trash; and accepted tasks that could not be deleted. The other findings are in `docs/conformance/audit.md`.
+- **Review** (`frappe-code-review`): fixed N+1 queries in Settings, Goals and the graph, Vault titles on an agent's graph, names sent as dicts, and missing indexes. Style points are in `docs/conformance/review.md`.
+- **Today was slow.** Set 5's Open band had made Today take 1.5 s on the set 4 load. Two indexes and a count-only `tasks.total` brought it to about 80 ms. The indexes come with the patch `v6.conformance_indexes`.
+- **Load test** (`bench execute lifeos.loadtest.run_sources`, the set 4 load: 122,045 index rows, 35,000 sources, 2,000 wiki pages; medians of five, warm, after a rebuild of the full-text index, see `DECISIONS.md`):
+
+  | Read | Median | Set 4 |
+  | --- | --- | --- |
+  | Today | 82 ms | 12 ms (before set 5's Open band; 1,537 ms at the start of this step) |
+  | Timeline, a later page, an area page | 8, 11, 52 ms | 8, 51 ms |
+  | Search, a common word, a rare word, all spaces | 8, 1, 12 ms | 40 to 61 ms |
+  | Sources: first page, Photos, Chats | 20, 18, 15 ms | 19, 17, 15 ms |
+  | Full-text search, wiki search | 23, 19 ms | 45, 45 ms |
+  | Wiki Pages, Wiki Changes | 3, 9 ms | 3, 9 ms |
+
+- **Checks:**
+  - Unit tests: 263 run, 262 pass and 1 is skipped (the live AI test). New: `test_pre6_conventions` (methods, hints, the GET list) and `test_pre6_fixes`. `test_pre6_fixes` covers: Ask's progress and failures; chat import savepoints and user; insights for a user without switching; `../` paths and links; every permission hook over every user and permission type; the audit and review fixes.
+  - `node tools/acceptance.mjs`: 86 of 86 at 1440 px and 390 px, the fake agent end to end, and the scan.
+  - `tools/scan.sh`: 0 findings.
+
 ## Summary
 
 ### What works
@@ -258,6 +289,8 @@ docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.loca
 node tools/acceptance.mjs            # the acceptance list, on its own site acceptance.localhost (http://localhost:19000), rebuilt from a snapshot first
 scripts/acceptance-site.sh --new     # rebuild that site and its snapshot from scratch (after a schema change); also starts its server and a worker
 node tools/screens.mjs               # screenshots of every screen, both widths and themes, with overflow, error and contrast checks
+./tools/scan.sh                      # Frappe's semgrep rules (pre-step 6): must report 0; run at the end of every set (acceptance's C.1 runs it too)
+python3 scripts/http-methods.py --check && python3 tools/scan_exceptions.py --check   # the GET list and the exceptions list are current
 ```
 
 The test site is `lifeos.localhost`, at http://localhost:18000/life. The three test users are `owner@lifeos.test`, `family@lifeos.test` and `hermes@lifeos.test`; their password is in the git-ignored `.env`. The stack is three containers (`lifeos-bench`, `lifeos-db`, `lifeos-redis`) with volumes and a network that carry the same prefix. To remove it all:

@@ -89,7 +89,7 @@ node tools/acceptance.mjs                         # walks the acceptance list of
 
 ## API
 
-Every method is whitelisted under `lifeos.api`, checks space membership before it reads or writes, and is called as `/api/method/lifeos.api.<module>.<method>` or through the MCP tool `call_method`. List methods take `start` and `page_length` and return at most 100 rows (the Library tree is the one exception, see `DECISIONS.md`). Methods that decide proposals, delete, or change spaces and settings are refused for `Life Agent`.
+Every method is whitelisted under `lifeos.api`, checks space membership before it reads or writes, and is called as `/api/method/lifeos.api.<module>.<method>` or through the MCP tool `call_method`. List methods take `start` and `page_length` and return at most 100 rows (the Library tree is the one exception, see `DECISIONS.md`). Methods that decide proposals, delete, or change spaces and settings are refused for `Life Agent`. Each method answers one HTTP method: reads are GET (arguments in the query string, lists and objects as JSON) and everything that changes something is POST; the list of GET methods is `frontend/src/lib/getMethods.json`. Over MCP, `call_method` picks the right one.
 
 **`lifeos.api.archive`**
 
