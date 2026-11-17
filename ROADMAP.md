@@ -50,6 +50,11 @@ Restructure the app around the four places. No AI work.
 - Old Inbox items: a setting. Default: after 7 days the assistant suggests a decision for each item, confirmed in batches. Options: auto-discard or auto-park after 14 days, with undo.
 - Weekly review in Plan > Week: score, then Reset, then goal work. For each goal: next action, when, who, what is needed. Each becomes a task; if "who" is someone else, it is Delegated. Working hours as a setting.
 
+- Goals say "Done when…": either a finish line (milestone goal) or a number (number goal: what is measured, start, target, current value). Every goal has one or the other; the assistant suggests which from the title, and a frequency suggests a habit instead.
+- A goal can point to the longer goal it serves (for example a 12-week drainage goal serving a multi-year yield goal); each goal shows the goal it serves and the goals that serve it.
+- Lead measures stay the goal's weekly actions: a tick, or an optional count per week ("4 times a week", ticked one at a time), each tick counting towards the week score.
+- Current values of number goals: the assistant pre-fills a value it finds in captures, showing the source; the weekly review asks for confirmation, or for a value when nothing was found. Goals show the result against its target beside task completion.
+
 ### Set 8: Calendar
 
 - Google Calendar, two-way, per person, through Frappe's integration.
