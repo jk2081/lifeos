@@ -142,11 +142,11 @@ def list_clause(space, status="open", area=None, project=None, tag=None, priorit
 	return clause + extra, values, extra
 
 
-def total(space, status="open", due=None, filters=None):
+def total(space, status="open", due=None, filters=None, area=None):
 	"""The `total` that `list` answers for these arguments, without its rows or tab counts: the counts on Today, Reset and
 	the sidebar (lifeos/counts.py) use it, and the same WHERE keeps the number and the list in step."""
 	space = permissions.resolve_space(space)
-	clause, values, _extra = list_clause(space, status, due=due, filters=filters)
+	clause, values, _extra = list_clause(space, status, area=area, due=due, filters=filters)
 	# nosemgrep: frappe-sql-format-injection -- where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters
 	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 

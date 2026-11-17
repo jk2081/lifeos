@@ -6,8 +6,15 @@
       </div>
 
       <main class="flex min-w-0 flex-1 flex-col pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0" data-main>
+        <!-- phone: the lens is the title at the top of every screen; tapping it opens the picker as a sheet (UX fixes, set 6) -->
+        <div class="sticky top-0 z-20 flex items-center border-b border-outline-gray-1 bg-surface-base px-2 py-1 md:hidden" data-lens-bar>
+          <Button class="min-w-0 !justify-start" variant="ghost" size="md" :label="lensLabel" icon-right="lucide-chevron-down" aria-haspopup="dialog" data-lens-title
+            @click="lensOpen = true">
+            <template #prefix><span class="size-2 shrink-0 rounded-full" :class="lensArea ? dotClass(lensArea) : 'bg-surface-gray-5'" aria-hidden="true" /></template>
+          </Button>
+        </div>
         <RouterView v-slot="{ Component }">
-          <component :is="Component" :key="store.space + ':' + route.path" />
+          <component :is="Component" :key="store.space + ':' + store.lensArea + ':' + route.path" />
         </RouterView>
       </main>
 
@@ -36,7 +43,7 @@
           </div>
           <div>
             <div class="mb-2 text-sm-medium text-ink-gray-6">Space</div>
-            <TabButtons :model-value="store.space" :options="store.spaces.map((s) => ({ label: s.name, value: s.name }))" @update:model-value="(v) => (store.space = v)" />
+            <TabButtons :model-value="store.space" :options="store.spaces.map((s) => ({ label: s.name, value: s.name }))" @update:model-value="(v) => setLens({ space: v })" />
           </div>
           <section v-for="g in GROUPS" :key="g.key" class="flex flex-col gap-0.5" :data-more-group="g.key">
             <RouterLink v-if="g.key === 'areas'" to="/areas" class="mb-1 rounded-4 text-sm-medium text-ink-gray-6 hover:underline focus-visible:focus-ring" @click="moreOpen = false">Areas</RouterLink>
@@ -69,6 +76,7 @@
 
       <NewRecord v-if="store.newKind === 'idea'" :model-value="true" title="New idea" action="Park on Someday" :fields="ideaFields" :save="createIdea"
         @update:model-value="(v) => !v && (store.newKind = '')" />
+      <LensSheet v-model:open="lensOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
       <RecordPane />
       <AskPanel />
       <SearchPalette v-model:open="store.searchOpen" />
@@ -110,12 +118,15 @@ import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'
 import { NAV, SETTINGS } from './lib/nav'
 import { boot, canWrite, store } from './lib/store'
+import { dotClass, initLens, lensArea, lensLabel, setLens } from './lib/lens'
+import LensSheet from './components/lens/LensSheet.vue'
 import { errorText } from './lib/api'
 import { stepTab } from './lib/tabs'
 
 const route = useRoute()
 const router = useRouter()
 const moreOpen = ref(false)
+const lensOpen = ref(false)
 const shortcutsOpen = ref(false)
 const bootError = ref('')
 const TABS = NAV.filter((n) => ['Today', 'Inbox', 'Tasks', 'Journal'].includes(n.label))
@@ -198,7 +209,7 @@ function onKey(e) {
 onMounted(async () => {
   window.addEventListener('keydown', onKey)
   try {
-    await boot()
+    await boot({ beforeReady: initLens })
   } catch (e) {
     bootError.value = errorText(e) || 'Could not load Life OS.'
   }

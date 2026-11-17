@@ -8,7 +8,7 @@ from frappe.utils import add_days, get_datetime, getdate, today
 
 from lifeos import calendar_data as data
 from lifeos import permissions
-from lifeos.api.utils import flag
+from lifeos.api.utils import flag, in_area, lens_area
 
 MAX_RANGE_DAYS = 100
 
@@ -29,9 +29,11 @@ def google_status():
 
 
 @frappe.whitelist(methods=["GET"])
-def get(space: str | None = None, from_date: str | None = None, to_date: str | None = None):
-	"""Everything on the calendar between two dates (at most 100 days): events, important dates, tasks due and documents expiring."""
+def get(space: str | None = None, from_date: str | None = None, to_date: str | None = None, area: str | None = None):
+	"""Everything on the calendar between two dates (at most 100 days): events, important dates, tasks due and documents expiring.
+	`area` is the lens: tasks and documents keep to the area; events and important dates have no area and always show."""
 	space = permissions.resolve_space(space)
+	area = lens_area(area)
 	start = getdate(from_date or today())
 	end = getdate(to_date) if to_date else add_days(start, 31)
 	if end < start:
@@ -39,10 +41,19 @@ def get(space: str | None = None, from_date: str | None = None, to_date: str | N
 	if (end - start).days > MAX_RANGE_DAYS:
 		end = add_days(start, MAX_RANGE_DAYS)
 	items = (data.events_between(space, start, end) + data.important_dates_between(space, start, end)
-		+ data.task_dues_between(space, start, end) + data.vault_expiries_between(space, start, end))
+		+ lens_items(space, area, data.task_dues_between(space, start, end) + data.vault_expiries_between(space, start, end)))
 	items.sort(key=lambda i: (i["date"], 0 if i.get("all_day") else 1, i.get("start") or "", i["title"]))
 	return {"space": space, "from_date": str(start), "to_date": str(end), "today": today(), "items": items,
 		"cycles": data.cycles_between(space, start, end), "google": google_status()}
+
+
+def lens_items(space, area, items):
+	"""Calendar items of tasks and documents, narrowed to the lens."""
+	if not area:
+		return items
+	keep = {src: in_area(space, area, dt, [i["name"] for i in items if i.get("source") == src])
+		for src, dt in (("task", "Life Task"), ("vault", "Life Vault Document"))}
+	return [i for i in items if i.get("name") in keep.get(i.get("source"), ())]
 
 
 def year_entries(space, year):

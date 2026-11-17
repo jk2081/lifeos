@@ -5,7 +5,7 @@ import frappe
 
 from lifeos import permissions
 from lifeos.api.timeline import decorate
-from lifeos.api.utils import flag
+from lifeos.api.utils import area_filter, flag, lens_area
 
 WORD = re.compile(r"[\w][\w'’-]*", re.UNICODE)
 FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, project, is_archived, status, record_owner, also_in_csv, space, search_text"
@@ -25,9 +25,10 @@ def _snippet(text, words, width=140):
 
 
 @frappe.whitelist(methods=["GET"])
-def query(text: str, limit: int | None = 20, space: str | None = None, include_archived: bool | int | None = 0):
+def query(text: str, limit: int | None = 20, space: str | None = None, include_archived: bool | int | None = 0, area: str | None = None):
 	"""Search notes, tasks, inbox items (including transcripts), chat logs, journal pages and vault titles.
-	Only records in spaces the user belongs to are returned. Archived records are left out unless asked for."""
+	Only records in spaces the user belongs to are returned. Archived records are left out unless asked for.
+	`area` (the lens, with `space`) keeps records filed under the area, a sub-area, or listing one in "also in"."""
 	permissions.require_login()
 	limit = min(max(int(limit or 20), 1), 100)
 	if space:
@@ -46,6 +47,9 @@ def query(text: str, limit: int | None = 20, space: str | None = None, include_a
 	if not flag(include_archived):
 		where += " and is_archived = 0"
 	values = {"spaces": spaces, "limit": limit, "closed": closed or [""]}
+	area = lens_area(area)
+	if area and len(spaces) == 1:
+		where += " and " + area_filter(spaces[0], area, "area", values, also_in="index")
 	rows = []
 	long_words = [w for w in words if len(w) >= 3]
 	if long_words:

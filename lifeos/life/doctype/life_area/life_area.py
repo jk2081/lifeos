@@ -20,3 +20,15 @@ class LifeArea(Document):
 				frappe.throw(_("Areas cannot form a loop."))
 			seen.add(parent)
 			parent = frappe.db.get_value("Life Area", parent, "parent_area")
+		if not self.colour:
+			self.colour = self.default_colour()
+
+	def default_colour(self):
+		"""A sub-area takes its parent's colour; a top-level area the next colour its space has used least."""
+		from lifeos.patches.v7.lens_areas import COLOURS
+
+		if self.parent_area:
+			return frappe.db.get_value("Life Area", self.parent_area, "colour") or "gray"
+		used = frappe.get_all("Life Area", filters={"space": self.space, "parent_area": ("is", "not set"), "name": ("!=", self.name or "")},
+			pluck="colour")
+		return min(COLOURS, key=lambda c: (used.count(c), COLOURS.index(c)))

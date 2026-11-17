@@ -83,7 +83,7 @@ function draw() {
   cy.on('dbltap', 'node', (evt) => router.push(evt.target.data('route')))
 }
 async function load() {
-  const res = await tryCall(() => api('graph.get', { space: store.space, center: center.value || undefined, collection: route.query.collection || undefined }))
+  const res = await tryCall(() => api('graph.get', { space: store.space, center: center.value || undefined, collection: route.query.collection || undefined, area: store.lensArea || undefined }))
   if (!res) return
   d.value = res
   picked.value = null

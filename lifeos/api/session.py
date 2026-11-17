@@ -32,15 +32,17 @@ def boot():
 
 
 @frappe.whitelist(methods=["GET"])
-def counts(space: str | None = None):
-	"""Small numbers for the sidebar."""
+def counts(space: str | None = None, area: str | None = None):
+	"""Small numbers for the sidebar, under the lens (`area`)."""
 	space = permissions.resolve_space(space)
+	from lifeos.api.utils import lens_area
+
 	from lifeos.api import tasks as task_api
 
 	from lifeos import counts as count_rules
 
 	# every number comes with the list it opens (UX fixes, set 5): Inbox items to review, Tasks due today or overdue
 	# (Open, Doing and Waiting), the Someday list, and the stuck count behind Reset's amber dot
-	c = count_rules.sidebar(space)
+	c = count_rules.sidebar(space, lens_area(area))
 	return {"to_review": c["inbox"]["n"], "due": c["tasks"]["n"], "doors": {k: c[k] for k in ("inbox", "tasks", "someday", "stuck")},
 		"over_limit": c["over_limit"]}

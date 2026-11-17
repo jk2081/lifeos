@@ -40,7 +40,7 @@ def list(space: str | None = None, area: str | None = None, start: int = 0, page
 	start, page_length = page(start, page_length)
 	where, values = "and is_archived = 1 and kind != 'Task Done'", {}
 	if area:
-		where += " and " + area_filter(space, area, "area", values)
+		where += " and " + area_filter(space, area, "area", values, also_in="index")
 	if reason or archived_from or archived_to:
 		# the reason and the day live on the records themselves, so each type is checked in its own table
 		parts = []

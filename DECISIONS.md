@@ -350,3 +350,16 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **New indexes** (in `index.ensure_indexes`, and the patch `v6.conformance_indexes` for existing sites): Life Index (space, kind, collection, is_archived, last_opened_on, modified); Life Inbox Item (space, is_archived, status, received_on); Life Task (goal, status); Life Proposal and Life Chat Log (owner, creation). No field changed.
 - **An agent's graph leaves out Vault documents while the Vault is closed to it**, also when a link points at one.
 - **The load test's full-text timings depend on the index being compact.** On this bench, many seed-and-remove cycles had bloated InnoDB's full-text index until a bare `MATCH` took 135 ms. `OPTIMIZE TABLE` (a rebuild) brought it back to under 10 ms. A real site does not delete 100,000 rows at a time; the load test's numbers in STATUS were taken after a rebuild.
+
+## Set 6: Simplify
+
+### 1. The lens
+
+- **The lens is `space=` and `area=` on every URL.** A router guard (`frontend/src/lib/lens.js`) adds them to any navigation that has none, so links built anywhere keep the lens; a URL that names them (a copied link, Back) sets it. The lens is remembered per user as the view state `lens` with no space (`{space, area}`), so it follows the user from phone to laptop. Changing the space starts on All of life.
+- **`area=` now always means the lens.** Every list already had an `area=` filter; on a list the lens's area is that filter, and the area control leaves the list's filter bar, its remembered view and its Clear. Filtering a list to records with no area ("Area: none") is therefore no longer offered; the lens has no "no area" choice. A remembered view saved before set 6 with an area in it is restored without the area.
+- **"Also in" counts everywhere.** `area_filter` takes the "also in" table of tasks, notes, inbox items, chats, journal pages and Vault documents, and of Life Index rows (sources, notes, timeline, archive, search). Before, only tasks did. The Timeline's area filter now includes sub-areas, like every other list.
+- **What has no area always shows.** Calendar events and important dates have no area, so the lens does not hide them on Today, the week and the month. A month goal or habit with no area also shows under every area. The 12 Week Year grid lists only the area's goals; the week scores and the average stay the whole cycle's, since a score is the cycle's measure.
+- **The graph under an area** starts from the area's notes and goals; people and Vault documents join it only through links.
+- **Reset is not narrowed.** It is a full screen for clearing the whole backlog, reached from Plan > Week and Today; the brief lists the places that narrow and Reset is not one.
+- **Area colours and pins are fields on Life Area** (`colour`, a frappe-ui colour name, and `is_pinned`). A patch gives every area a colour and pins the top-level areas of each space where nothing is pinned; a new area takes its parent's colour or the colour its space uses least. Pinned areas are listed in the areas' own order (Settings > Areas orders them), not in an order of their own.
+- **Pages reload under a new lens.** The page component is keyed on the space, the lens's area and the path, so a change of lens mounts the screen again instead of every screen watching the lens.

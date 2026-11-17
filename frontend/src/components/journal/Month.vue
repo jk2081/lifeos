@@ -91,7 +91,7 @@ const doneCount = computed(() => d.value.plan.goals.filter((g) => g.status === '
 const range = (lo, hi) => (lo == null ? '—' : lo === hi ? String(lo) : `${lo}-${hi}`)
 
 async function load(create = false) {
-  const res = await tryCall(() => api('journal.month', { space: store.space, year: year.value, month: month.value, create: create ? 1 : 0 }))
+  const res = await tryCall(() => api('journal.month', { space: store.space, year: year.value, month: month.value, create: create ? 1 : 0, area: store.lensArea || undefined }))
   if (res) d.value = res
   emit('sub', `${MONTHS[month.value - 1]} ${year.value}`)
 }

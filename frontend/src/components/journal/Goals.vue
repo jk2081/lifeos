@@ -96,7 +96,7 @@ function goalNote(g, c) {
   return c.status === 'Closed' ? g.result_note : ''
 }
 async function load() {
-  const res = await tryCall(() => api('journal.goals', { space: store.space, area: area.value || undefined }))
+  const res = await tryCall(() => api('journal.goals', { space: store.space, area: area.value || store.lensArea || undefined }))
   if (res) {
     d.value = res
     if (!area.value) all.value = res

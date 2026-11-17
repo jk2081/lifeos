@@ -222,7 +222,7 @@ async function reload() {
     if (res) yearData.value = res
     if (!google.value) google.value = (await tryCall(() => api('calendar.get', { space: store.space, from_date: store.today, to_date: store.today })))?.google
   } else {
-    const res = await tryCall(() => api('calendar.get', { space: store.space, from_date: range.value[0], to_date: range.value[1] }))
+    const res = await tryCall(() => api('calendar.get', { space: store.space, from_date: range.value[0], to_date: range.value[1], area: store.lensArea || undefined }))
     if (res) {
       data.value = res
       google.value = res.google

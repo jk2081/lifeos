@@ -150,7 +150,7 @@ watch(nodes, (list_) => {
 }, { immediate: true })
 
 async function loadTree() {
-  const res = await tryCall(() => api('library.tree', { space: store.space }))
+  const res = await tryCall(() => api('library.tree', { space: store.space, area: store.lensArea || undefined }))
   if (res) {
     notes.value = res.notes
     areas.value = res.areas

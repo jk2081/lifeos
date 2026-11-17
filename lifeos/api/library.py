@@ -5,14 +5,15 @@ import frappe
 from frappe import _
 
 from lifeos import links, permissions
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise
+from lifeos.api.utils import area_filter, extra_columns, flag, in_area, lens_area, names_map, page, parse, std_clause, std_filters, std_order, summarise
 from lifeos.api.utils import order_by as sort_order
 
 
 @frappe.whitelist(methods=["GET"])
-def tree(space: str | None = None, include_archived: bool | int | None = 0, collection: str | None = "My notes"):
+def tree(space: str | None = None, include_archived: bool | int | None = 0, collection: str | None = "My notes", area: str | None = None):
 	"""Every note of a space with what the tree needs: title, parent, area and project. At most 100 per call would hide notes,
-	so the tree returns light rows only and is capped at 2,000. collection: My notes (default), Wiki, or "all"."""
+	so the tree returns light rows only and is capped at 2,000. collection: My notes (default), Wiki, or "all".
+	`area` is the lens: notes of the area, its sub-areas or listing one in "also in"."""
 	space = permissions.resolve_space(space)
 	filters = {"space": space}
 	if collection and collection != "all":
@@ -21,6 +22,10 @@ def tree(space: str | None = None, include_archived: bool | int | None = 0, coll
 		filters["is_archived"] = 0
 	notes = frappe.get_all("Life Note", filters=filters, fields=["name", "title", "parent_note", "area", "project", "modified", "is_archived"],
 		order_by="title asc", limit=2000)
+	area = lens_area(area)
+	if area:
+		keep = in_area(space, area, "Life Note", [n.name for n in notes])
+		notes = [n for n in notes if n.name in keep]
 	areas = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "area_name", "parent_area"], order_by="sort_order, area_name", limit=1000)
 	projects = names_map("Life Project", [n.project for n in notes], "title")
 	for n in notes:
@@ -48,7 +53,7 @@ def list(space: str | None = None, area: str | None = None, project: str | None 
 	if not flag(include_archived):
 		where.append("x.is_archived = 0")
 	if area:
-		where.append(area_filter(space, area, "x.area", values))
+		where.append(area_filter(space, area, "x.area", values, also_in="index"))
 	if project:
 		where.append("x.project = %(project)s")
 		values["project"] = "" if project == "none" else project

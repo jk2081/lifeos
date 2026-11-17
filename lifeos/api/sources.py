@@ -70,7 +70,7 @@ def _where(space, tab=None, area=None, project=None, from_date=None, to_date=Non
 	if not int(include_archived or 0):
 		where.append("x.is_archived = 0")
 	if area:
-		where.append(area_filter(space, area, "x.area", values))
+		where.append(area_filter(space, area, "x.area", values, also_in="index"))
 	if project:
 		where.append("x.project = %(project)s")
 		values["project"] = "" if project == "none" else project

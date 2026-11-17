@@ -49,15 +49,15 @@ export function whenViewsLoaded(fn) {
   if (views.loaded) fn()
   else waiting.push(fn)
 }
-export const savedView = (screen) => views.map[key(screen)] || null
+// `space` '' keeps a state for the user across spaces (the lens)
+export const savedView = (screen, space = store.space) => views.map[key(screen, space)] || null
 
-export function saveView(screen, state) {
+export function saveView(screen, state, space = store.space) {
   if (store.isAgent) return
-  const k = key(screen)
+  const k = key(screen, space)
   if (JSON.stringify(views.map[k] || null) === JSON.stringify(state)) return
   views.map[k] = state
   writeLocal()
-  const space = store.space
   clearTimeout(timers[k])
   pending[k] = { screen, space, state }
   timers[k] = setTimeout(() => {

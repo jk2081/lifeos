@@ -5,19 +5,31 @@ from frappe.utils import add_days, getdate, today
 from lifeos import calendar_data, journal, permissions
 from lifeos.api import tasks as task_api
 from lifeos.api import vault as vault_api
-from lifeos.api.utils import user_names
+from lifeos.api.utils import area_filter, descendants, in_area, lens_area, user_names
 
 GROUP_ROWS = 7
 
 
-def week_actions(cycle, week):
-	"""The actions planned in a week of a cycle, with the ticks they have, for the This week card on Today."""
+def task_lens(space, area):
+	"""The lens as SQL on tasks (alias t): an " and ..." fragment and its values, or nothing for All of life."""
+	if not area:
+		return "", {}
+	values = {}
+	return f" and {area_filter(space, area, 't.area', values, also_in='Life Task')} ", values
+
+
+def week_actions(cycle, week, space=None, area=None):
+	"""The actions planned in a week of a cycle, with the ticks they have, for the This week card on Today. Under the lens,
+	only the actions of goals in the area."""
 	doc = frappe.get_cached_doc("Life Cycle", cycle.name)
 	actions, ticks = journal._actions(cycle.name), journal._ticks(cycle.name)
-	goals = dict(frappe.get_all("Life Goal", filters={"cycle": cycle.name}, fields=["name", "title"], as_list=True))
+	goal_filter = {"cycle": cycle.name}
+	if area:
+		goal_filter["area"] = ("in", descendants(space, area))
+	goals = dict(frappe.get_all("Life Goal", filters=goal_filter, fields=["name", "title"], as_list=True))
 	out = []
 	for a in actions:
-		if not journal.planned_in_week(doc, a, week):
+		if not journal.planned_in_week(doc, a, week) or (area and a.goal not in goals):
 			continue
 		out.append({"name": a.name, "title": a.title, "goal": a.goal, "goal_title": goals.get(a.goal), "status": a.status,
 			"per_week": int(a.per_week or 1), "count": ticks.get(a.name, {}).get(week, 0)})
@@ -25,26 +37,36 @@ def week_actions(cycle, week):
 
 
 @frappe.whitelist(methods=["GET"])
-def get(space: str | None = None):
+def get(space: str | None = None, area: str | None = None):
 	"""Tasks due or overdue, today's events, habits with today's state, items to review, the current week of the active cycle,
-	the open loops count and expiring documents."""
+	the open loops count and expiring documents. `area` is the lens (UX fixes, set 6): the band, Next and the rail keep to
+	the area and its sub-areas. Events and important dates have no area, so they always show."""
 	space = permissions.resolve_space(space)
+	area = lens_area(area)
 	now = getdate(today())
+	lens, lens_values = task_lens(space, area)
 
-	open_due = "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date "
-	due = task_api.query(space, open_due + "<= %(today)s", {"today": now}, None, 0, 30)
+	open_due = lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date "
+	due = task_api.query(space, open_due + "<= %(today)s", {"today": now, **lens_values}, None, 0, 30)
 	# the screen shows two groups of at most GROUP_ROWS: due today first, then overdue (oldest first)
-	due_today = task_api.query(space, open_due + "= %(today)s", {"today": now}, None, 0, GROUP_ROWS)
-	overdue_rows = task_api.query(space, open_due + "< %(today)s", {"today": now}, None, 0, GROUP_ROWS)
+	due_today = task_api.query(space, open_due + "= %(today)s", {"today": now, **lens_values}, None, 0, GROUP_ROWS)
+	overdue_rows = task_api.query(space, open_due + "< %(today)s", {"today": now, **lens_values}, None, 0, GROUP_ROWS)
+	# nosemgrep: frappe-sql-format-injection -- `lens` is area_filter's fixed SQL; values are parameters
 	oldest = frappe.db.sql("select min(t.due_date) from `tabLife Task` t where t.space=%(space)s and t.status in ('Open', 'Doing', 'Waiting') "
-		"and t.is_archived = 0 and t.due_date < %(today)s",
-		{"space": space, "today": now})[0][0]
+		f"and t.is_archived = 0 and t.due_date < %(today)s {lens}",
+		{"space": space, "today": now, **lens_values})[0][0]
 	# the numbers are counted with the filters their links lead to, not from the rows shown
-	due_count = task_api.count(space, due="today,overdue")
-	today_count = task_api.count(space, due="today")
-	overdue = task_api.count(space, due="overdue")
+	due_count = task_api.count(space, due="today,overdue", area=area)
+	today_count = task_api.count(space, due="today", area=area)
+	overdue = task_api.count(space, due="overdue", area=area)
 
-	review_items = frappe.get_all("Life Inbox Item", filters={"space": space, "status": "To Review", "is_archived": 0},
+	from lifeos.api import inbox as inbox_api
+
+	inbox_lens = inbox_api.list(space=space, status='["To Review"]', area=area, page_length=5) if area else None
+	review_filter = {"space": space, "status": "To Review", "is_archived": 0}
+	if inbox_lens is not None:
+		review_filter["name"] = ("in", [r.name for r in inbox_lens["items"]] or ["-"])
+	review_items = frappe.get_all("Life Inbox Item", filters=review_filter,
 		fields=["name", "title", "source_type", "received_on", "owner", "claimed_by", "transcript_md", "summary_md"], order_by="received_on desc", limit=5)
 	pending = {}
 	if review_items:
@@ -63,7 +85,7 @@ def get(space: str | None = None):
 		r.pop("summary_md", None)
 		r["processed_by"] = users.get(r.claimed_by)
 		r["received_on"] = str(r.received_on)[:19]
-	to_review = frappe.db.count("Life Inbox Item", {"space": space, "status": "To Review", "is_archived": 0})
+	to_review = inbox_lens["total"] if inbox_lens is not None else frappe.db.count("Life Inbox Item", {"space": space, "status": "To Review", "is_archived": 0})
 	proposals_waiting = frappe.db.sql(
 		"select count(*) from `tabLife Proposal` p join `tabLife Inbox Item` i on i.name = p.inbox_item "
 		"where p.space=%s and p.status='Pending' and i.status='To Review' and i.is_archived=0", space)[0][0]
@@ -81,13 +103,15 @@ def get(space: str | None = None):
 		if 1 <= week <= journal.WEEKS:
 			score = journal.week_score(cycle.name, week)
 			cycle_out = {"name": cycle.name, "title": cycle.title, "week": week, "weeks": journal.WEEKS, "score": score["percent"],
-				"done": score["done"], "planned": score["planned"], "actions": week_actions(cycle, week)}
+				"done": score["done"], "planned": score["planned"], "actions": week_actions(cycle, week, space, area)}
 		else:
 			cycle_out = {"name": cycle.name, "title": cycle.title, "week": None, "weeks": journal.WEEKS, "ended": week > journal.WEEKS,
 				"start_date": str(cycle.start_date)}
 
 	coming = []
-	for d in calendar_data.expiring_documents(space, now):
+	docs = calendar_data.expiring_documents(space, now)
+	keep = in_area(space, area, "Life Vault Document", [d["name"] for d in docs])
+	for d in (d for d in docs if d["name"] in keep):
 		coming.append({"kind": "vault", **d})
 	for d in sorted(calendar_data.important_dates_between(space, now, add_days(now, 14)), key=lambda x: x["date"]):
 		coming.append({"kind": "important", "name": d["name"], "title": d["label"], "date": d["date"], "date_kind": d["kind"],
@@ -95,9 +119,9 @@ def get(space: str | None = None):
 
 	from lifeos import counts
 
-	band = counts.open_band(space)
-	nxt = next_list(space, now, cycle_out, events)
-	rail = rail_of(space, now, events)
+	band = counts.open_band(space, area)
+	nxt = next_list(space, now, cycle_out, events, area)
+	rail = rail_of(space, now, events, area)
 	return {
 		"band": band, "next": nxt, "rail": rail, "days_left": 6 - now.weekday(),
 		"date": str(now), "space": space,
@@ -106,7 +130,7 @@ def get(space: str | None = None):
 		"tasks": {"items": due, "due": due_count, "overdue": overdue, "today": due_today, "today_count": today_count,
 			"overdue_items": overdue_rows, "oldest_overdue": str(oldest) if oldest else None, "group_rows": GROUP_ROWS},
 		"events": events, "habits": habits,
-		"open_loops": task_api.open_loops_count(space),
+		"open_loops": task_api.open_loops_count(space), "area": area,
 		"coming_up": coming,
 		"vault_soon": vault_api.expiry_counts(space)["soon"],
 	}
@@ -117,18 +141,19 @@ NEXT_ROWS = 8  # rows shown before "N more"
 GROUP_MAX = 30
 
 
-def next_list(space, now, cycle, events):
+def next_list(space, now, cycle, events, area=None):
 	"""One list in a fixed order: Overdue, Today (events at their times and tasks due today), 12 Week Year this week
 	(planned actions not yet ticked), Needs a decision (actionable insights). Someday items never appear."""
 	from lifeos import counts
 	from lifeos.api import insights as insight_api
 
-	open_due = "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date "
-	overdue = task_api.query(space, open_due + "< %(today)s", {"today": now}, "t.due_date asc, t.creation asc", 0, GROUP_MAX)
+	lens, lens_values = task_lens(space, area)
+	open_due = lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date "
+	overdue = task_api.query(space, open_due + "< %(today)s", {"today": now, **lens_values}, "t.due_date asc, t.creation asc", 0, GROUP_MAX)
 	for t in overdue:
 		t["why"] = "Overdue"
 		t["lead"] = f"{(now - getdate(t.due_date)).days} day{'s' if (now - getdate(t.due_date)).days != 1 else ''}"
-	due_today = task_api.query(space, open_due + "= %(today)s", {"today": now}, None, 0, GROUP_MAX)
+	due_today = task_api.query(space, open_due + "= %(today)s", {"today": now, **lens_values}, None, 0, GROUP_MAX)
 	today_rows = []
 	for e in events:
 		if e.get("date") and str(e["date"]) != str(now):
@@ -145,25 +170,26 @@ def next_list(space, now, cycle, events):
 		for a in cycle["actions"]:
 			if a["status"] == "Open" and a["count"] < a["per_week"]:
 				twy.append({**a, "type": "action", "why": "12WY", "week": cycle["week"]})
-	ins = insight_api.list(space=space, status="New", actionable=1, page_length=GROUP_MAX)
+	ins = insight_api.list(space=space, status="New", actionable=1, area=area, page_length=GROUP_MAX)
 	for r in ins["rows"]:
 		r["type"] = "insight"
 		r["why"] = r.kind
 	return {
 		"order": ["overdue", "today", "twy", "decisions"],
 		"groups": [
-			{"key": "overdue", "label": "Overdue", "rows": overdue, "total": counts.overdue_tasks(space)["n"], "door": counts.overdue_tasks(space)},
-			{"key": "today", "label": "Today", "rows": today_rows, "total": len(today_rows), "tasks": counts.due_today_tasks(space),
+			{"key": "overdue", "label": "Overdue", "rows": overdue, "total": counts.overdue_tasks(space, area)["n"], "door": counts.overdue_tasks(space, area)},
+			{"key": "today", "label": "Today", "rows": today_rows, "total": len(today_rows), "tasks": counts.due_today_tasks(space, area),
 				"events": len(today_rows) - len(due_today)},
 			{"key": "twy", "label": "12 Week Year · this week", "rows": twy, "total": len(twy)},
 			{"key": "decisions", "label": "Needs a decision", "rows": ins["rows"], "total": ins["total"],
-				"door": {"n": ins["total"], "to": {"path": "/ask", "query": {"tab": "insights", "actionable": 1}}, "label": "need a decision"}},
+				"door": {"n": ins["total"], "to": {"path": "/ask", "query": {"tab": "insights", "actionable": 1, **({"area": area} if area else {})}},
+					"label": "need a decision"}},
 		],
 		"show": NEXT_ROWS,
 	}
 
 
-def rail_of(space, now, events):
+def rail_of(space, now, events, area=None):
 	"""Today's events as a timeline, this week's important dates, renewals and the weekly review, and the other insights."""
 	from lifeos.api import insights as insight_api
 
@@ -171,7 +197,9 @@ def rail_of(space, now, events):
 	week = []
 	for d in calendar_data.important_dates_between(space, now, add_days(now, 7)):
 		week.append({"kind": "important", "name": d["name"], "title": d["label"], "date": d["date"], "when": str(d["date"])})
-	for d in calendar_data.expiring_documents(space, now):
+	docs = calendar_data.expiring_documents(space, now)
+	keep = in_area(space, area, "Life Vault Document", [d["name"] for d in docs])
+	for d in (d for d in docs if d["name"] in keep):
 		days = d.get("days")
 		if days is not None and days <= 45:
 			week.append({"kind": "vault", "name": d["name"], "title": d.get("title"), "date": d.get("expiry_date"), "days": days})
@@ -182,6 +210,6 @@ def rail_of(space, now, events):
 	week.append({"kind": "review", "title": "Weekly review", "date": str(review_on), "time": str(s.weekly_review_time or "18:00:00")[:5],
 		"day": day[:3]})
 	week.sort(key=lambda x: str(x.get("date") or ""))
-	other = insight_api.list(space=space, status="New", actionable=0, page_length=5)
+	other = insight_api.list(space=space, status="New", actionable=0, area=area, page_length=5)
 	timeline = [e for e in events if not e.get("date") or str(e["date"]) == str(now)]
 	return {"events": timeline, "week": week, "insights": other["rows"], "insights_total": other["total"]}

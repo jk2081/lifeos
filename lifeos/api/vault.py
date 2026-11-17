@@ -63,7 +63,7 @@ def where_clause(space, holder=None, doc_type=None, expiry=None, area=None, proj
 			frappe.throw(_("expiry must be one of: {0}.").format(", ".join(EXPIRY)))
 		where.append(EXPIRY[expiry])
 	if area:
-		where.append(area_filter(space, area, "d.area", values))
+		where.append(area_filter(space, area, "d.area", values, also_in="Life Vault Document"))
 	if project:
 		where.append("d.project = %(project)s")
 		values["project"] = project

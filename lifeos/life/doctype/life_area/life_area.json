@@ -10,7 +10,9 @@
   "parent_area",
   "sort_order",
   "is_archived",
-  "archived_on"
+  "archived_on",
+  "colour",
+  "is_pinned"
  ],
  "fields": [
   {
@@ -50,10 +52,24 @@
    "fieldname": "archived_on",
    "fieldtype": "Date",
    "label": "Archived On"
+  },
+  {
+   "fieldname": "colour",
+   "fieldtype": "Select",
+   "label": "Colour",
+   "options": "\nblue\ngreen\namber\nred\nviolet\nteal\norange\npink\ncyan\ngray",
+   "description": "The dot beside the area in the lens and the sidebar."
+  },
+  {
+   "default": "0",
+   "fieldname": "is_pinned",
+   "fieldtype": "Check",
+   "label": "Pinned to the sidebar",
+   "description": "Shown under \"Focus on an area\" as a one-click lens."
   }
  ],
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-17 18:11:06.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Area",

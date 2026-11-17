@@ -120,12 +120,12 @@ def detect_cycle(space):
 		titles = {g.name: g.title for g in goals}
 		out.append(candidate("12 Week Year", f"{len(no_ticks)} goal{'s have' if len(no_ticks) > 1 else ' has'} had no ticks for three weeks",
 			[ev("Life Goal", g, titles.get(g, "")) for g in no_ticks], actions=[{"kind": "open_list", "label": "Open the goals",
-				"to": counts.goals(space, "with no ticks for 3 weeks", no_ticks)["to"]}]))
+				"to": counts.goals(space, None, "with no ticks for 3 weeks", no_ticks)["to"]}]))
 	if no_tasks:
 		titles = dict(frappe.get_all("Life Goal", filters={"name": ["in", no_tasks]}, fields=["name", "title"], as_list=True))
 		out.append(candidate("12 Week Year", f"{len(no_tasks)} goal{'s have' if len(no_tasks) > 1 else ' has'} no tasks and no open actions",
 			[ev("Life Goal", g, titles.get(g, "")) for g in no_tasks], actions=[{"kind": "open_list", "label": "Open the goals",
-				"to": counts.goals(space, "with no tasks", no_tasks)["to"]}]))
+				"to": counts.goals(space, None, "with no tasks", no_tasks)["to"]}]))
 	return out
 
 

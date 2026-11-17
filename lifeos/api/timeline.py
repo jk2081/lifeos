@@ -3,7 +3,7 @@ import frappe
 from frappe.utils import add_days, getdate, today
 
 from lifeos import links, permissions
-from lifeos.api.utils import flag, names_map, page, std_filters, summarise, user_names
+from lifeos.api.utils import area_filter, flag, names_map, page, std_filters, summarise, user_names
 
 KIND_DOCTYPES = {
 	"Life Inbox Item": ["Inbox"], "Life Task": ["Task", "Task Done"], "Life Note": ["Note"], "Life Vault Document": ["Document"],
@@ -56,10 +56,7 @@ def get(space: str | None = None, from_date: str | None = None, to_date: str | N
 		where.append("record_date <= %(to_date)s")
 		values["to_date"] = getdate(to_date)
 	if area:
-		from lifeos.index import also_in_sql
-
-		where.append(f"(area = %(area)s or {also_in_sql('area')})")  # this one area only; sub-areas have their own pages
-		values.update({"area": area})
+		where.append(area_filter(space, area, "area", values, also_in="index"))  # with its sub-areas, as under the lens
 	if doctype:
 		where.append("ref_doctype = %(doctype)s")
 		values["doctype"] = doctype

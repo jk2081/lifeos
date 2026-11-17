@@ -6,6 +6,7 @@ import router from '@/router'
 import { toast } from 'frappe-ui'
 import { api, errorText } from './api'
 import { store } from './store'
+import { lookups } from './lookups'
 import { openRef, recordChanged } from './pane'
 
 export const ask = reactive({
@@ -27,18 +28,23 @@ export function askScope(scope) {
   onUnmounted(() => { if (ask.pageScope === scope) ask.pageScope = null })
 }
 
-const SPACE_WIDE = ['/', '/tasks', '/inbox', '/sources', '/timeline', '/calendar', '/archive', '/vault', '/areas']
 /** The scope a question starts with, from where the owner is (the table in UX_FIXES_5.md, section 2). */
 export function scopeFromRoute(route = router.currentRoute.value) {
   const p = route.path
   const first = '/' + (p.split('/')[1] || '')
   if (ask.pageScope) return typeof ask.pageScope === 'function' ? ask.pageScope() : { ...ask.pageScope }
   if (p.startsWith('/journal/goals/')) return { kind: 'goal', label: 'This goal', doctype: 'Life Goal', name: p.split('/')[3] }
+  if (first === '/library' && route.params.id) return { kind: 'record', label: 'This page', doctype: 'Life Note', name: route.params.id }
+  if (store.lensArea) return lensScope() // a place narrowed to an area: questions start in that area
   if (first === '/journal') return { kind: 'journal', label: 'This cycle and month' }
   if (first === '/goals') return { kind: 'goals', label: 'All goals' }
-  if (first === '/library' && route.params.id) return { kind: 'record', label: 'This page', doctype: 'Life Note', name: route.params.id }
   if (first === '/library' || first === '/wiki' || first === '/graph') return { kind: 'notes', label: first === '/wiki' ? 'All wiki pages' : 'All notes' }
-  if (SPACE_WIDE.includes(first) || first === '/ask') return { kind: 'space', label: 'Everything in this space' }
+  return lensScope()
+}
+/** The scope of the lens (UX fixes, set 6): the lens's area with its sub-areas, or everything in the space. */
+export function lensScope() {
+  const a = store.lensArea && (lookups.areas || []).find((x) => x.name === store.lensArea)
+  if (store.lensArea) return { kind: 'area', label: a?.area_name || 'This area', doctype: 'Life Area', name: store.lensArea }
   return { kind: 'space', label: 'Everything in this space' }
 }
 

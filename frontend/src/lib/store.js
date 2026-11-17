@@ -16,9 +16,10 @@ export const store = reactive({
   searchOpen: false,
   quickAdd: false,
   newKind: '', // the New menu's note or project dialog
+  lensArea: '', // the lens's area (lib/lens.js keeps it), here so the counts can follow it without importing the lens
 })
 
-export async function boot() {
+export async function boot({ beforeReady } = {}) {
   const data = await api('session.boot')
   Object.assign(store, {
     user: data.user, fullName: data.full_name, isAdmin: data.is_admin, isAgent: data.is_agent, spaces: data.spaces,
@@ -27,6 +28,7 @@ export async function boot() {
   if (!data.spaces.find((s) => s.name === store.space)) store.space = data.default_space || data.spaces[0]?.name || ''
   // saved list views: the local copy is used at once, and the server copy for at most a moment before the first screen draws
   await Promise.race([loadViews(), new Promise((r) => setTimeout(r, 1200))])
+  if (beforeReady) beforeReady() // the lens: from the URL or remembered (lib/lens.js)
   store.ready = true
   refreshCounts()
 }
@@ -34,7 +36,7 @@ export async function boot() {
 export async function refreshCounts() {
   if (!store.space) return
   try {
-    store.counts = await api('session.counts', { space: store.space })
+    store.counts = await api('session.counts', { space: store.space, area: store.lensArea || undefined })
   } catch (e) { /* the badge is not worth an error */ }
 }
 
@@ -47,10 +49,8 @@ if (typeof window !== 'undefined') {
   window.addEventListener('lifeos-task-added', later)
 }
 
-watch(() => store.space, (v) => {
-  localStorage.setItem('lifeos-space', v || '')
-  if (store.ready) refreshCounts()
-})
+watch(() => store.space, (v) => localStorage.setItem('lifeos-space', v || ''))
+watch(() => [store.space, store.lensArea], () => { if (store.ready) refreshCounts() })
 
 export function canWrite() {
   return store.spaces.find((s) => s.name === store.space)?.access === 'Write'

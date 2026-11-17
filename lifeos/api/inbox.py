@@ -130,7 +130,8 @@ def claim_next(space: str | None = None):
 
 def space_context(space):
 	"""What an agent needs to file proposals: the space's areas, projects, tags, people, habits, dimensions and active goals."""
-	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area"], order_by="sort_order, area_name", limit=500)
+	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour", "is_pinned"],
+		order_by="sort_order, area_name", limit=500)
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)
 	# every goal in progress, of every type, for filing a task under it; 12 Week Year goals of the active cycle carry their actions
 	goals = []
@@ -274,7 +275,7 @@ def list(space: str | None = None, status: str | builtins.list | None = None, in
 		where.append("i.source_type = %(source_type)s")
 		values["source_type"] = source_type
 	if area:
-		where.append(area_filter(space, area, "i.area", values))
+		where.append(area_filter(space, area, "i.area", values, also_in="Life Inbox Item"))
 	if from_date:
 		where.append("date(i.received_on) >= %(from_date)s")
 		values["from_date"] = frappe.utils.getdate(from_date)

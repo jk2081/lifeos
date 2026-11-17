@@ -172,7 +172,7 @@ async function createCycle() {
   if (await tryCall(() => api('journal.create_cycle', { space: store.space }), 'Cycle created.')) load()
 }
 async function load() {
-  const res = await tryCall(() => api('journal.grid', { space: store.space, cycle: route.query.cycle || undefined }))
+  const res = await tryCall(() => api('journal.grid', { space: store.space, cycle: route.query.cycle || undefined, area: store.lensArea || undefined }))
   g.value = res || null
   loaded.value = true
   emit('sub', res ? `${res.cycle.title} · ${long(res.cycle.start_date)} to ${long(res.cycle.end_date)}` : 'The 12 Week Year')

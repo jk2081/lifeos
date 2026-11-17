@@ -73,7 +73,7 @@ async function run() {
   }
   const mine = ++seq
   try {
-    const res = await api('search.query', { text: q, limit: 20, include_archived: archived.value ? 1 : 0 })
+    const res = await api('search.query', { text: q, limit: 20, include_archived: archived.value ? 1 : 0, ...(store.lensArea ? { space: store.space, area: store.lensArea } : {}) })
     if (mine !== seq) return
     results.value = res.results
     searched.value = q
@@ -101,7 +101,7 @@ function go(r) {
     text.value = ''
     return startAsk(q)
   }
-  if (r.space && r.space !== store.space) store.space = r.space
+  if (r.space && r.space !== store.space) Object.assign(store, { space: r.space, lensArea: '' }) // a result in another space: its whole space
   const ref = refOf(r.ref_doctype, r.ref_name)
   ref ? openRef(ref) : router.push(r.route)
 }

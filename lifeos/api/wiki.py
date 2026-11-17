@@ -165,7 +165,7 @@ def pages(space: str | None = None, area: str | None = None, project: str | None
 	if not int(include_archived or 0):
 		where.append("n.is_archived = 0")
 	if area:
-		where.append(area_filter(space, area, "n.area", values))
+		where.append(area_filter(space, area, "n.area", values, also_in="Life Note"))
 	if project:
 		where.append("ifnull(n.project, '') = %(project)s")
 		values["project"] = "" if project == "none" else project
@@ -203,7 +203,7 @@ def index(space: str | None = None, area: str | None = None, start: int | None =
 	values = {"space": space}
 	where = ["n.space = %(space)s", "n.collection = 'Wiki'", "n.is_archived = 0"]
 	if area:
-		where.append(area_filter(space, area, "n.area", values))
+		where.append(area_filter(space, area, "n.area", values, also_in="Life Note"))
 	order = {"updated": "n.modified desc", "title": "n.title asc"}.get(order_by or "title", "n.title asc")
 	# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments and area_filter; the order comes from a fixed map; values are parameters
 	rows = frappe.db.sql(f"""select n.name, n.title, n.summary, n.area, n.is_rules, n.modified,

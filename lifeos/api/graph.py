@@ -3,6 +3,7 @@ import frappe
 
 from lifeos import links as rules
 from lifeos import permissions
+from lifeos.api.utils import in_area, lens_area
 
 TYPES = {"Life Note": "Note", "Life Person": "Person", "Life Goal": "Goal", "Life Vault Document": "Document",
 	"Life Task": "Task", "Life Chat Log": "Chat", "Life Project": "Project"}
@@ -11,7 +12,7 @@ VAULT = "Life Vault Document"
 
 
 @frappe.whitelist(methods=["GET"])
-def get(space: str | None = None, center: str | None = None, collection: str | None = None):
+def get(space: str | None = None, center: str | None = None, collection: str | None = None, area: str | None = None):
 	"""Nodes and edges for the graph view. `center` is "DocType/name": the graph is then limited to two steps around that record.
 	collection (Wiki or My notes) starts the graph from the notes of that collection only; linked records still join it."""
 	space = permissions.resolve_space(space)
@@ -34,14 +35,21 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 	if collection in ("Wiki", "My notes"):
 		note_filters["collection"] = collection
 	notes = frappe.get_all("Life Note", filters=note_filters, fields=["name", "title", "parent_note"], order_by="modified desc", limit=300)
+	area = lens_area(area)
+	if area:  # the lens: the graph starts from the area's notes and goals; linked records still join it
+		keep = in_area(space, area, "Life Note", [n.name for n in notes])
+		notes = [n for n in notes if n.name in keep]
 	for n in notes:
 		add("Life Note", n.name, n.title)
-	for p in ([] if collection else frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name"], limit=100)):
+	for p in ([] if collection or area else frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name"], limit=100)):
 		add("Life Person", p.name, p.full_name)
 	goals = [] if collection else frappe.get_all("Life Goal", filters={"space": space}, fields=["name", "title", "carried_from", "project"], order_by="creation desc", limit=100)
+	if area:
+		keep = in_area(space, area, "Life Goal", [g.name for g in goals])
+		goals = [g for g in goals if g.name in keep]
 	for g in goals:
 		add("Life Goal", g.name, g.title)
-	docs = [] if permissions.vault_hidden(space) or collection else frappe.get_all("Life Vault Document", filters={"space": space, "is_archived": 0}, fields=["name", "title", "holder"], limit=100)
+	docs = [] if permissions.vault_hidden(space) or collection or area else frappe.get_all("Life Vault Document", filters={"space": space, "is_archived": 0}, fields=["name", "title", "holder"], limit=100)
 	for d in docs:
 		add("Life Vault Document", d.name, d.title)
 

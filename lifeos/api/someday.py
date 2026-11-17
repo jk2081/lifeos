@@ -37,7 +37,7 @@ def _sub(doctype, space, filters, values, i, area=None):
 	if area:
 		from lifeos.api.utils import area_filter
 
-		where.append(area_filter(space, area, "x.area", values))
+		where.append(area_filter(space, area, "x.area", values, also_in="Life Task" if doctype == "Life Task" else None))
 	extra = "''"
 	if doctype == "Life Project":
 		extra = "(select count(*) from `tabLife Task` t where t.someday_with = x.name and t.status = 'Someday')"

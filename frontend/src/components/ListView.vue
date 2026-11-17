@@ -172,7 +172,10 @@ const emit = defineEmits(['loaded'])
 const route = useRoute()
 const router = useRouter()
 const phone = useMediaQuery('(max-width: 639px)')
-const fixedKeys = props.fixed ? Object.keys(props.fixed) : []
+// The lens (lib/lens.js) owns `area=`: a list whose spec has an area filter takes the lens's area, and the area is left
+// out of its controls, its remembered view and its Clear (UX fixes, set 6).
+const lensKey = props.spec.some((e) => e.key === 'area') && !(props.fixed && 'area' in props.fixed) ? 'area' : null
+const fixedKeys = [...(props.fixed ? Object.keys(props.fixed) : []), ...(lensKey ? [lensKey] : [])]
 const fixedFields = props.spec.filter((e) => fixedKeys.includes(e.key)).map((e) => e.field)
 const list = useLifeListView(props.doctype, { virtual: props.virtual.filter((v) => !fixedFields.includes(v.fieldname)), synthetic: props.synthetic, hidden: [...props.hidden, ...fixedFields] })
 // the query this list reads: the URL while it is the open tab, what it last saw while another tab is open
@@ -338,7 +341,7 @@ const open = (row) => openRef(props.rowRef(row))
 
 function request(start, page_length) {
   const { params: own, filters } = queryToRequest(Q.value, spec.value)
-  const params = { ...own, ...(props.fixed || {}) }
+  const params = { ...own, ...(props.fixed || {}), ...(lensKey && Q.value.area ? { area: String(Q.value.area) } : {}) }
   return { params, tab: tab.value, filters: filters.length ? filters : undefined, order_by: queryToOrderBy(Q.value) || undefined,
     fields: extraFields.value.length ? extraFields.value : undefined, start, page_length, view: view.value, query: Q.value }
 }
@@ -400,7 +403,7 @@ function remember() {
 function restore(saved, { late = false } = {}) {
   if (!saved) return
   if (!late) list.restoreLayout(saved)
-  const q = saved.query || {}
+  const { area: _lens, ...q } = saved.query || {} // a view saved before the lens may hold an area: the lens decides that now
   if (!hasQuery()) {
     if (Object.keys(q).length) router.replace({ query: { ...route.query, ...q } })
   } else if (!Q.value.view && q.view && props.views.some((v) => v.key === q.view)) {
@@ -412,7 +415,7 @@ let quickReady = false // the strip shows the screen's own fields, or the saved 
 restore(initial)
 if (!viewsLoaded()) whenViewsLoaded(() => { if (!touched) restore(savedView(props.screen)) })
 
-const fetchKey = computed(() => JSON.stringify([listQuery(), list.summary.value, extraFields.value, mode.value]))
+const fetchKey = computed(() => JSON.stringify([listQuery(), list.summary.value, extraFields.value, mode.value, lensKey && Q.value.area]))
 watch(fetchKey, () => load())
 watch(() => JSON.stringify(listQuery()), () => { applyUrl(); if (viewsLoaded()) remember() })
 watch(() => JSON.stringify(list.layout.value), () => { if (list.ready.value && viewsLoaded()) remember() })

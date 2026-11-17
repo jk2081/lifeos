@@ -62,17 +62,35 @@ def descendants(space, area):
 
 
 def area_filter(space, area, column, values, also_in=None):
-	"""SQL for an Area filter, the same on every list: the area with its sub-areas, or "none" for records with no area.
-	`also_in` is the parenttype of a record that can also be filed under other areas."""
+	"""SQL for an Area filter, the same on every list and under the lens (UX fixes, set 6): the area with its sub-areas,
+	or "none" for records with no area. A record listing the area (or a sub-area) in "also in" counts as in it.
+	`also_in` is the parenttype of a record that can also be filed under other areas, or "index" for Life Index rows,
+	whose record is named by ref_doctype and ref_name."""
 	if area == "none":
 		return f"ifnull({column}, '') = ''"
 	values["area_ids"] = descendants(space, area)
 	sql = f"{column} in %(area_ids)s"
-	if also_in:
-		name = column.rsplit(".", 1)[0] + ".name" if "." in column else "name"
-		sql = (f"({sql} or exists (select 1 from `tabLife Also In` ai where ai.parent = {name} "
+	alias = column.rsplit(".", 1)[0] + "." if "." in column else ""
+	if also_in == "index":
+		from lifeos.index import also_in_sql
+
+		sql = f"({sql} or {also_in_sql('area_ids', alias)})"
+	elif also_in:
+		if also_in not in ALSO_IN:
+			frappe.throw(frappe._("Unknown filed DocType {0}.").format(also_in))
+		sql = (f"({sql} or exists (select 1 from `tabLife Also In` ai where ai.parent = {alias}name "
 			f"and ai.parenttype = '{also_in}' and ai.area in %(area_ids)s))")
 	return sql
+
+
+# the DocTypes with an "also in" table
+ALSO_IN = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Journal Page", "Life Vault Document")
+
+
+def lens_area(area):
+	"""The lens's area as a list argument: None for "All of life"."""
+	area = str(area or "").strip()
+	return None if area in ("", "all") else area
 
 
 def order_by(sort, direction, allowed, default):
@@ -281,3 +299,17 @@ def summarise(doctype, base, values, alias, summary, start=0, page_length=20):
 	if aggs and flag(summary.get("totals")):
 		totals = frappe.db.sql(f"select {', '.join(aggs)} {base}", values, as_dict=True)[0]  # nosemgrep: frappe-sql-format-injection -- allowlisted aggregates over meta-checked columns
 	return {"rows": rows, "total": total, "totals": totals}
+
+
+def in_area(space, area, doctype, names):
+	"""The names among `names` filed under the area, a sub-area, or listing one in "also in" (the lens on a set already
+	read). Returns every name when there is no area."""
+	names = [n for n in set(names or []) if n]
+	if not area or not names:
+		return set(names)
+	if doctype not in ALSO_IN and doctype not in ("Life Goal", "Life Project", "Life Idea", "Life Habit", "Life Insight"):
+		frappe.throw(frappe._("Unknown filed DocType {0}.").format(doctype))
+	values = {"names": names}
+	cond = area_filter(space, area, "x.area", values, also_in=doctype if doctype in ALSO_IN else None)
+	# nosemgrep: frappe-sql-format-injection -- the DocType is one of a fixed list; the condition is area_filter's fixed SQL; values are parameters
+	return set(frappe.db.sql_list(f"select x.name from `tab{doctype}` x where x.name in %(names)s and {cond}", values))

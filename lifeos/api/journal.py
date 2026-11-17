@@ -5,7 +5,7 @@ from frappe.utils import add_days, getdate, today
 
 from lifeos import journal as rules
 from lifeos import permissions
-from lifeos.api.utils import flag, names_map, page, parse
+from lifeos.api.utils import flag, in_area, lens_area, names_map, page, parse
 
 
 def _cycle(cycle=None, space=None):
@@ -21,12 +21,18 @@ def _cycle(cycle=None, space=None):
 # ---------- 12 Week Year ----------
 
 @frappe.whitelist(methods=["GET"])
-def grid(cycle: str | None = None, space: str | None = None):
-	"""The 12 Week Year grid of a cycle: goals, actions, ticks per week, week scores and the average."""
+def grid(cycle: str | None = None, space: str | None = None, area: str | None = None):
+	"""The 12 Week Year grid of a cycle: goals, actions, ticks per week, week scores and the average. Under the lens (`area`)
+	only the goals of the area and its sub-areas are listed; the week scores and the average stay the cycle's."""
 	doc = _cycle(cycle, space)
 	if not doc:
 		return None
 	out = rules.grid(doc.name)
+	area = lens_area(area)
+	if area:
+		keep = in_area(doc.space, area, "Life Goal", [g.name for g in out["goals"]])
+		out["goals"] = [g for g in out["goals"] if g.name in keep]
+		out["area"] = area
 	out["cycles"] = frappe.get_all("Life Cycle", filters={"space": doc.space}, fields=["name", "title", "status", "start_date"], order_by="start_date desc", limit=40)
 	for c in out["cycles"]:
 		c["start_date"] = str(c.start_date)
@@ -228,8 +234,9 @@ def _plan_dict(plan):
 
 
 @frappe.whitelist(methods=["POST"])
-def month(space: str | None = None, year: int | None = None, month: int | None = None, create: bool | int = 0):
-	"""The plan of one month: goals, mindsweep, habits with their month so far, and the latest check-in."""
+def month(space: str | None = None, year: int | None = None, month: int | None = None, create: bool | int = 0, area: str | None = None):
+	"""The plan of one month: goals, mindsweep, habits with their month so far, and the latest check-in. Under the lens
+	(`area`) the month's goals and habits keep to the area and its sub-areas; a goal or habit with no area always shows."""
 	space = permissions.resolve_space(space)
 	now = getdate(today())
 	year, month = int(year or now.year), int(month or now.month)
@@ -240,8 +247,20 @@ def month(space: str | None = None, year: int | None = None, month: int | None =
 	checkin = None
 	if latest:
 		checkin = _checkin_dict(frappe.get_doc("Life Check-in", latest[0].name))
-	return {"year": year, "month": month, "plan": _plan_dict(plan) if plan else None, "habits": rules.habits_month(space, year, month),
+	out = {"year": year, "month": month, "plan": _plan_dict(plan) if plan else None, "habits": rules.habits_month(space, year, month),
 		"latest_checkin": checkin, "today": str(now)}
+	area = lens_area(area)
+	if area:
+		from lifeos.api.utils import descendants
+
+		ids = set(descendants(space, area))
+		if out["plan"]:
+			out["plan"]["goals"] = [g for g in out["plan"]["goals"] if not g["area"] or g["area"] in ids]
+		areas = dict(frappe.get_all("Life Habit", filters={"name": ("in", [h["habit"] for h in out["habits"]["habits"]] or ["-"])},
+			fields=["name", "area"], as_list=True))
+		out["habits"]["habits"] = [h for h in out["habits"]["habits"] if not areas.get(h["habit"]) or areas[h["habit"]] in ids]
+		out["area"] = area
+	return out
 
 
 @frappe.whitelist(methods=["POST"])

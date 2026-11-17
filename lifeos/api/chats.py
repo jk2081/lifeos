@@ -78,7 +78,7 @@ def where_clause(space, area=None, project=None, open_items=0, from_date=None, t
 	if not flag(include_archived):
 		where.append("c.is_archived = 0")
 	if area:
-		where.append(area_filter(space, area, "c.area", values))
+		where.append(area_filter(space, area, "c.area", values, also_in="Life Chat Log"))
 	if project:
 		where.append("ifnull(c.project, '') = %(project)s")
 		values["project"] = "" if project == "none" else project
