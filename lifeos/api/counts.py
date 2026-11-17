@@ -4,6 +4,6 @@ import frappe
 from lifeos import counts
 
 
-@frappe.whitelist()
-def get(space=None, which="open_band"):
+@frappe.whitelist(methods=["GET"])
+def get(space: str | None = None, which: str = "open_band"):
 	return counts.get(space=space, which=which)

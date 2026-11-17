@@ -305,3 +305,14 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Older checks brought in line with set 5:** the search palette's field is now labelled "Search or ask anything" (U.3); Projects has a Someday tab before All, so `[` from All lands on Someday (U.8); a remembered list may restore its query parameters in another order, so U.7 compares them as a set; the Someday and Trash buttons are looked for among visible ones, since a phone row also holds the hidden desktop cells.
 
 - **U.33 (no key, the cap, the family user, the Vault payload) and U.34 (the insight rules) run once, at 1440 px**, because they test the server, not the layout. Every other set 5 check (U.16, U.31, U.32, U.35, U.36, U.37) runs at 1440 px and at 390 px.
+
+## Pre-step 6: Frappe conventions
+
+### 1. Whitelisted methods
+
+- **Every whitelisted method takes one HTTP method.** 78 reads are GET-only and 93 methods are POST-only. Over REST, sending a read as POST, or a change as GET, is now refused with 403. MCP's `call_method` picks the right one itself, so agents on MCP see no change. `agent/fake_agent.py` sends its reads as GET, and `agent/SKILL.md` names the reads an agent uses.
+- **Five methods that look like reads are POST**, because they can write and Frappe rolls back a GET: `journal.month` (with `create` it makes the month plan), `library.get` (it records when a note was opened), `wiki.rules` and `wiki.overview` (they create the rules page the first time), and `reset.get` (its AI batches record AI usage).
+- **The list of GET methods lives in one place.** `scripts/http-methods.py` writes `frontend/src/lib/getMethods.json` from the decorators. The front end's `api()` and the acceptance script send those as GET (objects as JSON, booleans as 1 or 0, empty values left out) and everything else as POST. `test_pre6_conventions` fails if the file is out of date, or if any method lacks `methods` or a type hint.
+- **A read that writes now fails loudly on the acceptance site.** `lifeos/strict_get.py` runs every GET to a `lifeos.` method in a read-only transaction when the site config has `lifeos_strict_get`. `scripts/acceptance-site.sh` sets it on that site. It is off everywhere else.
+- **Type hints accept what callers send.** Lists and objects are `str | list` or `str | dict`, parsed as before, because GET and REST send JSON strings while MCP sends objects. Flags are `bool | int`. Date arguments also accept `date` objects where Python callers pass them. Modules that define their own `list()` use `builtins.list` in hints, because Python 3.14 resolves annotations lazily.
+- **Changed test:** `test_ux2_views.test_what_is_saved` now accepts `FrappeTypeError` as well as `ValidationError` for a list passed as a view state. The list is still refused, but Frappe's type check now refuses it first.

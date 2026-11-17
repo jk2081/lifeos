@@ -28,8 +28,8 @@ def google_status():
 		"setup_url": "/app/google-calendar" if enabled else "/app/google-settings"}
 
 
-@frappe.whitelist()
-def get(space=None, from_date=None, to_date=None):
+@frappe.whitelist(methods=["GET"])
+def get(space: str | None = None, from_date: str | None = None, to_date: str | None = None):
 	"""Everything on the calendar between two dates (at most 100 days): events, important dates, tasks due and documents expiring."""
 	space = permissions.resolve_space(space)
 	start = getdate(from_date or today())
@@ -78,8 +78,8 @@ def year_entries(space, year):
 	return days, cycles
 
 
-@frappe.whitelist()
-def year(space=None, year=None):
+@frappe.whitelist(methods=["GET"])
+def year(space: str | None = None, year: int | None = None):
 	"""The year view: important dates, all-day and multi-day events, vault expiry dates and the start and end of each 12 Week Year."""
 	space = permissions.resolve_space(space)
 	y = int(year or getdate(today()).year)
@@ -89,7 +89,7 @@ def year(space=None, year=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def add_event(space=None, subject=None, starts_on=None, ends_on=None, all_day=0, description=None):
+def add_event(space: str | None = None, subject: str | None = None, starts_on: str | None = None, ends_on: str | None = None, all_day: bool | int = 0, description: str | None = None):
 	"""Create a core Event in a space. If the user has connected Google Calendar, the built-in integration pushes it there."""
 	space = permissions.resolve_space(space, write=True)
 	if not (subject or "").strip() or not starts_on:
@@ -113,7 +113,7 @@ def add_event(space=None, subject=None, starts_on=None, ends_on=None, all_day=0,
 
 
 @frappe.whitelist(methods=["POST"])
-def delete_event(event):
+def delete_event(event: str):
 	"""Delete an event of a space the user can write to."""
 	# Core Event lets only its creator delete it. In a space, any person with Write access may, so an
 	# event filed by an agent can be removed by the owner. The checks below replace the core one.
@@ -128,7 +128,8 @@ def delete_event(event):
 
 
 @frappe.whitelist(methods=["POST"])
-def add_important_date(space=None, title=None, day=None, month=None, year=None, kind="Birthday", person=None):
+def add_important_date(space: str | None = None, title: str | None = None, day: int | None = None, month: int | None = None, year: int | str | None = None, kind: str | None = "Birthday",
+		person: str | None = None):
 	"""Add a birthday, anniversary or other date that repeats every year."""
 	space = permissions.resolve_space(space, write=True)
 	doc = frappe.get_doc({"doctype": "Life Important Date", "space": space, "title": title, "day": day, "month": month,
@@ -136,8 +137,8 @@ def add_important_date(space=None, title=None, day=None, month=None, year=None, 
 	return {"name": doc.name}
 
 
-@frappe.whitelist()
-def entry(kind, name):
+@frappe.whitelist(methods=["GET"])
+def entry(kind: str, name: str):
 	"""One calendar entry for the record pane: kind is "event" or "date" (an important date)."""
 	if kind == "event":
 		doc = permissions.get_doc_checked("Event", name, "read")

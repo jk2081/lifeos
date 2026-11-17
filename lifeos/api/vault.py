@@ -1,4 +1,6 @@
 """Vault: documents by holder and type, with expiry badges."""
+import builtins
+
 import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
@@ -80,9 +82,11 @@ def expiry_counts(space):
 	return {"expired": count(space, expiry="expired"), "soon": count(space, expiry="soon")}
 
 
-@frappe.whitelist()
-def list(space=None, include_archived=0, start=0, page_length=100, holder=None, doc_type=None, expiry=None, area=None, project=None,
-		sort=None, dir=None, filters=None, order_by=None, fields=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, include_archived: bool | int = 0, start: int = 0, page_length: int = 100, holder: str | None = None,
+		doc_type: str | None = None, expiry: str | None = None, area: str | None = None, project: str | None = None, sort: str | None = None,
+		dir: str | None = None, filters: str | builtins.list | builtins.dict | None = None, order_by: str | None = None, fields: str | builtins.list | None = None,
+		summary: str | builtins.dict | None = None):
 	"""Vault documents of a space, soonest expiry first, as a flat list and grouped by holder.
 	Filters: holder (a person, or "none"), doc_type, expiry (expired, soon = within 60 days, later, none), area, project.
 	`total` is the number of documents the filters match.
@@ -121,8 +125,8 @@ def list(space=None, include_archived=0, start=0, page_length=100, holder=None, 
 		"total": total, "tabs": tabs, "people": people, "expiring": sum(1 for r in rows if r["badge"]), "expired": counts["expired"], "soon": counts["soon"]}
 
 
-@frappe.whitelist()
-def get(document):
+@frappe.whitelist(methods=["GET"])
+def get(document: str):
 	"""One vault document with its holder, file and expiry badge."""
 	doc = permissions.get_doc_checked("Life Vault Document", document)
 	row = _decorate([frappe._dict({f: doc.get(f) for f in FIELDS})])[0]
@@ -135,7 +139,7 @@ def get(document):
 
 
 @frappe.whitelist(methods=["POST"])
-def save(document=None, space=None, values=None):
+def save(document: str | None = None, space: str | None = None, values: str | builtins.dict | None = None):
 	"""Create or change a vault document. Only the last four characters of a number are ever stored."""
 	values = parse(values, {}) or {}
 	unknown = set(values) - EDITABLE
@@ -153,7 +157,7 @@ def save(document=None, space=None, values=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_file(document, file_url):
+def set_file(document: str, file_url: str):
 	"""Point the document at a file already uploaded to it with upload_file."""
 	doc = permissions.get_doc_checked("Life Vault Document", document, "write")
 	if not frappe.db.exists("File", {"file_url": file_url, "attached_to_doctype": "Life Vault Document", "attached_to_name": doc.name}):
@@ -164,7 +168,7 @@ def set_file(document, file_url):
 
 
 @frappe.whitelist(methods=["POST"])
-def add_person(space=None, full_name=None, relation=None):
+def add_person(space: str | None = None, full_name: str | None = None, relation: str | None = None):
 	"""Add a person, for example a document holder."""
 	space = permissions.resolve_space(space, write=True)
 	doc = frappe.get_doc({"doctype": "Life Person", "space": space, "full_name": full_name, "relation": relation}).insert()

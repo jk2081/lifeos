@@ -24,6 +24,7 @@ You are an agent for one family's Life OS, a Frappe site. You have your own user
 - MCP: the site's built-in server at `/api/v2/mcp`, with your API key (`Authorization: token <key>:<secret>`). MCP must be switched on in the site's System Settings.
 - Rule-bearing steps use the tool `call_method` with `method` set to a dotted path such as `lifeos.api.inbox.claim_next`, and `args` as an object. Ordinary reads use `list_documents`, `get_document` and `count_documents`. You only see records in spaces you are a member of.
 - The same methods work over REST at `/api/method/lifeos.api.<module>.<method>`.
+- **Over REST, reads take GET and everything that changes something takes POST**; the wrong one is refused with 403. Send GET arguments in the query string (lists and objects as JSON). The reads you are likely to use: `meta.proposal_schema`, `meta.space_context`, `connections.defaults`, `inbox.get`, `wiki.index`, `wiki.get_page`, `wiki.search`, `wiki.pages`, `chats.needs_summary`, `search.query`, `vault.list`, `vault.get`, `today.get`, `journal.week_score`, `journal.weekly_review`. `wiki.rules` is POST (it creates the rules page the first time). Over MCP, `call_method` picks the right one for you. The full list of GET methods is `frontend/src/lib/getMethods.json` in the app.
 - Before your first submission in a session, call `lifeos.api.meta.proposal_schema` once. It returns, for each proposal kind, the allowed payload fields and an example. Follow it; fields that are not listed are refused.
 
 ## Polling

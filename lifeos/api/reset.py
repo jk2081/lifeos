@@ -1,6 +1,7 @@
 """Reset (UX fixes, set 5): clear the backlog. Suggested batches found by rules (and up to three by the AI, see
 lifeos/ai/batches.py), the Inventory of counts, one-by-one decisions, and Undo for a minute. People only."""
 import re
+from datetime import date as Date
 
 import frappe
 from frappe import _
@@ -92,8 +93,9 @@ def rule_batches(space):
 	return out
 
 
-@frappe.whitelist()
-def get(space=None, ai=0):
+# POST: with `ai` it calls the model, which records the call's usage and cost
+@frappe.whitelist(methods=["POST"])
+def get(space: str | None = None, ai: bool | int = 0):
 	"""Everything the Reset screen shows: the goal bar, the batches, the inventory and the first one-by-one item."""
 	_person()
 	space = permissions.resolve_space(space)
@@ -133,8 +135,8 @@ def _queue(space, skip=(), only=None):
 	return (rows[0] if rows else None), int(total) - len(skip)
 
 
-@frappe.whitelist()
-def next_item(space=None, skip=None, only=None):
+@frappe.whitelist(methods=["GET"])
+def next_item(space: str | None = None, skip: str | list | None = None, only: str | list | None = None):
 	"""The oldest untouched open item, with its type, area, created date, days untouched and where it came from.
 	`only`: names to keep to (Review one by one on a batch)."""
 	space = permissions.resolve_space(space)
@@ -182,7 +184,7 @@ DECISIONS = ("do", "waiting", "someday", "archive", "delete")
 
 
 @frappe.whitelist(methods=["POST"])
-def decide(doctype, name, decision, date=None, waiting_on=None):
+def decide(doctype: str, name: str, decision: str, date: str | Date | None = None, waiting_on: str | None = None):
 	"""One decision on one item: Do (with a date), Waiting (for whom), Someday, Archive or Delete. Returns what Undo needs."""
 	_person()
 	if decision not in DECISIONS:
@@ -232,7 +234,7 @@ def _snap(doc):
 # ---- batches ----
 
 @frappe.whitelist(methods=["POST"])
-def apply_batch(action, items, space=None):
+def apply_batch(action: str, items: str | list, space: str | None = None):
 	"""Apply a batch's action to exactly the items listed. Returns the Undo log."""
 	_person()
 	space = permissions.resolve_space(space, write=True)
@@ -306,7 +308,7 @@ def _merge(note):
 
 
 @frappe.whitelist(methods=["POST"])
-def undo(log):
+def undo(log: str | list):
 	"""Put back what a batch or a decision changed, newest first."""
 	_person()
 	log = parse(log, []) or []
@@ -345,8 +347,8 @@ def undo(log):
 	return {"ok": True}
 
 
-@frappe.whitelist()
-def short(space=None):
+@frappe.whitelist(methods=["GET"])
+def short(space: str | None = None):
 	"""The weekly review's first step: the stuck count, the batches by title and count, and Someday items due for review."""
 	_person()
 	space = permissions.resolve_space(space)

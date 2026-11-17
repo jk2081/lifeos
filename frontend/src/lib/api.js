@@ -1,14 +1,30 @@
-import { call, toast } from 'frappe-ui'
+import { call, frappeRequest, toast } from 'frappe-ui'
+import GET_METHODS from './getMethods.json'
 
-// Every server call goes through here. Methods live under lifeos.api.
+const GET = new Set(GET_METHODS)
+
+// Every server call goes through here. Methods live under lifeos.api. Reads that the server answers only over GET
+// (getMethods.json, written by scripts/http-methods.py from the decorators) go as GET; everything else as POST.
 export function api(method, args = {}) {
   const path = method.startsWith('frappe.') ? method : `lifeos.api.${method}`
-  const out = call(path, args)
+  const out = GET.has(path) ? frappeRequest({ url: path, method: 'GET', params: queryParams(args) }) : call(path, args)
   // the sidebar's counts (items to review, tasks due) follow any change that can move them, without a reload
   if (CHANGES.test(method)) out.then(() => window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))).catch(() => {})
   return out
 }
 const CHANGES = /^(tasks\.(set_status|update|quick_add|carry_forward|reschedule_overdue)|archive\.|inbox\.|review\.|chats\.make_task|someday\.|reset\.|trash\.|insights\.|journal\.(month_plan_make_task|decide))/
+
+// A query string carries only text: objects and lists as JSON, booleans as 1 or 0, and no empty values.
+export function queryParams(args) {
+  const out = {}
+  for (const [key, value] of Object.entries(args || {})) {
+    if (value === undefined || value === null) continue
+    if (typeof value === 'boolean') out[key] = value ? 1 : 0
+    else if (typeof value === 'object') out[key] = JSON.stringify(value)
+    else out[key] = value
+  }
+  return out
+}
 
 export function errorText(e) {
   const messages = e?.messages || e?.exc_messages

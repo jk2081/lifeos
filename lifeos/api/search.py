@@ -24,8 +24,8 @@ def _snippet(text, words, width=140):
 	return ("…" if start else "") + text[start:end] + ("…" if end < len(text) else "")
 
 
-@frappe.whitelist()
-def query(text, limit=20, space=None, include_archived=0):
+@frappe.whitelist(methods=["GET"])
+def query(text: str, limit: int | None = 20, space: str | None = None, include_archived: bool | int | None = 0):
 	"""Search notes, tasks, inbox items (including transcripts), chat logs, journal pages and vault titles.
 	Only records in spaces the user belongs to are returned. Archived records are left out unless asked for."""
 	permissions.require_login()

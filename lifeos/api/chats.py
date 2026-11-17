@@ -1,4 +1,7 @@
 """Chat log: one record per AI chat, and the chats report."""
+import builtins
+import datetime
+
 import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
@@ -8,8 +11,8 @@ from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, 
 from lifeos.api.utils import order_by as sort_order
 
 
-@frappe.whitelist()
-def report(space=None, from_date=None, to_date=None, group_by="day", start=0, page_length=100):
+@frappe.whitelist(methods=["GET"])
+def report(space: str | None = None, from_date: str | None = None, to_date: str | None = None, group_by: str = "day", start: int | None = 0, page_length: int | None = 100):
 	"""Chat logs between two dates (default: the last seven days), grouped by day, area or project, with their open items rolled up.
 	The same records come back under each group_by."""
 	space = permissions.resolve_space(space)
@@ -110,9 +113,10 @@ def _chat_rows(rows):
 	return rows
 
 
-@frappe.whitelist()
-def list(space=None, area=None, project=None, open_items=0, from_date=None, to_date=None, include_archived=0, group_by="day",
-		sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, area: str | None = None, project: str | None = None, open_items: bool | int | None = 0, from_date: str | None = None, to_date: str | None = None, include_archived: bool | int | None = 0,
+		group_by: str = "day", sort: str | None = None, dir: str | None = None, start: int | None = 0, page_length: int | None = 50, filters: str | builtins.list | dict | None = None,
+		order_by: str | None = None, summary: str | dict | None = None):
 	"""Chat logs of a space as one list, newest first, ordered so that the groups of group_by (day, area, project) stay together.
 	Filters: area (with its sub-areas, or "none"), project, open_items=1 for chats that still have an open item, from_date, to_date.
 	`total` is the number of chats the filters match. `with_open_items` and `by_area` count inside the same filters.
@@ -146,8 +150,8 @@ def list(space=None, area=None, project=None, open_items=0, from_date=None, to_d
 		"by_area": [{"area": a or "none", "area_name": area_names.get(a) or "No area", "count": n} for a, n in by_area]}
 
 
-@frappe.whitelist()
-def get(chat):
+@frappe.whitelist(methods=["GET"])
+def get(chat: str):
 	"""One chat log with its summary and open items."""
 	doc = permissions.get_doc_checked("Life Chat Log", chat)
 	row = _chat_rows([frappe._dict({k: doc.get(k) for k in ("name", "title", "date", "url", "assistant", "summary_md", "area", "project", "is_archived")})])[0]
@@ -162,8 +166,10 @@ ASSISTANTS = ("Claude", "ChatGPT", "Codex", "Claude Code", "Other")
 
 
 @frappe.whitelist(methods=["POST"])
-def log(space=None, title=None, date=None, url=None, assistant="Claude", summary_md=None, open_items=None, area=None, project=None, tags=None,
-		also_in=None, source_system=None, external_id=None, transcript_md=None, updated_on=None):
+def log(space: str | None = None, title: str | None = None, date: str | datetime.date | None = None, url: str | None = None, assistant: str | None = "Claude",
+		summary_md: str | None = None, open_items: str | builtins.list | None = None, area: str | None = None, project: str | None = None, tags: str | builtins.list | None = None,
+		also_in: str | builtins.list | None = None, source_system: str | None = None, external_id: str | None = None, transcript_md: str | None = None,
+		updated_on: str | datetime.datetime | None = None):
 	"""Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal.
 	open_items is a list of strings. area, project and tags take a name or a title.
 
@@ -233,8 +239,8 @@ def log(space=None, title=None, date=None, url=None, assistant="Claude", summary
 	return {"name": doc.name, "created": True}
 
 
-@frappe.whitelist()
-def needs_summary(space=None, start=0, page_length=50):
+@frappe.whitelist(methods=["GET"])
+def needs_summary(space: str | None = None, start: int | None = 0, page_length: int | None = 50):
 	"""Chat logs with no summary yet (imported chats), oldest activity first, for an agent to summarise with
 	lifeos.api.chats.save_summary. Each row has name, title, date, updated_on, assistant, url and the transcript's length."""
 	space = permissions.resolve_space(space)
@@ -249,15 +255,15 @@ def needs_summary(space=None, start=0, page_length=50):
 	return {"space": space, "chats": rows, "total": total}
 
 
-@frappe.whitelist()
-def transcript(chat):
+@frappe.whitelist(methods=["GET"])
+def transcript(chat: str):
 	"""The full transcript of a chat log, for an agent writing its summary."""
 	doc = permissions.get_doc_checked("Life Chat Log", chat)
 	return {"name": doc.name, "title": doc.title, "transcript_md": doc.transcript_md or ""}
 
 
 @frappe.whitelist(methods=["POST"])
-def save_summary(chat, summary_md, open_items=None):
+def save_summary(chat: str, summary_md: str, open_items: str | builtins.list | None = None):
 	"""Write the summary of a chat log (and add open items found in it). Agents may call this."""
 	doc = permissions.get_doc_checked("Life Chat Log", chat, "write")
 	doc.summary_md = summary_md
@@ -280,7 +286,7 @@ def _row(chat, row):
 
 
 @frappe.whitelist(methods=["POST"])
-def make_task(chat, row):
+def make_task(chat: str, row: str):
 	"""Turn an open item into a task. People only: an open item becomes a task only when the owner asks."""
 	if permissions.is_agent():
 		frappe.throw(_("Only a person can turn an open item into a task."), frappe.PermissionError)
@@ -295,7 +301,7 @@ def make_task(chat, row):
 
 
 @frappe.whitelist(methods=["POST"])
-def close_item(chat, row, reopen=0):
+def close_item(chat: str, row: str, reopen: bool | int | None = 0):
 	"""Close an open item without making a task, or open it again."""
 	doc, item = _row(chat, row)
 	item.status = "Open" if int(reopen or 0) else "Closed"

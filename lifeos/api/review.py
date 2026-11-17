@@ -38,7 +38,7 @@ def _decide(prop, decision, payload=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def decide(proposal, decision, payload=None):
+def decide(proposal: str, decision: str, payload: str | dict | None = None):
 	"""Accept or reject one proposal. `payload` may carry edited values. People only."""
 	_people_only()
 	if decision not in ("accept", "reject"):
@@ -54,7 +54,7 @@ def decide(proposal, decision, payload=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def decide_all(item, decision):
+def decide_all(item: str, decision: str):
 	"""Accept or reject every pending proposal of an item. A proposal that cannot be accepted stays pending, with its error."""
 	_people_only()
 	if decision not in ("accept", "reject"):
@@ -75,7 +75,7 @@ def decide_all(item, decision):
 
 
 @frappe.whitelist(methods=["POST"])
-def update_payload(proposal, payload):
+def update_payload(proposal: str, payload: str | dict):
 	"""Save edited values on a pending proposal without deciding it, for example a changed area chip."""
 	_people_only()
 	prop = permissions.get_doc_checked("Life Proposal", proposal, "write")

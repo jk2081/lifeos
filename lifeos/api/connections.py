@@ -48,8 +48,8 @@ def _out(c):
 		"last_received_what": c.last_received_what, "quiet": quiet, "quiet_hours": hours}
 
 
-@frappe.whitelist()
-def defaults(space=None, system=None):
+@frappe.whitelist(methods=["GET"])
+def defaults(space: str | None = None, system: str | None = None):
 	"""The filing defaults for what arrives from `system` in `space`: default_area, default_project, default_intent and active.
 	A system with no connection row answers Process with no area or project."""
 	space = permissions.resolve_space(space)
@@ -59,8 +59,8 @@ def defaults(space=None, system=None):
 	return {**_out(c), "known": 1}
 
 
-@frappe.whitelist()
-def list(space=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None):
 	"""Every connection of a space, with its defaults, when something last arrived and whether it has been quiet too long."""
 	space = permissions.resolve_space(space)
 	rows = frappe.get_all("Life Connection", filters={"space": space},
@@ -70,7 +70,9 @@ def list(space=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def save(space=None, system=None, name=None, label=None, default_area=None, default_project=None, default_intent=None, active=None):
+def save(space: str | None = None, system: str | None = None, name: str | None = None, label: str | None = None,
+		default_area: str | None = None, default_project: str | None = None, default_intent: str | None = None,
+		active: bool | int | None = None):
 	"""Create or change a connection. People with Write access only; agents read the defaults and cannot change them."""
 	if permissions.is_agent():
 		frappe.throw(_("Only a person can change a connection."), frappe.PermissionError)
@@ -98,7 +100,7 @@ def save(space=None, system=None, name=None, label=None, default_area=None, defa
 # ---------- chat export import ----------
 
 @frappe.whitelist(methods=["POST"])
-def start_import(space=None, system=None, file_url=None):
+def start_import(space: str | None = None, system: str | None = None, file_url: str | None = None):
 	"""Import a Claude (system=claude) or ChatGPT (system=chatgpt) data export: the .zip uploaded as a private file.
 	It runs in a background job; import_status shows its progress. People with Write access only."""
 	from lifeos import chat_import
@@ -125,8 +127,8 @@ def start_import(space=None, system=None, file_url=None):
 	return chat_import.progress(space, system)
 
 
-@frappe.whitelist()
-def import_status(space=None, system=None):
+@frappe.whitelist(methods=["GET"])
+def import_status(space: str | None = None, system: str | None = None):
 	"""The progress of the last chat import of this kind in this space: status (Queued, Reading, Importing, Done, Failed),
 	done and total, and the counts created, updated, unchanged and skipped (could not be read)."""
 	from lifeos import chat_import

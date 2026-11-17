@@ -19,9 +19,9 @@ SCOPED = {
 CLOSED_PROJECT = ("Done", "Dropped")
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 @frappe.validate_and_sanitize_search_inputs
-def link_query(doctype, txt, searchfield, start, page_len, filters, **kwargs):
+def link_query(doctype: str, txt: str, searchfield: str | None, start: int, page_len: int, filters: str | dict | list | None, **kwargs):
 	if doctype not in SCOPED:
 		frappe.throw("Not a filing DocType")
 	field = SCOPED[doctype]

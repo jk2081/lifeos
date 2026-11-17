@@ -1,4 +1,6 @@
 """Projects: the list across areas, a project page, completing and reopening."""
+import builtins
+
 import frappe
 from frappe import _
 
@@ -44,8 +46,10 @@ def count(space, **filters):
 	return frappe.db.sql(f"select count(*) from `tabLife Project` p where p.space=%(space)s {clause}", {"space": space, **values})[0][0]
 
 
-@frappe.whitelist()
-def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None, start=0, page_length=100, filters=None, order_by=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, include_done: bool | int = 0, status: str | None = None, area: str | None = None, sort: str | None = None,
+		dir: str | None = None, start: int | str | None = 0, page_length: int | str | None = 100, filters: str | builtins.list | dict | None = None,
+		order_by: str | None = None, summary: str | dict | None = None):
 	"""Projects of a space, as a flat list and grouped by area. With no status: active and on hold ones; include_done=1 for every status.
 	Filters: status (Active, On Hold, Done, Dropped), area (with its sub-areas). `total` is the number the filters match.
 	`tabs` counts the projects on each state tab of the Projects screen (Active, On Hold, Done, Dropped, all) under the same filters,
@@ -73,8 +77,8 @@ def list(space=None, include_done=0, status=None, area=None, sort=None, dir=None
 	return {"space": space, "groups": out, "projects": rows, "tabs": tabs, "total": frappe.db.sql(f"select count(*) from `tabLife Project` p where p.space=%(space)s {where}", {"space": space, **values})[0][0]}
 
 
-@frappe.whitelist()
-def get(project):
+@frappe.whitelist(methods=["GET"])
+def get(project: str):
 	"""A project page: its tasks, notes, documents and chats."""
 	doc = permissions.get_doc_checked("Life Project", project)
 	space = doc.space
@@ -122,15 +126,15 @@ def tab_counts_of(space, project, include_archived=0):
 	}
 
 
-@frappe.whitelist()
-def completion_info(project):
+@frappe.whitelist(methods=["GET"])
+def completion_info(project: str):
 	"""How many records will move to the Archive when the project is completed. Shown in the confirm dialog."""
 	doc = permissions.get_doc_checked("Life Project", project)
 	return {"project": doc.name, "title": doc.title, "records": archive.project_record_count(doc.name)}
 
 
 @frappe.whitelist(methods=["POST"])
-def set_status(project, status):
+def set_status(project: str, status: str):
 	"""Change a project's status. Done or Dropped archives it at once with every record whose project points to it."""
 	doc = permissions.get_doc_checked("Life Project", project, "write")
 	if status not in ("Active", "On Hold", "Done", "Dropped"):

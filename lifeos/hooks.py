@@ -43,7 +43,7 @@ doc_events = {
 doc_events["Event"] = {"validate": "lifeos.events.validate_event"}
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
 doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
-before_request = ["lifeos.permissions.no_desk_redirect"]
+before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.strict_get.before_request"]
 
 scheduler_events = {
 	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.trash.purge_old"],

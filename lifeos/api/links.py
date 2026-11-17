@@ -35,8 +35,8 @@ def _title(doctype, name):
 	return rules.title_of(doctype, name)
 
 
-@frappe.whitelist()
-def backlinks(doctype, name):
+@frappe.whitelist(methods=["GET"])
+def backlinks(doctype: str, name: str):
 	"""Records that link to this one with [[Title]], plus records tied to it by a field."""
 	doc = permissions.get_doc_checked(doctype, name)
 	out, seen = [], set()
@@ -62,8 +62,8 @@ def backlinks(doctype, name):
 	return out
 
 
-@frappe.whitelist()
-def suggest(space=None, text="", limit=12):
+@frappe.whitelist(methods=["GET"])
+def suggest(space: str | None = None, text: str | None = "", limit: int | None = 12):
 	"""Records for the [[ picker: notes, tasks, people, vault documents, chat logs, goals and projects whose title matches."""
 	space = permissions.resolve_space(space)
 	text = (text or "").strip()
@@ -86,8 +86,8 @@ def suggest(space=None, text="", limit=12):
 	return out
 
 
-@frappe.whitelist()
-def outgoing(doctype, name):
+@frappe.whitelist(methods=["GET"])
+def outgoing(doctype: str, name: str):
 	"""The stored links of a record, with each target's current title, for rendering."""
 	doc = permissions.get_doc_checked(doctype, name)
 	return rules.outgoing(doc)

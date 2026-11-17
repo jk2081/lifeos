@@ -9,8 +9,8 @@ TYPES = {"Life Note": "Note", "Life Person": "Person", "Life Goal": "Goal", "Lif
 MAX_NODES = 600
 
 
-@frappe.whitelist()
-def get(space=None, center=None, collection=None):
+@frappe.whitelist(methods=["GET"])
+def get(space: str | None = None, center: str | None = None, collection: str | None = None):
 	"""Nodes and edges for the graph view. `center` is "DocType/name": the graph is then limited to two steps around that record.
 	collection (Wiki or My notes) starts the graph from the notes of that collection only; linked records still join it."""
 	space = permissions.resolve_space(space)

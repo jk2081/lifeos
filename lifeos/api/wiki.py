@@ -154,9 +154,9 @@ def _check_text(content_md):
 PAGE_SORTS = {"title": "n.title", "modified": "n.modified", "creation": "n.creation"}
 
 
-@frappe.whitelist()
-def pages(space=None, area=None, project=None, include_archived=0, sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None,
-		summary=None):
+@frappe.whitelist(methods=["GET"])
+def pages(space: str | None = None, area: str | None = None, project: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0, page_length: int | None = 50,
+		filters: str | list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None):
 	"""The Wiki screen's Pages list: title, summary, area, sources count, updated. Newest first. Filters: area (with its
 	sub-areas, or "none"), project, and standard filters on Life Note."""
 	space = permissions.resolve_space(space)
@@ -185,16 +185,16 @@ def pages(space=None, area=None, project=None, include_archived=0, sort=None, di
 		r["modified"] = str(r.modified)[:19]
 	return {"space": space, "pages": rows, "total": total}
 
-@frappe.whitelist()
-def rules(space=None):
+@frappe.whitelist(methods=["POST"])
+def rules(space: str | None = None):
 	"""The rules page of the space's wiki: what it is for and how pages are written. Read it before writing."""
 	space = permissions.resolve_space(space)
 	doc = frappe.get_doc("Life Note", ensure_rules(space))
 	return {"name": doc.name, "title": doc.title, "content_md": doc.content_md or "", "version": version_of(doc)}
 
 
-@frappe.whitelist()
-def index(space=None, area=None, start=0, page_length=100, order_by=None):
+@frappe.whitelist(methods=["GET"])
+def index(space: str | None = None, area: str | None = None, start: int | None = 0, page_length: int | None = 100, order_by: str | None = None):
 	"""Wiki pages of a space: name, title, summary, area, sources count, updated. By title. Paginated (at most 500 a call)."""
 	space = permissions.resolve_space(space)
 	start, page_length = int(start or 0), min(max(int(page_length or 100), 1), 500)
@@ -214,14 +214,14 @@ def index(space=None, area=None, start=0, page_length=100, order_by=None):
 	return {"space": space, "pages": rows, "total": total, "start": start, "page_length": page_length}
 
 
-@frappe.whitelist()
-def get_page(name):
+@frappe.whitelist(methods=["GET"])
+def get_page(name: str):
 	"""One page: title, Markdown, summary, area, sources, links and a `version` token to send back with update_page."""
 	return _page_out(_page_doc(name))
 
 
-@frappe.whitelist()
-def search(space=None, query=None, collection=None, include_sources=0, limit=20):
+@frappe.whitelist(methods=["GET"])
+def search(space: str | None = None, query: str | None = None, collection: str | None = None, include_sources: bool | int | None = 0, limit: int | None = 20):
 	"""Full-text search over pages (collection Wiki, My notes, or both when not given) and, with include_sources=1, over
 	sources too. Each result has doctype, name, title, collection, summary and a snippet."""
 	from lifeos.api.search import _snippet, WORD
@@ -258,8 +258,8 @@ def search(space=None, query=None, collection=None, include_sources=0, limit=20)
 # ---------- writing (agents and people) ----------
 
 @frappe.whitelist(methods=["POST"])
-def create_page(space=None, title=None, content_md=None, summary=None, area=None, project=None, parent_note=None, sources=None,
-		change_note=None, source=None):
+def create_page(space: str | None = None, title: str | None = None, content_md: str | None = None, summary: str | None = None, area: str | None = None, project: str | None = None,
+		parent_note: str | None = None, sources: str | list | None = None, change_note: str | None = None, source: str | dict | None = None):
 	"""Create a Wiki page and a Created change. Refuses a title that already exists in the space's Wiki (edit that page instead).
 	sources: [{doctype, name}] the page cites. source: the one source that prompted this change, if any."""
 	space = permissions.resolve_space(space, write=True)
@@ -287,7 +287,8 @@ def create_page(space=None, title=None, content_md=None, summary=None, area=None
 
 
 @frappe.whitelist(methods=["POST"])
-def update_page(name, content_md=None, base_version=None, summary=None, sources_add=None, change_note=None, source=None, title=None):
+def update_page(name: str, content_md: str | None = None, base_version: str | None = None, summary: str | None = None, sources_add: str | list | None = None,
+		change_note: str | None = None, source: str | dict | None = None, title: str | None = None):
 	"""Edit a Wiki page if `base_version` (from get_page) is still current. If the page changed since, nothing is written and
 	the answer is {"conflict": true, "current": <the page now>}: read it, merge, and send again. Refuses My notes pages and
 	the rules page. Writes an Edited change."""
@@ -327,7 +328,7 @@ def update_page(name, content_md=None, base_version=None, summary=None, sources_
 
 
 @frappe.whitelist(methods=["POST"])
-def cite(name, sources):
+def cite(name: str, sources: str | list):
 	"""Add sources to a page without changing its text."""
 	doc = _page_doc(name, "write")
 	if doc.collection != "Wiki" and permissions.is_agent():
@@ -349,7 +350,7 @@ def cite(name, sources):
 
 
 @frappe.whitelist(methods=["POST"])
-def move(name, to):
+def move(name: str, to: str):
 	"""Keep in My notes (to="My notes") or Hand to the wiki (to="Wiki"). People only. A page moved to My notes can no longer
 	be changed by agents. The rules page stays in the wiki."""
 	if permissions.is_agent():
@@ -390,9 +391,9 @@ def _decorate_changes(rows):
 	return rows
 
 
-@frappe.whitelist()
-def changes(space=None, note=None, by=None, source=None, from_date=None, to_date=None, start=0, page_length=50, filters=None, order_by=None,
-		summary=None):
+@frappe.whitelist(methods=["GET"])
+def changes(space: str | None = None, note: str | None = None, by: str | None = None, source: str | None = None, from_date: str | None = None, to_date: str | None = None, start: int | None = 0,
+		page_length: int | None = 50, filters: str | list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None):
 	"""Every Life Wiki Change of a space, newest first. Filters: note, by (a user), source ("doctype:name" or a name),
 	from_date, to_date, and standard filters on Life Wiki Change. Paginated."""
 	space = permissions.resolve_space(space)
@@ -427,8 +428,8 @@ def changes(space=None, note=None, by=None, source=None, from_date=None, to_date
 		[(p, ("Life OS" if p == "Administrator" else None)) for p in people]]}
 
 
-@frappe.whitelist()
-def change(name):
+@frappe.whitelist(methods=["GET"])
+def change(name: str):
 	"""One change with the text before and after, and whether the page has changed since."""
 	ch = frappe.get_doc("Life Wiki Change", name)
 	page_doc = _page_doc(ch.note)  # the page's own permission check
@@ -439,7 +440,7 @@ def change(name):
 
 
 @frappe.whitelist(methods=["POST"])
-def undo(change, force=0):
+def undo(change: str, force: bool | int | None = 0):
 	"""Put back the text from before a change. If the page has changed since that change, nothing is done and the answer is
 	{"conflict": true, "current_md": ...} unless force=1 (revert anyway). Writes a Reverted change."""
 	ch = frappe.get_doc("Life Wiki Change", change)
@@ -512,8 +513,8 @@ def _health_key(space):
 	return f"lifeos:wiki_health:{space}"
 
 
-@frappe.whitelist()
-def health(space=None, refresh=0):
+@frappe.whitelist(methods=["GET"])
+def health(space: str | None = None, refresh: bool | int | None = 0):
 	"""The wiki's health: orphans (no page links to them; the rules page excepted), broken [[links]], pages without sources,
 	near-duplicate titles (same title ignoring case and punctuation), ambiguous links, and reports filed by an agent as wiki
 	pages tagged health-report. Computed nightly and when asked (refresh=1)."""
@@ -535,8 +536,8 @@ def refresh_all_health():
 
 # ---------- the screen ----------
 
-@frappe.whitelist()
-def overview(space=None):
+@frappe.whitelist(methods=["POST"])
+def overview(space: str | None = None):
 	"""What the Wiki screen needs to open: the rules page (made on first visit), and the counts of its tabs."""
 	space = permissions.resolve_space(space)
 	rules_name = ensure_rules(space)
@@ -548,6 +549,6 @@ def overview(space=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def new_page(space=None, title=None, summary=None, area=None):
+def new_page(space: str | None = None, title: str | None = None, summary: str | None = None, area: str | None = None):
 	"""A person creates a wiki page from the Wiki screen."""
 	return create_page(space=space, title=title, content_md="", summary=summary or title, area=area)

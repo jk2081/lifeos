@@ -32,8 +32,8 @@ def chat_open_counts(names):
 		(names,)))
 
 
-@frappe.whitelist()
-def get(area, include_archived=0):
+@frappe.whitelist(methods=["GET"])
+def get(area: str, include_archived: bool | int = 0):
 	"""An area page: sub-areas, active projects, open tasks, reference notes, documents, recent chats with their open items,
 	the last 20 timeline entries, the goals of the active cycle, and records from other areas that are also filed here."""
 	doc = permissions.get_doc_checked("Life Area", area)
@@ -99,8 +99,8 @@ def tab_counts(space, area):
 	}
 
 
-@frappe.whitelist()
-def tree(space=None, include_archived=0):
+@frappe.whitelist(methods=["GET"])
+def tree(space: str | None = None, include_archived: bool | int = 0):
 	"""Every area of a space with its parent and small counts, for the Areas screen and for pickers."""
 	space = permissions.resolve_space(space)
 	filters = {"space": space}

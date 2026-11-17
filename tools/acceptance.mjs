@@ -16,6 +16,9 @@ const base = process.env.LIFEOS_URL || 'http://localhost:19000'
 const SITE = process.env.LIFEOS_SITE || 'acceptance.localhost'
 if (SITE === 'lifeos.localhost') throw new Error('acceptance runs on its own site, never on lifeos.localhost')
 if (!process.argv.includes('--no-reset')) execFileSync(path.join(root, 'scripts/acceptance-site.sh'), { stdio: 'inherit' })
+const GET_METHODS = new Set(JSON.parse(fs.readFileSync(path.join(root, 'frontend/src/lib/getMethods.json'), 'utf8')))
+const queryParams = (args) => Object.fromEntries(Object.entries(args || {}).filter(([, v]) => v !== undefined && v !== null)
+  .map(([k, v]) => [k, typeof v === 'boolean' ? (v ? 1 : 0) : typeof v === 'object' ? JSON.stringify(v) : v]))
 const SPACE = 'Private'
 const stamp = Date.now().toString(36)
 const results = []
@@ -41,8 +44,12 @@ async function session(user, width = 1440) {
   await page.goto(base + '/life', { waitUntil: 'networkidle' })
   const csrf = await page.evaluate(() => window.csrf_token)
   const api = async (method, args = {}, { raw = false } = {}) => {
-    const r = await page.request.post(`${base}/api/method/${method.includes('lifeos.') || method.startsWith('frappe.') ? method : 'lifeos.api.' + method}`,
-      { data: args, headers: { 'X-Frappe-CSRF-Token': csrf, 'Content-Type': 'application/json' } })
+    const full = method.includes('lifeos.') || method.startsWith('frappe.') ? method : 'lifeos.api.' + method
+    // reads the server answers only over GET go as GET, with the query string the front end sends (lib/api.js)
+    const r = GET_METHODS.has(full)
+      ? await page.request.get(`${base}/api/method/${full}`, { params: queryParams(args) })
+      : await page.request.post(`${base}/api/method/${full}`,
+        { data: args, headers: { 'X-Frappe-CSRF-Token': csrf, 'Content-Type': 'application/json' } })
     if (raw) return r
     if (!r.ok()) throw new Error(`${method} -> HTTP ${r.status()} ${(await r.text()).slice(0, 300)}`)
     return (await r.json()).message

@@ -73,8 +73,8 @@ def _agents(spaces):
 	return out
 
 
-@frappe.whitelist()
-def get(space=None):
+@frappe.whitelist(methods=["GET"])
+def get(space: str | None = None):
 	"""Everything the Settings screen shows for one space: the plain settings, the four lists with a count per row (archived
 	rows too, for the Archived section), the spaces with their members, and the agents. Role names are never sent.
 	The built-in Administrator is left out of every list."""
@@ -129,7 +129,7 @@ def ai_settings():
 
 
 @frappe.whitelist(methods=["POST"])
-def set_ai_key(key=None):
+def set_ai_key(key: str | None = None):
 	"""Store or clear the Anthropic API key (a Password field, encrypted by Frappe). The key is never returned."""
 	_admin_only()
 	doc = frappe.get_doc("Life Settings")
@@ -141,7 +141,7 @@ def set_ai_key(key=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_ai_price(model, input_per_mtok, output_per_mtok):
+def set_ai_price(model: str, input_per_mtok: float, output_per_mtok: float):
 	_admin_only()
 	doc = frappe.get_doc("Life Settings")
 	row = next((r for r in doc.ai_prices if r.model == model), None) or doc.append("ai_prices", {"model": model})
@@ -153,7 +153,7 @@ def set_ai_price(model, input_per_mtok, output_per_mtok):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_space_ask(space, ask_enabled=None, ask_can_read_vault=None):
+def set_space_ask(space: str, ask_enabled: bool | int | None = None, ask_can_read_vault: bool | int | None = None):
 	"""Ask on or off for a space, and whether Ask may read its Vault documents. Owner only."""
 	_admin_only()
 	doc = frappe.get_doc("Life Space", space)
@@ -166,7 +166,7 @@ def set_space_ask(space, ask_enabled=None, ask_can_read_vault=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def save(values):
+def save(values: str | dict):
 	"""Change Life Settings. Owner only."""
 	_admin_only()
 	values = parse(values, {}) or {}
@@ -193,7 +193,9 @@ ARCHIVABLE = ("area", "tag", "habit", "dimension")
 
 
 @frappe.whitelist(methods=["POST"])
-def save_item(kind, space=None, name=None, title=None, parent_area=None, relation=None, sort_order=None, is_archived=None, delete=0, with_children=1):
+def save_item(kind: str, space: str | None = None, name: str | None = None, title: str | None = None, parent_area: str | None = None,
+		relation: str | None = None, sort_order: int | None = None, is_archived: bool | int | None = None, delete: bool | int = 0,
+		with_children: bool | int = 1):
 	"""Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person.
 	Archiving sets archived_on to today; records filed under the heading are not changed. Archiving an area archives its
 	sub-areas with it. Restoring an area puts it back under its old parent if that parent is active, otherwise at the top
@@ -258,7 +260,7 @@ def save_item(kind, space=None, name=None, title=None, parent_area=None, relatio
 
 
 @frappe.whitelist(methods=["POST"])
-def create_space(space_name, owner_user=None, starter_areas=1):
+def create_space(space_name: str, owner_user: str | None = None, starter_areas: bool | int = 1):
 	"""Create a space, for example a private space for a family member, with the starter areas. Owner only."""
 	_admin_only()
 	from lifeos import seed
@@ -276,7 +278,7 @@ def create_space(space_name, owner_user=None, starter_areas=1):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_member(space, user, access="Write", remove=0):
+def set_member(space: str, user: str, access: str = "Write", remove: bool | int = 0):
 	"""Add a user to a space, change their access, or remove them. Owner only. The user must already exist."""
 	_admin_only()
 	doc = frappe.get_doc("Life Space", space)
@@ -303,7 +305,7 @@ def set_member(space, user, access="Write", remove=0):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_agent_vault(space, allowed):
+def set_agent_vault(space: str, allowed: bool | int):
 	"""Let agents open the documents of one space's Vault, or not. Off by default. Life Admin only."""
 	_admin_only()
 	doc = frappe.get_doc("Life Space", space)
@@ -312,8 +314,8 @@ def set_agent_vault(space, allowed):
 	return {"space": doc.name, "agents_can_read_vault": doc.agents_can_read_vault}
 
 
-@frappe.whitelist()
-def find_users(txt=""):
+@frappe.whitelist(methods=["GET"])
+def find_users(txt: str | None = ""):
 	"""People who can be added to a space: enabled website or desk users, never Administrator, Guest or an agent. Admin only."""
 	_admin_only()
 	like = f"%{txt or ''}%"
@@ -323,7 +325,7 @@ def find_users(txt=""):
 
 
 @frappe.whitelist(methods=["POST"])
-def reorder(kind, names, parent_area=None):
+def reorder(kind: str, names: str | list, parent_area: str | None = None):
 	"""Put the rows of one ordered list (areas, dimensions) in this order, in one call. For areas, `names` are siblings
 	and `parent_area` is their parent ("" for the top level): moving an area into this list nests it there."""
 	from lifeos.api.utils import parse

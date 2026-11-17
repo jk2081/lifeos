@@ -18,7 +18,7 @@ def _person():
 	return frappe.session.user
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def get_all():
 	"""Every saved list state of the session user, as {"<screen>|<space>": state}. Read once when the app starts."""
 	user = _person()
@@ -34,7 +34,7 @@ def get_all():
 
 
 @frappe.whitelist(methods=["POST"])
-def save(screen, space=None, state=None):
+def save(screen: str, space: str | None = None, state: str | dict | None = None):
 	"""Save the state of one screen in one space for the session user. It replaces what was saved before."""
 	user = _person()
 	screen = str(screen or "").strip()

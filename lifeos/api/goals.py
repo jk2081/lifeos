@@ -1,5 +1,7 @@
 """Goals of every type: 12 Week Year goals (in a cycle, with weekly actions), Annual goals (with a target date) and
 Open goals. One list across types with the share of their tasks that is done."""
+import builtins
+
 import frappe
 from frappe import _
 from frappe.utils import getdate
@@ -67,9 +69,10 @@ def where_clause(space, state=None, goal_type=None, area=None, cycle=None, targe
 	return "".join(" and " + w for w in where), values
 
 
-@frappe.whitelist()
-def list(space=None, state="in_progress", goal_type=None, area=None, cycle=None, target_from=None, target_to=None,
-		sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, state: str | None = "in_progress", goal_type: str | None = None, area: str | None = None,
+		cycle: str | None = None, target_from: str | None = None, target_to: str | None = None, sort: str | None = None, dir: str | None = None, start: int = 0, page_length: int = 50,
+		filters: str | builtins.list | None = None, order_by: str | None = None, summary: str | dict | None = None):
 	"""Goals of a space of every type. state: in_progress (default), achieved, closed (Partly Achieved, Not Achieved,
 	Carried, Dropped) or all. Each row has tasks_done and tasks_counted, and `score` (the 12 Week Year percentage; None
 	for other types). `tabs` counts each state under the other filters; `summary_line` has goals in progress and tasks
@@ -129,7 +132,7 @@ def _person_only():
 
 
 @frappe.whitelist(methods=["POST"])
-def create(title, goal_type="Open", space=None, area=None, project=None, target_date=None, cycle=None):
+def create(title: str, goal_type: str = "Open", space: str | None = None, area: str | None = None, project: str | None = None, target_date: str | None = None, cycle: str | None = None):
 	"""Create a goal. A 12 Week Year goal needs a cycle; an Annual goal needs a target date."""
 	_person_only()
 	if goal_type not in TYPES:
@@ -148,7 +151,7 @@ def create(title, goal_type="Open", space=None, area=None, project=None, target_
 
 
 @frappe.whitelist(methods=["POST"])
-def close(goal, outcome, result_note=None):
+def close(goal: str, outcome: str, result_note: str | None = None):
 	"""Set the outcome of an Annual or Open goal, with an optional result note. 12 Week Year goals close with their cycle."""
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
@@ -164,7 +167,7 @@ def close(goal, outcome, result_note=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def add_to_cycle(goal, cycle):
+def add_to_cycle(goal: str, cycle: str):
 	"""Move an Annual or Open goal into the active or a planned 12 Week Year. It becomes a 12 Week Year goal in that cycle
 	and keeps its tasks. carried_from is left empty: it records carrying between cycles."""
 	_person_only()
@@ -182,8 +185,8 @@ def add_to_cycle(goal, cycle):
 	return {"name": doc.name, "cycle": c.name}
 
 
-@frappe.whitelist()
-def picker(space=None):
+@frappe.whitelist(methods=["GET"])
+def picker(space: str | None = None):
 	"""Every goal in progress, grouped by type, for the goal picker on a task."""
 	space = permissions.resolve_space(space)
 	rows = frappe.db.sql("""select g.name, g.title, g.goal_type, g.area, c.title as cycle_title from `tabLife Goal` g
@@ -193,8 +196,8 @@ def picker(space=None):
 	return rows
 
 
-@frappe.whitelist()
-def cycles(space=None):
+@frappe.whitelist(methods=["GET"])
+def cycles(space: str | None = None):
 	"""The current and planned 12 Week Years of a space: where a new 12 Week Year goal can go, or an open goal can move."""
 	space = permissions.resolve_space(space)
 	return frappe.get_all("Life Cycle", filters={"space": space, "status": ("in", ["Active", "Planned"])}, fields=["name", "title", "status"], order_by="start_date")

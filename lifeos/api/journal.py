@@ -20,8 +20,8 @@ def _cycle(cycle=None, space=None):
 
 # ---------- 12 Week Year ----------
 
-@frappe.whitelist()
-def grid(cycle=None, space=None):
+@frappe.whitelist(methods=["GET"])
+def grid(cycle: str | None = None, space: str | None = None):
 	"""The 12 Week Year grid of a cycle: goals, actions, ticks per week, week scores and the average."""
 	doc = _cycle(cycle, space)
 	if not doc:
@@ -34,14 +34,14 @@ def grid(cycle=None, space=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def tick(action, week, count):
+def tick(action: str, week: int, count: int):
 	"""Set the ticks of a goal action in a week. Returns that week's score."""
 	permissions.require_login()
 	return rules.set_tick(action, week, count)
 
 
-@frappe.whitelist()
-def week_score(cycle=None, week=None, space=None):
+@frappe.whitelist(methods=["GET"])
+def week_score(cycle: str | None = None, week: int | None = None, space: str | None = None):
 	"""Done over planned for a week of a cycle. Defaults: the active cycle and its current week."""
 	doc = _cycle(cycle, space)
 	if not doc:
@@ -50,14 +50,14 @@ def week_score(cycle=None, week=None, space=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_action_status(action, status):
+def set_action_status(action: str, status: str):
 	"""Mark an action Done once and for all, Dropped, or Open again."""
 	permissions.require_login()
 	return rules.set_action_status(action, status)
 
 
 @frappe.whitelist(methods=["POST"])
-def save_goal(goal=None, cycle=None, title=None, area=None, project=None, actions=None):
+def save_goal(goal: str | None = None, cycle: str | None = None, title: str | None = None, area: str | None = None, project: str | None = None, actions: str | list | None = None):
 	"""Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}."""
 	permissions.require_login()
 	actions = parse(actions)
@@ -94,15 +94,15 @@ def save_goal(goal=None, cycle=None, title=None, area=None, project=None, action
 
 
 @frappe.whitelist(methods=["POST"])
-def delete_goal(goal):
+def delete_goal(goal: str):
 	"""Delete a goal. Refused for agents, who cannot delete."""
 	doc = permissions.get_doc_checked("Life Goal", goal, "delete")
 	doc.delete()
 	return {"deleted": goal}
 
 
-@frappe.whitelist()
-def goals(space=None, area=None):
+@frappe.whitelist(methods=["GET"])
+def goals(space: str | None = None, area: str | None = None):
 	"""Every goal across every cycle, grouped by cycle: planned, active, then closed, newest first."""
 	space = permissions.resolve_space(space)
 	cycles = frappe.get_all("Life Cycle", filters={"space": space}, fields=["name", "title", "status", "start_date", "end_date", "final_score"],
@@ -138,8 +138,8 @@ def goals(space=None, area=None):
 	return {"cycles": out, "target": target, "areas": [a for a in areas if a.name in used]}
 
 
-@frappe.whitelist()
-def goal(goal):
+@frappe.whitelist(methods=["GET"])
+def goal(goal: str):
 	"""A goal page: the goal, its actions, and its history across cycles through the carried_from chain."""
 	from lifeos.api.goals import task_counts
 
@@ -167,21 +167,21 @@ def goal(goal):
 
 
 @frappe.whitelist(methods=["POST"])
-def close_cycle(cycle, outcomes=None):
+def close_cycle(cycle: str, outcomes: str | list | None = None):
 	"""Close an active cycle after its end date. `outcomes` is a list of {goal, outcome, result_note}."""
 	permissions.require_login()
 	return rules.close_cycle(cycle, parse(outcomes, []))
 
 
 @frappe.whitelist(methods=["POST"])
-def plan_next_cycle(cycle, goals=None, title=None):
+def plan_next_cycle(cycle: str, goals: str | list | None = None, title: str | None = None):
 	"""Create the next cycle, starting the Monday after this one ends, and carry the chosen goals with their open actions."""
 	permissions.require_login()
 	return rules.plan_next_cycle(cycle, parse(goals, []), title)
 
 
 @frappe.whitelist(methods=["POST"])
-def start_cycle(cycle):
+def start_cycle(cycle: str):
 	"""Make a planned cycle the active one."""
 	doc = permissions.get_doc_checked("Life Cycle", cycle, "write")
 	if doc.status != "Planned":
@@ -192,7 +192,7 @@ def start_cycle(cycle):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_cycle(space=None, start_date=None, title=None):
+def create_cycle(space: str | None = None, start_date: str | None = None, title: str | None = None):
 	"""Create the first cycle of a space. It starts on the given date, or next Monday."""
 	space = permissions.resolve_space(space, write=True)
 	start = getdate(start_date) if start_date else rules.next_monday(add_days(today(), -1))
@@ -213,8 +213,8 @@ def _plan_dict(plan):
 	}
 
 
-@frappe.whitelist()
-def month(space=None, year=None, month=None, create=0):
+@frappe.whitelist(methods=["POST"])
+def month(space: str | None = None, year: int | None = None, month: int | None = None, create: bool | int = 0):
 	"""The plan of one month: goals, mindsweep, habits with their month so far, and the latest check-in."""
 	space = permissions.resolve_space(space)
 	now = getdate(today())
@@ -231,7 +231,7 @@ def month(space=None, year=None, month=None, create=0):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_month_goal(plan, row=None, title=None, priority=None, status=None, area=None, delete=0):
+def save_month_goal(plan: str, row: str | None = None, title: str | None = None, priority: str | None = None, status: str | None = None, area: str | None = None, delete: bool | int = 0):
 	"""Add, change or remove one goal of a month plan."""
 	doc = permissions.get_doc_checked("Life Month Plan", plan, "write")
 	if row:
@@ -259,7 +259,7 @@ def save_month_goal(plan, row=None, title=None, priority=None, status=None, area
 
 
 @frappe.whitelist(methods=["POST"])
-def save_month_text(plan, mindsweep_md=None, projects_md=None):
+def save_month_text(plan: str, mindsweep_md: str | None = None, projects_md: str | None = None):
 	"""Save the mindsweep or the projects text of a month plan (autosave)."""
 	doc = permissions.get_doc_checked("Life Month Plan", plan, "write")
 	if mindsweep_md is not None:
@@ -271,14 +271,14 @@ def save_month_text(plan, mindsweep_md=None, projects_md=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def carry_month_goal(plan, row):
+def carry_month_goal(plan: str, row: str):
 	"""Carry an open month goal into next month's plan. The old one is marked Carried."""
 	permissions.require_login()
 	return rules.carry_month_goal(plan, row)
 
 
 @frappe.whitelist(methods=["POST"])
-def make_task_from_goal(plan, row):
+def make_task_from_goal(plan: str, row: str):
 	"""Create a Life Task linked to a month goal."""
 	doc = permissions.get_doc_checked("Life Month Plan", plan, "write")
 	r = next((g for g in doc.goals if g.name == row), None)
@@ -295,8 +295,8 @@ def make_task_from_goal(plan, row):
 
 # ---------- habits ----------
 
-@frappe.whitelist()
-def habits(space=None, year=None, month=None):
+@frappe.whitelist(methods=["GET"])
+def habits(space: str | None = None, year: int | None = None, month: int | None = None):
 	"""The habit grid of one month: each tracked habit with its done days, count, target and percentage."""
 	space = permissions.resolve_space(space)
 	now = getdate(today())
@@ -304,21 +304,21 @@ def habits(space=None, year=None, month=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def toggle_habit(habit, date=None, done=None):
+def toggle_habit(habit: str, date: str | None = None, done: bool | int | None = None):
 	"""Tick or untick a habit on a day."""
 	permissions.require_login()
 	return rules.toggle_habit(habit, date, done)
 
 
-@frappe.whitelist()
-def habit_library(space=None):
+@frappe.whitelist(methods=["GET"])
+def habit_library(space: str | None = None):
 	"""Every habit ever tracked in a space."""
 	space = permissions.resolve_space(space)
 	return frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title", "area"], order_by="title", limit=200)
 
 
 @frappe.whitelist(methods=["POST"])
-def set_month_habits(space=None, year=None, month=None, habits=None):
+def set_month_habits(space: str | None = None, year: int | None = None, month: int | None = None, habits: str | list | None = None):
 	"""Set the habits tracked in one month. `habits` is an ordered list of {habit or title, days_per_week}. Other months are untouched."""
 	space = permissions.resolve_space(space, write=True)
 	rows = []
@@ -336,8 +336,8 @@ def set_month_habits(space=None, year=None, month=None, habits=None):
 	return rules.set_month_habits(space, year, month, rows)
 
 
-@frappe.whitelist()
-def habits_year(space=None, year=None):
+@frappe.whitelist(methods=["GET"])
+def habits_year(space: str | None = None, year: int | None = None):
 	"""Each habit's monthly percentage for the months of a year in which it was tracked."""
 	space = permissions.resolve_space(space)
 	return rules.habits_year(space, year or getdate(today()).year)
@@ -352,8 +352,8 @@ def _checkin_dict(doc):
 			"situation_low": s.situation_low, "situation_high": s.situation_high, "note": s.note or ""} for s in doc.scores]}
 
 
-@frappe.whitelist()
-def checkins(space=None, start=0, page_length=30):
+@frappe.whitelist(methods=["GET"])
+def checkins(space: str | None = None, start: int = 0, page_length: int = 30):
 	"""Check-ins of a space, newest first, with the dimensions and a series per dimension for the charts (midpoint of each range)."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
@@ -373,7 +373,7 @@ def checkins(space=None, start=0, page_length=30):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_checkin(space=None, date=None, scores=None, reflection_md=None, name=None):
+def save_checkin(space: str | None = None, date: str | None = None, scores: str | list | None = None, reflection_md: str | None = None, name: str | None = None):
 	"""Create or change a check-in. Each score is {dimension, habits, situation, note}; a score is a number or a range such as 2-3."""
 	from lifeos.life.doctype.life_check_in.life_check_in import parse_range
 
@@ -399,8 +399,8 @@ def save_checkin(space=None, date=None, scores=None, reflection_md=None, name=No
 
 # ---------- pages ----------
 
-@frappe.whitelist()
-def pages(space=None, start=0, page_length=24):
+@frappe.whitelist(methods=["GET"])
+def pages(space: str | None = None, start: int = 0, page_length: int = 24):
 	"""Photographed journal pages by date, newest first."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
@@ -411,8 +411,8 @@ def pages(space=None, start=0, page_length=24):
 	return {"pages": rows, "has_more": len(rows) == page_length}
 
 
-@frappe.whitelist()
-def page_detail(page):
+@frappe.whitelist(methods=["GET"])
+def page_detail(page: str):
 	"""One journal page: image, transcript, and the records created from the same inbox item."""
 	from lifeos import links
 
@@ -430,7 +430,7 @@ def page_detail(page):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_page_transcript(page, transcript_md):
+def save_page_transcript(page: str, transcript_md: str):
 	"""Correct the transcript of a journal page."""
 	doc = permissions.get_doc_checked("Life Journal Page", page, "write")
 	doc.transcript_md = transcript_md
@@ -440,8 +440,8 @@ def save_page_transcript(page, transcript_md):
 
 # ---------- weekly review ----------
 
-@frappe.whitelist()
-def weekly_review(space=None, week_start=None):
+@frappe.whitelist(methods=["GET"])
+def weekly_review(space: str | None = None, week_start: str | None = None):
 	"""Everything the weekly review gathers for one week (Monday to Sunday)."""
 	from lifeos import archive
 	from lifeos.api import tasks as task_api
@@ -491,7 +491,7 @@ def weekly_review(space=None, week_start=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def save_review_note(space=None, week_start=None, content_md=""):
+def save_review_note(space: str | None = None, week_start: str | None = None, content_md: str = ""):
 	"""Save the owner's notes for a week as a Life Note under the Reviews parent note."""
 	space = permissions.resolve_space(space, write=True)
 	start = getdate(week_start)

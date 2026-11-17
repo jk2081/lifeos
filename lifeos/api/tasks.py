@@ -1,4 +1,7 @@
 """Tasks: list, quick add, status, carry forward, open loops."""
+import builtins
+from datetime import date
+
 import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
@@ -127,10 +130,13 @@ def count(space, **filters):
 	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 
 
-@frappe.whitelist()
-def list(space=None, status="open", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None,
-		include_archived=0, start=0, page_length=50, due=None, done=0, loops=0, completed_from=None, completed_to=None,
-		sort=None, dir=None, filters=None, order_by=None, fields=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, status: str | None = "open", area: str | None = None, project: str | None = None,
+		tag: str | None = None, priority: str | None = None, goal: str | None = None, month_plan: str | None = None,
+		include_archived: bool | int = 0, start: int | str | None = 0, page_length: int | str | None = 50, due: str | None = None,
+		done: bool | int = 0, loops: bool | int = 0, completed_from: str | date | None = None, completed_to: str | date | None = None,
+		sort: str | None = None, dir: str | None = None, filters: str | builtins.list | dict | None = None, order_by: str | None = None,
+		fields: str | builtins.list | None = None, summary: str | dict | None = None):
 	"""Tasks of a space. status: open (Open, Doing and Waiting), open_doing, done, all, or one status; done=1 adds Done and Dropped to open.
 	area takes an area (its sub-areas and also-in count) or "none". due: overdue, today, week, none, or several with commas.
 	loops=1 keeps open tasks older than 14 days with no date. completed_from and completed_to bound completed_on.
@@ -162,8 +168,8 @@ def list(space=None, status="open", area=None, project=None, tag=None, priority=
 	return {"tasks": rows, "total": total, "start": start, "page_length": page_length, "today": today(), "tabs": tabs}
 
 
-@frappe.whitelist()
-def get(task):
+@frappe.whitelist(methods=["GET"])
+def get(task: str):
 	"""One task with its filing, source and tags."""
 	doc = permissions.get_doc_checked("Life Task", task)
 	row = decorate([frappe._dict({f: doc.get(f) for f in FIELDS})])[0]
@@ -177,7 +183,8 @@ def get(task):
 
 
 @frappe.whitelist(methods=["POST"])
-def quick_add(text, space=None, area=None, project=None, goal=None, due_date=None, priority=None, month_plan=None):
+def quick_add(text: str, space: str | None = None, area: str | None = None, project: str | None = None, goal: str | None = None,
+		due_date: str | date | None = None, priority: str | None = None, month_plan: str | None = None):
 	"""Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date."""
 	space = permissions.resolve_space(space, write=True)
 	title, when = datewords.parse(text)
@@ -193,7 +200,7 @@ def quick_add(text, space=None, area=None, project=None, goal=None, due_date=Non
 
 
 @frappe.whitelist(methods=["POST"])
-def set_status(task, status, waiting_on=None):
+def set_status(task: str, status: str, waiting_on: str | None = None):
 	"""Change a task's status. Done fills completed_on. Waiting needs waiting_on."""
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	if status == "Someday" and doc.status != "Someday":  # parking goes through Someday, which agents may not do
@@ -209,7 +216,7 @@ def set_status(task, status, waiting_on=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def update(task, values):
+def update(task: str, values: str | dict):
 	"""Change fields of a task. Only task fields a person edits are accepted."""
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	values = frappe.parse_json(values) or {}
@@ -228,7 +235,7 @@ def update(task, values):
 
 
 @frappe.whitelist(methods=["POST"])
-def carry_forward(task):
+def carry_forward(task: str):
 	"""Copy an open task into next month's plan, mark the old one Carried and set carried_from."""
 	out = journal.carry_task(task)
 	return {**out, "new_task": get(out["task"])}
@@ -244,8 +251,8 @@ def open_loops_count(space):
 		{"space": space, "cutoff": add_days(today(), -OPEN_LOOP_DAYS)})[0][0]
 
 
-@frappe.whitelist()
-def open_loops(space=None, start=0, page_length=50):
+@frappe.whitelist(methods=["GET"])
+def open_loops(space: str | None = None, start: int | str | None = 0, page_length: int | str | None = 50):
 	"""Open tasks older than 14 days with no due date."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
@@ -261,7 +268,7 @@ def stale_tasks(space, limit=50):
 
 
 @frappe.whitelist(methods=["POST"])
-def decide_stale(task, decision):
+def decide_stale(task: str, decision: str):
 	"""The three buttons under Decide in the weekly review: do (due this week), carry, drop."""
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	if decision == "do":
@@ -279,7 +286,7 @@ def decide_stale(task, decision):
 
 
 @frappe.whitelist(methods=["POST"])
-def reschedule_overdue(space=None, to_date=None):
+def reschedule_overdue(space: str | None = None, to_date: str | date | None = None):
 	"""Move every open overdue task of a space (Open, Doing or Waiting, not archived, due before today) to `to_date`,
 	today by default. Each task is saved on its own, with the same write check as `update`. Returns how many moved."""
 	space = permissions.resolve_space(space, write=True)

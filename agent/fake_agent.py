@@ -30,10 +30,18 @@ class HttpClient:
 		self.url = url.rstrip("/")
 		self.auth = f"token {key}:{secret}"
 
+	# Reads answer only GET, with the arguments in the query string (agent/SKILL.md lists them); the rest take POST.
+	GET = {"meta.proposal_schema", "meta.space_context", "wiki.index", "wiki.get_page", "wiki.search", "wiki.pages",
+		"connections.defaults", "inbox.get"}
+
 	def call(self, method, **args):
-		req = urllib.request.Request(
-			f"{self.url}/api/method/lifeos.api.{method}", data=json.dumps(args).encode(),
-			headers={"Authorization": self.auth, "Content-Type": "application/json", "Accept": "application/json"}, method="POST")
+		url, headers = f"{self.url}/api/method/lifeos.api.{method}", {"Authorization": self.auth, "Accept": "application/json"}
+		if method in self.GET:
+			query = {k: json.dumps(v) if isinstance(v, (dict, list)) else v for k, v in args.items() if v is not None}
+			req = urllib.request.Request(f"{url}?{urllib.parse.urlencode(query)}", headers=headers, method="GET")
+		else:
+			headers["Content-Type"] = "application/json"
+			req = urllib.request.Request(url, data=json.dumps(args).encode(), headers=headers, method="POST")
 		try:
 			with urllib.request.urlopen(req, timeout=60) as res:
 				return json.loads(res.read().decode()).get("message")

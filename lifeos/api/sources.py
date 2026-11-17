@@ -1,6 +1,8 @@
 """Sources (UX fixes, set 4): the library of every capture, finished or not. A source is an inbox item (a file, voice note,
 photo, pasted text, web link, email or email digest) or a chat log, kept unchanged. The Inbox is the queue of sources that
 are not finished; Sources lists them all. Reads Life Index, so it needs one query for a page of rows."""
+import builtins
+
 import frappe
 from frappe import _
 
@@ -95,9 +97,10 @@ def _where(space, tab=None, area=None, project=None, from_date=None, to_date=Non
 	return where, values
 
 
-@frappe.whitelist()
-def list(space=None, tab=None, area=None, project=None, from_date=None, to_date=None, status=None, intent=None, system=None, assistant=None,
-		include_archived=0, open_items=0, sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, tab: str | None = None, area: str | None = None, project: str | None = None, from_date: str | None = None, to_date: str | None = None, status: str | None = None, intent: str | None = None,
+		system: str | None = None, assistant: str | None = None, include_archived: bool | int | None = 0, open_items: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
+		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None):
 	"""Every source of a space, newest first: inbox items and chat logs.
 	tab: all (default), chats, voice, documents, photos, articles, email (emails and email digests), text.
 	Filters: area (with its sub-areas, or "none"), project, from_date and to_date (received), status (inbox, done, failed),
@@ -150,8 +153,8 @@ def decorate(rows):
 	return out
 
 
-@frappe.whitelist()
-def made_from(doctype, name):
+@frappe.whitelist(methods=["GET"])
+def made_from(doctype: str, name: str):
 	"""What was made from one source: records created from it, and the wiki pages citing it."""
 	if doctype not in SOURCE_DOCTYPES:
 		frappe.throw(_("Not a source."))
@@ -179,7 +182,7 @@ def made_from(doctype, name):
 
 
 @frappe.whitelist(methods=["POST"])
-def refile(sources, area=None, project=None):
+def refile(sources: str | builtins.list, area: str | None = None, project: str | None = None):
 	"""Set the area (and project) of many sources at once, from the Sources list. `sources` is a list of
 	{doctype, name}. People only."""
 	if permissions.is_agent():

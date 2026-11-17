@@ -1,4 +1,6 @@
 """Library: notes in a tree under their area and project."""
+import builtins
+
 import frappe
 from frappe import _
 
@@ -7,8 +9,8 @@ from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, 
 from lifeos.api.utils import order_by as sort_order
 
 
-@frappe.whitelist()
-def tree(space=None, include_archived=0, collection="My notes"):
+@frappe.whitelist(methods=["GET"])
+def tree(space: str | None = None, include_archived: bool | int | None = 0, collection: str | None = "My notes"):
 	"""Every note of a space with what the tree needs: title, parent, area and project. At most 100 per call would hide notes,
 	so the tree returns light rows only and is capped at 2,000. collection: My notes (default), Wiki, or "all"."""
 	space = permissions.resolve_space(space)
@@ -30,9 +32,9 @@ def tree(space=None, include_archived=0, collection="My notes"):
 SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modified"}
 
 
-@frappe.whitelist()
-def list(space=None, area=None, project=None, tag=None, include_archived=0, sort=None, dir=None, start=0, page_length=50, filters=None, order_by=None, summary=None,
-		collection="My notes"):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, area: str | None = None, project: str | None = None, tag: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
+		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, collection: str | None = "My notes"):
 	"""Notes of a space as a flat list, newest first. Reads Life Index.
 	Filters: area (with its sub-areas, or "none"), project (a project, or "none" for reference notes), tag,
 	collection (My notes, the default; Wiki; or "all").
@@ -89,8 +91,8 @@ def mark_opened(doc):
 	frappe.db.sql("update `tabLife Index` set last_opened_on=%s where ref_doctype='Life Note' and ref_name=%s", (day, doc.name))
 
 
-@frappe.whitelist()
-def get(note):
+@frappe.whitelist(methods=["POST"])
+def get(note: str):
 	"""One note with its links resolved to current titles. A person opening it sets its last_opened_on (UX fixes, set 5)."""
 	doc = permissions.get_doc_checked("Life Note", note)
 	mark_opened(doc)
@@ -115,8 +117,8 @@ def version_of(doc):
 
 
 @frappe.whitelist(methods=["POST"])
-def save(note=None, space=None, title=None, content_md=None, area=None, project=None, parent_note=None, also_in=None, tag_ids=None,
-		base_version=None, summary=None, collection=None):
+def save(note: str | None = None, space: str | None = None, title: str | None = None, content_md: str | None = None, area: str | None = None, project: str | None = None, parent_note: str | None = None,
+		also_in: str | builtins.list | None = None, tag_ids: str | builtins.list | None = None, base_version: str | None = None, summary: str | None = None, collection: str | None = None):
 	"""Create or change a note. On save its [[Title]] links are parsed and stored in Life Link.
 	`base_version` is the `version` the editor started from. If the note changed since (an agent's edit, another device),
 	nothing is saved and the answer is {"conflict": true, "current": <the note as it is now>}."""
@@ -159,8 +161,8 @@ def save(note=None, space=None, title=None, content_md=None, area=None, project=
 	return get(doc.name)
 
 
-@frappe.whitelist()
-def versions(note):
+@frappe.whitelist(methods=["GET"])
+def versions(note: str):
 	"""Saved versions of a note, from Frappe's document versioning."""
 	doc = permissions.get_doc_checked("Life Note", note)
 	rows = frappe.get_all("Version", filters={"ref_doctype": "Life Note", "docname": doc.name}, fields=["name", "owner", "creation", "data"],

@@ -66,7 +66,7 @@ class TestViewState(LifeTestCase):
 		views.save("tasks", PRIVATE, {"query": {"status": "Done"}, "open": "task:abc"})
 		self.assertNotIn("open", views.get_all()[f"tasks|{PRIVATE}"])  # the open record is never saved
 		self.assertRaises(frappe.ValidationError, views.save, "", PRIVATE, {})
-		self.assertRaises(frappe.ValidationError, views.save, "tasks", PRIVATE, [1, 2])
+		self.assertRaises((frappe.ValidationError, frappe.FrappeTypeError), views.save, "tasks", PRIVATE, [1, 2])  # refused by the type hint since pre-step 6
 		self.assertRaises(frappe.ValidationError, views.save, "tasks", PRIVATE, {"query": {"x": "y" * 30000}})
 		self.assertRaises(frappe.PermissionError, views.save, "tasks", "No such space", {})
 		views.save(NO_SPACE_SCREEN, None, {"view": "a"})  # a screen that is not tied to a space

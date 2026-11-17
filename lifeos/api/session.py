@@ -5,7 +5,7 @@ from frappe.utils import today
 from lifeos import permissions
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["GET"])
 def boot():
 	"""Who is logged in, which spaces they can use, and the settings the screens need."""
 	permissions.require_login()
@@ -31,8 +31,8 @@ def boot():
 	}
 
 
-@frappe.whitelist()
-def counts(space=None):
+@frappe.whitelist(methods=["GET"])
+def counts(space: str | None = None):
 	"""Small numbers for the sidebar."""
 	space = permissions.resolve_space(space)
 	from lifeos.api import tasks as task_api

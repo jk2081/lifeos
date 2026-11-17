@@ -1,4 +1,6 @@
 """Archive and restore, and the Archive screen."""
+import builtins
+
 import frappe
 
 from lifeos import archive as rules
@@ -9,14 +11,14 @@ from lifeos.api.utils import order_by as sort_order
 
 
 @frappe.whitelist(methods=["POST"])
-def set(doctype, name, archived=1):
+def set(doctype: str, name: str, archived: bool | int = 1):
 	"""Archive or restore one record. For a project, its records follow."""
 	permissions.require_login()
 	return rules.set_archived(doctype, name, flag(archived), "Manual")
 
 
 @frappe.whitelist(methods=["POST"])
-def restore(doctype, name):
+def restore(doctype: str, name: str):
 	"""Bring an archived record back. Restoring a project restores the records archived with it."""
 	permissions.require_login()
 	return rules.set_archived(doctype, name, False)
@@ -26,9 +28,10 @@ TYPES = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vau
 SORTS = {"title": "title", "kind": "kind", "record_date": "record_date", "area": "area"}
 
 
-@frappe.whitelist()
-def list(space=None, area=None, start=0, page_length=50, doctype=None, reason=None, archived_from=None, archived_to=None, sort=None, dir=None,
-		filters=None, order_by=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, area: str | None = None, start: int = 0, page_length: int = 50, doctype: str | None = None,
+		reason: str | None = None, archived_from: str | None = None, archived_to: str | None = None, sort: str | None = None,
+		dir: str | None = None, filters: str | builtins.list | builtins.dict | None = None, order_by: str | None = None, summary: str | builtins.dict | None = None):
 	"""Archived records, grouped by area, plus archived projects.
 	Filters: doctype (the record type), area (with its sub-areas, or "none"), reason (Auto, Manual, Project),
 	archived_from and archived_to on the day it was archived. `total` is the number of records the filters match.

@@ -1,5 +1,8 @@
 """Someday (UX fixes, set 5): park tasks, projects (with their open tasks), goals and ideas out of the way, and bring
 them back, keep them for longer, or purge them. Parking keeps `creation`. Agents may only propose parking."""
+import builtins
+from datetime import date
+
 import frappe
 from frappe import _
 from frappe.utils import add_months, cint, getdate, today
@@ -46,8 +49,9 @@ def _sub(doctype, space, filters, values, i, area=None):
 		f"x.someday_note, {extra} as extra from `tab{doctype}` x where {' and '.join(where + conds)}"), values
 
 
-@frappe.whitelist()
-def list(space=None, tab="all", area=None, filters=None, order_by=None, start=0, page_length=50):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, tab: str | None = "all", area: str | None = None, filters: str | builtins.list | dict | None = None,
+		order_by: str | None = None, start: int | str | None = 0, page_length: int | str | None = 50):
 	"""Parked items of a space, oldest review first. tab: all, due (review date reached), tasks, projects, goals, ideas.
 	filters: standard filters on the fields every parked kind has (title, area, someday_on, someday_review_on, name,
 	creation). `tabs` counts each tab under the same filters."""
@@ -134,7 +138,7 @@ def park_doc(doc, note=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def park(doctype, name, note=None):
+def park(doctype: str, name: str, note: str | None = None):
 	"""Move a task, project (with its open tasks) or goal to Someday. Returns what changed, for Undo."""
 	_person()
 	_check(doctype)
@@ -155,7 +159,8 @@ def _snapshot(doc):
 
 
 @frappe.whitelist(methods=["POST"])
-def bring_back(doctype, name, due_date=None, status=None, cycle=None, target_date=None, make=None, area=None):
+def bring_back(doctype: str, name: str, due_date: str | date | None = None, status: str | None = None, cycle: str | None = None,
+		target_date: str | date | None = None, make: str | None = None, area: str | None = None):
 	"""Make a parked item live again. A task: an optional due date. A project: a status (Active or On Hold); the tasks
 	it took come back as Open. A goal: a cycle (12 Week Year goals) or a target date. An idea: make a task, project or note."""
 	_person()
@@ -205,7 +210,7 @@ def bring_back(doctype, name, due_date=None, status=None, cycle=None, target_dat
 
 
 @frappe.whitelist(methods=["POST"])
-def keep(doctype, name, months=None):
+def keep(doctype: str, name: str, months: int | str | None = None):
 	"""Keep a parked item for another review period (3 months by default) from today."""
 	_person()
 	_check(doctype)
@@ -217,7 +222,7 @@ def keep(doctype, name, months=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def purge(doctype, name):
+def purge(doctype: str, name: str):
 	"""Move a parked item to the trash. A project takes the tasks it was parked with."""
 	_person()
 	_check(doctype)
@@ -231,7 +236,8 @@ def purge(doctype, name):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_idea(title, space=None, body_md=None, area=None, project=None, source_doctype=None, source_name=None, note=None):
+def create_idea(title: str, space: str | None = None, body_md: str | None = None, area: str | None = None, project: str | None = None,
+		source_doctype: str | None = None, source_name: str | None = None, note: str | None = None):
 	"""A new idea on the Someday list, from the New menu, a note selection, a chat open item or a digest item."""
 	_person()
 	space = permissions.resolve_space(space, write=True)
@@ -248,8 +254,8 @@ def create_idea(title, space=None, body_md=None, area=None, project=None, source
 	return {"name": doc.name, "title": doc.title, "review_on": doc.someday_review_on}
 
 
-@frappe.whitelist()
-def get_idea(idea):
+@frappe.whitelist(methods=["GET"])
+def get_idea(idea: str):
 	doc = permissions.get_doc_checked("Life Idea", idea)
 	out = doc.as_dict()
 	out["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
@@ -261,7 +267,7 @@ def get_idea(idea):
 
 
 @frappe.whitelist(methods=["POST"])
-def undo(snapshot):
+def undo(snapshot: str | dict):
 	"""Put records back as a snapshot from park or a Reset decision says they were."""
 	_person()
 	snap = parse(snapshot, {}) or {}

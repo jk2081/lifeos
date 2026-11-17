@@ -20,8 +20,8 @@ def _person():
 		frappe.throw(_("Agents cannot use Ask."), frappe.PermissionError)
 
 
-@frappe.whitelist()
-def status(space=None):
+@frappe.whitelist(methods=["GET"])
+def status(space: str | None = None):
 	"""Is Ask ready for this person in this space: set up (a key), on for the space, and under the monthly cap."""
 	from lifeos.ai import client
 
@@ -69,7 +69,7 @@ def _message_out(m):
 
 
 @frappe.whitelist(methods=["POST"])
-def ask(question, space=None, thread=None, scope=None, client_id=None):
+def ask(question: str, space: str | None = None, thread: str | None = None, scope: str | dict | None = None, client_id: str | None = None):
 	"""Ask a question, or a follow-up in a thread (same scope unless `scope` changes it). Returns the thread and the
 	answer. While it is written, `message` returns the text so far (and realtime events go to the asking user)."""
 	from lifeos.ai import ask as engine
@@ -144,8 +144,8 @@ def _refuse(t, question, code, text):
 	return {"thread": t.name, "error": code, "error_text": text, "spend": client.spend_status(), "question": question}
 
 
-@frappe.whitelist()
-def progress(client_id):
+@frappe.whitelist(methods=["GET"])
+def progress(client_id: str):
 	"""The answer so far for a question still being written (polling, when realtime is not available)."""
 	_person()
 	name = frappe.cache.get_value(f"lifeos_ask_req:{frappe.session.user}:{client_id}")
@@ -155,8 +155,8 @@ def progress(client_id):
 	return {"status": m.status, "text": m.text or "", "thread": m.thread, "message": m.name} if m else {"status": "Waiting", "text": ""}
 
 
-@frappe.whitelist()
-def message(name):
+@frappe.whitelist(methods=["GET"])
+def message(name: str):
 	"""One message, for polling while an answer is written."""
 	_person()
 	m = frappe.get_doc("Life Ask Message", name)
@@ -164,8 +164,8 @@ def message(name):
 	return _message_out(m)
 
 
-@frappe.whitelist()
-def thread(name):
+@frappe.whitelist(methods=["GET"])
+def thread(name: str):
 	_person()
 	t = _thread(name)
 	msgs = frappe.get_all("Life Ask Message", filters={"thread": t.name}, fields=["*"], order_by="creation asc")
@@ -173,8 +173,8 @@ def thread(name):
 		"doctype": t.scope_doctype, "name": t.scope_name}, "messages": [_message_out(frappe._dict(m)) for m in msgs]}
 
 
-@frappe.whitelist()
-def threads(space=None, q=None, start=0, page_length=30):
+@frappe.whitelist(methods=["GET"])
+def threads(space: str | None = None, q: str | None = None, start: int | str | None = 0, page_length: int | str | None = 30):
 	"""The History tab: this person's threads in a space, newest first, searchable by their questions and answers."""
 	_person()
 	space = permissions.resolve_space(space)
@@ -195,7 +195,7 @@ def threads(space=None, q=None, start=0, page_length=30):
 
 
 @frappe.whitelist(methods=["POST"])
-def delete_thread(name):
+def delete_thread(name: str):
 	_person()
 	t = _thread(name)
 	frappe.db.delete("Life Ask Message", {"thread": t.name})
@@ -204,7 +204,7 @@ def delete_thread(name):
 
 
 @frappe.whitelist(methods=["POST"])
-def run_action(message, index):
+def run_action(message: str, index: int | str):
 	"""Run one suggested action of an answer, with the person's own permissions, through the normal methods.
 	Returns what the screen needs: a route, the record made, or the Undo log."""
 	_person()
@@ -239,7 +239,7 @@ def run_action(message, index):
 
 
 @frappe.whitelist(methods=["POST"])
-def undo_made_task(task):
+def undo_made_task(task: str):
 	"""Undo of a suggested Make task: the task goes to the trash."""
 	_person()
 	from lifeos import trash

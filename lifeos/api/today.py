@@ -24,8 +24,8 @@ def week_actions(cycle, week):
 	return out
 
 
-@frappe.whitelist()
-def get(space=None):
+@frappe.whitelist(methods=["GET"])
+def get(space: str | None = None):
 	"""Tasks due or overdue, today's events, habits with today's state, items to review, the current week of the active cycle,
 	the open loops count and expiring documents."""
 	space = permissions.resolve_space(space)

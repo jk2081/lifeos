@@ -1,5 +1,6 @@
 """Insights for the screens (UX fixes, set 5): the Ask page's Insights tab, Today's Next list and rail. People only."""
 import json
+from datetime import date
 
 import frappe
 from frappe import _
@@ -55,8 +56,9 @@ def based_on(evidence):
 	return "Based on " + ", ".join(f"{n} {LABEL.get(dt, (dt, dt + 's'))[0 if n == 1 else 1]}" for dt, n in by.items())
 
 
-@frappe.whitelist()
-def list(space=None, status="New", kind=None, area=None, start=0, page_length=50, actionable=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, status: str | None = "New", kind: str | None = None, area: str | None = None,
+		start: int | str | None = 0, page_length: int | str | None = 50, actionable: int | str | None = None):
 	"""Insights of a space: status New (default), Snoozed, Acted, Dismissed or all; kind; area; actionable=1 or 0.
 	`tabs` counts each status under the other filters."""
 	_person()
@@ -95,7 +97,7 @@ def _run_on():
 
 
 @frappe.whitelist(methods=["POST"])
-def refresh(space=None):
+def refresh(space: str | None = None):
 	"""Find insights now (Refresh insights)."""
 	_person()
 	space = permissions.resolve_space(space)
@@ -109,7 +111,7 @@ def _doc(name):
 
 
 @frappe.whitelist(methods=["POST"])
-def dismiss(insight, reason=None):
+def dismiss(insight: str, reason: str | None = None):
 	"""Dismiss, with an optional reason (not relevant, already done, wrong). The AI reads the last 30 with their reasons."""
 	doc = _doc(insight)
 	if reason and reason not in ("Not relevant", "Already done", "Wrong"):
@@ -120,7 +122,7 @@ def dismiss(insight, reason=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def snooze(insight, until=None):
+def snooze(insight: str, until: str | date | None = None):
 	doc = _doc(insight)
 	doc.status, doc.snooze_until = "Snoozed", until or add_days(today(), 7)
 	doc.save()
@@ -128,7 +130,7 @@ def snooze(insight, until=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def restore(insight):
+def restore(insight: str):
 	"""Undo a dismiss, a snooze or an act: back to New."""
 	doc = _doc(insight)
 	doc.status, doc.snooze_until, doc.dismiss_reason = "New", None, ""
@@ -137,7 +139,7 @@ def restore(insight):
 
 
 @frappe.whitelist(methods=["POST"])
-def act(insight, index=0):
+def act(insight: str, index: int | str = 0):
 	"""Run one of an insight's suggested actions, with the person's own permissions. Navigation actions are done by the
 	screen; this records them. Returns what the screen needs (a route, a created record, Undo)."""
 	doc = _doc(insight)
@@ -176,8 +178,8 @@ def act(insight, index=0):
 	return out
 
 
-@frappe.whitelist()
-def summary(space=None):
+@frappe.whitelist(methods=["GET"])
+def summary(space: str | None = None):
 	"""Today's use: actionable New insights for Next, and the rest in one line for the rail."""
 	_person()
 	space = permissions.resolve_space(space)

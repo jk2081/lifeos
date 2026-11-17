@@ -1,4 +1,6 @@
 """Inbox pipeline: capture, claim, submit, fail, retry. See section 5 of the spec."""
+import builtins
+
 import frappe
 from frappe import _
 from frappe.utils import add_to_date, now_datetime
@@ -27,8 +29,9 @@ INTENTS = ("Process", "Add to wiki", "Just keep")
 
 
 @frappe.whitelist(methods=["POST"])
-def create_item(title=None, source_type="Upload", space=None, raw_text=None, instruction=None, source_url=None, intent=None,
-		source_system=None, external_id=None, area=None, project=None):
+def create_item(title: str | None = None, source_type: str = "Upload", space: str | None = None, raw_text: str | None = None,
+		instruction: str | None = None, source_url: str | None = None, intent: str | None = None, source_system: str | None = None,
+		external_id: str | None = None, area: str | None = None, project: str | None = None):
 	"""Create an inbox item. Attach files afterwards with /api/method/upload_file (doctype, docname, is_private=1).
 
 	intent: Process (the default), Add to wiki or Just keep. With source_system (gmail, claude, upload…) the space's connection for
@@ -86,7 +89,7 @@ def release_stale_claims():
 
 
 @frappe.whitelist(methods=["POST"])
-def claim_next(space=None):
+def claim_next(space: str | None = None):
 	"""Claim the oldest New item. Returns it with its file URLs and the filing context, or nothing."""
 	permissions.require_login()
 	release_stale_claims()
@@ -159,7 +162,7 @@ def _claimed_item(item_name):
 
 
 @frappe.whitelist(methods=["POST"])
-def submit_result(item, transcript_md=None, summary_md=None, proposals=None):
+def submit_result(item: str, transcript_md: str | None = None, summary_md: str | None = None, proposals: str | builtins.list | None = None):
 	"""Store the transcript, summary and proposals, and set the item To Review.
 
 	Each proposal is {kind, preview, payload, confidence}. An invalid proposal is refused with a clear error; the rest are kept.
@@ -216,7 +219,7 @@ def _finish_if_decided(doc):
 
 
 @frappe.whitelist(methods=["POST"])
-def fail_item(item, error=None):
+def fail_item(item: str, error: str | None = None):
 	"""Mark a claimed item Failed, with the reason."""
 	doc = _claimed_item(item)
 	doc.status = "Failed"
@@ -226,7 +229,7 @@ def fail_item(item, error=None):
 
 
 @frappe.whitelist(methods=["POST"])
-def retry(item):
+def retry(item: str):
 	"""Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed."""
 	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
 	if permissions.is_agent():
@@ -250,9 +253,11 @@ TABS = {"To Review": "i.status = 'To Review'", "Waiting": "i.status in ('New', '
 	"Done": "i.status = 'Done'", "all": None}
 
 
-@frappe.whitelist()
-def list(space=None, status=None, include_archived=0, start=0, page_length=30, source_type=None, area=None,
-		from_date=None, to_date=None, sort=None, dir=None, filters=None, order_by=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def list(space: str | None = None, status: str | builtins.list | None = None, include_archived: bool | int = 0, start: int = 0,
+		page_length: int = 30, source_type: str | None = None, area: str | None = None, from_date: str | None = None,
+		to_date: str | None = None, sort: str | None = None, dir: str | None = None, filters: str | builtins.list | builtins.dict | None = None,
+		order_by: str | None = None, summary: str | builtins.dict | None = None):
 	"""Inbox items of a space, newest first, with proposal counts.
 	Filters: status (one status or a JSON list), source_type, area (with its sub-areas, or "none"), from_date and to_date on the day received.
 	`total` is the number of items the filters match; `pending_total` is the pending proposals of those items.
@@ -313,8 +318,8 @@ def list(space=None, status=None, include_archived=0, start=0, page_length=30, s
 	return {"items": rows, "total": total, "pending_total": pending_total, "totals": totals, "tabs": tabs, "start": start, "page_length": page_length}
 
 
-@frappe.whitelist()
-def get(item):
+@frappe.whitelist(methods=["GET"])
+def get(item: str):
 	"""One inbox item with its files, proposals and the choices for the filing chips."""
 	doc = permissions.get_doc_checked("Life Inbox Item", item)
 	out = _item_dict(doc)
@@ -337,7 +342,7 @@ def get(item):
 
 
 @frappe.whitelist(methods=["POST"])
-def update_transcript(item, transcript_md):
+def update_transcript(item: str, transcript_md: str | None):
 	"""Correct the transcript of an item, for example words marked [?]."""
 	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
 	doc.transcript_md = transcript_md

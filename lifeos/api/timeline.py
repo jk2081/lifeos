@@ -41,8 +41,9 @@ def index_rows(space, where="", values=None, order="record_date desc, modified d
 	return decorate(rows)
 
 
-@frappe.whitelist()
-def get(space=None, from_date=None, to_date=None, area=None, doctype=None, include_archived=0, start=0, page_length=50, filters=None, summary=None):
+@frappe.whitelist(methods=["GET"])
+def get(space: str | None = None, from_date: str | None = None, to_date: str | None = None, area: str | None = None, doctype: str | None = None, include_archived: bool | int = 0, start: int = 0,
+		page_length: int = 50, filters: str | list | None = None, summary: str | dict | None = None):
 	"""Every record by day, newest first: inbox items, tasks created and completed, notes, documents, chats, journal pages, check-ins."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
