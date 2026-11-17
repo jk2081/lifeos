@@ -158,6 +158,12 @@ def ensure_indexes():
 	frappe.db.add_index("Life Index", ["space", "ref_doctype", "is_archived", "record_date"], "life_index_space_type_date")
 	# covering indexes for the counts (tab counts, totals, the timeline's and an area's counts): with text of up to 60,000
 	# characters a row, a count must not read the rows themselves
+	# the Outbox (set 7): what came in by creation, and exits by period
+	for dt in ("Life Task", "Life Goal", "Life Inbox Item", "Life Idea"):
+		frappe.db.add_index(dt, ["space", "creation", "area"], f"{dt.lower().replace(' ', '_')}_space_creation")
+	if frappe.db.table_exists("Life Exit"):
+		frappe.db.add_index("Life Exit", ["space", "reversed", "exited_on", "pile", "area"], "life_exit_period_area")
+		frappe.db.add_index("Life Exit", ["record_doctype", "record_name", "reversed"], "life_exit_record")
 	frappe.db.add_index("Life Index", ["space", "kind", "is_archived", "ref_doctype", "media_kind", "status", "vault_locked"], "life_index_counts")
 	frappe.db.add_index("Life Index", ["space", "area", "is_archived", "kind", "ref_doctype", "vault_locked"], "life_index_area_counts")
 	frappe.db.add_index("Life Index", ["space", "is_archived", "record_date", "modified"], "life_index_timeline")

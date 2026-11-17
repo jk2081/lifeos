@@ -46,9 +46,13 @@ def load(space="Private"):
 		people[name] = t.insert({"doctype": "Life Person", "space": space, "full_name": name, "relation": relation}).name
 
 	def project(title, area_name, status="Active", outcome=None, target=None):
-		# what were projects before set 6 are open-ended goals
-		return t.insert({"doctype": "Life Goal", "space": space, "title": title, "area": area[area_name], "goal_type": "Open",
-			"on_hold": 1 if status == "On Hold" else 0, "done_when": outcome, "target_date": target}).name
+		# what were projects before set 6 are open-ended goals; the project itself is kept, read-only, pointing at the goal it
+		# became, as the set 6 migration leaves it (old links to a project still find its goal)
+		goal = t.insert({"doctype": "Life Goal", "space": space, "title": title, "area": area[area_name], "goal_type": "Open",
+			"on_hold": 1 if status == "On Hold" else 0, "done_when": outcome, "measure_kind": "Milestone" if outcome else None, "target_date": target}).name
+		t.insert({"doctype": "Life Project", "space": space, "title": title, "area": area[area_name], "status": status, "outcome": outcome,
+			"target_date": target, "migrated_to": goal}, allow_migration=True)
+		return goal
 
 	ghl = project("Ghillidary turnaround", "Tea & Coffee", outcome="A drainage and replanting plan for the poor sections", target="2026-12-31")
 	mandir = project("Ghatia mandir", "Tea & Coffee", outcome="Contractor appointed within the budget")

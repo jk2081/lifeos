@@ -222,10 +222,10 @@ def _finish_if_decided(doc):
 	if doc.status != "To Review":
 		return doc.status
 	if not frappe.db.exists("Life Proposal", {"inbox_item": doc.name, "status": "Pending"}):
-		frappe.db.set_value("Life Inbox Item", doc.name, {"status": "Done", "finished_on": frappe.utils.today()})
+		# saved, not set: the Outbox hooks record the item leaving the Inbox (set 7)
 		doc.reload()
-		from lifeos import index
-		index.update(doc)
+		doc.status, doc.finished_on = "Done", frappe.utils.today()
+		doc.save(ignore_permissions=True)
 	return doc.status
 
 

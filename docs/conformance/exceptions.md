@@ -9,8 +9,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-manual-commit | 5 |
 | frappe-security-file-traversal | 4 |
 | frappe-setuser | 13 |
-| frappe-sql-format-injection | 76 |
-| Total | 98 |
+| frappe-sql-format-injection | 80 |
+| Total | 102 |
 
 ## frappe-manual-commit
 
@@ -36,11 +36,11 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/demo.py` | 32 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 195 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/demo.py` | 199 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 245 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 259 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 275 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 203 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 249 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 263 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 279 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/loadtest.py` | 44 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 136 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 154 | load test: reads are timed as a member of the space, the way a request runs |
@@ -79,6 +79,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/library.py` | 73 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/library.py` | 78 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/outbox.py` | 58 | the parts are constant SQL; the area condition comes from area_filter; values are parameters |
+| `lifeos/api/outbox.py` | 64 | WHERE from _out_where (constant SQL and area_filter); values are parameters |
+| `lifeos/api/outbox.py` | 89 | WHERE from _out_where (constant SQL and area_filter); values are parameters |
+| `lifeos/api/outbox.py` | 105 | the parts are constant SQL; the area condition comes from area_filter; values are parameters |
 | `lifeos/api/search.py` | 58 | FIELDS and WHERE are fixed fragments; the search text is the %(q)s parameter |
 | `lifeos/api/search.py` | 70 | FIELDS, WHERE and the LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
 | `lifeos/api/settings.py` | 36 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |

@@ -49,6 +49,8 @@
  "lifeos.api.links.outgoing",
  "lifeos.api.meta.proposal_schema",
  "lifeos.api.meta.space_context",
+ "lifeos.api.outbox.list",
+ "lifeos.api.outbox.chart",
  "lifeos.api.reset.next_item",
  "lifeos.api.reset.short",
  "lifeos.api.search.query",

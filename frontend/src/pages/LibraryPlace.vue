@@ -7,9 +7,10 @@
   </template>
   <Timeline v-else-if="current === 'timeline'" />
   <Archive v-else-if="current === 'archive'" />
+  <Outbox v-else-if="current === 'outbox'" />
 </template>
 <script setup>
-// Library, one of the four places (UX fixes, set 6): All, Notes, Captures, Timeline and Archive. The tabs are paths
+// Library, one of the four places (UX fixes, set 6): All, Notes, Captures, Outbox (set 7), Timeline and Archive. The tabs are paths
 // (/library/notes); every screen open here shows them under its header (PageHead).
 import { computed, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -19,6 +20,7 @@ import Graph from '@/pages/Graph.vue'
 import Wiki from '@/pages/Wiki.vue'
 import Timeline from '@/pages/Timeline.vue'
 import Archive from '@/pages/Archive.vue'
+import Outbox from '@/pages/Outbox.vue'
 import { LIBRARY_TABS, libraryPath } from '@/lib/nav'
 
 const props = defineProps({ tab: String })

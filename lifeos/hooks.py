@@ -40,6 +40,11 @@ doc_events = {
 	dt: {"validate": "lifeos.org.validate_common", "on_update": "lifeos.org.on_update", "on_trash": "lifeos.org.on_trash"}
 	for dt in SPACE_DOCTYPES
 }
+# the Outbox (set 7): exits are written by these hooks only
+for _dt in ("Life Task", "Life Goal", "Life Inbox Item", "Life Idea"):
+	for _event, _fn in (("on_update", "on_update"), ("after_insert", "after_insert"), ("on_trash", "on_trash")):
+		_have = doc_events[_dt].get(_event)
+		doc_events[_dt][_event] = [*([_have] if isinstance(_have, str) else _have or []), f"lifeos.outbox.{_fn}"]
 doc_events["Event"] = {"validate": "lifeos.events.validate_event"}
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
 doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}

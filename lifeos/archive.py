@@ -91,10 +91,14 @@ def restore_goal(goal) -> dict:
 			goal.name)
 		count += frappe.db.sql("select row_count()")[0][0]
 		_sync_index(dt, "t.goal = %s", (goal.name,))
-	values = {"is_archived": 0, "archived_on": None}
 	if goal.goal_type == "Open" and (goal.outcome or "In Progress") != "In Progress":
-		values.update({"outcome": "In Progress", "closed_on": None, "completed_on": None})
-	frappe.db.set_value("Life Goal", goal.name, values, update_modified=False)
+		# reopened by a save, so the Outbox reverses the goal's exit (set 7); validate clears closed_on and completed_on
+		doc = frappe.get_doc("Life Goal", goal.name)
+		doc.is_archived, doc.archived_on, doc.outcome = 0, None, "In Progress"
+		doc.flags.keep_touched = True
+		doc.save(ignore_permissions=True)
+	else:
+		frappe.db.set_value("Life Goal", goal.name, {"is_archived": 0, "archived_on": None}, update_modified=False)
 	return {"doctype": "Life Goal", "name": goal.name, "is_archived": 0, "records": count}
 
 

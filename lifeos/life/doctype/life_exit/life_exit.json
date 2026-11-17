@@ -1,0 +1,133 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-18 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "area",
+  "record_doctype",
+  "record_name",
+  "title",
+  "kind",
+  "pile",
+  "exited_on",
+  "exited_by",
+  "reversed",
+  "reversed_on",
+  "note"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Life Area",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "record_doctype",
+   "fieldtype": "Link",
+   "label": "Record Type",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "record_name",
+   "fieldtype": "Data",
+   "label": "Record",
+   "reqd": 1,
+   "search_index": 1,
+   "description": "Plain data, not a link: the record may be deleted while its exit stays."
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Capture\nTask\nGoal\nIdea",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "pile",
+   "fieldtype": "Select",
+   "label": "Pile",
+   "options": "Done\nDelegated\nParked\nDiscarded",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "exited_on",
+   "fieldtype": "Datetime",
+   "label": "When",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "exited_by",
+   "fieldtype": "Link",
+   "label": "By",
+   "options": "User"
+  },
+  {
+   "fieldname": "reversed",
+   "fieldtype": "Check",
+   "label": "Reversed",
+   "default": "0"
+  },
+  {
+   "fieldname": "reversed_on",
+   "fieldtype": "Datetime",
+   "label": "Reversed On"
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Small Text",
+   "label": "Note",
+   "description": "How the exit happened, when it is not plain (a backfilled date)."
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-18 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Exit",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "search_fields": "title",
+ "show_title_field_in_link": 1,
+ "sort_field": "exited_on",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

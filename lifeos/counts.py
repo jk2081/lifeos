@@ -286,3 +286,13 @@ def get(space=None, which="open_band", area=None):
 	if not fn:
 		frappe.throw(frappe._("Unknown set of counts."))
 	return fn(space, area)
+
+
+# ---- the Outbox (set 7) ----
+
+def outbox(space, area, pile, label, period="week"):
+	"""A count of Library > Outbox for a period: one pile, every exit (`all`), or what came in (`in`)."""
+	from lifeos.api import outbox as outbox_api
+
+	n = outbox_api.total(space, pile, period, lens_area(area))
+	return _door(n, "/library/outbox", {"pile": pile, "period": period}, label, area)

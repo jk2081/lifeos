@@ -369,8 +369,9 @@ def _unaccept(proposal):
 		frappe.delete_doc(prop.created_doctype, prop.created_name, ignore_permissions=True, delete_permanently=True)
 	frappe.db.set_value("Life Proposal", prop.name, {"status": "Pending", "created_doctype": None, "created_name": None,
 		"decided_by": None, "decided_on": None})
-	frappe.db.set_value("Life Inbox Item", item.name, {"status": "To Review", "finished_on": None})
-	index.update(frappe.get_doc("Life Inbox Item", item.name))
+	item.reload()
+	item.status, item.finished_on = "To Review", None
+	item.save(ignore_permissions=True)  # saved, so the Outbox reverses the item's exit (set 7)
 
 
 @frappe.whitelist(methods=["GET"])

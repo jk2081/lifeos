@@ -5,7 +5,7 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 // The four places (UX fixes, set 6): Today, Inbox, Plan and Library, with Settings and the Ask page beside them.
 // Plan's tabs: the rhythms, then the lists. Library's tabs: everything, then by kind, then time and the archive.
 export const PLAN_TABS = ['week', 'month', '12-weeks', 'year', 'goals', 'tasks', 'someday']
-export const LIBRARY_TABS = ['notes', 'captures', 'timeline', 'archive']
+export const LIBRARY_TABS = ['notes', 'captures', 'outbox', 'timeline', 'archive']
 
 // the Projects screen's query on the Goals tab: open-ended goals, and a project's status as a goal state
 const STATE = { Active: 'in_progress', 'On Hold': 'in_progress', Done: 'achieved', Dropped: 'closed', Someday: 'someday', all: 'all', current: 'in_progress' }

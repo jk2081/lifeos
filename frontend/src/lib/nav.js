@@ -13,7 +13,7 @@ export const PLAN_TABS = [
   { value: 'goals', label: 'Goals', group: 'lists' }, { value: 'tasks', label: 'Tasks', group: 'lists' }, { value: 'someday', label: 'Someday', group: 'lists' },
 ]
 export const LIBRARY_TABS = [
-  { value: 'all', label: 'All' }, { value: 'notes', label: 'Notes' }, { value: 'captures', label: 'Captures' },
+  { value: 'all', label: 'All' }, { value: 'notes', label: 'Notes' }, { value: 'captures', label: 'Captures' }, { value: 'outbox', label: 'Outbox' },
   { value: 'timeline', label: 'Timeline' }, { value: 'archive', label: 'Archive' },
 ]
 export const planPath = (tab) => `/plan/${tab}`
@@ -30,7 +30,7 @@ export const GO = [
   { label: 'Library: Notes', to: '/library/notes', key: 'n' }, { label: 'Library: Captures', to: '/library/captures', key: 'u' },
   { label: 'Library: Chats', to: '/library/captures?tab=chats', key: 'h' }, { label: 'Library: Sensitive documents', to: '/library/captures?tab=documents&sensitive=1', key: 'v' },
   { label: "Library: The assistant's notes", to: '/library/notes?by=assistant', key: 'x' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
-  { label: 'Library: Archive', to: '/library/archive', key: 'r' },
+  { label: 'Library: Archive', to: '/library/archive', key: 'r' }, { label: 'Library: Outbox', to: '/library/outbox', key: 'b' },
   { label: 'Ask: history and insights', to: '/ask', key: 'q' }, { label: 'Settings: Areas', to: '/settings?tab=areas', key: 'a' },
   SETTINGS,
 ]

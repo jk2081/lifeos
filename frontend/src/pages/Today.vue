@@ -42,6 +42,12 @@
             <Tile v-for="t in phoneRest" :key="t.key" :tile="t" class="w-40 flex-none rounded-5 border border-outline-gray-2" />
           </div>
         </div>
+        <!-- in and out this week (set 7): each number opens its list in Library > Outbox -->
+        <p v-if="d.inout" class="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-ink-gray-7" data-inout>
+          <span class="lucide-arrow-left-right size-3.5 text-ink-gray-6" aria-hidden="true" /><span>This week:</span>
+          <CountLink :count="d.inout.in" :aria-label="`${d.inout.in.n} came in this week`" count-key="inout:in" /><span>in,</span>
+          <CountLink :count="d.inout.out" :aria-label="`${d.inout.out.n} left the plate this week`" count-key="inout:out" /><span>out</span>
+        </p>
       </section>
 
       <div class="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_18.5rem]">

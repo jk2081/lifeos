@@ -137,6 +137,7 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		"events": events, "habits": habits,
 		"open_loops": task_api.open_loops_count(space), "area": area,
 		"banner": None if permissions.is_agent() else rhythms.banner(space, at),
+		"inout": None if permissions.is_agent() else _inout(space, area),
 		"coming_up": coming,
 		"vault_soon": vault_api.expiry_counts(space)["soon"],
 	}
@@ -234,3 +235,10 @@ def skip_banner(occurrence: str, how: str = "skipped"):
 	if how not in ("skipped", "done") or not OCCURRENCE.match(str(occurrence or "")):
 		frappe.throw(frappe._("Unknown banner."))
 	return rhythms.dismiss(occurrence, how)
+
+
+def _inout(space, area):
+	"""This week's in and out (set 7), for the line under the Open band."""
+	from lifeos.api import outbox
+
+	return outbox.week_line(space, area)
