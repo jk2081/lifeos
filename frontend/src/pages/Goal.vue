@@ -2,7 +2,7 @@
   <template v-if="d">
     <PageHead :title="g.title" :crumb="{ to: '/plan/goals', label: 'Goals', here: d.cycle ? d.cycle.title : g.goal_type }" :sub="sub">
       <Badge :theme="themeOf(g)" :label="g.is_archived ? `${g.status}, archived` : g.status === 'On Hold' ? 'On hold' : g.status" data-goal-status />
-      <Button v-if="d.cycle" label="Open grid" :route="`/journal?cycle=${d.cycle.name}`" />
+      <Button v-if="d.cycle" label="Open grid" :route="`/plan/12-weeks?cycle=${d.cycle.name}`" />
       <template v-if="writable && g.goal_type !== '12 Week Year'">
         <Button v-if="!g.is_archived" label="New note" @click="noteOpen = true" />
         <Button v-if="g.is_archived" variant="solid" label="Restore" data-goal-restore @click="setStatus('Active')" />

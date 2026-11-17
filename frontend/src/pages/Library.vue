@@ -10,7 +10,7 @@
   <!-- the tree with the reader: /library and /library/<id> -->
   <template v-else>
     <PageHead title="Notes">
-      <template #sub><NumLink :to="{ path: '/library', query: { view: 'list', all: '1' } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink> in {{ store.space }}</template>
+      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1' } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink> in {{ store.space }}</template>
       <TabButtons model-value="tree" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
     </PageHead>
@@ -198,11 +198,11 @@ const noteMenu = computed(() => [
   ...(writable.value && !store.isAgent ? [{ label: 'Selection to Someday', icon: 'lucide-lightbulb', onClick: selectionToIdea }] : []),
   { label: 'Earlier versions', icon: 'lucide-history', onClick: async () => { versions.value = (await tryCall(() => api('library.versions', { note: note.value.name }))) || []; versionsOpen.value = true } },
   { label: note.value?.is_archived ? 'Restore from archive' : 'Archive', icon: note.value?.is_archived ? 'lucide-archive-restore' : 'lucide-archive', onClick: async () => {
-    if (await tryCall(() => api('archive.set', { doctype: 'Life Note', name: note.value.name, archived: note.value.is_archived ? 0 : 1 }), note.value.is_archived ? 'Restored.' : 'Archived.')) { await loadTree(); router.push('/library') } } },
+    if (await tryCall(() => api('archive.set', { doctype: 'Life Note', name: note.value.name, archived: note.value.is_archived ? 0 : 1 }), note.value.is_archived ? 'Restored.' : 'Archived.')) { await loadTree(); router.push('/library/notes') } } },
   { label: 'Delete', icon: 'lucide-trash-2', onClick: () => dialog.danger({
     title: 'Delete this note?', message: `“${note.value.title}” moves to the trash. Restore it from Archive, Trash, within 30 days.`,
     onConfirm: async () => {
-      if ((await tryCall(() => api('trash.delete', { doctype: 'Life Note', name: note.value.name }), 'Moved to the trash.')) !== undefined) { await loadTree(); router.push('/library') }
+      if ((await tryCall(() => api('trash.delete', { doctype: 'Life Note', name: note.value.name }), 'Moved to the trash.')) !== undefined) { await loadTree(); router.push('/library/notes') }
     },
   }) },
 ])

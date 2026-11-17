@@ -18,7 +18,7 @@
     </template>
     <template #cell-title="{ row }"><div class="min-w-0"><div class="break-words font-medium text-ink-gray-9">{{ row.title }}</div>
       <div class="text-sm text-ink-gray-6">{{ [row.assistant, short(row.date), row.goal_title].filter(Boolean).join(' · ') }}</div></div></template>
-    <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="`/areas/${row.area}`">{{ row.area_name }}</RouterLink></template>
+    <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="{ query: { ...$route.query, area: row.area, open: undefined } }">{{ row.area_name }}</RouterLink></template>
     <template #cell-_summary="{ row }"><div class="line-clamp-2 text-sm text-ink-gray-8">{{ plain(row.summary_md) }}</div></template>
     <template #cell-_open="{ row }"><NumLink v-if="row.open_count" class="relative" :to="{ query: { ...route.query, open: 'chat:' + row.name, ptab: 'items' } }" data-door="chat-items">{{ row.open_count }} open item{{ row.open_count === 1 ? '' : 's' }}</NumLink><span v-else class="text-sm text-ink-gray-6">None</span></template>
     <template #stack="{ row }">

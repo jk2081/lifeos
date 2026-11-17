@@ -70,7 +70,7 @@
             <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ a.title }}</div><div class="text-sm text-ink-gray-6">{{ a.doctype.replace('Life ', '') }} · archived {{ short(a.archived_on) }}</div></div>
             <Button v-if="canWrite()" class="relative" label="Undo" @click="undo(a)" /></Row></Card>
         </section>
-        <section><SectionHead>Latest check-in <template #action><Button variant="ghost" size="sm" label="Check-ins" route="/journal/checkins" /></template></SectionHead>
+        <section><SectionHead>Latest check-in <template #action><Button variant="ghost" size="sm" label="Check-ins" route="/plan/month?view=checkins" /></template></SectionHead>
           <Card flush>
             <template v-if="d.latest_checkin"><Row><span class="text-sm text-ink-gray-6">{{ long(d.latest_checkin.date, true) }}</span></Row>
               <Row v-for="s in d.latest_checkin.scores" :key="s.dimension"><span class="min-w-0 flex-1">{{ s.dimension_name }}</span>

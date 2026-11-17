@@ -3,10 +3,10 @@
     <Dropdown v-if="g && g.cycles.length > 1" :options="cycleOptions"><Button :label="g.cycle.title" icon-right="lucide-chevron-down" /></Dropdown>
     <template v-if="g && writable">
       <Button v-if="g.cycle.status === 'Planned'" label="Start this cycle" @click="startCycle" />
-      <Button v-if="g.cycle.status === 'Active' && g.past_end" label="Close cycle" route="/journal/goals" />
+      <Button v-if="g.cycle.status === 'Active' && g.past_end" label="Close cycle" route="/plan/year?view=goals" />
       <Button v-if="g.cycle.status !== 'Closed'" label="Add goal" @click="editGoal(null)" />
     </template>
-    <Button variant="solid" label="Weekly review" route="/journal/review" />
+    <Button variant="solid" label="Weekly review" route="/plan/week?view=review" />
   </Teleport>
 
   <div v-if="g" class="page-body">

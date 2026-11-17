@@ -41,7 +41,7 @@
         <p v-if="editing" class="mt-2 text-sm text-ink-gray-6">{{ saveState }}</p>
       </section>
       <section>
-        <SectionHead>Habits <template #action><Button variant="ghost" size="sm" label="Open" route="/journal/habits" /></template></SectionHead>
+        <SectionHead>Habits <template #action><Button variant="ghost" size="sm" label="Open" route="/plan/month?view=habits" /></template></SectionHead>
         <Card flush>
           <Row v-for="h in d.habits.habits" :key="h.habit" class="!items-center">
             <span class="w-[84px] flex-none truncate">{{ h.title }}</span>
@@ -49,7 +49,7 @@
           </Row>
           <Empty v-if="!d.habits.habits.length" title="No habits this month." hint="Choose the habits to track under Habits, Manage habits." />
         </Card>
-        <SectionHead class="mt-6">Latest check-in <template #action><Button variant="ghost" size="sm" label="Open" route="/journal/checkins" /></template></SectionHead>
+        <SectionHead class="mt-6">Latest check-in <template #action><Button variant="ghost" size="sm" label="Open" route="/plan/month?view=checkins" /></template></SectionHead>
         <Card flush>
           <template v-if="d.latest_checkin">
             <Row><span class="text-sm text-ink-gray-6">{{ long(d.latest_checkin.date, true) }}</span></Row>

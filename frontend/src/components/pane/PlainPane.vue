@@ -42,8 +42,8 @@ onMounted(async () => {
     doc.scores = doc.scores || []
     doc.goals = doc.goals || []
     d.value = doc
-    emit('meta', props.type === 'checkin' ? { title: `Check-in, ${long(doc.date, true)}`, fullPage: '/journal/checkins' }
-      : { title: `Month plan, ${MONTHS[doc.month - 1]} ${doc.year}`, fullPage: '/journal/month' })
+    emit('meta', props.type === 'checkin' ? { title: `Check-in, ${long(doc.date, true)}`, fullPage: '/plan/month?view=checkins' }
+      : { title: `Month plan, ${MONTHS[doc.month - 1]} ${doc.year}`, fullPage: '/plan/month' })
   } catch (e) {
     emit('missing')
   }

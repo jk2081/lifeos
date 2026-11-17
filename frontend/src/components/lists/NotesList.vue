@@ -7,7 +7,7 @@
     <template #sub>Notes in {{ store.space }}</template>
     <template #actions><slot name="actions" /></template>
     <template #cell-title="{ row }"><span class="break-words font-medium text-ink-gray-9">{{ row.title }}</span></template>
-    <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="`/areas/${row.area}`">{{ row.area_name }}</RouterLink></template>
+    <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="{ query: { ...$route.query, area: row.area, open: undefined } }">{{ row.area_name }}</RouterLink></template>
     <template #cell-goal="{ row }"><span class="truncate">{{ row.goal_title }}</span></template>
     <template #cell-record_date="{ row }"><span class="whitespace-nowrap">{{ short(row.record_date || row.modified, true) }}</span></template>
     <template #cell-kind><span class="truncate">Note</span></template>
