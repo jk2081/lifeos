@@ -93,7 +93,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/tasks.py` | 271 | open_loops_where() is a constant fragment |
 | `lifeos/api/timeline.py` | 38 | ROW_FIELDS and vault_guard are constants; callers pass fixed WHERE and ORDER fragments; values are parameters |
 | `lifeos/api/timeline.py` | 71 | fixed fragments, std_filters columns checked against meta; values are parameters |
-| `lifeos/api/today.py` | 54 | `lens` is area_filter's fixed SQL; values are parameters |
+| `lifeos/api/today.py` | 57 | `lens` is area_filter's fixed SQL; values are parameters |
 | `lifeos/api/utils.py` | 242 | `base` and the tab conditions are fixed SQL from the list methods; values are parameters |
 | `lifeos/api/utils.py` | 281 | columns pass column() (DocType meta), aggregates an allowlist, `base` is fixed SQL; values are parameters |
 | `lifeos/api/utils.py` | 284 | as above |

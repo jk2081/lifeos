@@ -84,6 +84,8 @@
             <span class="text-sm text-ink-gray-6">{{ state || `Saved as the note “${d.note.title}” under Reviews.` }}
               <a v-if="d.note.name" href="#" class="text-ink-blue-8 hover:underline focus-visible:focus-ring" @click.prevent="openRef('note:' + d.note.name)">Open note</a></span>
             <Button v-if="canWrite()" variant="solid" label="Save notes" @click="saveNote" />
+            <!-- the review is done once its notes are saved: Today's reminder goes until next week -->
+            <Button v-if="canWrite() && !d.note.name" label="Finish this review" data-review-finish @click="saveNote" />
           </div>
         </section>
       </div>

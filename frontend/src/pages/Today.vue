@@ -9,6 +9,14 @@
     </PageHead>
 
     <div class="page-body !gap-5">
+      <!-- a rhythm that is due (UX fixes, set 6): at most one line, above the Open band, with Skip until its next occurrence -->
+      <div v-if="d.banner" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-4 py-2.5" role="status"
+        data-rhythm-banner :data-banner="d.banner.key">
+        <span class="lucide-bell size-4 text-ink-gray-7" aria-hidden="true" />
+        <RouterLink class="min-w-0 flex-1 text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="d.banner.to" data-banner-open>{{ d.banner.text }}</RouterLink>
+        <Button size="sm" variant="solid" :label="d.banner.action" :route="d.banner.to" />
+        <Button size="sm" variant="ghost" label="Skip" data-banner-skip @click="skipBanner" />
+      </div>
       <!-- the Open band: everything still open, each number a door; amber when the stuck count is over the limit -->
       <section data-open-band :data-over-limit="band.over_limit || undefined">
         <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base" data-band-head>
@@ -150,7 +158,7 @@
 import { computed, h, onMounted, onUnmounted, ref } from 'vue'
 import { lensAreaName } from '@/lib/lens'
 import { useMediaQuery } from '@vueuse/core'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, Dialog, Dropdown, Skeleton, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Empty from '@/components/Empty.vue'
@@ -164,6 +172,7 @@ import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
 import { askScope } from '@/lib/ask'
 
 const router = useRouter()
+const route = useRoute() // at=: a test site moves the banners' clock (site config lifeos_test_clock)
 const phone = useMediaQuery('(max-width: 767px)')
 const d = ref(null)
 const showAll = ref(false)
@@ -261,8 +270,14 @@ const railItems = computed(() => {
 })
 const weekRef = (w) => (w.kind === 'vault' ? 'vault:' + w.name : w.kind === 'important' ? 'date:' + w.name : null)
 
+async function skipBanner() {
+  const occ = d.value.banner.occurrence
+  d.value.banner = null
+  await tryCall(() => api('today.skip_banner', { occurrence: occ }), 'Skipped until next time.')
+  load()
+}
 async function load() {
-  const res = await tryCall(() => api('today.get', { space: store.space, area: store.lensArea || undefined }))
+  const res = await tryCall(() => api('today.get', { space: store.space, area: store.lensArea || undefined, at: route.query.at || undefined }))
   if (!res) return
   d.value = res
   paneNav.rows = res.next.groups.flatMap((g) => g.rows.map((r) => (r.type === 'event' ? 'event:' + r.name : !r.type || r.type === 'task' ? 'task:' + r.name : null)).filter(Boolean))

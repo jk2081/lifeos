@@ -1,8 +1,10 @@
 """One call for the Today screen."""
+import re
+
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos import calendar_data, journal, permissions
+from lifeos import calendar_data, journal, permissions, rhythms
 from lifeos.api import tasks as task_api
 from lifeos.api import vault as vault_api
 from lifeos.api.utils import area_filter, descendants, in_area, lens_area, user_names
@@ -37,10 +39,11 @@ def week_actions(cycle, week, space=None, area=None):
 
 
 @frappe.whitelist(methods=["GET"])
-def get(space: str | None = None, area: str | None = None):
+def get(space: str | None = None, area: str | None = None, at: str | None = None):
 	"""Tasks due or overdue, today's events, habits with today's state, items to review, the current week of the active cycle,
 	the open loops count and expiring documents. `area` is the lens (UX fixes, set 6): the band, Next and the rail keep to
-	the area and its sub-areas. Events and important dates have no area, so they always show."""
+	the area and its sub-areas. Events and important dates have no area, so they always show. `banner` is the one rhythm
+	that is due (lifeos/rhythms.py); `at` moves its clock on a test site only."""
 	space = permissions.resolve_space(space)
 	area = lens_area(area)
 	now = getdate(today())
@@ -131,6 +134,7 @@ def get(space: str | None = None, area: str | None = None):
 			"overdue_items": overdue_rows, "oldest_overdue": str(oldest) if oldest else None, "group_rows": GROUP_ROWS},
 		"events": events, "habits": habits,
 		"open_loops": task_api.open_loops_count(space), "area": area,
+		"banner": None if permissions.is_agent() else rhythms.banner(space, at),
 		"coming_up": coming,
 		"vault_soon": vault_api.expiry_counts(space)["soon"],
 	}
@@ -170,7 +174,8 @@ def next_list(space, now, cycle, events, area=None):
 		for a in cycle["actions"]:
 			if a["status"] == "Open" and a["count"] < a["per_week"]:
 				twy.append({**a, "type": "action", "why": "12WY", "week": cycle["week"]})
-	ins = insight_api.list(space=space, status="New", actionable=1, area=area, page_length=GROUP_MAX)
+	# insights are for people (set 5); an agent's Today has none
+	ins = {"rows": [], "total": 0} if permissions.is_agent() else insight_api.list(space=space, status="New", actionable=1, area=area, page_length=GROUP_MAX)
 	for r in ins["rows"]:
 		r["type"] = "insight"
 		r["why"] = r.kind
@@ -210,6 +215,20 @@ def rail_of(space, now, events, area=None):
 	week.append({"kind": "review", "title": "Weekly review", "date": str(review_on), "time": str(s.weekly_review_time or "18:00:00")[:5],
 		"day": day[:3]})
 	week.sort(key=lambda x: str(x.get("date") or ""))
-	other = insight_api.list(space=space, status="New", actionable=0, area=area, page_length=5)
+	other = {"rows": [], "total": 0} if permissions.is_agent() else insight_api.list(space=space, status="New", actionable=0, area=area, page_length=5)
 	timeline = [e for e in events if not e.get("date") or str(e["date"]) == str(now)]
 	return {"events": timeline, "week": week, "insights": other["rows"], "insights_total": other["total"]}
+
+
+OCCURRENCE = re.compile(r"^(review:\d{4}-\d{2}-\d{2}|month:\d{4}-\d{2}|(plan-next|close):[\w-]{1,40})$")
+
+
+@frappe.whitelist(methods=["POST"])
+def skip_banner(occurrence: str, how: str = "skipped"):
+	"""Hide Today's rhythm banner until its next occurrence: `how` is skipped, or done (the weekly review's Finish)."""
+	permissions.require_login()
+	if permissions.is_agent():
+		frappe.throw(frappe._("Agents have no Today."), frappe.PermissionError)
+	if how not in ("skipped", "done") or not OCCURRENCE.match(str(occurrence or "")):
+		frappe.throw(frappe._("Unknown banner."))
+	return rhythms.dismiss(occurrence, how)

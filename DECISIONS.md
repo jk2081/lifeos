@@ -408,3 +408,11 @@ Every place where the build chose a default, or differs from `SPEC.md`, with the
 - **Areas** keep their list and order; under it, "In the sidebar" sets each area's colour and its pin.
 - **Backups** reads only backup keys from the site configuration, whether Frappe's S3 backups are on, and the names and sizes of the latest backup files; it says "Not set up on this site" when no schedule is configured.
 - **Import and export** is the chat import, moved out of Connections. Export is Frappe's own backup; Life OS has no export of its own.
+
+### 7. Rhythm banners
+
+- **The rules are in `lifeos/rhythms.py`** and Today's answer carries `banner`. Each occurrence has a key (the review's week, the month, the cycle), and Skip is remembered per user in the view state `rhythm-banners`, so the same banner comes back at the next occurrence and on every device.
+- **"Done"**: the weekly review is done when its notes are saved (the existing "Weekly review, <date>" note); "Finish this review" saves them. The month plan is done when the month's plan exists. "Plan your next 12 weeks" stops once a later cycle is planned. "Close this cycle" shows through week 12 until skipped or closed (a closed cycle is no longer active).
+- **Month plan off** in Settings > Rhythms turns its banner off.
+- **Moving the clock.** `today.get(at=…)` sets the banners' clock only when the site config has `lifeos_test_clock` (the acceptance site); on any other site it is ignored.
+- **Fixed on the way:** `today.get` failed for agents since set 5, because it read insights, which refuse agents. An agent's Today now has no insights and no banner; `agent/SKILL.md` lists `today.get` as an agent read.
