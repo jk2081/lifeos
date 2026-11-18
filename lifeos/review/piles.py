@@ -99,10 +99,11 @@ class PileSet:
 
 	def drawer(self, pile):
 		"""Every item in a pile, and those moved out of it (shown as moved, with Undo)."""
-		if pile not in PILES:
+		if pile not in (*PILES, NEEDS):
 			frappe.throw(_("Unknown pile."))
 		rows = [_row(i) for i in self.items() if i["pile"] == pile or i.get("moved_from") == pile]
 		return {"pile": pile, "rows": rows, "sources": _sources([i for i in self.items() if i["pile"] == pile]),
+			"needs": sum(1 for i in self.items() if i["pile"] == NEEDS and not i.get("settled")),
 			"left": sum(1 for r in rows if not r["settled"] and r["pile"] == pile)}
 
 	# ---- deciding ----

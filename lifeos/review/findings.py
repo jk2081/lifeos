@@ -42,11 +42,11 @@ def detect_readings(space):
 	for r in rows:
 		if frappe.db.exists("Life Insight", {"reading": r.name}):
 			continue
-		value = f"{r.value:g}{(' ' + r.unit) if r.unit else ''}"
-		last = f" {r.title} last read {r.current_value:g}." if r.current_on else ""
-		said = f"“{r.excerpt.strip()[:120]}”" if r.excerpt else f"A value of {value} was read"
+		value = f"{r.value:,g}{(' ' + r.unit) if r.unit else ''}"
+		last = f" {r.title} last read {r.current_value:,g}." if r.current_on else f" {r.title} has no reading yet."
+		said = f"“{r.excerpt.strip()[:160]}”" if r.excerpt else f"{value} was read for {r.title}."
 		evidence = [insights.ev(r.source_doctype, r.source_name, "")] if r.source_doctype and r.source_name else [insights.ev("Life Goal", r.goal, r.title)]
-		add(space, "Goal reading", f"{said} for {r.title}.{last}", evidence,
+		add(space, "Goal reading", f"{said}{last}", evidence,
 			[{"kind": "confirm_reading", "label": f"Confirm {value}", "reading": r.name}, {"kind": "dismiss", "label": "Skip"}],
 			reading=r.name, source_line=_source_line(r.source_doctype, r.source_name, r.date), area=r.area)
 
@@ -160,7 +160,9 @@ def act(name, index, extra=None):
 		out["events"] = a.get("events") or []
 		return out  # going through the meetings is not acting on it
 	else:
-		frappe.throw(frappe._("Unknown action."))
+		from lifeos.api import insights as insight_api
+
+		return insight_api.act(name, index)  # the actions of set 5's insights (Waiting on you, Theme)
 	doc.status = "Acted"
 	doc.save()
 	return out

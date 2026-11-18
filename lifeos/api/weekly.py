@@ -75,6 +75,9 @@ def _refresh(rv):
 		frappe.db.rollback(save_point="lifeos_review_calendar")
 		frappe.log_error(title="Life OS Google Calendar read")
 	followups.refresh(space, user, rv.doc.period_start, rv.doc.period_end, ai=_ai(space))
+	from lifeos.review import findings
+
+	findings.revelations(rv)  # the five shown are kept, so acting on one leaves "4 left"
 
 
 @frappe.whitelist(methods=["POST"])

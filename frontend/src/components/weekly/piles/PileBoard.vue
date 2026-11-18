@@ -1,6 +1,6 @@
 <template>
   <div class="flex flex-col gap-4" data-pile-board :data-pile-key="pkey">
-    <NeedsYou v-if="s" :rows="s.needs" @settle="settle" @undo="undo" />
+    <NeedsYou v-if="s && !hideCards" :rows="s.needs" @settle="settle" @undo="undo" />
     <section v-if="s && !hideCards" class="flex flex-col gap-2">
       <h2 class="text-base-medium text-ink-gray-9">{{ heading }} · {{ total }}</h2>
       <div class="grid gap-3 md:grid-cols-3">

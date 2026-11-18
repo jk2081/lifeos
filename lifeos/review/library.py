@@ -76,7 +76,8 @@ def came_in(space, start, end):
 
 def _revelation(r):
 	return {"name": r.name, "kind": r.kind, "title": r.title, "source": r.source_line or r.based_on, "meeting": r.meeting, "reading": r.reading,
-		"actions": [{"index": i, "label": a.get("label"), "kind": a.get("kind"), "events": a.get("events")} for i, a in enumerate(r.actions)]}
+		"actions": [{"index": i, "label": a.get("label"), "kind": a.get("kind"), "events": a.get("events"), "ref": a.get("ref"), "to": a.get("to")}
+			for i, a in enumerate(r.actions)]}
 
 
 # ---- a meeting opened ----

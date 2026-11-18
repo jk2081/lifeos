@@ -27,6 +27,8 @@ else
 fi
 # GETs to Life OS methods run read-only here, so a read that writes fails the run (lifeos/strict_get.py)
 $B "cd ~/frappe-bench && bench --site $SITE set-config -p lifeos_strict_get 1 >/dev/null"
+# set 8: a fixture calendar stands in for Google here
+$B "cd ~/frappe-bench && bench --site $SITE set-config -p lifeos_fake_calendar 1 >/dev/null"
 # the rhythm banners' clock may be moved here (today.get's `at`), and only here (UX fixes, set 6)
 $B "cd ~/frappe-bench && bench --site $SITE set-config -p lifeos_test_clock 1 >/dev/null"
 # Its own web server on container port 9000 (host 19000, the port the compose file maps and nothing else uses), since

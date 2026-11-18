@@ -55,6 +55,7 @@ export const PILE_TEXT = {
   letgo: { title: 'Let go', dot: 'bg-surface-gray-7', verb: 'Let go of all', done: 'let go', inbox: { line: 'discarded, back from the trash for 30 days' },
     tasks: { line: 'dropped; bring them back from the Outbox' } },
 }
+PILE_TEXT.needs = { title: 'Needs you', dot: 'bg-surface-red-7', verb: '', done: 'settled', line: 'the assistant could not decide' }
 export const pileText = (pile, key, field) => PILE_TEXT[pile][key]?.[field] ?? PILE_TEXT[pile][field]
 
 // The three choices on a row, worded for its source (Needs you): an Inbox item, a stuck task, a task waiting on someone
