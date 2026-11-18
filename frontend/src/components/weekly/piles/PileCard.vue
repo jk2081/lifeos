@@ -20,11 +20,11 @@
     </template>
     <template v-else>
       <ul v-if="p.first.length" class="flex flex-col">
-        <li v-for="i in p.first" :key="i.ref" class="flex min-w-0 items-center gap-2 border-b border-outline-gray-1 py-1.5 text-sm text-ink-gray-8 last:border-b-0">
+        <li v-for="i in p.first.slice(0, show)" :key="i.ref" class="flex min-w-0 items-center gap-2 border-b border-outline-gray-1 py-1.5 text-sm text-ink-gray-8 last:border-b-0">
           <Badge size="sm" theme="gray" :label="i.source" /><span class="min-w-0 truncate">{{ i.title }}</span></li>
       </ul>
       <p v-else class="text-sm text-ink-gray-6">Nothing here.</p>
-      <p v-if="p.count > p.first.length" class="text-sm text-ink-gray-6">+ {{ p.count - p.first.length }} more ·
+      <p v-if="p.count > Math.min(p.first.length, show)" class="text-sm text-ink-gray-6">+ {{ p.count - Math.min(p.first.length, show) }} more ·
         <a href="#" class="text-ink-blue-8 hover:underline focus-visible:focus-ring" @click.prevent="emit('open')">see all and change</a></p>
       <Button class="mt-auto w-full" label="Open pile" :disabled="p.empty" data-pile-open @click="emit('open')" />
     </template>
@@ -37,7 +37,8 @@ import { Badge, Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import { PILE_TEXT, pileText } from '@/lib/review'
 
-const props = defineProps({ pile: String, pkey: String, p: Object })
+// `show`: how many of its items a card lists (two when Needs you is long, so the tab still fits on one screen)
+const props = defineProps({ pile: String, pkey: String, p: Object, show: { type: Number, default: 3 } })
 const emit = defineEmits(['open', 'undo'])
 const movedText = computed(() => Object.entries(props.p.moved || {}).map(([to, n]) => `${n} moved to ${PILE_TEXT[to].title}`).join(' · '))
 </script>

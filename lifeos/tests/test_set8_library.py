@@ -67,3 +67,15 @@ class TestLibrary(LibCase):
 		self.assertEqual(frappe.db.get_value("Life Insight", second["name"], "status"), "Dismissed")
 		got = weekly.library(space=PRIVATE)
 		self.assertEqual((len(got["revelations"]), got["revelations_shown"]), (3, 5))  # "3 left", the next two do not move in
+
+
+class TestReadingFromRevelations(LibCase):
+	def test_confirm_a_reading_from_the_review(self):
+		goal = self.make("Life Goal", title="s8 yield rev", goal_type="Open", measure_kind="Number", measure="yield", unit="kg/ha", start_value=1000, target_value=1800)
+		r = frappe.get_doc({"doctype": "Life Goal Reading", "space": PRIVATE, "goal": goal.name, "date": today(), "value": 1460, "status": "Suggested",
+			"suggested_by": "Agent", "excerpt": "1460 kg/ha"}).insert()
+		weekly.start(space=PRIVATE)
+		ins = frappe.db.get_value("Life Insight", {"reading": r.name})
+		weekly.finding_act(space=PRIVATE, insight=ins, index=0)
+		self.assertEqual(frappe.db.get_value("Life Goal", goal.name, "current_value"), 1460)
+		self.assertEqual(frappe.db.get_value("Life Insight", ins, "status"), "Acted")

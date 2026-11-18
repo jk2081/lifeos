@@ -17,7 +17,9 @@
             </template>
             <span class="truncate">{{ e.title }}</span>
           </Button>
-          <div v-else class="truncate rounded-4 bg-surface-gray-2 px-2 py-0.5 text-xs text-ink-gray-7" :title="e.title" data-strip-event>{{ e.title }}</div>
+          <!-- other events are grey and smaller; opening one lets the owner mark it as mattering -->
+          <Button v-else variant="subtle" size="sm" class="!h-6 w-full min-w-0 !justify-start !text-xs !text-ink-gray-7" :label="e.title" :title="e.title"
+            data-strip-event :data-strip-other="e.name" @click="emit('open', e.name)"><span class="truncate">{{ e.title }}</span></Button>
         </template>
         <Button v-if="d.events.length > PER_DAY" variant="ghost" size="sm" class="!justify-start" :label="`+ ${d.events.length - PER_DAY} more`" @click="emit('list')" />
       </div>

@@ -58,6 +58,15 @@ def start(space: str | None = None, fresh: bool | int = 0):
 		_refresh(rv)
 		for key in piles.KEYS:
 			piles.PileSet(rv, key).load(ai=_ai(space))
+		from lifeos.review import goals as goals_mod
+
+		gp = goals_mod.GoalPlan(rv)
+		gp.prefill(ai=_ai(space))  # next actions and slots, the assistant's within the cap; kept, so it is asked once
+		if _ai(space):
+			goals_mod.suggest_stars(gp)
+			from lifeos.review import lock as lock_mod
+
+			lock_mod.playback(rv)  # last week's note checked against this week, once
 		rv.save()
 	return rv.header()
 
@@ -244,3 +253,133 @@ def finding_act(space: str | None = None, insight: str = "", index: int = 0, tit
 		lib.note_created(rv, out["task"], goal or frappe.db.get_value("Life Task", out["task"], "goal"), "library")
 	rv.save()
 	return {**out, "header": rv.header()}
+
+
+# ---- tab 2: Tasks ----
+
+@frappe.whitelist(methods=["GET"])
+def plate(space: str | None = None):
+	"""Left your plate: the four Outbox piles for the review's period, and in against out, each a door to its list."""
+	from lifeos.review import plate as plate_mod
+
+	rv = _current(space)
+	return plate_mod.left_your_plate(rv)
+
+
+# ---- tab 3: Goals ----
+
+@frappe.whitelist(methods=["GET"])
+def goals(space: str | None = None):
+	"""The cycle's goals with mark, progress and the prefilled plan; stars; what is left before Next; capacity; next week."""
+	from lifeos.review import goals as goals_mod
+
+	rv = _current(space)
+	goals_mod.GoalPlan(rv).prefill(ai=False)  # an unsaved review shows the rule prefill; start() saved the assistant's
+	return goals_mod.tab(rv)
+
+
+@frappe.whitelist(methods=["GET"])
+def goal(space: str | None = None, goal: str = ""):
+	from lifeos.review import goals as goals_mod
+
+	rv = _current(space)
+	goals_mod.GoalPlan(rv).prefill(ai=False)
+	return goals_mod.detail(rv, goal)
+
+
+@frappe.whitelist(methods=["POST"])
+def goal_save(space: str | None = None, goal: str = "", values: str | dict | None = None):
+	"""Save a goal's plan from its drawer: next_action, task, slot (empty for no set time), minutes, who, note."""
+	from lifeos.api.utils import parse
+	from lifeos.review import goals as goals_mod
+
+	rv = _open(space)
+	vals = parse(values, {}) or {}
+	if not isinstance(vals, dict):
+		frappe.throw(_("values must be an object."))
+	goals_mod.GoalPlan(rv).save(goal, {k: vals[k] for k in ("next_action", "task", "slot", "minutes", "who", "note") if k in vals})
+	rv.save()
+	return {"header": rv.header()}
+
+
+@frappe.whitelist(methods=["POST"])
+def goal_skip(space: str | None = None, goal: str = "", reason: str | None = None, undo: bool | int = 0):
+	"""Skip this goal this week (a reason is required), or take the skip back."""
+	from lifeos.review import goals as goals_mod
+
+	rv = _open(space)
+	gp = goals_mod.GoalPlan(rv)
+	if goal not in [g.name for g in gp.goals()]:
+		frappe.throw(_("That goal is not in this review."))
+	gp.unskip(goal) if int(undo or 0) else gp.skip(goal, reason)
+	rv.save()
+	return {"header": rv.header()}
+
+
+@frappe.whitelist(methods=["POST"])
+def goal_star(space: str | None = None, goal: str = "", on: bool | int = 1):
+	from lifeos.review import goals as goals_mod
+
+	rv = _open(space)
+	gp = goals_mod.GoalPlan(rv)
+	if goal not in [g.name for g in gp.goals()]:
+		frappe.throw(_("That goal is not in this review."))
+	gp.set_star(goal, bool(int(on)))
+	rv.save()
+	return {"header": rv.header()}
+
+
+@frappe.whitelist(methods=["POST"])
+def goal_add(space: str | None = None, goal: str = ""):
+	"""Plan one of the other goals in progress this week: it joins the rows."""
+	from lifeos.review import goals as goals_mod
+
+	rv = _open(space)
+	gp = goals_mod.GoalPlan(rv)
+	gp.add_other(goal)
+	gp.prefill(ai=_ai(rv.doc.space))
+	rv.save()
+	return {"header": rv.header()}
+
+
+# ---- tab 4: Reflect, and Lock the week ----
+
+@frappe.whitelist(methods=["GET"])
+def reflect(space: str | None = None):
+	"""What went well and what to do differently, the week in numbers, last week's note played back, and what Lock will do."""
+	from lifeos.review import lock as lock_mod
+
+	rv = _current(space)
+	return lock_mod.reflect(rv)
+
+
+@frappe.whitelist(methods=["POST"])
+def reflect_save(space: str | None = None, went_well: str | None = None, do_differently: str | None = None):
+	from lifeos.review import lock as lock_mod
+
+	rv = _open(space)
+	lock_mod.save_words(rv, went_well, do_differently)
+	rv.save()
+	return {"header": rv.header()}
+
+
+@frappe.whitelist(methods=["POST"])
+def lock(space: str | None = None, went_well: str | None = None, do_differently: str | None = None):
+	"""Lock the week: schedule and delegate the goal work, pin the top three to Today, store the numbers. Returns the done screen."""
+	from lifeos.review import lock as lock_mod
+
+	rv = _open(space)
+	lock_mod.save_words(rv, went_well, do_differently)
+	out = lock_mod.lock(rv)
+	return {**out, "header": rv.header()}
+
+
+@frappe.whitelist(methods=["GET"])
+def done(space: str | None = None):
+	"""The done screen of the review locked last."""
+	from lifeos.review import lock as lock_mod
+
+	rv = _current(space)
+	if rv.doc.status != "Locked":
+		frappe.throw(_("This review is not locked yet."))
+	return lock_mod.summary(rv)

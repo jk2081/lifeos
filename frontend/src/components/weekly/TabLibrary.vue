@@ -21,7 +21,7 @@
               <span class="text-ink-gray-8">{{ c.label }}</span>
               <Button v-if="c.drawer" variant="ghost" size="sm" class="!text-ink-blue-8 tabular-nums" :label="String(c.n)" :aria-label="`${c.n} ${c.label}`"
                 data-meetings-door :data-count-n="c.n" @click="listOpen = true" />
-              <CountLink v-else class="font-semibold" :count="{ n: c.n, to: c.to, label: c.label }" />
+              <CountLink v-else class="font-semibold" :count="{ n: c.n, to: c.to, label: c.label }" :data-door="'review-came-' + c.key" />
             </div>
             <div class="mt-3 rounded-4 bg-surface-gray-1 p-3" data-review-inbox>
               <div class="text-base-medium text-ink-gray-9">Inbox · {{ inboxLeft }} to process</div>

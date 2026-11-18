@@ -1,6 +1,6 @@
 <template>
   <!-- set 8: the weekly review is its own screen, with its numbered tabs, not a view inside the Week's header -->
-  <ReviewPage v-if="tab === 'week' && route.query.view === 'review'" />
+  <ReviewPage v-if="tab === 'week' && (route.query.view === 'review' || (!route.query.view && reviewDay))" />
   <PlanRhythm v-else-if="tab === 'week'" title="Week" :views="WEEK" :initial="reviewDay ? 'review' : 'calendar'">
     <template #above="{ view }"><WeekScore v-if="view !== 'review'" /></template>
     <template #actions><Button icon-left="lucide-rotate-ccw" label="Reset" route="/plan/reset" data-plan-reset>

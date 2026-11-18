@@ -118,7 +118,6 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `goals/NewGoalDialog.vue` | New goal with its measure (Plan > Goals and the New menu) | `Dialog`, `FormControl`, `DatePicker`, `DoneWhen` |
 | `goals/GoalMeasure.vue`, `goals/ResultBar.vue`, `goals/ReadingChart.vue`, `goals/SuggestedReadings.vue` | A goal's key result on its page and pane: the result bar, the chart of confirmed readings, readings to confirm, a reading by hand, Mark achieved | `Progress`, `Badge`, `Alert`, `FormControl`, `DatePicker`, `Row`; the chart is SVG with token variables |
 | `outbox/InOutChart.vue`, `pages/Outbox.vue` | Library > Outbox: four piles, All out and Came in as state tabs, the period switch, the 8-week chart, Bring back | `ListView`, `TabButtons`, `Badge`, `Button`; SVG bars with token variables |
-| `review/KeyResults.vue`, `review/GoalWork.vue` | The weekly review's step 1 (readings to confirm, finish lines, "Where is X now?") and step 3 (goal cards) | `Card`, `Row`, `FormControl`, `DateTimePicker`, `Skeleton`, `SuggestedReadings`, `DoneWhen` |
 | `inbox/OldItems.vue` | The Inbox's banner of old items and its batch screen of suggested decisions | `Alert`, `Dialog`, `Checkbox`, `Select` |
 
 ## How a list screen is written
@@ -302,7 +301,7 @@ At most one line above the Open band (`data-rhythm-banner`), from `today.get`'s 
 
 ### The weekly review
 
-`components/journal/WeeklyReview.vue` is four steps on one page, each a `section[data-review-step]`: `results` (the score with its target, then `KeyResults`), `reset` (the Reset card; done or skipped it folds to one line), `goals` (`GoalWork`, current week only, people only) and `look-back`. Goal cards (`data-goal-card`) carry `data-card-state` (open, added, skipped); the footer (`data-goal-work-footer`) carries the planned and free minutes.
+Replaced in set 8 by `components/weekly/` (see "Set 8: the weekly review" below). The goal cards and key-results step of set 7 are gone; readings to confirm are Goal reading revelations in Library and links on the goal rows in Goals.
 
 ### Scheduled tasks
 
@@ -336,3 +335,23 @@ The Inbox's `#above` slot starts with `inbox/OldItems.vue`: an amber `Alert` (`d
 | `piles/PileDrawer.vue` | A pile opened: what happens, source filters with counts, each row with source, area, age and reason, Keep, Park and Let go settling it at once ("Moved to Keep · Undo"), and the footer that applies the pile's decision to the rest ("Park all 17") | `Drawer`, `TabButtons`, `Badge`, `Button` |
 
 `lib/review.js` holds the review's shared state (`provideReview`, `useReview`): `head` (period, tabs done and openable, the first unfinished tab), `act(method, args)` (a POST to `lifeos.api.weekly`, which saves at once and returns the new header) and `read(method, args)` (a GET). Every tab reloads what it shows when `version` changes.
+
+### The tabs
+
+| Component | What it is | Built from |
+| --- | --- | --- |
+| `TabLibrary.vue` with `library/CalendarStrip.vue`, `library/MeetingDrawer.vue`, `library/FindingRow.vue` | Tab 1 (boards 28, 29): the period's days with meetings that matter marked (a list by day on a phone; one line to Settings when no calendar), Came in with each count a `CountLink` (meetings open a list in a drawer), the Inbox piles' split and Review the piles, the Revelations ("N left"; "Nothing left to look at"; the line when the assistant is not set up). A meeting opened: linked records (Open, Unlink, Link a record), follow-ups found, a line that becomes a task on Enter under the goal shown, the "matters" switch, ← → and Done with this meeting | `Card`, `Button` (`variant="outline"` for a meeting that matters), `CountLink`, `Badge`, `TextInput`, `Select`, `Switch`, `Dropdown`, `Drawer` |
+| `TabTasks.vue` | Tab 2 (board 30): "N left to clear" with a bar, Left your plate (the four Outbox piles for the review's period, each a `CountLink` to Library > Outbox with `from=` and `to=`; in and out; Open the Outbox), then `PileBoard` for stuck and waiting tasks | `Progress`, `Card`, `CountLink`, `PileBoard` |
+| `TabGoals.vue` with `goals/GoalDrawer.vue`, `goals/WeekGlance.vue` | Tab 3 (boards 31, 32): the week's score against the target, goal work planned against free hours (amber when over), one row per cycle goal (star, mark, progress, next action, when and length, who; "needs a finish line" and "N readings to confirm" open the drawer), "N other goals in progress · Plan any" in one line, and next week at a glance (a "Next week" sheet on a phone). The drawer: the finish line (`DoneWhen`) when missing, readings to confirm (`SuggestedReadings`), next action with "other open tasks (N)", when and length, free slots as chips, who, what is needed, the top-three star, Skip this goal this week (a reason is required) and Save | `Card`, `Badge`, `Progress`, `Button`, `FormControl`, `DateTimePicker`, `Checkbox`, `Alert`, `Drawer`; the glance places blocks by time with `:style` (geometry only) |
+| `TabReflect.vue`, `ReviewDone.vue` | Tab 4 (board 33): what went well (required) and what to do differently, saved as typed; the week in numbers; last week's line played back; what Lock will do. The done screen: "Week planned in N minutes", what was decided, the top three, Go to Today, See the week, the next review | `FormControl`, `Card`, `Button` |
+
+Each tab ends with `ReviewFooter`. A tab's footer line says what is left before its button opens (the server's `ready.left` on Goals).
+
+### Today's top three
+
+After Lock, the week's three starred goal tasks (`is_top_three`) are the first group of Today's Next (`data-next-group="top"`), each with a star (`data-top-three`), until the next review is locked.
+
+### Outbox periods
+
+Library > Outbox also takes a review's period as `from=` and `to=` (shown as a fourth choice, "Review period"), so the review's counts open lists with exactly those rows.
+

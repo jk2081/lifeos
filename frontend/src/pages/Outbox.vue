@@ -1,9 +1,9 @@
 <template>
   <ListView ref="list" title="Outbox" noun="records" screen="outbox" doctype="Life Exit" :spec="SPEC" :tabs="TABS" :quick="['kind']" :synthetic="SYNTHETIC"
-    :hidden="HIDDEN" :fetch="fetch" :row-ref="rowRef" :row-label="(r) => r.title" :groupable="false" :watch-keys="['period']"
+    :hidden="HIDDEN" :fetch="fetch" :row-ref="rowRef" :row-label="(r) => r.title" :groupable="false" :watch-keys="['period', 'from', 'to']"
     :empty-title="EMPTY[tab] || 'Nothing left the plate in this period.'" empty-hint="Done, delegated, parked and discarded records show here, with when they left." @loaded="loaded">
     <template #sub><span data-outbox-sub>{{ store.space }} · what left your plate {{ PERIOD_LABEL[period] }}{{ range ? ` (${range})` : '' }}<span class="max-md:hidden"> · a record, not a place to work</span></span></template>
-    <template #bar><TabButtons :model-value="period" :options="PERIODS" data-outbox-period @update:model-value="setPeriod" /></template>
+    <template #bar><TabButtons :model-value="period" :options="periods" data-outbox-period @update:model-value="setPeriod" /></template>
     <template #above>
       <Card v-if="chart.length" data-outbox-chart-card><InOutChart :weeks="chart" /></Card>
     </template>
@@ -51,7 +51,7 @@ const SPEC = [{ key: 'pile', field: 'pile', kind: 'value' }, { key: 'area', fiel
 const SYNTHETIC = [{ key: '_area', label: 'Area', width: '10rem', place: 'end' }, { key: '_back', label: '', width: '8rem', align: 'right', place: 'end' }]
 const HIDDEN = ['record_doctype', 'record_name', 'exited_by', 'reversed', 'reversed_on', 'note', 'area', 'space']
 const PERIODS = [{ label: 'This week', value: 'week' }, { label: 'This month', value: 'month' }, { label: '12 weeks', value: '12weeks' }]
-const PERIOD_LABEL = { week: 'this week', month: 'this month', '12weeks': 'in the last 12 weeks' }
+const PERIOD_LABEL = { week: 'this week', month: 'this month', '12weeks': 'in the last 12 weeks', custom: 'in the review\'s period' }
 const THEME = { Done: 'green', Delegated: 'blue', Parked: 'amber', Discarded: 'gray', In: 'gray' }
 const route = useRoute()
 const router = useRouter()
@@ -59,14 +59,18 @@ const list = ref(null)
 const chart = ref([])
 const range = ref('')
 const tab = computed(() => list.value?.tab || 'Done')
-const period = computed(() => (['week', 'month', '12weeks'].includes(route.query.period) ? route.query.period : 'week'))
+// set 8: a review's period comes as from= and to= (its days), shown as a fourth choice while it is open
+const custom = computed(() => (route.query.from && route.query.to ? { from: String(route.query.from), to: String(route.query.to) } : null))
+const period = computed(() => (custom.value ? 'custom' : ['week', 'month', '12weeks'].includes(route.query.period) ? route.query.period : 'week'))
+const periods = computed(() => (custom.value ? [...PERIODS, { label: 'Review period', value: 'custom' }] : PERIODS))
 const rowRef = (r) => (r.exists === false ? null : r.doctype === 'Life Inbox Item' ? `source:${r.record}` : refOf(r.doctype, r.record))
 function setPeriod(v) {
-  router.push({ query: { ...route.query, period: v === 'week' ? undefined : v, open: undefined } })
+  if (v === 'custom') return
+  router.push({ query: { ...route.query, period: v === 'week' ? undefined : v, from: undefined, to: undefined, open: undefined } })
 }
 async function fetch({ params: p, tab: t, filters, start, page_length }) {
-  const [res, c] = await Promise.all([api('outbox.list', { space: store.space, pile: t, period: period.value, area: p.area, filters: filters?.length ? filters : undefined,
-    start, page_length }), start ? null : api('outbox.chart', { space: store.space, area: p.area })])
+  const [res, c] = await Promise.all([api('outbox.list', { space: store.space, pile: t, period: custom.value ? undefined : period.value, area: p.area,
+    filters: filters?.length ? filters : undefined, from_date: custom.value?.from, to_date: custom.value?.to, start, page_length }), start ? null : api('outbox.chart', { space: store.space, area: p.area })])
   if (c) chart.value = c.weeks
   return { rows: res.rows, total: res.total, tabs: res.tabs, from: res.from, to: res.to }
 }

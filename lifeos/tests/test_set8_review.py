@@ -81,6 +81,7 @@ class TestResumeAndGates(ReviewCase):
 
 	def test_resume_after_pause_and_tab_gates(self):
 		stuck = self.task("s8 stuck", age=70)
+		self.cycle_goal("s8 resume goal")  # a goal to plan, so the Goals tab is not done by having nothing in it
 		head = weekly.start(space=PRIVATE)
 		self.assertTrue(head["openable"]["tasks"])  # Library never blocks
 		self.assertFalse(head["openable"]["goals"])

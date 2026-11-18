@@ -146,10 +146,10 @@ def act(name, index, extra=None):
 			area=a.get("area") or doc.area)
 		doc.acted_note = "task made"
 	elif kind == "confirm_reading":
-		from lifeos import readings
+		from lifeos.api import goals as goal_api
 
-		readings.confirm(a["reading"], extra.get("value"))
-		doc.acted_note = "reading confirmed"
+		goal_api.confirm_reading(a["reading"], extra.get("value"))  # as on the goal: the goal's current value follows
+		return out  # the reading's hook has marked this finding Acted (reading_changed)
 	elif kind in ("make_goal", "someday"):
 		from lifeos.api import someday
 

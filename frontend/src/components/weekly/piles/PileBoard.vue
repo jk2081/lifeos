@@ -4,7 +4,7 @@
     <section v-if="s && !hideCards" class="flex flex-col gap-2">
       <h2 class="text-base-medium text-ink-gray-9">{{ heading }} · {{ total }}</h2>
       <div class="grid gap-3 md:grid-cols-3">
-        <PileCard v-for="p in PILES" :key="p" :pile="p" :pkey="pkey" :p="s.piles[p]" @open="open(p)" @undo="undoPile(p)" />
+        <PileCard v-for="p in PILES" :key="p" :pile="p" :pkey="pkey" :p="s.piles[p]" :show="s.needs_left > 2 ? 2 : 3" @open="open(p)" @undo="undoPile(p)" />
       </div>
     </section>
     <PileDrawer :pile="drawerPile" :pkey="pkey" :data="drawer" :switchable="switchable" @close="drawerPile = null" @switch="open"

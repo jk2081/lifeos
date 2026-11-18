@@ -7,20 +7,27 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | Rule | Exceptions |
 | --- | --- |
 | frappe-manual-commit | 5 |
+| frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 4 |
-| frappe-setuser | 13 |
-| frappe-sql-format-injection | 81 |
-| Total | 103 |
+| frappe-setuser | 14 |
+| frappe-sql-format-injection | 82 |
+| Total | 106 |
 
 ## frappe-manual-commit
 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
-| `lifeos/install.py` | 30 | after_install: the spaces and index DDL must be kept before install-app goes on |
+| `lifeos/install.py` | 49 | after_install: the spaces and index DDL must be kept before install-app goes on |
 | `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 258 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 317 | load test: its removal must stick even when run inside a test |
+
+## frappe-missing-translate-function-python
+
+| File | Line | Reason |
+| --- | --- | --- |
+| `lifeos/devtools_review.py` | 16 | development tool, never shown in the app |
 
 ## frappe-security-file-traversal
 
@@ -41,6 +48,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/demo.py` | 271 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/demo.py` | 285 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/demo.py` | 301 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/devtools_review.py` | 20 | development tool on the acceptance site: the owner-shaped data is made as the owner |
 | `lifeos/loadtest.py` | 44 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 136 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 154 | load test: reads are timed as a member of the space, the way a request runs |
@@ -81,8 +89,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/library.py` | 78 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/outbox.py` | 58 | the parts are constant SQL; the area condition comes from area_filter; values are parameters |
 | `lifeos/api/outbox.py` | 64 | WHERE from _out_where (constant SQL and area_filter); values are parameters |
-| `lifeos/api/outbox.py` | 89 | WHERE from _out_where (constant SQL and area_filter); values are parameters |
-| `lifeos/api/outbox.py` | 105 | the parts are constant SQL; the area condition comes from area_filter; values are parameters |
+| `lifeos/api/outbox.py` | 90 | WHERE from _out_where (constant SQL and area_filter); values are parameters |
+| `lifeos/api/outbox.py` | 106 | the parts are constant SQL; the area condition comes from area_filter; values are parameters |
 | `lifeos/api/search.py` | 58 | FIELDS and WHERE are fixed fragments; the search text is the %(q)s parameter |
 | `lifeos/api/search.py` | 70 | FIELDS, WHERE and the LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
 | `lifeos/api/settings.py` | 39 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |
@@ -133,4 +141,5 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/patches/v7/projects_into_goals.py` | 180 | DocType and field names come from the constant DYNAMIC |
 | `lifeos/patches/v7/projects_into_goals.py` | 250 | `dt` comes from index.KINDS, a constant |
 | `lifeos/readings.py` | 254 | only the code-owned vault fragment of the tool context is inserted; values are parameters |
+| `lifeos/review/library.py` | 137 | dt and the date column come from the fixed tuple above; values are parameters |
 | `lifeos/tests/test_ux6_goals.py` | 24 | `doctype` comes from the constant OLD_COLUMNS |

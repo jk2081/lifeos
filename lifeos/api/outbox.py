@@ -70,7 +70,8 @@ def out_counts(space, area, start, end, filters=None):
 
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, pile: str | None = "Done", period: str | None = "week", area: str | None = None, start: int = 0,
-		page_length: int = 50, filters: str | builtins.list | None = None, order_by: str | None = None, summary: str | dict | None = None):
+		page_length: int = 50, filters: str | builtins.list | None = None, order_by: str | None = None, summary: str | dict | None = None,
+		from_date: str | None = None, to_date: str | None = None):
 	"""The Outbox for a period (week, the default; month; 12weeks): exits of one pile (Done, Delegated, Parked, Discarded,
 	or all), newest first, or with pile `in` what came in (`filters` on Life Exit fields apply to the exits only). Each row has its kind, area, when, its pile, whether it is
 	sensitive, and whether Bring back is possible. `tabs` counts every tab for the period under the lens."""
@@ -78,7 +79,7 @@ def list(space: str | None = None, pile: str | None = "Done", period: str | None
 	space = permissions.resolve_space(space)
 	area = lens_area(area)
 	pile = pile if pile in TABS else "Done"
-	start_dt, end_dt = outbox.period_bounds(period)
+	start_dt, end_dt, period = bounds(period, from_date, to_date)
 	start, page_length = page(start, page_length)
 	tabs = out_counts(space, area, start_dt, end_dt, filters)
 	tabs["in"] = in_count(space, area, start_dt, end_dt)
@@ -96,7 +97,7 @@ def list(space: str | None = None, pile: str | None = "Done", period: str | None
 	for r in rows:
 		r["area_name"] = areas.get(r["area"])
 		r["on"] = str(r["on"])[:19]
-	return {"rows": rows, "total": total, "tabs": tabs, "period": period if period in outbox.PERIODS else "week",
+	return {"rows": rows, "total": total, "tabs": tabs, "period": period,
 		"from": str(start_dt)[:10], "to": str(add_days(getdate(end_dt), -1))}
 
 
@@ -205,9 +206,20 @@ def chart(space: str | None = None, area: str | None = None, weeks: int = 8):
 	return {"weeks": out}
 
 
-def total(space, pile, period="week", area=None):
-	"""What `list` answers as `total` for the same arguments, without its rows or its other tabs (for the count doors)."""
+def bounds(period, from_date=None, to_date=None):
+	"""[start, end) of a named period, or of the days from_date to to_date (set 8: a review's period), and the period's name."""
+	if from_date and to_date:
+		a, b = getdate(from_date), getdate(to_date)
+		if b < a or (b - a).days > 400:
+			frappe.throw(_("Choose a period of at most a year."))
+		return get_datetime(str(a)), get_datetime(str(add_days(b, 1))), "custom"
 	start_dt, end_dt = outbox.period_bounds(period)
+	return start_dt, end_dt, period if period in outbox.PERIODS else "week"
+
+
+def total(space, pile, period="week", area=None, from_date=None, to_date=None):
+	"""What `list` answers as `total` for the same arguments, without its rows or its other tabs (for the count doors)."""
+	start_dt, end_dt, _p = bounds(period, from_date, to_date)
 	if pile == "in":
 		return in_count(space, area, start_dt, end_dt)
 	return out_counts(space, area, start_dt, end_dt)[pile if pile in TABS else "Done"]

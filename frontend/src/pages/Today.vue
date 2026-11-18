@@ -60,7 +60,7 @@
         <!-- Next: one list in a fixed order, the order written at the top -->
         <section data-next>
           <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base"><span class="font-semibold text-ink-gray-9">Next</span>
-            <span class="text-sm text-ink-gray-6 max-md:hidden">in this order: overdue, today, this week's 12 Week Year actions, then decisions</span></h2>
+            <span class="text-sm text-ink-gray-6 max-md:hidden">in this order: the week's top three, overdue, today, this week's 12 Week Year actions, then decisions</span></h2>
           <Card flush class="!px-4">
             <template v-for="g in visibleGroups" :key="g.key">
               <div class="flex items-center gap-2 border-b border-outline-gray-1 pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-gray-6" :data-next-group="g.key">
@@ -76,13 +76,14 @@
                 <Row v-if="!r.type || r.type === 'task'" :pane="'task:' + r.name" :label="r.title" class="group !items-center" data-next-row :data-why="r.why" data-task-row>
                   <Checkbox class="relative" :model-value="r.status === 'Done'" :disabled="!canWrite()" :aria-label="'Done: ' + r.title" @update:model-value="done(r)" />
                   <span v-if="!phone" class="w-14 shrink-0 text-sm tabular-nums text-ink-gray-7">{{ r.lead || '' }}</span>
+                  <span v-if="r.why === 'Top three'" class="lucide-star size-4 shrink-0 text-ink-amber-9" role="img" aria-label="One of this week's top three" data-top-three />
                   <div class="min-w-0 flex-1">
                     <div class="break-words text-base text-ink-gray-9" :class="r._done && 'text-ink-gray-6 line-through'">{{ r.title }}</div>
                     <div class="truncate text-sm text-ink-gray-6">{{ taskLine(r) }}</div>
                   </div>
                   <Dropdown v-if="r.why === 'Overdue' && canWrite()" :options="triage(r)"><Button class="relative md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100" variant="ghost" size="sm"
                     icon="lucide-calendar-clock" :label="'Reschedule ' + r.title" data-triage /></Dropdown>
-                  <Badge :theme="r.why === 'Overdue' ? 'red' : 'gray'" :label="phone && r.why === 'Due today' ? 'Today' : r.why" data-why />
+                  <Badge :theme="r.why === 'Overdue' ? 'red' : r.why === 'Top three' ? 'amber' : 'gray'" :label="phone && r.why === 'Due today' ? 'Today' : r.why" data-why />
                 </Row>
                 <Row v-else-if="r.type === 'event'" :pane="'event:' + r.name" :label="r.title" class="!items-center" data-next-row data-why="Event">
                   <span class="w-5 shrink-0 md:hidden" />

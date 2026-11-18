@@ -96,7 +96,7 @@ class TestLens(LifeTestCase):
 		day = today_api.get(space=PRIVATE, area=self.parent)
 		listed = [r.name for g in day["next"]["groups"] if g["key"] == "today" for r in g["rows"] if r.get("type") == "task"]
 		self.check(names, listed, "today.get")
-		self.assertEqual(day["next"]["groups"][1]["tasks"]["n"], len([n for n in listed]))
+		self.assertEqual(next(g for g in day["next"]["groups"] if g["key"] == "today")["tasks"]["n"], len(listed))  # set 8: the top three come first
 		side = counts.sidebar(PRIVATE, self.parent)
 		self.assertEqual(side["tasks"]["to"]["query"]["area"], self.parent)
 

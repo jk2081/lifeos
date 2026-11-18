@@ -157,12 +157,19 @@ def next_list(space, now, cycle, events, area=None):
 	from lifeos.api import insights as insight_api
 
 	lens, lens_values = task_lens(space, area)
+	# set 8: the week's top three come first, starred, until the next review is locked
+	top = task_api.query(space, lens + "and t.is_top_three = 1 and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0", lens_values,
+		"t.scheduled_at asc, t.creation asc", 0, 3)
+	for t in top:
+		t.update({"why": "Top three", "type": "task", "lead": str(t.scheduled_at)[11:16] if t.get("scheduled_at") else ""})
+	tops = {t.name for t in top}
 	open_due = lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date "
 	overdue = task_api.query(space, open_due + "< %(today)s", {"today": now, **lens_values}, "t.due_date asc, t.creation asc", 0, GROUP_MAX)
 	for t in overdue:
 		t["why"] = "Overdue"
 		t["lead"] = f"{(now - getdate(t.due_date)).days} day{'s' if (now - getdate(t.due_date)).days != 1 else ''}"
-	due_today = task_api.query(space, open_due + "= %(today)s", {"today": now, **lens_values}, None, 0, GROUP_MAX)
+	overdue = [t for t in overdue if t.name not in tops]
+	due_today = [t for t in task_api.query(space, open_due + "= %(today)s", {"today": now, **lens_values}, None, 0, GROUP_MAX) if t.name not in tops]
 	today_rows = []
 	for e in events:
 		if e.get("date") and str(e["date"]) != str(now):
@@ -172,7 +179,7 @@ def next_list(space, now, cycle, events, area=None):
 	# tasks planned at a time today (set 7, the weekly review's goal work) sit among the events at their time
 	due_names = {t.name for t in due_today}
 	for t in scheduled_today(space, now, area):
-		if t.name in due_names:
+		if t.name in due_names or t.name in tops:
 			continue
 		t.update({"why": "Scheduled", "type": "task", "all_day": 0, "start": str(t.scheduled_at)[:19], "lead": str(t.scheduled_at)[11:16]})
 		today_rows.append(t)
@@ -194,8 +201,9 @@ def next_list(space, now, cycle, events, area=None):
 		r["type"] = "insight"
 		r["why"] = r.kind
 	return {
-		"order": ["overdue", "today", "twy", "decisions"],
+		"order": ["top", "overdue", "today", "twy", "decisions"],
 		"groups": [
+			{"key": "top", "label": "This week's top three", "rows": top, "total": len(top)},
 			{"key": "overdue", "label": "Overdue", "rows": overdue, "total": counts.overdue_tasks(space, area)["n"], "door": counts.overdue_tasks(space, area)},
 			{"key": "today", "label": "Today", "rows": today_rows, "total": len(today_rows), "tasks": counts.due_today_tasks(space, area),
 				"events": len(today_rows) - len(due_today)},

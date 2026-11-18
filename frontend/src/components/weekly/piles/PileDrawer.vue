@@ -2,7 +2,7 @@
   <Drawer :open="!!pile" name="pile" @close="emit('close')">
     <template #title><span class="size-2.5 rounded-full" :class="PILE_TEXT[cur].dot" aria-hidden="true" />{{ PILE_TEXT[cur].title }} · {{ left }}</template>
     <template #sub>{{ blurb }} Change any one, or accept the lot.</template>
-    <template #bar>
+    <template v-if="switchable || sourceOptions.length > 2" #bar>
       <div class="flex flex-wrap items-center gap-2">
         <TabButtons v-if="switchable" :model-value="cur" :options="switchOptions" aria-label="Pile"
           data-pile-switch @update:model-value="(v) => emit('switch', v)" />

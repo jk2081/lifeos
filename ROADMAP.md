@@ -16,8 +16,8 @@ Life OS keeps its owner moving forward: everything that lands on him goes in one
 | 6 | Simplify: four places, the lens, Projects into Goals, Library, Settings, rhythm banners (`UX_FIXES_6.md`) | Done |
 | 7 | Moving forward: Outbox, old Inbox items, the weekly review's goal work, Done when (`UX_FIXES_7.md`) | Done |
 | Bug fix 1 | Blank weekly review that froze navigation | Done |
-| 8 | The weekly review, redesigned; reading the calendar (`UX_FIXES_8.md`) | Next |
-| 9 | Calendar: writing goal blocks (see below) | |
+| 8 | The weekly review, redesigned; reading the calendar (`UX_FIXES_8.md`) | Done |
+| 9 | Calendar: writing goal blocks (see below) | Next |
 
 ## The target design in one paragraph
 
@@ -67,7 +67,15 @@ Built as `UX_FIXES_7.md` describes; `STATUS.md` ("Set 7: Moving forward") says w
 - Lead measures stay the goal's weekly actions: a tick, or an optional count per week ("4 times a week", ticked one at a time), each tick counting towards the week score.
 - Current values of number goals: the assistant pre-fills a value it finds in captures, showing the source; the weekly review asks for confirmation, or for a value when nothing was found. Goals show the result against its target beside task completion.
 
-### Set 8: The weekly review, redesigned (brief written, 18 November 2026)
+### Set 8: The weekly review, redesigned (done, 18 November 2026)
+
+Built as below: `STATUS.md`, "Set 8: The weekly review", says what works and `DECISIONS.md` how. Still to follow:
+
+- **The monthly and 12-week reviews move to the same shell in a later set.** The shell (`Life Review` with its `kind`, the period since the last locked review, numbered tabs with gates, piles, drawers, the done screen) is built for them; in set 8 they keep their current screens (Plan > Month and Plan > 12 Weeks).
+- The real Google Calendar connection is to be checked by hand with the owner (set 8 tested it against a fixture calendar and a recording stand-in for Google's client).
+
+What was agreed before the brief:
+
 
 The review built in set 7 reads as a long report with no guide. It is being redesigned from mockups before any brief is written (Life OS Screens canvas, boards 23 to 29 and those that follow). Agreed so far:
 

@@ -9,6 +9,7 @@
         <h3 class="mb-1 text-base-medium text-ink-gray-9">Linked to this meeting · {{ m.linked.length }}</h3>
         <div v-for="l in m.linked" :key="l.link" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-meeting-linked :data-how="l.how">
           <Badge size="sm" theme="gray" :label="l.kind" />
+          <span v-if="l.sensitive" class="lucide-lock size-3.5 shrink-0 text-ink-gray-6" role="img" aria-label="Sensitive" data-sensitive-lock />
           <span class="min-w-0 flex-1 truncate text-base text-ink-gray-8">{{ l.title }}</span>
           <Button variant="ghost" size="sm" label="Open" @click="openRef(l.ref)" />
           <Button variant="ghost" size="sm" icon="lucide-unlink" label="Unlink" data-meeting-unlink @click="emit('act', 'meeting_link', { event: m.name, unlink: l.link })" />

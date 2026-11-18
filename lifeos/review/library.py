@@ -62,7 +62,8 @@ def came_in(space, start, end):
 		query = {k: v for k, v in {"tab": None if tab == "all" else tab, "from": a, "to": b, "f": f(*conds)}.items() if v}
 		return {"key": key, "label": label, "n": int(n), "to": {"path": "/library/captures", "query": query}}
 
-	captures = src("Captures and voice notes", "captures", conds=[("ref_doctype", "=", "Life Inbox Item"), ("media_kind", "not in", ["Email", "Email Digest"])])
+	# one condition on the kind, which the Captures list keeps as it is (it has no control for the record type)
+	captures = src("Captures and voice notes", "captures", conds=[("media_kind", "in", ["Voice", "Photo", "Document", "Article", "Text"])])
 	chats = src("Claude and other chats", "chats", tab="chats")
 	emails = src("Emails from people", "emails", tab="email")
 	conds = [("modified", ">=", f"{a} 00:00:00"), ("modified", "<=", f"{b} 23:59:59")]
@@ -91,7 +92,9 @@ def meeting(review, event):
 	from lifeos.pane_refs import ref_of
 
 	recs = [{"link": l.name, "how": l.how, "doctype": l.record_doctype, "name": l.record_name, "title": l.title,
-		"kind": meetings.label_of(l.record_doctype, l.record_name), "ref": ref_of(l.record_doctype, l.record_name)} for l in links]
+		"kind": meetings.label_of(l.record_doctype, l.record_name), "ref": ref_of(l.record_doctype, l.record_name),
+		"sensitive": bool(frappe.get_meta(l.record_doctype).has_field("is_sensitive") and frappe.db.get_value(l.record_doctype, l.record_name, "is_sensitive"))}
+		for l in links]
 	order = [m.name for m in meetings.in_period(space, start, end, only_matter=True)]
 	i = order.index(event) if event in order else -1
 	goal = _goal_for(links)

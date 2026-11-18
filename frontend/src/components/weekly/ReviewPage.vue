@@ -27,10 +27,12 @@ const router = useRouter()
 const r = provideReview()
 const tab = computed(() => (TABS.some((t) => t.value === route.query.tab) ? route.query.tab : null))
 
+// read only (a site that refuses writes), nothing can be done in a tab, so every tab can be looked at
+const openable = (t) => r.readOnly || r.head?.openable[t]
 function go(next) {
   const h = r.head
   if (!h || next === tab.value) return
-  if (!h.openable[next]) {
+  if (!openable(next)) {
     const before = TABS.filter((t) => t.value !== 'library' && TABS.indexOf(t) < TABS.findIndex((x) => x.value === next) && !h.done[t.value])
     toast.warning(`Finish ${before.map((t) => t.label).join(' and ')} first.`)
     return
@@ -46,8 +48,8 @@ function settle() {
   if (!h) return
   // links to set 7's review steps open the tab that replaced them
   const old = { results: 'goals', reset: 'tasks', goals: 'goals', 'look-back': 'reflect' }[route.query.step]
-  if (old && h.openable[old]) return router.replace({ query: { ...route.query, step: undefined, view: 'review', tab: old } })
-  if (!tab.value || !h.openable[tab.value]) router.replace({ query: { ...route.query, view: 'review', tab: h.openable[h.first] ? h.first : 'library' } })
+  if (old && openable(old)) return router.replace({ query: { ...route.query, step: undefined, view: 'review', tab: old } })
+  if (!tab.value || !openable(tab.value)) router.replace({ query: { ...route.query, view: 'review', tab: openable(h.first) ? h.first : 'library' } })
 }
 async function visit() {
   const h = r.head

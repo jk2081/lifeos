@@ -156,7 +156,7 @@ def fixture_events(today=None):
 		ev("dalmia", 2, "15:00", 60, "Dalmia: blend sheet", [me, "mithun@dalmia.example", "arvind@dalmia.example"]),
 		ev("standup-2", 2, "12:00", 30, "Team stand-up", [me, "kunal@lifeos.test"], recurring=True),
 		ev("foxin", 3, "16:00", 45, "Foxin: dealer portal", [me, "ops@foxin.example"]),
-		ev("quick", 3, "17:00", 15, "Quick call with Ruchi", [me, "ruchi@ca-firm.example"]),
+		ev("quick", 3, "17:00", 15, "Quick call with the CA", [me, "ca@ca-firm.example"]),
 		ev("golf", 5, "07:00", 120, "Golf: round", [])]
 
 
@@ -174,14 +174,14 @@ def source_for(acc):
 
 def sync_user(user, source=None, now=None, space=None):
 	"""Read the window from every chosen calendar into Events in the user's private space. Returns the number read."""
-	from lifeos import permissions
-
 	acc = account(user)
 	if source is None:
 		if not frappe.conf.get("lifeos_fake_calendar") and not (acc and acc.enable and acc.get_password("refresh_token", raise_exception=False)):
 			return 0
 		source = source_for(acc)
-	space = space or private_space(user) or permissions.default_space(user)
+	space = space or private_space(user)
+	if not space:
+		return 0  # events from a calendar are private to whoever connected it: never read into a shared space
 	now = get_datetime(now or now_datetime())
 	start, end = now - frappe.utils.datetime.timedelta(days=BACK_DAYS), now + frappe.utils.datetime.timedelta(days=AHEAD_DAYS)
 	n = 0
@@ -243,7 +243,13 @@ def sync_all():
 
 
 def private_space(user):
-	"""The user's own space: the one he owns where he is the only member ("Private" for the owner)."""
-	rows = frappe.db.sql("""select s.name from `tabLife Space` s where s.owner_user = %s
-		and (select count(*) from `tabLife Space Member` m where m.parent = s.name) = 1 order by s.name = 'Private' desc, s.creation asc limit 1""", user)
-	return rows[0][0] if rows else None
+	"""The user's own space: one he owns where no other person is a member (agents and Administrator may be); "Private" first."""
+	from lifeos import permissions
+
+	own = []
+	for name in frappe.get_all("Life Space", filters={"owner_user": user}, pluck="name", order_by="creation asc"):
+		people = {m for m in frappe.get_all("Life Space Member", filters={"parent": name, "parenttype": "Life Space"}, pluck="user")
+			if m != "Administrator" and not permissions.is_agent(m)}
+		if people <= {user}:
+			own.append(name)
+	return "Private" if "Private" in own else (own[0] if own else None)

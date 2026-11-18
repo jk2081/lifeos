@@ -51,6 +51,10 @@ print(json.dumps(out))`, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).
     await page.goto(ownerBase + '/life', { waitUntil: 'networkidle' })
     const { seen, failures } = await walkScreens(page, { width })
     console.log(`${failures.length ? 'FAIL' : 'PASS'}  owner site at ${width} px: ${seen} screens${failures.length ? '  — ' + failures.join('; ') : ''}`)
+    // set 8: every tab of the weekly review and every drawer in it (read only, every tab can be looked at)
+    const review = await walkReview(page, ownerBase, width)
+    console.log(`${review.failures.length ? 'FAIL' : 'PASS'}  owner site at ${width} px: the weekly review, ${review.seen} tabs and drawers${review.failures.length ? '  — ' + review.failures.join('; ') : ''}`)
+    bad += review.failures.length
     if (refused.size) console.log(`      refused writes: ${[...refused].join(', ')}`)
     bad += failures.length
     await ctx.close()
@@ -60,6 +64,49 @@ print(json.dumps(out))`, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).
   const changed = Object.keys(after).filter((t) => JSON.stringify(after[t]) !== JSON.stringify(before[t]))
   console.log(`${changed.length ? 'FAIL' : 'PASS'}  the owner's site is unchanged${changed.length ? '  — changed: ' + changed.join(', ') : ''}`)
   return bad || changed.length ? 1 : 0
+}
+// set 8: open each tab of the weekly review by URL and each drawer in it, and report a script error, the error message, or a
+// tab or drawer that did not show
+async function walkReview(page, origin, width) {
+  const failures = []
+  let seen = 0
+  const errors = []
+  const onError = (e) => errors.push(String(e).split('\n')[0])
+  page.on('pageerror', onError)
+  const wait = () => page.waitForTimeout(700)
+  const look = async (name, sel) => {
+    await wait()
+    const ok = await page.locator(sel).first().isVisible().catch(() => false)
+    if (errors.length) failures.push(`${name}: script error: ${errors.splice(0).join(' | ')}`)
+    if (await page.locator('[data-screen-error]').count()) failures.push(`${name}: the screen could not be shown`)
+    if (!ok) failures.push(`${name}: not shown`)
+    seen += 1
+  }
+  const drawer = async (name, opener, sel = '[data-drawer]') => {
+    const el = page.locator(opener).first()
+    if (!(await el.count()) || !(await el.isVisible()) || await el.isDisabled().catch(() => false)) return
+    await el.click()
+    await look(name, sel)
+    await page.keyboard.press('Escape')
+    await wait()
+  }
+  for (const tab of ['library', 'tasks', 'goals', 'reflect']) {
+    await page.goto(`${origin}/life/plan/week?view=review&tab=${tab}&area=`, { waitUntil: 'networkidle' })
+    await look(`review > ${tab}`, `[data-review-${tab}]`)
+    if (tab === 'library') {
+      await drawer('a meeting', '[data-strip-meeting]:visible')
+      await drawer('the Inbox piles', '[data-review-the-piles]')
+      await drawer('the meetings that matter', '[data-meetings-door]')
+    } else if (tab === 'tasks') {
+      for (const p of ['keep', 'park', 'letgo']) await drawer(`the ${p} pile`, `[data-pile-card][data-pile="${p}"] [data-pile-open]`)
+    } else if (tab === 'goals') {
+      await drawer('a goal', '[data-goal-row] button')
+      await drawer('other goals', '[data-goals-plan-any]')
+      if (width < 800) await drawer('next week', '[data-goals-week-btn]')
+    }
+  }
+  page.off('pageerror', onError)
+  return { seen, failures }
 }
 if (process.argv.includes('--owner-read-only')) process.exit(await ownerReadOnly())
 if (!process.argv.includes('--no-reset')) execFileSync(path.join(root, 'scripts/acceptance-site.sh'), { stdio: 'inherit' })
@@ -125,7 +172,7 @@ const ONLY_UX = process.argv.includes('--ux') // run only the UX checks (U1 and 
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7) // run only the checks whose number ends with this: --only=.8
 async function check(n, title, fn) {
   if (ONLY_UX && !String(n).startsWith('U')) return
-  if (ONLY && !ONLY.split(',').some((o) => String(n).endsWith(o))) return // --only=.3,.32 runs several
+  if (ONLY && !ONLY.split(',').some((o) => String(n).endsWith(o) || String(n).startsWith(o))) return // --only=.3,.32 runs several; --only=S8 by prefix
   try {
     const note = await fn()
     results.push([n, true, title, note || ''])
@@ -356,7 +403,7 @@ await check(11, 'A second user who is only in Shared sees nothing from Private, 
   const reads = { 'today.get': {}, 'tasks.list': {}, 'timeline.get': {}, 'inbox.list': {}, 'library.tree': {}, 'vault.list': {}, 'chats.report': {},
     'graph.get': {}, 'archive.list': {}, 'calendar.get': { from_date: '2026-11-01', to_date: '2026-12-31' }, 'calendar.year': { year: 2026 },
     'goals.list': {}, 'sources.list': {}, 'someday.list': {}, 'counts.get': {}, 'session.counts': {}, 'area.tree': {}, 'journal.grid': {}, 'journal.goals': {}, 'journal.month': {}, 'journal.habits': {}, 'journal.checkins': {},
-    'journal.pages': {}, 'journal.weekly_review': {}, 'settings.get': {} }
+    'journal.pages': {}, 'journal.weekly_review': {}, 'settings.get': {}, 'weekly.get': {}, 'weekly.library': {}, 'weekly.goals': {}, 'weekly.plate': {} }
   for (const [m, args] of Object.entries(reads)) {
     const r = await fam.api(m, { ...args, space: SPACE }, { raw: true })
     must(r.status() === 403, `${m} with space=Private answered ${r.status()}`)
@@ -452,27 +499,28 @@ await check(15, 'Complete an open-ended goal (a project before set 6): it and it
   must((await owner.api('tasks.list', { space: SPACE, page_length: 100, filters: [['title', 'like', stamp]] })).tasks.some((t) => t.name === task.name), 'the task did not come back')
 })
 
-await check(16, 'Archive job archives done tasks; a stale open task is listed under Decide', async () => {
+await check(16, "Archive job archives done tasks; a stale open task waits in the weekly review's piles", async () => {
   const done = await owner.api('tasks.quick_add', { text: `Old done task ${stamp}`, space: SPACE, area: areaId('Personal') })
   const stale = await owner.api('tasks.quick_add', { text: `Stale open task ${stamp}`, space: SPACE, area: areaId('Personal') })
   await owner.api('tasks.set_status', { task: done.name, status: 'Done' })
   // move the clock: the first was finished 100 days ago, the second not touched for 100 days
   bench(`from frappe.utils import add_days, today
 frappe.db.set_value("Life Task", "${done.name}", "completed_on", add_days(today(), -100), update_modified=False)
-frappe.db.set_value("Life Task", "${stale.name}", "last_touched_on", add_days(today(), -100), update_modified=False)
+frappe.db.set_value("Life Task", "${stale.name}", {"last_touched_on": add_days(today(), -100), "creation": add_days(today(), -100)}, update_modified=False)
 from lifeos import archive, index
 index.update(frappe.get_doc("Life Task", "${done.name}"))
 archive.run_daily()`)
   const arch = await owner.api('archive.list', { space: SPACE, page_length: 100, filters: [['title', 'like', `%${stamp}%`]] }) // earlier runs fill the Archive
   must(JSON.stringify(arch.groups).includes(done.name), 'the done task was not archived')
   must(!JSON.stringify(arch.groups).includes(stale.name), 'the stale open task was archived')
-  const review = await owner.api('journal.weekly_review', { space: SPACE })
-  must(review.decide.some((t) => t.name === stale.name), 'the stale task is not under Decide')
-  must(JSON.stringify(review).includes(done.name), 'the weekly review does not list what the job archived')
-  await owner.open('/life/plan/week?view=review')
-  // the weekly review starts with a short Reset (set 5); skip it for this week to reach Decide
-  if (await owner.page.locator('[data-review-reset-skip]').count()) { await owner.page.locator('[data-review-reset-skip]').click(); await owner.page.waitForTimeout(400) }
-  must((await owner.page.locator('[data-main]').innerText()).includes(`Stale open task ${stamp}`), 'the screen does not show it under Decide')
+  // set 8: the weekly review's Tasks tab sorts it into a pile (untouched 100 days: Park in Someday); it is never archived for you
+  const park = await owner.api('weekly.pile_drawer', { space: SPACE, key: 'tasks', pile: 'park' })
+  must(park.rows.some((r) => r.name === stale.name), 'the stale task is not in the Park pile')
+  await owner.open('/life/plan/week?view=review&tab=tasks')
+  await owner.page.locator('[data-pile-card][data-pile="park"] [data-pile-open]').first().click()
+  await owner.page.waitForTimeout(800)
+  must((await owner.page.locator('[data-drawer-name="pile"]').innerText()).includes(`Stale open task ${stamp}`), 'the Park pile does not show it')
+  await owner.page.keyboard.press('Escape')
 })
 
 await check('S1', 'Security: rendered Markdown is sanitised', async () => {
@@ -773,8 +821,6 @@ for (const width of [1440, 390]) {
     // [where the number is, door, which number in its text, what to compare on the page it leads to]
     const door = async (from, name, { which = 0, target = '[data-lv-count]', path, nth = 0, optional = false } = {}) => {
       await s.open(from)
-      // the weekly review starts with a short Reset (set 5): skip it for this week to reach its numbers
-      if (await pg.locator('[data-review-reset-skip]:visible').count()) { await pg.locator('[data-review-reset-skip]').click(); await settle() }
       const el = pg.locator(`[data-door="${name}"]:visible`).nth(nth)
       if (!(await el.count()) || !(await el.isVisible())) {
         if (optional) return
@@ -801,10 +847,10 @@ for (const width of [1440, 390]) {
     await door('/life/library/captures?tab=chats&view=list&from=' + addDays(-6), 'chats-open', { path: '/life/library/captures' })
     must(new URL(pg.url()).searchParams.get('from') === addDays(-6) && new URL(pg.url()).searchParams.get('open_items') === '1', 'chats: the date range was not kept')
     await door('/life/library/notes?view=tree', 'library-notes', { path: '/life/library/notes' })
-    await door('/life/plan/week?view=review', 'review-done', { path: '/life/plan/tasks' })
-    await door('/life/plan/week?view=review', 'review-carried', { path: '/life/plan/tasks', ...hidden })
-    await door('/life/plan/week?view=review', 'review-loops', { path: '/life/plan/tasks' })
-    await door('/life/plan/week?view=review', 'review-archived', { path: '/life/library/archive' })
+    // set 8: the weekly review's numbers: what left the plate opens the Outbox, what came in opens Captures
+    await door('/life/plan/week?view=review&tab=tasks', 'review-plate-Done', { path: '/life/library/outbox' })
+    await door('/life/plan/week?view=review&tab=tasks', 'review-plate-in', { path: '/life/library/outbox' })
+    await door('/life/plan/week?view=review&tab=library', 'review-came-captures', { path: '/life/library/captures' })
     // an inbox row: "4 of 13 proposals pending" opens that item in the pane at its pending proposals
     await s.open('/life/inbox?status=To+Review')
     const link = pg.locator('[data-row] a:visible', { hasText: 'pending' }).first()
@@ -1111,7 +1157,7 @@ for (const width of [1440, 390]) {
     const problems = []
     try {
     // set 6: Me, Your life, Assistant, People and agents, Data
-    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai',
+    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai',
       'sensitive', 'note-rules', 'spaces', 'members', 'archive', 'import', 'backups']
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
@@ -1844,7 +1890,7 @@ while d <= last:
     return 'task, open-ended goal with tasks, goal, idea'
   })
 
-  await check(`${tag}.36`, `${width} px: Reset: each rule batch finds its seeded items; a batch changes exactly those and Undo reverts; one by one with ${phone ? 'the buttons' : 'the keys'}; Delete then Restore from the trash; Reset is the weekly review's second step`, async () => {
+  await check(`${tag}.36`, `${width} px: Reset: each rule batch finds its seeded items; a batch changes exactly those and Undo reverts; one by one with ${phone ? 'the buttons' : 'the keys'}; Delete then Restore from the trash; stuck tasks are the weekly review's Tasks tab`, async () => {
     const a = await s.api('tasks.quick_add', { text: S5('dupe'), space: SPACE, area: uxArea })
     const b = await s.api('tasks.quick_add', { text: S5('dupe'), space: SPACE, area: uxArea })
     const old = []
@@ -1892,12 +1938,9 @@ while d <= last:
     await pg.locator(ROW, { hasText: S5('delete me') }).locator('[data-trash-restore]:visible').first().click()
     await pg.waitForTimeout(1000)
     must(await s.api('frappe.client.get_count', { doctype: 'Life Task', filters: { name: del.name } }), 'Restore from the trash did not bring it back')
-    // the weekly review's Reset step (set 5), second after Score and results since set 7
-    await pg.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('lifeos-review-reset')).forEach((k) => localStorage.removeItem(k)))
-    await s.open('/life/plan/week?view=review')
-    must(await pg.locator('[data-review-reset]').isVisible(), 'the weekly review has no Reset step')
-    const order = await pg.locator('[data-review-step]').evaluateAll((els) => els.map((e) => e.getAttribute('data-review-step')))
-    must(order[0] === 'results' && order[1] === 'reset', `the review's steps are ${order}`)
+    // set 8: Reset's place in the weekly review is its second tab, Tasks, with the stuck tasks in piles
+    await s.open('/life/plan/week?view=review&tab=tasks')
+    must(await pg.locator('[data-pile-board][data-pile-key="tasks"]').count(), "the weekly review's Tasks tab has no piles")
     return 'batches, undo, one by one, trash, weekly review'
   })
 
@@ -2267,7 +2310,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       ['Library > Archive', '/life/library/archive?all=1', 'archive.list', (a) => total('archive.list', { area: a })],
     ]
     // the rhythm tabs are not lists: each asks the server for its area's records
-    const R = [['Plan > Week, Calendar', '/life/plan/week?view=calendar'], ['Plan > Week, Review', '/life/plan/week?view=review'], ['Plan > Month, Plan', '/life/plan/month?view=plan'],
+    const R = [['Plan > Week, Calendar', '/life/plan/week?view=calendar'], /* set 8: the review is about the whole plate and keeps no lens, like Reset */ ['Plan > Month, Plan', '/life/plan/month?view=plan'],
       ['Plan > Month, Calendar', '/life/plan/month?view=calendar'], ['Plan > 12 Weeks', '/life/plan/12-weeks'], ['Plan > Year, Calendar', '/life/plan/year?view=calendar'],
       ['Plan > Year, Goals', '/life/plan/year?view=goals']]
     pg.on('request', onReq)
@@ -2356,7 +2399,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
       '/life/library/captures', '/life/library/captures?tab=documents&sensitive=1', '/life/library/captures?tab=photos', '/life/library/captures?tab=pages', '/life/library/timeline',
       '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/plan/goals/${ux.goal}`, `/life/library/${ux.note}`,
-      ...['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai', 'sensitive',
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai', 'sensitive',
         'note-rules', 'spaces', 'members', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
       if (area && p.includes('settings')) continue
@@ -2463,7 +2506,7 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
     ['/projects?status=On%20Hold', '/plan/goals', { type: 'Open', status: 'in_progress' }],
     ['/projects?status=Done', '/plan/goals', { type: 'Open', status: 'achieved' }],
     [`/projects/${ux.project}?tab=tasks`, `/plan/goals/${ux.goal}`, { tab: 'tasks' }],
-    ['/reset', '/plan/week', { view: 'review', step: 'reset' }],
+    ['/reset', '/plan/week', { view: 'review', tab: 'tasks' }], // set 8: set 7's Reset step is the review's Tasks tab
     ['/calendar/week?date=2026-12-02', '/plan/week', { view: 'calendar', date: '2026-12-02' }],
     ['/calendar/agenda', '/plan/week', { view: 'agenda' }],
     ['/calendar/month?date=2026-12-02', '/plan/month', { view: 'calendar', date: '2026-12-02' }],
@@ -2691,7 +2734,6 @@ for (const width of [1440, 390]) {
     await pg.getByRole('option', { name: option, exact: true }).first().click()
     await settle()
   }
-  const skipReset = async () => { if (await pg.locator('[data-review-reset-skip]:visible').count()) { await pg.locator('[data-review-reset-skip]').click(); await settle() } }
   const cycle = (await owner.api('journal.grid', { space: SPACE })).cycle
 
   await check(`${tag}.1`, `${width} px: New goal asks "Done when…": a milestone goal and a number goal through the dialog; a frequency offers Make it a habit`, async () => {
@@ -2745,11 +2787,13 @@ for (const width of [1440, 390]) {
     runAgent()
     const waiting = (await s.api('goals.goal_readings', { goal: g })).suggested
     must(waiting.length === 1 && waiting[0].value === 1640 && waiting[0].excerpt.includes('1640'), 'the agent did not leave a Suggested reading: ' + JSON.stringify(waiting))
-    await s.open('/life/plan/week?view=review')
-    const row = pg.locator(`[data-review-readings] [data-reading="${waiting[0].name}"]`)
+    // a fresh review, with no other finding ahead of this reading among the five it shows
+    bench(`frappe.db.delete("Life Review", {"space": "${SPACE}", "user": "owner@lifeos.test"})
+frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s and status='New' and ifnull(reading, '') = ''", "${SPACE}")`)
+    await s.open('/life/plan/week?view=review&tab=library')
+    const row = pg.locator('[data-revelations] [data-finding][data-kind="Goal reading"]', { hasText: `S7 yield goal ${W}` }).first()
     must(await row.isVisible(), 'the reading is not in the weekly review')
-    must((await row.innerText()).includes(`S7 yield goal ${W}`), 'the reading does not name its goal')
-    await row.locator('[data-reading-confirm]').click()
+    await row.locator('[data-finding-action="confirm_reading"]').click()
     await pg.waitForLoadState('networkidle')
     await settle()
     const got = await s.api('goals.get', { goal: g })
@@ -2842,53 +2886,27 @@ for (const width of [1440, 390]) {
     return `in ${seen[0]}, out ${seen[1]}`
   })
 
-  await check(`${tag}.6`, `${width} px: the weekly review's goal step makes a scheduled task that shows on Today and in the week calendar, and a delegated one that shows as Waiting`, async () => {
-    // working hours of every day, all day long, so the first free slot is today whatever the time of the run
-    await owner.api('settings.save', { values: { work_days: 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday', work_start: '00:00:00', work_end: '23:59:00' } })
-    try {
-      // an area of their own, so under the lens the cards are only these two and the first gets the first free slot
-      await s.api('settings.save_item', { kind: 'area', space: SPACE, title: `S7 area ${W}` })
-      const own = (await s.api('area.tree', { space: SPACE })).areas.find((x) => x.area_name === `S7 area ${W}`).name
-      const a = (await s.api('goals.create', { space: SPACE, title: `S7 plan goal ${W}`, goal_type: 'Open', area: own, done_when: 'Planned' })).name
-      const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, goal_type: 'Open', area: own, done_when: 'Handed over' })).name
-      await s.open(`/life/plan/week?view=review&area=${own}`)
-      await skipReset()
-      const card = pg.locator(`[data-goal-card][data-goal="${a}"]`)
-      await card.waitFor({ timeout: 15000 })
-      await field(card, 'data-card-action').fill(`S7 plan step ${W}`)
-      await field(card, 'data-card-note').fill('the soil report')
-      await card.locator('[data-card-add]').click()
-      await pg.waitForLoadState('networkidle')
-      await settle()
-      must((await card.getAttribute('data-card-state')) === 'added', 'the card was not added')
-      const task = (await s.api('tasks.list', { space: SPACE, goal: a, status: 'all' })).tasks.find((x) => x.title === `S7 plan step ${W}`)
-      const now = iso(new Date()) // the run may cross midnight
-      must(task && task.scheduled_at && String(task.scheduled_at).slice(0, 10) === now, 'no task scheduled today: ' + JSON.stringify(task))
-      const footer = pg.locator('[data-goal-work-footer]')
-      must(Number(await footer.getAttribute('data-planned-minutes')) >= 60, 'the footer did not add the hour')
-      const other = pg.locator(`[data-goal-card][data-goal="${b}"]`)
-      await field(other, 'data-card-action').fill(`S7 handoff step ${W}`)
-      await pick(other, 'Who', 'Vivek')
-      await other.locator('[data-card-add]').click()
-      await pg.waitForLoadState('networkidle')
-      await settle()
-      const handed = (await s.api('tasks.list', { space: SPACE, goal: b, status: 'all' })).tasks.find((x) => x.title === `S7 handoff step ${W}`)
-      must(handed && handed.status === 'Waiting' && handed.waiting_on === 'Vivek', 'the delegated task is not Waiting on Vivek: ' + JSON.stringify(handed))
-      must((await s.api('outbox.list', { space: SPACE, pile: 'Delegated', page_length: 500 })).rows.some((r) => r.record === handed.name), 'not in Delegated')
-      await s.open('/life')
-      const next = pg.locator('[data-next] [data-why="Scheduled"]', { hasText: `S7 plan step ${W}` })
-      const rail = pg.locator('[data-rail-task]', { hasText: `S7 plan step ${W}` })
-      must(await next.count() || await rail.count(), 'the scheduled task is not on Today')
-      must(await rail.count(), "the scheduled task is not on the rail's timeline")
-      await s.open('/life/plan/week?view=calendar')
-      must((await pg.locator('[data-week-grid], [data-main]').first().innerText()).includes(`S7 plan step ${W}`), 'not in the week calendar')
-      await s.open(`/life/plan/tasks?status=Waiting`)
-      must((await pg.locator('[data-main]').innerText()).includes(`S7 handoff step ${W}`), 'the delegated task is not under Waiting')
-      return `scheduled ${String(task.scheduled_at).slice(11, 16)}, waiting on Vivek`
-    } finally {
-      await owner.api('settings.save', { values: { work_days: s7Settings.settings.work_days || 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-        work_start: s7Settings.settings.work_start || '09:00:00', work_end: s7Settings.settings.work_end || '19:00:00' } })
-    }
+  await check(`${tag}.6`, `${width} px: goal work planned the way Lock the week plans it makes a scheduled task that shows on Today and in the week calendar, and a delegated one that shows as Waiting`, async () => {
+    // set 8: the cards of set 7's goal step became the review's Goals tab (checked by S8); here the same planning call
+    const a = (await s.api('goals.create', { space: SPACE, title: `S7 plan goal ${W}`, goal_type: 'Open', area: areaId('Personal'), done_when: 'Planned' })).name
+    const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, goal_type: 'Open', area: areaId('Personal'), done_when: 'Handed over' })).name
+    const now = iso(new Date()) // the run may cross midnight
+    const at = `${now} 23:${phone ? '30' : '00'}:00`
+    const task = await s.api('week.add_goal_work', { goal: a, title: `S7 plan step ${W}`, scheduled_at: at, duration_min: 30, note: 'the soil report' })
+    must(task.scheduled_at && task.scheduled_at.slice(0, 10) === now, 'no task scheduled today: ' + JSON.stringify(task))
+    const handed = await s.api('week.add_goal_work', { goal: b, title: `S7 handoff step ${W}`, who: 'Vivek' })
+    must(handed.status === 'Waiting' && handed.waiting_on === 'Vivek', 'the delegated task is not Waiting on Vivek: ' + JSON.stringify(handed))
+    must((await s.api('outbox.list', { space: SPACE, pile: 'Delegated', page_length: 500 })).rows.some((r) => r.record === handed.task), 'not in Delegated')
+    await s.open('/life')
+    const next = pg.locator('[data-next] [data-why="Scheduled"]', { hasText: `S7 plan step ${W}` })
+    const rail = pg.locator('[data-rail-task]', { hasText: `S7 plan step ${W}` })
+    must(await next.count() || await rail.count(), 'the scheduled task is not on Today')
+    must(await rail.count(), "the scheduled task is not on the rail's timeline")
+    await s.open('/life/plan/week?view=calendar')
+    must((await pg.locator('[data-week-grid], [data-main]').first().innerText()).includes(`S7 plan step ${W}`), 'not in the week calendar')
+    await s.open(`/life/plan/tasks?status=Waiting`)
+    must((await pg.locator('[data-main]').innerText()).includes(`S7 handoff step ${W}`), 'the delegated task is not under Waiting')
+    return `scheduled ${String(task.scheduled_at).slice(11, 16)}, waiting on Vivek`
   })
 
   await check(`${tag}.7`, `${width} px: Inbox items left too long: on Suggest an old item gets a suggested decision and the batch confirms it; on Park and Discard the job acts and Today's Undo restores`, async () => {
@@ -2967,6 +2985,267 @@ for (const width of [1440, 390]) {
   await s.ctx.close()
 }
 
+// ---------- Set 8: the weekly review in four tabs, at 1440 px and 390 px ----------
+// On data shaped like the owner's (lifeos/devtools_review.py: a number goal with a Suggested reading, a milestone goal without its
+// finish line, stuck, waiting and delegated tasks, Inbox items of every kind) plus the fixture calendar. Records carry
+// "S8 … <width> <stamp>" and are removed by S4.1; devtools_review.cleanup removes the rest and puts the settings back.
+for (const width of [1440, 390]) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  const tag = `S8.${width}`
+  const W = `${width} ${stamp}`
+  const settle = () => pg.waitForTimeout(600)
+  const data = JSON.parse(bench(`import json
+from lifeos import devtools_review
+print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop())
+  const tabNow = () => new URL(pg.url()).searchParams.get('tab')
+  const goTab = async (t) => {
+    await pg.locator(phone ? `[data-review-step="${t}"]` : `[data-review-tab-btn="${t}"]`).first().click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+  }
+  const drawer = (name) => pg.locator(`[data-drawer][data-drawer-name="${name}"]`)
+  const closeDrawer = async () => { await pg.keyboard.press('Escape'); await settle() }
+  // nothing scrolls the page at 1440 x 900; nothing scrolls sideways at 390
+  const fits = async (where) => {
+    const o = await pg.evaluate(() => ({ x: document.documentElement.scrollWidth - window.innerWidth, y: document.documentElement.scrollHeight - window.innerHeight }))
+    if (o.x > 0) throw new Error(`${where} scrolls sideways by ${o.x} px`)
+    if (!phone && o.y > 0) throw new Error(`${where} scrolls the page by ${o.y} px at 1440 x 900`)
+  }
+
+  await check(`${tag}.1`, `${width} px: the review opens from Today's banner on Library, with its period in the header; Goals cannot open before Tasks is done`, async () => {
+    await s.open('/life')
+    const banner = pg.locator('[data-rhythm-banner][data-banner="review"]')
+    must(await banner.isVisible(), "no weekly review banner on Today")
+    await banner.locator('[data-banner-open]').click()
+    await pg.locator('[data-review-library]').waitFor({ timeout: 20000 })
+    await settle()
+    must(tabNow() === 'library', `the review opened on ${tabNow()}`)
+    const period = (await pg.locator('[data-review-period]').innerText()).trim()
+    must(/^Week of \d+ (to|[A-Z][a-z]+ to) /.test(period) || period.startsWith('Covers '), `the header says "${period}"`)
+    await goTab('goals')
+    must(tabNow() === 'library', 'Goals opened before Tasks was done')
+    must(await pg.getByText('Finish Tasks first.').count(), 'no word on why Goals is closed')
+    must(!errors.length, errors.splice(0).join(' | '))
+    return period
+  })
+
+  await check(`${tag}.2`, `${width} px: a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's drawer and the Revelations list`, async () => {
+    await s.open('/life/plan/week?view=review&tab=library')
+    await pg.locator(`[data-strip-meeting="${data.meeting}"]:visible`).first().click()
+    const d = drawer('meeting')
+    await d.locator('[data-meeting]').waitFor({ timeout: 10000 })
+    must((await d.locator('[data-meeting-linked]').allInnerTexts()).some((t) => t.includes(`S8 voice after Dalmia ${W}`)), 'the voice note is not linked')
+    const promise = d.locator('[data-finding][data-kind="Promise"]', { hasText: W }).first()
+    must(await promise.count(), 'no Promise follow-up for the voice note')
+    const name = await promise.getAttribute('data-finding-name')
+    await promise.locator('[data-finding-action="make_task"]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must(!(await d.locator(`[data-finding-name="${name}"]`).count()), "the follow-up stayed in the meeting's drawer")
+    const tasks = (await s.api('tasks.list', { space: SPACE, status: 'all', filters: [['title', 'like', `%send the blend sheet to Mithun ${W}%`]] })).tasks
+    must(tasks.length === 1, 'the task was not made: ' + tasks.length)
+    await closeDrawer()
+    must(!(await pg.locator(`[data-revelations] [data-finding-name="${name}"]`).count()), 'the finding is still in Revelations')
+    return tasks[0].title
+  })
+
+  await check(`${tag}.3`, `${width} px: a reading confirmed from Revelations shows its value on the goal's row in Goals`, async () => {
+    const row = pg.locator('[data-revelations] [data-finding][data-kind="Goal reading"]', { hasText: 'Mr. Rao reported' }).first()
+    must(await row.isVisible(), 'the reading is not among the revelations')
+    await row.locator('[data-finding-action="confirm_reading"]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    const g = await s.api('goals.get', { goal: data.number })
+    must(g.goal.current_value === 1460, `the goal reads ${g.goal.current_value}`)
+    const t = await s.api('weekly.goals', { space: SPACE })
+    const r = t.rows.find((x) => x.goal === data.number)
+    must(r && r.progress.label === '1,460 of 1,800', 'the row says ' + JSON.stringify(r?.progress))
+    return r.progress.label
+  })
+
+  await check(`${tag}.4`, `${width} px: the Park pile: one moved to Keep, the rest parked; the card's done state; the Outbox counts match; Undo restores both`, async () => {
+    await goTab('tasks')
+    must(tabNow() === 'tasks', 'Tasks did not open')
+    const before = (await s.api('weekly.plate', { space: SPACE })).piles.find((x) => x.pile === 'Parked').n
+    await pg.locator('[data-pile-card][data-pile="park"] [data-pile-open]').first().click()
+    const d = drawer('pile')
+    await d.locator('[data-pile-row]').first().waitFor({ timeout: 10000 })
+    const moved = d.locator('[data-pile-row]', { hasText: `S8 park 0 ${W}` })
+    await moved.locator('[data-pile-choice="keep"]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must((await d.locator('[data-pile-row]', { hasText: `S8 park 0 ${W}` }).innerText()).includes('Moved to Keep'), 'the row does not say Moved to Keep')
+    const left = (await s.api('weekly.pile_summary', { space: SPACE, key: 'tasks' })).piles.park.left
+    await d.locator('[data-pile-accept]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must(!(await d.count()) || !(await d.isVisible()), 'the drawer stayed open')
+    const card = pg.locator('[data-pile-card][data-pile="park"]')
+    must((await card.getAttribute('data-pile-done')) === '1', 'the card is not done')
+    must((await card.innerText()).includes('1 moved to Keep'), 'the card does not say what moved')
+    const status = async (n) => (await s.api('frappe.client.get_value', { doctype: 'Life Task', filters: { name: n }, fieldname: 'status' })).status
+    must(await status(data.park[0]) === 'Open' && await status(data.park[1]) === 'Someday' && await status(data.park[2]) === 'Someday', 'the tasks did not move')
+    const plate = (await s.api('weekly.plate', { space: SPACE })).piles.find((x) => x.pile === 'Parked')
+    const listed = await s.api('outbox.list', { space: SPACE, pile: 'Parked', from_date: plate.to.query.from, to_date: plate.to.query.to, page_length: 500 })
+    must(plate.n === listed.total && plate.n === listed.rows.length, `Parked says ${plate.n}, the Outbox lists ${listed.rows.length}`)
+    must(plate.n === before + left, `Parked went from ${before} to ${plate.n}, not by ${left}`)
+    await card.locator('[data-pile-undo]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must(await status(data.park[0]) === 'Open' && await status(data.park[1]) === 'Open' && await status(data.park[2]) === 'Open', 'Undo did not restore both')
+    must((await pg.locator('[data-pile-card][data-pile="park"]').getAttribute('data-pile-done')) === '0', 'the card stayed done after Undo')
+    const after = (await s.api('weekly.plate', { space: SPACE })).piles.find((x) => x.pile === 'Parked').n
+    must(after === before, `after Undo Parked is ${after}, was ${before}`)
+    return `${left} parked, 1 moved to Keep, Outbox ${plate.n}, undone`
+  })
+
+  await check(`${tag}.5`, `${width} px: Needs you settled and every pile accepted; Next: Goals opens`, async () => {
+    for (let i = 0; i < 8; i++) {
+      const row = pg.locator('[data-needs-row][data-settled="0"]').first()
+      if (!(await row.count())) break
+      await row.locator('[data-needs-choice]').first().click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+    }
+    must(!(await pg.locator('[data-needs-you]').count()), 'Needs you did not fold away')
+    for (const p of ['keep', 'park', 'letgo']) {
+      const card = pg.locator(`[data-pile-card][data-pile="${p}"]`)
+      if ((await card.getAttribute('data-pile-done')) === '1' || (await card.getAttribute('data-pile-count')) === '0') continue
+      await card.locator('[data-pile-open]').click()
+      await drawer('pile').locator('[data-pile-accept]').waitFor({ timeout: 10000 })
+      await drawer('pile').locator('[data-pile-accept]').click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+    }
+    const chase = (await s.api('tasks.list', { space: SPACE, status: 'all', filters: [['title', 'like', `Chase Ravi: S8 drainage photos ${W}%`]] })).tasks
+    must(chase.length === 1, 'the waiting item kept as Chase made no chase task')
+    const next = pg.locator('[data-review-next]')
+    must(await next.isEnabled(), 'Next: Goals is still closed: ' + (await pg.locator('[data-review-footer-line]').innerText()))
+    await next.dispatchEvent('click') // a toast may sit over the footer for a moment
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must(tabNow() === 'goals', 'Goals did not open')
+    return 'Needs you, Keep, Park, Let go'
+  })
+
+  await check(`${tag}.6`, `${width} px: every cycle goal gets a next action or a skip with a reason; exactly three stars; more than the free time shows the warning`, async () => {
+    await pg.locator('[data-goals-list]').waitFor({ timeout: 15000 })
+    const t = await s.api('weekly.goals', { space: SPACE })
+    const rows = t.rows
+    // one through the drawer: a new next action, a free slot, Save
+    const first = rows[0]
+    await pg.locator(`[data-goal-row][data-goal="${first.goal}"] button`).first().click()
+    const d = drawer('goal')
+    await d.locator('[data-goal-drawer]').waitFor({ timeout: 10000 })
+    await d.locator('[data-goal-next] input, input[data-goal-next]').first().fill(`S8 next 0 ${W}`)
+    await d.locator('[data-goal-save]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    // skip one with a reason, in its drawer
+    const skipped = rows[rows.length - 1]
+    await pg.locator(`[data-goal-row][data-goal="${skipped.goal}"] button`).first().click()
+    await d.locator('[data-goal-drawer]').waitFor({ timeout: 10000 })
+    await d.locator('[data-goal-skip]').click()
+    must(await d.locator('[data-goal-skip-confirm]').isDisabled(), 'a skip without a reason is allowed')
+    await d.locator('[data-goal-skip-reason] input, input[data-goal-skip-reason]').first().fill('Travelling all week')
+    await d.locator('[data-goal-skip-confirm]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    must((await pg.locator(`[data-goal-row][data-goal="${skipped.goal}"]`).getAttribute('data-skipped')) === '1', 'the skipped goal is not marked')
+    // the rest: a fresh next action each (new tasks, so the demo's own tasks stay as they are), long enough to pass the free time
+    for (const [i, r] of rows.entries()) {
+      if (r.goal === skipped.goal) continue
+      await s.api('weekly.goal_save', { space: SPACE, goal: r.goal, values: { next_action: `S8 next ${i} ${W}`, task: null, minutes: 600,
+        slot: `${addDays(1 + (i % 5))} 09:00`, who: i === 1 ? 'Vivek' : 'Me' } })
+    }
+    // exactly three stars, by the row's star buttons
+    await s.open('/life/plan/week?view=review&tab=goals')
+    await pg.locator('[data-goals-list]').waitFor({ timeout: 15000 })
+    for (let i = 0; i < 10; i++) {
+      const starred = await pg.locator('[data-goal-row][data-star="1"]').count()
+      if (starred === 3) break
+      const btn = starred < 3 ? pg.locator('[data-goal-row][data-star="0"][data-skipped="0"] [data-goal-star-btn]').first() : pg.locator('[data-goal-row][data-star="1"] [data-goal-star-btn]').first()
+      await btn.click()
+      await pg.waitForLoadState('networkidle')
+      await settle()
+    }
+    must(await pg.locator('[data-goal-row][data-star="1"]').count() === 3, 'not three stars')
+    const cap = pg.locator('[data-goals-capacity]')
+    must((await cap.getAttribute('data-over')) === '1', 'no warning for more than the free time')
+    must(/^planned, [\d.]+ h free$/.test((await cap.locator('[data-goals-capacity-line]').innerText()).trim()), 'the warning does not say planned and free')
+    must(await pg.locator('[data-review-next]').isEnabled(), 'Next: Reflect is closed: ' + (await pg.locator('[data-review-footer-line]').innerText()))
+    return `${rows.length} goals, 1 skipped, 3 stars, over by ${Math.round((Number((await s.api('weekly.goals', { space: SPACE })).capacity.planned_minutes) - Number(t.capacity.free_minutes)) / 60)} h`
+  })
+
+  await check(`${tag}.7`, `${width} px: Pause and reopen: everything is where it was left; no tab scrolls the page at 1440 x 900 or sideways at 390`, async () => {
+    if (!phone) await pg.setViewportSize({ width: 1440, height: 900 })
+    await pg.locator('[data-review-pause]:visible').first().dispatchEvent('click')
+    await pg.waitForLoadState('networkidle')
+    must(new URL(pg.url()).searchParams.get('view') === 'calendar', 'Pause did not return to Plan > Week')
+    await s.open('/life/plan/week?view=review')
+    await pg.locator('[data-review]').waitFor()
+    await settle()
+    await settle()
+    must(tabNow() === 'reflect', `the review reopened on ${tabNow()}, not Reflect`)
+    const seen = []
+    for (const t of ['library', 'tasks', 'goals', 'reflect']) {
+      await goTab(t)
+      await settle()
+      await fits(`the ${t} tab`)
+      seen.push(t)
+    }
+    await goTab('tasks')
+    must(await pg.locator('[data-pile-card][data-pile-done="1"]').count() >= 1, 'the piles were not kept')
+    await goTab('goals')
+    must(await pg.locator('[data-goal-row][data-star="1"]').count() === 3 && await pg.locator('[data-goal-row][data-skipped="1"]').count() === 1, 'stars or skip lost')
+    // the drawers too
+    await pg.locator('[data-goal-row] button').first().click()
+    await drawer('goal').locator('[data-goal-drawer]').waitFor()
+    await fits('the goal drawer')
+    await closeDrawer()
+    if (!phone) await pg.setViewportSize({ width: 1440, height: 1000 })
+    return seen.join(', ')
+  })
+
+  await check(`${tag}.8`, `${width} px: what went well; Lock; the done screen; Today shows the top three first; the scheduled tasks are on Today and in Plan > Week`, async () => {
+    await goTab('reflect')
+    await pg.locator('[data-went-well] textarea, textarea[data-went-well]').first().fill(`S8 went well ${W}`)
+    await pg.locator('[data-review-next]').dispatchEvent('click')
+    await pg.locator('[data-review-done]').waitFor({ timeout: 20000 })
+    await settle()
+    must((await pg.locator('[data-review-done-title]').innerText()).startsWith('Week planned in'), 'no done screen')
+    must(await pg.locator('[data-done-top]').count() === 3, 'the done screen does not list three')
+    await pg.locator('[data-done-today]').click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+    const first = pg.locator('[data-next-group]').first()
+    must((await first.getAttribute('data-next-group')) === 'top', `Today's first group is ${await first.getAttribute('data-next-group')}`)
+    const tops = await pg.locator('[data-next] [data-why="Top three"]').count()
+    must(tops === 3 && await pg.locator('[data-next] [data-top-three]').count() === 3, `${tops} top-three rows on Today`)
+    const made = (await s.api('tasks.list', { space: SPACE, status: 'all', filters: [['title', 'like', `S8 next % ${W}`]] })).tasks
+    const scheduled = made.filter((x) => x.scheduled_at)
+    must(scheduled.length >= 2, 'the plans were not scheduled')
+    must(made.some((x) => x.status === 'Waiting' && x.waiting_on === 'Vivek'), 'the delegated plan is not Waiting on Vivek')
+    const weekCal = await s.api('calendar.get', { space: SPACE, from_date: addDays(0), to_date: addDays(8) })
+    must(scheduled.every((x) => weekCal.items.some((i) => i.name === x.name && i.scheduled)), 'a scheduled task is not in Plan > Week')
+    await s.open('/life/plan/week?view=calendar')
+    const text = await pg.locator('[data-main]').innerText()
+    must(scheduled.some((x) => text.includes(x.title)), 'no scheduled task on the Week calendar')
+    // the next review starts after this one
+    must((await s.api('weekly.get', { space: SPACE })).status === 'Locked', 'the review is not locked')
+    must(!errors.length, errors.splice(0).join(' | '))
+    return `${made.length} tasks, ${scheduled.length} scheduled, top three on Today`
+  })
+
+  bench(`from lifeos import devtools_review
+devtools_review.cleanup("${stamp}", ${JSON.stringify(JSON.stringify(data.was))})`)
+  await s.ctx.close()
+}
+
 // ---------- Bug fix 1: the weekly review on data shaped like the owner's, the error boundary, and every screen ----------
 // Records carry "BF1 … <width> <stamp>" and are removed by S4.1.
 for (const width of [1440, 390]) {
@@ -3014,19 +3293,24 @@ t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "BF1 d
     "waiting_on": "Ravi", "scheduled_at": str(add_days(now_datetime(), 1).replace(hour=11, minute=0, second=0, microsecond=0)), "duration_min": 30})
 t.flags.ignore_permissions = True
 t.insert()
+# set 8: a fresh review, whose revelations have the reading among their five
+frappe.db.delete("Life Review", {"space": "${SPACE}", "user": "owner@lifeos.test"})
+frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s and status='New' and ifnull(reading, '') = ''", "${SPACE}")
 print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone, "nocycle": nocycle, "task": t.name}))`).split('\n').pop())
     must(made.migrated && made.task, 'the records were not made: ' + JSON.stringify(made))
+    // set 8: the review is its own screen (header, numbered tabs, period); the Suggested reading is a revelation in Library
     const review = async (how) => {
-      const body = pg.locator('[data-review-step="results"]')
+      const body = pg.locator('[data-review-library]')
       await body.waitFor({ timeout: 15000 }).catch(() => {})
+      await pg.locator('[data-revelations]').waitFor({ timeout: 15000 }).catch(() => {})
       await settle()
-      const buttons = await headerButtons()
       must(!errors.length, `${how}: script error: ${errors.splice(0).join(' | ')}`)
       must(!(await pg.locator('[data-screen-error]').count()), `${how}: the screen could not be shown`)
       must(await body.isVisible(), `${how}: the review's body is empty`)
-      must(buttons.includes('Previous week') && buttons.includes('Next week'), `${how}: header buttons are ${JSON.stringify(buttons)}`)
+      must((await pg.locator('[data-review-period]').innerText()).match(/^(Week of|Covers) /), `${how}: no period in the header`)
+      must((await pg.locator('[data-review-head] [data-review-pause]').count()) === 1, `${how}: no Pause in the header`)
       const text = await pg.locator('[data-main]').innerText()
-      must(text.includes(`BF1 number ${W}`) && text.includes(`BF1 milestone ${W}`), `${how}: the reading to confirm or the milestone without a finish line is missing`)
+      must(text.includes(`BF1 number ${W}`), `${how}: the reading to confirm is missing`)
     }
     // the way the owner reached it: Today, Plan, the Week's Calendar, then Review
     await s.open('/life')
@@ -3037,14 +3321,14 @@ print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone
     await pg.locator('[data-plan-views]:visible').first().getByText('Review', { exact: true }).click()
     await review('clicked from the Calendar')
     // by URL, and after a reload
-    await s.open('/life/plan/week?view=review')
+    await s.open('/life/plan/week?view=review&tab=library')
     await review('by URL')
     await pg.reload({ waitUntil: 'networkidle' })
     await review('after a reload')
     // and navigation still moves the page
     await place('Inbox')
     must(new URL(pg.url()).pathname === '/life/inbox' && await pg.locator('[data-main]').innerText().then((t) => t.includes('Inbox')), 'navigation after the review is stuck')
-    return 'clicked, by URL and reloaded; Previous week and Next week in the header'
+    return 'clicked, by URL and reloaded; the period and Pause in the header'
   })
 
   await check(`${tag}.2`, `${width} px: a screen forced to fail shows "This screen could not be shown." with Reload and a reference, logs it, and navigation keeps working`, async () => {

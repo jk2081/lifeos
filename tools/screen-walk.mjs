@@ -5,7 +5,7 @@
 
 // the views of Plan's rhythms and, for the journal screens, a button each puts into the header's #jr-actions
 const RHYTHMS = {
-  week: [['Review', 'Previous week'], ['Calendar'], ['Agenda']],
+  week: [['Review'], ['Calendar'], ['Agenda']], // set 8: the review is its own screen; Pause leaves it for the Calendar
   month: [['Plan', 'Previous month'], ['Habits', 'Previous month'], ['Check-ins'], ['Calendar']],
   '12-weeks': [[null, 'Weekly review']], // one view: no switch
   year: [['Calendar'], ['Goals across cycles', 'All goals']],
@@ -25,13 +25,24 @@ export async function walkScreens(page, { width, settle = () => page.waitForTime
     await page.waitForLoadState('networkidle')
     await settle()
   }
+  // set 8: the weekly review has no place tabs or view switch of its own; Pause returns to the Week's calendar
+  const leaveReview = async () => {
+    if (await page.locator('[data-review-pause]:visible').count()) {
+      await page.locator('[data-review-pause]:visible').first().click()
+      await page.waitForLoadState('networkidle')
+      await settle()
+    }
+  }
   const tab = async (value) => {
+    await leaveReview()
     await page.locator(`[data-place-tabs] [data-tab="${value}"]`).first().click()
     await page.waitForLoadState('networkidle')
     await settle()
   }
   const view = async (label) => {
     if (!label) return
+    if (label === 'Review' && await page.locator('[data-review]').count()) return
+    await leaveReview()
     await page.locator('[data-plan-views]:visible').first().getByText(label, { exact: true }).click()
     await page.waitForLoadState('networkidle')
     await settle()

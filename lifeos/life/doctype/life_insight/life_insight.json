@@ -114,7 +114,8 @@
    "fieldname": "reading",
    "fieldtype": "Link",
    "label": "Goal Reading",
-   "options": "Life Goal Reading"
+   "options": "Life Goal Reading",
+   "search_index": 1
   },
   {
    "fieldname": "source_line",

@@ -73,21 +73,31 @@ def _tasks(space, period_start):
 
 def sort(space, items, ai=False):
 	"""Give each item its pile and reason, in place. Returns "assistant" when the model sorted, else "rules"."""
+	pending = _pending([it["name"] for it in items if it["doctype"] == "Life Inbox Item"])
 	for it in items:
-		pile, reason, chase = rule(space, it)
+		pile, reason, chase = rule(space, it, pending)
 		it.update({"pile": pile, "orig": pile, "reason": reason, "chase": chase, "by": "rules"})
 	if ai and _ask_allowed(space):
 		return _ai(space, items)
 	return "rules"
 
 
-def rule(space, it):
+def _pending(names):
+	"""Pending proposals of the given Inbox items, by item, in one query."""
+	out = {}
+	if names:
+		for r in frappe.get_all("Life Proposal", filters={"inbox_item": ("in", names), "status": "Pending"}, fields=["inbox_item", "kind"], limit=20000):
+			out.setdefault(r.inbox_item, []).append(r)
+	return out
+
+
+def rule(space, it, pending=None):
 	"""(pile, reason, chase) by the rules."""
 	if it["doctype"] == "Life Inbox Item":
 		from lifeos import old_inbox
 
-		pending = frappe.get_all("Life Proposal", filters={"inbox_item": it["name"], "status": "Pending"}, fields=["kind"], limit=200)
-		decision, reason = old_inbox.rule_decision(pending)
+		got = (pending if pending is not None else _pending([it["name"]])).get(it["name"], [])
+		decision, reason = old_inbox.rule_decision(got)
 		return OLD_INBOX[decision], reason, False
 	age = it.get("age") or 0
 	if it["source"] == "Waiting":
