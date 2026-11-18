@@ -16,6 +16,10 @@
   "fingerprint",
   "source",
   "area",
+  "meeting",
+  "reading",
+  "source_line",
+  "found_for",
   "found_on",
   "rank",
   "dismiss_reason",
@@ -35,7 +39,7 @@
    "fieldname": "kind",
    "fieldtype": "Select",
    "label": "Kind",
-   "options": "Stuck\nWaiting on you\nPromise\n12 Week Year\nHabit\nCheck-in\nTheme\nSomeday",
+   "options": "Stuck\nWaiting on you\nPromise\n12 Week Year\nHabit\nCheck-in\nTheme\nSomeday\nGoal reading\nBlocker\nKeeps coming up\nNot captured\nDate",
    "reqd": 1,
    "in_list_view": 1,
    "search_index": 1
@@ -100,6 +104,31 @@
    "options": "Life Area"
   },
   {
+   "fieldname": "meeting",
+   "fieldtype": "Link",
+   "label": "Meeting",
+   "options": "Event",
+   "search_index": 1
+  },
+  {
+   "fieldname": "reading",
+   "fieldtype": "Link",
+   "label": "Goal Reading",
+   "options": "Life Goal Reading"
+  },
+  {
+   "fieldname": "source_line",
+   "fieldtype": "Data",
+   "label": "Source",
+   "description": "Where it was found, in a few words."
+  },
+  {
+   "fieldname": "found_for",
+   "fieldtype": "Date",
+   "label": "Period Start",
+   "description": "The review period a per-period finding belongs to (Not captured)."
+  },
+  {
    "fieldname": "found_on",
    "fieldtype": "Date",
    "label": "Found On",
@@ -123,7 +152,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-18 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Insight",

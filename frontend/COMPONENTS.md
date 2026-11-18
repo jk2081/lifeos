@@ -313,3 +313,26 @@ A task with `scheduled_at` shows at its time in Today's Next (why "Scheduled") a
 The Inbox's `#above` slot starts with `inbox/OldItems.vue`: an amber `Alert` (`data-old-items-banner`) and a `Dialog` batch (`data-old-item`, Confirm selected with an Undo toast). `?decisions=1` opens the batch; Reset's batch with action `review_inbox_decisions` routes there. What the rule parked or discarded on its own is one line on Today (`data-auto-inbox`) with Undo for seven days; it is separate from the rhythm banner, which stays one line.
 
 - **Buttons in a header from inside a screen** go through `<Teleport defer to="#jr-actions">`, never a plain `Teleport`: frappe-ui's `PageHeader` is itself a deferred teleport, so the target exists only after the render that mounts it (bug fix 1).
+
+## Set 8: the weekly review
+
+### The layout rule (every review, and every future screen of this kind)
+
+- **Nothing important below the fold.** At 1440 × 900 a review tab shows its whole state without scrolling the page. A list longer than fits is either a pile or folds into one line with a count ("4 other goals in progress · Plan any").
+- **Drawers for detail.** A 520 px drawer from the right over a dimmed page: `components/ui/Drawer.vue`. Header and footer stay put; only the list inside scrolls. Esc and the close button close it. On a phone it is a full-screen sheet. Neither library has a side sheet (frappe-ui's `Dialog` is centred, `@framework/ui` has none), so the drawer is built on reka-ui's Dialog parts exactly as frappe-ui builds its own `BottomSheet`: focus is trapped and given back, it is announced as a dialog, Esc closes it.
+- **The assistant decides first.** Each item carries the assistant's suggestion and a one-line reason. Only items it cannot decide are shown one by one, under **Needs you** (at most 5; any beyond 5 go into Keep with the reason "not sure").
+- **One primary button in a footer** (`weekly/ReviewFooter.vue`), with one line saying what is left before it opens. The footer is sticky at the bottom of the screen (above the tab bar on a phone).
+
+### The review's components (`components/weekly/`)
+
+| Component | What it is | Built from |
+| --- | --- | --- |
+| `ReviewPage.vue` | The review at `/plan/week?view=review&tab=…`: loads the header (`weekly.get`, then `weekly.start`, which resumes or starts it; a site that refuses writes keeps the unsaved review), opens the first unfinished tab, refuses a tab ahead whose tabs before it are not done (Library never blocks), Pause | `Skeleton`, `toast` |
+| `ReviewHeader.vue` | Title, period ("Week of 16 to 22 November", or "Covers … (you skipped last week)"), numbered tabs ticked when done (a step bar "Step 2 of 4 · Tasks" on a phone), "About 35 minutes · saved as you go", Pause | `PageHeader`, `Tabs`, `TabList`, `TabTrigger` (`#prefix` for the number or tick), `Button` |
+| `ReviewFooter.vue` | Back, the line of what is left, the one primary button | `Button` |
+| `piles/PileBoard.vue` | Needs you and the three piles for one key (`inbox` in Library, `tasks` in Tasks); owns the pile drawer | `NeedsYou`, `PileCard`, `PileDrawer` |
+| `piles/NeedsYou.vue` | Rows the assistant could not decide, with three choices worded for the source (Accept, Park, Discard; This week, Someday, Drop; Chase, Got it, Keep waiting); a settled row is one line with Undo; the section folds away when all are settled | `Card`, `Button` |
+| `piles/PileCard.vue` | A pile: count, what happens to its items, the first three with a source tag, "+ N more · see all and change", Open pile; done: tint, tick, "17 parked in Someday", what moved, See them and Undo | `Card`, `Badge`, `Button` |
+| `piles/PileDrawer.vue` | A pile opened: what happens, source filters with counts, each row with source, area, age and reason, Keep, Park and Let go settling it at once ("Moved to Keep · Undo"), and the footer that applies the pile's decision to the rest ("Park all 17") | `Drawer`, `TabButtons`, `Badge`, `Button` |
+
+`lib/review.js` holds the review's shared state (`provideReview`, `useReview`): `head` (period, tabs done and openable, the first unfinished tab), `act(method, args)` (a POST to `lifeos.api.weekly`, which saves at once and returns the new header) and `read(method, args)` (a GET). Every tab reloads what it shows when `version` changes.

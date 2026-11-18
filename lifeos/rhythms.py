@@ -61,10 +61,11 @@ def _week_start(day):
 	return add_days(day, -day.weekday())
 
 
-def review_done(space, week_start):
-	"""The weekly review of the week starting on `week_start` is done once its review note exists."""
-	title = f"Weekly review, {week_start.strftime('%-d %b %Y')}"
-	return bool(frappe.db.exists("Life Note", {"space": space, "title": title}))
+def review_done(space, week_start, user=None):
+	"""The weekly review of the week starting on `week_start` is done once a review was locked in that week (set 8; a
+	review note of set 7 became a locked review dated by its week)."""
+	return bool(frappe.db.exists("Life Review", {"space": space, "user": user or frappe.session.user, "kind": "Weekly", "status": "Locked",
+		"period_end": (">=", week_start)}))
 
 
 def banner(space, at=None):
@@ -81,7 +82,7 @@ def banner(space, at=None):
 		occ = f"review:{ws}"
 		at_time = str(s.weekly_review_time or "18:00:00")
 		if now.strftime("%H:%M:%S") >= at_time.zfill(8) and occ not in gone and not review_done(space, ws):
-			return {"key": "review", "occurrence": occ, "text": "Your weekly review is ready", "action": "Start with Reset",
+			return {"key": "review", "occurrence": occ, "text": "Your weekly review is ready", "action": "Start the review",
 				"to": {"path": "/plan/week", "query": {"view": "review"}}}
 
 	# 2. the month plan

@@ -47,7 +47,9 @@ class TestBanners(LifeTestCase):
 		rhythms.dismiss(b["occurrence"])
 		self.assertIsNone(self.banner("2027-02-14 19:00:00"))
 		self.assertEqual(self.banner("2027-02-21 19:00:00")["occurrence"], "review:2027-02-15")  # next week it is back
-		frappe.get_doc({"doctype": "Life Note", "space": PRIVATE, "title": "Weekly review, 15 Feb 2027", "content_md": "done"}).insert()
+		# set 8: done once a review covering that week is locked
+		frappe.get_doc({"doctype": "Life Review", "space": PRIVATE, "user": frappe.session.user, "status": "Locked", "period_start": "2027-02-15",
+			"period_end": "2027-02-21", "locked_on": "2027-02-21 18:40:00", "went_well": "done"}).insert()
 		self.assertIsNone(self.banner("2027-02-21 19:00:00"))
 
 	def test_month_plan_in_the_first_three_days(self):

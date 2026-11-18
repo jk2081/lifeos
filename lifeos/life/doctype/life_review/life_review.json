@@ -1,0 +1,203 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-18 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "user",
+  "title",
+  "kind",
+  "status",
+  "period_start",
+  "period_end",
+  "tab_state",
+  "went_well",
+  "do_differently",
+  "locked_on",
+  "minutes_spent",
+  "numbers_section",
+  "score",
+  "score_target",
+  "came_in",
+  "went_out",
+  "findings_acted",
+  "findings_dismissed",
+  "items_cleared",
+  "goals_planned",
+  "goals_skipped",
+  "note"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "User",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Weekly\nMonthly\n12 Weeks",
+   "default": "Weekly",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Open\nLocked",
+   "default": "Open",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "period_start",
+   "fieldtype": "Date",
+   "label": "Period Start",
+   "reqd": 1
+  },
+  {
+   "fieldname": "period_end",
+   "fieldtype": "Date",
+   "label": "Period End",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tab_state",
+   "fieldtype": "JSON",
+   "label": "Tab State",
+   "description": "Per tab: done or not; the piles, the goal plans, the stars, the revelations picked."
+  },
+  {
+   "fieldname": "went_well",
+   "fieldtype": "Small Text",
+   "label": "What Went Well"
+  },
+  {
+   "fieldname": "do_differently",
+   "fieldtype": "Small Text",
+   "label": "What To Do Differently"
+  },
+  {
+   "fieldname": "locked_on",
+   "fieldtype": "Datetime",
+   "label": "Locked On"
+  },
+  {
+   "fieldname": "minutes_spent",
+   "fieldtype": "Int",
+   "label": "Minutes Spent"
+  },
+  {
+   "fieldname": "numbers_section",
+   "fieldtype": "Section Break",
+   "label": "The Week in Numbers"
+  },
+  {
+   "fieldname": "score",
+   "fieldtype": "Float",
+   "label": "Score"
+  },
+  {
+   "fieldname": "score_target",
+   "fieldtype": "Int",
+   "label": "Score Target"
+  },
+  {
+   "fieldname": "came_in",
+   "fieldtype": "Int",
+   "label": "In"
+  },
+  {
+   "fieldname": "went_out",
+   "fieldtype": "Int",
+   "label": "Out"
+  },
+  {
+   "fieldname": "findings_acted",
+   "fieldtype": "Int",
+   "label": "Findings Acted On"
+  },
+  {
+   "fieldname": "findings_dismissed",
+   "fieldtype": "Int",
+   "label": "Findings Dismissed"
+  },
+  {
+   "fieldname": "items_cleared",
+   "fieldtype": "Int",
+   "label": "Items Cleared"
+  },
+  {
+   "fieldname": "goals_planned",
+   "fieldtype": "Int",
+   "label": "Goals Planned"
+  },
+  {
+   "fieldname": "goals_skipped",
+   "fieldtype": "Int",
+   "label": "Goals Skipped"
+  },
+  {
+   "fieldname": "note",
+   "fieldtype": "Link",
+   "label": "Review Note",
+   "options": "Life Note",
+   "description": "The review note this record was migrated from (set 7 and earlier)."
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-18 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Review",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  }
+ ],
+ "search_fields": "title",
+ "show_title_field_in_link": 1,
+ "sort_field": "period_end",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

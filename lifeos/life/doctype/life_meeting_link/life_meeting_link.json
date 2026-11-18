@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-18 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "event",
+  "record_doctype",
+  "record_name",
+  "title",
+  "how",
+  "removed"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "event",
+   "fieldtype": "Link",
+   "label": "Meeting",
+   "options": "Event",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "record_doctype",
+   "fieldtype": "Link",
+   "label": "Record Type",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "record_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Record",
+   "options": "record_doctype",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "how",
+   "fieldtype": "Select",
+   "label": "How",
+   "options": "Time\nPeople\nBoth\nOwner",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "removed",
+   "fieldtype": "Check",
+   "label": "Unlinked by the Owner",
+   "default": "0",
+   "description": "Kept so the rule does not link it again."
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-18 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Meeting Link",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  }
+ ],
+ "search_fields": "title",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

@@ -4,6 +4,24 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 from lifeos.constants import ROLES, STARTER_AREAS
 
+# set 8: what the weekly review knows about a meeting read from Google Calendar
+MEETING_FIELDS = [
+	{"fieldname": "life_attendees", "label": "Life Attendees", "fieldtype": "Small Text", "insert_after": "life_space", "read_only": 1,
+		"description": "JSON: the attendees' emails and names, as Google lists them."},
+	{"fieldname": "life_recurring", "label": "Life Recurring", "fieldtype": "Check", "insert_after": "life_attendees", "read_only": 1},
+	{"fieldname": "life_matters", "label": "Life Matters", "fieldtype": "Check", "insert_after": "life_recurring"},
+	{"fieldname": "life_matters_set_by", "label": "Life Matters Set By", "fieldtype": "Select", "options": "\nRule\nOwner",
+		"insert_after": "life_matters"},
+	{"fieldname": "life_followups_on", "label": "Life Follow-ups Read On", "fieldtype": "Datetime", "insert_after": "life_matters_set_by",
+		"read_only": 1},
+]
+GOOGLE_FIELDS = [
+	{"fieldname": "life_read_calendars", "label": "Life OS Reads", "fieldtype": "Small Text", "insert_after": "google_calendar_id",
+		"description": "JSON list of the calendar IDs Life OS reads (read-only; nothing is ever written to Google)."},
+	{"fieldname": "life_last_synced", "label": "Life OS Last Synced", "fieldtype": "Datetime", "insert_after": "life_read_calendars", "read_only": 1},
+	{"fieldname": "life_sync_error", "label": "Life OS Sync Error", "fieldtype": "Small Text", "insert_after": "life_last_synced", "read_only": 1},
+]
+
 
 def after_install():
 	setup()
@@ -22,7 +40,8 @@ def setup():
 		"Event": [{
 			"fieldname": "life_space", "label": "Life Space", "fieldtype": "Link", "options": "Life Space",
 			"insert_after": "event_type", "search_index": 1,
-		}]
+		}, *MEETING_FIELDS],
+		"Google Calendar": GOOGLE_FIELDS,
 	}, ignore_validate=True)
 	from lifeos import index
 	index.ensure_indexes()

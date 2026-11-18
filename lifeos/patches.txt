@@ -11,3 +11,4 @@ lifeos.patches.v7.lens_areas
 lifeos.patches.v7.projects_into_goals
 lifeos.patches.v7.rhythm_defaults
 lifeos.patches.v8.outbox_backfill
+lifeos.patches.v9.review_notes

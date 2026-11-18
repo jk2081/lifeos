@@ -61,6 +61,8 @@ def query_conditions(user=None, doctype=None):
 	if not spaces:
 		return "1=0"
 	cond = f"`tab{doctype}`.`space` in ({_in_list(spaces)})"
+	if doctype == "Life Review":  # a review is its reviewer's own (set 8), whoever else shares the space
+		cond += f" and `tabLife Review`.`user` = {frappe.db.escape(user)}"
 	if doctype == "Life Wiki Change" and is_agent(user):
 		closed = [s for s in spaces if s not in vault_open_spaces()]
 		if closed:  # the before and after text of a sensitive page (set 6)
@@ -152,6 +154,8 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 		return False
 	if doc.doctype in NO_AGENT_DOCTYPES and is_agent(user):
 		return False
+	if doc.doctype == "Life Review" and doc.get("user") and doc.user != user:
+		return False  # a review is its reviewer's own (set 8)
 	if doc.doctype == "Life Project" and ptype not in ("read", "select", "report", "print", "export"):
 		return False  # read-only since projects became goals (set 6); only the migration patch writes, as Administrator
 	if doc.doctype == "Life Wiki Change" and doc.get("note") and vault_hidden(doc.get("space"), user) \
