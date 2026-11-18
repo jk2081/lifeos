@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="#jr-actions">
+  <Teleport defer to="#jr-actions">
     <Button icon="lucide-chevron-left" label="Previous month" @click="step(-1)" />
     <Button icon="lucide-chevron-right" label="Next month" @click="step(1)" />
   </Teleport>

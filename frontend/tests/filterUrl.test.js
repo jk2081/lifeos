@@ -53,7 +53,9 @@ test('conditions with no short form go into f, and come back', () => {
   assert.equal(q.status, undefined)
   assert.deepEqual(JSON.parse(q.f), [['title', 'like', '%tea%'], ['status', 'in', ['Open', 'Doing']], ['priority', '!=', 'I'], ['due_date', '>', '2026-12-01']])
   const back = queryToFilters(clean(q), TASKS, TODAY)
-  assert.deepEqual(new Set(back.wire.map((w) => JSON.stringify(w))), new Set(wire.map((w) => JSON.stringify(w))))
+  // operators come back in the filter control's spelling (bug fix 1): "like" as "LIKE"
+  const spelt = wire.map(([f, op, v]) => [f, op === 'like' ? 'LIKE' : op, v])
+  assert.deepEqual(new Set(back.wire.map((w) => JSON.stringify(w))), new Set(spelt.map((w) => JSON.stringify(w))))
   assert.deepEqual(back.flags, { archived: true })
 })
 
@@ -77,13 +79,16 @@ test('clearing sets every filter key to undefined', () => {
 test('what is sent to the server', () => {
   const r = queryToRequest({ status: 'Done', due: 'overdue', done: '1', archived: '0', f: JSON.stringify([['title', 'like', '%x%']]), sort: 'title', open: 'task:1' }, TASKS)
   assert.deepEqual(r.params, { status: 'Done', due: 'overdue', done: 1 })
-  assert.deepEqual(r.filters, [['title', 'like', '%x%']])
+  assert.deepEqual(r.filters, [['title', 'LIKE', '%x%']])
   assert.deepEqual(queryToRequest({ due: 'sometime' }, TASKS).params, {})
 })
 
 test('bad input is ignored, never thrown', () => {
   assert.deepEqual(parseWire('not json'), [])
   assert.deepEqual(parseWire('{"a":1}'), [])
+  // bug fix 1: operators come back in the filter control's spelling, whatever the case in the link; unknown ones are left out
+  assert.deepEqual(parseWire('[["title","like","%a%"],["title","not like","b"],["x","equals",1],["y","nope",2]]'),
+    [['title', 'LIKE', '%a%'], ['title', 'NOT LIKE', 'b'], ['x', '=', 1]])
   assert.deepEqual(parseWire(JSON.stringify([['a', '=', 1], 'x', [1, 2, 3], ['only', 'two']])), [['a', '=', 1]])
   assert.deepEqual(queryToFilters({ f: '[[', status: ['Done', 'Open'], due: 'never' }, TASKS, TODAY).wire, [['status', '=', 'Done']])
   assert.deepEqual(queryToFilters(undefined, TASKS, TODAY), { wire: [], flags: {} })

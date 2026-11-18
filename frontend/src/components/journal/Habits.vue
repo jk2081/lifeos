@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="#jr-actions">
+  <Teleport defer to="#jr-actions">
     <Button v-if="canWrite()" class="max-md:hidden" label="Manage habits" @click="openManage" />
     <Button class="max-md:hidden" :label="yearView ? 'Month view' : 'Year view'" @click="toggleYear" />
     <Button icon="lucide-chevron-left" :label="yearView ? 'Previous year' : 'Previous month'" @click="step(-1)" />

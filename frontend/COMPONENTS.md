@@ -99,6 +99,7 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `ui/Row.vue`, `TaskRow.vue`, `IndexRow.vue` | Rows of mixed content inside a section card, opening the pane | The stretched-button pattern of frappe-ui's list guide, `Checkbox`, `Badge` |
 | `ui/Stat.vue` | A number with a label | `Card`, `text-3xl-semibold` |
 | `Empty.vue` | Empty states that say what belongs here | token text classes |
+| `ScreenBoundary.vue`, `ScreenErrorMessage.vue` (bug fix 1) | The error boundary around the routed page: a screen that fails shows "This screen could not be shown." with Reload and a reference; the rest of the app keeps working (`lib/screenError.js`) | `Card`, `Button` |
 | `Pick.vue` | One-tap change of a filing value | `Dropdown`, `Button` |
 | `FileAttach.vue` | Attach one private file to a record, in one step | frappe-ui `FileUploader`, `Button`, `ErrorMessage` |
 | `NewRecord.vue` | A small create dialog driven by a field list | `Dialog`, `FormControl`, `DatePicker`, `LifeLink` |
@@ -310,3 +311,5 @@ A task with `scheduled_at` shows at its time in Today's Next (why "Scheduled") a
 ### Inbox items left too long
 
 The Inbox's `#above` slot starts with `inbox/OldItems.vue`: an amber `Alert` (`data-old-items-banner`) and a `Dialog` batch (`data-old-item`, Confirm selected with an Undo toast). `?decisions=1` opens the batch; Reset's batch with action `review_inbox_decisions` routes there. What the rule parked or discarded on its own is one line on Today (`data-auto-inbox`) with Undo for seven days; it is separate from the rhythm banner, which stays one line.
+
+- **Buttons in a header from inside a screen** go through `<Teleport defer to="#jr-actions">`, never a plain `Teleport`: frappe-ui's `PageHeader` is itself a deferred teleport, so the target exists only after the render that mounts it (bug fix 1).

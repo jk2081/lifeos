@@ -101,12 +101,19 @@ export function queryToRequest(query = {}, spec = []) {
   return { params, filters }
 }
 
+// The operators the filter control reads back from a wire filter, in its spelling. A link may write them in any case
+// ("like" as well as "LIKE"); one the control does not know would break the list (bug fix 1), so it is left out.
+const WIRE_OPS = ['=', '!=', 'LIKE', 'NOT LIKE', '>', '<', '>=', '<=', 'in', 'not in', 'is', 'is not', 'between', 'timespan']
+const WIRE_OP = Object.fromEntries([...WIRE_OPS.map((op) => [op.toLowerCase(), op]), ['equals', '='], ['not equals', '!=']])
+
 export function parseWire(raw) {
   const value = text(raw)
   if (!value) return []
   try {
     const list = JSON.parse(value)
-    return Array.isArray(list) ? list.filter((w) => Array.isArray(w) && w.length === 3 && typeof w[0] === 'string' && typeof w[1] === 'string') : []
+    if (!Array.isArray(list)) return []
+    return list.filter((w) => Array.isArray(w) && w.length === 3 && typeof w[0] === 'string' && typeof w[1] === 'string' && WIRE_OP[w[1].trim().toLowerCase()])
+      .map(([field, op, val]) => [field, WIRE_OP[op.trim().toLowerCase()], val])
   } catch {
     return []
   }

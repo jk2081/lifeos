@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="#jr-actions">
+  <Teleport defer to="#jr-actions">
     <Dropdown v-if="g && g.cycles.length > 1" :options="cycleOptions"><Button :label="g.cycle.title" icon-right="lucide-chevron-down" /></Dropdown>
     <template v-if="g && writable">
       <Button v-if="g.cycle.status === 'Planned'" label="Start this cycle" @click="startCycle" />

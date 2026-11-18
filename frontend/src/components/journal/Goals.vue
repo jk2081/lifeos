@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="#jr-actions">
+  <Teleport defer to="#jr-actions">
     <Button label="All goals" icon-right="lucide-arrow-right" :route="{ path: '/plan/goals', query: { status: 'all' } }" data-all-goals />
     <template v-if="active && canWrite()">
       <Button v-if="active.past_end" label="Close cycle" @click="openClose" />

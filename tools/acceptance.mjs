@@ -6,8 +6,10 @@
 // It runs against the throwaway site acceptance.localhost (http://localhost:19000), which scripts/acceptance-site.sh
 // rebuilds from a snapshot with seed and demo data before every run, so lifeos.localhost stays clean for the owner.
 // Needs the Docker bench running and .env with LIFEOS_DEV_PASSWORD. `--no-reset` keeps the acceptance site as it is.
+// `--owner-read-only` only walks every screen on the owner's site, lifeos.localhost, changing nothing (bug fix 1).
 // It prints one line per acceptance item and exits 1 if any fails.
 import { chromium } from 'playwright-core'
+import { walkScreens } from './screen-walk.mjs'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -17,6 +19,49 @@ const env = Object.fromEntries(fs.readFileSync(path.join(root, '.env'), 'utf8').
 const base = process.env.LIFEOS_URL || 'http://localhost:19000'
 const SITE = process.env.LIFEOS_SITE || 'acceptance.localhost'
 if (SITE === 'lifeos.localhost') throw new Error('acceptance runs on its own site, never on lifeos.localhost')
+// Bug fix 1: `--owner-read-only` walks every screen on the owner's site (lifeos.localhost, http://localhost:18000) at both
+// widths, opening screens only. Requests that could write are refused in the browser (the remembered views, the Error Log),
+// and the site's Life tables and Error Log are compared before and after, so the run provably changed nothing.
+async function ownerReadOnly() {
+  const ownerBase = process.env.LIFEOS_OWNER_URL || 'http://localhost:18000'
+  // reads the screens send as POST; everything else that is not a GET is refused
+  const READS = /\/api\/method\/(frappe\.desk\.form\.load\.getdoctype|frappe\.desk\.search\.search_link|lifeos\.api\.(journal\.month|week\.goal_plan|wiki\.overview))$/
+  const snapshot = () => execFileSync('docker', ['exec', '-i', 'lifeos-bench', 'bash', '-lc', 'cd ~/frappe-bench/sites && ../env/bin/python -W ignore -'], {
+    input: `import frappe, json; frappe.init("lifeos.localhost"); frappe.connect()
+out = {}
+for (t,) in frappe.db.sql("show tables like 'tabLife %'") + (("tabError Log",),):
+    out[t] = [str(v) for v in frappe.db.sql(f"select count(*), max(modified) from \`{t}\`")[0]]
+print(json.dumps(out))`, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim().split('\n').pop()
+  const before = JSON.parse(snapshot())
+  const ob = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true })
+  let bad = 0
+  for (const width of [1440, 390]) {
+    const ctx = await ob.newContext({ viewport: { width, height: width < 800 ? 844 : 1000 }, timezoneId: 'Asia/Kolkata', isMobile: width < 800, hasTouch: width < 800 })
+    const page = await ctx.newPage()
+    const res = await page.request.post(ownerBase + '/api/method/login', { form: { usr: 'owner@lifeos.test', pwd: env.LIFEOS_DEV_PASSWORD } })
+    if (!res.ok()) throw new Error('login failed on the owner site')
+    const refused = new Set()
+    await page.route(/\/api\//, (r) => {
+      const req = r.request()
+      const create = req.method() !== 'GET' && /journal\.month$/.test(req.url()) && /"create":\s*(1|true)/.test(req.postData() || '')
+      if (req.method() === 'GET' || (READS.test(req.url()) && !create)) return r.continue()
+      refused.add(new URL(req.url()).pathname.replace('/api/method/', ''))
+      return r.abort()
+    })
+    await page.goto(ownerBase + '/life', { waitUntil: 'networkidle' })
+    const { seen, failures } = await walkScreens(page, { width })
+    console.log(`${failures.length ? 'FAIL' : 'PASS'}  owner site at ${width} px: ${seen} screens${failures.length ? '  — ' + failures.join('; ') : ''}`)
+    if (refused.size) console.log(`      refused writes: ${[...refused].join(', ')}`)
+    bad += failures.length
+    await ctx.close()
+  }
+  await ob.close()
+  const after = JSON.parse(snapshot())
+  const changed = Object.keys(after).filter((t) => JSON.stringify(after[t]) !== JSON.stringify(before[t]))
+  console.log(`${changed.length ? 'FAIL' : 'PASS'}  the owner's site is unchanged${changed.length ? '  — changed: ' + changed.join(', ') : ''}`)
+  return bad || changed.length ? 1 : 0
+}
+if (process.argv.includes('--owner-read-only')) process.exit(await ownerReadOnly())
 if (!process.argv.includes('--no-reset')) execFileSync(path.join(root, 'scripts/acceptance-site.sh'), { stdio: 'inherit' })
 const GET_METHODS = new Set(JSON.parse(fs.readFileSync(path.join(root, 'frontend/src/lib/getMethods.json'), 'utf8')))
 const queryParams = (args) => Object.fromEntries(Object.entries(args || {}).filter(([, v]) => v !== undefined && v !== null)
@@ -2919,6 +2964,131 @@ for (const width of [1440, 390]) {
       return '8 screens'
     })
   }
+  await s.ctx.close()
+}
+
+// ---------- Bug fix 1: the weekly review on data shaped like the owner's, the error boundary, and every screen ----------
+// Records carry "BF1 … <width> <stamp>" and are removed by S4.1.
+for (const width of [1440, 390]) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  const tag = `BF1.${width}`
+  const W = `${width} ${stamp}`
+  const settle = () => pg.waitForTimeout(500)
+  const place = async (label) => {
+    await pg.locator(width < 800 ? `[data-tab-item="${label}"]` : `[data-nav-item="${label}"]`).first().click()
+    await pg.waitForLoadState('networkidle')
+    await settle()
+  }
+  const headerButtons = () => pg.evaluate(() => [...document.querySelectorAll('#jr-actions [aria-label]')].map((b) => b.getAttribute('aria-label')))
+
+  await check(`${tag}.1`, `${width} px: the weekly review renders on data like the owner's (a goal migrated from a project, a number goal with a Suggested reading, a milestone goal without "done when", a goal with no cycle, a delegated task), reached by clicking and by URL`, async () => {
+    const made = JSON.parse(bench(`import json
+from frappe.utils import add_days, now_datetime, today
+from lifeos import readings
+from lifeos.patches.v7 import projects_into_goals
+frappe.set_user("owner@lifeos.test")
+area = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"})
+cycle = frappe.db.get_value("Life Cycle", {"space": "${SPACE}", "status": "Active"})
+def goal(title, **kw):
+    g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": title, "area": area, **kw})
+    g.flags.ignore_permissions = True
+    return g.insert().name
+# a project, migrated as set 6 did: an open-ended goal with no finish line and no measure
+p = frappe.get_doc({"doctype": "Life Project", "space": "${SPACE}", "title": "BF1 project ${W}", "area": area, "status": "Active"})
+p.flags.allow_migration = True
+p.insert(ignore_permissions=True)
+frappe.set_user("Administrator")
+projects_into_goals.execute()
+frappe.set_user("owner@lifeos.test")
+migrated = frappe.db.get_value("Life Project", p.name, "migrated_to")
+number = goal("BF1 number ${W}", goal_type="Open", measure_kind="Number", measure="BF1 weight", unit="kg", start_value=84, target_value=78)
+readings.suggest(number, 81, excerpt="Weighed 81 kg this morning.", by="Agent")
+milestone = goal("BF1 milestone ${W}", goal_type="12 Week Year", cycle=cycle, measure_kind="Milestone", done_when="Signed")
+frappe.db.set_value("Life Goal", milestone, "done_when", None)
+nocycle = goal("BF1 no cycle ${W}", goal_type="12 Week Year", cycle=cycle)
+frappe.db.set_value("Life Goal", nocycle, "cycle", None)
+t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "BF1 delegated ${W}", "goal": migrated, "area": area, "status": "Waiting",
+    "waiting_on": "Ravi", "scheduled_at": str(add_days(now_datetime(), 1).replace(hour=11, minute=0, second=0, microsecond=0)), "duration_min": 30})
+t.flags.ignore_permissions = True
+t.insert()
+print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone, "nocycle": nocycle, "task": t.name}))`).split('\n').pop())
+    must(made.migrated && made.task, 'the records were not made: ' + JSON.stringify(made))
+    const review = async (how) => {
+      const body = pg.locator('[data-review-step="results"]')
+      await body.waitFor({ timeout: 15000 }).catch(() => {})
+      await settle()
+      const buttons = await headerButtons()
+      must(!errors.length, `${how}: script error: ${errors.splice(0).join(' | ')}`)
+      must(!(await pg.locator('[data-screen-error]').count()), `${how}: the screen could not be shown`)
+      must(await body.isVisible(), `${how}: the review's body is empty`)
+      must(buttons.includes('Previous week') && buttons.includes('Next week'), `${how}: header buttons are ${JSON.stringify(buttons)}`)
+      const text = await pg.locator('[data-main]').innerText()
+      must(text.includes(`BF1 number ${W}`) && text.includes(`BF1 milestone ${W}`), `${how}: the reading to confirm or the milestone without a finish line is missing`)
+    }
+    // the way the owner reached it: Today, Plan, the Week's Calendar, then Review
+    await s.open('/life')
+    await place('Plan')
+    await pg.locator('[data-place-tabs] [data-tab="week"]').first().click()
+    await pg.locator('[data-plan-views]:visible').first().getByText('Calendar', { exact: true }).click()
+    await settle()
+    await pg.locator('[data-plan-views]:visible').first().getByText('Review', { exact: true }).click()
+    await review('clicked from the Calendar')
+    // by URL, and after a reload
+    await s.open('/life/plan/week?view=review')
+    await review('by URL')
+    await pg.reload({ waitUntil: 'networkidle' })
+    await review('after a reload')
+    // and navigation still moves the page
+    await place('Inbox')
+    must(new URL(pg.url()).pathname === '/life/inbox' && await pg.locator('[data-main]').innerText().then((t) => t.includes('Inbox')), 'navigation after the review is stuck')
+    return 'clicked, by URL and reloaded; Previous week and Next week in the header'
+  })
+
+  await check(`${tag}.2`, `${width} px: a screen forced to fail shows "This screen could not be shown." with Reload and a reference, logs it, and navigation keeps working`, async () => {
+    const got = []
+    for (const kind of ['render', 'patch']) {
+      await s.open(`/life/dev/throw?kind=${kind}`)
+      await pg.locator('[data-screen-error]').waitFor({ timeout: 5000 })
+      errors.splice(0)
+      const box = pg.locator('[data-screen-error]')
+      must((await box.innerText()).includes('This screen could not be shown.'), `${kind}: no message`)
+      must(await box.getByRole('button', { name: 'Reload' }).isVisible(), `${kind}: no Reload`)
+      const ref = (await pg.locator('[data-screen-error-ref]').innerText()).trim()
+      must(/^[A-Z0-9]{4,8}$/.test(ref), `${kind}: reference "${ref}"`)
+      // the sidebar or the phone's tab bar still works, and leaving clears the message
+      await place('Plan')
+      must(new URL(pg.url()).pathname === '/life/plan/week', `${kind}: Plan did not open (${pg.url()})`)
+      must(!(await pg.locator('[data-screen-error]').count()), `${kind}: the message stayed after leaving`)
+      await place('Today')
+      must(await pg.locator('[data-main]').innerText().then((t) => t.length > 100), `${kind}: Today is empty after the failure`)
+      const logged = bench(`print(frappe.db.count("Error Log", {"method": "Life OS screen error ${ref}"}))`).split('\n').pop()
+      must(logged === '1', `${kind}: the Error Log has ${logged} entries for ${ref}`)
+      got.push(`${kind} ${ref}`)
+    }
+    // a screen whose file is gone after a rebuild says a newer version is out
+    await s.open('/life')
+    await pg.route(/\/assets\/lifeos\/frontend\/assets\/Settings-[^/]*\.js/, (r) => r.fulfill({ status: 404, body: 'gone' }))
+    await pg.evaluate(() => document.querySelector('[data-app] a[href*="/settings"]').click())
+    await pg.locator('[data-screen-error]').waitFor({ timeout: 5000 })
+    must((await pg.locator('[data-screen-error]').innerText()).includes('A newer version of Life OS is available.'), 'a missing screen file gives the wrong message')
+    await pg.unroute(/Settings-/)
+    errors.splice(0)
+    await place('Inbox')
+    must(new URL(pg.url()).pathname === '/life/inbox' && !(await pg.locator('[data-screen-error]').count()), 'navigation after a missing screen file is stuck')
+    bench(`frappe.db.delete("Error Log", {"method": ["like", "Life OS screen error %"]})`)
+    return got.join(', ') + ', and a missing screen file'
+  })
+
+  await check(`${tag}.3`, `${width} px: every place, every Plan and Library tab and every view of Plan's rhythms opens by clicking, and navigation works afterwards`, async () => {
+    await s.open('/life')
+    errors.splice(0)
+    const { seen, failures } = await walkScreens(pg, { width })
+    must(!failures.length, failures.join('; '))
+    return `${seen} screens`
+  })
   await s.ctx.close()
 }
 

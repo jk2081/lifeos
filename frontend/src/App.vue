@@ -18,7 +18,7 @@
           </Dropdown>
         </div>
         <RouterView v-slot="{ Component }">
-          <component :is="Component" :key="store.space + ':' + store.lensArea + ':' + route.path" />
+          <ScreenBoundary><component :is="Component" :key="store.space + ':' + store.lensArea + ':' + route.path" /></ScreenBoundary>
         </RouterView>
       </main>
 
@@ -85,6 +85,7 @@ import { recordChanged } from './lib/pane'
 import { areaOptions, loadLookups } from './lib/lookups'
 import SearchPalette from './components/SearchPalette.vue'
 import RecordPane from './components/RecordPane.vue'
+import ScreenBoundary from './components/ScreenBoundary.vue'
 import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'
 import { boot, canWrite, store } from './lib/store'

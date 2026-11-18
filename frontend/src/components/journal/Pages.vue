@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="#jr-actions"><Button variant="solid" label="Add a page photo" route="/inbox" /></Teleport>
+  <Teleport defer to="#jr-actions"><Button variant="solid" label="Add a page photo" route="/inbox" /></Teleport>
   <div class="page-body">
     <div v-if="pages.length" class="gal">
       <RouterLink v-for="p in pages" :key="p.name" class="flex flex-col gap-0.5 rounded-5 border border-outline-gray-2 bg-surface-base p-2.5 text-ink-gray-9 hover:bg-surface-gray-1 focus-visible:focus-ring" :to="`/journal/pages/${p.name}`">

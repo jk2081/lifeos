@@ -1,6 +1,6 @@
 # Status
 
-Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** UX fixes sets 1 to 7 are done, and so is pre-step 6 (Frappe conventions). The summary at the end says what works, what is stubbed, what is untested, and how to install.
+Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** UX fixes sets 1 to 7 are done, and so are pre-step 6 (Frappe conventions) and bug fix 1 (the blank weekly review). The summary at the end says what works, what is stubbed, what is untested, and how to install.
 
 ## Milestones
 
@@ -267,6 +267,18 @@ Everything in `UX_FIXES_7.md` is done. Deviations are in `DECISIONS.md` under "S
   - `node tools/screens.mjs` on the new and changed screens (Today, Inbox and its batch, the weekly review, 12 Weeks, Goals, a goal and a number goal with its pane, New goal, Library > Outbox, Settings > Rhythms and Reset rules) at 1440 px and 390 px in light and dark: 56 screenshots, no sideways scrolling, script errors or low contrast. Looked at by eye; the readings chart was redrawn (it scaled far too tall) and the goal cards made compact.
 - `frontend/COMPONENTS.md`, `agent/SKILL.md` (Reading proposals; what agents may not do) and `ROADMAP.md` (set 7 done; the `project` aliases still pending) are updated.
 
+## Bug fix 1: the blank weekly review (18 Nov 2026)
+
+- **Bug fix 1: done.** The weekly review opened blank, without Previous week and Next week, when reached by switching views inside Plan > Week (Calendar, then Review), and navigation then stayed stuck until a reload. Root cause: the journal screens teleported their header buttons into `#jr-actions`, which frappe-ui's own deferred `PageHeader` teleport had not yet put in the document; the never-mounted buttons then broke the next re-render (`emitsOptions` of null) and every navigation after it. Fixed with `<Teleport defer>` in all six journal screens. Details in `DECISIONS.md`, "Bug fix 1".
+- **A second failing screen.** The boundary showed that Plan > Tasks opened from a link with an `f=` filter written with a lowercase `like` threw on every update (Frappe's filter control knows only `LIKE`); Vue had been logging it silently. `parseWire` now gives operators in the control's spelling. Three older acceptance checks failed on it until it was fixed.
+- **Error boundary.** A screen that fails to render now shows "This screen could not be shown." with Reload and a short reference (`ScreenBoundary` in `App.vue`, `app.config.errorHandler`, `router.onError`); the sidebar, the lens and navigation keep working. A screen file missing after a rebuild says "A newer version of Life OS is available." Errors go to the console with their stack and to the Error Log through `client_errors.log` (POST, typed, rate-limited, logged-in users only, no record contents).
+- **Checks:**
+  - The review renders on the owner's site with his data at 1440 px and 390 px, reached by clicking from the Calendar, with Previous week and Next week in the header (`screenshots/bf1-review-*.png`; the message: `screenshots/bf1-error-*.png`).
+  - Unit tests: 357 run, 356 pass, 1 skipped (the live AI test). New: `test_bf1_client_errors`. Front end: 11 tests (the URL tests now also cover operator spelling), `check-sfc.mjs` and `check-singletons.mjs` pass.
+  - `./tools/scan.sh`: 0 findings.
+  - `node tools/acceptance.mjs`: 120 of 120 pass on `acceptance.localhost` at 1440 px and 390 px, the scan (C.1) included. New: `BF1.<width>.1` (the review on owner-shaped data, clicked, by URL and reloaded; it fails with the old teleport), `BF1.<width>.2` (forced render and patch failures and a missing screen file, then navigation), `BF1.<width>.3` (every place, Plan and Library tab and rhythm view, by clicking).
+  - `node tools/acceptance.mjs --owner-read-only` on `lifeos.localhost`: 26 screens at each width pass, writes refused in the browser, and every Life table and the Error Log unchanged afterwards. No other screen failed.
+
 ## Summary
 
 ### What works
@@ -326,6 +338,7 @@ docker compose -f docker/docker-compose.yml up -d
 docker exec -d lifeos-bench bash -lc 'cd ~/frappe-bench && bench serve --port 8000'
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && yarn install && yarn build'   # rebuild the front end, inside the bench
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost run-tests --app lifeos'
+node tools/acceptance.mjs --owner-read-only   # bug fix 1: walk every screen on lifeos.localhost without changing it
 node tools/acceptance.mjs            # the acceptance list, on its own site acceptance.localhost (http://localhost:19000), rebuilt from a snapshot first
 scripts/acceptance-site.sh --new     # rebuild that site and its snapshot from scratch (after a schema change); also starts its server and a worker
 node tools/screens.mjs               # screenshots of every screen, both widths and themes, with overflow, error and contrast checks

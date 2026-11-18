@@ -80,6 +80,8 @@ const routes = [
 
   // development only: the editor on a sample note (owner only, not in the sidebar)
   { path: '/dev/editor', name: 'EditorDev', component: () => import('./pages/dev/EditorDev.vue') },
+  // development only: a screen that fails on purpose, for the error boundary's check (bug fix 1)
+  { path: '/dev/throw', name: 'ThrowDev', component: () => import('./pages/dev/ThrowDev.vue') },
   { path: '/:rest(.*)*', redirect: '/' },
 ]
 
