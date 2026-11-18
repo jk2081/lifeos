@@ -15,7 +15,9 @@ Life OS keeps its owner moving forward: everything that lands on him goes in one
 | Pre-step 6 | Frappe's official conventions, scan, audit and review | Done |
 | 6 | Simplify: four places, the lens, Projects into Goals, Library, Settings, rhythm banners (`UX_FIXES_6.md`) | Done |
 | 7 | Moving forward: Outbox, old Inbox items, the weekly review's goal work, Done when (`UX_FIXES_7.md`) | Done |
-| 8 | Calendar (see below) | Next |
+| Bug fix 1 | Blank weekly review that froze navigation | Done |
+| 8 | The weekly review, redesigned; reading the calendar (see below) | Designing |
+| 9 | Calendar: writing goal blocks (see below) | |
 
 ## The target design in one paragraph
 
@@ -65,13 +67,24 @@ Built as `UX_FIXES_7.md` describes; `STATUS.md` ("Set 7: Moving forward") says w
 - Lead measures stay the goal's weekly actions: a tick, or an optional count per week ("4 times a week", ticked one at a time), each tick counting towards the week score.
 - Current values of number goals: the assistant pre-fills a value it finds in captures, showing the source; the weekly review asks for confirmation, or for a value when nothing was found. Goals show the result against its target beside task completion.
 
-### Set 8: Calendar
+### Set 8: The weekly review, redesigned (designing, 18 November 2026)
 
-- Google Calendar, two-way, per person, through Frappe's integration.
+The review built in set 7 reads as a long report with no guide. It is being redesigned from mockups before any brief is written (Life OS Screens canvas, boards 23 to 29 and those that follow). Agreed so far:
+
+- Four numbered tabs, in a fixed order, each ticked off when done and open to going back: **1 Library** (what came in and what it means), **2 Tasks** (the commitments already on the plate), **3 Goals** (progress, then next week's plan), **4 Reflect** (what went well, then Lock the week).
+- The assistant suggests first everywhere; the owner confirms or corrects. Every tab fits on one screen; detail opens in a drawer. Long lists are sorted into piles (Keep, Park in Someday, Let go) accepted as a pile from a drawer or one item at a time; only items the assistant cannot decide are shown one by one ("Needs you").
+- Library shows last week's calendar. Only meetings that matter are marked (people from outside, 30 minutes or longer, not recurring internal check-ins): linked notes and follow-ups, or nothing captured. A meeting opens in a drawer with what is linked, follow-ups found, and "Anything to plan from this meeting?".
+- Revelations: at most five, each with its source and one action (a promise with no task, a goal reading, a blocker, a topic that keeps coming up, meetings that matter with nothing captured). Acted-on revelations leave the list.
+- To settle while designing: one finding shown in several places is cleared everywhere at once; a skipped week is covered by the next review; the monthly and 12-week reviews reuse the same tabs.
+- **Reading Google Calendar (read-only, per person) moves into this set**, because Library needs last week's meetings. Writing to the calendar stays in set 9.
+
+### Set 9: Calendar
+
+- Google Calendar, two-way, per person, through Frappe's integration. Reading arrives in set 8; this set adds writing.
 - Goal-work tasks from the weekly review become private events in their own colour; moving one in Google Calendar moves the task. Suggested times stay within working hours and never overlap existing events. The assistant suggests each slot's length.
 - Needs the owner's Google Cloud OAuth client.
 
-### Set 9: Cost and the model gateway
+### Set 10: Cost and the model gateway
 
 - A model gateway (LiteLLM) on the server; the Life OS AI client and every Hermes profile call models only through it, each with its own gateway key. Provider keys live only in the gateway.
 - Caps in US dollars: $30 a month overall (setting), optional caps per caller.
@@ -87,13 +100,13 @@ A checklist, done with the owner, before daily use:
 4. Move what matters from Folio.
 5. Use it daily for two weeks and keep a list of every annoyance. That list becomes the next set.
 
-### Set 10: People and sharing
+### Set 11: People and sharing
 
 - Members: Ruchi and others with their own logins; Shared and Family spaces; the lens shows spaces.
 - Calendars per person, shared calendars visible in shared spaces.
 - Sharing a single goal, note or capture.
 
-### Set 11: Agent platform
+### Set 12: Agent platform
 
 Needs a decision first: what read, propose and act mean per kind of record, and which actions always need approval.
 
@@ -117,4 +130,4 @@ Found when comparing Life OS with GTD, timeboxing, OKRs and Atomic Habits on 17 
 
 ## Open decisions
 
-1. The agents' permission model (before set 11).
+1. The agents' permission model (before set 12).
