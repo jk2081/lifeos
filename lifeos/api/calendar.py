@@ -14,7 +14,8 @@ MAX_RANGE_DAYS = 100
 
 
 def google_status():
-	"""Whether the session user has connected Google Calendar through Frappe's built-in integration."""
+	"""Whether the session user has connected Google Calendar through Frappe's built-in integration (set 8: read only; the
+	screens link to Settings > Me > Calendar to connect)."""
 	try:
 		enabled = frappe.db.get_single_value("Google Settings", "enable")
 		name = frappe.db.get_value("Google Calendar", {"user": frappe.session.user, "enable": 1}, "name")
@@ -25,7 +26,7 @@ def google_status():
 		from frappe.utils.password import get_decrypted_password
 		connected = bool(get_decrypted_password("Google Calendar", name, "refresh_token", raise_exception=False))
 	return {"enabled": bool(enabled), "connected": connected, "calendar": name if connected else None,
-		"setup_url": "/app/google-calendar" if enabled else "/app/google-settings"}
+		"setup_url": "/settings?tab=calendar"}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -102,7 +103,8 @@ def year(space: str | None = None, year: int | None = None):
 
 @frappe.whitelist(methods=["POST"])
 def add_event(space: str | None = None, subject: str | None = None, starts_on: str | None = None, ends_on: str | None = None, all_day: bool | int = 0, description: str | None = None):
-	"""Create a core Event in a space. If the user has connected Google Calendar, the built-in integration pushes it there."""
+	"""Create a core Event in a space. Set 8 reads Google Calendar and never writes to it, so the event stays in Life OS
+	(writing to Google comes with set 9)."""
 	space = permissions.resolve_space(space, write=True)
 	if not (subject or "").strip() or not starts_on:
 		frappe.throw(_("An event needs a title and a start."))
@@ -115,13 +117,9 @@ def add_event(space: str | None = None, subject: str | None = None, starts_on: s
 		frappe.throw(_("The end is before the start."))
 	doc = frappe.get_doc({"doctype": "Event", "subject": subject.strip(), "starts_on": starts, "ends_on": ends, "all_day": 1 if flag(all_day) else 0,
 		"description": description, "event_type": "Public", "life_space": space})
-	google = google_status()
-	if google["connected"]:
-		doc.sync_with_google_calendar = 1
-		doc.google_calendar = google["calendar"]
 	# the space check above is the rule; core Event asks for the Desk User role, which Life User and Life Agent do not have
 	doc.insert(ignore_permissions=True)
-	return {"name": doc.name, "synced_to_google": bool(google["connected"])}
+	return {"name": doc.name, "synced_to_google": False}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -157,7 +155,7 @@ def entry(kind: str, name: str):
 		return {"kind": "event", "name": doc.name, "title": doc.subject, "space": doc.get("life_space"), "all_day": bool(doc.all_day),
 			"starts_on": str(doc.starts_on)[:16] if doc.starts_on else None, "ends_on": str(doc.ends_on)[:16] if doc.ends_on else None,
 			"description": frappe.utils.strip_html(doc.description or ""), "repeats": bool(doc.repeat_this_event),
-			"synced_to_google": bool(doc.get("sync_with_google_calendar"))}
+			"synced_to_google": bool(doc.get("pulled_from_google_calendar"))}
 	if kind == "date":
 		doc = permissions.get_doc_checked("Life Important Date", name)
 		return {"kind": "date", "name": doc.name, "title": doc.title, "space": doc.space, "day": doc.day, "month": doc.month, "year": doc.year,

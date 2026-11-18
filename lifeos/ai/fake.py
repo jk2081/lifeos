@@ -180,5 +180,5 @@ def _rules_of(name):
 TASKS = {"goal_measure": _goal_measure, "goal_readings": _goal_readings,
 	"goal_plan": _rules_of("lifeos.weekplan.fake_plan"), "inbox_decisions": _rules_of("lifeos.old_inbox.fake_decisions"),
 	# set 8: the weekly review
-	"review_piles": _rules_of("lifeos.review.pile_sort.fake_sort"), "meeting_followups": _rules_of("lifeos.review.meetings.fake_followups"),
+	"review_piles": _rules_of("lifeos.review.pile_sort.fake_sort"), "meeting_followups": _rules_of("lifeos.review.followups.fake_followups"),
 	"review_stars": _rules_of("lifeos.review.goals.fake_stars"), "review_playback": _rules_of("lifeos.review.lock.fake_playback")}

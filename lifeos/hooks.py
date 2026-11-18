@@ -45,6 +45,9 @@ for _dt in ("Life Task", "Life Goal", "Life Inbox Item", "Life Idea"):
 	for _event, _fn in (("on_update", "on_update"), ("after_insert", "after_insert"), ("on_trash", "on_trash")):
 		_have = doc_events[_dt].get(_event)
 		doc_events[_dt][_event] = [*([_have] if isinstance(_have, str) else _have or []), f"lifeos.outbox.{_fn}"]
+# set 8: a reading confirmed or rejected anywhere clears its finding in the weekly review
+_have = doc_events["Life Goal Reading"].get("on_update")
+doc_events["Life Goal Reading"]["on_update"] = [*([_have] if isinstance(_have, str) else _have or []), "lifeos.review.findings.reading_changed"]
 doc_events["Event"] = {"validate": "lifeos.events.validate_event"}
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
 doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
@@ -57,6 +60,8 @@ scheduler_events = {
 		"0 6 * * *": ["lifeos.insights.run_nightly"],
 		# set 7: Inbox items left too long, before the morning
 		"30 5 * * *": ["lifeos.old_inbox.run_nightly"]},
+	# set 8: Google Calendar, read only, hourly
+	"hourly": ["lifeos.review.gcal.sync_all"],
 }
 
 # the Outbox (set 7) is a record of what happened: an exit naming an area or a record never stops that area from being deleted

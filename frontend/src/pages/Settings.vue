@@ -63,6 +63,7 @@
             <Badge label="None" /></SettingRow>
           <p class="pb-3 text-sm text-ink-gray-6">When each rhythm happens is set under Your life, Rhythms.</p>
         </Card>
+        <CalendarSection v-else-if="section === 'calendar'" />
         <template v-else-if="section === 'shortcuts'">
           <Card flush data-settings-shortcuts>
             <SettingRow v-for="g in GO" :key="g.key" :label="g.label" :help="'Press G, then ' + g.key.toUpperCase()"><KeyboardShortcut bg :combo="'G ' + g.key.toUpperCase()" /></SettingRow>
@@ -400,6 +401,7 @@ import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
+import CalendarSection from '@/components/settings/CalendarSection.vue'
 import SettingRow from '@/components/settings/SettingRow.vue'
 import SettingsList from '@/components/settings/SettingsList.vue'
 import ConnectionsSection from '@/components/settings/ConnectionsSection.vue'
@@ -460,7 +462,7 @@ const memberSpace = ref('')
 // The menu (UX fixes, set 6): Me; Your life (in the space picked here); Assistant; People and agents; Data.
 const groups = computed(() => [
   { key: 'me', label: 'Me', items: [{ value: 'profile', label: 'Profile' }, { value: 'appearance', label: 'Appearance' }, { value: 'notifications', label: 'Notifications' },
-    { value: 'shortcuts', label: 'Shortcuts' }] },
+    { value: 'shortcuts', label: 'Shortcuts' }, { value: 'calendar', label: 'Calendar' }] },
   { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas' }, { value: 'rhythms', label: 'Rhythms' }, { value: 'habits', label: 'Habits' },
     { value: 'dimensions', label: 'Check-ins' }, { value: 'reset', label: 'Reset rules' }, { value: 'tags', label: 'Tags' }] },
   { key: 'assistant', label: 'Assistant', items: [...(d.value?.is_admin ? [{ value: 'agents', label: 'Assistants' }] : []), { value: 'connections', label: 'Connections' },

@@ -18,6 +18,8 @@
  "lifeos.api.connections.list",
  "lifeos.api.connections.import_status",
  "lifeos.api.counts.get",
+ "lifeos.api.gcal.state",
+ "lifeos.api.gcal.calendars",
  "lifeos.api.goals.list",
  "lifeos.api.goals.picker",
  "lifeos.api.goals.cycles",

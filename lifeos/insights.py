@@ -257,7 +257,9 @@ def run(space, ai=True, user=None):
 		room -= 1
 		stats["created"] += 1
 	# rule insights still New whose finding is no longer true are removed (their evidence changed or went away)
-	for name, fp in frappe.db.sql("select name, fingerprint from `tabLife Insight` where space=%s and status='New' and source='Rule'", space):
+	# (the weekly review's own rule findings, set 8, are kept current by lifeos/review/findings.py, not here)
+	for name, fp in frappe.db.sql("""select name, fingerprint from `tabLife Insight` where space=%s and status='New' and source='Rule'
+			and kind in %s""", (space, KINDS)):
 		if fp not in seen:
 			frappe.delete_doc("Life Insight", name, ignore_permissions=True, delete_permanently=True)
 	frappe.db.set_single_value("Life Settings", "insights_run_on", now_datetime())
@@ -278,6 +280,9 @@ def run_nightly():
 				from lifeos import readings
 
 				readings.run_for_space(s.name, s.owner_user)
+			from lifeos.review import followups  # set 8: meetings linked, their follow-ups, readings waiting
+
+			followups.nightly(s.name, s.owner_user, ai=bool(s.ask_enabled))
 		except Exception:
 			frappe.db.rollback(save_point="lifeos_insights")
 			frappe.log_error(title=f"Life OS insights for {s.name}")

@@ -8,7 +8,6 @@ import frappe
 from frappe import _
 
 from lifeos import permissions
-from lifeos.api.utils import parse
 from lifeos.review import piles
 from lifeos.review.record import TABS, Review
 
@@ -56,10 +55,26 @@ def start(space: str | None = None, fresh: bool | int = 0):
 	space = permissions.resolve_space(space, write=True)
 	rv = Review.start(space, frappe.session.user, fresh=bool(int(fresh or 0)))
 	if rv.doc.status == "Open":
+		_refresh(rv)
 		for key in piles.KEYS:
 			piles.PileSet(rv, key).load(ai=_ai(space))
 		rv.save()
 	return rv.header()
+
+
+def _refresh(rv):
+	"""When the review opens: read the calendar (a failure is logged, the review goes on without it), link what was captured
+	to the meetings, and find the period's follow-ups, readings waiting and meetings with nothing captured."""
+	from lifeos.review import followups, gcal
+
+	user, space = frappe.session.user, rv.doc.space
+	frappe.db.savepoint("lifeos_review_calendar")
+	try:
+		gcal.sync_user(user)
+	except Exception:
+		frappe.db.rollback(save_point="lifeos_review_calendar")
+		frappe.log_error(title="Life OS Google Calendar read")
+	followups.refresh(space, user, rv.doc.period_start, rv.doc.period_end, ai=_ai(space))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -122,6 +137,107 @@ def pile_undo(space: str | None = None, key: str = "tasks", ref: str | None = No
 	return {"summary": ps.summary(), "header": rv.header()}
 
 
-def parse_list(value):
-	got = parse(value, []) or []
-	return got if isinstance(got, list) else []
+# ---- tab 1: Library ----
+
+@frappe.whitelist(methods=["GET"])
+def library(space: str | None = None):
+	"""The calendar strip, what came in, the Inbox piles' split and the revelations."""
+	from lifeos.review import library as lib
+
+	rv = _current(space)
+	return lib.data(rv, frappe.session.user)
+
+
+@frappe.whitelist(methods=["GET"])
+def meeting(space: str | None = None, event: str = ""):
+	"""A meeting opened: linked records, follow-ups, the goal a task will link to, the previous and next meeting that matters."""
+	from lifeos.review import library as lib
+
+	rv = _current(space)
+	return lib.meeting(rv, event)
+
+
+@frappe.whitelist(methods=["GET"])
+def meetings_list(space: str | None = None):
+	"""The period's meetings that matter (the count in Came in opens this list)."""
+	from lifeos.review import library as lib
+	from lifeos.review import meetings
+
+	rv = _current(space)
+	rows = meetings.in_period(rv.doc.space, rv.doc.period_start, rv.doc.period_end, only_matter=True)
+	marks = lib._marks([m.name for m in rows])
+	return {"rows": [{"name": m.name, "title": m.subject, "start": str(m.starts_on)[:16], "mark": marks.get(m.name),
+		"attendees": [a.get("name") or a["email"] for a in meetings.attendees(m)]} for m in rows]}
+
+
+@frappe.whitelist(methods=["POST"])
+def meeting_mark(space: str | None = None, event: str = "", matters: int | str | None = None):
+	"""Mark a meeting as mattering (1) or not (0) by hand; empty goes back to the rule."""
+	from lifeos.review import meetings
+
+	rv = _open(space)
+	_check_event(rv, event)
+	meetings.mark(event, None if matters in (None, "") else bool(int(matters)))
+	return {"ok": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def meeting_link(space: str | None = None, event: str = "", doctype: str = "", name: str = "", unlink: str | None = None):
+	"""Link a record to a meeting by hand, or unlink one (`unlink` names the link)."""
+	from lifeos.review import meetings
+
+	rv = _open(space)
+	_check_event(rv, event)
+	if unlink:
+		if frappe.db.get_value("Life Meeting Link", unlink, "event") != event:
+			frappe.throw(_("That link is not on this meeting."))
+		meetings.unlink(unlink)
+	else:
+		if doctype not in ("Life Inbox Item", "Life Chat Log", "Life Note", "Life Task"):
+			frappe.throw(_("Only captures, chats, notes and tasks link to a meeting."))
+		meetings.link(event, doctype, name)
+	return {"ok": True}
+
+
+@frappe.whitelist(methods=["POST"])
+def meeting_plan(space: str | None = None, event: str = "", title: str = "", goal: str | None = None):
+	"""A task from "Anything to plan from this meeting?", linked to the meeting and the goal chosen."""
+	from lifeos.review import library as lib
+
+	rv = _open(space)
+	task = lib.plan_task(rv, event, title, goal)
+	rv.save()
+	return {"task": task, "header": rv.header()}
+
+
+@frappe.whitelist(methods=["POST"])
+def meeting_done(space: str | None = None, event: str = ""):
+	rv = _open(space)
+	_check_event(rv, event)
+	done = rv.state.setdefault("meetings_done", [])
+	if event not in done:
+		done.append(event)
+	rv.save()
+	return {"header": rv.header()}
+
+
+def _check_event(rv, event):
+	if not isinstance(event, str) or frappe.db.get_value("Event", event, "life_space") != rv.doc.space:
+		frappe.throw(_("That meeting is not in this review."))
+
+
+@frappe.whitelist(methods=["POST"])
+def finding_act(space: str | None = None, insight: str = "", index: int = 0, title: str | None = None, goal: str | None = None,
+		value: float | None = None, reason: str | None = None):
+	"""Act on a finding (Make task, Confirm a reading, Someday, Not needed). It leaves every list where it showed."""
+	from lifeos.review import findings
+	from lifeos.review import library as lib
+
+	rv = _open(space)
+	if frappe.db.get_value("Life Insight", insight, "space") != rv.doc.space:
+		frappe.throw(_("That finding is not in this space."))
+	out = findings.act(insight, index, {"title": title, "goal": goal, "value": value, "reason": reason})
+	if out.get("task"):
+		lib.note_created(rv, out["task"], goal or frappe.db.get_value("Life Task", out["task"], "goal"), "library")
+	rv.save()
+	return {**out, "header": rv.header()}

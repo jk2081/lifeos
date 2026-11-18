@@ -14,8 +14,8 @@
 
   <div class="page-body" data-calendar :data-view="mode">
     <slot name="above" />
-    <Alert v-if="google && !google.connected" title="Google Calendar is not connected" description="Events added here stay on this site."
-      :primary-action="{ label: 'Connect it in Frappe\'s Google settings', href: google.setup_url }" data-google-prompt />
+    <Alert v-if="google && !google.connected" title="Google Calendar is not connected" description="Connect it to see your meetings here and in the weekly review. Events added here stay on this site."
+      :primary-action="{ label: 'Connect Google Calendar', route: { path: '/settings', query: { tab: 'calendar' } } }" data-google-prompt />
 
     <!-- year: one column a month, one line a day, as in the journal -->
     <template v-if="mode === 'year' && yearData">
@@ -272,7 +272,7 @@ async function saveEvent(v) {
   if (allDay && v.end_date) ends = `${v.end_date} 23:59:59`
   else if (!allDay && v.end_time) ends = `${v.date} ${v.end_time}:00`
   const res = await api('calendar.add_event', { space: store.space, subject: v.subject, starts_on: starts, ends_on: ends, all_day: allDay ? 1 : 0 })
-  toast.success(res.synced_to_google ? 'Event added. It will be pushed to Google Calendar.' : 'Event added.')
+  toast.success('Event added.')
 }
 async function saveDate(v) {
   const d = parse(v.date)

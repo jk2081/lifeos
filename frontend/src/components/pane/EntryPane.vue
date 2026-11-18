@@ -3,7 +3,7 @@
     <template v-if="e.kind === 'event'">
       <div><div class="mb-1 text-sm-medium text-ink-gray-7">When</div><div class="text-base text-ink-gray-8">{{ when }}</div></div>
       <div v-if="e.description"><div class="mb-1 text-sm-medium text-ink-gray-7">Notes</div><div class="whitespace-pre-wrap text-base text-ink-gray-8">{{ e.description }}</div></div>
-      <div class="text-sm text-ink-gray-6">{{ e.synced_to_google ? 'Pushed to Google Calendar.' : 'Kept on this site.' }}{{ e.repeats ? ' It repeats.' : '' }}</div>
+      <div class="text-sm text-ink-gray-6">{{ e.synced_to_google ? 'From Google Calendar.' : 'Kept on this site.' }}{{ e.repeats ? ' It repeats.' : '' }}</div>
     </template>
     <template v-else>
       <div><div class="mb-1 text-sm-medium text-ink-gray-7">Every year on</div><div class="text-base text-ink-gray-8">{{ e.day }} {{ MONTHS[e.month - 1] }}{{ e.year ? `, since ${e.year}` : '' }}</div></div>
