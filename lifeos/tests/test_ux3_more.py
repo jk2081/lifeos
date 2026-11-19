@@ -67,7 +67,8 @@ class TestSettings(LifeTestCase):
 		self.assertNotIn("Life User", text)
 		for s in got["spaces"]:
 			self.assertNotIn("Administrator", [m["user"] for m in s["members"]])
-			self.assertNotIn(AGENT, [m["user"] for m in s["members"]])  # agents are in their own section
+		# issue 1: agents are listed with people in Members, marked by kind, and again in Agents
+		self.assertTrue(any(m["user"] == AGENT and m["is_agent"] for s in got["spaces"] for m in s["members"]))
 		self.assertIn(AGENT, [a["user"] for a in got["agents"]])
 
 

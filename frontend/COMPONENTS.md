@@ -119,6 +119,8 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `goals/GoalMeasure.vue`, `goals/ResultBar.vue`, `goals/ReadingChart.vue`, `goals/SuggestedReadings.vue` | A goal's key result on its page and pane: the result bar, the chart of confirmed readings, readings to confirm, a reading by hand, Mark achieved | `Progress`, `Badge`, `Alert`, `FormControl`, `DatePicker`, `Row`; the chart is SVG with token variables |
 | `outbox/InOutChart.vue`, `pages/Outbox.vue` | Library > Outbox: four piles, All out and Came in as state tabs, the period switch, the 8-week chart, Bring back | `ListView`, `TabButtons`, `Badge`, `Button`; SVG bars with token variables |
 | `inbox/OldItems.vue` | The Inbox's banner of old items and its batch screen of suggested decisions | `Alert`, `Dialog`, `Checkbox`, `Select` |
+| `settings/MemberRow.vue` (issue 1) | **The one row for a member of a space, person or agent**: avatar, name, email, a kind badge (Owner green, Person gray, Agent blue), access (Can view, Can edit; the owner always Can edit) and Remove. Settings > People and agents > Members lists only these; do not build another member row | `Avatar`, `Badge`, `Select`, `Dropdown`, `Button` |
+| `settings/AddMemberDialog.vue` (issue 1) | Add member: a server search over every user (`settings.find_users`) with each one's kind, the access that fits (Can edit for a person, Can view for an agent), and the role offer for a user with no Life OS role | `Dialog`, `Combobox` (server search, as its guide says), `Badge`, `TabButtons`, `Select` |
 
 ## How a list screen is written
 

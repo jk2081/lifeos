@@ -36,7 +36,7 @@ Open `https://SITE/life`. On a phone, use Add to Home Screen to install it as an
 
 **Family members.** Create the user in Frappe, then add them to a space under Life OS, Settings, Spaces and members. They get the role `Life User`. Create a space of their own for them in the same place.
 
-**Agents.** Create one user per agent with only the role `Life Agent`, add it to the spaces it should work in, and generate its API key on the user record. Switch on MCP in System Settings (`Enable MCP`). The agent connects to `/api/v2/mcp` with `Authorization: token <key>:<secret>` and loads `agent/SKILL.md` as its instructions.
+**Agents.** Create one user per agent in Frappe, then add it to each space it should work in from Life OS: Settings → People and agents → Members, **Add member**. If the user has no Life OS role yet, Add member offers agent access and gives it the role `Life Agent` when you confirm (never `Life User` or `Life Admin`). Agents start with Can view; they need Can edit to file captures and proposals. Generate its API key on the user record (Settings → People and agents → Agents links to it). Switch on MCP in System Settings (`Enable MCP`). The agent connects to `/api/v2/mcp` with `Authorization: token <key>:<secret>` and loads `agent/SKILL.md` as its instructions.
 
 **Google Calendar.** Connect it in Frappe: Google Settings, then a Google Calendar record for your user. Life OS has no sync code of its own; events made in the app are core `Event` records, which Frappe pushes to Google.
 
@@ -242,14 +242,14 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `settings.get` | `space=None` | Everything the Settings screen shows for one space. |
+| `settings.get` | `space=None` | Everything the Settings screen shows for one space; each space's `members` holds people and agents together, with `is_agent` and `kind` on each row, and `agents` lists every agent across spaces. |
 | `settings.save` | `values` | Change Life Settings. Owner only. |
 | `settings.save_item` | `kind, space=None, name=None, title=None, parent_area=None, relation=None, sort_order=None, is_archived=None, delete=0, with_children=1` | Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person. Archiving sets `archived_on`; an area takes its sub-areas with it. `delete=1` is not offered on the screen. |
 | `settings.create_space` | `space_name, owner_user=None, starter_areas=1` | Create a space, for example a private space for a family member, with the starter areas. Owner only. |
-| `settings.set_member` | `space, user, access='Write', remove=0` | Add a user to a space, change their access, or remove them. Owner only. The user must already exist. |
+| `settings.set_member` | `space, user, access=None, remove=0, grant_role=None` | Add a person or an agent to a space, change their access, or remove them; the one method for space access. Owner only. The user must already exist. Access defaults to `Write` for a person and `Read` for an agent. A user with no Life OS role is refused unless `grant_role` is `Life User` or `Life Agent`; a user who has a Life role keeps it, and `Life Admin` is never given. The space owner cannot be removed and keeps `Write`. |
 | `settings.reorder` | `kind, names, parent_area=None` | Put the areas or check-in dimensions in this order in one call; for areas, moving one into `parent_area`'s list nests it there. |
 | `settings.set_agent_vault` | `space, allowed` | Let agents open the documents of one space's Vault, or not. Off by default. Life Admin only. |
-| `settings.find_users` | `txt=''` | People who can be added to a space. Life Admin only. |
+| `settings.find_users` | `txt='', space=None` | Users who can be added to a space, people and agents alike, each with its `kind` (`Person`, `Agent`, or none yet) and, with `space`, `is_member`. Life Admin only. |
 
 **`lifeos.api.tasks`**
 

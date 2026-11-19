@@ -94,7 +94,7 @@ watch(() => props.d, (d) => {
   skipping.value = false
   reason.value = ''
   Object.assign(measure, emptyMeasure(d.measure))
-  reloadReadings()
+  loadReadings()
 }, { immediate: true })
 const subLine = computed(() => {
   const d = props.d
@@ -102,9 +102,15 @@ const subLine = computed(() => {
 })
 const slotLabel = (s) => `${weekday(s, 3)} ${time(s)}`
 const sameSlot = (s) => (v.slot || '').slice(0, 16) === s
-async function reloadReadings() {
+// Opening the drawer only reads the suggested readings. Telling the parent "changed" here made it read the goal again, which
+// gave the drawer new data, which read the readings again: a loop that refreshed the open drawer and wiped what was typed.
+async function loadReadings() {
   if (!props.d) return
   readings.value = (await tryCall(() => api('goals.goal_readings', { goal: props.d.goal })))?.suggested || []
+}
+// after a reading is confirmed or dismissed: the goal's progress changed, so the row and the drawer read it again
+async function reloadReadings() {
+  await loadReadings()
   emit('changed')
 }
 async function saveMeasure() {

@@ -36,7 +36,7 @@
           <h2 class="min-w-0 flex-1 text-lg-semibold text-ink-gray-9" data-section-title>{{ heading }}</h2>
           <Button v-if="listOf(section) && canEdit" variant="solid" icon-left="lucide-plus" :label="'New ' + listOf(section).one" data-new @click="newOpen = true" />
           <Button v-if="section === 'members' && memberSpace" variant="solid" icon-left="lucide-plus" label="Add member" data-add-member @click="addOpen = true" />
-          <Button v-if="section === 'members'" label="New space" data-new-space @click="spaceOpen = true" />
+          <Button v-if="section === 'spaces'" label="New space" data-new-space @click="spaceOpen = true" />
         </div>
         <div v-if="!d" class="flex flex-col gap-3"><Skeleton v-for="i in 4" :key="i" class="h-10 w-full rounded-4" /></div>
 
@@ -140,14 +140,13 @@
         <!-- Assistant: Sensitive items and Note rules -->
         <template v-else-if="section === 'sensitive'">
           <p class="text-sm text-ink-gray-6">A sensitive item is a document from the Vault, or a capture or note marked sensitive. Each space decides who may read them. Anyone who can edit an item may mark it; only the space's owner may unmark it.</p>
-          <Card v-for="sp in d.spaces" :key="sp.name" flush :data-sensitive-space="sp.name">
-            <SettingRow :label="`Agents may open sensitive items in ${sp.name}`" help="Off by default. With it off, agents cannot list, read or download them.">
-              <Switch :model-value="!!sp.agents_can_read_vault" :aria-label="`Agents may open sensitive items in ${sp.name}`" :data-vault-switch="sp.name" :disabled="!d.is_admin"
-                @update:model-value="(v) => setVault(sp, v)" /></SettingRow>
-            <SettingRow :label="`Ask may read sensitive items in ${sp.name}`" help="Off by default. Separate from the agents' switch.">
+          <Card flush data-sensitive>
+            <SettingRow v-for="sp in d.spaces" :key="sp.name" :label="`Ask may read sensitive items in ${sp.name}`" help="Off by default. Ask answers the people in the space." :data-sensitive-space="sp.name">
               <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="`Ask may read sensitive items in ${sp.name}`" :data-ask-vault-switch="sp.name" :disabled="!d.is_admin"
                 @update:model-value="(v) => setSpaceAsk(sp, 'ask_can_read_vault', v)" /></SettingRow>
           </Card>
+          <p class="text-sm text-ink-gray-6" data-sensitive-agents-note>Whether agents may open sensitive items is set for each space under
+            <RouterLink v-if="d.is_admin" class="text-ink-blue-8 hover:underline" :to="{ query: { ...route.query, tab: 'spaces' } }">People and agents, Spaces</RouterLink><template v-else>People and agents, Spaces, by the owner</template>.</p>
         </template>
         <template v-else-if="section === 'note-rules'">
           <p class="text-sm text-ink-gray-6">The assistant reads this page before it writes its notes. People edit it; agents cannot. It is also pinned at the top of the assistant's notes in the Library.</p>
@@ -157,12 +156,21 @@
 
         <!-- People and agents: Spaces -->
         <template v-else-if="section === 'spaces'">
-          <Card flush data-settings-spaces>
-            <Row v-for="sp in d.spaces" :key="sp.name"><div class="min-w-0 flex-1"><div class="text-base-medium text-ink-gray-9">{{ sp.name }}</div>
-              <div class="text-sm text-ink-gray-6">Owner {{ sp.owner_name || '—' }} · {{ sp.members.length }} member{{ sp.members.length === 1 ? '' : 's' }}</div></div>
-              <Button size="sm" label="Members" @click="memberSpace = sp.name; open('members')" /></Row>
-          </Card>
-          <p class="text-sm text-ink-gray-6">Each record lives in one space. A person sees a space's records only as its member.</p>
+          <div class="flex flex-col gap-4" data-settings-spaces>
+            <Card v-for="sp in d.spaces" :key="sp.name" flush :data-space-card="sp.name">
+              <div class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2.5">
+                <div class="min-w-0 flex-1 basis-48"><div class="text-base-medium text-ink-gray-9">{{ sp.name }}</div>
+                  <div class="text-sm text-ink-gray-6" :data-space-counts="sp.name">Owner {{ sp.owner_name || '—' }} · {{ plural(sp.people_count, 'person', 'people') }} · {{ plural(sp.agent_count, 'agent', 'agents') }}</div></div>
+                <Button size="sm" label="Members" :data-space-members="sp.name" @click="showMembers(sp.name)" />
+              </div>
+              <SettingRow label="Ask in this space" help="People in this space can ask about its records.">
+                <Switch :model-value="!!sp.ask_enabled" :aria-label="`Ask in ${sp.name}`" :data-ask-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_enabled', v)" /></SettingRow>
+              <SettingRow label="Agents may open sensitive items" help="Off by default. With it off, agents cannot list, read or download this space's sensitive items.">
+                <Switch :model-value="!!sp.agents_can_read_vault" :aria-label="`Agents may open sensitive items in ${sp.name}`" :data-vault-switch="sp.name"
+                  @update:model-value="(v) => setVault(sp, v)" /></SettingRow>
+            </Card>
+          </div>
+          <p class="text-sm text-ink-gray-6">Each record lives in one space. A person or an agent sees a space's records only as its member.</p>
         </template>
 
         <!-- Data -->
@@ -270,20 +278,17 @@
             <div v-else class="flex w-40 flex-none flex-col gap-0.5" data-member-spaces>
               <Button v-for="s in d.spaces" :key="s.name" class="!justify-start" :variant="s.name === memberSpace ? 'subtle' : 'ghost'" :label="s.name" :data-space="s.name" @click="memberSpace = s.name" />
             </div>
-            <Card v-if="mSpace" flush class="min-w-0 flex-1" data-members>
-              <div v-for="m in mSpace.members" :key="m.user" class="flex min-h-12 flex-wrap items-center gap-2.5 border-b border-outline-gray-1 py-2 last:border-b-0" :data-member="m.user">
-                <Avatar size="md" :label="m.full_name" :image="m.image" />
-                <div class="min-w-0 flex-1 basis-40"><div class="break-words text-base-medium text-ink-gray-9">{{ m.full_name }}</div><div class="break-all text-sm text-ink-gray-6">{{ m.user }}</div></div>
-                <Badge v-if="m.is_owner" label="Owner" data-owner-badge />
-                <Select v-else class="w-32" :model-value="m.access" :options="ACCESS" :aria-label="`Access for ${m.full_name}`" :data-access="m.user"
-                  @update:model-value="(v) => v !== m.access && setMember(mSpace.name, m.user, v)" />
-                <Dropdown v-if="!m.is_owner" :options="[{ label: 'Remove', icon: 'lucide-user-minus', theme: 'red', onClick: () => askRemove(mSpace, m) }]">
-                  <Button variant="ghost" icon="lucide-ellipsis" :label="`More for ${m.full_name}`" :data-member-menu="m.user" /></Dropdown>
-              </div>
-              <Empty v-if="!mSpace.members.length" title="No members." />
-            </Card>
+            <div v-if="mSpace" class="flex min-w-0 flex-1 flex-col gap-3">
+              <TabButtons v-model="memberKind" class="self-start" :options="memberTabs" aria-label="Show" data-member-filter />
+              <Card flush data-members>
+                <MemberRow v-for="m in shownMembers" :key="m.user" :member="m" @access="(v) => setMember(mSpace.name, m.user, v)" @remove="askRemove(mSpace, m)" />
+                <Empty v-if="!shownMembers.length" :title="memberKind === 'agents' ? `No agents in ${mSpace.name}.` : memberKind === 'people' ? `No people in ${mSpace.name}.` : 'No members.'"
+                  hint="Add someone with Add member." />
+              </Card>
+            </div>
           </div>
-          <p class="text-sm text-ink-gray-6">A person sees a record only if they are a member of its space. Can view lets them read; Can edit lets them add and change records. Agents are under Agents.</p>
+          <p class="text-sm text-ink-gray-6">Everyone in a space, people and agents, sees its records. Can view lets them read; Can edit lets them add and change records.
+            An agent's keys and its other spaces are under <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { ...route.query, tab: 'agents' } }">Agents</RouterLink>.</p>
         </template>
         <template v-else-if="section === 'ai' && d.ai">
           <Card flush data-ai-settings>
@@ -320,32 +325,31 @@
             </Card>
             <p class="mt-1 text-sm text-ink-gray-6">US dollars per million tokens.</p>
           </section>
-          <section>
-            <SectionHead>Ask in each space</SectionHead>
-            <Card flush>
-              <template v-for="sp in d.spaces" :key="sp.name">
-                <SettingRow :label="`Ask in ${sp.name}`" help="People in this space can ask about its records.">
-                  <Switch :model-value="!!sp.ask_enabled" :aria-label="`Ask in ${sp.name}`" :data-ask-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_enabled', v)" /></SettingRow>
-              </template>
-            </Card>
-          </section>
+          <p class="text-sm text-ink-gray-6" data-ai-spaces-note>Ask is switched on or off for each space under
+            <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { ...route.query, tab: 'spaces' } }">People and agents, Spaces</RouterLink>.</p>
         </template>
         <template v-else-if="section === 'agents'">
-          <Card flush data-agents>
-            <div v-for="a in d.agents" :key="a.user" class="flex flex-col gap-2 border-b border-outline-gray-1 py-3 last:border-b-0" :data-agent="a.user">
-              <div class="flex items-center gap-2.5"><Avatar size="md" :label="a.full_name" />
-                <div class="min-w-0 flex-1"><div class="text-base-medium text-ink-gray-9">{{ a.full_name }}</div>
-                  <div class="text-sm text-ink-gray-6">{{ a.last_filed ? 'Last filed something ' + dateTime(a.last_filed) : 'Has not filed anything yet' }}</div></div></div>
-              <div v-for="r in a.spaces" :key="r.space" class="flex flex-wrap items-center gap-2 pl-10">
-                <span class="min-w-24 flex-1 text-base text-ink-gray-8">{{ r.space }}</span>
-                <Select class="w-36" :model-value="r.access || ''" :options="AGENT_ACCESS" :aria-label="`${a.full_name} in ${r.space}`" :data-agent-access="a.user + '|' + r.space"
-                  @update:model-value="(v) => setAgent(r.space, a.user, v, r.access)" />
-              </div>
+          <Card v-for="a in d.agents" :key="a.user" flush :data-agent="a.user">
+            <div class="flex flex-wrap items-center gap-2.5 border-b border-outline-gray-1 py-2.5">
+              <Avatar size="md" :label="a.full_name" :image="a.image" />
+              <div class="min-w-0 flex-1 basis-40"><div class="break-words text-base-medium text-ink-gray-9">{{ a.full_name }}</div>
+                <div class="break-all text-sm text-ink-gray-6">{{ a.user }}</div>
+                <div class="text-sm text-ink-gray-6" data-agent-last>{{ a.last_filed ? 'Last filed something ' + dateTime(a.last_filed) : 'Has not filed anything yet' }}</div></div>
+              <Badge theme="blue" label="Agent" />
+              <Button size="sm" icon-right="lucide-external-link" label="Keys in Frappe" :href="`/app/user/${encodeURIComponent(a.user)}`" :data-agent-user-link="a.user" />
             </div>
-            <Empty v-if="!d.agents.length" title="No agents." hint="An agent is a user with the Life OS agent role and no other Life OS role. Create one in Frappe, then give it access here." />
+            <div v-for="r in a.spaces" :key="r.space" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" :data-agent-space="a.user + '|' + r.space">
+              <span class="min-w-24 flex-1 text-base text-ink-gray-8">{{ r.space }}</span>
+              <span class="text-sm text-ink-gray-6" :data-agent-sensitive="a.user + '|' + r.space">{{ r.agents_can_read_vault ? 'Opens sensitive items' : 'No sensitive items' }}</span>
+              <Select class="w-36" :model-value="r.access || ''" :options="AGENT_ACCESS" :aria-label="`${a.full_name} in ${r.space}`" :data-agent-access="a.user + '|' + r.space"
+                @update:model-value="(v) => setAgent(r.space, a.user, v, r.access)" />
+            </div>
           </Card>
-          <p class="text-sm text-ink-gray-6">Whether agents may open sensitive items is set under <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'sensitive' } }">Sensitive items</RouterLink>.</p>
-          <p class="text-sm text-ink-gray-6">Keys for agents are made in Frappe, never on this screen.</p>
+          <Card v-if="!d.agents.length"><Empty title="No agents yet." data-agents-empty
+            hint="An agent is a Frappe user that only an assistant signs in as. Create the user in Frappe, then add it to a space with Add member under Members: Life OS offers it agent access there." /></Card>
+          <p class="text-sm text-ink-gray-6">Whether agents may open sensitive items is set for each space under
+            <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { ...route.query, tab: 'spaces' } }">Spaces</RouterLink>.
+            Keys for agents are made in Frappe, never on this screen.</p>
         </template>
       </div>
     </section>
@@ -370,13 +374,7 @@
       <p class="text-sm text-ink-gray-6">Nothing is deleted. Restore it from Archived in Settings.</p>
     </div>
   </Dialog>
-  <Dialog v-model:open="addOpen" :title="`Add a member to ${memberSpace}`" size="sm"
-    :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Add', variant: 'solid', onClick: addMember }]">
-    <div class="flex flex-col gap-3" data-add-dialog>
-      <LifeLink v-model="newMember.user" doctype="User" label="Person" placeholder="Search by name or email" />
-      <Select v-model="newMember.access" :options="ACCESS" aria-label="Access" />
-    </div>
-  </Dialog>
+  <AddMemberDialog v-if="memberSpace" v-model:open="addOpen" :space="memberSpace" @added="load" />
   <Dialog v-model:open="spaceOpen" title="New space" size="sm"
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Create space', variant: 'solid', onClick: createSpace }]">
     <div class="flex flex-col gap-3">
@@ -392,7 +390,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 // A routed page, not frappe-ui's SettingsDialog: that family's panels only work inside the dialog. The menu is frappe-ui
 // Tabs in its vertical form, with the open section in the URL (tab=).
-import { Avatar, Badge, Button, Dialog, Dropdown, KeyboardShortcut, Select, Skeleton, Switch, TabButtons, TabList, Tabs, TabTrigger, TextInput, TimePicker, dialog, toast, useColorScheme } from 'frappe-ui'
+import { Avatar, Badge, Button, Dialog, KeyboardShortcut, Select, Skeleton, Switch, TabButtons, TabList, Tabs, TabTrigger, TextInput, TimePicker, dialog, toast, useColorScheme } from 'frappe-ui'
 import NoteEditor from '@/components/NoteEditor.vue'
 import { GO } from '@/lib/nav'
 import { dotClass } from '@/lib/lens'
@@ -405,6 +403,8 @@ import CalendarSection from '@/components/settings/CalendarSection.vue'
 import SettingRow from '@/components/settings/SettingRow.vue'
 import SettingsList from '@/components/settings/SettingsList.vue'
 import ConnectionsSection from '@/components/settings/ConnectionsSection.vue'
+import MemberRow from '@/components/settings/MemberRow.vue'
+import AddMemberDialog from '@/components/settings/AddMemberDialog.vue'
 import LifeLink from '@/framework/LifeLink.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { boot, store } from '@/lib/store'
@@ -430,8 +430,7 @@ function toggleDay(day) {
   if (set.length) setOne('work_days', WEEKDAYS.filter((x) => set.includes(x)).join(','))
 }
 const SCHEMES = [{ label: 'Light', value: 'light' }, { label: 'Dark', value: 'dark' }, { label: 'System', value: 'system' }]
-const ACCESS = [{ label: 'Can view', value: 'Read' }, { label: 'Can edit', value: 'Write' }]
-const AGENT_ACCESS = [{ label: 'No access', value: '' }, ...ACCESS]
+const AGENT_ACCESS = [{ label: 'No access', value: '' }, { label: 'Can view', value: 'Read' }, { label: 'Can edit', value: 'Write' }]
 const LISTS = [
   { kind: 'area', section: 'areas', label: 'Areas', one: 'area', noun: 'areas', key: 'areas', field: 'area_name', ordered: true, placeholder: 'For example Health',
     hint: 'Areas are your own filing headings.', countNoun: ['record', 'records'], link: (r) => ({ path: '/library/timeline', query: { area: r.name } }),
@@ -454,7 +453,6 @@ const draft = reactive({ title: '', parent: '' })
 const archiveOpen = ref(false)
 const archiving = ref(null)
 const addOpen = ref(false)
-const newMember = reactive({ user: null, access: 'Write' })
 const spaceOpen = ref(false)
 const newSpace = reactive({ name: '', owner: null })
 const memberSpace = ref('')
@@ -465,14 +463,16 @@ const groups = computed(() => [
     { value: 'shortcuts', label: 'Shortcuts' }, { value: 'calendar', label: 'Calendar' }] },
   { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas' }, { value: 'rhythms', label: 'Rhythms' }, { value: 'habits', label: 'Habits' },
     { value: 'dimensions', label: 'Check-ins' }, { value: 'reset', label: 'Reset rules' }, { value: 'tags', label: 'Tags' }] },
-  { key: 'assistant', label: 'Assistant', items: [...(d.value?.is_admin ? [{ value: 'agents', label: 'Assistants' }] : []), { value: 'connections', label: 'Connections' },
+  { key: 'assistant', label: 'Assistant', items: [{ value: 'connections', label: 'Connections' },
     ...(d.value?.is_admin ? [{ value: 'ai', label: 'Ask and AI' }] : []), { value: 'sensitive', label: 'Sensitive items' }, { value: 'note-rules', label: 'Note rules' }] },
-  ...(d.value?.is_admin ? [{ key: 'people', label: 'People and agents', items: [{ value: 'spaces', label: 'Spaces' }, { value: 'members', label: 'Members' }] }] : []),
+  // issue 1: who is in each space and what they can do, people and agents together
+  ...(d.value?.is_admin ? [{ key: 'people', label: 'People and agents', items: [{ value: 'spaces', label: 'Spaces' }, { value: 'members', label: 'Members' },
+    { value: 'agents', label: 'Agents' }] }] : []),
   { key: 'data', label: 'Data', items: [{ value: 'archive', label: 'Archive and trash' }, { value: 'import', label: 'Import and export' },
     ...(d.value?.is_admin ? [{ value: 'backups', label: 'Backups' }] : [])] },
 ])
-// sections from before set 6, by their new names
-const MOVED = { default: 'profile', review: 'rhythms', archived: 'archive' }
+// sections from before set 6 and issue 1, by their new names (tab=agents keeps its name: it is now People and agents, Agents)
+const MOVED = { default: 'profile', review: 'rhythms', archived: 'archive', assistants: 'agents', people: 'members' }
 const sections = computed(() => groups.value.flatMap((g) => g.items))
 // the open section is tab= in the URL. On a wide screen the first section is the default; on a phone the menu is.
 const ADMIN_ONLY = ['members', 'spaces', 'agents', 'ai', 'backups']
@@ -506,6 +506,15 @@ function archived(l) {
 const kidsOf = (r) => active(LISTS[0]).filter((x) => x.parent_area === r.name)
 const parentOptions = computed(() => [{ label: 'Top level', value: '' }, ...active(LISTS[0]).filter((x) => !x.parent_area).map((a) => ({ label: 'Inside ' + a.title, value: a.name }))])
 const mSpace = computed(() => d.value?.spaces.find((s) => s.name === memberSpace.value))
+// Members: All, People, Agents, with counts
+const memberKind = ref('all')
+const memberTabs = computed(() => {
+  const all = mSpace.value?.members || []
+  const agents = all.filter((m) => m.is_agent).length
+  return [{ label: `All ${all.length}`, value: 'all' }, { label: `People ${all.length - agents}`, value: 'people' }, { label: `Agents ${agents}`, value: 'agents' }]
+})
+const shownMembers = computed(() => (mSpace.value?.members || []).filter((m) => memberKind.value === 'all' || m.is_agent === (memberKind.value === 'agents')))
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
 
 // Note rules: the rules page of the assistant's notes in this space
 const rulesDoc = ref(null)
@@ -620,12 +629,10 @@ function askRemove(space, m) {
   dialog.danger({ title: `Remove ${m.full_name}?`, message: `${m.full_name} will no longer see anything in ${space.name}. Their records stay.`, confirmLabel: 'Remove',
     onConfirm: async () => { await setMember(space.name, m.user, m.access, 1) } })
 }
-async function addMember() {
-  if (!newMember.user) return toast.error('Choose a person.')
-  if (await setMember(memberSpace.value, newMember.user, newMember.access)) {
-    addOpen.value = false
-    newMember.user = null
-  }
+function showMembers(space) {
+  memberSpace.value = space
+  memberKind.value = 'all'
+  open('members')
 }
 async function createSpace() {
   if (!newSpace.name.trim()) return toast.error('A name is needed.')
@@ -638,9 +645,10 @@ async function createSpace() {
     load()
   }
 }
+// the Agents view changes access with the same method as Members: set_member
 async function setAgent(space, user, access, before) {
   if ((access || '') === (before || '')) return
-  await setMember(space, user, access || before || 'Read', access ? 0 : 1)
+  await setMember(space, user, access || before, access ? 0 : 1)
 }
 async function setVault(s, on) {
   if (await tryCall(() => api('settings.set_agent_vault', { space: s.name, allowed: on ? 1 : 0 }), 'Saved')) load()

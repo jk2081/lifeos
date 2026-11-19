@@ -5,8 +5,12 @@ from frappe.model.document import Document
 
 class LifeSpace(Document):
 	def validate(self):
+		from lifeos import permissions
+
 		if not self.owner_user:
 			self.owner_user = frappe.session.user
+		if self.owner_user != "Administrator" and permissions.is_agent(self.owner_user):
+			frappe.throw(_("An agent cannot own a space. Choose a person."))
 		seen = set()
 		for m in self.members:
 			if m.user in seen:

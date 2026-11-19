@@ -149,7 +149,7 @@ class AnthropicBackend:
 		except anthropic.APIConnectionError:
 			raise AIError(_("Could not reach the AI service."))
 		except anthropic.AuthenticationError:
-			raise AIError(_("The AI service refused the API key. Check it in Settings, Admin, AI."))
+			raise AIError(_("The AI service refused the API key. Check it in Settings, Assistant, Ask and AI."))
 		except anthropic.APIStatusError as e:
 			raise AIError(_("The AI service answered with an error ({0}).").format(e.status_code))
 		u = final.usage

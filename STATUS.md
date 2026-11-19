@@ -1,6 +1,6 @@
 # Status
 
-Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** UX fixes sets 1 to 8 are done, and so are pre-step 6 (Frappe conventions) and bug fix 1 (the blank weekly review). The summary at the end says what works, what is stubbed, what is untested, and how to install.
+Build of Life OS v1. Updated at the end of every milestone. **The build is finished: all ten milestones are done.** UX fixes sets 1 to 8 are done, and so are pre-step 6 (Frappe conventions), bug fix 1 (the blank weekly review) and issue 1 (people and agents in one place). The summary at the end says what works, what is stubbed, what is untested, and how to install.
 
 ## Milestones
 
@@ -302,6 +302,23 @@ Everything in `UX_FIXES_8.md` is done. Deviations are in `DECISIONS.md` under "S
 - **Not tested against the real service:** Google Calendar. No Google account was connected; reading was tested with a recording stand-in for Google's API client and with the fixture calendar. The OAuth connect flow is core's and was not run. To be checked by hand with the owner.
 - `frontend/COMPONENTS.md` (the layout rule, piles, drawers, the review's components), `agent/SKILL.md` (agents create findings only through Reading proposals; the review refuses them) and `ROADMAP.md` (set 8 done; the monthly and 12-week reviews move to the shell later) are updated.
 
+## Issue 1: people and agents (19 Nov 2026)
+
+GitHub issue #1, as `ISSUE_1.md` describes. Deviations are in `DECISIONS.md` under "Issue 1".
+
+- **Works:** Settings → People and agents has Spaces, Members and Agents. Members lists everyone in the chosen space, people and agents together, in one row component (`settings/MemberRow.vue`: avatar, name, email, Owner, Person or Agent badge, access, Remove) with All, People and Agents filters and their counts. Agents shows one card per agent across spaces (access per space, sensitive-item access, last filed, Keys in Frappe). Spaces shows each space's owner, people and agent counts, Ask in this space and Agents may open sensitive items. Assistant keeps Connections, Ask and AI (key, models, cost, prices), Sensitive items (Ask's side, with a line to Spaces) and Note rules. `?tab=agents` lands on People and agents → Agents.
+- **Add member** searches every user with each one's kind; an agent is added with Can view (with the note that it needs Can edit to file), a person with Can edit; a user with no Life OS role is told so and gets Life User or Life Agent only when the owner chooses and presses Add. The row appears at once with its badge.
+- **Server:** `settings.get` returns agents in each space's `members` with `is_agent` and builds `agents` from the same rows; `set_member` is the one method for space access (`grant_role` for the role offer, never Life Admin, never a second Life role); agents cannot own a space.
+- **Checks.**
+  - Unit tests: `lifeos/tests/test_issue1_members.py` (10 tests: agents in `members` with `is_agent`, the Agents view from the same rows, only Life Admin changes members, the owner cannot be removed or set to Can view, default access, the role offer and its refusals, agents cannot own a space, `find_users` kinds). `test_ux3_more` now expects agents in `members`.
+  - The whole unit suite: 405 run, 404 pass, 1 skipped (the live AI test).
+  - Front end: `check-sfc.mjs`, `check-singletons.mjs` and the 11 URL tests pass.
+  - `./tools/scan.sh`: 0 findings.
+  - `node tools/acceptance.mjs`: 142 of 142 pass on `acceptance.localhost` at 1440 px and 390 px, the scan (C.1) included. New: `I1.<width>.1` to `.3` (an agent added with Add member, in Members with its badge and in Agents; access changed in either view shows in the other; a user with no role offered one; Ask and agents' sensitive-item access switched from Spaces; `?tab=agents` and the old names; nothing under Assistant lists members or agents). U.12's menu order moved Agents under People and agents.
+  - Fixed on the way (set 8): the weekly review's goal drawer refreshed itself in a loop and wiped a typed skip reason, which failed `S8.390.6` to `.8` in the first full run; see `DECISIONS.md`. The S8 checks then passed three runs of three.
+  - Screenshots of Members, Agents, Spaces, Sensitive items and the Add member dialog at 1440 px and 390 px, light and dark, looked at by eye; nothing scrolls sideways. Fixed on the way here: an agent's email and last-filed line ran together and broke mid-word on a phone.
+- `README.md` (agents are added in Settings → People and agents → Members with Add member; the changed methods), `agent/SKILL.md` and `frontend/COMPONENTS.md` (the one member row, Add member) are updated.
+
 ## Summary
 
 ### What works
@@ -348,7 +365,7 @@ bench --site SITE execute lifeos.seed.load
 bench restart
 ```
 
-Then: set the time zone to Asia/Kolkata in System Settings, make sure the scheduler and the background workers are running (the chat export import is a background job), raise the upload limit if Claude or ChatGPT exports will be imported (`bench --site SITE set-config max_file_size 1073741824`), and open `https://SITE/life`. For agents, create one user per agent with the role `Life Agent`, add it to its spaces in Life OS Settings, generate its API key, and switch on Enable MCP in System Settings. `README.md` has the same steps with more detail. Take a backup of the live site before installing.
+Then: set the time zone to Asia/Kolkata in System Settings, make sure the scheduler and the background workers are running (the chat export import is a background job), raise the upload limit if Claude or ChatGPT exports will be imported (`bench --site SITE set-config max_file_size 1073741824`), and open `https://SITE/life`. For agents, create one user per agent in Frappe, add it to its spaces in Life OS with Settings → People and agents → Members → Add member (which offers the `Life Agent` role if it has none), generate its API key, and switch on Enable MCP in System Settings. `README.md` has the same steps with more detail. Take a backup of the live site before installing.
 
 ## Upgrade notes
 

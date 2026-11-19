@@ -33,7 +33,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/settings.py` | 185 | the site's own backup folder, names only |
+| `lifeos/api/settings.py` | 218 | the site's own backup folder, names only |
 | `lifeos/files.py` | 74 | local_path keeps the path inside the site's files folders |
 | `lifeos/sources.py` | 102 | a fixed name in a temporary folder made here |
 | `lifeos/sources.py` | 112 | pdftoppm's own output in a temporary folder made here |

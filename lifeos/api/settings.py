@@ -56,47 +56,76 @@ def _visible_user(user):
 	return user not in ("Administrator", "Guest")
 
 
+LIFE_ROLES = ("Life Admin", "Life User", "Life Agent")
+# the roles Add member may give a user who has no Life OS role yet: never Life Admin
+GRANTABLE = {"Person": "Life User", "Agent": "Life Agent"}
+
+
 def _people(users):
-	"""{user: {full_name, image, is_agent}} for many users, in two queries. An agent has Life Agent and no other Life role,
-	as permissions.is_agent decides."""
+	"""{user: {full_name, image, is_agent, kind}} for many users, in two queries. An agent has Life Agent and no other Life
+	role, as permissions.is_agent decides; a person has Life User or Life Admin; kind is None for a user with no Life role."""
 	users = sorted({u for u in users if u})
 	if not users:
 		return {}
 	out = {r.name: {"full_name": r.full_name or r.name, "image": r.user_image, "roles": set()}
 		for r in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "full_name", "user_image"])}
 	for r in frappe.get_all("Has Role", filters={"parent": ("in", users), "parenttype": "User",
-			"role": ("in", ["Life Agent", "Life Admin", "Life User"])}, fields=["parent", "role"]):
+			"role": ("in", list(LIFE_ROLES))}, fields=["parent", "role"]):
 		if r.parent in out:
 			out[r.parent]["roles"].add(r.role)
 	for p in out.values():
 		roles = p.pop("roles")
 		p["is_agent"] = "Life Agent" in roles and not roles & {"Life Admin", "Life User"}
+		p["kind"] = "Agent" if p["is_agent"] else "Person" if roles & {"Life Admin", "Life User"} else None
 	return out
 
 
 def _member_rows(space, people):
-	return [{"user": m.user, "access": m.access, "full_name": people.get(m.user, {}).get("full_name", m.user),
-		"image": people.get(m.user, {}).get("image"), "is_owner": m.user == space.owner_user}
-		for m in space.members if _visible_user(m.user) and not people.get(m.user, {}).get("is_agent")]
-
-
-def _agents(spaces, people):
-	"""Users who are agents (Life Agent and no other Life role), with the spaces each reaches and when each last filed something."""
-	users = frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent", distinct=True)
-	people = {**_people([u for u in users if u not in people]), **people}
-	out = []
-	for u in sorted(set(users)):
-		if not _visible_user(u) or not people.get(u, {}).get("is_agent"):
+	"""Everyone in a space, people and agents together (issue 1): the owner first, then people, then agents, each by name."""
+	rows = []
+	for m in space.members:
+		if not _visible_user(m.user):
 			continue
-		reach = []
-		for s in spaces:
-			row = next((m for m in s.members if m.user == u), None)
-			reach.append({"space": s.name, "access": row.access if row else None, "agents_can_read_vault": int(s.get("agents_can_read_vault") or 0)})
-		last = frappe.db.sql("""select max(creation) from `tabLife Proposal` where owner=%s""", u)[0][0]
-		last_chat = frappe.db.sql("""select max(creation) from `tabLife Chat Log` where owner=%s""", u)[0][0]
-		last = max([d for d in (last, last_chat) if d], default=None)
-		out.append({"user": u, "full_name": people[u]["full_name"], "spaces": reach, "last_filed": str(last) if last else None})
+		p = people.get(m.user, {})
+		is_owner = m.user == space.owner_user
+		rows.append({"user": m.user, "access": m.access, "full_name": p.get("full_name", m.user), "image": p.get("image"),
+			"is_owner": is_owner, "is_agent": bool(p.get("is_agent")), "kind": "Owner" if is_owner else "Agent" if p.get("is_agent") else "Person"})
+	return sorted(rows, key=lambda r: (not r["is_owner"], r["is_agent"], (r["full_name"] or "").lower()))
+
+
+def _last_filed(users):
+	"""{user: when each last filed a proposal or a chat log}, in two grouped queries."""
+	if not users:
+		return {}
+	out = {}
+	for doctype in ("Life Proposal", "Life Chat Log"):
+		for user, when in frappe.get_all(doctype, filters={"owner": ("in", users)}, fields=["owner", {"MAX": "creation"}],
+				group_by="owner", as_list=True):
+			if when and (user not in out or when > out[user]):
+				out[user] = when
 	return out
+
+
+def _agents(spaces):
+	"""One card per agent for Settings > People and agents > Agents: every agent account, its access in each space (None
+	where it is not a member; read from the same member rows as Members), whether agents may open that space's sensitive
+	items, and when it last filed something."""
+	reach = {}
+	for s in spaces:
+		for m in s["members"]:
+			if m["is_agent"]:
+				reach.setdefault(m["user"], []).append({"space": s["name"], "access": m["access"], "agents_can_read_vault": s["agents_can_read_vault"]})
+	users = set(reach) | set(frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent", distinct=True))
+	people = _people([u for u in users if _visible_user(u)])
+	last = _last_filed(list(people))
+	out = []
+	for u, p in people.items():
+		if not p["is_agent"]:
+			continue
+		mine = {r["space"]: r for r in reach.get(u, [])}
+		out.append({"user": u, "full_name": p["full_name"], "image": p["image"], "last_filed": str(last[u]) if last.get(u) else None,
+			"spaces": [mine.get(s["name"]) or {"space": s["name"], "access": None, "agents_can_read_vault": s["agents_can_read_vault"]} for s in spaces]})
+	return sorted(out, key=lambda a: a["full_name"].lower())
 
 
 def _spaces(names):
@@ -115,7 +144,8 @@ def _spaces(names):
 @frappe.whitelist(methods=["GET"])
 def get(space: str | None = None):
 	"""Everything the Settings screen shows for one space: the plain settings, the four lists with a count per row (archived
-	rows too, for the Archived section), the spaces with their members, and the agents. Role names are never sent.
+	rows too, for the Archived section), the spaces with everyone in them (people and agents, `is_agent` on each row), and
+	the agents across spaces, built from the same member rows. Role names are never sent.
 	The built-in Administrator is left out of every list."""
 	space = permissions.resolve_space(space)
 	s = frappe.get_cached_doc("Life Settings")
@@ -145,12 +175,15 @@ def get(space: str | None = None):
 	people = _people([m.user for d in docs for m in d.members] + [d.owner_user for d in docs])
 	access = permissions.user_spaces()
 	for doc in docs:
+		members = _member_rows(doc, people)
+		agents = sum(1 for m in members if m["is_agent"])
 		out["spaces"].append({"name": doc.name, "owner_user": doc.owner_user,
 			"owner_name": people.get(doc.owner_user, {}).get("full_name", doc.owner_user) if doc.owner_user else None,
-			"access": access.get(doc.name), "agents_can_read_vault": int(doc.agents_can_read_vault or 0), "members": _member_rows(doc, people),
+			"access": access.get(doc.name), "agents_can_read_vault": int(doc.agents_can_read_vault or 0), "members": members,
+			"people_count": len(members) - agents, "agent_count": agents,
 			"ask_enabled": int(doc.ask_enabled or 0), "ask_can_read_vault": int(doc.ask_can_read_vault or 0)})
 	if permissions.is_admin():
-		out["agents"] = _agents(docs, people)
+		out["agents"] = _agents(out["spaces"])
 		out["ai"] = ai_settings()
 		out["backups"] = backups()
 	return out
@@ -191,7 +224,7 @@ def backups():
 
 
 def ai_settings():
-	"""Settings, Admin, AI: whether a key is set (never the key), the models, the cap, the prices, and this month's spend by
+	"""Settings, Assistant, Ask and AI: whether a key is set (never the key), the models, the cap, the prices, and this month's spend by
 	purpose and by user."""
 	from lifeos.ai import client
 
@@ -371,30 +404,63 @@ def create_space(space_name: str, owner_user: str | None = None, starter_areas: 
 
 
 @frappe.whitelist(methods=["POST"])
-def set_member(space: str, user: str, access: str = "Write", remove: bool | int = 0):
-	"""Add a user to a space, change their access, or remove them. Owner only. The user must already exist."""
+def set_member(space: str, user: str, access: str | None = None, remove: bool | int = 0, grant_role: str | None = None):
+	"""Add a person or an agent to a space, change their access, or remove them. The one method for space access: Members
+	and Agents both call it. Life Admin only. The user must already exist. Access defaults to Write for a person and Read
+	for an agent. A user with no Life OS role is refused unless `grant_role` says which role to give: "Life User" for a
+	person or "Life Agent" for an agent, and only then. This method never gives Life Admin, and never gives a role to a user
+	who already has one. The owner of a space cannot be removed and keeps Write."""
 	_admin_only()
 	doc = frappe.get_doc("Life Space", space)
-	if not frappe.db.exists("User", user):
-		frappe.throw(_("User {0} does not exist. Create the user in Frappe first.").format(user))
-	if access not in ("Read", "Write"):
-		frappe.throw(_("Access is Read or Write."))
 	if user in ("Administrator", "Guest"):
 		frappe.throw(_("This account cannot be a member."))
+	if not frappe.db.exists("User", user):
+		frappe.throw(_("User {0} does not exist. Create the user in Frappe first.").format(user))
+	if access not in (None, "", "Read", "Write"):
+		frappe.throw(_("Access is Read or Write."))
 	row = next((m for m in doc.members if m.user == user), None)
+	if grant_role:
+		_check_grant(user, grant_role)
 	if int(remove or 0):
 		if user == doc.owner_user:
 			frappe.throw(_("The owner of a space cannot be removed from it."))
 		if row:
 			doc.remove(row)
 	elif row:
-		row.access = access
+		if user == doc.owner_user and access == "Read":
+			frappe.throw(_("The owner of a space always has Can edit."))
+		row.access = access or row.access
 	else:
-		doc.append("members", {"user": user, "access": access})
-		if not set(frappe.get_roles(user)) & {"Life Admin", "Life User", "Life Agent"}:
-			frappe.get_doc("User", user).add_roles("Life User")
+		_give_role(user, grant_role)
+		doc.append("members", {"user": user, "access": access or ("Read" if permissions.is_agent(user) else "Write")})
 	doc.save()
-	return {"space": doc.name, "members": [{"user": m.user, "access": m.access} for m in doc.members]}
+	people = _people([m.user for m in doc.members])
+	return {"space": doc.name, "members": _member_rows(doc, people)}
+
+
+def _life_roles(user):
+	return set(frappe.get_roles(user)) & set(LIFE_ROLES)
+
+
+def _check_grant(user, grant_role):
+	"""Add member's role rule (issue 1): only Life User or Life Agent, and only to a user with no Life role yet. So an agent
+	is never given Life User or Life Admin here."""
+	if grant_role not in GRANTABLE.values():
+		frappe.throw(_("Add member gives only the person or the agent role."), frappe.PermissionError)
+	if _life_roles(user) - {grant_role}:
+		frappe.throw(_("{0} already has a Life OS role. Change roles in Frappe.").format(user), frappe.PermissionError)
+
+
+def _give_role(user, grant_role):
+	"""A user who has a Life role keeps it; one who has none gets the role the owner confirmed, and is refused without one."""
+	if _life_roles(user):
+		return
+	if not grant_role:
+		frappe.throw(_("{0} has no Life OS role yet. Choose whether they are a person or an agent.").format(user))
+	u = frappe.get_doc("User", user)
+	u.flags.ignore_permissions = True  # Life Admin only (checked by the caller); _check_grant allowed only Life User or Life Agent
+	u.add_roles(grant_role)
+	permissions.clear_cache()
 
 
 @frappe.whitelist(methods=["POST"])
@@ -408,13 +474,17 @@ def set_agent_vault(space: str, allowed: bool | int):
 
 
 @frappe.whitelist(methods=["GET"])
-def find_users(txt: str | None = ""):
-	"""People who can be added to a space: enabled website or desk users, never Administrator, Guest or an agent. Admin only."""
+def find_users(txt: str | None = "", space: str | None = None):
+	"""Users who can be added to a space, people and agents alike: enabled users, never Administrator or Guest. Each has
+	its kind (Person, Agent, or None for no Life OS role yet) and, with `space`, whether it is already a member. Admin only."""
 	_admin_only()
 	like = f"%{txt or ''}%"
-	rows = frappe.db.sql("""select name, full_name from `tabUser` where enabled=1 and name not in ('Administrator', 'Guest')
-		and (name like %s or full_name like %s) order by full_name limit 20""", (like, like), as_dict=True)
-	return [r for r in rows if not permissions.is_agent(r.name)]
+	rows = frappe.get_all("User", filters={"enabled": 1, "name": ("not in", ["Administrator", "Guest"])},
+		or_filters={"name": ("like", like), "full_name": ("like", like)}, fields=["name", "full_name"], order_by="full_name asc", limit=20)
+	people = _people([r.name for r in rows])
+	members = set(frappe.get_all("Life Space Member", filters={"parent": space, "parenttype": "Life Space"}, pluck="user")) if space else set()
+	return [{"name": r.name, "full_name": r.full_name or r.name, "kind": people.get(r.name, {}).get("kind"),
+		"is_member": r.name in members} for r in rows]
 
 
 @frappe.whitelist(methods=["POST"])

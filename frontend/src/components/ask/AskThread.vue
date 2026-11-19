@@ -23,11 +23,12 @@
       </div>
     </template>
     <Alert v-if="ask.refusal" :theme="ask.refusal.error === 'cap' ? 'amber' : 'gray'" :title="ask.refusal.error_text" data-ask-refusal :data-refusal="ask.refusal.error">
-      <template v-if="ask.refusal.error === 'not_set_up'">An administrator adds the Anthropic API key in Settings, Admin, AI.
+      <template v-if="ask.refusal.error === 'not_set_up'">An administrator adds the Anthropic API key in Settings, Assistant, Ask and AI.
         <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'ai' } }" @click="ask.open = false">Open the setting</RouterLink></template>
       <template v-else-if="ask.refusal.error === 'cap'">{{ ask.refusal.spend?.text }}. The cap is in
-        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'ai' } }" @click="ask.open = false">Settings, Admin, AI</RouterLink>.</template>
-      <template v-else-if="ask.refusal.error === 'off'">The owner can turn it on in Settings, Admin, AI.</template>
+        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'ai' } }" @click="ask.open = false">Settings, Assistant, Ask and AI</RouterLink>.</template>
+      <template v-else-if="ask.refusal.error === 'off'">The owner can turn it on in
+        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'spaces' } }" @click="ask.open = false">Settings, People and agents, Spaces</RouterLink>.</template>
     </Alert>
   </div>
 </template>

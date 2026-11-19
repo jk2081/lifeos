@@ -1157,8 +1157,8 @@ for (const width of [1440, 390]) {
     const problems = []
     try {
     // set 6: Me, Your life, Assistant, People and agents, Data
-    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai',
-      'sensitive', 'note-rules', 'spaces', 'members', 'archive', 'import', 'backups']
+    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai',
+      'sensitive', 'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups']
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
     const listed = await menuItems()
@@ -2399,8 +2399,8 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
       '/life/library/captures', '/life/library/captures?tab=documents&sensitive=1', '/life/library/captures?tab=photos', '/life/library/captures?tab=pages', '/life/library/timeline',
       '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/plan/goals/${ux.goal}`, `/life/library/${ux.note}`,
-      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai', 'sensitive',
-        'note-rules', 'spaces', 'members', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'sensitive',
+        'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
       if (area && p.includes('settings')) continue
       await s.open(p + (p.includes('?') ? '&' : '?') + 'area=' + area)
@@ -3373,6 +3373,162 @@ print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone
     must(!failures.length, failures.join('; '))
     return `${seen} screens`
   })
+  await s.ctx.close()
+}
+
+// Issue 1: people and agents in one place (Settings > People and agents: Spaces, Members, Agents)
+const I1_AGENT = 'issue1-agent@lifeos.test'
+const I1_NEW = 'issue1-newcomer@lifeos.test'
+for (const width of [1440, 390]) {
+  const phone = width < 800
+  const tag = `I1.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  const settle = () => pg.waitForTimeout(500)
+  const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
+  // an agent in no space, and a user with no Life OS role in no space
+  const reset = () => bench(`from lifeos import devtools
+frappe.set_user("Administrator")
+devtools.make_user("${I1_AGENT}", "Issue One Agent", ["Life Agent"])
+devtools.make_user("${I1_NEW}", "Issue One Newcomer", [])
+u = frappe.get_doc("User", "${I1_NEW}"); u.flags.ignore_permissions = True; u.remove_roles("Life User", "Life Admin", "Life Agent")
+for sp in frappe.get_all("Life Space", pluck="name"):
+    doc = frappe.get_doc("Life Space", sp)
+    for m in [m for m in doc.members if m.user in ("${I1_AGENT}", "${I1_NEW}")]: doc.remove(m)
+    doc.save(ignore_permissions=True)
+frappe.db.commit()`)
+  const pickSpace = async (name) => {
+    if (phone) { await pg.locator('[data-settings-section] [aria-label="Space"]').first().click(); await pg.getByRole('option', { name, exact: true }).click() }
+    else await pg.locator(`[data-member-spaces] [data-space="${name}"]`).click()
+    await settle()
+  }
+  const choose = async (sel, option) => {
+    await pg.locator(sel).first().click()
+    await pg.waitForTimeout(250)
+    await pg.getByRole('option', { name: option, exact: true }).first().click()
+    await pg.waitForTimeout(1200)
+  }
+  const shownAccess = async (sel) => (await pg.locator(sel).first().innerText()).trim()
+  const addFromDialog = async (search, who) => {
+    await pg.locator('[data-add-member]').click()
+    await pg.waitForTimeout(400)
+    await pg.locator('[data-add-dialog] input').first().click()
+    await pg.keyboard.type(search, { delay: 30 })
+    await pg.waitForTimeout(1200)
+    await pg.getByRole('option', { name: new RegExp(who.split('@')[0].replace(/-/g, '.'), 'i') }).first().click()
+    await settle()
+  }
+  const space = async (name) => (await s.api('settings.get', { space: SPACE })).spaces.find((x) => x.name === name)
+
+  await check(`${tag}.1`, `${width} px: an agent added with Add member shows in Members with its badge and in Agents; access changed in one view shows in the other; a user with no role is offered one`, async () => {
+    reset()
+    await s.open('/life/settings?tab=members')
+    await pickSpace(SPACE)
+    // the agent: found by Add member with its kind, Can view by default with the note, and at once in the list with its badge
+    await addFromDialog('Issue One Agent', I1_AGENT)
+    must((await pg.locator('[data-add-picked]').getAttribute('data-kind')) === 'Agent', 'Add member does not show the agent as an agent')
+    must(/Can view/.test(await pg.locator('[data-add-dialog] [data-add-access]').first().innerText()), 'an agent does not default to Can view')
+    must(await pg.locator('[data-add-agent-note]').isVisible(), 'the note "Agents need Can edit…" is missing')
+    await pg.getByRole('button', { name: 'Add', exact: true }).last().click()
+    await pg.waitForTimeout(1500)
+    const row = pg.locator(`[data-members] [data-member="${I1_AGENT}"]`)
+    must(await row.count(), 'the agent did not appear in Members after Add')
+    must((await row.locator('[data-kind-badge]').innerText()).trim() === 'Agent', 'the agent has no Agent badge')
+    must(/Can view/.test(await shownAccess(`[data-access="${I1_AGENT}"]`)), 'the agent was not added with Can view')
+    // the filters: All, People, Agents with counts
+    const tabs = await pg.locator('[data-member-filter]').innerText()
+    const sp = await space(SPACE)
+    for (const want of [`All ${sp.members.length}`, `People ${sp.people_count}`, `Agents ${sp.agent_count}`]) must(tabs.replace(/\s+/g, ' ').includes(want), `the filters read "${tabs}", not ${want}`)
+    await pg.locator('[data-member-filter]').getByText(/^Agents/).click()
+    await settle()
+    must(await row.count() && !(await pg.locator('[data-members] [data-kind="Owner"], [data-members] [data-kind="Person"]').count()), 'Agents shows people')
+    await pg.locator('[data-member-filter]').getByText(/^People/).click()
+    await settle()
+    must(!(await row.count()), 'People shows the agent')
+    await pg.locator('[data-member-filter]').getByText(/^All/).click()
+    await settle()
+    // Agents: the same agent, the same access; change it there and Members matches, change it in Members and Agents matches
+    await s.open('/life/settings?tab=agents')
+    const ref = `${I1_AGENT}|${SPACE}`
+    must(await pg.locator(`[data-agent="${I1_AGENT}"]`).count(), 'the agent is not under Agents')
+    must(/Can view/.test(await shownAccess(`[data-agent-access="${ref}"]`)), 'Agents does not show Can view')
+    must(await pg.locator(`[data-agent-user-link="${I1_AGENT}"]`).count(), 'the agent card has no link to its Frappe user')
+    await choose(`[data-agent-access="${ref}"]`, 'Can edit')
+    must((await space(SPACE)).members.find((m) => m.user === I1_AGENT)?.access === 'Write', 'Can edit in Agents was not saved')
+    await s.open('/life/settings?tab=members')
+    await pickSpace(SPACE)
+    must(/Can edit/.test(await shownAccess(`[data-access="${I1_AGENT}"]`)), 'Members does not match the change made in Agents')
+    await choose(`[data-access="${I1_AGENT}"]`, 'Can view')
+    await s.open('/life/settings?tab=agents')
+    must(/Can view/.test(await shownAccess(`[data-agent-access="${ref}"]`)), 'Agents does not match the change made in Members')
+    // a user with no Life OS role: said so, and Add waits until the owner says person or agent; a person gets Can edit
+    await s.open('/life/settings?tab=members')
+    await pickSpace(SPACE)
+    await addFromDialog('Issue One Newcomer', I1_NEW)
+    must(await pg.locator('[data-add-no-role]').isVisible(), 'a user with no role is not told so')
+    must(await pg.getByRole('button', { name: 'Add', exact: true }).last().isDisabled(), 'Add is possible before choosing person or agent')
+    await pg.locator('[data-add-role]').getByText('A person', { exact: true }).click()
+    await settle()
+    must(/Can edit/.test(await pg.locator('[data-add-dialog] [data-add-access]').first().innerText()), 'a person does not default to Can edit')
+    await pg.getByRole('button', { name: 'Add', exact: true }).last().click()
+    await pg.waitForTimeout(1500)
+    must((await pg.locator(`[data-member="${I1_NEW}"] [data-kind-badge]`).innerText()).trim() === 'Person', 'the newcomer was not added as a person')
+    must(!(await pg.locator(`[data-member="${I1_NEW}"] [data-access]`).count()) || /Can edit/.test(await shownAccess(`[data-access="${I1_NEW}"]`)), 'the newcomer was not added with Can edit')
+    must(await pg.locator('[data-owner-badge]').count(), 'the owner has no Owner badge')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    return 'agent and person added; access matched both ways'
+  })
+
+  await check(`${tag}.2`, `${width} px: Ask and agents' sensitive-item access switch from Spaces`, async () => {
+    await s.open('/life/settings?tab=spaces')
+    const before = await space(SPACE)
+    must(/person|people/.test(await pg.locator(`[data-space-counts="${SPACE}"]`).innerText()) && /agent/.test(await pg.locator(`[data-space-counts="${SPACE}"]`).innerText()), 'Spaces has no people and agent counts')
+    try {
+      await pg.locator(`[data-ask-switch="${SPACE}"]`).click()
+      await pg.waitForTimeout(1200)
+      must((await space(SPACE)).ask_enabled === (before.ask_enabled ? 0 : 1), 'Ask in this space did not switch')
+      await pg.locator(`[data-vault-switch="${SPACE}"]`).click()
+      await pg.waitForTimeout(1500)
+      must((await space(SPACE)).agents_can_read_vault === (before.agents_can_read_vault ? 0 : 1), 'Agents may open sensitive items did not switch')
+      await s.open('/life/settings?tab=agents')
+      const said = await pg.locator(`[data-agent-sensitive="${I1_AGENT}|${SPACE}"]`).innerText()
+      must(before.agents_can_read_vault ? /No sensitive/.test(said) : /Opens sensitive/.test(said), `the agent card says "${said}" after the switch`)
+    } finally {
+      await s.api('settings.set_space_ask', { space: SPACE, ask_enabled: before.ask_enabled })
+      await s.api('settings.set_agent_vault', { space: SPACE, allowed: before.agents_can_read_vault })
+    }
+  })
+
+  await check(`${tag}.3`, `${width} px: ?tab=agents and the old names land under People and agents; nothing under Assistant lists members or agents`, async () => {
+    for (const [asked, now] of [['agents', 'agents'], ['assistants', 'agents'], ['people', 'members']]) {
+      await s.open(`/life/settings?tab=${asked}`)
+      must((await cur()) === now, `?tab=${asked} opened ${await cur()}, not ${now}`)
+    }
+    // the menu: Agents is the third item of People and agents; Assistant has Connections, Ask and AI, Sensitive items, Note rules
+    await s.open('/life/settings')
+    const menu = await pg.locator('[data-settings-menu] [data-settings-group], [data-settings-menu] [data-section]').evaluateAll((els) =>
+      els.map((e) => e.getAttribute('data-settings-group') ? '#' + e.getAttribute('data-settings-group') : e.getAttribute('data-section')))
+    const after = (g) => { const i = menu.indexOf('#' + g); const j = menu.findIndex((x, k) => k > i && x.startsWith('#')); return menu.slice(i + 1, j < 0 ? undefined : j) }
+    must(JSON.stringify(after('people')) === JSON.stringify(['spaces', 'members', 'agents']), `People and agents lists ${after('people')}`)
+    must(JSON.stringify(after('assistant')) === JSON.stringify(['connections', 'ai', 'sensitive', 'note-rules']), `Assistant lists ${after('assistant')}`)
+    for (const sec of after('assistant')) {
+      await s.open(`/life/settings?tab=${sec}`)
+      must(!(await pg.locator('[data-settings-section] [data-member], [data-settings-section] [data-agent], [data-settings-section] [data-agent-access]').count()), `${sec} lists members or agents`)
+      const text = await pg.locator('[data-settings-section]').innerText()
+      must(!text.includes(I1_AGENT) && !text.includes('hermes@lifeos.test'), `${sec} names an agent`)
+      must(!/Agents are under Agents/.test(text), `${sec} still says "Agents are under Agents"`)
+    }
+    for (const sec of ['sensitive', 'ai']) {
+      await s.open(`/life/settings?tab=${sec}`)
+      must(!(await pg.locator('[data-vault-switch], [data-ask-switch]').count()), `${sec} still has a per-space switch that moved to Spaces`)
+    }
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+  await s.api('settings.set_member', { space: SPACE, user: I1_AGENT, remove: 1 }).catch(() => {})
+  await s.api('settings.set_member', { space: SPACE, user: I1_NEW, remove: 1 }).catch(() => {})
   await s.ctx.close()
 }
 
