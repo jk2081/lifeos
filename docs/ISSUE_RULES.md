@@ -13,6 +13,7 @@ From 20 November 2026, build work comes from GitHub issues in `jk2081/lifeos`, n
 
 - Keep the change to what the issue asks. If you find something else broken, note it in the pull request under "Found, not fixed"; do not fix it here.
 - Every screen works at 390 px and 1440 px, light and dark.
+- Every screen you build or change has an **empty state** for a brand-new user with no data: one line on what will appear there, and the one action that fills it (for example "Nothing needs you. Things you capture or connect will show up here." with + Capture). Add an acceptance check that opens the screen on an empty space and sees it.
 - Run only the tests that touch your change: the unit test modules you add or change (`scripts/test.sh <module>`), the acceptance checks for this issue (`node tools/acceptance.mjs --only=I<n>`), and `./tools/scan.sh <changed files>`. Do not run the full suites after every edit.
 - Every acceptance test in the issue becomes a test: a unit test (`IntegrationTestCase`) or an acceptance check numbered `I<n>.<k>` in `tools/acceptance.mjs`, matching the issue's list in order.
 - Commit in small steps with messages that start `#<n>:`.
