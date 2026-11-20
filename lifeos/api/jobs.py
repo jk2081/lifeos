@@ -127,8 +127,9 @@ def _check(space, job_id, title, area, goal, inputs, outputs, proposals, wiki, c
 
 
 def _find_job(space, job_id):
-	"""The item of this job, or an item filed the old way (agent/FILE_WORK.md before issue 8) with the job id as external_id."""
-	return frappe.db.get_value(JOB, {"space": space, "job_id": job_id}) or \
+	"""The item of this job, or an item filed the old way (agent/FILE_WORK.md before issue 8) with the job id as external_id.
+	The lookup on the indexed job_id is locked, so a second call for a new job waits for the first instead of making a twin."""
+	return frappe.db.get_value(JOB, {"space": space, "job_id": job_id}, for_update=True) or \
 		frappe.db.get_value(JOB, {"space": space, "external_id": job_id, "job_id": ["is", "not set"]})
 
 

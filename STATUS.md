@@ -344,6 +344,13 @@ GitHub issue #7. Deviations are in `DECISIONS.md` under "Issue 7".
 - **Works:** a file attached to a Life OS record gets a SHA-256 (`life_sha256`, a custom field on `File`). The same bytes in the same space reuse the stored copy: each record has its own `File` row (the link), all pointing to one `file_url`. The same bytes in another space are stored again. The same bytes sent again to the same record (`/api/method/upload_file`, overridden by `lifeos.files.upload_file`) answer with the `File` already there. On an inbox item with an `external_id`, a different file under the same name becomes the current file and the old one an earlier version (`life_version_of`); the review and the source pane show "2 versions, latest 20 Nov" and list the earlier ones to open. A stored copy leaves the disk only when no `File` row points to it any more. Patch `v10.file_hashes` hashes the files already stored. `agent/SKILL.md` and `agent/FILE_WORK.md` say that sending a file again costs nothing.
 - **Tests:** `lifeos/tests/test_issue7_files.py` (the issue's five unit tests) and acceptance check `I7.<width>.6` at 1440 and 390 px. The full unit suite: 416 run, 415 pass, 1 skipped. `./tools/scan.sh`: 0 findings.
 
+## Issue 8: one call for an agent to file a piece of work (20 Nov 2026)
+
+GitHub issue #8. Deviations are in `DECISIONS.md` under "Issue 8".
+
+- **Works:** `lifeos.api.jobs.file_job` files a piece of work as one inbox item in one call: outputs on the item, reusable inputs kept once each as Just keep items (found again by `reusable_as`) and linked through `job_inputs`, other inputs attached but listed as inputs, the summary and transcript, proposals waiting for the owner, wiki pages created or merged and a chat log, both citing the item. The same `job_id` again updates the job; an item filed the old way with the job id as `external_id` is taken over. All or nothing, with the field named in the error. The review shows Outputs, Inputs and "Filed with it" for a job. `agent/FILE_WORK.md` is rewritten around the call; `agent/SKILL.md`, `README.md` and `agent/fake_agent.py` (`--file-job`) are updated.
+- **Tests:** `lifeos/tests/test_issue8_jobs.py` (8 tests: the issue's six, a failure while writing that rolls back, the old-way take-over) and acceptance check `I8.<width>.7` at 1440 and 390 px. The full unit suite: 424 run, 423 pass, 1 skipped. `--only=I7,I8`: 4 of 4. `./tools/scan.sh`: 0 findings. The job page was looked at in light and dark at 1440 and 390 px; nothing scrolls sideways.
+
 ## Summary
 
 ### What works
