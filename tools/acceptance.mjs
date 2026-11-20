@@ -710,7 +710,7 @@ for (const width of UX_WIDTHS) {
   }
   // a place through the sidebar on a wide screen, the tab bar on a phone; a list through the place's tabs (set 6, issue 14)
   // issue 14: Tasks is Goals > All tasks, Captures is Brain > Activity
-  const PLACE_OF = { Tasks: ['Goals', 'tasks'], Goals: ['Goals', 'by-area'], Notes: ['Library', 'notes'], Captures: ['Brain', 'activity'] }
+  const PLACE_OF = { Tasks: ['Goals', 'tasks'], 'No goal': ['Goals', 'no-goal'], Goals: ['Goals', 'by-area'], Notes: ['Library', 'notes'], Captures: ['Brain', 'activity'] }
   const nav = async (label) => {
     const [place, tab] = PLACE_OF[label] || [label]
     if (phone) await pg.locator(`[data-tabbar] [data-tab-item="${place}"]`).first().click()
@@ -956,21 +956,21 @@ for (const width of UX_WIDTHS) {
 
   await check(`${tag}.7`, `${width} px: a list remembers its view on every device, a link with a query wins, Clear clears`, async () => {
     const param = (k) => new URL(pg.url()).searchParams.get(k)
-    await s.open('/life/goals/tasks?view=list') // a query: the list shows exactly this, and it becomes the saved state
+    await s.open('/life/goals/no-goal') // Goals > All tasks is the grouped screen now (issue 21); the remembered views are checked on No goal, which is the task list with goal=none
     await pickQuick('Priority', 'II')
     must(param('priority') === 'II', 'the filter was not set')
     const filtered = await count()
     await nav('Today')
     must(new URL(pg.url()).pathname === '/life/today', 'the sidebar did not go to Today')
-    await nav('Tasks')
-    must(new URL(pg.url()).pathname === '/life/goals/tasks', 'Goals > All tasks did not open')
-    must(param('priority') === 'II' && param('view') === 'list', `coming back lost the view: ${new URL(pg.url()).search}`)
+    await nav('No goal')
+    must(new URL(pg.url()).pathname === '/life/goals/no-goal', 'Goals > No goal did not open')
+    must(param('priority') === 'II', `coming back lost the view: ${new URL(pg.url()).search}`)
     must((await count()) === filtered, 'the remembered filter is in the URL but the list is not filtered')
     must(!param('open'), 'an open record was restored')
     // the same person on another device: the state comes from the server, not from this browser
     await pg.waitForTimeout(1600)
     const other = await session('owner@lifeos.test', width)
-    await other.open('/life/goals/tasks')
+    await other.open('/life/goals/no-goal')
     must(new URL(other.page.url()).searchParams.get('priority') === 'II', `a second browser does not show the saved filter: ${new URL(other.page.url()).search}`)
     await other.ctx.close()
     // a link with a query wins over what was saved, and then becomes the saved state
@@ -983,29 +983,29 @@ for (const width of UX_WIDTHS) {
     must((await count()) === loops, `Open tasks shows ${await count()}, the number said ${loops}`)
     const loopsQuery = new URL(pg.url()).search
     await nav('Today')
-    await nav('Tasks')
-    const sameQuery = (a, b) => { const k = (q) => [...new URLSearchParams(q)].map(([x, y]) => x + '=' + y).sort().join('&'); return k(a) === k(b) } // the order of parameters does not matter
-    must(sameQuery(new URL(pg.url()).search, loopsQuery), `the list did not remember the link's query: ${new URL(pg.url()).search} instead of ${loopsQuery}`)
-    // Clear removes the filters and the cleared state is what is remembered
     await s.open('/life/goals/tasks?view=list')
+    const sameQuery = (a, b) => { const k = (q) => [...new URLSearchParams(q)].map(([x, y]) => x + '=' + y).sort().join('&'); return k(a) === k(b) } // the order of parameters does not matter
+    must(param('priority') !== 'II', `a query opened the list with the old filter: ${new URL(pg.url()).search}`)
+    // Clear removes the filters and the cleared state is what is remembered
+    await s.open('/life/goals/no-goal')
     await pickQuick('Priority', 'II')
     must(param('priority') === 'II', 'the filter was not set again')
     await pg.locator('[data-clear]:visible').first().click()
     await pg.waitForLoadState('networkidle')
     await settle()
     must(!param('priority'), 'Clear did not remove the filter')
-    must(!(await pg.locator('[data-active-filters]:visible').count()), 'the list still says a filter is on')
+    must(!(await pg.locator('[data-active-filters]:visible').allInnerTexts()).join(' ').includes('Priority'), 'the list still says the priority filter is on') // No goal keeps its goal filter
     await nav('Today')
-    await nav('Tasks')
+    await nav('No goal')
     must(!param('priority'), 'the cleared filter came back')
     // another person has their own states
     await pg.waitForTimeout(1600)
     const saved = await s.api('views.get_all')
-    must(Object.keys(saved).some((k) => k.startsWith('tasks|')), 'nothing was saved on the server for the owner')
+    must(Object.keys(saved).some((k) => k.startsWith('tasks-no-goal|')), 'nothing was saved on the server for the owner')
     const fam = await session('family@lifeos.test', width)
     const theirs = await fam.api('views.get_all')
     must(!Object.keys(theirs).some((k) => k.includes('Private')) && !JSON.stringify(theirs).includes('loops'), 'the family user sees the owner\'s saved states')
-    await fam.open('/life/goals/tasks')
+    await fam.open('/life/goals/no-goal')
     must(!new URL(fam.page.url()).search.includes('view=loops') && !new URL(fam.page.url()).searchParams.get('priority'), 'the family user got the owner\'s view')
     const rest = await fam.page.request.get(base + '/api/resource/Life%20View%20State?limit_page_length=100&fields=["user"]')
     must(!JSON.stringify(await rest.json()).includes('owner@lifeos.test'), 'the REST list shows the owner\'s saved states')
@@ -3986,7 +3986,7 @@ for (const width of SET_WIDTHS) {
   pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
   await check(`${tag}.7`, `${width} px: a quick-captured task shows its guessed area with ✦ and the confidence; one tap confirms it and the ✦ goes`, async () => {
     const title = `I13 quick capture ${width} ${stamp}`
-    await s.open('/life/goals/tasks')
+    await s.open('/life/goals/tasks?view=list')
     const box = pg.getByLabel('Quick add')
     await box.fill(`${title} today`)
     await box.press('Enter')
@@ -5048,6 +5048,128 @@ print(json.dumps(out))`).split('\n').pop())
       if (phone) must(boxes[0][2] >= width - 40 && boxes[0][0] + boxes[0][2] <= width, `the card is ${boxes[0][2]} px wide in a ${width} px screen`)
       const head = await pg.locator('[data-area-section][data-area="Career"] h2').boundingBox()
       must(head.y < boxes[0][1], 'the area heading is not above its cards')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
+// Issue 21: Goals > All tasks. Titles start "I21 ". Areas switched on here are put back after.
+for (const width of SET_WIDTHS) {
+  const tag = `I21.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I21 ${what} ${width} ${stamp}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openTasks = async (q = '') => { await s.open('/life/goals/tasks' + (q ? '?' + q : '')); await pg.locator('[data-all-tasks][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(400) }
+  const shown = () => pg.locator('[data-task-row]').evaluateAll((els) => els.map((e) => e.dataset.task))
+  const made = JSON.parse(bench(`import json
+top = lambda n: frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": n, "parent_area": ("is", "not set")})
+ids = {n: top(n) for n in ("Career", "Health", "Money")}
+was = {k: frappe.db.get_value("Life Area", v, "is_on") for k, v in ids.items()}
+for v in ids.values(): frappe.db.set_value("Life Area", v, "is_on", 1)
+print(json.dumps({"ids": ids, "was": was}))`).split('\n').pop())
+  const restore = () => bench(`import json
+frappe.set_user("Administrator")
+for t in frappe.get_all("Life Task", filters={"title": ["like", "I21 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
+for g in frappe.get_all("Life Goal", filters={"title": ["like", "I21 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Task", filters={"space": "zz-i21-aside-${width}"}, pluck="name"): frappe.db.set_value("Life Task", n, "space", "${SPACE}", update_modified=False)
+for k, v in ${JSON.stringify(made.was)}.items(): frappe.db.set_value("Life Area", ${JSON.stringify(made.ids)}[k], "is_on", v)`)
+  const ids = {}
+  try {
+    await check(`${tag}.7`, `${width} px: with no tasks All tasks says what will appear and offers a box to add one`, async () => {
+      bench(`for n in frappe.get_all("Life Task", filters={"space": "${SPACE}"}, pluck="name"): frappe.db.set_value("Life Task", n, "space", "zz-i21-aside-${width}", update_modified=False)`)
+      try {
+        await openTasks()
+        must(await pg.locator('[data-tasks-empty]').isVisible(), 'no empty state')
+        const t = await pg.locator('[data-tasks-empty]').innerText()
+        must(t.includes('No open tasks.') && t.includes('under the area of life'), 'the empty state says: ' + t)
+        must(await pg.locator('[data-tasks-empty-add]').isVisible(), 'no box to add the first task')
+        await noSideways()
+      } finally {
+        bench(`for n in frappe.get_all("Life Task", filters={"space": "zz-i21-aside-${width}"}, pluck="name"): frappe.db.set_value("Life Task", n, "space", "${SPACE}", update_modified=False)`)
+      }
+    })
+    const out = JSON.parse(bench(`import json
+ids = ${JSON.stringify(made.ids)}
+out = {}
+g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('goal')}", "area": ids["Career"], "goal_type": "Open", "done_when": "Done"}).insert(ignore_permissions=True).name
+def mk(key, title, area, **kw):
+    out[key] = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": title, "area": ids[area], "status": "Open", **kw}).insert(ignore_permissions=True).name
+mk("career", "${T('career')}", "Career", goal=g, due_date=frappe.utils.today())
+mk("health", "${T('health')}", "Health", due_date=frappe.utils.add_days(frappe.utils.today(), -2))
+mk("money", "${T('money')}", "Money")
+mk("guess", "${T('guess')}", "Money", area_guessed=1, area_confidence=70)
+mk("parked", "${T('parked')}", "Money")
+mk("done", "${T('done')}", "Health", status="Done")
+out["goal"] = g
+print(json.dumps(out))`).split('\n').pop())
+    Object.assign(ids, out)
+    await s.api('tasks.set_status', { task: ids.parked, status: 'Someday' })
+    const open = ['career', 'health', 'money', 'guess']
+    await check(`${tag}.1`, `${width} px: every open task appears once, under its area`, async () => {
+      await openTasks()
+      const all = await shown()
+      must(new Set(all).size === all.length, 'a task is listed twice')
+      const api = await s.api('tasks.all_tasks', { space: SPACE })
+      must(all.length === api.total && api.total === api.counts.open, `${all.length} rows, the server says ${api.total} (${api.counts.open} open)`)
+      for (const [k, area] of [['career', 'Career'], ['health', 'Health'], ['money', 'Money'], ['guess', 'Money']]) {
+        must((await pg.locator(`[data-task-group-section][data-group="${area}"] [data-task="${ids[k]}"]`).count()) === 1, `${k} is not under ${area}`)
+      }
+      must((await pg.locator(`[data-task="${ids.done}"], [data-task="${ids.parked}"]`).count()) === 0, 'a done or parked task shows under All open')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: grouping by goal and by due date shows the same tasks`, async () => {
+      await openTasks()
+      const base = (await shown()).sort()
+      await pg.locator('[data-task-group-by="goal"]').click()
+      await pg.waitForURL(/group=goal/, { timeout: 5000 })
+      await pg.waitForTimeout(600)
+      must(JSON.stringify((await shown()).sort()) === JSON.stringify(base), 'grouped by goal the tasks differ')
+      must((await pg.locator(`[data-task-group-section][data-group="${T('goal')}"] [data-task="${ids.career}"]`).count()) === 1, 'the goal group does not hold its task')
+      must((await pg.locator('[data-task-group-section][data-group="No goal"]').count()) === 1, 'no "No goal" group')
+      await pg.locator('[data-task-group-by="due"]').click()
+      await pg.waitForURL(/group=due/, { timeout: 5000 })
+      await pg.waitForTimeout(600)
+      must(JSON.stringify((await shown()).sort()) === JSON.stringify(base), 'grouped by due date the tasks differ')
+      must((await pg.locator(`[data-task-group-section][data-group="Overdue"] [data-task="${ids.health}"]`).count()) === 1 && (await pg.locator(`[data-task-group-section][data-group="Today"] [data-task="${ids.career}"]`).count()) === 1, 'the due groups are wrong')
+    })
+    await check(`${tag}.3`, `${width} px: quick add under Health creates a task in Health`, async () => {
+      await openTasks()
+      const title = T('quick')
+      const box = pg.locator('[data-group-add="Health"]')
+      await box.fill(title)
+      await box.press('Enter')
+      await pg.waitForFunction((t) => [...document.querySelectorAll('[data-task-title]')].some((e) => e.textContent.trim() === t), title, { timeout: 8000 })
+      const row = JSON.parse(bench(`import json
+print(json.dumps(frappe.db.get_value("Life Task", {"title": "${title}"}, ["area", "area_guessed"], as_dict=True)))`).split('\n').pop())
+      must(row.area === made.ids.Health && !row.area_guessed, 'the task is not in Health: ' + JSON.stringify(row))
+      must((await pg.locator(`[data-task-group-section][data-group="Health"] [data-task-title]`).allInnerTexts()).includes(title), 'the task is not listed under Health')
+    })
+    await check(`${tag}.4`, `${width} px: the Someday filter shows the tasks of the Someday page`, async () => {
+      await openTasks('show=someday')
+      const here = (await shown()).sort()
+      const old = (await s.api('someday.list', { space: SPACE, tab: 'tasks', page_length: 100 })).rows.map((r) => r.name).sort()
+      must(old.includes(ids.parked) && JSON.stringify(here) === JSON.stringify(old), `All tasks > Someday ${here.length}, the Someday page ${old.length}`)
+    })
+    await check(`${tag}.5`, `${width} px: a task with a guessed area shows ✦`, async () => {
+      await openTasks()
+      const row = pg.locator(`[data-task="${ids.guess}"]`)
+      must((await row.locator('[data-area-guess]').count()) === 1 && (await row.locator('[data-area-guess]').innerText()).includes('✦'), 'no ✦ on the guessed task')
+      must((await pg.locator(`[data-task="${ids.money}"] [data-area-guess]`).count()) === 0, '✦ on a task whose area is known')
+    })
+    await check(`${tag}.6`, `${width} px: ${phone ? 'the list is one column' : 'a row has its task, goal and due date side by side'}`, async () => {
+      await openTasks()
+      await noSideways()
+      const boxes = await pg.locator(`[data-task="${ids.career}"]`).evaluate((row) => [row.querySelector('[data-task-title]'), row.querySelector('[data-task-goal]'), row.querySelector('[data-task-due]')].map((e) => { const b = e.getBoundingClientRect(); return [b.x, b.y, b.width] }))
+      if (phone) must(boxes[0][1] < boxes[1][1] && boxes[1][1] < boxes[2][1] && boxes.every(([x, , w]) => x + w <= width), 'the task, goal and date are not stacked: ' + JSON.stringify(boxes))
+      else must(Math.abs(boxes[0][1] - boxes[1][1]) < 30 && boxes[0][0] < boxes[1][0] && boxes[1][0] < boxes[2][0], 'the columns are not side by side: ' + JSON.stringify(boxes))
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
   } finally {

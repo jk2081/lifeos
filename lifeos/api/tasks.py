@@ -193,6 +193,108 @@ def list(space: str | None = None, status: str | None = "open", area: str | None
 	return {"tasks": rows, "total": total, "start": start, "page_length": page_length, "today": today(), "tabs": tabs}
 
 
+ALL_SHOWS = {
+	"open": "t.status in ('Open', 'Doing', 'Waiting')",
+	"due": "t.status in ('Open', 'Doing', 'Waiting') and t.due_date is not null and t.due_date <= %(week_end)s",
+	"waiting": "t.status = 'Waiting'",
+	"someday": "t.status = 'Someday'",
+	"done": "t.status = 'Done'",
+}
+ALL_CAP = 1000
+DUE_GROUPS = (("overdue", "Overdue"), ("today", "Today"), ("week", "This week"), ("later", "Later"), ("none", "No date"))
+
+
+def _due_group(task, now, week_end):
+	if not task.due_date:
+		return "none"
+	d = getdate(task.due_date)
+	return "overdue" if d < now else "today" if d == now else "week" if d <= week_end else "later"
+
+
+@frappe.whitelist(methods=["GET"])
+def all_tasks(space: str | None = None, group: str = "area", show: str = "open", area: str | None = None, q: str | None = None):
+	"""Goals → All tasks: the tasks of one filter in groups, each task once. `show`: open (Open, Doing and Waiting), due (open and
+	due by the end of this week), waiting, someday or done. `group`: area (the areas that are on, each with its parts; tasks with
+	no area last), goal (a group for each goal, then no goal) or due (overdue, today, this week, later, no date). `area` keeps one area
+	of life with its parts; `q` searches titles. `counts` gives the tasks under each filter for the same area and search.
+	At most 1,000 tasks come back (`truncated`); Done keeps the newest first."""
+	space = permissions.resolve_space(space)
+	if show not in ALL_SHOWS:
+		frappe.throw(_("Unknown filter."))
+	if group not in ("area", "goal", "due"):
+		frappe.throw(_("Unknown grouping."))
+	now = getdate(today())
+	values = {"today": now, "week_end": add_days(now, 6 - now.weekday())}
+	base = " and t.is_archived = 0"
+	if area:
+		base += " and " + area_filter(space, area, "t.area", values)
+	if q and q.strip():
+		base += " and t.title like %(q)s"
+		values["q"] = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+	where = base + " and " + ALL_SHOWS[show]
+	order = "t.completed_on desc, t.modified desc" if show == "done" else None
+	rows = query(space, where, values, order, 0, ALL_CAP + 1, ["is_top_three"])
+	truncated = len(rows) > ALL_CAP
+	rows = rows[:ALL_CAP]
+	# the same filters (and the areas that are off) without the tab's own condition, so each filter's count agrees with its list
+	cond = ", ".join(f"ifnull(sum({c}), 0)" for c in ALL_SHOWS.values())
+	off = off_clause(space, "t.area", values, "count_off_areas")
+	# nosemgrep: frappe-sql-format-injection -- ALL_SHOWS is a constant map, base and off are fixed SQL; values are parameters
+	counts = dict(zip(ALL_SHOWS, [int(n) for n in frappe.db.sql(
+		f"select {cond} from `tabLife Task` t where t.space=%(space)s {base} {off}", {**values, "space": space})[0]]))
+	groups = {"area": _by_area, "goal": _by_goal, "due": _by_due}[group](space, rows, show, now, values["week_end"])
+	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0, "is_life_area": 1}, fields=["name", "area_name", "colour", "is_on"],
+		order_by="sort_order asc, area_name asc", limit=50)
+	return {"space": space, "group": group, "show": show, "total": len(rows), "truncated": truncated, "counts": counts, "groups": groups,
+		"areas": [a for a in areas if a.is_on], "today": str(now)}
+
+
+def _by_area(space, rows, show, now, week_end):
+	from lifeos.areas import off as areas_off
+
+	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour"],
+		order_by="sort_order asc, area_name asc", limit=5000)
+	hidden = set(areas_off(space))
+	by = {}
+	for r in rows:
+		by.setdefault(r.area or "", []).append(r)
+	out = []
+	for a in [x for x in tree if not x.parent_area and x.name not in hidden]:
+		parts = [x for x in tree if x.parent_area == a.name and x.name not in hidden]
+		subs = [{"name": "", "label": "", "area": a.name, "tasks": by.pop(a.name, [])}]
+		subs += [{"name": p.name, "label": p.area_name, "area": p.name, "tasks": by.pop(p.name, [])} for p in parts]
+		subs = [s for s in subs if s["tasks"]]
+		if subs:
+			out.append({"key": a.name, "label": a.area_name, "colour": a.colour, "area": a.name, "count": sum(len(s["tasks"]) for s in subs), "parts": subs})
+	loose = [t for ts in by.values() for t in ts]  # no area, or an area that is gone: listed last so no task is hidden
+	if loose:
+		out.append({"key": "none", "label": "No area", "colour": None, "area": "", "count": len(loose), "parts": [{"name": "", "label": "", "area": "", "tasks": loose}]})
+	return out
+
+
+def _by_goal(space, rows, show, now, week_end):
+	by = {}
+	for r in rows:
+		by.setdefault(r.goal or "", []).append(r)
+	goals = frappe.get_all("Life Goal", filters={"name": ("in", [g for g in by if g] or [""])}, fields=["name", "title", "area"], order_by="sort_order asc, creation asc", limit=0)
+	out = [{"key": g.name, "label": g.title, "colour": None, "goal": g.name, "area": g.area or "", "count": len(by[g.name]),
+		"parts": [{"name": "", "label": "", "area": g.area or "", "tasks": by[g.name]}]} for g in goals]
+	if by.get(""):
+		out.append({"key": "none", "label": "No goal", "colour": None, "goal": "", "area": "", "count": len(by[""]),
+			"parts": [{"name": "", "label": "", "area": "", "tasks": by[""]}]})
+	return out
+
+
+def _by_due(space, rows, show, now, week_end):
+	if show == "done":
+		return [{"key": "done", "label": "Done", "colour": None, "area": "", "count": len(rows), "parts": [{"name": "", "label": "", "area": "", "tasks": rows}]}] if rows else []
+	by = {k: [] for k, _label in DUE_GROUPS}
+	for r in rows:
+		by[_due_group(r, now, week_end)].append(r)
+	return [{"key": k, "label": label, "colour": None, "area": "", "count": len(by[k]), "parts": [{"name": "", "label": "", "area": "", "tasks": by[k]}]}
+		for k, label in DUE_GROUPS if by[k]]
+
+
 @frappe.whitelist(methods=["GET"])
 def get(task: str):
 	"""One task with its filing, source and tags."""
