@@ -61,6 +61,7 @@
  "lifeos.api.session.boot",
  "lifeos.api.session.counts",
  "lifeos.api.settings.get",
+ "lifeos.api.settings.area_open_work",
  "lifeos.api.settings.find_users",
  "lifeos.api.someday.list",
  "lifeos.api.someday.get_idea",

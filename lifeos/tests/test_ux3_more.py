@@ -13,7 +13,7 @@ class TestSettings(LifeTestCase):
 	def test_archive_a_part_and_restore(self):
 		career = self.life["Career"]
 		part = settings.save_item("area", space=PRIVATE, title="ux3 part", parent_area=career)["name"]
-		task = self.make("Life Task", title="ux3 filed under the part", area=part)
+		task = self.make("Life Task", title="ux3 filed under the part", area=part, status="Done")  # issue 12: open work must move first
 		out = settings.save_item("area", name=part, is_archived=1)
 		self.assertEqual(out["archived_children"], [])
 		self.assertEqual(frappe.db.get_value("Life Area", part, "is_archived"), 1)

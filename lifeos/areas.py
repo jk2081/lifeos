@@ -123,3 +123,58 @@ def ordered(space, include_off=False, include_archived=False, fields=FIELDS):
 	for rest in parts.values():  # parts whose area of life is archived or missing
 		out.extend(rest)
 	return out
+
+
+# Issue 12: archiving a part with open work asks where that work goes
+OPEN_TASK_STATUSES = ("Open", "Doing", "Waiting", "Someday")
+
+
+def open_work(area):
+	"""The open goals (in progress, not archived) and open tasks (not done, dropped or archived) filed under one area."""
+	return {
+		"goals": frappe.get_all("Life Goal", filters={"area": area, "outcome": "In Progress", "is_archived": 0}, pluck="name", limit=0),
+		"tasks": frappe.get_all("Life Task", filters={"area": area, "status": ("in", OPEN_TASK_STATUSES), "is_archived": 0}, pluck="name", limit=0),
+	}
+
+
+def move_targets(area):
+	"""Where the open work of a part can go: its own area of life first, then the other parts of that area that are not
+	archived. [{name, area_name, is_life_area}]."""
+	row = frappe.db.get_value("Life Area", area, ["space", "parent_area"], as_dict=True)
+	if not row or not row.parent_area:
+		return []
+	life = frappe.db.get_value("Life Area", row.parent_area, ["name", "area_name", "is_life_area"], as_dict=True)
+	parts = frappe.get_all("Life Area", filters={"parent_area": row.parent_area, "is_archived": 0, "name": ("!=", area)},
+		fields=["name", "area_name", "is_life_area"], order_by="sort_order asc, area_name asc")
+	return [life, *parts]
+
+
+def move_work(area, to):
+	"""Move the open goals and tasks of `area` to `to`, another area of the same space that is on and not archived. Each
+	record is saved as a document, so its index row and permissions follow. Returns the counts moved."""
+	src = frappe.db.get_value("Life Area", area, ["space", "area_name"], as_dict=True)
+	dest = frappe.db.get_value("Life Area", to, ["space", "area_name", "is_archived"], as_dict=True) if to else None
+	if not dest or dest.space != src.space or to == area or dest.is_archived:
+		frappe.throw(_("Choose another area of {0} to move its open goals and tasks to.").format(src.space))
+	if is_off(src.space, to):
+		frappe.throw(_("{0} is switched off. Choose an area that is on.").format(dest.area_name))
+	work = open_work(area)
+	for doctype, key in (("Life Goal", "goals"), ("Life Task", "tasks")):
+		for name in work[key]:
+			doc = frappe.get_doc(doctype, name)
+			doc.area = to
+			doc.save()
+	return {"goals": len(work["goals"]), "tasks": len(work["tasks"])}
+
+
+def goal_counts(space):
+	"""{area: goals in progress filed there}, where an area of life also counts the goals of its parts."""
+	rows = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "parent_area"], limit=0)
+	parent = {r.name: r.parent_area for r in rows}
+	out = {}
+	for a, n in frappe.get_all("Life Goal", filters={"space": space, "outcome": "In Progress", "is_someday": 0, "is_archived": 0,
+			"area": ("is", "set")}, fields=["area", {"COUNT": "*"}], group_by="area", as_list=True):
+		out[a] = out.get(a, 0) + n
+		if parent.get(a):
+			out[parent[a]] = out.get(parent[a], 0) + n
+	return out
