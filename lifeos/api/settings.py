@@ -163,6 +163,11 @@ def get(space: str | None = None):
 			r["count"] = counts.get(r.name, 0)
 			r["archived_on"] = str(r.archived_on) if r.archived_on else None
 		lists[key] = rows
+	from lifeos import areas
+
+	goals = areas.goal_counts(space)  # issue 12: the goal count beside each area and part
+	for r in lists["areas"]:
+		r["goals"] = goals.get(r.name, 0)
 	out = {
 		"space": space, "is_admin": permissions.is_admin(), "user": frappe.session.user,
 		"settings": {f: (str(s.get(f)) if f in TIME_FIELDS and s.get(f) else s.get(f)) for f in SETTING_FIELDS},
@@ -319,7 +324,7 @@ ARCHIVABLE = ("area", "tag", "habit", "dimension")
 def save_item(kind: str, space: str | None = None, name: str | None = None, title: str | None = None, parent_area: str | None = None,
 		relation: str | None = None, sort_order: int | None = None, is_archived: bool | int | None = None, delete: bool | int = 0,
 		with_children: bool | int = 1, colour: str | None = None, is_pinned: bool | int | None = None, is_on: bool | int | None = None,
-		description: str | None = None):
+		description: str | None = None, move_to: str | None = None):
 	"""Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person.
 	Archiving sets archived_on to today; records filed under the heading are not changed. Archiving an area archives its
 	parts with it. Restoring an area puts it back under its old area of life, and with_children=1 restores the parts
@@ -327,9 +332,13 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	Areas (issue 11): a new area is a part of `parent_area`, one of the seven areas of life, or of Career when none is given.
 	The seven cannot be renamed or archived; `is_on` switches an area on or off, which hides or shows it, its parts and
 	their goals and tasks without deleting anything.
+	Issue 12: only Life Admin changes areas. Archiving a part that holds open goals or tasks needs `move_to`: its own area
+	of life or another of its parts, where they are moved first.
 	delete=1 removes the row for good; the Settings screen does not offer it, agents and tests may use it."""
 	if kind not in LISTS:
 		frappe.throw(_("Unknown list."))
+	if kind == "area":
+		_areas_admin_only(is_on)
 	doctype, field = LISTS[kind]
 	if name:
 		doc = permissions.get_doc_checked(doctype, name, "write")
@@ -372,6 +381,8 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 		if int(is_archived):
 			if kind == "area" and doc.is_life_area:
 				frappe.throw(_("{0} is one of the seven areas of life. Switch it off instead of archiving it.").format(doc.area_name))
+			if kind == "area":
+				_move_open_work(doc, move_to)
 			doc.is_archived, doc.archived_on = 1, frappe.utils.today()
 			if kind == "area":
 				for child in frappe.get_all("Life Area", filters={"parent_area": doc.name, "is_archived": 0}, pluck="name"):
@@ -394,6 +405,42 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 						restored.append(child)
 	doc.save() if name else doc.insert()
 	return {"name": doc.name, "title": doc.get(field), "archived_children": archived, "restored_children": restored}
+
+
+def _areas_admin_only(is_on=None):
+	"""Only Life Admin changes areas (issue 12). An agent switching one gets the reason of issue 11."""
+	permissions.require_login()
+	if permissions.is_admin():
+		return
+	if is_on is not None and permissions.is_agent():
+		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError)
+	frappe.throw(_("Only the owner can change areas."), frappe.PermissionError)
+
+
+def _move_open_work(doc, move_to):
+	"""Before a part is archived, its open goals and tasks go to `move_to`; without it, a part that holds any is refused."""
+	from lifeos import areas
+
+	work = areas.open_work(doc.name)
+	if not (work["goals"] or work["tasks"]):
+		return
+	if not move_to:
+		goals, tasks = len(work["goals"]), len(work["tasks"])
+		frappe.throw(_("{0} has {1} and {2}. Choose where to move them before archiving it.").format(doc.area_name,
+			_("1 open goal") if goals == 1 else _("{0} open goals").format(goals), _("1 open task") if tasks == 1 else _("{0} open tasks").format(tasks)))
+	areas.move_work(doc.name, move_to)
+
+
+@frappe.whitelist(methods=["GET"])
+def area_open_work(area: str):
+	"""What archiving a part would leave behind: how many open goals and tasks it holds, and the areas they can move to
+	(its own area of life, then its other parts). Life Admin only."""
+	_admin_only()
+	from lifeos import areas
+
+	permissions.get_doc_checked("Life Area", area, "read")
+	work = areas.open_work(area)
+	return {"goals": len(work["goals"]), "tasks": len(work["tasks"]), "targets": areas.move_targets(area)}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -505,6 +552,8 @@ def reorder(kind: str, names: str | list, parent_area: str | None = None):
 
 	if kind not in ("area", "dimension"):
 		frappe.throw(_("Only areas and check-in dimensions have an order."))
+	if kind == "area":
+		_areas_admin_only()
 	doctype = LISTS[kind][0]
 	names = parse(names, []) or []
 	for i, name in enumerate(names):

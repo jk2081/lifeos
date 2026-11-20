@@ -1185,7 +1185,7 @@ for (const width of UX_WIDTHS) {
     must((await overflow()) <= 0, 'the page scrolls sideways')
   })
 
-  await check(`${tag}.12`, `${width} px: Settings: every section from the menu and the URL, old links to their new homes, rename, reorder and nest, archive and restore, members, a Rhythms setting survives a reload, no role names`, async () => {
+  await check(`${tag}.12`, `${width} px: Settings: every section from the menu and the URL, old links to their new homes, rename a tag and a part, archive a part (its open task moved) and restore it, members, a Rhythms setting survives a reload, no role names`, async () => {
     let step = 'sections'
     const problems = []
     try {
@@ -1212,65 +1212,60 @@ for (const width of UX_WIDTHS) {
       const text = await pg.locator('[data-main]').innerText()
       must(!/Life (Agent|User|Admin)|Administrator/.test(text), `${sec}: a role name or Administrator shows`)
     }
-    // areas: rename in place, reorder, nest. Issue 11: new areas are parts of Career, and a part moves under another of the
-    // seven areas of life
-    step = 'areas: rename in place, reorder, nest'
+    // areas (issue 12): Settings > Areas lists the seven with their parts; a part is renamed in its Edit dialog and archived
+    // there, its open tasks moving to the place chosen. Rename in place stays for tags (and habits and dimensions).
+    step = 'tags: rename in place'
+    const T = `ux3tag${width}${stamp}`
+    const tagId = (await s.api('settings.save_item', { kind: 'tag', space: SPACE, title: T })).name
+    const got = async () => (await s.api('settings.get', { space: SPACE }))
+    try {
+      await s.open('/life/settings?tab=tags')
+      await pg.locator(`[data-settings-list="tag"] [data-row-name="${tagId}"] [data-row-title]`).click()
+      await pg.keyboard.press('ControlOrMeta+a')
+      await pg.keyboard.type(T + 'x')
+      await pg.keyboard.press('Enter')
+      await pg.waitForTimeout(900)
+      must((await got()).tags.find((x) => x.name === tagId).tag_name === T + 'x', 'rename in place did not save')
+    } finally { await s.api('settings.save_item', { kind: 'tag', name: tagId, delete: 1 }).catch(() => {}) }
+    step = 'areas: rename a part in its Edit dialog'
     const A = `UX3 area A ${width} ${stamp}`
     const B = `UX3 area B ${width} ${stamp}`
     const a = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: A, sort_order: 900 })).name
     const b = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: B, sort_order: 901 })).name
-    const lifeAreas = (await s.api('settings.get', { space: SPACE })).areas.filter((x) => x.is_life_area)
-    const career = lifeAreas.find((x) => x.area_name === 'Career').name
+    const career = (await got()).areas.find((x) => x.is_life_area && x.area_name === 'Career').name
     await s.open('/life/settings?tab=areas')
-    const row = (n) => pg.locator(`[data-settings-list="area"] [data-row-name="${n}"]`)
-    must(!(await row(a).locator('[data-row-menu]').count()) || true, '')
-    await row(a).locator('[data-row-title]').click()
-    await pg.keyboard.press('ControlOrMeta+a')
-    await pg.keyboard.type(A + ' renamed')
-    await pg.keyboard.press('Enter')
+    await pg.locator(`[data-edit-part="${a}"]`).click()
+    await pg.locator('[data-part-title] input, input[data-part-title]').first().fill(A + ' renamed')
+    await pg.getByRole('button', { name: 'Save', exact: true }).click()
     await pg.waitForTimeout(900)
-    const got = async () => (await s.api('settings.get', { space: SPACE })).areas
-    must((await got()).find((x) => x.name === a).area_name === A + ' renamed', 'rename in place did not save')
-    const order = async () => { const all = (await got()).filter((x) => x.parent_area === career && !x.is_archived); return [all.findIndex((x) => x.name === a), all.findIndex((x) => x.name === b)] }
-    const [ia, ib] = await order()
-    must(ia >= 0 && ib >= 0 && ia < ib, `A and B are not parts of Career with A above B (${ia}, ${ib})`)
-    const menuPick = async (n, label) => { await row(n).locator('[data-row-menu]').click(); await pg.waitForTimeout(250); await pg.getByRole('menuitem', { name: label }).click(); await pg.waitForTimeout(250) }
-    const itemsOf = async (n) => { await row(n).locator('[data-row-menu]').click(); await pg.waitForTimeout(250); const t = await pg.getByRole('menuitem').allInnerTexts(); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); return t.map((x) => x.trim()) }
-    if (phone) await menuPick(b, 'Move up')
-    else { await row(b).focus(); await pg.keyboard.press('Alt+ArrowUp') }
-    await pg.waitForTimeout(900)
-    const [ja, jb] = await order()
-    must(jb < ja, `reordering did not move B above A (${ja}, ${jb})`)
-    await menuPick(a, 'Move under…')
-    await pg.locator('[data-under-select]').click()
-    await pg.getByRole('option', { name: 'Money', exact: true }).click()
-    await pg.getByRole('button', { name: 'Move', exact: true }).click()
-    await pg.waitForTimeout(900)
-    const money = lifeAreas.find((x) => x.area_name === 'Money').name
-    must((await got()).find((x) => x.name === a).parent_area === money, 'Move under did not move A under Money')
+    must((await got()).areas.find((x) => x.name === a).area_name === A + ' renamed', 'renaming a part did not save')
+    must(await pg.locator(`[data-parts-of="Career"] [data-part="${a}"]`).innerText().then((t) => t.includes(A + ' renamed')), 'the renamed part does not show under Career')
     // no Delete or Remove for areas, tags, habits or dimensions
     step = 'no Delete or Remove for areas, tags, habits or dimensions'
-    const items = await itemsOf(b)
-    must(!items.some((t) => /Delete|Remove/.test(t)) && items.includes('Archive'), `the row menu offers ${items}`)
+    const itemsOf = async (n) => { await pg.locator(`[data-row-name="${n}"] [data-row-menu]`).click(); await pg.waitForTimeout(250); const t = await pg.getByRole('menuitem').allInnerTexts(); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); return t.map((x) => x.trim()) }
+    must(!(await pg.locator('[data-areas-section]').getByRole('button', { name: /^(Delete|Remove)$/ }).count()), 'areas: a Delete or Remove button')
     for (const sec of ['tags', 'habits', 'dimensions']) {
       await s.open(`/life/settings?tab=${sec}`)
       const first = pg.locator('[data-settings-list] [data-row-name]').first()
       if (await first.count()) { const t = await itemsOf(await first.getAttribute('data-row-name')).catch(() => []); must(!t.some((x) => /Delete|Remove/.test(x)), `${sec}: ${t}`) }
       must(!(await pg.getByRole('button', { name: /^(Delete|Remove)$/ }).count()), `${sec}: a Delete or Remove button`)
     }
-    // archive B, a part (issue 11: parts hold no parts, and the seven are switched off rather than archived): it leaves the
-    // Areas screen and the pickers, its records stay, it is under Archived and comes back in place
-    step = 'archive B: it leaves the Areas screen and the pickers'
+    // archive B, a part with an open task: the task moves to Career itself, B leaves the Areas screen and the pickers, is under
+    // Archived and comes back in place
+    step = 'archive B: its task moves to Career, and it leaves the Areas screen and the pickers'
     const task = await s.api('tasks.quick_add', { text: `UX3 filed under B ${width} ${stamp}`, space: SPACE, area: b })
     await s.open('/life/settings?tab=areas')
-    await menuPick(b, 'Archive')
-    must(await pg.locator('[data-archive-dialog]').count(), 'no archive dialog')
+    await pg.locator(`[data-edit-part="${b}"]`).click()
+    await pg.locator('[data-archive-part]').click()
+    await pg.waitForTimeout(500)
+    must(await pg.locator('[data-archive-part-dialog] [data-move-to]').count(), 'no question where the open task goes')
     await pg.getByRole('button', { name: 'Archive', exact: true }).last().click()
     await pg.waitForTimeout(1200)
     const tree = (await s.api('area.tree', { space: SPACE })).areas.map((x) => x.name)
     const ctx = (await s.api('meta.space_context', { space: SPACE })).areas.map((x) => x.name)
     must(!tree.includes(b) && !ctx.includes(b), 'an archived area is still on the Areas screen or in the pickers')
-    must((await s.api('tasks.get', { task: task.name })).area === b, 'the task under the archived area changed')
+    must(!(await pg.locator(`[data-part="${b}"]`).count()), 'the archived part is still listed')
+    must((await s.api('tasks.get', { task: task.name })).area === career, 'the open task did not move to Career')
     if (!phone) must(!(await pg.locator(`[data-nav-pin="${b}"]`).count()), 'the archived area is still in the sidebar')
     await s.open('/life/settings?tab=archive')
     if (await pg.locator(`[data-archived-row="${b}"]`).count()) {
@@ -1280,7 +1275,7 @@ for (const width of UX_WIDTHS) {
       problems.push('the archived area is not under Settings > Archive and trash (?tab=archive), so it cannot be restored there')
       await s.api('settings.save_item', { kind: 'area', name: b, is_archived: 0, with_children: 1 })
     }
-    const back = await got()
+    const back = (await got()).areas
     must(!back.find((x) => x.name === b).is_archived && back.find((x) => x.name === b).parent_area === career, 'Restore did not bring B back in place')
     // tidy: the task and both test areas go (the site is rebuilt before each run, but nothing is left behind anyway)
     await s.api('frappe.client.delete', { doctype: 'Life Task', name: task.name })
@@ -3835,6 +3830,174 @@ for (const width of SET_WIDTHS) {
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${tops.length} areas on, ${parts.length} parts`
   })
+  await s.ctx.close()
+}
+
+// Issue 12: Settings > Areas. The seven areas of life with an On/Off switch, their parts with Edit and "+ Add a part of",
+// archiving a part that holds open work asks where it goes, and a Life User who is not Life Admin sees it read-only.
+for (const width of SET_WIDTHS) {
+  const tag = `I12.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  const lifeAreas = async () => (await s.api('area.tree', { space: SPACE, include_off: 1 })).areas.filter((a) => a.is_life_area)
+  const lifeArea = async (n) => (await lifeAreas()).find((a) => a.area_name === n)
+  const areasPage = async () => { await s.open(`/life/settings?tab=areas&space=${encodeURIComponent(SPACE)}`); await pg.locator('[data-areas-card]').waitFor() }
+  const flip = async (n) => {
+    await pg.locator(`[data-area-switch="${n}"]`).click()
+    await pg.waitForLoadState('networkidle')
+    await pg.waitForTimeout(700)
+  }
+  // what the lens offers: the sidebar's menu, or the phone's sheet
+  const lensLabels = async () => {
+    if (phone) await pg.locator('[data-lens-title]').click()
+    else await pg.locator('[data-lens-picker] button, [data-lens-picker]').first().click()
+    await pg.waitForTimeout(400)
+    const items = phone ? pg.locator('[data-lens-sheet] [data-lens-item]') : pg.getByRole('menuitem')
+    const out = (await items.allInnerTexts()).map((t) => t.trim())
+    await pg.keyboard.press('Escape')
+    await pg.waitForTimeout(300)
+    return out
+  }
+  // what the area picker of a task offers
+  let pickTask = null
+  const pickerLabels = async () => {
+    if (!pickTask) pickTask = (await s.api('tasks.quick_add', { text: `I12 picker task ${width} ${stamp}`, space: SPACE })).name
+    await s.open(`/life/plan/tasks?open=task:${pickTask}`)
+    await pg.locator('[data-task-area] button').click()
+    await pg.waitForTimeout(300)
+    const out = (await pg.getByRole('menuitem').allInnerTexts()).map((t) => t.trim())
+    await pg.keyboard.press('Escape')
+    return out
+  }
+
+  await check(`${tag}.1`, `${width} px: switching Money on shows it in the lens and the task area picker; off hides it; its goals come back when it is on again`, async () => {
+    const was = (await lifeArea('Money')).is_on
+    let goal = null
+    try {
+      await areasPage()
+      if (was) { await flip('Money'); must(!(await lifeArea('Money')).is_on, 'Money did not switch off') }
+      await areasPage()
+      must((await pg.locator('[data-life-area="Money"]').getAttribute('data-on')) === '0', 'Money does not show as off')
+      await flip('Money')
+      must((await lifeArea('Money')).is_on, 'the switch did not turn Money on')
+      await s.open('/life')
+      must((await lensLabels()).includes('Money'), 'Money is on but not in the lens')
+      must((await pickerLabels()).includes('Money'), 'Money is on but not in the task area picker')
+      goal = (await s.api('goals.create', { title: `I12 goal in Money ${width} ${stamp}`, goal_type: 'Open', space: SPACE, area: (await lifeArea('Money')).name })).name
+      const listed = async () => (await s.api('goals.list', { space: SPACE, page_length: 100, area: (await lifeArea('Money')).name }).catch(() => ({ goals: [] }))).goals.some((g) => g.name === goal)
+      must(await listed(), 'the new goal in Money is not listed')
+      await areasPage()
+      must(/\d+ goals?/.test(await pg.locator('[data-life-area="Money"] [data-area-goals]').innerText()), 'Money shows no goal count')
+      await flip('Money')
+      must(!(await lifeArea('Money')).is_on, 'the switch did not turn Money off')
+      await s.open('/life')
+      must(!(await lensLabels()).includes('Money'), 'Money is off but still in the lens')
+      must(!(await pickerLabels()).includes('Money'), 'Money is off but still in the task area picker')
+      must(!(await s.api('goals.list', { space: SPACE, page_length: 100 })).goals.some((g) => g.name === goal), 'the goal of Money is listed while Money is off')
+      await areasPage()
+      await flip('Money')
+      must((await s.api('goals.list', { space: SPACE, page_length: 100 })).goals.some((g) => g.name === goal), 'the goal did not come back when Money was switched on again')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    } finally {
+      if (goal) await s.api('frappe.client.delete', { doctype: 'Life Goal', name: goal }).catch(() => {})
+      const m = await lifeArea('Money')
+      if (!!m.is_on !== !!was) await s.api('settings.save_item', { kind: 'area', name: m.name, is_on: was ? 1 : 0 })
+    }
+  })
+
+  await check(`${tag}.2`, `${width} px: adding a part "CIS Board" under Career shows it in the list and in the pickers`, async () => {
+    const name = `I12 CIS Board ${width} ${stamp}`
+    await areasPage()
+    await pg.locator('[data-add-part="Career"]').click()
+    await pg.locator('[data-part-title] input, input[data-part-title]').first().fill(name)
+    await pg.locator('[data-part-description] input, input[data-part-description]').first().fill('Vice Chair')
+    await pg.getByRole('button', { name: 'Add', exact: true }).click()
+    await pg.waitForLoadState('networkidle')
+    await pg.waitForTimeout(700)
+    const row = pg.locator(`[data-parts-of="Career"] [data-part-name="${name}"]`)
+    must(await row.count(), 'the new part is not listed under Career')
+    must((await row.innerText()).includes('Vice Chair · no goals'), 'the new part does not show its description and goal count: ' + await row.innerText())
+    must((await pickerLabels()).includes(name), 'the new part is not in the task area picker')
+    await s.open('/life')
+    must((await lensLabels()).includes(name), 'the new part is not in the lens')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+
+  await check(`${tag}.3`, `${width} px: archiving a part with open tasks asks where to move them, and they end up there`, async () => {
+    const career = (await lifeArea('Career')).name
+    const part = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: `I12 part to archive ${width} ${stamp}`, parent_area: career })).name
+    const dest = `I12 destination ${width} ${stamp}`
+    const destId = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: dest, parent_area: career })).name
+    const t1 = (await s.api('tasks.quick_add', { text: `I12 open task one ${width} ${stamp}`, space: SPACE, area: part })).name
+    const t2 = (await s.api('tasks.quick_add', { text: `I12 open task two ${width} ${stamp}`, space: SPACE, area: part })).name
+    await areasPage()
+    await pg.locator(`[data-edit-part="${part}"]`).click()
+    await pg.locator('[data-archive-part]').click()
+    const dlg = pg.locator('[data-archive-part-dialog]')
+    await dlg.waitFor()
+    must((await dlg.innerText()).includes('2 open tasks'), 'the dialog does not say what is open: ' + await dlg.innerText())
+    await dlg.locator('[data-move-to]').click()
+    const options = (await pg.getByRole('option').allInnerTexts()).map((t) => t.trim())
+    must(options[0] === 'Career itself' && options.includes(dest), 'the places offered are ' + options.join(', '))
+    await pg.getByRole('option', { name: dest, exact: true }).click()
+    await pg.getByRole('button', { name: 'Archive', exact: true }).last().click()
+    await pg.waitForLoadState('networkidle')
+    await pg.waitForTimeout(900)
+    for (const t of [t1, t2]) must((await s.api('tasks.get', { task: t })).area === destId, 'a task did not move to the place chosen')
+    must((await s.api('settings.get', { space: SPACE })).areas.find((a) => a.name === part).is_archived, 'the part was not archived')
+    must(!(await pg.locator(`[data-part="${part}"]`).count()), 'the archived part is still listed')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+
+  await check(`${tag}.4`, `${width} px: a Life User who is not Life Admin sees Settings > Areas read-only`, async () => {
+    const fam = await session('family@lifeos.test', width)
+    try {
+      await fam.open('/life/settings?tab=areas&space=Shared')
+      const fp = fam.page
+      await fp.locator('[data-areas-card]').waitFor()
+      const switches = fp.locator('[data-area-switch]')
+      must((await switches.count()) === 7, `${await switches.count()} switches, not seven`)
+      for (const sw of await switches.all()) must(await sw.isDisabled(), 'a switch can be used')
+      must(!(await fp.locator('[data-edit-part], [data-add-part], [data-new]').count()), 'Edit, Add a part or New shows')
+      must(await fp.locator('[data-areas-read-only]').isVisible(), 'no line saying only the owner can change areas')
+      const career = (await fam.api('area.tree', { space: 'Shared' })).areas.find((a) => a.is_life_area && a.area_name === 'Career')
+      const r = await fam.api('settings.save_item', { kind: 'area', name: career.name, is_on: 0 }, { raw: true })
+      must(r.status() === 403, `the server let the family user switch an area (HTTP ${r.status()})`)
+      must((await s.api('area.tree', { space: 'Shared' })).areas.some((a) => a.name === career.name), 'Career of Shared was switched off')
+    } finally { await fam.ctx.close() }
+  })
+
+  await check(`${tag}.5`, `${width} px: the screen matches the mockup: intro, one card of the seven, switches, On by default on Career and Health, parts with Edit, the footer`, async () => {
+    await areasPage()
+    const main = await pg.locator('[data-settings-section]').innerText()
+    must(main.includes('Seven areas cover a whole life.'), 'no intro line')
+    must(await pg.locator('[data-areas-footer]').innerText() === 'Switching an area off hides it and its goals; nothing is deleted. The Brain stops filing into it and sends those items to Needs you.', 'the footer line differs')
+    const names = await pg.locator('[data-life-area]').evaluateAll((els) => els.map((e) => e.getAttribute('data-life-area')))
+    must(names.length === 7 && new Set(names).size === 7, 'not the seven: ' + names.join(', '))
+    const ons = await pg.locator('[data-life-area]').evaluateAll((els) => els.map((e) => e.getAttribute('data-on')))
+    must(ons.join('').replace(/0+$/, '').indexOf('0') < 0, 'the areas that are on are not listed first')
+    const byDefault = await pg.locator('[data-life-area]').evaluateAll((els) => els.filter((e) => [...e.querySelectorAll('*')].some((x) => x.textContent.trim() === 'On by default' && x.offsetParent)).map((e) => e.getAttribute('data-life-area')))
+    must(byDefault.sort().join() === 'Career,Health', '"On by default" is on ' + byDefault.join(', '))
+    // the switch: left of the name on a wide screen, on the right on a phone
+    for (const n of ['Career', 'Health']) {
+      const sw = await pg.locator(`[data-area-switch="${n}"]`).boundingBox()
+      const nm = await pg.locator(`[data-life-area="${n}"] [data-area-name]`).boundingBox()
+      const card = await pg.locator('[data-areas-card]').boundingBox()
+      if (phone) must(sw.x > nm.x + nm.width && sw.x + sw.width > card.x + card.width - 40, `${n}: the switch is not on the right`)
+      else must(sw.x + sw.width < nm.x, `${n}: the switch is not left of the name`)
+    }
+    const parts = pg.locator('[data-parts-of="Career"] [data-part]')
+    must(await parts.count(), 'Career lists no parts')
+    must(await pg.locator('[data-parts-of="Career"] [data-edit-part]').count() === await parts.count(), 'a part has no Edit')
+    must(/(no goals|\d+ goals?)\s*Edit$/.test((await parts.first().innerText()).trim()), 'a part shows no goal count before its Edit: ' + await parts.first().innerText())
+    must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+  if (pickTask) await s.api('frappe.client.delete', { doctype: 'Life Task', name: pickTask }).catch(() => {})
   await s.ctx.close()
 }
 
