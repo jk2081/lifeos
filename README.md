@@ -288,6 +288,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `tasks.quick_add` | `text, space=None, area=None, project=None, goal=None, due_date=None, priority=None, month_plan=None` | Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date. |
 | `tasks.set_status` | `task, status, waiting_on=None` | Change a task's status. Done fills completed_on. Waiting needs waiting_on. |
 | `tasks.update` | `task, values` | Change fields of a task. Only task fields a person edits are accepted. |
+| `tasks.confirm_area` | `task, area=None` | Confirm the area the Brain guessed for a task (a task saved without an area gets one, marked `area_guessed` with `area_confidence`), or move it to `area`. Either clears the mark; a move is kept as an area correction in `Life Action Log`. |
 | `tasks.carry_forward` | `task` | Copy an open task into next month's plan, mark the old one Carried and set carried_from. |
 | `tasks.open_loops` | `space=None, start=0, page_length=50` | Open tasks older than 14 days with no due date. |
 | `tasks.decide_stale` | `task, decision` | The three buttons under Decide in the weekly review: do (due this week), carry, drop. |

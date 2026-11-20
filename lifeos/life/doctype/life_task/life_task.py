@@ -27,7 +27,11 @@ class LifeTask(Document):
 		area_guess.track_change(self)  # issue 13: every task has an area
 
 	def on_update(self):
-		area_guess.log_correction(self)
+		area_guess.after_save(self)
 		# a goal's last activity follows its tasks (UX fixes, set 5: idle projects, now open-ended goals)
 		if self.goal and not self.flags.keep_touched:
 			frappe.db.set_value("Life Goal", self.goal, "last_activity_on", today(), update_modified=False)
+
+	def on_trash(self):
+		# its area corrections go with it, so they do not block the delete (issue 13)
+		frappe.db.delete("Life Action Log", {"task": self.name, "kind": "Area correction"})

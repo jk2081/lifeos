@@ -79,7 +79,7 @@
                   <span v-if="r.why === 'Top three'" class="lucide-star size-4 shrink-0 text-ink-amber-9" role="img" aria-label="One of this week's top three" data-top-three />
                   <div class="min-w-0 flex-1">
                     <div class="break-words text-base text-ink-gray-9" :class="r._done && 'text-ink-gray-6 line-through'">{{ r.title }}</div>
-                    <div class="truncate text-sm text-ink-gray-6">{{ taskLine(r) }}</div>
+                    <div class="flex min-w-0 items-center gap-1.5 text-sm text-ink-gray-6"><AreaGuess :task="r" :readonly="!canWrite()" /><span class="truncate">{{ taskLine(r) }}</span></div>
                   </div>
                   <Dropdown v-if="r.why === 'Overdue' && canWrite()" :options="triage(r)"><Button class="relative md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100" variant="ghost" size="sm"
                     icon="lucide-calendar-clock" :label="'Reschedule ' + r.title" data-triage /></Dropdown>
@@ -180,6 +180,7 @@ import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import Row from '@/components/ui/Row.vue'
+import AreaGuess from '@/components/AreaGuess.vue'
 import { api, errorText, optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { addDays, long, short, startOfWeek, weekday } from '@/lib/dates'
@@ -263,7 +264,8 @@ const visibleGroups = computed(() => {
   }).filter((g) => g.shown.length)
 })
 const hidden = computed(() => groups.value.reduce((n, g) => n + g.rows.length, 0) - visibleGroups.value.reduce((n, g) => n + g.shown.length, 0))
-const taskLine = (r) => [r.area_name, r.goal_title, r.source_title && 'from ' + r.source_title, r.status === 'Waiting' && r.waiting_on && 'waiting on ' + r.waiting_on].filter(Boolean).join(' · ') || 'Unfiled'
+// a guessed area shows as its own chip before the line (issue 13)
+const taskLine = (r) => [!r.area_guessed && r.area_name, r.goal_title, r.source_title && 'from ' + r.source_title, r.status === 'Waiting' && r.waiting_on && 'waiting on ' + r.waiting_on].filter(Boolean).join(' · ') || (r.area_guessed ? '' : 'Unfiled')
 function duration(e) {
   if (e.all_day || !e.start || !e.end) return ''
   const m = Math.round((new Date(e.end.replace(' ', 'T')) - new Date(e.start.replace(' ', 'T'))) / 60000)

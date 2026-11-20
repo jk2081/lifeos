@@ -79,20 +79,31 @@ class TestTaskAreas(LifeTestCase):
 	# 4
 	def test_the_model_guesses_when_nothing_else_does_and_no_key_falls_back(self):
 		set_key("sk-test-not-real")
-		frappe.flags.lifeos_ai_backend = fake.ScriptedFake([answer_with("Money", 77)])
+		backend = frappe.flags.lifeos_ai_backend = fake.ScriptedFake([answer_with("Money", 77)])
 		t = self.task("Zqxv blorp")
+		# the save itself never waits on the model: it files under Career and leaves the model to a job after the commit
+		self.assertEqual((t.area, t.area_confidence, backend.received), (self.life["Career"], area_guess.FALLBACK_CONFIDENCE, []))
+		area_guess.refine(t.name, t.area)  # the job
+		t.reload()
 		self.assertEqual(t.area, self.life["Money"])
 		self.assertTrue(t.area_guessed)
 		self.assertEqual(t.area_confidence, 77)
-		sent = json.loads(frappe.flags.lifeos_ai_backend.received[0]["messages"][-1]["content"])
+		self.assertFalse(frappe.db.exists("Life Action Log", {"task": t.name}))  # a better guess is not a correction
+		sent = json.loads(backend.received[0]["messages"][-1]["content"])
 		self.assertEqual(sent["title"], "Zqxv blorp")
 		self.assertNotIn("Emotions", [a["name"] for a in sent["areas"]])  # only the areas that are on
 		self.assertTrue(frappe.db.exists("Life AI Usage", {"purpose": "Area guess"}))
+		# a guess the owner confirmed before the job ran is left alone
+		t2 = self.task("Zqxv blorp confirmed")
+		tasks.confirm_area(t2.name)
+		self.assertIsNone(area_guess.refine(t2.name, self.life["Career"]))
+		self.assertEqual(len(backend.received), 1)
 		# without a key: no call, no error, Career with a low confidence
 		set_key("")
 		frappe.flags.lifeos_ai_backend = NoModel()
 		calls = NoModel.calls
 		t = self.task("Zqxv blorp again")
+		self.assertIsNone(area_guess.refine(t.name, t.area))
 		self.assertEqual(NoModel.calls, calls)
 		self.assertEqual(t.area, self.life["Career"])
 		self.assertTrue(t.area_guessed)
@@ -114,6 +125,8 @@ class TestTaskAreas(LifeTestCase):
 		log = frappe.get_all("Life Action Log", filters={"task": t2.name}, fields=["kind", "old_area", "new_area", "space"])
 		self.assertEqual([(r.kind, r.old_area, r.new_area, r.space) for r in log],
 			[("Area correction", self.life["Career"], self.life["Health"], PRIVATE)])
+		frappe.delete_doc("Life Task", t2.name)  # a correction does not block deleting the task, and goes with it
+		self.assertFalse(frappe.db.exists("Life Action Log", {"task": t2.name}))
 
 		# changing a guessed area through the task's own edit clears the mark and is logged too
 		t3 = self.task("Zqxv three")

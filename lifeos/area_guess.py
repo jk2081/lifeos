@@ -6,6 +6,9 @@
 4. with an AI key set and within the spend cap, one short model call with the title, notes and the areas that are on;
 5. otherwise Career, if it is on, with a low confidence.
 
+Steps 1, 2, 3 and 5 run as the task is saved, so it always has an area. Step 4 runs in a background job after the save,
+only when the task got the Career fallback, and replaces that guess with the model's.
+
 A guessed area carries `area_guessed` and `area_confidence` until a person confirms or changes it. A change is kept as a
 `Life Action Log` row of kind "Area correction" (the guessed area and the new one), for later issues to learn from.
 """
@@ -46,11 +49,11 @@ SCHEMA = {
 }
 
 
-def apply(doc, use_ai=True):
-	"""Fill `doc.area` with a guess when it has none. Returns the guess {area, confidence, source} or None."""
+def apply(doc):
+	"""Fill `doc.area` with a guess by steps 1, 2, 3 and 5 when it has none. Returns {area, confidence, source} or None."""
 	if doc.area:
 		return None
-	found = guess(doc, use_ai=use_ai)
+	found = guess(doc)
 	if found:
 		doc.area = found["area"]
 		doc.area_guessed = 1
@@ -58,26 +61,24 @@ def apply(doc, use_ai=True):
 	return found
 
 
-def guess(doc, use_ai=True):
-	"""The area a task most likely belongs to, as {area, confidence, source}, or None when no area of its space is on."""
+def guess(doc):
+	"""The area a task most likely belongs to without asking a model, as {area, confidence, source}, or None when no area
+	of its space is on."""
 	if doc.goal:
 		area = frappe.db.get_value("Life Goal", doc.goal, "area")
 		if area:
 			return _found(area, GOAL_CONFIDENCE, "goal")
-	candidates = areas.ordered(doc.space, fields=["name", "area_name", "parent_area", "is_life_area", "description"])
-	on = {a.name for a in candidates}
+	candidates = candidates_of(doc.space)
 	if doc.inbox_item:
 		area = frappe.db.get_value("Life Inbox Item", doc.inbox_item, "area")
-		if area in on:
+		if area in {a.name for a in candidates}:
 			return _found(area, CAPTURE_CONFIDENCE, "capture")
-	found = rule_match(doc.title, candidates)
-	if found:
-		return found
-	if use_ai and ai_allowed():
-		found = ask_model(doc, candidates)
-		if found:
-			return found
-	return fallback(candidates)
+	return rule_match(doc.title, candidates) or fallback(candidates)
+
+
+def candidates_of(space):
+	"""The areas a task may be filed into: those that are on and not archived, in picker order."""
+	return areas.ordered(space, fields=["name", "area_name", "parent_area", "is_life_area", "description"])
 
 
 def _found(area, confidence, source):
@@ -128,10 +129,32 @@ def fallback(candidates):
 	return _found(pick.name, FALLBACK_CONFIDENCE, "fallback") if pick else None
 
 
-def ai_allowed():
-	"""A model call is made only from a normal request or job, never during install, migrate, a patch or an import."""
+def model_possible():
+	"""Step 4 runs only with an AI key set, and never for a task saved during install, migrate, a patch or an import."""
+	from lifeos.ai import client
+
 	f = frappe.flags
-	return not (f.in_install or f.in_migrate or f.in_patch or f.in_import or f.lifeos_no_area_ai)
+	if f.in_install or f.in_migrate or f.in_patch or f.in_import:
+		return False
+	return client.is_set_up()
+
+
+def refine(task, area):
+	"""Step 4, in a background job after the task is saved, so no request waits on the model or holds its transaction
+	open: when the task still has the Career fallback, unconfirmed, ask the model and take its answer."""
+	if not frappe.db.exists("Life Task", task):
+		return None  # deleted before the job ran
+	doc = frappe.get_doc("Life Task", task)
+	if not (doc.area_guessed and doc.area == area and doc.area_confidence == FALLBACK_CONFIDENCE):
+		return None  # confirmed, changed or guessed better meanwhile
+	found = ask_model(doc, candidates_of(doc.space))
+	if not found:
+		return None
+	doc.area, doc.area_confidence = found["area"], found["confidence"]
+	doc.flags.area_guess = True  # still a guess: keep the mark, log no correction
+	doc.flags.keep_touched = True
+	doc.save(ignore_permissions=True)  # the job runs as the user who saved the task; only the guess changes
+	return found
 
 
 def ask_model(doc, candidates):
@@ -178,9 +201,11 @@ def track_change(doc):
 	area, clear the mark and remember the correction (written in on_update). Moving the open work of an archived part
 	(areas.move_work) is not a correction."""
 	if not doc.area:
-		apply(doc, use_ai=not doc.flags.no_area_ai)
+		found = apply(doc)
+		if found and found["source"] == "fallback" and model_possible():
+			doc.flags.refine_area = True
 		return
-	if doc.is_new() or not doc.has_value_changed("area") or doc.flags.area_moved:
+	if doc.is_new() or not doc.has_value_changed("area") or doc.flags.area_moved or doc.flags.area_guess:
 		return
 	before = doc.get_doc_before_save()
 	if before and before.area_guessed and before.area:
@@ -189,8 +214,12 @@ def track_change(doc):
 	doc.area_confidence = 0
 
 
-def log_correction(doc):
-	"""Called from the task's on_update: keep the owner's correction of a guessed area."""
+def after_save(doc):
+	"""Called from the task's on_update: ask the model about a fallback guess after the commit (step 4), and keep the
+	owner's correction of a guessed area."""
+	if doc.flags.pop("refine_area", None):
+		frappe.enqueue("lifeos.area_guess.refine", queue="short", enqueue_after_commit=True, task=doc.name,
+			area=doc.area)
 	change = doc.flags.pop("area_correction", None)
 	if not change:
 		return
@@ -210,7 +239,7 @@ def confirm(doc, area=None):
 	return doc
 
 
-def fill_missing(use_ai=False):
+def fill_missing():
 	"""The patch's work: give every task without an area a guessed one, by steps 1 to 3 and 5 (no model call). Writes the
 	fields directly (no `modified` change) and refreshes each task's index row. Returns how many were filled."""
 	from lifeos import index
@@ -218,7 +247,7 @@ def fill_missing(use_ai=False):
 	filled = 0
 	for name in frappe.get_all("Life Task", filters={"area": ("is", "not set")}, pluck="name", limit=0):
 		doc = frappe.get_doc("Life Task", name)
-		found = apply(doc, use_ai=use_ai)
+		found = apply(doc)
 		if not found:
 			continue
 		frappe.db.set_value("Life Task", name, {"area": doc.area, "area_guessed": 1, "area_confidence": doc.area_confidence},

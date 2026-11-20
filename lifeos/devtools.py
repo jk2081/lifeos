@@ -194,7 +194,7 @@ def find_test_debris(site_check=True):
 	import re
 
 	rx = _stamp_re()
-	s4 = re.compile(r"^(?:S[4578]|BF1|I(?:[78]|1[012])) [^\n]*?\b(m[0-9a-z]{7})\b")  # sets 4, 5, 7 and 8, bug fix 1, issues 7, 8, 10, 11 and 12: "S4 <what> [<width>] <stamp>"
+	s4 = re.compile(r"^(?:S[4578]|BF1|I(?:[78]|1[0123])) [^\n]*?\b(m[0-9a-z]{7})\b")  # sets 4, 5, 7 and 8, bug fix 1, issues 7, 8, 10, 11, 12 and 13: "S4 <what> [<width>] <stamp>"
 	stamps = set()
 	for dt, field in _TITLED.items():
 		# nosemgrep: frappe-sql-format-injection -- development tool: DocType and field from the _TITLED constant
@@ -276,6 +276,8 @@ def purge_test_debris(dry_run=True):
 			frappe.db.sql(f"delete from `tab{tf.options}` where parenttype=%s and parent in %s", (dt, names))
 		frappe.db.sql("delete from `tabLife Index` where ref_doctype=%s and ref_name in %s", (dt, names))
 		frappe.db.sql("delete from `tabLife Exit` where record_doctype=%s and record_name in %s", (dt, names))  # set 7
+		if dt == "Life Task":  # issue 13: area corrections
+			frappe.db.sql("delete from `tabLife Action Log` where task in %s", (names,))
 		if dt == "Life Habit":
 			frappe.db.sql("delete from `tabLife Month Plan Habit` where habit in %s", (names,))
 		frappe.db.sql("delete from `tabLife Link` where (from_doctype=%s and from_name in %s) or (to_doctype=%s and to_name in %s)",

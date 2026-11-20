@@ -65,6 +65,7 @@ class TestListFilters(LifeTestCase):
 		sub = self.make("Life Area", area_name="ux1 Estate", parent_area=career)
 		t = self.make("Life Task", title="ux1 in sub", area=sub.name)
 		unfiled = self.make("Life Task", title="ux1 unfiled")
+		frappe.db.set_value("Life Task", unfiled.name, {"area": None, "area_guessed": 0})  # issue 13 guesses one on save
 		self.assertIn(t.name, self.names(tasks.list(space=PRIVATE, area=career, page_length=100)["tasks"]))
 		self.assertNotIn(t.name, self.names(tasks.list(space=PRIVATE, area=self.areas["Money"], page_length=100)["tasks"]))
 		none = self.names(tasks.list(space=PRIVATE, area="none", page_length=100)["tasks"])

@@ -3,7 +3,7 @@
     <Checkbox class="relative mt-0.5" :model-value="task.status === 'Done'" :disabled="readonly" :aria-label="'Done: ' + task.title" @update:model-value="$emit('toggle', task)" />
     <div class="min-w-0 flex-1" data-row-main>
       <div class="break-words text-base-medium" :class="closed ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ task.title }}</div>
-      <div class="text-sm text-ink-gray-6">{{ taskMeta(task, today, { withDue }) }}</div>
+      <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-ink-gray-6"><AreaGuess :task="task" :readonly="readonly" /><span>{{ taskMeta(task, today, { withDue }) }}</span></div>
     </div>
     <Badge v-if="pill" :theme="pill.theme"><span class="max-md:hidden">{{ pill.text }}</span><span class="md:hidden">{{ pill.shortText || pill.text }}</span></Badge>
     <slot name="end" />
@@ -14,6 +14,7 @@
 import { computed } from 'vue'
 import { Badge, Checkbox } from 'frappe-ui'
 import Row from './ui/Row.vue'
+import AreaGuess from './AreaGuess.vue'
 import { taskMeta, taskPill } from '@/lib/tasks'
 
 const props = defineProps({ task: Object, today: String, withDue: Boolean, readonly: Boolean })

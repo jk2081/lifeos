@@ -29,7 +29,7 @@ class LifeActionLog(Document):
 			return
 		for field in ("goal", "action_id", "cycle", "week"):
 			if not self.get(field) and self.get(field) != 0:
-				frappe.throw(_("{0} is required.").format(self.meta.get_label(field)), frappe.MandatoryError)
+				frappe.throw(_("{0} is required.").format(_(self.meta.get_label(field))), frappe.MandatoryError)
 		check_cycle_open(self.cycle, self.flags)
 
 	def on_trash(self):
