@@ -1606,8 +1606,9 @@ for (const width of UX_WIDTHS) {
     must(await pg.locator('[data-open-band]').isVisible(), 'no Open band')
     for (const k of ['open', 'inbox', 'week', 'habits']) must(await pg.locator(`[data-tile="${k}"]:visible`).count(), `no ${k} tile`)
     const groups = await pg.locator('[data-next-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-next-group')))
-    const order = ['overdue', 'today', 'twy', 'decisions']
-    must(JSON.stringify(groups) === JSON.stringify(order.filter((g) => groups.includes(g))) && groups[0] === 'overdue', `Next groups are ${groups}`)
+    const order = ['today', 'overdue', 'twy', 'decisions']
+    must(JSON.stringify(groups) === JSON.stringify(order.filter((g) => groups.includes(g))), `Next groups are ${groups}`)
+    if (await pg.locator('[data-overdue-toggle]').count()) { await tap(pg.locator('[data-overdue-toggle]')); await settle() } // issue 15: overdue is folded
     if (await pg.locator('[data-next-more]').count()) { await tap(pg.locator('[data-next-more]')); await settle() }
     const next = await pg.locator('[data-next]').innerText()
     must(next.includes(S5('overdue')) && next.includes(S5('due today')), 'the overdue or due task is not in Next')
@@ -4195,6 +4196,98 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
       })
     } finally {
       bench(`frappe.delete_doc("Life Inbox Item", "${item.name}", force=1, ignore_permissions=True)`)
+      await s.ctx.close()
+    }
+  }
+
+  // Issue 15: Today > Day. Titles start "I15 " (known to the debris finder).
+  for (const width of SET_WIDTHS) {
+    const tag = `I15.${width}`
+    if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+    const phone = width < 800
+    const s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    const errors = errs(pg)
+    const meeting = `I15 meeting ${width} ${stamp}`
+    const mk = (title) => bench(`from frappe.utils import today
+ev = frappe.get_doc({"doctype": "Event", "subject": "${title}", "starts_on": today() + " 14:00:00", "ends_on": today() + " 15:00:00", "event_category": "Event",
+  "event_type": "Public", "life_space": "Private", "google_calendar_event_id": "fixture-i15-${stamp}-${width}"}).insert(ignore_permissions=True)
+print(ev.name)`).split('\n').pop()
+    const evName = mk(meeting)
+    const names = []
+    for (const t of ['one', 'two']) names.push((await s.api('tasks.quick_add', { text: `I15 ${t} ${width} ${stamp}`, space: SPACE, area: uxArea, due_date: today })).name)
+    const item = await s.api('inbox.create_item', { title: `I15 to review ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'I15' })
+    bench(`frappe.db.set_value("Life Inbox Item", "${item.name}", "status", "To Review")`)
+    try {
+      bench(`frappe.db.set_value("Life Task", "${names[0]}", "is_top_three", 1)`)
+      await check(`${tag}.1`, `${width} px: Today > Day shows today's tasks, the top three and the day's events from the calendar`, async () => {
+        await s.open('/life/today')
+        await pg.locator('[data-next]').waitFor({ timeout: 10000 })
+        const plate = await pg.locator('[data-next]').innerText()
+        for (const t of names.map((_, i) => `I15 ${['one', 'two'][i]} ${width} ${stamp}`)) must(plate.includes(t), `${t} is not on the plate`)
+        must(await pg.locator('[data-next-group="today"]').count(), 'no Today group')
+        const rail = await pg.locator('[data-rail-today]').innerText()
+        must(rail.includes(meeting), 'the calendar does not show ' + meeting)
+        must(!plate.includes(meeting), 'the meeting is on the plate as well as in the calendar')
+        const tops = (await s.api('today.get', { space: SPACE })).next.groups.find((g) => g.key === 'top').rows
+        must(tops.some((r) => r.name === names[0]) && (await pg.locator('[data-top-three]').count()) >= 1, 'the top three are not marked')
+        const od = pg.locator('[data-next-group="overdue"]')
+        if (await od.count()) must(!(await pg.locator('[data-next-row][data-why="Overdue"]').count()), 'overdue items are not folded')
+        must(await pg.locator('[data-open-band]').count(), 'the Open band is gone')
+        must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      })
+      await check(`${tag}.2`, `${width} px: ticking a task on Today marks it done and updates the counts`, async () => {
+        await s.open('/life/today')
+        const row = pg.locator('[data-task-row]', { hasText: `I15 two ${width} ${stamp}` }).first()
+        await row.waitFor({ timeout: 10000 })
+        const before = (await s.api('today.get', { space: SPACE })).tasks.today_count
+        await row.locator('[role="checkbox"], input[type="checkbox"], button[aria-label^="Done"]').first().click()
+        await pg.waitForTimeout(1500)
+        const after = (await s.api('today.get', { space: SPACE })).tasks.today_count
+        must(after === before - 1, `the due-today count went from ${before} to ${after}`)
+        const st = (await s.api('tasks.list', { space: SPACE, status: 'any', filters: JSON.stringify([['name', '=', names[1]]]), page_length: 1 })).tasks[0].status
+        must(st === 'Done', 'the task is ' + st)
+        await s.open('/life/today')
+        must(!(await pg.locator('[data-task-row]', { hasText: `I15 two ${width} ${stamp}` }).count()), 'the done task is still on the plate')
+      })
+      await check(`${tag}.3`, `${width} px: the Needs you line shows the waiting count and opens Brain > Needs you`, async () => {
+        await s.open('/life/today')
+        const line = pg.locator('[data-needs-you]')
+        await line.waitFor({ timeout: 10000 })
+        const n = Number((await line.locator('[data-needs-you-count]').innerText()).replace(/\D/g, ''))
+        const total = (await s.api('inbox.list', { space: SPACE, status: '["To Review"]', page_length: 1 })).total
+        must(n === total, `the line says ${n}; the Inbox has ${total} to review`)
+        await line.click()
+        await pg.waitForURL((u) => u.pathname === '/life/brain', { timeout: 10000 }).catch(() => {})
+        must(path(pg) === '/life/brain', 'the line opened ' + path(pg))
+        must((await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current')) === 'needs-you', 'Brain is not on Needs you')
+      })
+      await check(`${tag}.4`, `${width} px: the switch moves to Week, Month and Year routes`, async () => {
+        await s.open('/life/today')
+        for (const t of ['week', 'month', 'year', 'day']) {
+          await pg.locator(`[data-place-tabs] [data-tab="${t}"]`).first().click()
+          const want = t === 'day' ? '/life/today' : `/life/today/${t}`
+          await pg.waitForURL((u) => u.pathname === want, { timeout: 10000 }).catch(() => {})
+          must(path(pg) === want, `${t} opened ${path(pg)}`)
+        }
+      })
+      await check(`${tag}.5`, `${width} px: the layout matches the mockups (${phone ? 'Needs you, the plate, then the calendar below it' : 'the plate with the calendar beside it'}), with no sideways scroll`, async () => {
+        await s.open('/life/today')
+        await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 })
+        const box = async (sel) => (await pg.locator(sel).first().boundingBox())
+        const nu = await box('[data-needs-you]'), plate = await box('[data-next]'), rail = await box('[data-rail-today]'), band = await box('[data-open-band]')
+        must(nu.y < plate.y, 'Needs you is not above the plate')
+        if (phone) must(rail.y > plate.y && Math.abs(rail.x - plate.x) < 4, 'the calendar is not below the plate')
+        else must(rail.x > plate.x + plate.width - 4 && rail.y < plate.y + 80, 'the calendar is not beside the plate')
+        must(band.y > plate.y + plate.height - 4 || band.y > rail.y + rail.height - 4, 'the Open band is not below the fold')
+        await noSideways(pg)
+        must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      })
+    } finally {
+      bench(`frappe.delete_doc("Life Inbox Item", "${item.name}", force=1, ignore_permissions=True)
+for n in ${JSON.stringify(names)}:
+    frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+frappe.delete_doc("Event", "${evName}", force=1, ignore_permissions=True)`)
       await s.ctx.close()
     }
   }

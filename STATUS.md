@@ -466,3 +466,4 @@ The test site is `lifeos.localhost`, at http://localhost:18000/life. The three t
 ```
 docker compose -f docker/docker-compose.yml down -v
 ```
+- **Issue 15 (Today → Day):** Today re-laid out as the mockup: a Needs you line to Brain, the plate (top three, today, overdue folded) with the day's calendar beside it, the Open band below the fold. Checks `I15.<width>.1` to `.5`. See `DECISIONS.md`, Issue 15.
