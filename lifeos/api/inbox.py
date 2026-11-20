@@ -37,8 +37,10 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 
 	intent: Process (the default), Add to wiki or Just keep. With source_system (gmail, claude, upload…) the space's connection for
 	that system gives the default intent, area and goal (`project` names the goal a project became). With source_system and external_id (the original's ID in that system)
-	an item that already exists is updated instead of created: its text changes, and a Done item whose content changed goes back
-	to New so the agent processes the change. The answer carries `created` (true or false)."""
+	an item that already exists is updated instead of created: every argument passed (title, raw_text, source_url, instruction,
+	intent, area, goal) replaces the old value and an argument left out keeps it. A Done item whose content changed, or a Done or
+	Failed item whose intent changed, goes back to New so the agent processes it again. The answer carries `created` and `updated`
+	(true or false), and on an update `changed_fields`."""
 	from lifeos.api import connections
 
 	space = permissions.resolve_space(space, write=True)
@@ -47,38 +49,58 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 	if intent and intent not in INTENTS:
 		frappe.throw(_("intent must be one of: {0}.").format(", ".join(INTENTS)))
 	system = (source_system or "").strip().lower() or None
-	conn = connections.connection(space, system) if system else None
-	title = (title or "").strip() or f"{source_type}, {frappe.utils.format_datetime(now_datetime(), 'd MMM HH:mm')}"
+	if project and not goal:
+		goal = goal_for_project(project, space)
 	existing = frappe.db.get_value("Life Inbox Item", {"space": space, "source_system": system, "external_id": external_id.strip()}) \
 		if system and (external_id or "").strip() else None
 	if existing:
-		item = permissions.get_doc_checked("Life Inbox Item", existing, "write")
-		before = (item.title, item.raw_text or "", item.source_url or "", item.instruction or "")
-		item.title, item.source_type = title[:140], source_type
-		for field, value in (("raw_text", raw_text), ("source_url", source_url), ("instruction", instruction)):
-			if value is not None:
-				item.set(field, value)
-		changed = before != (item.title, item.raw_text or "", item.source_url or "", item.instruction or "")
-		if changed and item.status == "Done":
-			item.status = "New"
-			item.add_comment("Info", _("Updated from {0}: the content changed, so it went back to the agent.").format(system))
-		elif changed:
-			item.add_comment("Info", _("Updated from {0}.").format(system))
-		item.save()
-		connections.touch(space, system, item.title)
-		return {**_item_dict(item), "created": False, "changed": changed}
+		return _refile(existing, system, source_type, {"title": (title or "").strip()[:140] or None, "raw_text": raw_text,
+			"source_url": source_url, "instruction": instruction, "intent": intent, "area": area, "goal": goal})
+	conn = connections.connection(space, system) if system else None
+	title = (title or "").strip() or f"{source_type}, {frappe.utils.format_datetime(now_datetime(), 'd MMM HH:mm')}"
 	item = frappe.get_doc({"doctype": "Life Inbox Item", "space": space, "title": title[:140], "source_type": source_type,
 		"raw_text": raw_text, "instruction": instruction, "source_url": source_url, "status": "New",
 		"intent": intent or (conn.default_intent if conn and conn.active else None) or "Process",
 		"source_system": system, "external_id": (external_id or "").strip() or None,
 		"area": area or (conn.default_area if conn else None),
-		"goal": goal or (project and goal_for_project(project, space)) or (conn.default_goal if conn else None)})
+		"goal": goal or (conn.default_goal if conn else None)})
 	if item.goal and not item.area:
 		item.area = frappe.db.get_value("Life Goal", item.goal, "area")
 	item.insert()
 	if system:
 		connections.touch(space, system, item.title)
-	return {**_item_dict(item), "created": True}
+	return {**_item_dict(item), "created": True, "updated": False}
+
+
+CONTENT_FIELDS = ("title", "raw_text", "source_url", "instruction")
+
+
+def _refile(name, system, source_type, values):
+	"""Update an item filed again with the same source_system and external_id. `values` left as None keep the old value."""
+	from lifeos.api import connections
+
+	item = permissions.get_doc_checked("Life Inbox Item", name, "write")
+	item.source_type = source_type
+	changed_fields = []
+	for field, value in values.items():
+		if value is not None and (item.get(field) or "") != value:
+			item.set(field, value)
+			changed_fields.append(field)
+	if "goal" in changed_fields and not item.area:
+		item.area = frappe.db.get_value("Life Goal", item.goal, "area")
+	content_changed = any(f in CONTENT_FIELDS for f in changed_fields)
+	intent_changed = "intent" in changed_fields
+	if (content_changed and item.status == "Done") or (intent_changed and item.status in ("Done", "Failed")):
+		if item.status == "Failed":  # as retry does: the old attempt's pending proposals go
+			for proposal in frappe.get_all("Life Proposal", filters={"inbox_item": item.name, "status": "Pending"}, pluck="name"):
+				frappe.delete_doc("Life Proposal", proposal, ignore_permissions=True, force=True)
+		item.status, item.error = "New", None
+		item.add_comment("Info", _("Updated from {0} ({1}), so it went back to the agent.").format(system, ", ".join(changed_fields)))
+	elif changed_fields:
+		item.add_comment("Info", _("Updated from {0} ({1}).").format(system, ", ".join(changed_fields)))
+	item.save()
+	connections.touch(item.space, system, item.title)
+	return {**_item_dict(item), "created": False, "updated": True, "changed": bool(changed_fields), "changed_fields": changed_fields}
 
 
 def release_stale_claims():
