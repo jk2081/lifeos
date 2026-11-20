@@ -42,6 +42,7 @@
                 <a class="text-ink-blue-8 hover:underline" :href="f.file_url" target="_blank" rel="noopener">{{ f.file_name }}</a> · {{ fileSize(f.file_size) }}
                 <span v-if="fileKind(f.file_name) === 'image'"> · click the image to zoom</span>
               </div>
+              <FileVersions :file="f" />
             </div>
             <Card v-if="item.raw_text" class="mt-2"><DigestView v-if="item.source_type === 'Email Digest'" :text="item.raw_text" /><Md v-else :text="item.raw_text" /></Card>
           </section>
@@ -161,6 +162,7 @@ import SectionHead from './ui/SectionHead.vue'
 import Md from './Md.vue'
 import MdField from './MdField.vue'
 import DigestView from './DigestView.vue'
+import FileVersions from './FileVersions.vue'
 import Pick from './Pick.vue'
 import Empty from './Empty.vue'
 import Backlinks from './Backlinks.vue'

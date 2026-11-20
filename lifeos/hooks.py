@@ -50,6 +50,9 @@ _have = doc_events["Life Goal Reading"].get("on_update")
 doc_events["Life Goal Reading"]["on_update"] = [*([_have] if isinstance(_have, str) else _have or []), "lifeos.review.findings.reading_changed"]
 doc_events["Event"] = {"validate": "lifeos.events.validate_event"}
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
+# issue 7: a Life OS record's file is stored once per space by content, and the same file sent again is not attached twice
+extend_doctype_class = {"File": ["lifeos.files.LifeFile"]}
+override_whitelisted_methods = {"upload_file": "lifeos.files.upload_file", "frappe.handler.upload_file": "lifeos.files.upload_file"}
 doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
 before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.strict_get.before_request"]
 

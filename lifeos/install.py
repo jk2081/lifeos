@@ -22,6 +22,18 @@ GOOGLE_FIELDS = [
 	{"fieldname": "life_sync_error", "label": "Life OS Sync Error", "fieldtype": "Small Text", "insert_after": "life_last_synced", "read_only": 1},
 ]
 
+# issue 7: files of Life OS records are stored once per space by SHA-256, and an item's earlier versions point to the current file
+FILE_FIELDS = [
+	{"fieldname": "life_sha256", "label": "Life OS SHA-256", "fieldtype": "Data", "insert_after": "content_hash", "read_only": 1,
+		"search_index": 1, "no_copy": 1},
+	{"fieldname": "life_version_of", "label": "Life OS Earlier Version Of", "fieldtype": "Data", "insert_after": "life_sha256",
+		"read_only": 1, "search_index": 1, "no_copy": 1, "description": "The current File row this earlier version was replaced by."},
+]
+
+
+def make_file_fields():
+	create_custom_fields({"File": FILE_FIELDS}, ignore_validate=True)
+
 
 def after_install():
 	setup()
@@ -42,6 +54,7 @@ def setup():
 			"insert_after": "event_type", "search_index": 1,
 		}, *MEETING_FIELDS],
 		"Google Calendar": GOOGLE_FIELDS,
+		"File": FILE_FIELDS,
 	}, ignore_validate=True)
 	from lifeos import index
 	index.ensure_indexes()
