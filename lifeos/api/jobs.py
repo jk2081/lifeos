@@ -46,6 +46,9 @@ def file_job(job_id: str, space: str | None = None, title: str | None = None, ar
 	if not permissions.has_app_permission():
 		frappe.throw(_("Only Life OS users and agents can file work."), frappe.PermissionError)
 	space = permissions.resolve_space(space, write=True)
+	from lifeos.api import connections
+
+	connections.require_on(space, (source_system or "").strip().lower()[:40] or DEFAULT_SYSTEM)
 	plan = _check(space, job_id, title, area, goal, inputs, outputs, proposals, wiki, chat)
 	plan.update(instruction=instruction, raw_text=raw_text, transcript_md=transcript_md, summary_md=summary_md,
 		system=(source_system or "").strip().lower()[:40] or DEFAULT_SYSTEM)

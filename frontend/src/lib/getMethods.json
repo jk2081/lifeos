@@ -18,6 +18,7 @@
  "lifeos.api.chats.get",
  "lifeos.api.chats.needs_summary",
  "lifeos.api.chats.transcript",
+ "lifeos.api.connections.sources",
  "lifeos.api.connections.defaults",
  "lifeos.api.connections.list",
  "lifeos.api.connections.import_status",

@@ -83,6 +83,7 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 	if intent and intent not in INTENTS:
 		frappe.throw(_("intent must be one of: {0}.").format(", ".join(INTENTS)))
 	system = (source_system or "").strip().lower() or None
+	connections.require_on(space, system)
 	if project and not goal:
 		goal = goal_for_project(project, space)
 	existing = frappe.db.get_value("Life Inbox Item", {"space": space, "source_system": system, "external_id": external_id.strip()}) \

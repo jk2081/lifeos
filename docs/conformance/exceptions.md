@@ -10,8 +10,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 6 |
 | frappe-setuser | 14 |
-| frappe-sql-format-injection | 83 |
-| Total | 110 |
+| frappe-sql-format-injection | 86 |
+| Total | 113 |
 
 ## frappe-manual-commit
 
@@ -72,20 +72,23 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/archive.py` | 74 | fixed fragments, std_clause columns checked against meta, vault_guard constant; values are parameters |
 | `lifeos/api/ask.py` | 195 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
 | `lifeos/api/ask.py` | 200 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
+| `lifeos/api/brain.py` | 135 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 141 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 152 | WHERE is constant SQL plus area_filter; values are parameters |
 | `lifeos/api/chats.py` | 27 | vault_guard is a constant fragment; values are parameters |
 | `lifeos/api/chats.py` | 149 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 155 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 157 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 159 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
-| `lifeos/api/chats.py` | 265 | sensitive_guard is a constant fragment; values are parameters |
-| `lifeos/api/chats.py` | 269 | as above |
+| `lifeos/api/chats.py` | 268 | sensitive_guard is a constant fragment; values are parameters |
+| `lifeos/api/chats.py` | 272 | as above |
 | `lifeos/api/goals.py` | 37 | `sp` is one of two constant fragments; values are parameters |
 | `lifeos/api/goals.py` | 100 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
 | `lifeos/api/goals.py` | 109 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
 | `lifeos/api/goals.py` | 244 | `off` is off_clause's fixed SQL; values are parameters |
-| `lifeos/api/inbox.py` | 370 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 375 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 372 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
 | `lifeos/api/inbox.py` | 377 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 379 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |

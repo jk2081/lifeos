@@ -4107,7 +4107,7 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
           ['/life/plan/someday', '/life/goals/someday'], ['/life/plan/reset', '/life/today/reset'], ['/life/tasks', '/life/goals/tasks'],
           ['/life/someday', '/life/goals/someday'], ['/life/outbox', '/life/brain/outbox'], ['/life/archive', '/life/library/archive'],
           ['/life/wiki', '/life/library/notes'], ['/life/vault', '/life/library/documents'], ['/life/graph', '/life/library/notes'],
-          ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/captures'], ['/life/chats', '/life/library/chats'],
+          ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/sources'], ['/life/chats', '/life/library/chats'],
           ['/life/library/captures', '/life/brain/captures'], ['/life/library/outbox', '/life/brain/outbox'], ['/life/projects', '/life/goals'],
           ['/life/reset', '/life/today/week'], ['/life/calendar', '/life/today/week'], ['/life/calendar/month', '/life/today/month'],
           ['/life/calendar/year', '/life/today/year'], ['/life/calendar/agenda', '/life/today/week'], ['/life/journal', '/life/today/year'],
@@ -4781,6 +4781,128 @@ for t in frappe.get_all("Life Task", filters={"title": ["like", "I18 % ${width} 
 for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I18 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)
 for n in ${JSON.stringify(made.aside)}:
     if frappe.db.exists("Life Inbox Item", n): frappe.db.set_value("Life Inbox Item", n, "is_archived", 0, update_modified=False)
+frappe.db.set_value("Life Area", "${made.tea}", "is_on", ${made.was ? 1 : 0})`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 19: Brain > Sources. Titles start "I19 ". The space's own connections are put aside (their space renamed) for each width and
+// brought back after, so the cards are this check's alone.
+for (const width of SET_WIDTHS) {
+  const tag = `I19.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const ASIDE = `zz-i19-aside-${width}`
+  const made = JSON.parse(bench(`import json
+tea = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"})
+was = frappe.db.get_value("Life Area", tea, "is_on")
+frappe.db.set_value("Life Area", tea, "is_on", 1)
+aside = frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name")
+for n in aside: frappe.db.set_value("Life Connection", n, "space", "${ASIDE}", update_modified=False)
+print(json.dumps({"tea": tea, "was": was, "aside": aside}))`).split('\n').pop())
+  const card = (sys) => pg.locator(`[data-source-card][data-system="${sys}"]`)
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openSources = async () => { await s.open('/life/brain/sources'); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const capture = (title, system, extra = {}) => s.api('inbox.create_item', { space: SPACE, title: `I19 ${title} ${width} ${stamp}`, source_system: system, ...extra })
+  try {
+    await check(`${tag}.6`, `${width} px: with no source connected Sources says what will appear and offers Add a source`, async () => {
+      await openSources()
+      must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state')
+      const t = await pg.locator('[data-sources-empty]').innerText()
+      must(t.includes('Nothing is connected yet.') && t.includes('switch them on below'), 'the empty state says: ' + t)
+      must(await pg.locator('[data-source-tile][data-system="upload"]').innerText().then((x) => x.includes('Always on')), 'the Upload tile is missing')
+      await pg.locator('[data-add-source-empty]').click()
+      await pg.locator('[data-add-more]').waitFor({ state: 'visible' })
+      await noSideways()
+    })
+    await check(`${tag}.1`, `${width} px: connected sources show with this week's counts, matching the captures in the database`, async () => {
+      for (const n of [1, 2, 3]) await capture(`hermes ${n}`, 'hermes')
+      await capture('gmail 1', 'gmail')
+      await openSources()
+      must((await pg.locator('[data-source-card]').count()) === 2, 'expected two cards, got ' + await pg.locator('[data-source-card]').count())
+      must((await pg.locator('[data-connected-count]').innerText()) === '2', 'the count in the heading is wrong')
+      for (const sys of ['hermes', 'gmail']) {
+        const n = bench(`from frappe.utils import add_days, getdate
+d = getdate()
+print(frappe.db.count("Life Inbox Item", {"space": "${SPACE}", "source_system": "${sys}", "creation": [">=", add_days(d, -d.weekday())]}))`).split('\n').pop()
+        const shown = await card(sys).getAttribute('data-week')
+        must(shown === n && n !== '0', `${sys}: the card says ${shown}, the database ${n}`)
+        must((await card(sys).locator('[data-source-line]').innerText()).includes(`${n} this week`), `${sys}: the line does not say ${n} this week`)
+      }
+      must((await card('hermes').innerText()).includes('Agent · Telegram'), 'the kind of Hermes is missing')
+      must((await card('gmail').innerText()).includes('only people, not newsletters'), 'the Gmail note is missing')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: switching Hermes off makes create_item from hermes fail with a clear message; switching it on again works`, async () => {
+      await openSources()
+      await card('hermes').locator('button[role="switch"]').click()
+      await pg.waitForTimeout(800)
+      must((await card('hermes').getAttribute('data-active')) === '0', 'the card still says On')
+      const r = await s.api('inbox.create_item', { space: SPACE, title: `I19 refused ${width} ${stamp}`, source_system: 'hermes' }, { raw: true })
+      const text = await r.text()
+      must(!r.ok() && text.includes('switched off'), `create_item answered ${r.status()}: ${text.slice(0, 200)}`)
+      must(bench(`print(frappe.db.count("Life Inbox Item", {"title": "I19 refused ${width} ${stamp}"}))`).split('\n').pop() === '0', 'the refused capture was stored')
+      must((await (await s.api('inbox.create_item', { space: SPACE, title: `I19 upload ${width} ${stamp}`, source_system: 'upload' })).title).includes('upload'), 'Upload should always work')
+      await card('hermes').locator('button[role="switch"]').click()
+      await pg.waitForTimeout(800)
+      must((await card('hermes').getAttribute('data-active')) === '1', 'the card still says Off')
+      const ok = await capture('back on', 'hermes')
+      must(ok.created, 'create_item should work again')
+      must((await card('hermes').getAttribute('data-week')) !== null && bench(`print(frappe.db.count("Life Inbox Item", {"title": ["like", "I19 hermes %${width} ${stamp}"]}))`).split('\n').pop() === '3', 'what Hermes brought earlier was deleted')
+    })
+    await check(`${tag}.3`, `${width} px: a Coming tile cannot be switched on`, async () => {
+      await openSources()
+      const tile = pg.locator('[data-tile-coming][data-system="github"]')
+      must((await tile.innerText()).includes('Coming'), 'the GitHub tile does not say Coming')
+      must((await tile.locator('button').count()) === 0, 'a Coming tile has a button')
+      await tile.click({ force: true })
+      await pg.waitForTimeout(500)
+      must((await pg.locator('[data-source-settings]').count()) === 0 && (await card('github').count()) === 0, 'a Coming tile opened or added something')
+      for (const sys of ['github', 'whatsapp', 'wearable', 'tally', 'drive', 'erpnext']) must(await pg.locator(`[data-tile-coming][data-system="${sys}"]`).count() === 1, sys + ' is missing')
+      const r = await s.api('connections.save', { space: SPACE, system: 'github', active: 1 }, { raw: true })
+      must(!r.ok() && (await r.text()).includes('not built yet'), 'the server switched GitHub on: ' + r.status())
+    })
+    await check(`${tag}.4`, `${width} px: opening a source shows its default intent, area and goal, and saving changes what create_item uses`, async () => {
+      await openSources()
+      await card('gmail').locator('[data-source-open]').click()
+      const dlg = pg.locator('[data-source-settings][data-system="gmail"]')
+      await dlg.waitFor({ timeout: 5000 })
+      must(await dlg.locator('[data-settings-intent]').count() && await dlg.locator('[data-settings-area]').count() && await dlg.locator('[data-settings-goal]').count(), 'intent, area or goal is missing')
+      await dlg.locator('[data-settings-intent] [role="combobox"], [data-settings-intent] button').first().click()
+      await pg.getByRole('option', { name: 'Just keep', exact: true }).first().click()
+      await dlg.locator('[data-settings-area] button').click()
+      await pg.getByRole('menuitem', { name: 'Tea & Coffee', exact: false }).first().click()
+      await pg.getByRole('button', { name: 'Save' }).click()
+      await pg.waitForTimeout(1000)
+      const c = bench(`import json
+print(json.dumps(frappe.db.get_value("Life Connection", {"space": "${SPACE}", "system": "gmail"}, ["default_intent", "default_area"], as_dict=True)))`).split('\n').pop()
+      must(JSON.parse(c).default_intent === 'Just keep' && JSON.parse(c).default_area === made.tea, 'the defaults were not saved: ' + c)
+      const item = await capture('defaults', 'gmail')
+      must(item.intent === 'Just keep' && item.area === made.tea, `create_item used intent ${item.intent}, area ${item.area}`)
+      await card('gmail').locator('[data-source-open]').click()
+      await pg.locator('[data-source-settings][data-system="gmail"]').waitFor({ timeout: 5000 })
+      must((await pg.locator('[data-source-settings] [data-settings-intent]').innerText()).includes('Just keep'), 'the saved intent is not shown when it is opened again')
+      await pg.keyboard.press('Escape')
+    })
+    await check(`${tag}.5`, `${width} px: ${phone ? 'the cards stack in one column' : 'the cards sit in a grid'} and nothing scrolls sideways`, async () => {
+      await openSources()
+      await noSideways()
+      const boxes = await pg.locator('[data-source-card]').evaluateAll((els) => els.map((e) => { const b = e.getBoundingClientRect(); return [b.x, b.y, b.width] }))
+      must(boxes.length >= 2, 'expected at least two cards')
+      if (phone) must(boxes.every(([x, , w]) => Math.abs(x - boxes[0][0]) < 1 && w <= width), 'the cards do not stack')
+      else must(Math.abs(boxes[1][1] - boxes[0][1]) < 1 && boxes[1][0] > boxes[0][0], 'the cards are not side by side')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`import json
+frappe.set_user("Administrator")
+for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I19 %${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)
+for c in frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc("Life Connection", c, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.aside)}: frappe.db.set_value("Life Connection", n, "space", "${SPACE}", update_modified=False)
 frappe.db.set_value("Life Area", "${made.tea}", "is_on", ${made.was ? 1 : 0})`)
     await s.ctx.close()
   }

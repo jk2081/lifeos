@@ -86,7 +86,8 @@ const routes = [
     const [path, extra] = map[t] || ['/today/year', { view: 'cycle' }]
     return { path, query: { ...r.query, ...extra } }
   } },
-  { path: '/sources', redirect: (r) => libraryKind(r) },
+  // the old Sources page (the captures list) is Brain > Sources now; an old link with a filter still opens the captures it asked for
+  { path: '/sources', redirect: (r) => (Object.keys(r.query).length ? libraryKind(r) : { path: '/brain/sources', hash: r.hash }) },
   // Chats were a tab of Sources (set 4): filters carry over; the old report (group=day) is the By day view
   { path: '/chats', redirect: (r) => {
     const { group, open, view, ...rest } = r.query

@@ -3,16 +3,13 @@
   <Inbox v-else-if="current === 'queue'" />
   <Activity v-else-if="current === 'activity'" />
   <Sources v-else-if="current === 'captures'" place="captures" screen="brain-activity" />
-  <template v-else-if="current === 'sources'">
-    <PageHead title="Sources" sub="Where information comes from. The Brain reads only what you switch on." />
-    <div class="page-body max-w-4xl" data-brain-sources><ConnectionsSection :space="store.space" :writable="canWrite() && !store.isAgent" /></div>
-  </template>
+  <SourcesTab v-else-if="current === 'sources'" />
   <Outbox v-else-if="current === 'outbox'" />
   <PlaceLinks :links="LINKS" label="More in the Brain" />
 </template>
 <script setup>
 // The Brain, one of the four places (issue 14): Needs you (issue 17: what the Brain asks you to decide), Activity (everything that came in
-// and what was made from it) and Sources (the connections). The tabs are paths (/brain, /brain/activity); every screen
+// and what was made from it) and Sources (issue 19: what Life OS reads, switched on one by one). The tabs are paths (/brain, /brain/activity); every screen
 // open here shows them under its header. The Outbox and the Queue (the old Inbox list: captures waiting for the agent or failed) are pages of the Brain, linked under every tab. Until each tab's own
 // issue lands, it shows the nearest screen.
 import { computed, provide } from 'vue'
@@ -22,12 +19,10 @@ import NeedsYou from '@/components/brain/NeedsYou.vue'
 import Sources from '@/pages/Sources.vue'
 import Activity from '@/components/brain/Activity.vue'
 import Outbox from '@/pages/Outbox.vue'
-import PageHead from '@/components/PageHead.vue'
 import PlaceLinks from '@/components/PlaceLinks.vue'
-import ConnectionsSection from '@/components/settings/ConnectionsSection.vue'
+import SourcesTab from '@/components/brain/SourcesTab.vue'
 import { BRAIN_TABS, brainPath, withPage } from '@/lib/nav'
 import { navCount } from '@/lib/newMenu'
-import { canWrite, store } from '@/lib/store'
 
 const props = defineProps({ tab: String })
 const router = useRouter()

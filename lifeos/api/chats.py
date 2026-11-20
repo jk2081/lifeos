@@ -200,6 +200,9 @@ def log(space: str | None = None, title: str | None = None, date: str | datetime
 	if assistant not in ASSISTANTS:
 		assistant = "Other"
 	system = (source_system or "").strip().lower() or None
+	from lifeos.api import connections
+
+	connections.require_on(space, system)
 	ext = (external_id or "").strip() or None
 	items = [str(t).strip()[:500] for t in parse(open_items, []) or [] if str(t).strip()]
 	existing = frappe.db.get_value("Life Chat Log", {"space": space, "source_system": system, "external_id": ext}) if system and ext else None
