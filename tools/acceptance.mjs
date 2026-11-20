@@ -3623,9 +3623,13 @@ await check('I5.4', 'No password or key in the workflow file or in the logs a fa
   const literal = job.split('\n').filter((l) => /(password|secret|api[_-]?key|token)\w*["']?\s*[:=]\s*["']?(?![$"'\s])\S/i.test(l))
   must(!literal.length, 'written into the acceptance job: ' + literal.map((l) => l.trim()).join(' | '))
   must(!yml.includes(SETUP.password) && !yml.includes(agentSecret), "this run's password or agent key is in ci.yml")
-  const logs = bench("import glob\nfor f in ['/tmp/acc-site.log', '/tmp/serve-acceptance.log', '/tmp/worker-acceptance.log']:\n    print(open(f, errors='replace').read() if glob.glob(f) else '')")
-  must(logs.length > 0, 'the bench logs could not be read')
-  must(!logs.includes(SETUP.password) && !logs.includes(agentSecret), "the bench logs hold this run's password or agent key")
+  // searched on the bench, which prints only the names of the logs that hold one (the script goes in on stdin, never printed)
+  const found = JSON.parse(bench(`import json, os
+secrets = ${JSON.stringify([SETUP.password, agentSecret])}
+logs = [f for f in ('/tmp/acc-site.log', '/tmp/serve-acceptance.log', '/tmp/worker-acceptance.log') if os.path.exists(f)]
+print(json.dumps({"read": len(logs), "holding": [f for f in logs if any(s in open(f, errors="replace").read() for s in secrets)]}))`).split('\n').pop())
+  must(found.read > 0, 'the bench logs could not be read')
+  must(!found.holding.length, "this run's password or agent key is in " + found.holding.join(', '))
   if (FAIL_SHOTS && fs.existsSync(FAIL_SHOTS)) {
     const names = fs.readdirSync(FAIL_SHOTS).join(' ')
     must(!names.includes(SETUP.password), 'a screenshot name holds the password')
