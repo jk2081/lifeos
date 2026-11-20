@@ -59,8 +59,9 @@ class TestSettingsAreas(LifeTestCase):
 		with self.assertRaisesRegex(frappe.ValidationError, "Choose where to move them"):
 			settings.save_item("area", name=part, is_archived=1)
 		self.assertEqual(frappe.db.get_value("Life Area", part, "is_archived"), 0)
-		with self.assertRaises(frappe.ValidationError):  # not to itself
-			settings.save_item("area", name=part, is_archived=1, move_to=part)
+		for wrong in (part, self.life["Health"], self.areas["Personal"]):  # not to itself, nor outside Career
+			with self.assertRaises(frappe.ValidationError):
+				settings.save_item("area", name=part, is_archived=1, move_to=wrong)
 		settings.save_item("area", name=part, is_archived=1, move_to=other)
 		self.assertEqual(frappe.db.get_value("Life Area", part, "is_archived"), 1)
 		self.assertEqual(frappe.db.get_value("Life Task", open_task, "area"), other)

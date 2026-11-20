@@ -372,6 +372,13 @@ GitHub issue #11. Deviations are in `DECISIONS.md` under "Issue 11".
 - **Works:** every space has the seven areas of life (Career, Health, Relationships, Money, Emotions, Mind, Environment, each with its one-line description); a new space has Career and Health on. Any other area is a part of one of the seven, one level deep (`Life Area` has `is_life_area`, `is_on`, `description`; rules in `lifeos/areas.py`). An area that is off hides itself, its parts and their tasks and goals from the task and goal lists, counts, Today, the lens, `space_context`, the area tree and every picker; nothing is deleted, and proposals filed into it are refused with a clear message. Only a person can switch an area. The patch `v11.life_areas` gives existing spaces the seven and turns their areas into parts by a mapping table (unknown areas go under Career and are printed). Area pickers list the seven that are on, each followed by its parts, indented.
 - **Tests:** `lifeos/tests/test_issue11_areas.py` (the issue's five) and acceptance check `I11.<width>.6` at 1440 and 390 px. The full unit suite: 439 run, 438 pass, 1 skipped. `./tools/scan.sh`: 0 findings. `node tools/acceptance.mjs`: 160 of 162 on the first walk; the two failures were the Settings check `U<width>.12` (it nested areas under areas), rewritten for parts and passing on a rerun with `I11`.
 
+## Issue 12: Settings → Areas (20 Nov 2026)
+
+GitHub issue #12. Deviations are in `DECISIONS.md` under "Issue 12".
+
+- **Works:** Settings → Your life → Areas as in `mockups/v2/13-settings-areas.png`: the intro line, one card of the seven areas of life (on first) with an On/Off switch, the goal count, the description and "On by default" on Career and Health; under each area that is on, its parts with description, goal count and Edit, then "+ Add a part of <area>"; the footer line. A part's dialog edits its name, short description and colour, and archives it; archiving a part with open goals or tasks asks where they go (the area itself or another of its parts) and moves them (`settings.area_open_work`, `save_item(move_to=…)`). Only Life Admin changes areas, on the screen and on the server; anyone else sees the screen read-only. On a phone the card stacks and the switch is on the right.
+- **Tests:** `lifeos/tests/test_issue12_settings_areas.py` (5 tests) and acceptance checks `I12.<width>.1` to `.5` at 1440 and 390 px, 10 of 10. `U<width>.12` (Settings) rewritten for the new screen and passing, `I11` passing. The full unit suite: 444 run, 443 pass, 1 skipped. `./tools/scan.sh`: 0 findings. `node tools/screens.mjs --only settings-areas`: light and dark at both widths, no overflow, errors or low contrast.
+
 ## Summary
 
 ### What works

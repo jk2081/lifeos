@@ -150,12 +150,13 @@ def move_targets(area):
 
 
 def move_work(area, to):
-	"""Move the open goals and tasks of `area` to `to`, another area of the same space that is on and not archived. Each
-	record is saved as a document, so its index row and permissions follow. Returns the counts moved."""
-	src = frappe.db.get_value("Life Area", area, ["space", "area_name"], as_dict=True)
-	dest = frappe.db.get_value("Life Area", to, ["space", "area_name", "is_archived"], as_dict=True) if to else None
-	if not dest or dest.space != src.space or to == area or dest.is_archived:
-		frappe.throw(_("Choose another area of {0} to move its open goals and tasks to.").format(src.space))
+	"""Move the open goals and tasks of the part `area` to `to`: its own area of life or another of its parts that is not
+	archived (see move_targets). Each record is saved as a document, so its index row and permissions follow. A part holds
+	few open records, so one save each is fine. Returns the counts moved."""
+	src = frappe.db.get_value("Life Area", area, ["space", "area_name", "parent_area"], as_dict=True)
+	if to not in {t.name for t in move_targets(area)}:
+		frappe.throw(_("Move the open goals and tasks of {0} to its area of life or to another of its parts.").format(src.area_name))
+	dest = frappe.db.get_value("Life Area", to, ["area_name"], as_dict=True)
 	if is_off(src.space, to):
 		frappe.throw(_("{0} is switched off. Choose an area that is on.").format(dest.area_name))
 	work = open_work(area)
