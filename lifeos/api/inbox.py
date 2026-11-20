@@ -414,7 +414,7 @@ def get(item: str):
 
 
 @frappe.whitelist(methods=["GET"])
-def page(item: str):
+def item_page(item: str):
 	"""Issue 10: one item's page. Everything `get` returns, plus `came_of_it` (the records made from it, each with its state),
 	`related` (wiki pages and chat logs that cite it, the meetings it is linked to) and the space's name. An item the user may
 	not read is answered as not found, so its page says nothing about it."""

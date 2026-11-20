@@ -153,7 +153,7 @@ const relatedGroups = computed(() => [{ key: 'pages', label: 'Wiki pages and not
   { key: 'chats', label: 'Chat logs', rows: item.value.related.chats }, { key: 'meetings', label: 'Meetings', rows: item.value.related.meetings }])
 const relatedCount = computed(() => relatedGroups.value.reduce((n, g) => n + g.rows.length, 0))
 
-const fetchItem = () => api('inbox.page', { item: props.id })
+const fetchItem = () => api('inbox.item_page', { item: props.id })
 async function load() {
   try {
     item.value = await fetchItem()

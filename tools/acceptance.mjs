@@ -831,7 +831,7 @@ for (const width of UX_WIDTHS) {
       must(Math.round((await pane.boundingBox()).width) === 760, 'an inbox pane is not 760 px wide')
       await pg.locator('[data-pane-full]').click()
       await settle()
-      must(new URL(pg.url()).pathname === `/life/inbox/${ux.inbox}/review` && !(await pane.isVisible()), 'Open full page did not open the review screen')
+      must(new URL(pg.url()).pathname === `/life/item/${ux.inbox}` && !(await pane.isVisible()), "Open full page did not open the item page")
       // every pane type opens from its reference
       // set 6: goal: and a former project: (the goal it became) open in the pane too
       for (const ref of [`task:${ux.task}`, `note:${ux.note}`, `vault:${ux.vault}`, `goal:${ux.goal}`, `project:${ux.project}`, `chat:${ux.chat}`, `day:${today}`]) {
@@ -3651,6 +3651,116 @@ for (const width of SET_WIDTHS) {
     must(await pg.locator('[data-proposal="Pending"]').count() === 2, 'the two proposals are not shown')
     const overflow = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
     must(!overflow, 'the page scrolls sideways')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+  await s.ctx.close()
+}
+
+// Issue 10: one page per capture at /item/<name>: where it came from, what came in, what the Brain made of it, the decisions
+// waiting, what came of it and what is related. Its proposal cards are the Review screen's.
+for (const width of SET_WIDTHS) {
+  const tag = `I10.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  const title = `I10 capture ${width} ${stamp}`
+  // an item with a file, a summary and three proposals from the fake agent; one is accepted, so two wait
+  const made = await s.api('inbox.create_item', { title, space: SPACE, instruction: 'summarise and extract to-dos' })
+  const id = made.name
+  const pdfName = `i10-${width}-${stamp}.pdf`
+  await s.upload('Life Inbox Item', id, pdfName, 'application/pdf', PDF)
+  runAgent()
+  const first = (await s.api('inbox.get', { item: id })).proposals[0]
+  await s.api('review.decide', { proposal: first.name, decision: 'accept' })
+  const section = (name) => pg.locator(`[data-item-section="${name}"]`)
+  const openAll = async () => { // on a phone the folded sections are opened first
+    const folded = pg.locator('[data-item-toggle][aria-expanded="false"]')
+    for (let n = 0; n < 6 && await folded.count(); n++) await folded.first().click()
+  }
+  const settle = () => pg.waitForTimeout(700)
+
+  await check(`${tag}.1`, `${width} px: an item with a file, a summary, 2 waiting proposals and 1 accepted task shows every section right`, async () => {
+    await s.open(`/life/item/${id}`)
+    await openAll()
+    const head = await pg.locator('[data-item-head]').innerText()
+    must((await pg.locator('h1').first().innerText()).includes(title), 'the title is not in the header')
+    must(head.includes('Upload') && head.includes('Private'), 'the header does not say the source and the space: ' + head)
+    must(await section('came-in').locator('[data-file-view]', { hasText: pdfName }).count() === 1, 'the file is not under What came in once')
+    must((await section('came-in').innerText()).includes('summarise and extract to-dos'), 'the instruction is not under What came in')
+    must((await section('brain').innerText()).includes('summarised'), 'the summary is not under What the Brain made of it')
+    must(await section('decisions').locator('[data-proposal="Pending"]').count() === 2, 'Decisions does not show the 2 waiting proposals')
+    must(!(await section('decisions').locator('[data-proposal="Accepted"]').count()), 'an accepted proposal is still under Decisions')
+    const rows = section('came-of-it').locator('[data-came-of-it]')
+    must(await rows.count() === 1, `What came of it shows ${await rows.count()} records`)
+    const row = await rows.first().innerText()
+    must(row.includes(first.preview) && row.includes('Task') && row.includes('Open'), 'the accepted task is not shown with its state: ' + row)
+    must(await section('related').count() === 1, 'no Related section')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+
+  await check(`${tag}.2`, `${width} px: accepting a proposal on the item page moves it to What came of it without a reload`, async () => {
+    await s.open(`/life/item/${id}`)
+    await openAll()
+    await pg.evaluate(() => { window.__i10 = 1 })
+    const card = section('decisions').locator('[data-proposal="Pending"]').first()
+    const preview = (await card.locator('.text-base-medium').first().innerText()).trim()
+    await card.getByRole('button', { name: 'Accept', exact: true }).click()
+    await settle()
+    must(await pg.evaluate(() => window.__i10 === 1), 'the page reloaded')
+    must(await section('decisions').locator('[data-proposal="Pending"]').count() === 1, 'the accepted proposal is still waiting')
+    const rows = await section('came-of-it').locator('[data-came-of-it]').allInnerTexts()
+    must(rows.length === 2 && rows.some((r) => r.includes(preview)), `What came of it does not list "${preview}": ${rows.join(' | ')}`)
+  })
+
+  await check(`${tag}.3`, `${width} px: the item page opens from the Inbox list, from Library and from search`, async () => {
+    const full = async (from, what) => {
+      await s.open(from)
+      await pg.locator('[data-pane-full]').click()
+      await settle()
+      must(new URL(pg.url()).pathname === `/life/item/${id}`, `Open full page from ${what} went to ${new URL(pg.url()).pathname}`)
+      must(await pg.locator('[data-item-page]').count() === 1, `the item page did not show from ${what}`)
+    }
+    await s.open('/life/inbox')
+    const row = pg.locator('[data-row]', { hasText: title }).first()
+    must(await row.count() === 1, 'the item is not in the Inbox list')
+    await row.locator('[data-ref]').first().click()
+    await settle()
+    await pg.locator('[data-pane-full]').click()
+    await settle()
+    must(new URL(pg.url()).pathname === `/life/item/${id}`, 'the Inbox list did not lead to the item page')
+    await full(`/life/library/captures?open=${encodeURIComponent('source:' + id)}`, 'Library')
+    await s.open('/life/library/notes')
+    if (width < 768) await pg.locator('[data-phone-search]').click()
+    else await pg.keyboard.press('Meta+k')
+    await pg.locator('input[aria-label="Search or ask anything"]').fill(title)
+    await pg.waitForTimeout(900)
+    await pg.keyboard.press('Enter')
+    await settle()
+    must(new URL(pg.url()).pathname === `/life/item/${id}`, 'the search result did not open the item page: ' + new URL(pg.url()).pathname)
+  })
+
+  await check(`${tag}.4`, `${width} px: a user without access to the item's space gets "Not found" rather than its content`, async () => {
+    const f = await session('family@lifeos.test', width)
+    try {
+      await f.open(`/life/item/${id}`)
+      must(await f.page.locator('[data-item-missing]').isVisible(), 'the page does not say Not found')
+      const text = await f.page.locator('body').innerText()
+      must(!text.includes(title) && !text.includes(pdfName) && !text.includes('summarised'), 'the page shows the item to a user outside its space')
+      const r = await f.api('inbox.item_page', { item: id }, { raw: true })
+      must(r.status() === 404, 'the API answers ' + r.status())
+    } finally {
+      await f.ctx.close()
+    }
+  })
+
+  await check(`${tag}.5`, `${width} px: the item page is one column with no sideways scroll`, async () => {
+    await s.open(`/life/item/${id}`)
+    await openAll()
+    must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    const lefts = await pg.locator('[data-item-section]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)))
+    must(lefts.length === 5 && new Set(lefts).size === 1, 'the sections are not one column: ' + lefts.join(', '))
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
   })
   await s.ctx.close()

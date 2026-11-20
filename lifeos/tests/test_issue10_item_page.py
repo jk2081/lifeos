@@ -1,4 +1,4 @@
-"""Issue 10: the item page (lifeos.api.inbox.page): one capture with its files, summary, proposals, what came of it and
+"""Issue 10: the item page (lifeos.api.inbox.item_page): one capture with its files, summary, proposals, what came of it and
 what is related to it."""
 import frappe
 from frappe.utils import now_datetime
@@ -27,7 +27,7 @@ class TestItemPage(LifeTestCase):
 		review.decide(self.proposals[0], "accept")
 
 	def test_1_every_section_has_its_content(self):
-		got = inbox.page(self.item)
+		got = inbox.item_page(self.item)
 		self.assertEqual([f["file_name"] for f in got["files"]], ["i10-note.txt"])
 		self.assertEqual((got["summary_md"], got["transcript_md"], got["instruction"]), ("i10 the summary", "i10 the words", "summarise and extract to-dos"))
 		self.assertEqual(got["space_name"], PRIVATE)
@@ -38,12 +38,12 @@ class TestItemPage(LifeTestCase):
 
 	def test_2_accepting_a_proposal_adds_it_to_what_came_of_it(self):
 		review.decide(self.proposals[1], "accept")
-		got = inbox.page(self.item)
+		got = inbox.item_page(self.item)
 		self.assertEqual([m["title"] for m in got["came_of_it"]], ["i10 Call Vivek", "i10 Book the hall"])
 		self.assertEqual(len([p for p in got["proposals"] if p["status"] == "Pending"]), 1)
 		task = got["came_of_it"][0]["name"]
 		frappe.db.set_value("Life Task", task, "status", "Done")
-		self.assertEqual(inbox.page(self.item)["came_of_it"][0]["state"], "Done")
+		self.assertEqual(inbox.item_page(self.item)["came_of_it"][0]["state"], "Done")
 
 	def test_3_related_wiki_pages_chat_logs_and_meetings(self):
 		self.as_user(AGENT)
@@ -54,7 +54,7 @@ class TestItemPage(LifeTestCase):
 		event = frappe.get_doc({"doctype": "Event", "subject": "i10 production meeting", "starts_on": now_datetime(), "event_type": "Private",
 			"life_space": PRIVATE}).insert().name
 		meetings.link(event, "Life Inbox Item", self.item)
-		rel = inbox.page(self.item)["related"]
+		rel = inbox.item_page(self.item)["related"]
 		self.assertEqual([(p["kind"], p["title"]) for p in rel["pages"]], [("Wiki page", "i10 Production")])
 		self.assertEqual([c["name"] for c in rel["chats"]], [chat])
 		self.assertEqual([(m["title"], m["ref"]) for m in rel["meetings"]], [("i10 production meeting", f"event:{event}")])
@@ -62,9 +62,9 @@ class TestItemPage(LifeTestCase):
 	def test_4_a_user_outside_the_space_gets_not_found(self):
 		self.as_user(FAMILY)
 		with self.assertRaises(frappe.DoesNotExistError):
-			inbox.page(self.item)
+			inbox.item_page(self.item)
 		with self.assertRaises(frappe.DoesNotExistError):
-			inbox.page("no-such-item")
+			inbox.item_page("no-such-item")
 
 	def test_5_links_and_search_lead_to_the_item_page(self):
 		self.assertEqual(links.route_of("Life Inbox Item", self.item), f"/item/{self.item}")
