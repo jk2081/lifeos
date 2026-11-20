@@ -1,17 +1,21 @@
-// Bug fix 1: walk every place, every tab of Plan and Library, and every view of Plan's rhythms by clicking through the app
+// Bug fix 1: walk every place, every tab of each place, and every view of Today's rhythms by clicking through the app
 // as a person would (not by loading each URL), and report any screen that fails: a script error, the error boundary's
 // message, a body left empty, or the journal screens' header buttons missing. It ends by checking that navigation still
 // works. Used by tools/acceptance.mjs (BF1 checks) and, read-only, against the owner's site (--owner-read-only).
 
-// the views of Plan's rhythms and, for the journal screens, a button each puts into the header's #jr-actions
+// the views of Today's rhythms (Plan's before issue 14) and, for the journal screens, a button each puts into the header's #jr-actions
 const RHYTHMS = {
   week: [['Review'], ['Calendar'], ['Agenda']], // set 8: the review is its own screen; Pause leaves it for the Calendar
   month: [['Plan', 'Previous month'], ['Habits', 'Previous month'], ['Check-ins'], ['Calendar']],
-  '12-weeks': [[null, 'Weekly review']], // one view: no switch
-  year: [['Calendar'], ['Goals across cycles', 'All goals']],
+  year: [['Calendar'], ['12 Weeks', 'Weekly review'], ['Goals across cycles', 'All goals']],
 }
-const PLAN = ['week', 'month', '12-weeks', 'year', 'goals', 'tasks', 'someday']
-const LIBRARY = ['all', 'notes', 'captures', 'outbox', 'timeline', 'archive']
+// issue 14: the four places, each tab, and the pages linked at the foot of a place
+const PLACES = {
+  Today: { tabs: ['day', 'week', 'month', 'year'] },
+  Brain: { tabs: ['needs-you', 'activity', 'sources'], pages: ['outbox'] },
+  Goals: { tabs: ['by-area', 'tasks', 'no-goal'], pages: ['someday'] },
+  Library: { tabs: ['all', 'notes', 'documents', 'people', 'chats'], pages: ['timeline', 'archive'] },
+}
 
 export async function walkScreens(page, { width, settle = () => page.waitForTimeout(500) }) {
   const phone = width < 800
@@ -65,21 +69,26 @@ export async function walkScreens(page, { width, settle = () => page.waitForTime
     if (problems.length) failures.push(`${name}: ${problems.join('; ')}`)
   }
 
-  for (const label of ['Today', 'Inbox']) { await place(label); await inspect(label) }
-  await place('Plan')
-  for (const t of PLAN) {
-    await tab(t)
-    if (!RHYTHMS[t]) { await inspect(`Plan > ${t}`); continue }
-    // each view, then back to the first: switching views inside a mounted rhythm is how the review broke
-    for (const [label, button] of [...RHYTHMS[t], RHYTHMS[t][0]]) { await view(label); await inspect(`Plan > ${t} > ${label || 'Cycle'}`, button) }
+  const pageLink = async (key) => {
+    await page.locator(`[data-place-link="${key}"]`).first().click()
+    await page.waitForLoadState('networkidle')
+    await settle()
   }
-  await place('Library')
-  for (const t of LIBRARY) { await tab(t); await inspect(`Library > ${t}`) }
+  for (const [label, p] of Object.entries(PLACES)) {
+    await place(label)
+    for (const t of p.tabs) {
+      await tab(t)
+      if (!RHYTHMS[t]) { await inspect(`${label} > ${t}`); continue }
+      // each view, then back to the first: switching views inside a mounted rhythm is how the review broke
+      for (const [v, button] of [...RHYTHMS[t], RHYTHMS[t][0]]) { await view(v); await inspect(`${label} > ${t} > ${v}`, button) }
+    }
+    for (const k of p.pages || []) { await pageLink(k); await inspect(`${label} > ${k}`) }
+  }
   // navigation still moves the page after all of that
-  await place('Plan'); await tab('week'); await view('Review')
+  await place('Today'); await tab('week'); await view('Review')
   await place('Today')
   const path = await page.evaluate(() => location.pathname)
-  if (path.replace(/\/$/, '') !== '/life') failures.push(`navigation: Today left the page at ${path}`)
+  if (path.replace(/\/$/, '') !== '/life/today') failures.push(`navigation: Today left the page at ${path}`)
   await inspect('Today after the walk')
   page.off('pageerror', onError)
   return { seen, failures }

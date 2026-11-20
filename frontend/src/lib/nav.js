@@ -2,12 +2,12 @@
 // and the letters after G. Every tab of a place is its own path. Icons are Lucide names, drawn by frappe-ui's icon plugin.
 export const PLACES = [
   { label: 'Today', to: '/today', base: '/today', icon: 'lucide-sun', key: 't' },
-  { label: 'Brain', to: '/brain', base: '/brain', icon: 'lucide-sparkles', key: 'b' },
+  { label: 'Brain', to: '/brain', base: '/brain', icon: 'lucide-sparkles', key: 'i' },
   { label: 'Goals', to: '/goals', base: '/goals', icon: 'lucide-target', key: 'o' },
   { label: 'Library', to: '/library', base: '/library', icon: 'lucide-library', key: 'l' },
 ]
 // shown between Goals and Library once the person has locked a weekly review, or on the review's day
-export const REVIEW = { label: 'Review', to: '/review', base: '/review', icon: 'lucide-calendar-check', key: 'r' }
+export const REVIEW = { label: 'Review', to: '/review', base: '/review', icon: 'lucide-calendar-check', key: 'd' }
 export const SETTINGS = { label: 'Settings', to: '/settings', base: '/settings', key: 's', icon: 'lucide-settings' }
 
 // each place's tabs; the first is the place's own path
@@ -22,19 +22,20 @@ export const brainPath = tabPath('/brain', BRAIN_TABS)
 export const goalsPath = tabPath('/goals', GOALS_TABS)
 export const libraryPath = tabPath('/library', LIBRARY_TABS)
 
-// G then a letter: the places, then the pages that live inside them
+// G then a letter: the places, then the pages inside them. The letters from before issue 14 open their new homes
+// (I, once the Inbox, opens the Brain; P, once Plan, opens Today's Week; U, once Captures, opens Brain > Activity).
 export const GO = [
   ...PLACES, REVIEW,
-  { label: 'Today: Week', to: '/today/week', key: 'w' }, { label: 'Today: Month', to: '/today/month', key: 'm' },
-  { label: 'Today: Year', to: '/today/year', key: 'c' }, { label: 'Today: 12 Weeks', to: '/today/year?view=cycle', key: 'j' },
-  { label: 'Today: Reset', to: '/today/reset', key: 'e' },
-  { label: 'Brain: Activity', to: '/brain/activity', key: 'a' }, { label: 'Brain: Sources', to: '/brain/sources', key: 'u' },
-  { label: 'Brain: Outbox', to: '/brain/outbox', key: 'x' },
+  { label: 'Plan, now Today: Week', to: '/today/week', key: 'p' }, { label: 'Today: Week', to: '/today/week', key: 'w' },
+  { label: 'Today: Month', to: '/today/month', key: 'm' }, { label: 'Today: 12 Weeks', to: '/today/year?view=cycle', key: 'j' },
+  { label: 'Today: Year', to: '/today/year', key: 'c' }, { label: 'Today: Reset', to: '/today/reset', key: 'e' },
   { label: 'Goals: All tasks', to: '/goals/tasks', key: 'k' }, { label: 'Goals: Someday', to: '/goals/someday', key: 'y' },
+  { label: 'Brain: Activity', to: '/brain/activity', key: 'u' }, { label: 'Brain: Outbox', to: '/brain/outbox', key: 'b' },
   { label: 'Library: Notes', to: '/library/notes', key: 'n' }, { label: 'Library: Chats', to: '/library/chats', key: 'h' },
-  { label: 'Library: Sensitive documents', to: '/library/documents?tab=documents&sensitive=1', key: 'v' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
-  { label: 'Library: Trash and archive', to: '/library/archive', key: 'z' }, { label: 'Ask: history and insights', to: '/ask', key: 'q' },
-  SETTINGS,
+  { label: 'Library: Sensitive documents', to: '/library/documents?tab=documents&sensitive=1', key: 'v' },
+  { label: "Library: The assistant's notes", to: '/library/notes?by=assistant', key: 'x' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
+  { label: 'Library: Trash and archive', to: '/library/archive', key: 'r' }, { label: 'Ask: history and insights', to: '/ask', key: 'q' },
+  { label: 'Settings: Areas', to: '/settings?tab=areas', key: 'a' }, SETTINGS,
 ]
 export const TOOLTIPS = { Today: 'What to do now', Brain: 'What came in and what the Brain did with it', Goals: 'Where you are going', Library: 'What you have and know' }
 // the view switch of Library > Notes: List (the default), Tree and Graph, and the assistant's Changes and Health

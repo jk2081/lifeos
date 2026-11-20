@@ -263,7 +263,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | Method | Arguments | Does |
 | --- | --- | --- |
 | `session.boot` |  | Who is logged in, which spaces they can use, and the settings the screens need. |
-| `session.counts` | `space=None` | Small numbers for the sidebar. |
+| `session.counts` | `space=None`, `area=None` | Small numbers for the sidebar, each with the list it opens, and `reviewed`: whether the user has locked a weekly review (Review then joins the sidebar). |
 
 **`lifeos.api.settings`**
 
