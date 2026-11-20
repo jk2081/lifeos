@@ -620,3 +620,11 @@ Fixed: sensitive items reached agents through paths that did not use the Vault r
 - **The `tests` job's database password (`root`) stays.** It predates this issue and belongs to a service container that lives only for that job; I5.4 checks the acceptance job, where every password is made in the job.
 - **`lifeos.localhost` exists in CI** (empty, with Life OS installed) because the walk's S4.0 checks it for debris.
 - `tools/screens.mjs`, `shot.mjs`, `review-shots.mjs` and `dbg.mjs` still use Docker, Chrome from `/Applications` and `.env`; the issue covers the acceptance tooling only.
+
+## Issue 6: filing again with the same external_id (20 Nov 2026)
+
+- **A Failed item sent back by an intent change loses its pending proposals**, as `retry` does, so the new attempt starts clean. Its error is cleared. An agent may cause this (unlike `retry`, which is for people only), because the issue asks that re-filing with a new intent make the item claimable again.
+- **Only a real change counts.** A field passed with the value it already has is not in `changed_fields` and does not send the item back.
+- **`changed` stays in the answer** (true when any field changed) for callers that read it; `changed_fields` is new. A newly created item answers `updated: false`.
+- **`source_type` is still always set** from the call on an update (defaulting to Upload), as before; the issue does not list it.
+- **All acceptance items are unit tests**, numbered by their position in `test_issue6_refile.py`; no screen changed, so there is no `I6` check in `tools/acceptance.mjs`.
