@@ -319,6 +319,17 @@ GitHub issue #1, as `ISSUE_1.md` describes. Deviations are in `DECISIONS.md` und
   - Screenshots of Members, Agents, Spaces, Sensitive items and the Add member dialog at 1440 px and 390 px, light and dark, looked at by eye; nothing scrolls sideways. Fixed on the way here: an agent's email and last-filed line ran together and broke mid-word on a phone.
 - `README.md` (agents are added in Settings → People and agents → Members with Add member; the changed methods), `agent/SKILL.md` and `frontend/COMPONENTS.md` (the one member row, Add member) are updated.
 
+## Issue 5: the acceptance walk in GitHub Actions (20 Nov 2026)
+
+GitHub issue #5. Deviations are in `DECISIONS.md` under "Issue 5".
+
+- **Works:** `tools/bench.sh` is the one way the acceptance tooling reaches the bench (the Docker bench by default; `LIFEOS_BENCH_CMD=local` with `LIFEOS_BENCH_PATH` for a bench folder on the same machine). `tools/acceptance-env.mjs` picks Chrome from `/Applications` or else Playwright's own Chromium, and the test password from `LIFEOS_DEV_PASSWORD` or else `.env`. `scripts/acceptance-site.sh` and `tools/scan.sh` take the same switches. `LIFEOS_FAIL_SHOTS` saves a screenshot of every open page when a check fails. `--part=1440|390|sets` runs one part of the walk.
+- **CI:** the `acceptance` job in `.github/workflows/ci.yml` runs the three parts side by side, each on a fresh Frappe 16.56.0 bench with its own database: it builds the front end, makes `lifeos.localhost` and `acceptance.localhost`, serves the latter on 19000 and runs the walk. Passwords are made in the job with `openssl rand` and masked. On a failure it uploads screenshots and logs, unless either password is in them.
+- **Checks.**
+  - On the Mac, before the change: `node tools/acceptance.mjs` 142 of 142 in 39.5 minutes. After it: the same 142 pass, with the same Chrome, site and bench, plus I5.1 and I5.3 (39.6 minutes). I5.2 and I5.4 failed in that run only because the workflow was changed under it and I5.4 printed the Mac's large logs; after the fix `--only=I5` passes 4 of 4. `--owner-read-only` passes as before (26 screens and the review at each width, the owner's site unchanged).
+  - In GitHub Actions (scratch branches, since deleted): the three parts passed 58 of 58 (1440), 55 of 55 (390) and 75 of 75 (sets), in 20.5, 19.5 and 10 minutes for the whole job. A deliberately failing check failed its part and uploaded its screenshots and the logs as an artifact. The first try uploaded nothing, because the job's guard found the passwords in Frappe's `bench.log`, which is now left out.
+  - Unit tests: 405 run, 404 pass, 1 skipped. `./tools/scan.sh`: 0 findings.
+
 ## Summary
 
 ### What works
@@ -380,6 +391,7 @@ docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && yar
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost run-tests --app lifeos'
 node tools/acceptance.mjs --owner-read-only   # bug fix 1: walk every screen on lifeos.localhost without changing it
 node tools/acceptance.mjs            # the acceptance list, on its own site acceptance.localhost (http://localhost:19000), rebuilt from a snapshot first
+node tools/acceptance.mjs --part=sets  # one of the three parts CI runs side by side (1440, 390, sets)
 scripts/acceptance-site.sh --new     # rebuild that site and its snapshot from scratch (after a schema change); also starts its server and a worker
 node tools/screens.mjs               # screenshots of every screen, both widths and themes, with overflow, error and contrast checks
 ./tools/scan.sh                      # Frappe's semgrep rules (pre-step 6): must report 0; run at the end of every set (acceptance's C.1 runs it too)
