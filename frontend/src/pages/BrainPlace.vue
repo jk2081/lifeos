@@ -1,7 +1,8 @@
 <template>
   <NeedsYou v-if="current === 'needs-you'" />
   <Inbox v-else-if="current === 'queue'" />
-  <Sources v-else-if="current === 'activity'" place="captures" screen="brain-activity" />
+  <Activity v-else-if="current === 'activity'" />
+  <Sources v-else-if="current === 'captures'" place="captures" screen="brain-activity" />
   <template v-else-if="current === 'sources'">
     <PageHead title="Sources" sub="Where information comes from. The Brain reads only what you switch on." />
     <div class="page-body max-w-4xl" data-brain-sources><ConnectionsSection :space="store.space" :writable="canWrite() && !store.isAgent" /></div>
@@ -19,6 +20,7 @@ import { useRouter } from 'vue-router'
 import Inbox from '@/pages/Inbox.vue'
 import NeedsYou from '@/components/brain/NeedsYou.vue'
 import Sources from '@/pages/Sources.vue'
+import Activity from '@/components/brain/Activity.vue'
 import Outbox from '@/pages/Outbox.vue'
 import PageHead from '@/components/PageHead.vue'
 import PlaceLinks from '@/components/PlaceLinks.vue'
@@ -31,10 +33,11 @@ const props = defineProps({ tab: String })
 const router = useRouter()
 const current = computed(() => props.tab || 'needs-you')
 const LINKS = [{ key: 'queue', label: 'Queue: every capture and where it is', icon: 'lucide-list', to: '/brain/queue' },
+  { key: 'captures', label: 'Captures: every source, as a list', icon: 'lucide-inbox', to: '/brain/captures' },
   { key: 'outbox', label: 'Outbox: what went out', icon: 'lucide-send', to: '/brain/outbox' }]
 // Needs you carries the same count as the sidebar's Brain
 const tabs = computed(() => BRAIN_TABS.map((t) => (t.value === 'needs-you' ? { ...t, count: navCount('Brain')?.n ?? 0, noun: 'to review' } : t)))
-const PAGES = { outbox: 'Outbox', queue: 'Queue' }
+const PAGES = { outbox: 'Outbox', queue: 'Queue', captures: 'Captures' }
 provide('placeTabs', computed(() => ({ tabs: withPage(tabs.value, current.value, PAGES), current: current.value, label: 'Brain',
   set: (v) => router.push(brainPath(v)) })))
 </script>

@@ -651,7 +651,7 @@ const num = (text, which = 0) => { const m = String(text).match(/\d+/g); if (!m)
 const ROW = '[data-row]'
 const LISTS = [
   ['Inbox', '/life/brain/queue?all=1'], ['Timeline', '/life/library/timeline?all=1'], ['Tasks', '/life/goals/tasks?view=list'],
-  ['Goals', '/life/goals?all=1'], ['Documents', '/life/library/documents?tab=documents&all=1'], ['Captures', '/life/brain/activity?all=1'],
+  ['Goals', '/life/goals?all=1'], ['Documents', '/life/library/documents?tab=documents&all=1'], ['Captures', '/life/brain/captures?all=1'],
   ['Notes', '/life/library/notes?view=list&all=1'], ['All', '/life/library?view=list&all=1'], ['Archive', '/life/library/archive?all=1'],
 ].map(([name, p]) => [name, p, ROW])
 // one filter for each ListView, set through the library's quick-filter strip: [screen, path, URL key, URL value, the control's label, the option to pick, text to type for a Link]
@@ -659,7 +659,7 @@ const LISTS = [
 const FILTERS = [
   ['Inbox', '/life/brain/queue?all=1', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/goals/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
   ['Tasks table', '/life/goals/tasks?view=table&status=all', 'priority', 'I', 'Priority', 'I'], ['Goals', '/life/goals?status=all', 'type', 'Open', 'Type', 'Open'],
-  ['Captures', '/life/brain/activity?all=1', 'status', 'Done', 'Status', 'Done'],
+  ['Captures', '/life/brain/captures?all=1', 'status', 'Done', 'Status', 'Done'],
   ['Notes', '/life/library/notes?view=list&all=1', 'goal', ux.goal, 'Goal', ux.goalTitle, ux.goalTitle.slice(0, 6)],
 ]
 // UX fixes, set 3: the state tabs of each list screen. [screen, path, the URL parameter of the tabs, the tab values in order (the first is the default), another filter]
@@ -670,7 +670,7 @@ const STATE_TABS = [
   ['Goals', '/life/goals', 'status', ['in_progress', 'achieved', 'closed', 'someday', 'all'], `area=${uxArea}`],
   ['Archive', '/life/library/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'Life Journal Page', 'trash'], `area=${uxArea}`],
   ['Someday', '/life/goals/someday', 'tab', ['all', 'due', 'tasks', 'goals', 'ideas'], `area=${uxArea}`],
-  ['Captures', '/life/brain/activity', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
+  ['Captures', '/life/brain/captures', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
   ['All', '/life/library', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
 ]
 
@@ -884,7 +884,7 @@ for (const width of UX_WIDTHS) {
     // set 8: the weekly review's numbers: what left the plate opens the Outbox, what came in opens Captures
     await door('/life/today/week?view=review&tab=tasks', 'review-plate-Done', { path: '/life/brain/outbox' })
     await door('/life/today/week?view=review&tab=tasks', 'review-plate-in', { path: '/life/brain/outbox' })
-    await door('/life/today/week?view=review&tab=library', 'review-came-captures', { path: '/life/brain/activity' })
+    await door('/life/today/week?view=review&tab=library', 'review-came-captures', { path: '/life/brain/captures' })
     // an inbox row: "4 of 13 proposals pending" opens that item in the pane at its pending proposals
     await s.open('/life/brain/queue?status=To+Review')
     const link = pg.locator('[data-row] a:visible', { hasText: 'pending' }).first()
@@ -936,7 +936,7 @@ for (const width of UX_WIDTHS) {
       ['Today', '/life'], ['Today under an area', '/life?area=' + uxArea], ['Week review', '/life/today/week?view=review'], ['Week calendar', '/life/today/week?view=calendar'],
       ['Week agenda', '/life/today/week?view=agenda'], ['Month plan', '/life/today/month?view=plan'], ['Habits', '/life/today/month?view=habits'],
       ['Check-ins', '/life/today/month?view=checkins'], ['Month calendar', '/life/today/month?view=calendar'], ['12 Weeks', '/life/today/year?view=cycle'],
-      ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'], ['Journal pages', '/life/brain/activity?tab=pages'],
+      ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'], ['Journal pages', '/life/brain/captures?tab=pages'],
       ['Graph', '/life/library/notes?view=graph'], ['Settings', '/life/settings']]
     for (const [name, p] of screens) {
       await s.open(p)
@@ -1117,7 +1117,7 @@ for (const width of UX_WIDTHS) {
     // the area pages became the lens (U.40 and up); the main screens below open on All of life
     const PAGES = [
       ['/life/goals/' + ux.goal, [['tasks', `/life/goals/tasks?goal=${ux.goal}&view=list`], ['notes', `/life/library/notes?view=list&goal=${ux.goal}`],
-        ['captures', `/life/brain/activity?goal=${ux.goal}`], ['links', null]]],
+        ['captures', `/life/brain/captures?goal=${ux.goal}`], ['links', null]]],
     ]
     let n = 0
     for (const [page, tabs] of PAGES) {
@@ -2009,7 +2009,7 @@ while d <= last:
     must(!got.proposals.length, 'Just keep: it has proposals')
     const queue = await s.api('inbox.list', { space: SPACE, page_length: 100, status: JSON.stringify(['To Review', 'New', 'Processing', 'Failed']) })
     must(!queue.items.some((i) => i.name === kept.name), 'the Just keep item is still in the Inbox')
-    await s.open('/life/brain/activity?tab=text')
+    await s.open('/life/brain/captures?tab=text')
     must((await pg.locator('[data-main]').innerText()).includes(`S4 keep ${width} ${stamp}`), 'the Just keep item is not in Sources')
     // the intent is remembered
     await s.open('/life/brain')
@@ -2050,7 +2050,7 @@ while d <= last:
     // tab counts equal the rows each tab lists
     const res = await s.api('sources.list', { space: SPACE, page_length: 200 })
     for (const [t, n] of Object.entries(res.tabs)) {
-      await s.open(`/life/brain/activity?tab=${t}&view=list`)
+      await s.open(`/life/brain/captures?tab=${t}&view=list`)
       const shown = await pg.locator(`[data-state-tabs] [data-tab="${t}"]`).first().innerText()
       must(num(shown) === n, `${t}: the tab says ${shown}, the server ${n}`)
       const listed = (await s.api('sources.list', { space: SPACE, tab: t, page_length: 200 })).total
@@ -2058,11 +2058,11 @@ while d <= last:
       if (n && n <= 50) must((await pg.locator(ROW).count()) === n, `${t}: ${await pg.locator(ROW).count()} rows on screen, the tab says ${n}`)
     }
     // the Photos grid shows thumbnails (the grid is the Photos tab's first view; the loop above left List remembered, so ask for it)
-    await s.open('/life/brain/activity?tab=photos&view=grid')
+    await s.open('/life/brain/captures?tab=photos&view=grid')
     const thumbs = await pg.locator('[data-source-grid] img[data-thumb]').evaluateAll((els) => els.map((e) => e.getAttribute('src')))
     must(thumbs.length && thumbs.every((u) => /-thumb\.jpg$/.test(u)), `the Photos grid does not show thumbnails: ${thumbs.slice(0, 3)}`)
     // Made from this
-    await s.open(`/life/brain/activity?open=source:${src.name}&ptab=made`)
+    await s.open(`/life/brain/captures?open=source:${src.name}&ptab=made`)
     const madeText = await pg.locator('[data-source-made]').innerText()
     must(madeText.includes(`S4 made ${width} ${stamp}`) && madeText.includes(`S4 cites ${width} ${stamp}`), 'Made from this does not list the task and the wiki page')
     must(made.name, 'no page')
@@ -2236,7 +2236,7 @@ except frappe.PermissionError:
     const digest = `## Needs your attention\n- Mithun Sarkar: the despatch dates for December [Open](https://mail.google.com/mail/u/0/#inbox/s4${stamp}${width})\n- Ruchi: ITR papers [Open](https://mail.google.com/mail/u/0/#inbox/r${stamp})\n\n## Waiting on others\n- The auditor, scope letter [Open](https://mail.google.com/mail/u/0/#inbox/a${stamp})\n\n## Dates and deadlines\n- 20 Nov: board meeting\n\n## FYI from people\n- Anya: photos from the trip\n\n## Company information\n- Q3 numbers are out\n\n## Left out\n- 14 newsletters`
     const item = await s.api('inbox.create_item', { title: `S4 digest ${width} ${stamp}`, source_type: 'Email Digest', space: SPACE, raw_text: digest, source_system: 'gmail', external_id: `digest-${width}-${stamp}` })
     runAgent()
-    await s.open(`/life/brain/activity?tab=email&open=source:${item.name}`)
+    await s.open(`/life/brain/captures?tab=email&open=source:${item.name}`)
     must((await pg.locator('[data-digest-section]').count()) >= 6, 'the digest sections are not headed lists')
     must((await pg.locator('[data-open-gmail]').count()) >= 3, 'no Open in Gmail buttons')
     const got = await s.api('inbox.get', { item: item.name })
@@ -2284,7 +2284,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       }
       const shared = await fam.api('sources.list', { space: 'Shared', page_length: 500 })
       must(!shared.sources.some((r) => r.title.includes(stamp) && r.title.startsWith('S4')), 'the family member sees a Private source')
-      await fam.open('/life/brain/activity')
+      await fam.open('/life/brain/captures')
       must(!(await fam.page.locator('[data-main]').innerText()).includes(`S4 keep`), 'a Private source shows to the family member')
       const ch = await fam.api('frappe.client.get_count', { doctype: 'Life Wiki Change', filters: { space: SPACE } }, { raw: true })
       must(!ch.ok() || (await ch.json()).message === 0, 'the family member counts Private wiki changes')
@@ -2310,7 +2310,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       ['Plan > Someday', '/life/goals/someday?all=1', 'someday.list', (a) => total('someday.list', { area: a })],
       ['Library > All', '/life/library?view=list&all=1', 'sources.list', (a) => total('sources.list', { scope: 'all', area: a })],
       ['Library > Notes', '/life/library/notes?view=list&all=1', 'library.list', (a) => total('library.list', { collection: 'all', area: a })],
-      ['Library > Captures', '/life/brain/activity?view=list&all=1', 'sources.list', (a) => total('sources.list', { area: a })],
+      ['Library > Captures', '/life/brain/captures?view=list&all=1', 'sources.list', (a) => total('sources.list', { area: a })],
       ['Library > Timeline', '/life/library/timeline?all=1', 'timeline.get', (a) => total('timeline.get', { area: a })],
       ['Library > Archive', '/life/library/archive?all=1', 'archive.list', (a) => total('archive.list', { area: a })],
     ]
@@ -2402,7 +2402,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       '/life/today/month?view=habits', '/life/today/month?view=checkins', '/life/today/month?view=calendar', '/life/today/year?view=cycle', '/life/today/year?view=calendar',
       '/life/today/year?view=goals', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/today/reset', '/life/library', '/life/library/notes',
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
-      '/life/brain/activity', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/activity?tab=photos', '/life/brain/activity?tab=pages', '/life/library/timeline',
+      '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/brain/captures?tab=pages', '/life/library/timeline',
       '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
       ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
@@ -2484,7 +2484,7 @@ await check('S6.1', 'Keyboard: G then T, I, O or L opens a place; the older G le
   const done = []
   for (const [key, want, q] of [['t', '/life/today'], ['i', '/life/brain'], ['p', '/life/today/week'], ['l', '/life/library'], ['k', '/life/goals/tasks'], ['o', '/life/goals'],
     ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/today/year', { view: 'cycle' }], ['c', '/life/today/year'], ['e', '/life/today/reset'],
-    ['n', '/life/library/notes'], ['u', '/life/brain/activity'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
+    ['n', '/life/library/notes'], ['u', '/life/brain/captures'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
     ['x', '/life/library/notes', { by: 'assistant' }], ['g', '/life/library/notes', { view: 'graph' }], ['r', '/life/library/archive'], ['b', '/life/brain/outbox'], ['d', '/life/review'],
     ['q', '/life/ask'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
     await owner.open(key === 't' ? '/life/brain' : '/life')
@@ -3703,7 +3703,7 @@ for (const width of SET_WIDTHS) {
     await pg.locator('[data-pane-full]').click()
     await settle()
     must(new URL(pg.url()).pathname === `/life/item/${id}`, 'the Inbox list did not lead to the item page')
-    await full(`/life/brain/activity?open=${encodeURIComponent('source:' + id)}`, 'Library')
+    await full(`/life/brain/captures?open=${encodeURIComponent('source:' + id)}`, 'Library')
     await s.open('/life/library/notes')
     if (width < 768) await pg.locator('[data-phone-search]').click()
     else await pg.keyboard.press('Meta+k')
@@ -4107,8 +4107,8 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
           ['/life/plan/someday', '/life/goals/someday'], ['/life/plan/reset', '/life/today/reset'], ['/life/tasks', '/life/goals/tasks'],
           ['/life/someday', '/life/goals/someday'], ['/life/outbox', '/life/brain/outbox'], ['/life/archive', '/life/library/archive'],
           ['/life/wiki', '/life/library/notes'], ['/life/vault', '/life/library/documents'], ['/life/graph', '/life/library/notes'],
-          ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/activity'], ['/life/chats', '/life/library/chats'],
-          ['/life/library/captures', '/life/brain/activity'], ['/life/library/outbox', '/life/brain/outbox'], ['/life/projects', '/life/goals'],
+          ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/captures'], ['/life/chats', '/life/library/chats'],
+          ['/life/library/captures', '/life/brain/captures'], ['/life/library/outbox', '/life/brain/outbox'], ['/life/projects', '/life/goals'],
           ['/life/reset', '/life/today/week'], ['/life/calendar', '/life/today/week'], ['/life/calendar/month', '/life/today/month'],
           ['/life/calendar/year', '/life/today/year'], ['/life/calendar/agenda', '/life/today/week'], ['/life/journal', '/life/today/year'],
           ['/life/journal/goals', '/life/today/year'], ['/life/journal/month', '/life/today/month'], ['/life/journal/habits', '/life/today/month'],
@@ -4665,6 +4665,123 @@ for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I17 % ${w
 for n in ${JSON.stringify(made.aside)}:
     if frappe.db.exists("Life Inbox Item", n): frappe.db.set_value("Life Inbox Item", n, "is_archived", 0, update_modified=False)
 for n, v in ${JSON.stringify(made.was)}.items(): frappe.db.set_value("Life Area", n, "is_on", v)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 18: Brain > Activity. Titles start "I18 " (known to the debris finder). The space's other captures are put aside (archived)
+// for each width and brought back after, so the feed holds this check's captures alone.
+for (const width of SET_WIDTHS) {
+  const tag = `I18.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I18 ${what} ${width} ${stamp}`
+  const made = JSON.parse(bench(`import json
+tea = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"})
+was = frappe.db.get_value("Life Area", tea, "is_on")
+frappe.db.set_value("Life Area", tea, "is_on", 1)
+aside = frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "is_archived": 0}, pluck="name")
+for n in aside: frappe.db.set_value("Life Inbox Item", n, "is_archived", 1, update_modified=False)
+print(json.dumps({"tea": tea, "was": was, "aside": aside}))`).split('\n').pop())
+  const mk = (what, o = {}) => JSON.parse(bench(`import json
+item = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "${T(what)}", "source_type": "${o.source || 'Email'}", "status": "${o.status || 'Done'}",
+  "received_on": frappe.utils.now_datetime()${o.error ? `, "error": "${o.error}"` : ''}${o.area ? `, "area": "${o.area}"` : ''}}).insert(ignore_permissions=True)
+out = {"item": item.name}
+${o.task ? `t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "${T(what)}", "area": "${o.area}", "inbox_item": item.name}).insert(ignore_permissions=True)
+p = frappe.get_doc({"doctype": "Life Proposal", "space": "${SPACE}", "inbox_item": item.name, "kind": "Task", "preview": "${T(what)}",
+  "payload": frappe.as_json({"title": "${T(what)}"}), "status": "Pending"}).insert(ignore_permissions=True)
+frappe.db.set_value("Life Proposal", p.name, {"status": "Accepted", "created_doctype": "Life Task", "created_name": t.name})
+out["task"] = t.name` : ''}
+print(json.dumps(out))`).split('\n').pop())
+  const row = (i) => pg.locator(`[data-activity-row][data-item="${i}"]`)
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openFeed = async (q = '') => { await s.open('/life/brain/activity' + q); await pg.locator('[data-activity]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(500) }
+  try {
+    await check(`${tag}.6`, `${width} px: on a space with nothing captured Activity says what will appear and offers + Capture`, async () => {
+      await openFeed()
+      must(await pg.locator('[data-activity-empty]').isVisible(), 'no empty state')
+      const t = await pg.locator('[data-activity-empty]').innerText()
+      must(t.includes('Nothing has come in yet.') && t.includes('will show up here'), 'the empty state says: ' + t)
+      await pg.locator('[data-activity-capture]').click()
+      await pg.locator('[data-capture-text]').first().waitFor({ timeout: 5000 })
+      await pg.keyboard.press('Escape')
+      await noSideways()
+    })
+    await check(`${tag}.1`, `${width} px: a capture filed on its own today shows under Today with its area and a link to the record`, async () => {
+      const a = await mk('filed', { area: made.tea, task: true })
+      made.a = a
+      await openFeed()
+      const day = pg.locator('[data-activity-day]').first()
+      must((await day.locator('h2').innerText()) === 'Today', 'the first group is not Today')
+      const rw = row(a.item)
+      await rw.waitFor({ timeout: 10000 })
+      const t = await rw.innerText()
+      must(t.includes(T('filed')) && t.includes('Tea & Coffee') && t.includes('Email'), 'the row says: ' + t)
+      const href = await rw.locator('[data-made-link]').first().getAttribute('href')
+      must(href && href.includes(a.task), 'the link to the record is ' + href)
+      must((await rw.locator('[data-row-item]').getAttribute('href')) === `/life/item/${a.item}`, 'the item page link is wrong')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: the source filter narrows the feed to that source`, async () => {
+      const v = await mk('voice', { source: 'Voice Note' })
+      await openFeed()
+      must(await row(v.item).count() && await row(made.a.item).count(), 'both captures should be listed first')
+      await pg.locator('[data-activity-source]').selectOption('Voice Note')
+      await pg.waitForTimeout(600)
+      must(new URL(pg.url()).searchParams.get('source') === 'Voice Note', 'the filter is not in the URL')
+      must((await row(v.item).count()) === 1 && (await row(made.a.item).count()) === 0, 'the feed is not narrowed to Voice Note')
+      const sources = await pg.locator('[data-activity-row]').evaluateAll((els) => els.map((e) => e.getAttribute('data-source')))
+      must(sources.every((x) => x === 'Voice Note'), 'other sources remain: ' + sources)
+      await pg.locator('[data-outcome="dropped"]').click()
+      await pg.waitForTimeout(500)
+      must((await pg.locator('[data-activity-row]').count()) === 0, 'Dropped should hold nothing here')
+    })
+    await check(`${tag}.3`, `${width} px: a failed capture shows its reason and Retry puts it back in the queue`, async () => {
+      const f = await mk('failed', { status: 'Failed', error: 'Could not read the file', source: 'Upload' })
+      await openFeed('?outcome=failed')
+      const rw = row(f.item)
+      await rw.waitFor({ timeout: 10000 })
+      must((await rw.locator('[data-row-reason]').innerText()).includes('Could not read the file'), 'the reason is not shown')
+      await rw.locator('[data-retry]').click()
+      await pg.waitForTimeout(800)
+      const status = bench(`print(frappe.db.get_value("Life Inbox Item", "${f.item}", "status"))`).split('\n').pop()
+      must(status === 'New', 'the status is ' + status)
+      must((await row(f.item).count()) === 0, 'it is still listed as failed')
+    })
+    await check(`${tag}.4`, `${width} px: the Outbox piles in Activity show the same numbers as the Outbox`, async () => {
+      await openFeed()
+      const listed = (await s.api('outbox.list', { space: SPACE, pile: 'all', period: 'week', page_length: 1 })).tabs
+      for (const pile of ['Done', 'Delegated', 'Parked', 'Discarded']) {
+        const n = await pg.locator(`[data-plate-pile][data-pile="${pile}"]`).getAttribute('data-n')
+        must(Number(n) === listed[pile], `${pile}: Activity says ${n}, the Outbox ${listed[pile]}`)
+      }
+      must((await pg.locator('[data-flow-in]').innerText()) === String(listed.in) && (await pg.locator('[data-flow-out]').innerText()) === String(listed.all), 'the flow line differs')
+      await pg.locator('[data-plate-pile][data-pile="Done"]').click()
+      await pg.waitForURL((u) => u.pathname === '/life/brain/outbox' && u.searchParams.get('pile') === 'Done', { timeout: 10000 })
+      await pg.locator('[data-outbox-sub]').waitFor({ timeout: 10000 })
+    })
+    await check(`${tag}.5`, `${width} px: the feed is one column and nothing scrolls sideways`, async () => {
+      await openFeed()
+      await noSideways()
+      const boxes = await pg.locator('[data-activity-row]').evaluateAll((els) => els.map((e) => { const b = e.getBoundingClientRect(); return [b.x, b.width] }))
+      must(boxes.length > 0, 'no rows')
+      must(boxes.every(([x, w]) => Math.abs(x - boxes[0][0]) < 1 && Math.abs(w - boxes[0][1]) < 1), 'the rows are not one column')
+      if (phone) must(boxes[0][1] <= width, 'a row is wider than the screen')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`import json
+frappe.set_user("Administrator")
+for p in frappe.get_all("Life Proposal", filters={"preview": ["like", "I18 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Proposal", p, force=1, ignore_permissions=True)
+for t in frappe.get_all("Life Task", filters={"title": ["like", "I18 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
+for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I18 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.aside)}:
+    if frappe.db.exists("Life Inbox Item", n): frappe.db.set_value("Life Inbox Item", n, "is_archived", 0, update_modified=False)
+frappe.db.set_value("Life Area", "${made.tea}", "is_on", ${made.was ? 1 : 0})`)
     await s.ctx.close()
   }
 }

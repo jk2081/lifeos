@@ -8,7 +8,7 @@ import frappe
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import permissions, proposals
-from lifeos.api.utils import names_map
+from lifeos.api.utils import area_filter, lens_area, names_map, page
 
 MAX_ROWS = 7
 SECONDS_EACH = 20  # the guess at how long one decision takes: "about 2 minutes" for 7
@@ -95,3 +95,89 @@ def _failed(space):
 		"""select i.name as item, i.title, i.source_type as source, i.error as reason, i.received_on from `tabLife Inbox Item` i
 		where i.space = %(space)s and i.is_archived = 0 and i.status = 'Failed' and """ + SEES + " order by i.received_on asc limit 20",
 		{"space": space, "open": _open(space)}, as_dict=True)
+
+
+# Brain > Activity (issue 18): the feed of what came in and what the Brain did with it.
+OUTCOMES = ("filed", "waiting", "dropped", "failed")
+OUTCOME_SQL = """case when i.status = 'Failed' then 'failed' when i.status in ('New', 'Processing') then 'working'
+	when i.status = 'To Review' then 'waiting'
+	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Accepted') > 0 then 'decided'
+	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Rejected') > 0 then 'dropped'
+	else 'filed' end"""
+MADE_EACH = 4
+SOURCE_TYPES = ("Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web")
+
+
+def _activity_where(space, days, source, area):
+	where = "i.space = %(space)s and i.is_archived = 0 and i.received_on >= %(since)s and " + SEES
+	values = {"space": space, "open": _open(space), "since": add_to_date(now_datetime(), days=-days)}
+	if source:
+		where += " and i.source_type = %(source)s"
+		values["source"] = source
+	if area:
+		where += " and " + area_filter(space, area, "i.area", values)
+	return where, values
+
+
+@frappe.whitelist(methods=["GET"])
+def activity(space: str | None = None, days: int = 14, source: str | None = None, area: str | None = None, outcome: str | None = None,
+		start: int = 0, page_length: int = 50):
+	"""The Activity feed: captures of the last `days` days, newest first, each with its source, what it was, what the Brain did
+	(`outcome`: filed on its own, decided by you, waiting, dropped, failed or working), the area and goal, the error of a failed one,
+	and the records made from it. `counts` has every outcome under the other filters; `sources` the source types present;
+	`plate` is this week's Outbox piles and flow line, the numbers the Outbox shows."""
+	permissions.require_login()
+	space = permissions.resolve_space(space)
+	area = lens_area(area)
+	days = max(1, min(int(days or 14), 120))
+	start, page_length = page(start, page_length)
+	where, values = _activity_where(space, days, source if source in SOURCE_TYPES else None, area)
+	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter; values are parameters
+	counts = dict(frappe.db.sql(f"select o, count(*) from (select {OUTCOME_SQL} as o from `tabLife Inbox Item` i where {where}) t group by o", values))
+	total = sum(counts.values())
+	counts = {k: int(counts.get(k, 0)) for k in (*OUTCOMES, "decided", "working")}
+	if outcome in OUTCOMES:
+		values["outcome"] = outcome
+	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter; values are parameters
+	rows = frappe.db.sql(f"""select * from (select i.name as item, i.title, i.source_type as source, i.media_kind, i.received_on, i.status, i.error,
+			i.intent, i.area, i.goal, i.is_sensitive, {OUTCOME_SQL} as outcome from `tabLife Inbox Item` i where {where}) t
+		{'where outcome = %(outcome)s' if outcome in OUTCOMES else ''} order by received_on desc, item desc limit %(s)s, %(n)s""",
+		{**values, "s": start, "n": page_length}, as_dict=True)
+	areas = names_map("Life Area", [r.area for r in rows if r.area], "area_name")
+	goals = names_map("Life Goal", [r.goal for r in rows if r.goal], "title")
+	made = _made(space, [r.item for r in rows])
+	for r in rows:
+		r.update(received_on=str(r.received_on)[:19], area_name=areas.get(r.area), goal_title=goals.get(r.goal), made=made.get(r.item, []))
+	every, every_values = _activity_where(space, days, None, area)
+	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter; values are parameters
+	sources = [x[0] for x in frappe.db.sql(f"select distinct i.source_type from `tabLife Inbox Item` i where {every} order by 1", every_values)]
+	shown = counts[outcome] if outcome in OUTCOMES else total
+	return {"rows": rows, "total": shown, "all": total, "counts": counts, "sources": sources, "days": days, "plate": plate(space, area)}
+
+
+def _made(space, items):
+	"""The records made from each capture: those of its accepted proposals, at most MADE_EACH, each readable by the caller."""
+	from lifeos import item_page
+
+	if not items:
+		return {}
+	out = {}
+	for p in frappe.get_all("Life Proposal", filters={"inbox_item": ("in", items), "status": "Accepted", "created_name": ("is", "set")},
+			fields=["inbox_item", "kind", "preview", "created_doctype", "created_name"], order_by="decided_on asc, creation asc"):
+		bucket = out.setdefault(p.inbox_item, [])
+		if len(bucket) >= MADE_EACH or any(e["name"] == p.created_name for e in bucket) or not item_page._readable(p.created_doctype, p.created_name, space):
+			continue
+		bucket.append(item_page._entry(item_page.KIND_OF.get(p.created_doctype, p.kind), p.created_doctype, p.created_name, title=p.preview))
+	return out
+
+
+def plate(space, area=None):
+	"""This week's Outbox piles (Done, Delegated, Parked, Discarded) with what came in, as the Outbox counts them. People only."""
+	from lifeos import outbox
+	from lifeos.api import outbox as outbox_api
+
+	if permissions.is_agent():
+		return None
+	start, end, _p = outbox_api.bounds("week")
+	piles = outbox_api.out_counts(space, area, start, end)
+	return {"piles": piles, "in": outbox_api.in_count(space, area, start, end), "from": str(start)[:10], "order": list(outbox.PILES)}

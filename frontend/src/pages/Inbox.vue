@@ -5,7 +5,7 @@
     @loaded="(res) => (pendingTotal = res.pending_total)">
     <template #sub>{{ store.space }} · everything the agent has not finished, and what it asks you<template v-if="pendingTotal"> ·
       <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template> ·
-      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/brain/activity', query: { status: 'done' } }" data-finished-link>Finished items are in Activity</RouterLink></template>
+      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/brain/captures', query: { status: 'done' } }" data-finished-link>Finished items are in Captures</RouterLink></template>
     <template #cell-title="{ row }">
       <div class="min-w-0">
         <div class="break-words font-medium text-ink-gray-9">{{ row.title }}</div>
@@ -70,7 +70,7 @@ const THEME = { 'To Review': 'amber', New: 'gray', Processing: 'blue', Failed: '
 const route = useRoute()
 const router = useRouter()
 // old links to the Done and All tabs open Brain > Activity, where finished items are
-if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/brain/activity', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
+if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/brain/captures', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
 const list = ref(null)
 const pendingTotal = ref(0)
 

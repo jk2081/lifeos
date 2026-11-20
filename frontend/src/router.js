@@ -6,7 +6,7 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 // beside them. Housekeeping pages live inside the place they belong to and are not tabs: Reset under Today, the Outbox
 // under Brain, Someday under Goals, the Timeline and the trash and archive under Library.
 const TODAY = ['week', 'month', 'year']
-const BRAIN = ['activity', 'sources', 'outbox', 'queue']
+const BRAIN = ['activity', 'captures', 'sources', 'outbox', 'queue']
 const GOALS = ['tasks', 'no-goal', 'someday']
 const LIBRARY = ['notes', 'documents', 'people', 'chats', 'timeline', 'archive']
 
@@ -18,12 +18,12 @@ function projectQuery(q) {
 }
 // an old route that lands on a tab with its query carried over, and a few parameters of its own
 const to = (path, extra = {}) => (r) => ({ path, query: { ...r.query, ...(typeof extra === 'function' ? extra(r) : extra) }, hash: r.hash })
-// Captures (set 6) is Brain > Activity now: everything that came in. Opened on Documents or Chats it is that tab of the
+// Captures (set 6) is the list at Brain > Captures (Activity, issue 18, is the feed beside it): everything that came in. Opened on Documents or Chats it is that tab of the
 // Library, and on notes Library > Notes; any other kind stays a kind of Activity.
 const KIND_TAB = { documents: '/library/documents', chats: '/library/chats', notes: '/library/notes' }
 const libraryKind = (r, extra = {}) => {
   const q = { ...r.query, ...extra }
-  return { path: KIND_TAB[q.tab] || '/brain/activity', query: q, hash: r.hash }
+  return { path: KIND_TAB[q.tab] || '/brain/captures', query: q, hash: r.hash }
 }
 // Plan's old tabs, by their new homes
 const PLAN_HOME = { week: '/today/week', month: '/today/month', year: '/today/year', goals: '/goals', tasks: '/goals/tasks', someday: '/goals/someday' }
