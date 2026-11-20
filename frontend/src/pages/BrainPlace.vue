@@ -21,7 +21,7 @@ import Outbox from '@/pages/Outbox.vue'
 import PageHead from '@/components/PageHead.vue'
 import PlaceLinks from '@/components/PlaceLinks.vue'
 import ConnectionsSection from '@/components/settings/ConnectionsSection.vue'
-import { BRAIN_TABS, brainPath } from '@/lib/nav'
+import { BRAIN_TABS, brainPath, withPage } from '@/lib/nav'
 import { navCount } from '@/lib/newMenu'
 import { canWrite, store } from '@/lib/store'
 
@@ -31,6 +31,7 @@ const current = computed(() => props.tab || 'needs-you')
 const LINKS = [{ key: 'outbox', label: 'Outbox: what went out', icon: 'lucide-send', to: '/brain/outbox' }]
 // Needs you carries the same count as the sidebar's Brain
 const tabs = computed(() => BRAIN_TABS.map((t) => (t.value === 'needs-you' ? { ...t, count: navCount('Brain')?.n ?? 0, noun: 'to review' } : t)))
-provide('placeTabs', computed(() => ({ tabs: tabs.value, current: current.value === 'outbox' ? null : current.value, label: 'Brain',
+const PAGES = { outbox: 'Outbox' }
+provide('placeTabs', computed(() => ({ tabs: withPage(tabs.value, current.value, PAGES), current: current.value, label: 'Brain',
   set: (v) => router.push(brainPath(v)) })))
 </script>

@@ -13,7 +13,7 @@ import Goals from '@/pages/Goals.vue'
 import Tasks from '@/pages/Tasks.vue'
 import Someday from '@/pages/Someday.vue'
 import PlaceLinks from '@/components/PlaceLinks.vue'
-import { GOALS_TABS, goalsPath } from '@/lib/nav'
+import { GOALS_TABS, goalsPath, withPage } from '@/lib/nav'
 
 const props = defineProps({ tab: String })
 const route = useRoute()
@@ -26,6 +26,7 @@ watch(() => [current.value, route.query.goal], ([c, goal]) => {
   if (goal) router.replace({ path: '/goals/tasks', query: route.query })
   else router.replace({ query: { ...route.query, goal: 'none' } })
 }, { immediate: true })
-provide('placeTabs', computed(() => ({ tabs: GOALS_TABS, current: current.value === 'someday' ? null : current.value, label: 'Goals',
+const PAGES = { someday: 'Someday' }
+provide('placeTabs', computed(() => ({ tabs: withPage(GOALS_TABS, current.value, PAGES), current: current.value, label: 'Goals',
   set: (v) => router.push(goalsPath(v)) })))
 </script>

@@ -24,7 +24,7 @@ import Wiki from '@/pages/Wiki.vue'
 import Timeline from '@/pages/Timeline.vue'
 import Archive from '@/pages/Archive.vue'
 import PlaceLinks from '@/components/PlaceLinks.vue'
-import { LIBRARY_TABS, libraryPath } from '@/lib/nav'
+import { LIBRARY_TABS, libraryPath, withPage } from '@/lib/nav'
 
 const props = defineProps({ tab: String })
 const route = useRoute()
@@ -35,7 +35,7 @@ const KIND = { all: '', documents: 'documents', chats: 'chats' }
 const LINKS = [
   { key: 'timeline', label: 'Timeline', icon: 'lucide-history', to: '/library/timeline' },
   { key: 'graph', label: 'Graph', icon: 'lucide-waypoints', to: { path: '/library/notes', query: { view: 'graph' } } },
-  { key: 'sensitive', label: 'Sensitive documents', icon: 'lucide-lock', to: { path: '/library/documents', query: { sensitive: '1' } } },
+  { key: 'sensitive', label: 'Sensitive documents', icon: 'lucide-lock', to: { path: '/library/documents', query: { tab: 'documents', sensitive: '1' } } },
   { key: 'archive', label: 'Trash and archive', icon: 'lucide-archive', to: '/library/archive' },
 ]
 // Documents and Chats open on their kind; choosing another kind in the list moves to the tab that holds it
@@ -47,8 +47,8 @@ watch(() => route.query.tab, (t) => {
   if (!settled) return router.replace({ query: { ...route.query, tab: kind } })
   router.replace({ path: KIND.documents === t || KIND.chats === t ? `/library/${t}` : '/library', query: route.query })
 }, { immediate: true })
-// the Timeline and the archive are pages of Everything; the graph of notes is a view of Notes
-const PAGES = ['timeline', 'archive']
-provide('placeTabs', computed(() => ({ tabs: LIBRARY_TABS, current: PAGES.includes(current.value) ? null : current.value, label: 'Library',
+// the Timeline and the trash and archive are pages of the Library: each shows as a tab while it is open
+const PAGES = { timeline: 'Timeline', archive: 'Trash and archive' }
+provide('placeTabs', computed(() => ({ tabs: withPage(LIBRARY_TABS, current.value, PAGES), current: current.value, label: 'Library',
   set: (v) => router.push(libraryPath(v)) })))
 </script>

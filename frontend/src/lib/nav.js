@@ -32,7 +32,7 @@ export const GO = [
   { label: 'Brain: Outbox', to: '/brain/outbox', key: 'x' },
   { label: 'Goals: All tasks', to: '/goals/tasks', key: 'k' }, { label: 'Goals: Someday', to: '/goals/someday', key: 'y' },
   { label: 'Library: Notes', to: '/library/notes', key: 'n' }, { label: 'Library: Chats', to: '/library/chats', key: 'h' },
-  { label: 'Library: Sensitive documents', to: '/library/documents?sensitive=1', key: 'v' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
+  { label: 'Library: Sensitive documents', to: '/library/documents?tab=documents&sensitive=1', key: 'v' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
   { label: 'Library: Trash and archive', to: '/library/archive', key: 'z' }, { label: 'Ask: history and insights', to: '/ask', key: 'q' },
   SETTINGS,
 ]
@@ -53,8 +53,16 @@ export const ELSEWHERE = [
   { key: 'outbox', label: 'Outbox', home: 'Brain', to: '/brain/outbox' },
   { key: 'timeline', label: 'Timeline', home: 'Library', to: '/library/timeline' },
   { key: 'graph', label: 'Graph', home: 'Library > Notes', to: { path: '/library/notes', query: { view: 'graph' } } },
-  { key: 'vault', label: 'Sensitive documents', home: 'Library > Documents, by the lock', to: { path: '/library/documents', query: { sensitive: '1' } } },
+  { key: 'vault', label: 'Sensitive documents', home: 'Library > Documents, by the lock', to: { path: '/library/documents', query: { tab: 'documents', sensitive: '1' } } },
   { key: 'pages', label: 'Journal pages', home: 'Library > Everything', to: { path: '/library', query: { tab: 'pages' } } },
   { key: 'archive', label: 'Trash and archive', home: 'Library', to: '/library/archive' },
   { key: 'ask', label: 'Ask: history and insights', home: 'The Ask box in every header', to: '/ask' },
 ]
+/**
+ * A place's tab row while `current` is open. A page of the place that is not one of its tabs (the Outbox, Someday, the
+ * Timeline, the archive) is added after a gap while it is open: the tab row must always show the open value, or it
+ * would select its first tab by itself.
+ */
+export function withPage(tabs, current, pages) {
+  return pages[current] ? [...tabs, { value: current, label: pages[current], group: 'page' }] : tabs
+}
