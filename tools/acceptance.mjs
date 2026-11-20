@@ -3613,6 +3613,49 @@ for (const width of SET_WIDTHS) {
   await s.ctx.close()
 }
 
+// Issue 8: an agent files a piece of work with one call (agent/fake_agent.py --file-job); it is one item in the Inbox
+// (Needs you replaces it in issue 14), and its page shows Inputs, Outputs, the summary and the proposals
+for (const width of SET_WIDTHS) {
+  const tag = `I8.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  const title = `I8 deck ${width} ${stamp}`
+  const fileJob = () => execFileSync('python3', [path.join(root, 'agent/fake_agent.py'), '--url', base, '--file-job', `i8-job-${width}-${stamp}`,
+    '--title', title, '--space', SPACE], { env: { ...process.env, LIFEOS_API_KEY: agentKey, LIFEOS_API_SECRET: agentSecret }, encoding: 'utf8' })
+  await check(`${tag}.7`, `${width} px: a job filed (twice) with the fake agent is one item in the Inbox; its page shows Inputs, Outputs, the summary and the proposals`, async () => {
+    fileJob()
+    fileJob() // filing the same job again updates it
+    const found = await s.api('inbox.list', { space: SPACE, page_length: 10, filters: [['title', '=', title]] })
+    must(found.total === 1, `${found.total} items with the job's title`)
+    const item = found.items[0]
+    must(item.status === 'To Review' && item.pending === 2, `the item is ${item.status} with ${item.pending} pending proposals`)
+    await s.open('/life/inbox')
+    const shown = await pg.locator('[data-row]', { hasText: title }).count()
+    must(shown === 1, `the Inbox shows the job in ${shown} rows`)
+    await s.open(`/life/inbox/${item.name}/review?tab=original`) // phones open on the proposals
+    must(await pg.locator('[data-review-outputs]').count() === 1, 'no Outputs section')
+    for (const ext of ['txt', 'html'])
+      must(await pg.locator('[data-review-original] a', { hasText: `${title}.${ext}` }).count() === 1, `the output ${title}.${ext} is not shown once`)
+    const inputs = pg.locator('[data-review-inputs] [data-review-input]')
+    must(await inputs.count() === 2, `${await inputs.count()} inputs shown`)
+    const inputText = await pg.locator('[data-review-inputs]').innerText()
+    must(inputText.includes('Standard sales deck.txt') && inputText.includes('Brand guidelines.txt'), 'the inputs are not named')
+    must(!(await pg.locator('[data-review-original] a', { hasText: 'Standard sales deck.txt' }).count()), 'an input is listed as an output')
+    must(await pg.locator('[data-review-filed-with]').count() === 1, 'the wiki page and chat log filed with it are not shown')
+    await s.open(`/life/inbox/${item.name}/review?tab=summary`)
+    must((await pg.locator('body').innerText()).includes('An owner-first deck'), 'the summary is not shown')
+    await s.open(`/life/inbox/${item.name}/review?tab=proposals`)
+    must(await pg.locator('[data-proposal="Pending"]').count() === 2, 'the two proposals are not shown')
+    const overflow = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+    must(!overflow, 'the page scrolls sideways')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+  await s.ctx.close()
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {

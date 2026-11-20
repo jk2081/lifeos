@@ -7,10 +7,12 @@ so the inbox pipeline can be tested with no model.
     python3 agent/fake_agent.py            # claim and process every New item, then stop
     python3 agent/fake_agent.py --loop     # keep polling every 5 minutes
     python3 agent/fake_agent.py --fail     # report a failure for the next item instead
+    python3 agent/fake_agent.py --file-job mehi-pitch-2026-11-20 --title "Mehi Motors deck"   # file a finished piece of work in one call
 
 Only the Python standard library is needed. Credentials are read from the environment and never printed.
 """
 import argparse
+import base64
 import json
 import os
 import sys
@@ -270,16 +272,51 @@ def process_one(client, fail=False, today=None, log=print):
 	return result
 
 
+def file_job(client, job_id, title, space=None, log=print):
+	"""File a canned piece of work with lifeos.api.jobs.file_job, as agent/FILE_WORK.md says: two reusable inputs, two
+	outputs, a summary, a note and a task for the owner, a wiki page and the chat log, in one call. Filing the same job_id
+	again updates the same item."""
+	b64 = lambda text: base64.b64encode(text.encode()).decode()
+	result = client.call("jobs.file_job", job_id=job_id, space=space, title=title,
+		instruction="Make an owner-first sales deck from my standard deck and brand guidelines.",
+		raw_text=f"For {title}: a deck made from the standard deck and the brand guidelines.",
+		inputs=[{"name": "Standard sales deck.txt", "file": b64(f"Standard sales deck for {job_id}"), "reusable_as": f"{job_id}-standard-deck",
+				"title": f"{title}: standard sales deck"},
+			{"name": "Brand guidelines.txt", "file": b64(f"Brand guidelines for {job_id}"), "reusable_as": f"{job_id}-brand-guidelines",
+				"title": f"{title}: brand guidelines"}],
+		outputs=[{"name": f"{title}.txt", "file": b64(f"{title}: slide 1, why now; slide 2, what we replace")},
+			{"name": f"{title}.html", "file": b64(f"<h1>{title}</h1><p>Slide 1, why now.</p>")}],
+		transcript_md="Slide 1: why now\n\nSlide 2: what we replace",
+		summary_md="An owner-first deck: why now, then what it replaces. Made from [[Standard sales deck]] and [[Brand guidelines]].",
+		proposals=[{"kind": "Note", "preview": f"{title}: the record of the work", "confidence": 0.9,
+				"payload": {"title": title, "content_md": "The deck, its two slides and the inputs it used."}},
+			{"kind": "Task", "preview": f"{title}: get the questionnaire scored", "confidence": 0.7,
+				"payload": {"title": f"{title}: get the questionnaire scored"}}],
+		wiki=[{"title": f"{title} client", "summary": "The client the deck is for", "content_md": f"The client of [[{title}]]."}],
+		chat={"title": f"{title} with the fake agent", "summary_md": "The owner asked for a deck.", "open_items": ["Check the integrations"],
+			"source_system": "fake-agent"},
+		source_system="fake-agent")
+	log(f"filed {result['item']}: {'created' if result['created'] else 'updated'}, {len(result['outputs'])} outputs, "
+		f"{len(result['inputs'])} inputs, {len(result['proposals']['waiting'])} proposals waiting; {result['url']}")
+	return result
+
+
 def main():
 	ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 	ap.add_argument("--url", default=os.environ.get("LIFEOS_URL", "http://localhost:18000"))
 	ap.add_argument("--loop", action="store_true", help="poll every five minutes")
 	ap.add_argument("--fail", action="store_true", help="fail the next item instead of processing it")
+	ap.add_argument("--file-job", metavar="JOB_ID", help="file a canned piece of work under this job id, then stop")
+	ap.add_argument("--title", default="Fake agent deck", help="the title of the work filed with --file-job")
+	ap.add_argument("--space", help="the space to file into (the agent's default space if left out)")
 	args = ap.parse_args()
 	key, secret = os.environ.get("LIFEOS_API_KEY"), os.environ.get("LIFEOS_API_SECRET")
 	if not key or not secret:
 		sys.exit("Set LIFEOS_API_KEY and LIFEOS_API_SECRET in the environment.")
 	client = HttpClient(args.url, key, secret)
+	if args.file_job:
+		file_job(client, args.file_job, args.title, args.space)
+		return
 	schema = client.call("meta.proposal_schema")
 	print(f"schema loaded: {', '.join(schema)}")
 	while True:

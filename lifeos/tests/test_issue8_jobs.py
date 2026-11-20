@@ -190,3 +190,12 @@ class TestFileJob(LifeTestCase):
 		again = call("i8-no-accept", proposals=[{"kind": "Task", "payload": {"title": "i8 agent may not accept"}, "status": "Accepted"}])
 		self.assertEqual(frappe.db.get_value("Life Proposal", name, "status"), "Pending")
 		self.assertEqual(again["status"], "To Review")
+
+	def test_7_a_job_filed_the_old_way_is_taken_over_not_duplicated(self):
+		old = inbox.create_item(title="i8 old box", space=PRIVATE, source_system="hermes", external_id="i8-old-way", intent="Just keep")["name"]
+		out = call("i8-old-way", wiki=[], chat=None)
+		self.assertEqual(out["item"], old)
+		self.assertFalse(out["created"])
+		doc = frappe.get_doc("Life Inbox Item", old)
+		self.assertEqual((doc.job_id, doc.intent, doc.status), ("i8-old-way", "Process", "To Review"))
+		self.assertEqual(frappe.db.count("Life Inbox Item", {"space": PRIVATE, "external_id": "i8-old-way"}), 1)

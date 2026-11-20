@@ -53,6 +53,18 @@ Projects became **open-ended goals** (`goal_type` Open). There are four things: 
 - `connection` holds the filing defaults of the system the item came from (`default_area`, `default_goal`, `default_intent`), when it has a `source_system`. Read them with `lifeos.api.connections.defaults` (`space`, `system`) too.
 - When the owner sends you a message, an email or a link in chat that should be kept, create the item yourself with `lifeos.api.inbox.create_item` (`title`, `source_type`, `space`, `raw_text`, `instruction`, `source_url`, `intent`), attach any files with `/api/method/upload_file` (`doctype=Life Inbox Item`, `docname=<item>`, `is_private=1`), then claim and process it as usual. Sending the same file again is fine and costs nothing: Life OS stores each file once per space by its content (SHA-256), so the same bytes sent to the same item answer with the file already there, and the same bytes on another record are linked, not stored again. On an item with an `external_id`, a different file under the same name becomes the current file and keeps the old one as an earlier version.
 
+## Filing a piece of work: one call (issue 8)
+
+When you **did work for the owner** (a deck made from his files, a document, an analysis) and it should be kept, file it with **one call**, `lifeos.api.jobs.file_job`, as `agent/FILE_WORK.md` describes. Do not build it from `create_item`, `upload_file`, `claim_next`, `submit_result`, `wiki.*` and `chats.log` yourself.
+
+- `job_id` (stable, for example `mehi-motors-pitch-2026-11-19`): filing the same `job_id` again **updates** the job and creates nothing new. Also `space`, `title`, `area`, `goal`, `instruction` (the owner's own words), `raw_text` (the brief), `transcript_md`, `summary_md`, `proposals` (exactly as in `submit_result`; a Reading is refused here), `source_system` (for example `hermes`).
+- `inputs`: `[{name, file, reusable_as, title}]`. `file` is base64 or the URL of a file already in the space (`/private/files/...`). An input with `reusable_as` (a stable asset id such as `btw-standard-deck`) is kept **once**, as its own Just keep item, and linked to the job; a later job that sends it again, or sends `reusable_as` with no `file`, links the one already kept. An input without `reusable_as` is used by this job only.
+- `outputs`: `[{name, file}]`: the job item's own files. A changed file under the same name becomes the current version.
+- `wiki`: `[{title, summary, content_md, base_version}]`, created or merged. On a page this job wrote last, or with the `base_version` you read, your text replaces the page's; otherwise it is added below the page's text unless the page already holds it.
+- `chat`: `{title, summary_md, open_items, source_system, assistant}`.
+- **All or nothing.** If any part is invalid nothing is saved, and the error starts with the field, for example `proposals[1]: due_date must be a date`. Fix that part and send the whole call again.
+- The answer has `item`, `url` (the owner's link to it), `created`, `changed_fields`, `outputs`, `inputs`, `proposals.waiting`, `wiki` and `chat`. The item is To Review while proposals wait for the owner; you cannot accept them here or anywhere else.
+
 ## Streams: original IDs and connections
 
 Anything you bring in from another system carries that system's name and the original's ID, so nothing is filed twice:
