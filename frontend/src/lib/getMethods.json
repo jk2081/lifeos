@@ -30,6 +30,7 @@
  "lifeos.api.graph.get",
  "lifeos.api.inbox.list",
  "lifeos.api.inbox.get",
+ "lifeos.api.inbox.page",
  "lifeos.api.insights.list",
  "lifeos.api.insights.summary",
  "lifeos.api.journal.grid",

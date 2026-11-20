@@ -82,7 +82,7 @@ class TestFileJob(LifeTestCase):
 		self.assertEqual(after["Life Note"] - before["Life Note"], 1)
 		self.assertEqual(after["Life Chat Log"] - before["Life Chat Log"], 1)
 		self.assertEqual(after["File"] - before["File"], 4)
-		self.assertTrue(out["url"].endswith(f"/life/inbox/{out['item']}/review"))
+		self.assertTrue(out["url"].endswith(f"/life/item/{out['item']}"))
 
 	def test_2_the_same_call_again_creates_nothing_and_updates_what_changed(self):
 		first = call("i8-again")

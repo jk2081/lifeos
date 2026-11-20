@@ -277,7 +277,7 @@ def _write(space, plan, written):
 	pages = [_wiki(space, item, chat, page) for page in plan["wiki"]]
 	connections.touch(space, item.source_system, item.title)
 	return {"item": item.name, "title": item.title, "status": item.status,
-		"url": get_url("/life" + links.route_of(JOB, item.name) + "/review"), "created": created, "updated": not created,
+		"url": get_url("/life" + links.route_of(JOB, item.name)), "created": created, "updated": not created,
 		"changed_fields": changed, "outputs": outputs, "inputs": inputs, "proposals": waiting, "wiki": pages, "chat": chat}
 
 
