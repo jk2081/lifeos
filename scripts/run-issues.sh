@@ -132,6 +132,7 @@ mark_blocked() {
 
 build_issue() {
   local n="$1" title slug branch round=1 started elapsed log pr result short=0
+  if [ "$(gh issue view "$n" -R "$REPO" --json state -q .state)" = "CLOSED" ]; then say "Issue #$n is already closed. Skipping it."; return; fi
   title=$(gh issue view "$n" -R "$REPO" --json title -q .title)
   slug=$(echo "$title" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | cut -c1-40 | sed 's/-*$//')
   branch="issue-$n-$slug"
@@ -195,6 +196,9 @@ build_issue() {
         rm -f .issue/ci-failure.log
         if [ "$AUTO_MERGE" = "1" ]; then
           if gh pr merge "$pr" -R "$REPO" --squash --delete-branch >/dev/null 2>&1; then
+            # GitHub closes the issue from "Closes #n" a few seconds after the merge. Close it now, so the next
+            # lookup cannot pick it again before GitHub has caught up.
+            gh issue close "$n" -R "$REPO" --reason completed >/dev/null 2>&1 || true
             notify "Issue #$n done: pull request #$pr merged."
           else
             gh issue edit "$n" -R "$REPO" --add-label in-review >/dev/null
