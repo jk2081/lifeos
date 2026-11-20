@@ -601,3 +601,9 @@ Fixed: sensitive items reached agents through paths that did not use the Vault r
 - **The role offer** says "no Life OS access yet" and asks "A person" or "An agent" rather than naming roles, because Settings never shows role names (U.12 checks this).
 - **Acceptance:** `I1.<width>.1` to `.3` use two users made at the start of each width, `issue1-agent@lifeos.test` (an agent in no space) and `issue1-newcomer@lifeos.test` (no Life role), and take them out of the spaces at the end. U.12's menu order lists Agents under People and agents.
 - **A set 8 bug fixed on the way: the goal drawer refreshed itself in a loop.** Opening a goal in the weekly review loaded its suggested readings and then told the Goals tab "changed", which read the goal again and gave the drawer new data, which loaded the readings again, without end. Each round cleared what was typed (the skip reason, the next action). The full run of this issue failed `S8.390.6` to `.8` on it, and the S8 checks failed in 3 of 4 runs with this issue's change and passed in 3 of 3 without it: the change moved the timing, it did not cause the loop. `GoalDrawer.vue` now only reads the readings when it opens and sends "changed" only after a reading is confirmed or dismissed. With the fix the S8 checks passed 3 runs of 3.
+
+## Build process: GitHub issues and CI (20 November 2026)
+
+- Build work now comes from GitHub issues, run by `scripts/run-issues.sh`; rules in `docs/ISSUE_RULES.md`, target design in `docs/DIRECTION.md`, mockups in `mockups/v2/`.
+- GitHub Actions runs the unit suite and the scan on every pull request. The load test's 500 ms target stays on the Docker bench; in CI it is 2,000 ms (`LIFEOS_LOAD_TARGET_MS`), because GitHub's two-core runners measured Today at about 1.3 s where the bench is well under 500 ms. CI catches large slow-downs; the real target is still checked locally.
+- "Hide housekeeping pages" is part of the navigation issue (#14), not an issue of its own.
