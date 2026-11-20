@@ -1,5 +1,7 @@
 # Life OS roadmap
 
+> **From 20 November 2026 the plan is the GitHub issues** (labels `ready`, `phase-1` to `phase-4`), built one at a time by `scripts/run-issues.sh`, and the target design is `docs/DIRECTION.md`. The sets below are the history up to set 8. Set 9 (calendar writing) and the later sets became issues.
+
 Life OS keeps its owner moving forward: everything that lands on him goes in one place, becomes a few clear next steps, and the rest is let go. This file lists the build sets that take the app from where it is to the design agreed on 17 November 2026. Each set gets its own brief (`UX_FIXES_<n>.md`) written just before it runs, so it reflects what the previous set actually built.
 
 ## Where things stand

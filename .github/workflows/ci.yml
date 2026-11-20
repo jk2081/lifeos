@@ -1,0 +1,97 @@
+# Runs on every pull request and every push to main: the full unit suite on a fresh Frappe 16 bench, and the scan
+# with Frappe's semgrep rules over the whole app. The acceptance walk (tools/acceptance.mjs) still runs on the Mac.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan (Frappe semgrep rules)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # the same commit as tools/scan.sh
+      RULES_REF: 81a6e3d47a328249e8ddf04c586e493dd5553002
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scan
+        run: |
+          pip install -q semgrep
+          git clone -q https://github.com/frappe/semgrep-rules /tmp/frappe-semgrep-rules
+          git -C /tmp/frappe-semgrep-rules checkout -q "$RULES_REF"
+          semgrep scan --metrics=off --quiet --json --config /tmp/frappe-semgrep-rules/rules lifeos > /tmp/scan.json || true
+          python3 tools/scan_summary.py < /tmp/scan.json
+
+  tests:
+    name: Unit tests (Frappe 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports: ["3306:3306"]
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=2s --health-retries=20
+      redis-cache:
+        image: redis:7-alpine
+        ports: ["13000:6379"]
+      redis-queue:
+        image: redis:7-alpine
+        ports: ["11000:6379"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Cache pip and yarn
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/yarn
+          key: deps-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'frontend/yarn.lock', 'frontend/package.json') }}
+
+      - name: Bench
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client libmariadb-dev >/dev/null
+          npm install -g yarn >/dev/null
+          pip install -q frappe-bench
+          # the Frappe release the owner's server runs
+          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" --frappe-branch v16.56.0 ~/frappe-bench
+          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'; SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
+
+      - name: Install Life OS
+        working-directory: /home/runner/frappe-bench
+        env:
+          CI: "Yes"
+        run: |
+          bench get-app lifeos "$GITHUB_WORKSPACE"
+          bench setup requirements --dev
+          bench new-site --db-root-password root --admin-password "$(openssl rand -hex 16)" --mariadb-user-host-login-scope='%' test_site
+          bench --site test_site install-app lifeos
+          bench --site test_site set-config allow_tests true
+
+      - name: Unit tests
+        working-directory: /home/runner/frappe-bench
+        run: bench --site test_site run-tests --app lifeos
