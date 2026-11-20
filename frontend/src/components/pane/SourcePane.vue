@@ -85,7 +85,7 @@ onMounted(async () => {
     made.value = m
     emit('meta', { title: item.title, area: item.area, area_name: item.area_name, goal: item.goal, goal_title: item.goal_title,
       sub: [item.media_kind === 'Email Digest' ? 'Email digest' : item.media_kind, dateTime(item.received_on)].filter(Boolean).join(' · '),
-      archived: !!item.is_archived, canRestore: writable.value, sensitive: { doctype: 'Life Inbox Item', name: item.name, on: !!item.is_sensitive },
+      fullPage: '/item/' + item.name, archived: !!item.is_archived, canRestore: writable.value, sensitive: { doctype: 'Life Inbox Item', name: item.name, on: !!item.is_sensitive },
       tabs: [{ value: 'original', label: 'Original' }, { value: 'text', label: 'Text' }, { value: 'summary', label: 'Summary' },
         { value: 'made', label: 'Made from this', count: m.length, noun: 'records' }, { value: 'details', label: 'Details' }] })
   } catch (e) {

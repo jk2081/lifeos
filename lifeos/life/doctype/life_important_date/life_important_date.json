@@ -68,11 +68,12 @@
    "fieldname": "inbox_item",
    "fieldtype": "Link",
    "label": "Inbox Item",
-   "options": "Life Inbox Item"
+   "options": "Life Inbox Item",
+   "search_index": 1
   }
  ],
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Important Date",

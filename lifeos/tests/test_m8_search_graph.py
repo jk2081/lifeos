@@ -24,7 +24,7 @@ class TestSearch(LifeTestCase):
 		self.assertEqual(names(res), [item["name"]])
 		self.assertEqual(res["results"][0]["kind"], "Inbox")
 		self.assertIn("Nowrojeezzz", res["results"][0]["snippet"])
-		self.assertEqual(res["results"][0]["route"], f"/inbox/{item['name']}")
+		self.assertEqual(res["results"][0]["route"], f"/item/{item['name']}")
 		self.assertEqual(names(search.query("nowrojeez", space=PRIVATE)), [item["name"]])  # prefix
 
 	def test_searches_every_filed_type(self):

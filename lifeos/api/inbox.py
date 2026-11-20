@@ -413,6 +413,24 @@ def get(item: str):
 	return out
 
 
+@frappe.whitelist(methods=["GET"])
+def item_page(item: str):
+	"""Issue 10: one item's page. Everything `get` returns, plus `came_of_it` (the records made from it, each with its state),
+	`related` (wiki pages and chat logs that cite it, the meetings it is linked to) and the space's name. An item the user may
+	not read is answered as not found, so its page says nothing about it."""
+	from lifeos import item_page
+
+	if not frappe.db.exists("Life Inbox Item", item) or not frappe.has_permission("Life Inbox Item", "read", doc=item):
+		raise frappe.DoesNotExistError(_("Not found"))
+	out = get(item)
+	doc = frappe.get_doc("Life Inbox Item", item)
+	out["space_name"] = frappe.db.get_value("Life Space", doc.space, "space_name") or doc.space
+	out["filed_by_agent"] = permissions.is_agent(doc.owner)
+	out["came_of_it"] = item_page.came_of_it(doc)
+	out["related"] = item_page.related(doc)
+	return out
+
+
 @frappe.whitelist(methods=["POST"])
 def update_transcript(item: str, transcript_md: str | None):
 	"""Correct the transcript of an item, for example words marked [?]."""

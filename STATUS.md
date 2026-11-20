@@ -358,6 +358,13 @@ GitHub issue #9. Deviations are in `DECISIONS.md` under "Issue 9".
 - **Works:** `bench --site SITE execute lifeos.tools.tidy.run` reports duplicate stored files (same SHA-256 in one space) and the records using them, jobs from an agent that hold inputs beside outputs (with the files that look like inputs), and items Failed by the intent refusal; it changes nothing. With `{'apply': True}` it takes a backup with files first and refuses if that fails, then keeps the oldest copy of each duplicate and relinks the rest, removes copies no `File` row uses, moves input files to reusable assets linked from the job, and puts the Failed items back to New. Every change goes to `logs/lifeos_tidy.log` and as a comment on the record. A second run changes nothing. `README.md` has the three steps for the owner.
 - **Tests:** `lifeos/tests/test_issue9_tidy.py` (the issue's six). Also run end to end on `acceptance.localhost` with a real backup.
 
+## Issue 10: the item page (20 Nov 2026)
+
+GitHub issue #10. Deviations are in `DECISIONS.md` under "Issue 10".
+
+- **Works:** one page per inbox item at `/life/item/<name>`: a header with the source, when, the space, area and goal chips and the sensitive mark; What came in (the instruction, the files with their versions, the text, a job's inputs); What the Brain made of it (summary, transcript folded); Decisions (the waiting proposals with the Review screen's own cards); What came of it (the records made from it with their state); Related (wiki pages and chat logs that cite it, its meetings). Accepting on the page moves the record to What came of it without a reload. The Inbox and Library panes' Open full page, search, `[[links]]` and backlinks lead to it. A user outside the item's space gets "Not found". On a phone it is one column with sections that fold.
+- **Tests:** `lifeos/tests/test_issue10_item_page.py` (5 tests) and acceptance checks `I10.<width>.1` to `.5` at 1440 and 390 px. The item page is in `tools/screens.mjs` (light and dark, both widths).
+
 ## Summary
 
 ### What works

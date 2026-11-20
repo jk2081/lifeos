@@ -108,7 +108,7 @@ for (const scheme of schemes) {
     // the lens (picker, chip, phone sheet), Today's banner; then the panes and screens kept from earlier sets
     const SCREENS = [
       ['today', '/life/?area='], ['today-lens', `/life/?${lens}`], ['today-banner', '/life/?area=&at=2026-11-22%2019:00:00'],
-      ['inbox', '/life/inbox?all=1&area='], ['inbox-lens', `/life/inbox?all=1&${lens}`], ['inbox-pane', `/life/inbox?all=1&area=&open=inbox:${review}`], ['review', `/life/inbox/${review}/review`],
+      ['inbox', '/life/inbox?all=1&area='], ['inbox-lens', `/life/inbox?all=1&${lens}`], ['inbox-pane', `/life/inbox?all=1&area=&open=inbox:${review}`], ['review', `/life/inbox/${review}/review`], ['item', `/life/item/${review}`],
       ...['review', 'calendar', 'agenda'].map((v) => [`plan-week-${v}`, `/life/plan/week?view=${v}&area=`]),
       ...['plan', 'habits', 'checkins', 'calendar'].map((v) => [`plan-month-${v}`, `/life/plan/month?view=${v}&area=`]),
       ['plan-12-weeks', '/life/plan/12-weeks?area='], ['plan-12-weeks-lens', `/life/plan/12-weeks?${lens}`],
