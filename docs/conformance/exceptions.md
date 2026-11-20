@@ -10,8 +10,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 6 |
 | frappe-setuser | 14 |
-| frappe-sql-format-injection | 82 |
-| Total | 109 |
+| frappe-sql-format-injection | 83 |
+| Total | 110 |
 
 ## frappe-manual-commit
 
@@ -34,7 +34,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/settings.py` | 218 | the site's own backup folder, names only |
+| `lifeos/api/settings.py` | 224 | the site's own backup folder, names only |
 | `lifeos/files.py` | 90 | local_path keeps the path inside the site's files folders |
 | `lifeos/patches/v10/file_hashes.py` | 23 | local_path keeps the path inside the site's files folders |
 | `lifeos/sources.py` | 103 | a fixed name in a temporary folder made here |
@@ -46,11 +46,11 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/demo.py` | 32 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 199 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 203 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 271 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 285 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/demo.py` | 301 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 200 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 204 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 272 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 286 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/demo.py` | 302 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/devtools_review.py` | 20 | development tool on the acceptance site: the owner-shaped data is made as the owner |
 | `lifeos/loadtest.py` | 44 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 136 | load test: reads are timed as a member of the space, the way a request runs |
@@ -79,12 +79,13 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/chats.py` | 159 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 265 | sensitive_guard is a constant fragment; values are parameters |
 | `lifeos/api/chats.py` | 269 | as above |
-| `lifeos/api/goals.py` | 36 | `sp` is one of two constant fragments; values are parameters |
-| `lifeos/api/goals.py` | 96 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
-| `lifeos/api/goals.py` | 105 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
-| `lifeos/api/inbox.py` | 362 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 367 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/inbox.py` | 369 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/goals.py` | 37 | `sp` is one of two constant fragments; values are parameters |
+| `lifeos/api/goals.py` | 100 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
+| `lifeos/api/goals.py` | 109 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
+| `lifeos/api/goals.py` | 244 | `off` is off_clause's fixed SQL; values are parameters |
+| `lifeos/api/inbox.py` | 370 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
+| `lifeos/api/inbox.py` | 375 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 377 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |
@@ -103,11 +104,11 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/sources.py` | 163 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/sources.py` | 167 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/sources.py` | 243 | sensitive_guard is a constant fragment; values are parameters |
-| `lifeos/api/tasks.py` | 45 | fixed SQL and meta-checked columns only; values are parameters |
-| `lifeos/api/tasks.py` | 131 | the WHERE comes from where_clause (fixed fragments); values are parameters |
-| `lifeos/api/tasks.py` | 149 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
-| `lifeos/api/tasks.py` | 185 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
-| `lifeos/api/tasks.py` | 271 | open_loops_where() is a constant fragment |
+| `lifeos/api/tasks.py` | 48 | fixed SQL and meta-checked columns only; values are parameters |
+| `lifeos/api/tasks.py` | 137 | the WHERE comes from where_clause (fixed fragments); values are parameters |
+| `lifeos/api/tasks.py` | 155 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
+| `lifeos/api/tasks.py` | 191 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
+| `lifeos/api/tasks.py` | 288 | open_loops_where() is a constant fragment |
 | `lifeos/api/timeline.py` | 38 | ROW_FIELDS and vault_guard are constants; callers pass fixed WHERE and ORDER fragments; values are parameters |
 | `lifeos/api/timeline.py` | 71 | fixed fragments, std_filters columns checked against meta; values are parameters |
 | `lifeos/api/today.py` | 58 | `lens` is area_filter's fixed SQL; values are parameters |
@@ -136,7 +137,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/devtools.py` | 200 | development tool: DocType and field from the _TITLED constant |
 | `lifeos/devtools.py` | 250 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
 | `lifeos/devtools.py` | 275 | development tool: child table names from the meta of a checked DocType; values are parameters |
-| `lifeos/devtools.py` | 288 | development tool: dt is checked to be an existing DocType; names are a parameter |
+| `lifeos/devtools.py` | 290 | development tool: dt is checked to be an existing DocType; names are a parameter |
 | `lifeos/index.py` | 97 | column names come from the fixed COLUMNS list; every value is a %s parameter |
 | `lifeos/old_inbox.py` | 259 | WHERE is constant SQL plus area_filter's fixed fragment; values are parameters |
 | `lifeos/patches/v7/projects_into_goals.py` | 151 | `dt` comes from the constant RENAMED |

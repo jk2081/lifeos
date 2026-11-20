@@ -17,7 +17,7 @@
       <div class="flex items-start gap-2.5">
         <Checkbox class="relative mt-0.5" :model-value="row.status === 'Done'" :disabled="!canWrite()" :aria-label="'Done: ' + row.title" @update:model-value="toggle(row)" />
         <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="struck(row)">{{ row.title }}</div>
-          <div class="text-sm text-ink-gray-6">{{ taskMeta(row, today, { withDue: true }) }}</div></div>
+          <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-ink-gray-6"><AreaGuess :task="row" :readonly="!canWrite()" /><span>{{ taskMeta(row, today, { withDue: true }) }}</span></div></div>
         <Badge v-if="taskPill(row, today)" :theme="taskPill(row, today).theme"><span class="max-md:hidden">{{ taskPill(row, today).text }}</span>
           <span class="md:hidden">{{ taskPill(row, today).shortText || taskPill(row, today).text }}</span></Badge>
       </div>
@@ -31,7 +31,7 @@
       <div class="flex items-start gap-2.5">
         <Checkbox class="relative mt-0.5" :model-value="row.status === 'Done'" :disabled="!canWrite()" :aria-label="'Done: ' + row.title" @update:model-value="toggle(row)" />
         <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="struck(row)">{{ row.title }}</div>
-          <div class="text-sm text-ink-gray-6">{{ taskMeta(row, today, { withDue: true }) }}</div></div>
+          <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-ink-gray-6"><AreaGuess :task="row" :readonly="!canWrite()" /><span>{{ taskMeta(row, today, { withDue: true }) }}</span></div></div>
         <Badge v-if="taskPill(row, today)" :theme="taskPill(row, today).theme" :label="taskPill(row, today).shortText || taskPill(row, today).text" />
       </div>
     </template>
@@ -45,7 +45,7 @@
             :class="isOpen(t) ? 'border-outline-gray-4 !bg-surface-gray-3' : 'border-outline-gray-2'" draggable="true" data-row :data-active="isOpen(t) || undefined" @dragstart="dragging = t">
             <button type="button" class="absolute inset-0 rounded-4 focus-visible:focus-ring" :aria-label="t.title" :data-ref="'task:' + t.name" @click="openRef('task:' + t.name)" />
             <div class="break-words text-base-medium text-ink-gray-9">{{ t.title }}</div>
-            <div class="text-sm text-ink-gray-6">{{ taskMeta(t, today, { withDue: true }) }}</div>
+            <div class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-ink-gray-6"><AreaGuess :task="t" :readonly="!canWrite()" /><span>{{ taskMeta(t, today, { withDue: true }) }}</span></div>
             <div class="mt-1.5 flex flex-wrap items-center gap-2">
               <Badge v-if="t.priority" :label="t.priority" />
               <Select class="relative w-28" size="sm" :model-value="t.status" :options="BOARD" aria-label="Move to" :disabled="!canWrite()" @update:model-value="(v) => move(t, v)" />
@@ -63,6 +63,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Checkbox, Select, TextInput } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
+import AreaGuess from '@/components/AreaGuess.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import { api, optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'

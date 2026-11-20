@@ -4001,6 +4001,49 @@ for (const width of SET_WIDTHS) {
   await s.ctx.close()
 }
 
+// Issue 13: every task has an area. A task quick-captured with no area shows the area the Brain guessed, with ✦ and how
+// sure it is; one tap confirms it and the ✦ goes.
+for (const width of SET_WIDTHS) {
+  const tag = `I13.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  await check(`${tag}.7`, `${width} px: a quick-captured task shows its guessed area with ✦ and the confidence; one tap confirms it and the ✦ goes`, async () => {
+    const title = `I13 quick capture ${width} ${stamp}`
+    await s.open('/life/plan/tasks')
+    const box = pg.getByLabel('Quick add')
+    await box.fill(`${title} today`)
+    await box.press('Enter')
+    await pg.waitForLoadState('networkidle')
+    // after a full walk many tasks are due today: show this one by its title
+    await s.open(`/life/plan/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', '=', title]]))}`)
+    const row = pg.locator('[data-row]').filter({ hasText: title }).first()
+    await row.waitFor({ timeout: 10000 })
+    const chip = row.locator('[data-area-guess]')
+    must(await chip.isVisible(), 'the new task shows no guessed area')
+    const text = (await chip.innerText()).trim()
+    must(/^✦ .+ · \d+%$/.test(text), 'the guess does not read "✦ <area> · <n>%": ' + text)
+    const task = (await s.api('tasks.list', { space: SPACE, status: 'open', due: 'today' })).tasks.find((t) => t.title === title)
+    must(task && task.area && task.area_guessed, 'the server has no guessed area for the task')
+    // the model's guess comes from a job after the save and may replace the first one between the two reads: compare the area
+    must(text.includes(task.area_name), `the chip says ${text}; the task is in ${task.area_name}, ${task.area_confidence}% sure`)
+    await chip.click()
+    await pg.waitForLoadState('networkidle')
+    await chip.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {})
+    must(!(await row.locator('[data-area-guess]').count()), 'the ✦ is still shown after the tap')
+    must((await row.innerText()).includes(task.area_name), 'the confirmed area is no longer named on the row')
+    const after = await s.api('tasks.get', { task: task.name })
+    must(!after.area_guessed && after.area === task.area, 'the server did not confirm the area')
+    must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    await s.api('frappe.client.delete', { doctype: 'Life Task', name: task.name }).catch(() => {})
+    return `${task.area_name}, ${Math.round(task.area_confidence)}%`
+  })
+  await s.ctx.close()
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {

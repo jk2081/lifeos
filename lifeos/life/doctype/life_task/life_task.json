@@ -25,6 +25,8 @@
   "last_touched_on",
   "organisation_section",
   "area",
+  "area_guessed",
+  "area_confidence",
   "also_in",
   "tags",
   "is_archived",
@@ -166,6 +168,21 @@
    "in_list_view": 1
   },
   {
+   "fieldname": "area_guessed",
+   "fieldtype": "Check",
+   "label": "Area Guessed",
+   "default": "0",
+   "read_only": 1,
+   "description": "The Brain guessed the area; the owner has not confirmed it yet."
+  },
+  {
+   "fieldname": "area_confidence",
+   "fieldtype": "Percent",
+   "label": "Area Confidence",
+   "read_only": 1,
+   "depends_on": "area_guessed"
+  },
+  {
    "fieldname": "also_in",
    "fieldtype": "Table MultiSelect",
    "label": "Also In",
@@ -226,7 +243,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-18 12:00:00.000000",
+ "modified": "2026-11-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Task",

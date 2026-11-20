@@ -14,3 +14,4 @@ lifeos.patches.v8.outbox_backfill
 lifeos.patches.v9.review_notes
 lifeos.patches.v10.file_hashes
 lifeos.patches.v11.life_areas
+lifeos.patches.v12.task_areas

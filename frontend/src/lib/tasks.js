@@ -22,7 +22,7 @@ export function taskPill(t, today) {
 // The grey line under a task title.
 export function taskMeta(t, today, { withDue = false } = {}) {
   const parts = []
-  if (t.area_name) parts.push(t.area_name)
+  if (t.area_name && !t.area_guessed) parts.push(t.area_name) // a guessed area shows as its own chip (AreaGuess)
   if (t.goal_title) parts.push(t.goal_title)
   else if (t.source_title) parts.push('from ' + t.source_title)
   else if (t.carried_from) parts.push('carried forward')

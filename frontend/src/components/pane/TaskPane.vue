@@ -12,6 +12,7 @@
   <div><div class="mb-1.5 text-sm text-ink-gray-6">Filed under</div>
     <div class="flex flex-wrap items-center gap-2">
       <div class="contents" data-task-area><Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" /></div>
+      <AreaGuess :task="task" :readonly="!writable" full @confirmed="(t) => { task = { ...task, ...t }; tell(); emit('changed', task) }" />
       <Badge v-for="a in task.also_in" :key="a" size="lg">also in {{ areaName(a) }}
         <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)" @click="save({ also_in: task.also_in.filter((x) => x !== a) })" /></template></Badge>
       <Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== task.area && !task.also_in.includes(o.value))" placeholder="also in"
@@ -53,6 +54,7 @@ import { safeUrl } from '@/lib/editor/livePreview'
 import { loadBacklinks } from '@/lib/links'
 import { openRef } from '@/lib/pane'
 import { api, db, errorText, tryCall } from '@/lib/api'
+import AreaGuess from '@/components/AreaGuess.vue'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { OPEN, PRIORITIES } from '@/lib/tasks'
