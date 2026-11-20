@@ -12,6 +12,8 @@ so the inbox pipeline can be tested with no model.
 Only the Python standard library is needed. Credentials are read from the environment and never printed.
 """
 import argparse
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import base64
 import json
 import os
@@ -252,7 +254,8 @@ def process_one(client, fail=False, today=None, log=print):
 			data = client.download(f["file_url"])  # a real agent would transcribe this; the copy is dropped at once
 			log(f"  downloaded {f['file_name']} ({len(data)} bytes)")
 			del data
-		transcript, summary, proposals = canned_result(item, item.get("context") or {}, today or time.strftime("%Y-%m-%d"))
+		# the sites run on Asia/Kolkata, not the runner's UTC
+		transcript, summary, proposals = canned_result(item, item.get("context") or {}, today or datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d"))
 		intent = item.get("intent") or "Process"
 		if intent == "Just keep":
 			# only make it searchable: the text, no proposals

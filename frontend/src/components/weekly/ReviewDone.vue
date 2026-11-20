@@ -23,7 +23,7 @@
       <p class="text-sm text-ink-gray-7" data-review-next-date>Next review: {{ weekday(d.next.date) }} {{ long(d.next.date) }}, {{ d.next.time }}</p>
       <div class="flex flex-wrap gap-2">
         <Button variant="solid" label="Go to Today" route="/" data-done-today />
-        <Button label="See the week" :route="{ path: '/plan/week', query: { view: 'calendar' } }" data-done-week />
+        <Button label="See the week" :route="{ path: '/today/week', query: { view: 'calendar' } }" data-done-week />
       </div>
     </Card>
   </div>

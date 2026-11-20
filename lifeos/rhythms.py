@@ -83,7 +83,7 @@ def banner(space, at=None):
 		at_time = str(s.weekly_review_time or "18:00:00")
 		if now.strftime("%H:%M:%S") >= at_time.zfill(8) and occ not in gone and not review_done(space, ws):
 			return {"key": "review", "occurrence": occ, "text": "Your weekly review is ready", "action": "Start the review",
-				"to": {"path": "/plan/week", "query": {"view": "review"}}}
+				"to": {"path": "/today/week", "query": {"view": "review"}}}
 
 	# 2. the month plan
 	enabled = s.month_plan_enabled if s.month_plan_enabled is not None else 1
@@ -92,7 +92,7 @@ def banner(space, at=None):
 		has_plan = frappe.db.exists("Life Month Plan", {"space": space, "year": day.year, "month": day.month})
 		if occ not in gone and not has_plan:
 			return {"key": "month", "occurrence": occ, "text": f"Plan {MONTHS[day.month - 1]}", "action": "Open the month",
-				"to": {"path": "/plan/month", "query": {"view": "plan"}}}
+				"to": {"path": "/today/month", "query": {"view": "plan"}}}
 
 	# 3 and 4. the 12 Week cycle
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "start_date", "end_date"], as_dict=True)
@@ -103,10 +103,10 @@ def banner(space, at=None):
 			planned = frappe.db.exists("Life Cycle", {"space": space, "status": "Planned", "start_date": (">", cycle.start_date)})
 			if occ not in gone and not planned:
 				return {"key": "plan-next", "occurrence": occ, "text": "Plan your next 12 weeks", "action": "Open 12 Weeks",
-					"to": {"path": "/plan/12-weeks", "query": {}}}
+					"to": {"path": "/today/year", "query": {"view": "cycle"}}}
 		if week == 12:
 			occ = f"close:{cycle.name}"
 			if occ not in gone:
 				return {"key": "close", "occurrence": occ, "text": "Close this cycle", "action": "Open 12 Weeks",
-					"to": {"path": "/plan/12-weeks", "query": {}}}
+					"to": {"path": "/today/year", "query": {"view": "cycle"}}}
 	return None

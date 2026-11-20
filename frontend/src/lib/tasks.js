@@ -47,4 +47,4 @@ export const VAULT_TYPES = ['ID', 'Travel', 'Insurance', 'Property', 'Tax', 'Med
 export const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 // "4 of 10 tasks done" leads to the tasks of the goal with Show done on. Archived ones are counted, so they are listed too.
 // "x of y tasks done" counts every task of the goal but the carried ones: the All tab with that one condition
-export const doneLink = (g) => ({ path: '/plan/tasks', query: { goal: g.name, archived: '1', f: JSON.stringify([['status', '!=', 'Carried']]) } })
+export const doneLink = (g) => ({ path: '/goals/tasks', query: { goal: g.name, archived: '1', f: JSON.stringify([['status', '!=', 'Carried']]) } })

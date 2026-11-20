@@ -8,6 +8,8 @@
  "lifeos.api.ask.threads",
  "lifeos.api.calendar.get",
  "lifeos.api.calendar.year",
+ "lifeos.api.calendar.year_plan",
+ "lifeos.api.calendar.week_plan",
  "lifeos.api.calendar.entry",
  "lifeos.api.chats.report",
  "lifeos.api.chats.list",

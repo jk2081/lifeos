@@ -12,30 +12,27 @@
             @click="lensOpen = true">
             <template #prefix><span class="size-2 shrink-0 rounded-full" :class="lensArea ? dotClass(lensArea) : 'bg-surface-gray-5'" aria-hidden="true" /></template>
           </Button>
-          <span class="flex-1" />
-          <Dropdown v-if="canWrite()" :options="newMenuItems()">
-            <Button size="md" variant="solid" icon-left="lucide-plus" label="New" data-phone-new />
-          </Dropdown>
         </div>
         <RouterView v-slot="{ Component }">
           <ScreenBoundary><component :is="Component" :key="store.space + ':' + store.lensArea + ':' + route.path" /></ScreenBoundary>
         </RouterView>
       </main>
 
-      <!-- phone: the four places and Ask, which opens the Ask sheet with the lens as its scope; Settings is in the lens sheet -->
+      <!-- phone (issue 14): Today and Brain, the round capture button, Goals and Library; Settings is in the lens sheet, Ask in every header -->
       <div class="fixed inset-x-0 bottom-0 z-30 md:hidden" data-tabbar>
         <MobileNav aria-label="Places">
-          <MobileNavItem v-for="n in PLACES" :key="n.to" :label="n.label" :icon="navCount(n.label) ? undefined : n.icon" :route="n.to" :active="activePlace === (n.base || n.to)"
-            :data-tab-item="n.label">
-            <!-- Inbox carries the sidebar's count -->
-            <span v-if="navCount(n.label)" class="relative inline-flex"><span :class="n.icon" class="size-5" aria-hidden="true" />
-              <span class="absolute -right-3 -top-1.5" :data-tab-count="n.label"><Badge size="sm" theme="red" :label="navCount(n.label).n" /></span></span>
-          </MobileNavItem>
-          <MobileNavItem label="Ask" icon="lucide-sparkles" :active="ask.open" data-tab-item="Ask" @click="startAsk('', lensScope())" />
+          <template v-for="(n, i) in PLACES" :key="n.to">
+            <div v-if="i === 2" class="flex items-center justify-center">
+              <Button class="!size-12 -translate-y-1 !rounded-full shadow-lg" variant="solid" size="lg" icon="lucide-plus" label="Capture" data-tab-capture
+                @click="store.captureOpen = true" />
+            </div>
+            <MobileNavItem :label="n.label" :icon="navCount(n.label) ? undefined : n.icon" :route="n.to" :active="activePlace === n.base" :data-tab-item="n.label">
+              <!-- Brain carries the sidebar's count -->
+              <span v-if="navCount(n.label)" class="relative inline-flex"><span :class="n.icon" class="size-5" aria-hidden="true" />
+                <span class="absolute -right-3 -top-1.5" :data-tab-count="n.label"><Badge size="sm" theme="gray" variant="solid" :label="navCount(n.label).n" /></span></span>
+            </MobileNavItem>
+          </template>
         </MobileNav>
-      </div>
-      <div v-if="showFab" class="fixed bottom-[calc(72px+env(safe-area-inset-bottom))] right-4 z-30 md:hidden">
-        <Button class="!size-12 !rounded-full shadow-lg" variant="solid" size="lg" icon="lucide-plus" label="Add a task" @click="store.quickAdd = true" />
       </div>
 
       <NewRecord v-if="store.newKind === 'note'" :model-value="true" title="New note" action="Create note" :fields="[{ name: 'title', label: 'Title', required: true }]"
@@ -50,6 +47,7 @@
       <AskPanel />
       <SearchPalette v-model:open="store.searchOpen" />
       <QuickAdd v-model:open="store.quickAdd" />
+      <CaptureSheet v-model:open="store.captureOpen" />
       <KeyboardShortcutsDialog v-model:open="shortcutsOpen">
         <div class="grid gap-6 sm:grid-cols-3">
           <section v-for="g in SHORTCUTS" :key="g.title">
@@ -71,15 +69,14 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Alert, Badge, Button, Dropdown, FrappeUIProvider, KeyboardShortcut, KeyboardShortcutsDialog, LoadingIndicator, MobileNav, MobileNavItem,
+import { Alert, Badge, Button, FrappeUIProvider, KeyboardShortcut, KeyboardShortcutsDialog, LoadingIndicator, MobileNav, MobileNavItem,
   toast, useColorScheme } from 'frappe-ui'
 import AppSidebar from './components/AppSidebar.vue'
 import NewRecord from './components/NewRecord.vue'
 import NewGoalDialog from './components/goals/NewGoalDialog.vue'
 import { GO, PLACES } from './lib/nav'
 import { activePlace } from './lib/sidebar'
-import { navCount, newMenuItems } from './lib/newMenu'
-import { ask, lensScope, startAsk } from './lib/ask'
+import { navCount } from './lib/newMenu'
 import { api, db } from './lib/api'
 import { recordChanged } from './lib/pane'
 import { areaOptions, loadLookups } from './lib/lookups'
@@ -88,7 +85,8 @@ import RecordPane from './components/RecordPane.vue'
 import ScreenBoundary from './components/ScreenBoundary.vue'
 import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'
-import { boot, canWrite, store } from './lib/store'
+import CaptureSheet from './components/CaptureSheet.vue'
+import { boot, store } from './lib/store'
 import { dotClass, initLens, lensArea, lensLabel } from './lib/lens'
 import LensSheet from './components/lens/LensSheet.vue'
 import { errorText } from './lib/api'
@@ -111,7 +109,6 @@ const SHORTCUTS = [
 
 useColorScheme() // light and dark come from frappe-ui: it follows the system setting and stamps data-theme on <html>
 
-const showFab = computed(() => ['/', '/plan/tasks', '/inbox'].includes(route.path) && !route.query.open)
 // a new goal from the New menu: open-ended by default (what a project was before set 6); a 12 Week Year goal is added on the grid
 async function createNote(v) {
   const note = await db.insert({ doctype: 'Life Note', space: store.space, title: v.title, content_md: '' })
@@ -128,7 +125,7 @@ async function createIdea(v) {
 }
 function goalCreated(g) {
   store.newKind = ''
-  router.push(`/plan/goals/${g.name}`)
+  router.push(`/goals/${g.name}`)
 }
 // the sidebar's areas come from the space's lookups, read again when the space changes or Settings changes them
 watch(() => [store.ready, store.space], ([ready]) => ready && loadLookups(true), { immediate: true })

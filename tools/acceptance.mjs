@@ -95,7 +95,7 @@ async function walkReview(page, origin, width) {
     await wait()
   }
   for (const tab of ['library', 'tasks', 'goals', 'reflect']) {
-    await page.goto(`${origin}/life/plan/week?view=review&tab=${tab}&area=`, { waitUntil: 'networkidle' })
+    await page.goto(`${origin}/life/today/week?view=review&tab=${tab}&area=`, { waitUntil: 'networkidle' })
     await look(`review > ${tab}`, `[data-review-${tab}]`)
     if (tab === 'library') {
       await drawer('a meeting', '[data-strip-meeting]:visible')
@@ -323,7 +323,7 @@ await check(3, 'PDF with "summarise and extract to-dos" gives tasks through revi
 
 await check(4, 'Tick a habit at phone width and see the month count change', async () => {
   const phone = await session('owner@lifeos.test', 390)
-  await phone.open('/life/plan/month?view=habits')
+  await phone.open('/life/today/month?view=habits')
   const count = () => phone.page.locator('text=/\\d+ of \\d+ days/').first().innerText()
   const before = await count()
   // an empty box if the month has one, else untick a ticked one: the count changes either way
@@ -342,7 +342,7 @@ await check(4, 'Tick a habit at phone width and see the month count change', asy
 })
 
 await check(5, 'Tick week cells in the 12 Week Year grid and see the week score change', async () => {
-  await owner.open('/life/plan/12-weeks')
+  await owner.open('/life/today/year?view=cycle')
   const stat = () => owner.page.locator('[data-stat]').first().innerText()
   const before = (await stat()).replace(/\n/g, ' ')
   const g = await owner.api('journal.grid', { space: SPACE })
@@ -385,7 +385,7 @@ await check(7, 'Add a birthday and see it on the calendar this year and next', a
     const y = await owner.api('calendar.year', { space: SPACE, year })
     must(JSON.stringify(y).includes(title), 'not on the year view in ' + year)
   }
-  await owner.open('/life/plan/year?view=calendar')
+  await owner.open('/life/today/year?view=calendar')
   must((await owner.page.locator('[data-main]').innerText()).includes('Birthday'), 'not shown on the year screen')
 })
 
@@ -399,7 +399,7 @@ await check(8, 'Vault document expiring in 30 days shows a badge on Today', asyn
   await owner.open('/life')
   must((await owner.page.locator('[data-main]').innerText()).includes(title), 'not shown on Today')
   // set 6: the Vault's documents are captures of kind Document, marked sensitive, with their expiry
-  await owner.open('/life/library/captures?tab=documents&sensitive=1')
+  await owner.open('/life/library/documents?tab=documents&sensitive=1')
   const row = owner.page.locator('[data-row]', { hasText: title }).first()
   must(await row.count(), 'not shown in Library > Captures, Documents')
   must(await row.locator('[data-expiry-badge]').count() && await row.locator('[data-sensitive-lock]').count(), 'the document has no expiry badge or lock')
@@ -477,7 +477,7 @@ await check(12, 'At review, change the area with one tap and add a second: the r
   for (const name of ['Tea & Coffee', 'Personal']) {
     const rows = (await owner.api('tasks.list', { space: SPACE, area: areaId(name), status: 'all', page_length: 50, filters: [['title', '=', title]] })).tasks
     must(rows.length === 1, `not in Tasks under the ${name} lens`)
-    await owner.open(`/life/plan/tasks?view=list&status=all&area=${areaId(name)}`)
+    await owner.open(`/life/goals/tasks?view=list&status=all&area=${areaId(name)}`)
     must((await owner.page.locator('[data-main]').innerText()).includes(title), `not on Plan > Tasks with ${name} in the lens`)
   }
   const item = await owner.api('inbox.list', { space: SPACE, status: 'To Review' })
@@ -493,8 +493,8 @@ await check(13, 'Tea & Coffee in the lens: Plan and Library show its open-ended 
   const notes = (await owner.api('library.list', { space: SPACE, area: tea, collection: 'all', page_length: 1 })).notes
   const chats = (await owner.api('sources.list', { space: SPACE, area: tea, tab: 'chats', page_length: 1 })).sources
   must(goals.length && tasks.length && notes.length && chats.length, `goals ${goals.length}, tasks ${tasks.length}, notes ${notes.length}, chats ${chats.length}`)
-  for (const [p, title] of [[`/life/plan/goals?type=Open&area=${tea}`, goals[0].title], [`/life/plan/tasks?view=list&area=${tea}`, tasks[0].title],
-    [`/life/library/notes?view=list&area=${tea}`, notes[0].title], [`/life/library/captures?tab=chats&view=list&area=${tea}`, chats[0].title]]) {
+  for (const [p, title] of [[`/life/goals?type=Open&area=${tea}`, goals[0].title], [`/life/goals/tasks?view=list&area=${tea}`, tasks[0].title],
+    [`/life/library/notes?view=list&area=${tea}`, notes[0].title], [`/life/library/chats?tab=chats&view=list&area=${tea}`, chats[0].title]]) {
     await owner.open(p)
     must((await owner.page.locator('[data-main]').innerText()).includes(title), `${p} does not show ${title}`)
     must(await owner.page.locator('[data-lens-chip]').count(), `${p} does not show the area chip`)
@@ -549,7 +549,7 @@ archive.run_daily()`)
   // set 8: the weekly review's Tasks tab sorts it into a pile (untouched 100 days: Park in Someday); it is never archived for you
   const park = await owner.api('weekly.pile_drawer', { space: SPACE, key: 'tasks', pile: 'park' })
   must(park.rows.some((r) => r.name === stale.name), 'the stale task is not in the Park pile')
-  await owner.open('/life/plan/week?view=review&tab=tasks')
+  await owner.open('/life/today/week?view=review&tab=tasks')
   await owner.page.locator('[data-pile-card][data-pile="park"] [data-pile-open]').first().click()
   await owner.page.waitForTimeout(800)
   must((await owner.page.locator('[data-drawer-name="pile"]').innerText()).includes(`Stale open task ${stamp}`), 'the Park pile does not show it')
@@ -650,27 +650,27 @@ const num = (text, which = 0) => { const m = String(text).match(/\d+/g); if (!m)
 // Set 6: the lists are tabs of the four places; Projects are goals of type Open, the Vault's documents are captures.
 const ROW = '[data-row]'
 const LISTS = [
-  ['Inbox', '/life/inbox?all=1'], ['Timeline', '/life/library/timeline?all=1'], ['Tasks', '/life/plan/tasks?view=list'],
-  ['Goals', '/life/plan/goals?all=1'], ['Documents', '/life/library/captures?tab=documents&all=1'], ['Captures', '/life/library/captures?all=1'],
+  ['Inbox', '/life/brain?all=1'], ['Timeline', '/life/library/timeline?all=1'], ['Tasks', '/life/goals/tasks?view=list'],
+  ['Goals', '/life/goals?all=1'], ['Documents', '/life/library/documents?tab=documents&all=1'], ['Captures', '/life/brain/activity?all=1'],
   ['Notes', '/life/library/notes?view=list&all=1'], ['All', '/life/library?view=list&all=1'], ['Archive', '/life/library/archive?all=1'],
 ].map(([name, p]) => [name, p, ROW])
 // one filter for each ListView, set through the library's quick-filter strip: [screen, path, URL key, URL value, the control's label, the option to pick, text to type for a Link]
 // The Area filters of set 4 are the lens since set 6 (U.40 and up check it); the Archive's only other quick filter is a text field.
 const FILTERS = [
-  ['Inbox', '/life/inbox?all=1', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/plan/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
-  ['Tasks table', '/life/plan/tasks?view=table&status=all', 'priority', 'I', 'Priority', 'I'], ['Goals', '/life/plan/goals?status=all', 'type', 'Open', 'Type', 'Open'],
-  ['Captures', '/life/library/captures?all=1', 'status', 'Done', 'Status', 'Done'],
+  ['Inbox', '/life/brain?all=1', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/goals/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
+  ['Tasks table', '/life/goals/tasks?view=table&status=all', 'priority', 'I', 'Priority', 'I'], ['Goals', '/life/goals?status=all', 'type', 'Open', 'Type', 'Open'],
+  ['Captures', '/life/brain/activity?all=1', 'status', 'Done', 'Status', 'Done'],
   ['Notes', '/life/library/notes?view=list&all=1', 'goal', ux.goal, 'Goal', ux.goalTitle, ux.goalTitle.slice(0, 6)],
 ]
 // UX fixes, set 3: the state tabs of each list screen. [screen, path, the URL parameter of the tabs, the tab values in order (the first is the default), another filter]
 // The other filter is mostly the lens's area (set 6), so each tab's count is checked with an area chosen too.
 const STATE_TABS = [
-  ['Inbox', '/life/inbox', 'status', ['To Review', 'Waiting', 'Failed'], 'source_type=Message'],
-  ['Tasks', '/life/plan/tasks', 'status', ['open', 'loops', 'Waiting', 'Done', 'Someday', 'all'], `area=${uxArea}`],
-  ['Goals', '/life/plan/goals', 'status', ['in_progress', 'achieved', 'closed', 'someday', 'all'], `area=${uxArea}`],
+  ['Inbox', '/life/brain', 'status', ['To Review', 'Waiting', 'Failed'], 'source_type=Message'],
+  ['Tasks', '/life/goals/tasks', 'status', ['open', 'loops', 'Waiting', 'Done', 'Someday', 'all'], `area=${uxArea}`],
+  ['Goals', '/life/goals', 'status', ['in_progress', 'achieved', 'closed', 'someday', 'all'], `area=${uxArea}`],
   ['Archive', '/life/library/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'Life Journal Page', 'trash'], `area=${uxArea}`],
-  ['Someday', '/life/plan/someday', 'tab', ['all', 'due', 'tasks', 'goals', 'ideas'], `area=${uxArea}`],
-  ['Captures', '/life/library/captures', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
+  ['Someday', '/life/goals/someday', 'tab', ['all', 'due', 'tasks', 'goals', 'ideas'], `area=${uxArea}`],
+  ['Captures', '/life/brain/activity', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
   ['All', '/life/library', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
 ]
 
@@ -708,8 +708,9 @@ for (const width of UX_WIDTHS) {
     await settle()
     await closeControls()
   }
-  // a place through the sidebar on a wide screen, the tab bar on a phone; a Plan or Library list through the place's tabs (set 6)
-  const PLACE_OF = { Tasks: ['Plan', 'tasks'], Goals: ['Plan', 'goals'], Someday: ['Plan', 'someday'], Notes: ['Library', 'notes'], Captures: ['Library', 'captures'] }
+  // a place through the sidebar on a wide screen, the tab bar on a phone; a list through the place's tabs (set 6, issue 14)
+  // issue 14: Tasks is Goals > All tasks, Captures is Brain > Activity
+  const PLACE_OF = { Tasks: ['Goals', 'tasks'], Goals: ['Goals', 'by-area'], Notes: ['Library', 'notes'], Captures: ['Brain', 'activity'] }
   const nav = async (label) => {
     const [place, tab] = PLACE_OF[label] || [label]
     if (phone) await pg.locator(`[data-tabbar] [data-tab-item="${place}"]`).first().click()
@@ -786,7 +787,7 @@ for (const width of UX_WIDTHS) {
       must((await paneTitle()) === title, `${name}: reload opened another record`)
     }
     await s.open('/life/inbox/' + ux.inbox)
-    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/inbox' && await pg.locator(ROW).count(), '/inbox/:id does not show the list with the pane open')
+    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/brain' && await pg.locator(ROW).count(), '/inbox/:id does not show the list with the pane open')
     must((await pg.locator('[data-pane-title]').innerText()).includes('UX inbox'), '/inbox/:id opened another item')
   })
 
@@ -807,7 +808,7 @@ for (const width of UX_WIDTHS) {
     })
   } else {
     await check(`${tag}.3`, '1440 px: pane widths, Esc, j and k, focus, Open full page, search opens in the pane', async () => {
-      await s.open('/life/plan/tasks?view=list')
+      await s.open('/life/goals/tasks?view=list')
       await clickRow(ROW)
       must(Math.round((await pane.boundingBox()).width) === 520, 'a task pane is not 520 px wide')
       must(await pg.evaluate(() => document.activeElement?.hasAttribute('data-pane')), 'focus did not move into the pane')
@@ -870,22 +871,22 @@ for (const width of UX_WIDTHS) {
     }
     const hidden = { optional: phone } // lines the phone layout leaves out
     // Today's numbers, Reset's, Someday's and the sidebar's come from the count helper and are checked by U.31
-    await door('/life', 'nav-review', { path: '/life/inbox', ...hidden })
+    await door('/life', 'nav-review', { path: '/life/brain', ...hidden })
     // the goal page (a project page before set 6): the preview heading of Overview leads to its tab, whose list holds that number;
     // the task figure opens Plan > Tasks. The area pages became the lens and the Vault screen became Captures (no doors left there).
-    const goalPage = '/life/plan/goals/' + ux.goal
+    const goalPage = '/life/goals/' + ux.goal
     const tabList = '[data-tab-panel]:visible [data-lv-count]'
     await door(goalPage, 'goal-overview-tasks', { path: goalPage, target: tabList })
-    await door(goalPage, 'goal-tasks', { which: 1, path: '/life/plan/tasks' })
-    await door('/life/library/captures?tab=chats&view=list&from=' + addDays(-6), 'chats-open', { path: '/life/library/captures' })
+    await door(goalPage, 'goal-tasks', { which: 1, path: '/life/goals/tasks' })
+    await door('/life/library/chats?tab=chats&view=list&from=' + addDays(-6), 'chats-open', { path: '/life/library/chats' })
     must(new URL(pg.url()).searchParams.get('from') === addDays(-6) && new URL(pg.url()).searchParams.get('open_items') === '1', 'chats: the date range was not kept')
     await door('/life/library/notes?view=tree', 'library-notes', { path: '/life/library/notes' })
     // set 8: the weekly review's numbers: what left the plate opens the Outbox, what came in opens Captures
-    await door('/life/plan/week?view=review&tab=tasks', 'review-plate-Done', { path: '/life/library/outbox' })
-    await door('/life/plan/week?view=review&tab=tasks', 'review-plate-in', { path: '/life/library/outbox' })
-    await door('/life/plan/week?view=review&tab=library', 'review-came-captures', { path: '/life/library/captures' })
+    await door('/life/today/week?view=review&tab=tasks', 'review-plate-Done', { path: '/life/brain/outbox' })
+    await door('/life/today/week?view=review&tab=tasks', 'review-plate-in', { path: '/life/brain/outbox' })
+    await door('/life/today/week?view=review&tab=library', 'review-came-captures', { path: '/life/brain/activity' })
     // an inbox row: "4 of 13 proposals pending" opens that item in the pane at its pending proposals
-    await s.open('/life/inbox?status=To+Review')
+    await s.open('/life/brain?status=To+Review')
     const link = pg.locator('[data-row] a:visible', { hasText: 'pending' }).first()
     const text = await link.innerText()
     must(/^\d+ of \d+ proposals pending$/.test(text.trim()), `an inbox row says "${text}"`)
@@ -919,7 +920,7 @@ for (const width of UX_WIDTHS) {
       must(!new URL(pg.url()).searchParams.get(key), `${name}: Back did not undo the filter`)
     }
     // an empty result names the filters and offers Clear filters
-    await s.open('/life/inbox?status=Failed&source_type=Email+Digest') // set 6: the Vault's own list became Captures; the Inbox has no intent filter
+    await s.open('/life/brain?status=Failed&source_type=Email+Digest') // set 6: the Vault's own list became Captures; the Inbox has no intent filter
     await pg.locator('[data-lv-empty] button', { hasText: 'Clear filters' }).waitFor({ timeout: 8000 }).catch(() => {})
     const empty = await pg.locator('[data-lv-empty]').innerText()
     must(/Email Digest/.test(empty), 'the empty state does not name the filters: ' + empty.replace(/\s*\n\s*/g, ' | '))
@@ -930,12 +931,12 @@ for (const width of UX_WIDTHS) {
   })
 
   await check(`${tag}.6`, `${width} px: no horizontal scrolling and no script errors on any converted screen`, async () => {
-    const screens = [...LISTS.map(([n, p]) => [n, p]), ['Tasks table', '/life/plan/tasks?view=table'], ['Tasks board', '/life/plan/tasks?view=board'], ['Open loops', '/life/plan/tasks?view=loops'],
-      ['Goals cards', '/life/plan/goals?view=cards'], ['Notes tree', '/life/library/notes?view=tree'], ['Goal page', '/life/plan/goals/' + ux.goal],
-      ['Today', '/life'], ['Today under an area', '/life?area=' + uxArea], ['Week review', '/life/plan/week?view=review'], ['Week calendar', '/life/plan/week?view=calendar'],
-      ['Week agenda', '/life/plan/week?view=agenda'], ['Month plan', '/life/plan/month?view=plan'], ['Habits', '/life/plan/month?view=habits'],
-      ['Check-ins', '/life/plan/month?view=checkins'], ['Month calendar', '/life/plan/month?view=calendar'], ['12 Weeks', '/life/plan/12-weeks'],
-      ['Year calendar', '/life/plan/year?view=calendar'], ['Goals across cycles', '/life/plan/year?view=goals'], ['Journal pages', '/life/library/captures?tab=pages'],
+    const screens = [...LISTS.map(([n, p]) => [n, p]), ['Tasks table', '/life/goals/tasks?view=table'], ['Tasks board', '/life/goals/tasks?view=board'], ['Open loops', '/life/goals/tasks?view=loops'],
+      ['Goals cards', '/life/goals?view=cards'], ['Notes tree', '/life/library/notes?view=tree'], ['Goal page', '/life/goals/' + ux.goal],
+      ['Today', '/life'], ['Today under an area', '/life?area=' + uxArea], ['Week review', '/life/today/week?view=review'], ['Week calendar', '/life/today/week?view=calendar'],
+      ['Week agenda', '/life/today/week?view=agenda'], ['Month plan', '/life/today/month?view=plan'], ['Habits', '/life/today/month?view=habits'],
+      ['Check-ins', '/life/today/month?view=checkins'], ['Month calendar', '/life/today/month?view=calendar'], ['12 Weeks', '/life/today/year?view=cycle'],
+      ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'], ['Journal pages', '/life/brain/activity?tab=pages'],
       ['Graph', '/life/library/notes?view=graph'], ['Settings', '/life/settings']]
     for (const [name, p] of screens) {
       await s.open(p)
@@ -943,11 +944,11 @@ for (const width of UX_WIDTHS) {
       must(over <= 0, `${name}: ${over} px of horizontal scrolling`)
     }
     // the goal page and Today: a row opens the pane and the page does not change
-    for (const p of ['/life/plan/goals/' + ux.goal, '/life']) {
+    for (const p of ['/life/goals/' + ux.goal, '/life']) {
       await s.open(p)
       await pg.locator('[data-row]:has([data-ref])').first().click({ position: { x: 120, y: 12 } })
       await settle()
-      must(await pane.isVisible() && new URL(pg.url()).pathname.replace(/\/$/, '') === p, `${p}: a row did not open the pane in place`)
+      must(await pane.isVisible() && new URL(pg.url()).pathname.replace(/\/$/, '') === (p === '/life' ? '/life/today' : p), `${p}: a row did not open the pane in place`)
     }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${screens.length} screens`
@@ -955,21 +956,21 @@ for (const width of UX_WIDTHS) {
 
   await check(`${tag}.7`, `${width} px: a list remembers its view on every device, a link with a query wins, Clear clears`, async () => {
     const param = (k) => new URL(pg.url()).searchParams.get(k)
-    await s.open('/life/plan/tasks?view=list') // a query: the list shows exactly this, and it becomes the saved state
+    await s.open('/life/goals/tasks?view=list') // a query: the list shows exactly this, and it becomes the saved state
     await pickQuick('Priority', 'II')
     must(param('priority') === 'II', 'the filter was not set')
     const filtered = await count()
     await nav('Today')
-    must(new URL(pg.url()).pathname === '/life' || new URL(pg.url()).pathname === '/life/', 'the sidebar did not go to Today')
+    must(new URL(pg.url()).pathname === '/life/today', 'the sidebar did not go to Today')
     await nav('Tasks')
-    must(new URL(pg.url()).pathname === '/life/plan/tasks', 'Plan > Tasks did not open')
+    must(new URL(pg.url()).pathname === '/life/goals/tasks', 'Goals > All tasks did not open')
     must(param('priority') === 'II' && param('view') === 'list', `coming back lost the view: ${new URL(pg.url()).search}`)
     must((await count()) === filtered, 'the remembered filter is in the URL but the list is not filtered')
     must(!param('open'), 'an open record was restored')
     // the same person on another device: the state comes from the server, not from this browser
     await pg.waitForTimeout(1600)
     const other = await session('owner@lifeos.test', width)
-    await other.open('/life/plan/tasks')
+    await other.open('/life/goals/tasks')
     must(new URL(other.page.url()).searchParams.get('priority') === 'II', `a second browser does not show the saved filter: ${new URL(other.page.url()).search}`)
     await other.ctx.close()
     // a link with a query wins over what was saved, and then becomes the saved state
@@ -986,7 +987,7 @@ for (const width of UX_WIDTHS) {
     const sameQuery = (a, b) => { const k = (q) => [...new URLSearchParams(q)].map(([x, y]) => x + '=' + y).sort().join('&'); return k(a) === k(b) } // the order of parameters does not matter
     must(sameQuery(new URL(pg.url()).search, loopsQuery), `the list did not remember the link's query: ${new URL(pg.url()).search} instead of ${loopsQuery}`)
     // Clear removes the filters and the cleared state is what is remembered
-    await s.open('/life/plan/tasks?view=list')
+    await s.open('/life/goals/tasks?view=list')
     await pickQuick('Priority', 'II')
     must(param('priority') === 'II', 'the filter was not set again')
     await pg.locator('[data-clear]:visible').first().click()
@@ -1004,7 +1005,7 @@ for (const width of UX_WIDTHS) {
     const fam = await session('family@lifeos.test', width)
     const theirs = await fam.api('views.get_all')
     must(!Object.keys(theirs).some((k) => k.includes('Private')) && !JSON.stringify(theirs).includes('loops'), 'the family user sees the owner\'s saved states')
-    await fam.open('/life/plan/tasks')
+    await fam.open('/life/goals/tasks')
     must(!new URL(fam.page.url()).search.includes('view=loops') && !new URL(fam.page.url()).searchParams.get('priority'), 'the family user got the owner\'s view')
     const rest = await fam.page.request.get(base + '/api/resource/Life%20View%20State?limit_page_length=100&fields=["user"]')
     must(!JSON.stringify(await rest.json()).includes('owner@lifeos.test'), 'the REST list shows the owner\'s saved states')
@@ -1067,21 +1068,21 @@ for (const width of UX_WIDTHS) {
     await lands('/life', '[data-count-key="band:open_goals"]', 'in_progress') // the Projects tile became Open-ended goals (set 6)
     // Tasks: Open loops is a tab with its explanation, the layout switch has three options, the board is not offered on Done
     const layouts = async () => (await pg.locator('[role="radiogroup"]:visible [role="radio"]').allInnerTexts()).map((t) => t.trim())
-    await s.open('/life/plan/tasks?status=loops')
+    await s.open('/life/goals/tasks?status=loops')
     must((await current()) === 'loops' && (await pg.locator('[data-tasks-sub]').innerText()).includes('older than 14 days'), 'Open loops is not a tab with its explanatory line')
     must(JSON.stringify(await layouts()) === JSON.stringify(['List', 'Table']), `Open loops offers the layouts ${await layouts()}`)
-    await s.open('/life/plan/tasks?view=loops') // a link from before the tabs
+    await s.open('/life/goals/tasks?view=loops') // a link from before the tabs
     must((await current()) === 'loops' && new URL(pg.url()).searchParams.get('status') === 'loops', 'view=loops does not open the Open loops tab')
-    await s.open('/life/plan/tasks?view=board')
+    await s.open('/life/goals/tasks?view=board')
     must(JSON.stringify(await layouts()) === JSON.stringify(['List', 'Board', 'Table']), `the layout switch offers ${await layouts()}`)
     must((await pg.locator('[data-list]').getAttribute('data-view')) === 'board' && (await pg.locator('[data-column]').count()) === 2, 'the board on the Open tab does not show Open and Doing')
-    await s.open('/life/plan/tasks?view=board&status=all')
+    await s.open('/life/goals/tasks?view=board&status=all')
     must((await pg.locator('[data-column]').count()) === 4, 'the board on the All tab does not show four columns')
-    await s.open('/life/plan/tasks?view=board&status=Done')
+    await s.open('/life/goals/tasks?view=board&status=Done')
     must(JSON.stringify(await layouts()) === JSON.stringify(['List', 'Table']), `Done offers the layouts ${await layouts()}`)
     must((await pg.locator('[data-list]').getAttribute('data-view')) === 'list', 'the board did not fall back to the list on Done')
     // a status that is not a tab selects All and shows as a filter
-    await s.open('/life/plan/tasks?view=list&status=Dropped')
+    await s.open('/life/goals/tasks?view=list&status=Dropped')
     must((await current()) === 'all', `status=Dropped selected the ${await current()} tab`)
     if (phone) must((await pg.locator('[data-filters-button]').innerText()).includes('(1)'), 'status=Dropped is not shown as a filter')
     else must((await pg.locator('[data-active-filters]').innerText()).includes('1 filter'), 'status=Dropped is not shown as a filter')
@@ -1094,7 +1095,7 @@ for (const width of UX_WIDTHS) {
       must((await overflow()) <= 0, 'the Archive scrolls sideways')
     } else {
       // [ and ] move between tabs; arrow keys move inside the tab row
-      await s.open('/life/plan/goals?status=all&area=' + uxArea)
+      await s.open('/life/goals?status=all&area=' + uxArea)
       await pg.keyboard.press('[')
       await settle()
       must((await current()) === 'someday', '[ did not open the previous tab') // Someday comes before All
@@ -1115,8 +1116,8 @@ for (const width of UX_WIDTHS) {
     const panelCount = async (t) => num(await pg.locator(`[data-tab-panel="${t}"] [data-lv-count]`).innerText())
     // the area pages became the lens (U.40 and up); the main screens below open on All of life
     const PAGES = [
-      ['/life/plan/goals/' + ux.goal, [['tasks', `/life/plan/tasks?goal=${ux.goal}&view=list`], ['notes', `/life/library/notes?view=list&goal=${ux.goal}`],
-        ['captures', `/life/library/captures?goal=${ux.goal}`], ['links', null]]],
+      ['/life/goals/' + ux.goal, [['tasks', `/life/goals/tasks?goal=${ux.goal}&view=list`], ['notes', `/life/library/notes?view=list&goal=${ux.goal}`],
+        ['captures', `/life/brain/activity?goal=${ux.goal}`], ['links', null]]],
     ]
     let n = 0
     for (const [page, tabs] of PAGES) {
@@ -1171,10 +1172,10 @@ for (const width of UX_WIDTHS) {
       must((await pg.locator('[data-review-tabs]').getAttribute('data-tab-current')) === 'transcript', 'the full review page does not open on tab=transcript')
       if (pendingNow) must(await pg.getByRole('button', { name: /Accept all/ }).isVisible(), 'Accept all is hidden on the Original tab')
     }
-    // set 6: a journal page is a capture; its old link opens it in the pane over Library > Captures, Journal pages, on its tabs
+    // set 6: a journal page is a capture; its old link opens it in the pane over Library > Everything, Journal pages, on its tabs (issue 14)
     const jp = bench(`print(frappe.db.sql("select name from \`tabLife Journal Page\` where space='${SPACE}' limit 1")[0][0])`).split('\n').pop()
     await s.open('/life/journal/pages/' + jp)
-    must(new URL(pg.url()).pathname === '/life/library/captures' && new URL(pg.url()).searchParams.get('tab') === 'pages' && await pane.isVisible(),
+    must(new URL(pg.url()).pathname === '/life/library' && new URL(pg.url()).searchParams.get('tab') === 'pages' && await pane.isVisible(),
       `/journal/pages/:id went to ${new URL(pg.url()).pathname}${new URL(pg.url()).search}`)
     const jt = pg.locator('[data-pane-tabs]')
     await jt.locator('[data-tab="transcript"]').click()
@@ -1191,7 +1192,7 @@ for (const width of UX_WIDTHS) {
     try {
     // set 6: Me, Your life, Assistant, People and agents, Data
     const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai',
-      'sensitive', 'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups']
+      'sensitive', 'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'places', 'backups']
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
     const listed = await menuItems()
@@ -1342,32 +1343,37 @@ for (const width of UX_WIDTHS) {
     } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) }
   })
 
-  await check(`${tag}.13`, `${width} px: navigation (set 6): ${phone ? 'the phone bar is Today, Inbox, Plan, Library and Ask; each opens; Ask opens its sheet; the lens sheet holds Settings; the Inbox count' : 'the sidebar is the lens, New, Today, Inbox, Plan with its tabs, Library, the pinned areas and Settings; the active item; Plan open or closed is remembered; counts; New'}; /graph is the Graph view of Notes`, async () => {
+  await check(`${tag}.13`, `${width} px: navigation (set 6, issue 14): ${phone ? 'the phone bar is Today, Brain, Capture, Goals and Library; each opens; Capture opens its sheet; Ask is in the header; the lens sheet holds Settings; the Brain count' : 'the sidebar is the lens, Capture, Today, Brain, Goals, Library and Settings; the active item; the place tabs; the Brain count; the capture sheet and each of its entries'}; /graph is the Graph view of Notes`, async () => {
     let step = 'start'
     try {
-    const PLACES = ['Today', 'Inbox', 'Plan', 'Library']
-    const PLAN = ['week', 'month', '12-weeks', 'year', 'goals', 'tasks', 'someday']
+    const PLACES = ['Today', 'Brain', 'Goals', 'Library']
     const path = () => new URL(pg.url()).pathname.replace(/\/$/, '')
     if (phone) {
       await s.open('/life')
       const items = await pg.locator('[data-tabbar] [data-tab-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab-item')))
-      must(JSON.stringify(items) === JSON.stringify([...PLACES, 'Ask']), `the phone bar is ${items}`)
-      must(!(await pg.locator('[data-tabbar]').getByText('More', { exact: true }).count()), 'the phone bar still has More')
+      must(JSON.stringify(items) === JSON.stringify(PLACES), `the phone bar is ${items}`)
+      must(await pg.locator('[data-tabbar] [data-tab-capture]').count(), 'the phone bar has no capture button')
       step = 'each place opens from the bar'
-      for (const [label, want] of [['Inbox', '/life/inbox'], ['Plan', '/life/plan/week'], ['Library', '/life/library'], ['Today', '/life']]) {
+      for (const [label, want] of [['Brain', '/life/brain'], ['Goals', '/life/goals'], ['Library', '/life/library'], ['Today', '/life/today']]) {
         await nav(label)
         must(path() === want, `${label} opened ${path()}`)
       }
-      step = 'Ask opens its sheet'
-      await pg.locator('[data-tabbar] [data-tab-item="Ask"]').first().click()
+      step = 'Capture opens its sheet'
+      await pg.locator('[data-tabbar] [data-tab-capture]').click()
+      await settle()
+      must(await pg.locator('[data-capture-text]').count(), 'Capture did not open its sheet')
+      await pg.keyboard.press('Escape')
+      await settle()
+      step = 'Ask is in the header and opens its sheet'
+      await pg.locator('[data-phone-ask]').first().click()
       await settle()
       must(await pg.locator('[data-ask-sheet]:visible').count(), 'Ask did not open its sheet')
       await pg.keyboard.press('Escape')
       await settle()
-      step = 'the Inbox count'
+      step = 'the Brain count'
       const due = (await s.api('session.counts', { space: SPACE })).doors.inbox.n
-      const badge = pg.locator('[data-tabbar] [data-tab-count="Inbox"]')
-      must(due === 0 ? !(await badge.count()) : num(await badge.innerText()) === due, `the Inbox tab says ${await badge.count() ? await badge.innerText() : 'nothing'}, the count helper says ${due}`)
+      const badge = pg.locator('[data-tabbar] [data-tab-count="Brain"]')
+      must(due === 0 ? !(await badge.count()) : num(await badge.innerText()) === due, `the Brain tab says ${await badge.count() ? await badge.innerText() : 'nothing'}, the count helper says ${due}`)
       step = 'the lens sheet holds Settings'
       await pg.locator('[data-lens-title]').click()
       await settle()
@@ -1376,85 +1382,49 @@ for (const width of UX_WIDTHS) {
       await settle()
       must(path() === '/life/settings', `Settings in the lens sheet opened ${path()}`)
     } else {
-      // start with Plan closed and the full sidebar (the state is per user, with no space)
-      await s.api('views.save', { screen: 'sidebar', space: '', state: { plan_open: false, rail: false } })
+      await s.api('views.save', { screen: 'sidebar', space: '', state: { rail: false } })
       await s.open('/life')
-      const navItems = () => pg.locator('[data-nav-places] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')))
+      // Review joins the places once a review is locked, or on the review's day: the rest is fixed
+      const navItems = () => pg.locator('[data-nav-places] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')).filter((x) => x !== 'Review'))
       must(JSON.stringify(await navItems()) === JSON.stringify(PLACES), `the places are ${await navItems()}`)
       must(JSON.stringify(await pg.locator('[data-nav-bottom] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')))) === JSON.stringify(['Settings']), 'the bottom is not Settings')
-      must(await pg.locator('[data-lens-picker]').count() && await pg.locator('[data-nav-new]').count() && await pg.locator('[data-ask-box]').count(), 'the lens, New or the header box is missing')
-      must(await pg.locator('[data-nav-pin]').count() >= 1, 'no pinned areas under Focus on an area')
-      // the active item: the place, and under Plan its tab
+      must(await pg.locator('[data-lens-picker]').count() && await pg.locator('[data-nav-capture]').count() && await pg.locator('[data-ask-box]').count(), 'the lens, Capture or the header box is missing')
       step = 'each place opens and is the active item'
-      const active = () => pg.locator('[data-sidebar] [aria-current="page"], [data-sidebar] [data-state="active"]').evaluateAll((els) => [...new Set(els.map((e) => {
-        const el = e.closest('[data-nav-item], [data-nav-plan], [data-nav-pin]') || e.querySelector('[data-nav-item], [data-nav-plan], [data-nav-pin]')
-        return el ? el.getAttribute('data-nav-item') || 'plan:' + el.getAttribute('data-nav-plan') || 'pin' : null
-      }).filter(Boolean))])
-      for (const [label, want] of [['Inbox', '/life/inbox'], ['Plan', '/life/plan/week'], ['Library', '/life/library'], ['Settings', '/life/settings'], ['Today', '/life']]) {
+      const active = () => pg.locator('[data-sidebar] [aria-current="page"]').evaluateAll((els) => [...new Set(els.map((e) =>
+        (e.closest('[data-nav-item]') || e.querySelector('[data-nav-item]'))?.getAttribute('data-nav-item')).filter(Boolean))])
+      for (const [label, want] of [['Brain', '/life/brain'], ['Goals', '/life/goals'], ['Library', '/life/library'], ['Settings', '/life/settings'], ['Today', '/life/today']]) {
         await pg.locator(`[data-sidebar] [data-nav-item="${label}"]`).first().click()
-        await pg.waitForLoadState('networkidle')
+        await pg.waitForURL((u) => u.pathname === want, { timeout: 10000 }).catch(() => {})
         await settle()
         must(path() === want, `${label} opened ${path()}`)
-        const on = await active()
-        must(on.includes(label) && !on.some((x) => PLACES.includes(x) && x !== label), `${label}: the active items are ${on}`)
+        if (label !== 'Settings') {
+          const on = await active()
+          must(on.includes(label) && on.length === 1, `${label}: the active items are ${on}`)
+        }
       }
-      step = "Plan's tabs"
-      await s.open('/life/plan/goals')
-      const sub = await pg.locator('[data-nav-plan]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-plan')))
-      must(JSON.stringify(sub) === JSON.stringify(PLAN), `Plan's tabs in the sidebar are ${sub}`)
-      must(JSON.stringify((await active()).sort()) === JSON.stringify(['Plan', 'plan:goals']), `on Plan > Goals the active items are ${await active()}`)
-      for (const t of PLAN) {
-        await pg.locator(`[data-nav-plan="${t}"]`).first().click()
-        await pg.waitForLoadState('networkidle')
-        await settle()
-        must(path() === '/life/plan/' + t, `Plan > ${t} opened ${path()}`)
-      }
-      // Plan opened by hand on another place stays open after a reload, and closed again stays closed
-      step = 'Plan open or closed is remembered'
-      await s.api('views.save', { screen: 'sidebar', space: '', state: { plan_open: false, rail: false } }) // start closed (the default is open)
-      await s.open('/life/inbox')
-      must(!(await pg.locator('[data-nav-plan]').count()), "Plan's tabs show on Inbox before it was opened")
-      await pg.locator('[data-nav-toggle="plan"]').click()
-      await pg.waitForTimeout(1500)
-      await pg.reload({ waitUntil: 'networkidle' })
-      await settle()
-      must(await pg.locator('[data-nav-plan]').count() === PLAN.length, 'Plan did not stay open after a reload')
-      await pg.locator('[data-nav-toggle="plan"]').click()
-      await pg.waitForTimeout(1500)
-      await pg.reload({ waitUntil: 'networkidle' })
-      await settle()
-      must(!(await pg.locator('[data-nav-plan]').count()), 'Plan did not stay closed after a reload')
-      await s.api('views.save', { screen: 'sidebar', space: '', state: { plan_open: true, rail: false } }) // back to the default: open
-      // the Tasks count under Plan equals the count helper's and drops by one when such a task is done
-      step = "the Tasks count equals the count helper's and drops by one"
-      await s.open('/life/plan/week')
+      step = 'the place tabs'
+      await s.open('/life/goals/tasks')
+      must((await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current')) === 'tasks', 'Goals > All tasks is not the open tab')
+      must(JSON.stringify(await active()) === JSON.stringify(['Goals']), `on Goals > All tasks the active items are ${await active()}`)
+      step = "the Brain count equals the count helper's"
       const t = await s.api('session.counts', { space: SPACE })
-      const count = async () => (await pg.locator('[data-nav-count="Tasks"]').count()) ? num(await pg.locator('[data-nav-count="Tasks"]').innerText()) : 0
-      must((await count()) === t.doors.tasks.n, `the sidebar says ${await count()} tasks, the count helper says ${t.doors.tasks.n}`)
-      must((await pg.locator('[data-nav-count="Inbox"]').count() ? num(await pg.locator('[data-nav-count="Inbox"]').innerText()) : 0) === t.doors.inbox.n, 'the Inbox count is not the count helper\'s')
-      await s.api('tasks.quick_add', { text: `UX3 due today ${width} ${stamp} today`, space: SPACE })
-      await s.open('/life/plan/week')
-      const n = await count()
-      // tick it done in the Tasks list, as a person would; the sidebar follows without a reload
-      await s.open(`/life/plan/tasks?view=list&due=today&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%UX3 due today ${width} ${stamp}%`]]))}`)
-      await pg.locator(`${ROW}`, { hasText: `UX3 due today ${width} ${stamp}` }).getByRole('checkbox').first().click()
-      await pg.waitForTimeout(1500)
-      must((await count()) === n - 1, `the count did not drop by one without a reload (${n} -> ${await count()})`)
-      // New: Capture, Task, Goal, Note, Idea for Someday
-      step = 'New opens its menu and each entry works'
+      const brain = (await pg.locator('[data-nav-count="Brain"]').count()) ? num(await pg.locator('[data-nav-count="Brain"]').innerText()) : 0
+      must(brain === t.doors.inbox.n, `the sidebar says ${brain} for the Brain, the count helper says ${t.doors.inbox.n}`)
+      step = 'Capture opens its sheet and each entry works'
       await s.open('/life')
-      await pg.locator('[data-nav-new]').click()
-      const entries = (await pg.getByRole('menuitem').allInnerTexts()).map((x) => x.trim())
-      must(JSON.stringify(entries) === JSON.stringify(['Capture', 'Task', 'Goal', 'Note', 'Idea for Someday']), `New offers ${entries}`)
+      await pg.locator('[data-nav-capture]').click()
+      await settle()
+      const entries = (await pg.locator('[role="dialog"] button').allInnerTexts()).map((x) => x.trim()).filter(Boolean)
+      for (const e of ['Add as a task', 'Send to the Brain', 'Files or a photo', 'Goal', 'Note', 'Idea for Someday']) must(entries.includes(e), `the capture sheet has no ${e}: ${entries}`)
       await pg.keyboard.press('Escape')
-      for (const [label, ok] of [['Task', async () => pg.getByRole('dialog', { name: 'New task' }).isVisible()], ['Goal', async () => pg.getByRole('dialog', { name: 'New goal' }).isVisible()],
-        ['Note', async () => pg.getByRole('dialog', { name: 'New note' }).isVisible()], ['Idea for Someday', async () => pg.getByRole('dialog', { name: 'New idea' }).isVisible()],
-        ['Capture', async () => new URL(pg.url()).pathname === '/life/inbox']]) {
+      for (const [kind, ok] of [['goal', async () => pg.getByRole('dialog', { name: 'New goal' }).isVisible()], ['note', async () => pg.getByRole('dialog', { name: 'New note' }).isVisible()],
+        ['idea', async () => pg.getByRole('dialog', { name: 'New idea' }).isVisible()], ['files', async () => new URL(pg.url()).pathname === '/life/brain']]) {
         await s.open('/life')
-        await pg.locator('[data-nav-new]').click()
-        await pg.getByRole('menuitem', { name: label }).click()
+        await pg.locator('[data-nav-capture]').click()
         await settle()
-        must(await ok(), `New, ${label} did not open`)
+        await pg.locator(`[data-capture-kind="${kind}"]`).click()
+        await settle()
+        must(await ok(), `Capture, ${kind} did not open`)
         await pg.keyboard.press('Escape')
       }
     }
@@ -1476,7 +1446,7 @@ for (const width of UX_WIDTHS) {
     for (const i of [1, 2, 3]) ts.push(await s.api('tasks.quick_add', { text: `UX3 goal task ${i} ${width} ${stamp}`, space: SPACE, goal: open.name }))
     await s.api('tasks.set_status', { task: ts[0].name, status: 'Done' })
     await s.api('tasks.set_status', { task: ts[1].name, status: 'Dropped' })
-    const figure = async () => { await s.open(`/life/plan/goals?status=all&open=goal:${open.name}`); await paneTitle(); await settle(); return (await pg.locator('[data-goal-figure]').innerText()).replace(/\s+/g, ' ') }
+    const figure = async () => { await s.open(`/life/goals?status=all&open=goal:${open.name}`); await paneTitle(); await settle(); return (await pg.locator('[data-goal-figure]').innerText()).replace(/\s+/g, ' ') }
     must((await figure()).includes('1 of 2 tasks'), `the goal shows "${await figure()}"`)
     await s.api('archive.set', { doctype: 'Life Task', name: ts[0].name, archived: 1 })
     must((await figure()).includes('1 of 2 tasks'), 'archiving the done task changed the figure')
@@ -1484,11 +1454,11 @@ for (const width of UX_WIDTHS) {
     step = 'the Goals screen: both new goals beside the seeded 12 Wee'
     const bar = pg.locator('[data-state-tabs]')
     for (const v of ['in_progress', 'achieved', 'closed', 'all']) {
-      await s.open(`/life/plan/goals?${v === 'in_progress' ? 'all=1' : 'status=' + v}`)
+      await s.open(`/life/goals?${v === 'in_progress' ? 'all=1' : 'status=' + v}`)
       const said = num(await bar.locator(`[data-tab="${v}"] [data-tab-count]`).innerText())
       must(said === await count() && (await pg.locator(ROW).count()) === Math.min(said, 50), `Goals ${v}: the tab says ${said}, the list ${await count()}`)
     }
-    await s.open('/life/plan/goals?status=all')
+    await s.open('/life/goals?status=all')
     const text = await pg.locator('[data-main]').innerText()
     must(text.includes(`UX3 open goal ${width} ${stamp}`) && text.includes(`UX3 annual goal ${width} ${stamp}`) && text.includes('12 Week Year'), 'the Goals screen does not list the new goals beside the 12 Week Year goals')
     const rows = (await s.api('goals.list', { space: SPACE, state: 'all', page_length: 100 })).goals
@@ -1502,7 +1472,7 @@ for (const width of UX_WIDTHS) {
     must(!(await gridHas(open.name)) && !(await gridHas(annual.name)), 'a goal without a cycle shows in the 12 Week Year')
     const cycles = await s.api('goals.cycles', { space: SPACE })
     const active = cycles.find((c) => c.status === 'Active') || cycles[0]
-    await s.open(`/life/plan/goals?status=all&open=goal:${open.name}`)
+    await s.open(`/life/goals?status=all&open=goal:${open.name}`)
     await paneTitle()
     await pg.locator('[data-add-to-cycle]').click()
     await pg.getByRole('button', { name: 'Add', exact: true }).last().click()
@@ -1513,7 +1483,7 @@ for (const width of UX_WIDTHS) {
     step = 'the family member sees no goals or counts from Private'
     const fam = await session('family@lifeos.test', width)
     must((await fam.api('goals.list', { space: SPACE }, { raw: true })).status() >= 400, 'the family user can list Private goals')
-    await fam.open('/life/plan/goals?status=all')
+    await fam.open('/life/goals?status=all')
     must(!(await fam.page.locator('[data-main]').innerText()).includes('UX3 open goal'), 'the family user sees a Private goal')
     await fam.ctx.close()
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
@@ -1521,33 +1491,32 @@ for (const width of UX_WIDTHS) {
     } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) }
   })
 
-  await check(`${tag}.15`, `${width} px: Plan's and Library's tabs: the path holds the tab, the view switch is in the URL, [ and ] move, the phone row scrolls`, async () => {
+  await check(`${tag}.15`, `${width} px: a place's tabs (issue 14): the path holds the tab, the view switch is in the URL, [ and ] move, the phone row scrolls`, async () => {
     const bar = pg.locator('[data-place-tabs]').first()
-    await s.open('/life/plan/month?view=habits')
-    must((await bar.getAttribute('data-tab-current')) === 'month', 'Plan did not open on Month from its path')
+    await s.open('/life/today/month?view=habits')
+    must((await bar.getAttribute('data-tab-current')) === 'month', 'Today did not open on Month from its path')
     must((await pg.locator('[data-plan-views] [aria-checked="true"], [data-plan-views] [data-state="checked"], [data-plan-views] [data-state="on"]').first().innerText()).includes('Habits'), 'the view switch is not on Habits')
     const tabs = await bar.locator('[data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
-    must(JSON.stringify(tabs) === JSON.stringify(['week', 'month', '12-weeks', 'year', 'goals', 'tasks', 'someday']), `Plan's tabs are ${tabs}`)
-    must(await bar.locator('[data-tab-gap]').count() === 1, 'the rhythms and the lists are not set apart')
+    must(JSON.stringify(tabs) === JSON.stringify(['day', 'week', 'month', 'year']), `Today's tabs are ${tabs}`)
     await s.open('/life/library/notes')
     const lib = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
-    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'captures', 'outbox', 'timeline', 'archive']), `Library's tabs are ${lib}`)
+    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'documents', 'people', 'chats']), `Library's tabs are ${lib}`)
     if (!phone) {
-      await s.open('/life/plan/month')
+      await s.open('/life/today/month')
       await pg.locator('body').click({ position: { x: 600, y: 10 } })
       await pg.keyboard.press(']')
       await settle()
-      must(new URL(pg.url()).pathname === '/life/plan/12-weeks', `] went to ${new URL(pg.url()).pathname}`)
+      must(new URL(pg.url()).pathname === '/life/today/year', `] went to ${new URL(pg.url()).pathname}`)
       await pg.keyboard.press('[')
       await settle()
-      must(new URL(pg.url()).pathname === '/life/plan/month', `[ went to ${new URL(pg.url()).pathname}`)
+      must(new URL(pg.url()).pathname === '/life/today/month', `[ went to ${new URL(pg.url()).pathname}`)
       await s.open('/life/library/notes')
       await pg.keyboard.press(']')
       await settle()
-      must(new URL(pg.url()).pathname === '/life/library/captures', `] on the Library went to ${new URL(pg.url()).pathname}`)
+      must(new URL(pg.url()).pathname === '/life/library/documents', `] on the Library went to ${new URL(pg.url()).pathname}`)
     } else {
-      // the last tab: the row scrolls sideways with it in view, the page does not
-      for (const p of ['/life/plan/someday', '/life/library/archive']) {
+      // the last tab, and a page shown as a tab after them: the row scrolls sideways with it in view, the page does not
+      for (const p of ['/life/library/chats', '/life/library/archive', '/life/goals/someday']) {
         await s.open(p)
         const m = await pg.locator('[data-place-tabs]').first().evaluate((el) => { const t = el.querySelector('[data-state="active"]').getBoundingClientRect(); return { inView: t.left >= 0 && t.right <= window.innerWidth, h: t.height } })
         must(m.inView && m.h >= 44, `${p}: the tab row on a phone: ${JSON.stringify(m)}`)
@@ -1576,7 +1545,7 @@ for (const width of UX_WIDTHS) {
     ]
     const tabsOf = async () => (await pg.locator('[data-pane-tabs] [role="tab"]').allInnerTexts()).map((t) => t.replace(/\s*\d+$/, '').trim())
     for (const [ref, want] of KINDS) {
-      await s.open(`/life/plan/tasks?view=list&open=${encodeURIComponent(ref)}`)
+      await s.open(`/life/goals/tasks?view=list&open=${encodeURIComponent(ref)}`)
       await paneTitle()
       await settle()
       const got = await tabsOf()
@@ -1596,7 +1565,7 @@ for (const width of UX_WIDTHS) {
       must((await overflow()) <= 0, `${ref}: the page scrolls sideways`)
     }
     // Back closes the pane in one step even after changing its tab
-    await s.open('/life/plan/tasks?view=list')
+    await s.open('/life/goals/tasks?view=list')
     await clickRow(ROW)
     await pg.locator('[data-pane-tabs] [role="tab"]').last().click()
     await settle()
@@ -1604,7 +1573,7 @@ for (const width of UX_WIDTHS) {
     await settle()
     must(!(await pane.isVisible()), 'Back after changing the pane tab did not close the pane')
     // a count of open items opens the chat on its Open items tab
-    await s.open('/life/library/captures?tab=chats&open_items=1&view=list')
+    await s.open('/life/library/chats?tab=chats&open_items=1&view=list')
     const door = pg.locator('[data-door="chat-items"]:visible').first()
     if (await door.count()) {
       const n = num(await door.innerText())
@@ -1637,8 +1606,9 @@ for (const width of UX_WIDTHS) {
     must(await pg.locator('[data-open-band]').isVisible(), 'no Open band')
     for (const k of ['open', 'inbox', 'week', 'habits']) must(await pg.locator(`[data-tile="${k}"]:visible`).count(), `no ${k} tile`)
     const groups = await pg.locator('[data-next-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-next-group')))
-    const order = ['overdue', 'today', 'twy', 'decisions']
-    must(JSON.stringify(groups) === JSON.stringify(order.filter((g) => groups.includes(g))) && groups[0] === 'overdue', `Next groups are ${groups}`)
+    const order = ['today', 'overdue', 'twy', 'decisions']
+    must(JSON.stringify(groups) === JSON.stringify(order.filter((g) => groups.includes(g))), `Next groups are ${groups}`)
+    if (await pg.locator('[data-overdue-toggle]').count()) { await tap(pg.locator('[data-overdue-toggle]')); await settle() } // issue 15: overdue is folded
     if (await pg.locator('[data-next-more]').count()) { await tap(pg.locator('[data-next-more]')); await settle() }
     const next = await pg.locator('[data-next]').innerText()
     must(next.includes(S5('overdue')) && next.includes(S5('due today')), 'the overdue or due task is not in Next')
@@ -1668,9 +1638,9 @@ for (const width of UX_WIDTHS) {
       await s.open('/life')
       must(await pg.locator('[data-open-band][data-over-limit]').count(), 'the band is not marked over the limit')
       must(phone ? await pg.locator('[data-band-reset-phone]').isVisible() : await pg.locator('[data-band-amber]').isVisible(), 'no amber stuck warning')
-      if (!phone) { // set 6: the dot sits on Plan > Week in the sidebar and on the Week's Reset button
-        await s.open('/life/plan/week')
-        must(await pg.locator('[data-reset-dot]').count(), 'no amber dot on Plan > Week in the sidebar')
+      if (!phone) { // set 6: the dot sits on the Week's Reset button (issue 14: the sidebar has no Week item)
+        await s.open('/life/today/week?view=calendar')
+        must(await pg.locator('[data-plan-reset] [role="img"]').count(), "no amber dot on the Week's Reset button")
       }
     } finally {
       await s.api('settings.save', { values: { stuck_limit: limit } })
@@ -1680,15 +1650,15 @@ for (const width of UX_WIDTHS) {
 
   await check(`${tag}.31`, `${width} px: counts: every number on Today, Reset, Someday and the sidebar opens a list with exactly that many rows`, async () => {
     let n = 0
-    for (const from of ['/life', '/life/plan/reset', '/life/plan/someday?all=1']) {
+    for (const from of ['/life', '/life/today/reset', '/life/goals/someday?all=1']) {
       await s.open(from)
-      if (phone && from === '/life/plan/reset') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
+      if (phone && from === '/life/today/reset') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
       const keys = await pg.locator('[data-count-door]:visible').evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute('data-count-key')))])
       // Someday's own numbers are its tab counts, which U.8 clicks; here only the doors on the page (the sidebar's on a wide screen)
       must(keys.length || from.includes('someday'), `no counts on ${from}`)
       for (const key of keys) {
         await s.open(from)
-        if (phone && from === '/life/plan/reset') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
+        if (phone && from === '/life/today/reset') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
         const el = pg.locator(`[data-count-key="${key}"]:visible`).first()
         const want = Number(await el.getAttribute('data-count-n'))
         await el.click()
@@ -1706,10 +1676,10 @@ for (const width of UX_WIDTHS) {
       }
     }
     // the sidebar's numbers, with Plan open so Tasks and Someday show (a phone has no sidebar: U.13 checks its Inbox count)
-    await s.open('/life/plan/week')
+    await s.open('/life/today/week')
     const navKeys = await pg.locator('[data-count-door]:visible').evaluateAll((els) => els.map((e) => e.getAttribute('data-count-key')).filter((k) => /^nav:/.test(k)))
     for (const key of navKeys) {
-      await s.open('/life/plan/week')
+      await s.open('/life/today/week')
       const el = pg.locator(`[data-count-key="${key}"]:visible`).first()
       const want = Number(await el.getAttribute('data-count-n'))
       await el.click()
@@ -1747,7 +1717,7 @@ for (const width of UX_WIDTHS) {
     const done = []
     // set 6: the area page became the lens (Ask's scope is the lens), the project page the goal's page
     for (const [path, scope] of [['/life', 'Everything in this space'], ['/life?area=' + uxArea, areas.find((x) => x.name === uxArea).area_name],
-      ['/life/plan/goals/' + ux.goal, ux.goalTitle], ['/life/plan/reset', 'Items on Reset']]) {
+      ['/life/goals/' + ux.goal, ux.goalTitle], ['/life/today/reset', 'Items on Reset']]) {
       await askOn(path, scope)
       const here = new URL(pg.url()).pathname
       const cites = pg.locator('[data-ask-cite]:visible')
@@ -1762,12 +1732,12 @@ for (const width of UX_WIDTHS) {
       }
       if (!phone) { await pg.locator('[data-ask-close]').click(); await settle() } else { await pg.keyboard.press('Escape'); await settle() }
       must(!(await pg.locator('[data-ask-panel]:visible').count()), `${path}: the panel did not close`)
-      must(new URL(pg.url()).pathname === here && here.replace(/\/$/, '') === path.split('?')[0], `${path}: the screen changed under the panel (${new URL(pg.url()).pathname})`)
+      must(new URL(pg.url()).pathname === here && here.replace(/\/$/, '') === (path.split('?')[0] === '/life' ? '/life/today' : path.split('?')[0]), `${path}: the screen changed under the panel (${new URL(pg.url()).pathname})`)
       done.push(scope)
     }
     // a record pane: Ask about this
     const task = await s.api('tasks.quick_add', { text: S5('ask about'), space: SPACE, area: uxArea })
-    await s.open(`/life/plan/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%${S5('ask about')}%`]]))}`)
+    await s.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%${S5('ask about')}%`]]))}`)
     await pg.locator(`[data-ref="task:${task.name}"]`).first().click()
     await settle()
     await pg.locator('[data-pane-ask]').click()
@@ -1875,7 +1845,7 @@ while d <= last:
     const g = await s.api('goals.create', { space: SPACE, title: S5('someday goal'), goal_type: 'Open', area: uxArea })
     const created = (await s.api('frappe.client.get_value', { doctype: 'Life Task', filters: { name: t.name }, fieldname: 'creation' })).creation
     // the task is parked from its pane, the rest through the API the screens call
-    await s.open(`/life/plan/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%${S5('someday task')}%`]]))}`)
+    await s.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%${S5('someday task')}%`]]))}`)
     await pg.locator(`[data-ref="task:${t.name}"]`).first().click()
     await settle()
     await pg.locator('[data-pane-someday]').click()
@@ -1892,7 +1862,7 @@ while d <= last:
     must(!(await pg.locator('[data-next]').innerText()).includes(S5('someday task')), 'a parked task is on Today')
     // the clock moves past the review date
     bench(`frappe.db.set_value("Life Task", "${t.name}", "someday_review_on", frappe.utils.add_days(frappe.utils.today(), -1))`)
-    await s.open('/life/plan/someday?tab=due')
+    await s.open('/life/goals/someday?tab=due')
     must((await pg.locator('[data-main]').innerText()).includes(S5('someday task')), 'not under Due for review')
     must((await s.api('reset.get', { space: SPACE })).batches.some((b) => b.key === 'someday_due' && b.items.some((i) => i.name === t.name)), 'not in Reset')
     // Bring back through the row's dialog; then a second parked task comes back with a date and is in Tasks with it
@@ -1909,7 +1879,7 @@ while d <= last:
     const dated = (await s.api('tasks.list', { space: SPACE, status: 'open', filters: JSON.stringify([['title', 'like', `%${S5('someday dated')}%`]]) })).tasks
     must(dated.length === 1 && dated[0].due_date === addDays(3), 'a task brought back with a date is not in Tasks with that date')
     // Purge the idea to the trash, then Restore it from the Archive's Trash tab
-    await s.open('/life/plan/someday?tab=ideas')
+    await s.open('/life/goals/someday?tab=ideas')
     await pg.locator(ROW, { hasText: S5('someday idea') }).locator('[data-purge]:visible').first().click()
     await settle()
     await pg.getByRole('dialog').getByRole('button', { name: 'Purge' }).click()
@@ -1933,7 +1903,7 @@ while d <= last:
     must(dupes && dupes.items.some((i) => i.name === b.name) && !dupes.items.some((i) => i.name === a.name), 'the duplicate batch is wrong')
     must(got.batches.some((x) => x.key.startsWith('old:') && old.every((n) => x.items.some((i) => i.name === n))), 'the old tasks are not in a batch')
     // a batch from its card: confirm, exactly the listed items change, Undo from the toast
-    await s.open('/life/plan/reset')
+    await s.open('/life/today/reset')
     const card = pg.locator('[data-batch="duplicates"]')
     const listed = (await s.api('reset.get', { space: SPACE })).batches.find((x) => x.key === 'duplicates').items.map((i) => i.name)
     await card.locator('[data-batch-apply]').click()
@@ -1959,7 +1929,7 @@ while d <= last:
     // Delete one of this run's tasks with X (or the button), then Restore it from the Trash tab
     const del = await s.api('tasks.quick_add', { text: S5('delete me'), space: SPACE, area: uxArea })
     bench(`frappe.db.set_value("Life Task", "${del.name}", "last_touched_on", "2000-01-01")`)
-    await s.open('/life/plan/reset')
+    await s.open('/life/today/reset')
     if (phone) { await pg.locator('[role="tab"]', { hasText: 'One by one' }).first().click(); await settle() }
     must((await pg.locator('[data-obo-title]').innerText()).trim() === S5('delete me'), 'the oldest untouched item is not first')
     if (phone) await pg.locator('[data-obo="delete"]').click()
@@ -1971,7 +1941,7 @@ while d <= last:
     await pg.waitForTimeout(1000)
     must(await s.api('frappe.client.get_count', { doctype: 'Life Task', filters: { name: del.name } }), 'Restore from the trash did not bring it back')
     // set 8: Reset's place in the weekly review is its second tab, Tasks, with the stuck tasks in piles
-    await s.open('/life/plan/week?view=review&tab=tasks')
+    await s.open('/life/today/week?view=review&tab=tasks')
     must(await pg.locator('[data-pile-board][data-pile-key="tasks"]').count(), "the weekly review's Tasks tab has no piles")
     return 'batches, undo, one by one, trash, weekly review'
   })
@@ -1979,7 +1949,7 @@ while d <= last:
   await check(`${tag}.37`, `${width} px: no sideways scrolling and no script errors on the new screens`, async () => {
     const before = errors.length
     const bad = []
-    for (const p of ['/life', '/life/plan/reset', '/life/plan/someday', '/life/ask', '/life/ask?tab=insights', '/life/ask?tab=history', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
+    for (const p of ['/life', '/life/today/reset', '/life/goals/someday', '/life/ask', '/life/ask?tab=insights', '/life/ask?tab=history', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
       await s.open(p)
       if ((await overflow()) > 0) bad.push(`${p} scrolls sideways by ${await overflow()} px`)
     }
@@ -2002,7 +1972,7 @@ while d <= last:
       const active = await mk(SPACE, 'S4 active area', false)
       await mk(SPACE, 'S4 archived area', true)
       await mk('Shared', 'S4 shared area', false)
-      await s.open('/life/plan/tasks')
+      await s.open('/life/goals/tasks')
       const opts = await lensOptions()
       must(opts.some((o) => o.startsWith('S4 active area')), `the lens does not offer the active area (${opts.filter((o) => o.startsWith('S4'))})`)
       must(!opts.some((o) => /S4 (archived|shared) area/.test(o)), `the lens offers ${opts.filter((o) => o.startsWith('S4')).join(', ')}`)
@@ -2023,7 +1993,7 @@ while d <= last:
 
   await check(`${tag}.21`, `${width} px: intent: Just keep is in Library > Captures, not the Inbox, with text and no proposals; Add to wiki writes pages and leaves no wiki proposals`, async () => {
     // Just keep, dropped through the box
-    await s.open('/life/inbox')
+    await s.open('/life/brain')
     if (!(await pg.locator('[data-dropzone] textarea').count())) await pg.getByRole('button', { name: 'Or paste text instead' }).click()
     await pg.locator('[data-dropzone] textarea').fill(`S4 keep ${width} ${stamp}\nA note to keep.`)
     await pg.locator('[data-intent]').getByText('Just keep', { exact: true }).click()
@@ -2038,10 +2008,10 @@ while d <= last:
     must(!got.proposals.length, 'Just keep: it has proposals')
     const queue = await s.api('inbox.list', { space: SPACE, page_length: 100, status: JSON.stringify(['To Review', 'New', 'Processing', 'Failed']) })
     must(!queue.items.some((i) => i.name === kept.name), 'the Just keep item is still in the Inbox')
-    await s.open('/life/library/captures?tab=text')
+    await s.open('/life/brain/activity?tab=text')
     must((await pg.locator('[data-main]').innerText()).includes(`S4 keep ${width} ${stamp}`), 'the Just keep item is not in Sources')
     // the intent is remembered
-    await s.open('/life/inbox')
+    await s.open('/life/brain')
     await pg.waitForTimeout(1200)
     await pg.reload({ waitUntil: 'networkidle' })
     const keepBtn = pg.locator('[data-intent] button, [data-intent] [role="radio"]').filter({ hasText: 'Just keep' }).first()
@@ -2077,7 +2047,7 @@ while d <= last:
     // tab counts equal the rows each tab lists
     const res = await s.api('sources.list', { space: SPACE, page_length: 200 })
     for (const [t, n] of Object.entries(res.tabs)) {
-      await s.open(`/life/library/captures?tab=${t}&view=list`)
+      await s.open(`/life/brain/activity?tab=${t}&view=list`)
       const shown = await pg.locator(`[data-state-tabs] [data-tab="${t}"]`).first().innerText()
       must(num(shown) === n, `${t}: the tab says ${shown}, the server ${n}`)
       const listed = (await s.api('sources.list', { space: SPACE, tab: t, page_length: 200 })).total
@@ -2085,17 +2055,17 @@ while d <= last:
       if (n && n <= 50) must((await pg.locator(ROW).count()) === n, `${t}: ${await pg.locator(ROW).count()} rows on screen, the tab says ${n}`)
     }
     // the Photos grid shows thumbnails (the grid is the Photos tab's first view; the loop above left List remembered, so ask for it)
-    await s.open('/life/library/captures?tab=photos&view=grid')
+    await s.open('/life/brain/activity?tab=photos&view=grid')
     const thumbs = await pg.locator('[data-source-grid] img[data-thumb]').evaluateAll((els) => els.map((e) => e.getAttribute('src')))
     must(thumbs.length && thumbs.every((u) => /-thumb\.jpg$/.test(u)), `the Photos grid does not show thumbnails: ${thumbs.slice(0, 3)}`)
     // Made from this
-    await s.open(`/life/library/captures?open=source:${src.name}&ptab=made`)
+    await s.open(`/life/brain/activity?open=source:${src.name}&ptab=made`)
     const madeText = await pg.locator('[data-source-made]').innerText()
     must(madeText.includes(`S4 made ${width} ${stamp}`) && madeText.includes(`S4 cites ${width} ${stamp}`), 'Made from this does not list the task and the wiki page')
     must(made.name, 'no page')
     // /chats lands on the Chats tab, with its filters
     await s.open(`/life/chats?area=${uxArea}`)
-    must(/\/life\/library\/captures\?/.test(pg.url()) && pg.url().includes('tab=chats') && pg.url().includes(`area=${uxArea}`), `/chats went to ${pg.url()}`)
+    must(/\/life\/library\/chats\?/.test(pg.url()) && pg.url().includes('tab=chats') && pg.url().includes(`area=${uxArea}`), `/chats went to ${pg.url()}`)
     return `${Object.keys(res.tabs).length} tabs`
   })
 
@@ -2254,7 +2224,7 @@ except frappe.PermissionError:
     const c2 = await importOnce('claude', 'claude_export.zip')
     const g2 = await importOnce('chatgpt', 'chatgpt_export.zip')
     must(!c2.created && !c2.updated && !g2.created && !g2.updated, `the second import changed something: ${JSON.stringify([c2, g2])}`)
-    await s.open('/life/library/captures?tab=chats')
+    await s.open('/life/library/chats?tab=chats')
     must((await pg.locator('[data-main]').innerText()).includes('Blend sheet for Dalmia Gold'), 'the imported chat is not on the Chats tab')
     return 'two systems'
   })
@@ -2263,7 +2233,7 @@ except frappe.PermissionError:
     const digest = `## Needs your attention\n- Mithun Sarkar: the despatch dates for December [Open](https://mail.google.com/mail/u/0/#inbox/s4${stamp}${width})\n- Ruchi: ITR papers [Open](https://mail.google.com/mail/u/0/#inbox/r${stamp})\n\n## Waiting on others\n- The auditor, scope letter [Open](https://mail.google.com/mail/u/0/#inbox/a${stamp})\n\n## Dates and deadlines\n- 20 Nov: board meeting\n\n## FYI from people\n- Anya: photos from the trip\n\n## Company information\n- Q3 numbers are out\n\n## Left out\n- 14 newsletters`
     const item = await s.api('inbox.create_item', { title: `S4 digest ${width} ${stamp}`, source_type: 'Email Digest', space: SPACE, raw_text: digest, source_system: 'gmail', external_id: `digest-${width}-${stamp}` })
     runAgent()
-    await s.open(`/life/library/captures?tab=email&open=source:${item.name}`)
+    await s.open(`/life/brain/activity?tab=email&open=source:${item.name}`)
     must((await pg.locator('[data-digest-section]').count()) >= 6, 'the digest sections are not headed lists')
     must((await pg.locator('[data-open-gmail]').count()) >= 3, 'no Open in Gmail buttons')
     const got = await s.api('inbox.get', { item: item.name })
@@ -2271,17 +2241,17 @@ except frappe.PermissionError:
     must(p && /mail\.google\.com/.test(p.payload.source_url || ''), 'the reply task has no Gmail link')
     const res = await s.api('review.decide', { proposal: p.name, decision: 'accept' })
     const task = res.created_name || (await s.api('inbox.get', { item: item.name })).proposals.find((x) => x.name === p.name).created_name
-    await s.open(`/life/plan/tasks?open=task:${task}`)
+    await s.open(`/life/goals/tasks?open=task:${task}`)
     must((await pg.locator('[data-open-source]').innerText()).includes('Open in Gmail'), 'the task pane has no Open in Gmail')
   })
 
-  await check(`${tag}.29`, `${width} px: Library's tabs are All, Notes, Captures, Outbox, Timeline and Archive; each opens from its tab and its path`, async () => {
-    // set 6: the sidebar's Records (Sources, Notes, Wiki, Vault, Timeline) became Library's tabs
+  await check(`${tag}.29`, `${width} px: Library's tabs are Everything, Notes, Documents, People and Chats; each opens from its tab and its path`, async () => {
+    // set 6: the sidebar's Records (Sources, Notes, Wiki, Vault, Timeline) became Library's tabs; issue 14 gave it its own
     await s.open('/life')
     await nav('Library')
     must(new URL(pg.url()).pathname === '/life/library', `Library opened ${new URL(pg.url()).pathname}`)
     const bar = pg.locator('[data-place-tabs]').first()
-    for (const [t, p] of [['notes', '/life/library/notes'], ['captures', '/life/library/captures'], ['outbox', '/life/library/outbox'], ['timeline', '/life/library/timeline'], ['archive', '/life/library/archive'], ['all', '/life/library']]) {
+    for (const [t, p] of [['notes', '/life/library/notes'], ['documents', '/life/library/documents'], ['people', '/life/library/people'], ['chats', '/life/library/chats'], ['all', '/life/library']]) {
       await bar.locator(`[data-tab="${t}"]`).click()
       await pg.waitForLoadState('networkidle')
       await settle()
@@ -2311,7 +2281,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       }
       const shared = await fam.api('sources.list', { space: 'Shared', page_length: 500 })
       must(!shared.sources.some((r) => r.title.includes(stamp) && r.title.startsWith('S4')), 'the family member sees a Private source')
-      await fam.open('/life/library/captures')
+      await fam.open('/life/brain/activity')
       must(!(await fam.page.locator('[data-main]').innerText()).includes(`S4 keep`), 'a Private source shows to the family member')
       const ch = await fam.api('frappe.client.get_count', { doctype: 'Life Wiki Change', filters: { space: SPACE } }, { raw: true })
       must(!ch.ok() || (await ch.json()).message === 0, 'the family member counts Private wiki changes')
@@ -2331,20 +2301,20 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
     const total = (m, args) => s.api(m, { space: SPACE, page_length: 1, ...args }).then((r) => r.total)
     // [name, path, list method, the server's count under an area]
     const L = [
-      ['Inbox', '/life/inbox?all=1', 'inbox.list', null],
-      ['Plan > Goals', '/life/plan/goals?all=1', 'goals.list', (a) => total('goals.list', { area: a })],
-      ['Plan > Tasks', '/life/plan/tasks?view=list&all=1', 'tasks.list', (a) => total('tasks.list', { area: a, status: 'open_doing' })], // the Open tab: Open and Doing
-      ['Plan > Someday', '/life/plan/someday?all=1', 'someday.list', (a) => total('someday.list', { area: a })],
+      ['Inbox', '/life/brain?all=1', 'inbox.list', null],
+      ['Plan > Goals', '/life/goals?all=1', 'goals.list', (a) => total('goals.list', { area: a })],
+      ['Plan > Tasks', '/life/goals/tasks?view=list&all=1', 'tasks.list', (a) => total('tasks.list', { area: a, status: 'open_doing' })], // the Open tab: Open and Doing
+      ['Plan > Someday', '/life/goals/someday?all=1', 'someday.list', (a) => total('someday.list', { area: a })],
       ['Library > All', '/life/library?view=list&all=1', 'sources.list', (a) => total('sources.list', { scope: 'all', area: a })],
       ['Library > Notes', '/life/library/notes?view=list&all=1', 'library.list', (a) => total('library.list', { collection: 'all', area: a })],
-      ['Library > Captures', '/life/library/captures?view=list&all=1', 'sources.list', (a) => total('sources.list', { area: a })],
+      ['Library > Captures', '/life/brain/activity?view=list&all=1', 'sources.list', (a) => total('sources.list', { area: a })],
       ['Library > Timeline', '/life/library/timeline?all=1', 'timeline.get', (a) => total('timeline.get', { area: a })],
       ['Library > Archive', '/life/library/archive?all=1', 'archive.list', (a) => total('archive.list', { area: a })],
     ]
     // the rhythm tabs are not lists: each asks the server for its area's records
-    const R = [['Plan > Week, Calendar', '/life/plan/week?view=calendar'], /* set 8: the review is about the whole plate and keeps no lens, like Reset */ ['Plan > Month, Plan', '/life/plan/month?view=plan'],
-      ['Plan > Month, Calendar', '/life/plan/month?view=calendar'], ['Plan > 12 Weeks', '/life/plan/12-weeks'], ['Plan > Year, Calendar', '/life/plan/year?view=calendar'],
-      ['Plan > Year, Goals', '/life/plan/year?view=goals']]
+    const R = [['Plan > Week, Calendar', '/life/today/week?view=calendar'], /* set 8: the review is about the whole plate and keeps no lens, like Reset */ ['Plan > Month, Plan', '/life/today/month?view=plan'],
+      ['Plan > Month, Calendar', '/life/today/month?view=calendar'], ['Plan > 12 Weeks', '/life/today/year?view=cycle'], ['Plan > Year, Calendar', '/life/today/year?view=calendar'],
+      ['Plan > Year, Goals', '/life/today/year?view=goals']]
     pg.on('request', onReq)
     try {
       step = 'the counts on All of life'
@@ -2400,7 +2370,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
         must(carries(), `${name}: no request asked for the area (${[...new Set(calls.map((x) => x.m))].join(', ')})`)
       }
       step = 'the lens survives a reload'
-      await goto('/life/plan/tasks?view=list')
+      await goto('/life/goals/tasks?view=list')
       await pg.reload({ waitUntil: 'networkidle' })
       await settle()
       must(lensIn() === uxArea && await pg.locator('[data-lens-chip]:visible').count(), 'the lens was lost on reload')
@@ -2425,12 +2395,12 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
   await check(`${tag}.41`, `${width} px: no screen scrolls sideways: every place, Plan and Library tab and view, Settings section, a goal and a note page, with and without an area`, async () => {
     const before = errors.length
     const bad = []
-    const screens = ['/life', '/life/inbox', '/life/plan/week?view=review', '/life/plan/week?view=calendar', '/life/plan/week?view=agenda', '/life/plan/month?view=plan',
-      '/life/plan/month?view=habits', '/life/plan/month?view=checkins', '/life/plan/month?view=calendar', '/life/plan/12-weeks', '/life/plan/year?view=calendar',
-      '/life/plan/year?view=goals', '/life/plan/goals', '/life/plan/tasks', '/life/plan/someday', '/life/plan/reset', '/life/library', '/life/library/notes',
+    const screens = ['/life', '/life/brain', '/life/today/week?view=review', '/life/today/week?view=calendar', '/life/today/week?view=agenda', '/life/today/month?view=plan',
+      '/life/today/month?view=habits', '/life/today/month?view=checkins', '/life/today/month?view=calendar', '/life/today/year?view=cycle', '/life/today/year?view=calendar',
+      '/life/today/year?view=goals', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/today/reset', '/life/library', '/life/library/notes',
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
-      '/life/library/captures', '/life/library/captures?tab=documents&sensitive=1', '/life/library/captures?tab=photos', '/life/library/captures?tab=pages', '/life/library/timeline',
-      '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/plan/goals/${ux.goal}`, `/life/library/${ux.note}`,
+      '/life/brain/activity', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/activity?tab=photos', '/life/brain/activity?tab=pages', '/life/library/timeline',
+      '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
       ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
@@ -2506,15 +2476,15 @@ print(json.dumps(p))`)
 // ---------- UX fixes, set 6: once, at 1440 px, as the owner ----------
 const pathOf = (pg) => new URL(pg.url()).pathname.replace(/\/$/, '') || '/'
 
-await check('S6.1', 'Keyboard: G then T, I, P or L opens a place; the older G letters open their new homes', async () => {
+await check('S6.1', 'Keyboard: G then T, I, O or L opens a place; the older G letters open their new homes (issue 14)', async () => {
   const pg = owner.page
   const done = []
-  for (const [key, want, q] of [['t', '/life'], ['i', '/life/inbox'], ['p', '/life/plan/week'], ['l', '/life/library'], ['k', '/life/plan/tasks'], ['o', '/life/plan/goals'],
-    ['y', '/life/plan/someday'], ['w', '/life/plan/week'], ['m', '/life/plan/month'], ['j', '/life/plan/12-weeks'], ['c', '/life/plan/year'], ['e', '/life/plan/reset'],
-    ['n', '/life/library/notes'], ['u', '/life/library/captures'], ['h', '/life/library/captures', { tab: 'chats' }], ['v', '/life/library/captures', { tab: 'documents', sensitive: '1' }],
-    ['x', '/life/library/notes', { by: 'assistant' }], ['g', '/life/library/notes', { view: 'graph' }], ['r', '/life/library/archive'], ['q', '/life/ask'],
-    ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
-    await owner.open(key === 't' ? '/life/inbox' : '/life')
+  for (const [key, want, q] of [['t', '/life/today'], ['i', '/life/brain'], ['p', '/life/today/week'], ['l', '/life/library'], ['k', '/life/goals/tasks'], ['o', '/life/goals'],
+    ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/today/year', { view: 'cycle' }], ['c', '/life/today/year'], ['e', '/life/today/reset'],
+    ['n', '/life/library/notes'], ['u', '/life/brain/activity'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
+    ['x', '/life/library/notes', { by: 'assistant' }], ['g', '/life/library/notes', { view: 'graph' }], ['r', '/life/library/archive'], ['b', '/life/brain/outbox'], ['d', '/life/review'],
+    ['q', '/life/ask'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
+    await owner.open(key === 't' ? '/life/brain' : '/life')
     await pg.locator('[data-page-head]').first().click({ position: { x: 5, y: 5 } }).catch(() => {})
     await pg.keyboard.press('g')
     await pg.keyboard.press(key)
@@ -2527,45 +2497,45 @@ await check('S6.1', 'Keyboard: G then T, I, P or L opens a place; the older G le
   return done.join(' ')
 })
 
-await check('S6.2', 'Every old route lands on its new home with its query (section 2 of the brief)', async () => {
+await check('S6.2', 'Every old route lands on its new home with its query (section 2 of the brief; the homes of issue 14)', async () => {
   const pg = owner.page
   const goal12 = (await owner.api('goals.list', { space: SPACE, goal_type: '12 Week Year', page_length: 1 })).goals[0].name
   const jp = bench(`print(frappe.db.sql("select name from \`tabLife Journal Page\` where space='${SPACE}' limit 1")[0][0])`).split('\n').pop()
   const ROUTES = [
-    ['/tasks?priority=I&view=list', '/plan/tasks', { priority: 'I', view: 'list' }],
-    ['/goals?status=achieved', '/plan/goals', { status: 'achieved' }],
-    ['/someday?tab=ideas', '/plan/someday', { tab: 'ideas' }],
-    ['/projects?status=On%20Hold', '/plan/goals', { type: 'Open', status: 'in_progress' }],
-    ['/projects?status=Done', '/plan/goals', { type: 'Open', status: 'achieved' }],
-    [`/projects/${ux.project}?tab=tasks`, `/plan/goals/${ux.goal}`, { tab: 'tasks' }],
-    ['/reset', '/plan/week', { view: 'review', tab: 'tasks' }], // set 8: set 7's Reset step is the review's Tasks tab
-    ['/calendar/week?date=2026-12-02', '/plan/week', { view: 'calendar', date: '2026-12-02' }],
-    ['/calendar/agenda', '/plan/week', { view: 'agenda' }],
-    ['/calendar/month?date=2026-12-02', '/plan/month', { view: 'calendar', date: '2026-12-02' }],
-    ['/calendar/year', '/plan/year', {}],
-    ['/journal', '/plan/12-weeks', {}],
-    ['/journal/goals', '/plan/year', { view: 'goals' }],
-    ['/journal/month', '/plan/month', {}],
-    ['/journal/habits', '/plan/month', { view: 'habits' }],
-    ['/journal/checkins', '/plan/month', { view: 'checkins' }],
-    ['/journal/review', '/plan/week', { view: 'review' }],
-    ['/journal/pages', '/library/captures', { tab: 'pages' }],
-    [`/journal/pages/${jp}`, '/library/captures', { tab: 'pages', open: `page:${jp}` }],
-    [`/journal/goals/${goal12}`, `/plan/goals/${goal12}`, {}],
-    [`/sources?tab=chats&from=${addDays(-6)}`, '/library/captures', { tab: 'chats', from: addDays(-6) }],
-    ['/chats?group=day', '/library/captures', { tab: 'chats', view: 'day' }],
-    [`/chats?open=${ux.chat}`, '/library/captures', { tab: 'chats', open: `chat:${ux.chat}` }],
+    ['/tasks?priority=I&view=list', '/goals/tasks', { priority: 'I', view: 'list' }],
+    ['/goals?status=achieved', '/goals', { status: 'achieved' }],
+    ['/someday?tab=ideas', '/goals/someday', { tab: 'ideas' }],
+    ['/projects?status=On%20Hold', '/goals', { type: 'Open', status: 'in_progress' }],
+    ['/projects?status=Done', '/goals', { type: 'Open', status: 'achieved' }],
+    [`/projects/${ux.project}?tab=tasks`, `/goals/${ux.goal}`, { tab: 'tasks' }],
+    ['/reset', '/today/week', { view: 'review', tab: 'tasks' }], // set 8: set 7's Reset step is the review's Tasks tab
+    ['/calendar/week?date=2026-12-02', '/today/week', { view: 'calendar', date: '2026-12-02' }],
+    ['/calendar/agenda', '/today/week', { view: 'agenda' }],
+    ['/calendar/month?date=2026-12-02', '/today/month', { view: 'calendar', date: '2026-12-02' }],
+    ['/calendar/year', '/today/year', {}],
+    ['/journal', '/today/year', { view: 'cycle' }],
+    ['/journal/goals', '/today/year', { view: 'goals' }],
+    ['/journal/month', '/today/month', {}],
+    ['/journal/habits', '/today/month', { view: 'habits' }],
+    ['/journal/checkins', '/today/month', { view: 'checkins' }],
+    ['/journal/review', '/today/week', { view: 'review' }],
+    ['/journal/pages', '/library', { tab: 'pages' }],
+    [`/journal/pages/${jp}`, '/library', { tab: 'pages', open: `page:${jp}` }],
+    [`/journal/goals/${goal12}`, `/goals/${goal12}`, {}],
+    [`/sources?tab=chats&from=${addDays(-6)}`, '/library/chats', { tab: 'chats', from: addDays(-6) }],
+    ['/chats?group=day', '/library/chats', { tab: 'chats', view: 'day' }],
+    [`/chats?open=${ux.chat}`, '/library/chats', { tab: 'chats', open: `chat:${ux.chat}` }],
     ['/wiki', '/library/notes', { by: 'assistant' }],
     ['/wiki?tab=changes', '/library/notes', { by: 'assistant', view: 'changes' }],
-    ['/vault', '/library/captures', { tab: 'documents', sensitive: '1' }],
-    [`/vault?open=${ux.vault}`, '/library/captures', { tab: 'documents', sensitive: '1', open: `vault:${ux.vault}` }],
+    ['/vault', '/library/documents', { tab: 'documents', sensitive: '1' }],
+    [`/vault?open=${ux.vault}`, '/library/documents', { tab: 'documents', sensitive: '1', open: `vault:${ux.vault}` }],
     ['/graph', '/library/notes', { view: 'graph' }],
     [`/timeline?from=${addDays(-3)}`, '/library/timeline', { from: addDays(-3) }],
     ['/archive?type=trash', '/library/archive', { type: 'trash' }],
     ['/areas', '/settings', { tab: 'areas' }],
-    [`/areas/${uxArea}`, '', { area: uxArea }],
+    [`/areas/${uxArea}`, '/today', { area: uxArea }],
     ['/library?view=tree', '/library/notes', { view: 'tree' }],
-    [`/inbox/${ux.inbox}`, '/inbox', { open: `inbox:${ux.inbox}` }],
+    [`/inbox/${ux.inbox}`, '/brain', { open: `inbox:${ux.inbox}` }],
   ]
   const bad = []
   for (const [from, to, q] of ROUTES) {
@@ -2597,7 +2567,7 @@ print(json.dumps({"title": p.title, "goal": p.migrated_to, "unmoved": left, "had
   must(!proj.unmoved || proj.unmoved === 0, `${proj.unmoved} of the project's tasks are not under its goal`)
   await owner.open(`/life/projects/${ux.project}`)
   for (let i = 0; i < 20 && pathOf(pg).startsWith('/life/projects/'); i++) await pg.waitForTimeout(200)
-  must(pathOf(pg) === `/life/plan/goals/${ux.goal}`, `/projects/:id went to ${pathOf(pg)}`)
+  must(pathOf(pg) === `/life/goals/${ux.goal}`, `/projects/:id went to ${pathOf(pg)}`)
   must((await pg.locator('h1').first().innerText()).includes(proj.title), 'the goal page does not show the project title')
   await pg.locator('[data-page-tabs] [data-tab="tasks"]').click()
   await pg.waitForLoadState('networkidle')
@@ -2609,9 +2579,9 @@ print(json.dumps({"title": p.title, "goal": p.migrated_to, "unmoved": left, "had
   // serves and served by
   const longer = await owner.api('goals.create', { space: SPACE, title: `S5 longer goal ${stamp}`, goal_type: 'Annual', target_date: addDays(300), area: uxArea })
   const shorter = await owner.api('goals.create', { space: SPACE, title: `S5 shorter goal ${stamp}`, goal_type: 'Open', serves: longer.name, done_when: 'It is done.', area: uxArea })
-  await owner.open(`/life/plan/goals/${longer.name}`)
+  await owner.open(`/life/goals/${longer.name}`)
   must((await pg.locator('[data-goal-served-by]').innerText()).includes(`S5 shorter goal ${stamp}`), 'the longer goal does not list what serves it')
-  await owner.open(`/life/plan/goals/${shorter.name}`)
+  await owner.open(`/life/goals/${shorter.name}`)
   must((await pg.locator('[data-goal-serves]').innerText()).includes(`S5 longer goal ${stamp}`), 'the shorter goal does not show what it serves')
   const row = (await owner.api('goals.list', { space: SPACE, serves: longer.name, state: 'all' })).goals
   must(row.length === 1 && row[0].name === shorter.name && row[0].serves_title === `S5 longer goal ${stamp}` && row[0].done_when === 'It is done.', 'goals.list does not list what serves the goal')
@@ -2627,7 +2597,7 @@ await check('S6.4', 'A Vault document is a capture of kind Document, marked sens
   const rows = (await owner.api('sources.list', { space: SPACE, tab: 'documents', sensitive: 1, page_length: 200 })).sources
   const r = rows.find((x) => x.title === title)
   must(r && r.kind === 'Document' && r.sensitive, `not in Captures as a sensitive Document: ${JSON.stringify(r || null).slice(0, 200)}`)
-  await owner.open('/life/library/captures?tab=documents&sensitive=1')
+  await owner.open('/life/library/documents?tab=documents&sensitive=1')
   const row = pg.locator('[data-row]', { hasText: title }).first()
   must(await row.count(), 'not on Library > Captures, Documents')
   must(await row.locator('[data-sensitive-lock]').count(), 'no lock on the document')
@@ -2676,10 +2646,10 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
     // a day of weeks 11 and 12 that is not the 1st to 3rd of a month, in the morning
     const inWeek = (w) => { for (let n = 0; n < 7; n++) { const d = plusDays(info.start, (w - 1) * 7 + n); if (Number(d.slice(8)) > 3) return d } }
     const CASES = [
-      ['review', `${review} ${afterReview}`, 'Your weekly review is ready', '/life/plan/week'],
-      ['month', `${month}-02 08:00:00`, 'Plan ', '/life/plan/month'],
-      ['plan-next', `${inWeek(11)} 08:00:00`, 'Plan your next 12 weeks', '/life/plan/12-weeks'],
-      ['close', `${inWeek(12)} 08:00:00`, 'Close this cycle', '/life/plan/12-weeks'],
+      ['review', `${review} ${afterReview}`, 'Your weekly review is ready', '/life/today/week'],
+      ['month', `${month}-02 08:00:00`, 'Plan ', '/life/today/month'],
+      ['plan-next', `${inWeek(11)} 08:00:00`, 'Plan your next 12 weeks', '/life/today/year?view=cycle'],
+      ['close', `${inWeek(12)} 08:00:00`, 'Close this cycle', '/life/today/year?view=cycle'],
     ]
     const done = []
     for (const [key, at, text, to] of CASES) {
@@ -2699,7 +2669,7 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
       must((await pg.locator('[data-rhythm-banner]').count()) === 1, 'more than one banner')
       const order = await pg.evaluate(() => { const a = document.querySelector('[data-rhythm-banner]'), o = document.querySelector('[data-open-band]'); return !!(a && o && (a.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING)) })
       must(order, 'the banner is not above the Open band')
-      must(new URL(await banner.locator('[data-banner-open]').evaluate((a) => a.href)).pathname === to, `the ${key} banner does not lead to ${to}`)
+      must(new URL(await banner.locator('[data-banner-open]').evaluate((a) => a.href)).pathname === to.split('?')[0], `the ${key} banner does not lead to ${to} (${await banner.locator('[data-banner-open]').evaluate((a) => a.href)})`)
       await banner.locator('[data-banner-skip]').click()
       await pg.waitForTimeout(900)
       must(!(await banner.count()), `Skip did not hide the ${key} banner`)
@@ -2770,7 +2740,7 @@ for (const width of SET_WIDTHS) {
 
   await check(`${tag}.1`, `${width} px: New goal asks "Done when…": a milestone goal and a number goal through the dialog; a frequency offers Make it a habit`, async () => {
     const make = async (title, fill) => {
-      await s.open('/life/plan/goals')
+      await s.open('/life/goals')
       await pg.locator('[data-new-goal]').first().click()
       await settle()
       const dlg = pg.locator('[role="dialog"]').last()
@@ -2795,7 +2765,7 @@ for (const width of SET_WIDTHS) {
     })
     must(n && n.measure_kind === 'Number' && n.start_value === 84 && n.target_value === 78 && n.progress.kind === 'number', 'the number goal was not made: ' + JSON.stringify(n))
     // a frequency is a habit
-    await s.open('/life/plan/goals')
+    await s.open('/life/goals')
     await pg.locator('[data-new-goal]').first().click()
     await settle()
     const dlg = pg.locator('[role="dialog"]').last()
@@ -2822,7 +2792,7 @@ for (const width of SET_WIDTHS) {
     // a fresh review, with no other finding ahead of this reading among the five it shows
     bench(`frappe.db.delete("Life Review", {"space": "${SPACE}", "user": "owner@lifeos.test"})
 frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s and status='New' and ifnull(reading, '') = ''", "${SPACE}")`)
-    await s.open('/life/plan/week?view=review&tab=library')
+    await s.open('/life/today/week?view=review&tab=library')
     const row = pg.locator('[data-revelations] [data-finding][data-kind="Goal reading"]', { hasText: `S7 yield goal ${W}` }).first()
     must(await row.isVisible(), 'the reading is not in the weekly review')
     await row.locator('[data-finding-action="confirm_reading"]').click()
@@ -2830,7 +2800,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     await settle()
     const got = await s.api('goals.get', { goal: g })
     must(got.goal.current_value === 1640 && got.goal.progress.percent === 73.3, `current ${got.goal.current_value}, ${got.goal.progress.percent}%`)
-    await s.open(`/life/plan/goals/${g}`)
+    await s.open(`/life/goals/${g}`)
     const bar = pg.locator('[data-result-bar]').first()
     must((await bar.getAttribute('data-result-percent')) === '73.3' && (await bar.innerText()).includes('1640'), 'the result bar does not show 1640: ' + (await bar.innerText()))
     return '1640 kg/ha, 73.3%'
@@ -2844,13 +2814,13 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     const g = (await s.api('journal.save_goal', { cycle: cycle.name, title: `S7 cycle goal ${W}`, area: areaId('Tea & Coffee'), serves: long, measure_kind: 'Milestone',
       done_when: 'Ten pitches made', actions: [{ title: `S7 calls ${W}`, per_week: 4 }] })).goal
     action = (await s.api('journal.goal', { goal: g })).goal.actions[0]
-    await s.open('/life/plan/12-weeks')
+    await s.open('/life/today/year?view=cycle')
     const line = pg.locator('[data-grid-serves]', { hasText: `S7 long goal ${W}` })
     must(await line.count(), 'the 12 Weeks tab does not show the goal it serves')
-    await s.open(`/life/plan/goals/${long}`)
+    await s.open(`/life/goals/${long}`)
     const served = pg.locator('[data-goal-served-by]')
     must((await served.innerText()).includes(`S7 cycle goal ${W}`) && (await served.innerText()).includes(cycle.title), 'the longer goal does not show the cycle goal with its cycle')
-    await s.open(`/life/plan/goals/${g}`)
+    await s.open(`/life/goals/${g}`)
     must((await pg.locator('[data-goal-serves-progress]').innerText()).includes(`S7 long goal ${W}`), "the cycle goal's page does not show what it serves")
     return `${cycle.title}`
   })
@@ -2860,7 +2830,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     const g = await s.api('journal.grid', { space: SPACE })
     const wk = g.current_week
     const before = await s.api('journal.week_score', { cycle: cycle.name, week: wk })
-    await s.open('/life/plan/12-weeks')
+    await s.open('/life/today/year?view=cycle')
     const cell = pg.locator(`button[aria-label^="S7 calls ${W}, week ${wk},"]`).first()
     must(await cell.count(), 'the action is not on the grid')
     await cell.click()
@@ -2883,14 +2853,14 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     await s.api('someday.park', { doctype: 'Life Task', name: t.Parked })
     await s.api('tasks.set_status', { task: t.Discarded, status: 'Dropped' })
     for (const [pile, name] of Object.entries(t)) {
-      await s.open(`/life/library/outbox?pile=${pile}`)
+      await s.open(`/life/brain/outbox?pile=${pile}`)
       const row = pg.locator('[data-row]', { hasText: `S7 out` }).filter({ hasText: W })
       must(await row.count() === 1, `${pile}: ${await row.count()} rows of this run`)
       const listed = await s.api('outbox.list', { space: SPACE, pile, page_length: 500 })
       must(listed.rows.some((r) => r.record === name) && listed.total === listed.tabs[pile], `${pile}: not in its pile`)
     }
     // Bring back the done one: it is open again and leaves the pile
-    await s.open('/life/library/outbox?pile=Done')
+    await s.open('/life/brain/outbox?pile=Done')
     const row = pg.locator('[data-row]', { hasText: `S7 out done ${W}` })
     await row.locator('[data-outbox-bring-back]:visible').first().click()
     await pg.waitForLoadState('networkidle')
@@ -2909,7 +2879,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
       await d.click()
       await pg.waitForLoadState('networkidle')
       await settle()
-      must(new URL(pg.url()).pathname === '/life/library/outbox', 'the number went to ' + new URL(pg.url()).pathname)
+      must(new URL(pg.url()).pathname === '/life/brain/outbox', 'the number went to ' + new URL(pg.url()).pathname)
       const got = Number((await pg.locator('[data-lv-count]').first().innerText()).replace(/\D/g, '') || 0)
       must(got === n, `clicked ${n}, the Outbox lists ${got}`)
       seen.push(n)
@@ -2934,9 +2904,9 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     const rail = pg.locator('[data-rail-task]', { hasText: `S7 plan step ${W}` })
     must(await next.count() || await rail.count(), 'the scheduled task is not on Today')
     must(await rail.count(), "the scheduled task is not on the rail's timeline")
-    await s.open('/life/plan/week?view=calendar')
+    await s.open('/life/today/week?view=calendar')
     must((await pg.locator('[data-week-grid], [data-main]').first().innerText()).includes(`S7 plan step ${W}`), 'not in the week calendar')
-    await s.open(`/life/plan/tasks?status=Waiting`)
+    await s.open(`/life/goals/tasks?status=Waiting`)
     must((await pg.locator('[data-main]').innerText()).includes(`S7 handoff step ${W}`), 'the delegated task is not under Waiting')
     return `scheduled ${String(task.scheduled_at).slice(11, 16)}, waiting on Vivek`
   })
@@ -2953,7 +2923,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
       run()
       const got = (await s.api('old_items.suggested', { space: SPACE, page_length: 500 })).rows.find((r) => r.name === a)
       must(got && got.decision && got.reason, 'no suggested decision: ' + JSON.stringify(got))
-      await s.open('/life/inbox')
+      await s.open('/life/brain')
       const banner = pg.locator('[data-old-items-banner]')
       must(await banner.isVisible(), 'no banner on the Inbox')
       await banner.locator('[data-old-items-open]').click()
@@ -3004,8 +2974,8 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
   if (phone) {
     await check(`${tag}.8`, `${width} px: no set 7 screen scrolls sideways`, async () => {
       const bad = []
-      for (const p of ['/life', '/life/plan/goals', '/life/plan/week?view=review', '/life/library/outbox', '/life/library/outbox?pile=in&period=12weeks',
-        '/life/plan/12-weeks', '/life/settings?tab=rhythms', '/life/settings?tab=reset']) {
+      for (const p of ['/life', '/life/goals', '/life/today/week?view=review', '/life/brain/outbox', '/life/brain/outbox?pile=in&period=12weeks',
+        '/life/today/year?view=cycle', '/life/settings?tab=rhythms', '/life/settings?tab=reset']) {
         await s.open(p)
         const o = await pg.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width)
         if (o > 0) bad.push(`${p} by ${o} px`)
@@ -3066,7 +3036,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
   })
 
   await check(`${tag}.2`, `${width} px: a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's drawer and the Revelations list`, async () => {
-    await s.open('/life/plan/week?view=review&tab=library')
+    await s.open('/life/today/week?view=review&tab=library')
     await pg.locator(`[data-strip-meeting="${data.meeting}"]:visible`).first().click()
     const d = drawer('meeting')
     await d.locator('[data-meeting]').waitFor({ timeout: 10000 })
@@ -3195,7 +3165,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
         slot: `${addDays(1 + (i % 5))} 09:00`, who: i === 1 ? 'Vivek' : 'Me' } })
     }
     // exactly three stars, by the row's star buttons
-    await s.open('/life/plan/week?view=review&tab=goals')
+    await s.open('/life/today/week?view=review&tab=goals')
     await pg.locator('[data-goals-list]').waitFor({ timeout: 15000 })
     for (let i = 0; i < 10; i++) {
       const starred = await pg.locator('[data-goal-row][data-star="1"]').count()
@@ -3218,7 +3188,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     await pg.locator('[data-review-pause]:visible').first().dispatchEvent('click')
     await pg.waitForLoadState('networkidle')
     must(new URL(pg.url()).searchParams.get('view') === 'calendar', 'Pause did not return to Plan > Week')
-    await s.open('/life/plan/week?view=review')
+    await s.open('/life/today/week?view=review')
     await pg.locator('[data-review]').waitFor()
     await settle()
     await settle()
@@ -3264,7 +3234,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     must(made.some((x) => x.status === 'Waiting' && x.waiting_on === 'Vivek'), 'the delegated plan is not Waiting on Vivek')
     const weekCal = await s.api('calendar.get', { space: SPACE, from_date: addDays(0), to_date: addDays(8) })
     must(scheduled.every((x) => weekCal.items.some((i) => i.name === x.name && i.scheduled)), 'a scheduled task is not in Plan > Week')
-    await s.open('/life/plan/week?view=calendar')
+    await s.open('/life/today/week?view=calendar')
     const text = await pg.locator('[data-main]').innerText()
     must(scheduled.some((x) => text.includes(x.title)), 'no scheduled task on the Week calendar')
     // the next review starts after this one
@@ -3344,22 +3314,23 @@ print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone
       const text = await pg.locator('[data-main]').innerText()
       must(text.includes(`BF1 number ${W}`), `${how}: the reading to confirm is missing`)
     }
-    // the way the owner reached it: Today, Plan, the Week's Calendar, then Review
-    await s.open('/life')
-    await place('Plan')
+    // the way the owner reached it: Today, its Week tab, the Week's Calendar, then Review (issue 14: the Week is a tab of Today)
+    await s.open('/life/brain')
+    await place('Today')
     await pg.locator('[data-place-tabs] [data-tab="week"]').first().click()
-    await pg.locator('[data-plan-views]:visible').first().getByText('Calendar', { exact: true }).click()
+    // issue 16: the Week tab is its own screen; the Calendar and Review views open by `view=`
+    await pg.goto(new URL('/life/today/week?view=calendar', pg.url()).href)
     await settle()
     await pg.locator('[data-plan-views]:visible').first().getByText('Review', { exact: true }).click()
     await review('clicked from the Calendar')
     // by URL, and after a reload
-    await s.open('/life/plan/week?view=review&tab=library')
+    await s.open('/life/today/week?view=review&tab=library')
     await review('by URL')
     await pg.reload({ waitUntil: 'networkidle' })
     await review('after a reload')
     // and navigation still moves the page
-    await place('Inbox')
-    must(new URL(pg.url()).pathname === '/life/inbox' && await pg.locator('[data-main]').innerText().then((t) => t.includes('Inbox')), 'navigation after the review is stuck')
+    await place('Brain')
+    must(new URL(pg.url()).pathname === '/life/brain' && await pg.locator('[data-main]').innerText().then((t) => t.includes('Inbox')), 'navigation after the review is stuck')
     return 'clicked, by URL and reloaded; the period and Pause in the header'
   })
 
@@ -3375,8 +3346,8 @@ print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone
       const ref = (await pg.locator('[data-screen-error-ref]').innerText()).trim()
       must(/^[A-Z0-9]{4,8}$/.test(ref), `${kind}: reference "${ref}"`)
       // the sidebar or the phone's tab bar still works, and leaving clears the message
-      await place('Plan')
-      must(new URL(pg.url()).pathname === '/life/plan/week', `${kind}: Plan did not open (${pg.url()})`)
+      await place('Goals')
+      must(new URL(pg.url()).pathname === '/life/goals', `${kind}: Goals did not open (${pg.url()})`)
       must(!(await pg.locator('[data-screen-error]').count()), `${kind}: the message stayed after leaving`)
       await place('Today')
       must(await pg.locator('[data-main]').innerText().then((t) => t.length > 100), `${kind}: Today is empty after the failure`)
@@ -3392,8 +3363,8 @@ print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone
     must((await pg.locator('[data-screen-error]').innerText()).includes('A newer version of Life OS is available.'), 'a missing screen file gives the wrong message')
     await pg.unroute(/Settings-/)
     errors.splice(0)
-    await place('Inbox')
-    must(new URL(pg.url()).pathname === '/life/inbox' && !(await pg.locator('[data-screen-error]').count()), 'navigation after a missing screen file is stuck')
+    await place('Brain')
+    must(new URL(pg.url()).pathname === '/life/brain' && !(await pg.locator('[data-screen-error]').count()), 'navigation after a missing screen file is stuck')
     bench(`frappe.db.delete("Error Log", {"method": ["like", "Life OS screen error %"]})`)
     return got.join(', ') + ', and a missing screen file'
   })
@@ -3631,7 +3602,7 @@ for (const width of SET_WIDTHS) {
     must(found.total === 1, `${found.total} items with the job's title`)
     const item = found.items[0]
     must(item.status === 'To Review' && item.pending === 2, `the item is ${item.status} with ${item.pending} pending proposals`)
-    await s.open('/life/inbox')
+    await s.open('/life/brain')
     const shown = await pg.locator('[data-row]', { hasText: title }).count()
     must(shown === 1, `the Inbox shows the job in ${shown} rows`)
     await s.open(`/life/inbox/${item.name}/review?tab=original`) // phones open on the proposals
@@ -3721,7 +3692,7 @@ for (const width of SET_WIDTHS) {
       must(new URL(pg.url()).pathname === `/life/item/${id}`, `Open full page from ${what} went to ${new URL(pg.url()).pathname}`)
       must(await pg.locator('[data-item-page]').count() === 1, `the item page did not show from ${what}`)
     }
-    await s.open('/life/inbox')
+    await s.open('/life/brain')
     const row = pg.locator('[data-row]', { hasText: title }).first()
     must(await row.count() === 1, 'the item is not in the Inbox list')
     await row.locator('[data-ref]').first().click()
@@ -3729,7 +3700,7 @@ for (const width of SET_WIDTHS) {
     await pg.locator('[data-pane-full]').click()
     await settle()
     must(new URL(pg.url()).pathname === `/life/item/${id}`, 'the Inbox list did not lead to the item page')
-    await full(`/life/library/captures?open=${encodeURIComponent('source:' + id)}`, 'Library')
+    await full(`/life/brain/activity?open=${encodeURIComponent('source:' + id)}`, 'Library')
     await s.open('/life/library/notes')
     if (width < 768) await pg.locator('[data-phone-search]').click()
     else await pg.keyboard.press('Meta+k')
@@ -3788,7 +3759,7 @@ for (const width of SET_WIDTHS) {
     const partId = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: part, parent_area: career.name })).name
     const task = await s.api('tasks.quick_add', { text: `I11 task ${width} ${stamp}`, space: SPACE, area: partId })
     const rows = (await s.api('area.tree', { space: SPACE, include_off: 1 })).areas
-    await s.open(`/life/plan/tasks?open=task:${task.name}`)
+    await s.open(`/life/goals/tasks?open=task:${task.name}`)
     const button = pg.locator('[data-task-area] button')
     must((await button.innerText()).includes(`Career / ${part}`), 'the picker does not name the task\'s part with its area: ' + await button.innerText())
     await button.click()
@@ -3866,7 +3837,7 @@ for (const width of SET_WIDTHS) {
   let pickTask = null
   const pickerLabels = async () => {
     if (!pickTask) pickTask = (await s.api('tasks.quick_add', { text: `I12 picker task ${width} ${stamp}`, space: SPACE })).name
-    await s.open(`/life/plan/tasks?open=task:${pickTask}`)
+    await s.open(`/life/goals/tasks?open=task:${pickTask}`)
     await pg.locator('[data-task-area] button').click()
     await pg.waitForTimeout(300)
     const out = (await pg.getByRole('menuitem').allInnerTexts()).map((t) => t.trim())
@@ -4012,13 +3983,13 @@ for (const width of SET_WIDTHS) {
   pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
   await check(`${tag}.7`, `${width} px: a quick-captured task shows its guessed area with ✦ and the confidence; one tap confirms it and the ✦ goes`, async () => {
     const title = `I13 quick capture ${width} ${stamp}`
-    await s.open('/life/plan/tasks')
+    await s.open('/life/goals/tasks')
     const box = pg.getByLabel('Quick add')
     await box.fill(`${title} today`)
     await box.press('Enter')
     await pg.waitForLoadState('networkidle')
     // after a full walk many tasks are due today: show this one by its title
-    await s.open(`/life/plan/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', '=', title]]))}`)
+    await s.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', '=', title]]))}`)
     const row = pg.locator('[data-row]').filter({ hasText: title }).first()
     await row.waitFor({ timeout: 10000 })
     const chip = row.locator('[data-area-guess]')
@@ -4042,6 +4013,439 @@ for (const width of SET_WIDTHS) {
     return `${task.area_name}, ${Math.round(task.area_confidence)}%`
   })
   await s.ctx.close()
+}
+
+// Issue 14: the new navigation. Today, Brain, Goals and Library, each tab a route; Review after the first locked review;
+// + Capture and the capture sheet; every old route redirected; the housekeeping pages reached from their new homes.
+{
+  const errs = (pg) => { const e = []; pg.on('pageerror', (x) => e.push(String(x).split('\n')[0])); return e }
+  const path = (pg) => new URL(pg.url()).pathname
+  const noSideways = async (pg) => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const loaded = async (pg, what) => {
+    await pg.locator('[data-main]').first().waitFor({ timeout: 10000 })
+    // a screen draws its skeleton first: wait for words
+    const drawn = await pg.waitForFunction(() => (document.querySelector('[data-main]')?.innerText || '').trim().length > 20, null, { timeout: 8000 }).then(() => true, () => false)
+    must(!(await pg.locator('[data-screen-error]').count()), `${what} shows the error message`)
+    must(drawn, `${what} is blank`)
+  }
+  // the weekly review's day is moved off today for the Review checks, and put back after
+  const st = JSON.parse(bench('import json\nprint(json.dumps({"day": frappe.db.get_single_value("Life Settings", "weekly_review_day") or "Sunday"}))').split('\n').pop())
+  const offDay = DAY_NAMES[(new Date(bench('from frappe.utils import today\nprint(today())').split('\n').pop() + 'T12:00:00Z').getUTCDay() + 3) % 7]
+  const setDay = (d) => bench(`frappe.db.set_single_value("Life Settings", "weekly_review_day", "${d}")\nfrappe.clear_cache()`)
+  for (const width of SET_WIDTHS) {
+    const tag = `I14.${width}`
+    if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+    const phone = width < 800
+    if (!phone) {
+      setDay(offDay)
+      bench('frappe.db.delete("Life Review", {"user": "family@lifeos.test"})')
+      const f = await session('family@lifeos.test', width)
+      const fe = errs(f.page)
+      try {
+        await check(`${tag}.1`, `${width} px: the sidebar shows + Capture, Today, Brain, Goals, Library and Settings, in that order, and no other place`, async () => {
+          await f.open('/life/today')
+          const order = await f.page.locator('[data-sidebar] [data-nav-capture], [data-sidebar] [data-nav-item]').evaluateAll((els) =>
+            els.map((e) => (e.hasAttribute('data-nav-capture') ? '+ Capture' : e.getAttribute('data-nav-item'))))
+          must(JSON.stringify(order) === JSON.stringify(['+ Capture', 'Today', 'Brain', 'Goals', 'Library', 'Settings']), 'the sidebar reads ' + order.join(', '))
+          must((await f.page.locator('[data-sidebar] [data-nav-capture]').innerText()).includes('Capture'), 'the first button is not Capture')
+          for (const gone of ['[data-nav-pin]', '[data-nav-plan]', '[data-nav-new]']) must(!(await f.page.locator(gone).count()), 'the sidebar still has ' + gone)
+          must(await f.page.locator('[data-page-head] [data-ask-box]').count(), 'Ask is not in the header')
+          must(!fe.length, 'script errors: ' + fe.slice(0, 3).join(' | '))
+        })
+        await check(`${tag}.2`, `${width} px: Review is hidden for a user who has never locked a review, and shown between Goals and Library after one is locked`, async () => {
+          await f.open('/life/goals')
+          must(!(await f.page.locator('[data-nav-item="Review"]').count()), 'Review shows before any review was locked')
+          bench(`from frappe.utils import add_days, now_datetime, today
+frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lifeos.test", "kind": "Weekly", "status": "Locked", "period_start": add_days(today(), -6),
+  "period_end": today(), "locked_on": now_datetime(), "title": "I14 review", "tab_state": "{}"}).insert(ignore_permissions=True)`)
+          await f.open('/life/goals')
+          const order = await f.page.locator('[data-nav-places] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')))
+          must(JSON.stringify(order) === JSON.stringify(['Today', 'Brain', 'Goals', 'Review', 'Library']), 'after a locked review the places read ' + order.join(', '))
+          await f.page.locator('[data-nav-item="Review"]').first().click()
+          await f.page.waitForURL((u) => u.pathname === '/life/review', { timeout: 10000 }).catch(() => {})
+          must(path(f.page) === '/life/review', 'Review opens ' + path(f.page))
+          await loaded(f.page, 'Review')
+          must(!fe.length, 'script errors: ' + fe.slice(0, 3).join(' | '))
+        })
+      } finally {
+        bench('frappe.db.delete("Life Review", {"user": "family@lifeos.test"})')
+        setDay(st.day)
+        await f.ctx.close()
+      }
+    }
+    const s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    const errors = errs(pg)
+    const item = await s.api('inbox.create_item', { title: `I14 to review ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'I14' })
+    bench(`frappe.db.set_value("Life Inbox Item", "${item.name}", "status", "To Review")`)
+    try {
+      await check(`${tag}.3`, `${width} px: Brain shows the Needs you count, the same number as the Inbox count`, async () => {
+        await s.open('/life/today')
+        const inboxTotal = (await s.api('inbox.list', { space: SPACE, status: '["To Review"]', page_length: 1 })).total
+        const badge = pg.locator(phone ? '[data-tab-count="Brain"]' : '[data-nav-count="Brain"]').first()
+        await badge.waitFor({ timeout: 10000 })
+        const n = Number((await badge.innerText()).replace(/\D/g, ''))
+        must(n === inboxTotal, `Brain says ${n}; the Inbox has ${inboxTotal} to review`)
+        await s.open('/life/brain')
+        const tab = Number((await pg.locator('[data-place-tabs] [data-tab="needs-you"] [data-tab-count]').innerText()).replace(/\D/g, ''))
+        must(tab === inboxTotal, `Needs you says ${tab}; the Inbox has ${inboxTotal}`)
+        const listed = Number((await pg.locator('[data-state-tabs] [data-tab="To Review"] [data-tab-count]').first().innerText()).replace(/\D/g, ''))
+        must(listed === inboxTotal, `the list says ${listed} to review; the Inbox has ${inboxTotal}`)
+        return `${n}`
+      })
+      await check(`${tag}.4`, `${width} px: every route of the old router redirects to its new home, which loads without an error`, async () => {
+        const goal = (await s.api('goals.list', { space: SPACE, goal_type: 'Open', page_length: 1 })).goals[0].name
+        const area = areaId('Career') || areas[0].name
+        const OLD = [['/life', '/life/today'], ['/life/inbox', '/life/brain'], [`/life/inbox/${item.name}`, '/life/brain'],
+          [`/life/inbox/${item.name}/review`, `/life/brain/review/${item.name}`], ['/life/plan', '/life/today/week'], ['/life/plan/week', '/life/today/week'],
+          ['/life/plan/month', '/life/today/month'], ['/life/plan/12-weeks', '/life/today/year'], ['/life/plan/year', '/life/today/year'],
+          ['/life/plan/goals', '/life/goals'], [`/life/plan/goals/${goal}`, `/life/goals/${goal}`], ['/life/plan/tasks', '/life/goals/tasks'],
+          ['/life/plan/someday', '/life/goals/someday'], ['/life/plan/reset', '/life/today/reset'], ['/life/tasks', '/life/goals/tasks'],
+          ['/life/someday', '/life/goals/someday'], ['/life/outbox', '/life/brain/outbox'], ['/life/archive', '/life/library/archive'],
+          ['/life/wiki', '/life/library/notes'], ['/life/vault', '/life/library/documents'], ['/life/graph', '/life/library/notes'],
+          ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/activity'], ['/life/chats', '/life/library/chats'],
+          ['/life/library/captures', '/life/brain/activity'], ['/life/library/outbox', '/life/brain/outbox'], ['/life/projects', '/life/goals'],
+          ['/life/reset', '/life/today/week'], ['/life/calendar', '/life/today/week'], ['/life/calendar/month', '/life/today/month'],
+          ['/life/calendar/year', '/life/today/year'], ['/life/calendar/agenda', '/life/today/week'], ['/life/journal', '/life/today/year'],
+          ['/life/journal/goals', '/life/today/year'], ['/life/journal/month', '/life/today/month'], ['/life/journal/habits', '/life/today/month'],
+          ['/life/journal/checkins', '/life/today/month'], ['/life/journal/review', '/life/today/week'], ['/life/journal/pages', '/life/library'],
+          [`/life/journal/goals/${goal}`, `/life/goals/${goal}`], ['/life/areas', '/life/settings'], [`/life/areas/${area}`, '/life/today'],
+          ['/life/no-such-page', '/life/today']]
+        const bad = []
+        for (const [from, want] of OLD) {
+          const before = errors.length
+          await s.open(from)
+          if (path(pg) !== want) { bad.push(`${from} went to ${path(pg)}`); continue }
+          try { await loaded(pg, from) } catch (e) { bad.push(e.message) }
+          if (errors.length > before) bad.push(`${from}: ${errors.slice(before).join(' | ')}`)
+        }
+        must(!bad.length, bad.slice(0, 5).join('; '))
+        return `${OLD.length} routes`
+      })
+      await check(`${tag}.5`, `${width} px: Archive, Outbox, Graph, Timeline, Reset and Vault are reached from their new homes`, async () => {
+        const via = async (start, link, want, query = {}) => {
+          await s.open(start)
+          await pg.locator(link).first().click()
+          await pg.waitForURL((u) => u.pathname === want && Object.entries(query).every(([k, v]) => u.searchParams.get(k) === v), { timeout: 10000 }).catch(() => {})
+          await pg.waitForLoadState('networkidle')
+          const u = new URL(pg.url())
+          must(u.pathname === want, `${link} on ${start} opened ${u.pathname}`)
+          for (const [k, v] of Object.entries(query)) must(u.searchParams.get(k) === v, `${link} on ${start} did not set ${k}=${v}`)
+          await loaded(pg, want)
+        }
+        await via('/life/library', '[data-place-link="archive"]', '/life/library/archive')
+        await via('/life/brain/activity', '[data-place-link="outbox"]', '/life/brain/outbox')
+        await via('/life/library/notes', '[data-place-link="graph"]', '/life/library/notes', { view: 'graph' })
+        await via('/life/library', '[data-place-link="timeline"]', '/life/library/timeline')
+        await via('/life/library/documents', '[data-place-link="sensitive"]', '/life/library/documents', { sensitive: '1', tab: 'documents' })
+        await via('/life/today', phone ? '[data-band-reset-phone]' : '[data-band-reset]', '/life/today/reset')
+        await via('/life/today/week?view=calendar', '[data-plan-reset]', '/life/today/reset')
+        // Settings > Data lists every page with no other home
+        await s.open('/life/settings?tab=places')
+        const listed = await pg.locator('[data-settings-places] [data-elsewhere]').evaluateAll((els) => els.map((e) => e.getAttribute('data-elsewhere')))
+        for (const k of ['archive', 'outbox', 'graph', 'timeline', 'reset', 'vault']) must(listed.includes(k), 'Settings > Data does not list ' + k)
+        await noSideways(pg)
+        must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      })
+      if (phone) {
+        await check(`${tag}.6`, `${width} px: the bottom bar shows Today, Brain, the capture button, Goals and Library; capture opens the capture sheet`, async () => {
+          await s.open('/life/today')
+          const bar = pg.locator('[data-tabbar]')
+          const items = await bar.locator('[data-tab-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab-item')))
+          must(JSON.stringify(items) === JSON.stringify(['Today', 'Brain', 'Goals', 'Library']), 'the bar reads ' + items.join(', '))
+          const x = async (sel) => (await bar.locator(sel).first().boundingBox()).x
+          const cap = await x('[data-tab-capture]')
+          must(cap > await x('[data-tab-item="Brain"]') && cap < await x('[data-tab-item="Goals"]'), 'the capture button is not in the middle')
+          await bar.locator('[data-tab-capture]').click()
+          const sheet = pg.locator('[role="dialog"]').filter({ has: pg.locator('[data-capture-text]') })
+          await sheet.waitFor({ timeout: 5000 })
+          const title = `I14 captured ${width} ${stamp}`
+          await sheet.locator('[data-capture-text] textarea, textarea[data-capture-text]').first().fill(title)
+          await sheet.locator('[data-capture-task]').click()
+          await sheet.waitFor({ state: 'detached', timeout: 5000 })
+          const made = JSON.parse(bench(`import json\nprint(json.dumps(frappe.get_all("Life Task", filters={"title": "${title}"}, pluck="name")))`).split('\n').pop())
+          must(made.length === 1, 'the capture sheet did not add the task')
+          await s.api('frappe.client.delete', { doctype: 'Life Task', name: made[0] }).catch(() => {})
+          await noSideways(pg)
+          must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+        })
+      }
+      await check(`${tag}.7`, `${width} px: tabs are routes: each tab has its own path, and reloading /life/goals/tasks lands on Goals > All tasks`, async () => {
+        const TABS = { today: ['day', 'week', 'month', 'year'], brain: ['needs-you', 'activity', 'sources'], goals: ['by-area', 'tasks', 'no-goal'],
+          library: ['all', 'notes', 'documents', 'people', 'chats'] }
+        const bad = []
+        for (const [place, tabs] of Object.entries(TABS)) {
+          for (const [i, t] of tabs.entries()) {
+            const p = i ? `/life/${place}/${t}` : `/life/${place}`
+            await s.open(p)
+            const cur = await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current').catch(() => null)
+            if (cur !== t) bad.push(`${p} shows tab ${cur}`)
+          }
+        }
+        await s.open('/life/brain')
+        await pg.locator('[data-place-tabs] [data-tab="activity"]').first().click()
+        await pg.waitForURL((u) => u.pathname === '/life/brain/activity', { timeout: 10000 }).catch(() => {})
+        if (path(pg) !== '/life/brain/activity') bad.push('clicking Activity went to ' + path(pg))
+        await s.open('/life/goals/tasks')
+        await pg.reload({ waitUntil: 'networkidle' })
+        if (path(pg) !== '/life/goals/tasks') bad.push('the reload left /life/goals/tasks for ' + path(pg))
+        if ((await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current')) !== 'tasks') bad.push('the reload is not on All tasks')
+        if (!(await pg.locator('[data-nav-item="Goals"][aria-current="page"], [data-tab-item="Goals"]').count())) bad.push('Goals is not the place shown')
+        must(!bad.length, bad.slice(0, 5).join('; '))
+        await loaded(pg, '/life/goals/tasks')
+        must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      })
+    } finally {
+      bench(`frappe.delete_doc("Life Inbox Item", "${item.name}", force=1, ignore_permissions=True)`)
+      await s.ctx.close()
+    }
+  }
+
+  // Issue 15: Today > Day. Titles start "I15 " (known to the debris finder).
+  for (const width of SET_WIDTHS) {
+    const tag = `I15.${width}`
+    if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+    const phone = width < 800
+    const s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    const errors = errs(pg)
+    const meeting = `I15 meeting ${width} ${stamp}`
+    const mk = (title) => bench(`from frappe.utils import today
+ev = frappe.get_doc({"doctype": "Event", "subject": "${title}", "starts_on": today() + " 14:00:00", "ends_on": today() + " 15:00:00", "event_category": "Event",
+  "event_type": "Public", "life_space": "Private", "google_calendar_event_id": "fixture-i15-${stamp}-${width}"}).insert(ignore_permissions=True)
+print(ev.name)`).split('\n').pop()
+    const evName = mk(meeting)
+    const names = []
+    for (const t of ['one', 'two']) names.push((await s.api('tasks.quick_add', { text: `I15 ${t} ${width} ${stamp}`, space: SPACE, area: uxArea, due_date: today })).name)
+    const item = await s.api('inbox.create_item', { title: `I15 to review ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'I15' })
+    bench(`frappe.db.set_value("Life Inbox Item", "${item.name}", "status", "To Review")`)
+    try {
+      bench(`frappe.db.set_value("Life Task", "${names[0]}", "is_top_three", 1)`)
+      await check(`${tag}.1`, `${width} px: Today > Day shows today's tasks, the top three and the day's events from the calendar`, async () => {
+        await s.open('/life/today')
+        await pg.locator('[data-next]').waitFor({ timeout: 10000 })
+        const plate = await pg.locator('[data-next]').innerText()
+        for (const t of names.map((_, i) => `I15 ${['one', 'two'][i]} ${width} ${stamp}`)) must(plate.includes(t), `${t} is not on the plate`)
+        must(await pg.locator('[data-next-group="today"]').count(), 'no Today group')
+        const rail = await pg.locator('[data-rail-today]').innerText()
+        must(rail.includes(meeting), 'the calendar does not show ' + meeting)
+        must(!plate.includes(meeting), 'the meeting is on the plate as well as in the calendar')
+        const tops = (await s.api('today.get', { space: SPACE })).next.groups.find((g) => g.key === 'top').rows
+        must(tops.some((r) => r.name === names[0]) && (await pg.locator('[data-top-three]').count()) >= 1, 'the top three are not marked')
+        const od = pg.locator('[data-next-group="overdue"]')
+        if (await od.count()) must(!(await pg.locator('[data-next-row][data-why="Overdue"]').count()), 'overdue items are not folded')
+        must(await pg.locator('[data-open-band]').count(), 'the Open band is gone')
+        must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      })
+      await check(`${tag}.2`, `${width} px: ticking a task on Today marks it done and updates the counts`, async () => {
+        await s.open('/life/today')
+        const row = pg.locator('[data-task-row]', { hasText: `I15 two ${width} ${stamp}` }).first()
+        await row.waitFor({ timeout: 10000 })
+        const before = (await s.api('today.get', { space: SPACE })).tasks.today_count
+        await row.locator('[role="checkbox"], input[type="checkbox"], button[aria-label^="Done"]').first().click()
+        await pg.waitForTimeout(1500)
+        const after = (await s.api('today.get', { space: SPACE })).tasks.today_count
+        must(after === before - 1, `the due-today count went from ${before} to ${after}`)
+        const st = (await s.api('tasks.list', { space: SPACE, status: 'any', filters: JSON.stringify([['name', '=', names[1]]]), page_length: 1 })).tasks[0].status
+        must(st === 'Done', 'the task is ' + st)
+        await s.open('/life/today')
+        must(!(await pg.locator('[data-task-row]', { hasText: `I15 two ${width} ${stamp}` }).count()), 'the done task is still on the plate')
+      })
+      await check(`${tag}.3`, `${width} px: the Needs you line shows the waiting count and opens Brain > Needs you`, async () => {
+        await s.open('/life/today')
+        const line = pg.locator('[data-needs-you]')
+        await line.waitFor({ timeout: 10000 })
+        const n = Number((await line.locator('[data-needs-you-count]').innerText()).replace(/\D/g, ''))
+        const total = (await s.api('inbox.list', { space: SPACE, status: '["To Review"]', page_length: 1 })).total
+        must(n === total, `the line says ${n}; the Inbox has ${total} to review`)
+        await line.click()
+        await pg.waitForURL((u) => u.pathname === '/life/brain', { timeout: 10000 }).catch(() => {})
+        must(path(pg) === '/life/brain', 'the line opened ' + path(pg))
+        must((await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current')) === 'needs-you', 'Brain is not on Needs you')
+      })
+      await check(`${tag}.4`, `${width} px: the switch moves to Week, Month and Year routes`, async () => {
+        await s.open('/life/today')
+        for (const t of ['week', 'month', 'year', 'day']) {
+          await pg.locator(`[data-place-tabs] [data-tab="${t}"]`).first().click()
+          const want = t === 'day' ? '/life/today' : `/life/today/${t}`
+          await pg.waitForURL((u) => u.pathname === want, { timeout: 10000 }).catch(() => {})
+          must(path(pg) === want, `${t} opened ${path(pg)}`)
+        }
+      })
+      await check(`${tag}.5`, `${width} px: the layout matches the mockups (${phone ? 'Needs you, the plate, then the calendar below it' : 'the plate with the calendar beside it'}), with no sideways scroll`, async () => {
+        await s.open('/life/today')
+        await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 })
+        const box = async (sel) => (await pg.locator(sel).first().boundingBox())
+        const nu = await box('[data-needs-you]'), plate = await box('[data-next]'), rail = await box('[data-rail-today]'), band = await box('[data-open-band]')
+        must(nu.y < plate.y, 'Needs you is not above the plate')
+        if (phone) must(rail.y > plate.y && Math.abs(rail.x - plate.x) < 4, 'the calendar is not below the plate')
+        else must(rail.x > plate.x + plate.width - 4 && rail.y < plate.y + 80, 'the calendar is not beside the plate')
+        must(band.y > plate.y + plate.height - 4 || band.y > rail.y + rail.height - 4, 'the Open band is not below the fold')
+        await noSideways(pg)
+        must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      })
+    } finally {
+      bench(`frappe.delete_doc("Life Inbox Item", "${item.name}", force=1, ignore_permissions=True)
+for n in ${JSON.stringify(names)}:
+    frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+frappe.delete_doc("Event", "${evName}", force=1, ignore_permissions=True)`)
+      await s.ctx.close()
+    }
+  }
+}
+
+// Issue 16: Today > Week, Month and Year. Titles start "I16 " (known to the debris finder).
+for (const width of SET_WIDTHS) {
+  const tag = `I16.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const path = () => new URL(pg.url()).pathname
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const year = Number(today.slice(0, 4))
+  const monday = plusDays(today, -((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7))
+  const wed = plusDays(monday, 2)
+  const nextMonth = new Date(Date.UTC(year, Number(today.slice(5, 7)), 15)).toISOString().slice(0, 10)
+  const nextKey = nextMonth.slice(0, 7)
+  const meeting = `I16 meeting ${width} ${stamp}`, due = `I16 due ${width} ${stamp}`, later = `I16 later ${width} ${stamp}`
+  const goalTitle = `I16 goal ${width} ${stamp}`, offTitle = `I16 off ${width} ${stamp}`
+  const made = JSON.parse(bench(`import json
+area = lambda n: frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": n})
+career, tea, mind = area("Career"), area("Tea & Coffee"), area("Mind")
+was = {n: frappe.db.get_value("Life Area", n, "is_on") for n in (career, tea, mind)}
+for n in (career, tea): frappe.db.set_value("Life Area", n, "is_on", 1)
+frappe.db.set_value("Life Area", mind, "is_on", 0)
+ev = frappe.get_doc({"doctype": "Event", "subject": "${meeting}", "starts_on": "${monday} 10:00:00", "ends_on": "${monday} 11:00:00", "event_category": "Event",
+  "event_type": "Public", "life_space": "${SPACE}", "google_calendar_event_id": "fixture-i16-${stamp}-${width}"}).insert(ignore_permissions=True)
+tasks = [frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": t, "status": "Open", "area": tea, "due_date": d}).insert(ignore_permissions=True).name
+  for t, d in (("${due}", "${wed}"), ("${later}", "${nextMonth}"))]
+goal = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${goalTitle}", "area": tea, "goal_type": "Annual", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
+off = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${offTitle}", "area": mind, "goal_type": "Annual", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
+print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event": ev.name, "tasks": tasks, "goal": goal, "off": off}))`).split('\n').pop())
+  let reviewName = null
+  try {
+    await check(`${tag}.1`, `${width} px: Week shows this week's calendar events and due tasks on the right days, and a day opens Day`, async () => {
+      await s.open('/life/today/week')
+      await pg.locator('[data-week-grid]').waitFor({ timeout: 10000 })
+      const dayText = async (d) => await pg.locator(`[data-week-grid] [data-day="${d}"]`).innerText()
+      must((await dayText(monday)).includes(meeting), `${meeting} is not on ${monday}`)
+      must((await dayText(wed)).includes(due), `${due} is not on ${wed}`)
+      for (const d of [plusDays(monday, 1), plusDays(monday, 3)]) must(!(await dayText(d)).includes(meeting) && !(await dayText(d)).includes(due), 'an item is on the wrong day ' + d)
+      const to = wed === today ? monday : wed
+      await pg.locator(`[data-week-grid] [data-day="${to}"] [data-open-day]`).click()
+      await pg.waitForURL((u) => u.pathname === '/life/today' && u.searchParams.get('date') === to, { timeout: 10000 })
+      await pg.locator('[data-day-other]').waitFor({ timeout: 10000 })
+      await pg.waitForFunction((t) => document.querySelector('[data-day-other]')?.innerText.includes(t), to === wed ? due : meeting, { timeout: 10000 }).catch(() => {})
+      must((await pg.locator('[data-day-other]').innerText()).includes(to === wed ? due : meeting), 'Day does not list the item of ' + to)
+      must((await pg.locator('[data-page-head]').first().innerText()).includes(String(Number(to.slice(8)))), 'Day is not headed with the date')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: Month shows events and due tasks on the right dates; next and previous months work`, async () => {
+      await s.open('/life/today/month')
+      await pg.locator('[data-month-grid]').waitFor({ timeout: 10000 })
+      const month = today.slice(0, 7)
+      must((await pg.locator('[data-month-view]').getAttribute('data-month')) === month, 'Month is not on this month')
+      if (phone) {
+        for (const [d, title] of [[monday, meeting], [wed, due]]) {
+          await pg.locator(`[data-month-grid] [data-day="${d}"] > button`).click()
+          await pg.waitForFunction((t) => document.querySelector('[data-month-list]')?.innerText.includes(t), title, { timeout: 5000 })
+        }
+      } else {
+        must((await pg.locator(`[data-month-grid] [data-day="${monday}"]`).innerText()).includes(meeting), `${meeting} is not on ${monday}`)
+        must((await pg.locator(`[data-month-grid] [data-day="${wed}"]`).innerText()).includes(due), `${due} is not on ${wed}`)
+      }
+      await pg.locator('[data-cal-next]').click()
+      await pg.waitForFunction((k) => document.querySelector('[data-month-view]')?.getAttribute('data-month') === k, nextKey, { timeout: 10000 })
+      await pg.locator(`[data-month-grid] [data-day="${nextMonth}"]`).waitFor({ timeout: 10000 })
+      if (phone) {
+        await pg.locator(`[data-month-grid] [data-day="${nextMonth}"] > button`).click()
+        await pg.waitForFunction((t) => document.querySelector('[data-month-list]')?.innerText.includes(t), later, { timeout: 5000 })
+      } else must((await pg.locator(`[data-month-grid] [data-day="${nextMonth}"]`).innerText()).includes(later), `${later} is not on ${nextMonth}`)
+      await pg.locator('[data-cal-prev]').click()
+      await pg.waitForFunction((k) => document.querySelector('[data-month-view]')?.getAttribute('data-month') === k, month, { timeout: 10000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.3`, `${width} px: Year shows a bar for each goal in its area's lane, and one tick per weekly review with the right count`, async () => {
+      const before = await s.api('calendar.year_plan', { space: SPACE, year })
+      const week = before.reviews.weeks.find((w) => !w.done && !w.future)
+      must(week, 'no past week without a review')
+      reviewName = bench(`r = frappe.get_doc({"doctype": "Life Review", "space": "${SPACE}", "user": "owner@lifeos.test", "kind": "Weekly", "status": "Locked", "period_start": "${week.start}",
+  "period_end": "${plusDays(week.start, 6)}", "locked_on": frappe.utils.now_datetime(), "title": "I16 review ${width} ${stamp}", "tab_state": "{}"}).insert(ignore_permissions=True)
+print(r.name)`).split('\n').pop()
+      const after = await s.api('calendar.year_plan', { space: SPACE, year })
+      must(after.reviews.done === before.reviews.done + 1, `the server counts ${after.reviews.done} reviews; it was ${before.reviews.done}`)
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      if (phone) {
+        const section = await pg.locator(`[data-month-section="${Number(today.slice(5, 7))}"]`).innerText()
+        must(section.includes(goalTitle), 'the goal is not listed in its months')
+        must((await pg.locator('[data-reviews-phone]').innerText()).includes(`${after.reviews.done} of ${after.reviews.total}`), 'the reviews count is wrong')
+      } else {
+        const lane = pg.locator(`[data-lane="area-${made.tea}"]`)
+        await lane.waitFor({ timeout: 10000 })
+        const bar = pg.locator(`[data-goal-bar][data-goal="${made.goal}"]`)
+        must((await bar.count()) === 1 && (await bar.innerText()).includes(goalTitle), 'the goal has no bar')
+        const lanes = await pg.locator('[data-lane]').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
+        must(lanes.indexOf(`area-${made.tea}`) > lanes.indexOf(`area-${made.career}`), "the goal's part is not under its area")
+        must((await pg.locator('[data-review-tick]').count()) === after.reviews.weeks.length, 'there is not a tick for every week')
+        must((await pg.locator('[data-review-tick][data-done]').count()) === after.reviews.done, 'the done ticks are not the reviews held')
+        must((await pg.locator('[data-lane="reviews"]').innerText()).includes(`${after.reviews.done} of ${after.reviews.total} done`), 'the lane does not say n of m done')
+        must(await pg.locator(`[data-review-tick][data-start="${week.start}"][data-done]`).count(), 'the week of the review is not ticked')
+        const cards = await pg.locator('[data-year-cards]').innerText()
+        must(cards.includes('This year so far') && cards.includes('Next 12 Week Year'), 'the cards are missing')
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.4`, `${width} px: an area that is off has no lane`, async () => {
+      const out = await s.api('calendar.year_plan', { space: SPACE, year })
+      must(!out.lanes.some((l) => l.area === made.mind), 'the server sent a lane for an area that is off')
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      must(!(await pg.locator('[data-year-view]').innerText()).includes(offTitle), 'the goal of an area that is off is shown')
+      if (!phone) must(!(await pg.locator(`[data-lane="area-${made.mind}"]`).count()), 'the area that is off has a lane')
+      bench(`frappe.db.set_value("Life Area", "${made.mind}", "is_on", 1)`)
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-year-view]').innerText()).includes(offTitle), 'the goal does not show once the area is on')
+      bench(`frappe.db.set_value("Life Area", "${made.mind}", "is_on", 0)`)
+    })
+    await check(`${tag}.5`, `${width} px: clicking a goal opens the goal; clicking a month opens Month`, async () => {
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      const m = Number(today.slice(5, 7))
+      await (phone ? pg.locator(`[data-month-section="${m}"] a`, { hasText: goalTitle }) : pg.locator(`[data-goal-bar][data-goal="${made.goal}"] a`)).first().click()
+      await pg.waitForURL((u) => u.pathname === `/life/goals/${made.goal}`, { timeout: 10000 })
+      await pg.getByText(goalTitle).first().waitFor({ timeout: 10000 }).catch(() => {})
+      must((await pg.locator('body').innerText()).includes(goalTitle), 'the goal page does not show the goal')
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      const target = m === 12 ? 11 : m + 1
+      await (phone ? pg.locator(`[data-month-section="${target}"] h2 a`) : pg.locator(`[data-month-head="${target}"] button`)).click()
+      await pg.waitForURL((u) => u.pathname === '/life/today/month' && u.searchParams.get('date') === `${year}-${String(target).padStart(2, '0')}-01`, { timeout: 10000 })
+      await pg.locator('[data-month-view]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-month-view]').getAttribute('data-month')) === `${year}-${String(target).padStart(2, '0')}`, 'Month is on the wrong month')
+    })
+    await check(`${tag}.6`, `${width} px: Week, Month and Year have no sideways scroll`, async () => {
+      for (const p of ['week', 'month', 'year']) {
+        await s.open('/life/today/' + p)
+        await pg.locator(`[data-${p}-view]`).waitFor({ timeout: 10000 })
+        await pg.waitForTimeout(500)
+        await noSideways()
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`was = ${JSON.stringify(made.was)}
+for n, v in was.items(): frappe.db.set_value("Life Area", n, "is_on", v)
+for g in ("${made.goal}", "${made.off}"): frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)
+for t in ${JSON.stringify(made.tasks)}: frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
+frappe.delete_doc("Event", "${made.event}", force=1, ignore_permissions=True)
+${reviewName ? `frappe.delete_doc("Life Review", "${reviewName}", force=1, ignore_permissions=True)` : ''}`)
+    await s.ctx.close()
+  }
 }
 
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the

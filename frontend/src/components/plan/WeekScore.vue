@@ -5,7 +5,7 @@
     <span class="tabular-nums">{{ Math.round(s.percent) }}%</span>
     <div class="w-32"><Progress size="sm" :value="Math.round(s.percent)" /></div>
     <span class="text-sm text-ink-gray-6">{{ s.done }} of {{ s.planned }} ticks · target {{ store.settings.score_target }}%</span>
-    <NumLink class="text-sm" :to="{ path: '/plan/12-weeks' }">Open the cycle</NumLink>
+    <NumLink class="text-sm" :to="{ path: '/today/year', query: { view: 'cycle' } }">Open the cycle</NumLink>
   </div>
 </template>
 <script setup>

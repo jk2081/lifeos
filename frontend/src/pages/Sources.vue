@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" :title="embed ? null : place === 'all' ? 'All' : 'Captures'" noun="sources" :screen="embed ? embed.screen + '-captures' : 'sources'" :fixed="embed?.fixed" :active="embed ? embed.active : true"
+  <ListView ref="list" :title="embed ? null : place === 'all' ? 'All' : 'Captures'" noun="sources" :screen="embed ? embed.screen + '-captures' : screen" :fixed="embed?.fixed" :active="embed ? embed.active : true"
     :tabs-in-filter="!!embed" doctype="Life Index" :spec="SPEC" :tabs="TABS" :views="views" :quick="['area', 'goal', 'status']"
     :virtual="VIRTUAL" :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => r.ref" :row-key="(r) => r.ref" :row-label="(r) => r.title || 'Untitled'"
     :quiet="['open_items', 'archived']" :flag-labels="{ sensitive: 'Sensitive only', open_items: 'With open items', archived: 'Include archived' }" :group-by="groupBy" :empty-title="EMPTY[list?.tab] || 'No sources yet.'" :watch-keys="['view', 'by']" @loaded="(res) => (extra = res)"
@@ -129,7 +129,8 @@ const EMPTY = { notes: 'No notes yet.', pages: 'No journal pages yet.', chats: '
   email: 'No emails yet.', text: 'No text yet.' }
 
 // inside a record page's tab (the goal page): { screen, space, fixed: { goal }, active(route), writable }
-const props = defineProps({ embed: { type: Object, default: null }, place: { type: String, default: 'captures' } })
+const props = defineProps({ embed: { type: Object, default: null }, place: { type: String, default: 'captures' },
+  screen: { type: String, default: 'sources' } }) // the remembered view's name: Library > Documents and Chats keep their own
 // Library > All adds the notes as a kind (UX fixes, set 6)
 const TABS = computed(() => ({ key: 'tab', field: 'media_kind', label: 'Kind', items: props.place === 'all' && !props.embed
   ? [KINDS[0], { value: 'notes', label: 'Notes' }, ...KINDS.slice(1)] : KINDS }))

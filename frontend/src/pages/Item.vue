@@ -1,6 +1,6 @@
 <template>
   <template v-if="item">
-    <PageHead :title="item.title || 'Untitled'" :crumb="{ to: '/inbox', label: 'Inbox', here: 'Item' }">
+    <PageHead :title="item.title || 'Untitled'" :crumb="{ to: '/brain', label: 'Brain', here: 'Item' }">
       <template #sub>
         <span class="flex flex-wrap items-center gap-x-1.5 gap-y-1" data-item-head>
           <span class="inline-flex items-center gap-1" data-item-source><span :class="source.icon" class="size-4" aria-hidden="true" />{{ source.label }}</span>
@@ -21,7 +21,7 @@
       <div class="mx-auto flex w-full max-w-[860px] flex-col gap-6" data-item-page>
         <div v-if="item.area || item.goal || item.status !== 'Done'" class="-mt-2 flex flex-wrap items-center gap-2" data-item-chips>
           <Button v-if="item.area" size="sm" variant="outline" icon-left="lucide-folder" :label="item.area_name || 'Area'" :route="`/areas/${item.area}`" data-item-area />
-          <Button v-if="item.goal" size="sm" variant="outline" icon-left="lucide-target" :label="item.goal_title || item.goal" :route="`/plan/goals/${item.goal}`" data-item-goal />
+          <Button v-if="item.goal" size="sm" variant="outline" icon-left="lucide-target" :label="item.goal_title || item.goal" :route="`/goals/${item.goal}`" data-item-goal />
           <Badge :theme="STATUS[item.status]?.[1] || 'gray'" :label="STATUS[item.status]?.[0] || item.status" data-item-status />
         </div>
         <Alert v-if="item.is_archived" title="This item is archived. It is shown read-only." />
@@ -91,7 +91,7 @@
     </div>
   </template>
   <template v-else-if="missing">
-    <PageHead title="Not found" :crumb="{ to: '/inbox', label: 'Inbox', here: 'Item' }" />
+    <PageHead title="Not found" :crumb="{ to: '/brain', label: 'Brain', here: 'Item' }" />
     <div class="page-body"><Card data-item-missing><Empty title="Not found." hint="There is no such item, or it is in a space you cannot open." /></Card></div>
   </template>
   <div v-else class="page-body"><Skeleton class="h-40 w-full" /></div>

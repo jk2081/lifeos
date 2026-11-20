@@ -386,6 +386,13 @@ GitHub issue #13. Deviations are in `DECISIONS.md` under "Issue 13".
 - **Works:** a task saved without an area gets one, marked `area_guessed` with `area_confidence`: the goal's area, else the capture's, else a rule match of the title's words on the names and descriptions of the areas and parts that are on, else Career (low confidence). With an AI key, a Career fallback is then refined by one short model call in a background job after the save, within the spend cap. Task rows on Today, Plan > Tasks and the goal page show "✦ <area> · <n>%"; one tap confirms it (`lifeos.api.tasks.confirm_area`), and the task pane shows the guess beside the area picker. Changing a guessed area clears the mark and is kept as a `Life Action Log` row of kind "Area correction". Patch `v12.task_areas` fills every task without an area, with no model calls.
 - **Tests:** `lifeos/tests/test_issue13_task_areas.py` (the issue's six) and acceptance check `I13.<width>.7` at 1440 and 390 px. The full unit suite: 450 run, 449 pass, 1 skipped. `node tools/acceptance.mjs` with nearly every check (`--only=1,…,9` matches by prefix): 132 of 134; the two failures were I13 itself, whose new row fell off the first page of a long "due today" list; the check now opens the list filtered to its title and passes 2 of 2. I11 and I12 pass. `./tools/scan.sh`: 0 findings. `node tools/screens.mjs --only today,plan-tasks,plan-tasks-board` on the acceptance site: light and dark at both widths, no overflow, errors or low contrast.
 
+## Issue 14: the new navigation (20 Nov 2026)
+
+GitHub issue #14. Deviations are in `DECISIONS.md` under "Issue 14".
+
+- **Works:** the sidebar is the "Life OS" logo (which opens the lens), + Capture, Today, Brain (with the Needs you count), Goals and Library, Review between Goals and Library once the user has locked a weekly review or on the review's day, then Settings and the user. Each tab is a path: Today (Day, Week, Month, Year), Brain (Needs you, Activity, Sources), Goals (By area, All tasks, No goal), Library (Everything, Notes, Documents, People, Chats); each shows the nearest screen until its own issue lands. The Outbox, Someday, the Timeline and Trash and archive are linked at the foot of their place, Graph and Sensitive documents in the Library's, Reset from Today, the Week and the review; Settings > Data > Where things are lists them all. + Capture opens a capture sheet (a task, the Brain, files, a goal, a note, an idea). On a phone the bottom bar is Today, Brain, a round capture button, Goals and Library. Every old route redirects to its new home with its query. `session.counts` returns `reviewed`.
+- **Tests:** `lifeos/tests/test_issue14_navigation.py` (2 tests) and acceptance checks `I14.<width>.1` to `.7` (1 and 2 at 1440 px, 6 at 390 px, the rest at both). The set 6 navigation check, the Library and place-tab checks, the G keys, the old-routes check and the screen walk were rewritten for the new places.
+
 ## Summary
 
 ### What works
@@ -459,3 +466,5 @@ The test site is `lifeos.localhost`, at http://localhost:18000/life. The three t
 ```
 docker compose -f docker/docker-compose.yml down -v
 ```
+- **Issue 15 (Today → Day):** Today re-laid out as the mockup: a Needs you line to Brain, the plate (top three, today, overdue folded) with the day's calendar beside it, the Open band below the fold. Checks `I15.<width>.1` to `.5`. See `DECISIONS.md`, Issue 15.
+- **Issue 16 (Today → Week, Month and Year):** Week (seven days, the week's focus and score, goal work by goal), Month (grid, a compact grid and day list on a phone) and Year (the timeline: 12 Week Years with scores, a lane for each area that is on with its goals as bars, key dates, a tick for each weekly review, three cards), a day opening Day for its date. Checks `I16.<width>.1` to `.6`. See `DECISIONS.md`, Issue 16.

@@ -32,11 +32,11 @@ export function askScope(scope) {
 export function scopeFromRoute(route = router.currentRoute.value) {
   const p = route.path
   if (ask.pageScope) return typeof ask.pageScope === 'function' ? ask.pageScope() : { ...ask.pageScope }
-  if (p.startsWith('/plan/goals/')) return { kind: 'goal', label: 'This goal', doctype: 'Life Goal', name: p.split('/')[3] }
+  if (route.name === 'Goal' && route.params.id) return { kind: 'goal', label: 'This goal', doctype: 'Life Goal', name: route.params.id }
   if (route.name === 'Note' && route.params.id) return { kind: 'record', label: 'This page', doctype: 'Life Note', name: route.params.id }
   if (store.lensArea) return lensScope() // a place narrowed to an area: questions start in that area
-  if (['/plan/week', '/plan/month', '/plan/12-weeks', '/plan/year'].includes(p)) return { kind: 'journal', label: 'This cycle and month' }
-  if (p === '/plan/goals') return { kind: 'goals', label: 'All goals' }
+  if (['/today/week', '/today/month', '/today/year'].includes(p)) return { kind: 'journal', label: 'This cycle and month' }
+  if (p === '/goals') return { kind: 'goals', label: 'All goals' }
   if (p === '/library/notes') return { kind: 'notes', label: route.query.by === 'assistant' ? "The assistant's notes" : 'All notes' }
   return lensScope()
 }

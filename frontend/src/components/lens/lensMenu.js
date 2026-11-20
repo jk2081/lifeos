@@ -1,5 +1,5 @@
 // The lens picker's menu (UX fixes, set 6): the user's spaces, then "All of life" and every active area with its
-// sub-areas indented, each with its colour dot, then "Pin areas to the sidebar" and "Manage areas". The sidebar's header
+// sub-areas indented, each with its colour dot, then "Manage areas" (issue 14: the sidebar has no pinned areas). The sidebar's header
 // shows it as a dropdown; the phone shows the same entries in a sheet (LensSheet.vue).
 import { computed, h } from 'vue'
 import router from '@/router'
@@ -16,7 +16,6 @@ export const lensEntries = computed(() => [
   { key: 'area:', group: 'Area', label: 'All of life', selected: !lens.area, onClick: () => setLens({ area: '' }) },
   ...lensTree.value.map((a) => ({ key: 'area:' + a.name, group: 'Area', label: a.area_name, area: a, depth: a.depth, selected: lens.area === a.name,
     onClick: () => setLens({ area: a.name }) })),
-  { key: 'pin', group: 'more', label: 'Pin areas to the sidebar', icon: 'lucide-pin', onClick: () => router.push({ path: '/settings', query: { tab: 'areas', pin: 1 } }) },
   { key: 'manage', group: 'more', label: 'Manage areas', icon: 'lucide-folder-cog', onClick: () => router.push({ path: '/settings', query: { tab: 'areas' } }) },
 ])
 

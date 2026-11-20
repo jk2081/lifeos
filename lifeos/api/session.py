@@ -48,4 +48,9 @@ def counts(space: str | None = None, area: str | None = None):
 	# (Open, Doing and Waiting), the Someday list, and the stuck count behind Reset's amber dot
 	c = count_rules.sidebar(space, lens_area(area))
 	return {"to_review": c["inbox"]["n"], "due": c["tasks"]["n"], "doors": {k: c[k] for k in ("inbox", "tasks", "someday", "stuck")},
-		"over_limit": c["over_limit"]}
+		"over_limit": c["over_limit"], "reviewed": has_locked_review()}
+
+
+def has_locked_review(user: str | None = None) -> bool:
+	"""Whether the person has locked a weekly review in any space: Review then joins the sidebar (issue 14)."""
+	return bool(frappe.db.exists("Life Review", {"user": user or frappe.session.user, "kind": "Weekly", "status": "Locked"}))

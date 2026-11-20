@@ -101,6 +101,25 @@ def year(space: str | None = None, year: int | None = None):
 		"active_ranges": [{"start": c["start"], "end": c["end"]} for c in cycles if c["status"] == "Active"]}
 
 
+@frappe.whitelist(methods=["GET"])
+def year_plan(space: str | None = None, year: int | None = None, area: str | None = None):
+	"""Today > Year: the 12 Week Years with their scores, a lane for each area that is on with its goals as bars, key dates, one tick
+	for each weekly review, and the cards underneath. `area` is the lens."""
+	from lifeos import year_plan as plan
+
+	space = permissions.resolve_space(space)
+	return plan.year_plan(space, int(year or getdate(today()).year), lens_area(area))
+
+
+@frappe.whitelist(methods=["GET"])
+def week_plan(space: str | None = None, week_start: str | None = None, area: str | None = None):
+	"""Today > Week: the week's score in the 12 Week Year, the top three and the goal work planned, by goal."""
+	from lifeos import year_plan as plan
+
+	space = permissions.resolve_space(space)
+	return plan.week_plan(space, week_start or today(), lens_area(area))
+
+
 @frappe.whitelist(methods=["POST"])
 def add_event(space: str | None = None, subject: str | None = None, starts_on: str | None = None, ends_on: str | None = None, all_day: bool | int = 0, description: str | None = None):
 	"""Create a core Event in a space. Set 8 reads Google Calendar and never writes to it, so the event stays in Life OS

@@ -4,7 +4,7 @@
       <template #sub><span data-today-sub>
         <template v-if="d.cycle && d.cycle.week">Week {{ d.cycle.week }} of {{ d.cycle.weeks }} · </template>
         <template v-else-if="d.cycle">{{ d.cycle.title }} {{ d.cycle.ended ? 'has ended' : 'has not started' }} · </template>
-        {{ d.days_left }} day{{ d.days_left === 1 ? '' : 's' }} left<span class="max-md:hidden"> this week</span></span>
+        {{ d.days_left }} day{{ d.days_left === 1 ? '' : 's' }} left<span class="max-md:hidden"> this week</span><span class="max-md:hidden" data-day-summary> · {{ plateCount }} thing{{ plateCount === 1 ? '' : 's' }} today, {{ meetingCount }} meeting{{ meetingCount === 1 ? '' : 's' }}</span></span>
       </template>
     </PageHead>
 
@@ -23,44 +23,21 @@
         <span class="min-w-0 flex-1 text-base text-ink-gray-9">{{ autoText }}</span>
         <Button size="sm" label="Undo" data-auto-inbox-undo @click="undoAuto" />
       </div>
-      <!-- the Open band: everything still open, each number a door; amber when the stuck count is over the limit -->
-      <section data-open-band :data-over-limit="band.over_limit || undefined">
-        <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base" data-band-head>
-          <span class="font-semibold text-ink-gray-9">Open</span>
-          <span class="text-sm text-ink-gray-6 max-md:hidden">everything still open in {{ lensAreaName === 'All of life' ? store.space : lensAreaName }} · each number opens its list</span>
-          <span v-if="band.over_limit" class="text-sm text-ink-amber-9" data-band-amber> · <CountLink :count="band.stuck" tone="text-ink-amber-9 font-medium" count-key="band:stuck-head" /> tasks stuck<span class="max-md:hidden">, above your limit of {{ band.rules.stuck_limit }}</span></span>
-          <Button class="ml-auto md:hidden" size="sm" :variant="band.over_limit ? 'subtle' : 'ghost'" :class="band.over_limit && '!bg-surface-amber-2 !text-ink-amber-9'" label="Reset" route="/plan/reset" data-band-reset-phone />
-        </h2>
-        <!-- desktop: one row of tiles and the Reset button; phone: the four most important as a grid, the rest scroll sideways -->
-        <div class="overflow-hidden rounded-5 border border-outline-gray-2 max-md:hidden" data-band-row>
-          <div class="grid grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.1fr)_minmax(0,1.25fr)_auto]">
-            <Tile v-for="t in tiles" :key="t.key" :tile="t" class="border-r border-outline-gray-1" />
-            <div class="flex items-center px-4" :class="band.over_limit ? 'bg-surface-amber-1' : ''">
-              <Button :variant="band.over_limit ? 'solid' : 'subtle'" label="Reset" route="/plan/reset" data-band-reset />
-            </div>
-          </div>
-        </div>
-        <div class="md:hidden" data-band-phone>
-          <div class="grid grid-cols-2 gap-2">
-            <Tile v-for="t in phoneMain" :key="t.key" :tile="t" class="rounded-5 border border-outline-gray-2" />
-          </div>
-          <div class="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1" data-band-scroll>
-            <Tile v-for="t in phoneRest" :key="t.key" :tile="t" class="w-40 flex-none rounded-5 border border-outline-gray-2" />
-          </div>
-        </div>
-        <!-- in and out this week (set 7): each number opens its list in Library > Outbox -->
-        <p v-if="d.inout" class="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-ink-gray-7" data-inout>
-          <span class="lucide-arrow-left-right size-3.5 text-ink-gray-6" aria-hidden="true" /><span>This week:</span>
-          <CountLink :count="d.inout.in" :aria-label="`${d.inout.in.n} came in this week`" count-key="inout:in" /><span>in,</span>
-          <CountLink :count="d.inout.out" :aria-label="`${d.inout.out.n} left the plate this week`" count-key="inout:out" /><span>out</span>
-        </p>
-      </section>
+      <!-- Needs you (issue 15): one line to Brain when something waits for a decision -->
+      <RouterLink v-if="d.to_review.count > 0" to="/brain" class="flex items-center gap-3 rounded-5 border border-outline-violet-1 bg-surface-violet-1 px-4 py-3 hover:bg-surface-violet-2 focus-visible:focus-ring"
+        data-needs-you :data-count="d.to_review.count">
+        <span class="lucide-sparkles size-4 shrink-0 text-ink-violet-8" aria-hidden="true" />
+        <span class="min-w-0 flex-1 text-base text-ink-gray-9"><span class="font-semibold" data-needs-you-count>{{ d.to_review.count }} need{{ d.to_review.count === 1 ? 's' : '' }} you</span>
+          <span class="text-ink-gray-7 max-md:hidden"> · the Brain has {{ d.to_review.count === 1 ? 'a capture' : 'captures' }} waiting for your call</span></span>
+        <span class="text-sm-medium text-ink-gray-8 max-md:hidden">Open Brain</span>
+        <span class="lucide-chevron-right size-4 text-ink-gray-6" aria-hidden="true" />
+      </RouterLink>
 
       <div class="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_18.5rem]">
         <!-- Next: one list in a fixed order, the order written at the top -->
         <section data-next>
-          <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base"><span class="font-semibold text-ink-gray-9">Next</span>
-            <span class="text-sm text-ink-gray-6 max-md:hidden">in this order: the week's top three, overdue, today, this week's 12 Week Year actions, then decisions</span></h2>
+          <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base"><span class="font-semibold text-ink-gray-9">Today</span>
+            <span class="text-sm text-ink-gray-6 max-md:hidden">the top three, what is due today, overdue folded, this week's 12 Week Year actions, then decisions</span></h2>
           <Card flush class="!px-4">
             <template v-for="g in visibleGroups" :key="g.key">
               <div class="flex items-center gap-2 border-b border-outline-gray-1 pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-gray-6" :data-next-group="g.key">
@@ -68,7 +45,9 @@
                 <CountLink v-if="g.door" :count="g.door" tone="text-ink-gray-6" :aria-label="`${g.door.n} ${g.label.toLowerCase()}`" :count-key="'next:' + g.key" />
                 <template v-else-if="g.key === 'today'"><span class="tabular-nums">{{ g.total }}</span></template>
                 <span v-else class="tabular-nums">{{ g.total }}</span>
-                <Button v-if="g.key === 'overdue' && g.total > 1 && canWrite()" class="ml-auto !normal-case !tracking-normal" variant="ghost" size="sm" label="Move all to today" data-move-all @click="moveAllOpen = true" />
+                <Button v-if="g.key === 'overdue' && g.total > 1 && canWrite() && overdueOpen" class="ml-auto !normal-case !tracking-normal" variant="ghost" size="sm" label="Move all to today" data-move-all @click="moveAllOpen = true" />
+                <Button v-if="g.key === 'overdue'" :class="g.total > 1 && canWrite() && overdueOpen ? '' : 'ml-auto'" class="!normal-case !tracking-normal" variant="ghost" size="sm" :label="overdueOpen ? 'Fold' : 'Show'"
+                  :aria-expanded="overdueOpen" data-overdue-toggle @click="overdueOpen = !overdueOpen" />
                 <span v-if="g.key === 'today' && g.tasks.n" class="ml-auto font-normal normal-case tracking-normal max-md:hidden"><CountLink :count="g.tasks" :aria-label="`${g.tasks.n} tasks due today`" count-key="next:today-tasks">{{ g.tasks.n }} task{{ g.tasks.n === 1 ? '' : 's' }} due</CountLink></span>
               </div>
               <template v-for="r in g.shown" :key="r.type + r.name">
@@ -118,14 +97,14 @@
               </template>
             </template>
             <div v-if="hidden > 0" class="py-2.5"><Button variant="ghost" class="!px-0 !text-ink-blue-8" :label="`${hidden} more`" data-next-more @click="showAll = true" /></div>
-            <Empty v-if="!visibleGroups.length" title="Nothing is next." hint="No overdue tasks, nothing today, every action of the week ticked and no decision waiting." />
+            <Empty v-if="!groups.length" title="Nothing is next." hint="No overdue tasks, nothing today, every action of the week ticked and no decision waiting." />
           </Card>
         </section>
 
         <!-- the right rail; on a phone it moves below Next -->
         <aside class="flex flex-col gap-5" data-rail>
           <section data-rail-today>
-            <h2 class="mb-2 text-base font-semibold text-ink-gray-9">Today</h2>
+            <h2 class="mb-2 text-base font-semibold text-ink-gray-9">Meetings and time blocks</h2>
             <ol class="flex flex-col" aria-label="Today's events">
               <li v-for="e in railItems" :key="e.key" class="flex items-stretch gap-2.5" :data-rail-event="e.kind">
                 <span class="w-12 shrink-0 pt-1.5 text-right text-sm tabular-nums" :class="e.kind === 'now' ? 'text-ink-red-8' : 'text-ink-gray-6'">{{ e.time }}</span>
@@ -157,6 +136,40 @@
           </section>
         </aside>
       </div>
+
+      <!-- below the fold (issue 15): the Open band, everything still open, each number a door; amber when the stuck count is over the limit -->
+      <section data-open-band :data-over-limit="band.over_limit || undefined">
+        <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base" data-band-head>
+          <span class="font-semibold text-ink-gray-9">Open</span>
+          <span class="text-sm text-ink-gray-6 max-md:hidden">everything still open in {{ lensAreaName === 'All of life' ? store.space : lensAreaName }} · each number opens its list</span>
+          <span v-if="band.over_limit" class="text-sm text-ink-amber-9" data-band-amber> · <CountLink :count="band.stuck" tone="text-ink-amber-9 font-medium" count-key="band:stuck-head" /> tasks stuck<span class="max-md:hidden">, above your limit of {{ band.rules.stuck_limit }}</span></span>
+          <Button class="ml-auto md:hidden" size="sm" :variant="band.over_limit ? 'subtle' : 'ghost'" :class="band.over_limit && '!bg-surface-amber-2 !text-ink-amber-9'" label="Reset" route="/today/reset" data-band-reset-phone />
+        </h2>
+        <!-- desktop: one row of tiles and the Reset button; phone: the four most important as a grid, the rest scroll sideways -->
+        <div class="overflow-hidden rounded-5 border border-outline-gray-2 max-md:hidden" data-band-row>
+          <div class="grid grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.1fr)_minmax(0,1.25fr)_auto]">
+            <Tile v-for="t in tiles" :key="t.key" :tile="t" class="border-r border-outline-gray-1" />
+            <div class="flex items-center px-4" :class="band.over_limit ? 'bg-surface-amber-1' : ''">
+              <Button :variant="band.over_limit ? 'solid' : 'subtle'" label="Reset" route="/today/reset" data-band-reset />
+            </div>
+          </div>
+        </div>
+        <div class="md:hidden" data-band-phone>
+          <div class="grid grid-cols-2 gap-2">
+            <Tile v-for="t in phoneMain" :key="t.key" :tile="t" class="rounded-5 border border-outline-gray-2" />
+          </div>
+          <div class="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1" data-band-scroll>
+            <Tile v-for="t in phoneRest" :key="t.key" :tile="t" class="w-40 flex-none rounded-5 border border-outline-gray-2" />
+          </div>
+        </div>
+        <!-- in and out this week (set 7): each number opens its list in Library > Outbox -->
+        <p v-if="d.inout" class="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-ink-gray-7" data-inout>
+          <span class="lucide-arrow-left-right size-3.5 text-ink-gray-6" aria-hidden="true" /><span>This week:</span>
+          <CountLink :count="d.inout.in" :aria-label="`${d.inout.in.n} came in this week`" count-key="inout:in" /><span>in,</span>
+          <CountLink :count="d.inout.out" :aria-label="`${d.inout.out.n} left the plate this week`" count-key="inout:out" /><span>out</span>
+        </p>
+      </section>
+
     </div>
     <Dialog v-model:open="moveAllOpen" title="Move all overdue tasks to today?" size="sm"
       :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: `Move ${overdueGroup?.total || 0} to today`, variant: 'solid', onClick: moveAll }]">
@@ -224,7 +237,7 @@ const Tile = (props) => {
     return h('div', { class: box, 'data-tile': t.key }, [
       h('div', { class: 'truncate text-sm text-ink-gray-7' }, t.label),
       h('div', { class: 'flex items-baseline gap-2' }, [
-        h(RouterLinkNum, { to: { path: '/plan/12-weeks' }, text: pct === null ? '—' : pct + '%', aria: `Week score ${pct}%` }),
+        h(RouterLinkNum, { to: { path: '/today/year', query: { view: 'cycle' } }, text: pct === null ? '—' : pct + '%', aria: `Week score ${pct}%` }),
         h('span', { class: 'text-sm text-ink-gray-6' }, phone.value ? `/ ${d.value.target}%` : `target ${d.value.target}%`)]),
       pct === null ? null : h('div', { class: 'relative mt-1.5 h-1.5 rounded-full bg-surface-gray-3', role: 'img', 'aria-label': `${pct}% of the ${d.value.target}% target`, 'data-score-bar': '' }, [
         h('div', { class: 'h-full rounded-full ' + (pct >= d.value.target ? 'bg-surface-green-7' : 'bg-surface-gray-9'), style: { width: Math.min(pct, 100) + '%' } }),
@@ -253,17 +266,25 @@ const RouterLinkNum = (p) => h(RouterLink, { to: p.to, class: 'rounded-1 text-2x
 RouterLinkNum.props = ['to', 'text', 'aria']
 
 // Next: about 8 rows across the groups in order, then "N more"
-const groups = computed(() => d.value.next.groups.filter((g) => g.rows.length))
+// issue 15: today's plate reads top three, today, overdue (folded until asked for), 12 Week Year actions, decisions
+const PLATE_ORDER = ['top', 'today', 'overdue', 'twy', 'decisions']
+const overdueOpen = ref(false)
+// events are in the calendar beside the plate, not twice
+const groups = computed(() => d.value.next.groups.map((g) => (g.key === 'today' ? { ...g, rows: g.rows.filter((r) => r.type !== 'event') } : g))
+  .map((g) => (g.key === 'today' ? { ...g, total: g.rows.length } : g)).filter((g) => g.rows.length).sort((a, b) => PLATE_ORDER.indexOf(a.key) - PLATE_ORDER.indexOf(b.key)))
 const overdueGroup = computed(() => d.value.next.groups.find((g) => g.key === 'overdue'))
 const visibleGroups = computed(() => {
   let room = showAll.value ? Infinity : d.value.next.show
   return groups.value.map((g) => {
+    if (g.key === 'overdue' && !overdueOpen.value) return { ...g, shown: [] }
     const shown = g.rows.slice(0, Math.max(room, 0))
     room -= shown.length
     return { ...g, shown }
-  }).filter((g) => g.shown.length)
+  }).filter((g) => g.shown.length || g.key === 'overdue')
 })
-const hidden = computed(() => groups.value.reduce((n, g) => n + g.rows.length, 0) - visibleGroups.value.reduce((n, g) => n + g.shown.length, 0))
+const plateCount = computed(() => (d.value.next.groups.find((g) => g.key === 'today')?.tasks?.n || 0) + d.value.next.groups.find((g) => g.key === 'top')?.rows.length)
+const meetingCount = computed(() => d.value.rail.events.filter((e) => e.source !== 'task').length)
+const hidden = computed(() => groups.value.filter((g) => g.key !== 'overdue' || overdueOpen.value).reduce((n, g) => n + g.rows.length, 0) - visibleGroups.value.reduce((n, g) => n + g.shown.length, 0))
 // a guessed area shows as its own chip before the line (issue 13)
 const taskLine = (r) => [!r.area_guessed && r.area_name, r.goal_title, r.source_title && 'from ' + r.source_title, r.status === 'Waiting' && r.waiting_on && 'waiting on ' + r.waiting_on].filter(Boolean).join(' · ') || (r.area_guessed ? '' : 'Unfiled')
 function duration(e) {
@@ -344,7 +365,7 @@ function toggleHabit(x) {
 // an insight's buttons: nothing changes until clicked; a click calls the normal API and offers Undo where it can
 async function runAction(r, i) {
   const a = r.actions[i]
-  if (a.kind === 'open_reset') return router.push({ path: '/plan/reset' })
+  if (a.kind === 'open_reset') return router.push({ path: '/today/reset' })
   if (a.kind === 'open_list') return router.push(a.to)
   if (a.kind === 'open_record') return openRef(a.ref)
   try {
