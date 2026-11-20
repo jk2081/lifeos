@@ -37,7 +37,9 @@ export async function walkScreens(page, { width, settle = () => page.waitForTime
       await settle()
     }
   }
+  let current = 'day'
   const tab = async (value) => {
+    current = value
     await leaveReview()
     await page.locator(`[data-place-tabs] [data-tab="${value}"]`).first().click()
     await page.waitForLoadState('networkidle')
@@ -47,7 +49,11 @@ export async function walkScreens(page, { width, settle = () => page.waitForTime
     if (!label) return
     if (label === 'Review' && await page.locator('[data-review]').count()) return
     await leaveReview()
-    await page.locator('[data-plan-views]:visible').first().getByText(label, { exact: true }).click()
+    // issue 16: Week, Month and Year open on screens of their own; the older views are reached by `view=` until the switch shows
+    if (!(await page.locator('[data-plan-views]:visible').count())) {
+      const KEYS = { 'Check-ins': 'checkins', '12 Weeks': 'cycle', 'Goals across cycles': 'goals' }
+      await page.goto(new URL(`/life/today/${current}?view=${KEYS[label] || label.toLowerCase()}`, page.url()).href)
+    } else await page.locator('[data-plan-views]:visible').first().getByText(label, { exact: true }).click()
     await page.waitForLoadState('networkidle')
     await settle()
   }
@@ -86,6 +92,8 @@ export async function walkScreens(page, { width, settle = () => page.waitForTime
   }
   // navigation still moves the page after all of that
   await place('Today'); await tab('week'); await view('Review')
+  // issue 14: Today's own tab is the place already open on the Week's review, so move away and back
+  await place('Brain')
   await place('Today')
   const path = await page.evaluate(() => location.pathname)
   if (path.replace(/\/$/, '') !== '/life/today') failures.push(`navigation: Today left the page at ${path}`)
