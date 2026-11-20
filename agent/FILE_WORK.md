@@ -29,6 +29,7 @@ Inputs are what the owner gave you: his standard deck, brand guidelines, a templ
 - **Reusable inputs** (anything not specific to this job, such as the BTW standard deck, brand guidelines, a questionnaire template) get their own inbox item:
   - `inbox.create_item` with a plain title ("BTW standard sales deck", "BTW brand guidelines", "Dealership ERPNext fit questionnaire (template)"), `source_type` Upload, `area`, `intent` **Just keep**, `source_system` `hermes`, `external_id` a stable name for the asset, for example `btw-standard-deck`, `btw-brand-guidelines`, `dealership-fit-questionnaire`. When the owner later sends a newer version, the same `external_id` updates it.
   - Attach the file with `/api/method/upload_file`, keeping or improving its name (`BTW standard sales deck.pptx`, never `img_8efa4a28f542.jpg`).
+  - **Sending the same file again is fine and costs nothing.** Life OS stores each file once per space, by its content: the same bytes sent to the same item answer with the file already there, and the same bytes on another item are linked, not copied. When the owner sends a **newer version**, file the item again with the same `external_id` and attach the new file **under the same name**: it becomes the current file and the old one is kept as an earlier version ("2 versions, latest 19 Nov"), not as a second attachment.
   - Claim it and `submit_result` with `transcript_md` (the extracted text, so it is searchable) and a one-line `summary_md`. No proposals: Just keep refuses them.
 - **Inputs specific to this job** (for example a client's own document) go into the output item in step 2, not on their own.
 
@@ -89,7 +90,7 @@ One message: what you filed and where ("Inputs: 3 kept, 1 already there. Output:
 If a job was filed as one box (inputs and outputs together, status New), re-file it with this recipe:
 
 1. File the reusable inputs as in step 1.
-2. Call `inbox.create_item` again with the **same `external_id`** as the old item, the output-only title, `intent` Process and the brief as above. Life OS updates the old item instead of making a second one. Attach the output files if they are not already on it.
+2. Call `inbox.create_item` again with the **same `external_id`** as the old item, the output-only title, `intent` Process and the brief as above. Life OS updates the old item instead of making a second one. Attach the output files; any already on it are recognised by their content and not attached twice.
 3. Process it as in step 2, then do steps 3 to 5.
 
 You cannot delete the old files on that item. Tell the owner which input files are still attached to it, so he can remove them in the app if he wants.
