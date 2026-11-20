@@ -34,10 +34,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/api/settings.py` | 218 | the site's own backup folder, names only |
-| `lifeos/files.py` | 85 | local_path keeps the path inside the site's files folders |
+| `lifeos/files.py` | 90 | local_path keeps the path inside the site's files folders |
 | `lifeos/patches/v10/file_hashes.py` | 23 | local_path keeps the path inside the site's files folders |
-| `lifeos/sources.py` | 102 | a fixed name in a temporary folder made here |
-| `lifeos/sources.py` | 112 | pdftoppm's own output in a temporary folder made here |
+| `lifeos/sources.py` | 103 | a fixed name in a temporary folder made here |
+| `lifeos/sources.py` | 113 | pdftoppm's own output in a temporary folder made here |
 
 ## frappe-setuser
 
