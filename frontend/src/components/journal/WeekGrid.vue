@@ -3,10 +3,10 @@
     <Dropdown v-if="g && g.cycles.length > 1" :options="cycleOptions"><Button :label="g.cycle.title" icon-right="lucide-chevron-down" /></Dropdown>
     <template v-if="g && writable">
       <Button v-if="g.cycle.status === 'Planned'" label="Start this cycle" @click="startCycle" />
-      <Button v-if="g.cycle.status === 'Active' && g.past_end" label="Close cycle" route="/plan/year?view=goals" />
+      <Button v-if="g.cycle.status === 'Active' && g.past_end" label="Close cycle" route="/today/year?view=goals" />
       <Button v-if="g.cycle.status !== 'Closed'" label="Add goal" @click="editGoal(null)" />
     </template>
-    <Button variant="solid" label="Weekly review" route="/plan/week?view=review" />
+    <Button variant="solid" label="Weekly review" route="/today/week?view=review" />
   </Teleport>
 
   <div v-if="g" class="page-body">
@@ -31,10 +31,10 @@
         </div>
         <template v-for="(goal, gi) in g.goals" :key="goal.name">
           <div class="group flex flex-wrap items-center gap-2 px-3 pb-1.5 pt-3 max-md:px-2" :class="gi && 'border-t border-outline-gray-1'">
-            <RouterLink class="font-semibold text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/plan/goals/${goal.name}`">{{ goal.title }}</RouterLink>
+            <RouterLink class="font-semibold text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/goals/${goal.name}`">{{ goal.title }}</RouterLink>
             <Badge v-if="goal.area_name" :label="goal.area_name" />
             <span v-if="goal.result && goal.result.kind === 'number'" class="text-sm tabular-nums text-ink-gray-7" data-grid-result>{{ goal.result.label }}</span>
-            <RouterLink v-if="goal.serves_title" class="min-w-0 truncate text-sm text-ink-gray-6 hover:underline focus-visible:focus-ring" :to="`/plan/goals/${goal.serves}`"
+            <RouterLink v-if="goal.serves_title" class="min-w-0 truncate text-sm text-ink-gray-6 hover:underline focus-visible:focus-ring" :to="`/goals/${goal.serves}`"
               data-grid-serves>Serves {{ goal.serves_title }}{{ goal.serves_progress ? ' · ' + goal.serves_progress.label : '' }}</RouterLink>
             <Button v-if="canEdit" class="opacity-0 focus-visible:opacity-100 group-hover:opacity-100 max-md:opacity-100" variant="ghost" size="sm" label="Edit" :aria-label="`Edit ${goal.title}`" @click="editGoal(goal)" />
           </div>

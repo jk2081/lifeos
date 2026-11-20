@@ -7,7 +7,7 @@
   </div>
 </template>
 <script setup>
-// The weekly review (set 8): four numbered tabs in a fixed order, at /plan/week?view=review&tab=…. It opens on the first
+// The weekly review (set 8): four numbered tabs in a fixed order, at /today/week?view=review&tab=…. It opens on the first
 // unfinished tab; a tab ahead opens only when the tabs before it are done, except that Library never blocks. Everything is
 // saved as it is done, so Pause simply leaves (to the Week's calendar) and opening the review again resumes it.
 import { computed, onMounted, watch } from 'vue'
@@ -40,7 +40,7 @@ function go(next) {
   router.push({ query: { ...route.query, view: 'review', tab: next } })
 }
 function pause() {
-  router.push({ path: '/plan/week', query: { ...route.query, view: 'calendar', tab: undefined } })
+  router.push({ path: '/today/week', query: { ...route.query, view: 'calendar', tab: undefined } })
 }
 // a tab that is missing or not open yet becomes the first unfinished one
 function settle() {

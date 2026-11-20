@@ -68,7 +68,7 @@
         <Card class="flex min-w-0 flex-col max-lg:hidden" flush data-goals-calendar>
           <div class="flex items-baseline justify-between py-2.5">
             <h3 class="text-base-medium text-ink-gray-9">Next week</h3>
-            <RouterLink class="text-base text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="{ path: '/plan/week', query: { view: 'calendar', tab: undefined } }"
+            <RouterLink class="text-base text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="{ path: '/today/week', query: { view: 'calendar', tab: undefined } }"
               data-open-full-week>Open the full week</RouterLink>
           </div>
           <WeekGlance :g="t.glance" class="-mx-4" @open="open" />

@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" :title="embed ? null : 'Tasks'" noun="tasks" :screen="embed ? embed.screen + '-tasks' : 'tasks'" :fixed="embed?.fixed" :active="embed ? embed.active : true" :tabs-in-filter="!!embed"
+  <ListView ref="list" :title="embed ? null : 'Tasks'" noun="tasks" :screen="embed ? embed.screen + '-tasks' : screen" :fixed="embed?.fixed" :active="embed ? embed.active : true" :tabs-in-filter="!!embed"
     doctype="Life Task" :spec="SPEC" :flag-labels="FLAGS" :quiet="['archived']" :quick="QUICK" :virtual="VIRTUAL"
     :synthetic="SYNTHETIC" :views="views" :tabs="TABS" :fetch="fetch" :row-ref="(r) => 'task:' + r.name" :group-by="dueGroup"
     :empty-title="EMPTY[tab] || 'No tasks here.'"
@@ -94,7 +94,8 @@ const QUICK = ['area', 'goal', 'priority', 'due_date']
 const VIRTUAL = [{ fieldname: 'tag', label: 'Tag', fieldtype: 'Link', options: 'Life Tag' }]
 const SYNTHETIC = [{ key: '_check', label: '', width: '2rem', place: 'start' }]
 // Inside a record page's tab (the goal page): { screen, fixed: { goal }, active(route) }
-const props = defineProps({ embed: { type: Object, default: null } })
+// screen: the remembered view's name (Goals > No goal keeps its own)
+const props = defineProps({ embed: { type: Object, default: null }, screen: { type: String, default: 'tasks' } })
 const route = useRoute()
 const router = useRouter()
 const list = ref(null)

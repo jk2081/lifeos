@@ -1,42 +1,60 @@
-// The places of the app (UX fixes, set 6): four places, Plan's and Library's tabs, Settings, and the letters after G.
-// Icons are Lucide names, drawn by frappe-ui's icon plugin.
+// The places of the app (issue 14): Today, Brain, Goals and Library, with Review after the first locked review, Settings,
+// and the letters after G. Every tab of a place is its own path. Icons are Lucide names, drawn by frappe-ui's icon plugin.
 export const PLACES = [
-  { label: 'Today', to: '/', icon: 'lucide-house', key: 't' },
-  { label: 'Inbox', to: '/inbox', icon: 'lucide-inbox', key: 'i' },
-  { label: 'Plan', to: '/plan/week', base: '/plan', icon: 'lucide-compass', key: 'p' },
-  { label: 'Library', to: '/library', icon: 'lucide-library', key: 'l' },
+  { label: 'Today', to: '/today', base: '/today', icon: 'lucide-sun', key: 't' },
+  { label: 'Brain', to: '/brain', base: '/brain', icon: 'lucide-sparkles', key: 'b' },
+  { label: 'Goals', to: '/goals', base: '/goals', icon: 'lucide-target', key: 'o' },
+  { label: 'Library', to: '/library', base: '/library', icon: 'lucide-library', key: 'l' },
 ]
-// Plan's tabs: the rhythms first, then the lists (a gap between the two groups)
-export const PLAN_TABS = [
-  { value: 'week', label: 'Week', group: 'time' }, { value: 'month', label: 'Month', group: 'time' },
-  { value: '12-weeks', label: '12 Weeks', group: 'time' }, { value: 'year', label: 'Year', group: 'time' },
-  { value: 'goals', label: 'Goals', group: 'lists' }, { value: 'tasks', label: 'Tasks', group: 'lists' }, { value: 'someday', label: 'Someday', group: 'lists' },
-]
-export const LIBRARY_TABS = [
-  { value: 'all', label: 'All' }, { value: 'notes', label: 'Notes' }, { value: 'captures', label: 'Captures' }, { value: 'outbox', label: 'Outbox' },
-  { value: 'timeline', label: 'Timeline' }, { value: 'archive', label: 'Archive' },
-]
-export const planPath = (tab) => `/plan/${tab}`
-export const libraryPath = (tab) => (tab === 'all' ? '/library' : `/library/${tab}`)
-export const SETTINGS = { label: 'Settings', to: '/settings', key: 's', icon: 'lucide-settings' }
+// shown between Goals and Library once the person has locked a weekly review, or on the review's day
+export const REVIEW = { label: 'Review', to: '/review', base: '/review', icon: 'lucide-calendar-check', key: 'r' }
+export const SETTINGS = { label: 'Settings', to: '/settings', base: '/settings', key: 's', icon: 'lucide-settings' }
 
-// G then a letter. The four places first, then the shortcuts kept from before set 6, pointing at the new homes.
+// each place's tabs; the first is the place's own path
+export const TODAY_TABS = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }]
+export const BRAIN_TABS = [{ value: 'needs-you', label: 'Needs you' }, { value: 'activity', label: 'Activity' }, { value: 'sources', label: 'Sources' }]
+export const GOALS_TABS = [{ value: 'by-area', label: 'By area' }, { value: 'tasks', label: 'All tasks' }, { value: 'no-goal', label: 'No goal' }]
+export const LIBRARY_TABS = [{ value: 'all', label: 'Everything' }, { value: 'notes', label: 'Notes' }, { value: 'documents', label: 'Documents' },
+  { value: 'people', label: 'People' }, { value: 'chats', label: 'Chats' }]
+const tabPath = (base, tabs) => (tab) => (tab === tabs[0].value ? base : `${base}/${tab}`)
+export const todayPath = tabPath('/today', TODAY_TABS)
+export const brainPath = tabPath('/brain', BRAIN_TABS)
+export const goalsPath = tabPath('/goals', GOALS_TABS)
+export const libraryPath = tabPath('/library', LIBRARY_TABS)
+
+// G then a letter: the places, then the pages that live inside them
 export const GO = [
-  ...PLACES,
-  { label: 'Plan: Week', to: '/plan/week', key: 'w' }, { label: 'Plan: Month', to: '/plan/month', key: 'm' },
-  { label: 'Plan: 12 Weeks', to: '/plan/12-weeks', key: 'j' }, { label: 'Plan: Year', to: '/plan/year', key: 'c' },
-  { label: 'Plan: Goals', to: '/plan/goals', key: 'o' }, { label: 'Plan: Tasks', to: '/plan/tasks', key: 'k' },
-  { label: 'Plan: Someday', to: '/plan/someday', key: 'y' }, { label: 'Reset', to: '/plan/reset', key: 'e' },
-  { label: 'Library: Notes', to: '/library/notes', key: 'n' }, { label: 'Library: Captures', to: '/library/captures', key: 'u' },
-  { label: 'Library: Chats', to: '/library/captures?tab=chats', key: 'h' }, { label: 'Library: Sensitive documents', to: '/library/captures?tab=documents&sensitive=1', key: 'v' },
-  { label: "Library: The assistant's notes", to: '/library/notes?by=assistant', key: 'x' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
-  { label: 'Library: Archive', to: '/library/archive', key: 'r' }, { label: 'Library: Outbox', to: '/library/outbox', key: 'b' },
-  { label: 'Ask: history and insights', to: '/ask', key: 'q' }, { label: 'Settings: Areas', to: '/settings?tab=areas', key: 'a' },
+  ...PLACES, REVIEW,
+  { label: 'Today: Week', to: '/today/week', key: 'w' }, { label: 'Today: Month', to: '/today/month', key: 'm' },
+  { label: 'Today: Year', to: '/today/year', key: 'c' }, { label: 'Today: 12 Weeks', to: '/today/year?view=cycle', key: 'j' },
+  { label: 'Today: Reset', to: '/today/reset', key: 'e' },
+  { label: 'Brain: Activity', to: '/brain/activity', key: 'a' }, { label: 'Brain: Sources', to: '/brain/sources', key: 'u' },
+  { label: 'Brain: Outbox', to: '/brain/outbox', key: 'x' },
+  { label: 'Goals: All tasks', to: '/goals/tasks', key: 'k' }, { label: 'Goals: Someday', to: '/goals/someday', key: 'y' },
+  { label: 'Library: Notes', to: '/library/notes', key: 'n' }, { label: 'Library: Chats', to: '/library/chats', key: 'h' },
+  { label: 'Library: Sensitive documents', to: '/library/documents?sensitive=1', key: 'v' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
+  { label: 'Library: Trash and archive', to: '/library/archive', key: 'z' }, { label: 'Ask: history and insights', to: '/ask', key: 'q' },
   SETTINGS,
 ]
-export const TOOLTIPS = { Today: 'What to do now', Inbox: 'What came in', Plan: 'Where you are going', Library: 'What you have and know' }
+export const TOOLTIPS = { Today: 'What to do now', Brain: 'What came in and what the Brain did with it', Goals: 'Where you are going', Library: 'What you have and know' }
 // the view switch of Library > Notes: List (the default), Tree and Graph, and the assistant's Changes and Health
 export const NOTES_VIEWS = ['list', 'tree', 'graph', 'changes', 'health'].map((v) => ({ label: v[0].toUpperCase() + v.slice(1), value: v,
   route: { path: '/library/notes', query: { view: v } } }))
 // "Written by" on Library > Notes
 export const WRITTEN_BY = [{ label: 'Written by anyone', value: '' }, { label: 'Written by me', value: 'me' }, { label: 'Kept by the assistant', value: 'assistant' }]
+// Settings > Data > Where things are (issue 14): every page that is not a place or a tab, with the place it lives in
+export const ELSEWHERE = [
+  { key: 'reset', label: 'Reset', home: 'Today, and the weekly review', to: '/today/reset' },
+  { key: 'review', label: 'Weekly review', home: 'Review, once you have locked one; Today > Week on its day', to: '/review' },
+  { key: 'cycle', label: '12 Weeks', home: 'Today > Year', to: { path: '/today/year', query: { view: 'cycle' } } },
+  { key: 'habits', label: 'Habits', home: 'Today > Month', to: { path: '/today/month', query: { view: 'habits' } } },
+  { key: 'checkins', label: 'Check-ins', home: 'Today > Month', to: { path: '/today/month', query: { view: 'checkins' } } },
+  { key: 'someday', label: 'Someday', home: 'Goals', to: '/goals/someday' },
+  { key: 'outbox', label: 'Outbox', home: 'Brain', to: '/brain/outbox' },
+  { key: 'timeline', label: 'Timeline', home: 'Library', to: '/library/timeline' },
+  { key: 'graph', label: 'Graph', home: 'Library > Notes', to: { path: '/library/notes', query: { view: 'graph' } } },
+  { key: 'vault', label: 'Sensitive documents', home: 'Library > Documents, by the lock', to: { path: '/library/documents', query: { sensitive: '1' } } },
+  { key: 'pages', label: 'Journal pages', home: 'Library > Everything', to: { path: '/library', query: { tab: 'pages' } } },
+  { key: 'archive', label: 'Trash and archive', home: 'Library', to: '/library/archive' },
+  { key: 'ask', label: 'Ask: history and insights', home: 'The Ask box in every header', to: '/ask' },
+]

@@ -1,6 +1,6 @@
 <template>
   <Teleport defer to="#jr-actions">
-    <Button label="All goals" icon-right="lucide-arrow-right" :route="{ path: '/plan/goals', query: { status: 'all' } }" data-all-goals />
+    <Button label="All goals" icon-right="lucide-arrow-right" :route="{ path: '/goals', query: { status: 'all' } }" data-all-goals />
     <template v-if="active && canWrite()">
       <Button v-if="active.past_end" label="Close cycle" @click="openClose" />
       <Button label="Plan next cycle" @click="openPlan" />
@@ -19,10 +19,10 @@
           <b class="font-semibold text-ink-gray-9">{{ c.title }}</b>
           <Badge :theme="c.status === 'Active' ? 'blue' : 'gray'" :label="c.status === 'Active' ? (c.current_week ? `Active · week ${c.current_week}` : 'Active') : c.status" />
           <span class="text-sm text-ink-gray-6">{{ cycleNote(c) }}</span>
-          <Button class="ml-auto" variant="ghost" size="sm" label="Open grid" :route="`/plan/12-weeks?cycle=${c.name}`" />
+          <Button class="ml-auto" variant="ghost" size="sm" label="Open grid" :route="`/today/year?view=cycle&cycle=${c.name}`" />
         </div>
         <div v-for="g in c.goals" :key="g.name" class="gr border-t border-outline-gray-1 px-4 py-2.5">
-          <div><RouterLink class="font-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/plan/goals/${g.name}`">{{ g.title }}</RouterLink>
+          <div><RouterLink class="font-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/goals/${g.name}`">{{ g.title }}</RouterLink>
             <div v-if="goalNote(g, c)" class="text-sm text-ink-gray-6">{{ goalNote(g, c) }}</div></div>
           <div><Badge v-if="g.area_name" :label="g.area_name" /></div>
           <div>{{ g.actions }}</div>

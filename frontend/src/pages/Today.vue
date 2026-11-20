@@ -29,14 +29,14 @@
           <span class="font-semibold text-ink-gray-9">Open</span>
           <span class="text-sm text-ink-gray-6 max-md:hidden">everything still open in {{ lensAreaName === 'All of life' ? store.space : lensAreaName }} · each number opens its list</span>
           <span v-if="band.over_limit" class="text-sm text-ink-amber-9" data-band-amber> · <CountLink :count="band.stuck" tone="text-ink-amber-9 font-medium" count-key="band:stuck-head" /> tasks stuck<span class="max-md:hidden">, above your limit of {{ band.rules.stuck_limit }}</span></span>
-          <Button class="ml-auto md:hidden" size="sm" :variant="band.over_limit ? 'subtle' : 'ghost'" :class="band.over_limit && '!bg-surface-amber-2 !text-ink-amber-9'" label="Reset" route="/plan/reset" data-band-reset-phone />
+          <Button class="ml-auto md:hidden" size="sm" :variant="band.over_limit ? 'subtle' : 'ghost'" :class="band.over_limit && '!bg-surface-amber-2 !text-ink-amber-9'" label="Reset" route="/today/reset" data-band-reset-phone />
         </h2>
         <!-- desktop: one row of tiles and the Reset button; phone: the four most important as a grid, the rest scroll sideways -->
         <div class="overflow-hidden rounded-5 border border-outline-gray-2 max-md:hidden" data-band-row>
           <div class="grid grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.1fr)_minmax(0,1.25fr)_auto]">
             <Tile v-for="t in tiles" :key="t.key" :tile="t" class="border-r border-outline-gray-1" />
             <div class="flex items-center px-4" :class="band.over_limit ? 'bg-surface-amber-1' : ''">
-              <Button :variant="band.over_limit ? 'solid' : 'subtle'" label="Reset" route="/plan/reset" data-band-reset />
+              <Button :variant="band.over_limit ? 'solid' : 'subtle'" label="Reset" route="/today/reset" data-band-reset />
             </div>
           </div>
         </div>
@@ -224,7 +224,7 @@ const Tile = (props) => {
     return h('div', { class: box, 'data-tile': t.key }, [
       h('div', { class: 'truncate text-sm text-ink-gray-7' }, t.label),
       h('div', { class: 'flex items-baseline gap-2' }, [
-        h(RouterLinkNum, { to: { path: '/plan/12-weeks' }, text: pct === null ? '—' : pct + '%', aria: `Week score ${pct}%` }),
+        h(RouterLinkNum, { to: { path: '/today/year', query: { view: 'cycle' } }, text: pct === null ? '—' : pct + '%', aria: `Week score ${pct}%` }),
         h('span', { class: 'text-sm text-ink-gray-6' }, phone.value ? `/ ${d.value.target}%` : `target ${d.value.target}%`)]),
       pct === null ? null : h('div', { class: 'relative mt-1.5 h-1.5 rounded-full bg-surface-gray-3', role: 'img', 'aria-label': `${pct}% of the ${d.value.target}% target`, 'data-score-bar': '' }, [
         h('div', { class: 'h-full rounded-full ' + (pct >= d.value.target ? 'bg-surface-green-7' : 'bg-surface-gray-9'), style: { width: Math.min(pct, 100) + '%' } }),
@@ -344,7 +344,7 @@ function toggleHabit(x) {
 // an insight's buttons: nothing changes until clicked; a click calls the normal API and offers Undo where it can
 async function runAction(r, i) {
   const a = r.actions[i]
-  if (a.kind === 'open_reset') return router.push({ path: '/plan/reset' })
+  if (a.kind === 'open_reset') return router.push({ path: '/today/reset' })
   if (a.kind === 'open_list') return router.push(a.to)
   if (a.kind === 'open_record') return openRef(a.ref)
   try {

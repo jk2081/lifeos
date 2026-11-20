@@ -5,7 +5,7 @@
     @loaded="(res) => (pendingTotal = res.pending_total)">
     <template #sub>{{ store.space }} · drop anything here, an agent proposes, you approve<template v-if="pendingTotal"> ·
       <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template> ·
-      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/library/captures', query: { status: 'done' } }" data-finished-link>Finished items are in Sources</RouterLink></template>
+      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/brain/activity', query: { status: 'done' } }" data-finished-link>Finished items are in Activity</RouterLink></template>
     <template #above>
       <!-- set 7: items left too long, with suggested decisions to confirm -->
       <OldItems @changed="list?.reload()" />
@@ -104,8 +104,8 @@ const HIDDEN = ['raw_text', 'transcript_md', 'summary_md', 'preview_image', 'cla
 const THEME = { 'To Review': 'amber', New: 'gray', Processing: 'blue', Failed: 'red', Done: 'green' }
 const route = useRoute()
 const router = useRouter()
-// old links to the Done and All tabs open Sources, where finished items are
-if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/library/captures', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
+// old links to the Done and All tabs open Brain > Activity, where finished items are
+if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/brain/activity', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
 const intent = ref(savedView('inbox-intent')?.intent || 'Process')
 watch(intent, (v) => saveView('inbox-intent', { intent: v }))
 const picker = ref(null)

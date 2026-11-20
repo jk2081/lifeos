@@ -17,7 +17,7 @@ const missing = ref(false)
 onMounted(async () => {
   try {
     const r = await api('goals.for_project', { project: props.id })
-    router.replace({ path: `/plan/goals/${r.goal}`, query: route.query })
+    router.replace({ path: `/goals/${r.goal}`, query: route.query })
   } catch (e) {
     missing.value = true
   }

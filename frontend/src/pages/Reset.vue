@@ -1,5 +1,5 @@
 <template>
-  <PageHead title="Reset" :sub="sub" :crumb="{ to: '/plan/week', label: 'Plan', here: 'Week' }">
+  <PageHead title="Reset" :sub="sub" :crumb="{ to: '/today/week', label: 'Today', here: 'Week' }">
   </PageHead>
   <div class="page-body" data-reset>
     <template v-if="d">
@@ -129,7 +129,7 @@ async function undo(log, n) {
 function review(b) {
   if (b.review) return router.push(b.review)
   const names = b.items.filter((i) => ['Life Task', 'Life Goal'].includes(i.doctype)).map((i) => i.name)
-  if (!names.length) return router.push({ path: '/inbox', query: { status: 'To Review' } })
+  if (!names.length) return router.push({ path: '/brain', query: { status: 'To Review' } })
   only.value = { title: b.title, names }
   if (phone.value) tab.set('one')
   else oneSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })

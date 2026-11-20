@@ -216,6 +216,13 @@
             :writable="canEdit" :count-noun="listOf(section).countNoun" :link="listOf(section).link" @rename="rename" @reorder="reorder" @archive="askArchive" />
           <p class="text-sm text-ink-gray-6">{{ listOf(section).footer }}</p>
         </template>
+        <Card v-else-if="section === 'places'" flush data-settings-places>
+          <!-- issue 14: the pages that left the sidebar, each with the place it lives in now -->
+          <div v-for="p in ELSEWHERE" :key="p.key" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-outline-gray-1 px-4 py-2.5 last:border-b-0">
+            <RouterLink class="text-base-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="p.to" :data-elsewhere="p.key">{{ p.label }}</RouterLink>
+            <span class="text-sm text-ink-gray-6">{{ p.home }}</span>
+          </div>
+        </Card>
         <template v-else-if="section === 'archive'">
           <Card flush>
             <SettingRow label="Archive after" help="Done and dropped tasks, and inbox items that are done, move to the Archive this many days after they were closed. Notes, documents, chats, journal pages and goals are never archived automatically."
@@ -390,7 +397,7 @@ import { useMediaQuery } from '@vueuse/core'
 // Tabs in its vertical form, with the open section in the URL (tab=).
 import { Avatar, Badge, Button, Dialog, KeyboardShortcut, Select, Skeleton, Switch, TabButtons, TabList, Tabs, TabTrigger, TextInput, TimePicker, dialog, toast, useColorScheme } from 'frappe-ui'
 import NoteEditor from '@/components/NoteEditor.vue'
-import { GO } from '@/lib/nav'
+import { ELSEWHERE, GO } from '@/lib/nav'
 import { dotClass } from '@/lib/lens'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
@@ -468,6 +475,7 @@ const groups = computed(() => [
   ...(d.value?.is_admin ? [{ key: 'people', label: 'People and agents', items: [{ value: 'spaces', label: 'Spaces' }, { value: 'members', label: 'Members' },
     { value: 'agents', label: 'Agents' }] }] : []),
   { key: 'data', label: 'Data', items: [{ value: 'archive', label: 'Archive and trash' }, { value: 'import', label: 'Import and export' },
+    { value: 'places', label: 'Where things are' },
     ...(d.value?.is_admin ? [{ value: 'backups', label: 'Backups' }] : [])] },
 ])
 // sections from before set 6 and issue 1, by their new names (tab=agents keeps its name: it is now People and agents, Agents)

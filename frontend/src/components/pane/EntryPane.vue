@@ -44,7 +44,7 @@ async function doRemove() {
 onMounted(async () => {
   try {
     e.value = await api('calendar.entry', { kind: props.type, name: props.name })
-    emit('meta', { title: e.value.title, fullPage: '/plan/week?view=calendar' })
+    emit('meta', { title: e.value.title, fullPage: '/today/week?view=calendar' })
   } catch (err) {
     emit('missing')
   }

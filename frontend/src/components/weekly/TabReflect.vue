@@ -47,6 +47,7 @@ import { FormControl, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import ReviewFooter from './ReviewFooter.vue'
 import { useReview } from '@/lib/review'
+import { refreshCounts } from '@/lib/store'
 import { long, time, weekday } from '@/lib/dates'
 
 const emit = defineEmits(['go'])
@@ -78,7 +79,10 @@ async function save() {
 async function lock() {
   clearTimeout(timer)
   locking.value = true
-  try { await r.act('lock', { went_well: wentWell.value, do_differently: differently.value }) } catch (e) { locking.value = false }
+  try {
+    await r.act('lock', { went_well: wentWell.value, do_differently: differently.value })
+    refreshCounts() // Review joins the sidebar after the first locked review (issue 14)
+  } catch (e) { locking.value = false }
 }
 onMounted(load)
 onBeforeUnmount(() => clearTimeout(timer))
