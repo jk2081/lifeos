@@ -109,6 +109,7 @@ for (const scheme of schemes) {
     const SCREENS = [
       ['today', '/life/?area='], ['today-lens', `/life/?${lens}`], ['today-banner', '/life/?area=&at=2026-11-22%2019:00:00'],
       ['inbox', '/life/inbox?all=1&area='], ['inbox-lens', `/life/inbox?all=1&${lens}`], ['inbox-pane', `/life/inbox?all=1&area=&open=inbox:${review}`], ['review', `/life/inbox/${review}/review`], ['item', `/life/item/${review}`],
+      ...['week', 'month', 'year'].map((v) => [`today-${v}`, `/life/today/${v}?area=`]), ['today-other-day', '/life/today?area=&date=2026-12-02'], // issue 16
       ...['review', 'calendar', 'agenda'].map((v) => [`plan-week-${v}`, `/life/plan/week?view=${v}&area=`]),
       ...['plan', 'habits', 'checkins', 'calendar'].map((v) => [`plan-month-${v}`, `/life/plan/month?view=${v}&area=`]),
       ['plan-12-weeks', '/life/plan/12-weeks?area='], ['plan-12-weeks-lens', `/life/plan/12-weeks?${lens}`],

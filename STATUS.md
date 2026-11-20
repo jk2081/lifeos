@@ -467,3 +467,4 @@ The test site is `lifeos.localhost`, at http://localhost:18000/life. The three t
 docker compose -f docker/docker-compose.yml down -v
 ```
 - **Issue 15 (Today → Day):** Today re-laid out as the mockup: a Needs you line to Brain, the plate (top three, today, overdue folded) with the day's calendar beside it, the Open band below the fold. Checks `I15.<width>.1` to `.5`. See `DECISIONS.md`, Issue 15.
+- **Issue 16 (Today → Week, Month and Year):** Week (seven days, the week's focus and score, goal work by goal), Month (grid, a compact grid and day list on a phone) and Year (the timeline: 12 Week Years with scores, a lane for each area that is on with its goals as bars, key dates, a tick for each weekly review, three cards), a day opening Day for its date. Checks `I16.<width>.1` to `.6`. See `DECISIONS.md`, Issue 16.

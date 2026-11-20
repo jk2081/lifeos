@@ -46,7 +46,7 @@ export const WRITTEN_BY = [{ label: 'Written by anyone', value: '' }, { label: '
 // Settings > Data > Where things are (issue 14): every page that is not a place or a tab, with the place it lives in
 export const ELSEWHERE = [
   { key: 'reset', label: 'Reset', home: 'Today, and the weekly review', to: '/today/reset' },
-  { key: 'review', label: 'Weekly review', home: 'Review, once you have locked one; Today > Week on its day', to: '/review' },
+  { key: 'review', label: 'Weekly review', home: 'Review, once you have locked one; the banner on Today on its day', to: '/review' },
   { key: 'cycle', label: '12 Weeks', home: 'Today > Year', to: { path: '/today/year', query: { view: 'cycle' } } },
   { key: 'habits', label: 'Habits', home: 'Today > Month', to: { path: '/today/month', query: { view: 'habits' } } },
   { key: 'checkins', label: 'Check-ins', home: 'Today > Month', to: { path: '/today/month', query: { view: 'checkins' } } },

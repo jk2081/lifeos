@@ -4293,6 +4293,160 @@ frappe.delete_doc("Event", "${evName}", force=1, ignore_permissions=True)`)
   }
 }
 
+// Issue 16: Today > Week, Month and Year. Titles start "I16 " (known to the debris finder).
+for (const width of SET_WIDTHS) {
+  const tag = `I16.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const path = () => new URL(pg.url()).pathname
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const year = Number(today.slice(0, 4))
+  const monday = plusDays(today, -((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7))
+  const wed = plusDays(monday, 2)
+  const nextMonth = new Date(Date.UTC(year, Number(today.slice(5, 7)), 15)).toISOString().slice(0, 10)
+  const nextKey = nextMonth.slice(0, 7)
+  const meeting = `I16 meeting ${width} ${stamp}`, due = `I16 due ${width} ${stamp}`, later = `I16 later ${width} ${stamp}`
+  const goalTitle = `I16 goal ${width} ${stamp}`, offTitle = `I16 off ${width} ${stamp}`
+  const made = JSON.parse(bench(`import json
+area = lambda n: frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": n})
+career, tea, mind = area("Career"), area("Tea & Coffee"), area("Mind")
+was = {n: frappe.db.get_value("Life Area", n, "is_on") for n in (career, tea, mind)}
+for n in (career, tea): frappe.db.set_value("Life Area", n, "is_on", 1)
+frappe.db.set_value("Life Area", mind, "is_on", 0)
+ev = frappe.get_doc({"doctype": "Event", "subject": "${meeting}", "starts_on": "${monday} 10:00:00", "ends_on": "${monday} 11:00:00", "event_category": "Event",
+  "event_type": "Public", "life_space": "${SPACE}", "google_calendar_event_id": "fixture-i16-${stamp}-${width}"}).insert(ignore_permissions=True)
+tasks = [frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": t, "status": "Open", "area": tea, "due_date": d}).insert(ignore_permissions=True).name
+  for t, d in (("${due}", "${wed}"), ("${later}", "${nextMonth}"))]
+goal = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${goalTitle}", "area": tea, "goal_type": "Annual", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
+off = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${offTitle}", "area": mind, "goal_type": "Annual", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
+print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event": ev.name, "tasks": tasks, "goal": goal, "off": off}))`).split('\n').pop())
+  let reviewName = null
+  try {
+    await check(`${tag}.1`, `${width} px: Week shows this week's calendar events and due tasks on the right days, and a day opens Day`, async () => {
+      await s.open('/life/today/week')
+      await pg.locator('[data-week-grid]').waitFor({ timeout: 10000 })
+      const dayText = async (d) => await pg.locator(`[data-week-grid] [data-day="${d}"]`).innerText()
+      must((await dayText(monday)).includes(meeting), `${meeting} is not on ${monday}`)
+      must((await dayText(wed)).includes(due), `${due} is not on ${wed}`)
+      for (const d of [plusDays(monday, 1), plusDays(monday, 3)]) must(!(await dayText(d)).includes(meeting) && !(await dayText(d)).includes(due), 'an item is on the wrong day ' + d)
+      const to = wed === today ? monday : wed
+      await pg.locator(`[data-week-grid] [data-day="${to}"] [data-open-day]`).click()
+      await pg.waitForURL((u) => u.pathname === '/life/today' && u.searchParams.get('date') === to, { timeout: 10000 })
+      await pg.locator('[data-day-other]').waitFor({ timeout: 10000 })
+      await pg.waitForFunction((t) => document.querySelector('[data-day-other]')?.innerText.includes(t), to === wed ? due : meeting, { timeout: 10000 }).catch(() => {})
+      must((await pg.locator('[data-day-other]').innerText()).includes(to === wed ? due : meeting), 'Day does not list the item of ' + to)
+      must((await pg.locator('[data-page-head]').first().innerText()).includes(String(Number(to.slice(8)))), 'Day is not headed with the date')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: Month shows events and due tasks on the right dates; next and previous months work`, async () => {
+      await s.open('/life/today/month')
+      await pg.locator('[data-month-grid]').waitFor({ timeout: 10000 })
+      const month = today.slice(0, 7)
+      must((await pg.locator('[data-month-view]').getAttribute('data-month')) === month, 'Month is not on this month')
+      if (phone) {
+        for (const [d, title] of [[monday, meeting], [wed, due]]) {
+          await pg.locator(`[data-month-grid] [data-day="${d}"] > button`).click()
+          await pg.waitForFunction((t) => document.querySelector('[data-month-list]')?.innerText.includes(t), title, { timeout: 5000 })
+        }
+      } else {
+        must((await pg.locator(`[data-month-grid] [data-day="${monday}"]`).innerText()).includes(meeting), `${meeting} is not on ${monday}`)
+        must((await pg.locator(`[data-month-grid] [data-day="${wed}"]`).innerText()).includes(due), `${due} is not on ${wed}`)
+      }
+      await pg.locator('[data-cal-next]').click()
+      await pg.waitForFunction((k) => document.querySelector('[data-month-view]')?.getAttribute('data-month') === k, nextKey, { timeout: 10000 })
+      await pg.locator(`[data-month-grid] [data-day="${nextMonth}"]`).waitFor({ timeout: 10000 })
+      if (phone) {
+        await pg.locator(`[data-month-grid] [data-day="${nextMonth}"] > button`).click()
+        await pg.waitForFunction((t) => document.querySelector('[data-month-list]')?.innerText.includes(t), later, { timeout: 5000 })
+      } else must((await pg.locator(`[data-month-grid] [data-day="${nextMonth}"]`).innerText()).includes(later), `${later} is not on ${nextMonth}`)
+      await pg.locator('[data-cal-prev]').click()
+      await pg.waitForFunction((k) => document.querySelector('[data-month-view]')?.getAttribute('data-month') === k, month, { timeout: 10000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.3`, `${width} px: Year shows a bar for each goal in its area's lane, and one tick per weekly review with the right count`, async () => {
+      const before = await s.api('calendar.year_plan', { space: SPACE, year })
+      const week = before.reviews.weeks.find((w) => !w.done && !w.future)
+      must(week, 'no past week without a review')
+      reviewName = bench(`r = frappe.get_doc({"doctype": "Life Review", "space": "${SPACE}", "user": "owner@lifeos.test", "kind": "Weekly", "status": "Locked", "period_start": "${week.start}",
+  "period_end": "${plusDays(week.start, 6)}", "locked_on": frappe.utils.now_datetime(), "title": "I16 review ${width} ${stamp}", "tab_state": "{}"}).insert(ignore_permissions=True)
+print(r.name)`).split('\n').pop()
+      const after = await s.api('calendar.year_plan', { space: SPACE, year })
+      must(after.reviews.done === before.reviews.done + 1, `the server counts ${after.reviews.done} reviews; it was ${before.reviews.done}`)
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      if (phone) {
+        const section = await pg.locator(`[data-month-section="${Number(today.slice(5, 7))}"]`).innerText()
+        must(section.includes(goalTitle), 'the goal is not listed in its months')
+        must((await pg.locator('[data-reviews-phone]').innerText()).includes(`${after.reviews.done} of ${after.reviews.total}`), 'the reviews count is wrong')
+      } else {
+        const lane = pg.locator(`[data-lane="area-${made.tea}"]`)
+        await lane.waitFor({ timeout: 10000 })
+        const bar = pg.locator(`[data-goal-bar][data-goal="${made.goal}"]`)
+        must((await bar.count()) === 1 && (await bar.innerText()).includes(goalTitle), 'the goal has no bar')
+        const lanes = await pg.locator('[data-lane]').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
+        must(lanes.indexOf(`area-${made.tea}`) > lanes.indexOf(`area-${made.career}`), "the goal's part is not under its area")
+        must((await pg.locator('[data-review-tick]').count()) === after.reviews.weeks.length, 'there is not a tick for every week')
+        must((await pg.locator('[data-review-tick][data-done]').count()) === after.reviews.done, 'the done ticks are not the reviews held')
+        must((await pg.locator('[data-lane="reviews"]').innerText()).includes(`${after.reviews.done} of ${after.reviews.total} done`), 'the lane does not say n of m done')
+        must(await pg.locator(`[data-review-tick][data-start="${week.start}"][data-done]`).count(), 'the week of the review is not ticked')
+        const cards = await pg.locator('[data-year-cards]').innerText()
+        must(cards.includes('This year so far') && cards.includes('Next 12 Week Year'), 'the cards are missing')
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.4`, `${width} px: an area that is off has no lane`, async () => {
+      const out = await s.api('calendar.year_plan', { space: SPACE, year })
+      must(!out.lanes.some((l) => l.area === made.mind), 'the server sent a lane for an area that is off')
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      must(!(await pg.locator('[data-year-view]').innerText()).includes(offTitle), 'the goal of an area that is off is shown')
+      if (!phone) must(!(await pg.locator(`[data-lane="area-${made.mind}"]`).count()), 'the area that is off has a lane')
+      bench(`frappe.db.set_value("Life Area", "${made.mind}", "is_on", 1)`)
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-year-view]').innerText()).includes(offTitle), 'the goal does not show once the area is on')
+      bench(`frappe.db.set_value("Life Area", "${made.mind}", "is_on", 0)`)
+    })
+    await check(`${tag}.5`, `${width} px: clicking a goal opens the goal; clicking a month opens Month`, async () => {
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      const m = Number(today.slice(5, 7))
+      await (phone ? pg.locator(`[data-month-section="${m}"] a`, { hasText: goalTitle }) : pg.locator(`[data-goal-bar][data-goal="${made.goal}"] a`)).first().click()
+      await pg.waitForURL((u) => u.pathname === `/life/goals/${made.goal}`, { timeout: 10000 })
+      await pg.getByText(goalTitle).first().waitFor({ timeout: 10000 }).catch(() => {})
+      must((await pg.locator('body').innerText()).includes(goalTitle), 'the goal page does not show the goal')
+      await s.open('/life/today/year')
+      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      const target = m === 12 ? 11 : m + 1
+      await (phone ? pg.locator(`[data-month-section="${target}"] h2 a`) : pg.locator(`[data-month-head="${target}"] button`)).click()
+      await pg.waitForURL((u) => u.pathname === '/life/today/month' && u.searchParams.get('date') === `${year}-${String(target).padStart(2, '0')}-01`, { timeout: 10000 })
+      await pg.locator('[data-month-view]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-month-view]').getAttribute('data-month')) === `${year}-${String(target).padStart(2, '0')}`, 'Month is on the wrong month')
+    })
+    await check(`${tag}.6`, `${width} px: Week, Month and Year have no sideways scroll`, async () => {
+      for (const p of ['week', 'month', 'year']) {
+        await s.open('/life/today/' + p)
+        await pg.locator(`[data-${p}-view]`).waitFor({ timeout: 10000 })
+        await pg.waitForTimeout(500)
+        await noSideways()
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`was = ${JSON.stringify(made.was)}
+for n, v in was.items(): frappe.db.set_value("Life Area", n, "is_on", v)
+for g in ("${made.goal}", "${made.off}"): frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)
+for t in ${JSON.stringify(made.tasks)}: frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
+frappe.delete_doc("Event", "${made.event}", force=1, ignore_permissions=True)
+${reviewName ? `frappe.delete_doc("Life Review", "${reviewName}", force=1, ignore_permissions=True)` : ''}`)
+    await s.ctx.close()
+  }
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {
