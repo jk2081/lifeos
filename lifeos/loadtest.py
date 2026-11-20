@@ -10,7 +10,6 @@ Two fifths of the rows are real `Life Task` records with their index rows; the r
 other kinds (notes, chats, inbox items, documents). Half of all rows sit in one space, "Load 01",
 which is the space the timings are taken in. For a test site only.
 """
-import os
 import random
 import statistics
 import time
@@ -21,9 +20,7 @@ from frappe.utils import add_days, getdate, now, today
 from lifeos import devtools, index, permissions, seed as seed_data
 
 PREFIX = "Load "
-# 500 ms is the target (SPEC section 4b) and holds on the Docker bench. GitHub's runners are about three times slower,
-# so CI sets LIFEOS_LOAD_TARGET_MS to catch large regressions without failing on the machine's speed.
-TARGET_MS = int(os.environ.get("LIFEOS_LOAD_TARGET_MS") or 500)
+TARGET_MS = 500
 AREAS = ["Work", "Personal & Health", "Money & Legal", "Family", "Learning", "Estates", "Projects", "Travel"]
 KINDS = [("Life Note", "Note"), ("Life Chat Log", "Chat"), ("Life Inbox Item", "Inbox"), ("Life Vault Document", "Document")]
 SYLLABLES = ["ka", "ri", "mo", "te", "sun", "dar", "vel", "pho", "gan", "lit", "ost", "rem", "bui", "cha", "nes", "tor", "ula", "pin", "zed", "wom"]

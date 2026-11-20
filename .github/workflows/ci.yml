@@ -95,6 +95,6 @@ jobs:
       - name: Unit tests
         working-directory: /home/runner/frappe-bench
         env:
-          # the 500 ms target is checked on the Docker bench; these runners are slower (lifeos/loadtest.py)
-          LIFEOS_LOAD_TARGET_MS: "2000"
+          # the load test's 500 ms timings are checked on the Docker bench; shared runners vary too much (test_m9_load.py)
+          LIFEOS_SKIP_TIMINGS: "1"
         run: bench --site test_site run-tests --app lifeos
