@@ -22,6 +22,11 @@
 # Keeps the Mac awake while it runs. Logs go to build-logs/. Stop it any time with Ctrl-C; run it again to carry on.
 set -u
 cd "$(dirname "$0")/.."
+# Run from a copy, so that git pulling a newer version of this file while it runs cannot change it under bash's feet.
+if [ -z "${RUN_ISSUES_COPY:-}" ]; then
+  copy="$(mktemp -t run-issues.XXXXXX)"; cp "$0" "$copy"
+  RUN_ISSUES_COPY=1 exec bash "$copy" "$@"
+fi
 REPO="${REPO:-jk2081/lifeos}"
 MODEL="${MODEL:-opus}"; AUTO_MERGE="${AUTO_MERGE:-1}"; MAX_ROUNDS="${MAX_ROUNDS:-5}"
 WAIT_FOR_MORE="${WAIT_FOR_MORE:-0}"; PERMISSION_MODE="${PERMISSION_MODE:-auto}"
@@ -89,6 +94,17 @@ save_ci_failure() {
     gh run view "$run" -R "$REPO" --log-failed 2>&1 | tail -n 400; } > .issue/ci-failure.log
 }
 
+# A line every PROGRESS_EVERY seconds (default 600) while a round runs, so a quiet round is not mistaken for a hang.
+progress() {
+  local n="$1" round="$2" branch="$3" started="$4" commits latest editing
+  while sleep "${PROGRESS_EVERY:-600}"; do
+    commits=$(git rev-list --count "origin/main..$branch" 2>/dev/null || echo 0)
+    latest=$(git log -1 --format='%s (%cr)' "$branch" 2>/dev/null | cut -c1-80)
+    editing=$(git --no-optional-locks status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    say "Issue #$n, round $round: $(( ($(date +%s) - started) / 60 )) min in, $commits commits, $editing files being edited. Latest: $latest"
+  done
+}
+
 prompt_for() {
   local n="$1" title="$2" branch="$3" round="$4"
   cat <<EOF
@@ -135,7 +151,9 @@ build_issue() {
     log="$LOG_DIR/issue-$n-round-$round.log"
     say "Issue #$n, round $round"
     started=$(date +%s)
+    progress "$n" "$round" "$branch" "$started" & PROGRESS=$!
     claude -p "$(prompt_for "$n" "$title" "$branch" "$round")" --model "$MODEL" --permission-mode "$PERMISSION_MODE" --verbose > "$log" 2>&1
+    kill "$PROGRESS" 2>/dev/null
     elapsed=$(( $(date +%s) - started ))
     say "Round $round ended after $((elapsed / 60)) minutes."
     [ "$(git branch --show-current)" = "$branch" ] || git checkout -q "$branch"
