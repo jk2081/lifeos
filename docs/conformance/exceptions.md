@@ -6,12 +6,12 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | Rule | Exceptions |
 | --- | --- |
-| frappe-manual-commit | 5 |
+| frappe-manual-commit | 6 |
 | frappe-missing-translate-function-python | 1 |
-| frappe-security-file-traversal | 5 |
+| frappe-security-file-traversal | 6 |
 | frappe-setuser | 14 |
 | frappe-sql-format-injection | 82 |
-| Total | 107 |
+| Total | 109 |
 
 ## frappe-manual-commit
 
@@ -22,6 +22,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 258 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 317 | load test: its removal must stick even when run inside a test |
+| `lifeos/tools/tidy.py` | 125 | bench execute run: the copies are removed only after the rows that used them are saved |
 
 ## frappe-missing-translate-function-python
 
@@ -38,6 +39,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/patches/v10/file_hashes.py` | 23 | local_path keeps the path inside the site's files folders |
 | `lifeos/sources.py` | 103 | a fixed name in a temporary folder made here |
 | `lifeos/sources.py` | 113 | pdftoppm's own output in a temporary folder made here |
+| `lifeos/tools/tidy_files.py` | 170 | _path_of keeps the path inside the site's files folders |
 
 ## frappe-setuser
 

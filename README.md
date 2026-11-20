@@ -51,6 +51,27 @@ Open `https://SITE/life`. On a phone, use Add to Home Screen to install it as an
 | `bench --site SITE execute lifeos.demo.load` / `lifeos.demo.remove` | Example records for a test site: ticks, tasks, chats, notes. Not the owner's data |
 | `bench --site SITE execute lifeos.loadtest.run` | Test sites only. Seeds 100,000 index rows in 50 spaces for 20 users, times the main reads, removes the rows |
 | `bench --site SITE run-tests --app lifeos` | The test suite. Needs `allow_tests` on the site |
+| `bench --site SITE execute lifeos.tools.tidy.run` | Reports duplicate files, old jobs and intent-refused items; changes nothing. See below |
+
+### Tidy what was filed before November 2026
+
+Files and jobs filed before issues 6 to 8 may hold the same file several times, a job's inputs beside its outputs, or an item Failed because its intent refused the proposals. The tidy command cleans these up. Run it yourself, in three steps:
+
+1. **Dry run.** It only reports:
+
+   ```
+   bench --site SITE execute lifeos.tools.tidy.run
+   ```
+
+2. **Read the report.** It lists each duplicate file (the copy kept, the copies and the records that use them), each job with the files that look like inputs (a file also attached to another item, or one a reusable asset holds) and the ones that stay as outputs, and each Failed item it would put back to New. If a file listed as an input is really an output, do not apply; fix that item by hand first. Add `--kwargs "{'space': 'Private'}"` to look at one space.
+
+3. **Apply.**
+
+   ```
+   bench --site SITE execute lifeos.tools.tidy.run --kwargs "{'apply': True}"
+   ```
+
+   It first takes a backup with files (as `bench backup --with-files`) and stops, changing nothing, if that fails. Then it keeps the oldest copy of each duplicate and points every record at it, removes the copies nothing uses any more, moves input files to reusable assets and links them from the job, and puts the Failed items back to New. Every change is written to `sites/SITE/logs/lifeos_tidy.log` and as a comment on the record it changed, and the run ends with a list of them. Running it again changes nothing. Nothing a record still uses is deleted, and no note, task or proposal is deleted at all.
 
 ## Try the pipeline without a model
 
