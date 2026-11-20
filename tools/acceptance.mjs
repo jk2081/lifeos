@@ -2484,7 +2484,7 @@ await check('S6.1', 'Keyboard: G then T, I, O or L opens a place; the older G le
   const done = []
   for (const [key, want, q] of [['t', '/life/today'], ['i', '/life/brain'], ['p', '/life/today/week'], ['l', '/life/library'], ['k', '/life/goals/tasks'], ['o', '/life/goals'],
     ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/today/year', { view: 'cycle' }], ['c', '/life/today/year'], ['e', '/life/today/reset'],
-    ['n', '/life/library/notes'], ['u', '/life/brain/captures'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
+    ['n', '/life/library/notes'], ['u', '/life/brain/activity'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
     ['x', '/life/library/notes', { by: 'assistant' }], ['g', '/life/library/notes', { view: 'graph' }], ['r', '/life/library/archive'], ['b', '/life/brain/outbox'], ['d', '/life/review'],
     ['q', '/life/ask'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
     await owner.open(key === 't' ? '/life/brain' : '/life')
