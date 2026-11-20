@@ -330,6 +330,13 @@ GitHub issue #5. Deviations are in `DECISIONS.md` under "Issue 5".
   - In GitHub Actions (scratch branches, since deleted): the three parts passed 58 of 58 (1440), 55 of 55 (390) and 75 of 75 (sets), in 20.5, 19.5 and 10 minutes for the whole job. A deliberately failing check failed its part and uploaded its screenshots and the logs as an artifact. The first try uploaded nothing, because the job's guard found the passwords in Frappe's `bench.log`, which is now left out.
   - Unit tests: 405 run, 404 pass, 1 skipped. `./tools/scan.sh`: 0 findings.
 
+## Issue 6: filing again updates the intent, instruction and title (20 Nov 2026)
+
+GitHub issue #6. Deviations are in `DECISIONS.md` under "Issue 6".
+
+- **Works:** `inbox.create_item` with an existing `source_system` and `external_id` now sets every argument passed (`title`, `raw_text`, `source_url`, `instruction`, `intent`, `area`, `goal` or `project`); one left out keeps its value (the title too, which used to fall back to a time stamp). A Done item whose content changed, or a Done or Failed item whose intent changed, goes back to New. The answer carries `created`, `updated`, `changed` and `changed_fields`. `agent/SKILL.md` says so.
+- **Tests:** `lifeos/tests/test_issue6_refile.py` (6 tests: the issue's five, plus a Done item that goes back on an intent change and stays on an area change). The full unit suite: 411 run, 410 pass, 1 skipped. `./tools/scan.sh`: 0 findings. No screen changed, so no acceptance checks were added.
+
 ## Summary
 
 ### What works
