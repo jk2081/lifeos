@@ -10,11 +10,10 @@ Two fifths of the rows are real `Life Task` records with their index rows; the r
 other kinds (notes, chats, inbox items, documents). Half of all rows sit in one space, "Load 01",
 which is the space the timings are taken in. For a test site only.
 """
+import os
 import random
 import statistics
 import time
-
-import os
 
 import frappe
 from frappe.utils import add_days, getdate, now, today
