@@ -100,9 +100,14 @@ jobs:
         run: bench --site test_site run-tests --app lifeos
 
   acceptance:
-    name: Acceptance walk (1440 px and 390 px)
+    name: Acceptance walk (${{ matrix.width }} px)
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        # the two halves of the walk side by side, each on its own bench: the checks at 390 px, and everything else
+        width: [1440, 390]
     defaults:
       run:
         # bash with pipefail, so a failed walk fails its step through `tee`
@@ -195,7 +200,7 @@ jobs:
       - name: Acceptance walk
         run: |
           mkdir -p /tmp/acceptance-artifact
-          node tools/acceptance.mjs --no-reset 2>&1 | tee /tmp/acceptance-artifact/walk.log
+          node tools/acceptance.mjs --no-reset --width=${{ matrix.width }} 2>&1 | tee /tmp/acceptance-artifact/walk.log
 
       - name: Collect screenshots and logs
         if: failure()
@@ -214,7 +219,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          name: acceptance-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/acceptance-artifact
           if-no-files-found: ignore
           retention-days: 14
