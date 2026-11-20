@@ -22,8 +22,13 @@ def _item_dict(item, with_files=True):
 	d["received_on"] = str(d["received_on"]) if d["received_on"] else None
 	d["claimed_on"] = str(d["claimed_on"]) if d["claimed_on"] else None
 	if with_files:
-		d["files"] = [{"file_name": f.file_name, "file_url": f.file_url, "file_size": f.file_size} for f in files.attachments("Life Inbox Item", item.name)]
+		d["files"] = [{**_file_dict(f), "versions": [_file_dict(v) for v in f.versions]}
+			for f in files.attachments("Life Inbox Item", item.name)]
 	return d
+
+
+def _file_dict(f):
+	return {"file_name": f.file_name, "file_url": f.file_url, "file_size": f.file_size, "added": str(f.creation)}
 
 
 INTENTS = ("Process", "Add to wiki", "Just keep")

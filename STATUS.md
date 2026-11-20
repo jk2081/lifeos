@@ -337,6 +337,13 @@ GitHub issue #6. Deviations are in `DECISIONS.md` under "Issue 6".
 - **Works:** `inbox.create_item` with an existing `source_system` and `external_id` now sets every argument passed (`title`, `raw_text`, `source_url`, `instruction`, `intent`, `area`, `goal` or `project`); one left out keeps its value (the title too, which used to fall back to a time stamp). A Done item whose content changed, or a Done or Failed item whose intent changed, goes back to New. The answer carries `created`, `updated`, `changed` and `changed_fields`. `agent/SKILL.md` says so.
 - **Tests:** `lifeos/tests/test_issue6_refile.py` (6 tests: the issue's five, plus a Done item that goes back on an intent change and stays on an area change). The full unit suite: 411 run, 410 pass, 1 skipped. `./tools/scan.sh`: 0 findings. No screen changed, so no acceptance checks were added.
 
+## Issue 7: each file stored once, by content, with versions (20 Nov 2026)
+
+GitHub issue #7. Deviations are in `DECISIONS.md` under "Issue 7".
+
+- **Works:** a file attached to a Life OS record gets a SHA-256 (`life_sha256`, a custom field on `File`). The same bytes in the same space reuse the stored copy: each record has its own `File` row (the link), all pointing to one `file_url`. The same bytes in another space are stored again. The same bytes sent again to the same record (`/api/method/upload_file`, overridden by `lifeos.files.upload_file`) answer with the `File` already there. On an inbox item with an `external_id`, a different file under the same name becomes the current file and the old one an earlier version (`life_version_of`); the review and the source pane show "2 versions, latest 20 Nov" and list the earlier ones to open. A stored copy leaves the disk only when no `File` row points to it any more. Patch `v10.file_hashes` hashes the files already stored. `agent/SKILL.md` and `agent/FILE_WORK.md` say that sending a file again costs nothing.
+- **Tests:** `lifeos/tests/test_issue7_files.py` (the issue's five unit tests) and acceptance check `I7.<width>.6` at 1440 and 390 px. The full unit suite: 416 run, 415 pass, 1 skipped. `./tools/scan.sh`: 0 findings.
+
 ## Summary
 
 ### What works

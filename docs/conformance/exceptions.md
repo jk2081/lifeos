@@ -8,17 +8,17 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | --- | --- |
 | frappe-manual-commit | 5 |
 | frappe-missing-translate-function-python | 1 |
-| frappe-security-file-traversal | 4 |
+| frappe-security-file-traversal | 5 |
 | frappe-setuser | 14 |
 | frappe-sql-format-injection | 82 |
-| Total | 106 |
+| Total | 107 |
 
 ## frappe-manual-commit
 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
-| `lifeos/install.py` | 49 | after_install: the spaces and index DDL must be kept before install-app goes on |
+| `lifeos/install.py` | 62 | after_install: the spaces and index DDL must be kept before install-app goes on |
 | `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 258 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 317 | load test: its removal must stick even when run inside a test |
@@ -34,9 +34,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/api/settings.py` | 218 | the site's own backup folder, names only |
-| `lifeos/files.py` | 74 | local_path keeps the path inside the site's files folders |
-| `lifeos/sources.py` | 102 | a fixed name in a temporary folder made here |
-| `lifeos/sources.py` | 112 | pdftoppm's own output in a temporary folder made here |
+| `lifeos/files.py` | 90 | local_path keeps the path inside the site's files folders |
+| `lifeos/patches/v10/file_hashes.py` | 23 | local_path keeps the path inside the site's files folders |
+| `lifeos/sources.py` | 103 | a fixed name in a temporary folder made here |
+| `lifeos/sources.py` | 113 | pdftoppm's own output in a temporary folder made here |
 
 ## frappe-setuser
 
@@ -79,9 +80,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/goals.py` | 36 | `sp` is one of two constant fragments; values are parameters |
 | `lifeos/api/goals.py` | 96 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
 | `lifeos/api/goals.py` | 105 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
-| `lifeos/api/inbox.py` | 328 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 333 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/inbox.py` | 335 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 333 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
+| `lifeos/api/inbox.py` | 338 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 340 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |

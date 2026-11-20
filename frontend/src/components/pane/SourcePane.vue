@@ -10,6 +10,7 @@
           <iframe v-else-if="fileKind(f.file_name) === 'pdf'" class="h-[70vh] w-full rounded-4 border border-outline-gray-2" :src="f.file_url" :title="f.file_name" />
           <div class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6"><span class="lucide-paperclip size-4" aria-hidden="true" />
             <a class="text-ink-blue-8 hover:underline" :href="f.file_url" target="_blank" rel="noopener noreferrer">{{ f.file_name }}</a><span>{{ fileSize(f.file_size) }}</span></div>
+          <FileVersions :file="f" />
         </template>
         <Card v-if="s.raw_text"><DigestView v-if="s.source_type === 'Email Digest'" :text="s.raw_text" /><Md v-else :text="s.raw_text" read /></Card>
         <div v-if="safeLink"><Button icon-left="lucide-external-link" :label="/mail\.google\.com/.test(safeLink) ? 'Open in Gmail' : 'Open the original'" @click="openLink" /></div>
@@ -50,6 +51,7 @@ import Row from '../ui/Row.vue'
 import Md from '../Md.vue'
 import MdField from '../MdField.vue'
 import DigestView from '../DigestView.vue'
+import FileVersions from '../FileVersions.vue'
 import Empty from '../Empty.vue'
 import { api } from '@/lib/api'
 import { store } from '@/lib/store'
