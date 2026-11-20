@@ -141,8 +141,14 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `inbox.fail_item` | `item, error=None` | Mark a claimed item Failed, with the reason. |
 | `inbox.retry` | `item` | Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed. |
 | `inbox.list` | `space=None, status=None, include_archived=0, start=0, page_length=30` | Inbox items of a space, newest first, with proposal counts. `tabs` in the answer counts the items on each state tab (To Review, Waiting, Failed, Done, all) under the same filters. |
-| `inbox.get` | `item` | One inbox item with its files, proposals and the choices for the filing chips. |
+| `inbox.get` | `item` | One inbox item with its files, proposals and the choices for the filing chips. A job's item also has `inputs`, `job_chat` and `wiki_pages`. |
 | `inbox.update_transcript` | `item, transcript_md` | Correct the transcript of an item, for example words marked [?]. |
+
+**`lifeos.api.jobs`**
+
+| Method | Arguments | Does |
+| --- | --- | --- |
+| `jobs.file_job` | `job_id, space=None, title=None, area=None, goal=None, instruction=None, raw_text=None, inputs=None, outputs=None, transcript_md=None, summary_md=None, proposals=None, wiki=None, chat=None, source_system=None` | File a finished piece of work as one inbox item in one call (issue 8, `agent/FILE_WORK.md`): outputs on the item, reusable inputs kept once each and linked as inputs, proposals waiting for the owner, wiki pages and a chat log citing the item. The same `job_id` again updates the job. All or nothing: an invalid part refuses the call and names the field. |
 
 **`lifeos.api.journal`**
 

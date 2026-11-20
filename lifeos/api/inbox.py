@@ -18,13 +18,42 @@ SOURCE_TYPES = ["Upload", "Journal Photo", "Voice Note", "Email", "Email Digest"
 def _item_dict(item, with_files=True):
 	d = {k: item.get(k) for k in ("name", "space", "title", "source_type", "received_on", "instruction", "raw_text", "transcript_md",
 		"summary_md", "source_url", "status", "claimed_by", "claimed_on", "error", "area", "goal", "is_archived", "owner", "preview_image",
-		"intent", "media_kind", "source_system", "external_id", "thumbnail", "is_sensitive")}
+		"intent", "media_kind", "source_system", "external_id", "thumbnail", "is_sensitive", "job_id")}
 	d["received_on"] = str(d["received_on"]) if d["received_on"] else None
 	d["claimed_on"] = str(d["claimed_on"]) if d["claimed_on"] else None
 	if with_files:
 		d["files"] = [{**_file_dict(f), "versions": [_file_dict(v) for v in f.versions]}
 			for f in files.attachments("Life Inbox Item", item.name)]
+		if item.get("job_id"):
+			d.update(_job_parts(item))
 	return d
+
+
+def _job_parts(item):
+	"""Issue 8: a job's inputs (each kept asset or file used only here), its chat log and the wiki pages that cite it."""
+	inputs = []
+	for row in item.job_inputs:
+		entry = {"name": row.label, "reusable_as": row.reusable_as, "asset": row.asset, "asset_title": None, "file": None}
+		if row.asset:
+			entry["asset_title"] = frappe.db.get_value("Life Inbox Item", row.asset, "title")
+			entry["asset_route"] = links.route_of("Life Inbox Item", row.asset)
+			current = [f for f in files.attachments("Life Inbox Item", row.asset) if f.file_name == row.label] \
+				or files.attachments("Life Inbox Item", row.asset)
+			if current:
+				entry["file"] = {**_file_dict(current[0]), "versions": [_file_dict(v) for v in current[0].versions]}
+		elif row.file:
+			f = frappe.db.get_value("File", row.file, ["file_name", "file_url", "file_size", "creation"], as_dict=True)
+			entry["file"] = {**_file_dict(f), "versions": []} if f else None
+		inputs.append(entry)
+	chat = frappe.db.get_value("Life Chat Log", item.job_chat, ["name", "title"], as_dict=True) if item.job_chat else None
+	if chat:
+		chat["route"] = links.route_of("Life Chat Log", chat.name)
+	pages = frappe.db.sql("""select n.name, n.title from `tabLife Note` n join `tabLife Note Source` s on s.parent = n.name
+		and s.parenttype = 'Life Note' where s.source_doctype = 'Life Inbox Item' and s.source_name = %s and n.collection = 'Wiki'
+		order by n.title limit 50""", item.name, as_dict=True)
+	for page in pages:
+		page["route"] = links.route_of("Life Note", page.name)
+	return {"inputs": inputs, "job_chat": chat, "wiki_pages": pages}
 
 
 def _file_dict(f):

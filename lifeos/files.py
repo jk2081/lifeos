@@ -100,7 +100,8 @@ def attachments(doctype, name, exclude_field=("preview_image", "thumbnail")):
 		order_by="creation asc",
 	)
 	exclude = (exclude_field,) if isinstance(exclude_field, str) else tuple(exclude_field or ())
-	current = [r for r in rows if r.attached_to_field not in exclude and not r.life_version_of]
+	inputs = set(job_input_files(name)) if doctype == "Life Inbox Item" and rows else set()
+	current = [r for r in rows if r.attached_to_field not in exclude and not r.life_version_of and r.name not in inputs]
 	by_name = {r.name: r for r in current}
 	for r in current:
 		r.versions = []
@@ -108,6 +109,11 @@ def attachments(doctype, name, exclude_field=("preview_image", "thumbnail")):
 		if r.life_version_of in by_name:
 			by_name[r.life_version_of].versions.append(r)
 	return current
+
+
+def job_input_files(item):
+	"""Files on a job's item that are its inputs, not its outputs (issue 8: lifeos.api.jobs.file_job lists them in job_inputs)."""
+	return frappe.get_all("Life Job Input", filters={"parenttype": "Life Inbox Item", "parent": item, "file": ["is", "set"]}, pluck="file")
 
 
 # ---------- issue 7: one stored file per space, by content ----------
