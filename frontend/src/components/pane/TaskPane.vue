@@ -11,7 +11,7 @@
     @change="askWaiting ? setStatus('Waiting') : save({ waiting_on: task.waiting_on })" />
   <div><div class="mb-1.5 text-sm text-ink-gray-6">Filed under</div>
     <div class="flex flex-wrap items-center gap-2">
-      <Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" />
+      <div class="contents" data-task-area><Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" /></div>
       <Badge v-for="a in task.also_in" :key="a" size="lg">also in {{ areaName(a) }}
         <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)" @click="save({ also_in: task.also_in.filter((x) => x !== a) })" /></template></Badge>
       <Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== task.area && !task.also_in.includes(o.value))" placeholder="also in"

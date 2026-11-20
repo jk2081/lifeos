@@ -76,7 +76,6 @@ def make_areas(space, names):
 			existing = frappe.get_doc({"doctype": "Life Area", "space": space, "area_name": name, "parent_area": life[target],
 				"sort_order": i + 1}).insert(ignore_permissions=True).name
 		out[name] = existing
-	areas.clear_cache()
 	return out
 
 

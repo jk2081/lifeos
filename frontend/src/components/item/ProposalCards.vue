@@ -88,7 +88,7 @@ import Empty from '../Empty.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { refreshCounts } from '@/lib/store'
 import { openRoute } from '@/lib/pane'
-import { goalOptions } from '@/lib/lookups'
+import { areaOptionsOf, goalOptions } from '@/lib/lookups'
 
 const props = defineProps({ item: Object, writable: Boolean, only: String, emptyTitle: { type: String, default: 'No proposals.' }, emptyHint: String })
 const emit = defineEmits(['decided'])
@@ -103,7 +103,7 @@ const draft = ref({})
 const shown = computed(() => (props.only === 'pending' ? props.item.proposals.filter((p) => p.status === 'Pending') : props.item.proposals))
 const ctx = computed(() => props.item?.context || { areas: [], tags: [], goals: [], people: [], habits: [], dimensions: [] })
 const pct = (c) => Math.round((c || 0) * 100)
-const areaOptions = computed(() => ctx.value.areas.map((a) => ({ value: a.name, label: (a.parent_area ? areaName(a.parent_area) + ' / ' : '') + a.area_name })))
+const areaOptions = computed(() => areaOptionsOf(ctx.value.areas))
 const areaName = (id) => ctx.value.areas.find((a) => a.name === id)?.area_name || id
 const goalTitle = (id) => ctx.value.goals.find((g) => g.name === id)?.title || id
 const tagKey = (t) => (typeof t === 'string' ? t : 'new:' + t.new)

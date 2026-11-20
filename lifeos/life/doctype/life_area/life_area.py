@@ -26,11 +26,6 @@ class LifeArea(Document):
 		if not self.colour:
 			self.colour = self.default_colour()
 
-	def on_update(self):
-		from lifeos import areas
-
-		areas.clear_cache()
-
 	def default_colour(self):
 		"""A sub-area takes its parent's colour; a top-level area the next colour its space has used least."""
 		from lifeos.patches.v7.lens_areas import COLOURS

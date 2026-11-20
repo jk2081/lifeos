@@ -43,7 +43,6 @@ def run(spaces=None):
 		missed = convert_space(space)
 		if missed:
 			unknown[space] = missed
-	areas.clear_cache()
 	return unknown
 
 

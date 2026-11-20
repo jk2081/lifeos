@@ -22,7 +22,6 @@ class TestLifeAreas(LifeTestCase):
 
 	def switch(self, area, on):
 		settings.save_item("area", name=area, is_on=on)
-		areas.clear_cache()
 
 	# 1
 	def test_a_new_space_has_the_seven_with_career_and_health_on(self):
@@ -151,3 +150,7 @@ class TestLifeAreas(LifeTestCase):
 		self.assertEqual(len(out["errors"]), 1)
 		self.assertIn("The area Environment is switched off", out["errors"][0]["error"])
 		self.assertIn("Settings > Areas", out["errors"][0]["error"])
+		# and the Brain cannot switch the area on to file there
+		with self.assertRaisesRegex(frappe.PermissionError, "Only a person"):
+			settings.save_item("area", name=env, is_on=1)
+		self.assertTrue(areas.is_off(PRIVATE, env))

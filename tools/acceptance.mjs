@@ -1212,12 +1212,15 @@ for (const width of UX_WIDTHS) {
       const text = await pg.locator('[data-main]').innerText()
       must(!/Life (Agent|User|Admin)|Administrator/.test(text), `${sec}: a role name or Administrator shows`)
     }
-    // areas: rename in place, reorder, nest
+    // areas: rename in place, reorder, nest. Issue 11: new areas are parts of Career, and a part moves under another of the
+    // seven areas of life
     step = 'areas: rename in place, reorder, nest'
     const A = `UX3 area A ${width} ${stamp}`
     const B = `UX3 area B ${width} ${stamp}`
     const a = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: A, sort_order: 900 })).name
     const b = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: B, sort_order: 901 })).name
+    const lifeAreas = (await s.api('settings.get', { space: SPACE })).areas.filter((x) => x.is_life_area)
+    const career = lifeAreas.find((x) => x.area_name === 'Career').name
     await s.open('/life/settings?tab=areas')
     const row = (n) => pg.locator(`[data-settings-list="area"] [data-row-name="${n}"]`)
     must(!(await row(a).locator('[data-row-menu]').count()) || true, '')
@@ -1228,9 +1231,9 @@ for (const width of UX_WIDTHS) {
     await pg.waitForTimeout(900)
     const got = async () => (await s.api('settings.get', { space: SPACE })).areas
     must((await got()).find((x) => x.name === a).area_name === A + ' renamed', 'rename in place did not save')
-    const order = async () => { const all = (await got()).filter((x) => !x.parent_area && !x.is_archived); return [all.findIndex((x) => x.name === a), all.findIndex((x) => x.name === b)] }
+    const order = async () => { const all = (await got()).filter((x) => x.parent_area === career && !x.is_archived); return [all.findIndex((x) => x.name === a), all.findIndex((x) => x.name === b)] }
     const [ia, ib] = await order()
-    must(ia < ib, 'A is not above B to start with')
+    must(ia >= 0 && ib >= 0 && ia < ib, `A and B are not parts of Career with A above B (${ia}, ${ib})`)
     const menuPick = async (n, label) => { await row(n).locator('[data-row-menu]').click(); await pg.waitForTimeout(250); await pg.getByRole('menuitem', { name: label }).click(); await pg.waitForTimeout(250) }
     const itemsOf = async (n) => { await row(n).locator('[data-row-menu]').click(); await pg.waitForTimeout(250); const t = await pg.getByRole('menuitem').allInnerTexts(); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); return t.map((x) => x.trim()) }
     if (phone) await menuPick(b, 'Move up')
@@ -1240,10 +1243,11 @@ for (const width of UX_WIDTHS) {
     must(jb < ja, `reordering did not move B above A (${ja}, ${jb})`)
     await menuPick(a, 'Move under…')
     await pg.locator('[data-under-select]').click()
-    await pg.getByRole('option', { name: B, exact: true }).click()
+    await pg.getByRole('option', { name: 'Money', exact: true }).click()
     await pg.getByRole('button', { name: 'Move', exact: true }).click()
     await pg.waitForTimeout(900)
-    must((await got()).find((x) => x.name === a).parent_area === b, 'Move under did not nest A under B')
+    const money = lifeAreas.find((x) => x.area_name === 'Money').name
+    must((await got()).find((x) => x.name === a).parent_area === money, 'Move under did not move A under Money')
     // no Delete or Remove for areas, tags, habits or dimensions
     step = 'no Delete or Remove for areas, tags, habits or dimensions'
     const items = await itemsOf(b)
@@ -1254,30 +1258,30 @@ for (const width of UX_WIDTHS) {
       if (await first.count()) { const t = await itemsOf(await first.getAttribute('data-row-name')).catch(() => []); must(!t.some((x) => /Delete|Remove/.test(x)), `${sec}: ${t}`) }
       must(!(await pg.getByRole('button', { name: /^(Delete|Remove)$/ }).count()), `${sec}: a Delete or Remove button`)
     }
-    // archive B with its sub-area A: both leave the Areas screen and the pickers, their records stay, both are under Archived
-    step = 'archive B with its sub-area A: both leave the Areas scree'
-    const task = await s.api('tasks.quick_add', { text: `UX3 filed under A ${width} ${stamp}`, space: SPACE, area: a })
+    // archive B, a part (issue 11: parts hold no parts, and the seven are switched off rather than archived): it leaves the
+    // Areas screen and the pickers, its records stay, it is under Archived and comes back in place
+    step = 'archive B: it leaves the Areas screen and the pickers'
+    const task = await s.api('tasks.quick_add', { text: `UX3 filed under B ${width} ${stamp}`, space: SPACE, area: b })
     await s.open('/life/settings?tab=areas')
     await menuPick(b, 'Archive')
-    must((await pg.locator('[data-archive-dialog]').innerText()).includes('1 sub-area'), 'the archive dialog does not say how many sub-areas go with it')
+    must(await pg.locator('[data-archive-dialog]').count(), 'no archive dialog')
     await pg.getByRole('button', { name: 'Archive', exact: true }).last().click()
     await pg.waitForTimeout(1200)
     const tree = (await s.api('area.tree', { space: SPACE })).areas.map((x) => x.name)
     const ctx = (await s.api('meta.space_context', { space: SPACE })).areas.map((x) => x.name)
-    must(!tree.includes(a) && !tree.includes(b) && !ctx.includes(a) && !ctx.includes(b), 'an archived area is still on the Areas screen or in the pickers')
-    must((await s.api('tasks.get', { task: task.name })).area === a, 'the task under the archived area changed')
+    must(!tree.includes(b) && !ctx.includes(b), 'an archived area is still on the Areas screen or in the pickers')
+    must((await s.api('tasks.get', { task: task.name })).area === b, 'the task under the archived area changed')
     if (!phone) must(!(await pg.locator(`[data-nav-pin="${b}"]`).count()), 'the archived area is still in the sidebar')
     await s.open('/life/settings?tab=archive')
-    if (await pg.locator(`[data-archived-row="${a}"]`).count() && await pg.locator(`[data-archived-row="${b}"]`).count()) {
+    if (await pg.locator(`[data-archived-row="${b}"]`).count()) {
       await pg.locator(`[data-restore="${b}"]`).click()
-      await pg.getByRole('button', { name: 'Restore with sub-areas' }).click()
       await pg.waitForTimeout(1200)
-    } else { // an app bug: noted, and the areas are restored through the API so the rest of the check runs
-      problems.push('the archived areas are not under Settings > Archive and trash (?tab=archive), so they cannot be restored there')
+    } else { // an app bug: noted, and the area is restored through the API so the rest of the check runs
+      problems.push('the archived area is not under Settings > Archive and trash (?tab=archive), so it cannot be restored there')
       await s.api('settings.save_item', { kind: 'area', name: b, is_archived: 0, with_children: 1 })
     }
     const back = await got()
-    must(!back.find((x) => x.name === b).is_archived && !back.find((x) => x.name === a).is_archived && back.find((x) => x.name === a).parent_area === b, 'Restore did not bring both back in place')
+    must(!back.find((x) => x.name === b).is_archived && back.find((x) => x.name === b).parent_area === career, 'Restore did not bring B back in place')
     // tidy: the task and both test areas go (the site is rebuilt before each run, but nothing is left behind anyway)
     await s.api('frappe.client.delete', { doctype: 'Life Task', name: task.name })
     await s.api('settings.save_item', { kind: 'area', name: a, delete: 1 })
@@ -3762,6 +3766,74 @@ for (const width of SET_WIDTHS) {
     const lefts = await pg.locator('[data-item-section]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)))
     must(lefts.length === 5 && new Set(lefts).size === 1, 'the sections are not one column: ' + lefts.join(', '))
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+  await s.ctx.close()
+}
+
+// Issue 11: every area picker offers the seven areas of life that are on, each followed by its parts, indented; an area that
+// is off, and its parts, are not offered. Checked on the area picker of a task.
+for (const width of SET_WIDTHS) {
+  const tag = `I11.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  const SEVEN = ['Career', 'Health', 'Relationships', 'Money', 'Emotions', 'Mind', 'Environment']
+  await check(`${tag}.6`, `${width} px: the area picker on a task shows the seven areas that are on with their parts indented, and no area that is off`, async () => {
+    const all = (await s.api('area.tree', { space: SPACE, include_off: 1 })).areas
+    const life = all.filter((a) => a.is_life_area)
+    must(life.map((a) => a.area_name).join() === SEVEN.join(), 'the space does not have the seven: ' + life.map((a) => a.area_name).join(', '))
+    const off = life.find((a) => !a.is_on)
+    must(off, 'every area of life is on, so nothing can be checked as off')
+    const career = life.find((a) => a.area_name === 'Career')
+    const hidden = `I11 part of an area that is off ${width} ${stamp}`
+    await s.api('settings.save_item', { kind: 'area', space: SPACE, title: hidden, parent_area: off.name })
+    const part = `I11 part of Career ${width} ${stamp}`
+    const partId = (await s.api('settings.save_item', { kind: 'area', space: SPACE, title: part, parent_area: career.name })).name
+    const task = await s.api('tasks.quick_add', { text: `I11 task ${width} ${stamp}`, space: SPACE, area: partId })
+    const rows = (await s.api('area.tree', { space: SPACE, include_off: 1 })).areas
+    await s.open(`/life/plan/tasks?open=task:${task.name}`)
+    const button = pg.locator('[data-task-area] button')
+    must((await button.innerText()).includes(`Career / ${part}`), 'the picker does not name the task\'s part with its area: ' + await button.innerText())
+    await button.click()
+    await pg.waitForTimeout(300)
+    // textContent keeps the indent, which innerText may trim
+    const items = (await pg.getByRole('menuitem').evaluateAll((els) => els.map((e) => e.textContent.replace(/\s+$/, '')))).filter((t) => t.trim() !== 'Remove')
+    // where each item's first letter starts on screen
+    const starts = await pg.getByRole('menuitem').evaluateAll((els) => els.map((e) => {
+      const walk = document.createTreeWalker(e, NodeFilter.SHOW_TEXT)
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+        const i = n.data.search(/\S/)
+        if (i < 0) continue
+        const r = document.createRange()
+        r.setStart(n, i)
+        r.setEnd(n, i + 1)
+        return [n.data.trim(), r.getBoundingClientRect().left]
+      }
+      return [e.textContent.trim(), null]
+    }))
+    await pg.keyboard.press('Escape')
+    const parts = items.filter((t) => t.startsWith(' ')).map((t) => t.trim())
+    const tops = items.filter((t) => !t.startsWith(' '))
+    const on = life.filter((a) => a.is_on).map((a) => a.area_name)
+    must(tops.join() === on.join(), `the areas offered are ${tops.join(', ')}; the areas that are on are ${on.join(', ')}`)
+    must(!tops.includes(off.area_name) && !items.some((t) => t.includes(hidden)), `${off.area_name} is off but offered`)
+    must(parts.includes(part), 'the new part of Career is not offered, indented')
+    // each part sits right under its own area of life
+    let current = null
+    for (const t of items) {
+      if (!t.startsWith(' ')) { current = life.find((a) => a.area_name === t); continue }
+      const row = rows.find((a) => a.area_name === t.trim() && a.parent_area)
+      must(row && current && row.parent_area === current.name, `${t.trim()} is not listed under its area`)
+    }
+    // the indent shows: a part's name starts to the right of every area's
+    const at = Object.fromEntries(starts)
+    const topLeft = Math.max(...tops.map((t) => at[t]))
+    must(parts.every((t) => at[t] >= topLeft + 8), 'the parts are not indented: ' + starts.map(([t, x]) => `${t} at ${Math.round(x)}`).join(', '))
+    must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    return `${tops.length} areas on, ${parts.length} parts`
   })
   await s.ctx.close()
 }

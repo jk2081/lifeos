@@ -40,7 +40,6 @@ def ensure(space, on=ON_BY_DEFAULT):
 				"colour": colour, "sort_order": i + 1, "is_on": 1 if name in on else 0, "is_pinned": 1 if name in on else 0})
 			existing = doc.insert(ignore_permissions=True).name
 		out[name] = existing
-	clear_cache()
 	return out
 
 
@@ -50,22 +49,14 @@ def life_areas(space):
 
 
 def off(space):
-	"""Names of the areas of a space that are hidden: those switched off, and the parts of a life area that is off.
-	Cached for the request."""
-	cache = frappe.local.flags.setdefault("lifeos_off_areas", {})
-	if space not in cache:
-		rows = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "parent_area", "is_on"], limit=5000)
-		hidden = {r.name for r in rows if not r.is_on}
-		cache[space] = sorted(hidden | {r.name for r in rows if r.parent_area in hidden})
-	return cache[space]
+	"""Names of the areas of a space that are hidden: those switched off, and the parts of a life area that is off."""
+	rows = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "parent_area", "is_on"], limit=5000)
+	hidden = {r.name for r in rows if not r.is_on}
+	return sorted(hidden | {r.name for r in rows if r.parent_area in hidden})
 
 
 def is_off(space, area):
 	return bool(area) and area in off(space)
-
-
-def clear_cache():
-	frappe.local.flags.pop("lifeos_off_areas", None)
 
 
 def off_clause(space, column, values, key="off_areas"):
@@ -80,7 +71,11 @@ def off_clause(space, column, values, key="off_areas"):
 
 def validate_area(doc):
 	"""The rules of `Life Area`: the seven are fixed and sit at the top; any other area is a part of one of the seven in the
-	same space, one level deep."""
+	same space, one level deep. Only a person switches an area on or off: the Brain files only into areas that are on."""
+	from lifeos import permissions
+
+	if not doc.is_new() and doc.has_value_changed("is_on") and permissions.is_agent():
+		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError)
 	if doc.is_life_area:
 		if not doc.is_new() and doc.has_value_changed("area_name"):
 			frappe.throw(_("The seven areas of life cannot be renamed."))
