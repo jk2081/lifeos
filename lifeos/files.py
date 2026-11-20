@@ -58,13 +58,18 @@ def make_preview(file_doc):
 	frappe.flags.lifeos_making_preview = True
 	try:
 		preview = frappe.get_doc({
-			"doctype": "File", "file_name": os.path.splitext(file_doc.file_name)[0] + "-preview.jpg",
+			"doctype": "File", "file_name": os.path.splitext(stored_name(file_doc))[0] + "-preview.jpg",
 			"attached_to_doctype": file_doc.attached_to_doctype, "attached_to_name": file_doc.attached_to_name,
 			"attached_to_field": "preview_image", "is_private": 1, "content": buf.getvalue(),
 		}).insert(ignore_permissions=True)
 	finally:
 		frappe.flags.lifeos_making_preview = False
 	return preview.file_url
+
+
+def stored_name(file_doc) -> str:
+	"""The name the file is stored under (issue 7: `file_name` keeps the name it was sent with, which other files may share)."""
+	return os.path.basename(file_doc.file_url or "") or file_doc.file_name
 
 
 def local_path(file_doc) -> str:

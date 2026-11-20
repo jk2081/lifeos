@@ -9,6 +9,7 @@ import frappe
 from frappe import _
 
 from lifeos import files
+from lifeos.files import stored_name
 
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic")
 AUDIO_EXT = (".mp3", ".m4a", ".wav", ".ogg", ".opus", ".aac", ".flac", ".webm", ".amr")
@@ -87,7 +88,7 @@ def make_thumbnail(file_doc):
 	frappe.flags.lifeos_making_preview = True
 	try:
 		thumb = frappe.get_doc({
-			"doctype": "File", "file_name": os.path.splitext(file_doc.file_name)[0] + "-thumb.jpg",
+			"doctype": "File", "file_name": os.path.splitext(stored_name(file_doc))[0] + "-thumb.jpg",
 			"attached_to_doctype": file_doc.attached_to_doctype, "attached_to_name": file_doc.attached_to_name,
 			"attached_to_field": "thumbnail", "is_private": 1, "content": buf.getvalue(),
 		}).insert(ignore_permissions=True)
