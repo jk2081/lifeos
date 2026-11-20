@@ -34,7 +34,7 @@
         <Button v-if="phone" class="-ml-2 self-start" variant="ghost" icon-left="lucide-arrow-left" label="Settings" data-settings-back @click="open('')" />
         <div class="flex items-center gap-3">
           <h2 class="min-w-0 flex-1 text-lg-semibold text-ink-gray-9" data-section-title>{{ heading }}</h2>
-          <Button v-if="listOf(section) && canEdit" variant="solid" icon-left="lucide-plus" :label="'New ' + listOf(section).one" data-new @click="newOpen = true" />
+          <Button v-if="listOf(section) && section !== 'areas' && canEdit" variant="solid" icon-left="lucide-plus" :label="'New ' + listOf(section).one" data-new @click="newOpen = true" />
           <Button v-if="section === 'members' && memberSpace" variant="solid" icon-left="lucide-plus" label="Add member" data-add-member @click="addOpen = true" />
           <Button v-if="section === 'spaces'" label="New space" data-new-space @click="spaceOpen = true" />
         </div>
@@ -191,26 +191,30 @@
           <p class="text-sm text-ink-gray-6">Backups hold the database (every record, including Life OS) and, when files are included, the uploaded files.</p>
         </template>
 
-        <!-- This space -->
-        <template v-else-if="listOf(section)">
-          <SettingsList :kind="listOf(section).kind" :rows="active(listOf(section))" :noun="listOf(section).noun" :hint="listOf(section).hint" :ordered="listOf(section).ordered"
-            :writable="canEdit" :count-noun="listOf(section).countNoun" :link="listOf(section).link" @rename="rename" @reorder="reorder" @archive="askArchive" />
-          <p class="text-sm text-ink-gray-6">{{ listOf(section).footer }}</p>
+        <!-- Your life: Areas (issue 12): the seven areas of life with their parts; only Life Admin changes them -->
+        <template v-else-if="section === 'areas'">
+          <AreasSection :space="spaceSel" :rows="d.areas" :is-admin="!!d.is_admin" @changed="changed" />
           <!-- the sidebar's "Focus on an area": which areas are pinned there, and each area's dot -->
-          <section v-if="section === 'areas'" id="pins" data-area-pins>
+          <section id="pins" data-area-pins>
             <SectionHead>In the sidebar</SectionHead>
             <Card flush>
-              <SettingRow v-for="a in active(LISTS[0])" :key="a.name" :label="(a.parent_area ? '· ' : '') + a.title" :help="a.parent_area ? 'Sub-area' : 'Pinned areas are one-click lenses, in this order.'">
+              <SettingRow v-for="a in shownAreas" :key="a.name" :label="(a.parent_area ? '· ' : '') + a.title" :help="a.parent_area ? 'Part' : 'Pinned areas are one-click lenses, in this order.'">
                 <div class="flex items-center gap-2">
                   <span class="size-2.5 rounded-full" :class="dotClass(a)" aria-hidden="true" />
-                  <Select class="w-28" :model-value="a.colour || 'gray'" :options="COLOURS" :disabled="!canEdit" :aria-label="`Colour of ${a.title}`" :data-area-colour="a.name"
+                  <Select class="w-28" :model-value="a.colour || 'gray'" :options="COLOURS" :disabled="!d.is_admin" :aria-label="`Colour of ${a.title}`" :data-area-colour="a.name"
                     @update:model-value="(v) => saveArea(a, { colour: v })" />
-                  <Switch :model-value="!!a.is_pinned" :disabled="!canEdit" :aria-label="`Pin ${a.title} to the sidebar`" :data-area-pin="a.name"
+                  <Switch :model-value="!!a.is_pinned" :disabled="!d.is_admin" :aria-label="`Pin ${a.title} to the sidebar`" :data-area-pin="a.name"
                     @update:model-value="(v) => saveArea(a, { is_pinned: v ? 1 : 0 })" />
                 </div>
               </SettingRow>
             </Card>
           </section>
+        </template>
+        <!-- This space -->
+        <template v-else-if="listOf(section)">
+          <SettingsList :kind="listOf(section).kind" :rows="active(listOf(section))" :noun="listOf(section).noun" :hint="listOf(section).hint" :ordered="listOf(section).ordered"
+            :writable="canEdit" :count-noun="listOf(section).countNoun" :link="listOf(section).link" @rename="rename" @reorder="reorder" @archive="askArchive" />
+          <p class="text-sm text-ink-gray-6">{{ listOf(section).footer }}</p>
         </template>
         <template v-else-if="section === 'archive'">
           <Card flush>
@@ -359,18 +363,12 @@
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Add', variant: 'solid', onClick: create }]">
     <div class="flex flex-col gap-3">
       <TextInput v-model="draft.title" :placeholder="listOf(section)?.placeholder" aria-label="Name" data-new-name @keydown.enter="create" />
-      <Select v-if="section === 'areas'" v-model="draft.parent" :options="parentOptions" aria-label="Inside" />
     </div>
   </Dialog>
   <Dialog v-model:open="archiveOpen" :title="`Archive ${archiving?.row.title || ''}?`" size="md"
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Archive', variant: 'solid', onClick: archive }]">
     <div class="flex flex-col gap-2 text-base text-ink-gray-8" data-archive-dialog>
-      <template v-if="archiving?.l.kind === 'area'">
-        <p>The area leaves the Areas screen, the sidebar and the area pickers.<template v-if="kidsOf(archiving.row).length"> Its {{ kidsOf(archiving.row).length }}
-          sub-area{{ kidsOf(archiving.row).length === 1 ? ' is' : 's are' }} archived with it.</template></p>
-        <p>Its records are not changed and stay where they are: still findable through search, the Timeline and their own screens.</p>
-      </template>
-      <p v-else>It leaves the {{ archiving?.l.kind === 'tag' ? 'tag pickers' : archiving?.l.kind === 'habit' ? 'habit pickers' : 'check-in form' }}. Past records that use it keep it.</p>
+      <p>It leaves the {{ archiving?.l.kind === 'tag' ? 'tag pickers' : archiving?.l.kind === 'habit' ? 'habit pickers' : 'check-in form' }}. Past records that use it keep it.</p>
       <p class="text-sm text-ink-gray-6">Nothing is deleted. Restore it from Archived in Settings.</p>
     </div>
   </Dialog>
@@ -400,6 +398,7 @@ import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
 import CalendarSection from '@/components/settings/CalendarSection.vue'
+import AreasSection from '@/components/settings/AreasSection.vue'
 import SettingRow from '@/components/settings/SettingRow.vue'
 import SettingsList from '@/components/settings/SettingsList.vue'
 import ConnectionsSection from '@/components/settings/ConnectionsSection.vue'
@@ -449,7 +448,7 @@ const { colorScheme, setColorScheme } = useColorScheme()
 const d = ref(null)
 const errors = reactive({})
 const newOpen = ref(false)
-const draft = reactive({ title: '', parent: '' })
+const draft = reactive({ title: '' })
 const archiveOpen = ref(false)
 const archiving = ref(null)
 const addOpen = ref(false)
@@ -492,7 +491,7 @@ const spaceSel = computed(() => (route.query.space ? String(route.query.space) :
 const pickSpace = (v) => router.replace({ query: { ...route.query, space: v === store.space ? undefined : v } })
 const spaceGroup = ['areas', 'tags', 'habits', 'dimensions', 'connections', 'note-rules', 'import']
 const heading = computed(() => {
-  const label = sections.value.find((s) => s.value === section.value)?.label || ''
+  const label = section.value === 'areas' ? 'Areas of life' : sections.value.find((s) => s.value === section.value)?.label || ''
   return spaceGroup.includes(section.value) ? `${label} in ${spaceSel.value}` : label
 })
 const canEdit = computed(() => d.value?.spaces.find((s) => s.name === spaceSel.value)?.access === 'Write')
@@ -503,8 +502,12 @@ function archived(l) {
   const all = rowsOf(l)
   return all.filter((x) => x.is_archived).map((x) => ({ ...x, parentTitle: x.parent_area ? all.find((p) => p.name === x.parent_area)?.title : null }))
 }
-const kidsOf = (r) => active(LISTS[0]).filter((x) => x.parent_area === r.name)
-const parentOptions = computed(() => [{ label: 'Top level', value: '' }, ...active(LISTS[0]).filter((x) => !x.parent_area).map((a) => ({ label: 'Inside ' + a.title, value: a.name }))])
+// the areas the sidebar may pin: those that are on, each area of life followed by its parts
+const shownAreas = computed(() => {
+  const all = active(LISTS[0])
+  const on = all.filter((a) => a.is_life_area && a.is_on)
+  return on.flatMap((a) => [a, ...all.filter((p) => p.parent_area === a.name && p.is_on)])
+})
 const mSpace = computed(() => d.value?.spaces.find((s) => s.name === memberSpace.value))
 // Members: All, People, Agents, with counts
 const memberKind = ref('all')
@@ -589,10 +592,10 @@ async function create() {
   const title = draft.title.trim()
   if (!title) return
   const n = active(l).length
-  const extra = l.kind === 'area' ? { parent_area: draft.parent, sort_order: n + 1 } : l.ordered ? { sort_order: n + 1 } : {}
+  const extra = l.ordered ? { sort_order: n + 1 } : {}
   if (await tryCall(() => api('settings.save_item', { kind: l.kind, space: spaceSel.value, title, ...extra }), 'Added')) {
     newOpen.value = false
-    draft.title = draft.parent = ''
+    draft.title = ''
     changed()
   }
 }
