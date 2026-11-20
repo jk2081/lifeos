@@ -6,16 +6,21 @@
 // It runs against the throwaway site acceptance.localhost (http://localhost:19000), which scripts/acceptance-site.sh
 // rebuilds from a snapshot with seed and demo data before every run, so lifeos.localhost stays clean for the owner.
 // Needs the Docker bench running and .env with LIFEOS_DEV_PASSWORD. `--no-reset` keeps the acceptance site as it is.
+// Issue 5: the bench, the browser and the password can come from elsewhere (tools/acceptance-env.mjs), as in GitHub
+// Actions; LIFEOS_FAIL_SHOTS names a folder that gets a screenshot of every open page when a check fails.
 // `--owner-read-only` only walks every screen on the owner's site, lifeos.localhost, changing nothing (bug fix 1).
 // It prints one line per acceptance item and exits 1 if any fails.
 import { chromium } from 'playwright-core'
 import { walkScreens } from './screen-walk.mjs'
+import { resolveSetup, benchPython, MAC_CHROME } from './acceptance-env.mjs'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 
 const root = path.resolve(import.meta.dirname, '..')
-const env = Object.fromEntries(fs.readFileSync(path.join(root, '.env'), 'utf8').split('\n').filter(Boolean).map((l) => l.split('=')))
+const SETUP = resolveSetup()
+const env = { LIFEOS_DEV_PASSWORD: SETUP.password }
 const base = process.env.LIFEOS_URL || 'http://localhost:19000'
 const SITE = process.env.LIFEOS_SITE || 'acceptance.localhost'
 if (SITE === 'lifeos.localhost') throw new Error('acceptance runs on its own site, never on lifeos.localhost')
@@ -26,14 +31,13 @@ async function ownerReadOnly() {
   const ownerBase = process.env.LIFEOS_OWNER_URL || 'http://localhost:18000'
   // reads the screens send as POST; everything else that is not a GET is refused
   const READS = /\/api\/method\/(frappe\.desk\.form\.load\.getdoctype|frappe\.desk\.search\.search_link|lifeos\.api\.(journal\.month|week\.goal_plan|wiki\.overview))$/
-  const snapshot = () => execFileSync('docker', ['exec', '-i', 'lifeos-bench', 'bash', '-lc', 'cd ~/frappe-bench/sites && ../env/bin/python -W ignore -'], {
-    input: `import frappe, json; frappe.init("lifeos.localhost"); frappe.connect()
+  const snapshot = () => benchPython(`import frappe, json; frappe.init("lifeos.localhost"); frappe.connect()
 out = {}
 for (t,) in frappe.db.sql("show tables like 'tabLife %'") + (("tabError Log",),):
     out[t] = [str(v) for v in frappe.db.sql(f"select count(*), max(modified) from \`{t}\`")[0]]
-print(json.dumps(out))`, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim().split('\n').pop()
+print(json.dumps(out))`).trim().split('\n').pop()
   const before = JSON.parse(snapshot())
-  const ob = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true })
+  const ob = await chromium.launch({ executablePath: SETUP.chrome, headless: true })
   let bad = 0
   for (const width of [1440, 390]) {
     const ctx = await ob.newContext({ viewport: { width, height: width < 800 ? 844 : 1000 }, timezoneId: 'Asia/Kolkata', isMobile: width < 800, hasTouch: width < 800 })
@@ -127,11 +131,10 @@ const plusDays = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 86400e3).
 function bench(code, site = SITE) {
   // run Python on the acceptance site, for the steps that need the clock moved (the archive job)
   const script = `import frappe; frappe.init("${site}"); frappe.connect()\n${code}\nfrappe.db.commit()\n`
-  return execFileSync('docker', ['exec', '-i', 'lifeos-bench', 'bash', '-lc', 'cd ~/frappe-bench/sites && ../env/bin/python -W ignore -'],
-    { input: script, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }).trim()
+  return benchPython(script).trim()
 }
 
-const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true })
+const browser = await chromium.launch({ executablePath: SETUP.chrome, headless: true })
 
 async function session(user, width = 1440) {
   const ctx = await browser.newContext({ viewport: { width, height: width < 800 ? 844 : 1000 }, timezoneId: 'Asia/Kolkata',
@@ -180,11 +183,25 @@ async function check(n, title, fn) {
     const lines = String(e.message || e).split('\n')
     const at = lines.find((l) => /waiting for (locator|getBy)/.test(l)) // which element Playwright waited for
     results.push([n, false, title, (lines[0] + (at ? ' ' + at.trim() : '')).slice(0, 400)])
+    if (FAIL_SHOTS) await failShots(n)
   }
   const [, ok, t, note] = results[results.length - 1]
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${String(n).padStart(2)}. ${t}${note ? '  — ' + note : ''}`)
 }
 const must = (cond, message) => { if (!cond) throw new Error(message) }
+// Issue 5: when a check fails, every page still open is saved to LIFEOS_FAIL_SHOTS (GitHub Actions uploads the folder)
+const FAIL_SHOTS = process.env.LIFEOS_FAIL_SHOTS
+async function failShots(n, dir = FAIL_SHOTS) {
+  fs.mkdirSync(dir, { recursive: true })
+  const saved = []
+  for (const [c, ctx] of browser.contexts().entries()) {
+    for (const [p, page] of ctx.pages().entries()) {
+      const file = path.join(dir, `${String(n).replace(/[^\w.-]/g, '_')}-${c + 1}-${p + 1}.png`)
+      if (await page.screenshot({ path: file, timeout: 10000 }).then(() => true, () => false)) saved.push(file)
+    }
+  }
+  return saved
+}
 
 // the agent's key is made for this run and passed in the environment; it is never printed or stored
 const [agentKey, agentSecret] = bench('from lifeos import devtools\nprint(devtools.agent_api_key())').split('\n').pop().split(':')
@@ -3531,6 +3548,72 @@ frappe.db.commit()`)
   await s.api('settings.set_member', { space: SPACE, user: I1_NEW, remove: 1 }).catch(() => {})
   await s.ctx.close()
 }
+
+// Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
+// screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
+const ciJob = (name) => {
+  const yml = fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8')
+  const at = yml.indexOf(`\n  ${name}:\n`)
+  if (at < 0) return ''
+  const rest = yml.slice(at + 1)
+  const next = rest.slice(1).search(/\n  [\w-]+:\n/)
+  return next < 0 ? rest : rest.slice(0, next + 1)
+}
+await check('I5.1', 'Without the switches the tooling uses the Docker bench, Chrome and .env; with them, a local bench, Playwright\'s Chromium and the environment', async () => {
+  const mac = resolveSetup({ env: {}, exists: () => true, readEnvFile: () => ({ LIFEOS_DEV_PASSWORD: 'from-file' }) })
+  must(mac.bench === 'docker exec lifeos-bench' && mac.chrome === MAC_CHROME && mac.passwordFrom === '.env' && mac.password === 'from-file',
+    'the Mac defaults changed: ' + JSON.stringify({ ...mac, password: undefined }))
+  const ci = resolveSetup({ env: { LIFEOS_BENCH_CMD: 'local', LIFEOS_BENCH_PATH: '/b', LIFEOS_DEV_PASSWORD: 'from-env' }, exists: () => false,
+    readEnvFile: () => { throw new Error('.env was read') } })
+  must(ci.bench === 'local bench in /b' && ci.chrome === undefined && ci.passwordFrom === 'environment' && ci.password === 'from-env',
+    'the switches did not apply: ' + JSON.stringify({ ...ci, password: undefined }))
+  // the one helper reaches this run's bench
+  const v = execFileSync(path.join(root, 'tools/bench.sh'), ['bench --version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  must(/\d+\.\d+/.test(v), 'tools/bench.sh did not reach the bench: ' + v)
+  return `this run: ${SETUP.bench}, ${SETUP.chrome ? 'Google Chrome' : "Playwright's Chromium"}, password from ${SETUP.passwordFrom}`
+})
+await check('I5.2', 'CI has an acceptance job that builds the front end, makes acceptance.localhost, serves it and runs every check', async () => {
+  const job = ciJob('acceptance')
+  must(job, 'no acceptance job in .github/workflows/ci.yml')
+  for (const step of ['LIFEOS_BENCH_CMD: local', 'bench build --app lifeos', 'scripts/acceptance-site.sh', 'node tools/acceptance.mjs'])
+    must(job.includes(step), 'the job lacks: ' + step)
+  must(!/acceptance\.mjs[^\n]*--(only|ux)/.test(job), 'the job runs only some checks')
+  if (process.env.GITHUB_ACTIONS) {
+    must(!ONLY && !ONLY_UX, 'this CI run was given --only or --ux')
+    must(SETUP.bench.startsWith('local bench') && !SETUP.chrome && SETUP.passwordFrom === 'environment', 'CI is not using the switches')
+  }
+  return process.env.GITHUB_ACTIONS ? 'running in GitHub Actions' : 'the job as written'
+})
+await check('I5.3', 'A failed check saves screenshots, and CI uploads them with the logs as an artifact', async () => {
+  const job = ciJob('acceptance')
+  must(/LIFEOS_FAIL_SHOTS: \S+/.test(job), 'the job does not set LIFEOS_FAIL_SHOTS')
+  must(/if: failure\(\)\s*\n\s*uses: actions\/upload-artifact@/.test(job), 'the job does not upload an artifact on failure')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lifeos-i5-'))
+  const s = await session('owner@lifeos.test')
+  try {
+    const saved = await failShots('I5.3', dir)
+    must(saved.length && saved.every((f) => fs.statSync(f).size > 1000), 'no screenshot was saved: ' + saved.join(', '))
+    return `${saved.length} pages saved`
+  } finally {
+    await s.ctx.close()
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+await check('I5.4', 'No password or key in the workflow file or in the logs a failed run uploads', async () => {
+  const yml = fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8')
+  const job = ciJob('acceptance')
+  // a value written into the job: `PASSWORD: x`, `secret=x`; values made in the job start with $
+  const literal = job.split('\n').filter((l) => /(password|secret|api[_-]?key|token)\w*["']?\s*[:=]\s*["']?(?![$"'\s])\S/i.test(l))
+  must(!literal.length, 'written into the acceptance job: ' + literal.map((l) => l.trim()).join(' | '))
+  must(!yml.includes(SETUP.password) && !yml.includes(agentSecret), "this run's password or agent key is in ci.yml")
+  const logs = bench("import glob\nfor f in ['/tmp/acc-site.log', '/tmp/serve-acceptance.log', '/tmp/worker-acceptance.log']:\n    print(open(f, errors='replace').read() if glob.glob(f) else '')")
+  must(logs.length > 0, 'the bench logs could not be read')
+  must(!logs.includes(SETUP.password) && !logs.includes(agentSecret), "the bench logs hold this run's password or agent key")
+  if (FAIL_SHOTS && fs.existsSync(FAIL_SHOTS)) {
+    const names = fs.readdirSync(FAIL_SHOTS).join(' ')
+    must(!names.includes(SETUP.password), 'a screenshot name holds the password')
+  }
+})
 
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {

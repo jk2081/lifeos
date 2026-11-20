@@ -1,5 +1,5 @@
-# Runs on every pull request and every push to main: the full unit suite on a fresh Frappe 16 bench, and the scan
-# with Frappe's semgrep rules over the whole app. The acceptance walk (tools/acceptance.mjs) still runs on the Mac.
+# Runs on every pull request and every push to main: the full unit suite on a fresh Frappe 16 bench, the scan with
+# Frappe's semgrep rules over the whole app, and the acceptance walk (tools/acceptance.mjs) at 1440 px and 390 px.
 name: CI
 
 on:
@@ -98,3 +98,123 @@ jobs:
           # the load test's 500 ms timings are checked on the Docker bench; shared runners vary too much (test_m9_load.py)
           LIFEOS_SKIP_TIMINGS: "1"
         run: bench --site test_site run-tests --app lifeos
+
+  acceptance:
+    name: Acceptance walk (1440 px and 390 px)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        # bash with pipefail, so a failed walk fails its step through `tee`
+        shell: bash
+    services:
+      redis-cache:
+        image: redis:7-alpine
+        ports: ["13000:6379"]
+      redis-queue:
+        image: redis:7-alpine
+        ports: ["11000:6379"]
+    env:
+      # the switches of tools/bench.sh and tools/acceptance-env.mjs: a bench folder here instead of the Mac's Docker bench
+      LIFEOS_BENCH_CMD: local
+      LIFEOS_BENCH_PATH: /home/runner/frappe-bench
+      LIFEOS_FAIL_SHOTS: /tmp/acceptance-artifact/screenshots
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Cache pip, yarn and Playwright's browser
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/yarn
+            ~/.cache/ms-playwright
+          key: acceptance-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'frontend/yarn.lock', 'frontend/package.json', 'tools/package-lock.json') }}
+          restore-keys: acceptance-${{ runner.os }}-
+
+      - name: Passwords for this run
+        # made here, masked in the log and kept only in this job's environment
+        run: |
+          for name in LIFEOS_DEV_PASSWORD LIFEOS_DB_ROOT_PASSWORD; do
+            value="$(openssl rand -hex 24)"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Database
+        # started here rather than as a service, so its root password is the one made above
+        run: |
+          MARIADB_ROOT_PASSWORD="$LIFEOS_DB_ROOT_PASSWORD" docker run -d --name lifeos-ci-db -e MARIADB_ROOT_PASSWORD \
+            -p 3306:3306 mariadb:11.8 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci \
+            --skip-character-set-client-handshake >/dev/null
+          for i in $(seq 1 60); do
+            docker exec lifeos-ci-db healthcheck.sh --connect --innodb_initialized >/dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          echo "MariaDB did not start"; exit 1
+
+      - name: Bench
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client libmariadb-dev >/dev/null
+          npm install -g yarn >/dev/null
+          pip install -q frappe-bench
+          pipx install semgrep >/dev/null
+          # the Frappe release the owner's server runs, with its own assets built (the desk and login pages)
+          bench init --skip-redis-config-generation --python "$(which python)" --frappe-branch v16.56.0 "$LIFEOS_BENCH_PATH"
+          # as on the Docker bench
+          cd "$LIFEOS_BENCH_PATH" && bench set-config -g developer_mode 1
+
+      - name: Install Life OS and build the front end
+        working-directory: /home/runner/frappe-bench
+        env:
+          CI: "Yes"
+        run: |
+          bench get-app --skip-assets lifeos "$GITHUB_WORKSPACE"
+          bench setup requirements --dev
+          bench build --app lifeos
+          # the owner's test site: the walk's last checks look for debris there (S4.0)
+          bench new-site --db-root-password "$LIFEOS_DB_ROOT_PASSWORD" --admin-password "$(openssl rand -hex 16)" \
+            --mariadb-user-host-login-scope='%' --install-app lifeos lifeos.localhost
+
+      - name: Browser
+        run: |
+          npm ci --prefix tools --no-audit --no-fund
+          (cd tools && npx playwright-core install --with-deps chromium)
+
+      - name: Acceptance site
+        run: scripts/acceptance-site.sh --new
+
+      - name: Acceptance walk
+        run: |
+          mkdir -p /tmp/acceptance-artifact
+          node tools/acceptance.mjs --no-reset 2>&1 | tee /tmp/acceptance-artifact/walk.log
+
+      - name: Collect screenshots and logs
+        if: failure()
+        run: |
+          mkdir -p /tmp/acceptance-artifact/logs
+          cp /tmp/acc-site.log /tmp/serve-acceptance.log /tmp/worker-acceptance.log /tmp/acceptance-artifact/logs/ 2>/dev/null || true
+          cp -r "$LIFEOS_BENCH_PATH/logs" /tmp/acceptance-artifact/logs/bench 2>/dev/null || true
+          # nothing secret leaves the runner (issue 5, acceptance test 4)
+          if grep -rlF -e "$LIFEOS_DEV_PASSWORD" -e "$LIFEOS_DB_ROOT_PASSWORD" /tmp/acceptance-artifact; then
+            echo "a password is in the files above; nothing is uploaded"
+            rm -rf /tmp/acceptance-artifact
+            exit 1
+          fi
+
+      - name: Upload screenshots and logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: /tmp/acceptance-artifact
+          if-no-files-found: ignore
+          retention-days: 14
