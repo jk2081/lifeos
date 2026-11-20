@@ -11,6 +11,8 @@
   "preview",
   "payload",
   "confidence",
+  "reason",
+  "alt_area",
   "status",
   "created_doctype",
   "created_name",
@@ -62,6 +64,19 @@
    "label": "Confidence"
   },
   {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "description": "One short line: why this was proposed, or what made the Brain unsure"
+  },
+  {
+   "fieldname": "alt_area",
+   "fieldtype": "Link",
+   "label": "Second-choice area",
+   "options": "Life Area",
+   "description": "Set when the Brain is torn between two areas"
+  },
+  {
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
@@ -100,7 +115,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-18 09:00:00.000000",
+ "modified": "2026-11-20 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Proposal",

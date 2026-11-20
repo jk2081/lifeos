@@ -6,6 +6,7 @@
  "lifeos.api.ask.message",
  "lifeos.api.ask.thread",
  "lifeos.api.ask.threads",
+ "lifeos.api.brain.needs_you",
  "lifeos.api.calendar.get",
  "lifeos.api.calendar.year",
  "lifeos.api.calendar.year_plan",

@@ -40,7 +40,7 @@ def file_job(job_id: str, space: str | None = None, title: str | None = None, ar
 	inputs: [{name, file, reusable_as?, title?, transcript_md?}]; outputs: [{name, file}]. `file` is base64 (a data: URL is fine)
 	or the URL of a file already in this space (/private/files/...). An input with `reusable_as` (a stable asset id such as
 	btw-standard-deck) is kept once as its own item and linked; without `file` it links the asset already kept under that id.
-	proposals: as submit_result; they wait for the owner. wiki: [{title, summary?, content_md, base_version?}] pages to create
+	proposals: as submit_result (kind, preview, payload, confidence, reason, alt_area); they wait for the owner. wiki: [{title, summary?, content_md, base_version?}] pages to create
 	or merge. chat: {title, summary_md?, open_items?, source_system?, assistant?, date?, transcript_md?}.
 	Answers {item, url, created, changed_fields, inputs, outputs, proposals, wiki, chat}."""
 	if not permissions.has_app_permission():
@@ -201,12 +201,13 @@ def _check_proposals(space, value):
 		try:
 			payload = rules.validate(kind, row.get("payload") or {}, space, ctx)
 			confidence = 0.5 if row.get("confidence") is None else float(row.get("confidence"))
+			extra = rules.extras(row, payload, space)
 		except (rules.PayloadError, ValueError, TypeError) as e:
 			frappe.throw(f"{field}: {e}", rules.PayloadError)
 		if not 0 <= confidence <= 1:
 			frappe.throw(_("{0}: confidence must be between 0 and 1.").format(field), rules.PayloadError)
 		preview = (str(row.get("preview") or "").strip() or payload.get("title") or payload.get("subject") or kind)[:500]
-		out.append({"kind": kind, "payload": payload, "confidence": confidence, "preview": preview, "key": _key(kind, payload)})
+		out.append({"kind": kind, "payload": payload, "confidence": confidence, "preview": preview, "key": _key(kind, payload), **extra})
 	return out
 
 
@@ -387,7 +388,7 @@ def _proposals(item, wanted):
 	"""The proposals of this call wait for the owner. One already there (by kind and payload) is kept, whatever its status;
 	a pending one this call no longer sends is removed. Nothing is ever decided here."""
 	have = frappe.get_all("Life Proposal", filters={"inbox_item": item.name},
-		fields=["name", "kind", "payload", "status", "preview", "confidence"], order_by="sort_order asc, creation asc")
+		fields=["name", "kind", "payload", "status", "preview", "confidence", "reason", "alt_area"], order_by="sort_order asc, creation asc")
 	by_key = {}
 	for p in have:
 		by_key.setdefault(_key(p.kind, frappe.parse_json(p.payload) if p.payload else {}), p)
@@ -396,14 +397,16 @@ def _proposals(item, wanted):
 		p = by_key.get(w["key"])
 		if p and p.name not in used:
 			used.add(p.name)
-			if p.status == "Pending" and (p.preview != w["preview"] or float(p.confidence or 0) != w["confidence"]):
-				frappe.db.set_value("Life Proposal", p.name, {"preview": w["preview"], "confidence": w["confidence"], "sort_order": i})
+			if p.status == "Pending" and (p.preview != w["preview"] or float(p.confidence or 0) != w["confidence"]
+					or p.reason != w["reason"] or p.alt_area != w["alt_area"]):
+				frappe.db.set_value("Life Proposal", p.name, {"preview": w["preview"], "confidence": w["confidence"], "sort_order": i,
+					"reason": w["reason"], "alt_area": w["alt_area"]})
 			kept.append(p.name)
 			continue
 		with _at(f"proposals[{i}]"):
 			doc = frappe.get_doc({"doctype": "Life Proposal", "space": item.space, "inbox_item": item.name, "kind": w["kind"],
 				"preview": w["preview"], "payload": frappe.as_json(w["payload"]), "confidence": w["confidence"], "status": "Pending",
-				"sort_order": i}).insert()
+				"sort_order": i, "reason": w["reason"], "alt_area": w["alt_area"]}).insert()
 		made.append(doc.name)
 	removed = [p.name for p in have if p.status == "Pending" and p.name not in used]
 	for name in removed:

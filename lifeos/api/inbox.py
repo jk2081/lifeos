@@ -236,7 +236,7 @@ def _claimed_item(item_name):
 def submit_result(item: str, transcript_md: str | None = None, summary_md: str | None = None, proposals: str | builtins.list | None = None):
 	"""Store the transcript, summary and proposals, and set the item To Review.
 
-	Each proposal is {kind, preview, payload, confidence}. An invalid proposal is refused with a clear error; the rest are kept.
+	Each proposal is {kind, preview, payload, confidence, reason, alt_area}; the last two are optional (see meta.proposal_schema). An invalid proposal is refused with a clear error; the rest are kept.
 	"""
 	from lifeos import proposals as rules
 
@@ -259,13 +259,14 @@ def submit_result(item: str, transcript_md: str | None = None, summary_md: str |
 			confidence = 0.5 if confidence is None else float(confidence)
 			if not 0 <= confidence <= 1:
 				raise rules.PayloadError(_("confidence must be between 0 and 1."))
+			extra = rules.extras(row, payload, doc.space)
 			if kind in rules.DIRECT:  # a Reading is stored at once as a Suggested reading for the weekly review (set 7)
 				r = rules.store_reading(payload, doc)
 				readings_made.append({"index": i, "name": r.name, "kind": kind})
 				continue
 			preview = (row.get("preview") or payload.get("title") or payload.get("subject") or kind)[:500]
 			p = frappe.get_doc({"doctype": "Life Proposal", "space": doc.space, "inbox_item": doc.name, "kind": kind, "preview": preview,
-				"payload": frappe.as_json(payload), "confidence": confidence, "status": "Pending", "sort_order": i}).insert()
+				"payload": frappe.as_json(payload), "confidence": confidence, "status": "Pending", "sort_order": i, **extra}).insert()
 			created.append({"index": i, "name": p.name, "kind": kind})
 		except (rules.PayloadError, ValueError, TypeError) as e:
 			errors.append({"index": i, "kind": row.get("kind") if isinstance(row, dict) else None,
@@ -408,7 +409,7 @@ def get(item: str):
 	out["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
 	out["goal_title"] = frappe.db.get_value("Life Goal", doc.goal, "title") if doc.goal else None
 	props = frappe.get_all("Life Proposal", filters={"inbox_item": doc.name},
-		fields=["name", "kind", "preview", "payload", "confidence", "status", "created_doctype", "created_name", "decided_on"],
+		fields=["name", "kind", "preview", "payload", "confidence", "reason", "alt_area", "status", "created_doctype", "created_name", "decided_on"],
 		order_by="sort_order asc, creation asc", limit=100)
 	for p in props:
 		p["payload"] = frappe.parse_json(p.payload) if p.payload else {}

@@ -194,7 +194,7 @@ def find_test_debris(site_check=True):
 	import re
 
 	rx = _stamp_re()
-	s4 = re.compile(r"^(?:S[4578]|BF1|I(?:[78]|1[0-6])) [^\n]*?\b(m[0-9a-z]{7})\b")  # sets 4, 5, 7 and 8, bug fix 1, issues 7, 8, 10 to 16: "S4 <what> [<width>] <stamp>"
+	s4 = re.compile(r"^(?:S[4578]|BF1|I(?:[78]|1[0-7])) [^\n]*?\b(m[0-9a-z]{7})\b")  # sets 4, 5, 7 and 8, bug fix 1, issues 7, 8, 10 to 17: "S4 <what> [<width>] <stamp>"
 	stamps = set()
 	for dt, field in _TITLED.items():
 		# nosemgrep: frappe-sql-format-injection -- development tool: DocType and field from the _TITLED constant

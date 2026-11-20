@@ -140,9 +140,35 @@ class PayloadError(frappe.ValidationError):
 	pass
 
 
+# beside the payload, a proposal carries these two optional fields (issue 17)
+EXTRAS = {
+	"reason": F("text", help="One short line on why this was proposed, or what made you unsure. Shown to the owner on Needs you.", max_length=200),
+	"alt_area": F("link", help="Only when two areas are both likely: the second choice. It must be an area that is on, in the same space, "
+		"and not the payload's area. The owner picks one.", doctype="Life Area"),
+}
+
+
 def schema():
-	"""The allowed payload fields and an example for each proposal kind."""
-	return {kind: {"target": s["target"], "fields": s["fields"], "example": s["example"]} for kind, s in SCHEMA.items()}
+	"""The allowed payload fields and an example for each proposal kind. `beside_payload` names the optional fields a proposal
+	carries next to its payload (reason, alt_area), the same for every kind."""
+	return {kind: {"target": s["target"], "fields": s["fields"], "example": s["example"], "beside_payload": EXTRAS} for kind, s in SCHEMA.items()}
+
+
+def extras(row, payload, space):
+	"""Validate `reason` and `alt_area` of a proposal row (beside its payload). Returns {"reason", "alt_area"}, each None when not sent."""
+	reason = row.get("reason")
+	reason = None if reason is None else " ".join(str(reason).split())
+	if reason and len(reason) > EXTRAS["reason"]["max_length"]:
+		raise PayloadError(_("reason can hold at most {0} characters.").format(EXTRAS["reason"]["max_length"]))
+	alt = row.get("alt_area")
+	if alt in (None, ""):
+		return {"reason": reason or None, "alt_area": None}
+	if not payload.get("area"):
+		raise PayloadError(_("alt_area needs an area in the payload: it is the second choice to that area."))
+	alt = _switched_on("Life Area", resolve_link("Life Area", alt, space), space)
+	if alt == payload["area"]:
+		raise PayloadError(_("alt_area must be a different area from the payload's area."))
+	return {"reason": reason or None, "alt_area": alt}
 
 
 def resolve_link(doctype, value, space, extra_filters=None):

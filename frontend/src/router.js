@@ -6,7 +6,7 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 // beside them. Housekeeping pages live inside the place they belong to and are not tabs: Reset under Today, the Outbox
 // under Brain, Someday under Goals, the Timeline and the trash and archive under Library.
 const TODAY = ['week', 'month', 'year']
-const BRAIN = ['activity', 'sources', 'outbox']
+const BRAIN = ['activity', 'sources', 'outbox', 'queue']
 const GOALS = ['tasks', 'no-goal', 'someday']
 const LIBRARY = ['notes', 'documents', 'people', 'chats', 'timeline', 'archive']
 
@@ -49,10 +49,14 @@ const routes = [
   { path: '/settings', name: 'Settings', component: page('Settings') },
 
   // ---- every route from before issue 14 lands on its new home, with its query ----
-  { path: '/inbox', redirect: to('/brain') },
+  // a bare /inbox is Needs you; one with a filter or a state (a count's door) is the Queue, the list that count is of
+  { path: '/inbox', redirect: (r) => {
+    const { all, area, space, ...rest } = r.query
+    return { path: Object.keys(rest).length ? '/brain/queue' : '/brain', query: r.query, hash: r.hash }
+  } },
   { path: '/inbox/:id/review', redirect: (r) => ({ path: `/brain/review/${r.params.id}`, query: r.query }) },
   // an inbox item opens in the pane over the list; old links to /inbox/:id still work
-  { path: '/inbox/:id', redirect: (r) => ({ path: '/brain', query: { ...r.query, open: `inbox:${r.params.id}` } }) },
+  { path: '/inbox/:id', redirect: (r) => ({ path: '/brain/queue', query: { ...r.query, open: `inbox:${r.params.id}` } }) },
   { path: '/plan', redirect: to('/today/week') },
   { path: '/plan/goals/:id', redirect: (r) => ({ path: `/goals/${r.params.id}`, query: r.query, hash: r.hash }) },
   { path: '/plan/reset', redirect: to('/today/reset') },
