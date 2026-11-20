@@ -173,14 +173,23 @@ async function session(user, width = 1440) {
 
 const ONLY_UX = process.argv.includes('--ux') // run only the UX checks (U1 and up)
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7) // run only the checks whose number ends with this: --only=.8
-// Issue 5: `--width=390` runs only the checks made at 390 px (and the clean-up), `--width=1440` everything else, so GitHub
-// Actions can run the two halves side by side, each on its own bench. Without it, both run, one after the other.
-const WIDTH = (process.argv.find((a) => a.startsWith('--width=')) || '').slice(8)
-const WIDTHS = WIDTH ? [Number(WIDTH)] : [1440, 390]
-const AT_390 = /(^U|\.)390\./ // U390.1, S7.390.1, BF1.390.1
-const inHalf = (n) => !WIDTH || ['S4.1', 'S4.0'].includes(String(n)) || (WIDTH === '390') === AT_390.test(String(n))
+// Issue 5: `--part=` runs one part of the walk, so GitHub Actions can run the parts side by side, each on its own bench:
+//   --part=1440   the UX checks of sets 1 to 6 at 1440 px (U1440.n)
+//   --part=390    the same at 390 px (U390.n)
+//   --part=sets   everything else: S6, sets 7 and 8, bug fix 1 and the issues at both widths, I5 and the scan (C.1)
+// Every part also runs checks 1 to 16 and S1 to S3, whose records later checks use, and the clean-up S4.1 and S4.0.
+// Without it, the whole walk runs, one check after another, as before.
+const PART = (process.argv.find((a) => a.startsWith('--part=')) || '').slice(7)
+if (PART && !['1440', '390', 'sets'].includes(PART)) throw new Error('--part= takes 1440, 390 or sets')
+const UX_WIDTHS = { '': [1440, 390], 1440: [1440], 390: [390], sets: [] }[PART]
+const SET_WIDTHS = PART && PART !== 'sets' ? [] : [1440, 390]
+const inPart = (n) => {
+  const name = String(n)
+  if (!PART || /^(\d+|S[123]|S4\.[01])$/.test(name)) return true
+  return PART === 'sets' ? !/^U\d/.test(name) : name.startsWith(`U${PART}.`)
+}
 async function check(n, title, fn) {
-  if (!inHalf(n)) return
+  if (!inPart(n)) return
   if (ONLY_UX && !String(n).startsWith('U')) return
   if (ONLY && !ONLY.split(',').some((o) => String(n).endsWith(o) || String(n).startsWith(o))) return // --only=.3,.32 runs several; --only=S8 by prefix
   try {
@@ -665,7 +674,7 @@ const STATE_TABS = [
   ['All', '/life/library', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
 ]
 
-for (const width of WIDTHS) {
+for (const width of UX_WIDTHS) {
   const phone = width < 800
   const s = await session('owner@lifeos.test', width)
   const pg = s.page
@@ -2741,7 +2750,7 @@ await check('S6.6', 'The fake agent runs end to end with the goal-based API: tas
 // ---------- Set 7: Moving forward, at 1440 px and 390 px ----------
 // Key results, the Outbox and the weekly review's goal step. Every record carries "S7 … <width> <stamp>" and is removed by S4.1.
 const s7Settings = await owner.api('settings.get', { space: SPACE })
-for (const width of WIDTHS) {
+for (const width of SET_WIDTHS) {
   const phone = width < 800
   const s = await session('owner@lifeos.test', width)
   const pg = s.page
@@ -3013,7 +3022,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
 // On data shaped like the owner's (lifeos/devtools_review.py: a number goal with a Suggested reading, a milestone goal without its
 // finish line, stuck, waiting and delegated tasks, Inbox items of every kind) plus the fixture calendar. Records carry
 // "S8 … <width> <stamp>" and are removed by S4.1; devtools_review.cleanup removes the rest and puts the settings back.
-for (const width of WIDTHS) {
+for (const width of SET_WIDTHS) {
   const phone = width < 800
   const s = await session('owner@lifeos.test', width)
   const pg = s.page
@@ -3272,7 +3281,7 @@ devtools_review.cleanup("${stamp}", ${JSON.stringify(JSON.stringify(data.was))})
 
 // ---------- Bug fix 1: the weekly review on data shaped like the owner's, the error boundary, and every screen ----------
 // Records carry "BF1 … <width> <stamp>" and are removed by S4.1.
-for (const width of WIDTHS) {
+for (const width of SET_WIDTHS) {
   const s = await session('owner@lifeos.test', width)
   const pg = s.page
   const errors = []
@@ -3403,7 +3412,7 @@ print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone
 // Issue 1: people and agents in one place (Settings > People and agents: Spaces, Members, Agents)
 const I1_AGENT = 'issue1-agent@lifeos.test'
 const I1_NEW = 'issue1-newcomer@lifeos.test'
-for (const width of WIDTHS) {
+for (const width of SET_WIDTHS) {
   const phone = width < 800
   const tag = `I1.${width}`
   if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
@@ -3585,7 +3594,7 @@ await check('I5.2', 'CI has an acceptance job that builds the front end, makes a
   for (const step of ['LIFEOS_BENCH_CMD: local', 'bench build --app lifeos', 'scripts/acceptance-site.sh', 'node tools/acceptance.mjs'])
     must(job.includes(step), 'the job lacks: ' + step)
   must(!/acceptance\.mjs[^\n]*--(only|ux)/.test(job), 'the job runs only some checks')
-  must(/width: \[1440, 390\]/.test(job) && job.includes('--width=${{ matrix.width }}'), 'the job does not run both halves, 1440 and 390')
+  must(/part: \[1440, 390, sets\]/.test(job) && job.includes('--part=${{ matrix.part }}'), 'the job does not run all three parts')
   if (process.env.GITHUB_ACTIONS) {
     must(!ONLY && !ONLY_UX, 'this CI run was given --only or --ux')
     must(SETUP.bench.startsWith('local bench') && !SETUP.chrome && SETUP.passwordFrom === 'environment', 'CI is not using the switches')

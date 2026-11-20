@@ -100,14 +100,15 @@ jobs:
         run: bench --site test_site run-tests --app lifeos
 
   acceptance:
-    name: Acceptance walk (${{ matrix.width }} px)
+    name: Acceptance walk (${{ matrix.part }})
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        # the two halves of the walk side by side, each on its own bench: the checks at 390 px, and everything else
-        width: [1440, 390]
+        # the walk in three parts side by side, each on its own bench (`--part=` in tools/acceptance.mjs): the UX checks
+        # of sets 1 to 6 at 1440 px, the same at 390 px, and everything else at both widths
+        part: [1440, 390, sets]
     defaults:
       run:
         # bash with pipefail, so a failed walk fails its step through `tee`
@@ -200,7 +201,7 @@ jobs:
       - name: Acceptance walk
         run: |
           mkdir -p /tmp/acceptance-artifact
-          node tools/acceptance.mjs --no-reset --width=${{ matrix.width }} 2>&1 | tee /tmp/acceptance-artifact/walk.log
+          node tools/acceptance.mjs --no-reset --part=${{ matrix.part }} 2>&1 | tee /tmp/acceptance-artifact/walk.log
 
       - name: Collect screenshots and logs
         if: failure()
@@ -208,6 +209,8 @@ jobs:
           mkdir -p /tmp/acceptance-artifact/logs
           cp /tmp/acc-site.log /tmp/serve-acceptance.log /tmp/worker-acceptance.log /tmp/acceptance-artifact/logs/ 2>/dev/null || true
           cp -r "$LIFEOS_BENCH_PATH/logs" /tmp/acceptance-artifact/logs/bench 2>/dev/null || true
+          # bench.log records each bench command with its arguments, passwords included
+          rm -f /tmp/acceptance-artifact/logs/bench/bench.log*
           # nothing secret leaves the runner (issue 5, acceptance test 4)
           if grep -rlF -e "$LIFEOS_DEV_PASSWORD" -e "$LIFEOS_DB_ROOT_PASSWORD" /tmp/acceptance-artifact; then
             echo "a password is in the files above; nothing is uploaded"
@@ -219,7 +222,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-${{ matrix.width }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: acceptance-${{ matrix.part }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: /tmp/acceptance-artifact
           if-no-files-found: ignore
           retention-days: 14
