@@ -365,6 +365,13 @@ GitHub issue #10. Deviations are in `DECISIONS.md` under "Issue 10".
 - **Works:** one page per inbox item at `/life/item/<name>`: a header with the source, when, the space, area and goal chips and the sensitive mark; What came in (the instruction, the files with their versions, the text, a job's inputs); What the Brain made of it (summary, transcript folded); Decisions (the waiting proposals with the Review screen's own cards); What came of it (the records made from it with their state); Related (wiki pages and chat logs that cite it, its meetings). Accepting on the page moves the record to What came of it without a reload. The Inbox and Library panes' Open full page, search, `[[links]]` and backlinks lead to it. A user outside the item's space gets "Not found". On a phone it is one column with sections that fold.
 - **Tests:** `lifeos/tests/test_issue10_item_page.py` (5 tests) and acceptance checks `I10.<width>.1` to `.5` at 1440 and 390 px. The item page is in `tools/screens.mjs` (light and dark, both widths).
 
+## Issue 11: the seven areas of life, with parts (20 Nov 2026)
+
+GitHub issue #11. Deviations are in `DECISIONS.md` under "Issue 11".
+
+- **Works:** every space has the seven areas of life (Career, Health, Relationships, Money, Emotions, Mind, Environment, each with its one-line description); a new space has Career and Health on. Any other area is a part of one of the seven, one level deep (`Life Area` has `is_life_area`, `is_on`, `description`; rules in `lifeos/areas.py`). An area that is off hides itself, its parts and their tasks and goals from the task and goal lists, counts, Today, the lens, `space_context`, the area tree and every picker; nothing is deleted, and proposals filed into it are refused with a clear message. Only a person can switch an area. The patch `v11.life_areas` gives existing spaces the seven and turns their areas into parts by a mapping table (unknown areas go under Career and are printed). Area pickers list the seven that are on, each followed by its parts, indented.
+- **Tests:** `lifeos/tests/test_issue11_areas.py` (the issue's five) and acceptance check `I11.<width>.6` at 1440 and 390 px. The full unit suite: 439 run, 438 pass, 1 skipped. `./tools/scan.sh`: 0 findings. `node tools/acceptance.mjs`: 160 of 162 on the first walk; the two failures were the Settings check `U<width>.12` (it nested areas under areas), rewritten for parts and passing on a rerun with `I11`.
+
 ## Summary
 
 ### What works
