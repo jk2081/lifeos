@@ -351,6 +351,13 @@ GitHub issue #8. Deviations are in `DECISIONS.md` under "Issue 8".
 - **Works:** `lifeos.api.jobs.file_job` files a piece of work as one inbox item in one call: outputs on the item, reusable inputs kept once each as Just keep items (found again by `reusable_as`) and linked through `job_inputs`, other inputs attached but listed as inputs, the summary and transcript, proposals waiting for the owner, wiki pages created or merged and a chat log, both citing the item. The same `job_id` again updates the job; an item filed the old way with the job id as `external_id` is taken over. All or nothing, with the field named in the error. The review shows Outputs, Inputs and "Filed with it" for a job. `agent/FILE_WORK.md` is rewritten around the call; `agent/SKILL.md`, `README.md` and `agent/fake_agent.py` (`--file-job`) are updated.
 - **Tests:** `lifeos/tests/test_issue8_jobs.py` (8 tests: the issue's six, a failure while writing that rolls back, the old-way take-over) and acceptance check `I8.<width>.7` at 1440 and 390 px. The full unit suite: 424 run, 423 pass, 1 skipped. `--only=I7,I8`: 4 of 4. `./tools/scan.sh`: 0 findings. The job page was looked at in light and dark at 1440 and 390 px; nothing scrolls sideways.
 
+## Issue 9: the tidy command (20 Nov 2026)
+
+GitHub issue #9. Deviations are in `DECISIONS.md` under "Issue 9".
+
+- **Works:** `bench --site SITE execute lifeos.tools.tidy.run` reports duplicate stored files (same SHA-256 in one space) and the records using them, jobs from an agent that hold inputs beside outputs (with the files that look like inputs), and items Failed by the intent refusal; it changes nothing. With `{'apply': True}` it takes a backup with files first and refuses if that fails, then keeps the oldest copy of each duplicate and relinks the rest, removes copies no `File` row uses, moves input files to reusable assets linked from the job, and puts the Failed items back to New. Every change goes to `logs/lifeos_tidy.log` and as a comment on the record. A second run changes nothing. `README.md` has the three steps for the owner.
+- **Tests:** `lifeos/tests/test_issue9_tidy.py` (the issue's six). Also run end to end on `acceptance.localhost` with a real backup.
+
 ## Summary
 
 ### What works
