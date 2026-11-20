@@ -24,7 +24,10 @@ class DuplicateFiles:
 		groups = {}
 		for row in self._rows():
 			space = self._space(row)
-			if space in self.spaces and row.digest:
+			if space not in self.spaces:
+				continue
+			row.digest = row.life_sha256 or _hash_of(row.file_url)
+			if row.digest:
 				groups.setdefault((space, row.digest, row.is_private), []).append(row)
 		out = []
 		for (space, digest, _private), rows in groups.items():
@@ -68,13 +71,10 @@ class DuplicateFiles:
 	# ---------- finding ----------
 
 	def _rows(self):
-		rows = frappe.get_all("File", filters={"attached_to_doctype": ["in", SPACE_DOCTYPES], "is_folder": 0,
+		return frappe.get_all("File", filters={"attached_to_doctype": ["in", SPACE_DOCTYPES], "is_folder": 0,
 			"file_url": ["like", "%/files/%"]}, fields=["name", "file_name", "file_url", "content_hash", "file_size", "is_private",
 			"attached_to_doctype", "attached_to_name", "attached_to_field", "life_sha256", "life_version_of", "creation"],
 			order_by="creation asc, name asc")
-		for row in rows:
-			row.digest = row.life_sha256 or _hash_of(row.file_url)
-		return rows
 
 	def _space(self, row):
 		key = (row.attached_to_doctype, row.attached_to_name)
