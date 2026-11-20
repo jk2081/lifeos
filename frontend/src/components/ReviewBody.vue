@@ -26,8 +26,8 @@
       <div class="cols">
         <div class="half">
           <section v-show="part('original')" data-review-original>
-            <SectionHead>Original</SectionHead>
-            <div v-if="!item.files.length && !item.raw_text" class="grid min-h-[120px] place-items-center rounded-5 border border-dashed border-outline-gray-3 bg-surface-gray-1 text-base text-ink-gray-6"><span>No file was attached.</span></div>
+            <SectionHead :data-review-outputs="item.job_id ? '' : undefined">{{ item.job_id ? 'Outputs' : 'Original' }}</SectionHead>
+            <div v-if="!item.files.length && !item.raw_text" class="grid min-h-[120px] place-items-center rounded-5 border border-dashed border-outline-gray-3 bg-surface-gray-1 text-base text-ink-gray-6"><span>{{ item.job_id ? 'No output was attached.' : 'No file was attached.' }}</span></div>
             <div v-for="f in item.files" :key="f.file_url" class="mb-3">
               <template v-if="fileKind(f.file_name) === 'image'">
                 <div class="max-h-[520px] overflow-auto rounded-5 border border-outline-gray-1 bg-surface-gray-1" :class="zoom ? 'cursor-zoom-out' : 'cursor-zoom-in'" @click="zoom = !zoom">
@@ -45,6 +45,29 @@
               <FileVersions :file="f" />
             </div>
             <Card v-if="item.raw_text" class="mt-2"><DigestView v-if="item.source_type === 'Email Digest'" :text="item.raw_text" /><Md v-else :text="item.raw_text" /></Card>
+          </section>
+          <!-- Issue 8: a piece of work filed with one call lists what it was made from apart from what was made -->
+          <section v-if="item.job_id" v-show="part('original')" data-review-inputs>
+            <SectionHead>Inputs</SectionHead>
+            <Card v-if="!item.inputs.length"><Empty title="No inputs." hint="The agent filed no inputs with this work." /></Card>
+            <ul v-else class="flex flex-col gap-2">
+              <li v-for="i in item.inputs" :key="i.name" class="min-w-0 rounded-5 border border-outline-gray-1 px-3 py-2" data-review-input>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-base">
+                  <a v-if="i.file" class="break-all text-ink-blue-8 hover:underline" :href="i.file.file_url" target="_blank" rel="noopener">{{ i.name }}</a>
+                  <span v-else class="break-all text-ink-gray-9">{{ i.name }}</span>
+                  <span v-if="i.file?.file_size" class="text-sm text-ink-gray-6">{{ fileSize(i.file.file_size) }}</span>
+                  <Badge v-if="i.asset" label="Reusable" />
+                </div>
+                <div v-if="i.asset" class="mt-1 text-sm text-ink-gray-6">Kept once as
+                  <a href="#" class="text-ink-blue-8 underline" @click.prevent="openRoute(i.asset_route)">{{ i.asset_title || i.reusable_as }}</a></div>
+                <FileVersions v-if="i.file" :file="i.file" />
+              </li>
+            </ul>
+            <p v-if="item.wiki_pages.length || item.job_chat" class="mt-3 flex flex-wrap gap-x-2 gap-y-1 text-sm text-ink-gray-6" data-review-filed-with>
+              <span>Filed with it:</span>
+              <a v-for="w in item.wiki_pages" :key="w.name" href="#" class="text-ink-blue-8 underline" @click.prevent="openRoute(w.route)">{{ w.title }}</a>
+              <a v-if="item.job_chat" href="#" class="text-ink-blue-8 underline" @click.prevent="openRoute(item.job_chat.route)">{{ item.job_chat.title }}</a>
+            </p>
           </section>
           <Card v-if="phone && part('transcript') && !item.transcript_md && !writable"><Empty title="No transcript." /></Card>
           <section v-if="(item.transcript_md || writable) && part('transcript')">
@@ -198,10 +221,10 @@ const ctx = computed(() => item.value?.context || { areas: [], tags: [], goals: 
 const canRestore = computed(() => store.spaces.find((s) => s.name === item.value?.space)?.access === 'Write')
 const writable = computed(() => canRestore.value && !item.value?.is_archived)
 const pending = computed(() => item.value.proposals.filter((p) => p.status === 'Pending'))
-// Phone only: Original, Transcript, Summary, Proposals as tabs (tab= on the page, ptab= in the pane). It opens on
+// Phone only: Original (Files for a job, issue 8), Transcript, Summary, Proposals as tabs (tab= on the page, ptab= in the pane). It opens on
 // Proposals while some are pending, otherwise on Summary.
 const phone = useMediaQuery('(max-width: 639px)')
-const phoneTabs = computed(() => !item.value ? [] : [{ value: 'original', label: 'Original' }, { value: 'transcript', label: 'Transcript' },
+const phoneTabs = computed(() => !item.value ? [] : [{ value: 'original', label: item.value.job_id ? 'Files' : 'Original' }, { value: 'transcript', label: 'Transcript' },
   { value: 'summary', label: 'Summary' }, { value: 'proposals', label: 'Proposals', count: item.value.proposals.length, noun: 'proposals' }])
 // the opening tab is decided once, so accepting the last proposal does not move the screen to another tab
 let opening = null
