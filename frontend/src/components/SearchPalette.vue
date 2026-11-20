@@ -111,6 +111,7 @@ function go(r) {
     return startAsk(q)
   }
   if (r.space && r.space !== store.space) Object.assign(store, { space: r.space, lensArea: '' }) // a result in another space: its whole space
+  if (r.ref_doctype === 'Life Inbox Item') return router.push(r.route) // a capture opens its item page (issue 10)
   const ref = refOf(r.ref_doctype, r.ref_name)
   ref ? openRef(ref) : router.push(r.route)
 }

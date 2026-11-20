@@ -20,6 +20,8 @@ const routes = [
   { path: '/', name: 'Today', component: page('Today') },
   { path: '/inbox', name: 'Inbox', component: page('Inbox') },
   { path: '/inbox/:id/review', name: 'Review', component: page('Review'), props: true },
+  // issue 10: one page per capture, with its source, files, summary, decisions and what came of it
+  { path: '/item/:id', name: 'Item', component: page('Item'), props: true },
   // an inbox item opens in the pane over the list; old links to /inbox/:id still work
   { path: '/inbox/:id', redirect: (r) => ({ path: '/inbox', query: { ...r.query, open: `inbox:${r.params.id}` } }) },
 
