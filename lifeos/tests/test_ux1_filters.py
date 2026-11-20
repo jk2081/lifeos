@@ -61,16 +61,17 @@ class TestListFilters(LifeTestCase):
 		self.assertEqual(tasks.list(space=PRIVATE, loops=1)["total"], tasks.open_loops(space=PRIVATE)["total"])
 
 	def test_area_filter_takes_sub_areas(self):
-		sub = self.make("Life Area", area_name="ux1 Estate", parent_area=self.areas["Tea"])
+		career = self.life["Career"]  # issue 11: an area of life with its parts
+		sub = self.make("Life Area", area_name="ux1 Estate", parent_area=career)
 		t = self.make("Life Task", title="ux1 in sub", area=sub.name)
 		unfiled = self.make("Life Task", title="ux1 unfiled")
-		self.assertIn(t.name, self.names(tasks.list(space=PRIVATE, area=self.areas["Tea"], page_length=100)["tasks"]))
+		self.assertIn(t.name, self.names(tasks.list(space=PRIVATE, area=career, page_length=100)["tasks"]))
 		self.assertNotIn(t.name, self.names(tasks.list(space=PRIVATE, area=self.areas["Money"], page_length=100)["tasks"]))
 		none = self.names(tasks.list(space=PRIVATE, area="none", page_length=100)["tasks"])
 		self.assertIn(unfiled.name, none)
 		self.assertNotIn(t.name, none)
 		tree = {a["name"]: a for a in area_api.tree(space=PRIVATE)["areas"]}
-		self.assertEqual(tree[self.areas["Tea"]]["open_tasks"], tasks.list(space=PRIVATE, area=self.areas["Tea"])["total"])
+		self.assertEqual(tree[career]["open_tasks"], tasks.list(space=PRIVATE, area=career)["total"])
 
 	def test_inbox_filters(self):
 		a = self.make("Life Inbox Item", title="ux1 voice", source_type="Voice Note", status="New", area=self.areas["Tea"])

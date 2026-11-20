@@ -8,45 +8,40 @@ from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED, LifeTestCas
 
 
 class TestSettings(LifeTestCase):
-	def test_archive_area_with_sub_area_and_restore(self):
-		top = settings.save_item("area", space=PRIVATE, title="ux3 top")["name"]
-		sub = settings.save_item("area", space=PRIVATE, title="ux3 sub", parent_area=top)["name"]
-		task = self.make("Life Task", title="ux3 filed under sub", area=sub)
-		out = settings.save_item("area", name=top, is_archived=1)
-		self.assertEqual(out["archived_children"], [sub])
-		for n in (top, sub):
-			self.assertEqual(frappe.db.get_value("Life Area", n, "is_archived"), 1)
-			self.assertEqual(str(frappe.db.get_value("Life Area", n, "archived_on")), today())
+	# issue 11: areas are the seven areas of life with their parts; the seven are switched off, not archived, so only a part is
+	# archived, and a part holds no parts of its own
+	def test_archive_a_part_and_restore(self):
+		career = self.life["Career"]
+		part = settings.save_item("area", space=PRIVATE, title="ux3 part", parent_area=career)["name"]
+		task = self.make("Life Task", title="ux3 filed under the part", area=part)
+		out = settings.save_item("area", name=part, is_archived=1)
+		self.assertEqual(out["archived_children"], [])
+		self.assertEqual(frappe.db.get_value("Life Area", part, "is_archived"), 1)
+		self.assertEqual(str(frappe.db.get_value("Life Area", part, "archived_on")), today())
 		# the records under it are not changed, and the pickers no longer offer it
-		self.assertEqual(frappe.db.get_value("Life Task", task.name, ["area", "is_archived"]), (sub, 0))
-		self.assertNotIn(sub, [a.name for a in area.tree(PRIVATE)["areas"]])
+		self.assertEqual(frappe.db.get_value("Life Task", task.name, ["area", "is_archived"]), (part, 0))
+		self.assertNotIn(part, [a.name for a in area.tree(PRIVATE)["areas"]])
 		got = settings.get(PRIVATE)
-		row = next(a for a in got["areas"] if a.name == sub)
+		row = next(a for a in got["areas"] if a.name == part)
 		self.assertTrue(row.is_archived and row["count"] >= 1)
-		# restore with the sub-area archived with it: both come back in place
-		out = settings.save_item("area", name=top, is_archived=0, with_children=1)
-		self.assertEqual(out["restored_children"], [sub])
-		self.assertEqual(frappe.db.get_value("Life Area", sub, ["is_archived", "parent_area"]), (0, top))
-		self.assertIsNone(frappe.db.get_value("Life Area", sub, "archived_on"))
-
-	def test_restore_under_an_archived_parent_goes_to_the_top(self):
-		top = settings.save_item("area", space=PRIVATE, title="ux3 parent b")["name"]
-		sub = settings.save_item("area", space=PRIVATE, title="ux3 child b", parent_area=top)["name"]
-		settings.save_item("area", name=sub, is_archived=1)
-		settings.save_item("area", name=top, is_archived=1)
-		settings.save_item("area", name=sub, is_archived=0)
-		self.assertEqual(frappe.db.get_value("Life Area", sub, ["is_archived", "parent_area"]), (0, None))
+		# restored: back in place under its area of life
+		settings.save_item("area", name=part, is_archived=0)
+		self.assertEqual(frappe.db.get_value("Life Area", part, ["is_archived", "parent_area"]), (0, career))
+		self.assertIsNone(frappe.db.get_value("Life Area", part, "archived_on"))
+		self.assertRaises(frappe.ValidationError, settings.save_item, "area", name=career, is_archived=1)
 
 	def test_reorder_and_nest(self):
-		a = settings.save_item("area", space=PRIVATE, title="ux3 order a")["name"]
-		b = settings.save_item("area", space=PRIVATE, title="ux3 order b")["name"]
-		settings.reorder("area", frappe.as_json([b, a]), parent_area="")
+		career, mind = self.life["Career"], self.life["Mind"]
+		a = settings.save_item("area", space=PRIVATE, title="ux3 order a", parent_area=career)["name"]
+		b = settings.save_item("area", space=PRIVATE, title="ux3 order b", parent_area=career)["name"]
+		settings.reorder("area", frappe.as_json([b, a]), parent_area=career)
 		self.assertLess(frappe.db.get_value("Life Area", b, "sort_order"), frappe.db.get_value("Life Area", a, "sort_order"))
-		settings.reorder("area", frappe.as_json([a]), parent_area=b)
-		self.assertEqual(frappe.db.get_value("Life Area", a, "parent_area"), b)
-		# one level deep: an area under a sub-area is refused
-		c = settings.save_item("area", space=PRIVATE, title="ux3 order c")["name"]
+		settings.reorder("area", frappe.as_json([a]), parent_area=mind)
+		self.assertEqual(frappe.db.get_value("Life Area", a, "parent_area"), mind)
+		# one level deep: a part under a part, or a part at the top, is refused
+		c = settings.save_item("area", space=PRIVATE, title="ux3 order c", parent_area=career)["name"]
 		self.assertRaises(frappe.ValidationError, settings.save_item, "area", name=c, parent_area=a)
+		self.assertRaises(frappe.ValidationError, settings.save_item, "area", name=c, parent_area="")
 
 	def test_tags_habits_dimensions_archive_and_leave_the_pickers(self):
 		tag = settings.save_item("tag", space=PRIVATE, title="ux3tag")["name"]

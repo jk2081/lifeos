@@ -33,11 +33,12 @@ def load(space="Private"):
 	permissions.clear_cache()
 	t = seed.Tracker(seed.DEMO_KEY)
 	now = getdate(today())
-	area = {a.area_name: a.name for a in frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set")}, fields=["name", "area_name"])}
-	tea = area["Tea & Coffee"]
+	area = {a.area_name: a.name for a in frappe.get_all("Life Area", filters={"space": space}, fields=["name", "area_name"])}
+	career, tea = area["Career"], area["Tea & Coffee"]
 
+	# the estates are parts of Career beside Tea & Coffee: parts are one level deep (issue 11)
 	for i, name in enumerate(["Ghatia", "Ghillidary", "Chandighat", "Chikmagalur", "Head office"]):
-		t.insert({"doctype": "Life Area", "space": space, "area_name": name, "parent_area": tea, "sort_order": i + 1})
+		area[name] = t.insert({"doctype": "Life Area", "space": space, "area_name": name, "parent_area": career, "sort_order": i + 10}).name
 	for name in ("estate", "audit", "tax"):
 		t.insert({"doctype": "Life Tag", "space": space, "tag_name": name})
 
@@ -271,7 +272,7 @@ def load_v4(space="Private"):
 	frappe.set_user(owner)  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	permissions.clear_cache()
 	t = seed.Tracker(DEMO4_KEY)
-	area = {a.area_name: a.name for a in frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set")}, fields=["name", "area_name"])}
+	area = {a.area_name: a.name for a in frappe.get_all("Life Area", filters={"space": space}, fields=["name", "area_name"])}
 	made = []
 	for title, stype, text, intent, extra in (
 		("Email digest, 16 Nov", "Email Digest", DIGEST, "Process", {"source_system": "gmail", "external_id": "demo-digest-2026-11-16"}),

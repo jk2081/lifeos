@@ -188,9 +188,14 @@ def claim_next(space: str | None = None):
 
 def space_context(space):
 	"""What an agent needs to file proposals: the space's areas, tags, people, habits, dimensions and goals in progress (projects
-	became open-ended goals in set 6)."""
-	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour", "is_pinned"],
-		order_by="sort_order, area_name", limit=500)
+	became open-ended goals in set 6).
+	`areas` (issue 11) holds the areas of life that are on, each followed by its parts: file only into these. `areas_off`
+	names the areas of life that are switched off; nothing may be filed there, and their goals are left out."""
+	from lifeos import areas as life
+
+	areas = life.ordered(space, fields=["name", "area_name", "parent_area", "is_life_area", "description", "colour", "is_pinned"])
+	off = set(life.off(space))
+	areas_off = [a.area_name for a in life.ordered(space, include_off=True, fields=["name", "area_name"]) if a.is_life_area and a.name in off]
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)
 	# every goal in progress, of every type, for filing a task under it; 12 Week Year goals of the active cycle carry their actions
 	goals = []
@@ -198,6 +203,8 @@ def space_context(space):
 			g.target_value, g.current_value, g.current_on from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
 			where g.space=%s and g.outcome='In Progress' and (ifnull(g.cycle, '') = '' or c.status in ('Active', 'Planned'))
 			order by field(g.goal_type, '12 Week Year', 'Annual', 'Open'), g.sort_order, g.title""", space, as_dict=True):
+		if g.area in off:  # the goals of an area that is off are hidden
+			continue
 		g["actions"] = frappe.get_all("Life Goal Action", filters={"parent": g.name}, fields=["name", "title", "status", "per_week"], order_by="idx") if g.cycle else []
 		if g.measure_kind == "Number":  # a number goal: what a Reading proposal reports (set 7)
 			g["measure"] = {"measure": g.measure, "unit": g.unit, "start": g.start_value, "target": g.target_value, "current": g.current_value if g.current_on else None}
@@ -206,6 +213,7 @@ def space_context(space):
 	return {
 		"space": space,
 		"areas": areas,
+		"areas_off": areas_off,
 		"tags": frappe.get_all("Life Tag", filters={"space": space, "is_archived": 0}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
 		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], limit=500),
 		"habits": frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title"], limit=200),

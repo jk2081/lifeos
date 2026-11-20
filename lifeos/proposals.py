@@ -158,6 +158,18 @@ def resolve_link(doctype, value, space, extra_filters=None):
 	return matches[0]
 
 
+def _switched_on(doctype, name, space):
+	"""Nothing is filed into an area that is switched off, or a part of one (issue 11)."""
+	from lifeos import areas
+
+	if doctype == "Life Area" and areas.is_off(space, name):
+		area = frappe.db.get_value("Life Area", name, ["area_name", "parent_area", "is_on"], as_dict=True)
+		life = area.area_name if area.is_on == 0 or not area.parent_area else frappe.db.get_value("Life Area", area.parent_area, "area_name")
+		raise PayloadError(_("The area {0} is switched off, so nothing can be filed there. Choose an area that is on, or ask the "
+			"owner to switch {1} on in Settings > Areas.").format(area.area_name, life))
+	return name
+
+
 def _coerce(name, spec, value, space, ctx):
 	t = spec["type"]
 	if t in ("text", "markdown"):
@@ -203,13 +215,13 @@ def _coerce(name, spec, value, space, ctx):
 		if spec["doctype"] == "Life Goal":
 			active = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"})
 			extra = {"cycle": active} if active else None
-		return resolve_link(spec["doctype"], value, space, extra)
+		return _switched_on(spec["doctype"], resolve_link(spec["doctype"], value, space, extra), space)
 	if t == "links":
 		if isinstance(value, str):
 			value = [value]
 		if not isinstance(value, list):
 			raise PayloadError(_("{0} must be a list.").format(name))
-		return [resolve_link(spec["doctype"], v, space) for v in value if v]
+		return [_switched_on(spec["doctype"], resolve_link(spec["doctype"], v, space), space) for v in value if v]
 	if t == "tags":
 		if isinstance(value, str):
 			value = [value]

@@ -17,7 +17,16 @@ export function areaLabel(a) {
   const parent = a.parent_area && lookups.areas.find((x) => x.name === a.parent_area)
   return (parent ? parent.area_name + ' / ' : '') + a.area_name
 }
-export const areaOptions = () => lookups.areas.map((a) => ({ value: a.name, label: areaLabel(a) }))
+// The area pickers (issue 11): the seven areas of life that are on, each followed by its parts, indented. The server sends
+// them in that order and leaves out the areas that are off. `title` is the full name, for the chosen value.
+export const PART_INDENT = '\u2003'
+export function areaOptionsOf(areas) {
+  return (areas || []).map((a) => {
+    const parent = a.parent_area && areas.find((x) => x.name === a.parent_area)
+    return { value: a.name, label: (a.parent_area ? PART_INDENT : '') + a.area_name, title: (parent ? parent.area_name + ' / ' : '') + a.area_name }
+  })
+}
+export const areaOptions = () => areaOptionsOf(lookups.areas)
 export const areaName = (id) => lookups.areas.find((a) => a.name === id)?.area_name || ''
 
 // The goal picker on a task: every goal in progress, grouped by type (12 Week Year, Annual, Open) in that order

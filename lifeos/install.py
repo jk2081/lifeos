@@ -2,7 +2,7 @@
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
-from lifeos.constants import ROLES, STARTER_AREAS
+from lifeos.constants import ROLES
 
 # set 8: what the weekly review knows about a meeting read from Google Calendar
 MEETING_FIELDS = [
@@ -126,11 +126,10 @@ def add_member(space, user, access="Write", role="Life User"):
 
 
 def make_personal_space(user, space_name=None):
-	"""Create a private space for a family member, with the starter areas."""
+	"""Create a private space for a family member. Like every new space it gets the seven areas of life (issue 11)."""
 	from lifeos import seed
 	space_name = space_name or f"{frappe.db.get_value('User', user, 'first_name') or user}'s space"
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name, "owner_user": user,
 		"members": [{"user": user, "access": "Write"}]}).insert(ignore_permissions=True)
-	seed.make_areas(doc.name, STARTER_AREAS)
 	seed.make_dimensions(doc.name)
 	return doc.name

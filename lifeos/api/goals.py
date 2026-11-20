@@ -8,6 +8,7 @@ from frappe.utils import getdate
 
 from lifeos import journal as rules
 from lifeos import permissions, readings
+from lifeos.areas import off_clause
 from lifeos.api.utils import area_filter, names_map, page, std_clause, std_order, summarise, tab_counts
 from lifeos.proposals import goal_for_project
 from lifeos.api.utils import order_by as sort_order
@@ -59,6 +60,9 @@ def where_clause(space, state=None, goal_type=None, area=None, cycle=None, targe
 		values["goal_type"] = goal_type
 	if area:
 		where.append(area_filter(space, area, "g.area", values))
+	off = off_clause(space, "g.area", values)  # goals of an area that is off are hidden (issue 11)
+	if off:
+		where.append(off[len(" and "):])
 	if serves:
 		where.append("g.serves = %(serves)s")
 		values["serves"] = serves
@@ -235,10 +239,13 @@ def add_to_cycle(goal: str, cycle: str):
 def picker(space: str | None = None):
 	"""Every goal in progress, grouped by type, for the goal picker on a task."""
 	space = permissions.resolve_space(space)
-	rows = frappe.db.sql("""select g.name, g.title, g.goal_type, g.area, c.title as cycle_title from `tabLife Goal` g
-		left join `tabLife Cycle` c on c.name = g.cycle where g.space=%s and g.outcome = 'In Progress'
-		and (g.goal_type != '12 Week Year' or c.status in ('Active', 'Planned'))
-		order by field(g.goal_type, '12 Week Year', 'Annual', 'Open'), g.sort_order, g.title""", space, as_dict=True)
+	values = {"space": space}
+	off = off_clause(space, "g.area", values)  # not goals of an area that is off (issue 11)
+	# nosemgrep: frappe-sql-format-injection -- `off` is off_clause's fixed SQL; values are parameters
+	rows = frappe.db.sql(f"""select g.name, g.title, g.goal_type, g.area, c.title as cycle_title from `tabLife Goal` g
+		left join `tabLife Cycle` c on c.name = g.cycle where g.space=%(space)s and g.outcome = 'In Progress'
+		and (g.goal_type != '12 Week Year' or c.status in ('Active', 'Planned')){off}
+		order by field(g.goal_type, '12 Week Year', 'Annual', 'Open'), g.sort_order, g.title""", values, as_dict=True)
 	return rows
 
 

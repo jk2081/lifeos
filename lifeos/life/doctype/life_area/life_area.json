@@ -8,6 +8,9 @@
   "space",
   "area_name",
   "parent_area",
+  "is_life_area",
+  "is_on",
+  "description",
   "sort_order",
   "is_archived",
   "archived_on",
@@ -34,8 +37,29 @@
   {
    "fieldname": "parent_area",
    "fieldtype": "Link",
-   "label": "Parent Area",
-   "options": "Life Area"
+   "label": "Part of",
+   "options": "Life Area",
+   "description": "A part sits under one of the seven areas of life."
+  },
+  {
+   "default": "0",
+   "fieldname": "is_life_area",
+   "fieldtype": "Check",
+   "label": "One of the seven areas of life",
+   "read_only": 1,
+   "description": "Career, Health, Relationships, Money, Emotions, Mind or Environment. Every other area is a part of one of them."
+  },
+  {
+   "default": "1",
+   "fieldname": "is_on",
+   "fieldtype": "Check",
+   "label": "On",
+   "description": "An area that is off is hidden with its parts, goals and tasks, and the Brain does not file into it. Nothing is deleted."
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
   },
   {
    "fieldname": "sort_order",
@@ -69,7 +93,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-17 18:11:06.000000",
+ "modified": "2026-11-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Area",

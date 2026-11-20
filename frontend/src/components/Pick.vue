@@ -10,11 +10,11 @@ import { Button, Dropdown } from 'frappe-ui'
 
 const props = defineProps({
   modelValue: { type: [String, null], default: null },
-  options: { type: Array, default: () => [] }, // [{ value, label }]
+  options: { type: Array, default: () => [] }, // [{ value, label, title? }]
   placeholder: String, prefix: { type: String, default: '' }, clearable: { type: Boolean, default: true }, disabled: Boolean,
 })
 const emit = defineEmits(['update:modelValue'])
-const label = computed(() => props.options.find((o) => o.value === props.modelValue)?.label || '')
+const label = computed(() => { const o = props.options.find((x) => x.value === props.modelValue); return o?.title || o?.label || '' }) // title: the full name when the label is short or indented
 const menu = computed(() => {
   const items = props.options.map((o) => ({ label: o.label, selected: o.value === props.modelValue, onClick: () => emit('update:modelValue', o.value) }))
   if (props.clearable && props.modelValue) items.push({ label: 'Remove', icon: 'lucide-x', onClick: () => emit('update:modelValue', null) })

@@ -121,10 +121,10 @@ class TestAreasAndGoals(LifeTestCase):
 		self.assertRaises(frappe.ValidationError, other.insert)
 
 	def test_area_names_are_unique_per_space(self):
-		dup = frappe.get_doc({"doctype": "Life Area", "space": PRIVATE, "area_name": "Tea"})
+		dup = frappe.get_doc({"doctype": "Life Area", "space": PRIVATE, "area_name": "Tea", "parent_area": self.life["Career"]})
 		self.assertRaises(frappe.DuplicateEntryError, dup.insert)
-		self.make("Life Area", area_name="Ghatia", parent_area=self.areas["Tea"])
-		self.make("Life Area", space=SHARED, area_name="Tea")
+		self.make("Life Area", area_name="Tea", parent_area=self.life["Health"])  # the same name under another area of life
+		self.make("Life Area", space=SHARED, area_name="Tea", parent_area=self.shared_life["Career"])
 
 
 class TestIndex(LifeTestCase):
@@ -200,11 +200,10 @@ class TestIndex(LifeTestCase):
 
 class TestSeed(LifeTestCase):
 	def test_structure_is_created_at_install(self):
-		names = frappe.get_all("Life Area", filters={"space": "Private", "parent_area": ("is", "not set")}, pluck="area_name")
-		for name in seed.PRIVATE_AREAS:
-			self.assertIn(name, names)
-		shared = frappe.get_all("Life Area", filters={"space": "Shared"}, pluck="area_name")
-		self.assertEqual(sorted(shared), sorted(seed.SHARED_AREAS))
+		# issue 11: the two spaces have the seven areas of life at the top; the owner's own areas come with the seed, as parts
+		for space in ("Private", "Shared"):
+			top = frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set")}, pluck="area_name", order_by="sort_order")
+			self.assertEqual(top, ["Career", "Health", "Relationships", "Money", "Emotions", "Mind", "Environment"])
 		self.assertEqual(frappe.db.count("Life Dimension", {"space": "Private"}), 8)
 
 	def test_load_and_remove(self):

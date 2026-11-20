@@ -17,7 +17,7 @@ class TestLens(LifeTestCase):
 	def setUpClass(cls):
 		super().setUpClass()
 		frappe.set_user("Administrator")
-		cls.parent = cls.areas["Tea"]
+		cls.parent = cls.life["Career"]  # issue 11: an area of life with its parts
 		cls.sub = frappe.get_doc({"doctype": "Life Area", "space": PRIVATE, "area_name": "Lens Estate", "parent_area": cls.parent}).insert().name
 		cls.other = cls.areas["Money"]
 
@@ -109,8 +109,8 @@ class TestLens(LifeTestCase):
 		self.assertIsNone(journal.grid(space=PRIVATE, area=self.parent)) if not frappe.db.exists("Life Cycle", {"space": PRIVATE}) else None
 
 	def test_new_area_gets_a_colour(self):
-		a = frappe.get_doc({"doctype": "Life Area", "space": PRIVATE, "area_name": "Lens Colour"}).insert()
-		self.assertTrue(a.colour)
+		a = frappe.get_doc("Life Area", self.life["Mind"])  # issue 11: the seven come with their colours
+		self.assertEqual(a.colour, "violet")
 		b = frappe.get_doc({"doctype": "Life Area", "space": PRIVATE, "area_name": "Lens Colour Sub", "parent_area": a.name}).insert()
 		self.assertEqual(b.colour, a.colour)
 		json.dumps(a.as_dict(), default=str)

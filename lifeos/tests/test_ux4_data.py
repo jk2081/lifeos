@@ -176,9 +176,9 @@ class TestVaultSources(LifeTestCase):
 
 class TestLinkQuery(LifeTestCase):
 	def test_only_active_areas_of_the_space_unless_asked(self):
-		active = self.make("Life Area", area_name="ux4 active area")
-		gone = self.make("Life Area", area_name="ux4 gone area", is_archived=1)
-		shared = self.make("Life Area", space=SHARED, area_name="ux4 shared area")
+		active = self.make("Life Area", area_name="ux4 active area", parent_area=self.life["Career"])
+		gone = self.make("Life Area", area_name="ux4 gone area", is_archived=1, parent_area=self.life["Career"])
+		shared = self.make("Life Area", space=SHARED, area_name="ux4 shared area", parent_area=self.shared_life["Career"])
 		rows = queries.link_query("Life Area", "ux4", "area_name", 0, 20, {"space": PRIVATE})
 		names = [r[0] for r in rows]
 		self.assertIn(active.name, names)
@@ -209,7 +209,7 @@ class TestLinkQuery(LifeTestCase):
 	def test_search_link_uses_the_query(self):
 		from frappe.desk.search import search_link
 
-		gone = self.make("Life Area", area_name="ux4 hidden by search", is_archived=1)
+		gone = self.make("Life Area", area_name="ux4 hidden by search", is_archived=1, parent_area=self.life["Career"])
 		got = [r["value"] for r in search_link("Life Area", "ux4 hidden", filters={"space": PRIVATE})]
 		self.assertNotIn(gone.name, got)
 		self.assertTrue(permissions)

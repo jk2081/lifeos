@@ -1,6 +1,7 @@
 """The area tree (Settings > Areas and pickers). Area pages went in set 6: the lens shows an area on every place."""
 import frappe
 
+from lifeos import areas as life_areas
 from lifeos import permissions
 from lifeos.api import tasks as task_api
 from lifeos.api.utils import flag
@@ -15,14 +16,11 @@ def chat_open_counts(names):
 
 
 @frappe.whitelist(methods=["GET"])
-def tree(space: str | None = None, include_archived: bool | int = 0):
-	"""Every area of a space with its parent and small counts, for the Areas screen and for pickers."""
+def tree(space: str | None = None, include_archived: bool | int = 0, include_off: bool | int = 0):
+	"""Every area of a space with its parent and small counts, for the Areas screen and for pickers: each of the seven areas of
+	life followed by its parts (issue 11). Areas that are off, with their parts, are left out unless include_off=1."""
 	space = permissions.resolve_space(space)
-	filters = {"space": space}
-	if not flag(include_archived):
-		filters["is_archived"] = 0
-	areas = frappe.get_all("Life Area", filters=filters, fields=["name", "area_name", "parent_area", "sort_order", "is_archived", "colour", "is_pinned"],
-		order_by="sort_order asc, area_name asc", limit=1000)
+	areas = life_areas.ordered(space, include_off=flag(include_off), include_archived=flag(include_archived))
 	# each number is counted the way the list it links to is filtered: the area with its sub-areas
 	kids = {}
 	for a in areas:

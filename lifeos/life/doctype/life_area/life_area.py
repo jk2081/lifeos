@@ -20,6 +20,9 @@ class LifeArea(Document):
 				frappe.throw(_("Areas cannot form a loop."))
 			seen.add(parent)
 			parent = frappe.db.get_value("Life Area", parent, "parent_area")
+		from lifeos import areas
+
+		areas.validate_area(self)
 		if not self.colour:
 			self.colour = self.default_colour()
 

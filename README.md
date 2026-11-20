@@ -19,7 +19,7 @@ bench build --app lifeos                                 # only if get-app did n
 bench restart                                            # or restart bench start
 ```
 
-Install creates the roles `Life Admin`, `Life User` and `Life Agent`, the spaces `Private` and `Shared` with their areas and check-in dimensions, the `life_space` field on `Event`, and the database indexes. The user who runs the install (or `Administrator`) owns both spaces. Then:
+Install creates the roles `Life Admin`, `Life User` and `Life Agent`, the spaces `Private` and `Shared` with the seven areas of life (Career, Health, Relationships, Money, Emotions, Mind, Environment; Career and Health on) and check-in dimensions, the `life_space` field on `Event`, and the database indexes. The user who runs the install (or `Administrator`) owns both spaces. Then:
 
 ```
 # make yourself the owner, if you installed as Administrator
@@ -125,7 +125,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | Method | Arguments | Does |
 | --- | --- | --- |
 | `area.get` | `area, include_archived=0` | An area page: sub-areas, active projects, open tasks, reference notes, documents, recent chats with their open items, the last 20 timeline entries, the goals of the active cycle, and records from other areas that are also filed here. |
-| `area.tree` | `space=None, include_archived=0` | Every area of a space with its parent and small counts, for the Areas screen and for pickers. |
+| `area.tree` | `space=None, include_archived=0, include_off=0` | Every area of a space with its parent and small counts, for the Areas screen and for pickers: each area of life followed by its parts. Areas that are off are left out unless `include_off=1`. |
 
 **`lifeos.api.calendar`**
 
@@ -233,7 +233,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | Method | Arguments | Does |
 | --- | --- | --- |
 | `meta.proposal_schema` |  | For each proposal kind: the allowed payload fields and an example. Call once before the first submission. |
-| `meta.space_context` | `space=None` | Areas, projects, tags, people, habits, dimensions and active goals of a space, for filing proposals. |
+| `meta.space_context` | `space=None` | Areas, tags, people, habits, dimensions and active goals of a space, for filing proposals. `areas` holds the areas of life that are on, each followed by its parts; `areas_off` names those that are off. |
 
 **`lifeos.api.projects`**
 
@@ -271,8 +271,8 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | --- | --- | --- |
 | `settings.get` | `space=None` | Everything the Settings screen shows for one space; each space's `members` holds people and agents together, with `is_agent` and `kind` on each row, and `agents` lists every agent across spaces. |
 | `settings.save` | `values` | Change Life Settings. Owner only. |
-| `settings.save_item` | `kind, space=None, name=None, title=None, parent_area=None, relation=None, sort_order=None, is_archived=None, delete=0, with_children=1` | Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person. Archiving sets `archived_on`; an area takes its sub-areas with it. `delete=1` is not offered on the screen. |
-| `settings.create_space` | `space_name, owner_user=None, starter_areas=1` | Create a space, for example a private space for a family member, with the starter areas. Owner only. |
+| `settings.save_item` | `kind, space=None, name=None, title=None, parent_area=None, relation=None, sort_order=None, is_archived=None, delete=0, with_children=1, colour=None, is_pinned=None, is_on=None, description=None` | Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person. Archiving sets `archived_on`. A new area is a part of `parent_area` (one of the seven areas of life) or of Career. The seven cannot be renamed or archived; `is_on` switches an area on or off (people only). `delete=1` is not offered on the screen. |
+| `settings.create_space` | `space_name, owner_user=None, starter_areas=1` | Create a space, for example a private space for a family member. It gets the seven areas of life with Career and Health on; `starter_areas` adds the check-in dimensions. Owner only. |
 | `settings.set_member` | `space, user, access=None, remove=0, grant_role=None` | Add a person or an agent to a space, change their access, or remove them; the one method for space access. Owner only. The user must already exist. Access defaults to `Write` for a person and `Read` for an agent. A user with no Life OS role is refused unless `grant_role` is `Life User` or `Life Agent`; a user who has a Life role keeps it, and `Life Admin` is never given. The space owner cannot be removed and keeps `Write`. |
 | `settings.reorder` | `kind, names, parent_area=None` | Put the areas or check-in dimensions in this order in one call; for areas, moving one into `parent_area`'s list nests it there. |
 | `settings.set_agent_vault` | `space, allowed` | Let agents open the documents of one space's Vault, or not. Off by default. Life Admin only. |
