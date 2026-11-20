@@ -6,7 +6,7 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 // beside them. Housekeeping pages live inside the place they belong to and are not tabs: Reset under Today, the Outbox
 // under Brain, Someday under Goals, the Timeline and the trash and archive under Library.
 const TODAY = ['week', 'month', 'year']
-const BRAIN = ['activity', 'sources', 'outbox']
+const BRAIN = ['activity', 'captures', 'sources', 'outbox', 'queue']
 const GOALS = ['tasks', 'no-goal', 'someday']
 const LIBRARY = ['notes', 'documents', 'people', 'chats', 'timeline', 'archive']
 
@@ -18,12 +18,12 @@ function projectQuery(q) {
 }
 // an old route that lands on a tab with its query carried over, and a few parameters of its own
 const to = (path, extra = {}) => (r) => ({ path, query: { ...r.query, ...(typeof extra === 'function' ? extra(r) : extra) }, hash: r.hash })
-// Captures (set 6) is Brain > Activity now: everything that came in. Opened on Documents or Chats it is that tab of the
+// Captures (set 6) is the list at Brain > Captures (Activity, issue 18, is the feed beside it): everything that came in. Opened on Documents or Chats it is that tab of the
 // Library, and on notes Library > Notes; any other kind stays a kind of Activity.
 const KIND_TAB = { documents: '/library/documents', chats: '/library/chats', notes: '/library/notes' }
 const libraryKind = (r, extra = {}) => {
   const q = { ...r.query, ...extra }
-  return { path: KIND_TAB[q.tab] || '/brain/activity', query: q, hash: r.hash }
+  return { path: KIND_TAB[q.tab] || '/brain/captures', query: q, hash: r.hash }
 }
 // Plan's old tabs, by their new homes
 const PLAN_HOME = { week: '/today/week', month: '/today/month', year: '/today/year', goals: '/goals', tasks: '/goals/tasks', someday: '/goals/someday' }
@@ -49,10 +49,14 @@ const routes = [
   { path: '/settings', name: 'Settings', component: page('Settings') },
 
   // ---- every route from before issue 14 lands on its new home, with its query ----
-  { path: '/inbox', redirect: to('/brain') },
+  // a bare /inbox is Needs you; one with a filter or a state (a count's door) is the Queue, the list that count is of
+  { path: '/inbox', redirect: (r) => {
+    const { all, area, space, ...rest } = r.query
+    return { path: Object.keys(rest).length ? '/brain/queue' : '/brain', query: r.query, hash: r.hash }
+  } },
   { path: '/inbox/:id/review', redirect: (r) => ({ path: `/brain/review/${r.params.id}`, query: r.query }) },
   // an inbox item opens in the pane over the list; old links to /inbox/:id still work
-  { path: '/inbox/:id', redirect: (r) => ({ path: '/brain', query: { ...r.query, open: `inbox:${r.params.id}` } }) },
+  { path: '/inbox/:id', redirect: (r) => ({ path: '/brain/queue', query: { ...r.query, open: `inbox:${r.params.id}` } }) },
   { path: '/plan', redirect: to('/today/week') },
   { path: '/plan/goals/:id', redirect: (r) => ({ path: `/goals/${r.params.id}`, query: r.query, hash: r.hash }) },
   { path: '/plan/reset', redirect: to('/today/reset') },
@@ -82,7 +86,8 @@ const routes = [
     const [path, extra] = map[t] || ['/today/year', { view: 'cycle' }]
     return { path, query: { ...r.query, ...extra } }
   } },
-  { path: '/sources', redirect: (r) => libraryKind(r) },
+  // the old Sources page (the captures list) is Brain > Sources now; an old link with a filter still opens the captures it asked for
+  { path: '/sources', redirect: (r) => (Object.keys(r.query).filter((k) => k !== 'area' && k !== 'space').length ? libraryKind(r) : { path: '/brain/sources', query: r.query, hash: r.hash }) },
   // Chats were a tab of Sources (set 4): filters carry over; the old report (group=day) is the By day view
   { path: '/chats', redirect: (r) => {
     const { group, open, view, ...rest } = r.query

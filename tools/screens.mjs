@@ -108,7 +108,8 @@ for (const scheme of schemes) {
     // the lens (picker, chip, phone sheet), Today's banner; then the panes and screens kept from earlier sets
     const SCREENS = [
       ['today', '/life/?area='], ['today-lens', `/life/?${lens}`], ['today-banner', '/life/?area=&at=2026-11-22%2019:00:00'],
-      ['inbox', '/life/inbox?all=1&area='], ['inbox-lens', `/life/inbox?all=1&${lens}`], ['inbox-pane', `/life/inbox?all=1&area=&open=inbox:${review}`], ['review', `/life/inbox/${review}/review`], ['item', `/life/item/${review}`],
+      ['needs-you', '/life/brain?area='], ['brain-activity', '/life/brain/activity?area='], ['brain-sources', '/life/brain/sources?area='], ['needs-you-lens', `/life/brain?${lens}`], ['inbox', '/life/brain/queue?all=1&area='], ['inbox-lens', `/life/brain/queue?all=1&${lens}`], ['inbox-pane', `/life/brain/queue?all=1&area=&open=inbox:${review}`], // issue 17: Needs you, and the old list as the Queue
+       ['review', `/life/inbox/${review}/review`], ['item', `/life/item/${review}`],
       ...['week', 'month', 'year'].map((v) => [`today-${v}`, `/life/today/${v}?area=`]), ['today-other-day', '/life/today?area=&date=2026-12-02'], // issue 16
       ...['review', 'calendar', 'agenda'].map((v) => [`plan-week-${v}`, `/life/plan/week?view=${v}&area=`]),
       ...['plan', 'habits', 'checkins', 'calendar'].map((v) => [`plan-month-${v}`, `/life/plan/month?view=${v}&area=`]),
@@ -138,7 +139,7 @@ for (const scheme of schemes) {
       // set 7: the Outbox, a number goal, New goal with "Done when…", the old Inbox items' batch
       ['library-outbox', '/life/library/outbox?area='], ['library-outbox-in', '/life/library/outbox?pile=in&period=12weeks&area='],
       ...(numberGoal ? [['goal-number', `/life/plan/goals/${numberGoal}`], ['goal-number-pane', `/life/plan/goals?status=all&area=&open=goal:${numberGoal}`]] : []),
-      ['new-goal', '/life/plan/goals?area='], ['inbox-old', '/life/inbox?all=1&area=&decisions=1'],
+      ['new-goal', '/life/plan/goals?area='], ['inbox-old', '/life/brain?all=1&area=&decisions=1'],
       ...['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai', 'sensitive',
         'note-rules', 'spaces', 'members', 'archive', 'import', 'backups'].map((t) => [`settings-${t}`, `/life/settings?tab=${t}&area=`]),
     ].filter(([n]) => !only.length || only.includes(n))

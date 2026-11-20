@@ -650,27 +650,27 @@ const num = (text, which = 0) => { const m = String(text).match(/\d+/g); if (!m)
 // Set 6: the lists are tabs of the four places; Projects are goals of type Open, the Vault's documents are captures.
 const ROW = '[data-row]'
 const LISTS = [
-  ['Inbox', '/life/brain?all=1'], ['Timeline', '/life/library/timeline?all=1'], ['Tasks', '/life/goals/tasks?view=list'],
-  ['Goals', '/life/goals?all=1'], ['Documents', '/life/library/documents?tab=documents&all=1'], ['Captures', '/life/brain/activity?all=1'],
+  ['Inbox', '/life/brain/queue?all=1'], ['Timeline', '/life/library/timeline?all=1'], ['Tasks', '/life/goals/tasks?view=list'],
+  ['Goals', '/life/goals?all=1'], ['Documents', '/life/library/documents?tab=documents&all=1'], ['Captures', '/life/brain/captures?all=1'],
   ['Notes', '/life/library/notes?view=list&all=1'], ['All', '/life/library?view=list&all=1'], ['Archive', '/life/library/archive?all=1'],
 ].map(([name, p]) => [name, p, ROW])
 // one filter for each ListView, set through the library's quick-filter strip: [screen, path, URL key, URL value, the control's label, the option to pick, text to type for a Link]
 // The Area filters of set 4 are the lens since set 6 (U.40 and up check it); the Archive's only other quick filter is a text field.
 const FILTERS = [
-  ['Inbox', '/life/brain?all=1', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/goals/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
+  ['Inbox', '/life/brain/queue?all=1', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/goals/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
   ['Tasks table', '/life/goals/tasks?view=table&status=all', 'priority', 'I', 'Priority', 'I'], ['Goals', '/life/goals?status=all', 'type', 'Open', 'Type', 'Open'],
-  ['Captures', '/life/brain/activity?all=1', 'status', 'Done', 'Status', 'Done'],
+  ['Captures', '/life/brain/captures?all=1', 'status', 'Done', 'Status', 'Done'],
   ['Notes', '/life/library/notes?view=list&all=1', 'goal', ux.goal, 'Goal', ux.goalTitle, ux.goalTitle.slice(0, 6)],
 ]
 // UX fixes, set 3: the state tabs of each list screen. [screen, path, the URL parameter of the tabs, the tab values in order (the first is the default), another filter]
 // The other filter is mostly the lens's area (set 6), so each tab's count is checked with an area chosen too.
 const STATE_TABS = [
-  ['Inbox', '/life/brain', 'status', ['To Review', 'Waiting', 'Failed'], 'source_type=Message'],
+  ['Inbox', '/life/brain/queue', 'status', ['To Review', 'Waiting', 'Failed'], 'source_type=Message'],
   ['Tasks', '/life/goals/tasks', 'status', ['open', 'loops', 'Waiting', 'Done', 'Someday', 'all'], `area=${uxArea}`],
   ['Goals', '/life/goals', 'status', ['in_progress', 'achieved', 'closed', 'someday', 'all'], `area=${uxArea}`],
   ['Archive', '/life/library/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'Life Journal Page', 'trash'], `area=${uxArea}`],
   ['Someday', '/life/goals/someday', 'tab', ['all', 'due', 'tasks', 'goals', 'ideas'], `area=${uxArea}`],
-  ['Captures', '/life/brain/activity', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
+  ['Captures', '/life/brain/captures', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
   ['All', '/life/library', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
 ]
 
@@ -787,7 +787,7 @@ for (const width of UX_WIDTHS) {
       must((await paneTitle()) === title, `${name}: reload opened another record`)
     }
     await s.open('/life/inbox/' + ux.inbox)
-    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/brain' && await pg.locator(ROW).count(), '/inbox/:id does not show the list with the pane open')
+    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/brain/queue' && await pg.locator(ROW).count(), '/inbox/:id does not show the list with the pane open')
     must((await pg.locator('[data-pane-title]').innerText()).includes('UX inbox'), '/inbox/:id opened another item')
   })
 
@@ -871,7 +871,7 @@ for (const width of UX_WIDTHS) {
     }
     const hidden = { optional: phone } // lines the phone layout leaves out
     // Today's numbers, Reset's, Someday's and the sidebar's come from the count helper and are checked by U.31
-    await door('/life', 'nav-review', { path: '/life/brain', ...hidden })
+    await door('/life', 'nav-review', { path: '/life/brain/queue', ...hidden })
     // the goal page (a project page before set 6): the preview heading of Overview leads to its tab, whose list holds that number;
     // the task figure opens Plan > Tasks. The area pages became the lens and the Vault screen became Captures (no doors left there).
     const goalPage = '/life/goals/' + ux.goal
@@ -884,9 +884,9 @@ for (const width of UX_WIDTHS) {
     // set 8: the weekly review's numbers: what left the plate opens the Outbox, what came in opens Captures
     await door('/life/today/week?view=review&tab=tasks', 'review-plate-Done', { path: '/life/brain/outbox' })
     await door('/life/today/week?view=review&tab=tasks', 'review-plate-in', { path: '/life/brain/outbox' })
-    await door('/life/today/week?view=review&tab=library', 'review-came-captures', { path: '/life/brain/activity' })
+    await door('/life/today/week?view=review&tab=library', 'review-came-captures', { path: '/life/brain/captures' })
     // an inbox row: "4 of 13 proposals pending" opens that item in the pane at its pending proposals
-    await s.open('/life/brain?status=To+Review')
+    await s.open('/life/brain/queue?status=To+Review')
     const link = pg.locator('[data-row] a:visible', { hasText: 'pending' }).first()
     const text = await link.innerText()
     must(/^\d+ of \d+ proposals pending$/.test(text.trim()), `an inbox row says "${text}"`)
@@ -920,7 +920,7 @@ for (const width of UX_WIDTHS) {
       must(!new URL(pg.url()).searchParams.get(key), `${name}: Back did not undo the filter`)
     }
     // an empty result names the filters and offers Clear filters
-    await s.open('/life/brain?status=Failed&source_type=Email+Digest') // set 6: the Vault's own list became Captures; the Inbox has no intent filter
+    await s.open('/life/brain/queue?status=Failed&source_type=Email+Digest') // set 6: the Vault's own list became Captures; the Inbox has no intent filter
     await pg.locator('[data-lv-empty] button', { hasText: 'Clear filters' }).waitFor({ timeout: 8000 }).catch(() => {})
     const empty = await pg.locator('[data-lv-empty]').innerText()
     must(/Email Digest/.test(empty), 'the empty state does not name the filters: ' + empty.replace(/\s*\n\s*/g, ' | '))
@@ -936,7 +936,7 @@ for (const width of UX_WIDTHS) {
       ['Today', '/life'], ['Today under an area', '/life?area=' + uxArea], ['Week review', '/life/today/week?view=review'], ['Week calendar', '/life/today/week?view=calendar'],
       ['Week agenda', '/life/today/week?view=agenda'], ['Month plan', '/life/today/month?view=plan'], ['Habits', '/life/today/month?view=habits'],
       ['Check-ins', '/life/today/month?view=checkins'], ['Month calendar', '/life/today/month?view=calendar'], ['12 Weeks', '/life/today/year?view=cycle'],
-      ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'], ['Journal pages', '/life/brain/activity?tab=pages'],
+      ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'], ['Journal pages', '/life/brain/captures?tab=pages'],
       ['Graph', '/life/library/notes?view=graph'], ['Settings', '/life/settings']]
     for (const [name, p] of screens) {
       await s.open(p)
@@ -1117,7 +1117,7 @@ for (const width of UX_WIDTHS) {
     // the area pages became the lens (U.40 and up); the main screens below open on All of life
     const PAGES = [
       ['/life/goals/' + ux.goal, [['tasks', `/life/goals/tasks?goal=${ux.goal}&view=list`], ['notes', `/life/library/notes?view=list&goal=${ux.goal}`],
-        ['captures', `/life/brain/activity?goal=${ux.goal}`], ['links', null]]],
+        ['captures', `/life/brain/captures?goal=${ux.goal}`], ['links', null]]],
     ]
     let n = 0
     for (const [page, tabs] of PAGES) {
@@ -1418,7 +1418,7 @@ for (const width of UX_WIDTHS) {
       for (const e of ['Add as a task', 'Send to the Brain', 'Files or a photo', 'Goal', 'Note', 'Idea for Someday']) must(entries.includes(e), `the capture sheet has no ${e}: ${entries}`)
       await pg.keyboard.press('Escape')
       for (const [kind, ok] of [['goal', async () => pg.getByRole('dialog', { name: 'New goal' }).isVisible()], ['note', async () => pg.getByRole('dialog', { name: 'New note' }).isVisible()],
-        ['idea', async () => pg.getByRole('dialog', { name: 'New idea' }).isVisible()], ['files', async () => new URL(pg.url()).pathname === '/life/brain']]) {
+        ['idea', async () => pg.getByRole('dialog', { name: 'New idea' }).isVisible()], ['files', async () => pg.locator('[data-capture-files]').isVisible()]]) {
         await s.open('/life')
         await pg.locator('[data-nav-capture]').click()
         await settle()
@@ -1993,11 +1993,12 @@ while d <= last:
 
   await check(`${tag}.21`, `${width} px: intent: Just keep is in Library > Captures, not the Inbox, with text and no proposals; Add to wiki writes pages and leaves no wiki proposals`, async () => {
     // Just keep, dropped through the box
+    // (issue 17: the drop zone and the intent moved from the Inbox to the + Capture sheet)
     await s.open('/life/brain')
-    if (!(await pg.locator('[data-dropzone] textarea').count())) await pg.getByRole('button', { name: 'Or paste text instead' }).click()
-    await pg.locator('[data-dropzone] textarea').fill(`S4 keep ${width} ${stamp}\nA note to keep.`)
-    await pg.locator('[data-intent]').getByText('Just keep', { exact: true }).click()
-    await pg.getByRole('button', { name: 'Add to Inbox' }).click()
+    await pg.locator('[data-nav-capture]:visible, [data-tab-capture]:visible').first().click()
+    await pg.locator('[data-capture-text] textarea, textarea[data-capture-text]').first().fill(`S4 keep ${width} ${stamp}\nA note to keep.`)
+    await pg.locator('[role="dialog"] [data-intent]').getByText('Just keep', { exact: true }).click()
+    await pg.locator('[data-capture-brain]').click()
     await pg.waitForTimeout(1200)
     const kept = (await s.api('inbox.list', { space: SPACE, page_length: 5, filters: [['title', 'like', `S4 keep ${width} ${stamp}%`]] })).items[0]
     must(kept, 'the Just keep item was not created')
@@ -2008,16 +2009,18 @@ while d <= last:
     must(!got.proposals.length, 'Just keep: it has proposals')
     const queue = await s.api('inbox.list', { space: SPACE, page_length: 100, status: JSON.stringify(['To Review', 'New', 'Processing', 'Failed']) })
     must(!queue.items.some((i) => i.name === kept.name), 'the Just keep item is still in the Inbox')
-    await s.open('/life/brain/activity?tab=text')
+    await s.open('/life/brain/captures?tab=text')
     must((await pg.locator('[data-main]').innerText()).includes(`S4 keep ${width} ${stamp}`), 'the Just keep item is not in Sources')
     // the intent is remembered
     await s.open('/life/brain')
     await pg.waitForTimeout(1200)
     await pg.reload({ waitUntil: 'networkidle' })
-    const keepBtn = pg.locator('[data-intent] button, [data-intent] [role="radio"]').filter({ hasText: 'Just keep' }).first()
+    await pg.locator('[data-nav-capture]:visible, [data-tab-capture]:visible').first().click()
+    const keepBtn = pg.locator('[role="dialog"] [data-intent] button, [role="dialog"] [data-intent] [role="radio"]').filter({ hasText: 'Just keep' }).first()
     must(await keepBtn.evaluate((e) => ['true'].includes(e.getAttribute('aria-checked')) || ['on', 'checked', 'active'].includes(e.getAttribute('data-state')) || e.getAttribute('aria-pressed') === 'true'),
       'the last intent is not remembered')
-    await pg.locator('[data-intent]').getByText('Process', { exact: true }).click()
+    await pg.locator('[role="dialog"] [data-intent]').getByText('Process', { exact: true }).click()
+    await pg.keyboard.press('Escape')
     // Add to wiki: pages are created and edited directly; no wiki proposals for review
     const w = await s.api('inbox.create_item', { title: `S4 wiki ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'Mithun runs the Ghatia factory.', intent: 'Add to wiki' })
     runAgent()
@@ -2047,7 +2050,7 @@ while d <= last:
     // tab counts equal the rows each tab lists
     const res = await s.api('sources.list', { space: SPACE, page_length: 200 })
     for (const [t, n] of Object.entries(res.tabs)) {
-      await s.open(`/life/brain/activity?tab=${t}&view=list`)
+      await s.open(`/life/brain/captures?tab=${t}&view=list`)
       const shown = await pg.locator(`[data-state-tabs] [data-tab="${t}"]`).first().innerText()
       must(num(shown) === n, `${t}: the tab says ${shown}, the server ${n}`)
       const listed = (await s.api('sources.list', { space: SPACE, tab: t, page_length: 200 })).total
@@ -2055,11 +2058,11 @@ while d <= last:
       if (n && n <= 50) must((await pg.locator(ROW).count()) === n, `${t}: ${await pg.locator(ROW).count()} rows on screen, the tab says ${n}`)
     }
     // the Photos grid shows thumbnails (the grid is the Photos tab's first view; the loop above left List remembered, so ask for it)
-    await s.open('/life/brain/activity?tab=photos&view=grid')
+    await s.open('/life/brain/captures?tab=photos&view=grid')
     const thumbs = await pg.locator('[data-source-grid] img[data-thumb]').evaluateAll((els) => els.map((e) => e.getAttribute('src')))
     must(thumbs.length && thumbs.every((u) => /-thumb\.jpg$/.test(u)), `the Photos grid does not show thumbnails: ${thumbs.slice(0, 3)}`)
     // Made from this
-    await s.open(`/life/brain/activity?open=source:${src.name}&ptab=made`)
+    await s.open(`/life/brain/captures?open=source:${src.name}&ptab=made`)
     const madeText = await pg.locator('[data-source-made]').innerText()
     must(madeText.includes(`S4 made ${width} ${stamp}`) && madeText.includes(`S4 cites ${width} ${stamp}`), 'Made from this does not list the task and the wiki page')
     must(made.name, 'no page')
@@ -2233,7 +2236,7 @@ except frappe.PermissionError:
     const digest = `## Needs your attention\n- Mithun Sarkar: the despatch dates for December [Open](https://mail.google.com/mail/u/0/#inbox/s4${stamp}${width})\n- Ruchi: ITR papers [Open](https://mail.google.com/mail/u/0/#inbox/r${stamp})\n\n## Waiting on others\n- The auditor, scope letter [Open](https://mail.google.com/mail/u/0/#inbox/a${stamp})\n\n## Dates and deadlines\n- 20 Nov: board meeting\n\n## FYI from people\n- Anya: photos from the trip\n\n## Company information\n- Q3 numbers are out\n\n## Left out\n- 14 newsletters`
     const item = await s.api('inbox.create_item', { title: `S4 digest ${width} ${stamp}`, source_type: 'Email Digest', space: SPACE, raw_text: digest, source_system: 'gmail', external_id: `digest-${width}-${stamp}` })
     runAgent()
-    await s.open(`/life/brain/activity?tab=email&open=source:${item.name}`)
+    await s.open(`/life/brain/captures?tab=email&open=source:${item.name}`)
     must((await pg.locator('[data-digest-section]').count()) >= 6, 'the digest sections are not headed lists')
     must((await pg.locator('[data-open-gmail]').count()) >= 3, 'no Open in Gmail buttons')
     const got = await s.api('inbox.get', { item: item.name })
@@ -2281,7 +2284,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       }
       const shared = await fam.api('sources.list', { space: 'Shared', page_length: 500 })
       must(!shared.sources.some((r) => r.title.includes(stamp) && r.title.startsWith('S4')), 'the family member sees a Private source')
-      await fam.open('/life/brain/activity')
+      await fam.open('/life/brain/captures')
       must(!(await fam.page.locator('[data-main]').innerText()).includes(`S4 keep`), 'a Private source shows to the family member')
       const ch = await fam.api('frappe.client.get_count', { doctype: 'Life Wiki Change', filters: { space: SPACE } }, { raw: true })
       must(!ch.ok() || (await ch.json()).message === 0, 'the family member counts Private wiki changes')
@@ -2301,13 +2304,13 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
     const total = (m, args) => s.api(m, { space: SPACE, page_length: 1, ...args }).then((r) => r.total)
     // [name, path, list method, the server's count under an area]
     const L = [
-      ['Inbox', '/life/brain?all=1', 'inbox.list', null],
+      ['Inbox', '/life/brain/queue?all=1', 'inbox.list', null],
       ['Plan > Goals', '/life/goals?all=1', 'goals.list', (a) => total('goals.list', { area: a })],
       ['Plan > Tasks', '/life/goals/tasks?view=list&all=1', 'tasks.list', (a) => total('tasks.list', { area: a, status: 'open_doing' })], // the Open tab: Open and Doing
       ['Plan > Someday', '/life/goals/someday?all=1', 'someday.list', (a) => total('someday.list', { area: a })],
       ['Library > All', '/life/library?view=list&all=1', 'sources.list', (a) => total('sources.list', { scope: 'all', area: a })],
       ['Library > Notes', '/life/library/notes?view=list&all=1', 'library.list', (a) => total('library.list', { collection: 'all', area: a })],
-      ['Library > Captures', '/life/brain/activity?view=list&all=1', 'sources.list', (a) => total('sources.list', { area: a })],
+      ['Library > Captures', '/life/brain/captures?view=list&all=1', 'sources.list', (a) => total('sources.list', { area: a })],
       ['Library > Timeline', '/life/library/timeline?all=1', 'timeline.get', (a) => total('timeline.get', { area: a })],
       ['Library > Archive', '/life/library/archive?all=1', 'archive.list', (a) => total('archive.list', { area: a })],
     ]
@@ -2399,7 +2402,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       '/life/today/month?view=habits', '/life/today/month?view=checkins', '/life/today/month?view=calendar', '/life/today/year?view=cycle', '/life/today/year?view=calendar',
       '/life/today/year?view=goals', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/today/reset', '/life/library', '/life/library/notes',
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
-      '/life/brain/activity', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/activity?tab=photos', '/life/brain/activity?tab=pages', '/life/library/timeline',
+      '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/brain/captures?tab=pages', '/life/library/timeline',
       '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
       ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
@@ -2535,7 +2538,7 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
     ['/areas', '/settings', { tab: 'areas' }],
     [`/areas/${uxArea}`, '/today', { area: uxArea }],
     ['/library?view=tree', '/library/notes', { view: 'tree' }],
-    [`/inbox/${ux.inbox}`, '/brain', { open: `inbox:${ux.inbox}` }],
+    [`/inbox/${ux.inbox}`, '/brain/queue', { open: `inbox:${ux.inbox}` }],
   ]
   const bad = []
   for (const [from, to, q] of ROUTES) {
@@ -3330,7 +3333,7 @@ print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone
     await review('after a reload')
     // and navigation still moves the page
     await place('Brain')
-    must(new URL(pg.url()).pathname === '/life/brain' && await pg.locator('[data-main]').innerText().then((t) => t.includes('Inbox')), 'navigation after the review is stuck')
+    must(new URL(pg.url()).pathname === '/life/brain' && await pg.locator('[data-main]').innerText().then((t) => t.includes('Needs you')), 'navigation after the review is stuck')
     return 'clicked, by URL and reloaded; the period and Pause in the header'
   })
 
@@ -3602,7 +3605,7 @@ for (const width of SET_WIDTHS) {
     must(found.total === 1, `${found.total} items with the job's title`)
     const item = found.items[0]
     must(item.status === 'To Review' && item.pending === 2, `the item is ${item.status} with ${item.pending} pending proposals`)
-    await s.open('/life/brain')
+    await s.open('/life/brain/queue')
     const shown = await pg.locator('[data-row]', { hasText: title }).count()
     must(shown === 1, `the Inbox shows the job in ${shown} rows`)
     await s.open(`/life/inbox/${item.name}/review?tab=original`) // phones open on the proposals
@@ -3692,7 +3695,7 @@ for (const width of SET_WIDTHS) {
       must(new URL(pg.url()).pathname === `/life/item/${id}`, `Open full page from ${what} went to ${new URL(pg.url()).pathname}`)
       must(await pg.locator('[data-item-page]').count() === 1, `the item page did not show from ${what}`)
     }
-    await s.open('/life/brain')
+    await s.open('/life/brain/queue')
     const row = pg.locator('[data-row]', { hasText: title }).first()
     must(await row.count() === 1, 'the item is not in the Inbox list')
     await row.locator('[data-ref]').first().click()
@@ -3700,7 +3703,7 @@ for (const width of SET_WIDTHS) {
     await pg.locator('[data-pane-full]').click()
     await settle()
     must(new URL(pg.url()).pathname === `/life/item/${id}`, 'the Inbox list did not lead to the item page')
-    await full(`/life/brain/activity?open=${encodeURIComponent('source:' + id)}`, 'Library')
+    await full(`/life/brain/captures?open=${encodeURIComponent('source:' + id)}`, 'Library')
     await s.open('/life/library/notes')
     if (width < 768) await pg.locator('[data-phone-search]').click()
     else await pg.keyboard.press('Meta+k')
@@ -4089,6 +4092,7 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
         await s.open('/life/brain')
         const tab = Number((await pg.locator('[data-place-tabs] [data-tab="needs-you"] [data-tab-count]').innerText()).replace(/\D/g, ''))
         must(tab === inboxTotal, `Needs you says ${tab}; the Inbox has ${inboxTotal}`)
+        await s.open('/life/brain/queue')
         const listed = Number((await pg.locator('[data-state-tabs] [data-tab="To Review"] [data-tab-count]').first().innerText()).replace(/\D/g, ''))
         must(listed === inboxTotal, `the list says ${listed} to review; the Inbox has ${inboxTotal}`)
         return `${n}`
@@ -4096,15 +4100,15 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
       await check(`${tag}.4`, `${width} px: every route of the old router redirects to its new home, which loads without an error`, async () => {
         const goal = (await s.api('goals.list', { space: SPACE, goal_type: 'Open', page_length: 1 })).goals[0].name
         const area = areaId('Career') || areas[0].name
-        const OLD = [['/life', '/life/today'], ['/life/inbox', '/life/brain'], [`/life/inbox/${item.name}`, '/life/brain'],
+        const OLD = [['/life', '/life/today'], ['/life/inbox', '/life/brain'], [`/life/inbox/${item.name}`, '/life/brain/queue'],
           [`/life/inbox/${item.name}/review`, `/life/brain/review/${item.name}`], ['/life/plan', '/life/today/week'], ['/life/plan/week', '/life/today/week'],
           ['/life/plan/month', '/life/today/month'], ['/life/plan/12-weeks', '/life/today/year'], ['/life/plan/year', '/life/today/year'],
           ['/life/plan/goals', '/life/goals'], [`/life/plan/goals/${goal}`, `/life/goals/${goal}`], ['/life/plan/tasks', '/life/goals/tasks'],
           ['/life/plan/someday', '/life/goals/someday'], ['/life/plan/reset', '/life/today/reset'], ['/life/tasks', '/life/goals/tasks'],
           ['/life/someday', '/life/goals/someday'], ['/life/outbox', '/life/brain/outbox'], ['/life/archive', '/life/library/archive'],
           ['/life/wiki', '/life/library/notes'], ['/life/vault', '/life/library/documents'], ['/life/graph', '/life/library/notes'],
-          ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/activity'], ['/life/chats', '/life/library/chats'],
-          ['/life/library/captures', '/life/brain/activity'], ['/life/library/outbox', '/life/brain/outbox'], ['/life/projects', '/life/goals'],
+          ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/sources'], ['/life/chats', '/life/library/chats'],
+          ['/life/library/captures', '/life/brain/captures'], ['/life/library/outbox', '/life/brain/outbox'], ['/life/projects', '/life/goals'],
           ['/life/reset', '/life/today/week'], ['/life/calendar', '/life/today/week'], ['/life/calendar/month', '/life/today/month'],
           ['/life/calendar/year', '/life/today/year'], ['/life/calendar/agenda', '/life/today/week'], ['/life/journal', '/life/today/year'],
           ['/life/journal/goals', '/life/today/year'], ['/life/journal/month', '/life/today/month'], ['/life/journal/habits', '/life/today/month'],
@@ -4444,6 +4448,462 @@ for g in ("${made.goal}", "${made.off}"): frappe.delete_doc("Life Goal", g, forc
 for t in ${JSON.stringify(made.tasks)}: frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
 frappe.delete_doc("Event", "${made.event}", force=1, ignore_permissions=True)
 ${reviewName ? `frappe.delete_doc("Life Review", "${reviewName}", force=1, ignore_permissions=True)` : ''}`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 17: Brain > Needs you. Titles start "I17 " (known to the debris finder). Other waiting captures of the space are put
+// aside (archived) for each width and brought back after, so the rows and the numbers are this check's alone.
+for (const width of SET_WIDTHS) {
+  const tag = `I17.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I17 ${what} ${width} ${stamp}`
+  const made = JSON.parse(bench(`import json
+area = lambda n: frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": n})
+tea, mind, career = area("Tea & Coffee"), area("Mind"), area("Career")
+was = {n: frappe.db.get_value("Life Area", n, "is_on") for n in (tea, mind, career)}
+for n in (tea, mind, career): frappe.db.set_value("Life Area", n, "is_on", 1)
+aside = frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "is_archived": 0, "status": ["in", ["To Review", "Failed", "New", "Processing"]]}, pluck="name")
+for n in aside: frappe.db.set_value("Life Inbox Item", n, "is_archived", 1, update_modified=False)
+print(json.dumps({"tea": tea, "mind": mind, "career": career, "was": was, "aside": aside, "tea_name": "Tea & Coffee", "mind_name": "Mind"}))`).split('\n').pop())
+  // a capture waiting for a decision, with one proposal: { kind, area, alt, reason, hours, source, status }
+  const mk = (what, o = {}) => JSON.parse(bench(`import json
+from frappe.utils import add_to_date, now_datetime
+item = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "${T(what)}", "source_type": "${o.source || 'Email'}", "status": "${o.status || 'To Review'}",
+  "received_on": add_to_date(now_datetime(), hours=-${o.hours ?? 1})${o.error ? `, "error": "${o.error}"` : ''}}).insert(ignore_permissions=True)
+out = {"item": item.name}
+if "${o.status || 'To Review'}" == "To Review":
+    body = {"title": "${T(what)}"${o.kind === 'Reading' ? ', "goal": "x", "value": 1, "excerpt": "x"' : ''}${o.area ? `, "area": ${JSON.stringify(o.area)}` : ''}}
+    p = frappe.get_doc({"doctype": "Life Proposal", "space": "${SPACE}", "inbox_item": item.name, "kind": "${o.kind || 'Task'}", "preview": "${T(what)}",
+      "payload": frappe.as_json(body), "confidence": 0.6, "status": "Pending", "reason": ${o.reason ? JSON.stringify(o.reason) : 'None'}, "alt_area": ${o.alt ? JSON.stringify(o.alt) : 'None'}}).insert(ignore_permissions=True)
+    out["proposal"] = p.name
+print(json.dumps(out))`).split('\n').pop())
+  const row = (p) => pg.locator(`[data-needs-row][data-proposal="${p}"]`)
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openNeeds = async () => { await s.open('/life/brain'); await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(400) }
+  const rowsOf = async () => (await s.api('brain.needs_you', { space: SPACE })).rows
+  const queue = async () => { for (const r of await rowsOf()) await s.api('review.decide', { proposal: r.proposal, decision: 'reject' }) }
+  try {
+    await check(`${tag}.12`, `${width} px: on an empty space Needs you says what will appear and offers + Capture`, async () => {
+      await openNeeds()
+      must(await pg.locator('[data-needs-empty]').isVisible(), 'no empty state')
+      const t = await pg.locator('[data-needs-empty]').innerText()
+      must(t.includes('Nothing needs you.') && t.includes('Things you capture or connect will show up here.'), 'the empty state says: ' + t)
+      await pg.locator('[data-needs-capture]').click()
+      await pg.locator('[data-capture-text]').first().waitFor({ timeout: 5000 })
+      await pg.keyboard.press('Escape')
+      await noSideways()
+    })
+    await check(`${tag}.1`, `${width} px: with 3 waiting captures (one with two possible areas) Needs you shows 3 rows with their best guesses and reasons`, async () => {
+      const a = await mk('voice', { area: made.mind, reason: 'Sounds like a task, but no date was said', hours: 3, source: 'Voice Note' })
+      const b = await mk('torn', { area: made.tea, alt: made.mind, reason: 'Mentions both Tea and Mind', hours: 2 })
+      const c = await mk('plain', { area: made.career, hours: 1 })
+      await openNeeds()
+      must((await pg.locator('[data-needs-row]').count()) === 3, `${await pg.locator('[data-needs-row]').count()} rows, not 3`)
+      const ra = await row(a.proposal).innerText(), rb = await row(b.proposal).innerText(), rc = await row(c.proposal).innerText()
+      must(ra.includes(T('voice')) && ra.includes('✦ Sounds like a task, but no date was said') && ra.includes('Best guess:') && ra.includes('Task') && ra.includes('Mind'), 'row 1: ' + ra)
+      must(rb.includes('Mentions both Tea and Mind') && rb.includes('Tea & Coffee') && /\bor\b/.test(rb) && rb.includes('Mind'), 'row 2: ' + rb)
+      must(rc.includes('Career') && !rc.includes('✦'), 'row 3 (no reason, no mark): ' + rc)
+      must((await row(b.proposal).locator('[data-area-chip]').count()) === 2 && (await row(a.proposal).locator('[data-area-chip]').count()) === 1, 'the area chips are wrong')
+      must(await row(a.proposal).locator('[data-keep]').count() && await row(a.proposal).locator('[data-change]').count() && await row(a.proposal).locator('[data-drop]').count(), 'a row lacks Keep, Change or Drop')
+      must(!(await row(b.proposal).locator('[data-keep]').count()) && (await row(b.proposal).locator('[data-pick]').count()) === 2, 'the torn row has Keep, or not two choices')
+      must((await pg.locator('[data-stat-needs]').getAttribute('data-n')) === '3', 'the Needs you number is not 3')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      made.k = { a, b, c }
+    })
+    await check(`${tag}.2`, `${width} px: Keep accepts the proposal, the row leaves, and the record exists with the guessed area`, async () => {
+      const { a } = made.k
+      await openNeeds()
+      await row(a.proposal).locator('[data-keep]').click()
+      await row(a.proposal).waitFor({ state: 'detached', timeout: 10000 })
+      const got = JSON.parse(bench(`import json
+p = frappe.get_doc("Life Proposal", "${a.proposal}")
+print(json.dumps({"status": p.status, "area": frappe.db.get_value(p.created_doctype, p.created_name, "area"), "dt": p.created_doctype}))`).split('\n').pop())
+      must(got.status === 'Accepted' && got.dt === 'Life Task' && got.area === made.mind, 'after Keep: ' + JSON.stringify(got))
+    })
+    await check(`${tag}.3`, `${width} px: picking the second of two area chips files it there`, async () => {
+      const { b } = made.k
+      await openNeeds()
+      await row(b.proposal).locator('[data-pick="second"]').click()
+      await row(b.proposal).waitFor({ state: 'detached', timeout: 10000 })
+      const area = bench(`p = frappe.get_doc("Life Proposal", "${b.proposal}")
+print(p.status, frappe.db.get_value(p.created_doctype, p.created_name, "area"))`).split('\n').pop()
+      must(area === `Accepted ${made.mind}`, 'after the second chip: ' + area)
+    })
+    await check(`${tag}.4`, `${width} px: Drop discards it and it appears in the Outbox as Discarded`, async () => {
+      const { c } = made.k
+      await openNeeds()
+      await row(c.proposal).locator('[data-drop]').click()
+      await row(c.proposal).waitFor({ state: 'detached', timeout: 10000 })
+      const listed = await s.api('outbox.list', { space: SPACE, pile: 'Discarded', page_length: 500 })
+      must(listed.rows.some((r) => r.record === c.item), 'the capture is not in the Outbox as Discarded')
+      await s.open('/life/brain/outbox?pile=Discarded')
+      await pg.waitForFunction((t) => document.body.innerText.includes(t), T('plain'), { timeout: 10000 })
+    })
+    await check(`${tag}.5`, `${width} px: Done, file all files every row in one go`, async () => {
+      const rows = []
+      for (let i = 0; i < 3; i++) rows.push(await mk(`all ${i}`, { area: made.tea, hours: 3 - i }))
+      await openNeeds()
+      const label = await pg.locator('[data-file-all]').innerText()
+      must(label.includes('Done, file all 3'), 'the button says: ' + label)
+      await pg.locator('[data-file-all]').click()
+      await pg.locator('[data-needs-empty]').waitFor({ timeout: 10000 })
+      const states = bench(`print(",".join(frappe.db.get_value("Life Proposal", n, "status") for n in ${JSON.stringify(rows.map((r) => r.proposal))}))`).split('\n').pop()
+      must(states === 'Accepted,Accepted,Accepted', 'after Done, file all: ' + states)
+    })
+    await check(`${tag}.6`, `${width} px: with more than 7 waiting, 7 show and the rest come in as rows are cleared`, async () => {
+      const rows = []
+      for (let i = 0; i < 9; i++) rows.push(await mk(`many ${i}`, { area: made.tea, hours: 20 - i }))
+      await openNeeds()
+      must((await pg.locator('[data-needs-row]').count()) === 7, `${await pg.locator('[data-needs-row]').count()} rows, not 7`)
+      must((await pg.locator('[data-stat-needs]').getAttribute('data-n')) === '9', 'the Needs you number is not 9')
+      must(!(await row(rows[7].proposal).count()), 'the eighth is already shown')
+      await row(rows[0].proposal).locator('[data-drop]').click()
+      await row(rows[7].proposal).waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-needs-row]').count()) === 7, 'a row did not come in')
+      await row(rows[1].proposal).locator('[data-drop]').click()
+      await row(rows[8].proposal).waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-needs-row]').count()) === 7, 'the ninth did not come in')
+      await queue()
+    })
+    await check(`${tag}.7`, `${width} px: the two numbers match the captures of the last 24 hours`, async () => {
+      await queue()
+      const before = await s.api('brain.needs_you', { space: SPACE })
+      bench(`from frappe.utils import add_to_date, now_datetime
+def mk(title, source, hours, area=None):
+    frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": title, "source_type": source, "status": "Done", "area": area,
+      "received_on": add_to_date(now_datetime(), hours=-hours)}).insert(ignore_permissions=True)
+mk("${T('own 1')}", "Email", 2, "${made.tea}")
+mk("${T('own 2')}", "Chat", 4, "${made.mind}")
+mk("${T('own 3')}", "Email", 5, "${made.tea}")
+mk("${T('old')}", "Email", 30, "${made.tea}")`)
+      const after = await s.api('brain.needs_you', { space: SPACE })
+      must(after.came_in.count === before.came_in.count + 3, `came in: ${before.came_in.count} then ${after.came_in.count}`)
+      must(after.filed.count === before.filed.count + 3, `filed: ${before.filed.count} then ${after.filed.count}`)
+      // the server's numbers are the captures of the last 24 hours
+      const truth = JSON.parse(bench(`import json
+from frappe.utils import add_to_date, now_datetime
+rows = frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "is_archived": 0, "received_on": [">=", add_to_date(now_datetime(), hours=-24)]}, fields=["source_type"])
+print(json.dumps({"n": len(rows), "sources": len({r.source_type for r in rows})}))`).split('\n').pop())
+      must(truth.n === after.came_in.count && truth.sources === after.came_in.sources, `the server says ${after.came_in.count} from ${after.came_in.sources}; the captures say ${JSON.stringify(truth)}`)
+      await openNeeds()
+      must((await pg.locator('[data-stat-came-in]').getAttribute('data-n')) === String(after.came_in.count), 'the screen shows another number for came in')
+      must((await pg.locator('[data-stat-came-in]').innerText()).includes(`from ${after.came_in.sources} source`), 'the sources are not shown')
+      must((await pg.locator('[data-stat-filed]').getAttribute('data-n')) === String(after.filed.count), 'the screen shows another number for filed on its own')
+      await pg.locator('[data-see-activity]').click()
+      await pg.waitForURL((u) => u.pathname === '/life/brain/activity', { timeout: 10000 })
+    })
+    await check(`${tag}.8`, `${width} px: each row stacks at 390 px, with Keep, Change and Drop reachable and no sideways scroll`, async () => {
+      const r = await mk('stack', { area: made.tea, reason: 'A long reason that needs room to wrap on a phone, with more words than fit on one line', hours: 1 })
+      await openNeeds()
+      const rw = row(r.proposal)
+      await rw.waitFor({ timeout: 10000 })
+      const box = await rw.boundingBox()
+      for (const sel of ['[data-keep]', '[data-change]', '[data-drop]']) {
+        const b = await rw.locator(sel).boundingBox()
+        must(b && b.x >= 0 && b.x + b.width <= width + 1 && b.y >= box.y && b.y + b.height <= box.y + box.height + 1, `${sel} is not inside the row (${JSON.stringify(b)})`)
+      }
+      if (phone) {
+        const text = await rw.locator('[data-row-title]').boundingBox(), acts = await rw.locator('[data-row-actions]').boundingBox()
+        must(acts.y >= text.y + text.height - 1, 'on a phone the actions do not sit under the text')
+      }
+      await noSideways()
+      await rw.locator('[data-change]').click()
+      await pg.waitForURL((u) => u.pathname.startsWith('/life/item/'), { timeout: 10000 })
+      await queue()
+    })
+    await check(`${tag}.10`, `${width} px: an agent's proposal with alt_area shows two area chips; picking the second files it in that area`, async () => {
+      const out = JSON.parse(bench(`import json
+from lifeos.api import inbox
+frappe.set_user("owner@lifeos.test")
+it = inbox.create_item(title="${T('agent')}", space="${SPACE}", raw_text="Mentions both", source_type="Email")
+frappe.set_user("hermes@lifeos.test")
+from lifeos import permissions
+permissions.clear_cache()
+inbox.claim_next(space="${SPACE}")
+res = inbox.submit_result(item=it["name"], proposals=[{"kind": "Task", "preview": "${T('agent')}", "confidence": 0.6, "reason": "Mentions both Tea and Mind",
+  "payload": {"title": "${T('agent')}", "area": "${made.tea}"}, "alt_area": "${made.mind}"}])
+print(json.dumps({"item": it["name"], "proposal": res["created"][0]["name"], "errors": res["errors"]}))`).split('\n').pop())
+      must(!out.errors.length, 'the agent was refused: ' + JSON.stringify(out.errors))
+      await openNeeds()
+      const rw = row(out.proposal)
+      await rw.waitFor({ timeout: 10000 })
+      must((await rw.locator('[data-area-chip]').count()) === 2, 'not two area chips')
+      await rw.locator('[data-pick="second"]').click()
+      await rw.waitFor({ state: 'detached', timeout: 10000 })
+      const area = bench(`p = frappe.get_doc("Life Proposal", "${out.proposal}")
+print(p.status, frappe.db.get_value(p.created_doctype, p.created_name, "area"))`).split('\n').pop()
+      must(area === `Accepted ${made.mind}`, 'filed as: ' + area)
+    })
+    await check(`${tag}.11`, `${width} px: a Reading proposal shows as Read later`, async () => {
+      const r = await mk('reading', { kind: 'Reading', hours: 1 })
+      await openNeeds()
+      const rw = row(r.proposal)
+      await rw.waitFor({ timeout: 10000 })
+      must((await rw.locator('[data-row-kind]').innerText()) === 'Read later', 'the kind reads: ' + await rw.locator('[data-row-kind]').innerText())
+      await queue()
+    })
+    await check(`${tag}.13`, `${width} px: a capture that failed is listed under Unfiled with Retry, never lost`, async () => {
+      const f = await mk('failed', { status: 'Failed', error: 'Could not read the file', source: 'Upload' })
+      await openNeeds()
+      const rw = pg.locator(`[data-failed-row][data-item="${f.item}"]`)
+      await rw.waitFor({ timeout: 10000 })
+      must((await rw.innerText()).includes('Could not read the file') && (await rw.locator('[data-retry]').count()) === 1, 'the failed capture is not shown with Retry')
+      await noSideways()
+    })
+  } finally {
+    bench(`import json
+frappe.set_user("Administrator")
+for p in frappe.get_all("Life Proposal", filters={"preview": ["like", "I17 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Proposal", p, force=1, ignore_permissions=True)
+for t in frappe.get_all("Life Task", filters={"title": ["like", "I17 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
+for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I17 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.aside)}:
+    if frappe.db.exists("Life Inbox Item", n): frappe.db.set_value("Life Inbox Item", n, "is_archived", 0, update_modified=False)
+for n, v in ${JSON.stringify(made.was)}.items(): frappe.db.set_value("Life Area", n, "is_on", v)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 18: Brain > Activity. Titles start "I18 " (known to the debris finder). The space's other captures are put aside (archived)
+// for each width and brought back after, so the feed holds this check's captures alone.
+for (const width of SET_WIDTHS) {
+  const tag = `I18.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I18 ${what} ${width} ${stamp}`
+  const made = JSON.parse(bench(`import json
+tea = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"})
+was = frappe.db.get_value("Life Area", tea, "is_on")
+frappe.db.set_value("Life Area", tea, "is_on", 1)
+aside = frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "is_archived": 0}, pluck="name")
+for n in aside: frappe.db.set_value("Life Inbox Item", n, "is_archived", 1, update_modified=False)
+print(json.dumps({"tea": tea, "was": was, "aside": aside}))`).split('\n').pop())
+  const mk = (what, o = {}) => JSON.parse(bench(`import json
+item = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "${T(what)}", "source_type": "${o.source || 'Email'}", "status": "${o.status || 'Done'}",
+  "received_on": frappe.utils.now_datetime()${o.error ? `, "error": "${o.error}"` : ''}${o.area ? `, "area": "${o.area}"` : ''}}).insert(ignore_permissions=True)
+out = {"item": item.name}
+${o.task ? `t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "${T(what)}", "area": "${o.area}", "inbox_item": item.name}).insert(ignore_permissions=True)
+p = frappe.get_doc({"doctype": "Life Proposal", "space": "${SPACE}", "inbox_item": item.name, "kind": "Task", "preview": "${T(what)}",
+  "payload": frappe.as_json({"title": "${T(what)}"}), "status": "Pending"}).insert(ignore_permissions=True)
+frappe.db.set_value("Life Proposal", p.name, {"status": "Accepted", "created_doctype": "Life Task", "created_name": t.name})
+out["task"] = t.name` : ''}
+print(json.dumps(out))`).split('\n').pop())
+  const row = (i) => pg.locator(`[data-activity-row][data-item="${i}"]`)
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openFeed = async (q = '') => { await s.open('/life/brain/activity' + q); await pg.locator('[data-activity]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(500) }
+  try {
+    await check(`${tag}.6`, `${width} px: on a space with nothing captured Activity says what will appear and offers + Capture`, async () => {
+      await openFeed()
+      must(await pg.locator('[data-activity-empty]').isVisible(), 'no empty state')
+      const t = await pg.locator('[data-activity-empty]').innerText()
+      must(t.includes('Nothing has come in yet.') && t.includes('will show up here'), 'the empty state says: ' + t)
+      await pg.locator('[data-activity-capture]').click()
+      await pg.locator('[data-capture-text]').first().waitFor({ timeout: 5000 })
+      await pg.keyboard.press('Escape')
+      await noSideways()
+    })
+    await check(`${tag}.1`, `${width} px: a capture filed on its own today shows under Today with its area and a link to the record`, async () => {
+      const a = await mk('filed', { area: made.tea, task: true })
+      made.a = a
+      await openFeed()
+      const day = pg.locator('[data-activity-day]').first()
+      must((await day.locator('h2').innerText()) === 'Today', 'the first group is not Today')
+      const rw = row(a.item)
+      await rw.waitFor({ timeout: 10000 })
+      const t = await rw.innerText()
+      must(t.includes(T('filed')) && t.includes('Tea & Coffee') && t.includes('Email'), 'the row says: ' + t)
+      const href = await rw.locator('[data-made-link]').first().getAttribute('href')
+      must(href && href.includes(a.task), 'the link to the record is ' + href)
+      must((await rw.locator('[data-row-item]').getAttribute('href')) === `/life/item/${a.item}`, 'the item page link is wrong')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: the source filter narrows the feed to that source`, async () => {
+      const v = await mk('voice', { source: 'Voice Note' })
+      await openFeed()
+      must(await row(v.item).count() && await row(made.a.item).count(), 'both captures should be listed first')
+      await pg.locator('[data-activity-source]').selectOption('Voice Note')
+      await pg.waitForTimeout(600)
+      must(new URL(pg.url()).searchParams.get('source') === 'Voice Note', 'the filter is not in the URL')
+      must((await row(v.item).count()) === 1 && (await row(made.a.item).count()) === 0, 'the feed is not narrowed to Voice Note')
+      const sources = await pg.locator('[data-activity-row]').evaluateAll((els) => els.map((e) => e.getAttribute('data-source')))
+      must(sources.every((x) => x === 'Voice Note'), 'other sources remain: ' + sources)
+      await pg.locator('[data-outcome="dropped"]').click()
+      await pg.waitForTimeout(500)
+      must((await pg.locator('[data-activity-row]').count()) === 0, 'Dropped should hold nothing here')
+    })
+    await check(`${tag}.3`, `${width} px: a failed capture shows its reason and Retry puts it back in the queue`, async () => {
+      const f = await mk('failed', { status: 'Failed', error: 'Could not read the file', source: 'Upload' })
+      await openFeed('?outcome=failed')
+      const rw = row(f.item)
+      await rw.waitFor({ timeout: 10000 })
+      must((await rw.locator('[data-row-reason]').innerText()).includes('Could not read the file'), 'the reason is not shown')
+      await rw.locator('[data-retry]').click()
+      await pg.waitForTimeout(800)
+      const status = bench(`print(frappe.db.get_value("Life Inbox Item", "${f.item}", "status"))`).split('\n').pop()
+      must(status === 'New', 'the status is ' + status)
+      must((await row(f.item).count()) === 0, 'it is still listed as failed')
+    })
+    await check(`${tag}.4`, `${width} px: the Outbox piles in Activity show the same numbers as the Outbox`, async () => {
+      await openFeed()
+      const listed = (await s.api('outbox.list', { space: SPACE, pile: 'all', period: 'week', page_length: 1 })).tabs
+      for (const pile of ['Done', 'Delegated', 'Parked', 'Discarded']) {
+        const n = await pg.locator(`[data-plate-pile][data-pile="${pile}"]`).getAttribute('data-n')
+        must(Number(n) === listed[pile], `${pile}: Activity says ${n}, the Outbox ${listed[pile]}`)
+      }
+      must((await pg.locator('[data-flow-in]').innerText()) === String(listed.in) && (await pg.locator('[data-flow-out]').innerText()) === String(listed.all), 'the flow line differs')
+      await pg.locator('[data-plate-pile][data-pile="Done"]').click()
+      await pg.waitForURL((u) => u.pathname === '/life/brain/outbox' && u.searchParams.get('pile') === 'Done', { timeout: 10000 })
+      await pg.locator('[data-outbox-sub]').waitFor({ timeout: 10000 })
+    })
+    await check(`${tag}.5`, `${width} px: the feed is one column and nothing scrolls sideways`, async () => {
+      await openFeed()
+      await noSideways()
+      const boxes = await pg.locator('[data-activity-row]').evaluateAll((els) => els.map((e) => { const b = e.getBoundingClientRect(); return [b.x, b.width] }))
+      must(boxes.length > 0, 'no rows')
+      must(boxes.every(([x, w]) => Math.abs(x - boxes[0][0]) < 1 && Math.abs(w - boxes[0][1]) < 1), 'the rows are not one column')
+      if (phone) must(boxes[0][1] <= width, 'a row is wider than the screen')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`import json
+frappe.set_user("Administrator")
+for p in frappe.get_all("Life Proposal", filters={"preview": ["like", "I18 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Proposal", p, force=1, ignore_permissions=True)
+for t in frappe.get_all("Life Task", filters={"title": ["like", "I18 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
+for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I18 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.aside)}:
+    if frappe.db.exists("Life Inbox Item", n): frappe.db.set_value("Life Inbox Item", n, "is_archived", 0, update_modified=False)
+frappe.db.set_value("Life Area", "${made.tea}", "is_on", ${made.was ? 1 : 0})`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 19: Brain > Sources. Titles start "I19 ". The space's own connections are put aside (their space renamed) for each width and
+// brought back after, so the cards are this check's alone.
+for (const width of SET_WIDTHS) {
+  const tag = `I19.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const ASIDE = `zz-i19-aside-${width}`
+  const made = JSON.parse(bench(`import json
+tea = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"})
+was = frappe.db.get_value("Life Area", tea, "is_on")
+frappe.db.set_value("Life Area", tea, "is_on", 1)
+aside = frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name")
+for n in aside: frappe.db.set_value("Life Connection", n, "space", "${ASIDE}", update_modified=False)
+print(json.dumps({"tea": tea, "was": was, "aside": aside}))`).split('\n').pop())
+  const card = (sys) => pg.locator(`[data-source-card][data-system="${sys}"]`)
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openSources = async () => { await s.open('/life/brain/sources'); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const capture = (title, system, extra = {}) => s.api('inbox.create_item', { space: SPACE, title: `I19 ${title} ${width} ${stamp}`, source_system: system, ...extra })
+  try {
+    await check(`${tag}.6`, `${width} px: with no source connected Sources says what will appear and offers Add a source`, async () => {
+      await openSources()
+      must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state')
+      const t = await pg.locator('[data-sources-empty]').innerText()
+      must(t.includes('Nothing is connected yet.') && t.includes('switch them on below'), 'the empty state says: ' + t)
+      must(await pg.locator('[data-source-tile][data-system="upload"]').innerText().then((x) => x.includes('Always on')), 'the Upload tile is missing')
+      await pg.locator('[data-add-source-empty]').click()
+      await pg.locator('[data-add-more]').waitFor({ state: 'visible' })
+      await noSideways()
+    })
+    await check(`${tag}.1`, `${width} px: connected sources show with this week's counts, matching the captures in the database`, async () => {
+      for (const n of [1, 2, 3]) await capture(`hermes ${n}`, 'hermes')
+      await capture('gmail 1', 'gmail')
+      await openSources()
+      must((await pg.locator('[data-source-card]').count()) === 2, 'expected two cards, got ' + await pg.locator('[data-source-card]').count())
+      must((await pg.locator('[data-connected-count]').innerText()) === '2', 'the count in the heading is wrong')
+      for (const sys of ['hermes', 'gmail']) {
+        const n = bench(`from frappe.utils import add_days, getdate
+d = getdate()
+print(frappe.db.count("Life Inbox Item", {"space": "${SPACE}", "source_system": "${sys}", "creation": [">=", add_days(d, -d.weekday())]}))`).split('\n').pop()
+        const shown = await card(sys).getAttribute('data-week')
+        must(shown === n && n !== '0', `${sys}: the card says ${shown}, the database ${n}`)
+        must((await card(sys).locator('[data-source-line]').innerText()).includes(`${n} this week`), `${sys}: the line does not say ${n} this week`)
+      }
+      must((await card('hermes').innerText()).includes('Agent · Telegram'), 'the kind of Hermes is missing')
+      must((await card('gmail').innerText()).includes('only people, not newsletters'), 'the Gmail note is missing')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: switching Hermes off makes create_item from hermes fail with a clear message; switching it on again works`, async () => {
+      await openSources()
+      await card('hermes').locator('button[role="switch"]').click()
+      await pg.waitForTimeout(800)
+      must((await card('hermes').getAttribute('data-active')) === '0', 'the card still says On')
+      const r = await s.api('inbox.create_item', { space: SPACE, title: `I19 refused ${width} ${stamp}`, source_system: 'hermes' }, { raw: true })
+      const text = await r.text()
+      must(!r.ok() && text.includes('switched off'), `create_item answered ${r.status()}: ${text.slice(0, 200)}`)
+      must(bench(`print(frappe.db.count("Life Inbox Item", {"title": "I19 refused ${width} ${stamp}"}))`).split('\n').pop() === '0', 'the refused capture was stored')
+      must((await (await s.api('inbox.create_item', { space: SPACE, title: `I19 upload ${width} ${stamp}`, source_system: 'upload' })).title).includes('upload'), 'Upload should always work')
+      await card('hermes').locator('button[role="switch"]').click()
+      await pg.waitForTimeout(800)
+      must((await card('hermes').getAttribute('data-active')) === '1', 'the card still says Off')
+      const ok = await capture('back on', 'hermes')
+      must(ok.created, 'create_item should work again')
+      must((await card('hermes').getAttribute('data-week')) !== null && bench(`print(frappe.db.count("Life Inbox Item", {"title": ["like", "I19 hermes %${width} ${stamp}"]}))`).split('\n').pop() === '3', 'what Hermes brought earlier was deleted')
+    })
+    await check(`${tag}.3`, `${width} px: a Coming tile cannot be switched on`, async () => {
+      await openSources()
+      const tile = pg.locator('[data-tile-coming][data-system="github"]')
+      must((await tile.innerText()).includes('Coming'), 'the GitHub tile does not say Coming')
+      must((await tile.locator('button').count()) === 0, 'a Coming tile has a button')
+      await tile.click({ force: true })
+      await pg.waitForTimeout(500)
+      must((await pg.locator('[data-source-settings]').count()) === 0 && (await card('github').count()) === 0, 'a Coming tile opened or added something')
+      for (const sys of ['github', 'whatsapp', 'wearable', 'tally', 'drive', 'erpnext']) must(await pg.locator(`[data-tile-coming][data-system="${sys}"]`).count() === 1, sys + ' is missing')
+      const r = await s.api('connections.save', { space: SPACE, system: 'github', active: 1 }, { raw: true })
+      must(!r.ok() && (await r.text()).includes('not built yet'), 'the server switched GitHub on: ' + r.status())
+    })
+    await check(`${tag}.4`, `${width} px: opening a source shows its default intent, area and goal, and saving changes what create_item uses`, async () => {
+      await openSources()
+      await card('gmail').locator('[data-source-open]').click()
+      const dlg = pg.locator('[data-source-settings][data-system="gmail"]')
+      await dlg.waitFor({ timeout: 5000 })
+      must(await dlg.locator('[data-settings-intent]').count() && await dlg.locator('[data-settings-area]').count() && await dlg.locator('[data-settings-goal]').count(), 'intent, area or goal is missing')
+      await dlg.locator('[data-settings-intent] [role="combobox"], [data-settings-intent] button').first().click()
+      await pg.getByRole('option', { name: 'Just keep', exact: true }).first().click()
+      await dlg.locator('[data-settings-area] button').click()
+      await pg.getByRole('menuitem', { name: 'Tea & Coffee', exact: false }).first().click()
+      await pg.getByRole('button', { name: 'Save' }).click()
+      await pg.waitForTimeout(1000)
+      const c = bench(`import json
+print(json.dumps(frappe.db.get_value("Life Connection", {"space": "${SPACE}", "system": "gmail"}, ["default_intent", "default_area"], as_dict=True)))`).split('\n').pop()
+      must(JSON.parse(c).default_intent === 'Just keep' && JSON.parse(c).default_area === made.tea, 'the defaults were not saved: ' + c)
+      const item = await capture('defaults', 'gmail')
+      must(item.intent === 'Just keep' && item.area === made.tea, `create_item used intent ${item.intent}, area ${item.area}`)
+      await card('gmail').locator('[data-source-open]').click()
+      await pg.locator('[data-source-settings][data-system="gmail"]').waitFor({ timeout: 5000 })
+      must((await pg.locator('[data-source-settings] [data-settings-intent]').innerText()).includes('Just keep'), 'the saved intent is not shown when it is opened again')
+      await pg.keyboard.press('Escape')
+    })
+    await check(`${tag}.5`, `${width} px: ${phone ? 'the cards stack in one column' : 'the cards sit in a grid'} and nothing scrolls sideways`, async () => {
+      await openSources()
+      await noSideways()
+      const boxes = await pg.locator('[data-source-card]').evaluateAll((els) => els.map((e) => { const b = e.getBoundingClientRect(); return [b.x, b.y, b.width] }))
+      must(boxes.length >= 2, 'expected at least two cards')
+      if (phone) must(boxes.every(([x, , w]) => Math.abs(x - boxes[0][0]) < 1 && w <= width), 'the cards do not stack')
+      else must(Math.abs(boxes[1][1] - boxes[0][1]) < 1 && boxes[1][0] > boxes[0][0], 'the cards are not side by side')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`import json
+frappe.set_user("Administrator")
+for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I19 %${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)
+for c in frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc("Life Connection", c, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.aside)}: frappe.db.set_value("Life Connection", n, "space", "${SPACE}", update_modified=False)
+frappe.db.set_value("Life Area", "${made.tea}", "is_on", ${made.was ? 1 : 0})`)
     await s.ctx.close()
   }
 }

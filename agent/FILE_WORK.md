@@ -47,7 +47,7 @@ Follow the `lifeos` skill for every rule and refusal. This file only says how to
 
 ### Proposals
 
-Each is `{kind, preview, payload, confidence}`, for the owner to accept or reject:
+Each is `{kind, preview, payload, confidence, reason, alt_area}`, for the owner to accept or reject. Send a `reason` on every proposal: one short line on why, or what made you unsure (the owner reads it on Needs you). Send `alt_area` only when two areas are both likely: an area that is on, in this space, and different from the payload's `area`:
 
 - a **Note** that is the record of the work: title as the job's, `area`, `goal` if one fits, body = the summary plus the list of files and inputs. This is what the owner will open later.
 - **Tasks** only for next steps the owner stated or that the work plainly needs, each with a short `preview` and an honest `confidence`. Example: "Get Mehi Motors' questionnaire scored before the demo" (the questionnaire shows 0 of 11 answered). Set `due_date` only when he gave one.

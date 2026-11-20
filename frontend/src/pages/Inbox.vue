@@ -1,38 +1,11 @@
 <template>
   <ListView ref="list" title="Inbox" noun="inbox items" screen="inbox" doctype="Life Inbox Item" :spec="SPEC" :tabs="TABS" :quick="['source_type', 'area']"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => 'inbox:' + r.name"
-    :empty-title="EMPTY[list?.tab] || 'The Inbox is empty.'" empty-hint="Drop a file above or forward something to your agent. What it proposes waits here for you."
+    :empty-title="EMPTY[list?.tab] || 'The queue is empty.'" empty-hint="Anything you capture is read by the agent and shows here until it is decided."
     @loaded="(res) => (pendingTotal = res.pending_total)">
-    <template #sub>{{ store.space }} · drop anything here, an agent proposes, you approve<template v-if="pendingTotal"> ·
+    <template #sub>{{ store.space }} · everything the agent has not finished, and what it asks you<template v-if="pendingTotal"> ·
       <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template> ·
-      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/brain/activity', query: { status: 'done' } }" data-finished-link>Finished items are in Activity</RouterLink></template>
-    <template #above>
-      <!-- set 7: items left too long, with suggested decisions to confirm -->
-      <OldItems @changed="list?.reload()" />
-      <!-- The drop zone. Files wait here until Add to Inbox creates the item they belong to; then each is uploaded, private, to that item. -->
-      <section v-if="canWrite()" class="rounded-5 border border-dashed p-4" :class="over ? 'border-outline-gray-5 bg-surface-gray-3' : 'border-outline-gray-3 bg-surface-gray-1'"
-        data-dropzone @dragover.prevent="over = true" @dragleave.prevent="over = false" @drop.prevent="onDrop">
-        <input ref="picker" type="file" multiple class="hidden" aria-label="Choose files" @change="onPick" />
-        <div v-if="!files.length" class="flex flex-col gap-0.5 pb-3 pt-1.5">
-          <b class="text-base-medium text-ink-gray-9">Drop files here</b>
-          <span class="text-sm text-ink-gray-6">A journal photo, a voice note, a PDF, anything. Or
-            <Button class="!inline-flex !h-auto !px-0 align-baseline !text-sm underline" size="sm" variant="ghost" label="choose files" @click="picker.click()" /></span>
-        </div>
-        <div v-else class="chips">
-          <Badge v-for="(f, i) in files" :key="i" size="lg">{{ f.name }} <span class="text-ink-gray-6">{{ fileSize(f.size) }}</span>
-            <template #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove ' + f.name" @click="files.splice(i, 1)" /></template></Badge>
-          <Button size="sm" variant="outline" icon-left="lucide-plus" label="more" @click="picker.click()" />
-        </div>
-        <div class="mt-2.5 flex flex-wrap gap-2">
-          <TextInput v-model="instruction" class="min-w-64 flex-1" :placeholder="INTENT_HINT[intent]" aria-label="Instruction" @keydown.enter="add" />
-          <TabButtons v-model="intent" :options="INTENTS" aria-label="What to do with it" data-intent />
-          <Select v-model="sourceType" class="w-36" :options="SOURCES" aria-label="Kind" />
-          <Button variant="solid" :loading="busy" loading-text="Adding…" :disabled="!files.length && !text.trim()" label="Add to Inbox" @click="add" />
-        </div>
-        <Textarea v-if="showText" v-model="text" class="mt-2" :rows="3" placeholder="Paste or type text to file" aria-label="Text to file" />
-        <Button v-else class="-ml-2 mt-2" size="sm" variant="ghost" label="Or paste text instead" @click="showText = true" />
-      </section>
-    </template>
+      <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/brain/captures', query: { status: 'done' } }" data-finished-link>Finished items are in Captures</RouterLink></template>
     <template #cell-title="{ row }">
       <div class="min-w-0">
         <div class="break-words font-medium text-ink-gray-9">{{ row.title }}</div>
@@ -68,24 +41,16 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Avatar, Badge, Button, Select, TabButtons, TextInput, Textarea, toast } from 'frappe-ui'
+import { Avatar, Badge, Button } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
-import OldItems from '@/components/inbox/OldItems.vue'
 import NumLink from '@/components/ui/NumLink.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { api, tryCall } from '@/lib/api'
 import { canWrite, refreshCounts, store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
-import { fileKind, fileSize, uploadFile } from '@/lib/upload'
 import { loadLookups } from '@/lib/lookups'
-import { saveView, savedView } from '@/lib/views'
 
-const SOURCES = ['Upload', 'Journal Photo', 'Voice Note', 'Email', 'Email Digest', 'Chat', 'Message', 'Web']
-// what the agent does with it: propose records (Process), write the wiki (Add to wiki), or only make it searchable (Just keep)
-const INTENTS = [{ label: 'Process', value: 'Process' }, { label: 'Add to wiki', value: 'Add to wiki' }, { label: 'Just keep', value: 'Just keep' }]
-const INTENT_HINT = { Process: 'What should the agent do? For example: summarise and pull out to-dos', 'Add to wiki': 'Anything the agent should know for the wiki (optional)',
-  'Just keep': 'A note to keep with it (optional). It is made searchable; nothing is proposed' }
 // status=Waiting in the URL is two statuses, New and Processing: "waiting for the agent"
 const STATUS = { 'To Review': ['To Review'], Waiting: ['New', 'Processing'], Failed: ['Failed'] }
 // the state tabs, on status=. The first is the default; "Waiting for the agent" is the two statuses New and Processing
@@ -105,17 +70,7 @@ const THEME = { 'To Review': 'amber', New: 'gray', Processing: 'blue', Failed: '
 const route = useRoute()
 const router = useRouter()
 // old links to the Done and All tabs open Brain > Activity, where finished items are
-if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/brain/activity', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
-const intent = ref(savedView('inbox-intent')?.intent || 'Process')
-watch(intent, (v) => saveView('inbox-intent', { intent: v }))
-const picker = ref(null)
-const files = ref([])
-const instruction = ref('')
-const sourceType = ref('Upload')
-const text = ref('')
-const showText = ref(false)
-const over = ref(false)
-const busy = ref(false)
+if (['Done', 'all'].includes(route.query.status)) router.replace({ path: '/brain/captures', query: { ...route.query, status: route.query.status === 'Done' ? 'done' : undefined } })
 const list = ref(null)
 const pendingTotal = ref(0)
 
@@ -129,49 +84,6 @@ function describe(it) {
   return parts.join(' · ')
 }
 
-function guessSource(list) {
-  if (sourceType.value !== 'Upload' || !list.length) return
-  const kinds = list.map((f) => fileKind(f.name))
-  if (kinds.every((k) => k === 'audio')) sourceType.value = 'Voice Note'
-  else if (kinds.every((k) => k === 'image') && /journal/i.test(instruction.value)) sourceType.value = 'Journal Photo'
-}
-function onDrop(e) {
-  over.value = false
-  files.value.push(...e.dataTransfer.files)
-  guessSource(files.value)
-}
-function onPick(e) {
-  files.value.push(...e.target.files)
-  e.target.value = ''
-  guessSource(files.value)
-}
-
-async function add() {
-  if (busy.value || (!files.value.length && !text.value.trim())) return
-  busy.value = true
-  try {
-    guessSource(files.value)
-    const title = files.value.length ? (files.value.length === 1 ? files.value[0].name : `${files.value[0].name} and ${files.value.length - 1} more`) : text.value.trim().split('\n')[0].slice(0, 80)
-    const item = await api('inbox.create_item', {
-      title, source_type: files.value.length ? sourceType.value : (sourceType.value === 'Upload' ? 'Message' : sourceType.value),
-      space: store.space, instruction: instruction.value, raw_text: text.value, intent: intent.value,
-    })
-    for (const f of files.value) await uploadFile(f, 'Life Inbox Item', item.name)
-    toast.success(intent.value === 'Just keep' ? 'Added. The agent will make it searchable and file it in Sources.' : 'Added to the Inbox. An agent will pick it up.')
-    files.value = []
-    instruction.value = ''
-    text.value = ''
-    showText.value = false
-    sourceType.value = 'Upload'
-    if (route.query.status === 'Waiting') list.value.reload()
-    else router.push({ query: { status: 'Waiting' } })
-  } catch (e) {
-    toast.error(errorText(e))
-  } finally {
-    busy.value = false
-  }
-}
-
 async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
   const res = await api('inbox.list', { space: store.space, status: STATUS[tab] ? JSON.stringify(STATUS[tab]) : undefined,
     source_type: p.source_type, area: p.area, from_date: p.from, to_date: p.to, filters, order_by, summary, start, page_length })
@@ -183,11 +95,4 @@ async function retry(it) {
   if (await tryCall(() => api('inbox.retry', { item: it.name }), 'Sent back to the agent.')) list.value.reload()
 }
 onMounted(loadLookups)
-// New > Capture opens the Inbox ready to take text or files (UX fixes, set 6)
-watch(() => route.query.capture, (on) => {
-  if (!on) return
-  showText.value = true
-  router.replace({ query: { ...route.query, capture: undefined } })
-  setTimeout(() => document.querySelector('[aria-label="Text to file"] textarea, textarea[aria-label="Text to file"]')?.focus(), 50)
-}, { immediate: true })
 </script>
