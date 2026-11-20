@@ -25,7 +25,7 @@
       <TabBar v-if="phone" :tabs="phoneTabs" :model-value="ptab.current.value" label="Inbox item parts" :level="page ? 1 : 2" data-review-tabs @update:model-value="ptab.set" />
       <div class="cols">
         <div class="half">
-          <section v-show="part('original')">
+          <section v-show="part('original')" data-review-original>
             <SectionHead>Original</SectionHead>
             <div v-if="!item.files.length && !item.raw_text" class="grid min-h-[120px] place-items-center rounded-5 border border-dashed border-outline-gray-3 bg-surface-gray-1 text-base text-ink-gray-6"><span>No file was attached.</span></div>
             <div v-for="f in item.files" :key="f.file_url" class="mb-3">

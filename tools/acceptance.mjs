@@ -3565,6 +3565,54 @@ frappe.db.commit()`)
   await s.ctx.close()
 }
 
+// Issue 7: a file is stored once by content, and an item filed again with a changed file of the same name keeps versions
+for (const width of SET_WIDTHS) {
+  const tag = `I7.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).split('\n')[0]))
+  const file = (title, ext) => s.api('inbox.create_item', { title, space: SPACE, source_type: 'Upload', intent: 'Just keep',
+    source_system: 'hermes', external_id: ext })
+  const ext = `i7-deck-${width}-${stamp}`
+  const v1 = Buffer.from(`I7 standard deck ${stamp}, first version`)
+  const v2 = Buffer.from(`I7 standard deck ${stamp}, second version`)
+  const original = '[data-review-original]'
+  await check(`${tag}.6`, `${width} px: an item filed twice with the same file shows one attachment; with two versions it shows "2 versions" and opens the older one`, async () => {
+    const item = await file(`I7 deck ${width} ${stamp}`, ext)
+    const first = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v1)
+    must((await file(`I7 deck ${width} ${stamp}`, ext)).name === item.name, 'filing again made a second item')
+    const again = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v1)
+    must(again.name === first.name, 'the same file sent again was attached a second time')
+    must((await s.api('inbox.get', { item: item.name })).files.length === 1, 'the item has more than one attachment')
+    await s.open(`/life/inbox/${item.name}/review?tab=original`) // phones open on the summary
+    must(await pg.locator(`${original} a[href="${first.file_url}"]`).count() === 1, 'the review does not show the one attachment once')
+    must(!(await pg.locator('[data-file-versions]').count()), 'a file with one version shows versions')
+    // a changed file of the same name: one current file and the old one as an earlier version
+    await file(`I7 deck ${width} ${stamp}`, ext)
+    const second = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v2)
+    const got = await s.api('inbox.get', { item: item.name })
+    must(got.files.length === 1 && got.files[0].file_url === second.file_url && got.files[0].versions.length === 1, 'not one current file with one earlier version: ' + JSON.stringify(got.files))
+    await s.open(`/life/inbox/${item.name}/review?tab=original`) // phones open on the summary
+    const toggle = pg.locator('[data-file-versions-toggle]')
+    must(/^2 versions, latest \d+ \w{3}$/.test((await toggle.innerText()).trim()), 'the versions line says: ' + (await toggle.innerText()))
+    await toggle.click()
+    const link = pg.locator('[data-file-version] a')
+    must(await link.count() === 1, 'the earlier version is not listed')
+    const href = await link.getAttribute('href')
+    must(href === first.file_url, 'the earlier version links to ' + href)
+    const [popup] = await Promise.all([pg.context().waitForEvent('page'), link.click()])
+    await popup.waitForLoadState()
+    must((await popup.locator('body').innerText()).includes('first version'), 'opening the earlier version did not show the old file')
+    await popup.close()
+    const overflow = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+    must(!overflow, 'the page scrolls sideways')
+    must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+  })
+  await s.ctx.close()
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {
