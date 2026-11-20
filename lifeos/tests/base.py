@@ -2,7 +2,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from lifeos import devtools, permissions, seed
+from lifeos import areas, devtools, permissions, seed
 
 OWNER, FAMILY, AGENT = devtools.OWNER, devtools.FAMILY, devtools.AGENT
 PRIVATE, SHARED = "Test Private", "Test Shared"
@@ -25,6 +25,9 @@ class LifeTestCase(IntegrationTestCase):
 					"members": [{"user": u, "access": "Write"} for u in members]}).insert()
 		cls.areas = seed.make_areas(PRIVATE, ["Tea", "Personal", "Money"])
 		cls.shared_areas = seed.make_areas(SHARED, ["Family", "Work"])
+		# issue 11: the seven areas of life of each space; "Tea" and "Work" are parts of Career, "Personal" of Health
+		cls.life = areas.life_areas(PRIVATE)
+		cls.shared_life = areas.life_areas(SHARED)
 		seed.make_dimensions(PRIVATE)
 		permissions.clear_cache()
 

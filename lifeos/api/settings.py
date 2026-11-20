@@ -151,7 +151,8 @@ def get(space: str | None = None):
 	s = frappe.get_cached_doc("Life Settings")
 	lists = {}
 	for kind, (doctype, field, key, extra, order) in {
-		"area": ("Life Area", "area_name", "areas", ["parent_area", "sort_order", "colour", "is_pinned"], "sort_order, area_name"),
+		"area": ("Life Area", "area_name", "areas", ["parent_area", "sort_order", "colour", "is_pinned", "is_life_area", "is_on", "description"],
+			"sort_order, area_name"),
 		"tag": ("Life Tag", "tag_name", "tags", [], "tag_name"),
 		"habit": ("Life Habit", "title", "habits", [], "title"),
 		"dimension": ("Life Dimension", "dimension_name", "dimensions", ["sort_order"], "sort_order, dimension_name"),
@@ -317,11 +318,15 @@ ARCHIVABLE = ("area", "tag", "habit", "dimension")
 @frappe.whitelist(methods=["POST"])
 def save_item(kind: str, space: str | None = None, name: str | None = None, title: str | None = None, parent_area: str | None = None,
 		relation: str | None = None, sort_order: int | None = None, is_archived: bool | int | None = None, delete: bool | int = 0,
-		with_children: bool | int = 1, colour: str | None = None, is_pinned: bool | int | None = None):
+		with_children: bool | int = 1, colour: str | None = None, is_pinned: bool | int | None = None, is_on: bool | int | None = None,
+		description: str | None = None):
 	"""Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person.
 	Archiving sets archived_on to today; records filed under the heading are not changed. Archiving an area archives its
-	sub-areas with it. Restoring an area puts it back under its old parent if that parent is active, otherwise at the top
-	level, and with_children=1 restores the sub-areas archived on the same day with it.
+	parts with it. Restoring an area puts it back under its old area of life, and with_children=1 restores the parts
+	archived on the same day with it.
+	Areas (issue 11): a new area is a part of `parent_area`, one of the seven areas of life, or of Career when none is given.
+	The seven cannot be renamed or archived; `is_on` switches an area on or off, which hides or shows it, its parts and
+	their goals and tasks without deleting anything.
 	delete=1 removes the row for good; the Settings screen does not offer it, agents and tests may use it."""
 	if kind not in LISTS:
 		frappe.throw(_("Unknown list."))
@@ -344,13 +349,15 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 			frappe.throw(_("A name is needed."))
 		doc.set(field, title.strip())
 	if kind == "area" and parent_area is not None:
-		parent_area = parent_area or None
-		if parent_area:
-			if frappe.db.get_value("Life Area", parent_area, "parent_area"):
-				frappe.throw(_("Areas nest one level deep: {0} is already inside another area.").format(frappe.db.get_value("Life Area", parent_area, "area_name")))
-			if name and frappe.db.exists("Life Area", {"parent_area": name}):
-				frappe.throw(_("An area with sub-areas stays at the top level."))
-		doc.parent_area = parent_area
+		doc.parent_area = parent_area or None
+	if kind == "area" and not name and not doc.parent_area:  # a new area is a part; Career when no area of life is named
+		from lifeos import areas
+
+		doc.parent_area = areas.ensure(doc.space)[areas.DEFAULT_PARENT]
+	if kind == "area" and is_on is not None:
+		doc.is_on = 1 if int(is_on or 0) else 0
+	if kind == "area" and description is not None:
+		doc.description = description.strip()
 	if kind == "area" and colour is not None:  # the dot in the lens and the sidebar (set 6)
 		doc.colour = colour or None
 	if kind == "area" and is_pinned is not None:  # "Focus on an area" in the sidebar (set 6)
@@ -363,6 +370,8 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	archived = []
 	if is_archived is not None and kind in ARCHIVABLE and int(is_archived) != int(doc.get("is_archived") or 0):
 		if int(is_archived):
+			if kind == "area" and doc.is_life_area:
+				frappe.throw(_("{0} is one of the seven areas of life. Switch it off instead of archiving it.").format(doc.area_name))
 			doc.is_archived, doc.archived_on = 1, frappe.utils.today()
 			if kind == "area":
 				for child in frappe.get_all("Life Area", filters={"parent_area": doc.name, "is_archived": 0}, pluck="name"):
@@ -373,7 +382,9 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 			doc.is_archived, doc.archived_on = 0, None
 			if kind == "area":
 				if doc.parent_area and frappe.db.get_value("Life Area", doc.parent_area, "is_archived"):
-					doc.parent_area = None  # its parent is archived: back at the top level
+					from lifeos import areas  # its old parent is archived: back under Career
+
+					doc.parent_area = areas.ensure(doc.space)[areas.DEFAULT_PARENT]
 				if int(with_children or 0):
 					f = {"parent_area": doc.name, "is_archived": 1}
 					if when:
@@ -387,10 +398,10 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 
 @frappe.whitelist(methods=["POST"])
 def create_space(space_name: str, owner_user: str | None = None, starter_areas: bool | int = 1):
-	"""Create a space, for example a private space for a family member, with the starter areas. Owner only."""
+	"""Create a space, for example a private space for a family member. Owner only. Every new space gets the seven areas of
+	life with Career and Health on (issue 11); `starter_areas` (kept for older callers) adds the check-in dimensions."""
 	_admin_only()
 	from lifeos import seed
-	from lifeos.constants import STARTER_AREAS
 
 	owner_user = owner_user or frappe.session.user
 	if not frappe.db.exists("User", owner_user):
@@ -398,7 +409,6 @@ def create_space(space_name: str, owner_user: str | None = None, starter_areas: 
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name.strip(), "owner_user": owner_user,
 		"members": [{"user": owner_user, "access": "Write"}]}).insert()
 	if int(starter_areas or 0):
-		seed.make_areas(doc.name, STARTER_AREAS)
 		seed.make_dimensions(doc.name)
 	return {"name": doc.name}
 

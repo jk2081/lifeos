@@ -33,4 +33,3 @@ LINKABLE = {
 }
 
 ROLES = ["Life Admin", "Life User", "Life Agent"]
-STARTER_AREAS = ["Work", "Personal & Health", "Money & Legal", "Family"]

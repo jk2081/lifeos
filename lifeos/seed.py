@@ -56,12 +56,27 @@ DEMO_KEY = "lifeos_demo_records"
 # ---------- structure created at install ----------
 
 def make_areas(space, names):
+	"""The areas named, as parts of the seven areas of life (issue 11): a name that is one of the seven is that area; any other
+	becomes a part of the area the patch's mapping table gives (Career when it does not know the name). The areas of life
+	used are switched on, so what is filed there shows. Returns {name: area}."""
+	from lifeos import areas
+	from lifeos.patches.v11.life_areas import life_area_for
+
+	life = areas.ensure(space)
 	out = {}
 	for i, name in enumerate(names):
-		existing = frappe.db.get_value("Life Area", {"space": space, "area_name": name, "parent_area": ("is", "not set")})
+		target = life_area_for(name) or areas.DEFAULT_PARENT
+		if not frappe.db.get_value("Life Area", life[target], "is_on"):
+			frappe.db.set_value("Life Area", life[target], "is_on", 1)
+		if areas.life_area_name(name):
+			out[name] = life[target]
+			continue
+		existing = frappe.db.get_value("Life Area", {"space": space, "area_name": name, "parent_area": life[target]})
 		if not existing:
-			existing = frappe.get_doc({"doctype": "Life Area", "space": space, "area_name": name, "sort_order": i + 1}).insert(ignore_permissions=True).name
+			existing = frappe.get_doc({"doctype": "Life Area", "space": space, "area_name": name, "parent_area": life[target],
+				"sort_order": i + 1}).insert(ignore_permissions=True).name
 		out[name] = existing
+	areas.clear_cache()
 	return out
 
 
@@ -72,12 +87,14 @@ def make_dimensions(space):
 
 
 def ensure_structure():
-	"""Areas and check-in dimensions for the two starting spaces. Runs once per space, at install."""
-	for space, areas in (("Private", PRIVATE_AREAS), ("Shared", SHARED_AREAS)):
+	"""The seven areas of life and the check-in dimensions for the two starting spaces. The owner's own areas come with the
+	seed, as parts (issue 11)."""
+	from lifeos import areas
+
+	for space in ("Private", "Shared"):
 		if not frappe.db.exists("Life Space", space):
 			continue
-		if not frappe.db.exists("Life Area", {"space": space}):
-			make_areas(space, areas)
+		areas.ensure(space)
 		if not frappe.db.exists("Life Dimension", {"space": space}):
 			make_dimensions(space)
 

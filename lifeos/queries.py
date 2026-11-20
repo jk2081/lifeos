@@ -40,6 +40,13 @@ def link_query(doctype: str, txt: str, searchfield: str | None, start: int, page
 		where["is_archived"] = 0
 		if doctype == "Life Goal":
 			where["outcome"] = "In Progress"
+	if doctype in ("Life Area", "Life Goal"):  # areas switched off, with their parts and goals, are not offered (issue 11)
+		from lifeos import areas, permissions
+
+		spaces = [where["space"]] if isinstance(where.get("space"), str) else list(permissions.user_spaces())
+		off = [n for s in spaces for n in areas.off(s)]
+		if off:
+			where["name" if doctype == "Life Area" else "area"] = ["not in", off]
 	or_filters = {field: ["like", f"%{txt}%"], "name": ["like", f"%{txt}%"]} if txt else None
 	extra = ["parent_area"] if doctype == "Life Area" else (["outcome", "goal_type"] if doctype == "Life Goal" else [])
 	rows = frappe.get_list(doctype, filters=where, or_filters=or_filters, fields=["name", field, "is_archived", "space", *extra],

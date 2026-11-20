@@ -7,6 +7,7 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import datewords, journal, permissions
+from lifeos.areas import off_clause
 from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
@@ -41,11 +42,13 @@ def decorate(rows):
 def query(space, where="", values=None, order=None, start=0, page_length=50, fields=None):
 	cols = ", ".join([f"t.`{f}`" for f in FIELDS] + extra_columns("Life Task", fields, "t", FIELDS))
 	order = order or f"t.due_date is null, t.due_date asc, {PRIORITY_ORDER}, t.creation asc"
+	values = dict(values or {})
+	where = (where or "") + off_clause(space, "t.area", values, "query_off_areas")  # areas switched off (issue 11)
 	# columns are FIELDS or pass column() (DocType meta); WHERE comes from where_clause and ORDER from SORTS or std_order
 	# nosemgrep: frappe-sql-format-injection -- fixed SQL and meta-checked columns only; values are parameters
 	rows = frappe.db.sql(
 		f"select {cols} from `tabLife Task` t where t.space=%(space)s {where} order by {order} limit %(start)s, %(len)s",
-		{"space": space, "start": start, "len": page_length, **(values or {})}, as_dict=True)
+		{**values, "space": space, "start": start, "len": page_length}, as_dict=True)
 	return decorate(rows)
 
 
@@ -93,6 +96,9 @@ def where_clause(space, status="open_doing", area=None, project=None, tag=None, 
 		where.append("t.is_archived = 0")
 	if area:
 		where.append(area_filter(space, area, "t.area", values, also_in="Life Task"))
+	off = off_clause(space, "t.area", values)  # tasks of an area that is off are hidden (issue 11)
+	if off:
+		where.append(off[len(" and "):])
 	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
 		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	if tag:

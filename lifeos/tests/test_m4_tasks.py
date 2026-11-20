@@ -173,7 +173,7 @@ class TestToday(LifeTestCase):
 class TestAreasGoalsTimeline(LifeTestCase):
 	# set 6: area pages went (the lens shows an area on every place, see test_ux6_lens); the area tree keeps the counts
 	def test_area_tree_counts_with_sub_areas(self):
-		tea = self.areas["Tea"]
+		tea = self.life["Career"]  # issue 11: an area of life with its parts
 		sub = self.make("Life Area", area_name="Ghatia m4", parent_area=tea)
 		goal = self.make("Life Goal", title="Mandir m4", goal_type="Open", area=sub.name)
 		self.make("Life Goal", title="Mandir m4 done", goal_type="Open", area=tea, outcome="Achieved")

@@ -19,6 +19,11 @@ class LifeSpace(Document):
 		if self.owner_user not in seen:
 			self.append("members", {"user": self.owner_user, "access": "Write"})
 
+	def after_insert(self):
+		from lifeos import areas
+
+		areas.ensure(self.name)  # every space has the seven areas of life, Career and Health on (issue 11)
+
 	def on_update(self):
 		from lifeos import permissions
 		permissions.clear_cache()
