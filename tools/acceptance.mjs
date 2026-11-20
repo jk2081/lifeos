@@ -4908,6 +4908,154 @@ frappe.db.set_value("Life Area", "${made.tea}", "is_on", ${made.was ? 1 : 0})`)
   }
 }
 
+// Issue 20: Goals > By area. Titles start "I20 ". Areas switched on or off here are put back after.
+for (const width of SET_WIDTHS) {
+  const tag = `I20.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I20 ${what} ${width} ${stamp}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openGoals = async (q = 'show=open') => { await s.open('/life/goals?' + q); await pg.locator('[data-goals-by-area][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const made = JSON.parse(bench(`import json
+top = lambda n: frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": n, "parent_area": ("is", "not set")})
+part = lambda n: frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": n, "parent_area": ("is", "set")})
+ids = {n: top(n) for n in ("Career", "Health", "Money", "Mind", "Emotions", "Environment", "Relationships")}
+ids["btw"], ids["tea"] = part("Business That Works"), part("Tea & Coffee")
+was = {k: frappe.db.get_value("Life Area", v, "is_on") for k, v in ids.items()}
+for k in ("Career", "Health", "Money", "Mind", "btw", "tea"): frappe.db.set_value("Life Area", ids[k], "is_on", 1)
+used = set(frappe.get_all("Life Goal", filters={"space": "${SPACE}"}, pluck="area"))
+empty = next(n for n in ("Emotions", "Environment", "Relationships") if ids[n] not in used)
+frappe.db.set_value("Life Area", ids[empty], "is_on", 1)
+cycle = frappe.db.get_value("Life Cycle", {"space": "${SPACE}", "status": "Active"})
+print(json.dumps({"ids": ids, "was": was, "empty": empty, "cycle": cycle}))`).split('\n').pop())
+  const restore = () => bench(`import json
+frappe.set_user("Administrator")
+for t in frappe.get_all("Life Task", filters={"title": ["like", "I20 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
+for g in frappe.get_all("Life Goal", filters={"title": ["like", "I20 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Goal", filters={"space": "zz-i20-aside-${width}"}, pluck="name"): frappe.db.set_value("Life Goal", n, "space", "${SPACE}", update_modified=False)
+for k, v in ${JSON.stringify(made.was)}.items(): frappe.db.set_value("Life Area", ${JSON.stringify(made.ids)}[k], "is_on", v)`)
+  const goals = {}
+  try {
+    await check(`${tag}.6`, `${width} px: with no goals By area says what will appear and offers + Goal`, async () => {
+      bench(`for n in frappe.get_all("Life Goal", filters={"space": "${SPACE}"}, pluck="name"): frappe.db.set_value("Life Goal", n, "space", "zz-i20-aside-${width}", update_modified=False)`)
+      try {
+        await openGoals('show=open')
+        must(await pg.locator('[data-goals-empty]').isVisible(), 'no empty state')
+        const t = await pg.locator('[data-goals-empty]').innerText()
+        must(t.includes('No goals yet.') && t.includes('under the area of life'), 'the empty state says: ' + t)
+        await pg.locator('[data-goals-empty-add]').click()
+        await pg.locator('[role="dialog"]').last().waitFor({ timeout: 5000 })
+        await pg.keyboard.press('Escape')
+        await noSideways()
+      } finally {
+        bench(`for n in frappe.get_all("Life Goal", filters={"space": "zz-i20-aside-${width}"}, pluck="name"): frappe.db.set_value("Life Goal", n, "space", "${SPACE}", update_modified=False)`)
+      }
+    })
+    // eight goals: Career (two parts and one on Career itself), Health, Money and Mind
+    const plan = [['ctx', 'career year', 'Career', 'Annual'], ['pilot', 'pilot', 'btw', 'Open'], ['hire', 'hire', 'btw', 'Open'], ['tea', 'tea yield', 'tea', 'Open'],
+      ['fit', 'fit', 'Health', '12 Week Year'], ['golf', 'golf', 'Health', 'Open'], ['itr', 'itr', 'Money', 'Open'], ['read', 'read', 'Mind', 'Open']]
+    const out = JSON.parse(bench(`import json
+ids = ${JSON.stringify(made.ids)}
+out = {}
+def mk(key, title, area, kind, **kw):
+    v = {"doctype": "Life Goal", "space": "${SPACE}", "title": title, "area": ids[area], "goal_type": kind, **kw}
+    if kind == "Annual": v["target_date"] = "2026-12-31"
+    if kind == "12 Week Year": v["cycle"] = ${JSON.stringify(made.cycle)}
+    out[key] = frappe.get_doc(v).insert(ignore_permissions=True).name
+mk("ctx", "${T('career year')}", "Career", "Annual", done_when="Career year done")
+mk("pilot", "${T('pilot')}", "btw", "Open", done_when="Pilot signed", serves=out["ctx"])
+mk("hire", "${T('hire')}", "btw", "Open", measure_kind="Number", measure="Consultants", unit="people", start_value=0, target_value=2)
+mk("tea", "${T('tea yield')}", "tea", "Open", done_when="Yield up")
+mk("fit", "${T('fit')}", "Health", "12 Week Year", done_when="Fit by March")
+mk("golf", "${T('golf')}", "Health", "Open", done_when="Five birdies")
+mk("itr", "${T('itr')}", "Money", "Open", done_when="Return filed")
+mk("read", "${T('read')}", "Mind", "Open", done_when="Five books")
+task = lambda title, status, due=None, at=None: frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": title, "status": status, "goal": out["pilot"], "area": ids["btw"], "due_date": due, "scheduled_at": at}).insert(ignore_permissions=True)
+task("${T('later')}", "Open", due="2026-12-20")
+task("${T('sooner')}", "Open", due="2026-12-01")
+task("${T('finished')}", "Done")
+print(json.dumps(out))`).split('\n').pop())
+    Object.assign(goals, out)
+    const row = (key) => pg.locator(`[data-goal-card][data-goal="${goals[key]}"]`)
+    await check(`${tag}.1`, `${width} px: with eight goals over Career (two parts), Health, Money and Mind each appears under its area and part`, async () => {
+      await openGoals('show=open')
+      const want = { ctx: ['Career', ''], pilot: ['Career', 'Business That Works'], hire: ['Career', 'Business That Works'], tea: ['Career', 'Tea & Coffee'], fit: ['Health', ''],
+        golf: ['Health', ''], itr: ['Money', ''], read: ['Mind', ''] }
+      for (const [k, [area, partName]] of Object.entries(want)) {
+        const c = row(k)
+        must((await c.count()) === 1, `${k}: expected one card, got ${await c.count()}`)
+        must((await c.getAttribute('data-area-name')) === area && (await c.getAttribute('data-part-name')) === partName, `${k} is under ${await c.getAttribute('data-area-name')} / ${await c.getAttribute('data-part-name')}`)
+        must((await pg.locator(`[data-area-section][data-area="${area}"] [data-goal="${goals[k]}"]`).count()) === 1, `${k}: not inside the ${area} section`)
+      }
+      must((await pg.locator('[data-area-section][data-area="Career"] [data-part-head]').allInnerTexts()).join('|').includes('Business That Works'), 'the part heading is missing')
+      for (const n of ['Health', 'Money', 'Mind']) must(await pg.locator(`[data-area-chip^="${n}"]`).count() === 1, `no chip for ${n}`)
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: a goal's card shows its Done when, score, next action and open task count, matching the goal page`, async () => {
+      await openGoals('show=open')
+      const c = row('pilot')
+      const page = await s.api('goals.get', { goal: goals.pilot })
+      const txt = await c.innerText()
+      must(txt.includes('Done when: Pilot signed'), 'Done when is missing: ' + txt)
+      must(txt.includes(`Serves ${T('career year')}`), 'what it serves is missing')
+      must((await c.locator('[data-goal-next-title]').innerText()) === T('sooner'), 'the next action is not the earliest due task')
+      must(Number(await c.locator('[data-goal-open-tasks]').getAttribute('data-count')) === page.tabs.tasks && page.tabs.tasks === 2, `open tasks: card ${await c.locator('[data-goal-open-tasks]').getAttribute('data-count')}, goal page ${page.tabs.tasks}`)
+      must((await c.locator('[data-goal-progress]').innerText()).includes('1 of 3 tasks') && page.goal.progress.label === '1 of 3 tasks', 'progress differs from the goal page')
+      must((await row('hire').innerText()).includes('0 → 2 people'), 'a number goal does not show its target')
+      const fit = row('fit')
+      const fp = await s.api('goals.get', { goal: goals.fit })
+      must(fp.goal.progress.kind === 'cycle' && Number(await fit.locator('[data-goal-score]').getAttribute('data-score')) === Math.round(fp.goal.progress.percent), 'the cycle goal score differs from the goal page')
+      must(/^Week \d+ · \d+%$/.test(await fit.locator('[data-goal-score]').innerText()), 'the week and score are not shown: ' + await fit.locator('[data-goal-score]').innerText())
+      must((await row('golf').locator('[data-goal-next-title]').innerText()) === 'No next action', 'a goal with no tasks should say so')
+      await c.locator('[data-goal-open]').click()
+      await pg.waitForURL(new RegExp(`/life/goals/${goals.pilot}`), { timeout: 8000 })
+      // the default filter is this cycle: only the cycle goal of the eight shows, and Finished shows none of them
+      await openGoals('')
+      must((await row('fit').count()) === 1 && (await row('pilot').count()) === 0, 'This cycle should hold the cycle goal only')
+      await openGoals('show=finished')
+      must((await pg.locator('[data-goal-card][data-goal]').evaluateAll((els, ids) => els.filter((e) => ids.includes(e.dataset.goal)).length, Object.values(goals))) === 0, 'an open goal shows under Finished')
+    })
+    await check(`${tag}.3`, `${width} px: an area that is off has no section; turning it on shows its goals`, async () => {
+      bench(`frappe.db.set_value("Life Area", "${made.ids.Mind}", "is_on", 0)`)
+      await openGoals('show=open')
+      must((await pg.locator('[data-area-section][data-area="Mind"]').count()) === 0 && (await row('read').count()) === 0, 'the off area still has a section')
+      must((await pg.locator('[data-area-chip-off="Mind"]').count()) === 1, 'the off area has no dimmed chip')
+      bench(`frappe.db.set_value("Life Area", "${made.ids.Mind}", "is_on", 1)`)
+      await openGoals('show=open')
+      must((await pg.locator('[data-area-section][data-area="Mind"]').count()) === 1 && (await row('read').count()) === 1, 'the goal did not come back')
+    })
+    await check(`${tag}.4`, `${width} px: + Goal in an empty area opens the new-goal form with that area set`, async () => {
+      await openGoals('show=open')
+      const sec = pg.locator(`[data-area-section][data-area="${made.empty}"]`)
+      must((await sec.locator('[data-area-empty]').innerText()).includes('No goals yet'), 'the empty area does not say so')
+      await sec.locator('[data-area-add]').click()
+      const dlg = pg.locator('[role="dialog"]').last()
+      await dlg.waitFor({ timeout: 5000 })
+      const text = await dlg.innerText()
+      must(new RegExp(`Area\\s+${made.empty}`).test(text), `the area is not set to ${made.empty}: ${text.slice(0, 200)}`)
+      await pg.keyboard.press('Escape')
+    })
+    await check(`${tag}.5`, `${width} px: ${phone ? 'goal cards are full width under area headings' : 'goal cards stack one to a row under area headings'}`, async () => {
+      await openGoals('show=open')
+      await noSideways()
+      const boxes = await pg.locator('[data-area-section][data-area="Career"] [data-goal-card]').evaluateAll((els) => els.map((e) => { const b = e.getBoundingClientRect(); return [b.x, b.y, b.width] }))
+      must(boxes.length >= 4, 'expected the Career cards')
+      must(boxes.every(([x, , w]) => Math.abs(x - boxes[0][0]) < 1 && Math.abs(w - boxes[0][2]) < 1), 'the cards are not the same width')
+      if (phone) must(boxes[0][2] >= width - 40 && boxes[0][0] + boxes[0][2] <= width, `the card is ${boxes[0][2]} px wide in a ${width} px screen`)
+      const head = await pg.locator('[data-area-section][data-area="Career"] h2').boundingBox()
+      must(head.y < boxes[0][1], 'the area heading is not above its cards')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {

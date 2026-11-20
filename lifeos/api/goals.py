@@ -8,8 +8,9 @@ from frappe.utils import getdate
 
 from lifeos import journal as rules
 from lifeos import permissions, readings
+from lifeos.areas import off as areas_off
 from lifeos.areas import off_clause
-from lifeos.api.utils import area_filter, names_map, page, std_clause, std_order, summarise, tab_counts
+from lifeos.api.utils import area_filter, names_map, parse, page, std_clause, std_order, summarise, tab_counts
 from lifeos.proposals import goal_for_project
 from lifeos.api.utils import order_by as sort_order
 
@@ -131,6 +132,122 @@ def list(space: str | None = None, state: str | None = "in_progress", goal_type:
 		r["reached"] = readings.reached(r)
 	return {"goals": rows, "total": len(names), "tabs": tabs,
 		"summary_line": {"in_progress": tabs["in_progress"], "tasks_done": total_done, "tasks_counted": total_counted}}
+
+
+SHOWS = {
+	"cycle": "g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0 and c.status = 'Active'",
+	"open": TABS["in_progress"],
+	"finished": "g.outcome != 'In Progress' and g.is_someday = 0",
+}
+
+
+def _next_actions(space, names):
+	"""{goal: (task row, open count)}: the first open or doing task of each goal (planned time, then due date, then age) and how
+	many there are, counted as the goal page's Open tasks tab counts them."""
+	if not names:
+		return {}
+	hidden = set(areas_off(space))
+	rows = frappe.get_all("Life Task", filters={"goal": ("in", names), "status": ("in", ("Open", "Doing")), "is_archived": 0},
+		fields=["name", "title", "goal", "scheduled_at", "due_date", "area"], limit=5000)
+	rows = [r for r in rows if not r.area or r.area not in hidden]
+	rows.sort(key=lambda r: (r.scheduled_at is None, r.scheduled_at or 0, r.due_date is None, r.due_date or 0))
+	out = {}
+	for r in rows:
+		first, n = out.get(r.goal, (None, 0))
+		out[r.goal] = (first or r, n + 1)
+	return out
+
+
+def _done_when_line(g):
+	"""The finish line in words: a number as "84 → 78 kg", otherwise the goal's own Done when text."""
+	if g.measure_kind == "Number" and g.target_value is not None:
+		unit = f" {g.unit}" if g.unit else ""
+		return f"{readings.num(g.start_value)} → {readings.num(g.target_value)}{unit}"
+	return g.done_when or None
+
+
+@frappe.whitelist(methods=["GET"])
+def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
+	"""Goals → By area: one section for each area that is on, with its parts as sub-groups. `show` is cycle (goals in the active
+	12 Week Year), open (every goal in progress) or finished. `sort` is order (the owner's order, set by reorder) or score. Each
+	goal has its Done when, progress, the cycle's current week and score, the next action, the open task count and what it
+	serves. Areas that are off have no section and are listed in `off` for the chips."""
+	space = permissions.resolve_space(space)
+	if show not in SHOWS:
+		frappe.throw(_("Unknown filter."))
+	if sort not in ("order", "score"):
+		frappe.throw(_("Unknown sort."))
+	values = {"space": space}
+	off = off_clause(space, "g.area", values)
+	# nosemgrep: frappe-sql-format-injection -- SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters
+	rows = frappe.db.sql(f"""select g.name, g.title, g.goal_type, g.area, g.serves, g.cycle, g.target_date, g.outcome, g.on_hold, g.done_when,
+		g.measure_kind, g.measure, g.unit, g.start_value, g.target_value, g.current_value, g.current_on, g.sort_order,
+		c.title as cycle_title, c.start_date as cycle_start, s.title as serves_title
+		from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle left join `tabLife Goal` s on s.name = g.serves
+		where g.space = %(space)s and {SHOWS[show]} {off} order by g.sort_order, g.creation""", values, as_dict=True)
+	names = [r.name for r in rows]
+	counts = task_counts(names)
+	nxt = _next_actions(space, names)
+	scores = _scores([r for r in rows if r.goal_type == "12 Week Year" and r.cycle])
+	week_of = {c: rules.current_week(frappe.get_doc("Life Cycle", c)) for c in {r.cycle for r in rows if r.cycle}}
+	for r in rows:
+		r["tasks_done"], r["tasks_counted"] = counts.get(r.name, (0, 0))
+		is_cycle = r.goal_type == "12 Week Year" and r.cycle
+		r["score"] = scores.get(r.name) if is_cycle else None
+		r["week"] = week_of.get(r.cycle) if is_cycle else None
+		r["progress"] = readings.summary(r)
+		r["done_when_line"] = _done_when_line(r)
+		task, n = nxt.get(r.name, (None, 0))
+		r["open_tasks"] = n
+		r["next_action"] = {"name": task.name, "title": task.title, "scheduled_at": str(task.scheduled_at) if task.scheduled_at else None,
+			"due_date": str(task.due_date) if task.due_date else None} if task else None
+		r["target_date"] = str(r.target_date) if r.target_date else None
+		r["current_on"] = str(r.current_on) if r.current_on else None
+		r["cycle_start"] = str(r.cycle_start) if r.cycle_start else None
+	if sort == "score":
+		rows.sort(key=lambda r: -(r.score if r.score is not None else (r.progress.get("percent") or 0)))
+	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "is_life_area", "is_on", "colour", "sort_order"],
+		order_by="sort_order asc, area_name asc", limit=5000)
+	top = [a for a in tree if not a.parent_area]
+	hidden = set(areas_off(space))
+	by_area_name = {}
+	for r in rows:
+		by_area_name.setdefault(r.area or "", []).append(r)
+	sections = []
+	for a in top:
+		if a.name in hidden:
+			continue
+		parts = [p for p in tree if p.parent_area == a.name and p.name not in hidden]
+		groups = [{"area": None, "goals": by_area_name.get(a.name, [])}]
+		groups += [{"area": {"name": p.name, "area_name": p.area_name}, "goals": by_area_name.get(p.name, [])} for p in parts]
+		groups = [g for g in groups if g["goals"]]
+		n = sum(len(g["goals"]) for g in groups)
+		sections.append({"area": a.name, "area_name": a.area_name, "colour": a.colour, "count": n,
+			"parts": [{"name": p.name, "area_name": p.area_name} for p in parts], "groups": groups if n else []})
+	known = {a.name for a in tree}
+	loose = [r for r in rows if not r.area or r.area not in known]
+	return {"space": space, "show": show, "sort": sort, "total": len(rows), "sections": sections,
+		"no_area": loose, "areas_on": len([s for s in sections if s["area"]]),
+		"off": [{"name": a.name, "area_name": a.area_name} for a in top if a.name in hidden]}
+
+
+@frappe.whitelist(methods=["POST"])
+def reorder(goals: str | builtins.list):
+	"""Save the owner's order of goals (Goals → By area, drag): the first name gets the lowest sort order. People only; each goal
+	must be one the user can write."""
+	_person_only()
+	names = parse(goals, [])
+	if not isinstance(names, builtins.list) or not names or len(names) > 200:
+		frappe.throw(_("Give the goals in their new order."))
+	docs = [permissions.get_doc_checked("Life Goal", n) for n in names]
+	slots = sorted(d.sort_order or 0 for d in docs)
+	if len(set(slots)) < len(slots):
+		slots = builtins.list(range(min(slots), min(slots) + len(slots)))
+	for d, slot in zip(docs, slots):
+		if (d.sort_order or 0) != slot:
+			d.check_permission("write")
+			d.db_set("sort_order", slot, update_modified=False)
+	return {"ok": True}
 
 
 def _scores(rows):
