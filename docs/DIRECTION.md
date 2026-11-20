@@ -20,7 +20,7 @@ Board: `mockups/v2/01-how-it-works.png`.
 | --- | --- | --- |
 | **Today** | The day's plate and the calendar | Day · Week · Month · Year |
 | **Brain** | What came in and what the Brain did with it | Needs you · Activity · Sources · Skills (from level 5) |
-| **Goals** | Goals and tasks by area | By area · All tasks · No goal |
+| **Goals** | Goals and tasks by area, and the plans that pace them | By area · All tasks · No goal · Cycles (the 12 Week Year and the month plan, #45) |
 | **Library** | Everything kept | Everything · Notes · Documents · People · Chats · Files (Files is added by its own issue; it is not in the mockup) |
 | **Review** | The weekly review (set 8's shell) | Hidden until the first review is due; then it appears |
 | **Settings** | As now | |
