@@ -13,7 +13,7 @@ from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, 
 from lifeos.api.utils import order_by as sort_order
 
 OPEN = ("Open", "Doing", "Waiting")
-FIELDS = ["name", "title", "status", "priority", "due_date", "area", "goal", "inbox_item", "carried_from", "waiting_on",
+FIELDS = ["name", "title", "status", "priority", "due_date", "area", "area_guessed", "area_confidence", "goal", "inbox_item", "carried_from", "waiting_on",
 	"month_plan", "creation", "completed_on", "source_url", "is_archived", "notes_md", "last_touched_on", "owner", "scheduled_at", "duration_min"]
 PRIORITY_ORDER = "case t.priority when 'I' then 1 when 'II' then 2 when 'III' then 3 when 'IV' then 4 else 5 end"
 OPEN_LOOP_DAYS = 14
@@ -259,6 +259,17 @@ def update(task: str, values: str | dict):
 		else:
 			frappe.throw(_("Field {0} cannot be changed here.").format(k))
 	doc.save()
+	return get(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def confirm_area(task: str, area: str | None = None):
+	"""Confirm the area the Brain guessed for a task, or move the task to `area`. Either clears the guess mark; a move is
+	kept as a correction (issue 13)."""
+	from lifeos import area_guess
+
+	doc = permissions.get_doc_checked("Life Task", task, "write")
+	area_guess.confirm(doc, area or None)
 	return get(doc.name)
 
 

@@ -164,6 +164,7 @@ def move_work(area, to):
 		for name in work[key]:
 			doc = frappe.get_doc(doctype, name)
 			doc.area = to
+			doc.flags.area_moved = True  # not a correction of a guessed area (issue 13)
 			doc.save()
 	return {"goals": len(work["goals"]), "tasks": len(work["tasks"])}
 

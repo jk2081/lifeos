@@ -6,13 +6,17 @@
  "engine": "InnoDB",
  "field_order": [
   "space",
+  "kind",
   "goal",
   "action_id",
   "cycle",
   "week",
   "date",
   "count",
-  "inbox_item"
+  "inbox_item",
+  "task",
+  "old_area",
+  "new_area"
  ],
  "fields": [
   {
@@ -25,18 +29,24 @@
    "in_standard_filter": 1
   },
   {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Week tick\nArea correction",
+   "default": "Week tick",
+   "in_list_view": 1
+  },
+  {
    "fieldname": "goal",
    "fieldtype": "Link",
    "label": "Goal",
    "options": "Life Goal",
-   "reqd": 1,
    "search_index": 1
   },
   {
    "fieldname": "action_id",
    "fieldtype": "Data",
    "label": "Action Id",
-   "reqd": 1,
    "search_index": 1
   },
   {
@@ -44,14 +54,12 @@
    "fieldtype": "Link",
    "label": "Cycle",
    "options": "Life Cycle",
-   "reqd": 1,
    "search_index": 1
   },
   {
    "fieldname": "week",
    "fieldtype": "Int",
-   "label": "Week",
-   "reqd": 1
+   "label": "Week"
   },
   {
    "fieldname": "date",
@@ -71,10 +79,32 @@
    "fieldtype": "Link",
    "label": "Inbox Item",
    "options": "Life Inbox Item"
+  },
+  {
+   "fieldname": "task",
+   "fieldtype": "Link",
+   "label": "Task",
+   "options": "Life Task",
+   "search_index": 1,
+   "depends_on": "eval:doc.kind=='Area correction'"
+  },
+  {
+   "fieldname": "old_area",
+   "fieldtype": "Link",
+   "label": "Guessed Area",
+   "options": "Life Area",
+   "depends_on": "eval:doc.kind=='Area correction'"
+  },
+  {
+   "fieldname": "new_area",
+   "fieldtype": "Link",
+   "label": "Corrected Area",
+   "options": "Life Area",
+   "depends_on": "eval:doc.kind=='Area correction'"
   }
  ],
  "links": [],
- "modified": "2026-11-15 00:00:00.000000",
+ "modified": "2026-11-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Action Log",
