@@ -948,7 +948,7 @@ for (const width of UX_WIDTHS) {
       await s.open(p)
       await pg.locator('[data-row]:has([data-ref])').first().click({ position: { x: 120, y: 12 } })
       await settle()
-      must(await pane.isVisible() && new URL(pg.url()).pathname.replace(/\/$/, '') === p, `${p}: a row did not open the pane in place`)
+      must(await pane.isVisible() && new URL(pg.url()).pathname.replace(/\/$/, '') === (p === '/life' ? '/life/today' : p), `${p}: a row did not open the pane in place`)
     }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     return `${screens.length} screens`
@@ -1732,7 +1732,7 @@ for (const width of UX_WIDTHS) {
       }
       if (!phone) { await pg.locator('[data-ask-close]').click(); await settle() } else { await pg.keyboard.press('Escape'); await settle() }
       must(!(await pg.locator('[data-ask-panel]:visible').count()), `${path}: the panel did not close`)
-      must(new URL(pg.url()).pathname === here && here.replace(/\/$/, '') === path.split('?')[0], `${path}: the screen changed under the panel (${new URL(pg.url()).pathname})`)
+      must(new URL(pg.url()).pathname === here && here.replace(/\/$/, '') === (path.split('?')[0] === '/life' ? '/life/today' : path.split('?')[0]), `${path}: the screen changed under the panel (${new URL(pg.url()).pathname})`)
       done.push(scope)
     }
     // a record pane: Ask about this
@@ -2068,7 +2068,7 @@ while d <= last:
     must(made.name, 'no page')
     // /chats lands on the Chats tab, with its filters
     await s.open(`/life/chats?area=${uxArea}`)
-    must(/\/life\/library\/captures\?/.test(pg.url()) && pg.url().includes('tab=chats') && pg.url().includes(`area=${uxArea}`), `/chats went to ${pg.url()}`)
+    must(/\/life\/library\/chats\?/.test(pg.url()) && pg.url().includes('tab=chats') && pg.url().includes(`area=${uxArea}`), `/chats went to ${pg.url()}`)
     return `${Object.keys(res.tabs).length} tabs`
   })
 
@@ -2672,7 +2672,7 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
       must((await pg.locator('[data-rhythm-banner]').count()) === 1, 'more than one banner')
       const order = await pg.evaluate(() => { const a = document.querySelector('[data-rhythm-banner]'), o = document.querySelector('[data-open-band]'); return !!(a && o && (a.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING)) })
       must(order, 'the banner is not above the Open band')
-      must(new URL(await banner.locator('[data-banner-open]').evaluate((a) => a.href)).pathname === to, `the ${key} banner does not lead to ${to}`)
+      must(new URL(await banner.locator('[data-banner-open]').evaluate((a) => a.href)).pathname === to.split('?')[0], `the ${key} banner does not lead to ${to} (${await banner.locator('[data-banner-open]').evaluate((a) => a.href)})`)
       await banner.locator('[data-banner-skip]').click()
       await pg.waitForTimeout(900)
       must(!(await banner.count()), `Skip did not hide the ${key} banner`)
@@ -3321,7 +3321,8 @@ print(json.dumps({"migrated": migrated, "number": number, "milestone": milestone
     await s.open('/life/brain')
     await place('Today')
     await pg.locator('[data-place-tabs] [data-tab="week"]').first().click()
-    await pg.locator('[data-plan-views]:visible').first().getByText('Calendar', { exact: true }).click()
+    // issue 16: the Week tab is its own screen; the Calendar and Review views open by `view=`
+    await pg.goto(new URL('/life/today/week?view=calendar', pg.url()).href)
     await settle()
     await pg.locator('[data-plan-views]:visible').first().getByText('Review', { exact: true }).click()
     await review('clicked from the Calendar')
