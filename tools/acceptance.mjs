@@ -4016,6 +4016,9 @@ for (const width of SET_WIDTHS) {
     const box = pg.getByLabel('Quick add')
     await box.fill(`${title} today`)
     await box.press('Enter')
+    await pg.waitForLoadState('networkidle')
+    // after a full walk many tasks are due today: show this one by its title
+    await s.open(`/life/plan/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', '=', title]]))}`)
     const row = pg.locator('[data-row]').filter({ hasText: title }).first()
     await row.waitFor({ timeout: 10000 })
     const chip = row.locator('[data-area-guess]')

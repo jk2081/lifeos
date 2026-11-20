@@ -384,7 +384,7 @@ GitHub issue #12. Deviations are in `DECISIONS.md` under "Issue 12".
 GitHub issue #13. Deviations are in `DECISIONS.md` under "Issue 13".
 
 - **Works:** a task saved without an area gets one, marked `area_guessed` with `area_confidence`: the goal's area, else the capture's, else a rule match of the title's words on the names and descriptions of the areas and parts that are on, else Career (low confidence). With an AI key, a Career fallback is then refined by one short model call in a background job after the save, within the spend cap. Task rows on Today, Plan > Tasks and the goal page show "✦ <area> · <n>%"; one tap confirms it (`lifeos.api.tasks.confirm_area`), and the task pane shows the guess beside the area picker. Changing a guessed area clears the mark and is kept as a `Life Action Log` row of kind "Area correction". Patch `v12.task_areas` fills every task without an area, with no model calls.
-- **Tests:** `lifeos/tests/test_issue13_task_areas.py` (the issue's six) and acceptance check `I13.<width>.7` at 1440 and 390 px.
+- **Tests:** `lifeos/tests/test_issue13_task_areas.py` (the issue's six) and acceptance check `I13.<width>.7` at 1440 and 390 px. The full unit suite: 450 run, 449 pass, 1 skipped. `node tools/acceptance.mjs` with nearly every check (`--only=1,…,9` matches by prefix): 132 of 134; the two failures were I13 itself, whose new row fell off the first page of a long "due today" list; the check now opens the list filtered to its title and passes 2 of 2. I11 and I12 pass. `./tools/scan.sh`: 0 findings. `node tools/screens.mjs --only today,plan-tasks,plan-tasks-board` on the acceptance site: light and dark at both widths, no overflow, errors or low contrast.
 
 ## Summary
 
