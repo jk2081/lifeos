@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Brain: Needs you</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#0062B3;text-decoration:none}a:hover{color:#004F91}
+.app{display:flex;background:#fff;color:#171717;font-family:Inter,system-ui,sans-serif;font-size:14px;line-height:1.5;min-height:1000px}
+.sb{flex:none;width:232px;background:#F8F8F8;border-right:1px solid #EDEDED;padding:12px 8px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:1px}
+.sp{display:flex;align-items:center;gap:8px;padding:4px 8px 10px}
+.lg{width:28px;height:28px;border-radius:7px;background:#EDEDED;color:#383838;display:grid;place-items:center;font-size:12px;font-weight:600}
+.sr{display:flex;gap:6px;padding:0 4px 8px}
+.sx{flex:1;height:30px;border-radius:7px;background:#EDEDED;display:flex;align-items:center;gap:6px;padding:0 8px;color:#525252;font-size:13px}
+.nb{height:30px;border-radius:7px;background:#171717;color:#fff;display:flex;align-items:center;padding:0 10px;font-size:13px;font-weight:500}
+.nv{display:flex;align-items:center;gap:10px;min-height:30px;padding:0 8px;border-radius:6px;color:#383838}
+.nv.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.nv i{width:15px;height:15px;border:1.6px solid #8A8A8A;border-radius:4px;flex:none}
+.ct{margin-left:auto;font-size:12px;color:#525252;background:#EDEDED;border-radius:999px;padding:0 7px}
+.gh{font-size:12px;color:#6B6B6B;padding:12px 8px 3px}
+.new{margin-left:auto;font-size:11px;font-weight:600;color:#0062B3;background:#E6F4FF;border-radius:999px;padding:0 6px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid #EDEDED}
+.h1{font-size:20px;font-weight:600;margin:0}
+.sub{font-size:13px;color:#6B6B6B}
+.bt{height:30px;padding:0 11px;border-radius:7px;border:0;font:500 13px Inter,system-ui,sans-serif;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.bt.p{background:#171717;color:#fff}.bt.s{background:#F3F3F3;color:#171717}.bt.g{background:transparent;color:#525252;padding:0 6px}
+.bd{padding:20px 28px 32px;display:flex;flex-direction:column;gap:22px}
+.cd{border:1px solid #EDEDED;border-radius:10px;padding:14px 16px;background:#fff}
+.sh{font-size:13px;font-weight:600;color:#383838;margin:0 0 8px;display:flex;align-items:baseline;gap:8px}
+.sh .mt{font-weight:400}
+.mt{font-size:12.5px;color:#6B6B6B}
+.pl{display:inline-flex;align-items:center;font-size:11.5px;font-weight:500;padding:1px 8px;border-radius:999px;white-space:nowrap}
+.g{background:#E4FAEB;color:#1A6B43}.b{background:#E6F4FF;color:#0062B3}.o{background:#FFF1E7;color:#A8480A}.r{background:#FFE7E7;color:#B42525}.n{background:#F3F3F3;color:#525252}.v{background:#F1ECFF;color:#5B3CC4}
+.rw{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid #F2F2F2}
+.rw:last-child{border-bottom:0}
+.ck{width:17px;height:17px;margin:2px 0 0;accent-color:#171717;flex:none}
+.bar{position:relative;height:8px;border-radius:4px;background:#EDEDED}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#171717}
+.bar u{position:absolute;top:-4px;width:2px;height:16px;background:#0062B3}
+.hb{width:42px;height:42px;border-radius:10px;border:1px solid #DADADA;background:#fff;font:600 14px Inter,system-ui,sans-serif;display:inline-grid;place-items:center}
+.hb.on{background:#171717;color:#fff;border-color:#171717}
+.ins{border:1px solid #EDEDED;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.ins p{margin:0;font-weight:500;line-height:1.45}
+.ev{font-size:12.5px;color:#6B6B6B;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.ev a{background:#F5F5F5;border-radius:6px;padding:0 6px;color:#383838}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.tb{display:flex;gap:20px;padding:0 28px;border-bottom:1px solid #EDEDED}
+.tb span{padding:10px 0;color:#525252;border-bottom:2px solid transparent}
+.tb span.on{color:#171717;font-weight:500;border-bottom-color:#171717}
+.tb b{font-weight:400;color:#8A8A8A;margin-left:4px}
+.note{font-size:12px;color:#8A8A8A;margin:0}
+</style>
+</helmet>
+<style>
+.app{min-height:900px}
+.plate{display:flex;align-items:stretch;border:1px solid #EDEDED;border-radius:10px;overflow:hidden}
+.pt{flex:1;padding:10px 14px;border-right:1px solid #EDEDED;display:flex;flex-direction:column;gap:1px;min-width:0}
+.pt:last-child{border-right:0}
+.pt .k{font-size:12px;color:#6B6B6B}
+.pt .num{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.25}
+.pt .h{font-size:12px;color:#6B6B6B;line-height:1.35}
+.pt .h.w{color:#A8480A}
+.cu{display:flex;align-items:center;padding:0 14px;background:#FFF8F2}
+.nx .rw{align-items:center;padding:8px 0}
+.gp{font-size:11.5px;font-weight:600;color:#8A8A8A;text-transform:uppercase;letter-spacing:.04em;padding:10px 0 2px}
+.why{font-size:12px;white-space:nowrap}
+.tl{position:relative;border-left:1px solid #E2E2E2;margin-left:44px;display:flex;flex-direction:column}
+.tl div{position:relative;padding:4px 0 14px 12px}
+.tl b{position:absolute;left:-46px;top:4px;width:38px;text-align:right;font-weight:400;font-size:12px;color:#8A8A8A}
+.tl .ev{display:block;background:#E6F4FF;color:#0062B3;border-radius:6px;padding:4px 8px;font-size:13px}
+.tl .now{position:absolute;left:-4px;top:9px;width:7px;height:7px;border-radius:50%;background:#B42525}
+.ask{display:flex;align-items:center;gap:8px;height:34px;border:1px solid #DADADA;border-radius:9px;padding:0 10px;color:#8A8A8A;width:420px}
+.kbd{font-size:11px;border:1px solid #DADADA;border-radius:4px;padding:0 4px;color:#6B6B6B}
+.mini{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;border:1px solid #DADADA;font-size:11px;font-weight:600}
+.mini.on{background:#171717;color:#fff;border-color:#171717}
+.grid th{font-weight:500;color:#6B6B6B;font-size:12px;text-align:right;padding:6px 10px}
+.grid td{padding:7px 10px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid #F2F2F2}
+.grid td:first-child,.grid th:first-child{text-align:left}
+.hot{background:#FFF1E7;color:#A8480A;font-weight:600}
+.key{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border-radius:8px;border:1px solid #DADADA;background:#fff;font-weight:500}
+.key .kbd{margin-left:2px}
+
+.lens{display:flex;align-items:center;gap:8px;padding:8px;border-radius:9px;background:#fff;box-shadow:0 0 0 1px #E2E2E2;margin:0 4px 8px}
+.lens .t{line-height:1.2;flex:1}.lens .t b{display:block;font-size:13.5px}.lens .t span{font-size:12px;color:#6B6B6B}
+.sub2{padding-left:34px;min-height:28px;font-size:13.5px;color:#525252}
+.sub2.on{color:#171717;font-weight:500;background:#fff;box-shadow:0 0 0 1px #E2E2E2}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.dd{position:absolute;left:236px;top:56px;width:300px;background:#fff;border:1px solid #E2E2E2;border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.12);padding:8px;z-index:5}
+.dd .h{font-size:11.5px;font-weight:600;color:#8A8A8A;text-transform:uppercase;letter-spacing:.04em;padding:8px 8px 4px}
+.dd .i{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px}
+.dd .i.on{background:#F3F3F3;font-weight:500}
+.sm{display:flex;flex-direction:column;gap:2px;width:250px;flex:none;border-right:1px solid #EDEDED;padding:16px 10px;background:#FCFCFC}
+.sm .grp{font-size:11.5px;font-weight:600;color:#8A8A8A;text-transform:uppercase;letter-spacing:.04em;padding:12px 8px 4px}
+.sm .i{padding:6px 10px;border-radius:7px;color:#383838}
+.sm .i.on{background:#fff;box-shadow:0 0 0 1px #E2E2E2;color:#171717;font-weight:500}
+.set{display:flex;align-items:flex-start;gap:24px;padding:16px 0;border-bottom:1px solid #F0F0F0}
+.set .l{flex:1}.set .l b{display:block;font-weight:500}.set .c{width:280px;flex:none;display:flex;justify-content:flex-end}
+.fld{height:32px;border:1px solid #DADADA;border-radius:8px;padding:0 10px;display:flex;align-items:center;gap:8px;min-width:120px;justify-content:space-between}
+.seg{display:inline-flex;background:#F3F3F3;border-radius:8px;padding:2px}.seg span{padding:4px 10px;border-radius:6px;font-size:13px}.seg span.on{background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.1);font-weight:500}
+.node{border:1px solid #DADADA;border-radius:10px;padding:10px 12px;background:#fff}
+.node b{display:block;font-size:15px}
+.tabsl{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.tabsl span{font-size:12px;background:#F3F3F3;border-radius:6px;padding:1px 7px;color:#383838}
+
+.c-ask{display:flex;align-items:center;gap:8px;height:34px;width:380px;border:1px solid #E2E2E2;border-radius:9px;padding:0 10px;color:#8A8A8A;font-size:13px}
+.src{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:#525252;background:#F5F5F5;border-radius:5px;padding:0 6px;white-space:nowrap}
+.brn{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;color:#5B3CC4;background:#F1ECFF;border-radius:5px;padding:0 6px;white-space:nowrap}
+.task{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #F2F2F2}
+.task:last-child{border-bottom:0}
+.circ{width:18px;height:18px;border-radius:50%;border:1.6px solid #BDBDBD;flex:none}
+.circ.dn{background:#171717;border-color:#171717}
+.tt{flex:1;min-width:0}
+.tt b{font-weight:500}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.ladder{display:flex;gap:6px}
+.ladder span{flex:1;height:5px;border-radius:3px;background:#E2E2E2}
+.ladder span.on{background:#171717}
+.chip{display:inline-flex;align-items:center;height:28px;padding:0 10px;border-radius:8px;border:1px solid #DADADA;background:#fff;font-size:13px;white-space:nowrap}
+.chip.sel{background:#171717;color:#fff;border-color:#171717}
+.conn{border:1px solid #EDEDED;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:600;font-size:14px}
+.gcard{border:1px solid #EDEDED;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.big{font-size:26px;font-weight:600;line-height:1.1}
+
+.tabs2{display:flex;gap:22px;padding:0 28px;border-bottom:1px solid #EDEDED}
+.tabs2 span{padding:10px 0;color:#6B6B6B;display:inline-flex;gap:6px;align-items:center}
+.tabs2 span.on{color:#171717;font-weight:500;border-bottom:2px solid #171717}
+.tabs2 .ct2{font-size:11.5px;background:#171717;color:#fff;border-radius:999px;padding:0 6px}
+.lrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #F2F2F2}
+.kind{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:12px;font-weight:600;flex:none}
+</style><div class="app"><nav class="sb" style="width:220px">
+  <div class="sp"><div class="lg" style="background:#171717;color:#fff">L</div><b>Life OS</b></div>
+  <div class="sr"><span class="nb" style="flex:1;justify-content:center;height:34px">+ Capture</span></div>
+  <span class="nv" style="min-height:34px;font-size:14.5px"><i></i>Today</span><span class="nv on" style="min-height:34px;font-size:14.5px"><i></i>Brain<span class="ct" style="background:#171717;color:#fff">7</span></span><span class="nv" style="min-height:34px;font-size:14.5px"><i></i>Goals</span><span class="nv" style="min-height:34px;font-size:14.5px"><i></i>Library</span>
+  <div style="flex:1"></div>
+  <div class="cd" style="margin:0 4px 10px;padding:12px;background:#fff">
+    <div class="mt">Your setup · level 3 of 6</div>
+    <div class="ladder" style="margin:6px 0 8px"><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span><span></span></div>
+    <div style="font-size:13px;font-weight:500">Next: a weekly review</div>
+    <div class="mt">30 minutes on Sunday. Review joins the menu after your first one.</div>
+  </div>
+  <span class="nv"><i></i>Settings</span>
+  <span class="nv" style="gap:8px"><span class="lg" style="width:24px;height:24px;font-size:11px">JK</span>Jai</span>
+</nav><main class="main"><header class="hd"><div><h1 class="h1">Brain</h1><div class="sub">Reads everything that comes in and sorts it onto your goals. Here it shows its work and asks for your call.</div></div>
+<div style="display:flex;gap:10px;align-items:center"><div class="c-ask">✦ Ask anything about your life <span style="flex:1"></span>⌘K</div></div></header><div class="tabs2"><span class="on">Needs you<span class=ct2>7</span></span><span class="">Activity</span><span class="">Sources</span></div>
+<div class="bd">
+ <div style="display:flex;gap:12px">
+  <div class="cd" style="flex:1"><div class="mt">Came in since yesterday</div><div class="big">41</div><div class="mt">from 6 sources</div></div>
+  <div class="cd" style="flex:1"><div class="mt">Filed on its own</div><div class="big">34</div><div class="mt">under 6 areas and 4 goals · <a href="#">see in Activity</a></div></div>
+  <div class="cd" style="flex:1;border-color:#171717"><div class="mt">Needs you</div><div class="big">7</div><div class="mt">about 2 minutes</div></div>
+ </div>
+ <div class="cd" style="padding:2px 16px">
+  <div class="rw" style="align-items:center;padding:12px 0"><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:center"><span class="src">Wearable</span><b style="font-weight:500">Voice note, 08:12, 1 min</b></div>
+<div class="mt" style="margin-top:3px">✦ Sounds like a task for Anya, but no date was said</div></div><div style="display:flex;gap:6px;align-items:center"><span class="mt">Best guess:</span><span class="pl b">Task</span> <span style="display:inline-flex;align-items:center;gap:5px"><span class="dot" style="background:#1A6B43"></span>Family</span></div><div style="display:flex;gap:4px;margin-left:10px"><span class="chip sel">Keep</span><span class="chip">Change</span><span class="chip">Drop</span></div></div>
+  <div class="rw" style="align-items:center;padding:12px 0"><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:center"><span class="src">Email</span><b style="font-weight:500">“Re: Q3 numbers” from Prakash</b></div>
+<div class="mt" style="margin-top:3px">✦ Mentions both BTW and Rungamattee</div></div><div style="display:flex;gap:6px;align-items:center"><span class="mt">Best guess:</span><span class="pl n">Note</span> <span style="display:inline-flex;align-items:center;gap:5px"><span class="dot" style="background:#0062B3"></span>BTW</span> or <span style="display:inline-flex;align-items:center;gap:5px"><span class="dot" style="background:#5B3CC4"></span>Tea &amp; Coffee</span></div><div style="display:flex;gap:4px;margin-left:10px"><span class="chip">BTW</span><span class="chip">Tea &amp; Coffee</span><span class="chip">Drop</span></div></div>
+  <div class="rw" style="align-items:center;padding:12px 0"><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:center"><span class="src">ERPNext</span><b style="font-weight:500">Sales Order SO-0412 overdue 30 days</b></div>
+<div class="mt" style="margin-top:3px">✦ Not tied to any goal you have</div></div><div style="display:flex;gap:6px;align-items:center"><span class="mt">Best guess:</span><span class="pl b">Task</span> <span style="display:inline-flex;align-items:center;gap:5px"><span class="dot" style="background:#5B3CC4"></span>Tea &amp; Coffee</span></div><div style="display:flex;gap:4px;margin-left:10px"><span class="chip sel">Keep</span><span class="chip">Change</span><span class="chip">Drop</span></div></div>
+  <div class="rw" style="align-items:center;padding:12px 0"><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:center"><span class="src">GitHub</span><b style="font-weight:500">PR #88 waiting for your review</b></div>
+<div class="mt" style="margin-top:3px">✦ You have no goal for Life OS yet</div></div><div style="display:flex;gap:6px;align-items:center"><span class="mt">Best guess:</span><span class="pl b">Task</span> <span style="display:inline-flex;align-items:center;gap:5px"><span class="dot" style="background:#0062B3"></span>BTW</span></div><div style="display:flex;gap:4px;margin-left:10px"><span class="chip">Keep</span><span class="chip">New goal</span><span class="chip">Drop</span></div></div>
+  <div class="rw" style="align-items:center;padding:12px 0"><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:center"><span class="src">Hermes</span><b style="font-weight:500">Photo of a whiteboard</b></div>
+<div class="mt" style="margin-top:3px">✦ Could not read two lines</div></div><div style="display:flex;gap:6px;align-items:center"><span class="mt">Best guess:</span><span class="pl n">Note</span></div><div style="display:flex;gap:4px;margin-left:10px"><span class="chip">Keep</span><span class="chip">Change</span><span class="chip">Drop</span></div></div>
+  <div class="rw" style="align-items:center;padding:12px 0"><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:center"><span class="src">Email</span><b style="font-weight:500">Newsletter: robusta prices</b></div>
+<div class="mt" style="margin-top:3px">✦ Interesting, nothing to do</div></div><div style="display:flex;gap:6px;align-items:center"><span class="mt">Best guess:</span><span class="pl n">Read later</span></div><div style="display:flex;gap:4px;margin-left:10px"><span class="chip">Keep</span><span class="chip sel">Drop</span></div></div>
+  <div class="rw" style="align-items:center;padding:12px 0"><div style="flex:1;min-width:0"><div style="display:flex;gap:6px;align-items:center"><span class="src">Phone</span><b style="font-weight:500">Unknown number, 3 missed calls</b></div>
+<div class="mt" style="margin-top:3px">✦ No one you know</div></div><div style="display:flex;gap:6px;align-items:center"><span class="mt">Best guess:</span>—</div><div style="display:flex;gap:4px;margin-left:10px"><span class="chip">Keep</span><span class="chip sel">Drop</span></div></div>
+ </div>
+ <div style="display:flex;align-items:center;gap:12px"><span class="mt">Every choice teaches the Brain. Next time it files these on its own.</span><span style="flex:1"></span><button class="bt p" type="button" style="height:36px;padding:0 16px">Done, file all 7</button></div>
+</div></main></div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

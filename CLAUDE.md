@@ -12,6 +12,10 @@ This repo will hold `lifeos`, a Frappe v16 app. It is empty apart from the spec 
 - **This build runs unattended.** Do not ask questions. When finished, create `BUILD_DONE`. If you cannot go further, write the reason to `BUILD_BLOCKED`. `scripts/start-build.sh` restarts you with `CONTINUE_PROMPT.md` until one of those files exists.
 - Do not read or change anything outside this repository and the local bench you create for it.
 
+## Building from GitHub issues (from 20 November 2026)
+
+Build work now comes from GitHub issues, one at a time, run by `scripts/run-issues.sh` (see `docs/BUILDING.md`). For an issue run, `docs/ISSUE_RULES.md` replaces the milestone, `_DONE` file and `BUILD_DONE`/`BUILD_BLOCKED` rules above, and `docs/DIRECTION.md` is the target design wherever it differs from `SPEC.md`.
+
 ## Frappe conventions (from 17 November 2026)
 
 Frappe publishes official agent skills at github.com/frappe/skills. `scripts/get-frappe-skills.sh` fetches them into `.claude/skills/` (the task runner does this at the start of every run). Follow them in every set:
