@@ -17,6 +17,11 @@ class LifeTask(Document):
 			self.completed_on = today()
 		if self.status not in CLOSED:
 			self.completed_on = None
+		for field in ("waiting_on_person", "delegated_to"):
+			if self.get(field) and frappe.db.get_value("Life Person", self.get(field), "space") != self.space:
+				frappe.throw(_("{0} must be someone in the task's space.").format(_(self.meta.get_label(field))))
+		if self.status == "Waiting" and self.waiting_on_person and not (self.waiting_on or "").strip():
+			self.waiting_on = frappe.db.get_value("Life Person", self.waiting_on_person, "full_name")
 		if self.status == "Waiting" and not (self.waiting_on or "").strip():
 			frappe.throw(_("Say who or what this task is waiting on."), frappe.MandatoryError)
 		if not self.flags.keep_touched:

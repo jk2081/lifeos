@@ -1501,7 +1501,7 @@ for (const width of UX_WIDTHS) {
     must(JSON.stringify(tabs) === JSON.stringify(['day', 'week', 'month', 'year']), `Today's tabs are ${tabs}`)
     await s.open('/life/library/notes')
     const lib = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
-    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'documents', 'people', 'chats']), `Library's tabs are ${lib}`)
+    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'documents', 'people', 'chats', 'files']), `Library's tabs are ${lib}`)
     if (!phone) {
       await s.open('/life/today/month')
       await pg.locator('body').click({ position: { x: 600, y: 10 } })
@@ -1517,7 +1517,7 @@ for (const width of UX_WIDTHS) {
       must(new URL(pg.url()).pathname === '/life/library/documents', `] on the Library went to ${new URL(pg.url()).pathname}`)
     } else {
       // the last tab, and a page shown as a tab after them: the row scrolls sideways with it in view, the page does not
-      for (const p of ['/life/library/chats', '/life/library/archive', '/life/goals/someday']) {
+      for (const p of ['/life/library/files', '/life/library/archive', '/life/goals/someday']) {
         await s.open(p)
         const m = await pg.locator('[data-place-tabs]').first().evaluate((el) => { const t = el.querySelector('[data-state="active"]').getBoundingClientRect(); return { inView: t.left >= 0 && t.right <= window.innerWidth, h: t.height } })
         must(m.inView && m.h >= 44, `${p}: the tab row on a phone: ${JSON.stringify(m)}`)
@@ -5314,6 +5314,401 @@ print(json.dumps(frappe.db.sql("select count(*) from \`tabLife Task\` where spac
       await pg.waitForFunction((n) => !document.querySelector(`[data-no-goal-row][data-task="${n}"]`), ids.money, { timeout: 8000 })
       const r = dbRow(T('money'), ['goal', 'standalone'])
       must(!r.goal && r.standalone === 1, 'the task changed unexpectedly: ' + JSON.stringify(r))
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
+// Issue 23: Library > Everything. Records titled "I23 ". Moved or changed rows are put back after.
+for (const width of SET_WIDTHS) {
+  const tag = `I23.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I23 ${what} ${width} ${stamp}`
+  const WORD = `zebrafruit${stamp}${width}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const Q = `${width} ${stamp}` // only this run's records, whatever else the site holds
+  const openLib = async (path = '/life/library', q = '') => { await s.open(q ? `${path}?q=${encodeURIComponent(q)}` : path); await pg.locator('[data-library-everything][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const rowFor = (title) => pg.locator('[data-lib-row]', { hasText: title })
+  const letters = async () => pg.locator('[data-lib-row]').evaluateAll((els) => els.map((e) => e.dataset.letter))
+  const was = JSON.parse(bench(`import json
+print(json.dumps(frappe.db.get_value("Life Space", "${SPACE}", "agents_can_read_vault")))`).split('\n').pop())
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Note", "Life Vault Document", "Life Chat Log", "Life Person"):
+    for n in frappe.get_all(dt, filters={"title" if dt != "Life Person" else "full_name": ["like", "I23 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+frappe.db.sql("update \`tabLife Index\` set space = %s where space = %s", ("${SPACE}", "zz-i23-aside-${width}"))
+frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i23-aside-${width}"))
+frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", ${was ? 1 : 0})`)
+  const ids = {}
+  try {
+    await check(`${tag}.7`, `${width} px: on an empty space the Library says what will appear and offers + Capture; People says the same`, async () => {
+      bench(`frappe.db.sql("update \`tabLife Index\` set space = %s where space = %s and ref_doctype in ('Life Note', 'Life Vault Document', 'Life Chat Log', 'Life Inbox Item')", ("zz-i23-aside-${width}", "${SPACE}"))
+frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("zz-i23-aside-${width}", "${SPACE}"))`)
+      try {
+        // People has its own screen and its own empty state since issue 25 (checked by I25.7)
+        for (const p of ['/life/library']) {
+          await openLib(p)
+          must(await pg.locator('[data-lib-empty]').isVisible(), `no empty state at ${p}`)
+          const t = await pg.locator('[data-lib-empty]').innerText()
+          must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
+          must(await pg.locator('[data-lib-capture]').isVisible(), 'no Capture button')
+          must((await pg.locator('[data-lib-count]').innerText()).startsWith('0 items'), 'the count is not 0')
+        }
+        await noSideways()
+      } finally {
+        bench(`frappe.db.sql("update \`tabLife Index\` set space = %s where space = %s", ("${SPACE}", "zz-i23-aside-${width}"))
+frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i23-aside-${width}"))`)
+      }
+    })
+    const out = JSON.parse(bench(`import json
+out = {}
+mk = lambda **v: frappe.get_doc({"space": "${SPACE}", **v}).insert(ignore_permissions=True).name
+career = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Career", "parent_area": ("is", "not set")})
+out["note"] = mk(doctype="Life Note", title="${T('note')}", content_md="the ${WORD} idea", area=career)
+out["other"] = mk(doctype="Life Note", title="${T('plain')}", content_md="nothing special here")
+out["wiki"] = mk(doctype="Life Note", title="${T('org')}", collection="Wiki", summary="Organisation · Honda dealer", content_md="x")
+out["doc"] = mk(doctype="Life Vault Document", title="${T('passport')}", doc_type="ID")
+out["chat"] = mk(doctype="Life Chat Log", title="${T('chat')}", assistant="Claude", date=frappe.utils.today(), summary_md="s", open_items=[{"text": "do it", "status": "Open"}, {"text": "and it", "status": "Open"}])
+out["person"] = mk(doctype="Life Person", full_name="${T('person')}", relation="Manager")
+frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", 0)
+print(json.dumps(out))`).split('\n').pop())
+    Object.assign(ids, out)
+    await check(`${tag}.1`, `${width} px: Everything shows notes, documents, people and chats together, newest first, with the right kind and line`, async () => {
+      await openLib('/life/library', Q)
+      const want = [[T('note'), 'N', 'Note'], [T('org'), 'P', 'Organisation · Honda dealer · kept by the Brain'], [T('passport'), 'D', 'Document · ID · sensitive'],
+        [T('chat'), 'C', 'Chat · Claude · 2 open items'], [T('person'), 'P', 'Person · Manager']]
+      for (const [title, letter, line] of want) {
+        const row = rowFor(title)
+        must((await row.count()) === 1, `${title} is not listed once`)
+        must((await row.getAttribute('data-letter')) === letter, `${title} has the wrong letter`)
+        const l = await row.locator('[data-lib-line]').innerText()
+        must(l.includes(line), `${title}: the line is "${l}", wanted "${line}"`)
+      }
+      must((await pg.locator('[data-lib-title]').first().innerText()).length > 0, 'a row has no title')
+      const api = await s.api('everything.list', { space: SPACE, q: Q, page_length: 50 })
+      const shown = await pg.locator('[data-lib-row]').evaluateAll((els) => els.map((e) => e.dataset.ref))
+      must(JSON.stringify(shown) === JSON.stringify(api.rows.map((r) => r.ref)), 'the rows are not the server\'s, in its order')
+      const dates = api.rows.map((r) => r.date)
+      must(JSON.stringify(dates) === JSON.stringify([...dates].sort().reverse()), 'the rows are not newest first')
+      must((await pg.locator('[data-lib-count]').innerText()).includes(api.total.toLocaleString() + ' item'), 'the count is not the server\'s total')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: each tab shows only its kind`, async () => {
+      for (const [tab, letter] of [['notes', 'N'], ['documents', 'D'], ['people', 'P'], ['chats', 'C']]) {
+        const api = await s.api('everything.list', { space: SPACE, tab, page_length: 100 })
+        must(api.rows.length && api.rows.every((r) => r.letter === letter), `${tab} holds another kind`)
+      }
+      // issue 25: People is its own screen, one row per Life Person
+      await s.open('/life/library/people?q=' + encodeURIComponent(Q))
+      await pg.locator('[data-library-people][data-loaded="1"]').waitFor({ timeout: 10000 })
+      await pg.waitForTimeout(300)
+      const ls = await pg.locator('[data-people-letter]').evaluateAll((els) => els.map((e) => e.textContent.trim()))
+      must(ls.length && ls.every((l) => l === 'P' || l === 'O'), 'People shows another kind: ' + ls.join(''))
+      must((await pg.locator('[data-people-row]', { hasText: T('person') }).count()) === 1, 'People does not show the person')
+      must((await pg.locator('[data-people-row]', { hasText: T('note') }).count()) === 0 && (await pg.locator('[data-people-row]', { hasText: T('chat') }).count()) === 0, 'People shows a note or a chat')
+      for (const [path, yes, no] of [['/life/library/documents', T('passport'), T('note')], ['/life/library/chats', T('chat'), T('note')]]) {
+        await s.open(path)
+        await pg.waitForLoadState('networkidle')
+        await pg.waitForTimeout(500)
+        const text = await pg.locator('[data-main]').innerText()
+        must(text.includes(yes) && !text.includes(no), `${path} does not show only its kind`)
+      }
+    })
+    await check(`${tag}.3`, `${width} px: search finds a note by a word in its body and the Area filter narrows the list`, async () => {
+      await openLib()
+      await pg.locator('[data-lib-search] input, input[data-lib-search]').first().fill(WORD)
+      await pg.waitForFunction((n) => document.querySelectorAll('[data-lib-row]').length === n, 1, { timeout: 8000 })
+      must((await rowFor(T('note')).count()) === 1, 'the note with the word is not found')
+      await pg.locator('[data-lib-search] input, input[data-lib-search]').first().fill('')
+      await pg.waitForFunction((n) => document.querySelectorAll('[data-lib-row]').length > n, 1, { timeout: 8000 })
+      const total = Number((await pg.locator('[data-lib-count]').innerText()).replace(/\D/g, ''))
+      await pg.locator('select[data-lib-area]').selectOption({ label: 'Career' })
+      await pg.waitForFunction((n) => { const t = document.querySelector('[data-lib-count]'); return t && Number(t.textContent.replace(/\D/g, '')) < n }, total, { timeout: 8000 })
+      must((await rowFor(T('note')).count()) === 1, 'the Career note left the list')
+      must((await rowFor(T('chat')).count()) === 0, 'a chat with no area is still listed under Career')
+    })
+    await check(`${tag}.4`, `${width} px: a sensitive document shows 🔒 and opens for the owner; the agent, with the Vault closed, never gets it`, async () => {
+      await openLib('/life/library', Q)
+      const row = rowFor(T('passport'))
+      must((await row.locator('[data-sensitive-lock]').count()) === 1, 'no 🔒 on the document')
+      must((await row.locator('[data-lib-line]').innerText()).includes('sensitive'), 'the line does not say sensitive')
+      await row.locator('button').click()
+      await pg.locator('[data-pane-title]', { hasText: T('passport') }).waitFor({ timeout: 8000 }).catch(() => {})
+      must((await pg.locator('[data-pane-title]').innerText()).includes(T('passport')), 'the document did not open: ' + (await pg.locator('[data-pane-title]').innerText()))
+      const agent = JSON.parse(bench(`import json
+frappe.set_user("hermes@lifeos.test")
+from lifeos import permissions
+from lifeos.api import everything
+permissions.clear_cache()
+rows = everything.list(space="${SPACE}", page_length=100)["rows"]
+print(json.dumps({"listed": any(r["name"] == "${ids.doc}" for r in rows), "others": len(rows)}))`).split('\n').pop())
+      must(!agent.listed, 'the agent lists the sensitive document')
+      must(agent.others > 0, 'the agent sees nothing at all')
+    })
+    await check(`${tag}.5`, `${width} px: Trash and archive opens the old archive`, async () => {
+      await openLib()
+      await pg.locator('[data-place-link="archive"]').click()
+      await pg.waitForURL(/\/life\/library\/archive/, { timeout: 8000 })
+      await pg.waitForLoadState('networkidle')
+      must(await pg.locator('[data-main] h1').first().isVisible(), 'the archive shows nothing')
+      must((await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current')) === 'archive', 'the archive is not the open page')
+      must(await pg.locator('[data-place-link="timeline"]').count() === 1 && await pg.locator('[data-place-link="graph"]').count() === 1, 'Timeline and Graph links are missing')
+    })
+    await check(`${tag}.6`, `${width} px: ${phone ? 'rows stack and the tabs scroll sideways inside their bar, not the page' : 'a row has its title, area and date side by side; the tabs fit'}`, async () => {
+      await openLib()
+      await noSideways()
+      const row = rowFor(T('note'))
+      const box = async (sel) => { const b = await row.locator(sel).boundingBox(); must(b, sel + ' is not visible'); return b }
+      const [title, where, date] = [await box('[data-lib-title]'), await box('[data-lib-where]'), await box('[data-lib-date]')]
+      for (const b of [title, where, date]) must(b.x >= 0 && b.x + b.width <= width + 1, `part of a row is outside the ${width} px screen`)
+      if (phone) {
+        must(where.y > title.y && date.y >= where.y, 'the row does not stack')
+        const bar = await pg.locator('[data-place-tabs] [data-tab-bar], [data-tab-bar]').first().evaluate((e) => ({ sw: e.scrollWidth, cw: e.clientWidth }))
+        must(bar.sw >= bar.cw, 'the tab bar is cut off')
+      } else {
+        must(where.x > title.x && date.x > where.x && Math.abs(title.y - date.y) < 40, 'the row is not side by side')
+      }
+      const tabs = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.dataset.tab))
+      must(['all', 'notes', 'documents', 'people', 'chats'].every((t) => tabs.includes(t)), 'a tab is missing: ' + tabs.join())
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
+// Issue 24: Library > Files. Records titled "I24 ". Records and files made here are deleted after.
+for (const width of SET_WIDTHS) {
+  const tag = `I24.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I24 ${what} ${width} ${stamp}`
+  const F = (what, ext) => `I24 ${what} ${width} ${stamp}.${ext}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openFiles = async (query = '') => { await s.open('/life/library/files' + query); await pg.locator('[data-library-files][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const rowFor = (name) => pg.locator('[data-file-row]', { hasText: name })
+  const was = JSON.parse(bench(`import json
+print(json.dumps(frappe.db.get_value("Life Space", "${SPACE}", "agents_can_read_vault")))`).split('\n').pop())
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Inbox Item", "Life Vault Document"):
+    for n in frappe.get_all(dt, filters={"title": ["like", "I24 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", ${was ? 1 : 0})`)
+  const ids = {}
+  try {
+    const out = JSON.parse(bench(`import json
+from lifeos.api import inbox
+mk = lambda **v: frappe.get_doc({"space": "${SPACE}", **v}).insert(ignore_permissions=True).name
+att = lambda dt, name, file, data: frappe.get_doc({"doctype": "File", "file_name": file, "attached_to_doctype": dt, "attached_to_name": name, "is_private": 1, "content": data}).insert(ignore_permissions=True)
+out = {}
+career = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Career", "parent_area": ("is", "not set")})
+out["a"] = mk(doctype="Life Inbox Item", title="${T('first user')}", source_type="Upload", area=career)
+out["b"] = mk(doctype="Life Inbox Item", title="${T('second user')}", source_type="Upload")
+for n in (out["a"], out["b"]): att("Life Inbox Item", n, "${F('shared', 'pptx')}", b"i24 shared slides ${width} ${stamp}")
+out["v"] = mk(doctype="Life Inbox Item", title="${T('versions')}", source_type="Upload", source_system="claude", external_id="i24-${width}-${stamp}")
+att("Life Inbox Item", out["v"], "${F('report', 'txt')}", b"i24 report one ${width} ${stamp}")
+att("Life Inbox Item", out["v"], "${F('report', 'txt')}", b"i24 report two, newer ${width} ${stamp}")
+for ext in ("txt", "png", "mp3"): att("Life Inbox Item", out["v"], "${F('kind', 'EXT')}".replace("EXT", ext), b"i24 " + ext.encode() + b" ${width} ${stamp}")
+out["doc"] = mk(doctype="Life Vault Document", title="${T('passport')}", doc_type="ID")
+att("Life Vault Document", out["doc"], "${F('passport', 'txt')}", b"i24 passport ${width} ${stamp}")
+frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", 0)
+print(json.dumps(out))`).split('\n').pop())
+    Object.assign(ids, out)
+    await check(`${tag}.1`, `${width} px: a file used by two items is listed once, with both under Used in`, async () => {
+      await openFiles('?q=' + encodeURIComponent(F('shared', 'pptx')))
+      const row = rowFor(F('shared', 'pptx'))
+      must((await row.count()) === 1, 'the shared file is not listed once: ' + (await row.count()))
+      const used = await row.locator('[data-file-used-in]').evaluateAll((els) => els.map((e) => e.dataset.ref).sort())
+      must(JSON.stringify(used) === JSON.stringify([`source:${ids.a}`, `source:${ids.b}`].sort()), 'Used in is ' + used.join())
+      await row.locator('[data-file-used-in]').first().click()
+      await pg.locator('[data-pane-title]').waitFor({ timeout: 8000 })
+      must(await row.locator('[data-file-open]').isVisible() && await row.locator('[data-file-download]').isVisible(), 'Open or Download is missing')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: a file with 2 versions shows "2 versions" and opens either`, async () => {
+      await openFiles('?q=' + encodeURIComponent(F('report', 'txt')))
+      const row = rowFor(F('report', 'txt'))
+      must((await row.count()) === 1, 'the file is not listed once')
+      must((await row.locator('[data-file-versions]').innerText()).includes('2 versions'), 'the row does not say 2 versions')
+      await row.locator('[data-file-versions]').click()
+      const hrefs = await row.locator('[data-file-version]').evaluateAll((els) => els.map((e) => e.getAttribute('href')))
+      must(hrefs.length === 2 && hrefs[0] !== hrefs[1], 'the two versions are not two links: ' + hrefs.join())
+      for (const h of hrefs) {
+        const r = await pg.evaluate(async (u) => { const x = await fetch(u); return { status: x.status, text: (await x.text()).slice(0, 40) } }, h)
+        must(r.status === 200 && r.text.startsWith('i24 report'), `${h} does not open: ${JSON.stringify(r)}`)
+      }
+    })
+    await check(`${tag}.3`, `${width} px: the type filter shows only slides when Slides is chosen`, async () => {
+      await openFiles('?q=' + encodeURIComponent(`I24 `))
+      const pick = async (label) => { await pg.locator('[data-files-type]').first().click(); await pg.getByRole('option', { name: label, exact: true }).click() }
+      await pick('Slides')
+      await pg.waitForFunction(() => /type=slides/.test(location.search), null, { timeout: 8000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-file-row]').length > 0 && !document.querySelector('[data-file-row]:not([data-type="slides"])'), null, { timeout: 8000 })
+      const names = await pg.locator('[data-file-row]').evaluateAll((els) => els.map((e) => e.dataset.type))
+      must(names.length && names.every((t) => t === 'slides'), 'the list holds ' + names.join())
+      must((await rowFor(F('shared', 'pptx')).count()) === 1 && (await rowFor(F('kind', 'png')).count()) === 0, 'the slides are not the only rows')
+      await pick('Images')
+      await pg.waitForFunction(() => /type=images/.test(location.search), null, { timeout: 8000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-file-row]').length > 0 && !document.querySelector('[data-file-row]:not([data-type="images"])'), null, { timeout: 8000 })
+      const imgs = await pg.locator('[data-file-row]').evaluateAll((els) => els.map((e) => e.dataset.type))
+      must(imgs.every((t) => t === 'images'), 'Images shows ' + imgs.join())
+    })
+    await check(`${tag}.4`, `${width} px: a user who cannot see any record using a file does not see the file`, async () => {
+      const agent = JSON.parse(bench(`import json
+frappe.set_user("hermes@lifeos.test")
+from lifeos import permissions
+from lifeos.api import files
+permissions.clear_cache()
+names = [r["name"] for r in files.list(space="${SPACE}", page_length=100, q="I24 ")["rows"]]
+print(json.dumps({"names": names}))`).split('\n').pop())
+      must(!agent.names.includes(F('passport', 'txt')), 'the agent lists the file of a closed Vault document')
+      must(agent.names.includes(F('shared', 'pptx')), 'the agent sees nothing it may open')
+      await openFiles('?q=' + encodeURIComponent(F('passport', 'txt')))
+      must((await rowFor(F('passport', 'txt')).count()) === 1, 'the owner does not see the Vault file')
+    })
+    await check(`${tag}.5`, `${width} px: ${phone ? 'at 390 px the list is one column' : 'a row has its name, Used in and the buttons side by side'}`, async () => {
+      await openFiles('?q=' + encodeURIComponent(F('shared', 'pptx')))
+      await noSideways()
+      const row = rowFor(F('shared', 'pptx'))
+      const box = async (sel) => { const b = await row.locator(sel).first().boundingBox(); must(b, sel + ' is not visible'); return b }
+      const [name, used, open] = [await box('[data-file-name]'), await box('[data-file-used]'), await box('[data-file-open]')]
+      for (const b of [name, used, open]) must(b.x >= 0 && b.x + b.width <= width + 1, `part of a row is outside the ${width} px screen`)
+      if (phone) must(used.y > name.y && open.y > used.y, 'the row is not one column')
+      else must(used.x > name.x && open.x > used.x, 'the row is not side by side')
+      must((await row.locator('[data-file-reusable]').count()) === 0, 'a file no job used shows Reusable')
+      const tabs = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.dataset.tab))
+      must(tabs.includes('files'), 'the Files tab is missing: ' + tabs.join())
+    })
+    await check(`${tag}.6`, `${width} px: with no files the screen says what will appear and offers + Capture; a search with no match says so`, async () => {
+      const aside = JSON.parse(bench(`import json
+rows = frappe.db.sql("select name, attached_to_doctype from \`tabFile\` where attached_to_doctype in ('Life Inbox Item', 'Life Note', 'Life Vault Document', 'Life Chat Log')", as_dict=True)
+frappe.db.sql("update \`tabFile\` set attached_to_doctype = concat('zz ', attached_to_doctype) where attached_to_doctype in ('Life Inbox Item', 'Life Note', 'Life Vault Document', 'Life Chat Log')")
+frappe.db.commit()
+print(json.dumps(rows))`).split('\n').pop())
+      try {
+        await openFiles()
+        must(await pg.locator('[data-files-empty]').isVisible(), 'no empty state')
+        const t = await pg.locator('[data-files-empty]').innerText()
+        must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
+        must(await pg.locator('[data-files-capture]').isVisible(), 'no Capture button')
+        await noSideways()
+      } finally {
+        bench(`import json
+for r in json.loads(${JSON.stringify(JSON.stringify(aside))}):
+    frappe.db.set_value("File", r["name"], "attached_to_doctype", r["attached_to_doctype"], update_modified=False)
+frappe.db.commit()`)
+      }
+      await openFiles('?q=nosuchfile' + stamp)
+      must((await pg.locator('[data-files-empty]').innerText()).includes('No file matches'), 'a search with no match does not say so')
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
+// Issue 25: Library > People. Records named "I25 ". People, organisations, notes and tasks made here are deleted after.
+for (const width of SET_WIDTHS) {
+  const tag = `I25.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I25 ${what} ${width} ${stamp}`
+  const Q = `${width} ${stamp}` // only this run's records, whatever else the site holds
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openPeople = async (query = '') => { await s.open('/life/library/people' + query); await pg.locator('[data-library-people][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const openPerson = async (name) => { await s.open('/life/library/people/' + name); await pg.locator('[data-library-person][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt, field in (("Life Task", "title"), ("Life Note", "title")):
+    for n in frappe.get_all(dt, filters={field: ["like", "I25 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+frappe.db.set_value("Life Person", {"full_name": ["like", "I25 % ${width} ${stamp}"]}, "organisation", None)
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "I25 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i25-aside-${width}"))`)
+  const ids = {}
+  try {
+    Object.assign(ids, JSON.parse(bench(`import json
+mk = lambda **v: frappe.get_doc({"space": "${SPACE}", **v}).insert(ignore_permissions=True).name
+out = {}
+out["org"] = mk(doctype="Life Person", full_name="${T('Acme Ltd')}", kind="Organisation")
+out["asha"] = mk(doctype="Life Person", full_name="${T('Asha')}", kind="Person", organisation=out["org"], role="Buyer")
+out["ravi"] = mk(doctype="Life Person", full_name="${T('Ravi')}", kind="Person", organisation=out["org"])
+out["old"] = mk(doctype="Life Note", title="${T('old note')}", content_md="Met ${T('Asha')} in May.")
+out["new"] = mk(doctype="Life Note", title="${T('new note')}", content_md="${T('Asha')} sent the papers.")
+out["task"] = mk(doctype="Life Task", title="${T('chase papers')}", status="Waiting", waiting_on="the bank", waiting_on_person=out["asha"])
+frappe.db.sql("update \`tabLife Index\` set record_date = '2026-05-01' where ref_name = %s", out["old"])
+print(json.dumps(out))`).split('\n').pop()))
+    await check(`${tag}.3`, `${width} px: People lists persons and organisations; filtering by kind works`, async () => {
+      await openPeople('?q=' + encodeURIComponent(Q))
+      const kinds = async () => pg.locator('[data-people-row]').evaluateAll((els) => els.map((e) => e.dataset.kind + ':' + e.dataset.name))
+      const all = await kinds()
+      must(all.length === 3 && all.includes('Organisation:' + ids.org) && all.includes('Person:' + ids.asha), 'People lists ' + all.join())
+      const letters = await pg.locator('[data-people-letter]').evaluateAll((els) => els.map((e) => e.textContent.trim()).sort().join(''))
+      must(letters === 'OPP', 'letters are ' + letters)
+      await pg.selectOption('[data-people-kind]', 'Organisation')
+      await pg.waitForFunction(() => document.querySelectorAll('[data-people-row]').length === 1, null, { timeout: 8000 })
+      must(JSON.stringify(await kinds()) === JSON.stringify(['Organisation:' + ids.org]), 'the Organisation filter shows ' + (await kinds()).join())
+      must(new URL(pg.url()).searchParams.get('kind') === 'Organisation', 'the kind is not in the address')
+      await pg.selectOption('[data-people-kind]', 'Person')
+      await pg.waitForFunction(() => document.querySelectorAll('[data-people-row]').length === 2, null, { timeout: 8000 })
+      must((await kinds()).every((k) => k.startsWith('Person:')), 'the People filter shows an organisation')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.4`, `${width} px: a person page lists the notes and tasks that mention them, newest first`, async () => {
+      await openPerson(ids.asha)
+      const refs = await pg.locator('[data-mention]').evaluateAll((els) => els.map((e) => e.dataset.ref))
+      must(refs.length === 3 && refs.includes('note:' + ids.new) && refs.includes('note:' + ids.old) && refs.includes('task:' + ids.task), 'Mentioned in is ' + refs.join())
+      must(refs[refs.length - 1] === 'note:' + ids.old, 'the oldest note is not last: ' + refs.join())
+      const t = await pg.locator(`[data-mention][data-ref="task:${ids.task}"]`).innerText()
+      must(t.includes('Waiting on them'), 'the task does not say it is waiting on them: ' + t)
+      await pg.locator(`[data-mention][data-ref="note:${ids.new}"] button`).click()
+      await pg.locator('[data-pane-title]').waitFor({ timeout: 8000 })
+      must(new URL(pg.url()).searchParams.get('open') === 'note:' + ids.new, 'the note did not open in the pane')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.5`, `${width} px: an organisation page lists its people`, async () => {
+      await openPerson(ids.org)
+      const names = await pg.locator('[data-org-person]').evaluateAll((els) => els.map((e) => e.dataset.name).sort())
+      must(JSON.stringify(names) === JSON.stringify([ids.asha, ids.ravi].sort()), 'the organisation lists ' + names.join())
+      await pg.locator(`[data-org-person][data-name="${ids.asha}"] a`).click()
+      await pg.waitForFunction((n) => location.pathname.endsWith('/library/people/' + n), ids.asha, { timeout: 8000 })
+      await pg.locator('[data-person-org]').waitFor({ timeout: 8000 })
+      must((await pg.locator('[data-person-org]').innerText()).includes(T('Acme Ltd')), 'the person page does not name the organisation')
+    })
+    await check(`${tag}.6`, `${width} px: ${phone ? 'at 390 px the person page is one column' : 'the facts sit beside the text and mentions'}`, async () => {
+      await openPerson(ids.asha)
+      await noSideways()
+      const box = async (sel) => { const b = await pg.locator(sel).first().boundingBox(); must(b, sel + ' is not visible'); return b }
+      const [who, mentions, facts] = [await box('[data-person-who]'), await box('[data-person-mentions]'), await box('[data-person-facts]')]
+      for (const b of [who, mentions, facts]) must(b.x >= 0 && b.x + b.width <= width + 1, `part of the page is outside the ${width} px screen`)
+      if (phone) must(Math.abs(who.x - facts.x) < 2 && facts.y > mentions.y && mentions.y > who.y, 'the page is not one column')
+      else must(facts.x > who.x + who.width - 2 && Math.abs(facts.y - who.y) < 40, 'the facts are not beside the text')
+    })
+    await check(`${tag}.7`, `${width} px: with no people the screen says what will appear and offers + Capture`, async () => {
+      bench(`frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("zz-i25-aside-${width}", "${SPACE}"))`)
+      try {
+        await openPeople()
+        must(await pg.locator('[data-people-empty]').isVisible(), 'no empty state')
+        const t = await pg.locator('[data-people-empty]').innerText()
+        must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
+        must(await pg.locator('[data-people-capture]').isVisible(), 'no Capture button')
+        await noSideways()
+      } finally {
+        bench(`frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i25-aside-${width}"))`)
+      }
     })
   } finally {
     restore()

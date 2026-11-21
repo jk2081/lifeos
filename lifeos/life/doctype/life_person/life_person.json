@@ -8,6 +8,12 @@
   "space",
   "full_name",
   "relation",
+  "kind",
+  "organisation",
+  "role",
+  "aliases",
+  "area",
+  "wiki_page",
   "user",
   "notes_md"
  ],
@@ -44,6 +50,44 @@
    "fieldname": "notes_md",
    "fieldtype": "Long Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "Person\nOrganisation",
+   "default": "Person",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "organisation",
+   "fieldtype": "Link",
+   "label": "Organisation",
+   "options": "Life Person"
+  },
+  {
+   "fieldname": "role",
+   "fieldtype": "Data",
+   "label": "Role"
+  },
+  {
+   "fieldname": "aliases",
+   "fieldtype": "Small Text",
+   "label": "Also called",
+   "description": "Other names, one per line or separated by commas"
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "label": "Area",
+   "options": "Life Area"
+  },
+  {
+   "fieldname": "wiki_page",
+   "fieldtype": "Link",
+   "label": "Wiki page",
+   "options": "Life Note"
   }
  ],
  "links": [],

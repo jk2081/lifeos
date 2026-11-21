@@ -10,8 +10,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 6 |
 | frappe-setuser | 14 |
-| frappe-sql-format-injection | 89 |
-| Total | 116 |
+| frappe-sql-format-injection | 91 |
+| Total | 118 |
 
 ## frappe-manual-commit
 
@@ -82,6 +82,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/chats.py` | 159 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 268 | sensitive_guard is a constant fragment; values are parameters |
 | `lifeos/api/chats.py` | 272 | as above |
+| `lifeos/api/everything.py` | 53 | WHERE from fixed fragments (TAB_SQL) and area_filter; every value is a parameter |
+| `lifeos/api/everything.py` | 55 | WHERE from fixed fragments (TAB_SQL) and area_filter; every value is a parameter |
 | `lifeos/api/goals.py` | 38 | `sp` is one of two constant fragments; values are parameters |
 | `lifeos/api/goals.py` | 101 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
 | `lifeos/api/goals.py` | 110 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
