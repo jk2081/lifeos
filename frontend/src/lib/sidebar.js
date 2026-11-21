@@ -20,7 +20,7 @@ const HOME = { '/item': '/brain', '/inbox': '/brain' }
 export const activePlace = computed(() => {
   const first = '/' + router.currentRoute.value.path.split('/')[1]
   if (HOME[first]) return HOME[first]
-  return ['/today', '/brain', '/goals', '/library', '/review', '/settings', '/ask'].includes(first) ? first : ''
+  return ['/today', '/brain', '/goals', '/library', '/review', '/settings', '/ask', '/how-it-works'].includes(first) ? first : ''
 })
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']

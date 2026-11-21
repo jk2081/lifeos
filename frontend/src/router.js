@@ -46,6 +46,7 @@ const routes = [
   // the weekly review: in the sidebar once one is locked, or on its day
   { path: '/review', name: 'WeeklyReview', component: page('WeeklyReview') },
 
+  { path: '/how-it-works', name: 'HowItWorks', component: page('HowItWorks') },
   { path: '/ask', name: 'Ask', component: page('Ask') },
   { path: '/settings', name: 'Settings', component: page('Settings') },
 

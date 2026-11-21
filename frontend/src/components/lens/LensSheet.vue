@@ -14,6 +14,7 @@
           <template v-if="e.selected" #suffix><span class="lucide-check ml-auto size-4 text-ink-gray-7" aria-hidden="true" /></template>
         </Button>
       </section>
+      <SetupCard v-if="!store.isAgent" class="!mt-0" @go="emit('update:open', false)" />
       <section class="flex flex-col gap-0.5 border-t border-outline-gray-1 pt-3">
         <Button class="!justify-start" size="lg" variant="ghost" icon-left="lucide-settings" label="Settings" data-lens-settings @click="go('/settings')" />
         <Button class="!justify-start" size="lg" variant="ghost" icon-left="lucide-keyboard" label="Keyboard shortcuts" @click="emit('update:open', false); emit('shortcuts')" />
@@ -27,6 +28,8 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { BottomSheet, Button } from 'frappe-ui'
 import { dotClass } from '@/lib/lens'
+import { store } from '@/lib/store'
+import SetupCard from '../SetupCard.vue'
 import { lensEntries } from './lensMenu'
 
 defineProps({ open: Boolean })

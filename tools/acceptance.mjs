@@ -5716,6 +5716,81 @@ print(json.dumps(out))`).split('\n').pop()))
   }
 }
 
+// Issue 26: the ladder. A user made for the run (their own space, one task) is at level 1; their records are deleted after.
+// I26.1 and I26.2 are unit tests (test_issue26_ladder).
+for (const width of SET_WIDTHS) {
+  const tag = `I26.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const user = `i26-${width}-${stamp}@lifeos.test`.toLowerCase()
+  const space = `I26 ${width} ${stamp}`
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Task",):
+    for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+from lifeos import devtools
+devtools.purge_space("${space}", drop=True)
+frappe.db.delete("DefaultValue", {"parent": "${user}"})
+if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  let s
+  try {
+    bench(`from lifeos import devtools
+devtools.make_user("${user}", "Ladder", ["Life User"])
+frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
+frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
+frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user": "${user}", "members": [{"user": "${user}", "access": "Write"}]}).insert(ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task ${width} ${stamp}"}).insert(ignore_permissions=True)`)
+    s = await session(user, width)
+    const pg = s.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    // the card is in the sidebar on a desktop and in the focus sheet (the logo) on a phone
+    const openCard = async () => {
+      await s.open('/life/today')
+      if (phone) await pg.locator('[data-lens-title]').click()
+      return pg.locator('[data-setup-card]:visible')
+    }
+    await check(`${tag}.3`, `${width} px: the setup card shows the level and the next step, and links to How it works`, async () => {
+      const card = await openCard()
+      await card.waitFor({ timeout: 10000 })
+      const t = await card.innerText()
+      must(t.includes('Your setup · level 1 of 6'), 'the card says: ' + t)
+      must(t.includes('Next: Connect a source'), 'the next step is not Connect a source: ' + t)
+      await card.locator('[data-setup-how]').click()
+      await pg.waitForFunction(() => location.pathname.endsWith('/how-it-works'), null, { timeout: 8000 })
+      await pg.locator('[data-how]').waitFor({ timeout: 8000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.4`, `${width} px: How it works marks the current level as next, and shows the flow`, async () => {
+      await s.open('/life/how-it-works')
+      await pg.locator('[data-ladder]').waitFor({ timeout: 10000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-ladder-level]').length === 6, null, { timeout: 8000 })
+      const marks = await pg.locator('[data-ladder-level]').evaluateAll((els) => els.map((e) => e.dataset.ladderMark).join())
+      must(marks === 'done,next,later,later,later,later', 'the levels are marked ' + marks)
+      const next = await pg.locator('[data-ladder-mark="next"]').innerText()
+      must(next.includes('Level 2 · next') && next.includes('Connect a source'), 'next says: ' + next)
+      must((await pg.locator('[data-how-flow] [data-how-step]').count()) === 4, 'the flow is not four boxes')
+      await noSideways()
+    })
+    await check(`${tag}.5`, `${width} px: dismissing the card hides it for that user, and Settings still reaches How it works`, async () => {
+      const card = await openCard()
+      await card.locator('[data-setup-dismiss]').click()
+      await pg.waitForFunction(() => !document.querySelector('[data-setup-card]'), null, { timeout: 8000 })
+      await s.open('/life/today')
+      await pg.waitForTimeout(800)
+      if (phone) await pg.locator('[data-lens-title]').click()
+      must((await pg.locator('[data-setup-card]').count()) === 0, 'the card came back after a reload')
+      await s.open('/life/settings?tab=places')
+      await pg.locator('[data-settings-how]').click()
+      await pg.waitForFunction(() => location.pathname.endsWith('/how-it-works'), null, { timeout: 8000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    restore()
+  }
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {

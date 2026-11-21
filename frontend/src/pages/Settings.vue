@@ -217,6 +217,11 @@
           <p class="text-sm text-ink-gray-6">{{ listOf(section).footer }}</p>
         </template>
         <Card v-else-if="section === 'places'" flush data-settings-places>
+          <!-- issue 26: How it works is reached from here and from the sidebar's setup card -->
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-outline-gray-1 px-4 py-2.5">
+            <RouterLink class="text-base-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" to="/how-it-works" data-settings-how>How it works</RouterLink>
+            <span class="text-sm text-ink-gray-6">Sources, the Brain, your plan and the ladder of six levels</span>
+          </div>
           <!-- issue 14: the pages that left the sidebar, each with the place it lives in now -->
           <div v-for="p in ELSEWHERE" :key="p.key" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-outline-gray-1 px-4 py-2.5 last:border-b-0">
             <RouterLink class="text-base-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="p.to" :data-elsewhere="p.key">{{ p.label }}</RouterLink>
