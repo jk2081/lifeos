@@ -1192,7 +1192,7 @@ for (const width of UX_WIDTHS) {
     const problems = []
     try {
     // set 6: Me, Your life, Assistant, People and agents, Data
-    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai',
+    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'cost',
       'sensitive', 'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'places', 'backups']
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
@@ -2405,7 +2405,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
       '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/brain/captures?tab=pages', '/life/library/timeline',
       '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
-      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'sensitive',
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'cost', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
       if (area && p.includes('settings')) continue
@@ -3520,7 +3520,7 @@ frappe.db.commit()`)
       els.map((e) => e.getAttribute('data-settings-group') ? '#' + e.getAttribute('data-settings-group') : e.getAttribute('data-section')))
     const after = (g) => { const i = menu.indexOf('#' + g); const j = menu.findIndex((x, k) => k > i && x.startsWith('#')); return menu.slice(i + 1, j < 0 ? undefined : j) }
     must(JSON.stringify(after('people')) === JSON.stringify(['spaces', 'members', 'agents']), `People and agents lists ${after('people')}`)
-    must(JSON.stringify(after('assistant')) === JSON.stringify(['connections', 'ai', 'sensitive', 'note-rules']), `Assistant lists ${after('assistant')}`)
+    must(JSON.stringify(after('assistant')) === JSON.stringify(['connections', 'ai', 'cost', 'sensitive', 'note-rules']), `Assistant lists ${after('assistant')}`)
     for (const sec of after('assistant')) {
       await s.open(`/life/settings?tab=${sec}`)
       must(!(await pg.locator('[data-settings-section] [data-member], [data-settings-section] [data-agent], [data-settings-section] [data-agent-access]').count()), `${sec} lists members or agents`)
@@ -5713,6 +5713,144 @@ print(json.dumps(out))`).split('\n').pop()))
   } finally {
     restore()
     await s.ctx.close()
+  }
+}
+
+// Issue 26: the ladder. A user made for the run (their own space, one task) is at level 1; their records are deleted after.
+// I26.1 and I26.2 are unit tests (test_issue26_ladder).
+for (const width of SET_WIDTHS) {
+  const tag = `I26.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const user = `i26-${width}-${stamp}@lifeos.test`.toLowerCase()
+  const space = `I26 ${width} ${stamp}`
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Task",):
+    for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+from lifeos import devtools
+devtools.purge_space("${space}", drop=True)
+frappe.db.delete("DefaultValue", {"parent": "${user}"})
+if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  let s
+  try {
+    bench(`from lifeos import devtools
+devtools.make_user("${user}", "Ladder", ["Life User"])
+frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
+frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
+frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user": "${user}", "members": [{"user": "${user}", "access": "Write"}]}).insert(ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task ${width} ${stamp}"}).insert(ignore_permissions=True)`)
+    s = await session(user, width)
+    const pg = s.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    // the card is in the sidebar on a desktop and in the focus sheet (the logo) on a phone
+    const openCard = async () => {
+      await s.open('/life/today')
+      if (phone) await pg.locator('[data-lens-title]').click()
+      return pg.locator('[data-setup-card]:visible')
+    }
+    await check(`${tag}.3`, `${width} px: the setup card shows the level and the next step, and links to How it works`, async () => {
+      const card = await openCard()
+      await card.waitFor({ timeout: 10000 })
+      const t = await card.innerText()
+      must(t.includes('Your setup · level 1 of 6'), 'the card says: ' + t)
+      must(t.includes('Next: Connect a source'), 'the next step is not Connect a source: ' + t)
+      await card.locator('[data-setup-how]').click()
+      await pg.waitForFunction(() => location.pathname.endsWith('/how-it-works'), null, { timeout: 8000 })
+      await pg.locator('[data-how]').waitFor({ timeout: 8000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.4`, `${width} px: How it works marks the current level as next, and shows the flow`, async () => {
+      await s.open('/life/how-it-works')
+      await pg.locator('[data-ladder]').waitFor({ timeout: 10000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-ladder-level]').length === 6, null, { timeout: 8000 })
+      const marks = await pg.locator('[data-ladder-level]').evaluateAll((els) => els.map((e) => e.dataset.ladderMark).join())
+      must(marks === 'done,next,later,later,later,later', 'the levels are marked ' + marks)
+      const next = await pg.locator('[data-ladder-mark="next"]').innerText()
+      must(next.includes('Level 2 · next') && next.includes('Connect a source'), 'next says: ' + next)
+      must((await pg.locator('[data-how-flow] [data-how-step]').count()) === 4, 'the flow is not four boxes')
+      await noSideways()
+    })
+    await check(`${tag}.5`, `${width} px: dismissing the card hides it for that user, and Settings still reaches How it works`, async () => {
+      const card = await openCard()
+      await card.locator('[data-setup-dismiss]').click()
+      await pg.waitForFunction(() => !document.querySelector('[data-setup-card]'), null, { timeout: 8000 })
+      await s.open('/life/today')
+      await pg.waitForTimeout(800)
+      if (phone) await pg.locator('[data-lens-title]').click()
+      must((await pg.locator('[data-setup-card]').count()) === 0, 'the card came back after a reload')
+      await s.open('/life/settings?tab=places')
+      await pg.locator('[data-settings-how]').click()
+      await pg.waitForFunction(() => location.pathname.endsWith('/how-it-works'), null, { timeout: 8000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    restore()
+  }
+}
+
+// Issue 27: Settings, Assistant, Cost lists this month's spend by feature, matching the recorded calls. I27.1 to I27.4 are unit tests
+// (test_issue27_gateway). The run's own calls are written under a feature made for it and deleted after.
+for (const width of SET_WIDTHS) {
+  const tag = `I27.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const feature = `I27 feature ${width} ${stamp}`
+  const restore = () => bench(`frappe.db.delete("Life AI Usage", {"purpose": "${feature}"})`)
+  let s
+  try {
+    // two haiku calls of 1,000,000 tokens in and 100,000 out: $0.15 each, $0.30 and 2,200,000 tokens in all
+    bench(`from lifeos.ai import client
+for _i in range(2):
+    client.record("claude-haiku-5-5", {"input_tokens": 1000000, "output_tokens": 100000}, "${feature}", user="owner@lifeos.test")`)
+    s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    await check(tag, `${width} px: Cost shows this month's spend by feature, matching the recorded calls`, async () => {
+      await s.open('/life/settings?tab=cost')
+      await pg.locator('[data-ai-spend]').waitFor({ timeout: 10000 })
+      const row = pg.locator(`[data-cost-feature="${feature}"]`)
+      await row.waitFor({ timeout: 8000 })
+      const t = await row.innerText()
+      must(t.includes('2,200,000 tokens') && t.includes('$0.30'), 'the feature row says: ' + t)
+      must(/This month: \$/.test(await pg.locator('[data-cost-total]').innerText()), 'no this-month total')
+      must((await pg.locator('[data-cost-call]').count()) >= 2, 'the last calls are not listed')
+      must((await pg.locator('[data-cost-days]').innerText()).includes('call'), 'no by-day list')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    restore()
+  }
+}
+
+// Issue 31: Settings > Calendar shows the calendars of the connected account and saves the one Life OS writes to (off by default).
+// I31.1 to I31.4 are unit tests (test_issue31_gcal_write). The fixture calendar stands in for Google; the choice is cleared after.
+for (const width of SET_WIDTHS) {
+  const tag = `I31.${width}.5`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const restore = () => bench('frappe.defaults.clear_default("life_write_calendar", parent="owner@lifeos.test")')
+  let s
+  try {
+    restore()
+    s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    await check(tag, `${width} px: Settings > Calendar lists the account's calendars and saves the one to write to`, async () => {
+      await s.open('/life/settings?tab=calendar')
+      const pick = pg.locator('[data-calendar-write]')
+      await pick.waitFor({ timeout: 10000 })
+      must((await pick.inputValue()) === '', 'writing is not off by default')
+      must((await pick.locator('option').count()) >= 2, 'the calendars of the account are not listed')
+      await pick.selectOption('primary')
+      await pg.waitForTimeout(800)
+      await s.open('/life/settings?tab=calendar')
+      await pg.locator('[data-calendar-write]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-calendar-write]').inputValue()) === 'primary', 'the choice was not saved')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    restore()
   }
 }
 

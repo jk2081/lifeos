@@ -38,7 +38,9 @@ Open `https://SITE/life`. On a phone, use Add to Home Screen to install it as an
 
 **Agents.** Create one user per agent in Frappe, then add it to each space it should work in from Life OS: Settings → People and agents → Members, **Add member**. If the user has no Life OS role yet, Add member offers agent access and gives it the role `Life Agent` when you confirm (never `Life User` or `Life Admin`). Agents start with Can view; they need Can edit to file captures and proposals. Generate its API key on the user record (Settings → People and agents → Agents links to it). Switch on MCP in System Settings (`Enable MCP`). The agent connects to `/api/v2/mcp` with `Authorization: token <key>:<secret>` and loads `agent/SKILL.md` as its instructions.
 
-**Google Calendar.** Connect it in Frappe: Google Settings, then a Google Calendar record for your user. Life OS has no sync code of its own; events made in the app are core `Event` records, which Frappe pushes to Google.
+**Google Calendar.** Connect it in Settings > Me > Calendar (Frappe's Google Settings holds the OAuth client). Life OS reads your calendars; it writes only if you choose a calendar under "Write to Google Calendar" (off by default). Then an accepted Event proposal and a goal block from the weekly review are created in that calendar, private, with a link back to Life OS and no guests unless you add emails on the proposal; moving or deleting them in Life OS updates or deletes them in Google, and changes made in Google come back with the hourly read.
+
+*Writing needs the Calendar scope (`https://www.googleapis.com/auth/calendar`) on the Google client, so reconnect after turning it on. A separate Google Cloud project for Life OS with only Calendar scopes is recommended.*
 
 **Scheduler.** The archive job runs daily and stale inbox claims are released every five minutes, so the bench scheduler must be enabled.
 
@@ -133,7 +135,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | --- | --- | --- |
 | `calendar.get` | `space=None, from_date=None, to_date=None` | Everything on the calendar between two dates (at most 100 days): events, important dates, tasks due and documents expiring. |
 | `calendar.year` | `space=None, year=None` | The year view: important dates, all-day and multi-day events, vault expiry dates and the start and end of each 12 Week Year. |
-| `calendar.add_event` | `space=None, subject=None, starts_on=None, ends_on=None, all_day=0, description=None` | Create a core Event in a space. If the user has connected Google Calendar, the built-in integration pushes it there. |
+| `calendar.add_event` | `space=None, subject=None, starts_on=None, ends_on=None, all_day=0, description=None` | Create a core Event in a space. It stays in Life OS; only accepted proposals and goal blocks are written to Google, when the person has chosen a calendar. |
 | `calendar.delete_event` | `event` | Delete an event of a space the user can write to. |
 | `calendar.add_important_date` | `space=None, title=None, day=None, month=None, year=None, kind='Birthday', person=None` | Add a birthday, anniversary or other date that repeats every year. |
 

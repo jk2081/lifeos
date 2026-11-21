@@ -238,9 +238,19 @@ def ai_settings():
 	month = client.month()
 	by_purpose = frappe.db.sql("select purpose, sum(cost), sum(input_tokens), sum(output_tokens) from `tabLife AI Usage` where month=%s group by purpose", month)
 	by_user = frappe.db.sql("select user, sum(cost) from `tabLife AI Usage` where month=%s group by user", month)
+	by_day = frappe.db.sql("select date(creation), sum(cost), count(*) from `tabLife AI Usage` where month=%s group by date(creation) order by date(creation) desc", month)
+	calls = frappe.get_all("Life AI Usage", fields=["creation", "purpose", "model", "input_tokens", "output_tokens", "cached_tokens", "cost", "user",
+		"reference_doctype", "reference_name"], order_by="creation desc, name desc", limit=50)
+	caps = client.feature_caps()
+	features = sorted({p for p, *_r in by_purpose} | set(caps))
 	return {"key_set": client.is_set_up(), "ask_model": s.get("ask_model") or client.DEFAULT_ASK_MODEL, "short_model": s.get("short_model") or client.DEFAULT_SHORT_MODEL,
 		"monthly_cap_usd": client.cap(), "spend": client.spend_status(),
-		"prices": [{"model": m, "input_per_mtok": p[0], "output_per_mtok": p[1]} for m, p in client.prices().items()],
+		"prices": [{"model": m, "input_per_mtok": p[0], "output_per_mtok": p[1], "cached_per_mtok": p[2]} for m, p in client.price_table().items()],
+		"by_day": [{"day": str(d), "cost": round(c or 0, 2), "calls": int(n)} for d, c, n in by_day],
+		"calls": [{"when": str(c.creation), "feature": c.purpose, "model": c.model, "input_tokens": c.input_tokens or 0, "output_tokens": c.output_tokens or 0,
+			"cached_tokens": c.cached_tokens or 0, "cost": round(c.cost or 0, 4), "user": c.user, "full_name": frappe.utils.get_fullname(c.user),
+			"reference": f"{c.reference_doctype} {c.reference_name}" if c.reference_name else None} for c in calls],
+		"feature_caps": [{"feature": f, "cap": caps.get(f) or 0, "spent": round(client.spent(feature=f), 2)} for f in features],
 		"by_purpose": [{"purpose": p, "cost": round(c or 0, 2), "input_tokens": int(i or 0), "output_tokens": int(o or 0)} for p, c, i, o in by_purpose],
 		"by_user": [{"user": u, "full_name": frappe.utils.get_fullname(u), "cost": round(c or 0, 2)} for u, c in by_user]}
 
@@ -258,11 +268,32 @@ def set_ai_key(key: str | None = None):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_ai_price(model: str, input_per_mtok: float, output_per_mtok: float):
+def set_feature_cap(feature: str, cap: float = 0):
+	"""A monthly cap in dollars for one feature (Ask, Area guess, …); 0 removes it."""
+	_admin_only()
+	import json
+
+	if float(cap) < 0:
+		frappe.throw(_("A cap cannot be negative."))
+	doc = frappe.get_doc("Life Settings")
+	caps = json.loads(doc.feature_caps or "{}")
+	if float(cap):
+		caps[feature] = float(cap)
+	else:
+		caps.pop(feature, None)
+	doc.feature_caps = json.dumps(caps)
+	doc.save()
+	return {"feature_caps": caps}
+
+
+@frappe.whitelist(methods=["POST"])
+def set_ai_price(model: str, input_per_mtok: float, output_per_mtok: float, cached_per_mtok: float | None = None):
 	_admin_only()
 	doc = frappe.get_doc("Life Settings")
 	row = next((r for r in doc.ai_prices if r.model == model), None) or doc.append("ai_prices", {"model": model})
 	row.input_per_mtok, row.output_per_mtok = float(input_per_mtok), float(output_per_mtok)
+	if cached_per_mtok is not None:
+		row.cached_per_mtok = float(cached_per_mtok)
 	if row.input_per_mtok < 0 or row.output_per_mtok < 0:
 		frappe.throw(_("Prices cannot be negative."))
 	doc.save()

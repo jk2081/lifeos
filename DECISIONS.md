@@ -865,3 +865,32 @@ Fixed: sensitive items reached agents through paths that did not use the Vault r
 - **List.** One row per Life Person, by name, with kind, one line (the wiki page's summary, else role and organisation), area and the newest mention. A row opens the person's page at `/library/people/<name>`; Library → Everything's People rows open it too. Wiki pages that look like people but have no Life Person are not listed here until the patch or an agent links them. The graph is no longer the People tab; it is still under "More in the Library".
 - **Not built:** adding or editing a person on screen (people come from captures, agents and Settings), merging two people. The list's last-mention column does one query per row of the page (50 at most).
 - **Checks.** I25.1 and I25.2 are unit tests (`test_issue25_people.py`); I25.3 to .6 follow the issue's list; added **.7** (empty state). I23.2 and I23.7 now look at the new People screen instead of Everything's People tab.
+
+## Issue 26: the ladder (21 Nov 2026)
+
+- **How a level is worked out** (`lifeos/ladder.py`, `meta.setup_level`), over every space the person belongs to. 1: a task. 2: a capture whose source is not Upload (a `source_system` other than `upload`, or a source type other than Upload). 3: three areas of life on (not archived) and a goal. 4: a locked weekly review of their own. 5: a capture that an agent or the built-in Brain filed (a job id or a claimer) and that is To Review or Done. 6: another member with Write access in one of their spaces. The level is the longest run from 1, never below 1; with no task the next step is still "Add your first task".
+- **Cache and dismiss.** The answer is cached per person for 3 minutes (`forget` clears it); the front end asks again whenever the sidebar's counts refresh. "Dismissed" is a per-user default (`DefaultValue`, key `lifeos_setup_dismissed`) and is read outside the cache, so dismissing takes effect at once. `meta.dismiss_setup(undo=1)` brings the card back; How it works shows "Show setup card" while it is hidden.
+- **The card** is in the sidebar (hidden in the icon rail) and, on a phone, at the foot of the focus sheet (tap the lens title), since a phone has no sidebar. Hidden after level 6 and for agents.
+- **Held back.** Review keeps #14's rule and Brain > Skills waits for #30. Nothing else is hidden by level, so no existing user loses anything.
+- **How it works** is at `/how-it-works`, reached from the card and Settings > Data > Where things are (first row). Levels are marked done, next (the first one not yet in use, outlined) and later (faded); the issue's "current level marked next" is read this way.
+- **Checks.** I26.1 and I26.2 are unit tests (`test_issue26_ladder.py`, with extras for the Upload rule and dismiss); I26.3 to .5 follow the issue's list and use a user made for the run.
+
+## Issue 27: one gateway for model calls (21 Nov 2026)
+
+- **Already one gateway.** A search found no use of `anthropic` outside `lifeos/ai/client.py`, so nothing needed routing; a test now walks the code and fails if that changes.
+- **Feature is `purpose`.** `Life AI Usage.purpose` already named the feature; it is now a Data field (it was a fixed Select) so the Brain and skills can add features without a migration. Added `cached_tokens`, `cache_write_tokens`, `reference_doctype` and `reference_name`. Only the area guess passes its record so far; the other callers can pass `reference=` when they have one.
+- **Token fields.** `input_tokens` is now the uncached input only (it used to add the cached tokens in), so cost is exact. Life AI Price gains `cached_per_mtok`; blank means a tenth of the input price. Cache writes are priced at 1.25 times input.
+- **Per-feature caps** live in one JSON field on Life Settings (`feature_caps`), set from the Cost tab (`settings.set_feature_cap`), not a new child table.
+- **Fallbacks.** A refused call raises `CapReached`, an `AIError`; every caller already catches `AIError` and falls back (the area guess to its rules). The Brain (#28) does not exist yet and must do the same.
+- **Cost tab.** A new admin-only tab under Assistant; the "This month" card moved there from Ask and AI. The acceptance check is `I27.<width>` (the issue's test 5); tests 1 to 4 are unit tests in `test_issue27_gateway.py`.
+
+## Issue 31: write accepted events and goal blocks to Google Calendar (21 Nov 2026)
+
+- **The choice is a per-user default** (`life_write_calendar`, the calendar's ID; empty is off), not a field on the `Google Calendar` record, so it also works on a site that uses the fixture calendar. Disconnecting clears it. `gcal.set_write` and `gcal.calendars` (which now returns `write`) are the methods; Settings > Calendar has the select.
+- **A goal block is a scheduled `Life Task`, not an `Event`**, so it keeps its Google ID in two hidden fields on `Life Task` (`google_event_id`, `google_calendar_id`; a migrate adds them). The issue's "the `Event` keeps the Google ID" holds for accepted Event proposals (`Event.google_calendar_event_id`). A block is written when `weekplan.add` saves it with a time, updated when it moves or is renamed, and deleted from Google when it is unscheduled, done, dropped, set to Someday or deleted.
+- **Only what Life OS made is written.** Events read from Google (`pulled_from_google_calendar`) are never updated or deleted there. Events added by hand with `calendar.add_event` are not written (the issue names accepted proposals and goal blocks only). Core's own push stays off (`sync_with_google_calendar` is never set).
+- **Guests.** The Event proposal takes an optional `attendees` (emails, comma separated); only valid emails are sent, and Google then emails the invitation (`sendUpdates=all`). Without any, `sendUpdates=none`.
+- **A Google failure never fails the save.** It is logged (`Life OS Google Calendar write`) and the record stays without an ID.
+- **`calendar.delete_event` now deletes an event an accepted proposal made.** It was refused by core's link check against the proposal, which would have made "deleting it in Life OS deletes it in Google" impossible for exactly these events.
+- **Acceptance check.** `I31.<width>.5` (Settings > Calendar on the fixture calendar); tests 1 to 4 are unit tests in `test_issue31_gcal_write.py`.
+- **Not tested against the real service**, as in set 8: the stand-in records calls; the write scope and a real insert were not run.

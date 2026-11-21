@@ -17,6 +17,7 @@
           <template v-if="countOf(n.label)" #suffix><CountBadge :c="countOf(n.label)" :name="n.label" /></template>
         </SidebarItem>
       </nav>
+      <SetupCard v-if="!nav.rail && !store.isAgent" />
     </div>
     <div class="flex flex-col gap-0.5 border-t border-outline-gray-1 px-2 pb-3 pt-2" data-nav-bottom>
       <SidebarItem :label="SETTINGS.label" :icon="SETTINGS.icon" :route="SETTINGS.to" :active="activePlace === '/settings'" data-nav-item="Settings" />
@@ -43,6 +44,7 @@ import { activePlace, nav, reviewShown, setRail } from '@/lib/sidebar'
 import { lensLabel } from '@/lib/lens'
 import { lensMenu } from './lens/lensMenu'
 import { store } from '@/lib/store'
+import SetupCard from './SetupCard.vue'
 import { navCount } from '@/lib/newMenu'
 
 const emit = defineEmits(['logout', 'shortcuts'])

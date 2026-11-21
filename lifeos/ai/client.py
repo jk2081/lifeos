@@ -3,8 +3,9 @@
 - Provider: the Anthropic API through the official `anthropic` package (pinned in pyproject.toml).
 - Key: Life Settings.anthropic_api_key (a Password field, encrypted by Frappe), or `anthropic_api_key` in site config.
   It is never logged, put in an error message or sent to the browser.
-- Spend cap: Life Settings.monthly_cap_usd. Every call is refused once this month's recorded spend has reached it, and
-  every call's tokens and cost are written to Life AI Usage.
+- Spend cap: Life Settings.monthly_cap_usd, and an optional cap per feature (Life Settings.feature_caps). A call is refused
+  (CapReached, an AIError the caller turns into its fallback) once either is reached. Every call's feature, model, tokens
+  (cached ones priced as cached), cost, record and user are written to Life AI Usage.
 - Tests and the acceptance site never call the real API: `frappe.flags.lifeos_ai_backend` (set by tests) or the site
   config `lifeos_fake_ai` (the acceptance site) selects the fake in fake.py, which records what it was sent.
 """
@@ -64,24 +65,47 @@ def models():
 	return {"ask": s.get("ask_model") or DEFAULT_ASK_MODEL, "short": s.get("short_model") or DEFAULT_SHORT_MODEL}
 
 
-def prices():
-	out = dict(DEFAULT_PRICES)
+def price_table():
+	"""{model: (input, output, cached input)} in dollars per million tokens. A blank cached price is a tenth of the input price."""
+	out = {m: (i, o, i / 10) for m, (i, o) in DEFAULT_PRICES.items()}
 	for r in frappe.get_cached_doc("Life Settings").get("ai_prices") or []:
 		if r.model:
-			out[r.model] = (flt(r.input_per_mtok), flt(r.output_per_mtok))
+			cached = flt(r.get("cached_per_mtok")) or flt(r.input_per_mtok) / 10
+			out[r.model] = (flt(r.input_per_mtok), flt(r.output_per_mtok), cached)
 	return out
 
 
-def cost_of(model, input_tokens, output_tokens):
-	inp, out = prices().get(model, (0.0, 0.0))
-	return round((int(input_tokens or 0) * inp + int(output_tokens or 0) * out) / 1_000_000, 6)
+def prices():
+	return {m: (i, o) for m, (i, o, _c) in price_table().items()}
+
+
+def cost_of(model, input_tokens, output_tokens, cached_tokens=0, cache_write_tokens=0):
+	"""Dollars for one call. `input_tokens` are the ones read at the full price; cached reads are priced as cached and cache
+	writes at 1.25 times the input price."""
+	inp, out, cached = price_table().get(model, (0.0, 0.0, 0.0))
+	total = (int(input_tokens or 0) * inp + int(cache_write_tokens or 0) * inp * 1.25 + int(cached_tokens or 0) * cached
+		+ int(output_tokens or 0) * out)
+	return round(total / 1_000_000, 6)
 
 
 def cap():
 	return flt(frappe.get_cached_doc("Life Settings").get("monthly_cap_usd")) or 30.0
 
 
-def spent(m=None):
+def feature_caps():
+	"""{feature: dollars a month}; a feature that is not listed has no cap of its own."""
+	import json
+
+	try:
+		raw = json.loads(frappe.get_cached_doc("Life Settings").get("feature_caps") or "{}")
+	except ValueError:
+		return {}
+	return {str(k): flt(v) for k, v in raw.items() if isinstance(raw, dict) and flt(v) > 0}
+
+
+def spent(m=None, feature=None):
+	if feature:
+		return flt(frappe.db.sql("select sum(cost) from `tabLife AI Usage` where month=%s and purpose=%s", (m or month(), feature))[0][0])
 	return flt(frappe.db.sql("select sum(cost) from `tabLife AI Usage` where month=%s", m or month())[0][0])
 
 
@@ -93,20 +117,26 @@ def spend_status():
 
 
 def check(purpose="Ask"):
-	"""Stop before a call: no key, or the month's spend has reached the cap."""
+	"""Stop before a call: no key, the month's spend has reached the cap, or this feature has reached its own cap."""
 	if not is_set_up():
 		raise NotSetUp(_("Ask is not set up yet."))
 	st = spend_status()
 	if st["reached"]:
 		raise CapReached(_("This month's AI spend has reached the cap: ${0} of ${1}.").format(f"{st['spent']:,.2f}", f"{st['cap']:,.0f}"))
+	own = feature_caps().get(purpose)
+	if own and spent(feature=purpose) >= own:
+		raise CapReached(_("{0} has reached its own cap for this month: ${1} of ${2}.").format(purpose, f"{spent(feature=purpose):,.2f}", f"{own:,.0f}"))
 	return st
 
 
-def record(model, input_tokens, output_tokens, purpose, space=None, user=None):
-	cost = cost_of(model, input_tokens, output_tokens)
+def record(model, usage, purpose, space=None, user=None, reference=None):
+	"""Write one call to Life AI Usage. `usage` has input_tokens, output_tokens and optionally cached_tokens and cache_write_tokens."""
+	cost = cost_of(model, usage.get("input_tokens"), usage.get("output_tokens"), usage.get("cached_tokens"), usage.get("cache_write_tokens"))
+	ref = reference or (None, None)
 	frappe.get_doc({"doctype": "Life AI Usage", "user": user or frappe.session.user, "month": month(), "model": model,
-		"input_tokens": int(input_tokens or 0), "output_tokens": int(output_tokens or 0), "cost": cost, "purpose": purpose,
-		"space": space}).insert(ignore_permissions=True)
+		"input_tokens": int(usage.get("input_tokens") or 0), "output_tokens": int(usage.get("output_tokens") or 0),
+		"cached_tokens": int(usage.get("cached_tokens") or 0), "cache_write_tokens": int(usage.get("cache_write_tokens") or 0),
+		"cost": cost, "purpose": purpose, "space": space, "reference_doctype": ref[0], "reference_name": ref[1]}).insert(ignore_permissions=True)
 	return cost
 
 
@@ -153,14 +183,17 @@ class AnthropicBackend:
 		except anthropic.APIStatusError as e:
 			raise AIError(_("The AI service answered with an error ({0}).").format(e.status_code))
 		u = final.usage
-		inp = int(u.input_tokens or 0) + int(getattr(u, "cache_creation_input_tokens", 0) or 0) + int(getattr(u, "cache_read_input_tokens", 0) or 0)
 		return {"content": [b.to_dict() for b in final.content], "stop_reason": final.stop_reason, "model": final.model,
-			"usage": {"input_tokens": inp, "output_tokens": int(u.output_tokens or 0)}}
+			"usage": {"input_tokens": int(u.input_tokens or 0), "output_tokens": int(u.output_tokens or 0),
+				"cached_tokens": int(getattr(u, "cache_read_input_tokens", 0) or 0),
+				"cache_write_tokens": int(getattr(u, "cache_creation_input_tokens", 0) or 0)}}
 
 
-def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_text=None, space=None, effort=None, schema=None, user=None):
+def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_text=None, space=None, effort=None, schema=None, user=None, reference=None):
 	"""One request to the model, after the cap check, with its usage recorded. Returns
-	{content: [blocks as dicts], stop_reason, usage, cost, model}. `kind` picks the Ask model or the short-task model."""
+	{content: [blocks as dicts], stop_reason, usage, cost, model}. `kind` picks the Ask model or the short-task model.
+	`purpose` is the feature the cost is booked to; `reference` is (doctype, name) of the record the call was for. Over a cap it
+	raises CapReached (an AIError): callers catch AIError and fall back."""
 	check(purpose)
 	model = models()["short" if kind == "short" else "ask"]
 	params = {"model": model, "max_tokens": max_tokens, "system": system, "messages": messages,
@@ -170,7 +203,7 @@ def call(purpose, system, messages, tools=None, kind="ask", max_tokens=8000, on_
 	if schema:  # structured output: the answer is JSON that matches the schema
 		params["output_config"]["format"] = {"type": "json_schema", "schema": schema}
 	out = backend().run(params, on_text)
-	out["cost"] = record(out.get("model") or model, out["usage"]["input_tokens"], out["usage"]["output_tokens"], purpose, space, user)
+	out["cost"] = record(out.get("model") or model, out["usage"], purpose, space, user, reference)
 	out["model"] = out.get("model") or model
 	return out
 

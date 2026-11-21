@@ -10,8 +10,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 6 |
 | frappe-setuser | 14 |
-| frappe-sql-format-injection | 91 |
-| Total | 118 |
+| frappe-sql-format-injection | 92 |
+| Total | 119 |
 
 ## frappe-manual-commit
 
@@ -101,6 +101,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/outbox.py` | 64 | WHERE from _out_where (constant SQL and area_filter); values are parameters |
 | `lifeos/api/outbox.py` | 90 | WHERE from _out_where (constant SQL and area_filter); values are parameters |
 | `lifeos/api/outbox.py` | 106 | the parts are constant SQL; the area condition comes from area_filter; values are parameters |
+| `lifeos/api/people.py` | 47 | the only formatted part is vault_guard's fixed SQL; every value is a parameter |
 | `lifeos/api/search.py` | 58 | FIELDS and WHERE are fixed fragments; the search text is the %(q)s parameter |
 | `lifeos/api/search.py` | 70 | FIELDS, WHERE and the LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
 | `lifeos/api/settings.py` | 39 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |
@@ -134,8 +135,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/wiki.py` | 216 | WHERE from fixed fragments and area_filter; values are parameters |
 | `lifeos/api/wiki.py` | 254 | WHERE from fixed fragments and vault_guard; the search text is the %(q)s parameter |
 | `lifeos/api/wiki.py` | 259 | WHERE and LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
-| `lifeos/api/wiki.py` | 436 | CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
-| `lifeos/api/wiki.py` | 439 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/wiki.py` | 450 | CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/wiki.py` | 453 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/archive.py` | 14 | the table is one of ORG_DOCTYPES (checked above) and `where` a fixed fragment; values are parameters |
 | `lifeos/archive.py` | 76 | `dt` comes from the constant ORG_DOCTYPES |
 | `lifeos/archive.py` | 89 | `dt` comes from the constant ORG_DOCTYPES |

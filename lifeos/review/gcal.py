@@ -1,4 +1,4 @@
-"""Reading Google Calendar (set 8). Read-only: nothing is ever written to Google.
+"""Reading Google Calendar (set 8). Reading only lists; writing, when the person turns it on, is `gcal_write` (issue 31).
 
 The connection is Frappe's own: Google Settings (the OAuth client, entered by the owner) and a core `Google Calendar` record per
 user, authorised through core's flow. Core's own sync is left off on that record (pull and push both off), because it writes to
@@ -39,7 +39,7 @@ def state(user):
 	token = bool(acc and acc.get_password("refresh_token", raise_exception=False))
 	return {"configured": configured() or fake, "connected": fake or bool(acc and acc.enable and token), "fake": fake,
 		"read": read_ids(acc) if acc else ["primary"], "last_synced": acc.get("life_last_synced") if acc else _fake_synced(user),
-		"error": acc.get("life_sync_error") if acc else None, "domains": meetings.own_domains()}
+		"error": acc.get("life_sync_error") if acc else None, "write": frappe.defaults.get_user_default("life_write_calendar", user), "domains": meetings.own_domains()}
 
 
 def connect(user):
@@ -57,6 +57,7 @@ def connect(user):
 def disconnect(user):
 	"""Stop reading: the record is switched off and its tokens cleared. Events already read stay."""
 	acc = account(user)
+	frappe.defaults.clear_default("life_write_calendar", parent=user)
 	if acc:
 		acc.enable = 0
 		acc.refresh_token = acc.authorization_code = acc.next_sync_token = None

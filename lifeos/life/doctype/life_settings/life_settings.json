@@ -29,6 +29,7 @@
   "ask_model",
   "short_model",
   "monthly_cap_usd",
+  "feature_caps",
   "ai_prices",
   "insights_run_on"
  ],
@@ -201,6 +202,12 @@
    "fieldtype": "Datetime",
    "label": "Insights Last Run",
    "read_only": 1
+  },
+  {
+   "fieldname": "feature_caps",
+   "fieldtype": "Code",
+   "options": "JSON",
+   "label": "Feature Caps (USD per month)"
   }
  ],
  "issingle": 1,

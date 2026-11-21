@@ -217,6 +217,11 @@
           <p class="text-sm text-ink-gray-6">{{ listOf(section).footer }}</p>
         </template>
         <Card v-else-if="section === 'places'" flush data-settings-places>
+          <!-- issue 26: How it works is reached from here and from the sidebar's setup card -->
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-outline-gray-1 px-4 py-2.5">
+            <RouterLink class="text-base-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" to="/how-it-works" data-settings-how>How it works</RouterLink>
+            <span class="text-sm text-ink-gray-6">Sources, the Brain, your plan and the ladder of six levels</span>
+          </div>
           <!-- issue 14: the pages that left the sidebar, each with the place it lives in now -->
           <div v-for="p in ELSEWHERE" :key="p.key" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-outline-gray-1 px-4 py-2.5 last:border-b-0">
             <RouterLink class="text-base-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="p.to" :data-elsewhere="p.key">{{ p.label }}</RouterLink>
@@ -319,15 +324,6 @@
                 @change="(e) => setOne('monthly_cap_usd', Number(e.target.value))"><template #prefix><span class="text-sm text-ink-gray-6">$</span></template></TextInput></SettingRow>
           </Card>
           <section>
-            <SectionHead>This month</SectionHead>
-            <Card flush data-ai-spend>
-              <Row><span class="flex-1 text-base text-ink-gray-9">{{ d.ai.spend.text }}</span></Row>
-              <Row v-for="p in d.ai.by_purpose" :key="p.purpose"><span class="flex-1 text-base text-ink-gray-8">{{ p.purpose }}</span>
-                <span class="text-sm tabular-nums text-ink-gray-6">{{ (p.input_tokens + p.output_tokens).toLocaleString() }} tokens · ${{ p.cost.toFixed(2) }}</span></Row>
-              <Row v-for="u in d.ai.by_user" :key="u.user"><span class="flex-1 text-base text-ink-gray-8">{{ u.full_name }}</span><span class="text-sm tabular-nums text-ink-gray-6">${{ u.cost.toFixed(2) }}</span></Row>
-            </Card>
-          </section>
-          <section>
             <SectionHead>Prices per model</SectionHead>
             <Card flush>
               <Row v-for="pr in d.ai.prices" :key="pr.model" class="flex-wrap !items-center"><span class="min-w-40 flex-1 text-base text-ink-gray-8">{{ pr.model }}</span>
@@ -338,6 +334,43 @@
           </section>
           <p class="text-sm text-ink-gray-6" data-ai-spaces-note>Ask is switched on or off for each space under
             <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { ...route.query, tab: 'spaces' } }">People and agents, Spaces</RouterLink>.</p>
+        </template>
+        <template v-else-if="section === 'cost' && d.ai">
+          <section>
+            <SectionHead>This month by feature</SectionHead>
+            <Card flush data-ai-spend>
+              <Row><span class="flex-1 text-base text-ink-gray-9" data-cost-total>{{ d.ai.spend.text }}</span></Row>
+              <Row v-for="p in d.ai.by_purpose" :key="p.purpose" :data-cost-feature="p.purpose"><span class="flex-1 text-base text-ink-gray-8">{{ p.purpose }}</span>
+                <span class="text-sm tabular-nums text-ink-gray-6">{{ (p.input_tokens + p.output_tokens).toLocaleString() }} tokens · ${{ p.cost.toFixed(2) }}</span></Row>
+              <Empty v-if="!d.ai.by_purpose.length" title="No AI calls this month." hint="Each call to the model, and what it cost, will be listed here." data-cost-empty />
+            </Card>
+          </section>
+          <section>
+            <SectionHead>Cap for a feature</SectionHead>
+            <Card flush>
+              <Row v-for="f in d.ai.feature_caps" :key="f.feature" class="flex-wrap !items-center" :data-feature-cap="f.feature"><span class="min-w-40 flex-1 text-base text-ink-gray-8">{{ f.feature }}
+                <span class="text-sm text-ink-gray-6">${{ f.spent.toFixed(2) }} so far</span></span>
+                <TextInput class="w-28" type="number" min="0" step="1" placeholder="No cap" :model-value="f.cap || ''" :aria-label="`${f.feature} cap`" @change="(e) => setFeatureCap(f, e.target.value)"><template #prefix><span class="text-sm text-ink-gray-6">$</span></template></TextInput></Row>
+              <Row v-if="!d.ai.feature_caps.length"><span class="text-sm text-ink-gray-6">A feature appears here after its first call.</span></Row>
+            </Card>
+            <p class="mt-1 text-sm text-ink-gray-6">The monthly cap of ${{ d.ai.monthly_cap_usd }} is set under Ask and AI. Over a cap a feature falls back: area guesses use the rules, the Brain leaves items in Needs you.</p>
+          </section>
+          <section>
+            <SectionHead>By day</SectionHead>
+            <Card flush data-cost-days>
+              <Row v-for="x in d.ai.by_day" :key="x.day"><span class="flex-1 text-base text-ink-gray-8">{{ x.day }}</span><span class="text-sm tabular-nums text-ink-gray-6">{{ x.calls }} {{ x.calls === 1 ? 'call' : 'calls' }} · ${{ x.cost.toFixed(2) }}</span></Row>
+              <Row v-if="!d.ai.by_day.length"><span class="text-sm text-ink-gray-6">Nothing yet this month.</span></Row>
+            </Card>
+          </section>
+          <section>
+            <SectionHead>Last 50 calls</SectionHead>
+            <Card flush data-cost-calls>
+              <Row v-for="(c, i) in d.ai.calls" :key="i" class="flex-wrap !items-start" data-cost-call><div class="min-w-0 flex-1 basis-48"><div class="text-base text-ink-gray-8">{{ c.feature }}</div>
+                <div class="break-words text-sm text-ink-gray-6">{{ dateTime(c.when) }} · {{ c.model }}<template v-if="c.reference"> · {{ c.reference }}</template> · {{ c.full_name }}</div></div>
+                <span class="text-sm tabular-nums text-ink-gray-6">{{ (c.input_tokens + c.cached_tokens + c.output_tokens).toLocaleString() }} tokens · ${{ c.cost.toFixed(4) }}</span></Row>
+              <Row v-if="!d.ai.calls.length"><span class="text-sm text-ink-gray-6">No calls yet.</span></Row>
+            </Card>
+          </section>
         </template>
         <template v-else-if="section === 'agents'">
           <Card v-for="a in d.agents" :key="a.user" flush :data-agent="a.user">
@@ -470,7 +503,7 @@ const groups = computed(() => [
   { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas' }, { value: 'rhythms', label: 'Rhythms' }, { value: 'habits', label: 'Habits' },
     { value: 'dimensions', label: 'Check-ins' }, { value: 'reset', label: 'Reset rules' }, { value: 'tags', label: 'Tags' }] },
   { key: 'assistant', label: 'Assistant', items: [{ value: 'connections', label: 'Connections' },
-    ...(d.value?.is_admin ? [{ value: 'ai', label: 'Ask and AI' }] : []), { value: 'sensitive', label: 'Sensitive items' }, { value: 'note-rules', label: 'Note rules' }] },
+    ...(d.value?.is_admin ? [{ value: 'ai', label: 'Ask and AI' }, { value: 'cost', label: 'Cost' }] : []), { value: 'sensitive', label: 'Sensitive items' }, { value: 'note-rules', label: 'Note rules' }] },
   // issue 1: who is in each space and what they can do, people and agents together
   ...(d.value?.is_admin ? [{ key: 'people', label: 'People and agents', items: [{ value: 'spaces', label: 'Spaces' }, { value: 'members', label: 'Members' },
     { value: 'agents', label: 'Agents' }] }] : []),
@@ -482,7 +515,7 @@ const groups = computed(() => [
 const MOVED = { default: 'profile', review: 'rhythms', archived: 'archive', assistants: 'agents', people: 'members' }
 const sections = computed(() => groups.value.flatMap((g) => g.items))
 // the open section is tab= in the URL. On a wide screen the first section is the default; on a phone the menu is.
-const ADMIN_ONLY = ['members', 'spaces', 'agents', 'ai', 'backups']
+const ADMIN_ONLY = ['members', 'spaces', 'agents', 'ai', 'cost', 'backups']
 const section = computed(() => {
   const asked = route.query.tab ? String(route.query.tab) : ''
   const v = MOVED[asked] || asked
@@ -562,7 +595,10 @@ async function saveKey(clear = false) {
 }
 async function setPrice(pr, field, value) {
   pr[field] = Number(value)
-  if (await tryCall(() => api('settings.set_ai_price', { model: pr.model, input_per_mtok: pr.input_per_mtok, output_per_mtok: pr.output_per_mtok }), 'Saved')) await load()
+  if (await tryCall(() => api('settings.set_ai_price', { model: pr.model, input_per_mtok: pr.input_per_mtok, output_per_mtok: pr.output_per_mtok, cached_per_mtok: pr.cached_per_mtok }), 'Saved')) await load()
+}
+async function setFeatureCap(f, value) {
+  if (await tryCall(() => api('settings.set_feature_cap', { feature: f.feature, cap: Number(value) || 0 }), 'Saved')) await load()
 }
 async function setSpaceAsk(sp, field, value) {
   const before = sp[field]
