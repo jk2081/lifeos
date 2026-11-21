@@ -37,7 +37,7 @@ Phone: a bottom bar with Today, Brain, Goals and Library, and a capture button.
 
 ## Focuses: ongoing work behind the goals
 
-Some things are never "done": improving systems at RMT, marketing at BTW, Ghillidary's yield. They are ongoing bodies of work with a **standard** to keep up and **principles** to work within. A **focus** holds that; goals of any length (12 weeks, a year, three years) serve it for a while and then finish. A focus lives in an area or part, has no "Done when", and is optional: goals without a focus sit directly under their area. Mockups: `mockups/v2/18-goals-focuses.png` and `19-focus.png`.
+Some work is never "done": systems and review cadence in a company, Yield on an estate, marketing. A **focus** is an optional level of the area tree under a part (or a life area), with opinionated defaults by kind of part (a company gets Review cadence, Systems, Marketing, People, Finance; an estate gets Yield, Quality, People, Systems). Each focus has a **standard** and **principles** and expects an **annual goal**; 12 Week Year goals serve the annual goal. The "Open" goal type is retired. Focuses are off for a new user and on for the owner (#57). Mockups: `mockups/v2/18-goals-focuses.png` and `19-focus.png`.
 
 ## The ladder
 
