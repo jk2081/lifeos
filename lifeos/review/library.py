@@ -122,7 +122,7 @@ def _goal_for(links):
 def goal_options(space):
 	return frappe.db.sql("""select g.name as value, g.title as label from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
 		where g.space = %s and g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0
-		and (g.goal_type != '12 Week Year' or c.status = 'Active') order by g.goal_type = '12 Week Year' desc, g.title limit 100""", space, as_dict=True)
+		and (g.horizon != '12 weeks' or c.status = 'Active') order by g.horizon = '12 weeks' desc, g.title limit 100""", space, as_dict=True)
 
 
 def candidates(space, ev, recs):

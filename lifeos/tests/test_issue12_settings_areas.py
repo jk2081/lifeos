@@ -18,7 +18,7 @@ class TestSettingsAreas(LifeTestCase):
 	def test_switching_money_on_and_off_shows_and_hides_it_and_its_goals(self):
 		money = self.life["Money"]
 		settings.save_item("area", name=money, is_on=0)
-		goal = goals.create("i12 goal in Money", "Open", space=PRIVATE, area=money)["name"]
+		goal = goals.create("i12 goal in Money", "Long term", space=PRIVATE, area=money)["name"]
 		self.assertNotIn(money, self.context_areas())
 		settings.save_item("area", name=money, is_on=1)
 		self.assertIn(money, self.context_areas())
@@ -39,7 +39,7 @@ class TestSettingsAreas(LifeTestCase):
 		row = self.row(part)
 		self.assertEqual((row.parent_area, row.description, row.colour, row["goals"]), (career, "Vice Chair", "violet", 0))
 		self.assertIn(part, self.context_areas())
-		goals.create("i12 board goal", "Open", space=PRIVATE, area=part)
+		goals.create("i12 board goal", "Long term", space=PRIVATE, area=part)
 		self.assertEqual(self.row(part)["goals"], 1)
 		self.assertGreaterEqual(self.row(career)["goals"], 1)  # an area of life counts the goals of its parts
 
@@ -50,7 +50,7 @@ class TestSettingsAreas(LifeTestCase):
 		other = settings.save_item("area", space=PRIVATE, title="i12 other part", parent_area=career)["name"]
 		open_task = self.make("Life Task", title="i12 open task", area=part).name
 		done_task = self.make("Life Task", title="i12 done task", area=part, status="Done").name
-		goal = goals.create("i12 goal in the part", "Open", space=PRIVATE, area=part)["name"]
+		goal = goals.create("i12 goal in the part", "Long term", space=PRIVATE, area=part)["name"]
 		work = settings.area_open_work(part)
 		self.assertEqual((work["goals"], work["tasks"]), (1, 1))
 		self.assertEqual([t.name for t in work["targets"]][0], career)
@@ -92,8 +92,8 @@ class TestSettingsAreas(LifeTestCase):
 		mind = self.life["Mind"]
 		settings.save_item("area", name=mind, is_on=1)
 		before = areas.goal_counts(PRIVATE).get(mind, 0)
-		goals.create("i12 counted", "Open", space=PRIVATE, area=mind)
-		closed = goals.create("i12 achieved", "Open", space=PRIVATE, area=mind)["name"]
+		goals.create("i12 counted", "Long term", space=PRIVATE, area=mind)
+		closed = goals.create("i12 achieved", "Long term", space=PRIVATE, area=mind)["name"]
 		frappe.db.set_value("Life Goal", closed, "outcome", "Achieved")
 		self.assertEqual(areas.goal_counts(PRIVATE).get(mind, 0), before + 1)
 		settings.save_item("area", name=mind, is_on=0)

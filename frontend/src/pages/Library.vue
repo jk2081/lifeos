@@ -12,7 +12,7 @@
   <!-- the tree with the reader: /library and /library/<id> -->
   <template v-else>
     <PageHead title="Notes">
-      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink> in {{ store.space }}</template>
+      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length + journalPages }} note{{ notes.length + journalPages === 1 ? '' : 's' }}</NumLink> in {{ store.space }}</template>
       <TabButtons model-value="tree" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
     </PageHead>
@@ -103,6 +103,7 @@ const list = ref(null)
 const SWITCH = NOTES_VIEWS
 const router = useRouter()
 const notes = ref([])
+const journalPages = ref(0)
 const areas = ref([])
 const loaded = ref(false)
 const filter = ref('')
@@ -156,6 +157,7 @@ async function loadTree() {
   const res = await tryCall(() => api('library.tree', { space: store.space, area: store.lensArea || undefined, collection: { me: 'My notes', assistant: 'Wiki' }[route.query.by] || 'all' }))
   if (res) {
     notes.value = res.notes
+    journalPages.value = res.journal_pages || 0 // the list also holds the journal pages
     areas.value = res.areas
     loaded.value = true
   }
@@ -185,20 +187,20 @@ async function create(v) {
   await loadTree()
   router.push(`/library/${res.name}?edit=1`)
 }
-// Part of a note that can wait becomes an idea on the Someday list, linked back to the note
-async function selectionToIdea() {
+// Part of a note that can wait becomes a Someday note
+async function selectionToSomeday() {
   const text = (editorRef.value?.selection?.() || '').trim()
-  if (!text) return toast.info('Select the text of the idea first.')
+  if (!text) return toast.info('Select the text that can wait first.')
   const [first, ...rest] = text.split('\n')
-  await tryCall(() => api('someday.create_idea', { space: note.value.space, title: first.replace(/^[-*#\s]+/, '').slice(0, 140), body_md: rest.join('\n').trim() || undefined,
-    area: note.value.area || undefined, source_doctype: 'Life Note', source_name: note.value.name }), 'Parked on the Someday list.')
+  await tryCall(() => api('someday.create', { space: note.value.space, title: first.replace(/^[-*#\s]+/, '').slice(0, 140), as_note: 1, body_md: [rest.join('\n').trim(), `From [[${note.value.title}]]`].filter(Boolean).join('\n\n'),
+    area: note.value.area || undefined }), 'Parked on the Someday list.')
 }
 const noteMenu = computed(() => [
   { label: raw.value ? 'Show formatted' : 'Show Markdown', icon: 'lucide-code', onClick: () => { raw.value = !raw.value } },
   ...(writable.value && !store.isAgent && !note.value?.is_rules ? [note.value?.collection === 'Wiki'
     ? { label: 'Keep in My notes', icon: 'lucide-lock', onClick: () => move('My notes') }
     : { label: 'Hand to the wiki', icon: 'lucide-book-open', onClick: () => move('Wiki') }] : []),
-  ...(writable.value && !store.isAgent ? [{ label: 'Selection to Someday', icon: 'lucide-lightbulb', onClick: selectionToIdea }] : []),
+  ...(writable.value && !store.isAgent ? [{ label: 'Selection to Someday', icon: 'lucide-lightbulb', onClick: selectionToSomeday }] : []),
   { label: 'Earlier versions', icon: 'lucide-history', onClick: async () => { versions.value = (await tryCall(() => api('library.versions', { note: note.value.name }))) || []; versionsOpen.value = true } },
   { label: note.value?.is_archived ? 'Restore from archive' : 'Archive', icon: note.value?.is_archived ? 'lucide-archive-restore' : 'lucide-archive', onClick: async () => {
     if (await tryCall(() => api('archive.set', { doctype: 'Life Note', name: note.value.name, archived: note.value.is_archived ? 0 : 1 }), note.value.is_archived ? 'Restored.' : 'Archived.')) { await loadTree(); router.push('/library/notes') } } },

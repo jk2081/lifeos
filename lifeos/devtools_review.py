@@ -32,12 +32,12 @@ def setup(tag):
 	out = {"was": was}
 	# a number goal in the cycle, with a reading suggested from a voice note
 	src = _item(f"S8 voice reading {tag}", "Voice Note", "Done", f"Mr. Rao reported 1,460 kg/ha for October ({tag}).")
-	out["number"] = _doc("Life Goal", title=f"S8 yield {tag}", goal_type="12 Week Year", cycle=cycle, area=area, measure_kind="Number",
+	out["number"] = _doc("Life Goal", title=f"S8 yield {tag}", horizon="12 weeks", cycle=cycle, area=area, measure_kind="Number",
 		measure="Ghillidary yield", unit="kg/ha", start_value=1200, target_value=1800)
 	out["reading"] = readings.suggest(out["number"], 1460, excerpt="Mr. Rao reported 1,460 kg/ha for October.", source_doctype="Life Inbox Item",
 		source_name=src, by="Agent").name
 	# a milestone goal without its finish line, and a goal no longer in a cycle
-	out["milestone"] = _doc("Life Goal", title=f"S8 milestone {tag}", goal_type="12 Week Year", cycle=cycle, area=area, measure_kind="Milestone", done_when="Signed")
+	out["milestone"] = _doc("Life Goal", title=f"S8 milestone {tag}", horizon="12 weeks", cycle=cycle, area=area, measure_kind="Milestone", done_when="Signed")
 	frappe.db.set_value("Life Goal", out["milestone"], "done_when", None)
 	# stuck and waiting tasks, made before the review's period
 	def task(title, age, **kw):

@@ -1,9 +1,9 @@
 <template>
-  <ListView ref="list" title="Someday" noun="items" screen="someday" doctype="Life Idea" :spec="SPEC" :tabs="TABS" :quick="['area', 'someday_on']"
+  <ListView ref="list" title="Someday" noun="items" screen="someday" doctype="Life Task" :spec="SPEC" :tabs="TABS" :quick="['area', 'someday_on']"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => r.ref" :groupable="false"
-    :empty-title="EMPTY[tab] || 'Nothing is parked.'" empty-hint="Park a task or goal from its pane or from Reset, or add an idea with New. Each comes back for review after a while.">
+    :empty-title="EMPTY[tab] || 'Nothing is parked.'" empty-hint="Park a task, goal or note from its pane or from Reset, or add something with New. Each comes back for review after a while.">
     <template #sub><span data-someday-sub>{{ store.space }} · parked, not forgotten · each item comes back for review {{ months }} months after it was parked</span></template>
-    <template #actions><Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New idea" data-new-idea @click="store.newKind = 'idea'" /></template>
+    <template #actions><Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New" data-new-someday @click="store.newKind = 'someday'" /></template>
     <template #bar><span class="text-sm text-ink-gray-6 max-sm:hidden">Sorted by review date, oldest first</span></template>
     <template #cell-title="{ row }"><div class="min-w-0"><div class="break-words font-medium text-ink-gray-9">{{ row.title }}</div>
       <div v-if="row.area_path" class="truncate text-sm text-ink-gray-6">{{ row.area_path }}</div></div></template>
@@ -23,7 +23,7 @@
     <template #below>
       <Card class="mt-4 bg-surface-gray-1" data-someday-how>
         <div class="text-base-medium text-ink-gray-9">How Someday works</div>
-        <p class="mt-1 text-base text-ink-gray-7">Anything can be parked here: a task, a goal (an open-ended goal takes its tasks), or an idea from a note, chat or digest. It leaves Today,
+        <p class="mt-1 text-base text-ink-gray-7">Anything can be parked here: a task, a goal (a long-term goal takes its tasks), or a note for a thought with no action. It leaves Today,
           Tasks and the Open counts, keeps its original creation date, and records the day it was parked. {{ months }} months later it comes up in Reset for a decision:
           <b>Bring back</b> (pick a date, status or cycle), <b>Keep</b> for {{ months }} more months, or <b>Purge</b> (to the trash, 30 days to undo).</p>
       </Card>
@@ -47,19 +47,19 @@ import { askScope } from '@/lib/ask'
 
 // state tabs on tab=: All (default), Due for review, and one per kind
 const TABS = { key: 'tab', field: 'status', label: 'Someday kind', items: [{ value: 'all', label: 'All' }, { value: 'due', label: 'Due for review' },
-  { value: 'tasks', label: 'Tasks' }, { value: 'goals', label: 'Goals' }, { value: 'ideas', label: 'Ideas' }] }
-const EMPTY = { due: 'Nothing is due for review.', tasks: 'No parked tasks.', goals: 'No parked goals.', ideas: 'No ideas yet.' }
+  { value: 'tasks', label: 'Tasks' }, { value: 'goals', label: 'Goals' }, { value: 'notes', label: 'Notes' }] }
+const EMPTY = { due: 'Nothing is due for review.', tasks: 'No parked tasks.', goals: 'No parked goals.', notes: 'No parked notes.' }
 const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'tab', field: 'status', kind: 'value' },
   { key: 'parked_from', field: 'someday_on', kind: 'from' }, { key: 'parked_to', field: 'someday_on', kind: 'to' }]
 const SYNTHETIC = [{ key: '_type', label: 'Type', width: '10rem', place: 'end' }, { key: '_created', label: 'Created', width: '6rem', place: 'end' },
   { key: '_parked', label: 'Parked', width: '6rem', place: 'end' }, { key: '_review', label: 'Review', width: '8rem', place: 'end' },
   { key: '_actions', label: '', width: '12rem', align: 'right', place: 'end' }]
-const HIDDEN = ['status', 'body_md', 'goal', 'source_doctype', 'source_name', 'brought_to_doctype', 'brought_to_name', 'someday_note']
-const THEME = { Idea: 'violet', Goal: 'green', Task: 'gray' }
+const HIDDEN = ['status', 'goal', 'someday_note']
+const THEME = { Note: 'violet', Goal: 'green', Task: 'gray' }
 const list = ref(null)
 const months = ref(3)
 const tab = computed(() => list.value?.tab || 'all')
-const typeLabel = (r) => (r.type === 'Goal' && r.tasks ? `Goal · ${r.tasks} task${r.tasks === 1 ? '' : 's'}` : r.type === 'Idea' && r.from_source ? 'Idea · from ' + (r.from_source === 'Life Chat Log' ? 'chat' : r.from_source === 'Life Note' ? 'note' : 'source') : r.type)
+const typeLabel = (r) => (r.type === 'Goal' && r.tasks ? `Goal · ${r.tasks} task${r.tasks === 1 ? '' : 's'}`: r.type)
 function reviewLabel(r) {
   if (r.due) return 'Review due'
   if (!r.someday_review_on) return ''

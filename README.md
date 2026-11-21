@@ -34,9 +34,9 @@ bench --site SITE execute lifeos.seed.remove            # takes exactly those re
 
 Open `https://SITE/life`. On a phone, use Add to Home Screen to install it as an app.
 
-**Family members.** Create the user in Frappe, then add them to a space under Life OS, Settings, Spaces and members. They get the role `Life User`. Create a space of their own for them in the same place.
+**Family members.** Create the user in Frappe, then add them to a space under Life OS, Settings → Members. They get the role `Life User`. Make a space of their own for them in Members → Spaces.
 
-**Agents.** Create one user per agent in Frappe, then add it to each space it should work in from Life OS: Settings → People and agents → Members, **Add member**. If the user has no Life OS role yet, Add member offers agent access and gives it the role `Life Agent` when you confirm (never `Life User` or `Life Admin`). Agents start with Can view; they need Can edit to file captures and proposals. Generate its API key on the user record (Settings → People and agents → Agents links to it). Switch on MCP in System Settings (`Enable MCP`). The agent connects to `/api/v2/mcp` with `Authorization: token <key>:<secret>` and loads its instructions from Life OS: `lifeos.api.skills.get` with the name `lifeos` (and `lifeos-file-work`).
+**Agents.** Create one user per agent in Frappe, then add it to each space it should work in from Life OS: Settings → Members, **Add member**. If the user has no Life OS role yet, Add member offers agent access and gives it the role `Life Agent` when you confirm (never `Life User` or `Life Admin`). Agents start with Can view; they need Can edit to file captures and proposals. Generate its API key on the user record (Settings → People and agents → Agents links to it). Switch on MCP in System Settings (`Enable MCP`). The agent connects to `/api/v2/mcp` with `Authorization: token <key>:<secret>` and loads its instructions from Life OS: `lifeos.api.skills.get` with the name `lifeos` (and `lifeos-file-work`).
 
 **Google Calendar.** Connect it in Settings > Me > Calendar (Frappe's Google Settings holds the OAuth client). Life OS reads your calendars; it writes only if you choose a calendar under "Write to Google Calendar" (off by default). Then an accepted Event proposal and a goal block from the weekly review are created in that calendar, private, with a link back to Life OS and no guests unless you add emails on the proposal; moving or deleting them in Life OS updates or deletes them in Google, and changes made in Google come back with the hourly read.
 
@@ -144,7 +144,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | Method | Arguments | Does |
 | --- | --- | --- |
 | `chats.report` | `space=None, from_date=None, to_date=None, group_by='day', start=0, page_length=100` | Chat logs between two dates (default: the last seven days), grouped by day, area or project, with their open items rolled up. The same records come back under each group_by. |
-| `chats.log` | `space=None, title=None, date=None, url=None, assistant='Claude', summary_md=None, open_items=None, area=None, project=None, tags=None, also_in=None` | Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal. open_items is a list of strings. area, project and tags take a name or a title. |
+| `chats.log` | `space=None, title=None, date=None, url=None, assistant='Claude', summary_md=None, open_items=None, area=None, project=None, also_in=None` | Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal. open_items is a list of strings. area, project and tags take a name or a title. |
 | `chats.make_task` | `chat, row` | Turn an open item into a task. People only: an open item becomes a task only when the owner asks. |
 | `chats.close_item` | `chat, row, reopen=0` | Close an open item without making a task, or open it again. |
 
@@ -187,10 +187,11 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `journal.save_goal` | `goal=None, cycle=None, title=None, area=None, project=None, actions=None` | Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}. |
 | `journal.delete_goal` | `goal` |  |
 | `journal.goals` | `space=None, area=None` | Every goal across every cycle, grouped by cycle: planned, active, then closed, newest first. |
-| `goals.list` | `space=None, state='in_progress', goal_type=None, area=None, cycle=None, target_from=None, target_to=None, start=0, page_length=50, filters=None, order_by=None, summary=None` | Goals of every type with `tasks_done`, `tasks_counted` and `score` (12 Week Year only), the state `tabs` and a `summary_line`. |
-| `goals.create` | `title, goal_type='Open', space=None, area=None, project=None, target_date=None, cycle=None` | Create a goal. 12 Week Year needs a cycle, Annual a target date. Not for agents. |
-| `goals.close` | `goal, outcome, result_note=None` | Set the outcome of an Annual or Open goal. Not for agents. |
-| `goals.add_to_cycle` | `goal, cycle` | Move an Annual or Open goal into the active or a planned 12 Week Year, with its tasks. Not for agents. |
+| `goals.list` | `space=None, state='in_progress', horizon=None, area=None, cycle=None, target_from=None, target_to=None, start=0, page_length=50, filters=None, order_by=None, summary=None` | Goals of every type with `tasks_done`, `tasks_counted` and `score` (12 Week Year only), the state `tabs` and a `summary_line`. |
+| `goals.create` | `title, horizon=None, space=None, area=None, project=None, target_date=None, cycle=None` | Create a goal. The horizon (Long term, Year, 12 weeks, Month) follows the target date and cycle when not given; Year and Month need a target date. Not for agents. |
+| `goals.suggest_horizon` | `space=None, target_date=None, cycle=None` | The horizon the goal form sets from the date, and whether 12-week goals follow the quarter. |
+| `goals.close` | `goal, outcome, result_note=None` | Set the outcome of a goal that is not a 12-week goal. Not for agents. |
+| `goals.add_to_cycle` | `goal, cycle` | Move a goal into the active or a planned 12 Week Year, with its tasks. Not for agents. |
 | `goals.picker` | `space=None` | Every goal in progress, ordered by type, for the goal picker on a task. |
 | `goals.cycles` | `space=None` | The active and planned 12 Week Years of a space. |
 | `journal.goal` | `goal` | A goal page: the goal, its actions, and its history across cycles through the carried_from chain. |
@@ -199,10 +200,10 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `journal.start_cycle` | `cycle` | Make a planned cycle the active one. |
 | `journal.create_cycle` | `space=None, start_date=None, title=None` | Create the first cycle of a space. It starts on the given date, or next Monday. |
 | `journal.month` | `space=None, year=None, month=None, create=0` | The plan of one month: goals, mindsweep, habits with their month so far, and the latest check-in. |
-| `journal.save_month_goal` | `plan, row=None, title=None, priority=None, status=None, area=None, delete=0` | Add, change or remove one goal of a month plan. |
+| `journal.save_month_goal` | `plan, row=None, title=None, status=None, area=None, delete=0, move=None` | Add, change, move (the priority order) or remove one Month goal of a month plan. |
 | `journal.save_month_text` | `plan, mindsweep_md=None, projects_md=None` |  |
-| `journal.carry_month_goal` | `plan, row` | Carry an open month goal into next month's plan. The old one is marked Carried. |
-| `journal.make_task_from_goal` | `plan, row` | Create a Life Task linked to a month goal. |
+| `journal.carry_month_goal` | `plan, row` | Carry an open Month goal into next month. The old one is marked Carried. |
+| `journal.make_task_from_goal` | `plan, row` | Create a Life Task filed under a Month goal. |
 | `journal.habits` | `space=None, year=None, month=None` | The habit grid of one month: each tracked habit with its done days, count, target and percentage. |
 | `journal.toggle_habit` | `habit, date=None, done=None` | Tick or untick a habit on a day. |
 | `journal.habit_library` | `space=None` | Every habit ever tracked in a space. |
@@ -222,7 +223,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | --- | --- | --- |
 | `library.tree` | `space=None, include_archived=0` | Every note of a space with what the tree needs: title, parent, area and project. At most 100 per call would hide notes, so the tree returns light rows only and is capped at 2,000. |
 | `library.get` | `note` | One note with its links resolved to current titles. |
-| `library.save` | `note=None, space=None, title=None, content_md=None, area=None, project=None, parent_note=None, also_in=None, tag_ids=None` | Create or change a note. On save its [[Title]] links are parsed and stored in Life Link. |
+| `library.save` | `note=None, space=None, title=None, content_md=None, area=None, project=None, parent_note=None, also_in=None` | Create or change a note. On save its [[Title]] links are parsed and stored in Life Link. |
 | `library.versions` | `note` | Saved versions of a note, from Frappe's document versioning. |
 
 **`lifeos.api.links`**
@@ -238,7 +239,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | Method | Arguments | Does |
 | --- | --- | --- |
 | `meta.proposal_schema` |  | For each proposal kind: the allowed payload fields and an example. Call once before the first submission. |
-| `meta.space_context` | `space=None` | Areas, tags, people, habits, dimensions and active goals of a space, for filing proposals. `areas` holds the areas of life that are on, each followed by its parts; `areas_off` names those that are off. |
+| `meta.space_context` | `space=None` | Areas, people, habits, dimensions and active goals of a space, for filing proposals. `areas` holds the areas of life that are on, each followed by its parts; `areas_off` names those that are off. |
 
 **`lifeos.api.projects`**
 
@@ -288,7 +289,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `tasks.list` | `space=None, status='open', area=None, project=None, tag=None, priority=None, goal=None, month_plan=None, include_archived=0, start=0, page_length=50` | Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first. `status=open_doing` leaves Waiting tasks out. `tabs` in the answer counts the tasks on each state tab (open = Open and Doing, loops, Waiting, Done, all) under the same filters. |
+| `tasks.list` | `space=None, status='open', area=None, project=None, priority=None, goal=None, month_plan=None, include_archived=0, start=0, page_length=50` | Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first. `status=open_doing` leaves Waiting tasks out. `tabs` in the answer counts the tasks on each state tab (open = Open and Doing, loops, Waiting, Done, all) under the same filters. |
 | `tasks.get` | `task` |  |
 | `tasks.quick_add` | `text, space=None, area=None, project=None, goal=None, due_date=None, priority=None, month_plan=None` | Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date. |
 | `tasks.set_status` | `task, status, waiting_on=None` | Change a task's status. Done fills completed_on. Waiting needs waiting_on. |

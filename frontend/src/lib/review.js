@@ -50,7 +50,7 @@ export const useReview = () => inject(KEY)
 export const PILE_TEXT = {
   keep: { title: 'Keep', dot: 'bg-surface-green-7', verb: 'Keep all', done: 'kept', inbox: { line: 'proposals accepted as they are', verb: 'Accept all', done: 'accepted' },
     tasks: { line: 'stay open' } },
-  park: { title: 'Park in Someday', dot: 'bg-surface-amber-7', verb: 'Park all', done: 'parked in Someday', inbox: { line: 'kept as ideas in Someday, back in 3 months' },
+  park: { title: 'Park in Someday', dot: 'bg-surface-amber-7', verb: 'Park all', done: 'parked in Someday', inbox: { line: 'kept as notes in Someday, back in 3 months' },
     tasks: { line: 'back for a look in 3 months' } },
   letgo: { title: 'Let go', dot: 'bg-surface-gray-7', verb: 'Let go of all', done: 'let go', inbox: { line: 'discarded, back from the trash for 30 days' },
     tasks: { line: 'dropped; bring them back from the Outbox' } },

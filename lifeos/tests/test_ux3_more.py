@@ -43,15 +43,13 @@ class TestSettings(LifeTestCase):
 		self.assertRaises(frappe.ValidationError, settings.save_item, "area", name=c, parent_area=a)
 		self.assertRaises(frappe.ValidationError, settings.save_item, "area", name=c, parent_area="")
 
-	def test_tags_habits_dimensions_archive_and_leave_the_pickers(self):
-		tag = settings.save_item("tag", space=PRIVATE, title="ux3tag")["name"]
+	def test_habits_dimensions_archive_and_leave_the_pickers(self):
 		habit = settings.save_item("habit", space=PRIVATE, title="ux3 habit")["name"]
 		dim = settings.save_item("dimension", space=PRIVATE, title="ux3 dim")["name"]
-		for kind, name in (("tag", tag), ("habit", habit), ("dimension", dim)):
+		for kind, name in (("habit", habit), ("dimension", dim)):
 			settings.save_item(kind, name=name, is_archived=1)
 		from lifeos.api.inbox import space_context
 		ctx = space_context(PRIVATE)
-		self.assertNotIn(tag, [t.name for t in ctx["tags"]])
 		self.assertNotIn(habit, [t.name for t in ctx["habits"]])
 		self.assertNotIn(dim, [t.name for t in ctx["dimensions"]])
 
@@ -145,16 +143,16 @@ class TestDeskAndRoles(LifeTestCase):
 
 class TestGoals(LifeTestCase):
 	def test_types_and_validation(self):
-		self.assertRaises(frappe.ValidationError, goals.create, "ux3 annual no date", "Annual", space=PRIVATE)
-		g = goals.create("ux3 annual", "Annual", space=PRIVATE, target_date="2026-12-31", area=self.areas["Tea"])
+		self.assertRaises(frappe.ValidationError, goals.create, "ux3 annual no date", "Year", space=PRIVATE)
+		g = goals.create("ux3 annual", "Year", space=PRIVATE, target_date="2026-12-31", area=self.areas["Tea"])
 		self.assertIsNone(frappe.db.get_value("Life Goal", g["name"], "cycle"))
-		self.assertRaises(frappe.ValidationError, goals.create, "ux3 12wy no cycle", "12 Week Year", space=PRIVATE)
+		self.assertRaises(frappe.ValidationError, goals.create, "ux3 12wy no cycle", "12 weeks", space=PRIVATE)
 		doc = frappe.get_doc("Life Goal", g["name"])
 		doc.cycle = "nonexistent"
 		self.assertRaises(Exception, doc.save)
 
 	def test_task_completion(self):
-		g = goals.create("ux3 open goal", "Open", space=PRIVATE, area=self.areas["Tea"])["name"]
+		g = goals.create("ux3 open goal", "Long term", space=PRIVATE, area=self.areas["Tea"])["name"]
 		self.assertEqual(goals.task_counts([g]), {})
 		t1 = self.make("Life Task", title="ux3 g1", goal=g)
 		self.make("Life Task", title="ux3 g2", goal=g)
@@ -169,7 +167,7 @@ class TestGoals(LifeTestCase):
 		self.assertEqual((rows[0].tasks_done, rows[0].tasks_counted, rows[0].score), (1, 2, None))
 
 	def test_list_tabs_and_close(self):
-		g = goals.create("ux3 closable", "Open", space=PRIVATE)["name"]
+		g = goals.create("ux3 closable", "Long term", space=PRIVATE)["name"]
 		mine = frappe.as_json([["title", "like", "ux3 closable"]])
 		self.assertEqual(goals.list(space=PRIVATE, filters=mine)["tabs"], {"in_progress": 1, "achieved": 0, "closed": 0, "someday": 0, "all": 1})
 		goals.close(g, "Dropped", "not now")
@@ -180,23 +178,23 @@ class TestGoals(LifeTestCase):
 
 	def test_add_to_cycle_keeps_tasks(self):
 		cycle = frappe.get_doc({"doctype": "Life Cycle", "space": PRIVATE, "title": "ux3 cycle", "start_date": add_days(today(), -7), "status": "Active"}).insert()
-		g = goals.create("ux3 moving", "Open", space=PRIVATE)["name"]
+		g = goals.create("ux3 moving", "Long term", space=PRIVATE)["name"]
 		t = self.make("Life Task", title="ux3 moving task", goal=g)
 		self.assertNotIn(g, [x["name"] for x in journal.goals(space=PRIVATE)["cycles"][0]["goals"]] if journal.goals(space=PRIVATE)["cycles"] else [])
 		goals.add_to_cycle(g, cycle.name)
-		self.assertEqual(frappe.db.get_value("Life Goal", g, ["goal_type", "cycle", "carried_from"]), ("12 Week Year", cycle.name, None))
+		self.assertEqual(frappe.db.get_value("Life Goal", g, ["horizon", "cycle", "carried_from"]), ("12 weeks", cycle.name, None))
 		self.assertEqual(frappe.db.get_value("Life Task", t.name, "goal"), g)
 		from lifeos import journal as rules
 		self.assertIn(g, [x["name"] for x in rules.grid(cycle.name)["goals"]])
 
 	def test_agents_cannot_create_or_close(self):
-		g = goals.create("ux3 agent goal", "Open", space=PRIVATE)["name"]
+		g = goals.create("ux3 agent goal", "Long term", space=PRIVATE)["name"]
 		self.as_user(AGENT)
-		self.assertRaises(frappe.PermissionError, goals.create, "ux3 by agent", "Open", space=PRIVATE)
+		self.assertRaises(frappe.PermissionError, goals.create, "ux3 by agent", "Long term", space=PRIVATE)
 		self.assertRaises(frappe.PermissionError, goals.close, g, "Achieved")
 
 	def test_other_space_member_sees_no_goals_or_counts(self):
-		g = goals.create("ux3 private goal", "Open", space=PRIVATE)["name"]
+		g = goals.create("ux3 private goal", "Long term", space=PRIVATE)["name"]
 		self.make("Life Task", title="ux3 private goal task", goal=g)
 		self.as_user(FAMILY)
 		self.assertRaises(frappe.PermissionError, goals.list, space=PRIVATE)

@@ -43,12 +43,11 @@ class TestTasks(LifeTestCase):
 		self.assertRaises(frappe.PermissionError, tasks.quick_add, "Sneak", space=PRIVATE)
 
 	def test_list_filters_and_order(self):
-		tag = self.make("Life Tag", tag_name="m4tag")
 		goal_cycle = self.make("Life Cycle", title="M4 cycle", start_date=today())
 		goal = self.make("Life Goal", cycle=goal_cycle.name, title="M4 goal")
-		open_goal = self.make("Life Goal", title="M4 open goal", goal_type="Open", area=self.areas["Tea"])
+		open_goal = self.make("Life Goal", title="M4 open goal", horizon="Long term", area=self.areas["Tea"])
 		a = self.make("Life Task", title="A later IV", due_date=add_days(today(), 9), priority="IV", area=self.areas["Tea"], goal=open_goal.name)
-		b = self.make("Life Task", title="B today II", due_date=today(), priority="II", area=self.areas["Tea"], tags=[{"tag": tag.name}])
+		b = self.make("Life Task", title="B today II", due_date=today(), priority="II", area=self.areas["Tea"])
 		c = self.make("Life Task", title="C today I", due_date=today(), priority="I", area=self.areas["Money"], also_in=[{"area": self.areas["Tea"]}], goal=goal.name)
 		d = self.make("Life Task", title="D no date", area=self.areas["Personal"])
 		done = self.make("Life Task", title="E done", area=self.areas["Tea"], status="Done")
@@ -60,7 +59,6 @@ class TestTasks(LifeTestCase):
 		in_tea = {t["name"] for t in tasks.list(space=PRIVATE, area=self.areas["Tea"])["tasks"]}
 		self.assertTrue({a.name, b.name, c.name} <= in_tea and d.name not in in_tea)
 		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, goal=open_goal.name)["tasks"]], [a.name])
-		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, tag=tag.name)["tasks"]], [b.name])
 		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, goal=goal.name)["tasks"]], [c.name])
 		self.assertIn(c.name, [t["name"] for t in tasks.list(space=PRIVATE, priority="I")["tasks"]])
 		self.assertIn(done.name, [t["name"] for t in tasks.list(space=PRIVATE, status="done")["tasks"]])
@@ -86,8 +84,7 @@ class TestTasks(LifeTestCase):
 		ny, nm = (now.year + 1, 1) if now.month == 12 else (now.year, now.month + 1)
 		self.assertEqual((old.status, new.status, new.carried_from, new.title, new.priority), ("Carried", "Open", old.name, old.title, "I"))
 		self.assertEqual(new.month_plan, f"{PRIVATE}-{ny}-{nm:02d}")
-		plan = frappe.get_doc("Life Month Plan", new.month_plan)
-		self.assertIn(new.name, [g.task for g in plan.goals])
+		self.assertTrue(frappe.db.exists("Life Month Plan", new.month_plan))
 		self.assertRaises(frappe.ValidationError, tasks.carry_forward, t.name)  # already carried
 
 	def test_open_loops(self):
@@ -175,8 +172,8 @@ class TestAreasGoalsTimeline(LifeTestCase):
 	def test_area_tree_counts_with_sub_areas(self):
 		tea = self.life["Career"]  # issue 11: an area of life with its parts
 		sub = self.make("Life Area", area_name="Ghatia m4", parent_area=tea)
-		goal = self.make("Life Goal", title="Mandir m4", goal_type="Open", area=sub.name)
-		self.make("Life Goal", title="Mandir m4 done", goal_type="Open", area=tea, outcome="Achieved")
+		goal = self.make("Life Goal", title="Mandir m4", horizon="Long term", area=sub.name)
+		self.make("Life Goal", title="Mandir m4 done", horizon="Long term", area=tea, outcome="Achieved")
 		self.make("Life Task", title="Area task m4", area=tea, goal=goal.name)
 		self.make("Life Task", title="Sub-area task m4", area=sub.name)
 		self.make("Life Note", title="Reference note m4", area=sub.name)
@@ -194,11 +191,11 @@ class TestAreasGoalsTimeline(LifeTestCase):
 		self.assertRaises(frappe.PermissionError, area_api.tree, space=PRIVATE)
 
 	def test_open_goals_list_and_page(self):
-		goal = self.make("Life Goal", title="Turnaround m4", goal_type="Open", area=self.areas["Tea"], done_when="A plan")
+		goal = self.make("Life Goal", title="Turnaround m4", horizon="Long term", area=self.areas["Tea"], done_when="A plan")
 		t1 = self.make("Life Task", title="P task 1", area=self.areas["Tea"], goal=goal.name)
 		self.make("Life Task", title="P task 2", area=self.areas["Tea"], goal=goal.name, status="Done")
 		self.make("Life Note", title="P note", area=self.areas["Tea"], goal=goal.name)
-		card = next(g for g in goal_api.list(space=PRIVATE, goal_type="Open")["goals"] if g["name"] == goal.name)
+		card = next(g for g in goal_api.list(space=PRIVATE, horizon="Long term")["goals"] if g["name"] == goal.name)
 		self.assertEqual((card["tasks_counted"], card["tasks_done"], card["area_name"], card["done_when"]), (2, 1, "Tea", "A plan"))
 		page = goal_api.get(goal.name)
 		self.assertEqual((page["goal"]["status"], page["goal"]["done_when"]), ("Active", "A plan"))

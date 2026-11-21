@@ -46,7 +46,7 @@ def mark_of(gp, g):
 def progress_of(g):
 	"""Number goals: current of target; milestone goals: tasks done of total."""
 	full = frappe.db.get_value("Life Goal", g.name, ["measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on",
-		"done_when", "goal_type"], as_dict=True)
+		"done_when", "horizon"], as_dict=True)
 	if full.measure_kind == "Number":
 		s = readings.summary(full)
 		cur = f"{s['current']:,g}" if s.get("current") is not None else "—"

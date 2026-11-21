@@ -1,4 +1,4 @@
-"""The Settings screen: spaces and members, areas, tags, dimensions, habits, review time, archive days."""
+"""The Settings screen: spaces and members, areas, dimensions, habits, review time, archive days."""
 import frappe
 from frappe import _
 
@@ -9,13 +9,13 @@ SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "s
 	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
 	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
 	# UX fixes, set 6: Rhythms
-	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week",
+	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week", "planning_period",
 	# set 7: working hours, for the weekly review's goal work
 	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days", "own_domains")
 TIME_FIELDS = ("weekly_review_time", "start_of_day", "work_start", "work_end")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 LISTS = {
-	"area": ("Life Area", "area_name"), "tag": ("Life Tag", "tag_name"), "dimension": ("Life Dimension", "dimension_name"),
+	"area": ("Life Area", "area_name"), "dimension": ("Life Dimension", "dimension_name"),
 	"habit": ("Life Habit", "title"), "person": ("Life Person", "full_name"),
 }
 
@@ -27,7 +27,7 @@ def _admin_only():
 
 
 def _counts(kind, space, names):
-	"""The quiet count beside each row: areas, active records filed there; tags, tagged records; habits, months that
+	"""The quiet count beside each row: areas, active records filed there; habits, months that
 	track it; dimensions, check-ins that scored it."""
 	if not names:
 		return {}
@@ -40,9 +40,6 @@ def _counts(kind, space, names):
 			out[n] = frappe.db.sql(f"""select count(*) from `tabLife Index` where space=%(space)s and is_archived=0
 				and (area=%(area)s or {also_in_sql('area')}){permissions.vault_guard(space)}""", {"space": space, "area": n})[0][0]
 		return out
-	if kind == "tag":
-		return dict(frappe.db.sql("""select tag, count(distinct parenttype, parent) from `tabLife Tag Link`
-			where tag in %s group by tag""", (names,)))
 	if kind == "habit":
 		return dict(frappe.db.sql("""select habit, count(distinct parent) from `tabLife Month Plan Habit`
 			where habit in %s group by habit""", (names,)))
@@ -107,7 +104,7 @@ def _last_filed(users):
 
 
 def _agents(spaces):
-	"""One card per agent for Settings > People and agents > Agents: every agent account, its access in each space (None
+	"""One card per agent for Settings > Members > Agents: every agent account, its access in each space (None
 	where it is not a member; read from the same member rows as Members), whether agents may open that space's sensitive
 	items, and when it last filed something."""
 	reach = {}
@@ -153,7 +150,6 @@ def get(space: str | None = None):
 	for kind, (doctype, field, key, extra, order) in {
 		"area": ("Life Area", "area_name", "areas", ["parent_area", "sort_order", "colour", "is_pinned", "is_life_area", "is_on", "description"],
 			"sort_order, area_name"),
-		"tag": ("Life Tag", "tag_name", "tags", [], "tag_name"),
 		"habit": ("Life Habit", "title", "habits", [], "title"),
 		"dimension": ("Life Dimension", "dimension_name", "dimensions", ["sort_order"], "sort_order, dimension_name"),
 	}.items():
@@ -209,7 +205,7 @@ BACKUP_KEYS = ("backup_frequency", "backup_with_files", "backup_path", "encrypt_
 
 
 def backups():
-	"""What is backed up and when, read from the site's configuration (Settings > Data > Backups). Never a secret: only the
+	"""What is backed up and when, read from the site's configuration (Settings > Advanced > Backups). Never a secret: only the
 	keys above, whether S3 backups are switched on, and the dates and sizes of the latest backup files on this server."""
 	conf = frappe.get_site_config() or {}
 	keys = {k: conf.get(k) for k in BACKUP_KEYS if conf.get(k) not in (None, "")}
@@ -230,7 +226,7 @@ def backups():
 
 
 def ai_settings():
-	"""Settings, Assistant, Ask and AI: whether a key is set (never the key), the models, the cap, the prices, and this month's spend by
+	"""Settings, Advanced, AI key and cost: whether a key is set (never the key), the models, the cap, the prices, and this month's spend by
 	purpose and by user."""
 	from lifeos.ai import client
 
@@ -348,7 +344,7 @@ def save(values: str | dict):
 	return {"saved": True}
 
 
-ARCHIVABLE = ("area", "tag", "habit", "dimension")
+ARCHIVABLE = ("area", "habit", "dimension")
 
 
 @frappe.whitelist(methods=["POST"])
@@ -356,7 +352,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 		relation: str | None = None, sort_order: int | None = None, is_archived: bool | int | None = None, delete: bool | int = 0,
 		with_children: bool | int = 1, colour: str | None = None, is_pinned: bool | int | None = None, is_on: bool | int | None = None,
 		description: str | None = None, move_to: str | None = None):
-	"""Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person.
+	"""Add, rename, reorder, nest, archive or restore one area, dimension or habit of a space, or a person.
 	Archiving sets archived_on to today; records filed under the heading are not changed. Archiving an area archives its
 	parts with it. Restoring an area puts it back under its old area of life, and with_children=1 restores the parts
 	archived on the same day with it.

@@ -198,8 +198,8 @@ class TestLinkQuery(LifeTestCase):
 	def test_goals_leave_out_achieved_and_dropped(self):
 		# set 6: the project picker became the goal picker; open-ended goals that are finished leave it
 		area = self.areas["Tea"]
-		live = self.make("Life Goal", title="ux4 live goal", goal_type="Open", area=area)
-		done = self.make("Life Goal", title="ux4 done goal", goal_type="Open", area=area, outcome="Achieved")
+		live = self.make("Life Goal", title="ux4 live goal", horizon="Long term", area=area)
+		done = self.make("Life Goal", title="ux4 done goal", horizon="Long term", area=area, outcome="Achieved")
 		names = [r[0] for r in queries.link_query("Life Goal", "ux4", "title", 0, 20, {"space": PRIVATE})]
 		self.assertIn(live.name, names)
 		self.assertNotIn(done.name, names)

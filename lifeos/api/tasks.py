@@ -20,20 +20,13 @@ OPEN_LOOP_DAYS = 14
 
 
 def decorate(rows):
-	"""Add the names a list row shows: area, goal, tags."""
+	"""Add the names a list row shows: area, goal, source."""
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows], "title")
 	sources = names_map("Life Inbox Item", [r.inbox_item for r in rows], "title")
-	tags = {}
-	if rows:
-		for parent, tag in frappe.db.sql(
-			"select l.parent, g.tag_name from `tabLife Tag Link` l join `tabLife Tag` g on g.name = l.tag where l.parenttype='Life Task' and l.parent in %s",
-			([r.name for r in rows],)):
-			tags.setdefault(parent, []).append(tag)
 	for r in rows:
 		r["area_name"], r["goal_title"] = areas.get(r.area), goals.get(r.goal)
 		r["source_title"] = sources.get(r.inbox_item)
-		r["tags"] = tags.get(r.name, [])
 		for k in ("due_date", "creation", "completed_on", "last_touched_on"):
 			r[k] = str(r[k])[:19] if r.get(k) else None
 	return rows
@@ -75,7 +68,7 @@ TABS = {
 }
 
 
-def where_clause(space, status="open_doing", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None,
+def where_clause(space, status="open_doing", area=None, project=None, priority=None, goal=None, month_plan=None,
 		include_archived=0, due=None, done=0, loops=0, completed_from=None, completed_to=None):
 	"""The WHERE of a task list. Every count in the app that leads to a task list is made with this, so the two agree.
 	The default status, open_doing, is what the Open tab of the Tasks screen shows; "open" also holds Waiting tasks."""
@@ -102,9 +95,6 @@ def where_clause(space, status="open_doing", area=None, project=None, tag=None, 
 		where.append(off[len(" and "):])
 	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
 		goal = project if project == "none" else (goal_for_project(project, space) or project)
-	if tag:
-		where.append("exists (select 1 from `tabLife Tag Link` tl where tl.parent = t.name and tl.parenttype='Life Task' and tl.tag = %(tag)s)")
-		values["tag"] = tag
 	if priority:
 		where.append("ifnull(t.priority, '') = %(priority)s")
 		values["priority"] = "" if priority == "none" else priority
@@ -139,10 +129,10 @@ def count(space, **filters):
 	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 
 
-def list_clause(space, status="open", area=None, project=None, tag=None, priority=None, goal=None, month_plan=None, include_archived=0,
+def list_clause(space, status="open", area=None, project=None, priority=None, goal=None, month_plan=None, include_archived=0,
 		due=None, done=0, loops=0, completed_from=None, completed_to=None, filters=None):
 	"""The WHERE of `list`, its values, and the part that came from `filters`."""
-	clause, values = where_clause(space, status, area, project, tag, priority, goal, month_plan, include_archived, due, done, loops,
+	clause, values = where_clause(space, status, area, project, priority, goal, month_plan, include_archived, due, done, loops,
 		completed_from, completed_to)
 	extra, values = std_clause("Life Task", filters, "t", values)
 	return clause + extra, values, extra
@@ -159,7 +149,7 @@ def total(space, status="open", due=None, filters=None, area=None):
 
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, status: str | None = "open", area: str | None = None, project: str | None = None,
-		tag: str | None = None, priority: str | None = None, goal: str | None = None, month_plan: str | None = None,
+		priority: str | None = None, goal: str | None = None, month_plan: str | None = None,
 		include_archived: bool | int = 0, start: int | str | None = 0, page_length: int | str | None = 50, due: str | None = None,
 		done: bool | int = 0, loops: bool | int = 0, completed_from: str | date | None = None, completed_to: str | date | None = None,
 		sort: str | None = None, dir: str | None = None, filters: str | builtins.list | dict | None = None, order_by: str | None = None,
@@ -174,10 +164,10 @@ def list(space: str | None = None, status: str | None = "open", area: str | None
 	under the same filters, whatever status was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	clause, values, extra = list_clause(space, status, area, project, tag, priority, goal, month_plan, include_archived, due, done,
+	clause, values, extra = list_clause(space, status, area, project, priority, goal, month_plan, include_archived, due, done,
 		loops, completed_from, completed_to, filters)
 	# the tab counts: the same filters without the status and the open-loops switch, which are what a tab stands for
-	t_clause, t_values = where_clause(space, "any", area, project, tag, priority, goal, month_plan, include_archived, due, 0, 0,
+	t_clause, t_values = where_clause(space, "any", area, project, priority, goal, month_plan, include_archived, due, 0, 0,
 		completed_from, completed_to)
 	t_values = {**t_values, **values, "space": space, "cutoff": add_days(today(), -OPEN_LOOP_DAYS)}
 	tabs = tab_counts(f"from `tabLife Task` t where t.space=%(space)s {t_clause}{extra}", t_values, TABS)
@@ -378,7 +368,7 @@ def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | 
 		frappe.throw(_("That area is not in this space."))
 	area = area or next((d.area for d in docs if d.area), None)
 	title = (title or "").strip() or goal_suggest.title_for([d.title for d in docs], space)
-	goal = goals.create(title=title, goal_type="Open", space=space, area=area)
+	goal = goals.create(title=title, horizon="Long term", space=space, area=area)
 	for d in docs:
 		d.goal = goal["name"]
 		d.save()
@@ -387,11 +377,10 @@ def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | 
 
 @frappe.whitelist(methods=["GET"])
 def get(task: str):
-	"""One task with its filing, source and tags."""
+	"""One task with its filing and source."""
 	doc = permissions.get_doc_checked("Life Task", task)
 	row = decorate([frappe._dict({f: doc.get(f) for f in FIELDS})])[0]
 	row["also_in"] = [r.area for r in doc.also_in]
-	row["tag_ids"] = [r.tag for r in doc.tags]
 	row["space"] = doc.space
 	from lifeos import links
 
@@ -444,8 +433,6 @@ def update(task: str, values: str | dict):
 	for k, v in values.items():
 		if k == "also_in":
 			doc.set("also_in", [{"area": a} for a in v or []])
-		elif k == "tag_ids":
-			doc.set("tags", [{"tag": t} for t in v or []])
 		elif k in allowed:
 			doc.set(k, v or None)
 		else:

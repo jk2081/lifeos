@@ -52,7 +52,7 @@ class TestLadder(LifeTestCase):
 		self.assertEqual(self.level()["level"], 2)
 		self.areas_on(3)
 		self.assertEqual(self.level()["level"], 2)  # three areas but no goal yet
-		self.mk("Life Goal", title="i26 goal", goal_type="Annual", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
+		self.mk("Life Goal", title="i26 goal", horizon="Year", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
 		self.assertEqual(self.level()["level"], 3)
 		self.mk("Life Review", user=ANYA, kind="Weekly", status="Locked", title="i26 review", period_start="2026-11-09", period_end="2026-11-15")
 		self.assertEqual(self.level()["level"], 4)
@@ -80,7 +80,7 @@ class TestLadder(LifeTestCase):
 		self.assertEqual(self.level()["level"], 1)
 		self.mk("Life Inbox Item", title="i26 mail", source_type="Email", source_system="gmail")
 		self.areas_on(3)
-		self.mk("Life Goal", title="i26 goal", goal_type="Annual", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
+		self.mk("Life Goal", title="i26 goal", horizon="Year", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
 		nxt = self.level()["next"]
 		self.assertEqual(nxt["to"], "/review")
 		self.assertIn("a weekly review · 30 minutes on Sunday. Review joins the menu after your first one.", nxt["text"])

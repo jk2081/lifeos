@@ -11,7 +11,7 @@
         <Card flush>
           <Row v-for="p in goals" :key="p.name" class="!items-center" :pane="'goal:' + p.name" :label="p.title">
             <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ p.title }}</div>
-              <div class="text-sm text-ink-gray-6">{{ [p.area_name, p.goal_type + ' goal', p.status, p.archived_on && 'archived ' + short(p.archived_on, true)].filter(Boolean).join(' · ') }}</div></div>
+              <div class="text-sm text-ink-gray-6">{{ [p.area_name, p.horizon + ' goal', p.status, p.archived_on && 'archived ' + short(p.archived_on, true)].filter(Boolean).join(' · ') }}</div></div>
             <Button v-if="canWrite()" class="relative" label="Restore with its records" @click="restore('Life Goal', p.name)" />
           </Row>
         </Card>
@@ -67,7 +67,7 @@ const TABS = { key: 'type', field: 'ref_doctype', label: 'Record type', items: [
   { value: 'Life Chat Log', label: 'Chats' }, { value: 'Life Vault Document', label: 'Documents' }, { value: 'Life Inbox Item', label: 'Inbox items' }, { value: 'Life Journal Page', label: 'Journal pages' },
   // Trash (UX fixes, set 5): records deleted in the last 30 days, with Restore; a daily job removes older ones for good
   { value: 'trash', label: 'Trash' }] }
-const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'tags_csv', 'is_archived', 'record_owner', 'status']
+const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'is_archived', 'record_owner', 'status']
 const SYNTHETIC = [{ key: '_archived', label: 'Archived', width: 'minmax(0, 1.4fr)', place: 'end' }, { key: '_restore', label: '', width: '6rem', align: 'right', place: 'end' }]
 const route = useRoute()
 const list = ref(null)

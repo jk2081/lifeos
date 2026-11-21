@@ -9,7 +9,7 @@ LIMIT = 100
 # records that keep the item they came from in their own `inbox_item` field, besides those named by accepted proposals
 BACKREF = ("Life Task", "Life Note", "Life Important Date", "Life Journal Page", "Life Vault Document")
 KIND_OF = {"Life Task": "Task", "Life Note": "Note", "Life Important Date": "Date", "Life Journal Page": "Journal page",
-	"Life Vault Document": "Document", "Event": "Event", "Life Goal": "Goal", "Life Idea": "Idea", "Life Habit Log": "Habit",
+	"Life Vault Document": "Document", "Event": "Event", "Life Goal": "Goal", "Life Habit Log": "Habit",
 	"Life Check-in": "Check-in", "Life Action Log": "Week tick", "Life Month Plan": "Month goal"}
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
 
@@ -45,8 +45,6 @@ def _state(doctype, name):
 		return "Journal page", str(frappe.db.get_value(doctype, name, "page_date") or "")
 	if doctype == permissions.VAULT:
 		return "In the Vault", str(frappe.db.get_value(doctype, name, "expiry_date") or "")
-	if doctype == "Life Idea":
-		return frappe.db.get_value(doctype, name, "status") or "Someday", ""
 	return "Made", ""
 
 

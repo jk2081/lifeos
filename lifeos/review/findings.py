@@ -153,9 +153,9 @@ def act(name, index, extra=None):
 	elif kind in ("make_goal", "someday"):
 		from lifeos.api import someday
 
-		idea = someday.create_idea(title=(a.get("title") or doc.title)[:140], space=doc.space, body_md=doc.title, area=doc.area)
-		out["idea"] = idea.get("name") if isinstance(idea, dict) else idea
-		doc.acted_note = "parked as an idea" if kind == "someday" else "kept as an idea to make a goal from"
+		parked = someday.create(title=(a.get("title") or doc.title)[:140], space=doc.space, body_md=doc.title, area=doc.area)
+		out["parked"] = parked.get("name")
+		doc.acted_note = "parked in Someday" if kind == "someday" else "parked in Someday to make a goal from"
 	elif kind == "open_meetings":
 		out["events"] = a.get("events") or []
 		return out  # going through the meetings is not acting on it

@@ -62,7 +62,7 @@ class ReviewCase(OldCase):
 	def cycle_goal(self, title):
 		cycle = frappe.db.get_value("Life Cycle", {"space": PRIVATE, "status": "Active"}) or self.make("Life Cycle", title="s8 cycle",
 			start_date=add_days(today(), -14), end_date=add_days(today(), 69), status="Active").name
-		return self.make("Life Goal", title=title, goal_type="12 Week Year", cycle=cycle)
+		return self.make("Life Goal", title=title, horizon="12 weeks", cycle=cycle)
 
 	def ref(self, name, dt="Life Task"):
 		return f"{dt}:{name}"

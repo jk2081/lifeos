@@ -28,7 +28,7 @@ class TestRuleInsights(LifeTestCase):
 		# a cycle in week 5 with a goal that has had no ticks and no tasks
 		start = journal.monday_of(add_days(today(), -28)) if hasattr(journal, "monday_of") else add_days(today(), -28 - getdate(today()).weekday())
 		cyc = self.make("Life Cycle", title="ux5 cycle", start_date=start, status="Active")
-		self.make("Life Goal", cycle=cyc.name, title="ux5 quiet goal", goal_type="12 Week Year", area=self.areas["Tea"],
+		self.make("Life Goal", cycle=cyc.name, title="ux5 quiet goal", horizon="12 weeks", area=self.areas["Tea"],
 			actions=[{"title": "ux5 action", "per_week": 1}])
 		# a habit done every day last month and never this month
 		h = self.make("Life Habit", title="ux5 Workout")
@@ -86,7 +86,7 @@ class TestRuleInsights(LifeTestCase):
 
 	def test_at_most_twelve_new_a_day(self):
 		for i in range(15):
-			p = self.make("Life Goal", title=f"ux5 idle {i}", goal_type="Open", area=self.areas["Tea"])
+			p = self.make("Life Goal", title=f"ux5 idle {i}", horizon="Long term", area=self.areas["Tea"])
 			frappe.db.set_value("Life Goal", p.name, "last_activity_on", add_days(today(), -100))
 		stats = insights.run(PRIVATE, ai=False)
 		self.assertEqual(stats["created"], 12)

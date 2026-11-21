@@ -41,5 +41,4 @@ def tree(space: str | None = None, include_archived: bool | int = 0, include_off
 		a["goals"] = sum(direct_goals.get(i, 0) for i in ids)
 		a["notes"] = sum(direct_notes.get(i, 0) for i in ids)
 	return {"space": space, "areas": areas,
-		"tags": frappe.get_all("Life Tag", filters={"space": space, "is_archived": 0}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
 		"unfiled_tasks": task_api.count(space, area="none")}

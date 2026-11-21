@@ -181,11 +181,11 @@ ASSISTANTS = ("Claude", "ChatGPT", "Codex", "Claude Code", "Other")
 
 @frappe.whitelist(methods=["POST"])
 def log(space: str | None = None, title: str | None = None, date: str | datetime.date | None = None, url: str | None = None, assistant: str | None = "Claude",
-		summary_md: str | None = None, open_items: str | builtins.list | None = None, area: str | None = None, goal: str | None = None, tags: str | builtins.list | None = None,
+		summary_md: str | None = None, open_items: str | builtins.list | None = None, area: str | None = None, goal: str | None = None,
 		also_in: str | builtins.list | None = None, source_system: str | None = None, external_id: str | None = None, transcript_md: str | None = None,
 		updated_on: str | datetime.datetime | None = None, project: str | None = None):
 	"""Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal.
-	open_items is a list of strings. area, goal and tags take a name or a title; `project` names the goal a project became.
+	open_items is a list of strings. area and goal take a name or a title; `project` names the goal a project became.
 
 	With source_system (claude, chatgpt…) and external_id (the chat's ID there), a chat already logged is updated instead of
 	logged twice: title, updated_on, url, summary and transcript change when given, and open items are merged by their text
@@ -248,8 +248,6 @@ def log(space: str | None = None, title: str | None = None, date: str | datetime
 			doc.goal = conn.default_goal
 		for a in parse(also_in, []) or []:
 			doc.append("also_in", {"area": proposals.resolve_link("Life Area", a, space)})
-		for t in parse(tags, []) or []:
-			doc.append("tags", {"tag": proposals.resolve_link("Life Tag", t, space)})  # existing tags only
 	except proposals.PayloadError as e:
 		frappe.throw(str(e))
 	doc.insert()

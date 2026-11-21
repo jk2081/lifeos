@@ -1,5 +1,5 @@
-"""Goals of every type: 12 Week Year goals (in a cycle, with weekly actions), Annual goals (with a target date) and
-Open goals. One list across types with the share of their tasks that is done."""
+"""Goals of every horizon: Long term, Year, 12 weeks (in a cycle, with weekly actions) and Month. One list across
+horizons with the share of their tasks that is done."""
 import builtins
 
 import frappe
@@ -8,13 +8,14 @@ from frappe.utils import getdate
 
 from lifeos import journal as rules
 from lifeos import permissions, readings
+from lifeos.life.doctype.life_goal.life_goal import HORIZONS, derive_horizon, planning_in_quarters
 from lifeos.areas import off as areas_off
 from lifeos.areas import off_clause
 from lifeos.api.utils import area_filter, names_map, parse, page, std_clause, std_order, summarise, tab_counts
 from lifeos.proposals import goal_for_project
 from lifeos.api.utils import order_by as sort_order
 
-TYPES = ("12 Week Year", "Annual", "Open")
+TYPES = ("12 weeks", "Month", "Year", "Long term")  # the order lists show them in
 CLOSED = ("Partly Achieved", "Not Achieved", "Carried", "Dropped")
 OUTCOMES = ("In Progress", "Achieved", *CLOSED)
 # the state tabs of the Goals screen
@@ -23,7 +24,7 @@ TABS = {"in_progress": "g.outcome = 'In Progress' and g.is_someday = 0 and g.is_
 	"closed": "g.outcome in ('Partly Achieved', 'Not Achieved', 'Carried', 'Dropped')", "someday": "g.is_someday = 1", "all": "g.is_someday = 0"}
 COUNTED = ("Open", "Doing", "Waiting", "Done")
 SORTS = {"title": "g.title", "target_date": "g.target_date is null, g.target_date", "completion": "_completion",
-	"creation": "g.creation", "serves": "s.title is null, s.title, g.serves, g.goal_type, g.title"}
+	"creation": "g.creation", "serves": "s.title is null, s.title, g.serves, g.horizon, g.title"}
 
 
 def task_counts(goals):
@@ -50,15 +51,15 @@ def with_tasks(rows, key="name"):
 	return rows
 
 
-def where_clause(space, state=None, goal_type=None, area=None, cycle=None, target_from=None, target_to=None, serves=None):
+def where_clause(space, state=None, horizon=None, area=None, cycle=None, target_from=None, target_to=None, serves=None):
 	where, values = [], {}
 	if state:
 		if state not in TABS:
 			frappe.throw(_("Unknown state."))
 		where.append(TABS[state])
-	if goal_type:
-		where.append("g.goal_type = %(goal_type)s")
-		values["goal_type"] = goal_type
+	if horizon:
+		where.append("g.horizon = %(horizon)s")
+		values["horizon"] = horizon
 	if area:
 		where.append(area_filter(space, area, "g.area", values))
 	off = off_clause(space, "g.area", values)  # goals of an area that is off are hidden (issue 11)
@@ -80,7 +81,7 @@ def where_clause(space, state=None, goal_type=None, area=None, cycle=None, targe
 
 
 @frappe.whitelist(methods=["GET"])
-def list(space: str | None = None, state: str | None = "in_progress", goal_type: str | None = None, area: str | None = None,
+def list(space: str | None = None, state: str | None = "in_progress", horizon: str | None = None, area: str | None = None,
 		cycle: str | None = None, target_from: str | None = None, target_to: str | None = None, sort: str | None = None, dir: str | None = None, start: int = 0, page_length: int = 50,
 		filters: str | builtins.list | None = None, order_by: str | None = None, summary: str | dict | None = None, serves: str | None = None):
 	"""Goals of a space of every type. state: in_progress (default), achieved, closed (Partly Achieved, Not Achieved,
@@ -90,10 +91,10 @@ def list(space: str | None = None, state: str | None = "in_progress", goal_type:
 	goals of type Open (set 6): each row also has on_hold, done_when, serves and its title, and last_activity_on."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = where_clause(space, state, goal_type, area, cycle, target_from, target_to, serves)
+	where, values = where_clause(space, state, horizon, area, cycle, target_from, target_to, serves)
 	extra, values = std_clause("Life Goal", filters, "g", values)
 	where += extra
-	t_where, t_values = where_clause(space, None, goal_type, area, cycle, target_from, target_to, serves)
+	t_where, t_values = where_clause(space, None, horizon, area, cycle, target_from, target_to, serves)
 	base = {"space": space}
 	tabs = tab_counts(f"from `tabLife Goal` g where g.space=%(space)s {t_where}{extra}", {**t_values, **values, **base}, TABS)
 	if summary:
@@ -106,9 +107,9 @@ def list(space: str | None = None, state: str | None = "in_progress", goal_type:
 	completion = (order_by or "").startswith("completion") or sort == "completion"
 	order = None if completion else std_order("Life Goal", order_by, "g")
 	if not order and not completion:
-		order = sort_order(sort, dir, {k: v for k, v in SORTS.items() if k != "completion"}, "field(g.goal_type, '12 Week Year', 'Annual', 'Open'), g.target_date is null, g.target_date, g.creation")
+		order = sort_order(sort, dir, {k: v for k, v in SORTS.items() if k != "completion"}, "field(g.horizon, '12 weeks', 'Month', 'Year', 'Long term'), g.target_date is null, g.target_date, g.creation")
 	# nosemgrep: frappe-sql-format-injection -- WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order
-	rows = frappe.db.sql(f"""select g.name, g.title, g.goal_type, g.area, g.serves, g.cycle, g.target_date, g.outcome, g.closed_on,
+	rows = frappe.db.sql(f"""select g.name, g.title, g.horizon, g.area, g.serves, g.cycle, g.target_date, g.outcome, g.closed_on,
 		g.result_note, g.final_score, g.on_hold, g.done_when, g.last_activity_on, g.is_archived, g.is_someday,
 		g.measure_kind, g.measure, g.unit, g.start_value, g.target_value, g.current_value, g.current_on,
 		a.area_name, c.title as cycle_title, c.status as cycle_status, s.title as serves_title
@@ -121,12 +122,12 @@ def list(space: str | None = None, state: str | None = "in_progress", goal_type:
 		desc = "desc" in (order_by or dir or "").lower()
 		rows.sort(key=lambda r: (r.tasks_done / r.tasks_counted) if r.tasks_counted else -1, reverse=desc)
 		rows = rows[start:start + page_length]
-	scores = _scores([r for r in rows if r.goal_type == "12 Week Year" and r.cycle])
+	scores = _scores([r for r in rows if r.horizon == "12 weeks" and r.cycle])
 	for r in rows:
 		r["target_date"] = str(r.target_date) if r.target_date else None
 		r["closed_on"] = str(r.closed_on) if r.closed_on else None
 		r["last_activity_on"] = str(r.last_activity_on) if r.last_activity_on else None
-		r["score"] = scores.get(r.name) if r.goal_type == "12 Week Year" else None
+		r["score"] = scores.get(r.name) if r.horizon == "12 weeks" else None
 		r["current_on"] = str(r.current_on) if r.current_on else None
 		r["progress"] = readings.summary(r)
 		r["reached"] = readings.reached(r)
@@ -180,7 +181,7 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 	values = {"space": space}
 	off = off_clause(space, "g.area", values)
 	# nosemgrep: frappe-sql-format-injection -- SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters
-	rows = frappe.db.sql(f"""select g.name, g.title, g.goal_type, g.area, g.serves, g.cycle, g.target_date, g.outcome, g.on_hold, g.done_when,
+	rows = frappe.db.sql(f"""select g.name, g.title, g.horizon, g.area, g.serves, g.cycle, g.target_date, g.outcome, g.on_hold, g.done_when,
 		g.measure_kind, g.measure, g.unit, g.start_value, g.target_value, g.current_value, g.current_on, g.sort_order,
 		c.title as cycle_title, c.start_date as cycle_start, s.title as serves_title
 		from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle left join `tabLife Goal` s on s.name = g.serves
@@ -188,11 +189,11 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 	names = [r.name for r in rows]
 	counts = task_counts(names)
 	nxt = _next_actions(space, names)
-	scores = _scores([r for r in rows if r.goal_type == "12 Week Year" and r.cycle])
+	scores = _scores([r for r in rows if r.horizon == "12 weeks" and r.cycle])
 	week_of = {c: rules.current_week(frappe.get_doc("Life Cycle", c)) for c in {r.cycle for r in rows if r.cycle}}
 	for r in rows:
 		r["tasks_done"], r["tasks_counted"] = counts.get(r.name, (0, 0))
-		is_cycle = r.goal_type == "12 Week Year" and r.cycle
+		is_cycle = r.horizon == "12 weeks" and r.cycle
 		r["score"] = scores.get(r.name) if is_cycle else None
 		r["week"] = week_of.get(r.cycle) if is_cycle else None
 		r["progress"] = readings.summary(r)
@@ -291,27 +292,36 @@ def _float(v):
 		frappe.throw(_("{0} is not a number.").format(v))
 
 
+@frappe.whitelist(methods=["GET"])
+def suggest_horizon(space: str | None = None, target_date: str | None = None, cycle: str | None = None):
+	"""The horizon the goal form sets from the target date (the owner may change it), and whether 12-week goals follow the
+	calendar quarter (Rhythms) instead of a cycle."""
+	space = permissions.resolve_space(space)
+	return {"horizon": derive_horizon(target_date, cycle, space), "quarters": planning_in_quarters()}
+
+
 @frappe.whitelist(methods=["POST"])
-def create(title: str, goal_type: str = "Open", space: str | None = None, area: str | None = None, project: str | None = None, target_date: str | None = None,
+def create(title: str, horizon: str | None = None, space: str | None = None, area: str | None = None, project: str | None = None, target_date: str | None = None,
 		cycle: str | None = None, serves: str | None = None, done_when: str | None = None, notes_md: str | None = None,
 		measure_kind: str | None = None, measure: str | None = None, unit: str | None = None, start_value: float | str | None = None,
 		target_value: float | str | None = None):
-	"""Create a goal. A 12 Week Year goal needs a cycle; an Annual goal needs a target date. `serves` is the longer goal it
+	"""Create a goal. Its horizon (Long term, Year, 12 weeks, Month) is worked out from the target date and the cycle when
+	not given. A 12-week goal needs a cycle (or, planning in quarters, a date in the quarter); a Year or Month goal needs a
+	target date. `serves` is the longer goal it
 	serves; `project` is read as the goal that project became, for one set (set 6). Key results (set 7): `measure_kind`
 	Milestone needs `done_when`; Number needs `measure`, `start_value` and `target_value` (with `unit`)."""
 	_person_only()
-	if goal_type not in TYPES:
-		frappe.throw(_("Unknown goal type."))
-	if goal_type == "12 Week Year":
-		if not cycle:
-			frappe.throw(_("Choose the cycle of this 12 Week Year goal."))
+	if cycle:
 		c = permissions.get_doc_checked("Life Cycle", cycle, "write")
 		space = c.space
 	space = permissions.resolve_space(space, write=True)
+	horizon = horizon or derive_horizon(target_date, cycle, space)
+	if horizon not in HORIZONS:
+		frappe.throw(_("Unknown horizon."))
 	last = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s", space)[0][0]
-	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": (title or "").strip(), "goal_type": goal_type, "area": area or None,
+	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": (title or "").strip(), "horizon": horizon, "area": area or None,
 		"serves": serves or (project and goal_for_project(project, space)) or None, "done_when": done_when or None, "notes_md": notes_md or None,
-		"target_date": target_date or None, "cycle": cycle if goal_type == "12 Week Year" else None, "sort_order": last + 1,
+		"target_date": target_date or None, "cycle": cycle if horizon == "12 weeks" else None, "sort_order": last + 1,
 		**measure_values(measure_kind, done_when, measure, unit, start_value, target_value)})
 	doc.insert()
 	return {"name": doc.name, "title": doc.title}
@@ -322,7 +332,7 @@ def close(goal: str, outcome: str, result_note: str | None = None):
 	"""Set the outcome of an Annual or Open goal, with an optional result note. 12 Week Year goals close with their cycle."""
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
-	if doc.goal_type == "12 Week Year":
+	if doc.horizon == "12 weeks":
 		frappe.throw(_("A 12 Week Year goal is closed with its cycle, through Close cycle."))
 	if outcome not in OUTCOMES:
 		frappe.throw(_("Unknown outcome."))
@@ -339,14 +349,14 @@ def add_to_cycle(goal: str, cycle: str):
 	and keeps its tasks. carried_from is left empty: it records carrying between cycles."""
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
-	if doc.goal_type == "12 Week Year":
+	if doc.horizon == "12 weeks":
 		frappe.throw(_("This goal is already in a 12 Week Year."))
 	c = permissions.get_doc_checked("Life Cycle", cycle, "write")
 	if c.space != doc.space:
 		frappe.throw(_("The cycle is in another space."))
 	if c.status not in ("Active", "Planned"):
 		frappe.throw(_("Choose the current or a planned cycle."))
-	doc.goal_type, doc.cycle, doc.target_date = "12 Week Year", c.name, doc.target_date
+	doc.horizon, doc.cycle, doc.target_date = "12 weeks", c.name, doc.target_date
 	doc.sort_order = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where cycle=%s", c.name)[0][0] + 1
 	doc.save()
 	return {"name": doc.name, "cycle": c.name}
@@ -359,10 +369,10 @@ def picker(space: str | None = None):
 	values = {"space": space}
 	off = off_clause(space, "g.area", values)  # not goals of an area that is off (issue 11)
 	# nosemgrep: frappe-sql-format-injection -- `off` is off_clause's fixed SQL; values are parameters
-	rows = frappe.db.sql(f"""select g.name, g.title, g.goal_type, g.area, c.title as cycle_title from `tabLife Goal` g
+	rows = frappe.db.sql(f"""select g.name, g.title, g.horizon, g.area, c.title as cycle_title from `tabLife Goal` g
 		left join `tabLife Cycle` c on c.name = g.cycle where g.space=%(space)s and g.outcome = 'In Progress'
-		and (g.goal_type != '12 Week Year' or c.status in ('Active', 'Planned')){off}
-		order by field(g.goal_type, '12 Week Year', 'Annual', 'Open'), g.sort_order, g.title""", values, as_dict=True)
+		and (g.horizon != '12 weeks' or c.status in ('Active', 'Planned')){off}
+		order by field(g.horizon, '12 weeks', 'Month', 'Year', 'Long term'), g.sort_order, g.title""", values, as_dict=True)
 	return rows
 
 
@@ -405,9 +415,9 @@ def get(goal: str):
 	g["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
 	g["serves_title"] = frappe.db.get_value("Life Goal", doc.serves, "title") if doc.serves else None
 	g["cycle_title"] = frappe.db.get_value("Life Cycle", doc.cycle, "title") if doc.cycle else None
-	served_by = frappe.get_all("Life Goal", filters={"serves": doc.name, "space": space}, fields=["name", "title", "goal_type", "outcome", "is_someday", "on_hold",
+	served_by = frappe.get_all("Life Goal", filters={"serves": doc.name, "space": space}, fields=["name", "title", "horizon", "outcome", "is_someday", "on_hold",
 		"cycle", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"], order_by="creation asc", limit=100)
-	served_by.sort(key=lambda r: TYPES.index(r.goal_type) if r.goal_type in TYPES else 9)
+	served_by.sort(key=lambda r: TYPES.index(r.horizon) if r.horizon in TYPES else 9)
 	cycles = names_map("Life Cycle", [r.cycle for r in served_by], "title")
 	for r in served_by:
 		r["status"] = status_of(r)
@@ -415,7 +425,7 @@ def get(goal: str):
 	with_progress(served_by)
 	serves = None
 	if doc.serves:  # always in the goal's own space (check_serves)
-		serves = frappe.db.get_value("Life Goal", doc.serves, ["name", "title", "goal_type", "cycle", "measure_kind", "measure", "unit", "start_value",
+		serves = frappe.db.get_value("Life Goal", doc.serves, ["name", "title", "horizon", "cycle", "measure_kind", "measure", "unit", "start_value",
 			"target_value", "current_value", "current_on"], as_dict=True)
 		with_progress([serves])
 	g["progress"] = with_progress([frappe._dict(doc.as_dict())])[0]["progress"]
@@ -428,14 +438,14 @@ def get(goal: str):
 
 def with_progress(rows):
 	"""Add `progress` to goal rows: a number goal's result against its target, a 12 Week Year goal's score, else the share
-	of its tasks done (readings.summary). Rows need name, goal_type, cycle and the measure fields."""
+	of its tasks done (readings.summary). Rows need name, horizon, cycle and the measure fields."""
 	if not rows:
 		return rows
 	with_tasks(rows)
-	scores = _scores([r for r in rows if r.get("goal_type") == "12 Week Year" and r.get("cycle")])
+	scores = _scores([r for r in rows if r.get("horizon") == "12 weeks" and r.get("cycle")])
 	for r in rows:
 		score = r.get("score") if r.get("score") is not None else scores.get(r["name"])
-		r["progress"] = readings.summary({**r, "score": score if r.get("goal_type") == "12 Week Year" else None})
+		r["progress"] = readings.summary({**r, "score": score if r.get("horizon") == "12 weeks" else None})
 	return rows
 
 
@@ -474,7 +484,7 @@ def set_status(goal: str, status: str):
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	if status not in STATUS:
 		frappe.throw(_("Unknown status."))
-	if doc.goal_type == "12 Week Year":
+	if doc.horizon == "12 weeks":
 		frappe.throw(_("A 12 Week Year goal is closed with its cycle, through Close cycle."))
 	outcome, on_hold = STATUS[status]
 	records = archive.goal_record_count(doc.name) if outcome != "In Progress" else 0
@@ -489,17 +499,20 @@ def set_status(goal: str, status: str):
 
 @frappe.whitelist(methods=["POST"])
 def update(goal: str, values: str | dict):
-	"""Change the fields of a goal a person edits: title, area, serves, done_when, notes_md, target_date, result_note, and its
+	"""Change the fields of a goal a person edits: title, area, serves, done_when, notes_md, target_date, horizon (Long term, Year or Month; a goal joins 12 weeks with
+	add_to_cycle), result_note, and its
 	key result (measure_kind, measure, unit, start_value, target_value). Changing the key result applies the rule of a new goal."""
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	values = frappe.parse_json(values) or {}
 	if not isinstance(values, dict):
 		frappe.throw(_("values must be an object of fields."))
-	allowed = {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note", *MEASURE_FIELDS}
+	allowed = {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note", "horizon", *MEASURE_FIELDS}
 	for k, v in values.items():
 		if k not in allowed:
 			frappe.throw(_("Field {0} cannot be changed here.").format(k))
+		if k == "horizon" and v not in ("Long term", "Year", "Month"):
+			frappe.throw(_("Choose Long term, Year or Month. A goal joins a 12 Week Year with Add to a 12 Week Year."))
 		doc.set(k, _float(v) if k in ("start_value", "target_value") else (v if v == 0 else v or None))
 	if "measure_kind" not in values and values.get("done_when") and not doc.measure_kind:
 		doc.measure_kind = "Milestone"
@@ -590,7 +603,7 @@ def reject_reading(reading: str):
 
 
 def _goal_now(goal, reading):
-	g = frappe.db.get_value("Life Goal", goal, ["name", "title", "goal_type", "measure_kind", "measure", "unit", "start_value", "target_value",
+	g = frappe.db.get_value("Life Goal", goal, ["name", "title", "horizon", "measure_kind", "measure", "unit", "start_value", "target_value",
 		"current_value", "current_on"], as_dict=True)
 	return {"reading": reading, "goal": goal, "current_value": g.current_value if g.current_on else None, "current_on": str(g.current_on) if g.current_on else None,
 		"progress": readings.summary(g), "reached": readings.reached(g)}

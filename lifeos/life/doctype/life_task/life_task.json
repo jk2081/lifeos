@@ -33,7 +33,6 @@
   "area_confidence",
   "standalone",
   "also_in",
-  "tags",
   "is_archived",
   "archived_on",
   "archive_reason",
@@ -216,12 +215,6 @@
    "fieldtype": "Table MultiSelect",
    "label": "Also In",
    "options": "Life Also In"
-  },
-  {
-   "fieldname": "tags",
-   "fieldtype": "Table MultiSelect",
-   "label": "Tags",
-   "options": "Life Tag Link"
   },
   {
    "fieldname": "is_archived",

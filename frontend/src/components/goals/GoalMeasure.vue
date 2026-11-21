@@ -5,7 +5,7 @@
         <ResultBar :progress="g.progress" />
         <div v-if="g.progress.reached && writable && g.outcome === 'In Progress'" class="flex flex-wrap items-center gap-2" data-goal-reached>
           <Badge theme="green" label="Target reached" />
-          <Button v-if="g.goal_type !== '12 Week Year'" variant="solid" label="Mark achieved" data-mark-achieved @click="markAchieved" />
+          <Button v-if="g.horizon !== '12 weeks'" variant="solid" label="Mark achieved" data-mark-achieved @click="markAchieved" />
           <span v-else class="text-sm text-ink-gray-6">It closes with its cycle.</span>
         </div>
         <ReadingChart v-if="readings.length > 1" :readings="readings" :start="g.start_value" :target="g.target_value" :unit="g.unit"

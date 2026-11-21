@@ -15,6 +15,7 @@
   "work_end",
   "own_domains",
   "month_plan_enabled",
+  "planning_period",
   "cycle_break_week",
   "archive_after_days",
   "stale_task_days",
@@ -108,6 +109,14 @@
    "fieldtype": "Check",
    "label": "Month plan",
    "description": "Plan each month; Today reminds you in its first three days."
+  },
+  {
+   "default": "12 Week Years",
+   "fieldname": "planning_period",
+   "fieldtype": "Select",
+   "label": "Plan in 12 Week Years or quarters",
+   "options": "12 Week Years\nQuarters",
+   "description": "A 12-week goal follows your 12 Week Year cycle, or the calendar quarter."
   },
   {
    "default": "1",

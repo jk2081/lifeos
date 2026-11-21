@@ -115,7 +115,7 @@ const VIEWS = [{ label: 'List', value: 'list' }, { label: 'Graph', value: 'graph
 
 const PAGE_SPEC = [{ key: 'area', field: 'area', kind: 'link', none: true }, { key: 'goal', field: 'goal', kind: 'link', none: true }]
 const PAGE_VIRTUAL = []
-const PAGE_HIDDEN = ['content_md', 'inbox_item', 'collection', 'is_rules', 'parent_note', 'sources', 'tags', 'also_in', 'archive_reason']
+const PAGE_HIDDEN = ['content_md', 'inbox_item', 'collection', 'is_rules', 'parent_note', 'sources', 'also_in', 'archive_reason']
 const PAGE_SYNTHETIC = [{ key: '_sources', label: 'Sources', width: '6rem', align: 'right', place: 'end' }, { key: '_updated', label: 'Updated', width: '8rem', place: 'end' }]
 async function fetchPages({ params: p, filters, order_by, summary, start, page_length }) {
   const res = await api('wiki.pages', { space: store.space, area: p.area, goal: p.goal, filters, order_by, summary, start, page_length })

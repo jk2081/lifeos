@@ -497,3 +497,16 @@ docker compose -f docker/docker-compose.yml down -v
 - **Works:** a person's decision that is not a skill's guess (another area, Drop, another kind) is kept against the skill and version (`Life Skill Correction`); three of the same make a proposed lesson written by the built-in skill `improve-skill`, shown as a diff with its corrections in Brain > Needs you ("Lessons") and on the skill page. Accept (tried on the skill's examples first, then a new version), Edit, Reject; on the skill page, accepted lessons can be removed (a new version without them). A lesson changes the skill's text only. Checks: `test_issue30_lessons` (16 tests), `I30.<width>.3`, `.4`, `.E`.
 - **Not tested against the real service:** improve-skill's answer and the examples run on Accept were only run with scripted and stand-in models.
 
+
+## Issue 60: one kind of goal with a horizon, one parking lot (Someday), no tags
+
+- **Works:** `Life Goal.horizon` (Long term, Year, 12 weeks, Month) set from the target date and cycle, with the Rhythms setting "Plan in 12 Week Years or quarters"; the month's goals are the Month-horizon goals dated in that month, in `sort_order` (Move up and down on the month plan); Someday is the one parking lot for tasks, goals and notes, and Reset, the review piles and the old Inbox park into it; no tags anywhere; the agent proposal kinds are one Goal (Month Goal accepted for one release).
+- **Tests:** `test_issue60_horizons_someday_no_tags` (unit) and `I60.4`, `I60.8`, `I60.9` in the acceptance walk.
+
+## Issue 44: Settings, simplified
+
+- **Works:** Settings is eight items in four groups (Me: Profile, Calendar; Your life: Areas, Rhythms, Habits; Brain: Sources, Rules; People and agents: Members) and Advanced at the foot for the Life Admin (AI key and cost, Import and export, Backups, Archive). Profile holds Look, Reminders and Where things are; Rhythms holds the weekly review with check-in dimensions and the Reset rules, working hours, the month and the 12 Week Year; Rules holds note rules and sensitive-item access; Members has the filters All, People, Agents and Spaces. Items appear by level on the ladder, with a footer line for what comes next; a Life Admin sees all. Every old `?tab=` lands on its new place. Checks `I44.<width>.1` to `.9`. See `DECISIONS.md`, Issue 44.
+
+## Issue 45: Goals > Cycles
+
+- **Works:** the fourth tab of Goals, `/goals/cycles`: the 12 Week Year (cycle picker, week bars with "so far", each goal's lead action and this week's ticks, tickable, the footer with the review, next cycle and break week, **Cycle goals** to edit) beside this month's plan (goals in order with area and status, habits, mind sweep and projects folded, **Edit**; hidden when the month plan is off in Rhythms). Closed cycles are read-only. Plan's month, year, 12 Weeks and journal routes redirect here; journal pages are a kind in Library > Notes. Checks `I45.<width>.1` to `.11` and `.E`, and `test_issue45_cycles`. See `DECISIONS.md`, Issue 45.

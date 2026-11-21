@@ -120,7 +120,7 @@ import { MONTHS, long, parse, short } from '@/lib/dates'
 
 const route = useRoute()
 const router = useRouter()
-const LINKS = [{ label: '12 Week grid', to: { path: '/today/year', query: { view: 'cycle' } } }, { label: 'Goals across cycles', to: { path: '/today/year', query: { view: 'goals' } } }]
+const LINKS = [{ label: '12 Week Year', to: '/goals/cycles' }, { label: 'Goals across cycles', to: { path: '/today/year', query: { view: 'goals' } } }]
 const thisYear = parse(store.today).getFullYear()
 const year = computed(() => Number(route.query.year) || thisYear)
 const d = ref(null)

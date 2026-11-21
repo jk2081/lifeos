@@ -10,7 +10,7 @@ from lifeos import outbox, permissions
 from lifeos.api.utils import area_filter, lens_area, names_map, page, std_clause
 
 TABS = ("Done", "Delegated", "Parked", "Discarded", "all", "in")
-LABEL = {"Life Task": "Task", "Life Goal": "Goal", "Life Inbox Item": "Capture", "Life Idea": "Idea"}
+LABEL = {"Life Task": "Task", "Life Goal": "Goal", "Life Inbox Item": "Capture"}
 
 
 def _person():
@@ -33,15 +33,13 @@ def _out_where(space, area, start, end, pile=None, filters=None):
 	return where, values
 
 
-# what came in: captures received, and tasks, goals and ideas created directly (not from a capture, not made from an idea,
-# not carried from an earlier task or goal)
+# what came in: captures received, and tasks and goals created directly (not from a capture, not carried
+# from an earlier task or goal)
 IN_PARTS = {
 	"Life Inbox Item": "select 'Life Inbox Item' as doctype, x.name, x.title, x.area, x.creation as came_on, x.is_sensitive from `tabLife Inbox Item` x where {w}",
 	"Life Task": """select 'Life Task', x.name, x.title, x.area, x.creation, 0 from `tabLife Task` x where {w} and ifnull(x.inbox_item, '') = ''
-		and ifnull(x.carried_from, '') = '' and not exists (select 1 from `tabLife Idea` i where i.brought_to_doctype = 'Life Task' and i.brought_to_name = x.name)""",
-	"Life Goal": """select 'Life Goal', x.name, x.title, x.area, x.creation, 0 from `tabLife Goal` x where {w} and ifnull(x.carried_from, '') = ''
-		and not exists (select 1 from `tabLife Idea` i where i.brought_to_doctype = 'Life Goal' and i.brought_to_name = x.name)""",
-	"Life Idea": "select 'Life Idea', x.name, x.title, x.area, x.creation, 0 from `tabLife Idea` x where {w} and ifnull(x.source_doctype, '') != 'Life Inbox Item'",
+		and ifnull(x.carried_from, '') = ''""",
+	"Life Goal": """select 'Life Goal', x.name, x.title, x.area, x.creation, 0 from `tabLife Goal` x where {w} and ifnull(x.carried_from, '') = ''""",
 }
 
 
@@ -118,7 +116,7 @@ def _decorate(rows):
 	for dt, names in by_type.items():
 		fields = ["name", "is_sensitive"] if dt == "Life Inbox Item" else ["name"]
 		if dt == "Life Goal":
-			fields += ["goal_type", "cycle"]
+			fields += ["horizon", "cycle"]
 		for x in frappe.get_all(dt, filters={"name": ("in", names)}, fields=fields):
 			live[(dt, x.name)] = x
 	trashed = {(d.deleted_doctype, d.deleted_name) for d in frappe.get_all("Deleted Document", filters={
@@ -139,10 +137,10 @@ def _can_bring_back(row, live, trashed, closed_cycles):
 	if row.doctype == "Life Task":
 		return True
 	if row.doctype == "Life Goal":
-		if live.get("goal_type") == "12 Week Year" and row.pile != "Parked":
+		if live.get("horizon") == "12 weeks" and row.pile != "Parked":
 			return live.get("cycle") not in closed_cycles
 		return True
-	return False  # a capture done or parked, an idea brought back: their result is elsewhere
+	return False  # a capture done or parked: their result is elsewhere
 
 
 @frappe.whitelist(methods=["POST"])
@@ -174,7 +172,7 @@ def bring_back(exit: str):
 		from lifeos.api import goals
 
 		doc = permissions.get_doc_checked(dt, name, "write")
-		if doc.goal_type == "12 Week Year":
+		if doc.horizon == "12 weeks":
 			if frappe.db.get_value("Life Cycle", doc.cycle, "status") == "Closed":
 				frappe.throw(_("A goal of a closed cycle cannot be reopened."))
 			doc.outcome = "In Progress"

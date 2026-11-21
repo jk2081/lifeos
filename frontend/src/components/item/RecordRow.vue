@@ -19,7 +19,7 @@ import { dateTime, short } from '@/lib/dates'
 
 const props = defineProps({ record: Object })
 const ICONS = { Task: 'lucide-square-check', Note: 'lucide-file-text', 'Wiki page': 'lucide-book-open', Date: 'lucide-cake', Event: 'lucide-calendar',
-  Meeting: 'lucide-calendar', Chat: 'lucide-message-square', Goal: 'lucide-target', Document: 'lucide-lock', 'Journal page': 'lucide-notebook-pen', Idea: 'lucide-lightbulb' }
+  Meeting: 'lucide-calendar', Chat: 'lucide-message-square', Goal: 'lucide-target', Document: 'lucide-lock', 'Journal page': 'lucide-notebook-pen' }
 const THEME = { Done: 'green', Open: 'blue', Doing: 'blue', Waiting: 'amber', Achieved: 'green', 'In Progress': 'blue', Dropped: 'gray', Archived: 'gray' }
 const paneRef = computed(() => props.record.ref || refOfRoute(props.record.route))
 const when = computed(() => {

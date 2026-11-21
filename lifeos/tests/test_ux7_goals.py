@@ -14,42 +14,42 @@ from lifeos.tests.test_ux5_ask import set_key
 
 
 def number_goal(title="ux7 weight", start=84, target=78, **kw):
-	return goals.create(title, "Open", space=PRIVATE, measure_kind="Number", measure=kw.pop("measure", "Weight"), unit=kw.pop("unit", "kg"),
+	return goals.create(title, "Long term", space=PRIVATE, measure_kind="Number", measure=kw.pop("measure", "Weight"), unit=kw.pop("unit", "kg"),
 		start_value=start, target_value=target, **kw)["name"]
 
 
 class TestGoalRule(LifeTestCase):
 	def test_milestone_needs_a_finish_line(self):
-		self.assertRaises(frappe.ValidationError, goals.create, "ux7 m", "Open", space=PRIVATE, measure_kind="Milestone")
-		g = goals.create("ux7 m", "Open", space=PRIVATE, measure_kind="Milestone", done_when="The plan is signed")["name"]
+		self.assertRaises(frappe.ValidationError, goals.create, "ux7 m", "Long term", space=PRIVATE, measure_kind="Milestone")
+		g = goals.create("ux7 m", "Long term", space=PRIVATE, measure_kind="Milestone", done_when="The plan is signed")["name"]
 		self.assertEqual(frappe.db.get_value("Life Goal", g, "measure_kind"), "Milestone")
 
 	def test_number_needs_measure_start_and_target(self):
 		for missing in ("measure", "start_value", "target_value"):
 			args = {"measure": "Yield", "start_value": 1, "target_value": 2, missing: None}
-			self.assertRaises(frappe.ValidationError, goals.create, "ux7 n", "Open", space=PRIVATE, measure_kind="Number", **args)
-		self.assertRaises(frappe.ValidationError, goals.create, "ux7 n", "Open", space=PRIVATE, measure_kind="Number", measure="Yield",
+			self.assertRaises(frappe.ValidationError, goals.create, "ux7 n", "Long term", space=PRIVATE, measure_kind="Number", **args)
+		self.assertRaises(frappe.ValidationError, goals.create, "ux7 n", "Long term", space=PRIVATE, measure_kind="Number", measure="Yield",
 			start_value=5, target_value=5)
 
 	def test_finish_line_alone_is_a_milestone(self):
-		g = goals.create("ux7 f", "Open", space=PRIVATE, done_when="Done")["name"]
+		g = goals.create("ux7 f", "Long term", space=PRIVATE, done_when="Done")["name"]
 		self.assertEqual(frappe.db.get_value("Life Goal", g, "measure_kind"), "Milestone")
 
 	def test_old_goals_without_a_measure_still_save(self):
-		g = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "ux7 old", "goal_type": "Open"}).insert()
+		g = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "ux7 old", "horizon": "Long term"}).insert()
 		g.title = "ux7 old, renamed"
 		g.save()
 		self.assertFalse(readings.has_finish_line(g))
 
 	def test_editing_the_measure_applies_the_rule(self):
-		g = goals.create("ux7 e", "Open", space=PRIVATE, done_when="Done")["name"]
+		g = goals.create("ux7 e", "Long term", space=PRIVATE, done_when="Done")["name"]
 		self.assertRaises(frappe.ValidationError, goals.update, g, {"measure_kind": "Number", "measure": "Yield"})
 		goals.update(g, {"measure_kind": "Number", "measure": "Yield", "unit": "kg/ha", "start_value": 1200, "target_value": 1800})
 		self.assertEqual(frappe.db.get_value("Life Goal", g, "target_value"), 1800)
 
 	def test_agents_cannot_create_or_suggest(self):
 		self.as_user(AGENT)
-		self.assertRaises(frappe.PermissionError, goals.create, "ux7 a", "Open", space=PRIVATE, done_when="x")
+		self.assertRaises(frappe.PermissionError, goals.create, "ux7 a", "Long term", space=PRIVATE, done_when="x")
 		self.assertRaises(frappe.PermissionError, goals.suggest_measure, "Lose 6 kg", space=PRIVATE)
 
 
@@ -98,7 +98,7 @@ class TestReadings(LifeTestCase):
 		self.assertNotEqual(again.name, r.name)  # a rejected one does not block a new suggestion
 
 	def test_readings_only_on_number_goals(self):
-		g = goals.create("ux7 milestone", "Open", space=PRIVATE, done_when="Done")["name"]
+		g = goals.create("ux7 milestone", "Long term", space=PRIVATE, done_when="Done")["name"]
 		self.assertRaises(frappe.ValidationError, goals.add_reading, g, 3)
 
 	def test_agents_cannot_confirm_or_reject(self):
@@ -198,7 +198,7 @@ class TestServes(LifeTestCase):
 	def test_serves_and_served_by_with_progress(self):
 		top = number_goal("ux7 top", 1200, 1800, measure="Yield", unit="kg/ha")
 		goals.add_reading(top, 1500)
-		low = goals.create("ux7 low", "Annual", space=PRIVATE, target_date=add_days(today(), 90), serves=top, done_when="Plan done")["name"]
+		low = goals.create("ux7 low", "Year", space=PRIVATE, target_date=add_days(today(), 90), serves=top, done_when="Plan done")["name"]
 		frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "ux7 step", "goal": low, "status": "Done", "area": self.areas["Tea"]}).insert()
 		frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "ux7 step 2", "goal": low, "status": "Open", "area": self.areas["Tea"]}).insert()
 		d = goals.get(low)

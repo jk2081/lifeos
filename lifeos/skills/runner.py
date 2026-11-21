@@ -238,7 +238,7 @@ def _space_card(space):
 	c = space_context(space)
 	card = {"areas": [{"name": a["name"], "title": a["area_name"], "part_of": a.get("parent_area"), "about": a.get("description")} for a in c["areas"]],
 		"areas_off": c["areas_off"], "goals": [{"name": g["name"], "title": g["title"], "area": g["area"]} for g in c["goals"]],
-		"tags": [t["tag_name"] for t in c["tags"]], "people": [p["full_name"] for p in c["people"]]}
+		"people": [p["full_name"] for p in c["people"]]}
 	return json.dumps(card, ensure_ascii=False)
 
 

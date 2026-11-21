@@ -30,7 +30,7 @@ GOALS = [
 	("Mind and learning", "Learning", ["Agentic certification", "ERPNext certification", "Read three books [?]", "Accounting in ERPNext"]),
 ]
 
-# (priority, goal, status, area)
+# (priority, goal, status, area): the priority is the order they are listed in
 OCTOBER = [
 	("I", "Appoint internal auditor", "Carried", "Tea & Coffee"),
 	("I", "Start RMT newsletter", "Carried", "Tea & Coffee"),
@@ -165,9 +165,11 @@ def load(space="Private", key=SEED_KEY):
 			"sort_order": i + 1, "actions": rows})
 
 	habit_rows = [{"habit": h, "days_per_week": 7, "sort_order": i + 1} for i, h in enumerate(habits)]
+	for order, (_priority, title, status, area_name) in enumerate(OCTOBER, 1):  # October's goals, in the owner's priority order
+		t.insert({"doctype": "Life Goal", "space": space, "title": title, "horizon": "Month", "target_date": "2026-10-31", "sort_order": order,
+			"area": areas.get(area_name), "outcome": {"Done": "Achieved", "Carried": "Carried"}.get(status, "In Progress")})
 	t.insert({
 		"doctype": "Life Month Plan", "space": space, "year": 2026, "month": 10,
-		"goals": [{"priority": p, "title": g, "status": s, "area": areas.get(a)} for p, g, s, a in OCTOBER],
 		"habits": [dict(r, tracked_from="2026-10-01") for r in habit_rows],
 		"mindsweep_md": "\n\n".join(f"## {topic}" for topic in MINDSWEEP) + "\n",
 	})

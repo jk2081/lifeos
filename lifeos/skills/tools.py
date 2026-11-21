@@ -93,7 +93,7 @@ def tool_context_get(run, **_args):
 def tool_list_goals(run, **_args):
 	from lifeos.api.inbox import space_context
 
-	return {"goals": [{"name": g["name"], "title": g["title"], "area": g["area"], "type": g["goal_type"]} for g in space_context(run.space)["goals"]]}
+	return {"goals": [{"name": g["name"], "title": g["title"], "area": g["area"], "type": g["horizon"]} for g in space_context(run.space)["goals"]]}
 
 
 def tool_list_areas(run, **_args):
