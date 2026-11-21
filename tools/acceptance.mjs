@@ -5880,6 +5880,90 @@ store.install()`)
   }
 }
 
+// Issue 30: a proposed lesson shows in Needs you and on the skill page; Edit then Accept saves the edited words as a new version of the skill;
+// removing an accepted lesson makes a version without it. I30.1, .2 and .5 are unit tests (test_issue30_lessons). The acceptance site's stand-in
+// model answers every capture the same way, so process-capture's examples are replaced here by one it passes, and put back (store.install) after.
+for (const width of SET_WIDTHS) {
+  const tag = `I30.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const reset = (examples) => bench(`frappe.set_user("Administrator")
+for dt in ("Life Skill Correction", "Life Skill Lesson"):
+    frappe.db.delete(dt)
+for dt in ("Life Skill Run", "Life Skill Version", "Life Skill Example"):
+    frappe.db.delete(dt, {"skill": "process-capture"})
+frappe.db.delete("Life Skill", {"name": "process-capture"})
+from lifeos.skills import store
+store.install()
+${examples ? `frappe.db.delete("Life Skill Example", {"skill": "process-capture"})
+import json
+frappe.get_doc({"doctype": "Life Skill Example", "skill": "process-capture", "title": "Anything is filed", "source": "Owner",
+  "input": json.dumps({"title": "Robusta prices", "text": "Robusta is up."}), "expected": json.dumps([{"has_proposal": {"kind": "Task"}}])}).insert()` : ''}`)
+  // a proposed lesson with the three corrections it came from, as the Brain's improve-skill would have made it
+  const propose = () => JSON.parse(bench(`import json
+lesson = frappe.get_doc({"doctype": "Life Skill Lesson", "skill": "process-capture", "space": "${SPACE}", "status": "Proposed", "base_version": 1,
+  "summary": "Commodity newsletters", "text": "Newsletters about commodity prices are for reading later, never a task."}).insert()
+for i in range(3):
+    frappe.get_doc({"doctype": "Life Skill Correction", "skill": "process-capture", "skill_version": 1, "space": "${SPACE}", "correction_type": "Area",
+      "key": "area:Task:a>b", "detail": "The Brain filed a Task under Money; the owner filed it under Career.", "capture_title": f"Robusta prices {i}", "lesson": lesson.name}).insert()
+print(json.dumps(lesson.name))`).split('\n').pop())
+  let s
+  try {
+    reset(true)
+    s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    await check(`${tag}.E`, `${width} px: with no lessons Needs you has no lessons section and the skill page says what will appear`, async () => {
+      await s.open('/life/brain')
+      await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-needs-lessons]').count()) === 0, 'a lessons section shows with no lessons')
+      await s.open('/life/brain/skills/process-capture')
+      await pg.locator('[data-skill-lessons]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-skill-lessons]').innerText()).includes('No lessons yet.'), 'the skill page does not say what will appear')
+      await noSideways()
+    })
+    await check(`${tag}.3`, `${width} px: a lesson shows in Needs you and on the skill page; Edit then Accept saves the edited words`, async () => {
+      const name = propose()
+      await s.open('/life/brain')
+      const card = pg.locator(`[data-needs-lessons] [data-lesson="${name}"]`)
+      await card.waitFor({ timeout: 10000 })
+      must((await card.innerText()).includes('Newsletters about commodity prices') && (await card.innerText()).includes('3 corrections'), 'the lesson says: ' + (await card.innerText()))
+      await noSideways()
+      await s.open('/life/brain/skills/process-capture')
+      await pg.locator(`[data-skill-lessons] [data-lesson="${name}"]`).waitFor({ timeout: 10000 })
+      await s.open('/life/brain')
+      await card.waitFor({ timeout: 10000 })
+      await card.locator('[data-lesson-edit]').click()
+      await card.locator('[data-lesson-text]').fill('Price newsletters are read later, not tasks.')
+      await card.locator('[data-lesson-accept]').click()
+      await pg.waitForFunction((n) => !document.querySelector(`[data-needs-lessons] [data-lesson="${n}"]`), name, { timeout: 15000 })
+      const d = await s.api('skills.detail', { name: 'process-capture' })
+      must(d.version === 2 && d.instructions.includes('Price newsletters are read later, not tasks.') && !d.instructions.includes('commodity prices'), 'the skill is: version ' + d.version)
+      await s.open('/life/brain/skills/process-capture')
+      const done = pg.locator(`[data-skill-lessons] [data-lesson="${name}"][data-status="Accepted"]`)
+      await done.waitFor({ timeout: 10000 })
+      must((await done.locator('[data-lesson-version]').innerText()).includes('version 2'), 'the lesson does not link its version')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.4`, `${width} px: removing an accepted lesson makes a new version without it`, async () => {
+      await s.open('/life/brain/skills/process-capture')
+      const done = pg.locator('[data-skill-lessons] [data-lesson][data-status="Accepted"]')
+      await done.waitFor({ timeout: 10000 })
+      await done.locator('[data-lesson-remove]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-skill-page]')?.getAttribute('data-version') === '3', null, { timeout: 15000 })
+      const d = await s.api('skills.detail', { name: 'process-capture' })
+      must(!d.instructions.includes('Price newsletters') && !d.instructions.includes('Lessons from'), 'the text still has the lesson')
+      must((await pg.locator('[data-skill-lessons] [data-lesson][data-status="Removed"]').count()) === 1, 'the lesson is not shown as removed')
+      await noSideways()
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    reset(false)
+  }
+}
+
 // Issue 31: Settings > Calendar shows the calendars of the connected account and saves the one Life OS writes to (off by default).
 // I31.1 to I31.4 are unit tests (test_issue31_gcal_write). The fixture calendar stands in for Google; the choice is cleared after.
 for (const width of SET_WIDTHS) {

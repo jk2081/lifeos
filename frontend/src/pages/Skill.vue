@@ -46,6 +46,14 @@
       <Card v-else><Empty title="No examples yet." hint="An example is a sample capture and what the skill must make of it. It is how a changed text is tested before it is saved." /></Card>
     </section>
 
+    <section class="flex flex-col gap-2" data-skill-lessons>
+      <h2 class="text-base-medium text-ink-gray-9">Lessons <span class="text-sm font-normal text-ink-gray-6">What your corrections in Needs you taught this skill. They change its words, nothing else.</span></h2>
+      <Card v-if="d.lessons.length" flush>
+        <LessonCard v-for="l in d.lessons" :key="l.name" :lesson="l" :can-edit="d.can_edit" @changed="load" />
+      </Card>
+      <Card v-else><Empty title="No lessons yet." hint="When you correct this skill's guesses in Needs you the same way three times, it proposes a lesson here." /></Card>
+    </section>
+
     <section class="flex flex-col gap-2" data-skill-versions>
       <h2 class="text-base-medium text-ink-gray-9">Versions</h2>
       <Card flush>
@@ -97,6 +105,7 @@ import { Badge, Button, Dialog, FormControl, Switch } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import DiffView from '@/components/DiffView.vue'
 import Empty from '@/components/Empty.vue'
+import LessonCard from '@/components/brain/LessonCard.vue'
 import Md from '@/components/Md.vue'
 import PageHead from '@/components/PageHead.vue'
 import { api, tryCall } from '@/lib/api'

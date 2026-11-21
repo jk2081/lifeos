@@ -285,7 +285,7 @@ class TestVersions(SkillCase):
 
 	def test_a_fresh_install_shows_no_edit_and_no_update(self):
 		cards = skills_api.overview()["skills"]
-		self.assertEqual({c["name"] for c in cards}, {SKILL, "lifeos", "lifeos-file-work"})
+		self.assertEqual({c["name"] for c in cards}, {SKILL, "lifeos", "lifeos-file-work", "improve-skill"})
 		self.assertFalse([c for c in cards if c["edited"] or c["update_available"]])
 		store.install()  # a second migrate changes nothing
 		self.assertEqual(frappe.db.count("Life Skill Version", {"skill": SKILL}), 1)
@@ -313,7 +313,7 @@ class TestServing(SkillCase):
 		self.assertEqual((got["name"], got["version"]), ("lifeos", 1))
 		self.assertIn("Life OS agent instructions", got["instructions"])
 		self.assertIn("lifeos", [s["name"] for s in skills_api.list(space=PRIVATE)])
-		self.assertEqual({s["name"] for s in skills_api.list()}, {"lifeos", "lifeos-file-work", SKILL})
+		self.assertEqual({s["name"] for s in skills_api.list()}, {"lifeos", "lifeos-file-work", SKILL, "improve-skill"})
 		self.assertTrue(skills_api.get("lifeos-file-work")["instructions"])
 
 	def test_a_skill_for_one_space_is_served_only_to_its_members(self):

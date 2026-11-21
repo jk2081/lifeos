@@ -6,6 +6,7 @@ from frappe.utils import now_datetime
 from lifeos import links, permissions, proposals
 from lifeos.api.inbox import _finish_if_decided
 from lifeos.api.utils import parse
+from lifeos.skills import lessons
 
 
 def _people_only():
@@ -34,6 +35,10 @@ def _decide(prop, decision, payload=None):
 	prop.decided_by = frappe.session.user
 	prop.decided_on = now_datetime()
 	prop.save(ignore_permissions=True)
+	try:
+		lessons.record(prop, item)  # a decision that is not the skill's best guess is kept against the skill, for its lessons
+	except Exception:  # a lesson must never stop a decision
+		frappe.log_error(title="Lesson: could not record a correction")
 	return item
 
 

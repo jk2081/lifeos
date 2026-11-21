@@ -19,7 +19,8 @@
   "created_name",
   "decided_by",
   "decided_on",
-  "sort_order"
+  "sort_order",
+  "guess"
  ],
  "fields": [
   {
@@ -120,6 +121,14 @@
    "label": "Filed by",
    "read_only": 1,
    "description": "The skill and version that accepted it on its own, such as process-capture v1."
+  },
+  {
+   "fieldname": "guess",
+   "fieldtype": "Code",
+   "label": "The Brain's own guess",
+   "options": "JSON",
+   "read_only": 1,
+   "description": "The payload as first proposed, kept so a correction can be told from the guess."
   }
  ],
  "links": [],

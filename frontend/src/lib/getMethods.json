@@ -52,6 +52,7 @@
  "lifeos.api.journal.pages",
  "lifeos.api.journal.page_detail",
  "lifeos.api.journal.weekly_review",
+ "lifeos.api.lessons.for_skill",
  "lifeos.api.library.tree",
  "lifeos.api.library.list",
  "lifeos.api.library.versions",

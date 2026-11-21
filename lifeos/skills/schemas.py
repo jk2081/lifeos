@@ -13,6 +13,13 @@ SCHEMAS = {
 			"summary_md": {"type": "string", "description": "A short summary in Markdown, in the owner's words. Mention anything odd in the capture."},
 		},
 	},
+	"lesson-result": {
+		"title": "lesson-result", "type": "object", "additionalProperties": False, "required": ["lesson", "summary"],
+		"properties": {
+			"lesson": {"type": "string", "description": "One or two plain sentences to add to the skill's instructions."},
+			"summary": {"type": "string", "description": "A few words naming what the lesson teaches."},
+		},
+	},
 }
 
 

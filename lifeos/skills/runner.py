@@ -15,7 +15,7 @@ from frappe.utils import flt, now_datetime
 
 from lifeos import permissions
 from lifeos.ai import client
-from lifeos.skills import schemas, store
+from lifeos.skills import lessons, schemas, store
 from lifeos.skills import tools as fixed
 
 BRAIN_USER = permissions.BRAIN_USER
@@ -117,7 +117,8 @@ def _go(doc, log, input):
 	skill = skill_values(doc)
 	if not doc.active:
 		raise SkillError(_("the skill is switched off"), skipped=True)
-	item = _item_of(input)
+	lesson = input.get("name") if input.get("doctype") == "Life Skill Lesson" else None
+	item = None if lesson else _item_of(input)
 	space = item.space if item else input.get("space") or frappe.db.get_single_value("Life Settings", "default_space")
 	sensitive = bool(item and (item.is_sensitive or item.vault_document))
 	if sensitive and permissions.vault_hidden(space):
@@ -131,7 +132,8 @@ def _go(doc, log, input):
 	if item:
 		_claim(item)
 	frappe.db.set_value("Life Skill Run", log.name, "sensitive", 1 if sensitive else 0)
-	state = generate(skill, space, _blocks_of(item) if item else _scheduled_blocks(space), item=item.name if item else None,
+	blocks = lessons.blocks_of(lesson) if lesson else _blocks_of(item) if item else _scheduled_blocks(space)
+	state = generate(skill, space, blocks, item=item.name if item else None,
 		intent=item.intent if item else "Process", reference=(item.doctype, item.name) if item else None)
 	out = {"input_tokens": state["tin"], "output_tokens": state["tout"], "cost": state["cost"], "retries": state["retries"],
 		"sensitive": 1 if sensitive else 0}
@@ -140,6 +142,11 @@ def _go(doc, log, input):
 	out["tool_calls"] = json.dumps([{"tool": c["tool"]} if sensitive else c for c in state["calls"]])
 	if item:
 		_write_capture(doc, item, state)
+	if lesson:
+		try:
+			lessons.fill(lesson, state["output"])
+		except ValueError:
+			raise SkillError(_("it gave no lesson"))
 	return out
 
 
@@ -167,6 +174,9 @@ def _claim(item):
 
 def _not_processed(log, input, error):
 	"""The capture goes to Needs you, never lost: Failed, with the reason, and Retry sends it back."""
+	if input.get("doctype") == "Life Skill Lesson":
+		lessons.discard(input.get("name"))
+		return
 	if input.get("doctype") != "Life Inbox Item" or not frappe.db.exists("Life Inbox Item", input.get("name")):
 		return
 	if error.skipped and not error.exact:

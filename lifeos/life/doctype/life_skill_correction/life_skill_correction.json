@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-21 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "skill",
+  "skill_version",
+  "space",
+  "correction_type",
+  "key",
+  "detail",
+  "capture_title",
+  "capture_excerpt",
+  "proposal",
+  "inbox_item",
+  "lesson"
+ ],
+ "fields": [
+  {
+   "fieldname": "skill",
+   "fieldtype": "Link",
+   "label": "Skill",
+   "options": "Life Skill",
+   "reqd": 1,
+   "search_index": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "skill_version",
+   "fieldtype": "Int",
+   "label": "Version"
+  },
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "search_index": 1
+  },
+  {
+   "fieldname": "correction_type",
+   "fieldtype": "Select",
+   "label": "Correction",
+   "options": "Area\nKind\nDrop",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "key",
+   "fieldtype": "Data",
+   "label": "Matches others with",
+   "search_index": 1
+  },
+  {
+   "fieldname": "detail",
+   "fieldtype": "Small Text",
+   "label": "What happened"
+  },
+  {
+   "fieldname": "capture_title",
+   "fieldtype": "Data",
+   "label": "Capture"
+  },
+  {
+   "fieldname": "capture_excerpt",
+   "fieldtype": "Small Text",
+   "label": "Capture, the start of it"
+  },
+  {
+   "fieldname": "proposal",
+   "fieldtype": "Link",
+   "label": "Proposal",
+   "options": "Life Proposal"
+  },
+  {
+   "fieldname": "inbox_item",
+   "fieldtype": "Link",
+   "label": "Capture item",
+   "options": "Life Inbox Item"
+  },
+  {
+   "fieldname": "lesson",
+   "fieldtype": "Link",
+   "label": "Lesson",
+   "options": "Life Skill Lesson",
+   "search_index": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Skill Correction",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "in_create": 1
+}

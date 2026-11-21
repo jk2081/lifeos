@@ -12,6 +12,9 @@ class LifeProposal(Document):
 		if isinstance(self.payload, (dict, list)):
 			self.payload = json.dumps(self.payload)
 
+	def before_insert(self):
+		self.guess = self.payload  # what was first proposed; the owner's changes to the payload are told from it (skills/lessons.py)
+
 	def validate(self):
 		from lifeos import permissions
 

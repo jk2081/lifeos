@@ -10,7 +10,7 @@ from frappe.utils import get_first_day, now_datetime
 from lifeos import permissions
 from lifeos.proposals import SCHEMA
 from lifeos.api.utils import parse
-from lifeos.skills import examples, filing, store, triggers
+from lifeos.skills import examples, filing, lessons, store, triggers
 from lifeos.skills import tools as fixed
 
 LIST = list  # this module defines its own `list` method below
@@ -148,7 +148,7 @@ def detail(name: str):
 			"recorded": bool(e.fixture and e.fixture_hash == store.digest(doc.as_dict()))}
 			for e in frappe.get_all("Life Skill Example", filters={"skill": name}, fields=["name", "title", "input", "expected", "last_result", "source", "fixture", "fixture_hash"],
 				order_by="creation asc")],
-		"versions": versions, "runs": runs, "can_edit": permissions.is_admin(), "lists": lists()}
+		"versions": versions, "runs": runs, "lessons": [x for x in lessons.for_skill(name) if not x["space"] or x["space"] in permissions.user_spaces() or permissions.is_admin()], "can_edit": permissions.is_admin(), "lists": lists()}
 
 
 @frappe.whitelist(methods=["GET"])

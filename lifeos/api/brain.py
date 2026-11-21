@@ -9,6 +9,7 @@ from frappe.utils import add_to_date, now_datetime
 
 from lifeos import permissions, proposals
 from lifeos.api.utils import area_filter, lens_area, names_map, page
+from lifeos.skills import lessons
 
 MAX_ROWS = 7
 SECONDS_EACH = 20  # the guess at how long one decision takes: "about 2 minutes" for 7
@@ -77,7 +78,7 @@ def needs_you(space: str | None = None, limit: int = MAX_ROWS):
 		})
 	waiting = frappe.db.sql("""select count(*) from `tabLife Inbox Item` i where i.space = %(space)s and i.is_archived = 0
 		and i.status in ('New', 'Processing') and """ + SEES, args)[0][0]
-	out.update({"total": total, "waiting": waiting, "rows": rows, "minutes": minutes(len(rows)), "unfiled": _failed(space), "max_rows": limit})
+	out.update({"lessons": lessons.proposed(space) if not permissions.is_agent() else [], "total": total, "waiting": waiting, "rows": rows, "minutes": minutes(len(rows)), "unfiled": _failed(space), "max_rows": limit})
 	return out
 
 
