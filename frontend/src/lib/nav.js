@@ -13,7 +13,7 @@ export const SETTINGS = { label: 'Settings', to: '/settings', base: '/settings',
 // each place's tabs; the first is the place's own path
 export const TODAY_TABS = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }]
 export const BRAIN_TABS = [{ value: 'needs-you', label: 'Needs you' }, { value: 'activity', label: 'Activity' }, { value: 'sources', label: 'Sources' }, { value: 'skills', label: 'Skills' }]
-export const GOALS_TABS = [{ value: 'by-area', label: 'By area' }, { value: 'tasks', label: 'All tasks' }, { value: 'no-goal', label: 'No goal' }]
+export const GOALS_TABS = [{ value: 'by-area', label: 'By area' }, { value: 'tasks', label: 'All tasks' }, { value: 'no-goal', label: 'No goal' }, { value: 'cycles', label: 'Cycles' }]
 export const LIBRARY_TABS = [{ value: 'all', label: 'Everything' }, { value: 'notes', label: 'Notes' }, { value: 'documents', label: 'Documents' },
   { value: 'people', label: 'People' }, { value: 'chats', label: 'Chats' }, { value: 'files', label: 'Files' }]
 const tabPath = (base, tabs) => (tab) => (tab === tabs[0].value ? base : `${base}/${tab}`)
@@ -27,7 +27,7 @@ export const libraryPath = tabPath('/library', LIBRARY_TABS)
 export const GO = [
   ...PLACES, REVIEW,
   { label: 'Plan, now Today: Week', to: '/today/week', key: 'p' }, { label: 'Today: Week', to: '/today/week', key: 'w' },
-  { label: 'Today: Month', to: '/today/month', key: 'm' }, { label: 'Today: 12 Weeks', to: '/today/year?view=cycle', key: 'j' },
+  { label: 'Today: Month', to: '/today/month', key: 'm' }, { label: 'Goals: Cycles (12 Weeks)', to: '/goals/cycles', key: 'j' },
   { label: 'Today: Year', to: '/today/year', key: 'c' }, { label: 'Today: Reset', to: '/today/reset', key: 'e' },
   { label: 'Goals: All tasks', to: '/goals/tasks', key: 'k' }, { label: 'Goals: Someday', to: '/goals/someday', key: 'y' },
   { label: 'Brain: Activity', to: '/brain/activity', key: 'u' }, { label: 'Brain: Outbox', to: '/brain/outbox', key: 'b' },
@@ -47,7 +47,7 @@ export const WRITTEN_BY = [{ label: 'Written by anyone', value: '' }, { label: '
 export const ELSEWHERE = [
   { key: 'reset', label: 'Reset', home: 'Today, and the weekly review', to: '/today/reset' },
   { key: 'review', label: 'Weekly review', home: 'Review, once you have locked one; the banner on Today on its day', to: '/review' },
-  { key: 'cycle', label: '12 Weeks', home: 'Today > Year', to: { path: '/today/year', query: { view: 'cycle' } } },
+  { key: 'cycle', label: '12 Weeks and the month plan', home: 'Goals > Cycles', to: '/goals/cycles' },
   { key: 'habits', label: 'Habits', home: 'Today > Month', to: { path: '/today/month', query: { view: 'habits' } } },
   { key: 'checkins', label: 'Check-ins', home: 'Today > Month', to: { path: '/today/month', query: { view: 'checkins' } } },
   { key: 'someday', label: 'Someday', home: 'Goals', to: '/goals/someday' },
@@ -55,7 +55,7 @@ export const ELSEWHERE = [
   { key: 'timeline', label: 'Timeline', home: 'Library', to: '/library/timeline' },
   { key: 'graph', label: 'Graph', home: 'Library > Notes', to: { path: '/library/notes', query: { view: 'graph' } } },
   { key: 'vault', label: 'Sensitive documents', home: 'Library > Documents, by the lock', to: { path: '/library/documents', query: { tab: 'documents', sensitive: '1' } } },
-  { key: 'pages', label: 'Journal pages', home: 'Library > Everything', to: { path: '/library', query: { tab: 'pages' } } },
+  { key: 'pages', label: 'Journal pages', home: 'Library > Notes', to: { path: '/library/notes', query: { view: 'list' } } },
   { key: 'archive', label: 'Trash and archive', home: 'Library', to: '/library/archive' },
   { key: 'ask', label: 'Ask: history and insights', home: 'The Ask box in every header', to: '/ask' },
 ]

@@ -237,7 +237,7 @@ const Tile = (props) => {
     return h('div', { class: box, 'data-tile': t.key }, [
       h('div', { class: 'truncate text-sm text-ink-gray-7' }, t.label),
       h('div', { class: 'flex items-baseline gap-2' }, [
-        h(RouterLinkNum, { to: { path: '/today/year', query: { view: 'cycle' } }, text: pct === null ? '—' : pct + '%', aria: `Week score ${pct}%` }),
+        h(RouterLinkNum, { to: '/goals/cycles', text: pct === null ? '—' : pct + '%', aria: `Week score ${pct}%` }),
         h('span', { class: 'text-sm text-ink-gray-6' }, phone.value ? `/ ${d.value.target}%` : `target ${d.value.target}%`)]),
       pct === null ? null : h('div', { class: 'relative mt-1.5 h-1.5 rounded-full bg-surface-gray-3', role: 'img', 'aria-label': `${pct}% of the ${d.value.target}% target`, 'data-score-bar': '' }, [
         h('div', { class: 'h-full rounded-full ' + (pct >= d.value.target ? 'bg-surface-green-7' : 'bg-surface-gray-9'), style: { width: Math.min(pct, 100) + '%' } }),

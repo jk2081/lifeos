@@ -342,15 +342,16 @@ await check(4, 'Tick a habit at phone width and see the month count change', asy
 })
 
 await check(5, 'Tick week cells in the 12 Week Year grid and see the week score change', async () => {
-  await owner.open('/life/today/year?view=cycle')
-  const stat = () => owner.page.locator('[data-stat]').first().innerText()
+  await owner.open('/life/goals/cycles')
+  await owner.page.locator('[data-week-so-far]').waitFor({ timeout: 10000 })
+  const stat = () => owner.page.locator('[data-week-so-far]').first().innerText()
   const before = (await stat()).replace(/\n/g, ' ')
   const g = await owner.api('journal.grid', { space: SPACE })
   const col = g.current_week
-  // an empty cell of the current week
-  const cells = owner.page.locator(`[data-week-cell="${col}"]:not([disabled])`)
-  const empty = owner.page.locator(`[data-week-cell="${col}"][aria-pressed="false"]:not([disabled])`)
-  must(await cells.count(), 'the grid has no cells for the current week')
+  // an empty tick of the current week (issue 45: the ticks are on Goals > Cycles)
+  const cells = owner.page.locator('[data-tick]:not([disabled])')
+  const empty = owner.page.locator('[data-tick][aria-pressed="false"]:not([disabled])')
+  must(await cells.count(), 'Cycles has no ticks for the current week')
   await ((await empty.count()) ? empty.first() : cells.first()).click()
   await owner.page.waitForTimeout(800)
   const after = (await stat()).replace(/\n/g, ' ')
@@ -942,9 +943,8 @@ for (const width of UX_WIDTHS) {
     const screens = [...LISTS.map(([n, p]) => [n, p]), ['Tasks table', '/life/goals/tasks?view=table'], ['Tasks board', '/life/goals/tasks?view=board'], ['Open loops', '/life/goals/tasks?view=loops'],
       ['Goals cards', '/life/goals?view=cards'], ['Notes tree', '/life/library/notes?view=tree'], ['Goal page', '/life/goals/' + ux.goal],
       ['Today', '/life'], ['Today under an area', '/life?area=' + uxArea], ['Week review', '/life/today/week?view=review'], ['Week calendar', '/life/today/week?view=calendar'],
-      ['Week agenda', '/life/today/week?view=agenda'], ['Month plan', '/life/today/month?view=plan'], ['Habits', '/life/today/month?view=habits'],
-      ['Check-ins', '/life/today/month?view=checkins'], ['Month calendar', '/life/today/month?view=calendar'], ['12 Weeks', '/life/today/year?view=cycle'],
-      ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'], ['Journal pages', '/life/brain/captures?tab=pages'],
+      ['Week agenda', '/life/today/week?view=agenda'], ['Cycles', '/life/goals/cycles'], ['Habits', '/life/today/month?view=habits'],
+      ['Check-ins', '/life/today/month?view=checkins'], ['Month calendar', '/life/today/month?view=calendar'], ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'], ['Journal pages', '/life/brain/captures?tab=pages'],
       ['Graph', '/life/library/notes?view=graph'], ['Settings', '/life/settings']]
     for (const [name, p] of screens) {
       await s.open(p)
@@ -1184,7 +1184,7 @@ for (const width of UX_WIDTHS) {
     // set 6: a journal page is a capture; its old link opens it in the pane over Library > Everything, Journal pages, on its tabs (issue 14)
     const jp = bench(`print(frappe.db.sql("select name from \`tabLife Journal Page\` where space='${SPACE}' limit 1")[0][0])`).split('\n').pop()
     await s.open('/life/journal/pages/' + jp)
-    must(new URL(pg.url()).pathname === '/life/library' && new URL(pg.url()).searchParams.get('tab') === 'pages' && await pane.isVisible(),
+    must(new URL(pg.url()).pathname === '/life/library/notes' && new URL(pg.url()).searchParams.get('view') === 'list' && await pane.isVisible(),
       `/journal/pages/:id went to ${new URL(pg.url()).pathname}${new URL(pg.url()).search}`)
     const jt = pg.locator('[data-pane-tabs]')
     await jt.locator('[data-tab="transcript"]').click()
@@ -2312,8 +2312,8 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       ['Library > Archive', '/life/library/archive?all=1', 'archive.list', (a) => total('archive.list', { area: a })],
     ]
     // the rhythm tabs are not lists: each asks the server for its area's records
-    const R = [['Plan > Week, Calendar', '/life/today/week?view=calendar'], /* set 8: the review is about the whole plate and keeps no lens, like Reset */ ['Plan > Month, Plan', '/life/today/month?view=plan'],
-      ['Plan > Month, Calendar', '/life/today/month?view=calendar'], ['Plan > 12 Weeks', '/life/today/year?view=cycle'], ['Plan > Year, Calendar', '/life/today/year?view=calendar'],
+    const R = [['Plan > Week, Calendar', '/life/today/week?view=calendar'], /* set 8: the review is about the whole plate and keeps no lens, like Reset */ ['Goals > Cycles', '/life/goals/cycles'],
+      ['Plan > Month, Calendar', '/life/today/month?view=calendar'], ['Plan > Year, Calendar', '/life/today/year?view=calendar'],
       ['Plan > Year, Goals', '/life/today/year?view=goals']]
     pg.on('request', onReq)
     try {
@@ -2395,8 +2395,8 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
   await check(`${tag}.41`, `${width} px: no screen scrolls sideways: every place, Plan and Library tab and view, Settings section, a goal and a note page, with and without an area`, async () => {
     const before = errors.length
     const bad = []
-    const screens = ['/life', '/life/brain', '/life/today/week?view=review', '/life/today/week?view=calendar', '/life/today/week?view=agenda', '/life/today/month?view=plan',
-      '/life/today/month?view=habits', '/life/today/month?view=checkins', '/life/today/month?view=calendar', '/life/today/year?view=cycle', '/life/today/year?view=calendar',
+    const screens = ['/life', '/life/brain', '/life/today/week?view=review', '/life/today/week?view=calendar', '/life/today/week?view=agenda', '/life/goals/cycles',
+      '/life/today/month?view=habits', '/life/today/month?view=checkins', '/life/today/month?view=calendar', '/life/today/year?view=calendar',
       '/life/today/year?view=goals', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/today/reset', '/life/library', '/life/library/notes',
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
       '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/brain/captures?tab=pages', '/life/library/timeline',
@@ -2480,7 +2480,7 @@ await check('S6.1', 'Keyboard: G then T, I, O or L opens a place; the older G le
   const pg = owner.page
   const done = []
   for (const [key, want, q] of [['t', '/life/today'], ['i', '/life/brain'], ['p', '/life/today/week'], ['l', '/life/library'], ['k', '/life/goals/tasks'], ['o', '/life/goals'],
-    ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/today/year', { view: 'cycle' }], ['c', '/life/today/year'], ['e', '/life/today/reset'],
+    ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/goals/cycles'], ['c', '/life/today/year'], ['e', '/life/today/reset'],
     ['n', '/life/library/notes'], ['u', '/life/brain/activity'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
     ['x', '/life/library/notes', { by: 'assistant' }], ['g', '/life/library/notes', { view: 'graph' }], ['r', '/life/library/archive'], ['b', '/life/brain/outbox'], ['d', '/life/review'],
     ['q', '/life/ask'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
@@ -2513,14 +2513,14 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
     ['/calendar/agenda', '/today/week', { view: 'agenda' }],
     ['/calendar/month?date=2026-12-02', '/today/month', { view: 'calendar', date: '2026-12-02' }],
     ['/calendar/year', '/today/year', {}],
-    ['/journal', '/today/year', { view: 'cycle' }],
-    ['/journal/goals', '/today/year', { view: 'goals' }],
-    ['/journal/month', '/today/month', {}],
+    ['/journal', '/goals/cycles', {}],
+    ['/journal/goals', '/goals/cycles', {}],
+    ['/journal/month', '/goals/cycles', {}],
     ['/journal/habits', '/today/month', { view: 'habits' }],
     ['/journal/checkins', '/today/month', { view: 'checkins' }],
     ['/journal/review', '/today/week', { view: 'review' }],
-    ['/journal/pages', '/library', { tab: 'pages' }],
-    [`/journal/pages/${jp}`, '/library', { tab: 'pages', open: `page:${jp}` }],
+    ['/journal/pages', '/library/notes', { view: 'list' }],
+    [`/journal/pages/${jp}`, '/library/notes', { view: 'list', open: `page:${jp}` }],
     [`/journal/goals/${goal12}`, `/goals/${goal12}`, {}],
     [`/sources?tab=chats&from=${addDays(-6)}`, '/library/chats', { tab: 'chats', from: addDays(-6) }],
     ['/chats?group=day', '/library/chats', { tab: 'chats', view: 'day' }],
@@ -2647,9 +2647,9 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
     const inWeek = (w) => { for (let n = 0; n < 7; n++) { const d = plusDays(info.start, (w - 1) * 7 + n); if (Number(d.slice(8)) > 3) return d } }
     const CASES = [
       ['review', `${review} ${afterReview}`, 'Your weekly review is ready', '/life/today/week'],
-      ['month', `${month}-02 08:00:00`, 'Plan ', '/life/today/month'],
-      ['plan-next', `${inWeek(11)} 08:00:00`, 'Plan your next 12 weeks', '/life/today/year?view=cycle'],
-      ['close', `${inWeek(12)} 08:00:00`, 'Close this cycle', '/life/today/year?view=cycle'],
+      ['month', `${month}-02 08:00:00`, 'Plan ', '/life/goals/cycles'],
+      ['plan-next', `${inWeek(11)} 08:00:00`, 'Plan your next 12 weeks', '/life/goals/cycles'],
+      ['close', `${inWeek(12)} 08:00:00`, 'Close this cycle', '/life/goals/cycles'],
     ]
     const done = []
     for (const [key, at, text, to] of CASES) {
@@ -2814,9 +2814,10 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     const g = (await s.api('journal.save_goal', { cycle: cycle.name, title: `S7 cycle goal ${W}`, area: areaId('Tea & Coffee'), serves: long, measure_kind: 'Milestone',
       done_when: 'Ten pitches made', actions: [{ title: `S7 calls ${W}`, per_week: 4 }] })).goal
     action = (await s.api('journal.goal', { goal: g })).goal.actions[0]
-    await s.open('/life/today/year?view=cycle')
+    await s.open('/life/goals/cycles')
     const line = pg.locator('[data-grid-serves]', { hasText: `S7 long goal ${W}` })
-    must(await line.count(), 'the 12 Weeks tab does not show the goal it serves')
+    await line.first().waitFor({ timeout: 10000 }).catch(() => {})
+    must(await line.count(), 'Goals > Cycles does not show the goal it serves')
     await s.open(`/life/goals/${long}`)
     const served = pg.locator('[data-goal-served-by]')
     must((await served.innerText()).includes(`S7 cycle goal ${W}`) && (await served.innerText()).includes(cycle.title), 'the longer goal does not show the cycle goal with its cycle')
@@ -2830,13 +2831,15 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     const g = await s.api('journal.grid', { space: SPACE })
     const wk = g.current_week
     const before = await s.api('journal.week_score', { cycle: cycle.name, week: wk })
-    await s.open('/life/today/year?view=cycle')
-    const cell = pg.locator(`button[aria-label^="S7 calls ${W}, week ${wk},"]`).first()
-    must(await cell.count(), 'the action is not on the grid')
+    await s.open('/life/goals/cycles')
+    const cell = pg.locator(`button[data-tick][aria-label^="S7 calls ${W}, tick 1 "]`).first()
+    await cell.waitFor({ timeout: 10000 }).catch(() => {})
+    must(await cell.count(), 'the action is not on Goals > Cycles')
     await cell.click()
     await pg.waitForLoadState('networkidle')
     await settle()
-    must((await cell.getAttribute('aria-label')).endsWith('1 of 4'), 'the cell says ' + (await cell.getAttribute('aria-label')))
+    must((await cell.getAttribute('aria-pressed')) === 'true', 'the first tick of the action is not set')
+    must((await pg.locator('[data-cycle-goal]', { hasText: `S7 calls ${W}` }).locator('[data-tick-count]').innerText()).startsWith('1 of 4'), 'the goal row does not say 1 of 4')
     const after = await s.api('journal.week_score', { cycle: cycle.name, week: wk })
     must(after.done === before.done + 1 && after.percent > before.percent, `score ${before.percent}% → ${after.percent}%`)
     await s.open('/life')
@@ -2975,7 +2978,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     await check(`${tag}.8`, `${width} px: no set 7 screen scrolls sideways`, async () => {
       const bad = []
       for (const p of ['/life', '/life/goals', '/life/today/week?view=review', '/life/brain/outbox', '/life/brain/outbox?pile=in&period=12weeks',
-        '/life/today/year?view=cycle', '/life/settings?tab=rhythms', '/life/settings?tab=reset']) {
+        '/life/goals/cycles', '/life/settings?tab=rhythms', '/life/settings?tab=reset']) {
         await s.open(p)
         const o = await pg.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width)
         if (o > 0) bad.push(`${p} by ${o} px`)
@@ -4088,7 +4091,7 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
         const area = areaId('Career') || areas[0].name
         const OLD = [['/life', '/life/today'], ['/life/inbox', '/life/brain'], [`/life/inbox/${item.name}`, '/life/brain/queue'],
           [`/life/inbox/${item.name}/review`, `/life/brain/review/${item.name}`], ['/life/plan', '/life/today/week'], ['/life/plan/week', '/life/today/week'],
-          ['/life/plan/month', '/life/today/month'], ['/life/plan/12-weeks', '/life/today/year'], ['/life/plan/year', '/life/today/year'],
+          ['/life/plan/month', '/life/today/month'], ['/life/plan/12-weeks', '/life/goals/cycles'], ['/life/plan/year', '/life/today/year'],
           ['/life/plan/goals', '/life/goals'], [`/life/plan/goals/${goal}`, `/life/goals/${goal}`], ['/life/plan/tasks', '/life/goals/tasks'],
           ['/life/plan/someday', '/life/goals/someday'], ['/life/plan/reset', '/life/today/reset'], ['/life/tasks', '/life/goals/tasks'],
           ['/life/someday', '/life/goals/someday'], ['/life/outbox', '/life/brain/outbox'], ['/life/archive', '/life/library/archive'],
@@ -4096,9 +4099,9 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
           ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/sources'], ['/life/chats', '/life/library/chats'],
           ['/life/library/captures', '/life/brain/captures'], ['/life/library/outbox', '/life/brain/outbox'], ['/life/projects', '/life/goals'],
           ['/life/reset', '/life/today/week'], ['/life/calendar', '/life/today/week'], ['/life/calendar/month', '/life/today/month'],
-          ['/life/calendar/year', '/life/today/year'], ['/life/calendar/agenda', '/life/today/week'], ['/life/journal', '/life/today/year'],
-          ['/life/journal/goals', '/life/today/year'], ['/life/journal/month', '/life/today/month'], ['/life/journal/habits', '/life/today/month'],
-          ['/life/journal/checkins', '/life/today/month'], ['/life/journal/review', '/life/today/week'], ['/life/journal/pages', '/life/library'],
+          ['/life/calendar/year', '/life/today/year'], ['/life/calendar/agenda', '/life/today/week'], ['/life/journal', '/life/goals/cycles'],
+          ['/life/journal/goals', '/life/goals/cycles'], ['/life/journal/month', '/life/goals/cycles'], ['/life/journal/habits', '/life/today/month'],
+          ['/life/journal/checkins', '/life/today/month'], ['/life/journal/review', '/life/today/week'], ['/life/journal/pages', '/life/library/notes'],
           [`/life/journal/goals/${goal}`, `/life/goals/${goal}`], ['/life/areas', '/life/settings'], [`/life/areas/${area}`, '/life/today'],
           ['/life/no-such-page', '/life/today']]
         const bad = []
@@ -4161,7 +4164,7 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
         })
       }
       await check(`${tag}.7`, `${width} px: tabs are routes: each tab has its own path, and reloading /life/goals/tasks lands on Goals > All tasks`, async () => {
-        const TABS = { today: ['day', 'week', 'month', 'year'], brain: ['needs-you', 'activity', 'sources'], goals: ['by-area', 'tasks', 'no-goal'],
+        const TABS = { today: ['day', 'week', 'month', 'year'], brain: ['needs-you', 'activity', 'sources'], goals: ['by-area', 'tasks', 'no-goal', 'cycles'],
           library: ['all', 'notes', 'documents', 'people', 'chats'] }
         const bad = []
         for (const [place, tabs] of Object.entries(TABS)) {
@@ -6110,7 +6113,7 @@ print(json.dumps(t.name))`).split('\n').pop())
       const now = await s.api('journal.month', { space: SPACE })
       const third = now.plan.goals.find((g) => g.title === T('third'))
       await s.api('journal.save_month_goal', { plan: plan.plan.name, row: third.row, move: -1 })
-      await s.open('/life/today/month?view=plan')
+      await s.open('/life/goals/cycles')
       await pg.locator('[data-month-goal]').first().waitFor({ timeout: 10000 })
       const titles = (await pg.locator('[data-month-goal]').allInnerTexts()).map((x) => x.split('\n').find((l) => l.startsWith('I60 '))).filter((x) => [T('first'), T('second'), T('third')].includes(x))
       must(titles.join('|') === [T('first'), T('third'), T('second')].join('|'), 'the Month goals are in the order: ' + titles)
@@ -6316,6 +6319,263 @@ for (const width of SET_WIDTHS) {
   } finally {
     await save({ weekly_review_day: was.weekly_review_day, week_starts_on: was.week_starts_on || 'Monday', old_inbox_days: was.old_inbox_days || 7, work_days: was.work_days || 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
       month_plan_enabled: was.month_plan_enabled ? 1 : 0, score_target: was.score_target, cycle_break_week: was.cycle_break_week ? 1 : 0 })
+    await s.ctx.close()
+  }
+}
+
+// Issue 45: Goals > Cycles. The 12 Week Year (week bars, each goal's lead action and this week's ticks) beside this month's plan; the Plan
+// section's month, year, 12 Weeks and journal routes land here; journal pages are a kind in Library > Notes. Titles start "I45 ".
+for (const width of SET_WIDTHS) {
+  const tag = `I45.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I45 ${what} ${width} ${stamp}`
+  const settle = () => pg.waitForTimeout(700)
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const ready = () => pg.locator('[data-cycles][data-loaded="1"]').waitFor({ timeout: 15000 })
+  const was = (await s.api('settings.get', { space: SPACE })).settings
+  const cleanup = () => bench(`frappe.set_user("Administrator")
+for g in frappe.get_all("Life Goal", filters={"title": ["like", "I45 % ${width} ${stamp}"]}, pluck="name"):
+    frappe.db.delete("Life Task", {"goal": g})
+    frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)
+for c in frappe.get_all("Life Cycle", filters={"title": ["like", "I45 % ${width} ${stamp}"]}, pluck="name"):
+    for g in frappe.get_all("Life Goal", filters={"cycle": c}, pluck="name"): frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)
+    frappe.db.delete("Life Cycle", {"name": c})`)
+  // the active cycle gets one goal of this check, with a lead action done three times a week
+  let seeded = null
+  const seed = () => {
+    if (!seeded) seeded = JSON.parse(bench(`import json
+cycle = frappe.db.get_value("Life Cycle", {"space": "${SPACE}", "status": "Active"})
+g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('cycle goal')}", "horizon": "12 weeks", "cycle": cycle, "done_when": "Done", "sort_order": 999,
+  "actions": [{"title": "${T('lead')}", "per_week": 3, "status": "Open"}]}).insert(ignore_permissions=True)
+print(json.dumps({"cycle": cycle, "goal": g.name}))`).split('\n').pop())
+    return seeded
+  }
+  try {
+    await check(`${tag}.1`, `${width} px: Goals shows four tabs, and Cycles opens at /life/goals/cycles`, async () => {
+      await s.open('/life/goals')
+      const tabs = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
+      must(JSON.stringify(tabs) === JSON.stringify(['by-area', 'tasks', 'no-goal', 'cycles']), `Goals' tabs are ${tabs}`)
+      await pg.locator('[data-place-tabs] [data-tab="cycles"]').click()
+      await pg.waitForURL((u) => u.pathname === '/life/goals/cycles', { timeout: 10000 })
+      await ready()
+      must((await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current')) === 'cycles', 'the Cycles tab is not the open one')
+      await s.open('/life/goals/cycles')
+      await ready()
+      must(await pg.locator('[data-cycle-card]').isVisible(), 'the 12 Week Year card is not shown')
+    })
+
+    await check(`${tag}.2`, `${width} px: the week bars show the scores of the grid, with this week marked "so far"`, async () => {
+      seed()
+      const g = await s.api('journal.grid', { space: SPACE })
+      await s.open('/life/goals/cycles')
+      await ready()
+      must(await pg.locator('[data-week-bar]').count() === 12, 'there are not twelve week bars')
+      for (const w of g.weeks.slice(0, g.current_week - 1)) {
+        const got = await pg.locator(`[data-week-bar="${w.week}"]`).getAttribute('data-score')
+        must(Number(got) === Math.round(w.percent), `week ${w.week} shows ${got}, the grid says ${Math.round(w.percent)}`)
+        must((await pg.locator(`[data-week-bar="${w.week}"]`).getAttribute('data-week-state')) === 'past', `week ${w.week} is not marked as past`)
+      }
+      const now = pg.locator(`[data-week-bar="${g.current_week}"]`)
+      must((await now.getAttribute('data-week-state')) === 'now' && (await now.innerText()).includes('so far'), 'this week is not marked "so far"')
+      if (g.current_week < 12) must((await pg.locator(`[data-week-bar="${g.current_week + 1}"]`).getAttribute('data-week-state')) === 'future', 'a later week is not empty')
+      must(/week \d+ of 12/.test(await pg.locator('[data-cycle-line]').innerText()) && /average \d+%/.test(await pg.locator('[data-cycle-line]').innerText()) && /target \d+%/.test(await pg.locator('[data-cycle-line]').innerText()),
+        'the header line does not give the week, average and target')
+    })
+
+    await check(`${tag}.3`, `${width} px: ticking a lead action records the tick and the week's score so far changes`, async () => {
+      const { cycle, goal } = seed()
+      await s.open('/life/goals/cycles')
+      await ready()
+      const row = pg.locator(`[data-cycle-goal][data-goal="${goal}"]`)
+      const before = (await pg.locator('[data-week-so-far]').innerText()).trim()
+      await row.locator('[data-tick]').first().click()
+      await settle()
+      const after = (await pg.locator('[data-week-so-far]').innerText()).trim()
+      must(before !== after, `the score so far stayed at ${before}`)
+      must((await row.locator('[data-tick-count]').innerText()).startsWith('1 of 3'), 'the row does not say 1 of 3')
+      const g = await s.api('journal.grid', { space: SPACE, cycle })
+      const a = g.goals.find((x) => x.name === goal).actions[0]
+      must(a.ticks[String(g.current_week)] === 1, 'the tick was not recorded on the server')
+      must(Math.round(g.weeks[g.current_week - 1].percent) + '%' === after, `the server says ${Math.round(g.weeks[g.current_week - 1].percent)}%, the page ${after}`)
+      await row.locator('[data-tick]').first().click() // un-tick again: the same button turns it off
+      await settle()
+      must((await row.locator('[data-tick-count]').innerText()).startsWith('0 of 3'), 'a second press did not clear the tick')
+    })
+
+    await check(`${tag}.4`, `${width} px: each cycle goal shows its lead action and this week's ticks, as the goal page does`, async () => {
+      const { cycle, goal } = seed()
+      await s.api('journal.tick', { action: (await s.api('journal.goal', { goal })).goal.actions[0].name, week: (await s.api('journal.grid', { space: SPACE, cycle })).current_week, count: 2 })
+      await s.open('/life/goals/cycles')
+      await ready()
+      const row = pg.locator(`[data-cycle-goal][data-goal="${goal}"]`)
+      must((await row.locator('[data-lead-action]').innerText()).includes(T('lead')) && (await row.locator('[data-lead-action]').innerText()).includes('3/wk'), 'the row does not show the lead action and how often')
+      must((await row.locator('[data-tick-count]').innerText()).startsWith('2 of 3') && await row.locator('[data-tick][aria-pressed="true"]').count() === 2, 'the row does not show 2 of 3 ticks')
+      // every goal of the cycle has a row with the lead action the grid gives it
+      const g = await s.api('journal.grid', { space: SPACE, cycle })
+      for (const x of g.goals) {
+        const lead = x.actions.find((a) => a.status === 'Open')
+        const rows = pg.locator(`[data-cycle-goal][data-goal="${x.name}"]`)
+        must(await rows.count() === 1, `${x.title} has no row`)
+        if (lead) must((await rows.locator('[data-lead-action]').innerText()).includes(lead.title), `${x.title}: the lead action is not ${lead.title}`)
+      }
+      await s.open(`/life/goals/${goal}`)
+      await pg.getByText(T('lead')).first().waitFor({ timeout: 10000 }).catch(() => {})
+      // what the goal page reads (journal.goal) names the same lead action, with the same ticks
+      const asked = (await s.api('journal.goal', { goal })).goal.actions.find((x) => x.status === 'Open')
+      must(asked && asked.title === T('lead') && asked.per_week === 3 && Object.values(asked.ticks).reduce((x, y) => x + y, 0) === 2, 'the goal page data does not match the row')
+    })
+
+    // the month plan checks use goals in this month and last month's plan
+    await check(`${tag}.5`, `${width} px: the month plan lists the month goals in priority order with their status; a goal carried from last month says so`, async () => {
+      const now = new Date(Date.parse(today + 'T12:00:00Z'))
+      const py = now.getUTCMonth() === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear(), pm = now.getUTCMonth() === 0 ? 12 : now.getUTCMonth()
+      const last = await s.api('journal.month', { space: SPACE, year: py, month: pm, create: 1 })
+      await s.api('journal.save_month_goal', { plan: last.plan.name, title: T('carried') })
+      const lastGoal = (await s.api('journal.month', { space: SPACE, year: py, month: pm })).plan.goals.find((x) => x.title === T('carried'))
+      await s.api('journal.carry_month_goal', { plan: last.plan.name, row: lastGoal.row })
+      const cur = await s.api('journal.month', { space: SPACE, create: 1 })
+      for (const w of ['second', 'third']) await s.api('journal.save_month_goal', { plan: cur.plan.name, title: T(w) })
+      const goals = (await s.api('journal.month', { space: SPACE })).plan.goals.filter((x) => x.title.startsWith('I45 ') && x.title.endsWith(`${width} ${stamp}`))
+      const third = goals.find((x) => x.title === T('third'))
+      await s.api('journal.save_month_goal', { plan: cur.plan.name, row: third.row, move: -1 })
+      const order = (await s.api('journal.month', { space: SPACE })).plan.goals.map((x) => x.title).filter((t) => t.startsWith('I45 ') && t.endsWith(`${width} ${stamp}`))
+      await s.open('/life/goals/cycles')
+      await ready()
+      const rows = await pg.locator('[data-month-goal]').evaluateAll((els) => els.map((e) => ({ text: e.innerText, status: e.querySelector('[data-month-status]')?.innerText })))
+      const mine = rows.filter((r) => r.text.includes(`${width} ${stamp}`))
+      must(mine.map((r) => r.text.split('\n').find((l) => l.startsWith('I45 '))).join('|') === order.join('|'), `the month goals are in the order ${mine.map((r) => r.text.split('\n').find((l) => l.startsWith('I45 ')))}, not ${order}`)
+      must(mine.some((r) => /Carried from/.test(r.status || '') && r.text.includes(T('carried'))), 'the goal carried from last month does not say so')
+      must(mine.filter((r) => r.text.includes(T('second'))).every((r) => /In progress|\d+ of \d+/.test(r.status)), 'an open goal does not say In progress')
+      must((await pg.locator('[data-month-title]').innerText()).endsWith('plan') && /month goals? ·/.test(await pg.locator('[data-month-card]').innerText()), 'the month plan has no title or count')
+      must(await pg.locator('[data-month-habits]').count() > 0 || (await pg.locator('[data-month-card]').innerText()).length > 0, 'the habits are missing')
+      must(/plan opens on 1 /.test(await pg.locator('[data-month-next]').innerText()), 'no note on when next month opens')
+    })
+
+    await check(`${tag}.6`, `${width} px: Edit on the month plan changes a goal's status, and Cycles shows it`, async () => {
+      await s.open('/life/goals/cycles')
+      await ready()
+      await pg.locator('[data-month-edit]').click()
+      const dialog = pg.locator('[data-month-edit-body]')
+      await dialog.locator('[data-month-goal]', { hasText: T('second') }).waitFor({ timeout: 10000 })
+      await dialog.locator('[data-month-goal]', { hasText: T('second') }).getByRole('checkbox').click()
+      await settle()
+      await pg.keyboard.press('Escape')
+      await settle()
+      const row = pg.locator('[data-month-card] [data-month-goal]', { hasText: T('second') })
+      await row.locator('[data-month-status]', { hasText: 'Done' }).waitFor({ timeout: 10000 })
+      const done = (await s.api('journal.month', { space: SPACE })).plan.goals.find((x) => x.title === T('second'))
+      must(done.status === 'Done', 'the server did not record Done')
+    })
+
+    await check(`${tag}.7`, `${width} px: with the month plan switched off in Rhythms, the month plan panel is hidden`, async () => {
+      try {
+        await s.api('settings.save', { values: { month_plan_enabled: 0 } })
+        await s.open('/life/goals/cycles')
+        await ready()
+        must(await pg.locator('[data-month-card]').count() === 0, 'the month plan is shown with the month plan off')
+        must(await pg.locator('[data-cycle-card]').isVisible(), 'the 12 Week Year is gone too')
+      } finally {
+        await s.api('settings.save', { values: { month_plan_enabled: was.month_plan_enabled ? 1 : 0 } })
+      }
+      await s.open('/life/goals/cycles')
+      await ready()
+      if (was.month_plan_enabled) must(await pg.locator('[data-month-card]').count() === 1, 'the month plan did not come back')
+    })
+
+    await check(`${tag}.8`, `${width} px: a closed cycle chosen from the picker is shown read-only`, async () => {
+      const closed = bench(`from frappe.utils import add_days, today
+c = frappe.get_doc({"doctype": "Life Cycle", "space": "${SPACE}", "title": "${T('closed')}", "start_date": add_days(today(), -400), "status": "Closed", "final_score": 66}).insert(ignore_permissions=True)
+print(c.name)`).split('\n').pop()
+      must(closed, 'no closed cycle was made')
+      await s.open('/life/goals/cycles')
+      await ready()
+      await pg.locator('[data-cycle-picker]').click()
+      await pg.getByRole('menuitem', { name: new RegExp(T('closed')) }).click()
+      await pg.locator('[data-cycle-closed]').waitFor({ timeout: 10000 })
+      must(new URL(pg.url()).searchParams.get('cycle') === closed, 'the picked cycle is not in the address')
+      must((await pg.locator('[data-cycle-title]').innerText()).includes(T('closed').slice(0, 0)) && /closed/.test(await pg.locator('[data-cycle-line]').innerText()), 'the header does not say the cycle is closed')
+      must(await pg.locator('[data-tick]:not([disabled])').count() === 0, 'a closed cycle has ticks that can be pressed')
+      must(await pg.locator('[data-week-bar][data-week-state="future"]').count() === 0, 'a closed cycle shows empty future weeks')
+      await pg.locator('[data-cycle-goals]').click()
+      await pg.locator('[data-cycle-goals-body]').waitFor()
+      must(!(await pg.locator('[data-cg-add]').count()) && /read-only/.test(await pg.locator('[data-cycle-goals-body]').innerText()), 'a closed cycle can be edited')
+      await pg.keyboard.press('Escape')
+    })
+
+    await check(`${tag}.9`, `${width} px: journal pages appear in Library > Notes as "Journal page" and open with their image`, async () => {
+      // a page of its own, with a photograph, so that this check does not depend on another check having made one
+      const jp = bench(`p = frappe.get_doc({"doctype": "Life Journal Page", "space": "${SPACE}", "page_date": frappe.utils.today(), "page_number": "9${width}", "transcript_md": "${T('page words')}"}).insert(ignore_permissions=True)
+print(p.name)`).split('\n').pop()
+      const file = (await s.upload('Life Journal Page', jp, `i45-${width}-${stamp}.png`, 'image/png', await pg.screenshot())).file_url
+      bench(`frappe.db.set_value("Life Journal Page", "${jp}", "image", "${file}")`)
+      try {
+        await s.api('views.save', { screen: 'library', space: SPACE, state: {} }) // an earlier check left "Written by the assistant" remembered
+        await s.open('/life/library/notes?view=list')
+        await pg.locator('[data-journal-page-badge]:visible').first().waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-journal-page-badge]:visible').first().innerText()).includes('Journal page'), 'the kind is not "Journal page"')
+        await s.open(`/life/library/notes?view=list&open=page:${jp}`)
+        await pg.locator('[data-pane]').waitFor({ timeout: 10000 })
+        await pg.locator('[data-pane] img[alt="Photographed journal page"]').waitFor({ timeout: 10000 })
+        must(await pg.locator('[data-pane-tabs] [data-tab="transcript"]').count() === 1, 'the pane has no transcript tab')
+        await pg.locator('[data-pane-tabs] [data-tab="transcript"]').click()
+        await pg.getByText(T('page words')).first().waitFor({ timeout: 10000 })
+      } finally {
+        bench(`frappe.set_user("Administrator")
+frappe.delete_doc("Life Journal Page", "${jp}", force=1, ignore_permissions=True)`)
+      }
+    })
+
+    await check(`${tag}.10`, `${width} px: the old Plan month, year, 12 Weeks and journal routes land on Goals > Cycles or the page in Library`, async () => {
+      const jp = bench(`p = frappe.get_doc({"doctype": "Life Journal Page", "space": "${SPACE}", "page_date": frappe.utils.today(), "transcript_md": "${T('route page')}"}).insert(ignore_permissions=True)
+print(p.name)`).split('\n').pop()
+      const bad = []
+      for (const [from, to] of [['/life/plan/month?view=plan', '/life/goals/cycles'], ['/life/plan/year?view=cycle', '/life/goals/cycles'], ['/life/plan/12-weeks', '/life/goals/cycles'],
+        ['/life/today/month?view=plan', '/life/goals/cycles'], ['/life/today/year?view=cycle', '/life/goals/cycles'], ['/life/journal', '/life/goals/cycles'],
+        ['/life/journal/goals', '/life/goals/cycles'], ['/life/journal/month', '/life/goals/cycles'], [`/life/journal/pages/${jp}`, '/life/library/notes']]) {
+        await s.open(from)
+        if (new URL(pg.url()).pathname !== to) bad.push(`${from} → ${new URL(pg.url()).pathname}`)
+      }
+      must(!bad.length, bad.join('; '))
+      for (const [from, link] of [['/life/today/month', 'Month plan'], ['/life/today/year', '12 Week Year']]) {
+        await s.open(from)
+        await pg.locator('[data-view-links]').waitFor({ timeout: 10000 })
+        must(await pg.locator('[data-view-links] a', { hasText: link }).first().getAttribute('href') === '/life/goals/cycles', `${from}'s header does not link to Goals > Cycles`)
+      }
+    })
+
+    await check(`${tag}.11`, `${width} px: ${phone ? 'one column, and the week bars scroll inside their card, not the page' : 'two columns, the 12 Week Year beside the month plan'}`, async () => {
+      await s.open('/life/goals/cycles')
+      await ready()
+      const left = await pg.locator('[data-cycle-card]').boundingBox(), right = await pg.locator('[data-month-card]').boundingBox()
+      if (!right) return 'the month plan is off here'
+      if (phone) {
+        must(right.y >= left.y + left.height - 2 && Math.abs(right.x - left.x) < 2, 'the cards are not one column, the 12 Week Year first')
+        const sc = await pg.locator('[data-week-bars-scroll]').evaluate((e) => ({ inner: e.scrollWidth, outer: e.clientWidth }))
+        must(sc.inner > sc.outer, `the week bars do not scroll inside their card (${sc.inner} in ${sc.outer})`)
+      } else must(right.x > left.x + left.width - 2 && Math.abs(right.y - left.y) < 4, 'the cards are not side by side')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.E`, `${width} px: Cycles on a space with no cycle shows what will appear and the one action`, async () => {
+      const fam = await session('family@lifeos.test', width)
+      try {
+        await fam.open('/life/goals/cycles')
+        await fam.page.locator('[data-cycles][data-loaded="1"]').waitFor({ timeout: 15000 })
+        const text = await fam.page.locator('[data-cycle-card]').innerText()
+        must(/No 12 Week Year yet\./.test(text) && /Start a cycle next Monday/.test(text), `the empty card says "${text.slice(0, 120)}"`)
+        const over = await fam.page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
+        must(!over, 'the empty screen scrolls sideways')
+      } finally { await fam.ctx.close() }
+    })
+  } finally {
+    cleanup()
+    await s.api('settings.save', { values: { month_plan_enabled: was.month_plan_enabled ? 1 : 0 } })
     await s.ctx.close()
   }
 }

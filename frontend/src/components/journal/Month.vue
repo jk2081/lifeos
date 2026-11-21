@@ -1,5 +1,5 @@
 <template>
-  <Teleport defer to="#jr-actions">
+  <Teleport v-if="!embedded" defer to="#jr-actions">
     <Button icon="lucide-chevron-left" label="Previous month" @click="step(-1)" />
     <Button icon="lucide-chevron-right" label="Next month" @click="step(1)" />
   </Teleport>
@@ -74,6 +74,8 @@ import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { MONTHS, long, parse } from '@/lib/dates'
 
+// `embedded`: opened over Goals > Cycles, with no header buttons to teleport to
+defineProps({ embedded: Boolean })
 const emit = defineEmits(['sub'])
 const now = parse(store.today)
 const year = ref(now.getFullYear())

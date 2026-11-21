@@ -455,8 +455,16 @@ def month_goals(space, year, month) -> list[dict]:
 		for goal, task in frappe.db.sql("""select goal, name from `tabLife Task` where goal in %s and status in ('Open', 'Doing', 'Waiting')
 			order by creation desc""", [[r.name for r in rows]]):
 			tasks[goal] = task
+	from lifeos.api.goals import task_counts
+
+	counts = task_counts([r.name for r in rows])
+	from_month = {}
+	if any(r.carried_from for r in rows):
+		from_month = dict(frappe.get_all("Life Goal", filters={"name": ("in", [r.carried_from for r in rows if r.carried_from])},
+			fields=["name", "target_date"], as_list=True))
 	return [{"row": r.name, "title": r.title, "status": STATUS_OF.get(r.outcome, "Done"), "area": r.area, "task": tasks.get(r.name),
-		"carried_from": r.carried_from} for r in rows]
+		"carried_from": r.carried_from, "carried_from_month": from_month[r.carried_from].month if from_month.get(r.carried_from) else None,
+		"tasks_done": counts.get(r.name, (0, 0))[0], "tasks_counted": counts.get(r.name, (0, 0))[1]} for r in rows]
 
 
 def add_month_goal(space, year, month, title, area=None, carried_from=None, serves=None, ignore_permissions=False):

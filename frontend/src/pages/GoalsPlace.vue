@@ -3,6 +3,7 @@
   <Goals v-else-if="current === 'by-area'" />
   <GoalsAllTasks v-else-if="current === 'tasks' && allTasks" />
   <GoalsNoGoal v-else-if="current === 'no-goal' && noGoal" @changed="loadCount" />
+  <GoalsCycles v-else-if="current === 'cycles'" />
   <Tasks v-else-if="current === 'tasks' || current === 'no-goal'" :key="current" :screen="current === 'no-goal' ? 'tasks-no-goal' : 'tasks'" />
   <Someday v-else-if="current === 'someday'" />
   <PlaceLinks :links="LINKS" label="More in Goals" />
@@ -14,6 +15,7 @@ import { computed, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GoalsByArea from '@/components/goals/GoalsByArea.vue'
 import GoalsNoGoal from '@/components/goals/GoalsNoGoal.vue'
+import GoalsCycles from '@/components/goals/GoalsCycles.vue'
 import GoalsAllTasks from '@/components/goals/GoalsAllTasks.vue'
 import Goals from '@/pages/Goals.vue'
 import Tasks from '@/pages/Tasks.vue'

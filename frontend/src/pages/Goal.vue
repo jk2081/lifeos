@@ -2,7 +2,7 @@
   <template v-if="d">
     <PageHead :title="g.title" :crumb="{ to: '/goals', label: 'Goals', here: d.cycle ? d.cycle.title : g.horizon }" :sub="sub">
       <Badge :theme="themeOf(g)" :label="g.is_archived ? `${g.status}, archived` : g.status === 'On Hold' ? 'On hold' : g.status" data-goal-status />
-      <Button v-if="d.cycle" label="Open grid" :route="`/today/year?view=cycle&cycle=${d.cycle.name}`" />
+      <Button v-if="d.cycle" label="Open grid" :route="`/goals/cycles?cycle=${d.cycle.name}`" />
       <template v-if="writable && g.horizon !== '12 weeks'">
         <Button v-if="!g.is_archived" label="New note" @click="noteOpen = true" />
         <Button v-if="g.is_archived" variant="solid" label="Restore" data-goal-restore @click="setStatus('Active')" />
@@ -53,7 +53,7 @@
               <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
                 <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
               <Badge v-if="a.status !== 'Open'" :theme="a.status === 'Done' ? 'green' : 'gray'" :label="a.status" /></Row>
-              <Empty v-if="!j.goal.actions.length" title="No actions." hint="Edit the goal on the grid to add weekly actions." /></Card>
+              <Empty v-if="!j.goal.actions.length" title="No actions." hint="Edit the goal under Cycle goals on Goals > Cycles to add weekly actions." /></Card>
           </section>
           <section v-if="g.result_note"><SectionHead>Result</SectionHead><Card>{{ g.result_note }}</Card></section>
         </div>

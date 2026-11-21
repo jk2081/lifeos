@@ -114,7 +114,7 @@ def detect_cycle(space):
 		if prev["planned"] and prev["percent"] < target:
 			out.append(candidate("12 Week Year", f"Week {week - 1} ended at {round(prev['percent'])}% against your {target}% target",
 				[ev("Life Cycle", cycle.name, cycle.title)], body=f"{prev['done']} of {prev['planned']} planned ticks were done.",
-				actions=[{"kind": "open_list", "label": "Open the grid", "to": {"path": "/journal", "query": {}}}]))
+				actions=[{"kind": "open_list", "label": "Open the grid", "to": {"path": "/goals/cycles", "query": {}}}]))
 	no_ticks, no_tasks = counts.goal_sets(space)
 	if no_ticks:
 		titles = {g.name: g.title for g in goals}

@@ -33,7 +33,7 @@
           <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
             <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
           <Badge v-if="a.status !== 'Open'" :theme="a.status === 'Done' ? 'green' : 'gray'" :label="a.status" /></Row>
-          <Empty v-if="!d.goal.actions.length" title="No actions." hint="Edit the goal on the grid to add weekly actions." /></Card>
+          <Empty v-if="!d.goal.actions.length" title="No actions." hint="Edit the goal under Cycle goals on Goals > Cycles to add weekly actions." /></Card>
       </section>
     </template>
     <section v-if="on('tasks')" class="flex flex-col gap-3">
@@ -69,7 +69,7 @@
     <Dialog v-model:open="moveOpen" title="Add to a 12 Week Year" size="sm" :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Add', variant: 'solid', onClick: moveToCycle }]">
       <div class="flex flex-col gap-2">
         <Select v-model="cycle" :options="d.cycles.map((c) => ({ label: `${c.title} (${c.status.toLowerCase()})`, value: c.name }))" aria-label="Cycle" data-goal-cycle />
-        <p class="text-sm text-ink-gray-6">It becomes a 12 Week Year goal in that cycle and keeps its tasks. Add its weekly actions on the grid.</p>
+        <p class="text-sm text-ink-gray-6">It becomes a 12 Week Year goal in that cycle and keeps its tasks. Add its weekly actions under Cycle goals on Goals > Cycles.</p>
       </div>
     </Dialog>
   </template>

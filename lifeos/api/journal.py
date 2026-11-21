@@ -36,7 +36,16 @@ def grid(cycle: str | None = None, space: str | None = None, area: str | None = 
 	out["cycles"] = frappe.get_all("Life Cycle", filters={"space": doc.space}, fields=["name", "title", "status", "start_date"], order_by="start_date desc", limit=40)
 	for c in out["cycles"]:
 		c["start_date"] = str(c.start_date)
+	out["next"] = _next_cycle_dates(doc)
 	return out
+
+
+def _next_cycle_dates(cycle):
+	"""When planning for the next cycle opens (the Monday of week 11), when it starts, and the break week that comes between."""
+	settings = frappe.get_cached_doc("Life Settings")
+	start = rules.next_monday(cycle.end_date)
+	return {"plan_opens": str(add_days(getdate(cycle.start_date), 70)), "starts": str(start),
+		"break_week": [str(add_days(getdate(cycle.end_date), 1)), str(add_days(start, -1))] if settings.cycle_break_week else None}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -264,7 +273,8 @@ def month(space: str | None = None, year: int | None = None, month: int | None =
 	checkin = None
 	if latest:
 		checkin = _checkin_dict(frappe.get_doc("Life Check-in", latest[0].name))
-	out = {"year": year, "month": month, "plan": _plan_dict(plan) if plan else None, "habits": rules.habits_month(space, year, month),
+	enabled = frappe.get_cached_doc("Life Settings").month_plan_enabled
+	out = {"year": year, "month": month, "enabled": bool(1 if enabled is None else int(enabled)), "plan": _plan_dict(plan) if plan else None, "habits": rules.habits_month(space, year, month),
 		"latest_checkin": checkin, "today": str(now)}
 	area = lens_area(area)
 	if area:

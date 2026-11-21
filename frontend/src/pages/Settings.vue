@@ -173,7 +173,7 @@
           </Card>
           <SectionHead>12 Weeks</SectionHead>
           <Card flush>
-            <SettingRow label="Current cycle" :help="d.cycle ? `Week ${d.cycle.week} of 12. The next cycle can be planned from week 11.` : 'No cycle is running. Start one on Plan, 12 Weeks.'">
+            <SettingRow label="Current cycle" :help="d.cycle ? `Week ${d.cycle.week} of 12. The next cycle can be planned from week 11.` : 'No cycle is running. Start one on Goals, Cycles.'">
               <span class="text-sm text-ink-gray-7" data-current-cycle>{{ d.cycle ? `${short(d.cycle.start_date)} to ${short(d.cycle.end_date, true)}` : '—' }}</span>
             </SettingRow>
             <SettingRow label="Score target" help="The weekly share of planned actions you aim to complete, in per cent." :error="errors.score_target">
