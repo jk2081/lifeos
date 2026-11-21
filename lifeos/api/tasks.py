@@ -39,11 +39,12 @@ def decorate(rows):
 	return rows
 
 
-def query(space, where="", values=None, order=None, start=0, page_length=50, fields=None):
+def query(space, where="", values=None, order=None, start=0, page_length=50, fields=None, hide_off=True):
 	cols = ", ".join([f"t.`{f}`" for f in FIELDS] + extra_columns("Life Task", fields, "t", FIELDS))
 	order = order or f"t.due_date is null, t.due_date asc, {PRIORITY_ORDER}, t.creation asc"
 	values = dict(values or {})
-	where = (where or "") + off_clause(space, "t.area", values, "query_off_areas")  # areas switched off (issue 11)
+	if hide_off:
+		where = (where or "") + off_clause(space, "t.area", values, "query_off_areas")  # areas switched off (issue 11)
 	# columns are FIELDS or pass column() (DocType meta); WHERE comes from where_clause and ORDER from SORTS or std_order
 	# nosemgrep: frappe-sql-format-injection -- fixed SQL and meta-checked columns only; values are parameters
 	rows = frappe.db.sql(
@@ -191,6 +192,197 @@ def list(space: str | None = None, status: str | None = "open", area: str | None
 	# nosemgrep: frappe-sql-format-injection -- where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters
 	total = frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 	return {"tasks": rows, "total": total, "start": start, "page_length": page_length, "today": today(), "tabs": tabs}
+
+
+ALL_SHOWS = {
+	"open": "t.status in ('Open', 'Doing', 'Waiting')",
+	"due": "t.status in ('Open', 'Doing', 'Waiting') and t.due_date is not null and t.due_date <= %(week_end)s",
+	"waiting": "t.status = 'Waiting'",
+	"someday": "t.status = 'Someday'",
+	"done": "t.status = 'Done'",
+}
+ALL_CAP = 1000
+DUE_GROUPS = (("overdue", "Overdue"), ("today", "Today"), ("week", "This week"), ("later", "Later"), ("none", "No date"))
+
+
+def _due_group(task, now, week_end):
+	if not task.due_date:
+		return "none"
+	d = getdate(task.due_date)
+	return "overdue" if d < now else "today" if d == now else "week" if d <= week_end else "later"
+
+
+@frappe.whitelist(methods=["GET"])
+def all_tasks(space: str | None = None, group: str = "area", show: str = "open", area: str | None = None, q: str | None = None):
+	"""Goals → All tasks: the tasks of one filter in groups, each task once. `show`: open (Open, Doing and Waiting), due (open and
+	due by the end of this week), waiting, someday or done. `group`: area (the areas that are on, each with its parts; tasks with
+	no area last), goal (a group for each goal, then no goal) or due (overdue, today, this week, later, no date). `area` keeps one area
+	of life with its parts; `q` searches titles. `counts` gives the tasks under each filter for the same area and search.
+	At most 1,000 tasks come back (`truncated`); Done keeps the newest first."""
+	space = permissions.resolve_space(space)
+	if show not in ALL_SHOWS:
+		frappe.throw(_("Unknown filter."))
+	if group not in ("area", "goal", "due"):
+		frappe.throw(_("Unknown grouping."))
+	now = getdate(today())
+	values = {"today": now, "week_end": add_days(now, 6 - now.weekday())}
+	base = " and t.is_archived = 0"
+	if area:
+		base += " and " + area_filter(space, area, "t.area", values)
+	if q and q.strip():
+		base += " and t.title like %(q)s"
+		values["q"] = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+	where = base + " and " + ALL_SHOWS[show]
+	order = "t.completed_on desc, t.modified desc" if show == "done" else None
+	rows = query(space, where, values, order, 0, ALL_CAP + 1, ["is_top_three"])
+	truncated = len(rows) > ALL_CAP
+	rows = rows[:ALL_CAP]
+	# the same filters (and the areas that are off) without the tab's own condition, so each filter's count agrees with its list
+	cond = ", ".join(f"ifnull(sum({c}), 0)" for c in ALL_SHOWS.values())
+	off = off_clause(space, "t.area", values, "count_off_areas")
+	# nosemgrep: frappe-sql-format-injection -- ALL_SHOWS is a constant map, base and off are fixed SQL; values are parameters
+	counts = dict(zip(ALL_SHOWS, [int(n) for n in frappe.db.sql(
+		f"select {cond} from `tabLife Task` t where t.space=%(space)s {base} {off}", {**values, "space": space})[0]]))
+	groups = {"area": _by_area, "goal": _by_goal, "due": _by_due}[group](space, rows, show, now, values["week_end"])
+	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0, "is_life_area": 1}, fields=["name", "area_name", "colour", "is_on"],
+		order_by="sort_order asc, area_name asc", limit=50)
+	return {"space": space, "group": group, "show": show, "total": len(rows), "truncated": truncated, "counts": counts, "groups": groups,
+		"areas": [a for a in areas if a.is_on], "today": str(now)}
+
+
+def _by_area(space, rows, show, now, week_end):
+	from lifeos.areas import off as areas_off
+
+	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour"],
+		order_by="sort_order asc, area_name asc", limit=5000)
+	hidden = set(areas_off(space))
+	by = {}
+	for r in rows:
+		by.setdefault(r.area or "", []).append(r)
+	out = []
+	for a in [x for x in tree if not x.parent_area and x.name not in hidden]:
+		parts = [x for x in tree if x.parent_area == a.name and x.name not in hidden]
+		subs = [{"name": "", "label": "", "area": a.name, "tasks": by.pop(a.name, [])}]
+		subs += [{"name": p.name, "label": p.area_name, "area": p.name, "tasks": by.pop(p.name, [])} for p in parts]
+		subs = [s for s in subs if s["tasks"]]
+		if subs:
+			out.append({"key": a.name, "label": a.area_name, "colour": a.colour, "area": a.name, "count": sum(len(s["tasks"]) for s in subs), "parts": subs})
+	loose = [t for ts in by.values() for t in ts]  # no area, or an area that is gone: listed last so no task is hidden
+	if loose:
+		out.append({"key": "none", "label": "No area", "colour": None, "area": "", "count": len(loose), "parts": [{"name": "", "label": "", "area": "", "tasks": loose}]})
+	return out
+
+
+def _by_goal(space, rows, show, now, week_end):
+	by = {}
+	for r in rows:
+		by.setdefault(r.goal or "", []).append(r)
+	goals = frappe.get_all("Life Goal", filters={"name": ("in", [g for g in by if g] or [""])}, fields=["name", "title", "area"], order_by="sort_order asc, creation asc", limit=0)
+	out = [{"key": g.name, "label": g.title, "colour": None, "goal": g.name, "area": g.area or "", "count": len(by[g.name]),
+		"parts": [{"name": "", "label": "", "area": g.area or "", "tasks": by[g.name]}]} for g in goals]
+	if by.get(""):
+		out.append({"key": "none", "label": "No goal", "colour": None, "goal": "", "area": "", "count": len(by[""]),
+			"parts": [{"name": "", "label": "", "area": "", "tasks": by[""]}]})
+	return out
+
+
+def _by_due(space, rows, show, now, week_end):
+	if show == "done":
+		return [{"key": "done", "label": "Done", "colour": None, "area": "", "count": len(rows), "parts": [{"name": "", "label": "", "area": "", "tasks": rows}]}] if rows else []
+	by = {k: [] for k, _label in DUE_GROUPS}
+	for r in rows:
+		by[_due_group(r, now, week_end)].append(r)
+	return [{"key": k, "label": label, "colour": None, "area": "", "count": len(by[k]), "parts": [{"name": "", "label": "", "area": "", "tasks": by[k]}]}
+		for k, label in DUE_GROUPS if by[k]]
+
+
+NO_GOAL = "and t.is_archived = 0 and t.status in ('Open', 'Doing', 'Waiting') and ifnull(t.goal, '') = '' and ifnull(t.standalone, 0) = 0"
+
+
+def no_goal_count(space):
+	"""Open tasks with no goal that nobody has marked as fine without one. Tasks of an area that is off count too: they are
+	listed on Goals > No goal until the owner decides."""
+	# nosemgrep: frappe-sql-format-injection -- NO_GOAL is a constant fragment
+	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {NO_GOAL}", {"space": space})[0][0]
+
+
+@frappe.whitelist(methods=["GET"])
+def no_goal_total(space: str | None = None):
+	"""The number on the Goals > No goal tab."""
+	return {"count": no_goal_count(permissions.resolve_space(space))}
+
+
+@frappe.whitelist(methods=["GET"])
+def no_goal(space: str | None = None):
+	"""Goals → No goal: open tasks with no goal, grouped by the area of life they are filed in (a part sits under its area; an
+	area that is off still shows, marked, until the owner decides). Each group has `suggestion` when three or more of its tasks
+	share a word ({word, title, tasks}): a goal they may belong to, made only by `make_goal`. `goals` are the goals in progress
+	for the picker, the group's own first."""
+	from lifeos import goal_suggest
+	from lifeos.areas import off as areas_off
+
+	space = permissions.resolve_space(space)
+	rows = query(space, NO_GOAL, {}, None, 0, ALL_CAP + 1, ["standalone"], hide_off=False)
+	truncated = len(rows) > ALL_CAP
+	rows = rows[:ALL_CAP]
+	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour"],
+		order_by="sort_order asc, area_name asc", limit=5000)
+	hidden = set(areas_off(space))
+	top = {a.name: a.parent_area or a.name for a in tree}
+	label = {a.name: a.area_name for a in tree}
+	by = {}
+	for r in rows:
+		r["part"] = label.get(r.area) if top.get(r.area) not in (None, r.area) else None
+		by.setdefault(top.get(r.area, ""), []).append(r)
+	groups = []
+	for a in [x for x in tree if not x.parent_area]:
+		if a.name in by:
+			ts = by.pop(a.name)
+			groups.append({"key": a.name, "label": a.area_name, "colour": a.colour, "area": a.name, "is_on": a.name not in hidden, "count": len(ts),
+				"tasks": ts, "suggestion": goal_suggest.cluster(ts) if a.name not in hidden else None})
+	loose = [t for ts in by.values() for t in ts]
+	if loose:
+		groups.append({"key": "none", "label": "No area", "colour": None, "area": "", "is_on": True, "count": len(loose), "tasks": loose, "suggestion": None})
+	from lifeos.api import goals
+
+	return {"space": space, "total": len(rows), "truncated": truncated, "groups": groups, "goals": goals.picker(space), "today": today()}
+
+
+@frappe.whitelist(methods=["POST"])
+def keep_standalone(task: str):
+	"""Fine as is: the task stays without a goal and leaves Goals > No goal. Its guessed area, if any, is confirmed."""
+	doc = permissions.get_doc_checked("Life Task", task, "write")
+	doc.standalone = 1
+	doc.area_guessed = 0
+	doc.area_confidence = 0
+	doc.save()
+	return get(doc.name)
+
+
+@frappe.whitelist(methods=["POST"])
+def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | None = None, title: str | None = None):
+	"""Make it a goal: one Open goal in `area` (named `title`, else by the assistant when a key is set, else from the task
+	titles) and every one of `tasks` put under it. Only open tasks with no goal in this space are taken."""
+	from lifeos import goal_suggest
+	from lifeos.api import goals
+
+	space = permissions.resolve_space(space, write=True)
+	names = frappe.parse_json(tasks) if isinstance(tasks, str) else tasks
+	docs = [permissions.get_doc_checked("Life Task", n, "write") for n in names or []]
+	if not docs:
+		frappe.throw(_("Choose the tasks for the goal."))
+	for d in docs:
+		if d.space != space or d.goal or d.status not in OPEN:
+			frappe.throw(_("{0} is not an open task without a goal.").format(frappe.bold(d.title)))
+	if area and frappe.db.get_value("Life Area", area, "space") != space:
+		frappe.throw(_("That area is not in this space."))
+	area = area or next((d.area for d in docs if d.area), None)
+	title = (title or "").strip() or goal_suggest.title_for([d.title for d in docs], space)
+	goal = goals.create(title=title, goal_type="Open", space=space, area=area)
+	for d in docs:
+		d.goal = goal["name"]
+		d.save()
+	return {"goal": goal["name"], "title": goal["title"], "area": area, "tasks": [d.name for d in docs]}
 
 
 @frappe.whitelist(methods=["GET"])

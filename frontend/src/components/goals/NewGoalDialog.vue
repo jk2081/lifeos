@@ -28,7 +28,7 @@ import { store } from '@/lib/store'
 import { areaOptions, goalOptions, loadLookups, lookups } from '@/lib/lookups'
 import { emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
 
-const props = defineProps({ modelValue: Boolean, types: { type: Array, default: () => ['Open', 'Annual', '12 Week Year'] }, areaRequired: Boolean })
+const props = defineProps({ modelValue: Boolean, types: { type: Array, default: () => ['Open', 'Annual', '12 Week Year'] }, areaRequired: Boolean, area: { type: String, default: '' } })
 const emit = defineEmits(['update:modelValue', 'saved', 'habit'])
 const open = ref(false)
 const busy = ref(false)
@@ -39,7 +39,7 @@ const typeOptions = computed(() => props.types.map((t) => ({ label: t === 'Open'
 watch(() => props.modelValue, async (o) => {
   open.value = o
   if (!o) return
-  Object.assign(v, { title: '', goal_type: props.types[0], area: store.lensArea || '', target_date: '', cycle: '', serves: '' })
+  Object.assign(v, { title: '', goal_type: props.types[0], area: props.area || store.lensArea || '', target_date: '', cycle: '', serves: '' })
   Object.assign(m, emptyMeasure())
   loadLookups()
   if (props.types.includes('12 Week Year')) {

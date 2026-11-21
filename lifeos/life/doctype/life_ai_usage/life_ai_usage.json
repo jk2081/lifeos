@@ -57,7 +57,7 @@
    "fieldname": "purpose",
    "fieldtype": "Select",
    "label": "Purpose",
-   "options": "Ask\nInsights\nBatches\nWording\nTest\nReadings\nGoal measure\nWeekly plan\nInbox decisions\nWeekly review piles\nMeeting follow-ups\nReview stars\nReview playback\nArea guess",
+   "options": "Ask\nInsights\nBatches\nWording\nTest\nReadings\nGoal measure\nWeekly plan\nInbox decisions\nWeekly review piles\nMeeting follow-ups\nReview stars\nReview playback\nArea guess\nGoal from tasks",
    "in_list_view": 1
   },
   {
