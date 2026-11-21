@@ -883,3 +883,14 @@ Fixed: sensitive items reached agents through paths that did not use the Vault r
 - **Per-feature caps** live in one JSON field on Life Settings (`feature_caps`), set from the Cost tab (`settings.set_feature_cap`), not a new child table.
 - **Fallbacks.** A refused call raises `CapReached`, an `AIError`; every caller already catches `AIError` and falls back (the area guess to its rules). The Brain (#28) does not exist yet and must do the same.
 - **Cost tab.** A new admin-only tab under Assistant; the "This month" card moved there from Ask and AI. The acceptance check is `I27.<width>` (the issue's test 5); tests 1 to 4 are unit tests in `test_issue27_gateway.py`.
+
+## Issue 31: write accepted events and goal blocks to Google Calendar (21 Nov 2026)
+
+- **The choice is a per-user default** (`life_write_calendar`, the calendar's ID; empty is off), not a field on the `Google Calendar` record, so it also works on a site that uses the fixture calendar. Disconnecting clears it. `gcal.set_write` and `gcal.calendars` (which now returns `write`) are the methods; Settings > Calendar has the select.
+- **A goal block is a scheduled `Life Task`, not an `Event`**, so it keeps its Google ID in two hidden fields on `Life Task` (`google_event_id`, `google_calendar_id`; a migrate adds them). The issue's "the `Event` keeps the Google ID" holds for accepted Event proposals (`Event.google_calendar_event_id`). A block is written when `weekplan.add` saves it with a time, updated when it moves or is renamed, and deleted from Google when it is unscheduled, done, dropped, set to Someday or deleted.
+- **Only what Life OS made is written.** Events read from Google (`pulled_from_google_calendar`) are never updated or deleted there. Events added by hand with `calendar.add_event` are not written (the issue names accepted proposals and goal blocks only). Core's own push stays off (`sync_with_google_calendar` is never set).
+- **Guests.** The Event proposal takes an optional `attendees` (emails, comma separated); only valid emails are sent, and Google then emails the invitation (`sendUpdates=all`). Without any, `sendUpdates=none`.
+- **A Google failure never fails the save.** It is logged (`Life OS Google Calendar write`) and the record stays without an ID.
+- **`calendar.delete_event` now deletes an event an accepted proposal made.** It was refused by core's link check against the proposal, which would have made "deleting it in Life OS deletes it in Google" impossible for exactly these events.
+- **Acceptance check.** `I31.<width>.5` (Settings > Calendar on the fixture calendar); tests 1 to 4 are unit tests in `test_issue31_gcal_write.py`.
+- **Not tested against the real service**, as in set 8: the stand-in records calls; the write scope and a real insert were not run.

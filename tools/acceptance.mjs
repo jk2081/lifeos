@@ -5824,6 +5824,36 @@ for _i in range(2):
   }
 }
 
+// Issue 31: Settings > Calendar shows the calendars of the connected account and saves the one Life OS writes to (off by default).
+// I31.1 to I31.4 are unit tests (test_issue31_gcal_write). The fixture calendar stands in for Google; the choice is cleared after.
+for (const width of SET_WIDTHS) {
+  const tag = `I31.${width}.5`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const restore = () => bench('frappe.defaults.clear_default("life_write_calendar", parent="owner@lifeos.test")')
+  let s
+  try {
+    restore()
+    s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    await check(tag, `${width} px: Settings > Calendar lists the account's calendars and saves the one to write to`, async () => {
+      await s.open('/life/settings?tab=calendar')
+      const pick = pg.locator('[data-calendar-write]')
+      await pick.waitFor({ timeout: 10000 })
+      must((await pick.inputValue()) === '', 'writing is not off by default')
+      must((await pick.locator('option').count()) >= 2, 'the calendars of the account are not listed')
+      await pick.selectOption('primary')
+      await pg.waitForTimeout(800)
+      await s.open('/life/settings?tab=calendar')
+      await pg.locator('[data-calendar-write]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-calendar-write]').inputValue()) === 'primary', 'the choice was not saved')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    restore()
+  }
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {

@@ -152,7 +152,8 @@ def delete_event(event: str):
 	permissions.require_space(doc.life_space, write=True)
 	if permissions.is_agent():
 		frappe.throw(_("Agents cannot delete records."), frappe.PermissionError)
-	doc.delete(ignore_permissions=True)
+	# an accepted proposal still names the event it made; that is a record of what happened, not a reason to keep the event
+	frappe.delete_doc("Event", doc.name, force=True, ignore_permissions=True)
 	return {"deleted": event}
 
 

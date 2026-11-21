@@ -41,6 +41,7 @@ SCHEMA = {
 		"fields": {
 			"subject": F("text", True), "starts_on": F("datetime", True, "ISO date and time, site time zone."),
 			"ends_on": F("datetime"), "all_day": F("bool"), "description": F("markdown"),
+			"attendees": F("text", help="Emails to invite, comma separated. Nobody is invited unless given."),
 		},
 		"example": {"subject": "Call with Vivek on the ITR", "starts_on": "2026-11-14 16:30:00"},
 	},
@@ -427,6 +428,8 @@ def apply(kind, payload, item) -> tuple:
 		doc = frappe.get_doc({"doctype": "Event", "subject": p["subject"], "starts_on": p["starts_on"], "ends_on": p.get("ends_on"),
 			"all_day": p.get("all_day") or 0, "description": p.get("description"), "event_type": "Public", "life_space": space})
 		doc.insert()
+		from lifeos.review import gcal_write
+		gcal_write.push_event(doc, p.get("attendees"))
 	elif kind == "Important Date":
 		doc = frappe.get_doc({"doctype": "Life Important Date", **base, **{k: p.get(k) for k in ("title", "day", "month", "year", "person")},
 			"kind": p.get("kind") or "Birthday"}).insert()

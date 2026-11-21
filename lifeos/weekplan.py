@@ -255,4 +255,6 @@ def add(goal, title=None, task=None, scheduled_at=None, duration_min=None, who=N
 	elif doc.status == "Waiting" and who is not None and not (who or "").strip():
 		doc.status = "Open"
 	doc.save() if not doc.is_new() else doc.insert()
+	from lifeos.review import gcal_write
+	gcal_write.push_task(doc)  # a goal block goes to the chosen Google calendar, when there is one
 	return doc

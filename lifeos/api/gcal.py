@@ -1,11 +1,11 @@
 """Settings > Me > Calendar (set 8): connect Google Calendar through Frappe's own OAuth flow, choose which calendars to read,
-see when it last read, and disconnect. Read only: nothing is ever written to Google. People only."""
+see when it last read, choose the calendar to write to (off by default), and disconnect. People only."""
 import frappe
 from frappe import _
 
 from lifeos import permissions
 from lifeos.api.utils import parse
-from lifeos.review import gcal
+from lifeos.review import gcal, gcal_write
 
 
 def _person():
@@ -42,13 +42,19 @@ def calendars():
 	acc = gcal.account(user)
 	if not frappe.conf.get("lifeos_fake_calendar") and not (acc and acc.enable):
 		return {"calendars": []}
-	return {"calendars": gcal.source_for(acc).calendars(), "read": gcal.read_ids(acc) if acc else ["primary"]}
+	return {"calendars": gcal.source_for(acc).calendars(), "read": gcal.read_ids(acc) if acc else ["primary"], "write": gcal_write.chosen(user)}
 
 
 @frappe.whitelist(methods=["POST"])
 def set_read(ids: str | list):
 	ids = parse(ids, []) or []
 	return gcal.set_read(_person(), ids if isinstance(ids, list) else [])
+
+
+@frappe.whitelist(methods=["POST"])
+def set_write(calendar: str | None = None):
+	"""Choose the calendar Life OS writes accepted events and goal blocks to; empty turns writing off."""
+	return gcal_write.choose(_person(), calendar)
 
 
 @frappe.whitelist(methods=["POST"])

@@ -7,7 +7,7 @@
         data-calendar-not-configured />
       <Card flush>
         <SettingRow label="Google Calendar" :help="s.fake ? 'This site reads a fixture calendar instead of Google (tests and acceptance).' :
-          'Life OS reads your calendar to show last week\'s meetings in the weekly review. It never writes to it.'">
+          'Life OS reads your calendar to show last week\'s meetings in the weekly review. It writes only if you choose a calendar below.'">
           <div class="flex items-center gap-2">
             <Badge :theme="s.connected ? 'green' : 'gray'" :label="s.connected ? 'Connected' : 'Not connected'" data-calendar-status />
             <Button v-if="!s.connected" variant="solid" label="Connect Google Calendar" :disabled="!s.configured" data-calendar-connect @click="connect" />
@@ -25,6 +25,14 @@
               @update:model-value="(v) => toggle(c, v)" />
           </div>
         </SettingRow>
+        <SettingRow v-if="s.connected && cals.length" label="Write to Google Calendar"
+          help="Off by default. Events you accept and goal blocks from the weekly review are added to this calendar, private, with a link back here. Writing needs the Calendar scope on the Google client.">
+          <select v-model="write" class="h-7 rounded border border-outline-gray-2 bg-surface-white px-2 text-base text-ink-gray-8" aria-label="Write to Google Calendar"
+            data-calendar-write @change="saveWrite">
+            <option value="">Off: nothing is written</option>
+            <option v-for="c in cals" :key="c.id" :value="c.id">{{ c.summary || c.id }}</option>
+          </select>
+        </SettingRow>
       </Card>
       <Card flush>
         <SettingRow label="Your domains" help="Email domains that are yours, one per line. A meeting matters when someone from outside them attends for 30 minutes or more.">
@@ -38,7 +46,7 @@
   </div>
 </template>
 <script setup>
-// Settings > Me > Calendar (set 8): Google Calendar through Frappe's own OAuth flow, read only.
+// Settings > Me > Calendar (set 8, issue 31): Google Calendar through Frappe's own OAuth flow; read, and written to only when a calendar is chosen.
 import { onMounted, ref } from 'vue'
 import { Alert, Badge, Button, Checkbox, Skeleton, Textarea, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
@@ -50,15 +58,18 @@ import { dateTime } from '@/lib/dates'
 const s = ref(null)
 const cals = ref([])
 const read = ref([])
+const write = ref('')
 const domains = ref('')
 const busy = ref(false)
 async function load() {
   s.value = await api('gcal.state')
   domains.value = (s.value.domains || []).join('\n')
   read.value = s.value.read || []
+  write.value = s.value.write || ''
   if (s.value.connected) {
     const got = await tryCall(() => api('gcal.calendars'))
     cals.value = got?.calendars || []
+    write.value = got?.write || ''
   }
 }
 async function connect() {
@@ -78,6 +89,10 @@ async function toggle(c, on) {
   const ids = on ? [...new Set([...read.value, c.id])] : read.value.filter((x) => x !== c.id && !(c.primary && x === 'primary'))
   const out = await tryCall(() => api('gcal.set_read', { ids }))
   if (out) read.value = out.read
+}
+async function saveWrite() {
+  const out = await tryCall(() => api('gcal.set_write', { calendar: write.value }), write.value ? 'Writing to that calendar.' : 'Writing is off.')
+  if (out) write.value = out.write || ''
 }
 async function saveDomains() {
   await tryCall(() => api('settings.save', { values: { own_domains: domains.value } }), 'Saved.')
