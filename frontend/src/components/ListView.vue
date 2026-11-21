@@ -282,7 +282,8 @@ function push(patch) {
   router.push({ query: { ...route.query, ...patch, all: undefined } })
 }
 const setFlag = (k, on) => push({ [k]: on ? '1' : undefined })
-const clearFilters = () => push(controlsQuery([], {}))
+// Goals > No goal is this list with goal=none; clearing keeps that, or the address would become the screen of issue 22 and the cleared state would never be saved
+const clearFilters = () => push({ ...controlsQuery([], {}), ...(props.screen === 'tasks-no-goal' ? { goal: 'none' } : {}) })
 
 // URL -> controls. Skipped when the controls already say the same thing, so an edit in the Filter popover is not reset under the cursor.
 function applyUrl() {
@@ -406,7 +407,9 @@ function restore(saved, { late = false } = {}) {
   if (!saved) return
   if (!late) list.restoreLayout(saved)
   const { area: _lens, ...q } = saved.query || {} // a view saved before the lens may hold an area: the lens decides that now
-  if (!hasQuery()) {
+  // Goals > No goal opens with goal=none already in the address; that alone is not a query of the person's
+  const implied = props.screen === 'tasks-no-goal' && Object.keys(listQuery()).length === 1 && Q.value.goal === 'none' && Q.value.all !== '1'
+  if (implied || !hasQuery()) {
     if (Object.keys(q).length) router.replace({ query: { ...route.query, ...q } })
   } else if (!Q.value.view && q.view && props.views.some((v) => v.key === q.view)) {
     router.replace({ query: { ...route.query, view: q.view } })

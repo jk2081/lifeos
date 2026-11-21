@@ -996,6 +996,7 @@ for (const width of UX_WIDTHS) {
     must(!param('priority'), 'Clear did not remove the filter')
     must(!(await pg.locator('[data-active-filters]:visible').allInnerTexts()).join(' ').includes('Priority'), 'the list still says the priority filter is on') // No goal keeps its goal filter
     await nav('Today')
+    await pg.waitForTimeout(1600) // a full page load below reads the server's copy, so let the cleared state reach it first
     await s.open('/life/goals/no-goal?goal=none') // the bare path is the screen of issue 22; the old list is behind the goal filter
     must(!param('priority'), 'the cleared filter came back')
     // another person has their own states
