@@ -5351,7 +5351,8 @@ frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", ${was ? 1
       bench(`frappe.db.sql("update \`tabLife Index\` set space = %s where space = %s and ref_doctype in ('Life Note', 'Life Vault Document', 'Life Chat Log', 'Life Inbox Item')", ("zz-i23-aside-${width}", "${SPACE}"))
 frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("zz-i23-aside-${width}", "${SPACE}"))`)
       try {
-        for (const p of ['/life/library', '/life/library/people']) {
+        // People has its own screen and its own empty state since issue 25 (checked by I25.7)
+        for (const p of ['/life/library']) {
           await openLib(p)
           must(await pg.locator('[data-lib-empty]').isVisible(), `no empty state at ${p}`)
           const t = await pg.locator('[data-lib-empty]').innerText()
@@ -5403,11 +5404,14 @@ print(json.dumps(out))`).split('\n').pop())
         const api = await s.api('everything.list', { space: SPACE, tab, page_length: 100 })
         must(api.rows.length && api.rows.every((r) => r.letter === letter), `${tab} holds another kind`)
       }
-      await openLib('/life/library/people')
-      const ls = await letters()
-      must(ls.length && ls.every((l) => l === 'P'), 'People shows another kind: ' + ls.join(''))
-      must((await rowFor(T('person')).count()) === 1 && (await rowFor(T('org')).count()) === 1, 'People does not show the person and the organisation page')
-      must((await rowFor(T('note')).count()) === 0 && (await rowFor(T('chat')).count()) === 0, 'People shows a note or a chat')
+      // issue 25: People is its own screen, one row per Life Person
+      await s.open('/life/library/people?q=' + encodeURIComponent(Q))
+      await pg.locator('[data-library-people][data-loaded="1"]').waitFor({ timeout: 10000 })
+      await pg.waitForTimeout(300)
+      const ls = await pg.locator('[data-people-letter]').evaluateAll((els) => els.map((e) => e.textContent.trim()))
+      must(ls.length && ls.every((l) => l === 'P' || l === 'O'), 'People shows another kind: ' + ls.join(''))
+      must((await pg.locator('[data-people-row]', { hasText: T('person') }).count()) === 1, 'People does not show the person')
+      must((await pg.locator('[data-people-row]', { hasText: T('note') }).count()) === 0 && (await pg.locator('[data-people-row]', { hasText: T('chat') }).count()) === 0, 'People shows a note or a chat')
       for (const [path, yes, no] of [['/life/library/documents', T('passport'), T('note')], ['/life/library/chats', T('chat'), T('note')]]) {
         await s.open(path)
         await pg.waitForLoadState('networkidle')
@@ -5606,6 +5610,105 @@ frappe.db.commit()`)
       }
       await openFiles('?q=nosuchfile' + stamp)
       must((await pg.locator('[data-files-empty]').innerText()).includes('No file matches'), 'a search with no match does not say so')
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
+// Issue 25: Library > People. Records named "I25 ". People, organisations, notes and tasks made here are deleted after.
+for (const width of SET_WIDTHS) {
+  const tag = `I25.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I25 ${what} ${width} ${stamp}`
+  const Q = `${width} ${stamp}` // only this run's records, whatever else the site holds
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openPeople = async (query = '') => { await s.open('/life/library/people' + query); await pg.locator('[data-library-people][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const openPerson = async (name) => { await s.open('/life/library/people/' + name); await pg.locator('[data-library-person][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt, field in (("Life Task", "title"), ("Life Note", "title")):
+    for n in frappe.get_all(dt, filters={field: ["like", "I25 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+frappe.db.set_value("Life Person", {"full_name": ["like", "I25 % ${width} ${stamp}"]}, "organisation", None)
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "I25 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i25-aside-${width}"))`)
+  const ids = {}
+  try {
+    Object.assign(ids, JSON.parse(bench(`import json
+mk = lambda **v: frappe.get_doc({"space": "${SPACE}", **v}).insert(ignore_permissions=True).name
+out = {}
+out["org"] = mk(doctype="Life Person", full_name="${T('Acme Ltd')}", kind="Organisation")
+out["asha"] = mk(doctype="Life Person", full_name="${T('Asha')}", kind="Person", organisation=out["org"], role="Buyer")
+out["ravi"] = mk(doctype="Life Person", full_name="${T('Ravi')}", kind="Person", organisation=out["org"])
+out["old"] = mk(doctype="Life Note", title="${T('old note')}", content_md="Met ${T('Asha')} in May.")
+out["new"] = mk(doctype="Life Note", title="${T('new note')}", content_md="${T('Asha')} sent the papers.")
+out["task"] = mk(doctype="Life Task", title="${T('chase papers')}", status="Waiting", waiting_on="the bank", waiting_on_person=out["asha"])
+frappe.db.sql("update \`tabLife Index\` set record_date = '2026-05-01' where ref_name = %s", out["old"])
+print(json.dumps(out))`).split('\n').pop()))
+    await check(`${tag}.3`, `${width} px: People lists persons and organisations; filtering by kind works`, async () => {
+      await openPeople('?q=' + encodeURIComponent(Q))
+      const kinds = async () => pg.locator('[data-people-row]').evaluateAll((els) => els.map((e) => e.dataset.kind + ':' + e.dataset.name))
+      const all = await kinds()
+      must(all.length === 3 && all.includes('Organisation:' + ids.org) && all.includes('Person:' + ids.asha), 'People lists ' + all.join())
+      const letters = await pg.locator('[data-people-letter]').evaluateAll((els) => els.map((e) => e.textContent.trim()).sort().join(''))
+      must(letters === 'OPP', 'letters are ' + letters)
+      await pg.selectOption('[data-people-kind]', 'Organisation')
+      await pg.waitForFunction(() => document.querySelectorAll('[data-people-row]').length === 1, null, { timeout: 8000 })
+      must(JSON.stringify(await kinds()) === JSON.stringify(['Organisation:' + ids.org]), 'the Organisation filter shows ' + (await kinds()).join())
+      must(new URL(pg.url()).searchParams.get('kind') === 'Organisation', 'the kind is not in the address')
+      await pg.selectOption('[data-people-kind]', 'Person')
+      await pg.waitForFunction(() => document.querySelectorAll('[data-people-row]').length === 2, null, { timeout: 8000 })
+      must((await kinds()).every((k) => k.startsWith('Person:')), 'the People filter shows an organisation')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.4`, `${width} px: a person page lists the notes and tasks that mention them, newest first`, async () => {
+      await openPerson(ids.asha)
+      const refs = await pg.locator('[data-mention]').evaluateAll((els) => els.map((e) => e.dataset.ref))
+      must(refs.length === 3 && refs.includes('note:' + ids.new) && refs.includes('note:' + ids.old) && refs.includes('task:' + ids.task), 'Mentioned in is ' + refs.join())
+      must(refs[refs.length - 1] === 'note:' + ids.old, 'the oldest note is not last: ' + refs.join())
+      const t = await pg.locator(`[data-mention][data-ref="task:${ids.task}"]`).innerText()
+      must(t.includes('Waiting on them'), 'the task does not say it is waiting on them: ' + t)
+      await pg.locator(`[data-mention][data-ref="note:${ids.new}"] button`).click()
+      await pg.locator('[data-pane-title]').waitFor({ timeout: 8000 })
+      must(new URL(pg.url()).searchParams.get('open') === 'note:' + ids.new, 'the note did not open in the pane')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.5`, `${width} px: an organisation page lists its people`, async () => {
+      await openPerson(ids.org)
+      const names = await pg.locator('[data-org-person]').evaluateAll((els) => els.map((e) => e.dataset.name).sort())
+      must(JSON.stringify(names) === JSON.stringify([ids.asha, ids.ravi].sort()), 'the organisation lists ' + names.join())
+      await pg.locator(`[data-org-person][data-name="${ids.asha}"] a`).click()
+      await pg.waitForFunction((n) => location.pathname.endsWith('/library/people/' + n), ids.asha, { timeout: 8000 })
+      await pg.locator('[data-person-org]').waitFor({ timeout: 8000 })
+      must((await pg.locator('[data-person-org]').innerText()).includes(T('Acme Ltd')), 'the person page does not name the organisation')
+    })
+    await check(`${tag}.6`, `${width} px: ${phone ? 'at 390 px the person page is one column' : 'the facts sit beside the text and mentions'}`, async () => {
+      await openPerson(ids.asha)
+      await noSideways()
+      const box = async (sel) => { const b = await pg.locator(sel).first().boundingBox(); must(b, sel + ' is not visible'); return b }
+      const [who, mentions, facts] = [await box('[data-person-who]'), await box('[data-person-mentions]'), await box('[data-person-facts]')]
+      for (const b of [who, mentions, facts]) must(b.x >= 0 && b.x + b.width <= width + 1, `part of the page is outside the ${width} px screen`)
+      if (phone) must(Math.abs(who.x - facts.x) < 2 && facts.y > mentions.y && mentions.y > who.y, 'the page is not one column')
+      else must(facts.x > who.x + who.width - 2 && Math.abs(facts.y - who.y) < 40, 'the facts are not beside the text')
+    })
+    await check(`${tag}.7`, `${width} px: with no people the screen says what will appear and offers + Capture`, async () => {
+      bench(`frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("zz-i25-aside-${width}", "${SPACE}"))`)
+      try {
+        await openPeople()
+        must(await pg.locator('[data-people-empty]').isVisible(), 'no empty state')
+        const t = await pg.locator('[data-people-empty]').innerText()
+        must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
+        must(await pg.locator('[data-people-capture]').isVisible(), 'no Capture button')
+        await noSideways()
+      } finally {
+        bench(`frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i25-aside-${width}"))`)
+      }
     })
   } finally {
     restore()

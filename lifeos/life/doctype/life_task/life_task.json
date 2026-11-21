@@ -20,6 +20,8 @@
   "source_url",
   "notes_md",
   "waiting_on",
+  "waiting_on_person",
+  "delegated_to",
   "completed_on",
   "carried_from",
   "last_touched_on",
@@ -248,6 +250,18 @@
    "label": "Someday With",
    "options": "Life Goal",
    "description": "Parked together with this project"
+  },
+  {
+   "fieldname": "waiting_on_person",
+   "fieldtype": "Link",
+   "label": "Waiting on (person)",
+   "options": "Life Person"
+  },
+  {
+   "fieldname": "delegated_to",
+   "fieldtype": "Link",
+   "label": "Delegated to",
+   "options": "Life Person"
   }
  ],
  "links": [],

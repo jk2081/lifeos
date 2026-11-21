@@ -15,8 +15,8 @@
     <Card v-if="rows.length" class="!p-0" data-lib-card>
       <ul class="flex flex-col">
         <li v-for="r in rows" :key="r.ref" class="relative border-b border-outline-gray-1 last:border-b-0 hover:bg-surface-gray-1" data-lib-row :data-ref="r.ref" :data-kind="r.kind" :data-letter="r.letter">
-          <component :is="clickable(r) ? 'button' : 'div'" :type="clickable(r) ? 'button' : undefined"
-            class="flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left md:grid md:grid-cols-[2rem_minmax(0,1fr)_minmax(0,16rem)_4.5rem] md:items-center md:gap-4 focus-visible:focus-ring" @click="clickable(r) && openRef(r.ref)">
+          <button type="button"
+            class="flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left md:grid md:grid-cols-[2rem_minmax(0,1fr)_minmax(0,16rem)_4.5rem] md:items-center md:gap-4 focus-visible:focus-ring" @click="open(r)">
             <div class="flex min-w-0 items-start gap-3 md:contents">
               <span class="flex size-8 flex-none items-center justify-center rounded-md text-sm-medium" :class="LETTER_CLASS[r.letter]" aria-hidden="true" data-lib-letter>{{ r.letter }}</span>
               <div class="min-w-0 flex-1">
@@ -27,7 +27,7 @@
             </div>
             <div class="min-w-0 truncate pl-11 text-sm text-ink-gray-7 md:pl-0 md:text-base" data-lib-where>{{ [r.area_name, r.goal_title].filter(Boolean).join(' · ') }}</div>
             <div class="whitespace-nowrap pl-11 text-sm text-ink-gray-6 md:pl-0 md:text-right" data-lib-date>{{ short(r.date) }}</div>
-          </component>
+          </button>
         </li>
       </ul>
     </Card>
@@ -78,8 +78,8 @@ const areaChoices = computed(() => [{ label: 'Area', value: '' }, ...areaOptions
 const goalChoices = computed(() => [{ label: 'Goal', value: '' }, { label: 'No goal', value: 'none' }, ...goalOptions(lookups.goals, { empty: null })])
 const sourceChoices = computed(() => [{ label: 'Source', value: '' }, { label: 'Made by me', value: 'me' }, { label: 'Kept by the Brain', value: 'brain' },
   ...(data.value?.sources || []).map((s) => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }))])
-// a Life Person has no page of its own until the People issue; every other row opens in the pane
-const clickable = (r) => r.doctype !== 'Life Person'
+// a Life Person opens its page (issue 25); every other row opens in the pane
+const open = (r) => (r.doctype === 'Life Person' ? router.push({ path: `/library/people/${r.name}`, query: { space: route.query.space } }) : openRef(r.ref))
 
 const setQuery = (patch) => router.replace({ query: { ...route.query, ...patch, open: route.query.open } })
 const applyQuery = () => setQuery({ q: q.value.trim() || undefined })

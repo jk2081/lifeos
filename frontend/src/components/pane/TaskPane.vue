@@ -9,6 +9,12 @@
   </div>
   <TextInput v-if="task.status === 'Waiting' || askWaiting" ref="waitInput" v-model="task.waiting_on" label="Waiting on" placeholder="Who or what is this waiting on?" :disabled="!writable"
     @change="askWaiting ? setStatus('Waiting') : save({ waiting_on: task.waiting_on })" />
+  <div v-if="peopleOptions.length > 1" class="form-grid" data-task-people>
+    <FormControl v-if="task.status === 'Waiting' || task.waiting_on_person" type="select" label="Waiting on (person)" :model-value="task.waiting_on_person || ''" :options="peopleOptions" :disabled="!writable"
+      data-task-waiting-person @update:model-value="pickWaiting" />
+    <FormControl type="select" label="Delegated to" :model-value="task.delegated_to || ''" :options="peopleOptions" :disabled="!writable"
+      data-task-delegated @update:model-value="(v) => save({ delegated_to: v || null })" />
+  </div>
   <div><div class="mb-1.5 text-sm text-ink-gray-6">Filed under</div>
     <div class="flex flex-wrap items-center gap-2">
       <div class="contents" data-task-area><Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" /></div>
@@ -88,12 +94,23 @@ function tell() {
     someday: writable.value && OPEN.includes(t.status) ? { doctype: 'Life Task', name: t.name } : null,
     tabs: [{ value: 'details', label: 'Details' }, { value: 'notes', label: 'Notes' }, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
 }
+// the people and organisations of the task's space, to pick for "waiting on" and "delegated to" (issue 25)
+const peopleOptions = ref([{ label: '—', value: '' }])
+async function loadPeople() {
+  const rows = await api('people.options', { space: task.value.space })
+  peopleOptions.value = [{ label: '—', value: '' }, ...rows.map((r) => ({ label: r.label, value: r.value }))]
+}
+function pickWaiting(v) {
+  const who = peopleOptions.value.find((o) => o.value === v)
+  save({ waiting_on_person: v || null, ...(v && !(task.value.waiting_on || '').trim() ? { waiting_on: who.label } : {}) })
+}
 const tagName = (id) => lookups.tags.find((t) => t.name === id)?.tag_name || id
 
 async function load() {
   try {
     ;[task.value, links.value] = await Promise.all([api('tasks.get', { task: props.name }), loadBacklinks('Life Task', props.name)])
     tell()
+    loadPeople().catch(() => {})
   } catch (e) {
     emit('missing')
   }

@@ -41,6 +41,7 @@ const routes = [
   // /library?view=tree was the Notes screen's tree before set 6. ?view=list is now Library > Everything's own list view, so it stays.
   { path: `/library/:tab(${LIBRARY.join('|')})?`, name: 'Library', component: page('LibraryPlace'), props: true,
     beforeEnter: (r) => (!r.params.tab && r.query.view === 'tree' ? { path: '/library/notes', query: r.query } : true) },
+  { path: '/library/people/:person', name: 'Person', component: page('LibraryPlace'), props: (r) => ({ tab: 'people', person: r.params.person }) },
   { path: '/library/:id', name: 'Note', component: page('Library'), props: true },
   // the weekly review: in the sidebar once one is locked, or on its day
   { path: '/review', name: 'WeeklyReview', component: page('WeeklyReview') },

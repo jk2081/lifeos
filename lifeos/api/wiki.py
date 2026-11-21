@@ -267,11 +267,23 @@ def search(space: str | None = None, query: str | None = None, collection: str |
 
 # ---------- writing (agents and people) ----------
 
+def _about(doc, about):
+	"""`about` names what a page describes (Person or Organisation); anything else is refused so a typo is not lost."""
+	from lifeos import people
+
+	if about in (None, ""):
+		return
+	if not people.kind_of(about):
+		frappe.throw(_("about must be Person or Organisation."))
+	people.link_page(doc, about)
+
+
 @frappe.whitelist(methods=["POST"])
 def create_page(space: str | None = None, title: str | None = None, content_md: str | None = None, summary: str | None = None, area: str | None = None, goal: str | None = None,
-		parent_note: str | None = None, sources: str | list | None = None, change_note: str | None = None, source: str | dict | None = None, project: str | None = None):
+		parent_note: str | None = None, sources: str | list | None = None, change_note: str | None = None, source: str | dict | None = None, project: str | None = None, about: str | None = None):
 	"""Create a Wiki page and a Created change. Refuses a title that already exists in the space's Wiki (edit that page instead).
-	sources: [{doctype, name}] the page cites. source: the one source that prompted this change, if any."""
+	sources: [{doctype, name}] the page cites. source: the one source that prompted this change, if any.
+	about: Person or Organisation when the page describes one; the page is linked to a Life Person, made if there is none."""
 	space = permissions.resolve_space(space, write=True)
 	goal = goal or (project and goal_for_project(project, space)) or None
 	title = (title or "").strip()
@@ -294,12 +306,13 @@ def create_page(space: str | None = None, title: str | None = None, content_md: 
 	finally:
 		frappe.flags.lifeos_wiki_api = False
 	log_change(doc, "Created", "", doc.content_md, change_note, src)
+	_about(doc, about)
 	return _page_out(doc, with_text=False)
 
 
 @frappe.whitelist(methods=["POST"])
 def update_page(name: str, content_md: str | None = None, base_version: str | None = None, summary: str | None = None, sources_add: str | list | None = None,
-		change_note: str | None = None, source: str | dict | None = None, title: str | None = None):
+		change_note: str | None = None, source: str | dict | None = None, title: str | None = None, about: str | None = None):
 	"""Edit a Wiki page if `base_version` (from get_page) is still current. If the page changed since, nothing is written and
 	the answer is {"conflict": true, "current": <the page now>}: read it, merge, and send again. Refuses My notes pages and
 	the rules page. Writes an Edited change."""
@@ -335,6 +348,7 @@ def update_page(name: str, content_md: str | None = None, base_version: str | No
 		frappe.flags.lifeos_wiki_api = False
 	if (doc.content_md or "") != before or add or summary is not None:
 		log_change(doc, "Edited", before, doc.content_md, change_note, src)
+	_about(doc, about)
 	return {"name": doc.name, "version": version_of(doc), "conflict": False}
 
 

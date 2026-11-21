@@ -23,7 +23,8 @@
   "is_sensitive",
   "is_archived",
   "archived_on",
-  "archive_reason"
+  "archive_reason",
+  "person"
  ],
  "fields": [
   {
@@ -153,6 +154,12 @@
    "fieldtype": "Select",
    "label": "Archive Reason",
    "options": "\nManual\nAuto\nProject"
+  },
+  {
+   "fieldname": "person",
+   "fieldtype": "Link",
+   "label": "About (person or organisation)",
+   "options": "Life Person"
   }
  ],
  "links": [],

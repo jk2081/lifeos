@@ -400,6 +400,10 @@ GitHub issue #24. Deviations are in `DECISIONS.md` under "Issue 24".
 - **Works:** Library has a Files tab (`/library/files`): every stored file once (rows that share a `file_url`, issue 7, are one line), with its type, size, date, "N versions" that open either version, and **Used in**: the items, notes, documents and chats that use it (each opens in the pane). A reusable asset (an input that jobs link) shows "Reusable · N jobs", and those jobs are under Used in. Filters: Type (Documents, Images, Slides, Audio, Other), Area, Source, and a search by name; Open (in the browser) and Download. A record the user may not open (a Vault document or sensitive item while the Vault is closed to an agent) is left out of Used in, and a file with no record left is not listed. `files.list` is the one new method. Empty state with + Capture.
 - **Tests:** `lifeos/tests/test_issue24_files.py` (7 tests); acceptance checks I24.1 to I24.6 at 1440 and 390 px.
 
+## Issue 25: Library → People (21 Nov 2026)
+
+GitHub issue #25. Library → People lists every person and organisation (kind, one line, area, newest mention; filters for kind, area and search) and each has a page: who they are (the wiki page's text), their organisation or its people, and Mentioned in (captures, notes, tasks, meetings, chats; tasks waiting on or delegated to them). Wiki pages are linked to a `Life Person` through `wiki.create_page(about=...)`; a patch links the existing ones. Tasks can pick a person for waiting on and delegated to. Deviations are in `DECISIONS.md` under "Issue 25".
+
 ## Summary
 
 ### What works
