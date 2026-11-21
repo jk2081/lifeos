@@ -1501,7 +1501,7 @@ for (const width of UX_WIDTHS) {
     must(JSON.stringify(tabs) === JSON.stringify(['day', 'week', 'month', 'year']), `Today's tabs are ${tabs}`)
     await s.open('/life/library/notes')
     const lib = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
-    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'documents', 'people', 'chats']), `Library's tabs are ${lib}`)
+    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'documents', 'people', 'chats', 'files']), `Library's tabs are ${lib}`)
     if (!phone) {
       await s.open('/life/today/month')
       await pg.locator('body').click({ position: { x: 600, y: 10 } })
@@ -1517,7 +1517,7 @@ for (const width of UX_WIDTHS) {
       must(new URL(pg.url()).pathname === '/life/library/documents', `] on the Library went to ${new URL(pg.url()).pathname}`)
     } else {
       // the last tab, and a page shown as a tab after them: the row scrolls sideways with it in view, the page does not
-      for (const p of ['/life/library/chats', '/life/library/archive', '/life/goals/someday']) {
+      for (const p of ['/life/library/files', '/life/library/archive', '/life/goals/someday']) {
         await s.open(p)
         const m = await pg.locator('[data-place-tabs]').first().evaluate((el) => { const t = el.querySelector('[data-state="active"]').getBoundingClientRect(); return { inView: t.left >= 0 && t.right <= window.innerWidth, h: t.height } })
         must(m.inView && m.h >= 44, `${p}: the tab row on a phone: ${JSON.stringify(m)}`)
