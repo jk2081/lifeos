@@ -658,7 +658,7 @@ const LISTS = [
 // The Area filters of set 4 are the lens since set 6 (U.40 and up check it); the Archive's only other quick filter is a text field.
 const FILTERS = [
   ['Inbox', '/life/brain/queue?all=1', 'source_type', 'Message', 'Source Type', 'Message'], ['Tasks', '/life/goals/tasks?view=list', 'priority', 'I', 'Priority', 'I'],
-  ['Tasks table', '/life/goals/tasks?view=table&status=all', 'priority', 'I', 'Priority', 'I'], ['Goals', '/life/goals?status=all', 'type', 'Open', 'Type', 'Open'],
+  ['Tasks table', '/life/goals/tasks?view=table&status=all', 'priority', 'I', 'Priority', 'I'], ['Goals', '/life/goals?status=all', 'type', 'Long term', 'Horizon', 'Long term'],
   ['Captures', '/life/brain/captures?all=1', 'status', 'Done', 'Status', 'Done'],
   ['Notes', '/life/library/notes?view=list&all=1', 'goal', ux.goal, 'Goal', ux.goalTitle, ux.goalTitle.slice(0, 6)],
 ]
@@ -1449,7 +1449,7 @@ for (const width of UX_WIDTHS) {
     }
     await s.open('/life/goals?status=all')
     const text = await pg.locator('[data-main]').innerText()
-    must(text.includes(`UX3 open goal ${width} ${stamp}`) && text.includes(`UX3 annual goal ${width} ${stamp}`) && text.includes('12 Week Year'), 'the Goals screen does not list the new goals beside the 12 Week Year goals')
+    must(text.includes(`UX3 open goal ${width} ${stamp}`) && text.includes(`UX3 annual goal ${width} ${stamp}`) && text.includes('12 weeks'), 'the Goals screen does not list the new goals beside the 12 Week Year goals')
     const rows = (await s.api('goals.list', { space: SPACE, state: 'all', page_length: 100 })).goals
     must(rows.find((r) => r.name === open.name).score === null && rows.find((r) => r.name === annual.name).score === null, 'Score is not blank for the new goals')
     if (!phone) for (const n of [open.name, annual.name]) must((await pg.locator(`[data-ref="goal:${n}"]`).locator('xpath=..').locator('[data-goal-score]').innerText()).trim() === '', 'a Score shows for a goal without a cycle')
@@ -3261,7 +3261,6 @@ for (const width of SET_WIDTHS) {
     const made = JSON.parse(bench(`import json
 from frappe.utils import add_days, now_datetime, today
 from lifeos import readings
-from lifeos.patches.v7 import projects_into_goals
 frappe.set_user("owner@lifeos.test")
 area = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"})
 cycle = frappe.db.get_value("Life Cycle", {"space": "${SPACE}", "status": "Active"})
@@ -3273,10 +3272,8 @@ def goal(title, **kw):
 p = frappe.get_doc({"doctype": "Life Project", "space": "${SPACE}", "title": "BF1 project ${W}", "area": area, "status": "Active"})
 p.flags.allow_migration = True
 p.insert(ignore_permissions=True)
-frappe.set_user("Administrator")
-projects_into_goals.execute()
-frappe.set_user("owner@lifeos.test")
-migrated = frappe.db.get_value("Life Project", p.name, "migrated_to")
+migrated = goal("BF1 migrated ${W}", horizon="Long term")
+frappe.db.set_value("Life Project", p.name, "migrated_to", migrated)
 number = goal("BF1 number ${W}", horizon="Long term", measure_kind="Number", measure="BF1 weight", unit="kg", start_value=84, target_value=78)
 readings.suggest(number, 81, excerpt="Weighed 81 kg this morning.", by="Agent")
 milestone = goal("BF1 milestone ${W}", horizon="12 weeks", cycle=cycle, measure_kind="Milestone", done_when="Signed")
