@@ -35,6 +35,10 @@ Phone: a bottom bar with Today, Brain, Goals and Library, and a capture button.
 - An area can have **parts**: the owner's businesses (Business That Works, Tea & Coffee) are parts of Career. Parts are `Life Area` rows with `parent_area` set.
 - **Every task has an area.** A goal is optional. When a task has no area, the Brain guesses one and shows its guess for the owner to confirm or change.
 
+## Focuses: ongoing work behind the goals
+
+Some things are never "done": improving systems at RMT, marketing at BTW, Ghillidary's yield. They are ongoing bodies of work with a **standard** to keep up and **principles** to work within. A **focus** holds that; goals of any length (12 weeks, a year, three years) serve it for a while and then finish. A focus lives in an area or part, has no "Done when", and is optional: goals without a focus sit directly under their area. Mockups: `mockups/v2/18-goals-focuses.png` and `19-focus.png`.
+
 ## The ladder
 
 Six levels of adoption, so a new user is not shown everything at once. Each level opens when the one before it is in use. It teaches working with agents one step at a time. The sidebar shows "Your setup · level n of 6" and the next step.
