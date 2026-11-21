@@ -171,7 +171,7 @@ def ask_model(doc, candidates):
 			for k, a in ids.items()]})
 	try:
 		out = client.call("Area guess", SYSTEM, [{"role": "user", "content": prompt}], kind="short", space=doc.space,
-			schema=SCHEMA, max_tokens=200)
+			schema=SCHEMA, max_tokens=200, reference=(doc.doctype, doc.name))
 	except client.AIError:
 		return None
 	data = client.json_of(out["content"]) or {}

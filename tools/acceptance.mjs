@@ -5791,6 +5791,39 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task 
   }
 }
 
+// Issue 27: Settings, Assistant, Cost lists this month's spend by feature, matching the recorded calls. I27.1 to I27.4 are unit tests
+// (test_issue27_gateway). The run's own calls are written under a feature made for it and deleted after.
+for (const width of SET_WIDTHS) {
+  const tag = `I27.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const feature = `I27 feature ${width} ${stamp}`
+  const restore = () => bench(`frappe.db.delete("Life AI Usage", {"purpose": "${feature}"})`)
+  let s
+  try {
+    // two haiku calls of 1,000,000 tokens in and 100,000 out: $0.15 each, $0.30 and 2,200,000 tokens in all
+    bench(`from lifeos.ai import client
+for _i in range(2):
+    client.record("claude-haiku-5-5", {"input_tokens": 1000000, "output_tokens": 100000}, "${feature}", user="owner@lifeos.test")`)
+    s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    await check(tag, `${width} px: Cost shows this month's spend by feature, matching the recorded calls`, async () => {
+      await s.open('/life/settings?tab=cost')
+      await pg.locator('[data-ai-spend]').waitFor({ timeout: 10000 })
+      const row = pg.locator(`[data-cost-feature="${feature}"]`)
+      await row.waitFor({ timeout: 8000 })
+      const t = await row.innerText()
+      must(t.includes('2,200,000 tokens') && t.includes('$0.30'), 'the feature row says: ' + t)
+      must(/This month: \$/.test(await pg.locator('[data-cost-total]').innerText()), 'no this-month total')
+      must((await pg.locator('[data-cost-call]').count()) >= 2, 'the last calls are not listed')
+      must((await pg.locator('[data-cost-days]').innerText()).includes('call'), 'no by-day list')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    restore()
+  }
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {

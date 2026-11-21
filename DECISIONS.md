@@ -874,3 +874,12 @@ Fixed: sensitive items reached agents through paths that did not use the Vault r
 - **Held back.** Review keeps #14's rule and Brain > Skills waits for #30. Nothing else is hidden by level, so no existing user loses anything.
 - **How it works** is at `/how-it-works`, reached from the card and Settings > Data > Where things are (first row). Levels are marked done, next (the first one not yet in use, outlined) and later (faded); the issue's "current level marked next" is read this way.
 - **Checks.** I26.1 and I26.2 are unit tests (`test_issue26_ladder.py`, with extras for the Upload rule and dismiss); I26.3 to .5 follow the issue's list and use a user made for the run.
+
+## Issue 27: one gateway for model calls (21 Nov 2026)
+
+- **Already one gateway.** A search found no use of `anthropic` outside `lifeos/ai/client.py`, so nothing needed routing; a test now walks the code and fails if that changes.
+- **Feature is `purpose`.** `Life AI Usage.purpose` already named the feature; it is now a Data field (it was a fixed Select) so the Brain and skills can add features without a migration. Added `cached_tokens`, `cache_write_tokens`, `reference_doctype` and `reference_name`. Only the area guess passes its record so far; the other callers can pass `reference=` when they have one.
+- **Token fields.** `input_tokens` is now the uncached input only (it used to add the cached tokens in), so cost is exact. Life AI Price gains `cached_per_mtok`; blank means a tenth of the input price. Cache writes are priced at 1.25 times input.
+- **Per-feature caps** live in one JSON field on Life Settings (`feature_caps`), set from the Cost tab (`settings.set_feature_cap`), not a new child table.
+- **Fallbacks.** A refused call raises `CapReached`, an `AIError`; every caller already catches `AIError` and falls back (the area guess to its rules). The Brain (#28) does not exist yet and must do the same.
+- **Cost tab.** A new admin-only tab under Assistant; the "This month" card moved there from Ask and AI. The acceptance check is `I27.<width>` (the issue's test 5); tests 1 to 4 are unit tests in `test_issue27_gateway.py`.

@@ -7,7 +7,8 @@
  "field_order": [
   "model",
   "input_per_mtok",
-  "output_per_mtok"
+  "output_per_mtok",
+  "cached_per_mtok"
  ],
  "fields": [
   {
@@ -28,6 +29,12 @@
    "fieldtype": "Float",
    "label": "Output, $ per million tokens",
    "in_list_view": 1
+  },
+  {
+   "fieldname": "cached_per_mtok",
+   "fieldtype": "Float",
+   "label": "Cached Input per Mtok",
+   "description": "Blank: a tenth of the input price"
   }
  ],
  "istable": 1,
