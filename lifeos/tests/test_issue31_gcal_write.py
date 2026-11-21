@@ -159,7 +159,7 @@ class TestWriteGoalBlocks(WriteCase):
 class TestChoice(LifeTestCase):
 	def test_5_the_choice_is_saved_listed_and_can_be_turned_off(self):
 		self.addCleanup(lambda: frappe.defaults.clear_default(gcal_write.KEY, parent=OWNER))
-		with patch.object(gcal, "source_for", lambda acc: gcal.FakeSource()):
+		with patch.object(gcal, "source_for", lambda acc: gcal.FakeSource()), patch.dict(frappe.local.conf, {"lifeos_fake_calendar": 1}):
 			self.assertIsNone(gcal_api.state()["write"])
 			self.assertEqual(gcal_api.set_write("primary")["write"], "primary")
 			self.assertEqual(gcal_api.calendars()["write"], "primary")
