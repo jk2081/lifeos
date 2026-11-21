@@ -161,8 +161,8 @@ async function session(user, width = 1440) {
     if (!r.ok()) throw new Error('upload failed ' + r.status())
     return (await r.json()).message
   }
-  // Set 6: the lens (space= and area=) is remembered per user and added to every URL. A path that names no area opens on
-  // All of life (area= empty clears the lens), so one check's lens never narrows the next; the lens checks name it.
+  // Issue 46: `area=` is each page's own filter and is not carried; a path that names none opens on all of life, and the checks that
+  // narrow by area name it.
   const open = async (p) => {
     const u = new URL(base + p)
     if (u.pathname.startsWith('/life') && !u.searchParams.has('area')) u.searchParams.set('area', '')
@@ -733,31 +733,9 @@ for (const width of UX_WIDTHS) {
     }
   }
 
-  // the lens (set 6): the picker in the sidebar's header on a wide screen, the sheet behind the title bar on a phone
-  const openLens = async () => {
-    if (phone) await pg.locator('[data-lens-title]').click()
-    else await pg.locator('[data-lens-picker] button, [data-lens-picker]').first().click()
-    await pg.waitForTimeout(400)
-  }
-  const closeLens = async () => { if (await pg.locator('[data-lens-sheet]:visible, [role="menu"]:visible').count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(300) } }
-  // the picker's menu items are frappe-ui dropdown items (their data- attributes are not passed on): found by role and name
-  const lensItems = () => (phone ? pg.locator('[data-lens-sheet] [data-lens-item]') : pg.getByRole('menuitem'))
-  const lensOptions = async () => {
-    await openLens()
-    const texts = phone ? await pg.locator('[data-lens-sheet] [data-lens-item^="area:"]').allInnerTexts() : await lensItems().allInnerTexts()
-    await closeLens()
-    return texts.map((t) => t.trim())
-  }
-  const pickLens = async (area) => { // area: a Life Area name, or '' for All of life
-    await openLens()
-    if (phone) await pg.locator(`[data-lens-sheet] [data-lens-item="area:${area}"]`).first().click()
-    else {
-      const label = area ? (await s.api('area.tree', { space: SPACE })).areas.find((x) => x.name === area).area_name : 'All of life'
-      await pg.getByRole('menuitem', { name: label, exact: true }).first().click()
-    }
-    await pg.waitForLoadState('networkidle')
-    await settle()
-  }
+  // issue 46: no lens. The phone's menu sheet (behind "Life OS" at the top) holds Settings and, on two or more spaces, the spaces
+  const openMore = async () => { await pg.locator('[data-more-title]').click(); await pg.waitForTimeout(400) }
+  const closeMore = async () => { if (await pg.locator('[data-more-sheet]:visible').count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(300) } }
 
   await check(`${tag}.1`, `${width} px: a row opens a pane on every list screen and the list stays in the page`, async () => {
     for (const [name, p, sel] of LISTS) {
@@ -1371,13 +1349,13 @@ for (const width of UX_WIDTHS) {
       const due = (await s.api('session.counts', { space: SPACE })).doors.inbox.n
       const badge = pg.locator('[data-tabbar] [data-tab-count="Brain"]')
       must(due === 0 ? !(await badge.count()) : num(await badge.innerText()) === due, `the Brain tab says ${await badge.count() ? await badge.innerText() : 'nothing'}, the count helper says ${due}`)
-      step = 'the lens sheet holds Settings'
-      await pg.locator('[data-lens-title]').click()
+      step = 'the menu sheet holds Settings'
+      await pg.locator('[data-more-title]').click()
       await settle()
-      must(await pg.locator('[data-lens-sheet]').isVisible(), 'the lens title did not open the sheet')
-      await pg.locator('[data-lens-settings]').click()
+      must(await pg.locator('[data-more-sheet]').isVisible(), 'the title did not open the menu sheet')
+      await pg.locator('[data-more-settings]').click()
       await settle()
-      must(path() === '/life/settings', `Settings in the lens sheet opened ${path()}`)
+      must(path() === '/life/settings', `Settings in the menu sheet opened ${path()}`)
     } else {
       await s.api('views.save', { screen: 'sidebar', space: '', state: { rail: false } })
       await s.open('/life')
@@ -1385,7 +1363,7 @@ for (const width of UX_WIDTHS) {
       const navItems = () => pg.locator('[data-nav-places] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')).filter((x) => x !== 'Review'))
       must(JSON.stringify(await navItems()) === JSON.stringify(PLACES), `the places are ${await navItems()}`)
       must(JSON.stringify(await pg.locator('[data-nav-bottom] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')))) === JSON.stringify(['Settings']), 'the bottom is not Settings')
-      must(await pg.locator('[data-lens-picker]').count() && await pg.locator('[data-nav-capture]').count() && await pg.locator('[data-ask-box]').count(), 'the lens, Capture or the header box is missing')
+      must(await pg.locator('[data-nav-capture]').count() && await pg.locator('[data-ask-box]').count(), 'Capture or the header box is missing')
       step = 'each place opens and is the active item'
       const active = () => pg.locator('[data-sidebar] [aria-current="page"]').evaluateAll((els) => [...new Set(els.map((e) =>
         (e.closest('[data-nav-item]') || e.querySelector('[data-nav-item]'))?.getAttribute('data-nav-item')).filter(Boolean))])
@@ -1957,32 +1935,6 @@ while d <= last:
 
   // ---------- UX fixes, set 4 ----------
   // Area filters: no archived area and no area of another space, on every list with an Area filter; the Archive lists archived ones
-  await check(`${tag}.20`, `${width} px: the lens offers only active areas of this space (the Area filter of set 4 is the lens since set 6)`, async () => {
-    const made = []
-    try {
-      const mk = async (space, title, archived) => {
-        const a = (await s.api('settings.save_item', { kind: 'area', space, title: `${title} ${width} ${stamp}` })).name
-        made.push(a)
-        if (archived) await s.api('settings.save_item', { kind: 'area', name: a, is_archived: 1 })
-        return a
-      }
-      const active = await mk(SPACE, 'S4 active area', false)
-      await mk(SPACE, 'S4 archived area', true)
-      await mk('Shared', 'S4 shared area', false)
-      await s.open('/life/goals/tasks')
-      const opts = await lensOptions()
-      must(opts.some((o) => o.startsWith('S4 active area')), `the lens does not offer the active area (${opts.filter((o) => o.startsWith('S4'))})`)
-      must(!opts.some((o) => /S4 (archived|shared) area/.test(o)), `the lens offers ${opts.filter((o) => o.startsWith('S4')).join(', ')}`)
-      // the archived area's records stay findable in the Archive, which is narrowed by the lens like every list
-      must(active, '')
-      return `${opts.length} entries`
-    } finally {
-      await closeLens()
-      for (const a of made) await s.api('settings.save_item', { kind: 'area', name: a, delete: 1 }).catch(() => {})
-    }
-  })
-
-
   // Python on the acceptance site as the agent, answering JSON on its last line
   const asAgent = (code) => JSON.parse(bench(`frappe.set_user("hermes@lifeos.test")\nimport json\nfrom lifeos.api import wiki, library, sources, inbox, chats\nfrom lifeos import permissions\npermissions.clear_cache()\n${code}`).split('\n').pop())
   const editorEnd = async () => { await pg.locator('[data-live-editor] .cm-content').first().click(); await pg.keyboard.press('ControlOrMeta+End') }
@@ -2289,14 +2241,14 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
   })
 
   // ---------- UX fixes, set 6: the lens, the four places, Plan and Library (U<width>.40 and up) ----------
-  await check(`${tag}.40`, `${width} px: the lens: an area chosen in the ${phone ? 'lens sheet' : "sidebar's picker"} narrows Today, Inbox, every Plan tab and every Library tab; each count matches its rows and the server; the chip and the URL show it; it survives a reload; clearing it restores every count`, async () => {
+  await check(`${tag}.40`, `${width} px: ?area= narrows Today, Inbox, every Plan tab and every Library tab; each count matches its rows and the server; the chip and the URL show it; it survives a reload; clearing it restores every count`, async () => {
     let step = 'start'
     const calls = []
     const onReq = (r) => { const u = r.url(); if (u.includes('/api/method/lifeos.api.')) calls.push({ m: u.split('/api/method/lifeos.api.')[1].split('?')[0], url: u, body: r.postData() || '' }) }
     const carries = (m) => calls.some((c) => (!m || c.m === m) && (new URL(c.url).searchParams.get('area') === uxArea || c.body.includes(`"area":"${uxArea}"`)))
     const lensIn = () => new URL(pg.url()).searchParams.get('area')
     const areaName = areas.find((x) => x.name === uxArea).area_name
-    const goto = async (p) => { calls.length = 0; await pg.goto(base + p, { waitUntil: 'networkidle' }); await settle() } // no area= here: the lens decides
+    const goto = async (p, area = uxArea) => { calls.length = 0; await pg.goto(base + p + (p.includes('?') ? '&' : '?') + 'area=' + area, { waitUntil: 'networkidle' }); await settle() } // issue 46: the area is each page's own `?area=`, not carried
     const band = async () => Number(await pg.locator('[data-count-key="band:open"]:visible').first().getAttribute('data-count-n'))
     const total = (m, args) => s.api(m, { space: SPACE, page_length: 1, ...args }).then((r) => r.total)
     // [name, path, list method, the server's count under an area]
@@ -2319,16 +2271,14 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
     try {
       step = 'the counts on All of life'
       const before = {}
+      await s.open('/life') // a first visit to Today makes what it needs (a record Library > All lists), so it is made before counting
       for (const [name, p] of L) { step = `the counts on All of life: ${name}`; await s.open(p); before[name] = await count() }
       await s.open('/life')
       const band0 = await band()
-      step = 'choose the area in the lens'
-      calls.length = 0
-      await pickLens(uxArea)
+      step = 'open Today with the area'
+      await goto('/life')
       must(lensIn() === uxArea, `the URL has area=${lensIn()}`)
       must((await pg.locator('[data-lens-chip]:visible').innerText()).includes(areaName), 'the header has no chip for the area')
-      if (phone) must((await pg.locator('[data-lens-title]').innerText()).includes(areaName), 'the phone title does not show the area')
-      else must((await pg.locator('[data-lens-picker]').innerText()).includes(areaName), "the sidebar's picker does not show the area")
       step = 'Today under the lens'
       must(carries('today.get'), 'Today did not ask for the area')
       const c = await s.api('counts.get', { space: SPACE, area: uxArea })
@@ -2375,15 +2325,16 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       await settle()
       must(lensIn() === uxArea && await pg.locator('[data-lens-chip]:visible').count(), 'the lens was lost on reload')
       step = 'clear the area'
-      if (phone) await pickLens('')
-      else { await pg.locator('[data-lens-chip]:visible').first().click(); await pg.waitForLoadState('networkidle'); await settle() }
+      await pg.locator('[data-lens-chip]:visible').first().click(); await pg.waitForLoadState('networkidle'); await settle()
       must(!lensIn() && !(await pg.locator('[data-lens-chip]:visible').count()), `clearing left area=${lensIn()} or the chip`)
       for (const [name, p] of L) {
-        await goto(p)
+        await goto(p, '')
         must(!lensIn(), `${name}: the cleared lens came back`)
-        must((await count()) === before[name], `${name}: ${await count()} after clearing, ${before[name]} before`)
+        const server = L.find((x) => x[0] === name)[3]
+        const want = server ? await server(undefined) : before[name] // the server's own count: a record made while the check ran is not a failure of clearing
+        must((await count()) === want, `${name}: ${await count()} after clearing, ${want} expected (${before[name]} before)`)
       }
-      await goto('/life')
+      await goto('/life', '')
       must((await band()) === band0, `Today says ${await band()} open tasks after clearing, ${band0} before`)
       return done.join(', ')
     } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) } finally {
@@ -2411,9 +2362,9 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
     }
     if (phone) { // the lens sheet and the Ask sheet too
       await s.open('/life')
-      await openLens()
-      if ((await overflow()) > 0) bad.push('the lens sheet')
-      await closeLens()
+      await openMore()
+      if ((await overflow()) > 0) bad.push('the menu sheet')
+      await closeMore()
     }
     must(!bad.length, 'scrolls sideways: ' + bad.join('; '))
     must(errors.length === before, 'script errors: ' + errors.slice(before).join(' | ').slice(0, 300))
@@ -3814,17 +3765,6 @@ for (const width of SET_WIDTHS) {
     await pg.waitForLoadState('networkidle')
     await pg.waitForTimeout(700)
   }
-  // what the lens offers: the sidebar's menu, or the phone's sheet
-  const lensLabels = async () => {
-    if (phone) await pg.locator('[data-lens-title]').click()
-    else await pg.locator('[data-lens-picker] button, [data-lens-picker]').first().click()
-    await pg.waitForTimeout(400)
-    const items = phone ? pg.locator('[data-lens-sheet] [data-lens-item]') : pg.getByRole('menuitem')
-    const out = (await items.allInnerTexts()).map((t) => t.trim())
-    await pg.keyboard.press('Escape')
-    await pg.waitForTimeout(300)
-    return out
-  }
   // what the area picker of a task offers
   let pickTask = null
   const pickerLabels = async () => {
@@ -3837,7 +3777,7 @@ for (const width of SET_WIDTHS) {
     return out
   }
 
-  await check(`${tag}.1`, `${width} px: switching Money on shows it in the lens and the task area picker; off hides it; its goals come back when it is on again`, async () => {
+  await check(`${tag}.1`, `${width} px: switching Money on shows it in the task area picker; off hides it; its goals come back when it is on again`, async () => {
     const was = (await lifeArea('Money')).is_on
     let goal = null
     try {
@@ -3847,8 +3787,6 @@ for (const width of SET_WIDTHS) {
       must((await pg.locator('[data-life-area="Money"]').getAttribute('data-on')) === '0', 'Money does not show as off')
       await flip('Money')
       must((await lifeArea('Money')).is_on, 'the switch did not turn Money on')
-      await s.open('/life')
-      must((await lensLabels()).includes('Money'), 'Money is on but not in the lens')
       must((await pickerLabels()).includes('Money'), 'Money is on but not in the task area picker')
       goal = (await s.api('goals.create', { title: `I12 goal in Money ${width} ${stamp}`, horizon: 'Long term', space: SPACE, area: (await lifeArea('Money')).name })).name
       const listed = async () => (await s.api('goals.list', { space: SPACE, page_length: 100, area: (await lifeArea('Money')).name }).catch(() => ({ goals: [] }))).goals.some((g) => g.name === goal)
@@ -3857,8 +3795,6 @@ for (const width of SET_WIDTHS) {
       must(/\d+ goals?/.test(await pg.locator('[data-life-area="Money"] [data-area-goals]').innerText()), 'Money shows no goal count')
       await flip('Money')
       must(!(await lifeArea('Money')).is_on, 'the switch did not turn Money off')
-      await s.open('/life')
-      must(!(await lensLabels()).includes('Money'), 'Money is off but still in the lens')
       must(!(await pickerLabels()).includes('Money'), 'Money is off but still in the task area picker')
       must(!(await s.api('goals.list', { space: SPACE, page_length: 100 })).goals.some((g) => g.name === goal), 'the goal of Money is listed while Money is off')
       await areasPage()
@@ -3885,8 +3821,6 @@ for (const width of SET_WIDTHS) {
     must(await row.count(), 'the new part is not listed under Career')
     must((await row.innerText()).includes('Vice Chair · no goals'), 'the new part does not show its description and goal count: ' + await row.innerText())
     must((await pickerLabels()).includes(name), 'the new part is not in the task area picker')
-    await s.open('/life')
-    must((await lensLabels()).includes(name), 'the new part is not in the lens')
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
   })
 
@@ -5732,10 +5666,10 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task 
     const errors = []
     pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
     const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
-    // the card is in the sidebar on a desktop and in the focus sheet (the logo) on a phone
+    // the card is in the sidebar on a desktop and in the menu sheet (the title) on a phone
     const openCard = async () => {
       await s.open('/life/today')
-      if (phone) await pg.locator('[data-lens-title]').click()
+      if (phone) await pg.locator('[data-more-title]').click()
       return pg.locator('[data-setup-card]:visible')
     }
     await check(`${tag}.3`, `${width} px: the setup card shows the level and the next step, and links to How it works`, async () => {
@@ -5766,7 +5700,7 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task 
       await pg.waitForFunction(() => !document.querySelector('[data-setup-card]'), null, { timeout: 8000 })
       await s.open('/life/today')
       await pg.waitForTimeout(800)
-      if (phone) await pg.locator('[data-lens-title]').click()
+      if (phone) await pg.locator('[data-more-title]').click()
       must((await pg.locator('[data-setup-card]').count()) === 0, 'the card came back after a reload')
       await s.open('/life/settings?tab=places')
       await pg.locator('[data-settings-how]').click()
@@ -6577,6 +6511,161 @@ print(p.name)`).split('\n').pop()
     cleanup()
     await s.api('settings.save', { values: { month_plan_enabled: was.month_plan_enabled ? 1 : 0 } })
     await s.ctx.close()
+  }
+}
+
+// Issue 46: one space on new sites, and no lens. I46.1 and I46.2 are unit tests (test_i46_one_space). A user made for the run, with
+// their own single space, stands for a new site (the acceptance site keeps two spaces, for I46.4 and I46.6). Titles start "I46 ".
+for (const width of SET_WIDTHS) {
+  const tag = `I46.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const user = `i46-${width}-${stamp}@lifeos.test`.toLowerCase()
+  const space = `I46 ${width} ${stamp}`
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Task",):
+    for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+from lifeos import devtools
+devtools.purge_space("${space}", drop=True)
+frappe.db.delete("DefaultValue", {"parent": "${user}"})
+if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  let one = null
+  const owner = await session('owner@lifeos.test', width)
+  try {
+    bench(`from lifeos import devtools
+devtools.make_user("${user}", "One", ["Life Admin", "Life User"])
+frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
+frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
+frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user": "${user}", "members": [{"user": "${user}", "access": "Write"}]}).insert(ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I46 task ${width} ${stamp}"}).insert(ignore_permissions=True)`)
+    one = await session(user, width)
+    const pg = one.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const settle = () => pg.waitForTimeout(700)
+    const spaceUi = '[data-space-picker] button, [data-space-item], [data-space-sheet], [data-settings-space], [data-space-card], [data-member-spaces], [data-new-space], [data-space-chip]'
+
+    await check(`${tag}.3`, `${width} px: on a one-space site no space picker, chip or Spaces view appears on any screen`, async () => {
+      const screens = ['/life', '/life/brain', '/life/brain/captures', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/goals/cycles', '/life/library',
+        '/life/library/notes', '/life/library/people', '/life/library/timeline', '/life/library/archive', '/life/today/week?view=calendar', '/life/ask',
+        ...['profile', 'appearance', 'calendar', 'areas', 'rhythms', 'habits', 'rules', 'members', 'sources', 'advanced'].map((t) => `/life/settings?tab=${t}`),
+        '/life/settings?tab=members&view=spaces', '/life/settings?tab=spaces']
+      for (const p of screens) {
+        await one.open(p)
+        await settle()
+        must(await pg.locator(spaceUi).count() === 0, `${p}: a space control is shown`)
+        const text = await pg.locator('[data-main]').innerText()
+        must(!/\bSpaces\b/.test(text) && !/Default space/.test(text) && !/Space for these settings/.test(text), `${p}: the page mentions spaces`)
+        must(!/[Nn]o space/.test(text) && !text.includes(space), `${p}: the page shows a space name`)
+      }
+      if (phone) {
+        await one.open('/life')
+        await pg.locator('[data-more-title]').click()
+        await pg.locator('[data-more-sheet]').waitFor()
+        must(await pg.locator('[data-space-sheet]').count() === 0, 'the menu sheet lists spaces')
+        must((await pg.locator('[data-more-title]').innerText()).trim() === 'Life OS', 'the title shows a space')
+        await pg.keyboard.press('Escape')
+      } else {
+        must(!(await pg.locator('[data-sidebar] [data-slot="sidebar-header"]').innerText()).includes(space), 'the sidebar shows the space')
+      }
+      await one.open('/life/settings?tab=members')
+      await settle()
+      const tabs = await pg.locator('[data-member-filter]').innerText()
+      must(!/Spaces/.test(tabs), `Members offers ${tabs.replace(/\s+/g, ' ')}`)
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.5`, `${width} px: on a one-space site Ask is switched in Advanced and "Agents may open sensitive items" in Rules, and each takes effect`, async () => {
+      const get = async () => (await one.api('settings.get', { space })).spaces.find((x) => x.name === space)
+      const was = await get()
+      try {
+        await one.open('/life/settings?tab=advanced')
+        const ask = pg.locator('[data-ai-ask] [data-ask-switch]')
+        await ask.waitFor({ timeout: 10000 })
+        await ask.click()
+        await pg.waitForLoadState('networkidle')
+        await settle()
+        must(!!(await get()).ask_enabled !== !!was.ask_enabled, 'the Ask switch did not change the setting')
+        await one.open('/life/settings?tab=rules')
+        const vault = pg.locator('[data-sensitive-agents] [data-vault-switch]')
+        await vault.waitFor({ timeout: 10000 })
+        await vault.click()
+        await pg.waitForLoadState('networkidle')
+        await settle()
+        must(!!(await get()).agents_can_read_vault !== !!was.agents_can_read_vault, 'the sensitive-items switch did not change the setting')
+        must(await pg.locator('[data-sensitive] [data-ask-vault-switch]').count() === 1, 'Ask may read sensitive items is not in Rules')
+      } finally {
+        await one.api('settings.set_space_ask', { space, ask_enabled: was.ask_enabled ? 1 : 0 }).catch(() => {})
+        await one.api('settings.set_agent_vault', { space, allowed: was.agents_can_read_vault ? 1 : 0 }).catch(() => {})
+      }
+    })
+
+    await check(`${tag}.2`, `${width} px: a capture sent without a space on a one-space site lands in that space`, async () => {
+      const made = await one.api('inbox.create_item', { title: `I46 capture ${width} ${stamp}`, raw_text: 'one space' })
+      must(made.space === space, `the capture went to ${made.space}`)
+    })
+  } finally {
+    if (one) await one.ctx.close()
+    restore()
+  }
+
+  const pg = owner.page
+  const settle = () => pg.waitForTimeout(700)
+  try {
+    await check(`${tag}.4`, `${width} px: the sidebar has no lens and no pinned areas; ?area= on Goals and Library is that page's area filter`, async () => {
+      const area = (await owner.api('area.tree', { space: SPACE })).areas.find((a) => a.is_life_area && a.area_name === 'Career')
+      must(area, 'no Career area')
+      const calls = []
+      const onReq = (r) => { const u = r.url(); if (u.includes('/api/method/lifeos.api.')) calls.push({ url: u, body: r.postData() || '' }) }
+      pg.on('request', onReq)
+      try {
+        await owner.open('/life')
+        must(await pg.locator('[data-lens-picker], [data-lens-bar], [data-lens-sheet]').count() === 0, 'a lens control is shown')
+        if (!phone) {
+          const side = await pg.locator('[data-sidebar]').innerText()
+          must(!/Focus on an area|All of life/.test(side), 'the sidebar still has the lens')
+          must(await pg.locator('[data-sidebar] [data-pinned-area]').count() === 0, 'pinned areas are in the sidebar')
+        }
+        for (const p of ['/life/goals', '/life/goals/tasks', '/life/library']) {
+          calls.length = 0
+          await pg.goto(`${base}${p}${p.includes('?') ? '&' : '?'}area=${area.name}`, { waitUntil: 'networkidle' })
+          await settle()
+          must(new URL(pg.url()).searchParams.get('area') === area.name, `${p}: the area left the URL`)
+          must(calls.some((c) => new URL(c.url).searchParams.get('area') === area.name || c.body.includes(area.name)), `${p}: no request asked for the area`)
+          await pg.locator('[data-main] a[href^="/life/"]').first().waitFor({ timeout: 5000 }).catch(() => {})
+        }
+        // a link to another page does not carry the area along: it is that page's filter
+        await pg.goto(`${base}/life/goals/tasks?area=${area.name}`, { waitUntil: 'networkidle' })
+        await (phone ? pg.locator('[data-tabbar] [data-tab-item="Library"]') : pg.locator('[data-sidebar] [data-nav-item="Library"]')).first().click()
+        await pg.waitForURL((u) => u.pathname.startsWith('/life/library'), { timeout: 10000 })
+        await pg.waitForLoadState('networkidle')
+        must(!new URL(pg.url()).searchParams.get('area'), `the area was carried to the next page (${pg.url()})`)
+      } finally {
+        pg.off('request', onReq)
+      }
+    })
+
+    await check(`${tag}.6`, `${width} px: on the acceptance site, which keeps two spaces, the space is picked in the ${phone ? 'menu sheet' : "sidebar's picker"} and Settings still shows Spaces`, async () => {
+      must((await owner.api('session.boot')).spaces.length >= 2, 'the owner has fewer than two spaces')
+      await owner.open('/life')
+      if (phone) {
+        await pg.locator('[data-more-title]').click()
+        await pg.locator('[data-space-sheet]').waitFor({ timeout: 8000 })
+        await pg.locator('[data-space-sheet] [data-space-item="Shared"]').click()
+      } else {
+        await pg.locator('[data-space-picker] button, [data-space-picker]').first().click()
+        await pg.getByRole('menuitem', { name: 'Shared', exact: true }).click()
+      }
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must(new URL(pg.url()).searchParams.get('space') === 'Shared', 'the URL does not name Shared')
+      await owner.open('/life/settings?tab=members&view=spaces&space=Private')
+      must(await pg.locator('[data-space-card]').count() >= 2, 'Settings > Members > Spaces does not list the spaces')
+      must(await pg.locator('[data-settings-space]').count() >= 1 || phone, 'the space picker of Settings is gone')
+    })
+  } finally {
+    await owner.api('views.save', { screen: 'lens', space: '', state: { space: SPACE } }).catch(() => {})
+    await owner.ctx.close()
   }
 }
 

@@ -20,6 +20,14 @@ def make_user(email, first_name, roles, password=None):
 	return user
 
 
+def make_shared_space():
+	"""A new site has one space (issue 46); the test sites keep a second, Shared, to test what two spaces show and do."""
+	if not frappe.db.exists("Life Space", "Shared"):
+		frappe.get_doc({"doctype": "Life Space", "space_name": "Shared", "owner_user": "Administrator"}).insert(ignore_permissions=True)
+	from lifeos import seed
+	seed.ensure_structure()
+
+
 def setup_users(password=None):
 	"""Create the three test users: the owner, a family member who is only in Shared, and an agent.
 
@@ -30,6 +38,7 @@ def setup_users(password=None):
 	make_user(OWNER, "Jai", ["Life Admin", "Life User"], password)
 	make_user(FAMILY, "Family", ["Life User"], password)
 	make_user(AGENT, "Hermes", ["Life Agent"], password)
+	make_shared_space()
 	install.set_owner(OWNER)
 	install.add_member("Shared", FAMILY, "Write", "Life User")
 	install.add_member("Private", AGENT, "Write", "Life Agent")

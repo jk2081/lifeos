@@ -86,13 +86,11 @@ def make_dimensions(space):
 
 
 def ensure_structure():
-	"""The seven areas of life and the check-in dimensions for the two starting spaces. The owner's own areas come with the
+	"""The seven areas of life and the check-in dimensions for every space. The owner's own areas come with the
 	seed, as parts (issue 11)."""
 	from lifeos import areas
 
-	for space in ("Private", "Shared"):
-		if not frappe.db.exists("Life Space", space):
-			continue
+	for space in frappe.get_all("Life Space", pluck="name"):
 		areas.ensure(space)
 		if not frappe.db.exists("Life Dimension", {"space": space}):
 			make_dimensions(space)

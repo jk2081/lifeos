@@ -28,7 +28,8 @@
       <template v-else-if="ask.refusal.error === 'cap'">{{ ask.refusal.spend?.text }}. The cap is in
         <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'advanced' } }" @click="ask.open = false">Settings, Advanced, AI key and cost</RouterLink>.</template>
       <template v-else-if="ask.refusal.error === 'off'">The owner can turn it on in
-        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'members', view: 'spaces' } }" @click="ask.open = false">Settings, Members, Spaces</RouterLink>.</template>
+        <RouterLink v-if="manySpaces" class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'members', view: 'spaces' } }" @click="ask.open = false">Settings, Members, Spaces</RouterLink>
+        <RouterLink v-else class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'advanced' } }" @click="ask.open = false">Settings, Advanced</RouterLink>.</template>
     </Alert>
   </div>
 </template>
@@ -38,6 +39,7 @@
 import { useMediaQuery } from '@vueuse/core'
 import { Alert, Button, LoadingIndicator } from 'frappe-ui'
 import Md from '../Md.vue'
+import { manySpaces } from '@/lib/lens'
 import { canWrite } from '@/lib/store'
 import { ask, openCite, runAction } from '@/lib/ask'
 const phone = useMediaQuery('(max-width: 767px)')

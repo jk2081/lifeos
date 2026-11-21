@@ -6,19 +6,17 @@
       </div>
 
       <main class="flex min-w-0 flex-1 flex-col pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0" data-main>
-        <!-- phone: the lens is the title at the top of every screen; tapping it opens the picker as a sheet (UX fixes, set 6) -->
-        <div class="sticky top-0 z-20 flex items-center border-b border-outline-gray-1 bg-surface-base px-2 py-1 md:hidden" data-lens-bar>
-          <Button class="min-w-0 !justify-start" variant="ghost" size="md" :label="lensLabel" icon-right="lucide-chevron-down" aria-haspopup="dialog" data-lens-title
-            @click="lensOpen = true">
-            <template #prefix><span class="size-2 shrink-0 rounded-full" :class="lensArea ? dotClass(lensArea) : 'bg-surface-gray-5'" aria-hidden="true" /></template>
-          </Button>
+        <!-- phone: "Life OS" (the space too, on a site with two or more) at the top of every screen; tapping it opens the menu sheet -->
+        <div class="sticky top-0 z-20 flex items-center border-b border-outline-gray-1 bg-surface-base px-2 py-1 md:hidden" data-more-bar>
+          <Button class="min-w-0 !justify-start" variant="ghost" size="md" :label="manySpaces ? `Life OS · ${store.space}` : 'Life OS'" icon-right="lucide-chevron-down"
+            aria-haspopup="dialog" data-more-title @click="moreOpen = true" />
         </div>
         <RouterView v-slot="{ Component }">
           <ScreenBoundary><component :is="Component" :key="store.space + ':' + store.lensArea + ':' + route.path" /></ScreenBoundary>
         </RouterView>
       </main>
 
-      <!-- phone (issue 14): Today and Brain, the round capture button, Goals and Library; Settings is in the lens sheet, Ask in every header -->
+      <!-- phone (issue 14): Today and Brain, the round capture button, Goals and Library; Settings is in the menu sheet, Ask in every header -->
       <div class="fixed inset-x-0 bottom-0 z-30 md:hidden" data-tabbar>
         <MobileNav aria-label="Places">
           <template v-for="(n, i) in PLACES" :key="n.to">
@@ -42,7 +40,7 @@
 
       <NewRecord v-if="store.newKind === 'someday'" :model-value="true" title="Park on Someday" action="Park on Someday" :fields="somedayFields" :save="createSomeday"
         @update:model-value="(v) => !v && (store.newKind = '')" />
-      <LensSheet v-model:open="lensOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
+      <MoreSheet v-model:open="moreOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
       <RecordPane />
       <AskPanel />
       <SearchPalette v-model:open="store.searchOpen" />
@@ -87,14 +85,14 @@ import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'
 import CaptureSheet from './components/CaptureSheet.vue'
 import { boot, store } from './lib/store'
-import { dotClass, initLens, lensArea, lensLabel } from './lib/lens'
-import LensSheet from './components/lens/LensSheet.vue'
+import { initLens, manySpaces } from './lib/lens'
+import MoreSheet from './components/MoreSheet.vue'
 import { errorText } from './lib/api'
 import { stepTab } from './lib/tabs'
 
 const route = useRoute()
 const router = useRouter()
-const lensOpen = ref(false)
+const moreOpen = ref(false)
 const shortcutsOpen = ref(false)
 const bootError = ref('')
 const SHORTCUTS = [
@@ -136,7 +134,7 @@ async function logout() {
   window.location.href = '/login'
 }
 
-watch(() => route.fullPath, () => (lensOpen.value = false))
+watch(() => route.fullPath, () => (moreOpen.value = false))
 
 // Keyboard: Cmd/Ctrl+K search, n new task, g then a letter to jump, ? the shortcut list, Esc closes panels.
 // frappe-ui dialogs close themselves on Esc; the record pane listens for the event below.
@@ -148,7 +146,7 @@ function onKey(e) {
     return
   }
   if (e.key === 'Escape') {
-    if (!store.searchOpen && !store.quickAdd && !lensOpen.value && !shortcutsOpen.value) window.dispatchEvent(new CustomEvent('lifeos-escape'))
+    if (!store.searchOpen && !store.quickAdd && !moreOpen.value && !shortcutsOpen.value) window.dispatchEvent(new CustomEvent('lifeos-escape'))
     return
   }
   const el = e.target

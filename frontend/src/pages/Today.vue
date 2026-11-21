@@ -141,7 +141,7 @@
       <section data-open-band :data-over-limit="band.over_limit || undefined">
         <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base" data-band-head>
           <span class="font-semibold text-ink-gray-9">Open</span>
-          <span class="text-sm text-ink-gray-6 max-md:hidden">everything still open in {{ lensAreaName === 'All of life' ? store.space : lensAreaName }} · each number opens its list</span>
+          <span class="text-sm text-ink-gray-6 max-md:hidden">everything still open{{ lensAreaName !== 'All of life' ? ' in ' + lensAreaName : manySpaces ? ' in ' + store.space : '' }} · each number opens its list</span>
           <span v-if="band.over_limit" class="text-sm text-ink-amber-9" data-band-amber> · <CountLink :count="band.stuck" tone="text-ink-amber-9 font-medium" count-key="band:stuck-head" /> tasks stuck<span class="max-md:hidden">, above your limit of {{ band.rules.stuck_limit }}</span></span>
           <Button class="ml-auto md:hidden" size="sm" :variant="band.over_limit ? 'subtle' : 'ghost'" :class="band.over_limit && '!bg-surface-amber-2 !text-ink-amber-9'" label="Reset" route="/today/reset" data-band-reset-phone />
         </h2>
@@ -184,7 +184,7 @@
 // a fixed order: overdue, today, this week's 12 Week Year actions, decisions), and what is around it (today's events,
 // this week's dates, the other insights). Someday items never appear.
 import { computed, h, onMounted, onUnmounted, ref } from 'vue'
-import { lensAreaName } from '@/lib/lens'
+import { lensAreaName, manySpaces } from '@/lib/lens'
 import { useMediaQuery } from '@vueuse/core'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, Dialog, Dropdown, Skeleton, toast } from 'frappe-ui'

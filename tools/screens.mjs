@@ -135,7 +135,7 @@ for (const scheme of schemes) {
       ['task-pane-notes', `/life/plan/tasks?view=list&area=&open=task:${task}&ptab=notes`], ['goal-pane-history', `/life/plan/goals?status=all&area=&open=goal:${goal}&ptab=history`],
       ['ask', '/life/ask'], ['ask-insights', '/life/ask?tab=insights'], ['ask-history', '/life/ask?tab=history'],
       ['ask-panel', '/life/?area='], ['ask-pane', `/life/plan/tasks?view=list&area=&open=task:${task}`],
-      ['lens-picker', '/life/?area='], ['dev-editor', '/life/dev/editor'],
+      ['more-sheet', '/life/?area='], ['dev-editor', '/life/dev/editor'],
       // set 7: the Outbox, a number goal, New goal with "Done when…", the old Inbox items' batch
       ['library-outbox', '/life/library/outbox?area='], ['library-outbox-in', '/life/library/outbox?pile=in&period=12weeks&area='],
       ...(numberGoal ? [['goal-number', `/life/plan/goals/${numberGoal}`], ['goal-number-pane', `/life/plan/goals?status=all&area=&open=goal:${numberGoal}`]] : []),
@@ -146,8 +146,8 @@ for (const scheme of schemes) {
     for (const [name, p] of SCREENS) {
       await page.goto(base + p, { waitUntil: 'networkidle' })
       await page.waitForTimeout(700)
-      if (name === 'lens-picker') { // the lens's picker: the sidebar's dropdown, or the sheet from the phone's title bar
-        await page.locator(width < 800 ? '[data-lens-title]' : '[data-slot="sidebar-header"] button').first().click()
+      if (name === 'more-sheet' && width < 800) { // the phone's menu sheet from the title bar (issue 46: no lens)
+        await page.locator('[data-more-title]').first().click()
         await page.waitForTimeout(600)
       }
       if (name === 'new-goal') { // the New goal dialog on a number

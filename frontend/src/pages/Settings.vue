@@ -9,8 +9,8 @@
         <TabList variant="ghost" class="w-full">
           <template v-for="g in groups" :key="g.key">
             <div v-if="g.key === 'advanced'" class="mb-1 mt-4 border-t border-outline-gray-1" />
-            <div v-if="g.label" class="px-2 pb-1 pt-4 text-sm-medium text-ink-gray-6 first:pt-0" :data-settings-group="g.key">{{ g.key === 'space' ? `${g.label} · ${spaceSel}` : g.label }}</div>
-            <div v-if="g.key === 'space'" class="mb-1.5 px-1" @keydown.stop>
+            <div v-if="g.label" class="px-2 pb-1 pt-4 text-sm-medium text-ink-gray-6 first:pt-0" :data-settings-group="g.key">{{ g.key === 'space' && manySpaces ? `${g.label} · ${spaceSel}` : g.label }}</div>
+            <div v-if="g.key === 'space' && manySpaces" class="mb-1.5 px-1" @keydown.stop>
               <Select :model-value="spaceSel" :options="d.spaces.map((s) => ({ label: s.name, value: s.name }))" aria-label="Space for these settings" data-settings-space
                 @update:model-value="pickSpace" />
             </div>
@@ -21,7 +21,7 @@
       <template v-else-if="ready">
         <section v-for="g in groups" :key="g.key" class="mb-4 flex flex-col gap-0.5">
           <div v-if="g.label" class="mb-1 text-sm-medium text-ink-gray-6" :data-settings-group="g.key">{{ g.label }}</div>
-          <div v-if="g.key === 'space'" class="mb-1.5">
+          <div v-if="g.key === 'space' && manySpaces" class="mb-1.5">
             <Select :model-value="spaceSel" :options="d.spaces.map((s) => ({ label: s.name, value: s.name }))" aria-label="Space for these settings" data-settings-space
               @update:model-value="pickSpace" />
           </div>
@@ -39,7 +39,7 @@
           <h2 class="min-w-0 flex-1 text-lg-semibold text-ink-gray-9" data-section-title>{{ heading }}</h2>
           <Button v-if="section === 'habits' && canEdit" variant="solid" icon-left="lucide-plus" label="New habit" data-new @click="openNew(habitsList)" />
           <Button v-if="section === 'members' && memberKind !== 'spaces' && memberSpace" variant="solid" icon-left="lucide-plus" label="Add member" data-add-member @click="addOpen = true" />
-          <Button v-if="section === 'members' && memberKind === 'spaces'" label="New space" data-new-space @click="spaceOpen = true" />
+          <Button v-if="section === 'members' && memberKind === 'spaces' && manySpaces" label="New space" data-new-space @click="spaceOpen = true" />
         </div>
         <div v-if="!d" class="flex flex-col gap-3"><Skeleton v-for="i in 4" :key="i" class="h-10 w-full rounded-4" /></div>
 
@@ -51,11 +51,11 @@
           <SettingRow label="Name" help="How Life OS greets you and labels what you write. It comes from your Frappe user.">
             <span class="text-base text-ink-gray-9">{{ store.fullName || store.user }}</span></SettingRow>
           <SettingRow label="Email" help="You sign in with this address."><span class="break-all text-base text-ink-gray-8">{{ store.user }}</span></SettingRow>
-          <SettingRow label="Default space" help="The space the app opens in, and where new records go when no space is chosen." :error="errors.default_space">
+          <SettingRow v-if="manySpaces" label="Default space" help="The space the app opens in, and where new records go when no space is chosen." :error="errors.default_space">
             <Select class="w-44" :model-value="d.settings.default_space" :options="d.spaces.map((s) => s.name)" :disabled="!d.is_admin" data-setting="default_space"
               @update:model-value="(v) => setOne('default_space', v)" />
           </SettingRow>
-          <p v-if="!d.is_admin" class="pb-3 text-sm text-ink-gray-6">Only the owner can change this.</p>
+          <p v-if="!d.is_admin && manySpaces" class="pb-3 text-sm text-ink-gray-6">Only the owner can change this.</p>
         </Card>
           <SectionHead>Look</SectionHead>
         <Card flush data-settings-look>
@@ -200,17 +200,15 @@
         <!-- Areas (issue 12) -->
         <template v-if="show('areas')">
           <AreasSection :space="spaceSel" :rows="d.areas" :is-admin="!!d.is_admin" @changed="changed" />
-          <!-- the sidebar's "Focus on an area": which areas are pinned there, and each area's dot -->
+          <!-- each area's colour (its dot on goals and chips); issue 46 removed the pins with the lens -->
           <section id="pins" data-area-pins>
-            <SectionHead>In the sidebar</SectionHead>
+            <SectionHead>Colours</SectionHead>
             <Card flush>
-              <SettingRow v-for="a in shownAreas" :key="a.name" :label="(a.parent_area ? '· ' : '') + a.title" :help="a.parent_area ? 'Part' : 'Pinned areas are one-click lenses, in this order.'">
+              <SettingRow v-for="a in shownAreas" :key="a.name" :label="(a.parent_area ? '· ' : '') + a.title" :help="a.parent_area ? 'Part' : undefined">
                 <div class="flex items-center gap-2">
                   <span class="size-2.5 rounded-full" :class="dotClass(a)" aria-hidden="true" />
                   <Select class="w-28" :model-value="a.colour || 'gray'" :options="COLOURS" :disabled="!d.is_admin" :aria-label="`Colour of ${a.title}`" :data-area-colour="a.name"
                     @update:model-value="(v) => saveArea(a, { colour: v })" />
-                  <Switch :model-value="!!a.is_pinned" :disabled="!d.is_admin" :aria-label="`Pin ${a.title} to the sidebar`" :data-area-pin="a.name"
-                    @update:model-value="(v) => saveArea(a, { is_pinned: v ? 1 : 0 })" />
                 </div>
               </SettingRow>
             </Card>
@@ -223,19 +221,24 @@
           <NoteEditor v-if="rulesDoc" :key="rulesDoc.name" :note="rulesDoc" data-settings-rules />
           <Card v-else><Empty title="No rules page yet in this space." hint="It is made the first time the assistant reads the rules." /></Card>
           <SectionHead>Sensitive items</SectionHead>
-          <p class="text-sm text-ink-gray-6">A sensitive item is a document from the Vault, or a capture or note marked sensitive. Each space decides who may read them. Anyone who can edit an item may mark it; only the space's owner may unmark it.</p>
+          <p class="text-sm text-ink-gray-6">A sensitive item is a document from the Vault, or a capture or note marked sensitive. {{ manySpaces ? 'Each space decides who may read them. ' : '' }}Anyone who can edit an item may mark it; only the space's owner may unmark it.</p>
           <Card flush data-sensitive>
-            <SettingRow v-for="sp in d.spaces" :key="sp.name" :label="`Ask may read sensitive items in ${sp.name}`" help="Off by default. Ask answers the people in the space." :data-sensitive-space="sp.name">
-              <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="`Ask may read sensitive items in ${sp.name}`" :data-ask-vault-switch="sp.name" :disabled="!d.is_admin"
+            <SettingRow v-for="sp in d.spaces" :key="sp.name" :label="manySpaces ? `Ask may read sensitive items in ${sp.name}` : 'Ask may read sensitive items'" help="Off by default. Ask answers the people in the space." :data-sensitive-space="sp.name">
+              <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="manySpaces ? `Ask may read sensitive items in ${sp.name}` : 'Ask may read sensitive items'" :data-ask-vault-switch="sp.name" :disabled="!d.is_admin"
                 @update:model-value="(v) => setSpaceAsk(sp, 'ask_can_read_vault', v)" /></SettingRow>
           </Card>
-          <p class="text-sm text-ink-gray-6" data-sensitive-agents-note>Whether agents may open sensitive items is set for each space under
+          <Card v-if="!manySpaces && onlySpace" flush data-sensitive-agents>
+            <SettingRow label="Agents may open sensitive items" help="Off by default. With it off, agents cannot list, read or download sensitive items.">
+              <Switch :model-value="!!onlySpace.agents_can_read_vault" aria-label="Agents may open sensitive items" data-vault-switch :disabled="!d.is_admin"
+                @update:model-value="(v) => setVault(onlySpace, v)" /></SettingRow>
+          </Card>
+          <p v-else class="text-sm text-ink-gray-6" data-sensitive-agents-note>Whether agents may open sensitive items is set for each space under
             <RouterLink v-if="d.is_admin" class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'members', view: 'spaces' } }">People and agents, Spaces</RouterLink><template v-else>People and agents, Spaces, by the owner</template>.</p>
         </template>
         <!-- Members: people and agents in one list, and the spaces -->
         <template v-if="show('members')">
           <TabButtons v-model="memberKind" class="self-start" :options="memberTabs" aria-label="Show" data-member-filter />
-          <template v-if="memberKind === 'spaces'">
+          <template v-if="memberKind === 'spaces' && manySpaces">
           <div class="flex flex-col gap-4" data-settings-spaces>
             <Card v-for="sp in d.spaces" :key="sp.name" flush :data-space-card="sp.name">
               <div class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2.5">
@@ -254,8 +257,8 @@
           </template>
           <template v-else>
           <div class="flex gap-4 max-md:flex-col">
-            <Select v-if="phone" :model-value="memberSpace" :options="d.spaces.map((s) => s.name)" aria-label="Space" @update:model-value="(v) => (memberSpace = v)" />
-            <div v-else class="flex w-40 flex-none flex-col gap-0.5" data-member-spaces>
+            <Select v-if="phone && manySpaces" :model-value="memberSpace" :options="d.spaces.map((s) => s.name)" aria-label="Space" @update:model-value="(v) => (memberSpace = v)" />
+            <div v-else-if="manySpaces" class="flex w-40 flex-none flex-col gap-0.5" data-member-spaces>
               <Button v-for="s in d.spaces" :key="s.name" class="!justify-start" :variant="s.name === memberSpace ? 'subtle' : 'ghost'" :label="s.name" :data-space="s.name" @click="memberSpace = s.name" />
             </div>
             <div v-if="mSpace" class="flex min-w-0 flex-1 flex-col gap-3">
@@ -279,7 +282,7 @@
               <Button size="sm" icon-right="lucide-external-link" label="Keys in Frappe" :href="`/app/user/${encodeURIComponent(a.user)}`" :data-agent-user-link="a.user" />
             </div>
             <div v-for="r in a.spaces" :key="r.space" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" :data-agent-space="a.user + '|' + r.space">
-              <span class="min-w-24 flex-1 text-base text-ink-gray-8">{{ r.space }}</span>
+              <span class="min-w-24 flex-1 text-base text-ink-gray-8">{{ manySpaces ? r.space : 'Access' }}</span>
               <span class="text-sm text-ink-gray-6" :data-agent-sensitive="a.user + '|' + r.space">{{ r.agents_can_read_vault ? 'Opens sensitive items' : 'No sensitive items' }}</span>
               <Select class="w-36" :model-value="r.access || ''" :options="AGENT_ACCESS" :aria-label="`${a.full_name} in ${r.space}`" :data-agent-access="a.user + '|' + r.space"
                 @update:model-value="(v) => setAgent(r.space, a.user, v, r.access)" />
@@ -287,9 +290,9 @@
           </Card>
           <Card v-if="!d.agents.length"><Empty title="No agents yet." data-agents-empty
             hint="An agent is a Frappe user that only an assistant signs in as. Create the user in Frappe, then add it to a space with Add member under Members: Life OS offers it agent access there." /></Card>
-          <p class="text-sm text-ink-gray-6">Whether agents may open sensitive items is set for each space under
+          <p class="text-sm text-ink-gray-6"><template v-if="manySpaces">Whether agents may open sensitive items is set for each space under
             <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'members', view: 'spaces' } }">Spaces</RouterLink>.
-            Keys for agents are made in Frappe, never on this screen.</p>
+            </template><template v-else>Whether agents may open sensitive items is set under <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'rules' } }">Rules</RouterLink>. </template>Keys for agents are made in Frappe, never on this screen.</p>
             </template>
           </template>
         </template>
@@ -322,7 +325,11 @@
             </Card>
             <p class="mt-1 text-sm text-ink-gray-6">US dollars per million tokens.</p>
           </section>
-          <p class="text-sm text-ink-gray-6" data-ai-spaces-note>Ask is switched on or off for each space under
+          <Card v-if="!manySpaces && onlySpace" flush data-ai-ask>
+            <SettingRow label="Ask" help="People can ask about their records. Off, Ask is closed.">
+              <Switch :model-value="!!onlySpace.ask_enabled" aria-label="Ask" data-ask-switch :disabled="!d.is_admin" @update:model-value="(v) => setSpaceAsk(onlySpace, 'ask_enabled', v)" /></SettingRow>
+          </Card>
+          <p v-else class="text-sm text-ink-gray-6" data-ai-spaces-note>Ask is switched on or off for each space under
             <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'members', view: 'spaces' } }">People and agents, Spaces</RouterLink>.</p>
             <SectionHead>Cost</SectionHead>
           <section>
@@ -444,7 +451,7 @@ import { Avatar, Badge, Button, Dialog, Select, Skeleton, Switch, TabButtons, Ta
 import NoteEditor from '@/components/NoteEditor.vue'
 import { ELSEWHERE } from '@/lib/nav'
 import { ladder, loadLadder } from '@/lib/ladder'
-import { dotClass } from '@/lib/lens'
+import { dotClass, manySpaces } from '@/lib/lens'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
@@ -569,7 +576,7 @@ function open(v) {
   router.push({ query: { ...route.query, tab: v && (phone.value || v !== 'profile') ? v : undefined, view: undefined, part: undefined } })
 }
 // "This space": its own space picker, which does not change the space of the sidebar (space= in the URL)
-const spaceSel = computed(() => (route.query.space ? String(route.query.space) : store.space))
+const spaceSel = computed(() => (manySpaces.value && route.query.space ? String(route.query.space) : store.space))
 const pickSpace = (v) => router.replace({ query: { ...route.query, space: v === store.space ? undefined : v } })
 const spaceGroup = ['areas', 'habits', 'rhythms', 'rules']
 const heading = computed(() => {
@@ -589,10 +596,12 @@ const shownAreas = computed(() => {
   const on = all.filter((a) => a.is_life_area && a.is_on)
   return on.flatMap((a) => [a, ...all.filter((p) => p.parent_area === a.name && p.is_on)])
 })
+// the one space of a site that has one: its Ask and sensitive-items switches are plain settings (issue 46)
+const onlySpace = computed(() => (!manySpaces.value ? d.value?.spaces.find((x) => x.name === store.space) || null : null))
 const mSpace = computed(() => d.value?.spaces.find((s) => s.name === memberSpace.value))
 // Members: All, People, Agents, with counts
 const memberKind = computed({
-  get: () => (['people', 'agents', 'spaces'].includes(String(route.query.view)) ? String(route.query.view) : 'all'),
+  get: () => ((manySpaces.value ? ['people', 'agents', 'spaces'] : ['people', 'agents']).includes(String(route.query.view)) ? String(route.query.view) : 'all'),
   set: (v) => router.replace({ query: { ...route.query, view: v === 'all' ? undefined : v } }),
 })
 const advPart = computed({
@@ -603,7 +612,7 @@ const memberTabs = computed(() => {
   const all = mSpace.value?.members || []
   const agents = all.filter((m) => m.is_agent).length
   return [{ label: `All ${all.length}`, value: 'all' }, { label: `People ${all.length - agents}`, value: 'people' }, { label: `Agents ${agents}`, value: 'agents' },
-    { label: `Spaces ${d.value?.spaces.length || 0}`, value: 'spaces' }]
+    ...(manySpaces.value ? [{ label: `Spaces ${d.value?.spaces.length || 0}`, value: 'spaces' }] : [])]
 })
 const shownMembers = computed(() => (mSpace.value?.members || []).filter((m) => memberKind.value === 'all' || m.is_agent === (memberKind.value === 'agents')))
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
@@ -613,9 +622,9 @@ const rulesDoc = ref(null)
 watch(() => [section.value, d.value?.rules_note], async ([sec, name]) => {
   if (sec === 'note-rules' && name && rulesDoc.value?.name !== name) rulesDoc.value = await tryCall(() => api('library.get', { note: name }))
 }, { immediate: true })
-// an area's dot and its pin in the sidebar
+// an area's colour
 async function saveArea(a, values) {
-  const before = { colour: a.colour, is_pinned: a.is_pinned }
+  const before = { colour: a.colour }
   Object.assign(a, values)
   if (await tryCall(() => api('settings.save_item', { kind: 'area', name: a.name, ...values }), 'Saved')) changed()
   else Object.assign(a, before)
@@ -624,6 +633,10 @@ async function load() {
   const res = await tryCall(() => api('settings.get', { space: spaceSel.value }))
   if (!res) return
   if (res.settings.weekly_review_time) res.settings.weekly_review_time = String(res.settings.weekly_review_time).padStart(8, '0').slice(0, 5)
+  if (!manySpaces.value) { // issue 46: one space is not shown as a space; an owner of the site may be sent others, which this person does not see
+    res.spaces = res.spaces.filter((x) => x.name === store.space)
+    for (const a of res.agents || []) a.spaces = (a.spaces || []).filter((x) => x.space === store.space)
+  }
   d.value = res
   if (!res.spaces.some((s) => s.name === memberSpace.value)) memberSpace.value = res.spaces.find((s) => s.name === store.space)?.name || res.spaces[0]?.name || ''
 }

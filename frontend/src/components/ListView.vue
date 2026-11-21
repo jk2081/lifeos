@@ -172,9 +172,9 @@ const emit = defineEmits(['loaded'])
 const route = useRoute()
 const router = useRouter()
 const phone = useMediaQuery('(max-width: 639px)')
-// The lens (lib/lens.js) owns `area=`: a list whose spec has an area filter takes the lens's area, and the area is left
+// The page's `?area=` (lib/lens.js, issue 46): a list whose spec has an area filter takes it, and the area is left
 // out of its controls, its remembered view and its Clear (UX fixes, set 6). A list inside a record page's tab (`fixed`)
-// lists what is filed under that record, whatever the lens.
+// lists what is filed under that record, whatever `area=` says.
 const hasArea = props.spec.some((e) => e.key === 'area')
 const lensKey = hasArea && !props.fixed ? 'area' : null
 const fixedKeys = [...new Set([...(props.fixed ? Object.keys(props.fixed) : []), ...(hasArea ? ['area'] : [])])]

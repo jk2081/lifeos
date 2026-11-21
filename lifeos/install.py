@@ -1,4 +1,4 @@
-"""Install and migrate steps: roles, the Event custom field, indexes, the two starting spaces."""
+"""Install and migrate steps: roles, the Event custom field, indexes, the starting space."""
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
@@ -80,9 +80,14 @@ def make_roles():
 			doc.update_user_type_on_change()  # on_update skips this while installing
 
 
+# issue 46: a new site has one space. Spaces stay in the data model; a second one is made by hand (the acceptance site's
+# `lifeos.devtools.setup_users` makes Shared).
+STARTING_SPACES = ("Private",)
+
+
 def make_spaces():
 	owner = frappe.db.get_value("Life Space", "Private", "owner_user") or "Administrator"
-	for name in ("Private", "Shared"):
+	for name in STARTING_SPACES:
 		if not frappe.db.exists("Life Space", name):
 			frappe.get_doc({
 				"doctype": "Life Space", "space_name": name, "owner_user": owner,
@@ -98,14 +103,14 @@ def make_spaces():
 
 
 def set_owner(user):
-	"""Make `user` the owner: Life Admin role, owner and member of Private and Shared.
+	"""Make `user` the owner: Life Admin role, owner and member of every space the site has.
 
 	Run: bench --site SITE execute lifeos.install.set_owner --kwargs "{'user': 'you@example.com'}"
 	"""
 	if not frappe.db.exists("User", user):
 		frappe.throw(f"User {user} does not exist.")
 	frappe.get_doc("User", user).add_roles("Life Admin", "Life User")
-	for name in ("Private", "Shared"):
+	for name in frappe.get_all("Life Space", pluck="name"):
 		space = frappe.get_doc("Life Space", name)
 		space.owner_user = user
 		if user not in [m.user for m in space.members]:

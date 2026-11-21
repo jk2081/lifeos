@@ -510,3 +510,7 @@ docker compose -f docker/docker-compose.yml down -v
 ## Issue 45: Goals > Cycles
 
 - **Works:** the fourth tab of Goals, `/goals/cycles`: the 12 Week Year (cycle picker, week bars with "so far", each goal's lead action and this week's ticks, tickable, the footer with the review, next cycle and break week, **Cycle goals** to edit) beside this month's plan (goals in order with area and status, habits, mind sweep and projects folded, **Edit**; hidden when the month plan is off in Rhythms). Closed cycles are read-only. Plan's month, year, 12 Weeks and journal routes redirect here; journal pages are a kind in Library > Notes. Checks `I45.<width>.1` to `.11` and `.E`, and `test_issue45_cycles`. See `DECISIONS.md`, Issue 45.
+
+## Issue 46: One space on new sites, and no lens
+
+- **Works:** a new site has one space, Private (the test sites make Shared by hand). The lens, its sidebar picker, the phone's lens sheet and the pinned areas are gone: `?area=` is each page's area filter and is not carried between pages; `?space=` counts only with two or more spaces. With one space nothing about spaces is shown (no picker, chip, breadcrumb, Spaces view); Ask is a switch in Advanced and "Agents may open sensitive items" one in Rules. The phone's title opens a small menu (Settings, shortcuts, Log out, and the spaces when there are several). `lifeos/skills/lifeos.md` says agents may leave `space` out. Checks `I46.<width>.2` to `.6`, and `test_i46_one_space`. See `DECISIONS.md`, Issue 46.
