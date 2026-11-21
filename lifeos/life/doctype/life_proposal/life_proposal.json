@@ -13,6 +13,7 @@
   "confidence",
   "reason",
   "alt_area",
+  "filed_by",
   "status",
   "created_doctype",
   "created_name",
@@ -112,6 +113,13 @@
    "fieldname": "sort_order",
    "fieldtype": "Int",
    "label": "Sort Order"
+  },
+  {
+   "fieldname": "filed_by",
+   "fieldtype": "Data",
+   "label": "Filed by",
+   "read_only": 1,
+   "description": "The skill and version that accepted it on its own, such as process-capture v1."
   }
  ],
  "links": [],

@@ -34,7 +34,7 @@ def _day_numbers(space):
 	since = add_to_date(now_datetime(), hours=-24)
 	rows = frappe.db.sql(
 		"""select i.name, i.source_type, i.status, i.area, i.goal,
-			(select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status != 'Pending') as decided
+			(select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status != 'Pending' and ifnull(p.filed_by, '') = '') as decided
 		from `tabLife Inbox Item` i where i.space = %(space)s and i.is_archived = 0 and i.received_on >= %(since)s and """ + SEES,
 		{"space": space, "since": since, "open": _open(space)}, as_dict=True)
 	own = [r for r in rows if r.status == "Done" and not r.decided]
@@ -101,7 +101,7 @@ def _failed(space):
 OUTCOMES = ("filed", "waiting", "dropped", "failed")
 OUTCOME_SQL = """case when i.status = 'Failed' then 'failed' when i.status in ('New', 'Processing') then 'working'
 	when i.status = 'To Review' then 'waiting'
-	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Accepted') > 0 then 'decided'
+	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Accepted' and ifnull(p.filed_by, '') = '') > 0 then 'decided'
 	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Rejected') > 0 then 'dropped'
 	else 'filed' end"""
 MADE_EACH = 4
@@ -140,14 +140,18 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 		values["outcome"] = outcome
 	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter; values are parameters
 	rows = frappe.db.sql(f"""select * from (select i.name as item, i.title, i.source_type as source, i.media_kind, i.received_on, i.status, i.error,
-			i.intent, i.area, i.goal, i.is_sensitive, {OUTCOME_SQL} as outcome from `tabLife Inbox Item` i where {where}) t
+			i.intent, i.area, i.goal, i.is_sensitive, i.processed_by, {OUTCOME_SQL} as outcome from `tabLife Inbox Item` i where {where}) t
 		{'where outcome = %(outcome)s' if outcome in OUTCOMES else ''} order by received_on desc, item desc limit %(s)s, %(n)s""",
 		{**values, "s": start, "n": page_length}, as_dict=True)
 	areas = names_map("Life Area", [r.area for r in rows if r.area], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows if r.goal], "title")
 	made = _made(space, [r.item for r in rows])
+	# "Filed by process-capture v1": the capture's skill, when it accepted something on its own
+	own = set(frappe.get_all("Life Proposal", filters={"inbox_item": ("in", [r.item for r in rows] or [""]), "filed_by": ("is", "set")}, pluck="inbox_item"))
 	for r in rows:
-		r.update(received_on=str(r.received_on)[:19], area_name=areas.get(r.area), goal_title=goals.get(r.goal), made=made.get(r.item, []))
+		r.update(received_on=str(r.received_on)[:19], area_name=areas.get(r.area), goal_title=goals.get(r.goal), made=made.get(r.item, []),
+			filed_by=r.processed_by if r.item in own else None)
+		r.pop("processed_by", None)
 	every, every_values = _activity_where(space, days, None, area)
 	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter; values are parameters
 	sources = [x[0] for x in frappe.db.sql(f"select distinct i.source_type from `tabLife Inbox Item` i where {every} order by 1", every_values)]

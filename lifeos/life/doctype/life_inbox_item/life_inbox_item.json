@@ -23,6 +23,7 @@
   "claimed_by",
   "claimed_on",
   "error",
+  "processed_by",
   "suggested_decision",
   "suggested_reason",
   "suggested_on",
@@ -284,6 +285,13 @@
    "fieldtype": "Select",
    "label": "Archive Reason",
    "options": "\nManual\nAuto\nProject"
+  },
+  {
+   "fieldname": "processed_by",
+   "fieldtype": "Data",
+   "label": "Processed by",
+   "read_only": 1,
+   "description": "The skill and version that processed it, such as process-capture v1."
   }
  ],
  "links": [],

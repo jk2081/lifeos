@@ -318,6 +318,9 @@ def retry(item: str):
 	doc.status = "New"
 	doc.error = None
 	doc.save()
+	from lifeos.skills import triggers
+
+	triggers.capture_created(doc)  # the Brain's skill, when it is on, takes it again
 	return {"item": doc.name, "status": doc.status}
 
 

@@ -4,6 +4,8 @@ from frappe import _
 
 from lifeos.constants import NO_AGENT_DOCTYPES
 
+BRAIN_USER = "brain@lifeos.local"  # the "Life Brain" user skills run as (lifeos/skills/runner.py)
+
 
 def user_spaces(user=None) -> dict:
 	"""Return {space: access} for the user. access is 'Read' or 'Write'."""
@@ -13,7 +15,9 @@ def user_spaces(user=None) -> dict:
 		cache = frappe.local.lifeos_spaces = {}
 	if user not in cache:
 		out = {}
-		if user and user != "Guest":
+		if user == BRAIN_USER:  # the built-in Brain works in every space, as an agent
+			out = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}
+		elif user and user != "Guest":
 			for row in frappe.db.sql(
 				"select parent, access from `tabLife Space Member` where user=%s and parenttype='Life Space'", user
 			):

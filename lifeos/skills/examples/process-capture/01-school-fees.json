@@ -1,0 +1,59 @@
+{
+ "title": "An email about school fees becomes a Money task",
+ "input": {
+  "title": "Fee reminder: Term 2",
+  "source_type": "Email",
+  "text": "Dear parent, the second term fee of Rs 48,000 for Aarav is due on 5 December. Please pay at the school office or online."
+ },
+ "checks": [
+  {
+   "summary_contains": "fee"
+  },
+  {
+   "has_proposal": {
+    "kind": "Task",
+    "area": "Money",
+    "title_contains": "fee"
+   }
+  },
+  {
+   "proposal_count": {
+    "min": 1,
+    "max": 2
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "tool_use",
+     "id": "toolu_1",
+     "name": "propose",
+     "input": {
+      "kind": "Task",
+      "preview": "Pay Aarav's term 2 school fee",
+      "payload": {
+       "title": "Pay Aarav's term 2 school fee (Rs 48,000)",
+       "due_date": "2026-12-05",
+       "area": "Money"
+      },
+      "confidence": 0.93,
+      "reason": "A school fee with a due date sits under Money."
+     }
+    }
+   ],
+   "stop_reason": "tool_use"
+  },
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"transcript_md\": \"\", \"summary_md\": \"The school reminds you that Aarav's second term fee of Rs 48,000 is due on 5 December.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "fd4b3a0face08239"
+}

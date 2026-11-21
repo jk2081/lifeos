@@ -54,7 +54,7 @@ Do not load the seed or demo data. Open `/life` and go through the first-run gui
 - **Agents (Hermes, Claude):**
   1. Create their users with the Life Agent role, and add them in Settings → Members.
   2. Generate a new API key and secret for each, and enter them in Hermes's own config on the server. They never go in chat.
-  3. Point Hermes at the latest skill, served by Life OS once #29 is merged, or `agent/SKILL.md` and `agent/FILE_WORK.md` before then.
+  3. Point Hermes at the skills Life OS serves (`lifeos.api.skills.get`, named `lifeos` and `lifeos-file-work`).
 - **The AI key** for Ask and the built-in Brain: Settings → Advanced, or `bench --site life.jaikejriwal.com set-config anthropic_api_key` typed at the server, never in chat.
 
 ## 5. Check

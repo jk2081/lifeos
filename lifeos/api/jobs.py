@@ -34,7 +34,7 @@ def file_job(job_id: str, space: str | None = None, title: str | None = None, ar
 		outputs: str | builtins.list | None = None, transcript_md: str | None = None, summary_md: str | None = None,
 		proposals: str | builtins.list | None = None, wiki: str | builtins.list | None = None, chat: str | builtins.dict | None = None,
 		source_system: str | None = None):
-	"""File a finished piece of work as one inbox item, in one call. See agent/FILE_WORK.md.
+	"""File a finished piece of work as one inbox item, in one call. See lifeos/skills/lifeos-file-work.md.
 
 	job_id: stable; the same job_id again updates the job. instruction: the owner's own words. raw_text: the brief.
 	inputs: [{name, file, reusable_as?, title?, transcript_md?}]; outputs: [{name, file}]. `file` is base64 (a data: URL is fine)
@@ -130,7 +130,7 @@ def _check(space, job_id, title, area, goal, inputs, outputs, proposals, wiki, c
 
 
 def _find_job(space, job_id):
-	"""The item of this job, or an item filed the old way (agent/FILE_WORK.md before issue 8) with the job id as external_id.
+	"""The item of this job, or an item filed the old way (lifeos/skills/lifeos-file-work.md before issue 8) with the job id as external_id.
 	The lookup on the indexed job_id is locked, so a second call for a new job waits for the first instead of making a twin."""
 	return frappe.db.get_value(JOB, {"space": space, "job_id": job_id}, for_update=True) or \
 		frappe.db.get_value(JOB, {"space": space, "external_id": job_id, "job_id": ["is", "not set"]})
@@ -190,7 +190,7 @@ def _check_input(space, row, field):
 
 
 def _find_asset(space, reusable_as):
-	"""The item a reusable input is kept as: filed under this id by any agent (agent/FILE_WORK.md used external_id)."""
+	"""The item a reusable input is kept as: filed under this id by any agent (lifeos/skills/lifeos-file-work.md used external_id)."""
 	return frappe.db.get_value(JOB, {"space": space, "external_id": reusable_as, "job_id": ["is", "not set"]})
 
 
