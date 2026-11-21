@@ -996,6 +996,7 @@ for (const width of UX_WIDTHS) {
     must(!param('priority'), 'Clear did not remove the filter')
     must(!(await pg.locator('[data-active-filters]:visible').allInnerTexts()).join(' ').includes('Priority'), 'the list still says the priority filter is on') // No goal keeps its goal filter
     await nav('Today')
+    await pg.waitForTimeout(1600) // a full page load below reads the server's copy, so let the cleared state reach it first
     await s.open('/life/goals/no-goal?goal=none') // the bare path is the screen of issue 22; the old list is behind the goal filter
     must(!param('priority'), 'the cleared filter came back')
     // another person has their own states
@@ -5552,7 +5553,10 @@ print(json.dumps({"read": len(logs), "holding": [f for f in logs if any(s in ope
 
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {
-  const out = bench('from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))').split('\n').pop()
+  const code = 'from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))'
+  let out
+  try { out = bench(code) } catch (e) { out = bench(code) } // the purge is safe to repeat: a lock wait on a busy runner should not fail the run
+  out = out.split('\n').pop()
   must(!Object.keys(JSON.parse(out)).length, 'left on the acceptance site: ' + out)
 })
 

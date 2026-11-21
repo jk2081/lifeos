@@ -1,6 +1,6 @@
 # Life OS: the product direction (from 20 November 2026)
 
-This file is the target design from 20 November 2026 onwards. Where it differs from `SPEC.md` or the "target design" paragraph in `ROADMAP.md`, this file wins. Where a GitHub issue differs from this file, the issue wins. Mockups for it are in `mockups/v2/` (PNG plus the HTML each was rendered from in `mockups/v2/source/`).
+This file is the target design from 20 November 2026 onwards. Where it differs from `docs/history/SPEC.md` or the "target design" paragraph in `docs/history/ROADMAP.md`, this file wins. Where a GitHub issue differs from this file, the issue wins. Mockups for it are in `mockups/v2/` (PNG plus the HTML each was rendered from in `mockups/v2/source/`).
 
 ## Who it is for
 
@@ -34,6 +34,10 @@ Phone: a bottom bar with Today, Brain, Goals and Library, and a capture button.
 - Seven areas: **Career, Health, Relationships, Money, Emotions, Mind, Environment.** Each can be switched on or off in Settings → Areas. Career and Health are on by default.
 - An area can have **parts**: the owner's businesses (Business That Works, Tea & Coffee) are parts of Career. Parts are `Life Area` rows with `parent_area` set.
 - **Every task has an area.** A goal is optional. When a task has no area, the Brain guesses one and shows its guess for the owner to confirm or change.
+
+## Focuses: ongoing work behind the goals
+
+Some work is never "done": systems and review cadence in a company, Yield on an estate, marketing. A **focus** is an optional level of the area tree under a part (or a life area), with opinionated defaults by kind of part (a company gets Review cadence, Systems, Marketing, People, Finance; an estate gets Yield, Quality, People, Systems). Each focus has a **standard** and **principles** and expects an **annual goal**; 12 Week Year goals serve the annual goal. The "Open" goal type is retired. Focuses are off for a new user and on for the owner (#57). Mockups: `mockups/v2/18-goals-focuses.png` and `19-focus.png`.
 
 ## The ladder
 

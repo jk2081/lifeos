@@ -1,27 +1,31 @@
 # Life OS
 
-This repo will hold `lifeos`, a Frappe v16 app. It is empty apart from the spec and mockups.
+`lifeos` is a Frappe v16 app: a personal operating system. Everything that comes in is filed by the Brain onto the owner's areas, focuses and goals, and he only decides what it could not.
 
-- **Read `SPEC.md` in full before writing any code.** It is the single source of truth. Where a later section overrides an earlier table, the spec says so.
-- **Match the mockups in `mockups/`.** PNGs show the approved look. `mockups/source/` holds the HTML they were rendered from, for exact colours, sizes and spacing. That HTML uses a design-tool template format and is reference only; do not copy its structure into the app.
-- **Build on a local bench, never on a live site.** Use Docker for Frappe v16 and a throwaway test site.
-- **Follow the milestone order in section 14.** Finish each milestone with its tests passing, commit with the milestone number in the message, and update `STATUS.md`.
-- **Record every deviation from the spec in `DECISIONS.md`**, with the reason.
-- **Never write secrets** to the repo, logs or docs.
-- The spec contains the owner's personal goals as seed data. Keep this repo private.
-- **This build runs unattended.** Do not ask questions. When finished, create `BUILD_DONE`. If you cannot go further, write the reason to `BUILD_BLOCKED`. `scripts/start-build.sh` restarts you with `CONTINUE_PROMPT.md` until one of those files exists.
-- Do not read or change anything outside this repository and the local bench you create for it.
+## Where things are
 
-## Building from GitHub issues (from 20 November 2026)
+- **What to build:** GitHub issues in `jk2081/lifeos`, built one at a time by `scripts/run-issues.sh`. How the build works: `docs/BUILDING.md`. The rules for every issue: `docs/ISSUE_RULES.md`.
+- **The target design:** `docs/DIRECTION.md`. Where it differs from older documents, it wins; where an issue differs from it, the issue wins.
+- **Mockups:** `mockups/v2/` (PNG, and the HTML each was rendered from in `mockups/v2/source/`, for exact colours, sizes and spacing; reference only, do not copy its structure). Older mockups in `mockups/` show earlier designs.
+- **What exists and why:** `STATUS.md` (what works) and `DECISIONS.md` (every deviation, with the reason).
+- **History:** `docs/history/` holds the original spec (`SPEC.md`) and the briefs of the build sets before 20 November 2026. Read them only to understand why something is the way it is.
 
-Build work now comes from GitHub issues, one at a time, run by `scripts/run-issues.sh` (see `docs/BUILDING.md`). For an issue run, `docs/ISSUE_RULES.md` replaces the milestone, `_DONE` file and `BUILD_DONE`/`BUILD_BLOCKED` rules above, and `docs/DIRECTION.md` is the target design wherever it differs from `SPEC.md`.
+## Rules
 
-## Frappe conventions (from 17 November 2026)
+- **Build on the local Docker bench (`docker/`), never on a live site.** Never touch life.jaikejriwal.com or the owner's server.
+- **Never write secrets** to the repo, logs, issues or pull requests.
+- **Keep this repo private.**
+- **Judgment is a skill with examples, not code.** Code is plumbing: records, permissions, schedules, deduplication, scoring, costs and screens.
+- **Prefer deleting to adding.** When an issue replaces something, remove the old code, screens, routes and tests in the same change.
+- Do not read or change anything outside this repository and the local bench.
+- Do not stop, restart, remove or change any Docker container, image, volume or network whose name does not start with `lifeos-`.
 
-Frappe publishes official agent skills at github.com/frappe/skills. `scripts/get-frappe-skills.sh` fetches them into `.claude/skills/` (the task runner does this at the start of every run). Follow them in every set:
+## Frappe conventions
 
-- **`frappe-app-dev`**: read it before writing code. In particular: every `@frappe.whitelist` declares `methods=[...]` and a type hint on every parameter; pass `ignore_permissions=False` to `frappe.qb.get_query` in user-facing code; a `has_permission` hook returns `True` or `False`, never `None`. The skill's commands use Pilot; this repo uses the Docker bench in `docker/`, so run the equivalent `bench` commands there.
+Frappe publishes official agent skills at github.com/frappe/skills. `scripts/get-frappe-skills.sh` fetches them into `.claude/skills/` (the runner does this at the start of every issue). Follow them:
+
+- **`frappe-app-dev`:** read it before writing code. Every `@frappe.whitelist` declares `methods=[...]` and a type hint on every parameter; pass `ignore_permissions=False` to `frappe.qb.get_query` in user-facing code; a `has_permission` hook returns `True` or `False`, never `None`. The skill's commands use Pilot; this repo uses the Docker bench in `docker/`, so run the equivalent `bench` commands there.
 - **Scan before every commit** with Frappe's rules: `./tools/scan.sh` (Frappe's semgrep rules over the files changed). A change may not add findings. An unavoidable finding gets an inline `# nosemgrep: <rule>` with the reason.
-- **`frappe-code-review`**: review every set's whole diff against it before creating the set's `_DONE` file, and fix what it finds.
-- **`code-style`** and **`ui-design`**: apply where they do not conflict with `frontend/COMPONENTS.md`, which wins for the front end.
+- **`frappe-code-review`:** review the whole diff against it before finishing an issue, and fix what it finds.
+- **`code-style`** and **`ui-design`:** apply where they do not conflict with `frontend/COMPONENTS.md`, which wins for the front end.
 - Tests subclass `IntegrationTestCase` from `frappe.tests` and run against the real database.

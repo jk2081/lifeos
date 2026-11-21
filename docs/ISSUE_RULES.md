@@ -1,6 +1,6 @@
 # Working on a GitHub issue
 
-From 20 November 2026, build work comes from GitHub issues in `jk2081/lifeos`, not from `UX_FIXES_<n>.md` briefs. `scripts/run-issues.sh` works through them one at a time. These rules apply to every issue. The issue's own text wins where it differs.
+From 20 November 2026, build work comes from GitHub issues in `jk2081/lifeos`, not from the old build-set briefs (now in `docs/history/`). `scripts/run-issues.sh` works through them one at a time. These rules apply to every issue. The issue's own text wins where it differs.
 
 ## Before you start
 
@@ -11,6 +11,7 @@ From 20 November 2026, build work comes from GitHub issues in `jk2081/lifeos`, n
 
 ## While working
 
+- **Judgment is a skill with examples, not code** (from 21 November 2026, once the skills engine, #28, exists). Code is plumbing: records, permissions, schedules, deduplication, scoring, costs and screens. Never write a model prompt in Python outside `lifeos/skills/` and `lifeos/ai/client.py`.
 - Keep the change to what the issue asks. If you find something else broken, note it in the pull request under "Found, not fixed"; do not fix it here.
 - Every screen works at 390 px and 1440 px, light and dark.
 - Every screen you build or change has an **empty state** for a brand-new user with no data: one line on what will appear there, and the one action that fills it (for example "Nothing needs you. Things you capture or connect will show up here." with + Capture). Add an acceptance check that opens the screen on an empty space and sees it.
