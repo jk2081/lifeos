@@ -1,5 +1,6 @@
 <template>
-  <Sources v-if="KIND[current] !== undefined" :key="current" place="all" :screen="current === 'all' ? 'sources' : 'library-' + current" />
+  <LibraryEverything v-if="own" :key="current" :tab="current" />
+  <Sources v-else-if="KIND[current] !== undefined" :key="current" place="all" :screen="current === 'all' ? 'sources' : 'library-' + current" />
   <template v-else-if="current === 'notes'">
     <Graph v-if="route.query.view === 'graph'" />
     <Wiki v-else-if="['changes', 'health', 'rules'].includes(route.query.view)" :section="route.query.view" />
@@ -17,6 +18,7 @@
 // what links them. The Timeline, the graph, sensitive documents and the trash and archive are linked under every tab.
 import { computed, provide, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import LibraryEverything from '@/components/library/LibraryEverything.vue'
 import Sources from '@/pages/Sources.vue'
 import Library from '@/pages/Library.vue'
 import Graph from '@/pages/Graph.vue'
@@ -31,6 +33,8 @@ const route = useRoute()
 const router = useRouter()
 const current = computed(() => props.tab || 'all')
 // the list's kind each tab holds ('' for any kind)
+const OWN_QUERY = ['space', 'area', 'goal', 'source', 'q', 'open', 'ptab']
+const own = computed(() => ['all', 'people'].includes(current.value) && Object.keys(route.query).every((k) => OWN_QUERY.includes(k)))
 const KIND = { all: '', documents: 'documents', chats: 'chats' }
 const LINKS = [
   { key: 'timeline', label: 'Timeline', icon: 'lucide-history', to: '/library/timeline' },

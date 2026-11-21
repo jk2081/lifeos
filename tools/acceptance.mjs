@@ -5320,6 +5320,164 @@ print(json.dumps(frappe.db.sql("select count(*) from \`tabLife Task\` where spac
   }
 }
 
+// Issue 23: Library > Everything. Records titled "I23 ". Moved or changed rows are put back after.
+for (const width of SET_WIDTHS) {
+  const tag = `I23.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I23 ${what} ${width} ${stamp}`
+  const WORD = `zebrafruit${stamp}${width}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openLib = async (path = '/life/library') => { await s.open(path); await pg.locator('[data-library-everything][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const rowFor = (title) => pg.locator('[data-lib-row]', { hasText: title })
+  const letters = async () => pg.locator('[data-lib-row]').evaluateAll((els) => els.map((e) => e.dataset.letter))
+  const was = JSON.parse(bench(`import json
+print(json.dumps(frappe.db.get_value("Life Space", "${SPACE}", "agents_can_read_vault")))`).split('\n').pop())
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Note", "Life Vault Document", "Life Chat Log", "Life Person"):
+    for n in frappe.get_all(dt, filters={"title" if dt != "Life Person" else "full_name": ["like", "I23 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+frappe.db.sql("update \`tabLife Index\` set space = %s where space = %s", ("${SPACE}", "zz-i23-aside-${width}"))
+frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i23-aside-${width}"))
+frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", ${was ? 1 : 0})`)
+  const ids = {}
+  try {
+    await check(`${tag}.7`, `${width} px: on an empty space the Library says what will appear and offers + Capture; People says the same`, async () => {
+      bench(`frappe.db.sql("update \`tabLife Index\` set space = %s where space = %s and ref_doctype in ('Life Note', 'Life Vault Document', 'Life Chat Log', 'Life Inbox Item')", ("zz-i23-aside-${width}", "${SPACE}"))
+frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("zz-i23-aside-${width}", "${SPACE}"))`)
+      try {
+        for (const p of ['/life/library', '/life/library/people']) {
+          await openLib(p)
+          must(await pg.locator('[data-lib-empty]').isVisible(), `no empty state at ${p}`)
+          const t = await pg.locator('[data-lib-empty]').innerText()
+          must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
+          must(await pg.locator('[data-lib-capture]').isVisible(), 'no Capture button')
+          must((await pg.locator('[data-lib-count]').innerText()).startsWith('0 items'), 'the count is not 0')
+        }
+        await noSideways()
+      } finally {
+        bench(`frappe.db.sql("update \`tabLife Index\` set space = %s where space = %s", ("${SPACE}", "zz-i23-aside-${width}"))
+frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i23-aside-${width}"))`)
+      }
+    })
+    const out = JSON.parse(bench(`import json
+out = {}
+mk = lambda **v: frappe.get_doc({"space": "${SPACE}", **v}).insert(ignore_permissions=True).name
+career = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Career", "parent_area": ("is", "not set")})
+out["note"] = mk(doctype="Life Note", title="${T('note')}", content_md="the ${WORD} idea", area=career)
+out["other"] = mk(doctype="Life Note", title="${T('plain')}", content_md="nothing special here")
+out["wiki"] = mk(doctype="Life Note", title="${T('org')}", collection="Wiki", summary="Organisation · Honda dealer", content_md="x")
+out["doc"] = mk(doctype="Life Vault Document", title="${T('passport')}", doc_type="ID")
+out["chat"] = mk(doctype="Life Chat Log", title="${T('chat')}", assistant="Claude", date=frappe.utils.today(), summary_md="s", open_items=[{"text": "do it", "status": "Open"}, {"text": "and it", "status": "Open"}])
+out["person"] = mk(doctype="Life Person", full_name="${T('person')}", relation="Manager")
+frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", 0)
+print(json.dumps(out))`).split('\n').pop())
+    Object.assign(ids, out)
+    await check(`${tag}.1`, `${width} px: Everything shows notes, documents, people and chats together, newest first, with the right kind and line`, async () => {
+      await openLib()
+      const want = [[T('note'), 'N', 'Note'], [T('org'), 'P', 'Organisation · Honda dealer · kept by the Brain'], [T('passport'), 'D', 'Document · ID · sensitive'],
+        [T('chat'), 'C', 'Chat · Claude · 2 open items'], [T('person'), 'P', 'Person · Manager']]
+      for (const [title, letter, line] of want) {
+        const row = rowFor(title)
+        must((await row.count()) === 1, `${title} is not listed once`)
+        must((await row.getAttribute('data-letter')) === letter, `${title} has the wrong letter`)
+        const l = await row.locator('[data-lib-line]').innerText()
+        must(l.includes(line), `${title}: the line is "${l}", wanted "${line}"`)
+      }
+      must((await pg.locator('[data-lib-title]').first().innerText()).length > 0, 'a row has no title')
+      const api = await s.api('everything.list', { space: SPACE, page_length: 50 })
+      const shown = await pg.locator('[data-lib-row]').evaluateAll((els) => els.map((e) => e.dataset.ref))
+      must(JSON.stringify(shown) === JSON.stringify(api.rows.map((r) => r.ref)), 'the rows are not the server\'s, in its order')
+      const dates = api.rows.map((r) => r.date)
+      must(JSON.stringify(dates) === JSON.stringify([...dates].sort().reverse()), 'the rows are not newest first')
+      must((await pg.locator('[data-lib-count]').innerText()).includes(api.total.toLocaleString() + ' item'), 'the count is not the server\'s total')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: each tab shows only its kind`, async () => {
+      for (const [tab, letter] of [['notes', 'N'], ['documents', 'D'], ['people', 'P'], ['chats', 'C']]) {
+        const api = await s.api('everything.list', { space: SPACE, tab, page_length: 100 })
+        must(api.rows.length && api.rows.every((r) => r.letter === letter), `${tab} holds another kind`)
+      }
+      await openLib('/life/library/people')
+      const ls = await letters()
+      must(ls.length && ls.every((l) => l === 'P'), 'People shows another kind: ' + ls.join(''))
+      must((await rowFor(T('person')).count()) === 1 && (await rowFor(T('org')).count()) === 1, 'People does not show the person and the organisation page')
+      must((await rowFor(T('note')).count()) === 0 && (await rowFor(T('chat')).count()) === 0, 'People shows a note or a chat')
+      for (const [path, yes, no] of [['/life/library/notes', T('note'), T('chat')], ['/life/library/documents', T('passport'), T('note')], ['/life/library/chats', T('chat'), T('note')]]) {
+        await s.open(path)
+        await pg.waitForLoadState('networkidle')
+        await pg.waitForTimeout(500)
+        const text = await pg.locator('[data-main]').innerText()
+        must(text.includes(yes) && !text.includes(no), `${path} does not show only its kind`)
+      }
+    })
+    await check(`${tag}.3`, `${width} px: search finds a note by a word in its body and the Area filter narrows the list`, async () => {
+      await openLib()
+      await pg.locator('[data-lib-search] input, input[data-lib-search]').first().fill(WORD)
+      await pg.waitForFunction((n) => document.querySelectorAll('[data-lib-row]').length === n, 1, { timeout: 8000 })
+      must((await rowFor(T('note')).count()) === 1, 'the note with the word is not found')
+      await pg.locator('[data-lib-search] input, input[data-lib-search]').first().fill('')
+      await pg.waitForFunction((n) => document.querySelectorAll('[data-lib-row]').length > n, 1, { timeout: 8000 })
+      const total = Number((await pg.locator('[data-lib-count]').innerText()).replace(/\D/g, ''))
+      await pg.locator('select[data-lib-area]').selectOption({ label: 'Career' })
+      await pg.waitForFunction((n) => { const t = document.querySelector('[data-lib-count]'); return t && Number(t.textContent.replace(/\D/g, '')) < n }, total, { timeout: 8000 })
+      must((await rowFor(T('note')).count()) === 1, 'the Career note left the list')
+      must((await rowFor(T('chat')).count()) === 0, 'a chat with no area is still listed under Career')
+    })
+    await check(`${tag}.4`, `${width} px: a sensitive document shows 🔒 and opens for the owner; the agent, with the Vault closed, never gets it`, async () => {
+      await openLib()
+      const row = rowFor(T('passport'))
+      must((await row.locator('[data-sensitive-lock]').count()) === 1, 'no 🔒 on the document')
+      must((await row.locator('[data-lib-line]').innerText()).includes('sensitive'), 'the line does not say sensitive')
+      await row.locator('button').click()
+      await pg.locator('[data-pane-title]').waitFor({ timeout: 8000 })
+      must((await pg.locator('[data-pane-title]').innerText()).includes(T('passport')), 'the document did not open')
+      const agent = JSON.parse(bench(`import json
+frappe.set_user("hermes@lifeos.test")
+from lifeos import permissions
+from lifeos.api import everything
+permissions.clear_cache()
+rows = everything.list(space="${SPACE}", page_length=100)["rows"]
+print(json.dumps({"listed": any(r["name"] == "${ids.doc}" for r in rows), "others": len(rows)}))`).split('\n').pop())
+      must(!agent.listed, 'the agent lists the sensitive document')
+      must(agent.others > 0, 'the agent sees nothing at all')
+    })
+    await check(`${tag}.5`, `${width} px: Trash and archive opens the old archive`, async () => {
+      await openLib()
+      await pg.locator('[data-place-link="archive"]').click()
+      await pg.waitForURL(/\/life\/library\/archive/, { timeout: 8000 })
+      await pg.waitForLoadState('networkidle')
+      must(await pg.locator('[data-main] h1').first().isVisible(), 'the archive shows nothing')
+      must((await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current')) === 'archive', 'the archive is not the open page')
+      must(await pg.locator('[data-place-link="timeline"]').count() === 1 && await pg.locator('[data-place-link="graph"]').count() === 1, 'Timeline and Graph links are missing')
+    })
+    await check(`${tag}.6`, `${width} px: ${phone ? 'rows stack and the tabs scroll sideways inside their bar, not the page' : 'a row has its title, area and date side by side; the tabs fit'}`, async () => {
+      await openLib()
+      await noSideways()
+      const row = rowFor(T('note'))
+      const box = async (sel) => { const b = await row.locator(sel).boundingBox(); must(b, sel + ' is not visible'); return b }
+      const [title, where, date] = [await box('[data-lib-title]'), await box('[data-lib-where]'), await box('[data-lib-date]')]
+      for (const b of [title, where, date]) must(b.x >= 0 && b.x + b.width <= width + 1, `part of a row is outside the ${width} px screen`)
+      if (phone) {
+        must(where.y > title.y && date.y >= where.y, 'the row does not stack')
+        const bar = await pg.locator('[data-place-tabs] [data-tab-bar], [data-tab-bar]').first().evaluate((e) => ({ sw: e.scrollWidth, cw: e.clientWidth }))
+        must(bar.sw >= bar.cw, 'the tab bar is cut off')
+      } else {
+        must(where.x > title.x && date.x > where.x && Math.abs(title.y - date.y) < 40, 'the row is not side by side')
+      }
+      const tabs = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.dataset.tab))
+      must(['all', 'notes', 'documents', 'people', 'chats'].every((t) => tabs.includes(t)), 'a tab is missing: ' + tabs.join())
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {
