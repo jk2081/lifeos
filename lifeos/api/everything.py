@@ -146,11 +146,13 @@ def list(space: str | None = None, tab: str | None = "all", q: str | None = None
 	idx, idx_total = _index_rows(space, tab, q, area, goal, source, include_archived, limit)
 	people, people_total = _person_rows(space, tab, q, area, goal, source, include_archived, limit)
 	rows = _decorate(idx)
+	for row, r in zip(rows, idx):
+		row["_at"] = str(r.modified)
 	for p in people:
 		rows.append({"ref": "person:" + p.name, "doctype": "Life Person", "name": p.name, "kind": "person", "letter": "P", "title": p.full_name,
 			"line": " · ".join(x for x in ("Person", p.relation) if x), "area": None, "area_name": None, "goal": None, "goal_title": None,
-			"date": str(p.creation.date()), "sensitive": 0, "by_brain": 1 if p.owner in set(agent_users()) else 0, "expiry": None})
-	rows.sort(key=lambda r: r["date"] or "", reverse=True)
+			"date": str(p.creation.date()), "_at": str(p.creation), "sensitive": 0, "by_brain": 1 if p.owner in set(agent_users()) else 0, "expiry": None})
+	rows.sort(key=lambda r: (r["date"] or "", r.pop("_at")), reverse=True)
 	systems = frappe.db.sql("select distinct source_system from `tabLife Index` where space = %s and source_system != '' order by source_system limit 30", space, pluck=True)
 	return {"space": space, "tab": tab, "rows": rows[start:start + page_length], "total": idx_total + people_total, "start": start,
 		"page_length": page_length, "sources": systems}

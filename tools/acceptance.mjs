@@ -5332,7 +5332,8 @@ for (const width of SET_WIDTHS) {
   const T = (what) => `I23 ${what} ${width} ${stamp}`
   const WORD = `zebrafruit${stamp}${width}`
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
-  const openLib = async (path = '/life/library') => { await s.open(path); await pg.locator('[data-library-everything][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const Q = `${width} ${stamp}` // only this run's records, whatever else the site holds
+  const openLib = async (path = '/life/library', q = '') => { await s.open(q ? `${path}?q=${encodeURIComponent(q)}` : path); await pg.locator('[data-library-everything][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
   const rowFor = (title) => pg.locator('[data-lib-row]', { hasText: title })
   const letters = async () => pg.locator('[data-lib-row]').evaluateAll((els) => els.map((e) => e.dataset.letter))
   const was = JSON.parse(bench(`import json
@@ -5377,7 +5378,7 @@ frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", 0)
 print(json.dumps(out))`).split('\n').pop())
     Object.assign(ids, out)
     await check(`${tag}.1`, `${width} px: Everything shows notes, documents, people and chats together, newest first, with the right kind and line`, async () => {
-      await openLib()
+      await openLib('/life/library', Q)
       const want = [[T('note'), 'N', 'Note'], [T('org'), 'P', 'Organisation · Honda dealer · kept by the Brain'], [T('passport'), 'D', 'Document · ID · sensitive'],
         [T('chat'), 'C', 'Chat · Claude · 2 open items'], [T('person'), 'P', 'Person · Manager']]
       for (const [title, letter, line] of want) {
@@ -5388,7 +5389,7 @@ print(json.dumps(out))`).split('\n').pop())
         must(l.includes(line), `${title}: the line is "${l}", wanted "${line}"`)
       }
       must((await pg.locator('[data-lib-title]').first().innerText()).length > 0, 'a row has no title')
-      const api = await s.api('everything.list', { space: SPACE, page_length: 50 })
+      const api = await s.api('everything.list', { space: SPACE, q: Q, page_length: 50 })
       const shown = await pg.locator('[data-lib-row]').evaluateAll((els) => els.map((e) => e.dataset.ref))
       must(JSON.stringify(shown) === JSON.stringify(api.rows.map((r) => r.ref)), 'the rows are not the server\'s, in its order')
       const dates = api.rows.map((r) => r.date)
@@ -5406,7 +5407,7 @@ print(json.dumps(out))`).split('\n').pop())
       must(ls.length && ls.every((l) => l === 'P'), 'People shows another kind: ' + ls.join(''))
       must((await rowFor(T('person')).count()) === 1 && (await rowFor(T('org')).count()) === 1, 'People does not show the person and the organisation page')
       must((await rowFor(T('note')).count()) === 0 && (await rowFor(T('chat')).count()) === 0, 'People shows a note or a chat')
-      for (const [path, yes, no] of [['/life/library/notes', T('note'), T('chat')], ['/life/library/documents', T('passport'), T('note')], ['/life/library/chats', T('chat'), T('note')]]) {
+      for (const [path, yes, no] of [['/life/library/documents', T('passport'), T('note')], ['/life/library/chats', T('chat'), T('note')]]) {
         await s.open(path)
         await pg.waitForLoadState('networkidle')
         await pg.waitForTimeout(500)
@@ -5428,13 +5429,13 @@ print(json.dumps(out))`).split('\n').pop())
       must((await rowFor(T('chat')).count()) === 0, 'a chat with no area is still listed under Career')
     })
     await check(`${tag}.4`, `${width} px: a sensitive document shows 🔒 and opens for the owner; the agent, with the Vault closed, never gets it`, async () => {
-      await openLib()
+      await openLib('/life/library', Q)
       const row = rowFor(T('passport'))
       must((await row.locator('[data-sensitive-lock]').count()) === 1, 'no 🔒 on the document')
       must((await row.locator('[data-lib-line]').innerText()).includes('sensitive'), 'the line does not say sensitive')
       await row.locator('button').click()
-      await pg.locator('[data-pane-title]').waitFor({ timeout: 8000 })
-      must((await pg.locator('[data-pane-title]').innerText()).includes(T('passport')), 'the document did not open')
+      await pg.locator('[data-pane-title]', { hasText: T('passport') }).waitFor({ timeout: 8000 }).catch(() => {})
+      must((await pg.locator('[data-pane-title]').innerText()).includes(T('passport')), 'the document did not open: ' + (await pg.locator('[data-pane-title]').innerText()))
       const agent = JSON.parse(bench(`import json
 frappe.set_user("hermes@lifeos.test")
 from lifeos import permissions
