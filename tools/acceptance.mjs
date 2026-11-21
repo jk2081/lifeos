@@ -1192,7 +1192,7 @@ for (const width of UX_WIDTHS) {
     const problems = []
     try {
     // set 6: Me, Your life, Assistant, People and agents, Data
-    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai',
+    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'cost',
       'sensitive', 'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'places', 'backups']
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
@@ -2405,7 +2405,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
       '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/brain/captures?tab=pages', '/life/library/timeline',
       '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
-      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'sensitive',
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'cost', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
       if (area && p.includes('settings')) continue
@@ -3520,7 +3520,7 @@ frappe.db.commit()`)
       els.map((e) => e.getAttribute('data-settings-group') ? '#' + e.getAttribute('data-settings-group') : e.getAttribute('data-section')))
     const after = (g) => { const i = menu.indexOf('#' + g); const j = menu.findIndex((x, k) => k > i && x.startsWith('#')); return menu.slice(i + 1, j < 0 ? undefined : j) }
     must(JSON.stringify(after('people')) === JSON.stringify(['spaces', 'members', 'agents']), `People and agents lists ${after('people')}`)
-    must(JSON.stringify(after('assistant')) === JSON.stringify(['connections', 'ai', 'sensitive', 'note-rules']), `Assistant lists ${after('assistant')}`)
+    must(JSON.stringify(after('assistant')) === JSON.stringify(['connections', 'ai', 'cost', 'sensitive', 'note-rules']), `Assistant lists ${after('assistant')}`)
     for (const sec of after('assistant')) {
       await s.open(`/life/settings?tab=${sec}`)
       must(!(await pg.locator('[data-settings-section] [data-member], [data-settings-section] [data-agent], [data-settings-section] [data-agent-access]').count()), `${sec} lists members or agents`)

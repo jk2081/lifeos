@@ -220,9 +220,16 @@ fix_pending() {
     notify "CI failed on pull request #$PENDING_PR. Fixing it (try $tries)."
     git checkout -q "$PENDING_BRANCH"
     rm -rf .issue && mkdir -p .issue && save_ci_failure "$PENDING_BRANCH"
+    local before_fix; before_fix=$(git rev-parse HEAD)
     if ! run_rounds "CI fix for #$PENDING_PR" "$PENDING_BRANCH" fix_prompt_r "$PENDING_PR" "$PENDING_BRANCH" "$PENDING_ISSUES"; then
       break
     fi
+    # A fix that changed nothing cannot pass: say so instead of re-reading the same failed checks.
+    if [ "$(git rev-parse HEAD)" = "$before_fix" ]; then
+      echo "The fix round made no change, so the same checks would fail again." > .issue/blocked.md
+      continue
+    fi
+    sleep 60   # let GitHub register the new commit's checks before reading them
     if [ "$(wait_ci "$PENDING_PR")" = pass ]; then
       local fixed="$PENDING_BRANCH"
       merge_pending
