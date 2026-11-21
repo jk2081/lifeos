@@ -546,13 +546,21 @@ archive.run_daily()`)
   const arch = await owner.api('archive.list', { space: SPACE, page_length: 100, filters: [['title', 'like', `%${stamp}%`]] }) // earlier runs fill the Archive
   must(JSON.stringify(arch.groups).includes(done.name), 'the done task was not archived')
   must(!JSON.stringify(arch.groups).includes(stale.name), 'the stale open task was archived')
-  // set 8: the weekly review's Tasks tab sorts it into a pile (untouched 100 days: Park in Someday); it is never archived for you
-  const park = await owner.api('weekly.pile_drawer', { space: SPACE, key: 'tasks', pile: 'park' })
-  must(park.rows.some((r) => r.name === stale.name), 'the stale task is not in the Park pile')
+  // set 8, as issue 59 left it: the age rules are gone, so with no skill answer the stale task waits in a pile of the weekly review's Tasks tab
+  // (Needs you, or Keep when Needs you is full); it is never archived for you
+  let pile = null
+  for (const p of ['needs', 'keep', 'park', 'letgo']) {
+    const d = await owner.api('weekly.pile_drawer', { space: SPACE, key: 'tasks', pile: p })
+    if (d.rows.some((r) => r.name === stale.name)) { pile = p; break }
+  }
+  must(pile, 'the stale task is in no pile of the weekly review')
   await owner.open('/life/today/week?view=review&tab=tasks')
-  await owner.page.locator('[data-pile-card][data-pile="park"] [data-pile-open]').first().click()
-  await owner.page.waitForTimeout(800)
-  must((await owner.page.locator('[data-drawer-name="pile"]').innerText()).includes(`Stale open task ${stamp}`), 'the Park pile does not show it')
+  if (pile === 'needs') must((await owner.page.locator('[data-main]').innerText()).includes(`Stale open task ${stamp}`), 'Needs you does not show it') // its rows are on the board, not in a drawer
+  else {
+    await owner.page.locator(`[data-pile-card][data-pile="${pile}"] [data-pile-open]`).first().click()
+    await owner.page.waitForTimeout(800)
+    must((await owner.page.locator('[data-drawer-name="pile"]').innerText()).includes(`Stale open task ${stamp}`), `the ${pile} pile does not show it`)
+  }
   await owner.page.keyboard.press('Escape')
 })
 
