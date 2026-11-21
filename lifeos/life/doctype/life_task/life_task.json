@@ -27,6 +27,7 @@
   "area",
   "area_guessed",
   "area_confidence",
+  "standalone",
   "also_in",
   "tags",
   "is_archived",
@@ -181,6 +182,13 @@
    "label": "Area Confidence",
    "read_only": 1,
    "depends_on": "area_guessed"
+  },
+  {
+   "fieldname": "standalone",
+   "fieldtype": "Check",
+   "label": "Standalone",
+   "default": "0",
+   "description": "The owner said this task is fine without a goal (Goals > No goal)."
   },
   {
    "fieldname": "also_in",

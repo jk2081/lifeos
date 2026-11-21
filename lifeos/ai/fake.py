@@ -183,4 +183,6 @@ TASKS = {"goal_measure": _goal_measure, "goal_readings": _goal_readings,
 	"review_piles": _rules_of("lifeos.review.pile_sort.fake_sort"), "meeting_followups": _rules_of("lifeos.review.followups.fake_followups"),
 	"review_stars": _rules_of("lifeos.review.goals.fake_stars"), "review_playback": _rules_of("lifeos.review.lock.fake_playback"),
 	# issue 13: the area of a task
-	"task_area": _rules_of("lifeos.area_guess.fake_area")}
+	"task_area": _rules_of("lifeos.area_guess.fake_area"),
+	# issue 22: a goal named from tasks
+	"goal_title": _rules_of("lifeos.goal_suggest.fake_title")}

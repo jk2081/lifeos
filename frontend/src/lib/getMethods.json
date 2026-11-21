@@ -75,6 +75,8 @@
  "lifeos.api.sources.made_from",
  "lifeos.api.tasks.list",
  "lifeos.api.tasks.all_tasks",
+ "lifeos.api.tasks.no_goal_total",
+ "lifeos.api.tasks.no_goal",
  "lifeos.api.tasks.get",
  "lifeos.api.tasks.open_loops",
  "lifeos.api.timeline.get",

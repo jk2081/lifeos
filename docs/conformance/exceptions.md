@@ -10,8 +10,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 6 |
 | frappe-setuser | 14 |
-| frappe-sql-format-injection | 88 |
-| Total | 115 |
+| frappe-sql-format-injection | 89 |
+| Total | 116 |
 
 ## frappe-manual-commit
 
@@ -108,12 +108,13 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/sources.py` | 163 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/sources.py` | 167 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/sources.py` | 243 | sensitive_guard is a constant fragment; values are parameters |
-| `lifeos/api/tasks.py` | 48 | fixed SQL and meta-checked columns only; values are parameters |
-| `lifeos/api/tasks.py` | 137 | the WHERE comes from where_clause (fixed fragments); values are parameters |
-| `lifeos/api/tasks.py` | 155 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
-| `lifeos/api/tasks.py` | 191 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
-| `lifeos/api/tasks.py` | 242 | ALL_SHOWS is a constant map, base and off are fixed SQL; values are parameters |
-| `lifeos/api/tasks.py` | 390 | open_loops_where() is a constant fragment |
+| `lifeos/api/tasks.py` | 49 | fixed SQL and meta-checked columns only; values are parameters |
+| `lifeos/api/tasks.py` | 138 | the WHERE comes from where_clause (fixed fragments); values are parameters |
+| `lifeos/api/tasks.py` | 156 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
+| `lifeos/api/tasks.py` | 192 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
+| `lifeos/api/tasks.py` | 243 | ALL_SHOWS is a constant map, base and off are fixed SQL; values are parameters |
+| `lifeos/api/tasks.py` | 305 | NO_GOAL is a constant fragment |
+| `lifeos/api/tasks.py` | 480 | open_loops_where() is a constant fragment |
 | `lifeos/api/timeline.py` | 38 | ROW_FIELDS and vault_guard are constants; callers pass fixed WHERE and ORDER fragments; values are parameters |
 | `lifeos/api/timeline.py` | 71 | fixed fragments, std_filters columns checked against meta; values are parameters |
 | `lifeos/api/today.py` | 58 | `lens` is area_filter's fixed SQL; values are parameters |

@@ -956,13 +956,13 @@ for (const width of UX_WIDTHS) {
 
   await check(`${tag}.7`, `${width} px: a list remembers its view on every device, a link with a query wins, Clear clears`, async () => {
     const param = (k) => new URL(pg.url()).searchParams.get(k)
-    await s.open('/life/goals/no-goal') // Goals > All tasks is the grouped screen now (issue 21); the remembered views are checked on No goal, which is the task list with goal=none
+    await s.open('/life/goals/no-goal?goal=none') // Goals > All tasks is the grouped screen now (issue 21); the remembered views are checked on No goal, which is the task list with goal=none
     await pickQuick('Priority', 'II')
     must(param('priority') === 'II', 'the filter was not set')
     const filtered = await count()
     await nav('Today')
     must(new URL(pg.url()).pathname === '/life/today', 'the sidebar did not go to Today')
-    await nav('No goal')
+    await s.open('/life/goals/no-goal?goal=none') // the bare path is the screen of issue 22; the old list is behind the goal filter
     must(new URL(pg.url()).pathname === '/life/goals/no-goal', 'Goals > No goal did not open')
     must(param('priority') === 'II', `coming back lost the view: ${new URL(pg.url()).search}`)
     must((await count()) === filtered, 'the remembered filter is in the URL but the list is not filtered')
@@ -970,7 +970,7 @@ for (const width of UX_WIDTHS) {
     // the same person on another device: the state comes from the server, not from this browser
     await pg.waitForTimeout(1600)
     const other = await session('owner@lifeos.test', width)
-    await other.open('/life/goals/no-goal')
+    await other.open('/life/goals/no-goal?goal=none')
     must(new URL(other.page.url()).searchParams.get('priority') === 'II', `a second browser does not show the saved filter: ${new URL(other.page.url()).search}`)
     await other.ctx.close()
     // a link with a query wins over what was saved, and then becomes the saved state
@@ -987,7 +987,7 @@ for (const width of UX_WIDTHS) {
     const sameQuery = (a, b) => { const k = (q) => [...new URLSearchParams(q)].map(([x, y]) => x + '=' + y).sort().join('&'); return k(a) === k(b) } // the order of parameters does not matter
     must(param('priority') !== 'II', `a query opened the list with the old filter: ${new URL(pg.url()).search}`)
     // Clear removes the filters and the cleared state is what is remembered
-    await s.open('/life/goals/no-goal')
+    await s.open('/life/goals/no-goal?goal=none')
     await pickQuick('Priority', 'II')
     must(param('priority') === 'II', 'the filter was not set again')
     await pg.locator('[data-clear]:visible').first().click()
@@ -996,7 +996,7 @@ for (const width of UX_WIDTHS) {
     must(!param('priority'), 'Clear did not remove the filter')
     must(!(await pg.locator('[data-active-filters]:visible').allInnerTexts()).join(' ').includes('Priority'), 'the list still says the priority filter is on') // No goal keeps its goal filter
     await nav('Today')
-    await nav('No goal')
+    await s.open('/life/goals/no-goal?goal=none') // the bare path is the screen of issue 22; the old list is behind the goal filter
     must(!param('priority'), 'the cleared filter came back')
     // another person has their own states
     await pg.waitForTimeout(1600)
@@ -1005,7 +1005,7 @@ for (const width of UX_WIDTHS) {
     const fam = await session('family@lifeos.test', width)
     const theirs = await fam.api('views.get_all')
     must(!Object.keys(theirs).some((k) => k.includes('Private')) && !JSON.stringify(theirs).includes('loops'), 'the family user sees the owner\'s saved states')
-    await fam.open('/life/goals/no-goal')
+    await fam.open('/life/goals/no-goal?goal=none')
     must(!new URL(fam.page.url()).search.includes('view=loops') && !new URL(fam.page.url()).searchParams.get('priority'), 'the family user got the owner\'s view')
     const rest = await fam.page.request.get(base + '/api/resource/Life%20View%20State?limit_page_length=100&fields=["user"]')
     must(!JSON.stringify(await rest.json()).includes('owner@lifeos.test'), 'the REST list shows the owner\'s saved states')
@@ -5171,6 +5171,148 @@ print(json.dumps(frappe.db.get_value("Life Task", {"title": "${title}"}, ["area"
       if (phone) must(boxes[0][1] < boxes[1][1] && boxes[1][1] < boxes[2][1] && boxes.every(([x, , w]) => x + w <= width), 'the task, goal and date are not stacked: ' + JSON.stringify(boxes))
       else must(Math.abs(boxes[0][1] - boxes[1][1]) < 30 && boxes[0][0] < boxes[1][0] && boxes[1][0] < boxes[2][0], 'the columns are not side by side: ' + JSON.stringify(boxes))
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
+// Issue 22: Goals > No goal. Titles start "I22 ". Areas switched on here are put back after.
+for (const width of SET_WIDTHS) {
+  const tag = `I22.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I22 ${what} ${width} ${stamp}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openNoGoal = async () => { await s.open('/life/goals/no-goal'); await pg.locator('[data-no-goal][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(400) }
+  const shown = () => pg.locator('[data-no-goal-row]').evaluateAll((els) => els.map((e) => e.dataset.task))
+  const dbRow = (title, fields) => JSON.parse(bench(`import json
+print(json.dumps(frappe.db.get_value("Life Task", {"title": "${title}"}, ${JSON.stringify(fields)}, as_dict=True)))`).split('\n').pop())
+  const made = JSON.parse(bench(`import json
+top = lambda n: frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": n, "parent_area": ("is", "not set")})
+ids = {n: top(n) for n in ("Career", "Health", "Money")}
+was = {k: frappe.db.get_value("Life Area", v, "is_on") for k, v in ids.items()}
+for v in ids.values(): frappe.db.set_value("Life Area", v, "is_on", 1)
+print(json.dumps({"ids": ids, "was": was}))`).split('\n').pop())
+  const restore = () => bench(`import json
+frappe.set_user("Administrator")
+for t in frappe.get_all("Life Task", filters={"title": ["like", "I22 % ${width} ${stamp}"]}, pluck="name") + frappe.get_all("Life Task", filters={"title": ["like", "I22 Quillfeather%"]}, pluck="name"): frappe.delete_doc("Life Task", t, force=1, ignore_permissions=True)
+for g in frappe.get_all("Life Goal", filters={"title": ["like", "%I22 % ${width} ${stamp}%"]}, pluck="name"): frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)
+for g in frappe.get_all("Life Goal", filters={"title": ["like", "%Quillfeather%"]}, pluck="name"): frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Task", filters={"space": "zz-i22-aside-${width}"}, pluck="name"): frappe.db.set_value("Life Task", n, "space", "${SPACE}", update_modified=False)
+for k, v in ${JSON.stringify(made.was)}.items(): frappe.db.set_value("Life Area", ${JSON.stringify(made.ids)}[k], "is_on", v)`)
+  const ids = {}
+  try {
+    await check(`${tag}.7`, `${width} px: with every task under a goal No goal says what will appear and offers a box to add one`, async () => {
+      bench(`for n in frappe.get_all("Life Task", filters={"space": "${SPACE}"}, pluck="name"): frappe.db.set_value("Life Task", n, "space", "zz-i22-aside-${width}", update_modified=False)`)
+      try {
+        await openNoGoal()
+        must(await pg.locator('[data-no-goal-empty]').isVisible(), 'no empty state')
+        const t = await pg.locator('[data-no-goal-empty]').innerText()
+        must(t.includes('Every open task serves a goal.') && t.includes('Tasks with no goal'), 'the empty state says: ' + t)
+        must(await pg.locator('[data-no-goal-empty-add]').isVisible(), 'no box to add a task')
+        await noSideways()
+      } finally {
+        bench(`for n in frappe.get_all("Life Task", filters={"space": "zz-i22-aside-${width}"}, pluck="name"): frappe.db.set_value("Life Task", n, "space", "${SPACE}", update_modified=False)`)
+      }
+    })
+    const out = JSON.parse(bench(`import json
+ids = ${JSON.stringify(made.ids)}
+out = {}
+g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('goal')}", "area": ids["Career"], "goal_type": "Open", "done_when": "Done"}).insert(ignore_permissions=True).name
+def mk(key, title, area, **kw):
+    out[key] = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": title, "area": ids[area], "status": "Open", **kw}).insert(ignore_permissions=True).name
+mk("withgoal", "${T('with goal')}", "Career", goal=g)
+mk("career", "${T('career')}", "Career")
+mk("health", "${T('health')}", "Health")
+mk("money", "${T('money')}", "Money")
+mk("guess", "${T('guess')}", "Money", area_guessed=1, area_confidence=70)
+mk("attach", "${T('attach')}", "Career")
+for i in range(8): mk("q%d" % i, "I22 Quillfeather call %d" % i, "Health")
+out["goal"] = g
+print(json.dumps(out))`).split('\n').pop())
+    Object.assign(ids, out)
+    await check(`${tag}.1`, `${width} px: tasks without a goal are grouped by area; a task with a goal is not listed`, async () => {
+      await openNoGoal()
+      const all = await shown()
+      must(new Set(all).size === all.length, 'a task is listed twice')
+      for (const [k, area] of [['career', 'Career'], ['health', 'Health'], ['money', 'Money'], ['guess', 'Money']]) {
+        must((await pg.locator(`[data-no-goal-group][data-group="${area}"] [data-task="${ids[k]}"]`).count()) === 1, `${k} is not under ${area}`)
+      }
+      must(!all.includes(ids.withgoal), 'a task with a goal is listed')
+      const api = await s.api('tasks.no_goal', { space: SPACE })
+      must(all.length === api.total, `${all.length} rows, the server says ${api.total}`)
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: adding a task to a goal takes it off the list and it shows under that goal`, async () => {
+      await openNoGoal()
+      const row = pg.locator(`[data-task="${ids.attach}"]`)
+      await row.locator('[data-add-to-goal]').click()
+      await pg.getByRole('menuitem', { name: T('goal') }).click()
+      await pg.waitForFunction((n) => !document.querySelector(`[data-no-goal-row][data-task="${n}"]`), ids.attach, { timeout: 8000 })
+      const g = dbRow(T('attach'), ['goal'])
+      must(g.goal === ids.goal, 'the task is not under the goal: ' + JSON.stringify(g))
+      const under = (await s.api('tasks.list', { space: SPACE, goal: ids.goal, status: 'open' })).tasks.map((t) => t.name)
+      must(under.includes(ids.attach), 'the goal does not list the task')
+    })
+    await check(`${tag}.3`, `${width} px: confirming a guessed area clears ✦`, async () => {
+      await openNoGoal()
+      const row = pg.locator(`[data-task="${ids.guess}"]`)
+      must((await row.locator('[data-area-guess]').count()) === 1, 'no ✦ on the guessed task')
+      await row.locator('[data-area-guess]').click()
+      await pg.waitForFunction((n) => !document.querySelector(`[data-task="${n}"] [data-area-guess]`), ids.guess, { timeout: 8000 })
+      must(dbRow(T('guess'), ['area_guessed']).area_guessed === 0, 'the guess is still marked')
+      must((await pg.locator(`[data-task="${ids.guess}"]`).count()) === 1, 'the task left the list when its area was confirmed')
+    })
+    await check(`${tag}.4`, `${width} px: Make it a goal creates one goal in that area with the tasks attached`, async () => {
+      await openNoGoal()
+      const group = pg.locator('[data-no-goal-group][data-group="Health"]')
+      must(await group.locator('[data-suggestion]').isVisible(), 'no suggestion under Health')
+      must((await group.locator('[data-suggestion]').innerText()).includes('look like a goal'), 'the suggestion does not say it looks like a goal')
+      const before = JSON.parse(bench(`import json\nprint(json.dumps(frappe.db.count("Life Goal", {"space": "${SPACE}"})))`).split('\n').pop())
+      await group.locator('[data-make-goal]').click()
+      await pg.waitForFunction((n) => !document.querySelector(`[data-no-goal-row][data-task="${n}"]`), ids.q0, { timeout: 8000 })
+      const res = JSON.parse(bench(`import json
+goals = frappe.get_all("Life Goal", filters={"space": "${SPACE}", "title": ["like", "%Quillfeather%"]}, fields=["name", "area"])
+tasks = frappe.get_all("Life Task", filters={"goal": ["in", [g.name for g in goals] or [""]]}, pluck="name")
+print(json.dumps({"goals": goals, "tasks": tasks, "total": frappe.db.count("Life Goal", {"space": "${SPACE}"})}))`).split('\n').pop())
+      must(res.goals.length === 1 && res.goals[0].area === made.ids.Health, 'the goal is not one goal in Health: ' + JSON.stringify(res.goals))
+      must(res.total === before + 1, `${res.total - before} goals were made`)
+      const want = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => ids['q' + i]).sort()
+      must(JSON.stringify(res.tasks.sort()) === JSON.stringify(want), 'the tasks under the goal are ' + res.tasks.length)
+    })
+    await check(`${tag}.5`, `${width} px: the tab count is the number of open tasks with no goal`, async () => {
+      await openNoGoal()
+      const n = Number((await pg.locator('[data-tab="no-goal"] [data-tab-count]').innerText()).trim())
+      const sql = JSON.parse(bench(`import json
+print(json.dumps(frappe.db.sql("select count(*) from \`tabLife Task\` where space=%s and is_archived=0 and status in ('Open','Doing','Waiting') and ifnull(goal,'')='' and ifnull(standalone,0)=0", "${SPACE}")[0][0]))`).split('\n').pop())
+      must(n === sql, `the tab says ${n}, the database has ${sql}`)
+      must((await shown()).length === n, `${(await shown()).length} rows under a tab that says ${n}`)
+    })
+    await check(`${tag}.6`, `${width} px: ${phone ? 'groups stack and a task\'s actions are reachable' : 'a row has its task and its actions side by side'}`, async () => {
+      await openNoGoal()
+      await noSideways()
+      const row = pg.locator(`[data-task="${ids.career}"]`)
+      const box = async (sel) => { const b = await row.locator(sel).boundingBox(); must(b, sel + ' is not visible'); return b }
+      const [title, area, fine, add] = [await box('[data-task-title]'), await box('[data-area-menu]'), await box('[data-fine-as-is]'), await box('[data-add-to-goal]')]
+      for (const b of [area, fine, add]) must(b.x >= 0 && b.x + b.width <= width, `an action is outside the ${width} px screen`)
+      if (phone) must(title.y < area.y && title.y < fine.y && title.y < add.y, 'the actions are not under the title')
+      else must(title.x < area.x && Math.abs(title.y - area.y) < 40, 'the actions are not beside the title')
+      const heads = await pg.locator('[data-no-goal-group] h2').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().y))
+      must(heads.every((y, i) => !i || y > heads[i - 1]), 'the groups do not stack')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.8`, `${width} px: Fine as is leaves the list and keeps the task without a goal`, async () => {
+      await openNoGoal()
+      await pg.locator(`[data-task="${ids.money}"] [data-fine-as-is]`).click()
+      await pg.waitForFunction((n) => !document.querySelector(`[data-no-goal-row][data-task="${n}"]`), ids.money, { timeout: 8000 })
+      const r = dbRow(T('money'), ['goal', 'standalone'])
+      must(!r.goal && r.standalone === 1, 'the task changed unexpectedly: ' + JSON.stringify(r))
     })
   } finally {
     restore()
