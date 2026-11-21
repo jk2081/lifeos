@@ -1,0 +1,36 @@
+{
+ "title": "A goal with no Done when gets a finish line",
+ "input": {
+  "data": {
+   "request": "measure",
+   "title": "Launch the new website",
+   "notes": "Replace the old one before the festival season."
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "kind",
+    "equals": "Milestone"
+   }
+  },
+  {
+   "answer": {
+    "path": "done_when",
+    "contains": "live"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"kind\": \"Milestone\", \"done_when\": \"The new website is live and the old one is switched off.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "072602fd48a3e3c6"
+}

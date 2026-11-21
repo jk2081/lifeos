@@ -26,6 +26,7 @@
   "processed_by",
   "suggested_decision",
   "suggested_reason",
+  "suggested_by",
   "suggested_on",
   "finished_on",
   "preview_image",
@@ -176,6 +177,12 @@
    "fieldname": "suggested_reason",
    "fieldtype": "Small Text",
    "label": "Suggested Reason",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggested_by",
+   "fieldtype": "Data",
+   "label": "Suggested By",
    "read_only": 1
   },
   {

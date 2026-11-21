@@ -5,7 +5,7 @@
         <div class="flex flex-wrap items-baseline gap-x-2">
           <span v-if="withGoal" class="text-base-medium text-ink-gray-9">{{ r.goal_title }}</span>
           <template v-if="editing !== r.name"><span class="text-base-medium tabular-nums text-ink-gray-9" data-reading-value>{{ fmt(r.value) }}{{ r.unit ? ' ' + r.unit : '' }}</span>
-            <span class="text-sm text-ink-gray-6">on {{ short(r.date, true) }} · suggested by {{ BY[r.suggested_by] || 'the assistant' }}</span></template>
+            <span class="text-sm text-ink-gray-6">on {{ short(r.date, true) }} · suggested by {{ BY[r.suggested_by] || r.suggested_by || 'the assistant' }}</span></template>
         </div>
         <div v-if="editing === r.name" class="flex flex-wrap items-end gap-2">
           <FormControl v-model="edit.value" class="w-32" type="number" label="Value" data-reading-edit-value />

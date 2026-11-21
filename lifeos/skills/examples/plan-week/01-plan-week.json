@@ -1,0 +1,57 @@
+{
+ "title": "A goal with no next action gets one, with a length",
+ "input": {
+  "data": {
+   "request": "plans",
+   "goals": [
+    {
+     "goal": "G1",
+     "title": "Plant the Yercaud nursery",
+     "done_when": "The nursery is planted and watered",
+     "next_action": null
+    },
+    {
+     "goal": "G2",
+     "title": "Agree the plan with Vivek",
+     "done_when": "A signed plan",
+     "next_action": "Call Vivek about the plan"
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "plans.0.next_action",
+    "contains": "saplings"
+   }
+  },
+  {
+   "answer": {
+    "path": "plans.1.minutes",
+    "equals": 30
+   }
+  },
+  {
+   "answer": {
+    "path": "stars",
+    "count": {
+     "min": 0,
+     "max": 0
+    }
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"plans\": [{\"goal\": \"G1\", \"next_action\": \"Order 500 saplings from the nursery supplier\", \"minutes\": 30}, {\"goal\": \"G2\", \"next_action\": \"Call Vivek about the plan\", \"minutes\": 30}], \"stars\": []}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "50043e8fda9294cf"
+}

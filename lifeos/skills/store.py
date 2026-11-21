@@ -49,6 +49,11 @@ def builtin(slug: str) -> dict | None:
 	return parse_file(path) if path.exists() else None
 
 
+def instructions_of(slug: str) -> str:
+	"""A skill's instructions as the owner has them, or as shipped when the site has none yet."""
+	return frappe.db.get_value("Life Skill", slug, "instructions") or builtin(slug)["instructions"]
+
+
 def digest(values: dict) -> str:
 	"""A hash of a skill's text and settings, to tell whether the owner changed it."""
 	data = {k: str(values.get(k) if values.get(k) is not None else "") for k in ("instructions", *CONFIG)}

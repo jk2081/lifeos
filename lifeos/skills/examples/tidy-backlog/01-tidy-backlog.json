@@ -1,0 +1,77 @@
+{
+ "title": "Old Inbox items: tasks are kept, notes only are parked, nothing found is dropped",
+ "input": {
+  "data": {
+   "request": "old Inbox items",
+   "items": [
+    {
+     "item": "I1",
+     "kind": "Inbox",
+     "title": "Fee reminder: Term 2",
+     "age_days": 12,
+     "summary": "School fee of Rs 48,000 due 5 December.",
+     "proposals": [
+      "Task"
+     ],
+     "previews": [
+      "Pay the term 2 fee"
+     ]
+    },
+    {
+     "item": "I2",
+     "kind": "Inbox",
+     "title": "Article on tea blending",
+     "age_days": 20,
+     "summary": "A long read.",
+     "proposals": [
+      "Note"
+     ],
+     "previews": [
+      "Tea blending notes"
+     ]
+    },
+    {
+     "item": "I3",
+     "kind": "Inbox",
+     "title": "Newsletter",
+     "age_days": 30,
+     "summary": "Discount offers.",
+     "proposals": [],
+     "previews": []
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "decisions.0.decision",
+    "equals": "keep"
+   }
+  },
+  {
+   "answer": {
+    "path": "decisions.1.decision",
+    "equals": "park"
+   }
+  },
+  {
+   "answer": {
+    "path": "decisions.2.decision",
+    "equals": "drop"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"decisions\": [{\"item\": \"I1\", \"decision\": \"keep\", \"reason\": \"It holds a school fee task with a date.\"}, {\"item\": \"I2\", \"decision\": \"park\", \"reason\": \"Only notes; read them later.\"}, {\"item\": \"I3\", \"decision\": \"drop\", \"reason\": \"Nothing was found in it.\"}]}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "d868ea15079fe7d7"
+}

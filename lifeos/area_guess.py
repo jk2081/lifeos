@@ -3,7 +3,7 @@
 1. the area of the task's goal;
 2. the area of the capture (inbox item) it came from;
 3. a rule match: the words of the title against the names and descriptions of the areas and parts that are on;
-4. with an AI key set and within the spend cap, one short model call with the title, notes and the areas that are on;
+4. with an AI key set and within the spend cap, the guess-area skill, given the title, notes and the areas that are on;
 5. otherwise Career, if it is on, with a low confidence.
 
 Steps 1, 2, 3 and 5 run as the task is saved, so it always has an area. Step 4 runs in a background job after the save,
@@ -12,7 +12,6 @@ only when the task got the Career fallback, and replaces that guess with the mod
 A guessed area carries `area_guessed` and `area_confidence` until a person confirms or changes it. A change is kept as a
 `Life Action Log` row of kind "Area correction" (the guessed area and the new one), for later issues to learn from.
 """
-import json
 import re
 
 import frappe
@@ -35,19 +34,6 @@ to too up us was we were what when where which who why will with would you your 
 back before call check do done email find follow just let like look make more much next off only over put reply say see
 send set should still take tell thing things think today tomorrow two week via want way well yet
 """.split())
-
-SYSTEM = (
-	"You file a task into one of the owner's areas of life. You get the task's title and notes, and the areas that are on: "
-	"each has an id, a name, a short description, and for a part, the area of life it belongs to. Pick the one area the task "
-	"belongs to, preferring a part when the task is clearly about it. Answer with its id and how sure you are, from 0 to 100."
-)
-SCHEMA = {
-	"type": "object",
-	"properties": {"area": {"type": "string"}, "confidence": {"type": "integer"}},
-	"required": ["area", "confidence"],
-	"additionalProperties": False,
-}
-
 
 def apply(doc):
 	"""Fill `doc.area` with a guess by steps 1, 2, 3 and 5 when it has none. Returns {area, confidence, source} or None."""
@@ -158,42 +144,25 @@ def refine(task, area):
 
 
 def ask_model(doc, candidates):
-	"""Step 4: one short model call, within the spend cap. None when there is no key, the cap is reached, the call fails,
-	or the answer names no area that is on."""
-	from lifeos.ai import client
+	"""Step 4: the guess-area skill, within the spend cap. None when there is no key, the cap is reached, the call fails, or the answer
+	names no area that is on."""
+	from lifeos.skills import call
 
-	if not candidates or not client.is_set_up():
+	if not candidates:
 		return None
 	ids = {f"A{i + 1}": a for i, a in enumerate(candidates[:80])}
 	names = {a.name: a.area_name for a in candidates}
-	prompt = json.dumps({"task": "task_area", "title": doc.title, "notes": (doc.notes_md or "")[:1500],
-		"areas": [{"id": k, "name": a.area_name, "part_of": names.get(a.parent_area), "description": a.description or ""}
-			for k, a in ids.items()]})
-	try:
-		out = client.call("Area guess", SYSTEM, [{"role": "user", "content": prompt}], kind="short", space=doc.space,
-			schema=SCHEMA, max_tokens=200, reference=(doc.doctype, doc.name))
-	except client.AIError:
-		return None
-	data = client.json_of(out["content"]) or {}
-	key = str(data.get("area") or "").strip()
+	got = call.ask("guess-area", {"title": doc.title, "notes": (doc.notes_md or "")[:1500], "areas": [{"id": k, "name": a.area_name,
+		"part_of": names.get(a.parent_area), "description": a.description or ""} for k, a in ids.items()]}, space=doc.space, reference=(doc.doctype, doc.name))
+	key = str(got.get("area") or "").strip()
 	pick = ids.get(key) or next((a for a in ids.values() if a.area_name.lower() == key.lower()), None)
 	if not pick:
 		return None
 	try:
-		confidence = int(data.get("confidence"))
+		confidence = int(got.get("confidence"))
 	except (TypeError, ValueError):
 		confidence = WORD_CONFIDENCE
 	return _found(pick.name, confidence, "model")
-
-
-def fake_area(data):
-	"""The acceptance site's model: the first part that shares a word with the title or notes, else the first area given,
-	40% sure."""
-	text = words(f"{data.get('title') or ''} {data.get('notes') or ''}")
-	listed = data.get("areas") or []
-	pick = next((a for a in listed if a.get("part_of") and text & words(f"{a['name']} {a.get('description') or ''}")), None)
-	pick = pick or (listed[0] if listed else {})
-	return {"area": pick.get("id") or "", "confidence": 40}
 
 
 def track_change(doc):

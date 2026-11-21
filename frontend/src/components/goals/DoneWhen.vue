@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col gap-3" data-done-when>
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <span class="text-sm text-ink-gray-6">Done when…</span>
+      <span class="text-sm text-ink-gray-6">Done when…<span v-if="by" class="text-ink-gray-5" data-measure-by> · Suggested by {{ by }}</span><span v-else-if="nothing" class="text-ink-gray-5" data-measure-none> · No suggestion. Write it yourself.</span></span>
       <Button v-if="title && !hideSuggest" size="sm" variant="ghost" icon-left="lucide-sparkles" label="Suggest" :loading="busy" data-measure-suggest @click="suggest" />
     </div>
     <TabButtons :model-value="m.measure_kind || ''" :options="KINDS" data-measure-kind @update:model-value="setKind" />
@@ -41,6 +41,8 @@ const emit = defineEmits(['update:modelValue', 'habit'])
 const KINDS = [{ label: 'A finish line', value: 'Milestone' }, { label: 'A number', value: 'Number' }]
 const m = props.modelValue
 const busy = ref(false)
+const by = ref('')
+const nothing = ref(false)
 const habitDismissed = ref(false)
 const suggestedHabit = ref(null)
 
@@ -72,6 +74,10 @@ async function suggest() {
   const r = await tryCall(() => api('goals.suggest_measure', { title: props.title, notes: props.notes || undefined, space: props.space || store.space }))
   busy.value = false
   if (!r) return
+  by.value = r.by || ''
+  nothing.value = !r.kind
+  if (r.habit) { suggestedHabit.value = r.habit; habitDismissed.value = false }
+  if (!r.kind) return
   m.measure_kind = r.kind
   if (r.kind === 'Number') {
     for (const k of ['measure', 'unit', 'target_value', 'start_value']) if (r[k] !== null && r[k] !== undefined) m[k] = r[k]

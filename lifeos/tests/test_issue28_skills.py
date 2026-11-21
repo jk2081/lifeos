@@ -13,6 +13,7 @@ from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED, LifeTestCas
 from lifeos.tests.test_issue13_task_areas import NoModel, set_key
 
 SKILL = "process-capture"
+BUILT_IN = {p.stem for p in store.builtin_files()}  # every skill the app ships (issue 59 added the skills that judge)
 
 
 def use(name, args, id="t1"):
@@ -285,7 +286,7 @@ class TestVersions(SkillCase):
 
 	def test_a_fresh_install_shows_no_edit_and_no_update(self):
 		cards = skills_api.overview()["skills"]
-		self.assertEqual({c["name"] for c in cards}, {SKILL, "lifeos", "lifeos-file-work", "improve-skill"})
+		self.assertEqual({c["name"] for c in cards}, BUILT_IN)
 		self.assertFalse([c for c in cards if c["edited"] or c["update_available"]])
 		store.install()  # a second migrate changes nothing
 		self.assertEqual(frappe.db.count("Life Skill Version", {"skill": SKILL}), 1)
@@ -313,7 +314,7 @@ class TestServing(SkillCase):
 		self.assertEqual((got["name"], got["version"]), ("lifeos", 1))
 		self.assertIn("Life OS agent instructions", got["instructions"])
 		self.assertIn("lifeos", [s["name"] for s in skills_api.list(space=PRIVATE)])
-		self.assertEqual({s["name"] for s in skills_api.list()}, {"lifeos", "lifeos-file-work", SKILL, "improve-skill"})
+		self.assertEqual({s["name"] for s in skills_api.list()}, BUILT_IN)
 		self.assertTrue(skills_api.get("lifeos-file-work")["instructions"])
 
 	def test_a_skill_for_one_space_is_served_only_to_its_members(self):
@@ -390,7 +391,7 @@ class TestExamples(SkillCase):
 				data = json.loads(path.read_text())
 				self.assertEqual(data.get("skill_hash"), current, f"{slug} changed since {path.name} was recorded. Record the fixtures with: "
 					f"bench --site SITE execute lifeos.skills.record --kwargs \"{{'skill': '{slug}'}}\"")
-				state = runner.generate(skill, PRIVATE, runner.blocks_of_sample(data["input"]), replay=data["fixture"], lenient=True)
+				state = runner.generate(skill, PRIVATE, examples.blocks_of(slug, data["input"]), replay=data["fixture"], lenient=True)
 				results = examples.evaluate(data["checks"], state["output"], state["proposals"])
 				self.assertTrue(all(r["passed"] for r in results), f"{slug}: {data['title']}: {results}")
 				checked += 1

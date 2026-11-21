@@ -3,7 +3,7 @@
     <div class="flex items-baseline gap-2.5">
       <span class="text-2xl-semibold tabular-nums text-ink-gray-9" data-batch-count>{{ batch.count }}</span>
       <span class="text-lg-semibold text-ink-gray-9">{{ batch.title }}</span>
-      <Badge v-if="batch.source === 'AI'" theme="violet" label="AI" />
+      <Badge v-if="batch.source === 'AI'" theme="violet" :label="batch.by ? 'Suggested by ' + batch.by : 'AI'" />
     </div>
     <p class="text-base text-ink-gray-7">Why: {{ batch.reason }}</p>
     <ul class="flex flex-col gap-1 text-base text-ink-gray-8" data-batch-samples>

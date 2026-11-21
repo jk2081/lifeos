@@ -1,0 +1,39 @@
+{
+ "title": "Tasks that belong together get a goal title",
+ "input": {
+  "data": {
+   "request": "title",
+   "titles": [
+    "Get fencing quotes",
+    "Order fence posts",
+    "Book the fencing crew"
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "kind",
+    "equals": "Title"
+   }
+  },
+  {
+   "answer": {
+    "path": "title",
+    "contains": "fence"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"kind\": \"Title\", \"title\": \"Fence the estate boundary\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "072602fd48a3e3c6"
+}

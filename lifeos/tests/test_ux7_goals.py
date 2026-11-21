@@ -170,14 +170,12 @@ class TestReadings(LifeTestCase):
 
 
 class TestSuggestAndHabit(LifeTestCase):
-	def test_rules_without_a_key(self):
+	def test_without_a_key_there_is_no_suggestion_but_a_habit_is_still_seen(self):
+		"""Issue 59: the rules that guessed a measure are gone; no key means no suggestion and no error."""
 		set_key("")
 		frappe.set_user(OWNER)
 		r = goals.suggest_measure("Ghillidary yield 1800 kg/ha", space=PRIVATE)
-		self.assertEqual((r["kind"], r["unit"], r["target_value"], r["source"]), ("Number", "kg/ha", 1800, "rules"))
-		r = goals.suggest_measure("Weight 84 to 78 kg", space=PRIVATE)
-		self.assertEqual((r["start_value"], r["target_value"]), (84, 78))
-		self.assertEqual(goals.suggest_measure("Ship MoneyOS", space=PRIVATE)["kind"], "Milestone")
+		self.assertEqual((r["kind"], r["by"], r["target_value"]), (None, None, None))
 		self.assertEqual(goals.suggest_measure("Walk 3 times a week", space=PRIVATE)["habit"]["days_per_week"], 3)
 
 	def test_frequencies_are_habits(self):

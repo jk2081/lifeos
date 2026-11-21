@@ -31,9 +31,19 @@ def install(slug):
 		doc.save(ignore_permissions=True) if row else doc.insert(ignore_permissions=True)
 
 
+def at(output, path):
+	"""The value at a path such as "decisions.0.decision" in an answer; None when it is not there."""
+	for part in str(path).split("."):
+		try:
+			output = output[int(part)] if isinstance(output, list) else output[part]
+		except (KeyError, IndexError, ValueError, TypeError):
+			return None
+	return output
+
+
 def evaluate(checks, output, proposals) -> list:
 	"""[(check, passed, detail)]: each check is one of summary_contains, has_proposal {kind, area, title_contains, min_confidence},
-	no_proposal {kind}, proposal_count {min, max}, waits (every proposal is below the auto-file threshold)."""
+	no_proposal {kind}, proposal_count {min, max}, answer {path, equals | contains | count}, waits (every proposal is below the auto-file threshold)."""
 	results = []
 	summary = (output or {}).get("summary_md", "") if isinstance(output, dict) else ""
 	for check in checks:
@@ -45,6 +55,15 @@ def evaluate(checks, output, proposals) -> list:
 			ok = any(_matches(p, arg) for p in proposals)
 		elif name == "no_proposal":
 			ok = not any(p["kind"] == arg.get("kind") for p in proposals) if arg.get("kind") else not proposals
+		elif name == "answer":  # {path, equals | contains | count: {min, max}}
+			got = at(output, arg["path"])
+			if "equals" in arg:
+				ok = got == arg["equals"]
+			elif "contains" in arg:
+				ok = str(arg["contains"]).lower() in str(got).lower()
+			else:
+				ok = isinstance(got, list) and arg["count"].get("min", 0) <= len(got) <= arg["count"].get("max", 999)
+			detail = str(got)[:80]
 		elif name == "proposal_count":
 			ok = arg.get("min", 0) <= len(proposals) <= arg.get("max", 999)
 			detail = f"{len(proposals)} proposals"
@@ -63,6 +82,13 @@ def _matches(p, want) -> bool:
 	return not want.get("min_confidence") or float(p.get("confidence") or 0) >= want["min_confidence"]
 
 
+def blocks_of(slug, sample):
+	"""An example's request: a capture for a skill that reads captures, or the data it is given (`{"data": …}`) for one that is asked."""
+	from lifeos.skills import call
+
+	return call.blocks_of(slug, sample["data"]) if "data" in sample else runner.blocks_of_sample(sample)
+
+
 def run_example(skill, example, text_hash, live=None, space=None):
 	"""Run one example against `skill` (a dict, so a draft text can be tried before it is saved). Uses the recorded answer when the
 	text is the one it was recorded for, else the real model. Returns {title, passed, checks, source}."""
@@ -76,7 +102,7 @@ def run_example(skill, example, text_hash, live=None, space=None):
 	space = space or frappe.db.get_single_value("Life Settings", "default_space")
 	source = "recorded" if replay is not None else "model"
 	try:
-		state = runner.generate(skill, space, runner.blocks_of_sample(sample), intent=sample.get("intent") or "Process", replay=replay, lenient=True)
+		state = runner.generate(skill, space, blocks_of(skill["name"], sample), intent=sample.get("intent") or "Process", replay=replay, lenient=True)
 	except runner.SkillError as e:
 		return {"title": example.title, "passed": False, "source": source, "error": e.reason, "checks": []}
 	results = evaluate(checks, state["output"], state["proposals"])
@@ -104,7 +130,8 @@ def shipped_skill(slug) -> dict:
 	"""A built-in skill as shipped (its file), as the runner takes it."""
 	shipped = store.builtin(slug)
 	return {"name": slug, "version": shipped["version"], "instructions": shipped["instructions"], "tools": json.loads(shipped["tools"]),
-		"output_schema": shipped.get("output_schema"), "model_tier": shipped.get("model_tier") or "Fast", "cost_limit": float(shipped.get("cost_limit") or 0)}
+		"output_schema": shipped.get("output_schema"), "model_tier": shipped.get("model_tier") or "Fast", "cost_limit": float(shipped.get("cost_limit") or 0),
+		"card": shipped.get("output_schema") in (None, "", "capture-result")}
 
 
 def record(slug):
@@ -113,7 +140,7 @@ def record(slug):
 	space = frappe.db.get_single_value("Life Settings", "default_space")
 	for path in files_of(slug):
 		data = json.loads(path.read_text())
-		state = runner.generate(skill, space, runner.blocks_of_sample(data["input"]), intent=data["input"].get("intent") or "Process", lenient=True)
+		state = runner.generate(skill, space, blocks_of(slug, data["input"]), intent=data["input"].get("intent") or "Process", lenient=True)
 		results = evaluate(data["checks"], state["output"], state["proposals"])
 		data["fixture"], data["skill_hash"] = state["responses"], text_hash
 		path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n")

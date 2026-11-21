@@ -1,0 +1,63 @@
+{
+ "title": "Reset: tasks of a finished initiative are grouped and dropped",
+ "input": {
+  "data": {
+   "request": "Reset: groups of open tasks",
+   "items": [
+    {
+     "item": "C1",
+     "kind": "Task",
+     "title": "Redesign old website header",
+     "area": "Career",
+     "goal": null,
+     "age_days": 400
+    },
+    {
+     "item": "C2",
+     "kind": "Task",
+     "title": "Old website: fix footer links",
+     "area": "Career",
+     "goal": null,
+     "age_days": 380
+    },
+    {
+     "item": "C3",
+     "kind": "Task",
+     "title": "Call the school about the bus",
+     "area": "Relationships",
+     "goal": null,
+     "age_days": 5
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "decisions",
+    "count": {
+     "min": 2,
+     "max": 3
+    }
+   }
+  },
+  {
+   "answer": {
+    "path": "decisions.0.group",
+    "equals": "The old website"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"decisions\": [{\"item\": \"C1\", \"decision\": \"drop\", \"reason\": \"The old website was replaced.\", \"group\": \"The old website\"}, {\"item\": \"C2\", \"decision\": \"drop\", \"reason\": \"The old website was replaced.\", \"group\": \"The old website\"}, {\"item\": \"C3\", \"decision\": \"keep\", \"reason\": \"Recent and still needed.\"}]}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "d868ea15079fe7d7"
+}

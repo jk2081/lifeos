@@ -22,6 +22,34 @@ SCHEMAS = {
 	},
 }
 
+def _obj(required, properties):
+	return {"type": "object", "additionalProperties": False, "required": required, "properties": properties}
+
+
+def _list(item):
+	return {"type": "array", "items": item}
+
+
+_S, _N = {"type": "string"}, {"type": "number"}
+_REFS = _list(_S)
+
+SCHEMAS.update({
+	"backlog-decisions": _obj(["decisions"], {"decisions": _list(_obj(["item", "decision", "reason"], {
+		"item": _S, "decision": {"type": "string", "enum": ["keep", "park", "drop"]}, "reason": _S, "chase": {"type": "boolean"}, "group": _S}))}),
+	"week-plan": _obj(["plans", "stars"], {"plans": _list(_obj(["goal", "minutes"], {
+		"goal": _S, "next_action": _S, "minutes": {"type": "integer", "enum": [30, 60, 90]}})), "stars": _REFS}),
+	"notice-result": _obj(["insights", "follow_ups", "readings"], {
+		"insights": _list(_obj(["kind", "title", "evidence"], {"kind": {"type": "string", "enum": ["Waiting on you", "Promise", "Theme"]},
+			"title": _S, "body": _S, "evidence": _REFS, "task_title": _S})),
+		"follow_ups": _list(_obj(["meeting", "kind", "title", "record"], {"meeting": _S, "kind": {"type": "string", "enum": ["Promise", "Date"]},
+			"title": _S, "task_title": _S, "date": _S, "record": _S, "excerpt": _S})),
+		"readings": _list(_obj(["goal", "value", "record", "excerpt"], {"goal": _S, "value": _N, "date": _S, "record": _S, "excerpt": _S}))}),
+	"goal-definition": _obj(["kind"], {"kind": {"type": "string", "enum": ["Milestone", "Number", "Title"]}, "done_when": _S, "measure": _S,
+		"unit": _S, "target_value": _N, "start_value": _N, "title": _S}),
+	"reflect-result": _obj(["sentence"], {"sentence": _S}),
+	"area-guess": _obj(["area", "confidence"], {"area": _S, "confidence": {"type": "integer"}}),
+})
+
 
 def resolve(value: str | None):
 	"""The schema a skill asks for, or None when it asks for none."""

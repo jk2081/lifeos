@@ -1,7 +1,7 @@
 """Insights (UX fixes, set 5): findings that push stuck things to a decision.
 
-Rule detectors run first (Stuck, Waiting on you, 12 Week Year, Habit, Check-in, Someday); the AI detector
-(lifeos/ai/insights.py) adds Waiting on you, Promise and Theme candidates when a key is set. Every insight carries its
+Rule detectors run first (Stuck, Waiting on you, 12 Week Year, Habit, Check-in, Someday); the notice skill
+adds Waiting on you, Promise and Theme candidates when a key is set. Every insight carries its
 evidence; its fingerprint is the kind plus the sorted evidence, so a dismissed one is not shown again unless the
 evidence changes. Snoozed ones come back after their date. At most 12 new insights a day per space, ranked by kind.
 """
@@ -28,9 +28,9 @@ def fingerprint(kind, evidence):
 	return hashlib.sha1((kind + "|" + "|".join(keys)).encode()).hexdigest()[:40]
 
 
-def candidate(kind, title, evidence, body="", actions=None, area=None, source="Rule"):
+def candidate(kind, title, evidence, body="", actions=None, area=None, source="Rule", source_line=None):
 	return {"kind": kind, "title": title[:255], "body": body, "evidence": evidence, "actions": actions or [], "area": area,
-		"source": source}
+		"source": source, "source_line": source_line}
 
 
 def ev(doctype, name, label=""):
@@ -188,6 +188,69 @@ def detect_someday(space):
 RULES = [detect_stuck, detect_waiting, detect_cycle, detect_habits, detect_checkins, detect_someday]
 
 
+# ---- the notice skill ----
+
+WINDOW_DAYS = 14
+MAX_RECORDS = 40
+CHARS_PER_RECORD = 1500
+KINDS_AI = ("Waiting on you", "Promise", "Theme")
+
+
+def recent_records(ctx, space, kinds, days, limit, chars):
+	"""The records of the last `days` days of these kinds, read through get_record, so the space, Vault and permission rules apply."""
+	from lifeos.ai.tools import t_get_record
+
+	# nosemgrep: frappe-sql-format-injection -- only the code-owned vault fragment of the tool context is inserted; the rest are parameters
+	rows = frappe.db.sql(f"""select ref_doctype, ref_name from `tabLife Index` x where x.space=%s and x.is_archived=0 and x.kind in %s
+		and x.modified >= %s{ctx.vault_sql()} order by x.modified desc limit %s""", (space, kinds, add_days(today(), -days), limit), as_dict=True)
+	out = []
+	for r in rows:
+		try:
+			got = t_get_record(ctx, doctype=r.ref_doctype, name=r.ref_name)
+		except (frappe.PermissionError, frappe.DoesNotExistError):
+			continue  # a record the user may not read is never sent
+		if not got.get("error"):
+			got["text"] = (got.get("text") or "")[:chars]
+			out.append(got)
+	return out
+
+
+def noticed(space, user):
+	"""([candidates], note) from the notice skill: Waiting on you, Promise and Theme over the last 14 days. Nothing when it has no key;
+	the rule insights still run. The last 30 dismissals, with their reasons, are sent as guidance."""
+	from lifeos.ai import client
+	from lifeos.ai.tools import Context
+	from lifeos.skills import call
+
+	if not client.is_set_up():
+		return [], "AI insights skipped: no API key."
+	ctx = Context(space, {"kind": "space", "label": "Everything in this space"}, user)
+	records = recent_records(ctx, space, ("Chat", "Inbox", "Note"), WINDOW_DAYS, MAX_RECORDS, CHARS_PER_RECORD)
+	if not records:
+		return [], None
+	dismissed = [{"kind": r.kind, "title": r.title, "reason": r.dismiss_reason or "no reason"} for r in frappe.get_all("Life Insight",
+		filters={"space": space, "status": "Dismissed"}, fields=["kind", "title", "dismiss_reason"], order_by="modified desc", limit=30)]
+	got = call.ask("notice", {"request": "insights", "today": today(), "records": records, "dismissed": dismissed,
+		"open_task_titles": frappe.get_all("Life Task", filters={"space": space, "status": ["in", ["Open", "Doing", "Waiting"]], "is_archived": 0},
+			pluck="title", limit=300)}, space=space, user=user)
+	if not got:
+		return [], f"AI insights skipped: {got.reason}"
+	found = []
+	for c in (got.get("insights") or [])[:6]:
+		if c.get("kind") not in KINDS_AI or not c.get("title"):
+			continue
+		evidence = [ev(ctx.refs[r]["doctype"], ctx.refs[r]["name"], ctx.refs[r]["title"]) for r in c.get("evidence") or [] if r in ctx.refs]
+		if not evidence:
+			continue
+		actions = []
+		if c["kind"] in ("Waiting on you", "Promise"):
+			area = next((ctx.refs[r].get("area") for r in c.get("evidence") or [] if r in ctx.refs and ctx.refs[r].get("area")), None)
+			actions.append({"kind": "make_task", "label": "Make task", "title": (c.get("task_title") or c["title"])[:140], "area": area})
+		actions.append({"kind": "open_record", "label": "Open", "ref": next((ctx.refs[r]["pane"] for r in c["evidence"] if r in ctx.refs), None)})
+		found.append(candidate(c["kind"], c["title"], evidence, body=c.get("body") or "", actions=actions, source="AI", source_line=f"Suggested by {got.label}"))
+	return found, None
+
+
 # ---- the run ----
 
 def _valid_evidence(evidence, user):
@@ -224,9 +287,7 @@ def run(space, ai=True, user=None):
 	for fn in RULES:
 		cands += fn(space)
 	if ai:
-		from lifeos.ai import insights as ai_insights
-
-		got, note = ai_insights.candidates(space, user)
+		got, note = noticed(space, user)
 		cands += got
 		stats["ai"] = note
 	existing = {r.fingerprint: r for r in frappe.get_all("Life Insight", filters={"space": space},
@@ -253,7 +314,7 @@ def run(space, ai=True, user=None):
 			continue
 		frappe.get_doc({"doctype": "Life Insight", "space": space, "kind": c["kind"], "title": c["title"], "body": c.get("body"),
 			"evidence": c["evidence"], "actions": json.dumps(c.get("actions") or []), "status": "New", "fingerprint": fp,
-			"source": c.get("source") or "Rule", "area": c.get("area") or None, "found_on": day, "rank": RANK.get(c["kind"], 99)}).insert(ignore_permissions=True)
+			"source": c.get("source") or "Rule", "source_line": c.get("source_line"), "area": c.get("area") or None, "found_on": day, "rank": RANK.get(c["kind"], 99)}).insert(ignore_permissions=True)
 		room -= 1
 		stats["created"] += 1
 	# rule insights still New whose finding is no longer true are removed (their evidence changed or went away)

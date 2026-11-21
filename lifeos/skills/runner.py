@@ -153,7 +153,8 @@ def _go(doc, log, input):
 def skill_values(doc) -> dict:
 	"""The parts of a skill the run needs, as a plain dict (an example run can pass a draft instead of a record)."""
 	return {"name": doc.name, "version": doc.version, "instructions": doc.instructions or "", "tools": store.tool_list(doc),
-		"output_schema": doc.output_schema, "model_tier": doc.model_tier, "cost_limit": flt(doc.cost_limit)}
+		"output_schema": doc.output_schema, "model_tier": doc.model_tier, "cost_limit": flt(doc.cost_limit),
+		"card": doc.output_schema in (None, "", "capture-result")}  # a skill that answers about data it is given does not need the space's card
 
 
 def _item_of(input):
@@ -244,7 +245,9 @@ def _space_card(space):
 def system_text(skill, space, schema):
 	from frappe.utils import today
 
-	text = f"{SYSTEM}\n\n# This skill\n{skill['instructions']}\n\n# The space\nToday is {today()}. File only into these areas and goals.\n{_space_card(space)}"
+	text = f"{SYSTEM}\n\n# This skill\n{skill['instructions']}\n\nToday is {today()}."
+	if skill.get("card", True):  # a skill that is given its data in the request does not need the space's areas and goals
+		text += f"\n\n# The space\nFile only into these areas and goals.\n{_space_card(space)}"
 	if schema:
 		text += f"\n\n# The shape of your final answer\n{json.dumps({k: v for k, v in schema.items() if k != 'title'})}"
 	return text
@@ -305,16 +308,17 @@ def _ask(skill, system, messages, specs, space, schema, reference, replay):
 			raise SkillError(_("the recorded answers ran out"))
 		r = replay.pop(0)
 		return {"content": r["content"], "stop_reason": r.get("stop_reason", "end_turn"), "usage": r.get("usage") or {"input_tokens": 0, "output_tokens": 0}, "cost": 0}
-	for attempt in range(len(BACKOFF) + 1):
+	tries = len(BACKOFF) if skill.get("patient", True) else 0  # a skill run inside a web request does not wait and retry
+	for attempt in range(tries + 1):
 		try:
 			out = client.call(f"Skill: {skill['name']}", system, messages, tools=specs, kind="ask" if skill["model_tier"] == "Smart" else "short",
-				space=space, schema=schema, user=frappe.session.user, reference=reference)
+				space=space, schema=schema, user=skill.get("user") or frappe.session.user, reference=reference)
 			out["retries"] = attempt
 			return out
 		except (client.NotSetUp, client.CapReached):
 			raise
 		except client.AIError as e:
-			if attempt == len(BACKOFF):
+			if attempt == tries:
 				raise SkillError(_("the AI service did not answer ({0})").format(str(e)[:120]))
 			time.sleep(BACKOFF[attempt])
 

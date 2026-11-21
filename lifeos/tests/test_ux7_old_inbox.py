@@ -1,5 +1,7 @@
 """Set 7, step 4: Inbox items left too long. The rule in all three modes, the rules without a key, Confirm selected and its
 Undo, Today's line and its Undo, what is never touched, and Reset's batch."""
+import json
+
 import frappe
 from frappe.utils import add_days, now_datetime, today
 
@@ -40,23 +42,50 @@ class OldCase(LifeTestCase):
 
 
 class TestSuggest(OldCase):
-	def test_rules_without_a_key(self):
+	def test_without_a_key_nothing_is_suggested_and_the_items_wait(self):
+		"""Issue 59: no rule decides for the owner; with no key the old items stay in Needs you, and nothing breaks."""
 		task = self.old_item("ux7 old tasks", ["Task", "Note"])
 		note = self.old_item("ux7 old notes", ["Note"])
-		empty = self.old_item("ux7 old empty", status="New")
-		fresh = self.old_item("ux7 fresh", ["Task"], age=2)
-		out = old_inbox.run_for_space(PRIVATE, OWNER)
-		self.assertEqual(out["mode"], "Suggest")
-		got = {n: frappe.db.get_value("Life Inbox Item", n, ["suggested_decision", "suggested_reason"]) for n in (task, note, empty, fresh)}
-		self.assertEqual(got[task][0], "Accept")
-		self.assertEqual(got[note][0], "Park")
-		self.assertEqual(got[empty][0], "Discard")
-		self.assertFalse(got[fresh][0])  # not old yet
-		self.assertTrue(all(got[n][1] for n in (task, note, empty)))
+		out = old_inbox.run_for_space(PRIVATE)
+		self.assertEqual(out, {"mode": "Suggest", "suggested": 0})
+		for n in (task, note):
+			got = frappe.db.get_value("Life Inbox Item", n, ["status", "suggested_decision", "suggested_on"])
+			self.assertEqual((got[0], got[1] or None, got[2]), ("To Review", None, None))
 		listed = old_items.suggested(space=PRIVATE)
-		self.assertEqual(listed["total"], len(listed["rows"]))
-		self.assertTrue({task, note, empty} <= {r["name"] for r in listed["rows"]})
-		# Reset offers the same items as a batch
+		self.assertEqual((listed["total"], listed["rows"]), (0, []))
+		self.assertFalse([b for b in reset.rule_batches(PRIVATE) if b["key"] == "inbox_decisions"])
+
+	def test_the_skill_decides_for_the_items_it_can_and_says_who_suggested(self):
+		from lifeos.ai import fake
+
+		set_key("sk-test-not-real")
+		frappe.set_user(OWNER)
+		task, note, empty, fresh = (self.old_item("ux7 s old tasks", ["Task"]), self.old_item("ux7 s old notes", ["Note"]),
+			self.old_item("ux7 s old empty", status="New"), self.old_item("ux7 s fresh", ["Task"], age=2))
+		words = {"decisions": []}
+
+		def answer(params):
+			ids = fake.asked(params)[1]["items"]
+			by_title = {i["title"]: i["item"] for i in ids}
+			words["decisions"] = [{"item": by_title["ux7 s old tasks"], "decision": "keep", "reason": "A task with a date."},
+				{"item": by_title["ux7 s old notes"], "decision": "park", "reason": "Only notes."}]  # the empty one is left out
+			return {"content": [{"type": "text", "text": json.dumps(words)}]}
+
+		frappe.flags.lifeos_ai_backend = fake.ScriptedFake([answer])
+		try:
+			out = old_inbox.run_for_space(PRIVATE)
+		finally:
+			frappe.flags.lifeos_ai_backend = None
+			set_key("")
+		self.assertEqual(out, {"mode": "Suggest", "suggested": 2})
+		got = {n: frappe.db.get_value("Life Inbox Item", n, ["suggested_decision", "suggested_by", "suggested_on"]) for n in (task, note, empty, fresh)}
+		self.assertEqual(got[task][:2], ("Accept", "tidy-backlog v1"))
+		self.assertEqual(got[note][:2], ("Park", "tidy-backlog v1"))
+		self.assertFalse(got[empty][0])  # left out: it waits for the owner, and is not asked about again
+		self.assertTrue(got[empty][2])
+		self.assertFalse(got[fresh][2])  # not old yet
+		listed = old_items.suggested(space=PRIVATE)
+		self.assertEqual({r["name"]: r["by"] for r in listed["rows"] if r["name"] in (task, note, empty)}, {task: "tidy-backlog v1", note: "tidy-backlog v1"})
 		batch = next(b for b in reset.rule_batches(PRIVATE) if b["key"] == "inbox_decisions")
 		self.assertEqual(batch["count"], listed["total"])
 		self.assertEqual(batch["review"], {"path": "/inbox", "query": {"decisions": "1"}})
@@ -67,13 +96,14 @@ class TestSuggest(OldCase):
 		set_key("sk-test-not-real")
 		frappe.set_user(OWNER)
 		item = self.old_item("ux7 old ai", ["Task"])
-		frappe.flags.lifeos_ai_backend = fake.ScriptedFake([{"content": [{"type": "text", "text": '{"decisions": [{"item": "I1", "decision": "Park", "reason": "Can wait."}]}'}]}])
+		frappe.flags.lifeos_ai_backend = fake.ScriptedFake([{"content": [{"type": "text", "text": '{"decisions": [{"item": "I1", "decision": "park", "reason": "Can wait."}]}'}]}])
 		try:
-			got = old_inbox.suggest(PRIVATE, [i for i in old_inbox.candidates(PRIVATE, 7) if i.name == item], OWNER)
+			got, label = old_inbox.suggest(PRIVATE, [i for i in old_inbox.candidates(PRIVATE, 7) if i.name == item])
 		finally:
 			frappe.flags.lifeos_ai_backend = None
 			set_key("")
-		self.assertEqual(got[item], ("Park", "Can wait."))  # the assistant's, not the rule's Accept
+		self.assertEqual(got[item], ("Park", "Can wait."))
+		self.assertEqual(label, "tidy-backlog v1")
 
 	def test_confirm_and_undo_each_decision(self):
 		acc = self.old_item("ux7 confirm accept", ["Task"])

@@ -1,0 +1,55 @@
+{
+ "title": "The weekly review: a waiting item is chased, a goal task is left for the owner",
+ "input": {
+  "data": {
+   "request": "the weekly review's piles",
+   "items": [
+    {
+     "item": "I1",
+     "kind": "Waiting",
+     "title": "Quote from the fencing contractor",
+     "age_days": 10,
+     "waiting_on": "Ravi",
+     "serves_cycle_goal": false
+    },
+    {
+     "item": "I2",
+     "kind": "Stuck",
+     "title": "Write the nursery plan",
+     "age_days": 45,
+     "waiting_on": null,
+     "serves_cycle_goal": true
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "decisions.0.chase",
+    "equals": true
+   }
+  },
+  {
+   "answer": {
+    "path": "decisions",
+    "count": {
+     "min": 1,
+     "max": 1
+    }
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"decisions\": [{\"item\": \"I1\", \"decision\": \"keep\", \"reason\": \"Asked 10 days ago; chase Ravi.\", \"chase\": true}]}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "d868ea15079fe7d7"
+}

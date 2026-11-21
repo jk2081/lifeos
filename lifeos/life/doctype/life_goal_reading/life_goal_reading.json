@@ -79,9 +79,8 @@
   },
   {
    "fieldname": "suggested_by",
-   "fieldtype": "Select",
-   "label": "Suggested By",
-   "options": "\nAgent\nAssistant\nOwner"
+   "fieldtype": "Data",
+   "label": "Suggested By"
   },
   {
    "fieldname": "confirmed_by",

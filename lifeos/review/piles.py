@@ -1,8 +1,8 @@
 """Needs you and the three piles (set 8): Keep, Park in Someday, Let go. One component for Library (Inbox items) and Tasks
 (stuck tasks and tasks waiting on others).
 
-The assistant sorts first, each item with a one-line reason (short model, batched, within the cap); without a key the rules
-below sort. Only what cannot be decided goes under Needs you, at most five; the rest of those join Keep as "not sure". A row
+The tidy-backlog skill sorts first, each item with a one-line reason (batched, within the cap); without a key everything waits
+under Needs you. Only what cannot be decided goes under Needs you, at most five; the rest of those join Keep as "not sure". A row
 settles one item at once; accepting a pile settles every item still in it. Every decision and its Undo are kept in the
 review's state, so an Undo reverses exactly what was done (and the Outbox exits with it).
 """
@@ -17,7 +17,6 @@ PILES = ("keep", "park", "letgo")
 NEEDS = "needs"
 NEEDS_MAX = 5
 CHASE_AFTER = 7  # a waiting item asked more than this many days ago is kept as Chase
-PARK_AFTER, LET_GO_AFTER = 60, 120  # a stuck task untouched this long is parked, then let go
 
 
 class PileSet:
@@ -49,8 +48,7 @@ class PileSet:
 		have = {it["ref"] for it in kept}
 		new = [c for c in cands.values() if c["ref"] not in have]
 		if new:
-			by = pile_sort.sort(self.space, new, ai=ai)
-			self.data["by"] = "assistant" if by == "assistant" or self.data.get("by") == "assistant" else "rules"
+			self.data["by"] = pile_sort.sort(self.space, new, ai=ai) or self.data.get("by")
 		self.data["items"] = kept + new
 		self._cap_needs()
 		self._loaded = True
@@ -93,7 +91,7 @@ class PileSet:
 				"sources": _sources(members)}
 		needs = [i for i in items if i["pile"] == NEEDS or i.get("moved_from") == NEEDS]
 		left = sum(1 for i in items if not i.get("settled"))
-		return {"key": self.key, "by": self.data.get("by") or "rules", "piles": piles, "needs": [_row(i) for i in needs],
+		return {"key": self.key, "by": self.data.get("by"), "piles": piles, "needs": [_row(i) for i in needs],
 			"needs_left": sum(1 for i in needs if not i.get("settled")), "total": len(items), "left": left,
 			"settled": len(items) - left, "cleared": left == 0}
 

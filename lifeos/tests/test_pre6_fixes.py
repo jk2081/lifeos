@@ -72,10 +72,12 @@ class TestNoUserSwitching(AskCase):
 		import json
 
 		def answer(params):
-			data = json.loads(params["messages"][-1]["content"])
-			seen.extend(r["title"] for r in data["records"])
-			refs = [r["ref"] for r in data["records"]] or ["R1"]
-			return {"content": [text(json.dumps({"candidates": [{"kind": "Theme", "title": "pre6 theme", "evidence": refs}]}))],
+			from lifeos.ai import fake
+
+			data = fake.asked(params)[1]
+			seen.extend(r["title"] for r in data.get("records", []))
+			refs = [r["ref"] for r in data.get("records", [])] or ["R1"]
+			return {"content": [text(json.dumps({"follow_ups": [], "readings": [], "insights": [{"kind": "Theme", "title": "pre6 theme", "evidence": refs}]}))],
 				"stop_reason": "end_turn"}
 
 		return answer
@@ -107,7 +109,7 @@ class TestNoUserSwitching(AskCase):
 		self.assertEqual(frappe.session.user, "Administrator")
 		self.assertIn("pre6 Mithun blend sheets", seen)
 		self.assertTrue(frappe.db.exists("Life Insight", {"space": PRIVATE, "title": "pre6 theme"}))
-		self.assertEqual(frappe.db.get_value("Life AI Usage", {"purpose": "Insights"}, "user"),
+		self.assertEqual(frappe.db.get_value("Life AI Usage", {"purpose": "Skill: notice"}, "user"),
 			frappe.db.get_value("Life Space", PRIVATE, "owner_user"))
 
 

@@ -1,0 +1,43 @@
+{
+ "title": "A task about a business goes to the part, not to the area of life",
+ "input": {
+  "data": {
+   "title": "Review the tea blend pricing",
+   "notes": "",
+   "areas": [
+    {
+     "id": "A1",
+     "name": "Career",
+     "part_of": null,
+     "description": "Work"
+    },
+    {
+     "id": "A2",
+     "name": "Tea & Coffee",
+     "part_of": "Career",
+     "description": "The tea and coffee business"
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "area",
+    "equals": "A2"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"area\": \"A2\", \"confidence\": 80}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "1f1419e210a1904d"
+}
