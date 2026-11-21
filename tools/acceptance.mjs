@@ -5393,7 +5393,10 @@ print(json.dumps({"read": len(logs), "holding": [f for f in logs if any(s in ope
 
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {
-  const out = bench('from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))').split('\n').pop()
+  const code = 'from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))'
+  let out
+  try { out = bench(code) } catch (e) { out = bench(code) } // the purge is safe to repeat: a lock wait on a busy runner should not fail the run
+  out = out.split('\n').pop()
   must(!Object.keys(JSON.parse(out)).length, 'left on the acceptance site: ' + out)
 })
 

@@ -32,5 +32,5 @@ function readDotEnv() {
 // run Python on a site of the bench, through tools/bench.sh (the one helper that reaches the bench)
 export function benchPython(script) {
   return execFileSync(path.join(root, 'tools/bench.sh'), ['-i', 'cd sites && ../env/bin/python -W ignore -'],
-    { input: script, encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] })
+    { input: script, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }) // stderr piped so a failure's message carries the Python error
 }
