@@ -844,3 +844,13 @@ Fixed: sensitive items reached agents through paths that did not use the Vault r
 - **Sensitive rules unchanged:** the same `vault_guard` as the old list; the Vault is closed to an agent when the space's switch is off, and its rows are not listed or counted. A closed row still shows 🔒 for the owner and opens in the pane as before.
 - **Acceptance:** I23.1 to .6 follow the issue's list; added **.7** (empty state). Unit tests: `test_issue23_everything.py`. Records titled "I23 " are the checks'.
 
+## Issue 24: Library → Files (21 Nov 2026)
+
+- **One line per stored copy, not per File row.** Issue 7 gives each record its own File row with one `file_url`; the list groups the current rows (not earlier versions) by `file_url`, within the space. A file in two spaces is two lines, one in each.
+- **Versions** are the earlier files (`life_version_of`) of any row in the group, plus the current one; "N versions" counts them all and each opens at its own `file_url`.
+- **"Reusable" means jobs link it.** A file is reusable when an item that holds it is the `asset` of at least one job input (`Life Job Input`, issue 8); the count is the jobs, and those jobs are also listed under Used in. An asset no job has used yet is just a file.
+- **Access** reuses `permissions.file_has_permission` for each record that uses the file, so the Files list matches who may open the file. A file with no visible record is not listed. Files attached to records other than inbox items, notes, Vault documents and chat logs are not listed (they have no pane to open under Used in).
+- **Source filter** is Made by me, Kept by the Brain (sent by an agent) or the source system of an item using it. Area is any area of a record using it, with its parts, or "No area".
+- **Type** is by file extension (Documents, Images, Slides, Audio, Other); no content sniffing.
+- **Open** is a link to the file in a new tab, which the browser previews where it can; there is no preview inside the page.
+- Preview images and thumbnails the app made are not listed.

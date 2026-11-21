@@ -24,6 +24,7 @@
  "lifeos.api.connections.import_status",
  "lifeos.api.counts.get",
  "lifeos.api.everything.list",
+ "lifeos.api.files.list",
  "lifeos.api.gcal.state",
  "lifeos.api.gcal.calendars",
  "lifeos.api.goals.list",

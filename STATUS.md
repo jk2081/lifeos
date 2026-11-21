@@ -393,6 +393,13 @@ GitHub issue #14. Deviations are in `DECISIONS.md` under "Issue 14".
 - **Works:** the sidebar is the "Life OS" logo (which opens the lens), + Capture, Today, Brain (with the Needs you count), Goals and Library, Review between Goals and Library once the user has locked a weekly review or on the review's day, then Settings and the user. Each tab is a path: Today (Day, Week, Month, Year), Brain (Needs you, Activity, Sources), Goals (By area, All tasks, No goal), Library (Everything, Notes, Documents, People, Chats); each shows the nearest screen until its own issue lands. The Outbox, Someday, the Timeline and Trash and archive are linked at the foot of their place, Graph and Sensitive documents in the Library's, Reset from Today, the Week and the review; Settings > Data > Where things are lists them all. + Capture opens a capture sheet (a task, the Brain, files, a goal, a note, an idea). On a phone the bottom bar is Today, Brain, a round capture button, Goals and Library. Every old route redirects to its new home with its query. `session.counts` returns `reviewed`.
 - **Tests:** `lifeos/tests/test_issue14_navigation.py` (2 tests) and acceptance checks `I14.<width>.1` to `.7` (1 and 2 at 1440 px, 6 at 390 px, the rest at both). The set 6 navigation check, the Library and place-tab checks, the G keys, the old-routes check and the screen walk were rewritten for the new places.
 
+## Issue 24: Library → Files (21 Nov 2026)
+
+GitHub issue #24. Deviations are in `DECISIONS.md` under "Issue 24".
+
+- **Works:** Library has a Files tab (`/library/files`): every stored file once (rows that share a `file_url`, issue 7, are one line), with its type, size, date, "N versions" that open either version, and **Used in**: the items, notes, documents and chats that use it (each opens in the pane). A reusable asset (an input that jobs link) shows "Reusable · N jobs", and those jobs are under Used in. Filters: Type (Documents, Images, Slides, Audio, Other), Area, Source, and a search by name; Open (in the browser) and Download. A record the user may not open (a Vault document or sensitive item while the Vault is closed to an agent) is left out of Used in, and a file with no record left is not listed. `files.list` is the one new method. Empty state with + Capture.
+- **Tests:** `lifeos/tests/test_issue24_files.py` (7 tests); acceptance checks I24.1 to I24.6 at 1440 and 390 px.
+
 ## Summary
 
 ### What works

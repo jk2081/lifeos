@@ -8,7 +8,7 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 const TODAY = ['week', 'month', 'year']
 const BRAIN = ['activity', 'captures', 'sources', 'outbox', 'queue']
 const GOALS = ['tasks', 'no-goal', 'someday']
-const LIBRARY = ['notes', 'documents', 'people', 'chats', 'timeline', 'archive']
+const LIBRARY = ['notes', 'documents', 'people', 'chats', 'files', 'timeline', 'archive']
 
 // the Projects screen's query on the Goals tab: open-ended goals, and a project's status as a goal state
 const STATE = { Active: 'in_progress', 'On Hold': 'in_progress', Done: 'achieved', Dropped: 'closed', Someday: 'someday', all: 'all', current: 'in_progress' }

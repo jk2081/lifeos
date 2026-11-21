@@ -1,5 +1,6 @@
 <template>
-  <LibraryEverything v-if="own" :key="current" :tab="current" />
+  <LibraryFiles v-if="current === 'files'" />
+  <LibraryEverything v-else-if="own" :key="current" :tab="current" />
   <Sources v-else-if="KIND[current] !== undefined" :key="current" place="all" :screen="current === 'all' ? 'sources' : 'library-' + current" />
   <template v-else-if="current === 'notes'">
     <Graph v-if="route.query.view === 'graph'" />
@@ -12,13 +13,14 @@
   <PlaceLinks :links="LINKS" label="More in the Library" />
 </template>
 <script setup>
-// Library, one of the four places (issue 14): Everything, Notes, Documents, People and Chats. The tabs are paths
+// Library, one of the four places (issue 14): Everything, Notes, Documents, People, Chats and Files. The tabs are paths
 // (/library/notes); every screen open here shows them under its header (PageHead). Until each tab's own issue lands it
 // shows the nearest screen: Documents and Chats are Everything held to that kind, People is the graph of people and
 // what links them. The Timeline, the graph, sensitive documents and the trash and archive are linked under every tab.
 import { computed, provide, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import LibraryEverything from '@/components/library/LibraryEverything.vue'
+import LibraryFiles from '@/components/library/LibraryFiles.vue'
 import Sources from '@/pages/Sources.vue'
 import Library from '@/pages/Library.vue'
 import Graph from '@/pages/Graph.vue'

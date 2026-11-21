@@ -5480,6 +5480,139 @@ print(json.dumps({"listed": any(r["name"] == "${ids.doc}" for r in rows), "other
   }
 }
 
+// Issue 24: Library > Files. Records titled "I24 ". Records and files made here are deleted after.
+for (const width of SET_WIDTHS) {
+  const tag = `I24.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I24 ${what} ${width} ${stamp}`
+  const F = (what, ext) => `I24 ${what} ${width} ${stamp}.${ext}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openFiles = async (query = '') => { await s.open('/life/library/files' + query); await pg.locator('[data-library-files][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const rowFor = (name) => pg.locator('[data-file-row]', { hasText: name })
+  const was = JSON.parse(bench(`import json
+print(json.dumps(frappe.db.get_value("Life Space", "${SPACE}", "agents_can_read_vault")))`).split('\n').pop())
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Inbox Item", "Life Vault Document"):
+    for n in frappe.get_all(dt, filters={"title": ["like", "I24 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", ${was ? 1 : 0})`)
+  const ids = {}
+  try {
+    const out = JSON.parse(bench(`import json
+from lifeos.api import inbox
+mk = lambda **v: frappe.get_doc({"space": "${SPACE}", **v}).insert(ignore_permissions=True).name
+att = lambda dt, name, file, data: frappe.get_doc({"doctype": "File", "file_name": file, "attached_to_doctype": dt, "attached_to_name": name, "is_private": 1, "content": data}).insert(ignore_permissions=True)
+out = {}
+career = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Career", "parent_area": ("is", "not set")})
+out["a"] = mk(doctype="Life Inbox Item", title="${T('first user')}", source_type="Upload", area=career)
+out["b"] = mk(doctype="Life Inbox Item", title="${T('second user')}", source_type="Upload")
+for n in (out["a"], out["b"]): att("Life Inbox Item", n, "${F('shared', 'pptx')}", b"i24 shared slides ${width} ${stamp}")
+out["v"] = mk(doctype="Life Inbox Item", title="${T('versions')}", source_type="Upload", source_system="claude", external_id="i24-${width}-${stamp}")
+att("Life Inbox Item", out["v"], "${F('report', 'txt')}", b"i24 report one ${width} ${stamp}")
+att("Life Inbox Item", out["v"], "${F('report', 'txt')}", b"i24 report two, newer ${width} ${stamp}")
+for ext in ("txt", "png", "mp3"): att("Life Inbox Item", out["v"], "${F('kind', 'EXT')}".replace("EXT", ext), b"i24 " + ext.encode() + b" ${width} ${stamp}")
+out["doc"] = mk(doctype="Life Vault Document", title="${T('passport')}", doc_type="ID")
+att("Life Vault Document", out["doc"], "${F('passport', 'txt')}", b"i24 passport ${width} ${stamp}")
+frappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", 0)
+print(json.dumps(out))`).split('\n').pop())
+    Object.assign(ids, out)
+    await check(`${tag}.1`, `${width} px: a file used by two items is listed once, with both under Used in`, async () => {
+      await openFiles('?q=' + encodeURIComponent(F('shared', 'pptx')))
+      const row = rowFor(F('shared', 'pptx'))
+      must((await row.count()) === 1, 'the shared file is not listed once: ' + (await row.count()))
+      const used = await row.locator('[data-file-used-in]').evaluateAll((els) => els.map((e) => e.dataset.ref).sort())
+      must(JSON.stringify(used) === JSON.stringify([`source:${ids.a}`, `source:${ids.b}`].sort()), 'Used in is ' + used.join())
+      await row.locator('[data-file-used-in]').first().click()
+      await pg.locator('[data-pane-title]').waitFor({ timeout: 8000 })
+      must(await row.locator('[data-file-open]').isVisible() && await row.locator('[data-file-download]').isVisible(), 'Open or Download is missing')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.2`, `${width} px: a file with 2 versions shows "2 versions" and opens either`, async () => {
+      await openFiles('?q=' + encodeURIComponent(F('report', 'txt')))
+      const row = rowFor(F('report', 'txt'))
+      must((await row.count()) === 1, 'the file is not listed once')
+      must((await row.locator('[data-file-versions]').innerText()).includes('2 versions'), 'the row does not say 2 versions')
+      await row.locator('[data-file-versions]').click()
+      const hrefs = await row.locator('[data-file-version]').evaluateAll((els) => els.map((e) => e.getAttribute('href')))
+      must(hrefs.length === 2 && hrefs[0] !== hrefs[1], 'the two versions are not two links: ' + hrefs.join())
+      for (const h of hrefs) {
+        const r = await pg.evaluate(async (u) => { const x = await fetch(u); return { status: x.status, text: (await x.text()).slice(0, 40) } }, h)
+        must(r.status === 200 && r.text.startsWith('i24 report'), `${h} does not open: ${JSON.stringify(r)}`)
+      }
+    })
+    await check(`${tag}.3`, `${width} px: the type filter shows only slides when Slides is chosen`, async () => {
+      await openFiles('?q=' + encodeURIComponent(`I24 `))
+      const pick = async (label) => { await pg.locator('[data-files-type]').first().click(); await pg.getByRole('option', { name: label, exact: true }).click() }
+      await pick('Slides')
+      await pg.waitForFunction(() => /type=slides/.test(location.search), null, { timeout: 8000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-file-row]').length > 0 && !document.querySelector('[data-file-row]:not([data-type="slides"])'), null, { timeout: 8000 })
+      const names = await pg.locator('[data-file-row]').evaluateAll((els) => els.map((e) => e.dataset.type))
+      must(names.length && names.every((t) => t === 'slides'), 'the list holds ' + names.join())
+      must((await rowFor(F('shared', 'pptx')).count()) === 1 && (await rowFor(F('kind', 'png')).count()) === 0, 'the slides are not the only rows')
+      await pick('Images')
+      await pg.waitForFunction(() => /type=images/.test(location.search), null, { timeout: 8000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-file-row]').length > 0 && !document.querySelector('[data-file-row]:not([data-type="images"])'), null, { timeout: 8000 })
+      const imgs = await pg.locator('[data-file-row]').evaluateAll((els) => els.map((e) => e.dataset.type))
+      must(imgs.every((t) => t === 'images'), 'Images shows ' + imgs.join())
+    })
+    await check(`${tag}.4`, `${width} px: a user who cannot see any record using a file does not see the file`, async () => {
+      const agent = JSON.parse(bench(`import json
+frappe.set_user("hermes@lifeos.test")
+from lifeos import permissions
+from lifeos.api import files
+permissions.clear_cache()
+names = [r["name"] for r in files.list(space="${SPACE}", page_length=100, q="I24 ")["rows"]]
+print(json.dumps({"names": names}))`).split('\n').pop())
+      must(!agent.names.includes(F('passport', 'txt')), 'the agent lists the file of a closed Vault document')
+      must(agent.names.includes(F('shared', 'pptx')), 'the agent sees nothing it may open')
+      await openFiles('?q=' + encodeURIComponent(F('passport', 'txt')))
+      must((await rowFor(F('passport', 'txt')).count()) === 1, 'the owner does not see the Vault file')
+    })
+    await check(`${tag}.5`, `${width} px: ${phone ? 'at 390 px the list is one column' : 'a row has its name, Used in and the buttons side by side'}`, async () => {
+      await openFiles('?q=' + encodeURIComponent(F('shared', 'pptx')))
+      await noSideways()
+      const row = rowFor(F('shared', 'pptx'))
+      const box = async (sel) => { const b = await row.locator(sel).first().boundingBox(); must(b, sel + ' is not visible'); return b }
+      const [name, used, open] = [await box('[data-file-name]'), await box('[data-file-used]'), await box('[data-file-open]')]
+      for (const b of [name, used, open]) must(b.x >= 0 && b.x + b.width <= width + 1, `part of a row is outside the ${width} px screen`)
+      if (phone) must(used.y > name.y && open.y > used.y, 'the row is not one column')
+      else must(used.x > name.x && open.x > used.x, 'the row is not side by side')
+      must((await row.locator('[data-file-reusable]').count()) === 0, 'a file no job used shows Reusable')
+      const tabs = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.dataset.tab))
+      must(tabs.includes('files'), 'the Files tab is missing: ' + tabs.join())
+    })
+    await check(`${tag}.6`, `${width} px: with no files the screen says what will appear and offers + Capture; a search with no match says so`, async () => {
+      const aside = JSON.parse(bench(`import json
+rows = frappe.db.sql("select name, attached_to_doctype from \`tabFile\` where attached_to_doctype in ('Life Inbox Item', 'Life Note', 'Life Vault Document', 'Life Chat Log')", as_dict=True)
+frappe.db.sql("update \`tabFile\` set attached_to_doctype = concat('zz ', attached_to_doctype) where attached_to_doctype in ('Life Inbox Item', 'Life Note', 'Life Vault Document', 'Life Chat Log')")
+frappe.db.commit()
+print(json.dumps(rows))`).split('\n').pop())
+      try {
+        await openFiles()
+        must(await pg.locator('[data-files-empty]').isVisible(), 'no empty state')
+        const t = await pg.locator('[data-files-empty]').innerText()
+        must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
+        must(await pg.locator('[data-files-capture]').isVisible(), 'no Capture button')
+        await noSideways()
+      } finally {
+        bench(`import json
+for r in json.loads(${JSON.stringify(JSON.stringify(aside))}):
+    frappe.db.set_value("File", r["name"], "attached_to_doctype", r["attached_to_doctype"], update_modified=False)
+frappe.db.commit()`)
+      }
+      await openFiles('?q=nosuchfile' + stamp)
+      must((await pg.locator('[data-files-empty]').innerText()).includes('No file matches'), 'a search with no match does not say so')
+    })
+  } finally {
+    restore()
+    await s.ctx.close()
+  }
+}
+
 // Issue 5: the acceptance walk runs in GitHub Actions too. These check the switches, the workflow's job as written, the
 // screenshots taken on a failure and that no password or key reaches the workflow file or the logs it uploads.
 const ciJob = (name) => {

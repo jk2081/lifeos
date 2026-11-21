@@ -15,7 +15,7 @@ export const TODAY_TABS = [{ value: 'day', label: 'Day' }, { value: 'week', labe
 export const BRAIN_TABS = [{ value: 'needs-you', label: 'Needs you' }, { value: 'activity', label: 'Activity' }, { value: 'sources', label: 'Sources' }]
 export const GOALS_TABS = [{ value: 'by-area', label: 'By area' }, { value: 'tasks', label: 'All tasks' }, { value: 'no-goal', label: 'No goal' }]
 export const LIBRARY_TABS = [{ value: 'all', label: 'Everything' }, { value: 'notes', label: 'Notes' }, { value: 'documents', label: 'Documents' },
-  { value: 'people', label: 'People' }, { value: 'chats', label: 'Chats' }]
+  { value: 'people', label: 'People' }, { value: 'chats', label: 'Chats' }, { value: 'files', label: 'Files' }]
 const tabPath = (base, tabs) => (tab) => (tab === tabs[0].value ? base : `${base}/${tab}`)
 export const todayPath = tabPath('/today', TODAY_TABS)
 export const brainPath = tabPath('/brain', BRAIN_TABS)
