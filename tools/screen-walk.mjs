@@ -3,11 +3,11 @@
 // message, a body left empty, or the journal screens' header buttons missing. It ends by checking that navigation still
 // works. Used by tools/acceptance.mjs (BF1 checks) and, read-only, against the owner's site (--owner-read-only).
 
-// the views of Today's rhythms (Plan's before issue 14) and, for the journal screens, a button each puts into the header's #jr-actions
+// the views of Today's rhythms (Plan's before issue 14; the month plan and 12 Weeks moved to Goals > Cycles in issue 45) and, for the journal screens, a button each puts into the header's #jr-actions
 const RHYTHMS = {
   week: [['Review'], ['Calendar'], ['Agenda']], // set 8: the review is its own screen; Pause leaves it for the Calendar
-  month: [['Plan', 'Previous month'], ['Habits', 'Previous month'], ['Check-ins'], ['Calendar']],
-  year: [['Calendar'], ['12 Weeks', 'Weekly review'], ['Goals across cycles', 'All goals']],
+  month: [['Habits', 'Previous month'], ['Check-ins'], ['Calendar']],
+  year: [['Calendar'], ['Goals across cycles', 'All goals']],
 }
 // issue 14: the four places, each tab, and the pages linked at the foot of a place
 const PLACES = {
@@ -51,7 +51,7 @@ export async function walkScreens(page, { width, settle = () => page.waitForTime
     await leaveReview()
     // issue 16: Week, Month and Year open on screens of their own; the older views are reached by `view=` until the switch shows
     if (!(await page.locator('[data-plan-views]:visible').count())) {
-      const KEYS = { 'Check-ins': 'checkins', '12 Weeks': 'cycle', 'Goals across cycles': 'goals' }
+      const KEYS = { 'Check-ins': 'checkins', 'Goals across cycles': 'goals' }
       await page.goto(new URL(`/life/today/${current}?view=${KEYS[label] || label.toLowerCase()}`, page.url()).href)
     } else await page.locator('[data-plan-views]:visible').first().getByText(label, { exact: true }).click()
     await page.waitForLoadState('networkidle')
