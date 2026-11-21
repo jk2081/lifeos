@@ -1,6 +1,6 @@
 # Life OS: the product direction (from 20 November 2026)
 
-This file is the target design from 20 November 2026 onwards. Where it differs from `SPEC.md` or the "target design" paragraph in `ROADMAP.md`, this file wins. Where a GitHub issue differs from this file, the issue wins. Mockups for it are in `mockups/v2/` (PNG plus the HTML each was rendered from in `mockups/v2/source/`).
+This file is the target design from 20 November 2026 onwards. Where it differs from `docs/history/SPEC.md` or the "target design" paragraph in `docs/history/ROADMAP.md`, this file wins. Where a GitHub issue differs from this file, the issue wins. Mockups for it are in `mockups/v2/` (PNG plus the HTML each was rendered from in `mockups/v2/source/`).
 
 ## Who it is for
 

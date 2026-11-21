@@ -1,6 +1,6 @@
 # Working on a GitHub issue
 
-From 20 November 2026, build work comes from GitHub issues in `jk2081/lifeos`, not from `UX_FIXES_<n>.md` briefs. `scripts/run-issues.sh` works through them one at a time. These rules apply to every issue. The issue's own text wins where it differs.
+From 20 November 2026, build work comes from GitHub issues in `jk2081/lifeos`, not from the old build-set briefs (now in `docs/history/`). `scripts/run-issues.sh` works through them one at a time. These rules apply to every issue. The issue's own text wins where it differs.
 
 ## Before you start
 

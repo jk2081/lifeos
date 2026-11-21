@@ -3,7 +3,7 @@
 A personal operating system on Frappe v16: inbox and review, tasks, calendar, a journal that mirrors a paper journal, areas and projects, a library, a vault, and a chat log. Agents capture and propose; the owner approves.
 
 - The app is `lifeos`, served at `/life`. It needs Frappe Framework v16 and nothing else (no ERPNext). It installs beside Folio and touches none of its DocTypes.
-- `SPEC.md` is the build spec. `DECISIONS.md` lists every default and every difference from it. `STATUS.md` says what works, what is stubbed and what is untested.
+- `docs/DIRECTION.md` is the target design; work comes from GitHub issues (`docs/BUILDING.md`). The original build spec is `docs/history/SPEC.md`. `DECISIONS.md` lists every default and every difference from it. `STATUS.md` says what works, what is stubbed and what is untested.
 - This repository holds the owner's personal goals as seed data. Keep it private.
 
 ## Install on an existing bench
@@ -106,7 +106,7 @@ node tools/acceptance.mjs                         # walks the acceptance list of
 | `agent/SKILL.md`, `agent/fake_agent.py` | Instructions for a real agent, and the test agent |
 | `mockups/` | The approved screen mockups |
 | `scripts/gen_doctypes.py` | Regenerates the DocType JSON from one table |
-| `scripts/start-build.sh`, `START_PROMPT.md`, `CONTINUE_PROMPT.md`, `CLAUDE.md` | The unattended build that produced this app |
+| `scripts/run-issues.sh`, `docs/BUILDING.md`, `docs/ISSUE_RULES.md`, `CLAUDE.md` | How the app is built: GitHub issues, one at a time |
 
 ## API
 
