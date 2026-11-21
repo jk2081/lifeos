@@ -2,13 +2,13 @@
 
 # Every lifeos DocType that carries a `space` field.
 SPACE_DOCTYPES = [
-	"Life Area", "Life Project", "Life Tag", "Life Dimension", "Life Person",
+	"Life Area", "Life Project", "Life Dimension", "Life Person",
 	"Life Inbox Item", "Life Proposal", "Life Task", "Life Important Date",
 	"Life Cycle", "Life Goal", "Life Month Plan", "Life Habit", "Life Habit Log",
 	"Life Check-in", "Life Journal Page", "Life Note", "Life Vault Document",
 	"Life Chat Log", "Life Link", "Life Index", "Life Action Log",
 	"Life Wiki Change", "Life Connection",
-	"Life Idea", "Life Insight",
+	"Life Insight",
 	"Life Goal Reading", "Life Exit",
 	"Life Review", "Life Meeting Link",
 ]

@@ -1,5 +1,5 @@
 """Inbox items left too long (set 7). A rule in Settings > Your life > Reset rules says what happens to items To Review (and
-New items no agent has claimed) older than N days: Suggest a decision for each (the default, after 7 days), Park them as ideas
+New items no agent has claimed) older than N days: Suggest a decision for each (the default, after 7 days), Park them in Someday
 in Someday, or Discard them to the trash (after 14 days). A nightly job applies it. Items an agent is processing, and Failed
 items, are never acted on. Parking and discarding record their Outbox exits with `auto_rule`, which Today's line and its Undo
 (for seven days) read."""
@@ -118,15 +118,15 @@ def accept(doc):
 
 
 def park(doc, auto=False):
-	"""Park as an idea in Someday: an idea with the item's title and summary, citing it; pending proposals are rejected and the
+	"""Park in Someday: a note marked Someday with the item's title and summary, citing it; pending proposals are rejected and the
 	item leaves the Inbox (the Outbox records it as Parked)."""
 	from lifeos.api import review, someday
 
 	before = doc.status
-	idea = frappe.get_doc({"doctype": "Life Idea", "space": doc.space, "title": (doc.title or "Parked capture")[:140], "area": doc.area or None,
-		"body_md": doc.summary_md or (doc.raw_text or "")[:4000] or None, "source_doctype": "Life Inbox Item", "source_name": doc.name, "status": "Someday",
+	parked = frappe.get_doc({"doctype": "Life Note", "space": doc.space, "title": (doc.title or "Parked capture")[:140], "area": doc.area or None,
+		"content_md": doc.summary_md or (doc.raw_text or "")[:4000] or "", "inbox_item": doc.name, "is_someday": 1,
 		"someday_on": today(), "someday_review_on": someday.review_date(), "someday_note": "Parked from the Inbox after it waited too long." if auto else None})
-	idea.insert()
+	parked.insert()
 	pending = frappe.get_all("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name")
 	doc.flags.auto_rule = RULE if auto else None
 	if pending and doc.status == "To Review":
@@ -138,7 +138,7 @@ def park(doc, auto=False):
 		doc.flags.auto_rule = RULE if auto else None
 	doc.status, doc.finished_on = "Done", today()
 	doc.save()
-	return {"op": "unpark", "item": doc.name, "idea": idea.name, "status": before, "proposals": pending}
+	return {"op": "unpark", "item": doc.name, "note": parked.name, "status": before, "proposals": pending}
 
 
 def discard(doc, auto=False):
@@ -185,12 +185,12 @@ def undo(log):
 			if dd:
 				trash.restore(dd)
 		elif kind == "unpark":
-			idea = op.get("idea")
-			if isinstance(idea, str) and frappe.db.exists("Life Idea", idea):
-				permissions.get_doc_checked("Life Idea", idea, "delete")
-				frappe.local.lifeos_no_exit = True  # the idea was only the item's parking place: no Discarded exit for it
+			note = op.get("note")
+			if isinstance(note, str) and frappe.db.exists("Life Note", note):
+				permissions.get_doc_checked("Life Note", note, "delete")
+				frappe.local.lifeos_no_exit = True  # the note was only the item's parking place: no Discarded exit for it
 				try:
-					frappe.delete_doc("Life Idea", idea, ignore_permissions=True, delete_permanently=True)
+					frappe.delete_doc("Life Note", note, ignore_permissions=True, delete_permanently=True)
 				finally:
 					frappe.local.lifeos_no_exit = False
 			doc = _reopen(item, op.get("status") or "To Review")
@@ -242,9 +242,9 @@ def undo_auto(space):
 	log = []
 	for name in got["items"]:
 		if frappe.db.exists("Life Inbox Item", name):
-			idea = frappe.db.get_value("Life Idea", {"source_doctype": "Life Inbox Item", "source_name": name, "status": "Someday"})
+			note = frappe.db.get_value("Life Note", {"inbox_item": name, "is_someday": 1})
 			props = frappe.get_all("Life Proposal", filters={"inbox_item": name, "status": "Rejected"}, pluck="name")
-			log.append({"op": "unpark", "item": name, "idea": idea, "status": "To Review" if props else "New", "proposals": props})
+			log.append({"op": "unpark", "item": name, "note": note, "status": "To Review" if props else "New", "proposals": props})
 		else:
 			log.append({"op": "restore", "item": name})
 	undo(log)

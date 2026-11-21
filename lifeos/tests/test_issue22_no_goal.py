@@ -18,7 +18,7 @@ class TestNoGoal(LifeTestCase):
 		return [t["name"] for g in res["groups"] for t in g["tasks"]]
 
 	def test_tasks_with_no_goal_by_area_and_the_count(self):
-		g = self.make("Life Goal", title="i22 goal", area=self.career, goal_type="Open").name
+		g = self.make("Life Goal", title="i22 goal", area=self.career, horizon="Long term").name
 		a = self.make("Life Task", title="i22 a", area=self.career).name
 		b = self.make("Life Task", title="i22 b", area=self.health, status="Waiting", waiting_on="Rao").name
 		self.make("Life Task", title="i22 has goal", area=self.career, goal=g)
@@ -59,7 +59,7 @@ class TestNoGoal(LifeTestCase):
 		other = self.make("Life Task", title="i22 other", area=self.career).name
 		out = tasks.make_goal(ts, space=PRIVATE, area=self.career)
 		goal = frappe.get_doc("Life Goal", out["goal"])
-		self.assertEqual((goal.area, goal.goal_type, goal.outcome), (self.career, "Open", "In Progress"))
+		self.assertEqual((goal.area, goal.horizon, goal.outcome), (self.career, "Long term", "In Progress"))
 		self.assertEqual(frappe.db.count("Life Goal", {"space": PRIVATE}), 1)
 		for t in ts:
 			self.assertEqual(frappe.db.get_value("Life Task", t, "goal"), goal.name)

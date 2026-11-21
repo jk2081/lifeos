@@ -79,7 +79,7 @@
     <GoalDrawer :goal="goalName" :d="detail" :focus="focus" @close="goalName = null" @save="save" @skip="skip" @unskip="unskip" @star="starFrom" @changed="reload" />
     <Drawer :open="othersOpen" name="other-goals" title="Other goals in progress" sub="Planning one adds it to this week's rows." @close="othersOpen = false">
       <div v-for="o in t?.others.rows || []" :key="o.goal" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-other-goal>
-        <div class="min-w-0 flex-1"><div class="truncate text-base text-ink-gray-9">{{ o.title }}</div><div class="text-sm text-ink-gray-6">{{ o.goal_type }}</div></div>
+        <div class="min-w-0 flex-1"><div class="truncate text-base text-ink-gray-9">{{ o.title }}</div><div class="text-sm text-ink-gray-6">{{ o.horizon }}</div></div>
         <Button size="sm" label="Plan" data-other-goal-plan @click="addOther(o)" />
       </div>
     </Drawer>

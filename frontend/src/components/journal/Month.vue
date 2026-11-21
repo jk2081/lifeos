@@ -12,10 +12,10 @@
       <section>
         <SectionHead>Goals <span class="font-normal text-ink-gray-6">{{ doneCount }} of {{ d.plan.goals.length }} done</span></SectionHead>
         <Card flush>
-          <Row v-for="g in d.plan.goals" :key="g.row" class="!items-center">
+          <Row v-for="(g, i) in d.plan.goals" :key="g.row" class="!items-center" data-month-goal>
             <Checkbox :model-value="g.status === 'Done'" :disabled="!canWrite() || g.status === 'Carried'" :aria-label="'Done: ' + g.title"
               @update:model-value="setGoal(g, { status: g.status === 'Done' ? 'Open' : 'Done' })" />
-            <Badge class="min-w-[26px] justify-center" :label="g.priority || '·'" />
+            <span class="w-5 flex-none text-center text-sm tabular-nums text-ink-gray-6" aria-hidden="true">{{ i + 1 }}</span>
             <div class="min-w-0 flex-1">
               <div class="break-words text-base-medium" :class="g.status === 'Done' || g.status === 'Dropped' ? 'text-ink-gray-6 line-through' : g.status === 'Carried' ? 'text-ink-gray-6' : 'text-ink-gray-9'">
                 {{ g.title }}<Tooltip v-if="g.status === 'Carried'" text="Carried to next month"><span> →</span></Tooltip></div>
@@ -24,9 +24,8 @@
             </div>
             <Dropdown v-if="canWrite()" :options="goalMenu(g)"><Button variant="ghost" icon="lucide-ellipsis" :label="'Actions for ' + g.title" /></Dropdown>
           </Row>
-          <Empty v-if="!d.plan.goals.length" title="No goals this month." hint="Add what you want done this month, with a priority from I to IV." />
+          <Empty v-if="!d.plan.goals.length" title="No goals this month." hint="Add what you want done this month. The order is your priority." />
           <Row v-if="canWrite()">
-            <Select v-model="newPriority" class="w-16 flex-none" :options="PRIORITY" aria-label="Priority" />
             <TextInput v-model="newGoal" class="min-w-0 flex-1" placeholder="Add a goal for the month" aria-label="New goal" @keydown.enter="addGoal" />
           </Row>
         </Card>
@@ -65,7 +64,7 @@
 <script setup>
 import { openRef } from '@/lib/pane'
 import { computed, onMounted, ref } from 'vue'
-import { Badge, Button, Checkbox, Dropdown, Progress, Select, Textarea, TextInput, Tooltip, dialog, toast } from 'frappe-ui'
+import { Button, Checkbox, Dropdown, Progress, Textarea, TextInput, Tooltip, dialog, toast } from 'frappe-ui'
 import Md from '@/components/Md.vue'
 import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
@@ -76,13 +75,11 @@ import { canWrite, store } from '@/lib/store'
 import { MONTHS, long, parse } from '@/lib/dates'
 
 const emit = defineEmits(['sub'])
-const PRIORITY = [{ label: '–', value: '' }, 'I', 'II', 'III', 'IV']
 const now = parse(store.today)
 const year = ref(now.getFullYear())
 const month = ref(now.getMonth() + 1)
 const d = ref(null)
 const newGoal = ref('')
-const newPriority = ref('')
 const editing = ref(false)
 const sweep = ref('')
 const saveState = ref('')
@@ -109,7 +106,7 @@ async function addGoal() {
   const title = newGoal.value.trim()
   if (!title) return
   newGoal.value = ''
-  const res = await tryCall(() => api('journal.save_month_goal', { plan: d.value.plan.name, title, priority: newPriority.value || '' }))
+  const res = await tryCall(() => api('journal.save_month_goal', { plan: d.value.plan.name, title }))
   if (res) d.value.plan = res
 }
 function goalMenu(g) {
@@ -125,7 +122,9 @@ function goalMenu(g) {
     } })
     items.push({ label: 'Drop', onClick: () => setGoal(g, { status: 'Dropped' }) })
   } else if (g.status !== 'Carried') items.push({ label: 'Open again', onClick: () => setGoal(g, { status: 'Open' }) })
-  for (const p of ['I', 'II', 'III', 'IV']) if (p !== g.priority) items.push({ label: `Priority ${p}`, onClick: () => setGoal(g, { priority: p }) })
+  const at = d.value.plan.goals.indexOf(g)
+  if (at > 0) items.push({ label: 'Move up', onClick: () => setGoal(g, { move: -1 }) })
+  if (at < d.value.plan.goals.length - 1) items.push({ label: 'Move down', onClick: () => setGoal(g, { move: 1 }) })
   items.push({ label: 'Rename', onClick: () => rename(g) })
   items.push({ label: 'Remove', onClick: () => setGoal(g, { delete: 1 }) })
   return items

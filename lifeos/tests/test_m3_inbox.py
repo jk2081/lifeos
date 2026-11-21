@@ -1,7 +1,7 @@
 import frappe
 from frappe.utils import add_to_date, now_datetime, today
 
-from lifeos import proposals
+from lifeos import journal, proposals
 from lifeos.api import inbox, meta, review
 from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED, LifeTestCase
 
@@ -91,18 +91,6 @@ class TestInboxPipeline(InboxCase):
 		self.assertIn("required", out["errors"][3]["error"])
 		self.assertEqual(out["status"], "To Review")
 		self.assertEqual(frappe.db.count("Life Proposal", {"inbox_item": claimed["name"]}), 2)
-
-	def test_only_one_new_tag_per_item(self):
-		self.as_user(OWNER)
-		self.make("Life Tag", tag_name="audit")
-		claimed = self.claim(title="Tags")
-		out = inbox.submit_result(claimed["name"], summary_md="s", proposals=[
-			{"kind": "Note", "payload": {"title": "A", "tags": ["audit", "brand new"]}},
-			{"kind": "Note", "payload": {"title": "B", "tags": ["brand new"]}},
-			{"kind": "Note", "payload": {"title": "C", "tags": ["second new"]}},
-		])
-		self.assertEqual(len(out["created"]), 2)
-		self.assertIn("one new tag", out["errors"][0]["error"])
 
 	def test_fail_and_retry(self):
 		claimed = self.claim(title="Broken scan")
@@ -243,12 +231,12 @@ class TestReview(InboxCase):
 		claimed = self.claim(title="Everything", source_type="Journal Photo")
 		attach("Life Inbox Item", claimed["name"], "page-187.png", b"\x89PNG fake")
 		out = inbox.submit_result(claimed["name"], transcript_md="Goal Oct to Dec", summary_md="s", proposals=[
-			{"kind": "Task", "payload": {"title": "Visit leased gardens", "area": "Tea", "goal": "Close open loops", "priority": "I", "tags": ["estate"]}},
+			{"kind": "Task", "payload": {"title": "Visit leased gardens", "area": "Tea", "goal": "Close open loops", "priority": "I"}},
 			{"kind": "Event", "payload": {"subject": "Golf round", "starts_on": "2026-11-14 07:00:00"}},
 			{"kind": "Important Date", "payload": {"title": "Ruchi", "day": 14, "month": 1, "kind": "Birthday", "person": "Ruchi"}},
 			{"kind": "Note", "payload": {"title": "New crops by estate", "content_md": "pepper", "area": "Tea", "also_in": ["Money"]}},
 			{"kind": "Vault Document", "payload": {"title": "Driving licence", "doc_type": "ID", "expiry_date": "2026-12-12", "number_last4": "4821", "area": "Personal", "holder": "Ruchi"}},
-			{"kind": "Month Goal", "payload": {"title": "GHL visit", "year": 2033, "month": 2, "priority": "I", "area": "Tea"}},
+			{"kind": "Month Goal", "payload": {"title": "GHL visit", "year": 2033, "month": 2, "area": "Tea"}},
 			{"kind": "Habit Log", "payload": {"habit": "Japa", "date": "2026-11-13"}},
 			{"kind": "Check-in", "payload": {"date": "2026-11-14", "scores": [{"dimension": "Money", "habits": "2-3", "situation": 7, "note": "PMS"}], "reflection_md": "ok"}},
 			{"kind": "Week Tick", "payload": {"goal": "Close open loops", "action": "Anya passport", "mark_done": True}},
@@ -263,7 +251,6 @@ class TestReview(InboxCase):
 
 		task = frappe.get_doc("Life Task", made["Task"].created_name)
 		self.assertEqual((task.goal, task.priority, task.inbox_item), (goal.name, "I", claimed["name"]))
-		self.assertEqual(frappe.db.get_value("Life Tag", task.tags[0].tag, "tag_name"), "estate")
 		event = frappe.get_doc("Event", made["Event"].created_name)
 		self.assertEqual((event.subject, event.life_space, event.event_type), ("Golf round", PRIVATE, "Public"))
 		date = frappe.get_doc("Life Important Date", made["Important Date"].created_name)
@@ -273,9 +260,8 @@ class TestReview(InboxCase):
 		vault = frappe.get_doc("Life Vault Document", made["Vault Document"].created_name)
 		self.assertEqual((vault.number_last4, str(vault.expiry_date), vault.holder), ("4821", "2026-12-12", person.name))
 		self.assertTrue(vault.file)
-		self.assertEqual(made["Month Goal"].created_doctype, "Life Month Plan")
-		plan = frappe.get_doc("Life Month Plan", f"{PRIVATE}-2033-02")
-		self.assertEqual([(g.title, g.priority) for g in plan.goals], [("GHL visit", "I")])
+		self.assertEqual(made["Month Goal"].created_doctype, "Life Goal")
+		self.assertEqual([(g["title"], g["status"]) for g in journal.month_goals(PRIVATE, 2033, 2)], [("GHL visit", "Open")])
 		self.assertTrue(frappe.db.exists("Life Habit Log", {"habit": habit.name, "date": "2026-11-13", "done": 1}))
 		checkin = frappe.get_doc("Life Check-in", made["Check-in"].created_name)
 		self.assertEqual((checkin.scores[0].habits_low, checkin.scores[0].habits_high, checkin.scores[0].situation_low), (2, 3, 7))

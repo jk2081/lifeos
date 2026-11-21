@@ -37,7 +37,7 @@ class TestAllTasks(LifeTestCase):
 		self.assertEqual(tasks.count(PRIVATE, status="open"), 4)
 
 	def test_goal_and_due_date_regroup_the_same_tasks(self):
-		g = self.make("Life Goal", title="i21 goal", area=self.career, goal_type="Open").name
+		g = self.make("Life Goal", title="i21 goal", area=self.career, horizon="Long term").name
 		self.make("Life Task", title="i21 g", area=self.career, goal=g, due_date=today())
 		self.make("Life Task", title="i21 late", area=self.health, due_date=add_days(today(), -2))
 		self.make("Life Task", title="i21 undated", area=self.health)

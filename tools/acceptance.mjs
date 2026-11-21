@@ -443,7 +443,7 @@ await check(11, 'A second user who is only in Shared sees nothing from Private, 
     const own = JSON.stringify(await fam.api(m, args)) || ''
     must(!own.includes(stamp) && !own.includes('Ruchi ITR') && !own.includes('Japa'), `${m} leaks Private records`)
   }
-  const privateGoal = (await owner.api('goals.list', { space: SPACE, goal_type: 'Open', page_length: 1 })).goals[0].name
+  const privateGoal = (await owner.api('goals.list', { space: SPACE, horizon: 'Long term', page_length: 1 })).goals[0].name
   for (const [m, args] of [['inbox.get', { item: photoItem }], ['goals.get', { goal: privateGoal }], ['goals.completion_info', { goal: privateGoal }],
     ['links.backlinks', { doctype: 'Life Inbox Item', name: photoItem }]]) {
     must((await fam.api(m, args, { raw: true })).status() === 403, `${m} is readable`)
@@ -488,12 +488,12 @@ await check(12, 'At review, change the area with one tap and add a second: the r
 await check(13, 'Tea & Coffee in the lens: Plan and Library show its open-ended goals, tasks, notes and chats together', async () => {
   // set 6: what the area page held is what the places show with the area in the lens
   const tea = areaId('Tea & Coffee')
-  const goals = (await owner.api('goals.list', { space: SPACE, area: tea, goal_type: 'Open' })).goals
+  const goals = (await owner.api('goals.list', { space: SPACE, area: tea, horizon: 'Long term' })).goals
   const tasks = (await owner.api('tasks.list', { space: SPACE, area: tea, page_length: 5 })).tasks
   const notes = (await owner.api('library.list', { space: SPACE, area: tea, collection: 'all', page_length: 1 })).notes
   const chats = (await owner.api('sources.list', { space: SPACE, area: tea, tab: 'chats', page_length: 1 })).sources
   must(goals.length && tasks.length && notes.length && chats.length, `goals ${goals.length}, tasks ${tasks.length}, notes ${notes.length}, chats ${chats.length}`)
-  for (const [p, title] of [[`/life/goals?type=Open&area=${tea}`, goals[0].title], [`/life/goals/tasks?view=list&area=${tea}`, tasks[0].title],
+  for (const [p, title] of [[`/life/goals?type=Long+term&area=${tea}`, goals[0].title], [`/life/goals/tasks?view=list&area=${tea}`, tasks[0].title],
     [`/life/library/notes?view=list&area=${tea}`, notes[0].title], [`/life/library/chats?tab=chats&view=list&area=${tea}`, chats[0].title]]) {
     await owner.open(p)
     must((await owner.page.locator('[data-main]').innerText()).includes(title), `${p} does not show ${title}`)
@@ -514,7 +514,7 @@ await check(14, 'Timeline shows everything captured on one day', async () => {
 })
 
 await check(15, 'Complete an open-ended goal (a project before set 6): it and its records move to Archive. Restore it', async () => {
-  const g = await owner.api('goals.create', { space: SPACE, title: `Open goal ${stamp}`, goal_type: 'Open', area: areaId('Learning') })
+  const g = await owner.api('goals.create', { space: SPACE, title: `Open goal ${stamp}`, horizon: 'Long term', area: areaId('Learning') })
   const task = await owner.api('tasks.quick_add', { text: `Goal task ${stamp}`, space: SPACE, goal: g.name })
   const info = await owner.api('goals.completion_info', { goal: g.name })
   must(info.records >= 1, 'the confirm dialog has no count')
@@ -669,7 +669,7 @@ const STATE_TABS = [
   ['Tasks', '/life/goals/tasks', 'status', ['open', 'loops', 'Waiting', 'Done', 'Someday', 'all'], `area=${uxArea}`],
   ['Goals', '/life/goals', 'status', ['in_progress', 'achieved', 'closed', 'someday', 'all'], `area=${uxArea}`],
   ['Archive', '/life/library/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'Life Journal Page', 'trash'], `area=${uxArea}`],
-  ['Someday', '/life/goals/someday', 'tab', ['all', 'due', 'tasks', 'goals', 'ideas'], `area=${uxArea}`],
+  ['Someday', '/life/goals/someday', 'tab', ['all', 'due', 'tasks', 'goals', 'notes'], `area=${uxArea}`],
   ['Captures', '/life/brain/captures', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
   ['All', '/life/library', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
 ]
@@ -1192,7 +1192,7 @@ for (const width of UX_WIDTHS) {
     const problems = []
     try {
     // set 6: Me, Your life, Assistant, People and agents, Data
-    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'cost',
+    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'connections', 'ai', 'cost',
       'sensitive', 'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'places', 'backups']
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
@@ -1215,20 +1215,8 @@ for (const width of UX_WIDTHS) {
       must(!/Life (Agent|User|Admin)|Administrator/.test(text), `${sec}: a role name or Administrator shows`)
     }
     // areas (issue 12): Settings > Areas lists the seven with their parts; a part is renamed in its Edit dialog and archived
-    // there, its open tasks moving to the place chosen. Rename in place stays for tags (and habits and dimensions).
-    step = 'tags: rename in place'
-    const T = `ux3tag${width}${stamp}`
-    const tagId = (await s.api('settings.save_item', { kind: 'tag', space: SPACE, title: T })).name
+    // there, its open tasks moving to the place chosen. Rename in place stays for habits and dimensions.
     const got = async () => (await s.api('settings.get', { space: SPACE }))
-    try {
-      await s.open('/life/settings?tab=tags')
-      await pg.locator(`[data-settings-list="tag"] [data-row-name="${tagId}"] [data-row-title]`).click()
-      await pg.keyboard.press('ControlOrMeta+a')
-      await pg.keyboard.type(T + 'x')
-      await pg.keyboard.press('Enter')
-      await pg.waitForTimeout(900)
-      must((await got()).tags.find((x) => x.name === tagId).tag_name === T + 'x', 'rename in place did not save')
-    } finally { await s.api('settings.save_item', { kind: 'tag', name: tagId, delete: 1 }).catch(() => {}) }
     step = 'areas: rename a part in its Edit dialog'
     const A = `UX3 area A ${width} ${stamp}`
     const B = `UX3 area B ${width} ${stamp}`
@@ -1242,11 +1230,11 @@ for (const width of UX_WIDTHS) {
     await pg.waitForTimeout(900)
     must((await got()).areas.find((x) => x.name === a).area_name === A + ' renamed', 'renaming a part did not save')
     must(await pg.locator(`[data-parts-of="Career"] [data-part="${a}"]`).innerText().then((t) => t.includes(A + ' renamed')), 'the renamed part does not show under Career')
-    // no Delete or Remove for areas, tags, habits or dimensions
-    step = 'no Delete or Remove for areas, tags, habits or dimensions'
+    // no Delete or Remove for areas, habits or dimensions
+    step = 'no Delete or Remove for areas, habits or dimensions'
     const itemsOf = async (n) => { await pg.locator(`[data-row-name="${n}"] [data-row-menu]`).click(); await pg.waitForTimeout(250); const t = await pg.getByRole('menuitem').allInnerTexts(); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); return t.map((x) => x.trim()) }
     must(!(await pg.locator('[data-areas-section]').getByRole('button', { name: /^(Delete|Remove)$/ }).count()), 'areas: a Delete or Remove button')
-    for (const sec of ['tags', 'habits', 'dimensions']) {
+    for (const sec of ['habits', 'dimensions']) {
       await s.open(`/life/settings?tab=${sec}`)
       const first = pg.locator('[data-settings-list] [data-row-name]').first()
       if (await first.count()) { const t = await itemsOf(await first.getAttribute('data-row-name')).catch(() => []); must(!t.some((x) => /Delete|Remove/.test(x)), `${sec}: ${t}`) }
@@ -1416,10 +1404,10 @@ for (const width of UX_WIDTHS) {
       await pg.locator('[data-nav-capture]').click()
       await settle()
       const entries = (await pg.locator('[role="dialog"] button').allInnerTexts()).map((x) => x.trim()).filter(Boolean)
-      for (const e of ['Add as a task', 'Send to the Brain', 'Files or a photo', 'Goal', 'Note', 'Idea for Someday']) must(entries.includes(e), `the capture sheet has no ${e}: ${entries}`)
+      for (const e of ['Add as a task', 'Send to the Brain', 'Files or a photo', 'Goal', 'Note', 'Park on Someday']) must(entries.includes(e), `the capture sheet has no ${e}: ${entries}`)
       await pg.keyboard.press('Escape')
       for (const [kind, ok] of [['goal', async () => pg.getByRole('dialog', { name: 'New goal' }).isVisible()], ['note', async () => pg.getByRole('dialog', { name: 'New note' }).isVisible()],
-        ['idea', async () => pg.getByRole('dialog', { name: 'New idea' }).isVisible()], ['files', async () => pg.locator('[data-capture-files]').isVisible()]]) {
+        ['someday', async () => pg.getByRole('dialog', { name: 'Park on Someday' }).isVisible()], ['files', async () => pg.locator('[data-capture-files]').isVisible()]]) {
         await s.open('/life')
         await pg.locator('[data-nav-capture]').click()
         await settle()
@@ -1441,8 +1429,8 @@ for (const width of UX_WIDTHS) {
   await check(`${tag}.14`, `${width} px: goals of every type: task figure, archive keeps it, tabs, score blank, add to a cycle, family sees none`, async () => {
     let step = 'start'
     try {
-    const open = await s.api('goals.create', { title: `UX3 open goal ${width} ${stamp}`, goal_type: 'Open', space: SPACE, area: uxArea })
-    const annual = await s.api('goals.create', { title: `UX3 annual goal ${width} ${stamp}`, goal_type: 'Annual', space: SPACE, area: uxArea, target_date: addDays(200) })
+    const open = await s.api('goals.create', { title: `UX3 open goal ${width} ${stamp}`, horizon: 'Long term', space: SPACE, area: uxArea })
+    const annual = await s.api('goals.create', { title: `UX3 annual goal ${width} ${stamp}`, horizon: 'Year', space: SPACE, area: uxArea, target_date: addDays(200) })
     const ts = []
     for (const i of [1, 2, 3]) ts.push(await s.api('tasks.quick_add', { text: `UX3 goal task ${i} ${width} ${stamp}`, space: SPACE, goal: open.name }))
     await s.api('tasks.set_status', { task: ts[0].name, status: 'Done' })
@@ -1536,7 +1524,7 @@ for (const width of UX_WIDTHS) {
       ['task:' + one('Life Task', 'is_archived=0'), ['Details', 'Notes', 'Links']],
       ['note:' + parent, ['Note', 'Notes under this one', 'Links']],
       ['note:' + leaf, ['Note', 'Links']],
-      ['goal:' + one('Life Goal', "goal_type='12 Week Year'"), null], // Actions, Tasks, History across cycles, Links
+      ['goal:' + one('Life Goal', "horizon='12 weeks'"), null], // Actions, Tasks, History across cycles, Links
       ['goal:' + ux.goal, ['Tasks', 'Links']], // an open-ended goal (a project before set 6) has no actions
       ['project:' + ux.project, ['Tasks', 'Links']], // a link to a project opens the goal it became
       ['chat:' + one('Life Chat Log', "is_archived=0 and ifnull(transcript_md, '')=''"), ['Summary', 'Open items', 'Made from this', 'Links']],
@@ -1840,10 +1828,10 @@ while d <= last:
   await check(`${tag}.35`, `${width} px: Someday: a task, an open-ended goal (a project before set 6) with two tasks, a goal and an idea leave Today, Tasks and the Open counts and keep their creation dates; due for review after the date, also in Reset; Bring back with a date; Purge to the trash and Restore`, async () => {
     const before = (await s.api('counts.get', { space: SPACE })).open_tasks.n
     const t = await s.api('tasks.quick_add', { text: S5('someday task'), space: SPACE, area: uxArea, due_date: today })
-    const p = await s.api('goals.create', { space: SPACE, title: S5('someday project'), goal_type: 'Open', area: uxArea })
+    const p = await s.api('goals.create', { space: SPACE, title: S5('someday project'), horizon: 'Long term', area: uxArea })
     const pt = []
     for (let i = 0; i < 2; i++) pt.push(await s.api('tasks.quick_add', { text: S5('someday project task ' + i), space: SPACE, area: uxArea, goal: p.name }))
-    const g = await s.api('goals.create', { space: SPACE, title: S5('someday goal'), goal_type: 'Open', area: uxArea })
+    const g = await s.api('goals.create', { space: SPACE, title: S5('someday goal'), horizon: 'Long term', area: uxArea })
     const created = (await s.api('frappe.client.get_value', { doctype: 'Life Task', filters: { name: t.name }, fieldname: 'creation' })).creation
     // the task is parked from its pane, the rest through the API the screens call
     await s.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%${S5('someday task')}%`]]))}`)
@@ -1853,7 +1841,7 @@ while d <= last:
     await pg.waitForTimeout(900)
     await s.api('someday.park', { doctype: 'Life Goal', name: p.name })
     await s.api('someday.park', { doctype: 'Life Goal', name: g.name })
-    const idea = await s.api('someday.create_idea', { title: S5('someday idea'), space: SPACE, area: uxArea })
+    const idea = await s.api('someday.create', { title: S5('someday idea'), space: SPACE, area: uxArea, as_note: 1 })
     must((await tasksLike(S5('someday task')))[0].status === 'Someday', 'the pane did not park the task')
     must((await s.api('counts.get', { space: SPACE })).open_tasks.n === before, 'the parked tasks are still in the Open count')
     must((await s.api('frappe.client.get_value', { doctype: 'Life Task', filters: { name: t.name }, fieldname: 'creation' })).creation === created, 'parking changed the creation date')
@@ -1879,18 +1867,18 @@ while d <= last:
     await s.api('someday.bring_back', { doctype: 'Life Task', name: t2.name, due_date: addDays(3) })
     const dated = (await s.api('tasks.list', { space: SPACE, status: 'open', filters: JSON.stringify([['title', 'like', `%${S5('someday dated')}%`]]) })).tasks
     must(dated.length === 1 && dated[0].due_date === addDays(3), 'a task brought back with a date is not in Tasks with that date')
-    // Purge the idea to the trash, then Restore it from the Archive's Trash tab
-    await s.open('/life/goals/someday?tab=ideas')
+    // Purge the Someday note to the trash, then Restore it from the Archive's Trash tab
+    await s.open('/life/goals/someday?tab=notes')
     await pg.locator(ROW, { hasText: S5('someday idea') }).locator('[data-purge]:visible').first().click()
     await settle()
     await pg.getByRole('dialog').getByRole('button', { name: 'Purge' }).click()
     await pg.waitForTimeout(900)
-    must(!(await s.api('frappe.client.get_count', { doctype: 'Life Idea', filters: { name: idea.name } })), 'Purge did not remove the idea')
+    must(!(await s.api('frappe.client.get_count', { doctype: 'Life Note', filters: { name: idea.name } })), 'Purge did not remove the note')
     await s.open('/life/library/archive?type=trash')
     await pg.locator(ROW, { hasText: S5('someday idea') }).locator('[data-trash-restore]:visible').first().click()
     await pg.waitForTimeout(900)
-    must(await s.api('frappe.client.get_count', { doctype: 'Life Idea', filters: { name: idea.name } }), 'Restore did not bring the idea back')
-    return 'task, open-ended goal with tasks, goal, idea'
+    must(await s.api('frappe.client.get_count', { doctype: 'Life Note', filters: { name: idea.name } }), 'Restore did not bring the note back')
+    return 'task, long-term goal with tasks, goal, note'
   })
 
   await check(`${tag}.36`, `${width} px: Reset: each rule batch finds its seeded items; a batch changes exactly those and Undo reverts; one by one with ${phone ? 'the buttons' : 'the keys'}; Delete then Restore from the trash; stuck tasks are the weekly review's Tasks tab`, async () => {
@@ -2405,7 +2393,7 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
       '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/brain/captures?tab=pages', '/life/library/timeline',
       '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
-      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'connections', 'ai', 'cost', 'sensitive',
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'connections', 'ai', 'cost', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
       if (area && p.includes('settings')) continue
@@ -2503,14 +2491,14 @@ await check('S6.1', 'Keyboard: G then T, I, O or L opens a place; the older G le
 
 await check('S6.2', 'Every old route lands on its new home with its query (section 2 of the brief; the homes of issue 14)', async () => {
   const pg = owner.page
-  const goal12 = (await owner.api('goals.list', { space: SPACE, goal_type: '12 Week Year', page_length: 1 })).goals[0].name
+  const goal12 = (await owner.api('goals.list', { space: SPACE, horizon: '12 weeks', page_length: 1 })).goals[0].name
   const jp = bench(`print(frappe.db.sql("select name from \`tabLife Journal Page\` where space='${SPACE}' limit 1")[0][0])`).split('\n').pop()
   const ROUTES = [
     ['/tasks?priority=I&view=list', '/goals/tasks', { priority: 'I', view: 'list' }],
     ['/goals?status=achieved', '/goals', { status: 'achieved' }],
-    ['/someday?tab=ideas', '/goals/someday', { tab: 'ideas' }],
-    ['/projects?status=On%20Hold', '/goals', { type: 'Open', status: 'in_progress' }],
-    ['/projects?status=Done', '/goals', { type: 'Open', status: 'achieved' }],
+    ['/someday?tab=notes', '/goals/someday', { tab: 'notes' }],
+    ['/projects?status=On%20Hold', '/goals', { type: 'Long term', status: 'in_progress' }],
+    ['/projects?status=Done', '/goals', { type: 'Long term', status: 'achieved' }],
     [`/projects/${ux.project}?tab=tasks`, `/goals/${ux.goal}`, { tab: 'tasks' }],
     ['/reset', '/today/week', { view: 'review', tab: 'tasks' }], // set 8: set 7's Reset step is the review's Tasks tab
     ['/calendar/week?date=2026-12-02', '/today/week', { view: 'calendar', date: '2026-12-02' }],
@@ -2566,7 +2554,7 @@ before = frappe.db.sql("select count(*) from \`tabLife Task\` where project=%s",
 print(json.dumps({"title": p.title, "goal": p.migrated_to, "unmoved": left, "had": before}))`).split('\n').pop())
   must(proj.goal === ux.goal, 'the project has no goal')
   const got = await owner.api('goals.get', { goal: ux.goal })
-  must(got.goal.title === proj.title && got.goal.goal_type === 'Open', `the goal is "${got.goal.title}" (${got.goal.goal_type}), the project was "${proj.title}"`)
+  must(got.goal.title === proj.title && got.goal.horizon === 'Long term', `the goal is "${got.goal.title}" (${got.goal.horizon}), the project was "${proj.title}"`)
   // the project's tasks are the goal's (the old column is left in the table: every task that had the project has the goal, or a goal that serves it)
   must(!proj.unmoved || proj.unmoved === 0, `${proj.unmoved} of the project's tasks are not under its goal`)
   await owner.open(`/life/projects/${ux.project}`)
@@ -2581,8 +2569,8 @@ print(json.dumps({"title": p.title, "goal": p.migrated_to, "unmoved": left, "had
   must(open > 0 && shown === open, `the Tasks tab lists ${shown}, the goal has ${open} open tasks`)
   must((await pg.locator('[data-tab-panel="tasks"]').innerText()).includes(`UX door task ${stamp}`), "the goal's tasks do not include this run's task")
   // serves and served by
-  const longer = await owner.api('goals.create', { space: SPACE, title: `S5 longer goal ${stamp}`, goal_type: 'Annual', target_date: addDays(300), area: uxArea })
-  const shorter = await owner.api('goals.create', { space: SPACE, title: `S5 shorter goal ${stamp}`, goal_type: 'Open', serves: longer.name, done_when: 'It is done.', area: uxArea })
+  const longer = await owner.api('goals.create', { space: SPACE, title: `S5 longer goal ${stamp}`, horizon: 'Year', target_date: addDays(300), area: uxArea })
+  const shorter = await owner.api('goals.create', { space: SPACE, title: `S5 shorter goal ${stamp}`, horizon: 'Long term', serves: longer.name, done_when: 'It is done.', area: uxArea })
   await owner.open(`/life/goals/${longer.name}`)
   must((await pg.locator('[data-goal-served-by]').innerText()).includes(`S5 shorter goal ${stamp}`), 'the longer goal does not list what serves it')
   await owner.open(`/life/goals/${shorter.name}`)
@@ -2695,7 +2683,7 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
 })
 
 await check('S6.6', 'The fake agent runs end to end with the goal-based API: tasks it proposes are filed under the open-ended goal of their area; project= still maps to the goal for one set', async () => {
-  const goals = (await owner.api('goals.list', { space: SPACE, goal_type: 'Open', area: uxArea })).goals.map((g) => g.name)
+  const goals = (await owner.api('goals.list', { space: SPACE, horizon: 'Long term', area: uxArea })).goals.map((g) => g.name)
   must(goals.length, 'Tea & Coffee has no open-ended goal')
   const item = await owner.api('inbox.create_item', { title: `S5 agent pdf ${stamp}.pdf`, space: SPACE, instruction: 'summarise and extract to-dos' })
   await owner.upload('Life Inbox Item', item.name, `s6-agent-${stamp}.pdf`, 'application/pdf', PDF)
@@ -2787,7 +2775,7 @@ for (const width of SET_WIDTHS) {
 
   await check(`${tag}.2`, `${width} px: the fake agent submits a Reading; it waits in the weekly review; Confirm updates the goal's current value and result bar`, async () => {
     const measure = `Yield ${W}`
-    const g = (await s.api('goals.create', { space: SPACE, title: `S7 yield goal ${W}`, goal_type: 'Open', area: areaId('Tea & Coffee'), measure_kind: 'Number',
+    const g = (await s.api('goals.create', { space: SPACE, title: `S7 yield goal ${W}`, horizon: 'Long term', area: areaId('Tea & Coffee'), measure_kind: 'Number',
       measure, unit: 'kg/ha', start_value: 1200, target_value: 1800 })).name
     await s.api('inbox.create_item', { space: SPACE, title: `S7 reading ${W}`, source_type: 'Message', raw_text: `${measure} this flush: 1640 kg/ha, up from last month.` })
     runAgent()
@@ -2813,7 +2801,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
   let action
   await check(`${tag}.3`, `${width} px: a 12-week goal serving a longer goal shows on both`, async () => {
     must(cycle, 'no active cycle')
-    const long = (await s.api('goals.create', { space: SPACE, title: `S7 long goal ${W}`, goal_type: 'Annual', target_date: addDays(200), area: areaId('Tea & Coffee'),
+    const long = (await s.api('goals.create', { space: SPACE, title: `S7 long goal ${W}`, horizon: 'Year', target_date: addDays(200), area: areaId('Tea & Coffee'),
       done_when: 'A new client signed' })).name
     const g = (await s.api('journal.save_goal', { cycle: cycle.name, title: `S7 cycle goal ${W}`, area: areaId('Tea & Coffee'), serves: long, measure_kind: 'Milestone',
       done_when: 'Ten pitches made', actions: [{ title: `S7 calls ${W}`, per_week: 4 }] })).goal
@@ -2894,8 +2882,8 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
 
   await check(`${tag}.6`, `${width} px: goal work planned the way Lock the week plans it makes a scheduled task that shows on Today and in the week calendar, and a delegated one that shows as Waiting`, async () => {
     // set 8: the cards of set 7's goal step became the review's Goals tab (checked by S8); here the same planning call
-    const a = (await s.api('goals.create', { space: SPACE, title: `S7 plan goal ${W}`, goal_type: 'Open', area: areaId('Personal'), done_when: 'Planned' })).name
-    const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, goal_type: 'Open', area: areaId('Personal'), done_when: 'Handed over' })).name
+    const a = (await s.api('goals.create', { space: SPACE, title: `S7 plan goal ${W}`, horizon: 'Long term', area: areaId('Personal'), done_when: 'Planned' })).name
+    const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, horizon: 'Long term', area: areaId('Personal'), done_when: 'Handed over' })).name
     const now = iso(new Date()) // the run may cross midnight
     const at = `${now} 23:${phone ? '30' : '00'}:00`
     const task = await s.api('week.add_goal_work', { goal: a, title: `S7 plan step ${W}`, scheduled_at: at, duration_min: 30, note: 'the soil report' })
@@ -2937,7 +2925,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
       await settle()
       const row = dlg.locator(`[data-old-item][data-item="${a}"]`)
       await row.getByRole('checkbox').click()
-      await pick(row, `Decision for S7 old suggest ${W}`, 'Park as an idea', 'data-old-item-decision')
+      await pick(row, `Decision for S7 old suggest ${W}`, 'Park in Someday', 'data-old-item-decision')
       await dlg.locator('[data-old-items-confirm]').click()
       await pg.waitForLoadState('networkidle')
       await settle()
@@ -3289,11 +3277,11 @@ frappe.set_user("Administrator")
 projects_into_goals.execute()
 frappe.set_user("owner@lifeos.test")
 migrated = frappe.db.get_value("Life Project", p.name, "migrated_to")
-number = goal("BF1 number ${W}", goal_type="Open", measure_kind="Number", measure="BF1 weight", unit="kg", start_value=84, target_value=78)
+number = goal("BF1 number ${W}", horizon="Long term", measure_kind="Number", measure="BF1 weight", unit="kg", start_value=84, target_value=78)
 readings.suggest(number, 81, excerpt="Weighed 81 kg this morning.", by="Agent")
-milestone = goal("BF1 milestone ${W}", goal_type="12 Week Year", cycle=cycle, measure_kind="Milestone", done_when="Signed")
+milestone = goal("BF1 milestone ${W}", horizon="12 weeks", cycle=cycle, measure_kind="Milestone", done_when="Signed")
 frappe.db.set_value("Life Goal", milestone, "done_when", None)
-nocycle = goal("BF1 no cycle ${W}", goal_type="12 Week Year", cycle=cycle)
+nocycle = goal("BF1 no cycle ${W}", horizon="12 weeks", cycle=cycle)
 frappe.db.set_value("Life Goal", nocycle, "cycle", None)
 t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "BF1 delegated ${W}", "goal": migrated, "area": area, "status": "Waiting",
     "waiting_on": "Ravi", "scheduled_at": str(add_days(now_datetime(), 1).replace(hour=11, minute=0, second=0, microsecond=0)), "duration_min": 30})
@@ -3862,7 +3850,7 @@ for (const width of SET_WIDTHS) {
       await s.open('/life')
       must((await lensLabels()).includes('Money'), 'Money is on but not in the lens')
       must((await pickerLabels()).includes('Money'), 'Money is on but not in the task area picker')
-      goal = (await s.api('goals.create', { title: `I12 goal in Money ${width} ${stamp}`, goal_type: 'Open', space: SPACE, area: (await lifeArea('Money')).name })).name
+      goal = (await s.api('goals.create', { title: `I12 goal in Money ${width} ${stamp}`, horizon: 'Long term', space: SPACE, area: (await lifeArea('Money')).name })).name
       const listed = async () => (await s.api('goals.list', { space: SPACE, page_length: 100, area: (await lifeArea('Money')).name }).catch(() => ({ goals: [] }))).goals.some((g) => g.name === goal)
       must(await listed(), 'the new goal in Money is not listed')
       await areasPage()
@@ -4099,7 +4087,7 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
         return `${n}`
       })
       await check(`${tag}.4`, `${width} px: every route of the old router redirects to its new home, which loads without an error`, async () => {
-        const goal = (await s.api('goals.list', { space: SPACE, goal_type: 'Open', page_length: 1 })).goals[0].name
+        const goal = (await s.api('goals.list', { space: SPACE, horizon: 'Long term', page_length: 1 })).goals[0].name
         const area = areaId('Career') || areas[0].name
         const OLD = [['/life', '/life/today'], ['/life/inbox', '/life/brain'], [`/life/inbox/${item.name}`, '/life/brain/queue'],
           [`/life/inbox/${item.name}/review`, `/life/brain/review/${item.name}`], ['/life/plan', '/life/today/week'], ['/life/plan/week', '/life/today/week'],
@@ -4327,8 +4315,8 @@ ev = frappe.get_doc({"doctype": "Event", "subject": "${meeting}", "starts_on": "
   "event_type": "Public", "life_space": "${SPACE}", "google_calendar_event_id": "fixture-i16-${stamp}-${width}"}).insert(ignore_permissions=True)
 tasks = [frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": t, "status": "Open", "area": tea, "due_date": d}).insert(ignore_permissions=True).name
   for t, d in (("${due}", "${wed}"), ("${later}", "${nextMonth}"))]
-goal = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${goalTitle}", "area": tea, "goal_type": "Annual", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
-off = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${offTitle}", "area": mind, "goal_type": "Annual", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
+goal = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${goalTitle}", "area": tea, "horizon": "Year", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
+off = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${offTitle}", "area": mind, "horizon": "Year", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
 print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event": ev.name, "tasks": tasks, "goal": goal, "off": off}))`).split('\n').pop())
   let reviewName = null
   try {
@@ -4957,24 +4945,24 @@ for k, v in ${JSON.stringify(made.was)}.items(): frappe.db.set_value("Life Area"
       }
     })
     // eight goals: Career (two parts and one on Career itself), Health, Money and Mind
-    const plan = [['ctx', 'career year', 'Career', 'Annual'], ['pilot', 'pilot', 'btw', 'Open'], ['hire', 'hire', 'btw', 'Open'], ['tea', 'tea yield', 'tea', 'Open'],
-      ['fit', 'fit', 'Health', '12 Week Year'], ['golf', 'golf', 'Health', 'Open'], ['itr', 'itr', 'Money', 'Open'], ['read', 'read', 'Mind', 'Open']]
+    const plan = [['ctx', 'career year', 'Career', 'Year'], ['pilot', 'pilot', 'btw', 'Long term'], ['hire', 'hire', 'btw', 'Long term'], ['tea', 'tea yield', 'tea', 'Long term'],
+      ['fit', 'fit', 'Health', '12 weeks'], ['golf', 'golf', 'Health', 'Long term'], ['itr', 'itr', 'Money', 'Long term'], ['read', 'read', 'Mind', 'Long term']]
     const out = JSON.parse(bench(`import json
 ids = ${JSON.stringify(made.ids)}
 out = {}
 def mk(key, title, area, kind, **kw):
-    v = {"doctype": "Life Goal", "space": "${SPACE}", "title": title, "area": ids[area], "goal_type": kind, **kw}
-    if kind == "Annual": v["target_date"] = "2026-12-31"
-    if kind == "12 Week Year": v["cycle"] = ${JSON.stringify(made.cycle)}
+    v = {"doctype": "Life Goal", "space": "${SPACE}", "title": title, "area": ids[area], "horizon": kind, **kw}
+    if kind == "Year": v["target_date"] = "2026-12-31"
+    if kind == "12 weeks": v["cycle"] = ${JSON.stringify(made.cycle)}
     out[key] = frappe.get_doc(v).insert(ignore_permissions=True).name
-mk("ctx", "${T('career year')}", "Career", "Annual", done_when="Career year done")
-mk("pilot", "${T('pilot')}", "btw", "Open", done_when="Pilot signed", serves=out["ctx"])
-mk("hire", "${T('hire')}", "btw", "Open", measure_kind="Number", measure="Consultants", unit="people", start_value=0, target_value=2)
-mk("tea", "${T('tea yield')}", "tea", "Open", done_when="Yield up")
-mk("fit", "${T('fit')}", "Health", "12 Week Year", done_when="Fit by March")
-mk("golf", "${T('golf')}", "Health", "Open", done_when="Five birdies")
-mk("itr", "${T('itr')}", "Money", "Open", done_when="Return filed")
-mk("read", "${T('read')}", "Mind", "Open", done_when="Five books")
+mk("ctx", "${T('career year')}", "Career", "Year", done_when="Career year done")
+mk("pilot", "${T('pilot')}", "btw", "Long term", done_when="Pilot signed", serves=out["ctx"])
+mk("hire", "${T('hire')}", "btw", "Long term", measure_kind="Number", measure="Consultants", unit="people", start_value=0, target_value=2)
+mk("tea", "${T('tea yield')}", "tea", "Long term", done_when="Yield up")
+mk("fit", "${T('fit')}", "Health", "12 weeks", done_when="Fit by March")
+mk("golf", "${T('golf')}", "Health", "Long term", done_when="Five birdies")
+mk("itr", "${T('itr')}", "Money", "Long term", done_when="Return filed")
+mk("read", "${T('read')}", "Mind", "Long term", done_when="Five books")
 task = lambda title, status, due=None, at=None: frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": title, "status": status, "goal": out["pilot"], "area": ids["btw"], "due_date": due, "scheduled_at": at}).insert(ignore_permissions=True)
 task("${T('later')}", "Open", due="2026-12-20")
 task("${T('sooner')}", "Open", due="2026-12-01")
@@ -5100,7 +5088,7 @@ for k, v in ${JSON.stringify(made.was)}.items(): frappe.db.set_value("Life Area"
     const out = JSON.parse(bench(`import json
 ids = ${JSON.stringify(made.ids)}
 out = {}
-g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('goal')}", "area": ids["Career"], "goal_type": "Open", "done_when": "Done"}).insert(ignore_permissions=True).name
+g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('goal')}", "area": ids["Career"], "horizon": "Long term", "done_when": "Done"}).insert(ignore_permissions=True).name
 def mk(key, title, area, **kw):
     out[key] = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": title, "area": ids[area], "status": "Open", **kw}).insert(ignore_permissions=True).name
 mk("career", "${T('career')}", "Career", goal=g, due_date=frappe.utils.today())
@@ -5225,7 +5213,7 @@ for k, v in ${JSON.stringify(made.was)}.items(): frappe.db.set_value("Life Area"
     const out = JSON.parse(bench(`import json
 ids = ${JSON.stringify(made.ids)}
 out = {}
-g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('goal')}", "area": ids["Career"], "goal_type": "Open", "done_when": "Done"}).insert(ignore_permissions=True).name
+g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('goal')}", "area": ids["Career"], "horizon": "Long term", "done_when": "Done"}).insert(ignore_permissions=True).name
 def mk(key, title, area, **kw):
     out[key] = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": title, "area": ids[area], "status": "Open", **kw}).insert(ignore_permissions=True).name
 mk("withgoal", "${T('with goal')}", "Career", goal=g)
@@ -6064,6 +6052,79 @@ print(json.dumps({"read": len(logs), "holding": [f for f in logs if any(s in ope
     must(!names.includes(SETUP.password), 'a screenshot name holds the password')
   }
 })
+
+// Issue 60: one kind of goal with a horizon, one parking lot (Someday), no tags. I60.1 to I60.3, I60.5 to I60.7 are unit tests
+// (test_issue60_horizons_someday_no_tags). Titles start "I60 ".
+for (const width of SET_WIDTHS) {
+  const tag = `I60.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I60 ${what} ${width} ${stamp}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const tea = bench(`print(frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"}))`).split('\n').pop()
+  const cleanup = () => bench(`frappe.set_user("Administrator")
+for g in frappe.get_all("Life Goal", filters={"title": ["like", "I60 % ${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Goal", g, force=1, ignore_permissions=True)`)
+  try {
+    await check(`${tag}.4`, `${width} px: a Month goal created with a parent 12-week goal shows under it on its page and in Goals > By area`, async () => {
+      const ids = JSON.parse(bench(`import json
+from frappe.utils import today, add_days, getdate
+cycle = frappe.db.get_value("Life Cycle", {"space": "${SPACE}", "status": "Active"})
+parent = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('twelve')}", "horizon": "12 weeks", "cycle": cycle, "area": "${tea}", "done_when": "Done"}).insert(ignore_permissions=True)
+child = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${T('month')}", "horizon": "Month", "target_date": today(), "area": "${tea}", "serves": parent.name, "done_when": "Done"}).insert(ignore_permissions=True)
+print(json.dumps({"parent": parent.name, "child": child.name, "horizon": child.horizon}))`).split('\n').pop())
+      must(ids.horizon === 'Month', 'the goal is not a Month goal')
+      await s.open(`/life/goals/${ids.parent}`)
+      await pg.locator('[data-served-by-line]').first().waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-main]').innerText()).includes(T('month')), 'the Month goal is not under the 12-week goal')
+      await noSideways()
+      await s.open('/life/goals?show=open')
+      await pg.locator('[data-goals-by-area][data-loaded="1"]').waitFor({ timeout: 10000 })
+      await pg.waitForTimeout(300)
+      must(await pg.locator(`[data-goal-card][data-goal="${ids.child}"]`).count() === 1, 'the Month goal is not in Goals > By area')
+      await noSideways()
+    })
+    await check(`${tag}.8`, `${width} px: no screen shows a tag, a tag picker or Settings > Tags`, async () => {
+      const task = JSON.parse(bench(`import json
+t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "${T('task')}", "area": "${tea}"}).insert(ignore_permissions=True)
+print(json.dumps(t.name))`).split('\n').pop())
+      for (const path of ['/life', '/life/goals/tasks', '/life/library', '/life/library/sources', '/life/goals/someday', '/life/settings?tab=areas', '/life/settings?tab=habits']) {
+        await s.open(path)
+        await pg.waitForTimeout(700)
+        const text = await pg.locator('body').innerText()
+        must(!/\btags?\b/i.test(text), `${path} shows a tag`)
+        await noSideways()
+      }
+      await s.open('/life/settings?tab=areas')
+      must((await pg.getByRole('button', { name: 'Tags' }).count()) + (await pg.getByRole('link', { name: 'Tags' }).count()) === 0, 'Settings lists Tags')
+      await s.open('/life/settings?tab=tags')
+      await pg.waitForTimeout(500)
+      must((await pg.locator('[data-settings-list="tag"]').count()) === 0, 'Settings > Tags still lists tags')
+      await s.open(`/life/goals/tasks?open=task:${task}`)
+      await pg.waitForTimeout(900)
+      must(!/\btags?\b/i.test(await pg.locator('body').innerText()), 'the task pane shows a tag picker')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.9`, `${width} px: the month plan shows this month's Month goals in priority order, with the habits`, async () => {
+      const plan = await s.api('journal.month', { space: SPACE, create: 1 })
+      for (const w of ['first', 'second', 'third']) await s.api('journal.save_month_goal', { plan: plan.plan.name, title: T(w) })
+      const now = await s.api('journal.month', { space: SPACE })
+      const third = now.plan.goals.find((g) => g.title === T('third'))
+      await s.api('journal.save_month_goal', { plan: plan.plan.name, row: third.row, move: -1 })
+      await s.open('/life/today/month?view=plan')
+      await pg.locator('[data-month-goal]').first().waitFor({ timeout: 10000 })
+      const titles = (await pg.locator('[data-month-goal]').allInnerTexts()).map((x) => x.split('\n').find((l) => l.startsWith('I60 '))).filter((x) => [T('first'), T('second'), T('third')].includes(x))
+      must(titles.join('|') === [T('first'), T('third'), T('second')].join('|'), 'the Month goals are in the order: ' + titles)
+      must((await pg.locator('[data-main]').innerText()).includes('Habits'), 'the habits are not shown with the goals')
+      await noSideways()
+    })
+  } finally {
+    cleanup()
+    await s.ctx.close()
+  }
+}
 
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {

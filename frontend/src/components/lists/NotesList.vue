@@ -1,7 +1,7 @@
 <template>
   <!-- the notes as a list, on the cross-type index: /library/notes?view=list, and the Notes tab of the goal page -->
   <ListView ref="list" :title="embed ? null : 'Notes'" noun="notes" :screen="embed ? embed.screen + (collection === 'Wiki' ? '-wiki' : '-notes') : 'library'" :fixed="embed?.fixed" :active="embed ? embed.active : true" doctype="Life Index" :spec="SPEC" :flag-labels="embed?.fixed?.goal ? { archived: 'Include archived' } : { archived: 'Include archived', reference: 'Reference only' }" :quiet="['archived']"
-    :virtual="VIRTUAL" :hidden="HIDDEN" :quick="['title', 'area', 'goal']" :synthetic="SYNTHETIC" :fetch="fetchList" :row-ref="(r) => 'note:' + r.name" :watch-keys="embed ? [] : ['by']"
+    :virtual="VIRTUAL" :hidden="HIDDEN" :quick="['title', 'area', 'goal']" :fetch="fetchList" :row-ref="(r) => 'note:' + r.name" :watch-keys="embed ? [] : ['by']"
     :empty-title="collection === 'Wiki' ? 'No wiki pages here yet.' : 'No notes yet.'"
     :empty-hint="collection === 'Wiki' ? 'The agent writes wiki pages from the sources you add with Add to wiki.' : 'Notes hold reference material and notes on your goals, in Markdown. Add one with New note.'">
     <template #sub>{{ by === 'assistant' ? 'Notes the assistant keeps from your sources, in' : by === 'me' ? 'Notes you wrote, in' : 'Every note in' }} {{ store.space }}</template>
@@ -19,10 +19,9 @@
     <template #cell-goal="{ row }"><span class="truncate">{{ row.goal_title }}</span></template>
     <template #cell-record_date="{ row }"><span class="whitespace-nowrap">{{ short(row.record_date || row.modified, true) }}</span></template>
     <template #cell-kind><span class="truncate">Note</span></template>
-    <template #cell-_tags="{ row }"><span class="truncate text-sm text-ink-gray-6">{{ row.tags.map((t) => '#' + t).join(' ') }}</span></template>
     <template #stack="{ row }"><div class="flex flex-wrap items-center gap-2"><span v-if="row.vault_locked" class="lucide-lock size-3.5 text-ink-gray-6" role="img" aria-label="Sensitive" />
       <span class="break-words text-base-medium text-ink-gray-9">{{ row.title }}</span><Badge v-if="row.collection === 'Wiki'" size="sm" theme="blue" label="Kept by the assistant" /></div>
-      <div class="text-sm text-ink-gray-6">{{ [row.area_name, row.goal_title, 'edited ' + short(row.modified, true), ...row.tags.map((t) => '#' + t)].filter(Boolean).join(' · ') }}</div></template>
+      <div class="text-sm text-ink-gray-6">{{ [row.area_name, row.goal_title, 'edited ' + short(row.modified, true)].filter(Boolean).join(' · ') }}</div></template>
   </ListView>
 </template>
 <script setup>
@@ -49,14 +48,12 @@ onMounted(async () => {
   if (!props.embed && props.collection === 'all') rules.value = (await api('wiki.overview', { space: store.space }).catch(() => ({})))?.rules || ''
 })
 // the short URL parameters of the list (lib/filterUrl.js). reference=1 is "Reference only": notes with no goal
-const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'goal', field: 'goal', kind: 'link' }, { key: 'tag', field: 'tag', kind: 'value' },
+const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'goal', field: 'goal', kind: 'link' },
   { key: 'reference', kind: 'flag' }, { key: 'archived', kind: 'flag' }]
-const VIRTUAL = [{ fieldname: 'area', label: 'Area', fieldtype: 'Link', options: 'Life Area' }, { fieldname: 'goal', label: 'Goal', fieldtype: 'Link', options: 'Life Goal' },
-  { fieldname: 'tag', label: 'Tag', fieldtype: 'Link', options: 'Life Tag' }]
-const HIDDEN = ['ref_doctype', 'ref_name', 'kind', 'search_text', 'also_in_csv', 'tags_csv', 'status', 'record_owner', 'vault_locked']
-const SYNTHETIC = [{ key: '_tags', label: 'Tags' }]
+const VIRTUAL = [{ fieldname: 'area', label: 'Area', fieldtype: 'Link', options: 'Life Area' }, { fieldname: 'goal', label: 'Goal', fieldtype: 'Link', options: 'Life Goal' }]
+const HIDDEN = ['ref_doctype', 'ref_name', 'kind', 'search_text', 'also_in_csv', 'status', 'record_owner', 'vault_locked']
 async function fetchList({ params: p, filters, order_by, summary, start, page_length }) {
-  const res = await api('library.list', { space: props.embed?.space || store.space, area: p.area, goal: p.reference ? 'none' : p.goal, tag: p.tag,
+  const res = await api('library.list', { space: props.embed?.space || store.space, area: p.area, goal: p.reference ? 'none' : p.goal,
     include_archived: p.archived ? 1 : 0, collection: collectionOf(), filters, order_by, summary, start, page_length })
   return summary ? res : { rows: res.notes, total: res.total }
 }

@@ -8,7 +8,6 @@
   "space",
   "year",
   "month",
-  "goals",
   "habits",
   "mindsweep_md",
   "projects_md"
@@ -36,12 +35,6 @@
    "label": "Month",
    "reqd": 1,
    "in_list_view": 1
-  },
-  {
-   "fieldname": "goals",
-   "fieldtype": "Table",
-   "label": "Goals",
-   "options": "Life Month Plan Goal"
   },
   {
    "fieldname": "habits",

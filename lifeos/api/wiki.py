@@ -18,7 +18,6 @@ from lifeos.life.doctype.life_note.life_note import MAX_MD, SOURCE_DOCTYPES
 
 MAX_SOURCES = 50
 COALESCE_MINUTES = 10  # a person's autosaves within this time are one Edited change
-HEALTH_TAG = "health-report"
 RULES_TITLE = "Wiki rules"
 RULES_SUMMARY = "What this wiki is for and how its pages are written. People edit this page; agents read it."
 RULES_TEXT = """# Wiki rules
@@ -520,14 +519,12 @@ def compute_health(space):
 	groups = {}
 	for p in pages:
 		groups.setdefault(_norm_title(p.title), []).append({"name": p.name, "title": p.title})
-	report_tag = frappe.db.get_value("Life Tag", {"space": space, "tag_name": HEALTH_TAG})
-	reports = []
-	if report_tag:
-		reports = frappe.db.sql("""select n.name, n.title, n.summary, n.modified from `tabLife Note` n join `tabLife Tag Link` t on t.parent = n.name
-			and t.parenttype = 'Life Note' where n.space = %s and n.collection = 'Wiki' and t.tag = %s and n.is_archived = 0
-			order by n.modified desc limit 10""", (space, report_tag), as_dict=True)
-		for r in reports:
-			r["modified"] = str(r.modified)[:19]
+	# a health report is a wiki page titled "Wiki health ..."
+	reports = frappe.db.sql("""select n.name, n.title, n.summary, n.modified from `tabLife Note` n
+		where n.space = %s and n.collection = 'Wiki' and n.title like 'Wiki health%%' and n.is_archived = 0
+		order by n.modified desc limit 10""", space, as_dict=True)
+	for r in reports:
+		r["modified"] = str(r.modified)[:19]
 	return {
 		"computed_on": str(now_datetime())[:19],
 		"orphans": [{"name": p.name, "title": p.title} for p in pages if not p.is_rules and p.name not in incoming],

@@ -87,8 +87,8 @@ def open_goals(space, area, label, conds=()):
 	from lifeos.api import goals as goal_api
 
 	conds = [("on_hold", "=", 0), *conds]
-	n = goal_api.list(space=space, area=area, state="in_progress", goal_type="Open", filters=_f(*conds), page_length=1)["total"]
-	return _door(n, "/plan/goals", {"status": "in_progress", "type": "Open", "f": _f(*conds)}, label, area)
+	n = goal_api.list(space=space, area=area, state="in_progress", horizon="Long term", filters=_f(*conds), page_length=1)["total"]
+	return _door(n, "/plan/goals", {"status": "in_progress", "type": "Long term", "f": _f(*conds)}, label, area)
 
 
 def active_open_goals(space, area=None):

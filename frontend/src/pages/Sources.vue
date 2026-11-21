@@ -114,7 +114,7 @@ const VIRTUAL = [
   { fieldname: 'assistant', label: 'Assistant', fieldtype: 'Select', options: 'Claude\nChatGPT\nCodex\nClaude Code\nOther' },
   { fieldname: 'record_date', label: 'Received', fieldtype: 'Date' },
 ]
-const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'tags_csv', 'record_owner', 'thumbnail', 'vault_locked', 'collection', 'kind', 'ref_doctype']
+const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'record_owner', 'thumbnail', 'vault_locked', 'collection', 'kind', 'ref_doctype']
 const SYNTHETIC = [{ key: '_status', label: 'Status', width: '7.5rem', place: 'end' }, { key: '_made', label: 'Made from it', width: '7rem', place: 'end' }]
 const ICON = { Chat: 'lucide-messages-square', Voice: 'lucide-mic', Document: 'lucide-file-text', Photo: 'lucide-image', Article: 'lucide-globe',
   Email: 'lucide-mail', 'Email Digest': 'lucide-mails', Text: 'lucide-text', 'Journal page': 'lucide-notebook-pen', Note: 'lucide-file-text' }

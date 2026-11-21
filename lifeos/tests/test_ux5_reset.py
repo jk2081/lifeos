@@ -16,7 +16,7 @@ class TestResetBatches(LifeTestCase):
 		tea = self.areas["Tea"]
 		a = self.make("Life Task", title="ux5 Call Kunal!", area=tea)
 		b = self.make("Life Task", title="ux5 call kunal", area=tea)
-		done = self.make("Life Goal", title="ux5 done goal", goal_type="Open", area=tea)
+		done = self.make("Life Goal", title="ux5 done goal", horizon="Long term", area=tea)
 		orphan = self.make("Life Task", title="ux5 orphan", area=tea, goal=done.name)
 		frappe.db.set_value("Life Goal", done.name, "outcome", "Achieved")  # finished without archiving what is filed under it
 		old = self.make("Life Task", title="ux5 ancient", area=self.areas["Money"])

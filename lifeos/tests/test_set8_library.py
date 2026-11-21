@@ -47,7 +47,7 @@ class TestLibrary(LibCase):
 		self.assertEqual((cell["matters"], cell["mark"]), (True, "linked"))
 		detail = weekly.meeting(space=PRIVATE, event=m)
 		self.assertEqual([l["name"] for l in detail["linked"]], [voice])
-		goal = self.make("Life Goal", title="s8 Lotwise pilot", goal_type="Open")
+		goal = self.make("Life Goal", title="s8 Lotwise pilot", horizon="Long term")
 		out = weekly.meeting_plan(space=PRIVATE, event=m, title="Send Mithun the lot sizes", goal=goal.name)
 		self.assertEqual(frappe.db.get_value("Life Task", out["task"], "goal"), goal.name)
 		self.assertIn(out["task"], [l["name"] for l in weekly.meeting(space=PRIVATE, event=m)["linked"]])
@@ -55,7 +55,7 @@ class TestLibrary(LibCase):
 
 	def test_revelations_at_most_five_and_how_many_are_left(self):
 		for i in range(7):
-			findings.add(PRIVATE, "Promise", f"s8 promise {i}", [{"ref_doctype": "Life Goal", "ref_name": self.make("Life Goal", title=f"s8 g{i}", goal_type="Open").name}],
+			findings.add(PRIVATE, "Promise", f"s8 promise {i}", [{"ref_doctype": "Life Goal", "ref_name": self.make("Life Goal", title=f"s8 g{i}", horizon="Long term").name}],
 				[{"kind": "make_task", "label": "Make task", "title": f"s8 task {i}"}, {"kind": "dismiss", "label": "Not needed"}], source="AI")
 		weekly.start(space=PRIVATE)
 		got = weekly.library(space=PRIVATE)
@@ -71,7 +71,7 @@ class TestLibrary(LibCase):
 
 class TestReadingFromRevelations(LibCase):
 	def test_confirm_a_reading_from_the_review(self):
-		goal = self.make("Life Goal", title="s8 yield rev", goal_type="Open", measure_kind="Number", measure="yield", unit="kg/ha", start_value=1000, target_value=1800)
+		goal = self.make("Life Goal", title="s8 yield rev", horizon="Long term", measure_kind="Number", measure="yield", unit="kg/ha", start_value=1000, target_value=1800)
 		r = frappe.get_doc({"doctype": "Life Goal Reading", "space": PRIVATE, "goal": goal.name, "date": today(), "value": 1460, "status": "Suggested",
 			"suggested_by": "Agent", "excerpt": "1460 kg/ha"}).insert()
 		weekly.start(space=PRIVATE)

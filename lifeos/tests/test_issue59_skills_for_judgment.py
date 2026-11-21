@@ -147,7 +147,7 @@ class TestNotice(Keyed):
 	def test_notice_makes_a_promise_insight_and_a_goal_reading_and_a_dismissed_one_stays_hidden(self):
 		"""I59.4: the insight and the reading come from notice; the fingerprint still hides a dismissed insight."""
 		chat = self.make("Life Chat Log", title="i59 Mithun chat", date=today(), summary_md="I will send six questions to Mithun. Body weight 79.5 kg today.")
-		goal = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "i59 weight", "goal_type": "Open", "measure_kind": "Number",
+		goal = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "i59 weight", "horizon": "Long term", "measure_kind": "Number",
 			"measure": "Body weight", "unit": "kg", "start_value": 84, "target_value": 78}).insert()
 
 		def notice(data):
@@ -194,7 +194,7 @@ class TestNoKey(ReviewCase):
 		frappe.set_user(OWNER)
 		self.old_item("i59 nokey old", ["Task"], age=20)
 		stuck = self.task("i59 nokey stuck", age=90)
-		self.make("Life Goal", title="i59 nokey goal", goal_type="Open")
+		self.make("Life Goal", title="i59 nokey goal", horizon="Long term")
 		self.assertEqual(old_inbox.run_for_space(PRIVATE), {"mode": "Suggest", "suggested": 0})
 		self.assertEqual(old_items.suggested(space=PRIVATE)["rows"], [])
 		got = reset.get(space=PRIVATE, ai=1)

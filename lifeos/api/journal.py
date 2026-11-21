@@ -189,7 +189,7 @@ def goal(goal: str):
 	tasks = sorted(frappe.get_all("Life Task", filters=tf,
 		fields=["name", "title", "status", "due_date", "is_archived"], limit=200),
 		key=lambda t: (order.index(t.status) if t.status in order else 9, t.due_date is None, str(t.due_date or "")))
-	common = {"space": doc.space, "goal_type": doc.goal_type or "12 Week Year", "target_date": str(doc.target_date) if doc.target_date else None,
+	common = {"space": doc.space, "horizon": doc.horizon or "12 weeks", "target_date": str(doc.target_date) if doc.target_date else None,
 		"closed_on": str(doc.closed_on) if doc.closed_on else None, "tasks": tasks, "tasks_done": done, "tasks_counted": counted,
 		"is_someday": doc.is_someday, "someday_review_on": str(doc.someday_review_on) if doc.someday_review_on else None}
 	if not doc.cycle:
@@ -241,12 +241,12 @@ def create_cycle(space: str | None = None, start_date: str | None = None, title:
 # ---------- month plan ----------
 
 def _plan_dict(plan):
-	areas = names_map("Life Area", [g.area for g in plan.goals], "area_name")
+	goals = rules.month_goals(plan.space, plan.year, plan.month)
+	areas = names_map("Life Area", [g["area"] for g in goals], "area_name")
 	return {
 		"name": plan.name, "year": plan.year, "month": plan.month, "space": plan.space,
 		"mindsweep_md": plan.mindsweep_md or "", "projects_md": plan.projects_md or "",
-		"goals": [{"row": g.name, "title": g.title, "priority": g.priority, "status": g.status, "area": g.area, "area_name": areas.get(g.area),
-			"task": g.task, "carried_from": g.carried_from} for g in plan.goals],
+		"goals": [{**g, "area_name": areas.get(g["area"])} for g in goals],
 	}
 
 
@@ -281,30 +281,38 @@ def month(space: str | None = None, year: int | None = None, month: int | None =
 
 
 @frappe.whitelist(methods=["POST"])
-def save_month_goal(plan: str, row: str | None = None, title: str | None = None, priority: str | None = None, status: str | None = None, area: str | None = None, delete: bool | int = 0):
-	"""Add, change or remove one goal of a month plan."""
+def save_month_goal(plan: str, row: str | None = None, title: str | None = None, status: str | None = None, area: str | None = None,
+		delete: bool | int = 0, move: int | None = None):
+	"""Add, change, move (`move` -1 up or 1 down, the priority order) or remove one Month goal of a month plan."""
 	doc = permissions.get_doc_checked("Life Month Plan", plan, "write")
 	if row:
-		r = next((g for g in doc.goals if g.name == row), None)
-		if not r:
+		g = permissions.get_doc_checked("Life Goal", row, "write")
+		if g.horizon != "Month" or g.space != doc.space:
 			frappe.throw(_("Goal not found."), frappe.DoesNotExistError)
 		if flag(delete):
-			doc.remove(r)
+			frappe.delete_doc("Life Goal", g.name)
+		elif move:
+			order = [r["row"] for r in rules.month_goals(doc.space, doc.year, doc.month)]
+			i = order.index(g.name)
+			j = i + (1 if int(move) > 0 else -1)
+			if 0 <= j < len(order):
+				order[i], order[j] = order[j], order[i]
+				for n, name in enumerate(order, 1):
+					frappe.db.set_value("Life Goal", name, "sort_order", n, update_modified=False)
 		else:
-			for k, v in (("title", title), ("priority", priority), ("status", status), ("area", area)):
-				if v is not None:
-					r.set(k, v or None)
-			if status and r.task and frappe.db.exists("Life Task", r.task):
-				task_status = {"Done": "Done", "Dropped": "Dropped", "Open": "Open"}.get(status)
-				if task_status and frappe.db.get_value("Life Task", r.task, "status") != task_status:
-					t = frappe.get_doc("Life Task", r.task)
-					t.status = task_status
-					t.save()
+			if title is not None:
+				g.title = title.strip() or g.title
+			if area is not None:
+				g.area = area or None
+			if status:
+				if status not in rules.OUTCOME_OF:
+					frappe.throw(_("Unknown status."))
+				g.outcome = rules.OUTCOME_OF[status]
+			g.save()
 	else:
 		if not (title or "").strip():
 			frappe.throw(_("Type a title for the goal."))
-		doc.append("goals", {"title": title.strip(), "priority": priority, "status": status or "Open", "area": area})
-	doc.save()
+		rules.add_month_goal(doc.space, doc.year, doc.month, title.strip(), area)
 	return _plan_dict(doc)
 
 
@@ -322,29 +330,24 @@ def save_month_text(plan: str, mindsweep_md: str | None = None, projects_md: str
 
 @frappe.whitelist(methods=["POST"])
 def carry_month_goal(plan: str, row: str):
-	"""Carry an open month goal into next month's plan. The old one is marked Carried."""
+	"""Carry an open Month goal into next month. The old one is marked Carried."""
 	permissions.require_login()
-	return rules.carry_month_goal(plan, row)
+	return rules.carry_month_goal(row)
 
 
 @frappe.whitelist(methods=["POST"])
 def make_task_from_goal(plan: str, row: str):
-	"""Create a Life Task linked to a month goal."""
+	"""Create a Life Task filed under a Month goal (or return its open one)."""
 	doc = permissions.get_doc_checked("Life Month Plan", plan, "write")
-	r = next((g for g in doc.goals if g.name == row), None)
-	if not r:
+	g = permissions.get_doc_checked("Life Goal", row, "write")
+	if g.horizon != "Month" or g.space != doc.space:
 		frappe.throw(_("Goal not found."), frappe.DoesNotExistError)
-	if r.task and frappe.db.exists("Life Task", r.task):
-		return {"task": r.task, "existing": True}
-	task = frappe.get_doc({"doctype": "Life Task", "space": doc.space, "title": r.title, "priority": r.priority, "area": r.area,
+	existing = frappe.db.get_value("Life Task", {"goal": g.name, "status": ("in", ("Open", "Doing", "Waiting"))})
+	if existing:
+		return {"task": existing, "existing": True}
+	task = frappe.get_doc({"doctype": "Life Task", "space": doc.space, "title": g.title, "area": g.area, "goal": g.name,
 		"month_plan": doc.name, "status": "Open"}).insert()
-	r.task = task.name
-	doc.save()
 	return {"task": task.name, "existing": False}
-
-
-# ---------- habits ----------
-
 @frappe.whitelist(methods=["GET"])
 def habits(space: str | None = None, year: int | None = None, month: int | None = None):
 	"""The habit grid of one month: each tracked habit with its done days, count, target and percentage."""

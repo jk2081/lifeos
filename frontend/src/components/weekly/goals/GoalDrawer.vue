@@ -98,7 +98,7 @@ watch(() => props.d, (d) => {
 }, { immediate: true })
 const subLine = computed(() => {
   const d = props.d
-  return [d.in_cycle ? '12 Weeks' : d.goal_type, d.area_name, d.finish_line ? `finish line: ${d.finish_line}` : 'needs a finish line', d.progress.label, d.mark].filter(Boolean).join(' · ')
+  return [d.in_cycle ? '12 Weeks' : d.horizon, d.area_name, d.finish_line ? `finish line: ${d.finish_line}` : 'needs a finish line', d.progress.label, d.mark].filter(Boolean).join(' · ')
 })
 const slotLabel = (s) => `${weekday(s, 3)} ${time(s)}`
 const sameSlot = (s) => (v.slot || '').slice(0, 16) === s

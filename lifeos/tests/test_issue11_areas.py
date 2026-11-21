@@ -76,7 +76,7 @@ class TestLifeAreas(LifeTestCase):
 		old["Ghatia"] = sub.name
 		filed = []
 		for name, area in old.items():
-			for doctype, extra in (("Life Task", {}), ("Life Goal", {"goal_type": "Open"}), ("Life Note", {})):
+			for doctype, extra in (("Life Task", {}), ("Life Goal", {"horizon": "Long term"}), ("Life Note", {})):
 				doc = frappe.get_doc({"doctype": doctype, "space": SEED_COPY, "title": f"i11 {doctype} in {name}", "area": area, **extra})
 				doc.insert()
 				filed.append((doctype, doc.name, area))
@@ -105,7 +105,7 @@ class TestLifeAreas(LifeTestCase):
 		books = self.make("Life Area", area_name="i11 Books", parent_area=mind).name
 		task_mind = self.make("Life Task", title="i11 task in Mind", area=mind).name
 		task_books = self.make("Life Task", title="i11 task in Books", area=books).name
-		goal = goals.create("i11 goal in Mind", "Open", space=PRIVATE, area=mind)["name"]
+		goal = goals.create("i11 goal in Mind", "Long term", space=PRIVATE, area=mind)["name"]
 
 		def visible():
 			ctx = meta.space_context(PRIVATE)

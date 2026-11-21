@@ -146,7 +146,7 @@ class TestChats(LifeTestCase):
 		for name in frappe.get_all("Life Chat Log", filters={"space": PRIVATE}, pluck="name"):
 			frappe.delete_doc("Life Chat Log", name, force=True)
 		frappe.set_user(OWNER)
-		self.goal = self.make("Life Goal", title="Mandir m7", goal_type="Open", area=self.areas["Tea"])
+		self.goal = self.make("Life Goal", title="Mandir m7", horizon="Long term", area=self.areas["Tea"])
 
 	def test_agent_logs_a_chat_directly_and_report_groups(self):
 		self.as_user(AGENT)
@@ -258,7 +258,7 @@ class TestArchive(LifeTestCase):
 		self.assertRaises(frappe.PermissionError, archive_api.restore, "Life Task", task.name)
 
 	def test_completing_an_open_goal_archives_its_records_and_restore_brings_them_back(self):
-		goal = self.make("Life Goal", title="Finish me m7", goal_type="Open", area=self.areas["Tea"])
+		goal = self.make("Life Goal", title="Finish me m7", horizon="Long term", area=self.areas["Tea"])
 		task = self.make("Life Task", title="Goal task m7", area=self.areas["Tea"], goal=goal.name)
 		note = self.make("Life Note", title="Goal note m7", area=self.areas["Tea"], goal=goal.name)
 		chat = self.make("Life Chat Log", title="Goal chat m7", date=today(), area=self.areas["Tea"], goal=goal.name)

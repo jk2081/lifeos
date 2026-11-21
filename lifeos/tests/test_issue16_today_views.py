@@ -30,7 +30,7 @@ class TestTodayViews(LifeTestCase):
 		return self.make("Life Cycle", title=title, start_date=start or add_days(today(), -21), status=status)
 
 	def goal(self, title, area, cycle=None, **values):
-		return self.make("Life Goal", title=title, area=area, cycle=cycle.name if cycle else None, goal_type="12 Week Year" if cycle else "Annual", **values)
+		return self.make("Life Goal", title=title, area=area, cycle=cycle.name if cycle else None, horizon="12 weeks" if cycle else "Year", **values)
 
 	def lane(self, out, area):
 		return next((lane for lane in out["lanes"] if lane["area"] == area), None)

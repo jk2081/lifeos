@@ -185,24 +185,25 @@ class TestMonthAndHabits(JournalCase):
 		frappe.db.delete("Life Habit Log", {"space": PRIVATE})
 
 	def test_carry_month_goal(self):
-		plan = self.make("Life Month Plan", year=2030, month=12, goals=[
-			{"title": "Ruchi ITR", "priority": "IV", "status": "Open", "area": self.areas["Money"]}, {"title": "Done thing", "status": "Done"}])
-		out = journal.carry_month_goal(plan.name, plan.goals[0].name)
-		self.assertEqual((out["year"], out["month"], out["plan"]), (2031, 1, f"{PRIVATE}-2031-01"))
-		plan.reload()
-		self.assertEqual(plan.goals[0].status, "Carried")
-		target = frappe.get_doc("Life Month Plan", out["plan"])
-		row = target.goals[0]
-		self.assertEqual((row.title, row.priority, row.status, row.area, row.carried_from), ("Ruchi ITR", "IV", "Open", self.areas["Money"], plan.goals[0].name))
-		self.assertRaises(frappe.ValidationError, journal.carry_month_goal, plan.name, plan.goals[0].name)
-		self.assertRaises(frappe.ValidationError, journal.carry_month_goal, plan.name, plan.goals[1].name)
+		itr = rules.add_month_goal(PRIVATE, 2030, 12, "Ruchi ITR", self.areas["Money"])
+		done = rules.add_month_goal(PRIVATE, 2030, 12, "Done thing")
+		frappe.db.set_value("Life Goal", done.name, "outcome", "Achieved")
+		out = rules.carry_month_goal(itr.name)
+		self.assertEqual((out["year"], out["month"]), (2031, 1))
+		self.assertEqual(frappe.db.get_value("Life Goal", itr.name, "outcome"), "Carried")
+		row = frappe.get_doc("Life Goal", out["row"])
+		self.assertEqual((row.title, row.horizon, row.outcome, row.area, row.carried_from), ("Ruchi ITR", "Month", "In Progress", self.areas["Money"], itr.name))
+		self.assertEqual([g["row"] for g in rules.month_goals(PRIVATE, 2031, 1)], [row.name])
+		self.assertRaises(frappe.ValidationError, rules.carry_month_goal, itr.name)
+		self.assertRaises(frappe.ValidationError, rules.carry_month_goal, done.name)
 
 	def test_make_task_from_goal(self):
-		plan = self.make("Life Month Plan", year=2030, month=6, goals=[{"title": "Accounts flow in ERP", "priority": "IV", "area": self.areas["Tea"]}])
-		out = journal.make_task_from_goal(plan.name, plan.goals[0].name)
+		plan = self.make("Life Month Plan", year=2030, month=6)
+		goal = rules.add_month_goal(PRIVATE, 2030, 6, "Accounts flow in ERP", self.areas["Tea"])
+		out = journal.make_task_from_goal(plan.name, goal.name)
 		task = frappe.get_doc("Life Task", out["task"])
-		self.assertEqual((task.title, task.priority, task.month_plan, task.area), ("Accounts flow in ERP", "IV", plan.name, self.areas["Tea"]))
-		self.assertTrue(journal.make_task_from_goal(plan.name, plan.goals[0].name)["existing"])
+		self.assertEqual((task.title, task.goal, task.month_plan, task.area), ("Accounts flow in ERP", goal.name, plan.name, self.areas["Tea"]))
+		self.assertTrue(journal.make_task_from_goal(plan.name, goal.name)["existing"])
 
 	def test_new_plan_copies_last_months_habits(self):
 		japa, workout = self.make("Life Habit", title="Japa t"), self.make("Life Habit", title="Workout t")

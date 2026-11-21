@@ -14,7 +14,7 @@ const LIBRARY = ['notes', 'documents', 'people', 'chats', 'files', 'timeline', '
 const STATE = { Active: 'in_progress', 'On Hold': 'in_progress', Done: 'achieved', Dropped: 'closed', Someday: 'someday', all: 'all', current: 'in_progress' }
 function projectQuery(q) {
   const { status, ...rest } = q
-  return { ...rest, type: 'Open', ...(status ? { status: STATE[status] || 'in_progress' } : {}) }
+  return { ...rest, type: 'Long term', ...(status ? { status: STATE[status] || 'in_progress' } : {}) }
 }
 // an old route that lands on a tab with its query carried over, and a few parameters of its own
 const to = (path, extra = {}) => (r) => ({ path, query: { ...r.query, ...(typeof extra === 'function' ? extra(r) : extra) }, hash: r.hash })

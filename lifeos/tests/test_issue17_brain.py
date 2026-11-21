@@ -90,7 +90,7 @@ class TestNeedsYou(LifeTestCase):
 		self.assertEqual(out["minutes"], 1)
 
 	def test_a_reading_is_read_later(self):
-		goal = self.make("Life Goal", title="i17 yield", goal_type="Open", area=self.tea)
+		goal = self.make("Life Goal", title="i17 yield", horizon="Long term", area=self.tea)
 		_, p = self.waiting("i17 newsletter", kind="Reading", goal=goal.name)
 		row = next(r for r in brain.needs_you(PRIVATE)["rows"] if r["proposal"] == p.name)
 		self.assertEqual(row["kind_label"], "Read later")
@@ -120,7 +120,7 @@ class TestNeedsYou(LifeTestCase):
 	def test_the_two_numbers_are_the_captures_of_the_last_24_hours(self):
 		frappe.db.sql("update `tabLife Inbox Item` set is_archived=0")  # nothing else matters: only this test's captures are counted below
 		frappe.db.sql("update `tabLife Inbox Item` set is_archived=1 where space=%s", (PRIVATE,))
-		goal = self.make("Life Goal", title="i17 goal", goal_type="Open", area=self.tea)
+		goal = self.make("Life Goal", title="i17 goal", horizon="Long term", area=self.tea)
 		mk = lambda title, source, status, hours, **kw: frappe.get_doc({"doctype": "Life Inbox Item", "space": PRIVATE, "title": title, "source_type": source,
 			"status": status, "received_on": add_to_date(now_datetime(), hours=-hours), **kw}).insert()
 		mk("i17 own 1", "Email", "Done", 2, area=self.tea, goal=goal.name)

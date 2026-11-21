@@ -191,7 +191,7 @@ def tab(review, now=None):
 	ready = gp.ready()
 	planned = [r for r in rows if not r["plan"].get("skip") and (r["plan"].get("next_action") or "").strip()]
 	return {"cycle": {"name": cyc.name, "title": cyc.title} if cyc else None, "rows": rows, "stars": stars, "needed": gp.needed(), "ready": ready,
-		"others": {"n": len(others), "titles": [g.title for g in others[:2]], "rows": [{"goal": g.name, "title": g.title, "goal_type": g.goal_type} for g in others]},
+		"others": {"n": len(others), "titles": [g.title for g in others[:2]], "rows": [{"goal": g.name, "title": g.title, "horizon": g.horizon} for g in others]},
 		"capacity": goal_week.capacity(gp, now), "score": score, "target": cint(frappe.db.get_single_value("Life Settings", "score_target")) or 85,
 		"glance": goal_week.glance(gp, now), "to_schedule": len(planned)}
 
@@ -210,7 +210,7 @@ def row(gp, g, stars):
 	m = goal_week.mark_of(gp, g)
 	prog = goal_week.progress_of(g)
 	full = frappe.db.get_value("Life Goal", g.name, ["measure_kind", "measure", "start_value", "target_value", "done_when"], as_dict=True)
-	return {"goal": g.name, "title": g.title, "goal_type": g.goal_type, "area": g.area, "in_cycle": g.name in gp.cycle_names(), "star": g.name in stars,
+	return {"goal": g.name, "title": g.title, "horizon": g.horizon, "area": g.area, "in_cycle": g.name in gp.cycle_names(), "star": g.name in stars,
 		"mark": m["mark"], "progress": prog, "plan": gp.plan(g.name), "needs_finish_line": not readings.has_finish_line(full),
 		"readings": frappe.db.count("Life Goal Reading", {"goal": g.name, "status": "Suggested"}),
 		"open_tasks": frappe.db.count("Life Task", {"goal": g.name, "status": ("in", list(OPEN)), "is_archived": 0})}

@@ -13,14 +13,14 @@
       <span class="text-sm text-ink-gray-6">Served by</span>
       <div v-for="s in info.served_by" :key="s.name" class="flex min-w-0 items-center gap-2">
         <Button class="min-w-0" size="sm" variant="ghost" :label="s.title" data-pane-served-by @click="openRef('goal:' + s.name)" />
-        <span class="min-w-0 flex-1 truncate text-sm text-ink-gray-6">{{ [s.goal_type === '12 Week Year' ? s.cycle_title || '12 Week Year' : s.goal_type, s.progress.label].join(' · ') }}</span>
+        <span class="min-w-0 flex-1 truncate text-sm text-ink-gray-6">{{ [s.horizon === '12 weeks' ? s.cycle_title || '12 weeks' : s.horizon, s.progress.label].join(' · ') }}</span>
         <div class="w-14 shrink-0"><Progress size="sm" :value="Math.round(s.progress.percent || 0)" /></div>
       </div>
     </div>
     <GoalMeasure v-if="info" :g="info.goal" :readings="info.readings" :suggested="info.suggested" :space="info.space" :writable="writable && !info.goal.is_archived"
       data-pane-measure @changed="async () => { await load(); emit('changed') }" />
     <div v-if="writable && !d.cycle" class="flex flex-wrap items-center gap-2" data-goal-actions>
-      <Button v-if="d.goal.outcome === 'In Progress' && d.goal_type === 'Open'" :label="info?.goal.on_hold ? 'Resume' : 'Put on hold'" data-goal-hold
+      <Button v-if="d.goal.outcome === 'In Progress' && d.horizon === 'Long term'" :label="info?.goal.on_hold ? 'Resume' : 'Put on hold'" data-goal-hold
         @click="setStatus(info?.goal.on_hold ? 'Active' : 'On Hold')" />
       <Button v-if="d.goal.outcome === 'In Progress'" label="Close goal" data-close-goal @click="closeOpen = true" />
       <Button v-else label="Reopen" @click="reopen" />
@@ -89,7 +89,7 @@ import { api, tryCall } from '@/lib/api'
 import { loadBacklinks } from '@/lib/links'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
-import { loadLookups, lookups } from '@/lib/lookups'
+import { loadLookups, lookups, parentOptions } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 
 const OUTCOMES = ['Achieved', 'Partly Achieved', 'Not Achieved', 'Dropped']
@@ -111,7 +111,7 @@ const writable = computed(() => store.spaces.find((s) => s.name === d.value?.spa
 const headline = computed(() => {
   const x = d.value
   if (x.cycle) return `${x.cycle.title} · ${Math.round(x.goal.percent)}% of ticks done`
-  return [x.goal_type + ' goal', x.target_date && 'by ' + short(x.target_date, true), x.closed_on && 'closed ' + short(x.closed_on, true)].filter(Boolean).join(' · ')
+  return [x.horizon + ' goal', x.target_date && 'by ' + short(x.target_date, true), x.closed_on && 'closed ' + short(x.closed_on, true)].filter(Boolean).join(' · ')
 })
 async function load() {
   try {
@@ -126,7 +126,7 @@ async function load() {
           { value: 'history', label: 'History across cycles', count: x.history.length, noun: 'cycles' }]
       : [{ value: 'tasks', label: 'Tasks', count: x.tasks.length, noun: 'tasks' }]
     emit('meta', { title: g.title, area: g.area, area_name: g.area_name, fullPage: `/goals/${g.name}`,
-      sub: x.is_someday ? 'On the Someday list' : x.cycle ? `${g.actions.length} action${g.actions.length === 1 ? '' : 's'}` : x.goal_type + ' goal',
+      sub: x.is_someday ? 'On the Someday list' : x.cycle ? `${g.actions.length} action${g.actions.length === 1 ? '' : 's'}` : x.horizon + ' goal',
       someday: canWrite() && g.outcome === 'In Progress' && !x.is_someday ? { doctype: 'Life Goal', name: g.name } : null,
       tabs: [...tabs, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
   } catch (e) {
@@ -134,7 +134,7 @@ async function load() {
   }
 }
 const servesOptions = computed(() => [{ label: 'None', value: '' },
-  ...(lookups.goals || []).filter((x) => x.name !== props.name).map((x) => ({ label: `${x.goal_type} · ${x.title}`, value: x.name })),
+  ...parentOptions({ name: props.name, horizon: info.value?.goal.horizon }),
   ...(info.value?.goal.serves && !(lookups.goals || []).some((x) => x.name === info.value.goal.serves) ? [{ label: info.value.goal.serves_title, value: info.value.goal.serves }] : [])])
 async function saveServes(v) {
   if (await tryCall(() => api('goals.update', { goal: props.name, values: { serves: v || null } }))) { await load(); emit('changed') }

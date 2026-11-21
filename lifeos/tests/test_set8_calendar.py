@@ -160,7 +160,7 @@ class TestFindings(CalCase):
 		self.assertIn("1 meeting that matters left nothing: Foxin", frappe.db.get_value("Life Insight", rows[0].name, "title"))
 
 	def test_a_reading_confirmed_on_the_goal_clears_its_finding(self):
-		goal = self.make("Life Goal", title="Ghillidary yield", goal_type="Open", measure_kind="Number", measure="yield", unit="kg/ha",
+		goal = self.make("Life Goal", title="Ghillidary yield", horizon="Long term", measure_kind="Number", measure="yield", unit="kg/ha",
 			start_value=1000, target_value=1800)
 		r = frappe.get_doc({"doctype": "Life Goal Reading", "space": PRIVATE, "goal": goal.name, "date": today(), "value": 1460, "status": "Suggested",
 			"suggested_by": "Agent", "excerpt": "yield 1460 kg/ha for October"}).insert()

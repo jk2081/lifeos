@@ -122,12 +122,12 @@ def grid(cycle_name) -> dict:
 	from lifeos import readings
 
 	served = {r.name: r for r in frappe.get_all("Life Goal", filters={"name": ("in", [g.serves for g in goals if g.serves] or ["-"])},
-		fields=["name", "title", "goal_type", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"])}
+		fields=["name", "title", "horizon", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"])}
 	for g in goals:
 		s = served.get(g.serves)
 		g["serves_title"] = s.title if s else None
 		g["serves_progress"] = readings.summary(s) if s and s.measure_kind == "Number" else None
-		g["result"] = readings.summary({**g, "goal_type": "12 Week Year", "score": g["percent"]})
+		g["result"] = readings.summary({**g, "horizon": "12 weeks", "score": g["percent"]})
 	weeks = [week_score(cycle, w, actions, ticks) for w in range(1, WEEKS + 1)]
 	started = week_of(cycle) >= 1
 	return {
@@ -441,25 +441,47 @@ def habits_year(space, year) -> dict:
 	return {"year": year, "habits": list(out.values())}
 
 
-def carry_month_goal(plan_name_, row_name) -> dict:
-	"""Copy an open month goal into next month's plan and mark the old one Carried."""
-	plan = frappe.get_doc("Life Month Plan", plan_name_)
-	plan.check_permission("write")
-	row = next((r for r in plan.goals if r.name == row_name), None)
-	if not row:
-		frappe.throw(_("Goal not found in this plan."), frappe.DoesNotExistError)
-	if row.status != "Open":
-		frappe.throw(_("Only an open goal can be carried forward."))
-	ny, nm = next_month(plan.year, plan.month)
-	target = get_month_plan(plan.space, ny, nm, create=True)
-	new = target.append("goals", {"title": row.title, "priority": row.priority, "status": "Open", "area": row.area,
-		"task": row.task, "carried_from": row.name})
-	target.save(ignore_permissions=True)
-	row.status = "Carried"
-	plan.save(ignore_permissions=True)
-	if row.task and frappe.db.exists("Life Task", row.task):
-		frappe.db.set_value("Life Task", row.task, "month_plan", target.name, update_modified=False)
-	return {"plan": target.name, "row": new.name, "year": ny, "month": nm}
+STATUS_OF = {"In Progress": "Open", "Achieved": "Done", "Dropped": "Dropped", "Carried": "Carried"}
+OUTCOME_OF = {"Open": "In Progress", "Done": "Achieved", "Dropped": "Dropped", "Carried": "Carried"}
+
+
+def month_goals(space, year, month) -> list[dict]:
+	"""The month's goals: goals with horizon Month and a target date in that month, in the owner's priority order."""
+	first, last = month_bounds(year, month)
+	rows = frappe.get_all("Life Goal", filters={"space": space, "horizon": "Month", "is_archived": 0, "target_date": ("between", [first, last])},
+		fields=["name", "title", "area", "outcome", "carried_from", "sort_order"], order_by="sort_order asc, creation asc")
+	tasks = {}
+	if rows:
+		for goal, task in frappe.db.sql("""select goal, name from `tabLife Task` where goal in %s and status in ('Open', 'Doing', 'Waiting')
+			order by creation desc""", [[r.name for r in rows]]):
+			tasks[goal] = task
+	return [{"row": r.name, "title": r.title, "status": STATUS_OF.get(r.outcome, "Done"), "area": r.area, "task": tasks.get(r.name),
+		"carried_from": r.carried_from} for r in rows]
+
+
+def add_month_goal(space, year, month, title, area=None, carried_from=None, serves=None, ignore_permissions=False):
+	"""Add a Month goal dated the last day of the month, at the end of the month's order."""
+	first, last = month_bounds(year, month)
+	top = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s and horizon='Month' and target_date between %s and %s",
+		(space, first, last))[0][0]
+	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": title, "horizon": "Month", "target_date": last, "area": area or None,
+		"sort_order": top + 1, "carried_from": carried_from, "serves": serves or None})
+	doc.insert(ignore_permissions=ignore_permissions)
+	return doc
+
+
+def carry_month_goal(goal_name) -> dict:
+	"""Copy an open month goal into next month, mark the old one Carried and move its open tasks to the new one."""
+	old = frappe.get_doc("Life Goal", goal_name)
+	old.check_permission("write")
+	if old.horizon != "Month" or old.outcome != "In Progress":
+		frappe.throw(_("Only an open month goal can be carried forward."))
+	ny, nm = next_month(old.target_date.year, old.target_date.month)
+	new = add_month_goal(old.space, ny, nm, old.title, old.area, carried_from=old.name, serves=old.serves)
+	old.outcome = "Carried"
+	old.save()
+	frappe.db.sql("update `tabLife Task` set goal=%s where goal=%s and status in ('Open', 'Doing', 'Waiting')", (new.name, old.name))
+	return {"row": new.name, "year": ny, "month": nm}
 
 
 def carry_task(task_name) -> dict:
@@ -483,18 +505,5 @@ def carry_task(task_name) -> dict:
 	new.insert(ignore_permissions=True)
 	old.status = "Carried"
 	old.save(ignore_permissions=True)
-	moved = False
-	if old.month_plan:
-		src = frappe.get_doc("Life Month Plan", old.month_plan)
-		for r in src.goals:
-			if r.task == old.name and r.status == "Open":
-				r.status = "Carried"
-				target.append("goals", {"title": r.title, "priority": r.priority, "status": "Open", "area": r.area,
-					"task": new.name, "carried_from": r.name})
-				moved = True
-		if moved:
-			src.save(ignore_permissions=True)
-	if not moved:
-		target.append("goals", {"title": new.title, "priority": new.priority, "status": "Open", "area": new.area, "task": new.name})
 	target.save(ignore_permissions=True)
 	return {"task": new.name, "plan": target.name, "year": ny, "month": nm}

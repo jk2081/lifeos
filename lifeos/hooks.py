@@ -18,7 +18,7 @@ after_migrate = "lifeos.install.after_migrate"
 website_route_rules = [{"from_route": "/life/<path:app_path>", "to_route": "life"}]
 
 # Link search for the filing DocTypes: the current space and active records only (lifeos/queries.py)
-standard_queries = {dt: "lifeos.queries.link_query" for dt in ("Life Area", "Life Tag", "Life Habit", "Life Dimension", "Life Goal")}
+standard_queries = {dt: "lifeos.queries.link_query" for dt in ("Life Area", "Life Habit", "Life Dimension", "Life Goal")}
 
 permission_query_conditions = {dt: "lifeos.permissions.query_conditions" for dt in SPACE_DOCTYPES}
 permission_query_conditions["Life Space"] = "lifeos.permissions.space_query_conditions"
@@ -41,7 +41,7 @@ doc_events = {
 	for dt in SPACE_DOCTYPES
 }
 # the Outbox (set 7): exits are written by these hooks only
-for _dt in ("Life Task", "Life Goal", "Life Inbox Item", "Life Idea"):
+for _dt in ("Life Task", "Life Goal", "Life Inbox Item", "Life Note"):
 	for _event, _fn in (("on_update", "on_update"), ("after_insert", "after_insert"), ("on_trash", "on_trash")):
 		_have = doc_events[_dt].get(_event)
 		doc_events[_dt][_event] = [*([_have] if isinstance(_have, str) else _have or []), f"lifeos.outbox.{_fn}"]

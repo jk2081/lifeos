@@ -297,14 +297,6 @@ class TestAuditFixes(LifeTestCase):
 		self.assertTrue(frappe.db.exists("Life Proposal", prop))
 		self.assertIsNone(frappe.db.get_value("Life Proposal", prop, "created_name"))
 
-	def test_a_goal_an_idea_is_filed_under_still_cannot_be_deleted(self):
-		from lifeos.api import trash
-
-		goal = self.make("Life Goal", title="pre6 goal with an idea", goal_type="Open", area=self.areas["Tea"])
-		self.make("Life Idea", title="pre6 idea", goal=goal.name)
-		self.assertRaises(frappe.ValidationError, trash.delete, "Life Goal", goal.name)
-		self.assertTrue(frappe.db.exists("Life Goal", goal.name))
-
 	def _vault_source(self):
 		frappe.db.set_value("Life Space", PRIVATE, "agents_can_read_vault", 0)
 		permissions.clear_cache()

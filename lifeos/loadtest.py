@@ -62,8 +62,8 @@ def seed(rows=100000, users=20, spaces=50, big_share=0.5):
 	task_cols = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "space", "title", "status", "priority",
 		"due_date", "area", "is_archived", "last_touched_on", "completed_on"]
 	index_cols = index.COLUMNS
-	# the columns set 4 added to the index, after the 21 these rows spell out
-	pad = tuple(0 if c == "vault_locked" else None if c in index.NULLABLE else "" for c in index.COLUMNS[21:])
+	# the columns set 4 added to the index, after the 20 these rows spell out
+	pad = tuple(0 if c == "vault_locked" else None if c in index.NULLABLE else "" for c in index.COLUMNS[20:])
 	tasks, idx = [], []
 
 	def flush(force=False):
@@ -102,13 +102,13 @@ def seed(rows=100000, users=20, spaces=50, big_share=0.5):
 				tasks.append((name, created, created, owner, owner, 0, 0, space, title, status, rng.choice(["I", "II", "III", "IV", ""]),
 					due, area, archived, day, add_days(day, 3) if done else None))
 				idx.append((index.row_name("Life Task", name, "Task"), created, created, owner, owner, 0, 0, "Life Task", name, space,
-					area, also, "", "", day, title, text, archived, "Task", status, owner) + pad)
+					area, also, "", day, title, text, archived, "Task", status, owner) + pad)
 			else:
 				doctype, kind = KINDS[n % len(KINDS)]
 				name = f"load-x-{made:07d}"
 				archived = 1 if kind in ("Chat", "Inbox") and age > 90 else 0
 				idx.append((index.row_name(doctype, name, kind), created, created, owner, owner, 0, 0, doctype, name, space,
-					area, also, "", "", day, title, text, archived, kind, "", owner) + pad)
+					area, also, "", day, title, text, archived, kind, "", owner) + pad)
 			flush()
 	flush(force=True)
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- load test: 100,000 seeded rows are committed so the timed reads see them as a real site would
@@ -173,7 +173,7 @@ def seed_sources(sources=20000, pages=2000, space=None, text_chars=5000):
 	areas = frappe.get_all("Life Area", filters={"space": space}, pluck="name") or [""]
 	owner = devtools.OWNER
 	ts, day0 = now(), getdate(today())
-	pad = {c: (0 if c == "vault_locked" else None if c in index.NULLABLE else "") for c in index.COLUMNS[21:]}
+	pad = {c: (0 if c == "vault_locked" else None if c in index.NULLABLE else "") for c in index.COLUMNS[20:]}
 
 	def words(n):
 		out, size = [], 0
@@ -191,8 +191,8 @@ def seed_sources(sources=20000, pages=2000, space=None, text_chars=5000):
 
 	def index_row(dt, name, kind, created, day, area, title, text, status, extra):
 		row = {**pad, **extra}
-		return (index.row_name(dt, name, kind), created, created, owner, owner, 0, 0, dt, name, space, area, "", "", "", day, title, text[:index.SEARCH_CAP],
-			0, kind, status, owner) + tuple(row[c] for c in index.COLUMNS[21:])
+		return (index.row_name(dt, name, kind), created, created, owner, owner, 0, 0, dt, name, space, area, "", "", day, title, text[:index.SEARCH_CAP],
+			0, kind, status, owner) + tuple(row[c] for c in index.COLUMNS[20:])
 
 	def flush(force=False):
 		nonlocal items, chats, idx

@@ -129,6 +129,10 @@
               <TextInput class="w-28" type="number" min="1" max="100" :model-value="d.settings.score_target" :disabled="!d.is_admin" data-setting="score_target"
                 @change="(e) => setOne('score_target', Number(e.target.value))"><template #suffix><span class="text-sm text-ink-gray-6">%</span></template></TextInput>
             </SettingRow>
+            <SettingRow label="Plan in 12 Week Years or quarters" help="A 12-week goal follows your 12 Week Year cycle, or the calendar quarter." :error="errors.planning_period">
+              <TabButtons :model-value="d.settings.planning_period || '12 Week Years'" :options="[{ label: '12 Week Years', value: '12 Week Years' }, { label: 'Quarters', value: 'Quarters' }]"
+                aria-label="Plan in 12 Week Years or quarters" data-setting="planning_period" @update:model-value="(v) => d.is_admin && setOne('planning_period', v)" />
+            </SettingRow>
             <SettingRow label="Break week" help="A week between cycles for review and planning." :error="errors.cycle_break_week">
               <TabButtons :model-value="d.settings.cycle_break_week ? 1 : 0" :options="[{ label: 'Yes', value: 1 }, { label: 'No', value: 0 }]" aria-label="Break week"
                 data-setting="cycle_break_week" @update:model-value="(v) => d.is_admin && setOne('cycle_break_week', v)" />
@@ -243,7 +247,7 @@
           </Card>
           <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/library/archive" data-archive-link>Archived records are in Library, Archive</RouterLink>,
             and deleted ones in its <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/library/archive', query: { type: 'trash' } }" data-trash-link>Trash</RouterLink>.
-            Below are the headings archived from Areas, Tags, Habits and Check-ins in {{ spaceSel }}.</p>
+            Below are the headings archived from Areas, Habits and Check-ins in {{ spaceSel }}.</p>
           <section v-for="l in LISTS" :key="l.kind" :data-archived-group="l.kind">
             <SectionHead :count="archived(l).length">{{ l.label }}</SectionHead>
             <Card flush>
@@ -408,7 +412,7 @@
   <Dialog v-model:open="archiveOpen" :title="`Archive ${archiving?.row.title || ''}?`" size="md"
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Archive', variant: 'solid', onClick: archive }]">
     <div class="flex flex-col gap-2 text-base text-ink-gray-8" data-archive-dialog>
-      <p>It leaves the {{ archiving?.l.kind === 'tag' ? 'tag pickers' : archiving?.l.kind === 'habit' ? 'habit pickers' : 'check-in form' }}. Past records that use it keep it.</p>
+      <p>It leaves the {{ archiving?.l.kind === 'habit' ? 'habit pickers' : 'check-in form' }}. Past records that use it keep it.</p>
       <p class="text-sm text-ink-gray-6">Nothing is deleted. Restore it from Archived in Settings.</p>
     </div>
   </Dialog>
@@ -454,7 +458,7 @@ const COLOURS = ['blue', 'green', 'amber', 'red', 'violet', 'teal', 'orange', 'p
 const hm = (t) => (t ? String(t).padStart(8, '0').slice(0, 5) : '06:00')
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 // set 7: Inbox items not dealt with. Each choice brings its own default number of days, unless the days were changed by hand
-const OLD_INBOX = [{ label: 'Suggest decisions', value: 'Suggest' }, { label: 'Park them as ideas', value: 'Park' }, { label: 'Discard them to the trash', value: 'Discard' }]
+const OLD_INBOX = [{ label: 'Suggest decisions', value: 'Suggest' }, { label: 'Park them in Someday', value: 'Park' }, { label: 'Discard them to the trash', value: 'Discard' }]
 const OLD_INBOX_DAYS = { Suggest: 7, Park: 14, Discard: 14 }
 async function setOldInboxMode(v) {
   const was = d.value.settings.old_inbox_mode || 'Suggest'
@@ -474,8 +478,6 @@ const LISTS = [
   { kind: 'area', section: 'areas', label: 'Areas', one: 'area', noun: 'areas', key: 'areas', field: 'area_name', ordered: true, placeholder: 'For example Health',
     hint: 'Areas are your own filing headings.', countNoun: ['record', 'records'], link: (r) => ({ path: '/library/timeline', query: { area: r.name } }),
     footer: 'Drag the handle to reorder, or to the middle of another area to put it under that one. Alt and the arrow keys move a focused row.' },
-  { kind: 'tag', section: 'tags', label: 'Tags', one: 'tag', noun: 'tags', key: 'tags', field: 'tag_name', placeholder: 'For example tax',
-    hint: 'Tags are themes that cut across areas.', countNoun: ['tagged record', 'tagged records'], footer: 'Tags are listed by name.' },
   { kind: 'habit', section: 'habits', label: 'Habits', one: 'habit', noun: 'habits', key: 'habits', field: 'title', placeholder: 'For example Walk',
     hint: 'Habits you may track in a month.', countNoun: ['month', 'months'], footer: 'This is the library of habits ever tracked. Which ones count in a month is set under Journal, Habits, Manage habits.' },
   { kind: 'dimension', section: 'dimensions', label: 'Check-in dimensions', one: 'dimension', noun: 'dimensions', key: 'dimensions', field: 'dimension_name', ordered: true,
@@ -501,7 +503,7 @@ const groups = computed(() => [
   { key: 'me', label: 'Me', items: [{ value: 'profile', label: 'Profile' }, { value: 'appearance', label: 'Appearance' }, { value: 'notifications', label: 'Notifications' },
     { value: 'shortcuts', label: 'Shortcuts' }, { value: 'calendar', label: 'Calendar' }] },
   { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas' }, { value: 'rhythms', label: 'Rhythms' }, { value: 'habits', label: 'Habits' },
-    { value: 'dimensions', label: 'Check-ins' }, { value: 'reset', label: 'Reset rules' }, { value: 'tags', label: 'Tags' }] },
+    { value: 'dimensions', label: 'Check-ins' }, { value: 'reset', label: 'Reset rules' }] },
   { key: 'assistant', label: 'Assistant', items: [{ value: 'connections', label: 'Connections' },
     ...(d.value?.is_admin ? [{ value: 'ai', label: 'Ask and AI' }, { value: 'cost', label: 'Cost' }] : []), { value: 'sensitive', label: 'Sensitive items' }, { value: 'note-rules', label: 'Note rules' }] },
   // issue 1: who is in each space and what they can do, people and agents together
@@ -530,7 +532,7 @@ function open(v) {
 // "This space": its own space picker, which does not change the space of the sidebar (space= in the URL)
 const spaceSel = computed(() => (route.query.space ? String(route.query.space) : store.space))
 const pickSpace = (v) => router.replace({ query: { ...route.query, space: v === store.space ? undefined : v } })
-const spaceGroup = ['areas', 'tags', 'habits', 'dimensions', 'connections', 'note-rules', 'import']
+const spaceGroup = ['areas', 'habits', 'dimensions', 'connections', 'note-rules', 'import']
 const heading = computed(() => {
   const label = section.value === 'areas' ? 'Areas of life' : sections.value.find((s) => s.value === section.value)?.label || ''
   return spaceGroup.includes(section.value) ? `${label} in ${spaceSel.value}` : label

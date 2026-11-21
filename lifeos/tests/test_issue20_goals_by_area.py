@@ -15,7 +15,7 @@ class TestGoalsByArea(LifeTestCase):
 		frappe.db.set_value("Life Area", self.health, "is_on", 1)
 
 	def goal(self, title, area, **kw):
-		return self.make("Life Goal", title=title, area=area, goal_type="Open", **kw).name
+		return self.make("Life Goal", title=title, area=area, horizon="Long term", **kw).name
 
 	def section(self, res, area):
 		return next((s for s in res["sections"] if s["area"] == area), None)
@@ -67,7 +67,7 @@ class TestGoalsByArea(LifeTestCase):
 
 	def test_filters_this_cycle_all_open_finished(self):
 		cycle = self.make("Life Cycle", title="i20 cycle", start_date="2026-10-05", status="Active").name
-		inside = self.make("Life Goal", title="i20 inside", area=self.health, goal_type="12 Week Year", cycle=cycle).name
+		inside = self.make("Life Goal", title="i20 inside", area=self.health, horizon="12 weeks", cycle=cycle).name
 		outside = self.goal("i20 outside", self.health)
 		done = self.goal("i20 done", self.health)
 		frappe.db.set_value("Life Goal", done, "outcome", "Achieved")

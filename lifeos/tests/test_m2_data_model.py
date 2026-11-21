@@ -2,13 +2,14 @@ import frappe
 from frappe.utils import add_days, today
 
 from lifeos import index, seed
+from lifeos import journal as rules
 from lifeos.constants import SPACE_DOCTYPES
 from lifeos.tests.base import PRIVATE, SHARED, LifeTestCase
 
 
 def index_rows(doctype, name):
 	return frappe.db.sql(
-		"select kind, space, area, also_in_csv, goal, tags_csv, record_date, title, search_text, is_archived, status "
+		"select kind, space, area, also_in_csv, goal, record_date, title, search_text, is_archived, status "
 		"from `tabLife Index` where ref_doctype=%s and ref_name=%s order by kind", (doctype, name), as_dict=True)
 
 
@@ -105,14 +106,9 @@ class TestAreasAndGoals(LifeTestCase):
 			"also_in": [{"area": self.shared_areas["Work"]}]})
 		self.assertRaises(frappe.ValidationError, task.insert)
 
-	def test_tag_from_another_space_is_refused(self):
-		tag = self.make("Life Tag", space=SHARED, tag_name="groceries")
-		note = frappe.get_doc({"doctype": "Life Note", "space": PRIVATE, "title": "Tagged", "tags": [{"tag": tag.name}]})
-		self.assertRaises(frappe.ValidationError, note.insert)
-
 	def test_goal_of_a_record_may_sit_in_any_area_of_its_space(self):
 		# set 6: projects became goals; a goal is not tied to the record's area (the old area check went with projects)
-		goal = self.make("Life Goal", title="Ghillidary turnaround", goal_type="Open", area=self.areas["Tea"])
+		goal = self.make("Life Goal", title="Ghillidary turnaround", horizon="Long term", area=self.areas["Tea"])
 		ok = self.make("Life Task", title="In the goal's area", area=self.areas["Tea"], goal=goal.name)
 		self.assertEqual(ok.goal, goal.name)
 		elsewhere = self.make("Life Task", title="Elsewhere", area=self.areas["Personal"], goal=goal.name)
@@ -129,15 +125,13 @@ class TestAreasAndGoals(LifeTestCase):
 
 class TestIndex(LifeTestCase):
 	def test_saving_writes_one_row(self):
-		tag = self.make("Life Tag", tag_name="audit")
 		note = self.make("Life Note", title="Estate training outline", content_md="Trained manpower plan",
-			area=self.areas["Tea"], also_in=[{"area": self.areas["Money"]}], tags=[{"tag": tag.name}])
+			area=self.areas["Tea"], also_in=[{"area": self.areas["Money"]}])
 		rows = index_rows("Life Note", note.name)
 		self.assertEqual(len(rows), 1)
 		r = rows[0]
 		self.assertEqual((r.kind, r.space, r.area, r.title), ("Note", PRIVATE, self.areas["Tea"], "Estate training outline"))
 		self.assertEqual(r.also_in_csv, f",{self.areas['Money']},")
-		self.assertEqual(r.tags_csv, f",{tag.name},")
 		self.assertIn("Trained manpower", r.search_text)
 		note.title = "Renamed outline"
 		note.save()
@@ -189,7 +183,7 @@ class TestIndex(LifeTestCase):
 		done.status = "Done"
 		done.save()
 		self.make("Life Chat Log", title="Rebuild chat", date=add_days(today(), -3))
-		query = ("select name, ref_doctype, ref_name, space, area, also_in_csv, goal, tags_csv, record_date, title, "
+		query = ("select name, ref_doctype, ref_name, space, area, also_in_csv, goal, record_date, title, "
 			"search_text, is_archived, kind, status, record_owner from `tabLife Index` order by name")
 		before = frappe.db.sql(query)
 		self.assertTrue(before)
@@ -220,8 +214,9 @@ class TestSeed(LifeTestCase):
 		self.assertEqual([a.status for a in loops.actions if a.title == "Anya passport"], ["Done"])
 		self.assertEqual(frappe.db.get_value("Life Area", goals[0].area, "area_name"), "Tea & Coffee")
 		october = frappe.get_doc("Life Month Plan", f"{PRIVATE}-2026-10")
-		self.assertEqual(len(october.goals), 14)
-		self.assertEqual(sum(1 for g in october.goals if g.status == "Carried"), 9)
+		goals = rules.month_goals(PRIVATE, 2026, 10)
+		self.assertEqual(len(goals), 14)
+		self.assertEqual(sum(1 for g in goals if g["status"] == "Carried"), 9)
 		self.assertEqual(len(october.habits), 4)
 		self.assertIn("## Land monetisation", october.mindsweep_md)
 		november = frappe.get_doc("Life Month Plan", f"{PRIVATE}-2026-11")

@@ -50,7 +50,7 @@ class TestTaskAreas(LifeTestCase):
 
 	# 1
 	def test_a_task_with_a_goal_gets_the_goals_area(self):
-		goal = self.make("Life Goal", title="i13 Grow the tea business", goal_type="Open", area=self.areas["Tea"])
+		goal = self.make("Life Goal", title="i13 Grow the tea business", horizon="Long term", area=self.areas["Tea"])
 		t = self.task("i13 Zqx call", goal=goal.name)
 		self.assertEqual(t.area, self.areas["Tea"])
 		self.assertTrue(t.area_guessed)
@@ -138,7 +138,7 @@ class TestTaskAreas(LifeTestCase):
 
 	# 6
 	def test_the_patch_fills_every_task_without_an_area_and_calls_no_model(self):
-		goal = self.make("Life Goal", title="i13 Patch goal", goal_type="Open", area=self.areas["Tea"])
+		goal = self.make("Life Goal", title="i13 Patch goal", horizon="Long term", area=self.areas["Tea"])
 		made = {}
 		for title, values in (("Zqxv patch goal task", {"goal": goal.name}), ("Patch the personal things", {}),
 				("Zqxv patch", {}), ("Zqxv patch done", {"status": "Done"})):

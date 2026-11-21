@@ -173,7 +173,7 @@ _TITLED = {
 	"Life Important Date": "title", "Life Goal": "title", "Life Vault Document": "title", "Life Chat Log": "title",
 	"Life Person": "full_name", "Life Proposal": "preview",
 	# UX fixes, set 5
-	"Life Idea": "title", "Life Habit": "title", "Life Ask Thread": "title",
+	"Life Habit": "title", "Life Ask Thread": "title",
 	# set 7
 	"Life Exit": "title", "Life Goal Reading": "title",
 }
@@ -263,8 +263,6 @@ def purge_test_debris(dry_run=True):
 	pairs = [(dt, n) for dt, names in debris.items() for n in names]
 	if dry_run or not (pairs or _orphan_files()):
 		return {"stamps": len(stamps), "records": report, "orphan_files": len(_orphan_files()), "dry_run": bool(dry_run)}
-	month_goals = frappe.db.sql("select name from `tabLife Month Plan Goal` where " +
-		" or ".join(["title like %s"] * len(stamps)), [f"%{s}%" for s in stamps]) if stamps else []
 	files = []
 	for dt, names in debris.items():
 		names = list(names)
@@ -289,8 +287,6 @@ def purge_test_debris(dry_run=True):
 			frappe.db.sql("delete from `tabLife Ask Message` where thread in %s", (names,))
 		# nosemgrep: frappe-sql-format-injection -- development tool: dt is checked to be an existing DocType; names are a parameter
 		frappe.db.sql(f"delete from `tab{dt}` where name in %s", (names,))
-	if month_goals:
-		frappe.db.sql("delete from `tabLife Month Plan Goal` where name in %s", ([m[0] for m in month_goals],))
 	files += _orphan_files()
 	for f in files:
 		_delete_file(f)
@@ -302,4 +298,4 @@ def purge_test_debris(dry_run=True):
 			frappe.db.sql("delete from `tabLife View State` where name=%s", v.name)
 			removed_views += 1
 	frappe.clear_cache()
-	return {"stamps": len(stamps), "records": report, "month_goals": len(month_goals), "files": len(files), "views": removed_views}
+	return {"stamps": len(stamps), "records": report, "files": len(files), "views": removed_views}

@@ -41,10 +41,10 @@ SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modi
 
 
 @frappe.whitelist(methods=["GET"])
-def list(space: str | None = None, area: str | None = None, goal: str | None = None, tag: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
+def list(space: str | None = None, area: str | None = None, goal: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
 		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, collection: str | None = "My notes", project: str | None = None):
 	"""Notes of a space as a flat list, newest first. Reads Life Index.
-	Filters: area (with its sub-areas, or "none"), goal (a goal, or "none" for reference notes; `project` names the goal a project became), tag,
+	Filters: area (with its sub-areas, or "none"), goal (a goal, or "none" for reference notes; `project` names the goal a project became),
 	collection (My notes, the default; Wiki; or "all").
 	`total` is the number of notes the filters match."""
 	space = permissions.resolve_space(space)
@@ -62,9 +62,6 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 	if goal:
 		where.append("x.goal = %(goal)s")
 		values["goal"] = "" if goal == "none" else goal
-	if tag:
-		where.append("exists (select 1 from `tabLife Tag Link` tl where tl.parent = x.ref_name and tl.parenttype = 'Life Note' and tl.tag = %(tag)s)")
-		values["tag"] = tag
 	conds, values = std_filters("Life Index", filters, "x", values)
 	clause = " and ".join(where + conds)
 	if summary:
@@ -79,14 +76,8 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {clause}", values)[0][0]
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows], "title")
-	tags = {}
-	if rows:
-		for parent, name in frappe.db.sql(
-			"select l.parent, g.tag_name from `tabLife Tag Link` l join `tabLife Tag` g on g.name = l.tag where l.parenttype='Life Note' and l.parent in %s",
-			([r.name for r in rows],)):
-			tags.setdefault(parent, []).append(name)
 	for r in rows:
-		r["area_name"], r["goal_title"], r["tags"] = areas.get(r.area), goals.get(r.goal), tags.get(r.name, [])
+		r["area_name"], r["goal_title"] = areas.get(r.area), goals.get(r.goal)
 		r["record_date"] = str(r.record_date) if r.record_date else None
 		r["modified"] = str(r.modified)[:10]
 	return {"space": space, "notes": rows, "total": total}
@@ -122,7 +113,7 @@ def get(note: str):
 		"parent_title": _visible_title(doc.parent_note, doc.space) if doc.parent_note else None,
 		"area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 		"goal": doc.goal, "goal_title": frappe.db.get_value("Life Goal", doc.goal, "title") if doc.goal else None,
-		"also_in": [r.area for r in doc.also_in], "tag_ids": [r.tag for r in doc.tags], "is_archived": doc.is_archived,
+		"also_in": [r.area for r in doc.also_in], "is_archived": doc.is_archived,
 		"inbox_item": doc.inbox_item, "modified": str(doc.modified)[:19], "owner": doc.owner, "version": version_of(doc),
 		"collection": doc.collection or "My notes", "summary": doc.summary, "is_rules": doc.is_rules,
 		"sources": [{"doctype": r.source_doctype, "name": r.source_name, "title": links.title_of(r.source_doctype, r.source_name)} for r in doc.sources],
@@ -140,7 +131,7 @@ def version_of(doc):
 
 @frappe.whitelist(methods=["POST"])
 def save(note: str | None = None, space: str | None = None, title: str | None = None, content_md: str | None = None, area: str | None = None, goal: str | None = None, parent_note: str | None = None,
-		also_in: str | builtins.list | None = None, tag_ids: str | builtins.list | None = None, base_version: str | None = None, summary: str | None = None, collection: str | None = None):
+		also_in: str | builtins.list | None = None, base_version: str | None = None, summary: str | None = None, collection: str | None = None):
 	"""Create or change a note. On save its [[Title]] links are parsed and stored in Life Link.
 	`base_version` is the `version` the editor started from. If the note changed since (an agent's edit, another device),
 	nothing is saved and the answer is {"conflict": true, "current": <the note as it is now>}."""
@@ -167,8 +158,6 @@ def save(note: str | None = None, space: str | None = None, title: str | None = 
 			doc.set(field, value or None)
 	if also_in is not None:
 		doc.set("also_in", [{"area": a} for a in parse(also_in, [])])
-	if tag_ids is not None:
-		doc.set("tags", [{"tag": t} for t in parse(tag_ids, [])])
 	if doc.parent_note and doc.parent_note == doc.name:
 		frappe.throw(_("A note cannot be its own parent."))
 	doc.save() if note else doc.insert()

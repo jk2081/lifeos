@@ -141,7 +141,7 @@ def summary(goal):
 			"label": f"{cur}{unit}, target {num(g.get('target_value'))}{unit}" if has else f"No reading yet, target {num(g.get('target_value'))}{unit}",
 			"start": g.get("start_value"), "current": g.get("current_value") if has else None, "target": g.get("target_value"), "unit": g.get("unit"),
 			"measure": g.get("measure"), "current_on": str(g.get("current_on")) if g.get("current_on") else None}
-	if g.get("goal_type") == "12 Week Year" and g.get("score") is not None:
+	if g.get("horizon") == "12 weeks" and g.get("score") is not None:
 		return {"kind": "cycle", "percent": round(flt(g.get("score")), 1), "label": f"{round(flt(g.get('score')))}% of ticks"}
 	n, done = cint(g.get("tasks_counted")), cint(g.get("tasks_done"))
 	if n:

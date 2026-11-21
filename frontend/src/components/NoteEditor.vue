@@ -82,7 +82,7 @@ const writable = computed(() => !props.readonly && !note.is_archived && store.sp
 const filingLine = computed(() => [note.area_name || 'Unfiled', note.goal_title || 'no goal',
   note.parent_title && 'in ' + note.parent_title, ...(note.also_in || []).map((a) => 'also in ' + areaName(a)),
   note.modified && 'edited ' + short(note.modified, true)].filter(Boolean).join(' · '))
-const goalPick = computed(() => [{ label: 'No goal', value: '' }, ...(lookups.goals || []).map((g) => ({ value: g.name, label: `${g.goal_type} · ${g.title}` })),
+const goalPick = computed(() => [{ label: 'No goal', value: '' }, ...(lookups.goals || []).map((g) => ({ value: g.name, label: `${g.horizon} · ${g.title}` })),
   ...(note.goal && !(lookups.goals || []).some((g) => g.name === note.goal) ? [{ value: note.goal, label: note.goal_title || note.goal }] : [])])
 const parentOptions = computed(() => allNotes.value.filter((n) => n.name !== note.name && n.parent_note !== note.name).map((n) => ({ value: n.name, label: n.title })))
 
@@ -143,7 +143,7 @@ async function saveMeta(values) {
 }
 watch(() => note.name, () => { saveState.value = 'Saved' })
 onBeforeUnmount(() => flush())
-// the selected text, for "Selection to Someday" (an idea made from part of a note)
+// the selected text, for "Selection to Someday" (a Someday note made from part of a note)
 function selection() {
   const v = editor.value?.view?.()
   if (!v) return ''

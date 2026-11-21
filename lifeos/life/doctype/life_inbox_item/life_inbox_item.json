@@ -39,7 +39,6 @@
   "area",
   "also_in",
   "goal",
-  "tags",
   "is_sensitive",
   "is_archived",
   "archived_on",
@@ -260,12 +259,6 @@
    "label": "Goal",
    "options": "Life Goal",
    "search_index": 1
-  },
-  {
-   "fieldname": "tags",
-   "fieldtype": "Table MultiSelect",
-   "label": "Tags",
-   "options": "Life Tag Link"
   },
   {
    "default": "0",

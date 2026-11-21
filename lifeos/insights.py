@@ -63,7 +63,7 @@ def detect_stuck(space):
 			[ev("Life Task", i.name, i.title) for i in items[:200]], body=f"The oldest has not changed since {oldest.strftime('%-d %b %Y')}.",
 			actions=[{"kind": "open_reset", "label": "Open in Reset", "names": names}, {"kind": "move_someday", "label": "Move all to Someday",
 				"items": [{"doctype": "Life Task", "name": n} for n in names]}], area=area))
-	idle = frappe.db.sql("""select name, title, area from `tabLife Goal` where space=%s and goal_type='Open' and outcome='In Progress'
+	idle = frappe.db.sql("""select name, title, area from `tabLife Goal` where space=%s and horizon='Long term' and outcome='In Progress'
 		and on_hold=0 and is_someday=0 and is_archived=0 and ifnull(last_activity_on, date(modified)) <= %s""", (space, cutoff), as_dict=True)
 	for p in idle:
 		out.append(candidate("Stuck", f"The goal {p.title} has had no activity for {days} days", [ev("Life Goal", p.name, p.title)],

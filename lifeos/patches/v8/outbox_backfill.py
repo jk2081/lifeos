@@ -53,8 +53,6 @@ def execute():
 		pile = outbox.pile_of(doc)
 		if pile:
 			put("Life Inbox Item", i, pile, i.finished_on)
-	for i in frappe.get_all("Life Idea", filters={"status": "Brought Back", "modified": (">=", since)}, fields=["name", "space", "area", "title", "modified", "modified_by"]):
-		put("Life Idea", i, "Done", i.modified, "Date of the idea's last change: when it was brought back was not recorded.")
 	for d in frappe.get_all("Deleted Document", filters={"deleted_doctype": ("in", list(outbox.KIND)), "restored": 0, "creation": (">=", since)},
 			fields=["deleted_doctype", "deleted_name", "data", "creation", "owner"]):
 		try:

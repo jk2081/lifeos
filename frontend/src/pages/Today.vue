@@ -311,7 +311,7 @@ const weekRef = (w) => (w.kind === 'vault' ? 'vault:' + w.name : w.kind === 'imp
 
 const autoText = computed(() => {
   const a = d.value.auto_inbox
-  const parts = [a.parked && `parked ${a.parked} as idea${a.parked === 1 ? '' : 's'} in Someday`, a.discarded && `moved ${a.discarded} to the trash`].filter(Boolean)
+  const parts = [a.parked && `parked ${a.parked} in Someday`, a.discarded && `moved ${a.discarded} to the trash`].filter(Boolean)
   return `Inbox items older than ${a.days} days: ${parts.join(' and ')}. Undo until ${short(a.undo_until)}.`
 })
 async function undoAuto() {

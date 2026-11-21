@@ -307,7 +307,7 @@ def in_area(space, area, doctype, names):
 	names = [n for n in set(names or []) if n]
 	if not area or not names:
 		return set(names)
-	if doctype not in ALSO_IN and doctype not in ("Life Goal", "Life Idea", "Life Habit", "Life Insight"):
+	if doctype not in ALSO_IN and doctype not in ("Life Goal", "Life Habit", "Life Insight"):
 		frappe.throw(frappe._("Unknown filed DocType {0}.").format(doctype))
 	values = {"names": names}
 	cond = area_filter(space, area, "x.area", values, also_in=doctype if doctype in ALSO_IN else None)

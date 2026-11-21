@@ -27,11 +27,6 @@
                 @click="setField(p, 'also_in', p.payload.also_in.filter((x) => x !== a))" /></template></Badge>
             <Pick :model-value="null" :options="areaOptions.filter((o) => o.value !== p.payload.area && !(p.payload.also_in || []).includes(o.value))"
               placeholder="also in" :clearable="false" :disabled="!writable" @update:model-value="(v) => setField(p, 'also_in', [...(p.payload.also_in || []), v])" />
-            <Badge v-for="t in p.payload.tags || []" :key="tagKey(t)" size="lg">#{{ tagName(t) }}
-              <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove #' + tagName(t)"
-                @click="setField(p, 'tags', p.payload.tags.filter((x) => tagKey(x) !== tagKey(t)))" /></template></Badge>
-            <Pick :model-value="null" :options="tagOptions(p)" placeholder="tag" :clearable="false" :disabled="!writable"
-              @update:model-value="(v) => setField(p, 'tags', [...(p.payload.tags || []), v])" />
           </template>
           <template v-if="p.kind === 'Task'">
             <span v-if="p.payload.due_date || dueFor === p.name" class="inline-flex items-center gap-1.5 text-sm text-ink-gray-6">due
@@ -101,17 +96,11 @@ const editing = ref(null)
 const draft = ref({})
 
 const shown = computed(() => (props.only === 'pending' ? props.item.proposals.filter((p) => p.status === 'Pending') : props.item.proposals))
-const ctx = computed(() => props.item?.context || { areas: [], tags: [], goals: [], people: [], habits: [], dimensions: [] })
+const ctx = computed(() => props.item?.context || { areas: [], goals: [], people: [], habits: [], dimensions: [] })
 const pct = (c) => Math.round((c || 0) * 100)
 const areaOptions = computed(() => areaOptionsOf(ctx.value.areas))
 const areaName = (id) => ctx.value.areas.find((a) => a.name === id)?.area_name || id
 const goalTitle = (id) => ctx.value.goals.find((g) => g.name === id)?.title || id
-const tagKey = (t) => (typeof t === 'string' ? t : 'new:' + t.new)
-const tagName = (t) => (typeof t === 'string' ? ctx.value.tags.find((x) => x.name === t)?.tag_name || t : t.new + ' (new)')
-function tagOptions(p) {
-  const have = (p.payload.tags || []).map(tagKey)
-  return ctx.value.tags.filter((t) => !have.includes(t.name)).map((t) => ({ value: t.name, label: '#' + t.tag_name }))
-}
 function linkOptions(doctype) {
   const c = ctx.value
   const map = {
@@ -183,7 +172,7 @@ async function decide(p, decision, payload) {
 const editFields = computed(() => {
   if (!editing.value) return {}
   const fields = schema.value[editing.value.kind]?.fields || {}
-  return Object.fromEntries(Object.entries(fields).filter(([, s]) => !['links', 'tags'].includes(s.type)))
+  return Object.fromEntries(Object.entries(fields).filter(([, s]) => s.type !== 'links'))
 })
 const fieldLabel = (f) => f.replace(/_md$/, '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
 function openEdit(p) {

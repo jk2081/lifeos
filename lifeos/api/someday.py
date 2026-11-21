@@ -1,4 +1,4 @@
-"""Someday (UX fixes, set 5): park tasks, goals and ideas out of the way, and bring them back, keep them for longer, or
+"""Someday, the one parking lot: park tasks, goals and notes out of the way, and bring them back, keep them for longer, or
 purge them. An open-ended goal (what a project was before set 6) takes its open tasks with it. Parking keeps `creation`.
 Agents may only propose parking."""
 import builtins
@@ -11,16 +11,15 @@ from frappe.utils import add_months, cint, getdate, today
 from lifeos import permissions
 from lifeos.api.utils import names_map, page, parse, std_filters
 from lifeos.counts import rules
-from lifeos.proposals import goal_for_project
 
-PARKABLE = ("Life Task", "Life Goal", "Life Idea")
-TYPE_OF = {"Life Task": "Task", "Life Goal": "Goal", "Life Idea": "Idea"}
+PARKABLE = ("Life Task", "Life Goal", "Life Note")
+TYPE_OF = {"Life Task": "Task", "Life Goal": "Goal", "Life Note": "Note"}
 # "projects" is read as "goals" for one set (projects became goals in set 6)
-TAB_TYPE = {"tasks": "Life Task", "goals": "Life Goal", "projects": "Life Goal", "ideas": "Life Idea"}
-TABS = ("all", "due", "tasks", "goals", "ideas")
+TAB_TYPE = {"tasks": "Life Task", "goals": "Life Goal", "projects": "Life Goal", "notes": "Life Note"}
+TABS = ("all", "due", "tasks", "goals", "notes")
 # the SQL that says "parked" for each kind
 PARKED = {"Life Task": "x.status = 'Someday' and x.is_archived = 0", "Life Goal": "x.is_someday = 1 and x.is_archived = 0",
-	"Life Idea": "x.status = 'Someday'"}
+	"Life Note": "x.is_someday = 1 and x.is_archived = 0"}
 
 
 def _person():
@@ -44,8 +43,6 @@ def _sub(doctype, space, filters, values, i, area=None):
 	extra = "''"
 	if doctype == "Life Goal":
 		extra = "(select count(*) from `tabLife Task` t where t.someday_with = x.name and t.status = 'Someday')"
-	elif doctype == "Life Idea":
-		extra = "ifnull(x.source_doctype, '')"
 	elif doctype == "Life Task":
 		extra = "ifnull(x.goal, '')"
 	return (f"select '{doctype}' as doctype, x.name, x.title, x.area, x.creation, x.someday_on, x.someday_review_on, "
@@ -55,7 +52,7 @@ def _sub(doctype, space, filters, values, i, area=None):
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, tab: str | None = "all", area: str | None = None, filters: str | builtins.list | dict | None = None,
 		order_by: str | None = None, start: int | str | None = 0, page_length: int | str | None = 50):
-	"""Parked items of a space, oldest review first. tab: all, due (review date reached), tasks, goals, ideas.
+	"""Parked items of a space, oldest review first. tab: all, due (review date reached), tasks, goals, notes.
 	filters: standard filters on the fields every parked kind has (title, area, someday_on, someday_review_on, name,
 	creation). `tabs` counts each tab under the same filters."""
 	space = permissions.resolve_space(space)
@@ -96,8 +93,7 @@ def list(space: str | None = None, tab: str | None = "all", area: str | None = N
 		r["area_path"] = " · ".join(x for x in (parent_names.get(parents.get(r.area)), areas.get(r.area)) if x)
 		r["due"] = bool(r.someday_review_on and getdate(r.someday_review_on) <= now)
 		r["tasks"] = cint(r.extra) if r.doctype == "Life Goal" else None
-		r["from_source"] = r.extra if r.doctype == "Life Idea" and r.extra else None
-		r["ref"] = {"Life Task": "task", "Life Goal": "goal", "Life Idea": "idea"}[r.doctype] + ":" + r.name
+		r["ref"] = {"Life Task": "task", "Life Goal": "goal", "Life Note": "note"}[r.doctype] + ":" + r.name
 		for k in ("creation", "someday_on", "someday_review_on"):
 			r[k] = str(r[k])[:10] if r.get(k) else None
 		r.pop("extra", None)
@@ -110,7 +106,7 @@ def count(space):
 
 def _check(doctype):
 	if doctype not in PARKABLE:
-		frappe.throw(_("Only tasks, goals and ideas can go on the Someday list."))
+		frappe.throw(_("Only tasks, goals and notes can go on the Someday list."))
 
 
 def _goal_tasks(goal):
@@ -130,11 +126,13 @@ def park_doc(doc, note=None):
 		if (doc.outcome or "In Progress") != "In Progress":
 			frappe.throw(_("Only a goal in progress can go on the Someday list."))
 		doc.is_someday = 1
+	elif doc.doctype == "Life Note":
+		doc.is_someday = 1
 	doc.someday_on, doc.someday_review_on = day, rev
 	if note is not None:
 		doc.someday_note = note
 	doc.save()
-	if doc.doctype == "Life Goal" and doc.goal_type == "Open":
+	if doc.doctype == "Life Goal" and doc.horizon == "Long term":
 		for name in _goal_tasks(doc.name):
 			t = frappe.get_doc("Life Task", name)
 			t.check_permission("write")
@@ -158,17 +156,17 @@ def _snapshot(doc):
 	"""What Undo needs to put a record back: its status fields, and for an open-ended goal the open tasks it took."""
 	out = {"doctype": doc.doctype, "name": doc.name, "status": doc.get("status"), "is_someday": doc.get("is_someday"),
 		"due_date": doc.get("due_date"), "on_hold": doc.get("on_hold"), "outcome": doc.get("outcome")}
-	if doc.doctype == "Life Goal" and doc.goal_type == "Open":
+	if doc.doctype == "Life Goal" and doc.horizon == "Long term":
 		out["tasks"] = frappe.get_all("Life Task", filters={"name": ["in", _goal_tasks(doc.name) or ["-"]]}, fields=["name", "status"])
 	return out
 
 
 @frappe.whitelist(methods=["POST"])
 def bring_back(doctype: str, name: str, due_date: str | date | None = None, status: str | None = None, cycle: str | None = None,
-		target_date: str | date | None = None, make: str | None = None, area: str | None = None):
+		target_date: str | date | None = None):
 	"""Make a parked item live again. A task: an optional due date. A goal: a cycle (12 Week Year goals) or a target date;
-	an open-ended goal also a status (Active or On Hold), and the tasks it took come back as Open. An idea: make a task,
-	a goal (open-ended) or a note; "project" is read as "goal" for one set."""
+	a long-term goal also a status (Active or On Hold), and the tasks it took come back as Open. A note: it is simply no
+	longer parked."""
 	_person()
 	_check(doctype)
 	doc = permissions.get_doc_checked(doctype, name, "write")
@@ -179,11 +177,11 @@ def bring_back(doctype: str, name: str, due_date: str | date | None = None, stat
 		doc.save()
 	elif doctype == "Life Goal":
 		doc.is_someday = 0
-		if cycle and doc.goal_type == "12 Week Year":
+		if cycle and doc.horizon == "12 weeks":
 			doc.cycle = cycle
 		if target_date:
 			doc.target_date = target_date
-		if doc.goal_type == "Open":
+		if doc.horizon == "Long term":
 			doc.on_hold = 1 if status == "On Hold" else 0
 		doc.save()
 		for t in frappe.get_all("Life Task", filters={"someday_with": doc.name, "status": "Someday"}, pluck="name"):
@@ -191,26 +189,8 @@ def bring_back(doctype: str, name: str, due_date: str | date | None = None, stat
 			td.status = "Open"
 			td.save()
 	else:
-		make = "goal" if make == "project" else make
-		if make not in ("task", "goal", "note"):
-			frappe.throw(_("Choose what the idea becomes: a task, a goal or a note."))
-		target_area = area or doc.area
-		if make == "task":
-			new = frappe.get_doc({"doctype": "Life Task", "space": doc.space, "title": doc.title[:140], "area": target_area,
-				"goal": doc.goal if doc.goal and target_area == doc.area else None, "notes_md": doc.body_md, "due_date": due_date or None,
-				"status": "Open"}).insert()
-		elif make == "goal":
-			if not target_area:
-				frappe.throw(_("A goal made from an idea needs an area."))
-			new = frappe.get_doc({"doctype": "Life Goal", "space": doc.space, "title": doc.title, "area": target_area, "goal_type": "Open",
-				"notes_md": doc.body_md, "outcome": "In Progress"}).insert()
-		else:
-			new = frappe.get_doc({"doctype": "Life Note", "space": doc.space, "title": doc.title, "area": target_area,
-				"content_md": doc.body_md or ""}).insert()
-		doc.status = "Brought Back"
-		doc.brought_to_doctype, doc.brought_to_name = new.doctype, new.name
+		doc.is_someday = 0
 		doc.save()
-		out["made"] = {"doctype": new.doctype, "name": new.name}
 	return out
 
 
@@ -241,34 +221,21 @@ def purge(doctype: str, name: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_idea(title: str, space: str | None = None, body_md: str | None = None, area: str | None = None, goal: str | None = None,
-		source_doctype: str | None = None, source_name: str | None = None, note: str | None = None, project: str | None = None):
-	"""A new idea on the Someday list, from the New menu, a note selection, a chat open item or a digest item."""
+def create(title: str, space: str | None = None, body_md: str | None = None, area: str | None = None, goal: str | None = None,
+		note: str | None = None, as_note: bool | int = 0):
+	"""Something new on the Someday list: a task marked Someday with a review date, or (`as_note`) a thought with no action,
+	a note marked Someday. From the New menu, a note selection, a chat open item or a digest item."""
 	_person()
 	space = permissions.resolve_space(space, write=True)
 	title = " ".join((title or "").split())[:140]
 	if not title:
-		frappe.throw(_("Type the idea."))
-	if source_doctype and source_name:
-		src = permissions.get_doc_checked(source_doctype, source_name)
-		if src.get("space") != space:
-			frappe.throw(_("The source belongs to another space."))
-	doc = frappe.get_doc({"doctype": "Life Idea", "space": space, "title": title, "body_md": body_md, "area": area or None,
-		"goal": goal or (project and goal_for_project(project, space)) or None, "source_doctype": source_doctype if source_name else None, "source_name": source_name or None,
-		"status": "Someday", "someday_on": today(), "someday_review_on": review_date(), "someday_note": note}).insert()
-	return {"name": doc.name, "title": doc.title, "review_on": doc.someday_review_on}
-
-
-@frappe.whitelist(methods=["GET"])
-def get_idea(idea: str):
-	doc = permissions.get_doc_checked("Life Idea", idea)
-	out = doc.as_dict()
-	out["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
-	if doc.source_doctype and doc.source_name:
-		from lifeos import links
-
-		out["source_title"] = links.title_of(doc.source_doctype, doc.source_name)
-	return {k: (str(v) if hasattr(v, "isoformat") else v) for k, v in out.items() if not k.startswith("_")}
+		frappe.throw(_("Type what to park."))
+	fields = {"space": space, "title": title, "area": area or None, "someday_on": today(), "someday_review_on": review_date(), "someday_note": note}
+	if cint(as_note):
+		doc = frappe.get_doc({"doctype": "Life Note", **fields, "content_md": body_md or "", "is_someday": 1}).insert()
+	else:
+		doc = frappe.get_doc({"doctype": "Life Task", **fields, "notes_md": body_md, "goal": goal or None, "status": "Someday"}).insert()
+	return {"name": doc.name, "title": doc.title, "doctype": doc.doctype, "review_on": doc.someday_review_on}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -289,7 +256,9 @@ def restore_snapshot(snap):
 
 		archive.set_archived(doc.doctype, doc.name, False)
 		doc.reload()
-	if doc.doctype == "Life Goal":
+	if doc.doctype == "Life Note":
+		doc.is_someday = cint(snap.get("is_someday"))
+	elif doc.doctype == "Life Goal":
 		doc.is_someday = cint(snap.get("is_someday"))
 		doc.on_hold = cint(snap.get("on_hold"))
 		if snap.get("outcome"):

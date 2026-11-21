@@ -11,7 +11,6 @@ export const TYPES = {
   vault: { label: 'Vault document', doctype: 'Life Vault Document' },
   project: { label: 'Goal' }, // a link to a project from before set 6: the pane opens the goal it became
   goal: { label: 'Goal', doctype: 'Life Goal' },
-  idea: { label: 'Idea', doctype: 'Life Idea' },
   page: { label: 'Journal page', doctype: 'Life Journal Page' },
   chat: { label: 'AI chat', doctype: 'Life Chat Log' },
   event: { label: 'Event', doctype: 'Event' },

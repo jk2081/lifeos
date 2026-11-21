@@ -61,8 +61,8 @@ class TestLens(LifeTestCase):
 		self.check(names, [r.name for r in vault.list(space=PRIVATE, area=self.parent, page_length=100)["documents"]], "vault.list")
 
 	def test_goals_and_someday(self):
-		sub = self.make("Life Goal", title="lens goal sub", goal_type="Open", area=self.sub)
-		out = self.make("Life Goal", title="lens goal elsewhere", goal_type="Open", area=self.other)
+		sub = self.make("Life Goal", title="lens goal sub", horizon="Long term", area=self.sub)
+		out = self.make("Life Goal", title="lens goal elsewhere", horizon="Long term", area=self.other)
 		listed = [r.name for r in goals.list(space=PRIVATE, area=self.parent, page_length=100)["goals"]]
 		self.assertIn(sub.name, listed)
 		self.assertNotIn(out.name, listed)

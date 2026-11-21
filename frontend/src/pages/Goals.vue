@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Goals" noun="goals" screen="goals" doctype="Life Goal" :spec="SPEC" :tabs="TABS" :quick="['goal_type', 'area', 'cycle']"
+  <ListView ref="list" title="Goals" noun="goals" screen="goals" doctype="Life Goal" :spec="SPEC" :tabs="TABS" :quick="['horizon', 'area', 'cycle']"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => 'goal:' + r.name" :watch-keys="['by']" :group-by="route.query.by === 'serves' ? (r) => (r.serves_title ? 'Serves ' + r.serves_title : 'Serves no longer goal') : null"
     :empty-title="EMPTY[tab] || 'No goals here.'" empty-hint="A goal can sit in a 12 Week cycle, have a year-end date, or be open-ended. Projects are open-ended goals with tasks. Add one with New goal."
     @loaded="(res) => (line = res.summary_line || line)">
@@ -11,7 +11,7 @@
     </template>
     <template #cell-title="{ row }"><div class="min-w-0"><div class="break-words font-medium text-ink-gray-9">{{ row.title }}</div>
       <div v-if="row.serves_title" class="truncate text-sm text-ink-gray-6" data-goal-serves-line>Serves {{ row.serves_title }}</div></div></template>
-    <template #cell-goal_type="{ row }"><Badge :theme="row.goal_type === '12 Week Year' ? 'blue' : 'gray'" :label="row.goal_type" /></template>
+    <template #cell-horizon="{ row }"><Badge :theme="row.horizon === '12 weeks' ? 'blue' : 'gray'" :label="row.horizon" /></template>
     <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="{ query: { ...route.query, area: row.area, open: undefined } }"
       :title="'Focus on ' + row.area_name">{{ row.area_name }}</RouterLink></template>
     <template #cell-_when="{ row }"><span class="truncate">{{ when(row) }}</span></template>
@@ -24,7 +24,7 @@
       <div class="flex flex-col gap-1">
         <div class="flex items-start gap-2"><div class="min-w-0 flex-1 break-words text-base-medium text-ink-gray-9">{{ row.title }}</div>
           <span v-if="row.score !== null && row.score !== undefined" class="text-sm tabular-nums text-ink-gray-8">{{ Math.round(row.score) }}%</span></div>
-        <div class="text-sm text-ink-gray-6">{{ [row.area_name, row.goal_type, when(row), row.on_hold && row.outcome === 'In Progress' ? 'on hold' : '', row.serves_title && 'serves ' + row.serves_title].filter(Boolean).join(' · ') }}</div>
+        <div class="text-sm text-ink-gray-6">{{ [row.area_name, row.horizon, when(row), row.on_hold && row.outcome === 'In Progress' ? 'on hold' : '', row.serves_title && 'serves ' + row.serves_title].filter(Boolean).join(' · ') }}</div>
         <GoalResult :row="row" />
         <GoalTasks :row="row" />
       </div>
@@ -49,7 +49,7 @@ import { askScope } from '@/lib/ask'
 const TABS = { key: 'status', field: 'outcome', label: 'Goal state', items: [{ value: 'in_progress', label: 'In progress' }, { value: 'achieved', label: 'Achieved' },
   { value: 'closed', label: 'Closed' }, { value: 'someday', label: 'Someday' }, { value: 'all', label: 'All' }] }
 const EMPTY = { in_progress: 'No goals in progress.', achieved: 'No achieved goals.', closed: 'No closed goals.' }
-const SPEC = [{ key: 'status', field: 'outcome', kind: 'value' }, { key: 'type', field: 'goal_type', kind: 'value', label: 'Type' }, { key: 'area', field: 'area', kind: 'link' },
+const SPEC = [{ key: 'status', field: 'outcome', kind: 'value' }, { key: 'type', field: 'horizon', kind: 'value', label: 'Horizon' }, { key: 'area', field: 'area', kind: 'link' },
   { key: 'cycle', field: 'cycle', kind: 'link' }, { key: 'serves', field: 'serves', kind: 'link' },
   { key: 'target_from', field: 'target_date', kind: 'from' }, { key: 'target_to', field: 'target_date', kind: 'to' }]
 const SYNTHETIC = [{ key: '_when', label: 'When', width: '10rem', place: 'end' }, { key: '_result', label: 'Result', width: '13rem', place: 'end' }, { key: '_tasks', label: 'Tasks', width: '12rem', place: 'end' },
@@ -64,7 +64,7 @@ const list = ref(null)
 const line = ref(null)
 const newOpen = ref(false)
 const tab = computed(() => list.value?.tab || 'in_progress')
-const when = (r) => (r.goal_type === '12 Week Year' ? r.cycle_title : r.target_date ? 'by ' + short(r.target_date, true) : '')
+const when = (r) => (r.horizon === '12 weeks' ? r.cycle_title : r.target_date ? 'by ' + short(r.target_date, true) : '')
 
 // "6 of 10 tasks" with a bar, or "No tasks yet". The figure opens the Tasks screen filtered to the goal.
 const GoalTasks = (props) => {
@@ -92,7 +92,7 @@ function created(g) {
   openRef('goal:' + g.name)
 }
 async function fetch({ params: p, tab: t, filters, order_by, summary, start, page_length }) {
-  const res = await api('goals.list', { space: store.space, state: t, goal_type: p.type, area: p.area, cycle: p.cycle, serves: p.serves, target_from: p.target_from, target_to: p.target_to,
+  const res = await api('goals.list', { space: store.space, state: t, horizon: p.type, area: p.area, cycle: p.cycle, serves: p.serves, target_from: p.target_from, target_to: p.target_to,
     filters, order_by: route.query.by === 'completion' ? 'completion desc' : route.query.by === 'serves' ? undefined : order_by,
     sort: route.query.by === 'serves' ? 'serves' : undefined, summary, start, page_length })
   return summary ? res : { rows: res.goals, total: res.total, tabs: res.tabs, summary_line: res.summary_line }

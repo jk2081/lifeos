@@ -128,14 +128,14 @@ def active_goals(space, area=None):
 	from lifeos.api.utils import in_area
 
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"})
-	rows = frappe.db.sql("""select g.name, g.title, g.goal_type, g.cycle, g.area, g.done_when, g.measure_kind, g.measure, g.unit, g.target_value,
+	rows = frappe.db.sql("""select g.name, g.title, g.horizon, g.cycle, g.area, g.done_when, g.measure_kind, g.measure, g.unit, g.target_value,
 		g.target_date, g.sort_order, g.last_activity_on, c.title as cycle_title from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
 		where g.space = %(space)s and g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0 and g.on_hold = 0
-		and (g.goal_type != '12 Week Year' or g.cycle = %(cycle)s)""", {"space": space, "cycle": cycle or ""}, as_dict=True)
+		and (g.horizon != '12 weeks' or g.cycle = %(cycle)s)""", {"space": space, "cycle": cycle or ""}, as_dict=True)
 	if area:
 		keep = in_area(space, area, "Life Goal", [r.name for r in rows])
 		rows = [r for r in rows if r.name in keep]
-	rows.sort(key=lambda r: (0 if r.cycle and r.cycle == cycle else 1, {"12 Week Year": 0, "Annual": 1, "Open": 2}.get(r.goal_type, 3),
+	rows.sort(key=lambda r: (0 if r.cycle and r.cycle == cycle else 1, {"12 weeks": 0, "Month": 1, "Year": 2, "Long term": 3}.get(r.horizon, 3),
 		r.sort_order or 0, str(r.target_date or "9999"), r.title))
 	return rows
 
@@ -167,7 +167,7 @@ def cards(space, area=None, now=None, ai=True):
 		slot = first_slot(free_left, minutes)
 		if slot:
 			free_left = subtract(free_left, [(slot, slot + timedelta(minutes=minutes))])
-		out.append({"goal": g.name, "title": g.title, "goal_type": g.goal_type, "cycle_title": g.cycle_title, "area": g.area,
+		out.append({"goal": g.name, "title": g.title, "horizon": g.horizon, "cycle_title": g.cycle_title, "area": g.area,
 			"task": task.name if task else None, "next_action": task.title if task else (tip.get("next_action") or ""),
 			"suggested": not task and bool(tip.get("next_action")), "slot": str(slot)[:19] if slot else None, "minutes": minutes,
 			"planned": [{"task": t.name, "title": t.title, "scheduled_at": str(t.scheduled_at)[:19], "duration_min": cint(t.duration_min) or DEFAULT_MINUTES,

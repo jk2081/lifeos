@@ -1,5 +1,5 @@
 <template>
-  <!-- One list of Settings: areas, tags, habits or check-in dimensions. Rename in place, reorder by dragging the handle
+  <!-- One list of Settings: areas, habits or check-in dimensions. Rename in place, reorder by dragging the handle
        (Alt+Up and Alt+Down on a focused row, Move up and Move down in the row menu), nest areas one level, archive. -->
   <Card flush :data-settings-list="kind">
     <div v-for="r in shown" :key="r.name" class="group relative flex min-h-11 items-center gap-2 border-b border-outline-gray-1 py-1.5 last:border-b-0 focus-visible:focus-ring"
@@ -38,7 +38,7 @@ import NumLink from '../ui/NumLink.vue'
 import Empty from '../Empty.vue'
 
 const props = defineProps({
-  kind: String, // area, tag, habit, dimension
+  kind: String, // area, habit, dimension
   rows: Array, // [{ name, title, parent_area, count }], active rows only, in their order
   noun: String, hint: String,
   ordered: Boolean, writable: Boolean,

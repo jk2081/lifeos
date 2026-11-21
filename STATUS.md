@@ -497,3 +497,8 @@ docker compose -f docker/docker-compose.yml down -v
 - **Works:** a person's decision that is not a skill's guess (another area, Drop, another kind) is kept against the skill and version (`Life Skill Correction`); three of the same make a proposed lesson written by the built-in skill `improve-skill`, shown as a diff with its corrections in Brain > Needs you ("Lessons") and on the skill page. Accept (tried on the skill's examples first, then a new version), Edit, Reject; on the skill page, accepted lessons can be removed (a new version without them). A lesson changes the skill's text only. Checks: `test_issue30_lessons` (16 tests), `I30.<width>.3`, `.4`, `.E`.
 - **Not tested against the real service:** improve-skill's answer and the examples run on Accept were only run with scripted and stand-in models.
 
+
+## Issue 60: one kind of goal with a horizon, one parking lot (Someday), no tags
+
+- **Works:** `Life Goal.horizon` (Long term, Year, 12 weeks, Month) set from the target date and cycle, with the Rhythms setting "Plan in 12 Week Years or quarters"; the month's goals are the Month-horizon goals dated in that month, in `sort_order` (Move up and down on the month plan); Someday is the one parking lot for tasks, goals and notes, and Reset, the review piles and the old Inbox park into it; no tags anywhere; the agent proposal kinds are one Goal (Month Goal accepted for one release).
+- **Tests:** `test_issue60_horizons_someday_no_tags` (unit) and `I60.4`, `I60.8`, `I60.9` in the acceptance walk.
