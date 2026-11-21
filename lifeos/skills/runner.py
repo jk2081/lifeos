@@ -176,6 +176,11 @@ def _not_processed(log, input, error):
 
 
 # ---- the context ----
+def _data(text):
+	"""Outside text with its angle brackets escaped, so it cannot close the <input> it sits in and pose as instructions."""
+	return (text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def blocks_of_sample(sample):
 	"""An example's capture, as the model is given a real one (it has no files)."""
 	item = frappe._dict(source_type=sample.get("source_type") or "Upload", received_on=sample.get("received") or "", intent=sample.get("intent") or "Process",
@@ -188,13 +193,13 @@ def _blocks_of(item, with_files=True):
 	from lifeos import files
 
 	parts = [f'<capture source="{item.source_type or ""}" received="{item.received_on or ""}" intent="{item.intent or "Process"}" id="{item.name}">',
-		f"<title>{item.title or ''}</title>"]
+		f"<title>{_data(item.title)}</title>"]
 	if item.instruction:
-		parts.append(f"<note_from_the_source>{item.instruction}</note_from_the_source>")
+		parts.append(f"<note_from_the_source>{_data(item.instruction)}</note_from_the_source>")
 	if item.source_url:
-		parts.append(f"<url>{item.source_url}</url>")
+		parts.append(f"<url>{_data(item.source_url)}</url>")
 	if item.raw_text:
-		parts.append(f"<text>\n{item.raw_text[:TEXT_CAP]}\n</text>")
+		parts.append(f"<text>\n{_data(item.raw_text[:TEXT_CAP])}\n</text>")
 	blocks, unread = [], []
 	for f in files.attachments("Life Inbox Item", item.name) if with_files else []:
 		kind = (f.file_name or "").rsplit(".", 1)[-1].lower()
@@ -205,7 +210,7 @@ def _blocks_of(item, with_files=True):
 		else:
 			unread.append(f.file_name)
 	if unread:
-		parts.append(f"<files_not_read>{', '.join(unread)}</files_not_read>")
+		parts.append(f"<files_not_read>{_data(', '.join(unread))}</files_not_read>")
 	parts.append("</capture>")
 	if not item.raw_text and not blocks:
 		raise SkillError(_("there is nothing the Brain can read in it (it has no text, and its files are not images or PDFs)"))

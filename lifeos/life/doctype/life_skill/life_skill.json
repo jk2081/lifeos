@@ -131,8 +131,9 @@
   },
   {
    "fieldname": "instructions",
-   "fieldtype": "Long Text",
-   "label": "Instructions"
+   "fieldtype": "Code",
+   "label": "Instructions",
+   "options": "Markdown"
   },
   {
    "fieldname": "built_in_version",
@@ -155,10 +156,11 @@
   },
   {
    "fieldname": "update_text",
-   "fieldtype": "Long Text",
+   "fieldtype": "Code",
    "label": "Update text",
    "read_only": 1,
-   "description": "The newer built-in text, waiting for the owner to take it."
+   "description": "The newer built-in text, waiting for the owner to take it.",
+   "options": "Markdown"
   },
   {
    "fieldname": "update_version",

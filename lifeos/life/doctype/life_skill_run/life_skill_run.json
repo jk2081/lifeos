@@ -92,8 +92,9 @@
   },
   {
    "fieldname": "output",
-   "fieldtype": "Long Text",
-   "label": "Output"
+   "fieldtype": "Code",
+   "label": "Output",
+   "options": "Text"
   },
   {
    "fieldname": "input_tokens",

@@ -33,9 +33,10 @@
   },
   {
    "fieldname": "input",
-   "fieldtype": "Long Text",
+   "fieldtype": "Code",
    "label": "Input",
-   "description": "The sample input: a capture's text or JSON."
+   "description": "The sample input: a capture's text or JSON.",
+   "options": "JSON"
   },
   {
    "fieldname": "expected",

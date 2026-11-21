@@ -28,7 +28,7 @@ def parse_file(path: Path) -> dict:
 	"""{slug, title, …, instructions, version} from a skill file."""
 	text = path.read_text()
 	head, _sep, body = text.removeprefix("---\n").partition("\n---\n")
-	out = {"instructions": body.strip() + "\n", "version": 1}
+	out = {"instructions": body.strip() + "\n", "version": 1, "cost_limit": "0.25"}
 	for line in head.splitlines():
 		key, _colon, value = line.partition(":")
 		key, value = key.strip(), value.strip()

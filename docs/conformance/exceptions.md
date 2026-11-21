@@ -6,22 +6,23 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | Rule | Exceptions |
 | --- | --- |
-| frappe-manual-commit | 6 |
+| frappe-manual-commit | 7 |
 | frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 6 |
-| frappe-setuser | 14 |
+| frappe-setuser | 16 |
 | frappe-sql-format-injection | 92 |
-| Total | 119 |
+| Total | 122 |
 
 ## frappe-manual-commit
 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
-| `lifeos/install.py` | 62 | after_install: the spaces and index DDL must be kept before install-app goes on |
+| `lifeos/install.py` | 66 | after_install: the spaces and index DDL must be kept before install-app goes on |
 | `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 258 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 317 | load test: its removal must stick even when run inside a test |
+| `lifeos/skills/__init__.py` | 20 | bench execute: keep the examples' last result |
 | `lifeos/tools/tidy.py` | 125 | bench execute run: the copies are removed only after the rows that used them are saved |
 
 ## frappe-missing-translate-function-python
@@ -59,6 +60,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/loadtest.py` | 273 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 290 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/loadtest.py` | 311 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/skills/runner.py` | 89 | the run is the Life Brain's, a Life Agent; the session user is put back below |
+| `lifeos/skills/runner.py` | 103 | back to the user whose request or job it was |
 
 ## frappe-sql-format-injection
 
@@ -74,7 +77,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/ask.py` | 200 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
 | `lifeos/api/brain.py` | 135 | WHERE is constant SQL plus area_filter; values are parameters |
 | `lifeos/api/brain.py` | 141 | WHERE is constant SQL plus area_filter; values are parameters |
-| `lifeos/api/brain.py` | 152 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 156 | WHERE is constant SQL plus area_filter; values are parameters |
 | `lifeos/api/chats.py` | 27 | vault_guard is a constant fragment; values are parameters |
 | `lifeos/api/chats.py` | 149 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 155 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
@@ -89,9 +92,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/goals.py` | 110 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
 | `lifeos/api/goals.py` | 182 | SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters |
 | `lifeos/api/goals.py` | 361 | `off` is off_clause's fixed SQL; values are parameters |
-| `lifeos/api/inbox.py` | 372 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 377 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/inbox.py` | 379 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 375 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
+| `lifeos/api/inbox.py` | 380 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 382 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |

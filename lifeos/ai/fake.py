@@ -68,6 +68,8 @@ class SiteFake:
 
 	def run(self, params, on_text=None):
 		_record(params)
+		if any(t["name"] == "propose" for t in params.get("tools") or []):
+			return self._capture(params)
 		if (params.get("output_config") or {}).get("format"):
 			return self._structured(params)
 		msgs = params["messages"]
@@ -111,6 +113,17 @@ class SiteFake:
 		act = tool_use("suggest_actions", {"actions": [{"kind": "make_task", "label": f"Make task: follow up {first[1][:40]}",
 			"title": f"Follow up: {first[1][:100]}", "area_ref": first[0]}]})
 		return self._out(params, on_text, text, [act], "tool_use")
+
+	def _capture(self, params):
+		"""process-capture (issue 28): one task named after the capture's title in Career, then a summary."""
+		first = params["messages"][0]["content"]
+		first = first if isinstance(first, str) else "".join(b.get("text", "") for b in first if b.get("type") == "text")
+		title = (re.search(r"<title>(.*?)</title>", first, re.S) or [None, "A capture"])[1].strip()[:100] or "A capture"
+		called = any(b.get("type") == "tool_use" for m in params["messages"] if m["role"] == "assistant" for b in m["content"])
+		if not called:
+			return self._out(params, None, "", [tool_use("propose", {"kind": "Task", "preview": title, "confidence": 0.6, "reason": "The acceptance site's stand-in model files everything under Career.",
+				"payload": {"title": title, "area": "Career"}})], "tool_use")
+		return self._done(params, None, json.dumps({"transcript_md": "", "summary_md": f"{title}. Read by the acceptance site's stand-in model."}))
 
 	def _structured(self, params):
 		"""The AI insight detector and the batch suggester: one finding over the first records given."""

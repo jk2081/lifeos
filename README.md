@@ -162,7 +162,10 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `inbox.claim_next` | `space=None` | Claim the oldest New item. Returns it with its file URLs and the filing context, or nothing. |
 | `inbox.submit_result` | `item, transcript_md=None, summary_md=None, proposals=None` | Store the transcript, summary and proposals, and set the item To Review. Each proposal is {kind, preview, payload, confidence}. An invalid proposal is refused with a clear error; the rest are kept. |
 | `inbox.fail_item` | `item, error=None` | Mark a claimed item Failed, with the reason. |
-| `inbox.retry` | `item` | Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed. |
+| `inbox.retry` | `item` | Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed. When the process-capture skill is on, it runs again. When the process-capture skill is on, it runs again. |
+| `skills.list` / `skills.get` | `space=None` / `name, space=None` | Issue 28: the active skills for the caller's spaces with their version, and one skill's instructions. Agents are served `lifeos` and `lifeos-file-work` here. |
+| `skills.run` | `skill, input` | Start a skill whose trigger is a Button on one record, in a background job. |
+| `skills.overview`, `detail`, `run_log`, `save`, `create`, `set_active`, `rollback`, `accept_update`, `test`, `add_example`, `save_auto_file` | | Brain > Skills (people; changes are the owner's). |
 | `inbox.list` | `space=None, status=None, include_archived=0, start=0, page_length=30` | Inbox items of a space, newest first, with proposal counts. `tabs` in the answer counts the items on each state tab (To Review, Waiting, Failed, Done, all) under the same filters. |
 | `inbox.get` | `item` | One inbox item with its files, proposals and the choices for the filing chips. A job's item also has `inputs`, `job_chat` and `wiki_pages`. |
 | `inbox.update_transcript` | `item, transcript_md` | Correct the transcript of an item, for example words marked [?]. |

@@ -32,8 +32,9 @@
   },
   {
    "fieldname": "instructions",
-   "fieldtype": "Long Text",
-   "label": "Instructions"
+   "fieldtype": "Code",
+   "label": "Instructions",
+   "options": "Markdown"
   },
   {
    "fieldname": "config",

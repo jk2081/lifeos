@@ -5824,6 +5824,62 @@ for _i in range(2):
   }
 }
 
+// Issue 28: Brain > Skills lists process-capture; Test runs its examples (recorded answers) and shows pass or fail before saving; editing and
+// saving makes version 2. A skill with no examples and no runs shows its empty states. I28.1 to I28.9 and I28.11 and .12 are unit tests
+// (test_issue28_skills). The built-in skill is put back as the app ships it after, and the skill made here is deleted.
+for (const width of SET_WIDTHS) {
+  const tag = `I28.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const reset = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Skill Run", "Life Skill Version", "Life Skill Example"):
+    frappe.db.delete(dt, {"skill": ("in", ["process-capture", "i28-empty-${width}"])})
+frappe.db.delete("Life Skill", {"name": ("in", ["process-capture", "i28-empty-${width}"])})
+from lifeos.skills import store
+store.install()`)
+  let s
+  try {
+    reset()
+    s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    await check(`${tag}.10`, `${width} px: Skills lists process-capture, Test shows pass for each example, saving an edit makes version 2`, async () => {
+      await s.open('/life/brain/skills')
+      const card = pg.locator('[data-skill-card][data-skill="process-capture"]')
+      await card.waitFor({ timeout: 10000 })
+      const t = await card.innerText()
+      must(t.includes('Process a capture') && t.includes('v1') && t.includes('Built-in') && /run/.test(t), 'the card says: ' + t)
+      await noSideways()
+      await card.locator('[data-skill-open]').click()
+      await pg.locator('[data-skill-page][data-skill="process-capture"]').waitFor({ timeout: 10000 })
+      must(await pg.locator('[data-skill-example]').count() === 4, 'the examples are not listed')
+      await pg.locator('[data-skill-test]').click()
+      await pg.locator('[data-example-result]').first().waitFor({ timeout: 15000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-example-result]').length === 4, null, { timeout: 15000 })
+      const results = await pg.locator('[data-example-result]').evaluateAll((els) => els.map((e) => e.getAttribute('data-example-result')))
+      must(results.every((r) => r === 'pass'), 'the examples say: ' + results.join(','))
+      await pg.locator('[data-skill-text]').fill((await pg.locator('[data-skill-text]').inputValue()) + '\nAlways write the summary in plain words.\n')
+      await pg.locator('[data-skill-save]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-skill-page]')?.getAttribute('data-version') === '2', null, { timeout: 10000 })
+      must(await pg.locator('[data-skill-version-row]').count() === 2, 'two versions are not listed')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.E`, `${width} px: a skill with no examples and no runs says what will appear`, async () => {
+      await s.api('skills.create', { slug: `i28-empty-${width}`, values: JSON.stringify({ title: `I28 empty ${width}`, trigger_kind: 'Button', tools: [], output_kind: 'Answer', instructions: 'Say hello.' }) })
+      await s.open(`/life/brain/skills/i28-empty-${width}`)
+      await pg.locator('[data-skill-page]').waitFor({ timeout: 10000 })
+      const empties = await pg.locator('[data-empty]').allInnerTexts()
+      must(empties.some((e) => e.includes('No examples yet.')) && empties.some((e) => e.includes('No runs yet.')), 'the empty states say: ' + empties.join(' | '))
+      await noSideways()
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    reset()
+  }
+}
+
 // Issue 31: Settings > Calendar shows the calendars of the connected account and saves the one Life OS writes to (off by default).
 // I31.1 to I31.4 are unit tests (test_issue31_gcal_write). The fixture calendar stands in for Google; the choice is cleared after.
 for (const width of SET_WIDTHS) {
