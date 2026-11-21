@@ -108,7 +108,7 @@ for (const scheme of schemes) {
     // the lens (picker, chip, phone sheet), Today's banner; then the panes and screens kept from earlier sets
     const SCREENS = [
       ['today', '/life/?area='], ['today-lens', `/life/?${lens}`], ['today-banner', '/life/?area=&at=2026-11-22%2019:00:00'],
-      ['needs-you', '/life/brain?area='], ['brain-activity', '/life/brain/activity?area='], ['brain-sources', '/life/brain/sources?area='], ['needs-you-lens', `/life/brain?${lens}`], ['inbox', '/life/brain/queue?all=1&area='], ['inbox-lens', `/life/brain/queue?all=1&${lens}`], ['inbox-pane', `/life/brain/queue?all=1&area=&open=inbox:${review}`], // issue 17: Needs you, and the old list as the Queue
+      ['needs-you', '/life/brain?area='], ['brain-activity', '/life/brain/activity?area='], ['brain-sources', '/life/brain/sources?area='], ['brain-skills', '/life/brain/skills?area='], ['skill', '/life/brain/skills/process-capture'], ['needs-you-lens', `/life/brain?${lens}`], ['inbox', '/life/brain/queue?all=1&area='], ['inbox-lens', `/life/brain/queue?all=1&${lens}`], ['inbox-pane', `/life/brain/queue?all=1&area=&open=inbox:${review}`], // issue 17: Needs you, and the old list as the Queue
        ['review', `/life/inbox/${review}/review`], ['item', `/life/item/${review}`],
       ...['week', 'month', 'year'].map((v) => [`today-${v}`, `/life/today/${v}?area=`]), ['today-other-day', '/life/today?area=&date=2026-12-02'], // issue 16
       ...['review', 'calendar', 'agenda'].map((v) => [`plan-week-${v}`, `/life/plan/week?view=${v}&area=`]),

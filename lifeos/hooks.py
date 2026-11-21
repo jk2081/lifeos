@@ -53,6 +53,11 @@ doc_events["Event"] = {"validate": "lifeos.events.validate_event", "on_update": 
 # issue 31: a goal block already written to Google follows its task
 for _event, _fn in (("on_update", "task_updated"), ("on_trash", "task_trashed")):
 	doc_events["Life Task"][_event] = [*([doc_events["Life Task"][_event]] if isinstance(doc_events["Life Task"][_event], str) else doc_events["Life Task"][_event]), f"lifeos.review.gcal_write.{_fn}"]
+# issue 28: skills start from document events, in a background job (lifeos/skills/triggers.py)
+doc_events["Life Inbox Item"]["after_insert"] = [*doc_events["Life Inbox Item"]["after_insert"], "lifeos.skills.triggers.capture_created"]
+for _dt in ("Life Task", "Life Goal", "Life Note"):
+	doc_events[_dt]["on_update"] = [*([doc_events[_dt]["on_update"]] if isinstance(doc_events[_dt]["on_update"], str) else doc_events[_dt]["on_update"]),
+		"lifeos.skills.triggers.record_changed"]
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
 # issue 7: a Life OS record's file is stored once per space by content, and the same file sent again is not attached twice
 extend_doctype_class = {"File": ["lifeos.files.LifeFile"]}
@@ -62,7 +67,7 @@ before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.strict_get.befo
 
 scheduler_events = {
 	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.trash.purge_old"],
-	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims"],
+	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims", "lifeos.skills.triggers.run_due"],
 		# insights: nightly at 06:00 site time (the owner's time zone is the site's, Asia/Kolkata)
 		"0 6 * * *": ["lifeos.insights.run_nightly"],
 		# set 7: Inbox items left too long, before the morning

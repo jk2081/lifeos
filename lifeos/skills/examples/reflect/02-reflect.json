@@ -1,0 +1,36 @@
+{
+ "title": "When the data cannot answer it, nothing is said",
+ "input": {
+  "data": {
+   "line": "Be kinder to myself",
+   "events_by_weekday": {
+    "Monday": [
+     "Planning"
+    ]
+   },
+   "numbers": {
+    "score": 70
+   }
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "sentence",
+    "equals": ""
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"sentence\": \"\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "f95b1e7bbac5316a"
+}

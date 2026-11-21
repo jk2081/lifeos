@@ -1,6 +1,11 @@
 ---
 name: lifeos-file-work
-description: File work done with the owner in chat (a deck, a document, an analysis made from files he sent) into Life OS so it can be found and used later. Use whenever the owner asks to file, keep or save something into Life OS, and at the end of any task in which you produced files for him. Needs the lifeos skill.
+title: File work done in chat
+when_to_use: The owner asks to file, keep or save work done with him in chat (a deck, a document, an analysis made from files he sent), and at the end of any task in which you produced files for him. Needs the lifeos skill.
+trigger: Served
+output: Answer
+model: Smart
+version: 1
 ---
 
 # Filing work into Life OS

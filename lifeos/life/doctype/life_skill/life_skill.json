@@ -1,0 +1,200 @@
+{
+ "actions": [],
+ "autoname": "field:slug",
+ "creation": "2026-11-21 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "slug",
+  "title",
+  "when_to_use",
+  "trigger_kind",
+  "trigger_event",
+  "schedule_cron",
+  "tools",
+  "output_kind",
+  "output_schema",
+  "model_tier",
+  "cost_limit",
+  "active",
+  "source",
+  "version",
+  "space",
+  "instructions",
+  "built_in_version",
+  "built_in_hash",
+  "update_available",
+  "update_text",
+  "update_version"
+ ],
+ "fields": [
+  {
+   "fieldname": "slug",
+   "fieldtype": "Data",
+   "label": "Name (slug)",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "when_to_use",
+   "fieldtype": "Small Text",
+   "label": "When to use"
+  },
+  {
+   "fieldname": "trigger_kind",
+   "fieldtype": "Select",
+   "label": "Trigger",
+   "options": "Event\nSchedule\nButton\nServed",
+   "default": "Button",
+   "reqd": 1
+  },
+  {
+   "fieldname": "trigger_event",
+   "fieldtype": "Select",
+   "label": "Event",
+   "options": "\nCapture created\nEmail filed\nRecord changed"
+  },
+  {
+   "fieldname": "schedule_cron",
+   "fieldtype": "Data",
+   "label": "Schedule (cron)"
+  },
+  {
+   "fieldname": "tools",
+   "fieldtype": "Code",
+   "label": "Tools",
+   "options": "JSON",
+   "description": "A JSON list of tool names from the fixed list."
+  },
+  {
+   "fieldname": "output_kind",
+   "fieldtype": "Select",
+   "label": "Output",
+   "options": "Proposals\nNote\nInsight\nPage update\nAnswer\nJSON",
+   "default": "Proposals"
+  },
+  {
+   "fieldname": "output_schema",
+   "fieldtype": "Code",
+   "label": "Output schema",
+   "options": "JSON"
+  },
+  {
+   "fieldname": "model_tier",
+   "fieldtype": "Select",
+   "label": "Model tier",
+   "options": "Fast\nSmart",
+   "default": "Fast"
+  },
+  {
+   "fieldname": "cost_limit",
+   "fieldtype": "Float",
+   "label": "Per-run cost limit (USD)",
+   "default": "0.25"
+  },
+  {
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "label": "Active",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Select",
+   "label": "Source",
+   "options": "Built-in\nOwner\nLearned",
+   "default": "Owner",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "version",
+   "fieldtype": "Int",
+   "label": "Version",
+   "default": "1",
+   "read_only": 1
+  },
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "description": "Blank means every space."
+  },
+  {
+   "fieldname": "instructions",
+   "fieldtype": "Code",
+   "label": "Instructions",
+   "options": "Markdown"
+  },
+  {
+   "fieldname": "built_in_version",
+   "fieldtype": "Int",
+   "label": "Shipped version",
+   "read_only": 1,
+   "description": "The version of the built-in text this skill started from."
+  },
+  {
+   "fieldname": "built_in_hash",
+   "fieldtype": "Data",
+   "label": "Shipped text hash",
+   "read_only": 1
+  },
+  {
+   "fieldname": "update_available",
+   "fieldtype": "Check",
+   "label": "Update Available",
+   "read_only": 1
+  },
+  {
+   "fieldname": "update_text",
+   "fieldtype": "Code",
+   "label": "Update text",
+   "read_only": 1,
+   "description": "The newer built-in text, waiting for the owner to take it.",
+   "options": "Markdown"
+  },
+  {
+   "fieldname": "update_version",
+   "fieldtype": "Int",
+   "label": "Update Version",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Skill",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

@@ -23,8 +23,10 @@
   "claimed_by",
   "claimed_on",
   "error",
+  "processed_by",
   "suggested_decision",
   "suggested_reason",
+  "suggested_by",
   "suggested_on",
   "finished_on",
   "preview_image",
@@ -178,6 +180,12 @@
    "read_only": 1
   },
   {
+   "fieldname": "suggested_by",
+   "fieldtype": "Data",
+   "label": "Suggested By",
+   "read_only": 1
+  },
+  {
    "fieldname": "suggested_on",
    "fieldtype": "Date",
    "label": "Suggested On",
@@ -284,6 +292,13 @@
    "fieldtype": "Select",
    "label": "Archive Reason",
    "options": "\nManual\nAuto\nProject"
+  },
+  {
+   "fieldname": "processed_by",
+   "fieldtype": "Data",
+   "label": "Processed by",
+   "read_only": 1,
+   "description": "The skill and version that processed it, such as process-capture v1."
   }
  ],
  "links": [],

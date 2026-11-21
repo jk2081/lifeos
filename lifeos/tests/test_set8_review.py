@@ -1,5 +1,6 @@
 """Set 8, step 1: the review record and its piles. The period (first review, normal, skipped week), resume after a pause, the
 tab gates, pile sorting without a key, each pile decision with its Outbox exit and Undo, Chase, and the review-note migration."""
+import contextlib
 import json
 
 import frappe
@@ -16,6 +17,32 @@ from lifeos.tests.test_ux7_old_inbox import OldCase
 def lock(space, user, start, end):
 	return frappe.get_doc({"doctype": "Life Review", "space": space, "user": user, "status": "Locked", "period_start": start,
 		"period_end": end, "locked_on": now_datetime(), "title": "x", "tab_state": "{}"}).insert(ignore_permissions=True)
+
+
+@contextlib.contextmanager
+def tidy(decide):
+	"""The tidy-backlog skill answering for the review's piles (model faked): `decide(item)` gives keep, park, drop or None (left out)."""
+	from lifeos.ai import fake
+
+	def answer(params):
+		data = fake.asked(params)[1]
+		if "items" not in data:  # another skill's request (the review also asks notice about meetings)
+			return {"content": [{"type": "text", "text": json.dumps({"insights": [], "follow_ups": [], "readings": []})}]}
+		rows = [{"item": i["item"], "decision": d, "reason": f"{d} by the skill", "chase": i["kind"] == "Waiting"} for i in data["items"] if (d := decide(i))]
+		return {"content": [{"type": "text", "text": json.dumps({"decisions": rows})}]}
+
+	was = frappe.db.get_value("Life Space", PRIVATE, "ask_enabled")
+	frappe.db.set_value("Life Space", PRIVATE, "ask_enabled", 1)
+	set_key("sk-test-not-real")
+	frappe.set_user(OWNER)  # set_key works as Administrator
+	frappe.flags.lifeos_ai_backend = fake.ScriptedFake([answer] * 8)
+	try:
+		yield
+	finally:
+		frappe.flags.lifeos_ai_backend = None
+		set_key("")
+		frappe.set_user(OWNER)
+		frappe.db.set_value("Life Space", PRIVATE, "ask_enabled", was)
 
 
 class ReviewCase(OldCase):
@@ -100,32 +127,47 @@ class TestResumeAndGates(ReviewCase):
 
 
 class TestPiles(ReviewCase):
-	def test_sorting_rules_without_a_key(self):
+	def test_without_a_key_everything_waits_except_waiting_items(self):
+		"""Issue 59: no rule parks or lets go of anything; Needs you holds it, and a waiting item is kept (chased after a week)."""
 		set_key("")
 		frappe.set_user(OWNER)
 		goal = self.cycle_goal("s8 goal")
-		names = {"goal": self.task("s8 serves", age=40, goal=goal.name), "keep": self.task("s8 recent", age=40),
-			"park": self.task("s8 old", age=70), "letgo": self.task("s8 ancient", age=130),
+		names = {"goal": self.task("s8 serves", age=40, goal=goal.name), "old": self.task("s8 old", age=70), "ancient": self.task("s8 ancient", age=130),
 			"chase": self.task("s8 asked", age=10, status="Waiting", waiting_on="Ruchi"),
 			"wait": self.task("s8 just asked", age=3, status="Waiting", waiting_on="Ruchi"),
 			"new": self.task("s8 came this week", age=40, created_days=1)}
 		weekly.start(space=PRIVATE)
 		items = {i["name"]: i for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").items()}
-		self.assertEqual(items[names["goal"]]["pile"], "needs")
-		self.assertEqual(items[names["keep"]]["pile"], "keep")
-		self.assertEqual(items[names["park"]]["pile"], "park")
-		self.assertEqual(items[names["letgo"]]["pile"], "letgo")
+		for key in ("goal", "old", "ancient"):
+			self.assertEqual(items[names[key]]["pile"], "needs")
 		self.assertEqual((items[names["chase"]]["pile"], items[names["chase"]]["chase"]), ("keep", True))
 		self.assertEqual((items[names["wait"]]["pile"], items[names["wait"]]["chase"]), ("keep", False))
 		self.assertNotIn(names["new"], items)  # came in during the period: handled in Library
 		self.assertTrue(all(i["reason"] for i in items.values()))
-		# inbox items: tasks or dates kept, notes parked, nothing found let go
+		self.assertIsNone(piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").summary()["by"])
+		task = self.old_item("s8 inbox task", ["Task"], age=2)
+		got = {i["name"]: i["pile"] for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "inbox").items()}
+		self.assertEqual(got[task], "needs")
+
+	def test_the_skill_sorts_tasks_and_inbox_items_into_the_piles(self):
+		"""I59.2: one skill, tidy-backlog, sorts the review's piles; what it leaves out waits under Needs you."""
+		frappe.set_user(OWNER)
+		goal = self.cycle_goal("s8 goal")
+		names = {"goal": self.task("s8 serves", age=40, goal=goal.name), "keep": self.task("s8 recent", age=40),
+			"park": self.task("s8 old", age=70), "letgo": self.task("s8 ancient", age=130)}
 		task = self.old_item("s8 inbox task", ["Task"], age=2)
 		note = self.old_item("s8 inbox note", ["Note"], age=2)
 		empty = self.old_item("s8 inbox empty", age=3, status="New")
-		rv = Review.find_open(PRIVATE, OWNER)
-		got = {i["name"]: i["pile"] for i in piles.PileSet(rv, "inbox").items()}
+		table = {"s8 recent": "keep", "s8 old": "park", "s8 ancient": "drop", "s8 inbox task": "keep", "s8 inbox note": "park", "s8 inbox empty": "drop"}
+		with tidy(lambda i: table.get(i["title"])):
+			weekly.start(space=PRIVATE)
+			items = {i["name"]: i for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").items()}
+			got = {i["name"]: i["pile"] for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "inbox").items()}
+		self.assertEqual(items[names["goal"]]["pile"], "needs")  # left out by the skill
+		self.assertEqual([items[names[k]]["pile"] for k in ("keep", "park", "letgo")], ["keep", "park", "letgo"])
+		self.assertEqual(items[names["park"]]["by"], "tidy-backlog v1")
 		self.assertEqual((got[task], got[note], got[empty]), ("keep", "park", "letgo"))
+		self.assertEqual(piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").summary()["by"], "tidy-backlog v1")
 
 	def test_needs_you_is_at_most_five(self):
 		goal = self.cycle_goal("s8 goal 2")
@@ -165,7 +207,8 @@ class TestPiles(ReviewCase):
 
 	def test_accept_a_pile_move_one_and_undo_both(self):
 		one, two, three = (self.task(f"s8 park {i}", age=70 + i) for i in range(3))
-		weekly.start(space=PRIVATE)
+		with tidy(lambda i: "park"):
+			weekly.start(space=PRIVATE)
 		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(one), decision="keep")  # moved to Keep
 		res = weekly.pile_accept(space=PRIVATE, key="tasks", pile="park")
 		self.assertEqual(res["done"], 2)

@@ -12,7 +12,7 @@ export const SETTINGS = { label: 'Settings', to: '/settings', base: '/settings',
 
 // each place's tabs; the first is the place's own path
 export const TODAY_TABS = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }]
-export const BRAIN_TABS = [{ value: 'needs-you', label: 'Needs you' }, { value: 'activity', label: 'Activity' }, { value: 'sources', label: 'Sources' }]
+export const BRAIN_TABS = [{ value: 'needs-you', label: 'Needs you' }, { value: 'activity', label: 'Activity' }, { value: 'sources', label: 'Sources' }, { value: 'skills', label: 'Skills' }]
 export const GOALS_TABS = [{ value: 'by-area', label: 'By area' }, { value: 'tasks', label: 'All tasks' }, { value: 'no-goal', label: 'No goal' }]
 export const LIBRARY_TABS = [{ value: 'all', label: 'Everything' }, { value: 'notes', label: 'Notes' }, { value: 'documents', label: 'Documents' },
   { value: 'people', label: 'People' }, { value: 'chats', label: 'Chats' }, { value: 'files', label: 'Files' }]

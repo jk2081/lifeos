@@ -15,7 +15,7 @@
       </Stat>
     </div>
 
-    <Card v-if="loaded && !rows.length && !unfiled.length" class="py-2" data-needs-empty>
+    <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length" class="py-2" data-needs-empty>
       <Empty title="Nothing needs you.">
         <p class="mt-1">Things you capture or connect will show up here.</p>
         <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-needs-capture @click="store.captureOpen = true" />
@@ -58,6 +58,16 @@
         </div>
       </div>
     </Card>
+
+    <section v-if="lessons.length" class="flex flex-col gap-2" data-needs-lessons>
+      <div>
+        <h2 class="text-base-medium text-ink-gray-9">Lessons</h2>
+        <p class="text-sm text-ink-gray-6">Your corrections taught a skill something. Accept it and the skill follows it from now on.</p>
+      </div>
+      <Card flush>
+        <LessonCard v-for="l in lessons" :key="l.name" :lesson="l" :can-edit="writable" @changed="load" />
+      </Card>
+    </section>
 
     <section v-if="unfiled.length || data?.unfiled?.length" class="flex flex-col gap-2" data-unfiled>
       <div>
@@ -107,6 +117,7 @@
 // Brain > Needs you (issue 17): what the Brain asks you to decide, at most seven at a time, each with its best guess and
 // the reason. Keep accepts the guess, Change opens the capture's page, Drop rejects (the Outbox keeps it as Discarded). A
 // proposal the Brain is torn on shows two area chips and you pick one. All of it is review.decide and review.decide_all.
+// Lessons (issue 30): what your corrections taught a skill, to Accept, Edit or Reject.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, toast } from 'frappe-ui'
@@ -116,6 +127,7 @@ import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
 import Stat from '@/components/ui/Stat.vue'
 import OldItems from '@/components/inbox/OldItems.vue'
+import LessonCard from '@/components/brain/LessonCard.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
@@ -128,6 +140,7 @@ const busy = reactive(new Set())
 const allBusy = ref(false)
 const writable = computed(() => canWrite() && !store.isAgent)
 const rows = computed(() => data.value?.rows || [])
+const lessons = computed(() => data.value?.lessons || [])
 // a proposal that takes an area and has none cannot be kept as it is: it sits under Unfiled until you choose one
 const unfiled = computed(() => rows.value.filter((r) => r.unfiled))
 const asked = computed(() => rows.value.filter((r) => !r.unfiled))

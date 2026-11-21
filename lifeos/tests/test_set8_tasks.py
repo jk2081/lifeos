@@ -5,7 +5,7 @@ import frappe
 from lifeos.api import outbox as outbox_api
 from lifeos.api import weekly
 from lifeos.tests.base import PRIVATE
-from lifeos.tests.test_set8_review import ReviewCase
+from lifeos.tests.test_set8_review import ReviewCase, tidy
 
 
 class TestTasksTab(ReviewCase):
@@ -31,7 +31,8 @@ class TestTasksTab(ReviewCase):
 		goal = self.cycle_goal("s8 tasks goal")
 		needs = self.task("s8 tasks needs", age=40, goal=goal.name)
 		old = self.task("s8 tasks old", age=70)
-		head = weekly.start(space=PRIVATE)
+		with tidy(lambda i: "park" if i["title"] == "s8 tasks old" else None):  # the skill parks the old one and leaves the goal's task out
+			head = weekly.start(space=PRIVATE)
 		self.assertFalse(head["done"]["tasks"])
 		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(needs), decision="keep")
 		self.assertFalse(weekly.get(space=PRIVATE)["done"]["tasks"])

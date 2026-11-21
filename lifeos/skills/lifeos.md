@@ -1,6 +1,11 @@
 ---
 name: lifeos
-description: Work the Life OS inbox on a Frappe site. Claim items the owner dropped in, transcribe and summarise them, propose tasks, dates and records for the owner to approve, keep the wiki, log AI chats, and fetch documents from the vault on request.
+title: Life OS agent instructions
+when_to_use: An agent works the Life OS inbox: claims captures, transcribes, summarises and proposes records for the owner to approve.
+trigger: Served
+output: Answer
+model: Smart
+version: 1
 ---
 
 # Life OS agent instructions
@@ -55,7 +60,7 @@ Projects became **open-ended goals** (`goal_type` Open). There are four things: 
 
 ## Filing a piece of work: one call (issue 8)
 
-When you **did work for the owner** (a deck made from his files, a document, an analysis) and it should be kept, file it with **one call**, `lifeos.api.jobs.file_job`, as `agent/FILE_WORK.md` describes. Do not build it from `create_item`, `upload_file`, `claim_next`, `submit_result`, `wiki.*` and `chats.log` yourself.
+When you **did work for the owner** (a deck made from his files, a document, an analysis) and it should be kept, file it with **one call**, `lifeos.api.jobs.file_job`, as the `lifeos-file-work` skill describes. Do not build it from `create_item`, `upload_file`, `claim_next`, `submit_result`, `wiki.*` and `chats.log` yourself.
 
 - `job_id` (stable, for example `mehi-motors-pitch-2026-11-19`): filing the same `job_id` again **updates** the job and creates nothing new. Also `space`, `title`, `area`, `goal`, `instruction` (the owner's own words), `raw_text` (the brief), `transcript_md`, `summary_md`, `proposals` (exactly as in `submit_result`; a Reading is refused here), `source_system` (for example `hermes`).
 - `inputs`: `[{name, file, reusable_as, title}]`. `file` is base64 or the URL of a file already in the space (`/private/files/...`). An input with `reusable_as` (a stable asset id such as `btw-standard-deck`) is kept **once**, as its own Just keep item, and linked to the job; a later job that sends it again, or sends `reusable_as` with no `file`, links the one already kept. An input without `reusable_as` is used by this job only.

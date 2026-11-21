@@ -1,0 +1,39 @@
+{
+ "title": "A line about Tuesday calls is checked against the calendar",
+ "input": {
+  "data": {
+   "line": "Keep Tuesdays free of calls",
+   "events_by_weekday": {
+    "Tuesday": [
+     "Call with Ravi",
+     "Call with bank",
+     "Review"
+    ],
+    "Monday": [
+     "Planning"
+    ]
+   },
+   "numbers": {}
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "sentence",
+    "contains": "2 calls"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"sentence\": \"This week Tuesday had 2 calls.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "f95b1e7bbac5316a"
+}

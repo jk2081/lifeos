@@ -20,7 +20,7 @@
       <template v-else>
         <div class="flex flex-col gap-1">
           <FormControl v-model="v.next_action" label="Next action" placeholder="One concrete step" data-goal-next />
-          <div class="text-sm text-ink-gray-6">{{ SOURCE[d.plan.source] || '' }}
+          <div class="text-sm text-ink-gray-6">{{ d.plan.source === 'assistant' && d.plan.by ? 'Suggested by ' + d.plan.by + '.' : SOURCE[d.plan.source] || '' }}
             <Dropdown v-if="d.tasks.length" :options="d.tasks.map((t) => ({ label: t.title, onClick: () => { v.next_action = t.title; v.task = t.name } }))">
               <Button variant="ghost" size="sm" class="!text-ink-blue-8" :label="`other open tasks (${d.tasks.length})`" data-goal-other-tasks />
             </Dropdown>

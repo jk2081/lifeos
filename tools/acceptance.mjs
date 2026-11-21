@@ -546,13 +546,21 @@ archive.run_daily()`)
   const arch = await owner.api('archive.list', { space: SPACE, page_length: 100, filters: [['title', 'like', `%${stamp}%`]] }) // earlier runs fill the Archive
   must(JSON.stringify(arch.groups).includes(done.name), 'the done task was not archived')
   must(!JSON.stringify(arch.groups).includes(stale.name), 'the stale open task was archived')
-  // set 8: the weekly review's Tasks tab sorts it into a pile (untouched 100 days: Park in Someday); it is never archived for you
-  const park = await owner.api('weekly.pile_drawer', { space: SPACE, key: 'tasks', pile: 'park' })
-  must(park.rows.some((r) => r.name === stale.name), 'the stale task is not in the Park pile')
+  // set 8, as issue 59 left it: the age rules are gone, so with no skill answer the stale task waits in a pile of the weekly review's Tasks tab
+  // (Needs you, or Keep when Needs you is full); it is never archived for you
+  let pile = null
+  for (const p of ['needs', 'keep', 'park', 'letgo']) {
+    const d = await owner.api('weekly.pile_drawer', { space: SPACE, key: 'tasks', pile: p })
+    if (d.rows.some((r) => r.name === stale.name)) { pile = p; break }
+  }
+  must(pile, 'the stale task is in no pile of the weekly review')
   await owner.open('/life/today/week?view=review&tab=tasks')
-  await owner.page.locator('[data-pile-card][data-pile="park"] [data-pile-open]').first().click()
-  await owner.page.waitForTimeout(800)
-  must((await owner.page.locator('[data-drawer-name="pile"]').innerText()).includes(`Stale open task ${stamp}`), 'the Park pile does not show it')
+  if (pile === 'needs') must((await owner.page.locator('[data-main]').innerText()).includes(`Stale open task ${stamp}`), 'Needs you does not show it') // its rows are on the board, not in a drawer
+  else {
+    await owner.page.locator(`[data-pile-card][data-pile="${pile}"] [data-pile-open]`).first().click()
+    await owner.page.waitForTimeout(800)
+    must((await owner.page.locator('[data-drawer-name="pile"]').innerText()).includes(`Stale open task ${stamp}`), `the ${pile} pile does not show it`)
+  }
   await owner.page.keyboard.press('Escape')
 })
 
@@ -5821,6 +5829,146 @@ for _i in range(2):
   } finally {
     if (s) await s.ctx.close()
     restore()
+  }
+}
+
+// Issue 28: Brain > Skills lists process-capture; Test runs its examples (recorded answers) and shows pass or fail before saving; editing and
+// saving makes version 2. A skill with no examples and no runs shows its empty states. I28.1 to I28.9 and I28.11 and .12 are unit tests
+// (test_issue28_skills). The built-in skill is put back as the app ships it after, and the skill made here is deleted.
+for (const width of SET_WIDTHS) {
+  const tag = `I28.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const reset = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Skill Run", "Life Skill Version", "Life Skill Example"):
+    frappe.db.delete(dt, {"skill": ("in", ["process-capture", "i28-empty-${width}"])})
+frappe.db.delete("Life Skill", {"name": ("in", ["process-capture", "i28-empty-${width}"])})
+from lifeos.skills import store
+store.install()`)
+  let s
+  try {
+    reset()
+    s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    await check(`${tag}.10`, `${width} px: Skills lists process-capture, Test shows pass for each example, saving an edit makes version 2`, async () => {
+      await s.open('/life/brain/skills')
+      const card = pg.locator('[data-skill-card][data-skill="process-capture"]')
+      await card.waitFor({ timeout: 10000 })
+      const t = await card.innerText()
+      must(t.includes('Process a capture') && t.includes('v1') && t.includes('Built-in') && /run/.test(t), 'the card says: ' + t)
+      await noSideways()
+      await card.locator('[data-skill-open]').click()
+      await pg.locator('[data-skill-page][data-skill="process-capture"]').waitFor({ timeout: 10000 })
+      must(await pg.locator('[data-skill-example]').count() === 4, 'the examples are not listed')
+      await pg.locator('[data-skill-test]').click()
+      await pg.locator('[data-example-result]').first().waitFor({ timeout: 15000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-example-result]').length === 4, null, { timeout: 15000 })
+      const results = await pg.locator('[data-example-result]').evaluateAll((els) => els.map((e) => e.getAttribute('data-example-result')))
+      must(results.every((r) => r === 'pass'), 'the examples say: ' + results.join(','))
+      await pg.locator('[data-skill-text]').fill((await pg.locator('[data-skill-text]').inputValue()) + '\nAlways write the summary in plain words.\n')
+      await pg.locator('[data-skill-save]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-skill-page]')?.getAttribute('data-version') === '2', null, { timeout: 10000 })
+      must(await pg.locator('[data-skill-version-row]').count() === 2, 'two versions are not listed')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.E`, `${width} px: a skill with no examples and no runs says what will appear`, async () => {
+      await s.api('skills.create', { slug: `i28-empty-${width}`, values: JSON.stringify({ title: `I28 empty ${width}`, trigger_kind: 'Button', tools: [], output_kind: 'Answer', instructions: 'Say hello.' }) })
+      await s.open(`/life/brain/skills/i28-empty-${width}`)
+      await pg.locator('[data-skill-page]').waitFor({ timeout: 10000 })
+      const empties = await pg.locator('[data-empty]').allInnerTexts()
+      must(empties.some((e) => e.includes('No examples yet.')) && empties.some((e) => e.includes('No runs yet.')), 'the empty states say: ' + empties.join(' | '))
+      await noSideways()
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    reset()
+  }
+}
+
+// Issue 30: a proposed lesson shows in Needs you and on the skill page; Edit then Accept saves the edited words as a new version of the skill;
+// removing an accepted lesson makes a version without it. I30.1, .2 and .5 are unit tests (test_issue30_lessons). The acceptance site's stand-in
+// model answers every capture the same way, so process-capture's examples are replaced here by one it passes, and put back (store.install) after.
+for (const width of SET_WIDTHS) {
+  const tag = `I30.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const reset = (examples) => bench(`frappe.set_user("Administrator")
+for dt in ("Life Skill Correction", "Life Skill Lesson"):
+    frappe.db.delete(dt)
+for dt in ("Life Skill Run", "Life Skill Version", "Life Skill Example"):
+    frappe.db.delete(dt, {"skill": "process-capture"})
+frappe.db.delete("Life Skill", {"name": "process-capture"})
+from lifeos.skills import store
+store.install()
+${examples ? `frappe.db.delete("Life Skill Example", {"skill": "process-capture"})
+import json
+frappe.get_doc({"doctype": "Life Skill Example", "skill": "process-capture", "title": "Anything is filed", "source": "Owner",
+  "input": json.dumps({"title": "Robusta prices", "text": "Robusta is up."}), "expected": json.dumps([{"has_proposal": {"kind": "Task"}}])}).insert()` : ''}`)
+  // a proposed lesson with the three corrections it came from, as the Brain's improve-skill would have made it
+  const propose = () => JSON.parse(bench(`import json
+lesson = frappe.get_doc({"doctype": "Life Skill Lesson", "skill": "process-capture", "space": "${SPACE}", "status": "Proposed", "base_version": 1,
+  "summary": "Commodity newsletters", "text": "Newsletters about commodity prices are for reading later, never a task."}).insert()
+for i in range(3):
+    frappe.get_doc({"doctype": "Life Skill Correction", "skill": "process-capture", "skill_version": 1, "space": "${SPACE}", "correction_type": "Area",
+      "key": "area:Task:a>b", "detail": "The Brain filed a Task under Money; the owner filed it under Career.", "capture_title": f"Robusta prices {i}", "lesson": lesson.name}).insert()
+print(json.dumps(lesson.name))`).split('\n').pop())
+  let s
+  try {
+    reset(true)
+    s = await session('owner@lifeos.test', width)
+    const pg = s.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    await check(`${tag}.E`, `${width} px: with no lessons Needs you has no lessons section and the skill page says what will appear`, async () => {
+      await s.open('/life/brain')
+      await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-needs-lessons]').count()) === 0, 'a lessons section shows with no lessons')
+      await s.open('/life/brain/skills/process-capture')
+      await pg.locator('[data-skill-lessons]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-skill-lessons]').innerText()).includes('No lessons yet.'), 'the skill page does not say what will appear')
+      await noSideways()
+    })
+    await check(`${tag}.3`, `${width} px: a lesson shows in Needs you and on the skill page; Edit then Accept saves the edited words`, async () => {
+      const name = propose()
+      await s.open('/life/brain')
+      const card = pg.locator(`[data-needs-lessons] [data-lesson="${name}"]`)
+      await card.waitFor({ timeout: 10000 })
+      must((await card.innerText()).includes('Newsletters about commodity prices') && (await card.innerText()).includes('3 corrections'), 'the lesson says: ' + (await card.innerText()))
+      await noSideways()
+      await s.open('/life/brain/skills/process-capture')
+      await pg.locator(`[data-skill-lessons] [data-lesson="${name}"]`).waitFor({ timeout: 10000 })
+      await s.open('/life/brain')
+      await card.waitFor({ timeout: 10000 })
+      await card.locator('[data-lesson-edit]').click()
+      await card.locator('[data-lesson-text]').fill('Price newsletters are read later, not tasks.')
+      await card.locator('[data-lesson-accept]').click()
+      await pg.waitForFunction((n) => !document.querySelector(`[data-needs-lessons] [data-lesson="${n}"]`), name, { timeout: 15000 })
+      const d = await s.api('skills.detail', { name: 'process-capture' })
+      must(d.version === 2 && d.instructions.includes('Price newsletters are read later, not tasks.') && !d.instructions.includes('commodity prices'), 'the skill is: version ' + d.version)
+      await s.open('/life/brain/skills/process-capture')
+      const done = pg.locator(`[data-skill-lessons] [data-lesson="${name}"][data-status="Accepted"]`)
+      await done.waitFor({ timeout: 10000 })
+      must((await done.locator('[data-lesson-version]').innerText()).includes('version 2'), 'the lesson does not link its version')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.4`, `${width} px: removing an accepted lesson makes a new version without it`, async () => {
+      await s.open('/life/brain/skills/process-capture')
+      const done = pg.locator('[data-skill-lessons] [data-lesson][data-status="Accepted"]')
+      await done.waitFor({ timeout: 10000 })
+      await done.locator('[data-lesson-remove]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-skill-page]')?.getAttribute('data-version') === '3', null, { timeout: 15000 })
+      const d = await s.api('skills.detail', { name: 'process-capture' })
+      must(!d.instructions.includes('Price newsletters') && !d.instructions.includes('Lessons from'), 'the text still has the lesson')
+      must((await pg.locator('[data-skill-lessons] [data-lesson][data-status="Removed"]').count()) === 1, 'the lesson is not shown as removed')
+      await noSideways()
+    })
+  } finally {
+    if (s) await s.ctx.close()
+    reset(false)
   }
 }
 

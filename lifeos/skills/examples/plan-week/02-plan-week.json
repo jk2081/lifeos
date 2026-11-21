@@ -1,0 +1,59 @@
+{
+ "title": "Three stars from four goals: the furthest behind",
+ "input": {
+  "data": {
+   "request": "stars",
+   "goals": [
+    {
+     "goal": "G1",
+     "title": "Ship the app",
+     "percent": 70
+    },
+    {
+     "goal": "G2",
+     "title": "Lose 6 kg",
+     "percent": 10
+    },
+    {
+     "goal": "G3",
+     "title": "Hire a manager",
+     "percent": 20
+    },
+    {
+     "goal": "G4",
+     "title": "Read 20 books",
+     "percent": 40
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "stars",
+    "count": {
+     "min": 3,
+     "max": 3
+    }
+   }
+  },
+  {
+   "answer": {
+    "path": "stars.0",
+    "equals": "G2"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"plans\": [], \"stars\": [\"G2\", \"G3\", \"G4\"]}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "50043e8fda9294cf"
+}

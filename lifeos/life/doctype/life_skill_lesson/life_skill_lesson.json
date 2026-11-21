@@ -1,0 +1,105 @@
+{
+ "actions": [],
+ "autoname": "format:LESSON-{####}",
+ "creation": "2026-11-21 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "skill",
+  "space",
+  "status",
+  "summary",
+  "text",
+  "edited",
+  "base_version",
+  "skill_version",
+  "removed_version",
+  "decided_by",
+  "decided_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "skill",
+   "fieldtype": "Link",
+   "label": "Skill",
+   "options": "Life Skill",
+   "reqd": 1,
+   "search_index": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "search_index": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Drafting\nProposed\nAccepted\nRejected\nRemoved",
+   "default": "Drafting",
+   "in_list_view": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Data",
+   "label": "What it teaches"
+  },
+  {
+   "fieldname": "text",
+   "fieldtype": "Text",
+   "label": "Lesson"
+  },
+  {
+   "fieldname": "edited",
+   "fieldtype": "Check",
+   "label": "Edited by the owner"
+  },
+  {
+   "fieldname": "base_version",
+   "fieldtype": "Int",
+   "label": "Drafted against version"
+  },
+  {
+   "fieldname": "skill_version",
+   "fieldtype": "Int",
+   "label": "Version it made"
+  },
+  {
+   "fieldname": "removed_version",
+   "fieldtype": "Int",
+   "label": "Version that removed it"
+  },
+  {
+   "fieldname": "decided_by",
+   "fieldtype": "Link",
+   "label": "Decided by",
+   "options": "User"
+  },
+  {
+   "fieldname": "decided_on",
+   "fieldtype": "Datetime",
+   "label": "Decided on"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Skill Lesson",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "in_create": 1
+}

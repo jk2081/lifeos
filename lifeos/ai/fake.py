@@ -5,8 +5,10 @@
   question, lists records when the search finds nothing, answers citing what it found, and suggests a Make task. Every
   request it receives is kept in the cache (last 200), so a check can assert what was sent.
 """
+import html
 import json
 import re
+from datetime import datetime
 
 import frappe
 
@@ -59,6 +61,18 @@ class ScriptedFake:
 			"usage": r.get("usage") or _usage(params, text)}
 
 
+def asked(params):
+	"""(skill, data) of a request made by lifeos.skills.call: the skill's name and the data it was given; ("", {}) for any other request."""
+	first = params["messages"][0]["content"]
+	first = first if isinstance(first, str) else "".join(b.get("text", "") for b in first if b.get("type") == "text")
+	m = re.search(r'<input skill="([\w-]+)">\n(.*)\n</input>', first, re.S)
+	try:
+		data = json.loads(html.unescape(m.group(2))) if m else {}
+	except ValueError:
+		data = {}
+	return (m.group(1) if m else ""), (data if isinstance(data, dict) else {})
+
+
 def tool_use(name, args, id=None):
 	return {"type": "tool_use", "id": id or f"toolu_{name}_{frappe.generate_hash(length=6)}", "name": name, "input": args}
 
@@ -68,6 +82,8 @@ class SiteFake:
 
 	def run(self, params, on_text=None):
 		_record(params)
+		if any(t["name"] == "propose" for t in params.get("tools") or []):
+			return self._capture(params)
 		if (params.get("output_config") or {}).get("format"):
 			return self._structured(params)
 		msgs = params["messages"]
@@ -112,22 +128,21 @@ class SiteFake:
 			"title": f"Follow up: {first[1][:100]}", "area_ref": first[0]}]})
 		return self._out(params, on_text, text, [act], "tool_use")
 
+	def _capture(self, params):
+		"""process-capture (issue 28): one task named after the capture's title in Career, then a summary."""
+		first = params["messages"][0]["content"]
+		first = first if isinstance(first, str) else "".join(b.get("text", "") for b in first if b.get("type") == "text")
+		title = (re.search(r"<title>(.*?)</title>", first, re.S) or [None, "A capture"])[1].strip()[:100] or "A capture"
+		called = any(b.get("type") == "tool_use" for m in params["messages"] if m["role"] == "assistant" for b in m["content"])
+		if not called:
+			return self._out(params, None, "", [tool_use("propose", {"kind": "Task", "preview": title, "confidence": 0.6, "reason": "The acceptance site's stand-in model files everything under Career.",
+				"payload": {"title": title, "area": "Career"}})], "tool_use")
+		return self._done(params, None, json.dumps({"transcript_md": "", "summary_md": f"{title}. Read by the acceptance site's stand-in model."}))
+
 	def _structured(self, params):
-		"""The AI insight detector and the batch suggester: one finding over the first records given."""
-		try:
-			data = json.loads(params["messages"][-1]["content"])
-		except (ValueError, TypeError, KeyError):
-			data = {}
-		if isinstance(data, dict) and data.get("task") in TASKS:
-			out = TASKS[data["task"]](data)
-		elif isinstance(data, dict) and "records" in data:
-			recs = [r for r in data["records"] if r.get("ref")]
-			out = {"candidates": [{"kind": "Promise", "title": f"You said you would follow up on {recs[0]['title'][:80]}. No task covers it.",
-				"evidence": [recs[0]["ref"]], "task_title": f"Follow up on {recs[0]['title'][:80]}"}]} if recs else {"candidates": []}
-		else:
-			rows = data if isinstance(data, list) else []
-			out = {"batches": [{"title": "Oldest tasks nobody has touched", "reason": "They have waited longest and nothing links them to this week's plan.",
-				"action": "someday", "items": [r["ref"] for r in rows[:3]]}]} if len(rows) >= 3 else {"batches": []}
+		"""A skill asked about data (lifeos/skills/call.py): the answer the skill's rules would give, from the data in the request."""
+		slug, data = asked(params)
+		out = SKILLS.get(slug, lambda d: {})(data)
 		text = json.dumps(out)
 		return {"content": [{"type": "text", "text": text}], "stop_reason": "end_turn", "model": params["model"], "usage": _usage(params, text)}
 
@@ -142,47 +157,108 @@ class SiteFake:
 			"usage": _usage(params, text)}
 
 
-# ---- set 7: the structured tasks of key results, the weekly review and old Inbox items, answered by the same rules the
-# app uses without a key, so the acceptance site exercises the assistant's path deterministically ----
+# ---- the skills that are asked about data, answered by simple rules, so the acceptance site exercises the path deterministically ----
 
-def _goal_measure(data):
-	from lifeos import readings
-
-	r = readings.rule_measure(data.get("title"), data.get("notes"))
-	if r["kind"] == "Milestone":
-		return {"kind": "Milestone", "done_when": f"{(data.get('title') or '').strip()} is done"}
-	return {k: r[k] for k in ("kind", "measure", "unit", "target_value", "start_value") if r.get(k) is not None}
+def _words(text):
+	return set(re.findall(r"[a-z]{4,}", (text or "").lower()))
 
 
-def _goal_readings(data):
-	"""A value is "<measure> ... <number>" within 60 characters in a record's text."""
+def _tidy(data):
+	"""Inbox items and tasks: an item with proposals is kept, only notes parked, nothing found dropped; a task untouched 120 days is
+	dropped, 60 parked, a waiting one kept. Reset's request gets its three oldest tasks as one group."""
 	out = []
-	for g in data.get("goals") or []:
-		if not g.get("measure"):
-			continue
-		pat = re.escape(g["measure"]) + r"[^0-9\n]{0,60}?(\d+(?:\.\d+)?)"
-		for r in data.get("records") or []:
-			m = re.search(pat, r.get("text") or "", re.I)
-			if m:
-				out.append({"goal": g["goal"], "value": float(m.group(1)), "record": r.get("ref"), "excerpt": m.group(0)[:200]})
-	return {"readings": out}
+	if str(data.get("request", "")).startswith("Reset"):  # the three oldest tasks, as one group
+		return {"decisions": [{"item": it["item"], "decision": "park", "reason": "They have waited longest and nothing links them to this week's plan.",
+			"group": "Oldest tasks nobody has touched"} for it in (data.get("items") or [])[:3]]}
+	for it in data.get("items") or []:
+		kinds = it.get("proposals")
+		age = it.get("age_days") or 0
+		if it.get("kind") in ("Inbox",):
+			decision = "drop" if not kinds else "park" if set(kinds) <= {"Note"} else "keep"
+		elif it.get("kind") == "Waiting":
+			decision = "keep"
+		else:
+			decision = "drop" if age > 120 else "park" if age > 60 else "keep"
+		row = {"item": it["item"], "decision": decision, "reason": f"Sorted by the stand-in model: {decision}.",
+			"chase": it.get("kind") == "Waiting" and age > 7}
+		out.append(row)
+	return {"decisions": out}
 
 
-def _rules_of(name):
-	def run(data):
-		import importlib
+def _plan(data):
+	"""The next action given, or "Plan the next step for <goal>", 60 minutes (30 for a call); the three goals furthest behind."""
+	goals = data.get("goals") or []
+	plans = []
+	for g in goals:
+		action = g.get("next_action") or f"Plan the next step for {g.get('title')}"[:140]
+		plans.append({"goal": g["goal"], "next_action": action, "minutes": 30 if "call" in action.lower() else 60})
+	stars = [g["goal"] for g in sorted(goals, key=lambda g: g.get("percent") or 0)[:3]]
+	return {"plans": plans if data.get("request") == "plans" else [], "stars": stars if data.get("request") == "stars" else []}
 
-		mod, fn = name.rsplit(".", 1)
-		return getattr(importlib.import_module(mod), fn)(data)
-	return run
+
+def _notice(data):
+	"""Insights: a Promise over the first record. Follow-ups: "I will ..." in a linked record. Readings: "<measure> ... <number>"."""
+	out = {"insights": [], "follow_ups": [], "readings": []}
+	request = data.get("request")
+	if request == "insights":
+		recs = [r for r in data.get("records") or [] if r.get("ref")]
+		if recs:
+			out["insights"] = [{"kind": "Promise", "title": f"You said you would follow up on {recs[0]['title'][:80]}. No task covers it.",
+				"evidence": [recs[0]["ref"]], "task_title": f"Follow up on {recs[0]['title'][:80]}"}]
+	elif request == "follow_ups":
+		for m in data.get("meetings") or []:
+			for r in m.get("records") or []:
+				for said in re.findall(r"\b(?:I will|I'll|I shall)\s+([^.\n]{5,120})", r.get("text") or "", re.I)[:2]:
+					out["follow_ups"].append({"meeting": m["meeting"], "kind": "Promise", "title": f"You said you would {said.strip()}.",
+						"task_title": said.strip()[:1].upper() + said.strip()[1:], "record": r["record"], "excerpt": said.strip()})
+				for day, month in re.findall(r"\b(?:on|by)\s+(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\b", r.get("text") or "", re.I)[:1]:
+					when = datetime.strptime(f"{int(day)} {month.title()} {frappe.utils.getdate().year}", "%d %B %Y").date()
+					out["follow_ups"].append({"meeting": m["meeting"], "kind": "Date", "title": f"{m['title']}: next on {int(day)} {month.title()}.",
+						"task_title": f"{m['title']} ({int(day)} {month.title()})", "date": str(when), "record": r["record"], "excerpt": f"{day} {month}"})
+	else:
+		for g in data.get("goals") or []:
+			if not g.get("measure"):
+				continue
+			pat = re.escape(g["measure"]) + r"[^0-9\n]{0,60}?(\d+(?:\.\d+)?)"
+			for r in data.get("records") or []:
+				if m := re.search(pat, r.get("text") or "", re.I):
+					out["readings"].append({"goal": g["goal"], "value": float(m.group(1)), "record": r.get("ref"), "excerpt": m.group(0)[:200]})
+	return out
 
 
-TASKS = {"goal_measure": _goal_measure, "goal_readings": _goal_readings,
-	"goal_plan": _rules_of("lifeos.weekplan.fake_plan"), "inbox_decisions": _rules_of("lifeos.old_inbox.fake_decisions"),
-	# set 8: the weekly review
-	"review_piles": _rules_of("lifeos.review.pile_sort.fake_sort"), "meeting_followups": _rules_of("lifeos.review.followups.fake_followups"),
-	"review_stars": _rules_of("lifeos.review.goals.fake_stars"), "review_playback": _rules_of("lifeos.review.lock.fake_playback"),
-	# issue 13: the area of a task
-	"task_area": _rules_of("lifeos.area_guess.fake_area"),
-	# issue 22: a goal named from tasks
-	"goal_title": _rules_of("lifeos.goal_suggest.fake_title")}
+def _define(data):
+	"""A finish line "<title> is done"; a number when the title holds a number and a unit ("Lose 6 kg"); a title from the word most tasks share."""
+	if data.get("request") == "title":
+		titles = data.get("titles") or []
+		seen = {}
+		for t in titles:
+			for w in _words(t):
+				seen[w] = seen.get(w, 0) + 1
+		best = max(seen.items(), key=lambda kv: (kv[1], len(kv[0]), kv[0]), default=None)
+		return {"kind": "Title", "title": f"Get {best[0].capitalize()} done" if best and best[1] >= 3 else (titles[0] if titles else "New goal")}
+	title = (data.get("title") or "").strip()
+	m = re.search(r"(\d+(?:\.\d+)?)\s*(kg|km|%|books|hours|days)\b", title, re.I)
+	if m:
+		return {"kind": "Number", "measure": re.sub(r"\s+", " ", title.replace(m.group(0), "")).strip(" :-,.") or m.group(2), "unit": m.group(2), "target_value": float(m.group(1))}
+	return {"kind": "Milestone", "done_when": f"{title} is done"}
+
+
+def _reflect(data):
+	"""A weekday named in the line is counted in the calendar."""
+	line = (data.get("line") or "").lower()
+	for day, rows in (data.get("events_by_weekday") or {}).items():
+		if day.lower() in line:
+			calls = sum(1 for t in rows if "call" in t.lower())
+			return {"sentence": f"This week {day} had {calls} call{'s' if calls != 1 else ''}."}
+	return {"sentence": ""}
+
+
+def _area(data):
+	"""The first part that shares a word with the title or notes, else the first area given, 40% sure."""
+	text = _words(f"{data.get('title') or ''} {data.get('notes') or ''}")
+	listed = data.get("areas") or []
+	pick = next((a for a in listed if a.get("part_of") and text & _words(f"{a['name']} {a.get('description') or ''}")), None) or (listed[0] if listed else {})
+	return {"area": pick.get("id") or "", "confidence": 40}
+
+
+SKILLS = {"tidy-backlog": _tidy, "plan-week": _plan, "notice": _notice, "define-goal": _define, "reflect": _reflect, "guess-area": _area}

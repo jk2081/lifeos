@@ -1,0 +1,50 @@
+{
+ "title": "A number stated in a capture becomes a reading for the goal",
+ "input": {
+  "data": {
+   "request": "readings",
+   "today": "2026-11-21",
+   "goals": [
+    {
+     "goal": "G1",
+     "title": "Ghillidary yield",
+     "measure": "Ghillidary yield",
+     "unit": "kg/ha"
+    }
+   ],
+   "records": [
+    {
+     "ref": "R1",
+     "title": "Estate note",
+     "text": "Ghillidary yield this season was 11.2 kg/ha."
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "readings.0.value",
+    "equals": 11.2
+   }
+  },
+  {
+   "answer": {
+    "path": "readings.0.goal",
+    "equals": "G1"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"insights\": [], \"follow_ups\": [], \"readings\": [{\"goal\": \"G1\", \"value\": 11.2, \"date\": \"2026-11-21\", \"record\": \"R1\", \"excerpt\": \"Ghillidary yield this season was 11.2 kg/ha\"}]}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "661c314d72497695"
+}

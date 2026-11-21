@@ -17,7 +17,7 @@
             <div class="flex items-center gap-1.5 break-words text-base-medium text-ink-gray-9">
               <span v-if="r.sensitive" class="lucide-lock size-3.5 shrink-0 text-ink-gray-6" aria-label="Sensitive" />{{ r.title }}</div>
             <div class="text-sm text-ink-gray-6">{{ [r.received_on && 'came in ' + short(r.received_on.slice(0, 10), true), r.proposals.length ? `${r.proposals.length} proposal${r.proposals.length === 1 ? '' : 's'}` : 'nothing extracted'].filter(Boolean).join(' · ') }}</div>
-            <div class="mt-1 text-sm text-ink-gray-8" data-old-item-reason>{{ r.reason }}</div>
+            <div class="mt-1 text-sm text-ink-gray-8" data-old-item-reason>{{ r.reason }}<span v-if="r.by" class="text-ink-gray-5"> · Suggested by {{ r.by }}</span></div>
           </div>
           <Select class="w-36" :model-value="r.decision" :options="DECISIONS" :aria-label="'Decision for ' + r.title" data-old-item-decision @update:model-value="(v) => (r.decision = v)" />
         </div>

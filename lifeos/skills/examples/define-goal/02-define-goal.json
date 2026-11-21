@@ -1,0 +1,36 @@
+{
+ "title": "A quantity in the title becomes a number goal",
+ "input": {
+  "data": {
+   "request": "measure",
+   "title": "Lose 6 kg",
+   "notes": ""
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "kind",
+    "equals": "Number"
+   }
+  },
+  {
+   "answer": {
+    "path": "target_value",
+    "equals": 6
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"kind\": \"Number\", \"measure\": \"Weight lost\", \"unit\": \"kg\", \"target_value\": 6}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "072602fd48a3e3c6"
+}

@@ -1,0 +1,55 @@
+{
+ "title": "A doctor's advice is kept as a Health note",
+ "input": {
+  "title": "Dr Rao visit",
+  "source_type": "Voice Note",
+  "text": "Dr Rao said to walk thirty minutes every day, cut sugar in tea, and repeat the blood test in three months."
+ },
+ "checks": [
+  {
+   "has_proposal": {
+    "kind": "Note",
+    "area": "Health"
+   }
+  },
+  {
+   "proposal_count": {
+    "min": 1,
+    "max": 3
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "tool_use",
+     "id": "toolu_1",
+     "name": "propose",
+     "input": {
+      "kind": "Note",
+      "preview": "Dr Rao's advice",
+      "payload": {
+       "title": "Dr Rao's advice",
+       "content_md": "- Walk thirty minutes every day\n- Cut sugar in tea\n- Repeat the blood test in three months",
+       "area": "Health"
+      },
+      "confidence": 0.9,
+      "reason": "A doctor's advice sits under Health."
+     }
+    }
+   ],
+   "stop_reason": "tool_use"
+  },
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"transcript_md\": \"\", \"summary_md\": \"Dr Rao's advice after your visit: walk daily, less sugar in tea, and a repeat blood test in three months.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "fd4b3a0face08239"
+}

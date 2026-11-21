@@ -24,7 +24,7 @@ def set_key(value):
 def answer_with(area_name, confidence):
 	"""A scripted model answer naming the id the prompt gave `area_name`."""
 	def run(params):
-		data = json.loads(params["messages"][-1]["content"])
+		_slug, data = fake.asked(params)
 		pick = next(a["id"] for a in data["areas"] if a["name"] == area_name)
 		return {"content": [{"type": "text", "text": json.dumps({"area": pick, "confidence": confidence})}]}
 	return run
@@ -89,10 +89,10 @@ class TestTaskAreas(LifeTestCase):
 		self.assertTrue(t.area_guessed)
 		self.assertEqual(t.area_confidence, 77)
 		self.assertFalse(frappe.db.exists("Life Action Log", {"task": t.name}))  # a better guess is not a correction
-		sent = json.loads(backend.received[0]["messages"][-1]["content"])
+		sent = fake.asked(backend.received[0])[1]
 		self.assertEqual(sent["title"], "Zqxv blorp")
 		self.assertNotIn("Emotions", [a["name"] for a in sent["areas"]])  # only the areas that are on
-		self.assertTrue(frappe.db.exists("Life AI Usage", {"purpose": "Area guess"}))
+		self.assertTrue(frappe.db.exists("Life AI Usage", {"purpose": "Skill: guess-area"}))
 		# a guess the owner confirmed before the job ran is left alone
 		t2 = self.task("Zqxv blorp confirmed")
 		tasks.confirm_area(t2.name)

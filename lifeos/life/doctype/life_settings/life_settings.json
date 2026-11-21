@@ -30,6 +30,9 @@
   "short_model",
   "monthly_cap_usd",
   "feature_caps",
+  "brain_section",
+  "brain_auto_threshold",
+  "brain_auto_kinds",
   "ai_prices",
   "insights_run_on"
  ],
@@ -208,6 +211,24 @@
    "fieldtype": "Code",
    "options": "JSON",
    "label": "Feature Caps (USD per month)"
+  },
+  {
+   "fieldname": "brain_section",
+   "fieldtype": "Section Break",
+   "label": "The Brain"
+  },
+  {
+   "fieldname": "brain_auto_threshold",
+   "fieldtype": "Float",
+   "label": "File on its own above this confidence",
+   "default": "0.85"
+  },
+  {
+   "fieldname": "brain_auto_kinds",
+   "fieldtype": "Code",
+   "options": "JSON",
+   "label": "Kinds the Brain may file on its own",
+   "description": "A JSON list of proposal kinds. Empty: it files nothing on its own."
   }
  ],
  "issingle": 1,

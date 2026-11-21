@@ -1,0 +1,49 @@
+{
+ "title": "School fees belong to Money",
+ "input": {
+  "data": {
+   "title": "Pay Aarav's school fees",
+   "notes": "",
+   "areas": [
+    {
+     "id": "A1",
+     "name": "Career",
+     "part_of": null,
+     "description": "Work and businesses"
+    },
+    {
+     "id": "A2",
+     "name": "Money",
+     "part_of": null,
+     "description": "Bills, fees, savings and tax"
+    },
+    {
+     "id": "A3",
+     "name": "Health",
+     "part_of": null,
+     "description": "Body and sleep"
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "area",
+    "equals": "A2"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"area\": \"A2\", \"confidence\": 85}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "1f1419e210a1904d"
+}

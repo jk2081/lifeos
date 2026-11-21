@@ -59,6 +59,10 @@ def setup():
 	from lifeos import index
 	index.ensure_indexes()
 	make_spaces()
+	from lifeos.skills import runner, store
+
+	runner.ensure_brain_user()  # issue 28: the user skills run as
+	store.install()  # the built-in skills and their examples; an owner's edit is kept
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- after_install: the spaces and index DDL must be kept before install-app goes on
 
 

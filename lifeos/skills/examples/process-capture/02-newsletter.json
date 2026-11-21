@@ -1,0 +1,31 @@
+{
+ "title": "A newsletter is summarised and proposes nothing",
+ "input": {
+  "title": "This week in gardening",
+  "source_type": "Email",
+  "text": "Ten plants that survive a dry summer. Unsubscribe at any time. You are receiving this because you signed up at greenthumb.example."
+ },
+ "checks": [
+  {
+   "summary_contains": "plants"
+  },
+  {
+   "proposal_count": {
+    "min": 0,
+    "max": 0
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"transcript_md\": \"\", \"summary_md\": \"A gardening newsletter about ten plants that survive a dry summer. Nothing in it asks anything of you.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "fd4b3a0face08239"
+}

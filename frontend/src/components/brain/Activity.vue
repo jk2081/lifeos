@@ -48,7 +48,7 @@
               <RouterLink :to="`/item/${r.item}`" class="break-words text-base-medium text-ink-gray-9 hover:underline" data-row-item>{{ r.title }}</RouterLink>
             </div>
             <div class="mt-0.5 text-sm text-ink-gray-6" data-row-what>
-              {{ SAYS[r.outcome] }}<template v-if="r.area_name"> under <span class="inline-flex items-center gap-1 text-ink-gray-9" data-row-area><span class="size-2 rounded-full" :class="dot(r.area)" aria-hidden="true" />{{ r.area_name }}</span></template><template v-if="r.goal_title"> · goal <span class="text-ink-gray-9" data-row-goal>{{ r.goal_title }}</span></template>
+              {{ SAYS[r.outcome] }}<template v-if="r.filed_by"> · <span class="text-ink-gray-9" data-row-filed-by>Filed by {{ r.filed_by }}</span></template><template v-if="r.area_name"> under <span class="inline-flex items-center gap-1 text-ink-gray-9" data-row-area><span class="size-2 rounded-full" :class="dot(r.area)" aria-hidden="true" />{{ r.area_name }}</span></template><template v-if="r.goal_title"> · goal <span class="text-ink-gray-9" data-row-goal>{{ r.goal_title }}</span></template>
             </div>
             <div v-if="r.outcome === 'failed'" class="mt-0.5 text-sm text-ink-red-8" data-row-reason><span aria-hidden="true">✦</span> {{ r.error || 'The agent could not read it.' }}</div>
             <div v-if="r.made.length" class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm" data-row-made>

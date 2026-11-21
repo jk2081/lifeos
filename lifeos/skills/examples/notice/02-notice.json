@@ -1,0 +1,52 @@
+{
+ "title": "A date agreed at a meeting becomes a follow-up",
+ "input": {
+  "data": {
+   "request": "follow_ups",
+   "meetings": [
+    {
+     "meeting": "M1",
+     "title": "Estate review",
+     "when": "2026-11-18 10:00",
+     "attendees": [
+      "Vivek"
+     ],
+     "records": [
+      {
+       "record": "R1",
+       "kind": "Voice note",
+       "title": "After the review",
+       "text": "We agreed to meet again on 2 December to sign off the budget."
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "follow_ups.0.kind",
+    "equals": "Date"
+   }
+  },
+  {
+   "answer": {
+    "path": "follow_ups.0.date",
+    "equals": "2026-12-02"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"insights\": [], \"follow_ups\": [{\"meeting\": \"M1\", \"kind\": \"Date\", \"title\": \"Estate review: next on 2 December.\", \"task_title\": \"Estate review (2 December)\", \"date\": \"2026-12-02\", \"record\": \"R1\", \"excerpt\": \"meet again on 2 December\"}], \"readings\": []}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "661c314d72497695"
+}

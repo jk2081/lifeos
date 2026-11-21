@@ -34,7 +34,7 @@ def suggested(space: str | None = None, area: str | None = None, start: int = 0,
 	pending = old_inbox._pending(part)
 	sensitive = dict(frappe.get_all("Life Inbox Item", filters={"name": ("in", [i.name for i in part] or ["-"])}, fields=["name", "is_sensitive"], as_list=True))
 	rows = [{"name": i.name, "title": i.title, "status": i.status, "received_on": str(i.received_on)[:19] if i.received_on else None,
-		"decision": i.suggested_decision, "reason": i.suggested_reason, "suggested_on": str(i.suggested_on) if i.suggested_on else None,
+		"decision": i.suggested_decision, "reason": i.suggested_reason, "by": i.suggested_by, "suggested_on": str(i.suggested_on) if i.suggested_on else None,
 		"proposals": [p.kind for p in pending.get(i.name, [])], "sensitive": bool(sensitive.get(i.name))} for i in part]
 	return {"rows": rows, "total": len(items), "days": r["days"], "mode": r["mode"]}
 

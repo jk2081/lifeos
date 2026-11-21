@@ -34,7 +34,7 @@ class HttpClient:
 		self.url = url.rstrip("/")
 		self.auth = f"token {key}:{secret}"
 
-	# Reads answer only GET, with the arguments in the query string (agent/SKILL.md lists them); the rest take POST.
+	# Reads answer only GET, with the arguments in the query string (lifeos/skills/lifeos.md lists them); the rest take POST.
 	GET = {"meta.proposal_schema", "meta.space_context", "wiki.index", "wiki.get_page", "wiki.search", "wiki.pages",
 		"connections.defaults", "inbox.get"}
 
@@ -276,7 +276,7 @@ def process_one(client, fail=False, today=None, log=print):
 
 
 def file_job(client, job_id, title, space=None, log=print):
-	"""File a canned piece of work with lifeos.api.jobs.file_job, as agent/FILE_WORK.md says: two reusable inputs, two
+	"""File a canned piece of work with lifeos.api.jobs.file_job, as lifeos/skills/lifeos-file-work.md says: two reusable inputs, two
 	outputs, a summary, a note and a task for the owner, a wiki page and the chat log, in one call. Filing the same job_id
 	again updates the same item."""
 	b64 = lambda text: base64.b64encode(text.encode()).decode()

@@ -74,9 +74,9 @@ class TestNoGoal(LifeTestCase):
 
 		ts = [self.make("Life Task", title=f"Call Vivek about plan {n}", area=self.career).name for n in range(3)]
 		set_key("sk-test-not-real")
-		backend = frappe.flags.lifeos_ai_backend = fake.ScriptedFake([{"content": [{"type": "text", "text": '{"title": "Agree the plan with Vivek"}'}],
+		backend = frappe.flags.lifeos_ai_backend = fake.ScriptedFake([{"content": [{"type": "text", "text": '{"kind": "Title", "title": "Agree the plan with Vivek"}'}],
 			"stop_reason": "end_turn", "usage": {"input_tokens": 100, "output_tokens": 10}}])
-		used = frappe.db.count("Life AI Usage", {"purpose": "Goal from tasks"})
+		used = frappe.db.count("Life AI Usage", {"purpose": "Skill: define-goal"})
 		try:
 			out = tasks.make_goal(ts, space=PRIVATE, area=self.career)
 		finally:
@@ -84,7 +84,7 @@ class TestNoGoal(LifeTestCase):
 			set_key(None)
 		self.assertEqual(out["title"], "Agree the plan with Vivek")
 		self.assertEqual(len(backend.received), 1)
-		self.assertEqual(frappe.db.count("Life AI Usage", {"purpose": "Goal from tasks"}), used + 1)
+		self.assertEqual(frappe.db.count("Life AI Usage", {"purpose": "Skill: define-goal"}), used + 1)
 
 	def test_make_goal_names_the_goal_from_the_titles_without_a_key(self):
 		ts = [self.make("Life Task", title=f"Quote for Zorbax {n}", area=self.career).name for n in range(3)]

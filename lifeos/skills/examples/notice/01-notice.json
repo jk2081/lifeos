@@ -1,0 +1,55 @@
+{
+ "title": "A promise in a chat with no task becomes an insight",
+ "input": {
+  "data": {
+   "request": "insights",
+   "today": "2026-11-21",
+   "records": [
+    {
+     "ref": "R1",
+     "title": "Chat with Meera about the school trip",
+     "text": "Meera: can you send the trip form? Jai: I will send it by Friday."
+    }
+   ],
+   "open_task_titles": [
+    "Pay electricity bill"
+   ],
+   "dismissed": []
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "insights.0.kind",
+    "equals": "Promise"
+   }
+  },
+  {
+   "answer": {
+    "path": "insights.0.evidence.0",
+    "equals": "R1"
+   }
+  },
+  {
+   "answer": {
+    "path": "readings",
+    "count": {
+     "min": 0,
+     "max": 0
+    }
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"insights\": [{\"kind\": \"Promise\", \"title\": \"You told Meera you would send the school trip form by Friday. No task covers it.\", \"evidence\": [\"R1\"], \"task_title\": \"Send Meera the school trip form\"}], \"follow_ups\": [], \"readings\": []}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "661c314d72497695"
+}

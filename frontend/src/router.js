@@ -6,7 +6,7 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 // beside them. Housekeeping pages live inside the place they belong to and are not tabs: Reset under Today, the Outbox
 // under Brain, Someday under Goals, the Timeline and the trash and archive under Library.
 const TODAY = ['week', 'month', 'year']
-const BRAIN = ['activity', 'captures', 'sources', 'outbox', 'queue']
+const BRAIN = ['activity', 'captures', 'sources', 'skills', 'outbox', 'queue']
 const GOALS = ['tasks', 'no-goal', 'someday']
 const LIBRARY = ['notes', 'documents', 'people', 'chats', 'files', 'timeline', 'archive']
 
@@ -33,6 +33,7 @@ const routes = [
   { path: `/today/:tab(${TODAY.join('|')})?`, name: 'Today', component: page('TodayPlace'), props: true },
   { path: '/today/reset', name: 'Reset', component: page('Reset') },
   { path: `/brain/:tab(${BRAIN.join('|')})?`, name: 'Brain', component: page('BrainPlace'), props: true },
+  { path: '/brain/skills/:name', name: 'Skill', component: page('Skill'), props: true },
   { path: '/brain/review/:id', name: 'ItemReview', component: page('Review'), props: true },
   // issue 10: one page per capture, with its source, files, summary, decisions and what came of it
   { path: '/item/:id', name: 'Item', component: page('Item'), props: true },

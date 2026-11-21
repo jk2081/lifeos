@@ -36,7 +36,7 @@ Open `https://SITE/life`. On a phone, use Add to Home Screen to install it as an
 
 **Family members.** Create the user in Frappe, then add them to a space under Life OS, Settings, Spaces and members. They get the role `Life User`. Create a space of their own for them in the same place.
 
-**Agents.** Create one user per agent in Frappe, then add it to each space it should work in from Life OS: Settings → People and agents → Members, **Add member**. If the user has no Life OS role yet, Add member offers agent access and gives it the role `Life Agent` when you confirm (never `Life User` or `Life Admin`). Agents start with Can view; they need Can edit to file captures and proposals. Generate its API key on the user record (Settings → People and agents → Agents links to it). Switch on MCP in System Settings (`Enable MCP`). The agent connects to `/api/v2/mcp` with `Authorization: token <key>:<secret>` and loads `agent/SKILL.md` as its instructions.
+**Agents.** Create one user per agent in Frappe, then add it to each space it should work in from Life OS: Settings → People and agents → Members, **Add member**. If the user has no Life OS role yet, Add member offers agent access and gives it the role `Life Agent` when you confirm (never `Life User` or `Life Admin`). Agents start with Can view; they need Can edit to file captures and proposals. Generate its API key on the user record (Settings → People and agents → Agents links to it). Switch on MCP in System Settings (`Enable MCP`). The agent connects to `/api/v2/mcp` with `Authorization: token <key>:<secret>` and loads its instructions from Life OS: `lifeos.api.skills.get` with the name `lifeos` (and `lifeos-file-work`).
 
 **Google Calendar.** Connect it in Settings > Me > Calendar (Frappe's Google Settings holds the OAuth client). Life OS reads your calendars; it writes only if you choose a calendar under "Write to Google Calendar" (off by default). Then an accepted Event proposal and a goal block from the weekly review are created in that calendar, private, with a link back to Life OS and no guests unless you add emails on the proposal; moving or deleting them in Life OS updates or deletes them in Google, and changes made in Google come back with the hourly read.
 
@@ -105,7 +105,7 @@ node tools/acceptance.mjs                         # walks the acceptance list of
 | --- | --- |
 | `lifeos/` | The Frappe app: DocTypes in `lifeos/life/doctype`, rules in `lifeos/*.py`, API in `lifeos/api/`, tests in `lifeos/tests/` |
 | `frontend/` | The single-page app: Vue 3, Vite, Tailwind, `frappe-ui` |
-| `agent/SKILL.md`, `agent/fake_agent.py` | Instructions for a real agent, and the test agent |
+| `lifeos/skills/lifeos.md`, `agent/fake_agent.py` | The skill a real agent is served (`skills.get`), and the test agent |
 | `mockups/` | The approved screen mockups |
 | `scripts/gen_doctypes.py` | Regenerates the DocType JSON from one table |
 | `scripts/run-issues.sh`, `docs/BUILDING.md`, `docs/ISSUE_RULES.md`, `CLAUDE.md` | How the app is built: GitHub issues, one at a time |
@@ -162,7 +162,10 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `inbox.claim_next` | `space=None` | Claim the oldest New item. Returns it with its file URLs and the filing context, or nothing. |
 | `inbox.submit_result` | `item, transcript_md=None, summary_md=None, proposals=None` | Store the transcript, summary and proposals, and set the item To Review. Each proposal is {kind, preview, payload, confidence}. An invalid proposal is refused with a clear error; the rest are kept. |
 | `inbox.fail_item` | `item, error=None` | Mark a claimed item Failed, with the reason. |
-| `inbox.retry` | `item` | Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed. |
+| `inbox.retry` | `item` | Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed. When the process-capture skill is on, it runs again. When the process-capture skill is on, it runs again. |
+| `skills.list` / `skills.get` | `space=None` / `name, space=None` | Issue 28: the active skills for the caller's spaces with their version, and one skill's instructions. Agents are served `lifeos` and `lifeos-file-work` here. |
+| `skills.run` | `skill, input` | Start a skill whose trigger is a Button on one record, in a background job. |
+| `skills.overview`, `detail`, `run_log`, `save`, `create`, `set_active`, `rollback`, `accept_update`, `test`, `add_example`, `save_auto_file` | | Brain > Skills (people; changes are the owner's). |
 | `inbox.list` | `space=None, status=None, include_archived=0, start=0, page_length=30` | Inbox items of a space, newest first, with proposal counts. `tabs` in the answer counts the items on each state tab (To Review, Waiting, Failed, Done, all) under the same filters. |
 | `inbox.get` | `item` | One inbox item with its files, proposals and the choices for the filing chips. A job's item also has `inputs`, `job_chat` and `wiki_pages`. |
 | `inbox.update_transcript` | `item, transcript_md` | Correct the transcript of an item, for example words marked [?]. |
@@ -171,7 +174,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `jobs.file_job` | `job_id, space=None, title=None, area=None, goal=None, instruction=None, raw_text=None, inputs=None, outputs=None, transcript_md=None, summary_md=None, proposals=None, wiki=None, chat=None, source_system=None` | File a finished piece of work as one inbox item in one call (issue 8, `agent/FILE_WORK.md`): outputs on the item, reusable inputs kept once each and linked as inputs, proposals waiting for the owner, wiki pages and a chat log citing the item. The same `job_id` again updates the job. All or nothing: an invalid part refuses the call and names the field. |
+| `jobs.file_job` | `job_id, space=None, title=None, area=None, goal=None, instruction=None, raw_text=None, inputs=None, outputs=None, transcript_md=None, summary_md=None, proposals=None, wiki=None, chat=None, source_system=None` | File a finished piece of work as one inbox item in one call (issue 8, the `lifeos-file-work` skill): outputs on the item, reusable inputs kept once each and linked as inputs, proposals waiting for the owner, wiki pages and a chat log citing the item. The same `job_id` again updates the job. All or nothing: an invalid part refuses the call and names the field. |
 
 **`lifeos.api.journal`**
 
