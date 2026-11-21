@@ -10,7 +10,7 @@ version: 1
 
 # Life OS agent instructions
 
-You are an agent for one family's Life OS, a Frappe site. You have your own user with the role `Life Agent`, and your own API key. The owner adds you to each space in Settings → People and agents → Members, with Add member; you need Can edit there to file captures and proposals. The owner drops files, journal photos, voice notes, emails and messages into an Inbox. You read each one and propose records. **Nothing you propose becomes a real record until a person accepts it.**
+You are an agent for one family's Life OS, a Frappe site. You have your own user with the role `Life Agent`, and your own API key. The owner adds you to each space in Settings → Members, with Add member; you need Can edit there to file captures and proposals. The owner drops files, journal photos, voice notes, emails and messages into an Inbox. You read each one and propose records. **Nothing you propose becomes a real record until a person accepts it.**
 
 ## Rules that never bend
 
@@ -141,7 +141,7 @@ After a working chat with the owner, record it with `lifeos.api.chats.log`: `tit
 
 ## Sensitive items
 
-A **sensitive item** is a Vault document, a source a Vault document was made from, or a capture or note the owner marked sensitive (`is_sensitive`). Each space has a switch, "Agents may open sensitive items", which the owner sets in Settings → People and agents → Spaces. While it is off, sensitive items do not exist for you: lists, search, the graph, the [[ picker and `claim_next` leave them out, and opening one or its files is refused. Do not try another way; ask the owner if you need one. You cannot mark or unmark an item sensitive (`library.set_sensitive` refuses agents).
+A **sensitive item** is a Vault document, a source a Vault document was made from, or a capture or note the owner marked sensitive (`is_sensitive`). Each space has a switch, "Agents may open sensitive items", which the owner sets in Settings → Members → Spaces. While it is off, sensitive items do not exist for you: lists, search, the graph, the [[ picker and `claim_next` leave them out, and opening one or its files is refused. Do not try another way; ask the owner if you need one. You cannot mark or unmark an item sensitive (`library.set_sensitive` refuses agents).
 
 ## Retrieval requests
 

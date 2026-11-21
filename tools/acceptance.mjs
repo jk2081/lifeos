@@ -1199,18 +1199,18 @@ for (const width of UX_WIDTHS) {
     let step = 'sections'
     const problems = []
     try {
-    // set 6: Me, Your life, Assistant, People and agents, Data
-    const SECTIONS = ['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'connections', 'ai', 'cost',
-      'sensitive', 'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'places', 'backups']
+    // issue 44: eight pages and Advanced (Sources is the Brain's screen)
+    const SECTIONS = ['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules', 'members', 'advanced']
+    const PAGES = SECTIONS.filter((x) => x !== 'sources')
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
     const listed = await menuItems()
     must(JSON.stringify(listed) === JSON.stringify(SECTIONS), `the menu lists ${listed}`)
-    for (const [old, now] of [['default', 'profile'], ['review', 'rhythms'], ['archived', 'archive']]) {
+    for (const [old, now] of [['default', 'profile'], ['review', 'rhythms']]) {
       await s.open(`/life/settings?tab=${old}`)
       must((await cur()) === now, `?tab=${old} opened ${await cur()}, not ${now}`)
     }
-    for (const sec of SECTIONS) {
+    for (const sec of PAGES) {
       await s.open(`/life/settings?tab=${sec}`)
       must((await cur()) === sec, `?tab=${sec} opened ${await cur()}`)
       await s.open('/life/settings')
@@ -1242,7 +1242,7 @@ for (const width of UX_WIDTHS) {
     step = 'no Delete or Remove for areas, habits or dimensions'
     const itemsOf = async (n) => { await pg.locator(`[data-row-name="${n}"] [data-row-menu]`).click(); await pg.waitForTimeout(250); const t = await pg.getByRole('menuitem').allInnerTexts(); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); return t.map((x) => x.trim()) }
     must(!(await pg.locator('[data-areas-section]').getByRole('button', { name: /^(Delete|Remove)$/ }).count()), 'areas: a Delete or Remove button')
-    for (const sec of ['habits', 'dimensions']) {
+    for (const sec of ['habits', 'rhythms']) {
       await s.open(`/life/settings?tab=${sec}`)
       const first = pg.locator('[data-settings-list] [data-row-name]').first()
       if (await first.count()) { const t = await itemsOf(await first.getAttribute('data-row-name')).catch(() => []); must(!t.some((x) => /Delete|Remove/.test(x)), `${sec}: ${t}`) }
@@ -1265,12 +1265,12 @@ for (const width of UX_WIDTHS) {
     must(!(await pg.locator(`[data-part="${b}"]`).count()), 'the archived part is still listed')
     must((await s.api('tasks.get', { task: task.name })).area === career, 'the open task did not move to Career')
     if (!phone) must(!(await pg.locator(`[data-nav-pin="${b}"]`).count()), 'the archived area is still in the sidebar')
-    await s.open('/life/settings?tab=archive')
+    await s.open('/life/settings?tab=advanced&part=archive')
     if (await pg.locator(`[data-archived-row="${b}"]`).count()) {
       await pg.locator(`[data-restore="${b}"]`).click()
       await pg.waitForTimeout(1200)
     } else { // an app bug: noted, and the area is restored through the API so the rest of the check runs
-      problems.push('the archived area is not under Settings > Archive and trash (?tab=archive), so it cannot be restored there')
+      problems.push('the archived area is not under Settings > Advanced > Archive, so it cannot be restored there')
       await s.api('settings.save_item', { kind: 'area', name: b, is_archived: 0, with_children: 1 })
     }
     const back = (await got()).areas
@@ -1332,7 +1332,7 @@ for (const width of UX_WIDTHS) {
     const fam = await session('family@lifeos.test', width)
     await fam.open('/life/settings')
     must(!(await fam.page.locator('[data-settings-group="people"]').count()), 'the family user sees People and agents')
-    must(!(await fam.page.locator('[data-settings-menu] [data-section="agents"], [data-settings-menu] [data-section="ai"], [data-settings-menu] [data-section="backups"]').count()), 'the family user sees an admin section')
+    must(!(await fam.page.locator('[data-settings-menu] [data-section="members"], [data-settings-menu] [data-section="advanced"]').count()), 'the family user sees an admin section')
     await fam.ctx.close()
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     must(!problems.length, problems.join('; '))
@@ -3502,26 +3502,18 @@ frappe.db.commit()`)
     }
   })
 
-  await check(`${tag}.3`, `${width} px: ?tab=agents and the old names land under People and agents; nothing under Assistant lists members or agents`, async () => {
-    for (const [asked, now] of [['agents', 'agents'], ['assistants', 'agents'], ['people', 'members']]) {
+  await check(`${tag}.3`, `${width} px: ?tab=agents and the old names land on Members; Rules and Advanced list no members or agents`, async () => {
+    for (const [asked, view] of [['agents', 'agents'], ['assistants', 'agents'], ['people', 'people'], ['spaces', 'spaces']]) {
       await s.open(`/life/settings?tab=${asked}`)
-      must((await cur()) === now, `?tab=${asked} opened ${await cur()}, not ${now}`)
+      must((await cur()) === 'members' && new URL(pg.url()).searchParams.get('view') === view, `?tab=${asked} opened ${await cur()} (${pg.url()})`)
     }
-    // the menu: Agents is the third item of People and agents; Assistant has Connections, Ask and AI, Sensitive items, Note rules
-    await s.open('/life/settings')
-    const menu = await pg.locator('[data-settings-menu] [data-settings-group], [data-settings-menu] [data-section]').evaluateAll((els) =>
-      els.map((e) => e.getAttribute('data-settings-group') ? '#' + e.getAttribute('data-settings-group') : e.getAttribute('data-section')))
-    const after = (g) => { const i = menu.indexOf('#' + g); const j = menu.findIndex((x, k) => k > i && x.startsWith('#')); return menu.slice(i + 1, j < 0 ? undefined : j) }
-    must(JSON.stringify(after('people')) === JSON.stringify(['spaces', 'members', 'agents']), `People and agents lists ${after('people')}`)
-    must(JSON.stringify(after('assistant')) === JSON.stringify(['connections', 'ai', 'cost', 'sensitive', 'note-rules']), `Assistant lists ${after('assistant')}`)
-    for (const sec of after('assistant')) {
+    for (const sec of ['rules', 'advanced']) {
       await s.open(`/life/settings?tab=${sec}`)
       must(!(await pg.locator('[data-settings-section] [data-member], [data-settings-section] [data-agent], [data-settings-section] [data-agent-access]').count()), `${sec} lists members or agents`)
       const text = await pg.locator('[data-settings-section]').innerText()
       must(!text.includes(I1_AGENT) && !text.includes('hermes@lifeos.test'), `${sec} names an agent`)
-      must(!/Agents are under Agents/.test(text), `${sec} still says "Agents are under Agents"`)
     }
-    for (const sec of ['sensitive', 'ai']) {
+    for (const sec of ['rules', 'advanced']) {
       await s.open(`/life/settings?tab=${sec}`)
       must(!(await pg.locator('[data-vault-switch], [data-ask-switch]').count()), `${sec} still has a per-space switch that moved to Spaces`)
     }
@@ -6127,6 +6119,203 @@ print(json.dumps(t.name))`).split('\n').pop())
     })
   } finally {
     cleanup()
+    await s.ctx.close()
+  }
+}
+
+// Issue 44: Settings, simplified. Eight items and Advanced; old links land on their new places; the ladder decides what a person who is not
+// a Life Admin sees. I44.6 (rename and merge tags in Library) was dropped by issue 60: Settings > Tags simply goes.
+for (const width of SET_WIDTHS) {
+  const tag = `I44.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const settle = () => pg.waitForTimeout(600)
+  const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
+  const items = () => pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section')))
+  const was = (await s.api('settings.get', { space: SPACE })).settings
+  const save = (values) => s.api('settings.save', { values })
+  try {
+    await check(`${tag}.1`, `${width} px: the owner's menu is Profile, Calendar, Areas, Rhythms, Habits, Sources, Rules, Members in four groups, and Advanced at the bottom`, async () => {
+      await s.open('/life/settings')
+      await pg.locator('[data-settings-menu] [data-section]').first().waitFor()
+      must(JSON.stringify(await items()) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules', 'members', 'advanced']), `the menu lists ${await items()}`)
+      const groups = await pg.locator('[data-settings-menu] [data-settings-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-settings-group')))
+      must(JSON.stringify(groups) === JSON.stringify(['me', 'space', 'brain', 'people']), `the groups are ${groups}`)
+      must(!(await pg.locator('[data-settings-later]').count()), 'a Life Admin is told more settings come later')
+      const adv = await pg.locator('[data-settings-menu] [data-section]').last().getAttribute('data-section')
+      must(adv === 'advanced', 'Advanced is not last')
+      if (phone) must(!(await pg.locator('[data-settings-section]').count()), 'on a phone a section is open before the menu')
+      else must((await cur()) === 'profile', 'the first page is not Profile')
+      // Sources opens the Brain's screen
+      await pg.locator('[data-settings-menu] [data-section="sources"]').click()
+      await settle()
+      must(new URL(pg.url()).pathname === '/life/brain/sources', `Sources opened ${pg.url()}`)
+    })
+
+    await check(`${tag}.2`, `${width} px: Rhythms holds the weekly review, check-in dimensions, old items, working hours, the month and the 12 Week Year, and each saves the same setting`, async () => {
+      await s.open('/life/settings?tab=rhythms')
+      await pg.locator('[data-settings-rhythms]').waitFor()
+      const text = await pg.locator('[data-settings-section]').innerText()
+      for (const want of ['Weekly review', 'Week starts on', 'Check-in dimensions', 'Inbox items not dealt with', 'Working days', 'Month plan', 'Current cycle', 'Score target', 'Break week'])
+        must(text.includes(want), `Rhythms does not show "${want}"`)
+      must(await pg.locator('[data-settings-list]').count(), 'no check-in dimensions list')
+      const pick = async (sel, label) => { await pg.locator(sel).first().click(); await pg.getByRole('option', { name: label, exact: true }).first().click(); await settle() }
+      const day = was.weekly_review_day === 'Tuesday' ? 'Wednesday' : 'Tuesday'
+      await pick('[data-setting="weekly_review_day"]', day)
+      must((await s.api('settings.get', { space: SPACE })).settings.weekly_review_day === day, 'the review day was not saved')
+      const start = was.week_starts_on === 'Sunday' ? 'Monday' : 'Sunday'
+      await pick('[data-setting="week_starts_on"]', start)
+      must((await s.api('settings.get', { space: SPACE })).settings.week_starts_on === start, 'week start was not saved')
+      const box = pg.locator('input[data-setting="old_inbox_days"], [data-setting="old_inbox_days"] input').first()
+      const days = Number(was.old_inbox_days || 7) === 9 ? 10 : 9
+      await box.fill(String(days)); await box.press('Tab'); await settle()
+      must(Number((await s.api('settings.get', { space: SPACE })).settings.old_inbox_days) === days, 'the old-items days were not saved')
+      const wd = pg.locator('[data-work-day="Sunday"]')
+      const had = String(was.work_days || 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday').includes('Sunday')
+      await wd.click(); await settle()
+      must(String((await s.api('settings.get', { space: SPACE })).settings.work_days).includes('Sunday') === !had, 'the working days were not saved')
+      const plan = pg.locator('[data-setting="month_plan_enabled"]')
+      const want = was.month_plan_enabled ? 'Off' : 'On'
+      await plan.getByText(want, { exact: true }).click(); await settle()
+      must(Number((await s.api('settings.get', { space: SPACE })).settings.month_plan_enabled) === (want === 'On' ? 1 : 0), 'the month plan was not saved')
+      const target = was.score_target === 77 ? 78 : 77
+      const tb = pg.locator('input[data-setting="score_target"], [data-setting="score_target"] input').first()
+      await tb.fill(String(target)); await tb.press('Tab'); await settle()
+      must(Number((await s.api('settings.get', { space: SPACE })).settings.score_target) === target, 'the score target was not saved')
+      const brk = pg.locator('[data-setting="cycle_break_week"]')
+      const bwant = was.cycle_break_week ? 'No' : 'Yes'
+      await brk.getByText(bwant, { exact: true }).click(); await settle()
+      must(Number((await s.api('settings.get', { space: SPACE })).settings.cycle_break_week) === (bwant === 'Yes' ? 1 : 0), 'the break week was not saved')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.3`, `${width} px: Profile shows Look and Reminders, and the theme takes effect`, async () => {
+      await s.open('/life/settings?tab=profile')
+      await pg.locator('[data-settings-profile]').waitFor()
+      must(await pg.locator('[data-settings-look]').count() && await pg.locator('[data-settings-notifications]').count(), 'Profile has no Look or Reminders')
+      must(/Keyboard shortcuts: press \? anywhere/.test(await pg.locator('[data-settings-shortcuts]').innerText()), 'no keyboard shortcuts line')
+      const isDark = () => pg.evaluate(() => document.documentElement.classList.contains('dark') || document.documentElement.getAttribute('data-theme') === 'dark')
+      try {
+        await pg.locator('[data-theme-switch]').getByText('Dark', { exact: true }).click(); await settle()
+        must(await isDark(), 'Dark did not take effect')
+        await pg.locator('[data-theme-switch]').getByText('Light', { exact: true }).click(); await settle()
+        must(!(await isDark()), 'Light did not take effect')
+      } finally {
+        await pg.locator('[data-theme-switch]').getByText('Light', { exact: true }).click()
+      }
+    })
+
+    await check(`${tag}.4`, `${width} px: every old ?tab= value lands on its new place`, async () => {
+      const MAP = [['default', 'profile'], ['appearance', 'profile'], ['notifications', 'profile'], ['shortcuts', 'profile'], ['calendar', 'calendar'], ['areas', 'areas'],
+        ['rhythms', 'rhythms'], ['review', 'rhythms'], ['dimensions', 'rhythms'], ['reset', 'rhythms'], ['habits', 'habits'], ['sensitive', 'rules'], ['note-rules', 'rules'],
+        ['spaces', 'members', 'spaces'], ['members', 'members'], ['agents', 'members', 'agents'], ['ai', 'advanced', null, 'ai'], ['cost', 'advanced', null, 'ai'],
+        ['import', 'advanced', null, 'import'], ['backups', 'advanced', null, 'backups'], ['places', 'profile']]
+      for (const [old, now, view, part] of MAP) {
+        await s.open(`/life/settings?tab=${old}`)
+        await pg.locator('[data-settings-section]').waitFor()
+        const u = new URL(pg.url())
+        must((await cur()) === now && (view ? u.searchParams.get('view') === view : true) && (part && part !== 'ai' ? u.searchParams.get('part') === part : true), `?tab=${old} opened ${await cur()} at ${pg.url()}`)
+      }
+      for (const [old, path] of [['tags', '/life/library/archive'], ['archive', '/life/library/archive'], ['archived', '/life/library/archive'], ['connections', '/life/brain/sources'], ['sources', '/life/brain/sources']]) {
+        await s.open(`/life/settings?tab=${old}`)
+        must(new URL(pg.url()).pathname === path, `?tab=${old} opened ${pg.url()}, not ${path}`)
+      }
+      await s.open('/life/areas')
+      must(new URL(pg.url()).pathname === '/life/settings' && (await cur()) === 'areas', '/areas does not open Settings, Areas')
+    })
+
+    await check(`${tag}.5`, `${width} px: Members lists people and agents with filters and a Spaces view that still switches Ask and sensitive-item access`, async () => {
+      await s.open('/life/settings?tab=members')
+      await pg.locator('[data-member-filter]').waitFor()
+      const tabs = (await pg.locator('[data-member-filter]').innerText()).replace(/\s+/g, ' ')
+      for (const w of ['All', 'People', 'Agents', 'Spaces']) must(tabs.includes(w), `the filters read "${tabs}"`)
+      must(await pg.locator('[data-members] [data-member]').count(), 'Members lists nobody')
+      await pg.locator('[data-member-filter]').getByText(/^Spaces/).click(); await settle()
+      must(new URL(pg.url()).searchParams.get('view') === 'spaces' && await pg.locator(`[data-space-card="${SPACE}"]`).count(), 'the Spaces view does not show the space')
+      const before = (await s.api('settings.get', { space: SPACE })).spaces.find((x) => x.name === SPACE)
+      try {
+        await pg.locator(`[data-ask-switch="${SPACE}"]`).click(); await settle()
+        must((await s.api('settings.get', { space: SPACE })).spaces.find((x) => x.name === SPACE).ask_enabled === (before.ask_enabled ? 0 : 1), 'Ask did not switch')
+        await pg.locator(`[data-vault-switch="${SPACE}"]`).click(); await settle()
+        must((await s.api('settings.get', { space: SPACE })).spaces.find((x) => x.name === SPACE).agents_can_read_vault === (before.agents_can_read_vault ? 0 : 1), 'sensitive-item access did not switch')
+        await s.open('/life/settings?tab=rules')
+        await pg.locator(`[data-ask-vault-switch="${SPACE}"]`).waitFor()
+      } finally {
+        await s.api('settings.set_space_ask', { space: SPACE, ask_enabled: before.ask_enabled })
+        await s.api('settings.set_agent_vault', { space: SPACE, allowed: before.agents_can_read_vault })
+      }
+    })
+
+    await check(`${tag}.6`, `${width} px: Settings has no Tags page (issue 60 removed tags); Library's Trash and archive is where ?tab=tags goes`, async () => {
+      await s.open('/life/settings')
+      await pg.locator('[data-settings-menu] [data-section]').first().waitFor()
+      must(!(await pg.locator('[data-settings-menu] [data-section="tags"]').count()), 'Settings still has Tags')
+      await s.open('/life/settings?tab=tags')
+      must(new URL(pg.url()).pathname === '/life/library/archive', `?tab=tags opened ${pg.url()}`)
+    })
+
+    // non-admins and the ladder: the level is the one the server reports, set here for each case
+    const fam = await session('family@lifeos.test', width)
+    try {
+      const levelAt = async (n) => {
+        await fam.page.route('**/lifeos.api.meta.setup_level*', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: { level: n, of: 6, complete: false, dismissed: true, next: null, levels: [], done: [], how: [] } }) }))
+        await fam.open('/life/settings')
+        await fam.page.waitForFunction((lv) => document.querySelector('[data-settings-menu]') && (lv === 6 || document.querySelector('[data-settings-later]')), n, { timeout: 8000 }).catch(() => {})
+        await fam.page.waitForTimeout(600)
+        await fam.page.unroute('**/lifeos.api.meta.setup_level*')
+        return fam.page.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section')))
+      }
+      await check(`${tag}.7`, `${width} px: a person who is not a Life Admin at level 1 sees Profile, Areas and Sources and the footer line; Rhythms appears at level 4`, async () => {
+        const one = await levelAt(1)
+        must(JSON.stringify(one) === JSON.stringify(['profile', 'areas', 'sources']), `level 1 shows ${one}`)
+        const line = await fam.page.locator('[data-settings-later]').innerText()
+        must(/More settings appear as you go up the ladder/.test(line) && /Rhythms at level 4/.test(line), `the footer says "${line}"`)
+        const four = await levelAt(4)
+        must(JSON.stringify(four) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules']), `level 4 shows ${four}`)
+        // a page that is not in the menu yet is still reached by its link
+        await fam.open('/life/settings?tab=habits')
+        await fam.page.locator('[data-settings-section]').waitFor()
+        must((await fam.page.locator('[data-settings-section]').getAttribute('data-current')) === 'habits', 'a link to a page not in the menu yet did not open it')
+      })
+      await check(`${tag}.8`, `${width} px: a person who is not a Life Admin does not see Advanced; the owner's Advanced opens AI key and cost, Import and export and Backups`, async () => {
+        const all = await levelAt(6)
+        must(!all.includes('advanced') && !all.includes('members'), `a non-admin at level 6 sees ${all}`)
+        await fam.open('/life/settings?tab=advanced')
+        await fam.page.waitForTimeout(800)
+        must((await fam.page.locator('[data-settings-section]').getAttribute('data-current').catch(() => null)) !== 'advanced', 'a non-admin opened Advanced')
+        await s.open('/life/settings?tab=advanced')
+        await pg.locator('[data-advanced-parts]').waitFor()
+        must(await pg.locator('[data-ai-settings]').count(), 'Advanced does not open AI key and cost')
+        await pg.locator('[data-advanced-parts]').getByText('Import and export', { exact: true }).click(); await settle()
+        must(await pg.locator('[data-chat-import]').count(), 'no Import and export')
+        await pg.locator('[data-advanced-parts]').getByText('Backups', { exact: true }).click(); await settle()
+        must(await pg.locator('[data-settings-backups]').count(), 'no Backups')
+      })
+    } finally { await fam.ctx.close() }
+
+    await check(`${tag}.9`, `${width} px: the menu is the first screen on a phone and every page opens with Back`, async () => {
+      for (const sec of ['profile', 'calendar', 'areas', 'rhythms', 'habits', 'rules', 'members', 'advanced']) {
+        await s.open('/life/settings')
+        await pg.locator(`[data-settings-menu] [data-section="${sec}"]`).waitFor()
+        if (phone) must(!(await pg.locator('[data-settings-section]').count()), 'a section is open before the menu')
+        await pg.locator(`[data-settings-menu] [data-section="${sec}"]`).click(); await settle()
+        must((await cur()) === sec, `the menu did not open ${sec}`)
+        const w = await pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+        must(w <= 1, `${sec} scrolls sideways`)
+        if (phone) {
+          must(!(await pg.locator('[data-settings-menu]').count()), `${sec}: the menu is still shown`)
+          await pg.locator('[data-settings-back]').click(); await settle()
+          must(await pg.locator('[data-settings-menu]').isVisible() && !(await pg.locator('[data-settings-section]').count()), `${sec}: Back did not return to the menu`)
+        }
+      }
+    })
+  } finally {
+    await save({ weekly_review_day: was.weekly_review_day, week_starts_on: was.week_starts_on || 'Monday', old_inbox_days: was.old_inbox_days || 7, work_days: was.work_days || 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+      month_plan_enabled: was.month_plan_enabled ? 1 : 0, score_target: was.score_target, cycle_break_week: was.cycle_break_week ? 1 : 0 })
     await s.ctx.close()
   }
 }

@@ -104,7 +104,7 @@ def _last_filed(users):
 
 
 def _agents(spaces):
-	"""One card per agent for Settings > People and agents > Agents: every agent account, its access in each space (None
+	"""One card per agent for Settings > Members > Agents: every agent account, its access in each space (None
 	where it is not a member; read from the same member rows as Members), whether agents may open that space's sensitive
 	items, and when it last filed something."""
 	reach = {}
@@ -205,7 +205,7 @@ BACKUP_KEYS = ("backup_frequency", "backup_with_files", "backup_path", "encrypt_
 
 
 def backups():
-	"""What is backed up and when, read from the site's configuration (Settings > Data > Backups). Never a secret: only the
+	"""What is backed up and when, read from the site's configuration (Settings > Advanced > Backups). Never a secret: only the
 	keys above, whether S3 backups are switched on, and the dates and sizes of the latest backup files on this server."""
 	conf = frappe.get_site_config() or {}
 	keys = {k: conf.get(k) for k in BACKUP_KEYS if conf.get(k) not in (None, "")}
@@ -226,7 +226,7 @@ def backups():
 
 
 def ai_settings():
-	"""Settings, Assistant, Ask and AI: whether a key is set (never the key), the models, the cap, the prices, and this month's spend by
+	"""Settings, Advanced, AI key and cost: whether a key is set (never the key), the models, the cap, the prices, and this month's spend by
 	purpose and by user."""
 	from lifeos.ai import client
 

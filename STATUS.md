@@ -502,3 +502,7 @@ docker compose -f docker/docker-compose.yml down -v
 
 - **Works:** `Life Goal.horizon` (Long term, Year, 12 weeks, Month) set from the target date and cycle, with the Rhythms setting "Plan in 12 Week Years or quarters"; the month's goals are the Month-horizon goals dated in that month, in `sort_order` (Move up and down on the month plan); Someday is the one parking lot for tasks, goals and notes, and Reset, the review piles and the old Inbox park into it; no tags anywhere; the agent proposal kinds are one Goal (Month Goal accepted for one release).
 - **Tests:** `test_issue60_horizons_someday_no_tags` (unit) and `I60.4`, `I60.8`, `I60.9` in the acceptance walk.
+
+## Issue 44: Settings, simplified
+
+- **Works:** Settings is eight items in four groups (Me: Profile, Calendar; Your life: Areas, Rhythms, Habits; Brain: Sources, Rules; People and agents: Members) and Advanced at the foot for the Life Admin (AI key and cost, Import and export, Backups, Archive). Profile holds Look, Reminders and Where things are; Rhythms holds the weekly review with check-in dimensions and the Reset rules, working hours, the month and the 12 Week Year; Rules holds note rules and sensitive-item access; Members has the filters All, People, Agents and Spaces. Items appear by level on the ladder, with a footer line for what comes next; a Life Admin sees all. Every old `?tab=` lands on its new place. Checks `I44.<width>.1` to `.9`. See `DECISIONS.md`, Issue 44.

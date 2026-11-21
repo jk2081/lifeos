@@ -1,4 +1,4 @@
-"""Inbox items left too long (set 7). A rule in Settings > Your life > Reset rules says what happens to items To Review (and
+"""Inbox items left too long (set 7). A rule in Settings > Your life > Rhythms says what happens to items To Review (and
 New items no agent has claimed) older than N days: Suggest a decision for each (the default, after 7 days), Park them in Someday
 in Someday, or Discard them to the trash (after 14 days). A nightly job applies it. Items an agent is processing, and Failed
 items, are never acted on. Parking and discarding record their Outbox exits with `auto_rule`, which Today's line and its Undo

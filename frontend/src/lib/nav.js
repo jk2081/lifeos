@@ -43,7 +43,7 @@ export const NOTES_VIEWS = ['list', 'tree', 'graph', 'changes', 'health'].map((v
   route: { path: '/library/notes', query: { view: v } } }))
 // "Written by" on Library > Notes
 export const WRITTEN_BY = [{ label: 'Written by anyone', value: '' }, { label: 'Written by me', value: 'me' }, { label: 'Kept by the assistant', value: 'assistant' }]
-// Settings > Data > Where things are (issue 14): every page that is not a place or a tab, with the place it lives in
+// Settings > Profile > Where things are (issue 14): every page that is not a place or a tab, with the place it lives in
 export const ELSEWHERE = [
   { key: 'reset', label: 'Reset', home: 'Today, and the weekly review', to: '/today/reset' },
   { key: 'review', label: 'Weekly review', home: 'Review, once you have locked one; the banner on Today on its day', to: '/review' },
