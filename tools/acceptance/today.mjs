@@ -369,6 +369,9 @@ for (const width of WIDTHS) {
   const year = Number(today.slice(0, 4))
   const monday = plusDays(today, -((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7))
   const wed = plusDays(monday, 2)
+  // today's own cell and row carry the run's other items and the month cell shows three, so the fixtures go on days that are not today
+  const meetDay = monday === today ? plusDays(monday, 1) : monday
+  const dueDay = wed === today ? plusDays(monday, 3) : wed
   const nextMonth = new Date(Date.UTC(year, Number(today.slice(5, 7)), 15)).toISOString().slice(0, 10)
   const nextKey = nextMonth.slice(0, 7)
   const meeting = `I16 meeting ${width} ${stamp}`, due = `I16 due ${width} ${stamp}`, later = `I16 later ${width} ${stamp}`
@@ -379,10 +382,10 @@ career, tea, mind = area("Career"), area("Tea & Coffee"), area("Mind")
 was = {n: frappe.db.get_value("Life Area", n, "is_on") for n in (career, tea, mind)}
 for n in (career, tea): frappe.db.set_value("Life Area", n, "is_on", 1)
 frappe.db.set_value("Life Area", mind, "is_on", 0)
-ev = frappe.get_doc({"doctype": "Event", "subject": "${meeting}", "starts_on": "${monday} 10:00:00", "ends_on": "${monday} 11:00:00", "event_category": "Event",
+ev = frappe.get_doc({"doctype": "Event", "subject": "${meeting}", "starts_on": "${meetDay} 10:00:00", "ends_on": "${meetDay} 11:00:00", "event_category": "Event",
   "event_type": "Public", "life_space": "${SPACE}", "google_calendar_event_id": "fixture-i16-${stamp}-${width}"}).insert(ignore_permissions=True)
 tasks = [frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": t, "status": "Open", "area": tea, "due_date": d}).insert(ignore_permissions=True).name
-  for t, d in (("${due}", "${wed}"), ("${later}", "${nextMonth}"))]
+  for t, d in (("${due}", "${dueDay}"), ("${later}", "${nextMonth}"))]
 goal = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${goalTitle}", "area": tea, "horizon": "Year", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
 off = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${offTitle}", "area": mind, "horizon": "Year", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
 print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event": ev.name, "tasks": tasks, "goal": goal, "off": off}))`).split('\n').pop())
@@ -392,15 +395,15 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
       await s.open('/life/today/week')
       await pg.locator('[data-week-grid]').waitFor({ timeout: 10000 })
       const dayText = async (d) => await pg.locator(`[data-week-grid] [data-day="${d}"]`).innerText()
-      must((await dayText(monday)).includes(meeting), `${meeting} is not on ${monday}`)
-      must((await dayText(wed)).includes(due), `${due} is not on ${wed}`)
-      for (const d of [plusDays(monday, 1), plusDays(monday, 3)]) must(!(await dayText(d)).includes(meeting) && !(await dayText(d)).includes(due), 'an item is on the wrong day ' + d)
-      const to = wed === today ? monday : wed
+      must((await dayText(meetDay)).includes(meeting), `${meeting} is not on ${meetDay}`)
+      must((await dayText(dueDay)).includes(due), `${due} is not on ${dueDay}`)
+      for (const d of [plusDays(monday, 4), plusDays(monday, 5)]) must(!(await dayText(d)).includes(meeting) && !(await dayText(d)).includes(due), 'an item is on the wrong day ' + d)
+      const to = dueDay === today ? meetDay : dueDay
       await pg.locator(`[data-week-grid] [data-day="${to}"] [data-open-day]`).click()
       await pg.waitForURL((u) => u.pathname === '/life/today' && u.searchParams.get('date') === to, { timeout: 10000 })
       await pg.locator('[data-day-other]').waitFor({ timeout: 10000 })
-      await pg.waitForFunction((t) => document.querySelector('[data-day-other]')?.innerText.includes(t), to === wed ? due : meeting, { timeout: 10000 }).catch(() => {})
-      must((await pg.locator('[data-day-other]').innerText()).includes(to === wed ? due : meeting), 'Day does not list the item of ' + to)
+      await pg.waitForFunction((t) => document.querySelector('[data-day-other]')?.innerText.includes(t), to === dueDay ? due : meeting, { timeout: 10000 }).catch(() => {})
+      must((await pg.locator('[data-day-other]').innerText()).includes(to === dueDay ? due : meeting), 'Day does not list the item of ' + to)
       must((await pg.locator('[data-page-head]').first().innerText()).includes(String(Number(to.slice(8)))), 'Day is not headed with the date')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
@@ -410,13 +413,13 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
       const month = today.slice(0, 7)
       must((await pg.locator('[data-month-view]').getAttribute('data-month')) === month, 'Month is not on this month')
       if (phone) {
-        for (const [d, title] of [[monday, meeting], [wed, due]]) {
+        for (const [d, title] of [[meetDay, meeting], [dueDay, due]]) {
           await pg.locator(`[data-month-grid] [data-day="${d}"] > button`).click()
           await pg.waitForFunction((t) => document.querySelector('[data-month-list]')?.innerText.includes(t), title, { timeout: 5000 })
         }
       } else {
-        must((await pg.locator(`[data-month-grid] [data-day="${monday}"]`).innerText()).includes(meeting), `${meeting} is not on ${monday}`)
-        must((await pg.locator(`[data-month-grid] [data-day="${wed}"]`).innerText()).includes(due), `${due} is not on ${wed}`)
+        must((await pg.locator(`[data-month-grid] [data-day="${meetDay}"]`).innerText()).includes(meeting), `${meeting} is not on ${meetDay}`)
+        must((await pg.locator(`[data-month-grid] [data-day="${dueDay}"]`).innerText()).includes(due), `${due} is not on ${dueDay}`)
       }
       await pg.locator('[data-cal-next]').click()
       await pg.waitForFunction((k) => document.querySelector('[data-month-view]')?.getAttribute('data-month') === k, nextKey, { timeout: 10000 })
