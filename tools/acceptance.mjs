@@ -4254,7 +4254,11 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
       if (phone) {
         await pg.locator(`[data-month-grid] [data-day="${nextMonth}"] > button`).click()
         await pg.waitForFunction((t) => document.querySelector('[data-month-list]')?.innerText.includes(t), later, { timeout: 5000 })
-      } else must((await pg.locator(`[data-month-grid] [data-day="${nextMonth}"]`).innerText()).includes(later), `${later} is not on ${nextMonth}`)
+      } else {
+        // the next month's items load after its grid is drawn
+        await pg.waitForFunction(([d, t]) => document.querySelector(`[data-month-grid] [data-day="${d}"]`)?.innerText.includes(t), [nextMonth, later], { timeout: 10000 }).catch(() => {})
+        must((await pg.locator(`[data-month-grid] [data-day="${nextMonth}"]`).innerText()).includes(later), `${later} is not on ${nextMonth}`)
+      }
       await pg.locator('[data-cal-prev]').click()
       await pg.waitForFunction((k) => document.querySelector('[data-month-view]')?.getAttribute('data-month') === k, month, { timeout: 10000 })
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
