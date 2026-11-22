@@ -6,7 +6,7 @@ import frappe
 
 from lifeos import areas, demo, install, permissions, seed
 from lifeos.api import onboarding
-from lifeos.tests.base import OWNER, PRIVATE, LifeTestCase
+from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, LifeTestCase
 
 NEW = "i49-owner@lifeos.test"
 FRESH = "I49 fresh"
@@ -103,4 +103,11 @@ class TestFirstRun(LifeTestCase):
 
 	def test_an_agent_and_a_family_user_never_get_the_guide(self):
 		self.as_user(OWNER)
+		self.make("Life Task", title="I49 a record, so the site is not empty")
 		self.assertFalse(onboarding.state()["show"])  # the owner's spaces have records
+		# a fresh site has no records, so the owner's spaces are empty and only the owner is shown the guide
+		with patch.object(onboarding, "is_empty", return_value=True):
+			self.assertTrue(onboarding.state()["show"])
+			for user in (AGENT, FAMILY):
+				self.as_user(user)
+				self.assertFalse(onboarding.state()["show"], user)
