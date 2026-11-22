@@ -37,10 +37,10 @@
 
       <NewRecord v-if="store.newKind === 'note'" :model-value="true" title="New note" action="Create note" :fields="[{ name: 'title', label: 'Title', required: true }]"
         :save="createNote" @update:model-value="(v) => !v && (store.newKind = '')" />
-      <NewGoalDialog v-if="store.newKind === 'goal'" :model-value="true" :types="['Open', 'Annual']" area-required @saved="goalCreated" @habit="store.newKind = ''"
+      <NewGoalDialog v-if="store.newKind === 'goal'" :model-value="true" area-required @saved="goalCreated" @habit="store.newKind = ''"
         @update:model-value="(v) => !v && (store.newKind = '')" />
 
-      <NewRecord v-if="store.newKind === 'idea'" :model-value="true" title="New idea" action="Park on Someday" :fields="ideaFields" :save="createIdea"
+      <NewRecord v-if="store.newKind === 'someday'" :model-value="true" title="Park on Someday" action="Park on Someday" :fields="somedayFields" :save="createSomeday"
         @update:model-value="(v) => !v && (store.newKind = '')" />
       <LensSheet v-model:open="lensOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
       <RecordPane />
@@ -115,12 +115,13 @@ async function createNote(v) {
   store.newKind = ''
   router.push(`/library/${note.name}?edit=1`)
 }
-const ideaFields = computed(() => [{ name: 'title', label: 'Idea', required: true }, { name: 'area', label: 'Area', options: areaOptions() },
+const somedayFields = computed(() => [{ name: 'title', label: 'What to park', required: true },
+  { name: 'as_note', label: 'It is', options: [{ label: 'A task', value: 0 }, { label: 'A thought with no action (a note)', value: 1 }] }, { name: 'area', label: 'Area', options: areaOptions() },
   { name: 'body_md', label: 'More detail', type: 'textarea' }, { name: 'note', label: 'Why it can wait (optional)' }])
-async function createIdea(v) {
-  await api('someday.create_idea', { space: store.space, ...v })
+async function createSomeday(v) {
+  await api('someday.create', { space: store.space, ...v })
   store.newKind = ''
-  recordChanged('idea:new')
+  recordChanged('task:new')
   toast.success('Parked on the Someday list.')
 }
 function goalCreated(g) {

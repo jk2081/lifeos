@@ -114,17 +114,17 @@ class TestSuggest(OldCase):
 		self.assertEqual(frappe.db.get_value("Life Inbox Item", acc, "status"), "Done")
 		self.assertEqual(self.exits(acc), ["Done"])
 		self.assertEqual(self.exits(park), ["Parked"])
-		self.assertTrue(frappe.db.exists("Life Idea", {"source_doctype": "Life Inbox Item", "source_name": park, "status": "Someday"}))
+		self.assertTrue(frappe.db.exists("Life Note", {"inbox_item": park, "is_someday": 1}))
 		self.assertFalse(frappe.db.exists("Life Inbox Item", gone))
 		self.assertEqual(self.exits(gone), ["Discarded"])
 		old_items.undo(res["undo"])
 		self.assertEqual(frappe.db.get_value("Life Inbox Item", acc, "status"), "To Review")
 		self.assertEqual(frappe.db.get_value("Life Inbox Item", park, "status"), "To Review")
-		self.assertFalse(frappe.db.exists("Life Idea", {"source_doctype": "Life Inbox Item", "source_name": park}))
+		self.assertFalse(frappe.db.exists("Life Note", {"inbox_item": park}))
 		self.assertEqual(frappe.db.count("Life Proposal", {"inbox_item": park, "status": "Pending"}), 1)
 		self.assertTrue(frappe.db.exists("Life Inbox Item", gone))
 		self.assertEqual([self.exits(n) for n in (acc, park, gone)], [[], [], []])
-		self.assertEqual(frappe.db.count("Life Exit", {"record_doctype": "Life Idea", "reversed": 0, "title": "ux7 confirm park"}), 0)
+		self.assertEqual(frappe.db.count("Life Exit", {"record_doctype": "Life Note", "reversed": 0, "title": "ux7 confirm park"}), 0)
 
 
 class TestParkAndDiscard(OldCase):

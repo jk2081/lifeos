@@ -23,10 +23,6 @@
         <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)" @click="save({ also_in: task.also_in.filter((x) => x !== a) })" /></template></Badge>
       <Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== task.area && !task.also_in.includes(o.value))" placeholder="also in"
         :clearable="false" :disabled="!writable" @update:model-value="(v) => save({ also_in: [...task.also_in, v] })" />
-      <Badge v-for="t in task.tag_ids" :key="t" size="lg">#{{ tagName(t) }}
-        <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove #' + tagName(t)" @click="save({ tag_ids: task.tag_ids.filter((x) => x !== t) })" /></template></Badge>
-      <Pick v-if="lookups.tags.length" :model-value="null" :options="lookups.tags.filter((t) => !task.tag_ids.includes(t.name)).map((t) => ({ value: t.name, label: '#' + t.tag_name }))"
-        placeholder="tag" :clearable="false" :disabled="!writable" @update:model-value="(v) => save({ tag_ids: [...task.tag_ids, v] })" />
     </div>
   </div>
    <FormControl type="select" label="Goal" :model-value="task.goal || ''" :options="goalOptions" :disabled="!writable" @update:model-value="(v) => save({ goal: v || null })" />
@@ -104,7 +100,6 @@ function pickWaiting(v) {
   const who = peopleOptions.value.find((o) => o.value === v)
   save({ waiting_on_person: v || null, ...(v && !(task.value.waiting_on || '').trim() ? { waiting_on: who.label } : {}) })
 }
-const tagName = (id) => lookups.tags.find((t) => t.name === id)?.tag_name || id
 
 async function load() {
   try {

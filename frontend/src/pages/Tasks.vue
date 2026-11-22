@@ -82,7 +82,7 @@ const EMPTY = { loops: 'No open loops.', Waiting: 'Nothing is waiting.', Done: '
 const BOARD = ['Open', 'Doing', 'Waiting', 'Done']
 // the short URL parameters of this list, as the count links write them (lib/filterUrl.js)
 const SPEC = [
-  { key: 'area', field: 'area', kind: 'link' }, { key: 'goal', field: 'goal', kind: 'link' }, { key: 'tag', field: 'tag', kind: 'value' },
+  { key: 'area', field: 'area', kind: 'link' }, { key: 'goal', field: 'goal', kind: 'link' },
   { key: 'priority', field: 'priority', kind: 'link' },
   { key: 'due', field: 'due_date', kind: 'preset', label: 'Due', presets: DUE_PRESETS, labels: { overdue: 'overdue', today: 'today', 'today,overdue': 'today and overdue', week: 'this week', none: 'no date' } },
   { key: 'status', field: 'status', kind: 'value' },
@@ -91,7 +91,6 @@ const SPEC = [
 ]
 const FLAGS = { archived: 'Include archived' }
 const QUICK = ['area', 'goal', 'priority', 'due_date']
-const VIRTUAL = [{ fieldname: 'tag', label: 'Tag', fieldtype: 'Link', options: 'Life Tag' }]
 const SYNTHETIC = [{ key: '_check', label: '', width: '2rem', place: 'start' }]
 // Inside a record page's tab (the goal page): { screen, fixed: { goal }, active(route) }
 // screen: the remembered view's name (Goals > No goal keeps its own)
@@ -131,7 +130,7 @@ function dueGroup(t) {
 }
 
 async function fetch({ params: p, tab: t, filters, order_by, fields, summary, start, page_length, view: v }) {
-  const base = { space: props.embed?.space || store.space, area: p.area, tag: p.tag, priority: p.priority, goal: p.goal, due: p.due,
+  const base = { space: props.embed?.space || store.space, area: p.area, priority: p.priority, goal: p.goal, due: p.due,
     include_archived: p.archived ? 1 : 0, completed_from: p.completed_from, completed_to: p.completed_to, filters }
   // what each tab asks the server for; under All a status that is not a tab (status=Dropped) is passed as it is
   const status = t === 'open' ? 'open_doing' : t === 'loops' ? 'open' : t === 'all' ? p.status || 'all' : t

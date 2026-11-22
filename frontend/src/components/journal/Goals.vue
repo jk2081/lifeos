@@ -19,7 +19,7 @@
           <b class="font-semibold text-ink-gray-9">{{ c.title }}</b>
           <Badge :theme="c.status === 'Active' ? 'blue' : 'gray'" :label="c.status === 'Active' ? (c.current_week ? `Active · week ${c.current_week}` : 'Active') : c.status" />
           <span class="text-sm text-ink-gray-6">{{ cycleNote(c) }}</span>
-          <Button class="ml-auto" variant="ghost" size="sm" label="Open grid" :route="`/today/year?view=cycle&cycle=${c.name}`" />
+          <Button class="ml-auto" variant="ghost" size="sm" label="Open grid" :route="`/goals/cycles?cycle=${c.name}`" />
         </div>
         <div v-for="g in c.goals" :key="g.name" class="gr border-t border-outline-gray-1 px-4 py-2.5">
           <div><RouterLink class="font-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/goals/${g.name}`">{{ g.title }}</RouterLink>

@@ -188,7 +188,7 @@ def claim_next(space: str | None = None):
 
 
 def space_context(space):
-	"""What an agent needs to file proposals: the space's areas, tags, people, habits, dimensions and goals in progress (projects
+	"""What an agent needs to file proposals: the space's areas, people, habits, dimensions and goals in progress (projects
 	became open-ended goals in set 6).
 	`areas` (issue 11) holds the areas of life that are on, each followed by its parts: file only into these. `areas_off`
 	names the areas of life that are switched off; nothing may be filed there, and their goals are left out."""
@@ -200,10 +200,10 @@ def space_context(space):
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)
 	# every goal in progress, of every type, for filing a task under it; 12 Week Year goals of the active cycle carry their actions
 	goals = []
-	for g in frappe.db.sql("""select g.name, g.title, g.area, g.goal_type, g.cycle, g.measure_kind, g.measure, g.unit, g.start_value,
+	for g in frappe.db.sql("""select g.name, g.title, g.area, g.horizon, g.cycle, g.measure_kind, g.measure, g.unit, g.start_value,
 			g.target_value, g.current_value, g.current_on from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
 			where g.space=%s and g.outcome='In Progress' and (ifnull(g.cycle, '') = '' or c.status in ('Active', 'Planned'))
-			order by field(g.goal_type, '12 Week Year', 'Annual', 'Open'), g.sort_order, g.title""", space, as_dict=True):
+			order by field(g.horizon, '12 weeks', 'Month', 'Year', 'Long term'), g.sort_order, g.title""", space, as_dict=True):
 		if g.area in off:  # the goals of an area that is off are hidden
 			continue
 		g["actions"] = frappe.get_all("Life Goal Action", filters={"parent": g.name}, fields=["name", "title", "status", "per_week"], order_by="idx") if g.cycle else []
@@ -215,7 +215,6 @@ def space_context(space):
 		"space": space,
 		"areas": areas,
 		"areas_off": areas_off,
-		"tags": frappe.get_all("Life Tag", filters={"space": space, "is_archived": 0}, fields=["name", "tag_name"], order_by="tag_name", limit=500),
 		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], limit=500),
 		"habits": frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title"], limit=200),
 		"dimensions": frappe.get_all("Life Dimension", filters={"space": space, "is_archived": 0}, fields=["name", "dimension_name"], order_by="sort_order", limit=50),

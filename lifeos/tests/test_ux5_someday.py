@@ -16,7 +16,7 @@ def _call_door(door, space=PRIVATE):
 	if path == "/plan/tasks":
 		return tasks.list(space=space, status=q.get("status"), due=q.get("due"), filters=q.get("f"), page_length=1)["total"]
 	if path == "/plan/goals":
-		return goals.list(space=space, state=q.get("status"), goal_type=q.get("type"), filters=q.get("f"), page_length=1)["total"]
+		return goals.list(space=space, state=q.get("status"), horizon=q.get("type"), filters=q.get("f"), page_length=1)["total"]
 	if path == "/inbox":
 		return inbox.list(space=space, status=json.dumps([q["status"]]), filters=q.get("f"), page_length=1)["total"]
 	if path == "/plan/someday":
@@ -29,15 +29,15 @@ class TestCounts(LifeTestCase):
 		old = self.make("Life Task", title="ux5 stuck task", area=self.areas["Tea"])
 		frappe.db.set_value("Life Task", old.name, "last_touched_on", add_days(today(), -200))
 		self.make("Life Task", title="ux5 fresh task", area=self.areas["Tea"], status="Waiting", waiting_on="Kunal")
-		idle = self.make("Life Goal", title="ux5 idle open goal", goal_type="Open", area=self.areas["Tea"])
+		idle = self.make("Life Goal", title="ux5 idle open goal", horizon="Long term", area=self.areas["Tea"])
 		frappe.db.set_value("Life Goal", idle.name, "last_activity_on", add_days(today(), -200))
-		self.make("Life Goal", title="ux5 held open goal", goal_type="Open", area=self.areas["Tea"], on_hold=1)
+		self.make("Life Goal", title="ux5 held open goal", horizon="Long term", area=self.areas["Tea"], on_hold=1)
 		band = counts.open_band(PRIVATE)
 		for key in ("open_tasks", "stuck", "open_goals", "idle_goals", "goals", "inbox", "inbox_old"):
 			self.assertEqual(band[key]["n"], _call_door(band[key]), key)
 		self.assertGreaterEqual(band["stuck"]["n"], 1)
 		self.assertGreaterEqual(band["idle_goals"]["n"], 1)
-		self.assertEqual(band["open_goals"]["to"]["query"]["type"], "Open")
+		self.assertEqual(band["open_goals"]["to"]["query"]["type"], "Long term")
 		self.assertIn("f", band["stuck"]["to"]["query"])
 		inv = counts.inventory(PRIVATE)
 		for row in inv["rows"]:
@@ -68,14 +68,16 @@ class TestSomeday(LifeTestCase):
 	def test_park_task_open_goal_with_tasks_goal_idea_and_leave_the_open_lists(self):
 		t = self.make("Life Task", title="ux5 park me", area=self.areas["Tea"])
 		created = str(t.creation)
-		p = self.make("Life Goal", title="ux5 parked open goal", goal_type="Open", area=self.areas["Tea"])
+		p = self.make("Life Goal", title="ux5 parked open goal", horizon="Long term", area=self.areas["Tea"])
 		pt = [self.make("Life Task", title=f"ux5 goal task {i}", area=self.areas["Tea"], goal=p.name) for i in range(2)]
-		g = self.make("Life Goal", title="ux5 parked goal", goal_type="Annual", target_date=add_months(today(), 6), area=self.areas["Tea"])
+		g = self.make("Life Goal", title="ux5 parked goal", horizon="Year", target_date=add_months(today(), 6), area=self.areas["Tea"])
 		before = counts.open_tasks(PRIVATE)["n"]
 		someday.park("Life Task", t.name, note="later")
 		someday.park("Life Goal", p.name)
 		someday.park("Life Goal", g.name)
-		idea = someday.create_idea("ux5 an idea", space=PRIVATE, area=self.areas["Tea"])
+		idea = someday.create("ux5 an idea", space=PRIVATE, area=self.areas["Tea"])
+		thought = someday.create("ux5 a thought", space=PRIVATE, area=self.areas["Tea"], as_note=1)
+		self.assertEqual((idea["doctype"], thought["doctype"]), ("Life Task", "Life Note"))
 		self.assertEqual(counts.open_tasks(PRIVATE)["n"], before - 3)
 		self.assertEqual(frappe.db.get_value("Life Task", t.name, "status"), "Someday")
 		self.assertEqual(str(frappe.db.get_value("Life Task", t.name, "creation")), created)
@@ -89,7 +91,8 @@ class TestSomeday(LifeTestCase):
 		self.assertNotIn(p.name, in_progress)
 		lst = someday.list(space=PRIVATE)
 		got = {r.name for r in lst["rows"]}
-		self.assertTrue({t.name, p.name, g.name, idea["name"]} <= got)
+		self.assertTrue({t.name, p.name, g.name, idea["name"], thought["name"]} <= got)
+		self.assertEqual(lst["tabs"]["notes"], 1)
 		self.assertEqual(lst["tabs"]["goals"], 2)
 		self.assertEqual(someday.list(space=PRIVATE, tab="projects")["total"], 2)  # "projects" is read as "goals" for one set
 		row = next(r for r in lst["rows"] if r.name == p.name)
@@ -107,8 +110,9 @@ class TestSomeday(LifeTestCase):
 		someday.bring_back("Life Goal", p.name, status="On Hold")
 		self.assertEqual({frappe.db.get_value("Life Task", x.name, "status") for x in pt}, {"Open"})
 		self.assertEqual(frappe.db.get_value("Life Goal", p.name, ["is_someday", "on_hold"]), (0, 1))
-		made = someday.bring_back("Life Idea", idea["name"], make="task")
-		self.assertEqual(made["made"]["doctype"], "Life Task")
+		someday.bring_back("Life Task", idea["name"])
+		someday.bring_back("Life Note", thought["name"])
+		self.assertEqual(frappe.db.get_value("Life Note", thought["name"], "is_someday"), 0)
 		# keep
 		someday.park("Life Goal", g.name) if not frappe.db.get_value("Life Goal", g.name, "is_someday") else None
 		out = someday.keep("Life Goal", g.name)

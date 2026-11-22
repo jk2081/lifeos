@@ -12,7 +12,7 @@ KINDS = {
 	"Life Chat Log": "Chat", "Life Journal Page": "Journal Page", "Life Check-in": "Check-in", "Life Month Plan": "Month Plan",
 }
 COLUMNS = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "ref_doctype", "ref_name", "space",
-	"area", "also_in_csv", "goal", "tags_csv", "record_date", "title", "search_text", "is_archived", "kind", "status", "record_owner",
+	"area", "also_in_csv", "goal", "record_date", "title", "search_text", "is_archived", "kind", "status", "record_owner",
 	"media_kind", "source_system", "intent", "assistant", "collection", "thumbnail", "vault_locked", "last_opened_on"]
 NULLABLE = ("last_opened_on",)
 # Characters of a record's text kept for search: transcripts, extracted text, summaries and page Markdown (UX fixes, set 4)
@@ -39,7 +39,6 @@ def build_rows(doc) -> list[dict]:
 		"ref_doctype": dt, "ref_name": doc.name, "space": doc.space, "kind": KINDS[dt],
 		"area": doc.get("area") or "", "goal": doc.get("goal") or "",
 		"also_in_csv": _csv([r.area for r in doc.get("also_in") or []]),
-		"tags_csv": _csv([r.tag for r in doc.get("tags") or []]),
 		"is_archived": 1 if doc.get("is_archived") else 0,
 		"status": doc.get("status") or "", "record_owner": doc.owner,
 		"record_date": getdate(doc.creation), "title": (doc.get("title") or "")[:255], "search_text": "",
@@ -78,7 +77,7 @@ def build_rows(doc) -> list[dict]:
 	elif dt == "Life Month Plan":
 		base["record_date"] = getdate(f"{doc.year}-{int(doc.month):02d}-01")
 		base["title"] = f"Month plan, {MONTHS[int(doc.month) - 1]} {doc.year}"
-		base["search_text"] = _text(doc.mindsweep_md, doc.projects_md, *[r.title for r in doc.goals or []])
+		base["search_text"] = _text(doc.mindsweep_md, doc.projects_md)
 	return rows
 
 
@@ -159,7 +158,7 @@ def ensure_indexes():
 	# covering indexes for the counts (tab counts, totals, the timeline's and an area's counts): with text of up to 60,000
 	# characters a row, a count must not read the rows themselves
 	# the Outbox (set 7): what came in by creation, and exits by period
-	for dt in ("Life Task", "Life Goal", "Life Inbox Item", "Life Idea"):
+	for dt in ("Life Task", "Life Goal", "Life Inbox Item"):
 		frappe.db.add_index(dt, ["space", "creation", "area"], f"{dt.lower().replace(' ', '_')}_space_creation")
 	if frappe.db.table_exists("Life Exit"):
 		frappe.db.add_index("Life Exit", ["space", "reversed", "exited_on", "pile", "area"], "life_exit_period_area")

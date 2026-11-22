@@ -9,7 +9,7 @@ from lifeos import journal
 from lifeos.life.doctype.life_check_in.life_check_in import parse_range
 
 TITLE_FIELDS = {
-	"Life Area": "area_name", "Life Tag": "tag_name", "Life Goal": "title",
+	"Life Area": "area_name", "Life Goal": "title",
 	"Life Person": "full_name", "Life Habit": "title", "Life Dimension": "dimension_name", "Life Note": "title",
 }
 PRIORITY = ["", "I", "II", "III", "IV"]
@@ -23,7 +23,6 @@ ORG = {
 	"area": F("link", help="The one area where the record lives. Name or title of a Life Area in the item's space.", doctype="Life Area"),
 	"also_in": F("links", help="Other areas where the record is relevant.", doctype="Life Area"),
 	"goal": F("link", help="Optional. The goal the record belongs to (projects became open-ended goals in set 6).", doctype="Life Goal"),
-	"tags": F("tags", help="Reuse existing tags. At most one new tag per inbox item.", doctype="Life Tag"),
 }
 
 SCHEMA = {
@@ -68,13 +67,22 @@ SCHEMA = {
 		},
 		"example": {"title": "Driving licence", "doc_type": "ID", "expiry_date": "2026-12-12", "number_last4": "4821", "area": "Personal"},
 	},
-	"Month Goal": {
-		"target": "Life Month Plan", "filed": False,
+	"Goal": {
+		"target": "Life Goal", "filed": False,
 		"fields": {
-			"title": F("text", True), "year": F("int", True), "month": F("int", True), "priority": F("select", options=PRIORITY),
-			"status": F("select", options=["Open", "Done", "Carried", "Dropped"]), "area": ORG["area"],
+			"title": F("text", True), "horizon": F("select", options=["Long term", "Year", "12 weeks", "Month"],
+				help="Optional. Worked out from target_date when left out. A 12-weeks goal joins the active cycle."),
+			"target_date": F("date", help="ISO date. A Year or Month goal needs one."), "area": ORG["area"],
+			"serves": F("link", help="Optional. The longer goal it serves, one horizon up.", doctype="Life Goal"),
+			"done_when": F("text", help="The finish line, in one line."),
 		},
-		"example": {"title": "GHL visit", "year": 2026, "month": 11, "priority": "I", "area": "Tea & Coffee"},
+		"example": {"title": "GHL visit", "horizon": "Month", "target_date": "2026-11-30", "area": "Tea & Coffee"},
+	},
+	# accepted as a Goal with horizon Month, for one release
+	"Month Goal": {
+		"target": "Life Goal", "filed": False,
+		"fields": {"title": F("text", True), "year": F("int", True), "month": F("int", True), "area": ORG["area"]},
+		"example": {"title": "GHL visit", "year": 2026, "month": 11, "area": "Tea & Coffee"},
 	},
 	"Habit Log": {
 		"target": "Life Habit Log", "filed": False,
@@ -107,13 +115,13 @@ SCHEMA = {
 	},
 	# UX fixes, set 5: an agent may propose parking something; only a person's Accept parks it
 	"Someday": {
-		"target": "Life Idea", "filed": False,
+		"target": "Life Task", "filed": False,
 		"fields": {
-			"record_type": F("text", True, "Task, Goal, or Idea for a new idea. Project is read as Goal for one set."),
-			"record": F("text", help="For Task and Goal: the name (id) or exact title of the record to park."),
-			"title": F("text", help="For Idea: the idea in one line.", max_length=140),
-			"body_md": F("markdown", help="For Idea: more detail."),
-			"area": F("link", help="For Idea: the area it belongs to.", doctype="Life Area"),
+			"record_type": F("text", True, "Task, Goal or Note to park an existing record; New task or New note to park something new."),
+			"record": F("text", help="For Task, Goal and Note: the name (id) or exact title of the record to park."),
+			"title": F("text", help="For New task and New note: the title, in one line.", max_length=140),
+			"body_md": F("markdown", help="For New task and New note: more detail."),
+			"area": F("link", help="For New task and New note: the area it belongs to.", doctype="Life Area"),
 			"note": F("text", help="Why it can wait. Shown on the Someday list."),
 		},
 		"example": {"record_type": "Task", "record": "Get quotes for a solar dryer pilot", "note": "Not before the monsoon."},
@@ -249,25 +257,6 @@ def _coerce(name, spec, value, space, ctx):
 		if not isinstance(value, list):
 			raise PayloadError(_("{0} must be a list.").format(name))
 		return [_switched_on(spec["doctype"], resolve_link(spec["doctype"], v, space), space) for v in value if v]
-	if t == "tags":
-		if isinstance(value, str):
-			value = [value]
-		if not isinstance(value, list):
-			raise PayloadError(_("{0} must be a list.").format(name))
-		out = []
-		for v in value:
-			v = str(v.get("new") if isinstance(v, dict) else v or "").strip()
-			if not v:
-				continue
-			try:
-				out.append(resolve_link("Life Tag", v, space))
-			except PayloadError:
-				new = ctx.setdefault("new_tags", set())
-				if v.lower() not in new and len(new) >= 1 and not ctx.get("allow_new_tags"):
-					raise PayloadError(_("Only one new tag may be proposed per item. '{0}' is a second new tag.").format(v))
-				new.add(v.lower())
-				out.append({"new": v})
-		return out
 	if t == "scores":
 		if not isinstance(value, list) or not value:
 			raise PayloadError(_("scores must be a list with at least one dimension."))
@@ -376,22 +365,10 @@ def _find_action(goal, action):
 
 # ---------- creating the record ----------
 
-def _tag_names(tags, space):
-	out = []
-	for t in tags or []:
-		if isinstance(t, dict):
-			existing = frappe.db.get_value("Life Tag", {"space": space, "tag_name": t["new"]})
-			out.append(existing or frappe.get_doc({"doctype": "Life Tag", "space": space, "tag_name": t["new"]}).insert(ignore_permissions=True).name)
-		else:
-			out.append(t)
-	return out
-
-
 def _org(p, space):
 	return {
 		"area": p.get("area"), "goal": p.get("goal"),
 		"also_in": [{"area": a} for a in p.get("also_in") or []],
-		"tags": [{"tag": t} for t in _tag_names(p.get("tags"), space)],
 	}
 
 
@@ -413,7 +390,7 @@ def _attach_copy(file_url, doctype, name, fieldname):
 def apply(kind, payload, item) -> tuple:
 	"""Create the target record for an accepted proposal. Returns (doctype, name)."""
 	space = item.space
-	p = validate(kind, payload, space, {"allow_new_tags": True})
+	p = validate(kind, payload, space, {})
 	if kind in AREA_REQUIRED and not p.get("area"):
 		raise PayloadError(_("Choose an area before accepting this {0}.").format(kind.lower()))
 	base = {"space": space, "inbox_item": item.name}
@@ -451,12 +428,12 @@ def apply(kind, payload, item) -> tuple:
 		frappe.db.set_value("Life Inbox Item", item.name, "vault_document", doc.name, update_modified=False)
 		from lifeos import index
 		index.update(frappe.get_doc("Life Inbox Item", item.name))
-	elif kind == "Month Goal":
-		plan = journal.get_month_plan(space, p["year"], p["month"], create=True)
-		plan.check_permission("write")
-		plan.append("goals", {"title": p["title"], "priority": p.get("priority"), "status": p.get("status") or "Open", "area": p.get("area")})
-		plan.save()
-		doc = plan
+	elif kind in ("Goal", "Month Goal"):
+		if kind == "Month Goal":
+			first, last = journal.month_bounds(p["year"], p["month"])
+			p = {**p, "horizon": "Month", "target_date": str(last)}
+		doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": p["title"], "horizon": p.get("horizon"), "area": p.get("area"),
+			"target_date": p.get("target_date"), "serves": p.get("serves"), "done_when": p.get("done_when")}).insert()
 	elif kind == "Habit Log":
 		journal.toggle_habit(p["habit"], p["date"], bool(p.get("done", 1)))
 		name = frappe.db.get_value("Life Habit Log", {"habit": p["habit"], "date": p["date"]})
@@ -487,21 +464,23 @@ def apply(kind, payload, item) -> tuple:
 
 
 # "Project" is still accepted for one set: projects are open-ended goals now (set 6)
-SOMEDAY_TYPES = {"Task": "Life Task", "Project": "Life Goal", "Goal": "Life Goal"}
+SOMEDAY_TYPES = {"Task": "Life Task", "Project": "Life Goal", "Goal": "Life Goal", "Note": "Life Note"}
 
 
 def _apply_someday(p, item):
-	"""Accepting a Someday proposal parks the record it names, or makes a new idea."""
+	"""Accepting a Someday proposal parks the record it names, or makes a new Someday task or note."""
 	from lifeos import permissions
 	from lifeos.api import someday
 
 	kind = str(p.get("record_type") or "").strip().title()
-	if kind == "Idea":
+	if kind in ("New Task", "New Note"):
 		if not p.get("title"):
-			raise PayloadError(_("An idea needs a title."))
-		doc = frappe.get_doc({"doctype": "Life Idea", "space": item.space, "title": p["title"], "body_md": p.get("body_md"),
-			"area": p.get("area"), "source_doctype": "Life Inbox Item", "source_name": item.name, "status": "Someday",
-			"someday_on": today(), "someday_review_on": someday.review_date(), "someday_note": p.get("note")}).insert()
+			raise PayloadError(_("Something to park needs a title."))
+		task = kind == "New Task"
+		doc = frappe.get_doc({"doctype": "Life Task" if task else "Life Note", "space": item.space, "title": p["title"],
+			"notes_md" if task else "content_md": p.get("body_md"), "area": p.get("area"), "inbox_item": item.name,
+			**({"status": "Someday"} if task else {"is_someday": 1}), "someday_on": today(), "someday_review_on": someday.review_date(),
+			"someday_note": p.get("note")}).insert()
 		return doc.doctype, doc.name
 	doctype = SOMEDAY_TYPES.get(kind)
 	if not doctype or not p.get("record"):

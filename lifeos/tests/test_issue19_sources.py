@@ -51,7 +51,7 @@ class TestSources(LifeTestCase):
 		self.assertFalse(frappe.db.exists("Life Connection", {"space": PRIVATE, "system": "github"}))
 
 	def test_saved_defaults_are_what_create_item_uses(self):
-		goal = self.make("Life Goal", title="i19 goal", goal_type="Open", area=self.areas["Tea"]).name
+		goal = self.make("Life Goal", title="i19 goal", horizon="Long term", area=self.areas["Tea"]).name
 		c = connections.save(space=PRIVATE, system="gmail", default_area=self.areas["Tea"], default_goal=goal, default_intent="Just keep")
 		self.assertEqual((c["label"], c["default_intent"], c["default_goal"]), ("Gmail", "Just keep", goal))
 		item = inbox.create_item(title="i19 mail", source_system="gmail", space=PRIVATE)

@@ -111,7 +111,7 @@ class TestSensitiveEverywhere(LifeTestCase):
 		from lifeos.api import chats, goals, links
 		from lifeos.api import today as today_api
 
-		goal = self.make("Life Goal", space=SHARED, title="ux6 review goal", goal_type="Open")
+		goal = self.make("Life Goal", space=SHARED, title="ux6 review goal", horizon="Long term")
 		parent = self.make("Life Note", space=SHARED, title="ux6 parent", content_md="x", goal=goal.name)
 		child = self.make("Life Note", space=SHARED, title="ux6 secret child", content_md="x", parent_note=parent.name, goal=goal.name, is_sensitive=1)
 		item = self.make("Life Inbox Item", space=SHARED, title="ux6 secret item", status="To Review", is_sensitive=1)

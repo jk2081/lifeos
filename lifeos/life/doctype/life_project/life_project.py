@@ -4,8 +4,8 @@ from frappe.model.document import Document
 
 
 class LifeProject(Document):
-	"""Kept read-only after set 6, when every project became an open-ended goal (lifeos.patches.v7.projects_into_goals),
-	so the migration can be checked. Only that patch writes here (it sets `migrated_to`)."""
+	"""Kept read-only after set 6, when every project became a long-term goal,
+	so the migration can be checked. Only the seed and the demo write here (they set `migrated_to`)."""
 
 	def validate(self):
 		if not self.flags.allow_migration:

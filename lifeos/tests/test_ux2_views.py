@@ -141,8 +141,8 @@ class TestStandardFilters(LifeTestCase):
 
 	def test_every_list_takes_standard_filters(self):
 		tea = self.areas["Tea"]
-		goal = self.make("Life Goal", title="ux2 goal", goal_type="Open", area=tea)
-		self.make("Life Goal", title="ux2 other", goal_type="Open", area=tea)
+		goal = self.make("Life Goal", title="ux2 goal", horizon="Long term", area=tea)
+		self.make("Life Goal", title="ux2 other", horizon="Long term", area=tea)
 		note = self.make("Life Note", title="ux2 note", area=tea, content_md="x")
 		self.make("Life Note", title="ux2 second", area=tea, content_md="x")
 		doc = self.make("Life Vault Document", title="ux2 passport", doc_type="Travel", area=tea, number_last4="1234")

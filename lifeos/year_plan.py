@@ -44,13 +44,13 @@ def cycle_rows(space, start, end):
 def goal_span(goal, cycle, start, end):
 	"""The dates a goal's bar covers. A goal of a 12 Week Year covers its cycle; any other starts when it was made and runs to its
 	target date (the end of the year when it has none), or to the day it was closed."""
-	if goal.goal_type == "12 Week Year" and cycle:
+	if goal.horizon == "12 weeks" and cycle:
 		first, last = getdate(cycle.start_date), getdate(cycle.end_date)
 	else:
 		first = getdate(goal.creation)
 		last = getdate(goal.target_date) if goal.target_date else end
 	closed = goal.closed_on or goal.completed_on
-	if closed and goal.outcome in GREY and goal.goal_type != "12 Week Year":
+	if closed and goal.outcome in GREY and goal.horizon != "12 weeks":
 		last = min(last, getdate(closed)) if getdate(closed) >= first else last
 	return max(first, start), min(max(last, first), end)
 
@@ -62,15 +62,15 @@ def lanes(space, start, end, area=None):
 	keep = set(descendants(space, area)) if area else None
 	cycles = {c.name: c for c in frappe.get_all("Life Cycle", filters={"space": space}, fields=["name", "start_date", "end_date"], limit=200)}
 	goals = frappe.get_all("Life Goal", filters={"space": space, "is_archived": 0, "is_someday": 0},
-		fields=["name", "title", "area", "goal_type", "cycle", "target_date", "closed_on", "completed_on", "outcome", "creation"],
+		fields=["name", "title", "area", "horizon", "cycle", "target_date", "closed_on", "completed_on", "outcome", "creation"],
 		order_by="creation asc", limit=2000)
 	by_area = {}
 	for g in goals:
 		first, last = goal_span(g, cycles.get(g.cycle), start, end)
 		cycle = cycles.get(g.cycle)
-		if g.goal_type == "12 Week Year" and cycle and (getdate(cycle.end_date) < start or getdate(cycle.start_date) > end):
+		if g.horizon == "12 weeks" and cycle and (getdate(cycle.end_date) < start or getdate(cycle.start_date) > end):
 			continue
-		if g.goal_type != "12 Week Year" and (getdate(g.creation) > end or (g.target_date and getdate(g.target_date) < start)):
+		if g.horizon != "12 weeks" and (getdate(g.creation) > end or (g.target_date and getdate(g.target_date) < start)):
 			continue
 		word = OUTCOME_WORD.get(g.outcome)
 		by_area.setdefault(g.area, []).append({"name": g.name, "title": g.title, "start": str(first), "end": str(last), "outcome": g.outcome,

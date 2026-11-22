@@ -17,7 +17,7 @@
 </template>
 <script setup>
 // One member of a space, a person or an agent (issue 1): avatar, name, email, a kind badge (Owner, Person, Agent),
-// access (the owner always has Can edit) and Remove. Settings > People and agents > Members lists these.
+// access (the owner always has Can edit) and Remove. Settings > Members lists these.
 import { Avatar, Badge, Button, Dropdown, Select } from 'frappe-ui'
 
 defineProps({ member: { type: Object, required: true }, writable: { type: Boolean, default: true } })

@@ -84,7 +84,7 @@ def list(space: str | None = None, area: str | None = None, start: int = 0, page
 		r["archive_reason"], r["archived_on"] = reasons.get((r.ref_doctype, r.ref_name), ("", None))
 		groups.setdefault((r.area or "", r.area_name or "Unfiled"), []).append(r)
 	goals = frappe.get_all("Life Goal", filters={"space": space, "is_archived": 1},
-		fields=["name", "title", "area", "goal_type", "outcome", "on_hold", "is_someday", "archived_on"], order_by="archived_on desc", limit=100)
+		fields=["name", "title", "area", "horizon", "outcome", "on_hold", "is_someday", "archived_on"], order_by="archived_on desc", limit=100)
 	areas = names_map("Life Area", [g.area for g in goals], "area_name")
 	from lifeos.api.goals import status_of
 

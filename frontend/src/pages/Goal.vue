@@ -1,12 +1,12 @@
 <template>
   <template v-if="d">
-    <PageHead :title="g.title" :crumb="{ to: '/goals', label: 'Goals', here: d.cycle ? d.cycle.title : g.goal_type }" :sub="sub">
+    <PageHead :title="g.title" :crumb="{ to: '/goals', label: 'Goals', here: d.cycle ? d.cycle.title : g.horizon }" :sub="sub">
       <Badge :theme="themeOf(g)" :label="g.is_archived ? `${g.status}, archived` : g.status === 'On Hold' ? 'On hold' : g.status" data-goal-status />
-      <Button v-if="d.cycle" label="Open grid" :route="`/today/year?view=cycle&cycle=${d.cycle.name}`" />
-      <template v-if="writable && g.goal_type !== '12 Week Year'">
+      <Button v-if="d.cycle" label="Open grid" :route="`/goals/cycles?cycle=${d.cycle.name}`" />
+      <template v-if="writable && g.horizon !== '12 weeks'">
         <Button v-if="!g.is_archived" label="New note" @click="noteOpen = true" />
         <Button v-if="g.is_archived" variant="solid" label="Restore" data-goal-restore @click="setStatus('Active')" />
-        <template v-else-if="g.goal_type === 'Open' && g.outcome === 'In Progress'">
+        <template v-else-if="g.horizon === 'Long term' && g.outcome === 'In Progress'">
           <Button :label="g.on_hold ? 'Resume' : 'Put on hold'" data-goal-hold @click="setStatus(g.on_hold ? 'Active' : 'On Hold')" />
           <Button label="Drop" @click="askComplete('Dropped')" />
           <Button variant="solid" label="Complete" data-goal-complete @click="askComplete('Done')" />
@@ -22,7 +22,9 @@
           <Card class="flex flex-col gap-3" data-goal-overview>
             <GoalMeasure :g="g" :readings="d.readings" :suggested="d.suggested" :space="d.space" :writable="writable && !g.is_archived" @changed="changed" />
             <div class="form-grid">
-              <DatePicker v-if="g.goal_type !== '12 Week Year'" v-model="g.target_date" format="D MMM YYYY" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
+              <FormControl v-if="g.horizon !== '12 weeks'" v-model="g.horizon" type="select" label="Horizon" :options="['Long term', 'Year', 'Month']" :disabled="!writable" data-goal-horizon
+                @update:model-value="saveField('horizon')" />
+              <DatePicker v-if="g.horizon !== '12 weeks'" v-model="g.target_date" format="D MMM YYYY" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
               <div class="space-y-1.5"><div class="text-sm text-ink-gray-6">Progress</div><div class="flex h-8 items-center gap-2" data-goal-figure>
                 <div class="min-w-0 flex-1"><Progress size="sm" :value="j.tasks_counted ? Math.round((100 * j.tasks_done) / j.tasks_counted) : 0" /></div>
                 <NumLink class="text-sm" :to="{ path: '/goals/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</NumLink></div></div>
@@ -42,7 +44,7 @@
             <SectionHead :count="d.served_by.length">Served by</SectionHead>
             <Card flush><Row v-for="s in d.served_by" :key="s.name" :pane="'goal:' + s.name" :label="s.title">
               <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ s.title }}</div>
-                <div class="text-sm text-ink-gray-6" data-served-by-line>{{ [s.goal_type === '12 Week Year' ? s.cycle_title || '12 Week Year' : s.goal_type + ' goal', s.progress.label].filter(Boolean).join(' · ') }}</div></div>
+                <div class="text-sm text-ink-gray-6" data-served-by-line>{{ [s.horizon === '12 weeks' ? s.cycle_title || '12 weeks' : s.horizon + ' goal', s.progress.label].filter(Boolean).join(' · ') }}</div></div>
               <div class="w-20 shrink-0 self-center max-md:w-12"><Progress size="sm" :value="Math.round(s.progress.percent || 0)" /></div>
               <Badge :theme="themeOf(s)" :label="s.status" /></Row></Card>
           </section>
@@ -51,7 +53,7 @@
               <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
                 <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
               <Badge v-if="a.status !== 'Open'" :theme="a.status === 'Done' ? 'green' : 'gray'" :label="a.status" /></Row>
-              <Empty v-if="!j.goal.actions.length" title="No actions." hint="Edit the goal on the grid to add weekly actions." /></Card>
+              <Empty v-if="!j.goal.actions.length" title="No actions." hint="Edit the goal under Cycle goals on Goals > Cycles to add weekly actions." /></Card>
           </section>
           <section v-if="g.result_note"><SectionHead>Result</SectionHead><Card>{{ g.result_note }}</Card></section>
         </div>
@@ -101,7 +103,7 @@
 // archives it with what is filed under it. The tabs are the main screens' lists with this goal fixed.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, DatePicker, Dialog, Progress, TextInput, toast } from 'frappe-ui'
+import { Badge, Button, DatePicker, Dialog, FormControl, Progress, TextInput, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import NumLink from '@/components/ui/NumLink.vue'
@@ -122,7 +124,7 @@ import { api, db, optimistic, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { askScope } from '@/lib/ask'
-import { loadLookups, lookups } from '@/lib/lookups'
+import { loadLookups, lookups, parentOptions } from '@/lib/lookups'
 import { onRecordChanged } from '@/lib/pane'
 import { useUrlTab } from '@/lib/tabs'
 
@@ -141,11 +143,11 @@ const g = computed(() => d.value.goal)
 const writable = computed(() => store.spaces.find((s) => s.name === d.value?.space)?.access === 'Write' && !store.isAgent)
 const arch = computed(() => (g.value.is_archived ? { archived: '1' } : {}))
 const themeOf = (x) => (x.is_archived ? 'gray' : { Active: 'green', 'On Hold': 'amber', Done: 'blue', Someday: 'gray' }[x.status] || 'gray')
-const sub = computed(() => [g.value.area_name, g.value.goal_type + ' goal', g.value.target_date && 'by ' + short(g.value.target_date, true),
+const sub = computed(() => [g.value.area_name, g.value.horizon + ' goal', g.value.target_date && 'by ' + short(g.value.target_date, true),
   g.value.serves_title && 'serves ' + g.value.serves_title, d.value.served_by.length && `served by ${d.value.served_by.length}`].filter(Boolean).join(' · '))
 // a goal can serve any other goal in progress of the space, never itself
 const servesOptions = computed(() => [{ label: 'None', value: '' },
-  ...(lookups.goals || []).filter((x) => x.name !== g.value.name).map((x) => ({ label: `${x.goal_type} · ${x.title}`, value: x.name })),
+  ...parentOptions(g.value),
   ...(g.value.serves && !(lookups.goals || []).some((x) => x.name === g.value.serves) ? [{ label: g.value.serves_title || g.value.serves, value: g.value.serves }] : [])])
 // The tabs. Each list tab is the main screen's list with this goal fixed, its view remembered per tab across goals.
 const TABS = [['overview', 'Overview'], ['tasks', 'Tasks'], ['notes', 'Notes'], ['captures', 'Captures'], ['links', 'Links']]

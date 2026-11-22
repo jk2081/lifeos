@@ -71,9 +71,9 @@ def _goal(context, title):
 
 
 def _open_goal(context, area_name):
-	"""An open-ended goal in progress filed under the area, if the space has one: what a project was before set 6."""
+	"""A long-term goal in progress filed under the area, if the space has one: what a project was before set 6."""
 	ids = {a["name"] for a in context.get("areas", []) if a["area_name"] == area_name}
-	return next((g["name"] for g in context.get("goals", []) if g.get("goal_type") == "Open" and g.get("area") in ids), None)
+	return next((g["name"] for g in context.get("goals", []) if g.get("horizon") == "Long term" and g.get("area") in ids), None)
 
 
 def _with(d, **optional):
@@ -117,7 +117,7 @@ def canned_document(item, context, today):
 	summary = (f"**{item['title']}** summarised. The document lists three follow-ups, extracted below as to-dos. "
 		"No dates were stated, so none were set.")
 	area = _area(context, "Tea & Coffee", "Business That Works", "Work", "Tea")
-	# file the follow-ups under an open-ended goal of that area when there is one (projects became goals in set 6);
+	# file the follow-ups under a long-term goal of that area when there is one (projects became goals in set 6);
 	# `goal` takes the goal's name, as every filing field does
 	goal = _open_goal(context, area) or (item.get("connection") or {}).get("default_goal")
 	titles = ["Review the production figures with Mithun", "Send six questions on the blend sheets", "Confirm the despatch schedule"]

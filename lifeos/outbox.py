@@ -5,13 +5,12 @@ Exits are written by the document hooks below and nowhere else. Each record's st
 brought back from Someday, a record restored from the trash) its exit is marked `reversed` and no longer counts. A record has
 at most one exit that counts: moving from one pile to another (Waiting, then Done) reverses the earlier exit.
 
-"In" for a period is what arrived: captures received, plus tasks, goals and ideas created directly (not from a capture, not
-made from an idea, not carried), so nothing is counted twice.
+"In" for a period is what arrived: captures received, plus tasks and goals created directly (not from a capture, not carried), so nothing is counted twice.
 """
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 
-KIND = {"Life Task": "Task", "Life Goal": "Goal", "Life Inbox Item": "Capture", "Life Idea": "Idea"}
+KIND = {"Life Task": "Task", "Life Goal": "Goal", "Life Inbox Item": "Capture"}
 DOCTYPE = {v: k for k, v in KIND.items()}
 PILES = ("Done", "Delegated", "Parked", "Discarded")
 SELF = {"me", "myself", "self", "owner", "i"}
@@ -56,13 +55,11 @@ def pile_of(doc):
 		decided = frappe.get_all("Life Proposal", filters={"inbox_item": doc.name}, pluck="status")
 		if "Accepted" in decided or (doc.get("intent") or "Process") != "Process":
 			return "Done"
-		if frappe.db.exists("Life Idea", {"source_doctype": "Life Inbox Item", "source_name": doc.name}):
+		if frappe.db.exists("Life Note", {"inbox_item": doc.name, "is_someday": 1}):
 			return "Parked"
 		if decided and all(s == "Rejected" for s in decided):
 			return "Discarded"
 		return "Done"  # a capture kept with nothing to decide
-	if dt == "Life Idea":
-		return "Done" if doc.get("status") == "Brought Back" else None
 	return None
 
 
@@ -104,6 +101,12 @@ def record(doc, pile, on=None, note=None, kind=None):
 # ---- document hooks (hooks.py) ----
 
 def on_update(doc, method=None):
+	if doc.doctype == "Life Note":
+		# a capture parked as a Someday note is back on the plate once the note is brought back
+		before = doc.get_doc_before_save()
+		if doc.inbox_item and before and before.is_someday and not doc.is_someday and not doc.flags.get("no_exit"):
+			reverse("Life Inbox Item", doc.inbox_item, "Parked")
+		return
 	if doc.doctype not in KIND or doc.flags.get("no_exit"):
 		return
 	before = doc.get_doc_before_save()
@@ -115,13 +118,10 @@ def on_update(doc, method=None):
 		record(doc, new)
 	else:
 		reverse(doc.doctype, doc.name)
-	if doc.doctype == "Life Idea" and new == "Done" and doc.get("source_doctype") == "Life Inbox Item":
-		# a capture parked as an idea is back on the plate once its idea is brought back
-		reverse("Life Inbox Item", doc.source_name, "Parked")
 
 
 def after_insert(doc, method=None):
-	"""A record restored from the trash: its Discarded exit no longer counts. An idea parked from a capture: the capture's
+	"""A record restored from the trash: its Discarded exit no longer counts. A note parked from a capture: the capture's
 	exit is worked out again when the capture is saved."""
 	if doc.doctype not in KIND:
 		return

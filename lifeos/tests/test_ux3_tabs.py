@@ -74,16 +74,16 @@ class TestTabCounts(LifeTestCase):
 	def test_open_goals(self):
 		# set 6: projects became goals of type Open; their states are the Goals screen's tabs
 		tea, money = self.areas["Tea"], self.areas["Money"]
-		self.make("Life Goal", title="ux3 p active", goal_type="Open", area=tea)
-		self.make("Life Goal", title="ux3 p active 2", goal_type="Open", area=money)
-		self.make("Life Goal", title="ux3 p hold", goal_type="Open", area=tea, on_hold=1)
-		dropped = self.make("Life Goal", title="ux3 p dropped", goal_type="Open", area=money)
+		self.make("Life Goal", title="ux3 p active", horizon="Long term", area=tea)
+		self.make("Life Goal", title="ux3 p active 2", horizon="Long term", area=money)
+		self.make("Life Goal", title="ux3 p hold", horizon="Long term", area=tea, on_hold=1)
+		dropped = self.make("Life Goal", title="ux3 p dropped", horizon="Long term", area=money)
 		goals.set_status(dropped.name, "Dropped")
-		done = self.make("Life Goal", title="ux3 p done", goal_type="Open", area=tea)
+		done = self.make("Life Goal", title="ux3 p done", horizon="Long term", area=tea)
 		goals.set_status(done.name, "Done")
 
 		def check(**f):
-			get = lambda **a: goals.list(space=PRIVATE, goal_type="Open", **f, **a)  # noqa: E731
+			get = lambda **a: goals.list(space=PRIVATE, horizon="Long term", **f, **a)  # noqa: E731
 			tabs = get()["tabs"]
 			for state in ("in_progress", "achieved", "closed", "someday", "all"):
 				self.assertEqual(tabs[state], get(state=state)["total"], state)
@@ -168,7 +168,7 @@ class TestTabCounts(LifeTestCase):
 	def test_a_member_of_another_space_sees_only_their_own_counts(self):
 		self.make("Life Task", title="ux3 private task")
 		self.make("Life Task", title="ux3 shared task", space=SHARED)
-		self.make("Life Goal", title="ux3 private goal", goal_type="Open", area=self.areas["Tea"])
+		self.make("Life Goal", title="ux3 private goal", horizon="Long term", area=self.areas["Tea"])
 		self.make("Life Vault Document", title="ux3 private doc", doc_type="Travel", area=self.areas["Tea"], expiry_date=add_days(today(), 10))
 		chats.log(space=PRIVATE, title="ux3 private chat", summary_md="s", open_items=["x"])
 		self.make("Life Inbox Item", title="ux3 private inbox", source_type="Message", raw_text="x")
@@ -194,7 +194,7 @@ class TestRecordPageTabs(LifeTestCase):
 
 	def test_goal_page(self):
 		tea = self.areas["Tea"]
-		p = self.make("Life Goal", title="ux3 page goal", goal_type="Open", area=tea)
+		p = self.make("Life Goal", title="ux3 page goal", horizon="Long term", area=tea)
 		self.make("Life Task", title="ux3 page task", area=tea, goal=p.name)
 		self.make("Life Task", title="ux3 page done", area=tea, goal=p.name, status="Done")
 		self.make("Life Note", title="ux3 page note", area=tea, goal=p.name, content_md="see [[ux3 page goal]]")
@@ -210,6 +210,6 @@ class TestRecordPageTabs(LifeTestCase):
 
 	def test_other_space_member_cannot_read_the_counts(self):
 		tea = self.areas["Tea"]
-		p = self.make("Life Goal", title="ux3 hidden goal", goal_type="Open", area=tea)
+		p = self.make("Life Goal", title="ux3 hidden goal", horizon="Long term", area=tea)
 		self.as_user(FAMILY)
 		self.assertRaises(frappe.PermissionError, goals.get, p.name)

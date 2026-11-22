@@ -47,7 +47,7 @@ class TestSlots(WeekCase):
 		blocker = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "ux7 planned", "status": "Open", "scheduled_at": monday_at(11),
 			"duration_min": 60, "area": self.areas["Tea"]}).insert()
 		for i in range(3):
-			goals.create(f"ux7 plan goal {i}", "Open", space=PRIVATE, area=self.areas["Tea"], done_when="x")
+			goals.create(f"ux7 plan goal {i}", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")
 		out = weekplan.cards(PRIVATE, now=now, ai=False)
 		slots = [(get_datetime(c["slot"]), c["minutes"]) for c in out["cards"] if c["slot"]]
 		self.assertTrue(slots)
@@ -78,7 +78,7 @@ class TestSlots(WeekCase):
 
 class TestAddGoalWork(WeekCase):
 	def test_add_creates_a_scheduled_task_under_the_goal(self):
-		g = goals.create("ux7 add goal", "Open", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
+		g = goals.create("ux7 add goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		at = monday_at(10)
 		out = week.add_goal_work(g, title="ux7 draft the plan", scheduled_at=str(at), duration_min=90, note="the soil report")
 		t = frappe.get_doc("Life Task", out["task"])
@@ -91,7 +91,7 @@ class TestAddGoalWork(WeekCase):
 		self.assertEqual(t.notes_md.count("the soil report"), 1)
 
 	def test_someone_else_makes_it_waiting_and_delegated(self):
-		g = goals.create("ux7 delegate goal", "Open", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
+		g = goals.create("ux7 delegate goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		out = week.add_goal_work(g, title="ux7 get the quotes", scheduled_at=str(monday_at(11)), duration_min=60, who="Mithun")
 		self.assertEqual((out["status"], out["waiting_on"]), ("Waiting", "Mithun"))
 		self.assertEqual(frappe.get_all("Life Exit", filters={"record_name": out["task"], "reversed": 0}, pluck="pile"), ["Delegated"])
@@ -99,7 +99,7 @@ class TestAddGoalWork(WeekCase):
 		self.assertEqual(mine["status"], "Open")
 
 	def test_cards_prefill_the_oldest_open_task(self):
-		g = goals.create("ux7 oldest goal", "Open", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
+		g = goals.create("ux7 oldest goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		first = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "ux7 first step", "goal": g, "status": "Open", "area": self.areas["Tea"]}).insert()
 		frappe.db.set_value("Life Task", first.name, "creation", add_days(today(), -10))
 		frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "ux7 second step", "goal": g, "status": "Open", "area": self.areas["Tea"]}).insert()
@@ -107,7 +107,7 @@ class TestAddGoalWork(WeekCase):
 		self.assertEqual((card["task"], card["next_action"], card["minutes"]), (first.name, "ux7 first step", 60))
 
 	def test_people_only(self):
-		g = goals.create("ux7 agent goal", "Open", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
+		g = goals.create("ux7 agent goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		self.as_user(AGENT)
 		self.assertRaises(frappe.PermissionError, week.add_goal_work, g, title="x")
 		self.assertRaises(frappe.PermissionError, week.goal_plan, space=PRIVATE)
@@ -116,10 +116,10 @@ class TestAddGoalWork(WeekCase):
 
 class TestKeyResults(WeekCase):
 	def test_readings_finish_lines_and_stale_goals(self):
-		n = goals.create("ux7 kr number", "Open", space=PRIVATE, area=self.areas["Tea"], measure_kind="Number", measure="Yield", unit="kg/ha",
+		n = goals.create("ux7 kr number", "Long term", space=PRIVATE, area=self.areas["Tea"], measure_kind="Number", measure="Yield", unit="kg/ha",
 			start_value=1200, target_value=1800)["name"]
 		r = readings.suggest(n, 1500, today(), "Yield came to 1500", by="Agent")
-		old = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "ux7 kr no line", "goal_type": "Open", "area": self.areas["Tea"]}).insert()
+		old = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "ux7 kr no line", "horizon": "Long term", "area": self.areas["Tea"]}).insert()
 		out = week.key_results(space=PRIVATE)
 		self.assertIn(r.name, [x["name"] for x in out["readings"]])
 		self.assertEqual(next(x for x in out["readings"] if x["name"] == r.name)["goal_title"], "ux7 kr number")

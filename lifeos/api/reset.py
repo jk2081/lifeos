@@ -51,7 +51,7 @@ def rule_batches(space):
 		out.append(_batch("duplicates", "Duplicate open tasks", "Each has the same title, area and goal as an older open task, which is kept.",
 			dupes, "delete", "Delete {n}"))
 	# 2. open tasks whose open-ended goal (a project before set 6) is achieved or dropped
-	closed = set(frappe.get_all("Life Goal", filters={"space": space, "goal_type": "Open", "outcome": ["not in", ["In Progress", "Carried"]]}, pluck="name"))
+	closed = set(frappe.get_all("Life Goal", filters={"space": space, "horizon": "Long term", "outcome": ["not in", ["In Progress", "Carried"]]}, pluck="name"))
 	orphans = [_item("Life Task", t.name, t.title) for t in tasks if t.goal in closed]
 	if orphans:
 		out.append(_batch("closed_project", "Open tasks of finished goals", "Their open-ended goal is achieved or dropped, but they are still open.",
@@ -90,7 +90,7 @@ def rule_batches(space):
 	rule = old_inbox.rule()
 	waiting = [i for i in old_inbox.candidates(space, rule["days"], limit=1000) if i.suggested_decision]
 	if waiting:
-		out.append(_batch("inbox_decisions", f"Inbox items older than {rule['days']} days", "Each has a suggested decision and a reason: accept its proposals, park it as an idea, or discard it.",
+		out.append(_batch("inbox_decisions", f"Inbox items older than {rule['days']} days", "Each has a suggested decision and a reason: accept its proposals, park it in Someday, or discard it.",
 			[_item("Life Inbox Item", i.name, f"{i.title} ({i.suggested_decision.lower()})") for i in waiting], "review_inbox_decisions", "Review {n}",
 			review={"path": "/inbox", "query": {"decisions": "1"}}))
 	# 6. Someday items due for review
@@ -134,13 +134,13 @@ def _queue(space, skip=(), only=None):
 			from `tabLife Task` where space=%(space)s and status in ('Open', 'Doing', 'Waiting') and is_archived=0
 		union all
 		select 'Life Goal', name, title, area, '' as goal, creation, ifnull(last_activity_on, date(modified)), '' as inbox_item,
-			if(on_hold, 'On Hold', 'Active') from `tabLife Goal` where space=%(space)s and goal_type='Open' and outcome='In Progress' and is_someday=0 and is_archived=0
+			if(on_hold, 'On Hold', 'Active') from `tabLife Goal` where space=%(space)s and horizon='Long term' and outcome='In Progress' and is_someday=0 and is_archived=0
 		) q where name not in %(skip)s {only} order by touched asc, creation asc limit 1""".replace("{only}", "and name in %(only)s" if only else ""),
 		{"space": space, "skip": list(skip) or [""], "only": only or [""]}, as_dict=True)
 	if only is not None:
 		return (rows[0] if rows else None), len(only)
 	total = frappe.db.sql("""select (select count(*) from `tabLife Task` where space=%(space)s and status in ('Open', 'Doing', 'Waiting') and is_archived=0)
-		+ (select count(*) from `tabLife Goal` where space=%(space)s and goal_type='Open' and outcome='In Progress' and is_someday=0 and is_archived=0)""",
+		+ (select count(*) from `tabLife Goal` where space=%(space)s and horizon='Long term' and outcome='In Progress' and is_someday=0 and is_archived=0)""",
 		{"space": space})[0][0]
 	return (rows[0] if rows else None), int(total) - len(skip)
 
@@ -259,7 +259,7 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 		doctype, name = it.get("doctype"), it.get("name")
 		if not isinstance(name, str):  # a name sent as a dict would act as a filter
 			continue
-		if doctype not in ("Life Task", "Life Goal", "Life Idea", "Life Inbox Item", "Life Note"):
+		if doctype not in ("Life Task", "Life Goal", "Life Inbox Item", "Life Note"):
 			continue
 		if not frappe.db.exists(doctype, name) or frappe.db.get_value(doctype, name, "space") != space:
 			continue

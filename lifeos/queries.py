@@ -13,7 +13,7 @@ import json
 import frappe
 
 SCOPED = {
-	"Life Area": "area_name", "Life Tag": "tag_name", "Life Habit": "title", "Life Dimension": "dimension_name",
+	"Life Area": "area_name", "Life Habit": "title", "Life Dimension": "dimension_name",
 	"Life Goal": "title",
 }
 
@@ -48,7 +48,7 @@ def link_query(doctype: str, txt: str, searchfield: str | None, start: int, page
 		if off:
 			where["name" if doctype == "Life Area" else "area"] = ["not in", off]
 	or_filters = {field: ["like", f"%{txt}%"], "name": ["like", f"%{txt}%"]} if txt else None
-	extra = ["parent_area"] if doctype == "Life Area" else (["outcome", "goal_type"] if doctype == "Life Goal" else [])
+	extra = ["parent_area"] if doctype == "Life Area" else (["outcome", "horizon"] if doctype == "Life Goal" else [])
 	rows = frappe.get_list(doctype, filters=where, or_filters=or_filters, fields=["name", field, "is_archived", "space", *extra],
 		order_by=f"is_archived asc, {'sort_order asc, ' if meta.has_field('sort_order') else ''}{field} asc",
 		start=start, page_length=page_len)
@@ -62,6 +62,6 @@ def link_query(doctype: str, txt: str, searchfield: str | None, start: int, page
 		closed = r.is_archived or (doctype == "Life Goal" and r.outcome != "In Progress")
 		if include_archived and closed:
 			label += " (archived)" if r.is_archived else f" ({(r.outcome or '').lower()})"
-		desc = (parents.get(r.parent_area) or "") if doctype == "Life Area" else (r.goal_type or "") if doctype == "Life Goal" else ""
+		desc = (parents.get(r.parent_area) or "") if doctype == "Life Area" else (r.horizon or "") if doctype == "Life Goal" else ""
 		out.append((r.name, label, desc) if desc else (r.name, label))
 	return out

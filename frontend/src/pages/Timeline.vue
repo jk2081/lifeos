@@ -43,7 +43,7 @@ const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'doctype', fi
   { key: 'from', field: 'record_date', kind: 'from' }, { key: 'to', field: 'record_date', kind: 'to' }, { key: 'archived', kind: 'flag' }]
 const VIRTUAL = [{ fieldname: 'ref_doctype', label: 'Type', fieldtype: 'Select', options: TYPES.join('\n') },
   { fieldname: 'area', label: 'Area', fieldtype: 'Link', options: 'Life Area' }, { fieldname: 'goal', label: 'Goal', fieldtype: 'Link', options: 'Life Goal' }]
-const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'tags_csv', 'is_archived', 'record_owner']
+const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'is_archived', 'record_owner']
 // inside a record page's tab (the area page): { screen, space, fixed: { area }, active(route) }
 const props = defineProps({ embed: { type: Object, default: null } })
 const route = useRoute()

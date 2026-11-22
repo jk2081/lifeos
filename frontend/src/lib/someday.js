@@ -6,15 +6,15 @@ import { api, errorText } from './api'
 import { recordChanged } from './pane'
 
 export const UNDO_MS = 60000
-export const TYPE_LABEL = { 'Life Task': 'Task', 'Life Goal': 'Goal', 'Life Idea': 'Idea' }
-export const REF_TYPE = { 'Life Task': 'task', 'Life Goal': 'goal', 'Life Idea': 'idea' }
+export const TYPE_LABEL = { 'Life Task': 'Task', 'Life Goal': 'Goal', 'Life Note': 'Note' }
+export const REF_TYPE = { 'Life Task': 'task', 'Life Goal': 'goal', 'Life Note': 'note' }
 
 function changed(doctype, name) {
   recordChanged(`${REF_TYPE[doctype]}:${name}`)
   window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))
 }
 
-/** Park one task or goal (an open-ended goal takes its open tasks); a toast offers Undo for a minute. */
+/** Park one task, goal or note (a long-term goal takes its open tasks); a toast offers Undo for a minute. */
 export async function park(doctype, name, title = '') {
   try {
     const res = await api('someday.park', { doctype, name })
@@ -40,11 +40,11 @@ export function askBringBack(row, cycles = []) {
   const f = {
     'Life Task': [{ name: 'due_date', label: 'Due date (optional)', type: 'date', help: 'Leave empty for a task with no date.' }],
     'Life Goal': [{ name: 'target_date', label: 'Target date', type: 'date' },
-      { name: 'status', label: 'Status (open-ended goals)', options: ['Active', 'On Hold'] },
+      { name: 'status', label: 'Status (long-term goals)', options: ['Active', 'On Hold'] },
       ...(cycles.length ? [{ name: 'cycle', label: '12 Week Year (for a 12 Week Year goal)', options: cycles.map((c) => ({ label: c.title, value: c.name })) }] : [])],
-    'Life Idea': [{ name: 'make', label: 'Make it a', required: true, options: [{ label: 'Task', value: 'task' }, { label: 'Goal', value: 'goal' }, { label: 'Note', value: 'note' }] }],
+    'Life Note': [],
   }[row.doctype]
-  Object.assign(bringBack, { open: true, row, fields: f, initial: row.doctype === 'Life Goal' ? { status: 'Active' } : row.doctype === 'Life Idea' ? { make: 'task' } : {} })
+  Object.assign(bringBack, { open: true, row, fields: f, initial: row.doctype === 'Life Goal' ? { status: 'Active' } : {} })
 }
 export async function doBringBack(values) {
   const row = bringBack.row

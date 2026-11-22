@@ -19,12 +19,16 @@
   "area",
   "also_in",
   "goal",
-  "tags",
   "is_sensitive",
   "is_archived",
   "archived_on",
   "archive_reason",
-  "person"
+  "person",
+  "someday_section",
+  "is_someday",
+  "someday_on",
+  "someday_review_on",
+  "someday_note"
  ],
  "fields": [
   {
@@ -124,12 +128,6 @@
    "search_index": 1
   },
   {
-   "fieldname": "tags",
-   "fieldtype": "Table MultiSelect",
-   "label": "Tags",
-   "options": "Life Tag Link"
-  },
-  {
    "default": "0",
    "fieldname": "is_sensitive",
    "fieldtype": "Check",
@@ -160,6 +158,35 @@
    "fieldtype": "Link",
    "label": "About (person or organisation)",
    "options": "Life Person"
+  },
+  {
+   "fieldname": "someday_section",
+   "fieldtype": "Section Break",
+   "label": "Someday"
+  },
+  {
+   "fieldname": "is_someday",
+   "fieldtype": "Check",
+   "label": "Someday",
+   "default": "0",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_on",
+   "fieldtype": "Date",
+   "label": "Parked On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_review_on",
+   "fieldtype": "Date",
+   "label": "Review On",
+   "search_index": 1
+  },
+  {
+   "fieldname": "someday_note",
+   "fieldtype": "Small Text",
+   "label": "Why It Was Parked"
   }
  ],
  "links": [],

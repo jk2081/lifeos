@@ -1,6 +1,6 @@
 <template>
   <!-- + Capture (issue 14): one box for anything on your mind. It becomes a task at once, or goes to the Brain, which files
-       it and asks only if it needs you. Files, a goal, a note or an idea are one tap below. -->
+       it and asks only if it needs you. Files, a goal, a note or something for Someday are one tap below. -->
   <Dialog v-model:open="open" title="Capture" size="lg" position="top" data-capture-sheet>
     <div v-if="canWrite()" class="flex flex-col gap-3">
       <Textarea ref="box" v-model="text" :rows="3" placeholder="Anything on your mind. A task with a date word such as tomorrow, a thought, a link."
@@ -76,7 +76,7 @@ const MORE = [
   { key: 'files', label: 'Files or a photo', icon: 'lucide-paperclip', run: () => { showFiles.value = true } },
   { key: 'goal', label: 'Goal', icon: 'lucide-target', run: () => { close(); store.newKind = 'goal' } },
   { key: 'note', label: 'Note', icon: 'lucide-file-text', run: () => { close(); store.newKind = 'note' } },
-  { key: 'idea', label: 'Idea for Someday', icon: 'lucide-lightbulb', run: () => { close(); store.newKind = 'idea' } },
+  { key: 'someday', label: 'Park on Someday', icon: 'lucide-lightbulb', run: () => { close(); store.newKind = 'someday' } },
 ]
 
 async function asTask() {

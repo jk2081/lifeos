@@ -70,7 +70,7 @@ class TestTaskExits(OutboxCase):
 
 class TestGoalExits(OutboxCase):
 	def test_outcomes_someday_and_delete(self):
-		g = goals.create("ux7 g1", "Annual", space=PRIVATE, target_date=add_days(today(), 60), done_when="x")["name"]
+		g = goals.create("ux7 g1", "Year", space=PRIVATE, target_date=add_days(today(), 60), done_when="x")["name"]
 		goals.close(g, "Achieved")
 		self.assertEqual(exits("Life Goal", g), ["Done"])
 		goals.close(g, "In Progress")
@@ -88,7 +88,7 @@ class TestGoalExits(OutboxCase):
 		self.assertEqual(exits("Life Goal", g), ["Discarded"])
 
 	def test_open_goal_dropped(self):
-		g = goals.create("ux7 g2", "Open", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
+		g = goals.create("ux7 g2", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		goals.set_status(g, "Dropped")
 		self.assertEqual(exits("Life Goal", g), ["Discarded"])
 		goals.set_status(g, "Active")
@@ -137,14 +137,14 @@ class TestCaptureAndIdeaExits(OutboxCase):
 		trash.delete("Life Inbox Item", other["name"])
 		self.assertEqual(exits("Life Inbox Item", other["name"]), ["Discarded"])
 
-	def test_idea_brought_back_and_purged(self):
-		idea = someday.create_idea("ux7 idea", space=PRIVATE, area=self.areas["Tea"])["name"]
-		self.assertEqual(exits("Life Idea", idea), [])  # ideas start parked
-		someday.bring_back("Life Idea", idea, make="task")
-		self.assertEqual(exits("Life Idea", idea), ["Done"])
-		idea2 = someday.create_idea("ux7 idea 2", space=PRIVATE, area=self.areas["Tea"])["name"]
-		someday.purge("Life Idea", idea2)
-		self.assertEqual(exits("Life Idea", idea2), ["Discarded"])
+	def test_something_parked_new_is_brought_back_and_purged(self):
+		parked = someday.create("ux7 parked", space=PRIVATE, area=self.areas["Tea"])["name"]
+		self.assertEqual(exits("Life Task", parked), ["Parked"])
+		someday.bring_back("Life Task", parked)
+		self.assertEqual(exits("Life Task", parked), [])
+		parked2 = someday.create("ux7 parked 2", space=PRIVATE, area=self.areas["Tea"])["name"]
+		someday.purge("Life Task", parked2)
+		self.assertEqual(exits("Life Task", parked2), ["Parked"])  # it had already left the plate: that exit stands
 
 
 class TestInAndOut(OutboxCase):
@@ -154,11 +154,8 @@ class TestInAndOut(OutboxCase):
 		self.task("ux7 direct")  # +1
 		item = inbox.create_item(space=PRIVATE, title="ux7 in", source_type="Message", raw_text="x")  # +1
 		self.task("ux7 from capture", inbox_item=item["name"])  # from a capture: 0
-		idea = someday.create_idea("ux7 in idea", space=PRIVATE, area=self.areas["Tea"])["name"]  # +1
-		someday.bring_back("Life Idea", idea, make="task")  # the task made from the idea: 0
-		goals.create("ux7 in goal", "Open", space=PRIVATE, area=self.areas["Tea"], done_when="x")  # +1
-		frappe.get_doc({"doctype": "Life Idea", "space": PRIVATE, "title": "ux7 idea of a capture", "status": "Someday",
-			"source_doctype": "Life Inbox Item", "source_name": item["name"]}).insert()  # from a capture: 0
+		someday.create("ux7 in parked", space=PRIVATE, area=self.areas["Tea"])  # a task made directly, parked: +1
+		goals.create("ux7 in goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")  # +1
 		self.assertEqual(outbox_api.in_count(PRIVATE, None, a, b) - before, 4)
 
 	def test_today_line_matches_its_lists(self):
@@ -231,7 +228,7 @@ class TestBackfill(OutboxCase):
 		frappe.db.set_value("Life Task", p.name, {"status": "Someday", "someday_on": add_days(today(), -5)})
 		old = self.task("ux7 too old")
 		frappe.db.set_value("Life Task", old.name, {"status": "Done", "completed_on": add_days(today(), -200)})
-		g = goals.create("ux7 old goal", "Annual", space=PRIVATE, target_date=add_days(today(), 30), done_when="x")["name"]
+		g = goals.create("ux7 old goal", "Year", space=PRIVATE, target_date=add_days(today(), 30), done_when="x")["name"]
 		frappe.db.set_value("Life Goal", g, {"outcome": "Achieved", "closed_on": add_days(today(), -3)})
 		gone = self.task("ux7 old deleted")
 		gone.flags.no_exit = True

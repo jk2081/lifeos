@@ -7,14 +7,14 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 // under Brain, Someday under Goals, the Timeline and the trash and archive under Library.
 const TODAY = ['week', 'month', 'year']
 const BRAIN = ['activity', 'captures', 'sources', 'skills', 'outbox', 'queue']
-const GOALS = ['tasks', 'no-goal', 'someday']
+const GOALS = ['tasks', 'no-goal', 'cycles', 'someday']
 const LIBRARY = ['notes', 'documents', 'people', 'chats', 'files', 'timeline', 'archive']
 
 // the Projects screen's query on the Goals tab: open-ended goals, and a project's status as a goal state
 const STATE = { Active: 'in_progress', 'On Hold': 'in_progress', Done: 'achieved', Dropped: 'closed', Someday: 'someday', all: 'all', current: 'in_progress' }
 function projectQuery(q) {
   const { status, ...rest } = q
-  return { ...rest, type: 'Open', ...(status ? { status: STATE[status] || 'in_progress' } : {}) }
+  return { ...rest, type: 'Long term', ...(status ? { status: STATE[status] || 'in_progress' } : {}) }
 }
 // an old route that lands on a tab with its query carried over, and a few parameters of its own
 const to = (path, extra = {}) => (r) => ({ path, query: { ...r.query, ...(typeof extra === 'function' ? extra(r) : extra) }, hash: r.hash })
@@ -28,9 +28,13 @@ const libraryKind = (r, extra = {}) => {
 // Plan's old tabs, by their new homes
 const PLAN_HOME = { week: '/today/week', month: '/today/month', year: '/today/year', goals: '/goals', tasks: '/goals/tasks', someday: '/goals/someday' }
 
+// the month plan and the 12 Week Year grid, which Goals > Cycles replaced
+const asksForCycles = (tab, view) => (tab === 'month' && view === 'plan') || (tab === 'year' && view === 'cycle')
+
 const routes = [
   { path: '/', redirect: to('/today') },
-  { path: `/today/:tab(${TODAY.join('|')})?`, name: 'Today', component: page('TodayPlace'), props: true },
+  { path: `/today/:tab(${TODAY.join('|')})?`, name: 'Today', component: page('TodayPlace'), props: true,
+    beforeEnter: (r) => (asksForCycles(r.params.tab, r.query.view) ? { path: '/goals/cycles', query: { ...r.query, view: undefined }, hash: r.hash } : true) },
   { path: '/today/reset', name: 'Reset', component: page('Reset') },
   { path: `/brain/:tab(${BRAIN.join('|')})?`, name: 'Brain', component: page('BrainPlace'), props: true },
   { path: '/brain/skills/:name', name: 'Skill', component: page('Skill'), props: true },
@@ -63,8 +67,10 @@ const routes = [
   { path: '/plan', redirect: to('/today/week') },
   { path: '/plan/goals/:id', redirect: (r) => ({ path: `/goals/${r.params.id}`, query: r.query, hash: r.hash }) },
   { path: '/plan/reset', redirect: to('/today/reset') },
-  { path: '/plan/12-weeks', redirect: to('/today/year', { view: 'cycle' }) },
-  { path: '/plan/:tab(week|month|year|goals|tasks|someday)', redirect: (r) => ({ path: PLAN_HOME[r.params.tab], query: r.query, hash: r.hash }) },
+  { path: '/plan/12-weeks', redirect: to('/goals/cycles') },
+  // Plan's month and year, when they ask for the plan (not the calendar), are Goals > Cycles
+  { path: '/plan/:tab(week|month|year|goals|tasks|someday)', redirect: (r) => (asksForCycles(r.params.tab, r.query.view)
+    ? { path: '/goals/cycles', query: { ...r.query, view: undefined }, hash: r.hash } : { path: PLAN_HOME[r.params.tab], query: r.query, hash: r.hash }) },
   { path: '/library/captures', redirect: (r) => libraryKind(r) },
   { path: '/library/outbox', redirect: to('/brain/outbox') },
   { path: '/tasks', redirect: to('/goals/tasks') },
@@ -81,12 +87,12 @@ const routes = [
   } },
   { path: '/journal/goals/:id', redirect: (r) => ({ path: `/goals/${r.params.id}`, query: r.query }) },
   // journal pages are captures now: a page opens in the pane over Library > Everything
-  { path: '/journal/pages/:id', redirect: (r) => ({ path: '/library', query: { ...r.query, tab: 'pages', open: `page:${r.params.id}` } }) },
+  { path: '/journal/pages/:id', redirect: (r) => ({ path: '/library/notes', query: { ...r.query, view: 'list', open: `page:${r.params.id}` } }) },
   { path: '/journal/:tab?', redirect: (r) => {
     const t = r.params.tab
-    const map = { goals: ['/today/year', { view: 'goals' }], month: ['/today/month', {}], habits: ['/today/month', { view: 'habits' }],
-      checkins: ['/today/month', { view: 'checkins' }], review: ['/today/week', { view: 'review' }], pages: ['/library', { tab: 'pages' }] }
-    const [path, extra] = map[t] || ['/today/year', { view: 'cycle' }]
+    const map = { goals: ['/goals/cycles', {}], month: ['/goals/cycles', {}], habits: ['/today/month', { view: 'habits' }],
+      checkins: ['/today/month', { view: 'checkins' }], review: ['/today/week', { view: 'review' }], pages: ['/library/notes', { view: 'list' }] }
+    const [path, extra] = map[t] || ['/goals/cycles', {}]
     return { path, query: { ...r.query, ...extra } }
   } },
   // the old Sources page (the captures list) is Brain > Sources now; an old link with a filter still opens the captures it asked for

@@ -19,7 +19,7 @@ show so than that the their them then there these they this to up was we were wh
 still open here stuck tell give list find about any all""".split())
 
 KIND_DOCTYPE = {"task": "Life Task", "note": "Life Note", "source": "Life Inbox Item", "chat": "Life Chat Log", "document": "Life Vault Document",
-	"journal page": "Life Journal Page", "project": "Life Goal", "goal": "Life Goal", "idea": "Life Idea", "insight": "Life Insight"}
+	"journal page": "Life Journal Page", "project": "Life Goal", "goal": "Life Goal", "insight": "Life Insight"}
 INDEX_KIND = {"task": "Task", "note": "Note", "source": "Inbox", "chat": "Chat", "document": "Document", "journal page": "Journal Page",
 	"check-in": "Check-in", "month plan": "Month Plan"}
 
@@ -32,9 +32,9 @@ TOOLS = [
 			"required": ["query"]}},
 	{"name": "get_record", "description": "One record's fields and text (truncated), by its reference (R3) or doctype and name.",
 		"input_schema": {"type": "object", "properties": {"ref": {"type": "string"}, "doctype": {"type": "string"}, "name": {"type": "string"}}}},
-	{"name": "list_records", "description": "Rows of one kind, at most 50: tasks, goals (projects are open-ended goals), notes, sources, chats, ideas (Someday), insights.",
+	{"name": "list_records", "description": "Rows of one kind, at most 50: tasks, goals (projects are open-ended goals), notes, sources, chats, someday (parked tasks, goals and notes), insights.",
 		"input_schema": {"type": "object", "properties": {
-			"kind": {"type": "string", "enum": ["tasks", "goals", "projects", "notes", "sources", "chats", "ideas", "insights"]},
+			"kind": {"type": "string", "enum": ["tasks", "goals", "projects", "notes", "sources", "chats", "someday", "insights"]},
 			"filters": {"type": "object", "description": "For tasks: status (open, waiting, done, someday, overdue, due_today, stuck), area, goal. For goals: state (in_progress, achieved, closed, someday), type (12 Week Year, Annual, Open), area. projects lists open-ended goals. Others: area."},
 			"order": {"type": "string", "enum": ["oldest", "newest", "due"]}, "limit": {"type": "integer"}},
 			"required": ["kind"]}},
@@ -193,12 +193,12 @@ def _area(area):
 
 TEXT_FIELDS = {"Life Note": ["summary", "content_md"], "Life Task": ["notes_md", "waiting_on"], "Life Inbox Item": ["instruction", "summary_md", "transcript_md", "raw_text"],
 	"Life Chat Log": ["summary_md", "transcript_md"], "Life Journal Page": ["transcript_md"],
-	"Life Goal": ["done_when", "notes_md", "result_note"], "Life Vault Document": ["notes_md"], "Life Idea": ["body_md", "someday_note"], "Life Insight": ["body"]}
+	"Life Goal": ["done_when", "notes_md", "result_note"], "Life Vault Document": ["notes_md"], "Life Insight": ["body"]}
 FIELDS = {"Life Task": ["status", "due_date", "priority", "goal", "completed_on", "last_touched_on", "someday_review_on"],
-	"Life Goal": ["goal_type", "outcome", "on_hold", "target_date", "cycle", "serves", "is_someday", "last_activity_on"],
+	"Life Goal": ["horizon", "outcome", "on_hold", "target_date", "cycle", "serves", "is_someday", "last_activity_on"],
 	"Life Inbox Item": ["status", "received_on", "source_type", "intent"], "Life Chat Log": ["date", "assistant", "url"],
 	"Life Note": ["collection", "last_opened_on"], "Life Vault Document": ["doc_type", "expiry_date", "number_last4"],
-	"Life Idea": ["status", "someday_review_on"], "Life Journal Page": ["page_date", "page_number"], "Life Insight": ["kind", "status"]}
+	"Life Journal Page": ["page_date", "page_number"], "Life Insight": ["kind", "status"]}
 
 
 def t_get_record(ctx, ref=None, doctype=None, name=None):
@@ -290,11 +290,11 @@ def t_list(ctx, kind, filters=None, order=None, limit=20):
 		res = tasks.list(**args)
 		return {"total": res["total"], "rows": _rows_out(ctx, "Life Task", res["tasks"], extra=("status", "due_date", "goal_title", "last_touched_on", "waiting_on"))}
 	if kind in ("goals", "projects"):  # projects are open-ended goals since set 6
-		goal_type = filters.get("type") or ("Open" if kind == "projects" else None)
-		res = goals.list(space=ctx.space, state=filters.get("state") or "in_progress", goal_type=goal_type if goal_type in goals.TYPES else None,
+		horizon = filters.get("type") or ("Long term" if kind == "projects" else None)
+		res = goals.list(space=ctx.space, state=filters.get("state") or "in_progress", horizon=horizon if horizon in goals.TYPES else None,
 			area=area, page_length=limit)
-		return {"total": res["total"], "rows": _rows_out(ctx, "Life Goal", res["goals"], extra=("goal_type", "outcome", "tasks_done", "tasks_counted", "score"))}
-	if kind == "ideas":
+		return {"total": res["total"], "rows": _rows_out(ctx, "Life Goal", res["goals"], extra=("horizon", "outcome", "tasks_done", "tasks_counted", "score"))}
+	if kind == "someday":
 		res = someday.list(space=ctx.space, area=area, page_length=limit)
 		return {"total": res["total"], "rows": [{"ref": ctx.ref(r.doctype, r.name, r.title, r.type, r.creation, r.area), "title": r.title, "type": r.type,
 			"parked": r.someday_on, "review": r.someday_review_on} for r in res["rows"]]}

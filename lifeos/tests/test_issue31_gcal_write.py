@@ -126,7 +126,7 @@ class TestWriteEvents(WriteCase):
 
 class TestWriteGoalBlocks(WriteCase):
 	def block(self, **kw):
-		g = goals.create("issue31 goal", "Open", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
+		g = goals.create("issue31 goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		at = get_datetime(f"{add_days(today(), 7)} 10:00:00")
 		return g, at, __import__("lifeos.weekplan", fromlist=["add"]).add(g, title="issue31 draft", scheduled_at=at, duration_min=90, **kw)
 

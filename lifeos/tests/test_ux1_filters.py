@@ -39,7 +39,7 @@ class TestListFilters(LifeTestCase):
 		self.assertEqual(t["open_loops"], tasks.list(space=PRIVATE, loops=1)["total"])
 
 	def test_task_done_loops_sort_and_completed(self):
-		goal = self.make("Life Goal", title="ux1 goal", goal_type="Open", area=self.areas["Tea"])
+		goal = self.make("Life Goal", title="ux1 goal", horizon="Long term", area=self.areas["Tea"])
 		a = self.make("Life Task", title="ux1 b open", goal=goal.name, area=self.areas["Tea"])
 		b = self.make("Life Task", title="ux1 a done", goal=goal.name, area=self.areas["Tea"], status="Done")
 		c = self.make("Life Task", title="ux1 c carried", goal=goal.name, area=self.areas["Tea"], status="Carried")
@@ -48,7 +48,7 @@ class TestListFilters(LifeTestCase):
 		self.assertEqual(self.names(get(done=1)["tasks"]), {a.name, b.name})
 		self.assertEqual(self.names(get(status="Carried")["tasks"]), {c.name})
 		# "4 of 10 tasks done" on a goal card: the total equals the list with Show done and archived records
-		card = next(g for g in goals.list(space=PRIVATE, goal_type="Open")["goals"] if g["name"] == goal.name)
+		card = next(g for g in goals.list(space=PRIVATE, horizon="Long term")["goals"] if g["name"] == goal.name)
 		self.assertEqual(card["tasks_counted"], get(done=1, include_archived=1)["total"])
 		self.assertEqual([t["title"] for t in get(done=1, sort="title")["tasks"]], ["ux1 a done", "ux1 b open"])
 		self.assertEqual([t["title"] for t in get(done=1, sort="title", dir="desc")["tasks"]], ["ux1 b open", "ux1 a done"])
@@ -96,9 +96,9 @@ class TestListFilters(LifeTestCase):
 
 	def test_open_goal_filters(self):
 		sub = self.make("Life Area", area_name="ux1 Garden", parent_area=self.areas["Money"])
-		a = self.make("Life Goal", title="ux1 active", goal_type="Open", area=sub.name)
-		h = self.make("Life Goal", title="ux1 hold", goal_type="Open", area=self.areas["Money"], on_hold=1)
-		get = lambda **f: goals.list(space=PRIVATE, goal_type="Open", **f)  # noqa: E731
+		a = self.make("Life Goal", title="ux1 active", horizon="Long term", area=sub.name)
+		h = self.make("Life Goal", title="ux1 hold", horizon="Long term", area=self.areas["Money"], on_hold=1)
+		get = lambda **f: goals.list(space=PRIVATE, horizon="Long term", **f)  # noqa: E731
 		self.assertEqual(self.names(get(area=self.areas["Money"])["goals"]), {a.name, h.name})
 		self.assertEqual(self.names(get(area=self.areas["Money"], filters=[["on_hold", "=", 0]])["goals"]), {a.name})
 		self.assertEqual(get(area=self.areas["Money"], filters=[["on_hold", "=", 1]])["total"], 1)
@@ -132,7 +132,7 @@ class TestListFilters(LifeTestCase):
 		self.assertEqual(vault.list(space=PRIVATE)["expired"], vault.list(space=PRIVATE, expiry="expired")["total"])
 
 	def test_chat_filters(self):
-		goal = self.make("Life Goal", title="ux1 chat goal", goal_type="Open", area=self.areas["Tea"])
+		goal = self.make("Life Goal", title="ux1 chat goal", horizon="Long term", area=self.areas["Tea"])
 		a = chats.log(space=PRIVATE, title="ux1 chat open", area=self.areas["Tea"], goal=goal.name, open_items=["Follow up"])["name"]
 		b = chats.log(space=PRIVATE, title="ux1 chat old", date=add_days(today(), -20))["name"]
 		mine = {a, b}
@@ -156,9 +156,8 @@ class TestListFilters(LifeTestCase):
 		self.assertRaises(frappe.PermissionError, chats.get, a)
 
 	def test_library_list(self):
-		tag = self.make("Life Tag", tag_name="ux1tag")
-		goal = self.make("Life Goal", title="ux1 note goal", goal_type="Open", area=self.areas["Tea"])
-		a = self.make("Life Note", title="ux1 reference", area=self.areas["Tea"], content_md="a", tags=[{"tag": tag.name}])
+		goal = self.make("Life Goal", title="ux1 note goal", horizon="Long term", area=self.areas["Tea"])
+		a = self.make("Life Note", title="ux1 reference", area=self.areas["Tea"], content_md="a")
 		b = self.make("Life Note", title="ux1 goal note", area=self.areas["Tea"], goal=goal.name, content_md="b")
 		c = self.make("Life Note", title="ux1 loose", content_md="c")
 		mine = {a.name, b.name, c.name}
@@ -166,7 +165,6 @@ class TestListFilters(LifeTestCase):
 		self.assertEqual(mine & self.names(get(area=self.areas["Tea"])["notes"]), {a.name, b.name})
 		self.assertEqual(mine & self.names(get(area=self.areas["Tea"], goal="none")["notes"]), {a.name})
 		self.assertEqual(mine & self.names(get(goal=goal.name)["notes"]), {b.name})
-		self.assertEqual(mine & self.names(get(tag=tag.name)["notes"]), {a.name})
 		self.assertEqual(mine & self.names(get(area="none")["notes"]), {c.name})
 		self.assertEqual(goals.get(goal.name)["tabs"]["notes"], get(goal=goal.name, collection="all")["total"])
 

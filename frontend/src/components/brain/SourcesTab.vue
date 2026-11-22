@@ -69,7 +69,7 @@
     <template #default>
       <div class="flex flex-col gap-2" data-other-agent>
         <FormControl v-model="otherName" label="Name" placeholder="For example Atlas" @keydown.enter="addOther" />
-        <p class="text-sm text-ink-gray-6">The agent sends this as its source_system. It can bring things in once it has its own user and key (Settings, People and agents).</p>
+        <p class="text-sm text-ink-gray-6">The agent sends this as its source_system. It can bring things in once it has its own user and key (Settings, Members).</p>
       </div>
     </template>
   </Dialog>

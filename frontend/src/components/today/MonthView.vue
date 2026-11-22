@@ -63,7 +63,7 @@ const MAX = 3
 const route = useRoute()
 const router = useRouter()
 const phone = useMediaQuery('(max-width: 767px)')
-const LINKS = [{ label: 'Month plan', to: { path: '/today/month', query: { view: 'plan' } } }, { label: 'Habits', to: { path: '/today/month', query: { view: 'habits' } } },
+const LINKS = [{ label: 'Month plan', to: '/goals/cycles' }, { label: 'Habits', to: { path: '/today/month', query: { view: 'habits' } } },
   { label: 'Check-ins', to: { path: '/today/month', query: { view: 'checkins' } } }]
 const sunday = store.settings?.week_starts_on === 'Sunday'
 const HEADS = sunday ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']

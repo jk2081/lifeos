@@ -39,8 +39,6 @@ def load(space="Private"):
 	# the estates are parts of Career beside Tea & Coffee: parts are one level deep (issue 11)
 	for i, name in enumerate(["Ghatia", "Ghillidary", "Chandighat", "Chikmagalur", "Head office"]):
 		area[name] = t.insert({"doctype": "Life Area", "space": space, "area_name": name, "parent_area": career, "sort_order": i + 10}).name
-	for name in ("estate", "audit", "tax"):
-		t.insert({"doctype": "Life Tag", "space": space, "tag_name": name})
 
 	people = {}
 	for name, relation in (("Jai", "Self"), ("Ruchi", "Wife"), ("Anya", "Daughter"), ("Vivek", "Accountant")):
@@ -49,7 +47,7 @@ def load(space="Private"):
 	def project(title, area_name, status="Active", outcome=None, target=None):
 		# what were projects before set 6 are open-ended goals; the project itself is kept, read-only, pointing at the goal it
 		# became, as the set 6 migration leaves it (old links to a project still find its goal)
-		goal = t.insert({"doctype": "Life Goal", "space": space, "title": title, "area": area[area_name], "goal_type": "Open",
+		goal = t.insert({"doctype": "Life Goal", "space": space, "title": title, "area": area[area_name], "horizon": "Long term",
 			"on_hold": 1 if status == "On Hold" else 0, "done_when": outcome, "measure_kind": "Milestone" if outcome else None, "target_date": target}).name
 		t.insert({"doctype": "Life Project", "space": space, "title": title, "area": area[area_name], "status": status, "outcome": outcome,
 			"target_date": target, "migrated_to": goal}, allow_migration=True)
@@ -73,7 +71,7 @@ def load(space="Private"):
 			index.update(doc)
 		return doc
 
-	task("Download Merrill statements for Ruchi ITR", "Money & Legal", due_date=add_days(now, -2), tags=[{"tag": frappe.db.get_value("Life Tag", {"space": space, "tag_name": "tax"})}])
+	task("Download Merrill statements for Ruchi ITR", "Money & Legal", due_date=add_days(now, -2))
 	task("Send quote request to data vendors", "Business That Works", due_date=now, priority="I", goal=funnel)
 	task("Six questions to Mithun on the blend sheets", "Business That Works", due_date=now, priority="I", goal=dalmia)
 	task("Practise 5-footers, 30 minutes", "Personal", due_date=now, goal=goals.get("Golf: hit 5 birdies"))
@@ -167,6 +165,8 @@ def load(space="Private"):
 
 	# habits this month
 	plan = journal.get_month_plan(space, now.year, now.month, create=True)
+	for title, a in (("Ghillidary drainage plan agreed", "Tea & Coffee"), ("File the ITR", "Money & Legal")):  # this month's goals, in priority order
+		journal.add_month_goal(space, now.year, now.month, title, area[a])
 	for row in plan.habits:
 		title = frappe.db.get_value("Life Habit", row.habit, "title")
 		for day in range(1, now.day + 1):
@@ -213,7 +213,7 @@ def load_set7(space="Private"):
 	if frappe.db.exists("Life Goal", {"space": space, "title": "Ghillidary yield to 1,800 kg/ha"}):
 		return "Already loaded."
 	area = frappe.db.get_value("Life Area", {"space": space, "area_name": "Tea & Coffee"})
-	g = t.insert({"doctype": "Life Goal", "space": space, "title": "Ghillidary yield to 1,800 kg/ha", "goal_type": "Annual", "area": area,
+	g = t.insert({"doctype": "Life Goal", "space": space, "title": "Ghillidary yield to 1,800 kg/ha", "horizon": "Year", "area": area,
 		"target_date": f"{getdate(today()).year + 1}-12-31", "measure_kind": "Number", "measure": "Ghillidary yield", "unit": "kg/ha",
 		"start_value": 1200, "target_value": 1800, "notes_md": "Made tea per hectare, a rolling twelve months."})
 	for weeks, value in ((9, 1250), (5, 1320), (2, 1410)):

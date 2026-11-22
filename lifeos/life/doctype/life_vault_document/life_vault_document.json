@@ -20,7 +20,6 @@
   "area",
   "also_in",
   "goal",
-  "tags",
   "is_archived",
   "archived_on",
   "archive_reason"
@@ -124,12 +123,6 @@
    "label": "Goal",
    "options": "Life Goal",
    "search_index": 1
-  },
-  {
-   "fieldname": "tags",
-   "fieldtype": "Table MultiSelect",
-   "label": "Tags",
-   "options": "Life Tag Link"
   },
   {
    "fieldname": "is_archived",

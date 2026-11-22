@@ -49,7 +49,7 @@ def set_archived(doctype, name, archived=True, reason="Manual"):
 	doc.check_permission("write")
 	if doctype == "Life Goal":
 		if archived:
-			return archive_goal(doc, with_records=doc.goal_type == "Open")
+			return archive_goal(doc, with_records=doc.horizon == "Long term")
 		return restore_goal(doc)
 	if doctype not in ORG_DOCTYPES:
 		frappe.throw(f"{doctype} cannot be archived.")
@@ -91,7 +91,7 @@ def restore_goal(goal) -> dict:
 			goal.name)
 		count += frappe.db.sql("select row_count()")[0][0]
 		_sync_index(dt, "t.goal = %s", (goal.name,))
-	if goal.goal_type == "Open" and (goal.outcome or "In Progress") != "In Progress":
+	if goal.horizon == "Long term" and (goal.outcome or "In Progress") != "In Progress":
 		# reopened by a save, so the Outbox reverses the goal's exit (set 7); validate clears closed_on and completed_on
 		doc = frappe.get_doc("Life Goal", goal.name)
 		doc.is_archived, doc.archived_on, doc.outcome = 0, None, "In Progress"

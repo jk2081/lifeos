@@ -1,6 +1,6 @@
 <template>
   <Alert v-if="total" theme="amber" :title="`${total} item${total === 1 ? '' : 's'} older than ${days} days ${total === 1 ? 'has a' : 'have'} suggested decision${total === 1 ? '' : 's'}`"
-    description="Each says what to do with it and why: accept its proposals, park it as an idea, or discard it." data-old-items-banner :data-old-items-n="total">
+    description="Each says what to do with it and why: accept its proposals, park it in Someday, or discard it." data-old-items-banner :data-old-items-n="total">
     <template #actions><Button variant="solid" :label="`Review ${total}`" data-old-items-open @click="openBatch" /></template>
   </Alert>
   <Dialog v-model:open="open" :title="`Inbox items older than ${days} days`" size="3xl" data-old-items-dialog>
@@ -40,7 +40,7 @@ import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 
 const emit = defineEmits(['changed'])
-const DECISIONS = [{ label: 'Accept', value: 'Accept' }, { label: 'Park as an idea', value: 'Park' }, { label: 'Discard', value: 'Discard' }]
+const DECISIONS = [{ label: 'Accept', value: 'Accept' }, { label: 'Park in Someday', value: 'Park' }, { label: 'Discard', value: 'Discard' }]
 const route = useRoute()
 const router = useRouter()
 const total = ref(0)

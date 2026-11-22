@@ -107,7 +107,7 @@ class TestStarsSkipsAndGate(GoalsCase):
 			frappe.clear_document_cache("Life Settings", "Life Settings")
 
 	def test_other_goals_fold_and_can_be_planned(self):
-		other = self.make("Life Goal", title="s8 Lotwise pilot", goal_type="Open").name
+		other = self.make("Life Goal", title="s8 Lotwise pilot", horizon="Long term").name
 		t = self.tab()
 		self.assertEqual(t["others"]["n"], 1)
 		weekly.goal_add(space=PRIVATE, goal=other)

@@ -97,7 +97,7 @@ for (const scheme of schemes) {
     }
     const area = await first('Life Area', { space: 'Private', area_name: 'Tea & Coffee' })
     const openGoal = await first('Life Goal', { space: 'Private', title: 'Ghillidary turnaround' })
-    const goal = await first('Life Goal', { goal_type: '12 Week Year' }), jpage = await first('Life Journal Page'), note = await first('Life Note'), task = await first('Life Task', { space: 'Private', status: 'Open' })
+    const goal = await first('Life Goal', { horizon: '12 weeks' }), jpage = await first('Life Journal Page'), note = await first('Life Note'), task = await first('Life Task', { space: 'Private', status: 'Long term' })
     const vault = await first('Life Vault Document'), chat = await first('Life Chat Log')
     const review = await first('Life Inbox Item', { space: 'Private', status: 'To Review' })
     const wikiPage = await first('Life Note', { space: 'Private', collection: 'Wiki', is_rules: 0 }).catch(() => null)
@@ -140,7 +140,7 @@ for (const scheme of schemes) {
       ['library-outbox', '/life/library/outbox?area='], ['library-outbox-in', '/life/library/outbox?pile=in&period=12weeks&area='],
       ...(numberGoal ? [['goal-number', `/life/plan/goals/${numberGoal}`], ['goal-number-pane', `/life/plan/goals?status=all&area=&open=goal:${numberGoal}`]] : []),
       ['new-goal', '/life/plan/goals?area='], ['inbox-old', '/life/brain?all=1&area=&decisions=1'],
-      ...['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'tags', 'agents', 'connections', 'ai', 'sensitive',
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'agents', 'connections', 'ai', 'sensitive',
         'note-rules', 'spaces', 'members', 'archive', 'import', 'backups'].map((t) => [`settings-${t}`, `/life/settings?tab=${t}&area=`]),
     ].filter(([n]) => !only.length || only.includes(n))
     for (const [name, p] of SCREENS) {
