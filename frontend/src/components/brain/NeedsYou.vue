@@ -31,6 +31,7 @@
             <span class="break-words text-base-medium text-ink-gray-9" data-row-title>{{ r.title }}</span>
           </div>
           <div v-if="r.reason" class="mt-0.5 text-sm text-ink-gray-6" data-row-reason><span aria-hidden="true">✦</span> {{ r.reason }}</div>
+          <div v-if="r.blocked" class="mt-0.5 text-sm text-ink-amber-3" data-row-blocked>Needs a “Done when” before it can be kept. Use Change to add one.</div>
         </div>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-2 max-md:w-full">
           <div class="flex flex-wrap items-center gap-1.5 text-sm text-ink-gray-6" data-best-guess>
@@ -50,7 +51,7 @@
               <Button :disabled="busy.has(r.proposal)" :label="r.alt_area_name" :aria-label="`File in ${r.alt_area_name}`" data-pick="second" @click="decide(r, 'accept', r.alt_area)" />
             </template>
             <template v-else>
-              <Button variant="solid" label="Keep" :disabled="busy.has(r.proposal)" data-keep @click="decide(r, 'accept')" />
+              <Button variant="solid" label="Keep" :disabled="busy.has(r.proposal) || !!r.blocked" data-keep @click="decide(r, 'accept')" />
               <Button label="Change" :disabled="busy.has(r.proposal)" data-change @click="change(r)" />
             </template>
             <Button label="Drop" :disabled="busy.has(r.proposal)" data-drop @click="decide(r, 'reject')" />
@@ -156,7 +157,7 @@ const contradictions = computed(() => data.value?.contradictions || [])
 // a proposal that takes an area and has none cannot be kept as it is: it sits under Unfiled until you choose one
 const unfiled = computed(() => rows.value.filter((r) => r.unfiled))
 const asked = computed(() => rows.value.filter((r) => !r.unfiled))
-const filable = computed(() => asked.value.filter((r) => !r.alt_area))
+const filable = computed(() => asked.value.filter((r) => !r.alt_area && !r.blocked))
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 const dot = (area) => dotClass((lookups.areas || []).find((a) => a.name === area))
 

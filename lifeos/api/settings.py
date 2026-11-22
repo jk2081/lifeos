@@ -2,14 +2,14 @@
 import frappe
 from frappe import _
 
-from lifeos import permissions
+from lifeos import permissions, readings
 from lifeos.api.utils import parse
 
 SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "score_target", "archive_after_days", "stale_task_days",
 	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
 	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
 	# UX fixes, set 6: Rhythms
-	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week", "planning_period",
+	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week", "planning_period", "require_done_when",
 	# set 7: working hours, for the weekly review's goal work
 	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days", "own_domains")
 TIME_FIELDS = ("weekly_review_time", "start_of_day", "work_start", "work_end")
@@ -188,6 +188,7 @@ def get(space: str | None = None):
 		out["agents"] = _agents(out["spaces"])
 		out["ai"] = ai_settings()
 		out["backups"] = backups()
+	out["settings"]["require_done_when"] = int(readings.done_when_required())  # a Check never saved reads 0 here; the setting is on until switched off
 	return out
 
 

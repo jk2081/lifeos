@@ -29,6 +29,8 @@
                 <FormControl type="select" :label="monthly ? 'Serves (optional)' : 'Serves (optional)'" :model-value="g.serves || ''" :options="[{ label: '—', value: '' }, ...(d.serves_options || goalChoices)]"
                   @update:model-value="(v) => edit(g, { serves: v })" />
               </div>
+              <FormControl v-if="monthly && !g.carried_from && store.settings.require_done_when" type="text" label="Done when" :model-value="g.done_when" placeholder="What is true when it is done"
+                data-plan-done-when @update:model-value="(v) => edit(g, { done_when: v })" />
               <template v-if="!monthly">
                 <FormControl type="text" label="Done when" :model-value="g.done_when" placeholder="What is true when it is done" data-plan-done-when @update:model-value="(v) => edit(g, { done_when: v })" />
                 <FormControl v-if="g.carried_from && g.measure_kind === 'Number'" class="max-w-xs" type="number" :label="`Target${g.unit ? ' (' + g.unit + ')' : ''}`" :model-value="g.target"
@@ -74,6 +76,7 @@ import ReviewFooter from '@/components/weekly/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 import { areaOptions, goalOptions, loadLookups } from '@/lib/lookups'
 import { long, short } from '@/lib/dates'
+import { store } from '@/lib/store'
 
 const emit = defineEmits(['go'])
 const r = useReview()

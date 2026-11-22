@@ -316,11 +316,13 @@ def create(title: str, horizon: str | None = None, space: str | None = None, are
 	horizon = horizon or derive_horizon(target_date, cycle, space)
 	if horizon not in HORIZONS:
 		frappe.throw(_("Unknown horizon."))
+	measure_fields = measure_values(measure_kind, done_when, measure, unit, start_value, target_value)
+	readings.require_finish_line({"done_when": done_when, **measure_fields})
 	last = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s", space)[0][0]
 	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": (title or "").strip(), "horizon": horizon, "area": area or None,
 		"serves": serves or None, "done_when": done_when or None, "notes_md": notes_md or None,
 		"target_date": target_date or None, "cycle": cycle if horizon == "12 weeks" else None, "sort_order": last + 1,
-		**measure_values(measure_kind, done_when, measure, unit, start_value, target_value)})
+		**measure_fields})
 	doc.insert()
 	return {"name": doc.name, "title": doc.title}
 
@@ -428,9 +430,10 @@ def get(goal: str):
 		with_progress([serves])
 	g["progress"] = with_progress([frappe._dict(doc.as_dict())])[0]["progress"]
 	g["has_finish_line"] = readings.has_finish_line(doc)
+	cycle = frappe.db.get_value("Life Cycle", doc.cycle, ["name", "title", "status"], as_dict=True) if doc.cycle else None
 	confirmed, suggested = readings.for_goal(doc.name) if doc.measure_kind == "Number" else ([], [])
 	inc = 1 if doc.is_archived else 0
-	return {"goal": g, "space": space, "served_by": served_by, "serves": serves, "readings": confirmed, "suggested": suggested,
+	return {"goal": g, "cycle": cycle, "space": space, "served_by": served_by, "serves": serves, "readings": confirmed, "suggested": suggested,
 		"record_count": archive.goal_record_count(doc.name), "tabs": tab_counts_of(space, doc.name, inc)}
 
 
@@ -495,6 +498,18 @@ def set_status(goal: str, status: str):
 		"archived_records": records}
 
 
+def _apply_values(doc, values, allowed):
+	"""Set the fields a person edits on a goal. Changing the key result applies the rule of a new goal."""
+	for k, v in values.items():
+		if k not in allowed:
+			frappe.throw(_("Field {0} cannot be changed here.").format(k))
+		if k == "horizon" and v not in ("Long term", "Year", "Month", "12 weeks"):
+			frappe.throw(_("Choose Long term, Year, Month or 12 weeks."))
+		doc.set(k, _float(v) if k in ("start_value", "target_value") else (v if v == 0 else v or None))
+	if "measure_kind" not in values and values.get("done_when") and not doc.measure_kind:
+		doc.measure_kind = "Milestone"
+
+
 @frappe.whitelist(methods=["POST"])
 def update(goal: str, values: str | dict):
 	"""Change the fields of a goal a person edits: title, area, serves, done_when, notes_md, target_date, horizon (Long term, Year or Month; a goal joins 12 weeks with
@@ -505,29 +520,92 @@ def update(goal: str, values: str | dict):
 	values = frappe.parse_json(values) or {}
 	if not isinstance(values, dict):
 		frappe.throw(_("values must be an object of fields."))
-	allowed = {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note", "horizon", *MEASURE_FIELDS}
-	for k, v in values.items():
-		if k not in allowed:
-			frappe.throw(_("Field {0} cannot be changed here.").format(k))
-		if k == "horizon" and v not in ("Long term", "Year", "Month"):
-			frappe.throw(_("Choose Long term, Year or Month. A goal joins a 12 Week Year with Add to a 12 Week Year."))
-		doc.set(k, _float(v) if k in ("start_value", "target_value") else (v if v == 0 else v or None))
-	if "measure_kind" not in values and values.get("done_when") and not doc.measure_kind:
-		doc.measure_kind = "Milestone"
+	if values.get("horizon") == "12 weeks":
+		frappe.throw(_("A goal joins a 12 Week Year with Add to a 12 Week Year."))
+	_apply_values(doc, values, {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note", "horizon", *MEASURE_FIELDS})
 	doc.save()
 	return get(doc.name)
+
+
+EDIT_FIELDS = {"title", "area", "serves", "done_when", "target_date", "horizon", "cycle", *MEASURE_FIELDS}
+
+
+@frappe.whitelist(methods=["POST"])
+def edit(goal: str, values: str | dict, actions: str | builtins.list | None = None):
+	"""The Edit form of a goal: title, area, type (`horizon`), cycle, target date, done_when and serves, and for a 12 Week Year goal its
+	weekly actions as a list of {name?, title, per_week, retired?} in the order shown. An action in the list is renamed, retired
+	(status Dropped, its ticks kept) or brought back; a new one is added; one not in the list is left as it is. The change is
+	written to the goal's timeline."""
+	_person_only()
+	doc = permissions.get_doc_checked("Life Goal", goal, "write")
+	values = frappe.parse_json(values) or {}
+	if not isinstance(values, dict):
+		frappe.throw(_("values must be an object of fields."))
+	before = {k: doc.get(k) for k in values}
+	if values.get("cycle"):
+		c = permissions.get_doc_checked("Life Cycle", values["cycle"], "write")
+		if c.space != doc.space:
+			frappe.throw(_("The cycle is in another space."))
+	if values.get("horizon") and values["horizon"] != "12 weeks":
+		values["cycle"] = None
+	_apply_values(doc, values, EDIT_FIELDS)
+	actions = parse(actions)
+	if actions is not None:
+		_set_actions(doc, actions)
+	doc.save()
+	changed = [k for k in values if before.get(k) != doc.get(k)]
+	if "title" in changed:
+		doc.add_comment("Info", _("Edited: renamed from {0} to {1}.").format(before["title"], doc.title))
+	other = [doc.meta.get_label(k) for k in changed if k != "title"]
+	if other or actions is not None:
+		doc.add_comment("Info", _("Edited: {0}.").format(", ".join([*other, *([_("weekly actions")] if actions is not None else [])])))
+	return get(doc.name)
+
+
+def _set_actions(doc, actions):
+	if doc.horizon != "12 weeks" and actions:
+		frappe.throw(_("Weekly actions belong to 12-week goals."))
+	rows = {a.name: a for a in doc.actions}
+	ordered, seen = [], set()
+	for a in actions:
+		title = (a.get("title") or "").strip()
+		if not title:
+			continue
+		per_week = max(1, min(7, int(a.get("per_week") or 1)))
+		row = rows.get(a.get("name"))
+		if row:
+			row.title, row.per_week = title, per_week
+			if a.get("retired"):
+				row.status = "Dropped"
+			elif row.status == "Dropped":
+				row.status = "Open"
+			seen.add(row.name)
+		else:
+			row = {"title": title, "per_week": per_week, "status": "Dropped" if a.get("retired") else "Open"}
+		ordered.append(row)
+	ordered += [r for n, r in rows.items() if n not in seen]  # an action the form did not list stays, after the ones it did
+	doc.set("actions", ordered)
+	for i, row in enumerate(doc.actions, 1):  # a row that was already there keeps its old idx unless it is set
+		row.idx = i
 
 
 # ---- key results (set 7): suggestions, habits, readings ----
 
 @frappe.whitelist(methods=["POST"])
-def suggest_measure(title: str, notes: str | None = None, space: str | None = None):
+def suggest_measure(title: str, notes: str | None = None, space: str | None = None, goal: str | None = None, horizon: str | None = None):
 	"""Propose how a goal will be known to be done: Milestone (a finish line) or Number (measure, unit, target), from its
-	title and notes. The assistant answers within the spend cap; without a key, simple rules do. `habit` is set when the
+	title and notes (and, with `goal`, its area, weekly actions and open tasks). `examples` are two finish lines for its type, for when no one answers. The assistant answers within the spend cap; without a key, simple rules do. `habit` is set when the
 	title reads as a frequency ("daily", "3 times a week"): it is a habit, not a goal."""
 	_person_only()
 	space = permissions.resolve_space(space, write=True)
-	return readings.suggest_measure((title or "").strip()[:300], notes, space)
+	area = actions = tasks = None
+	if goal:  # an existing goal: its area, weekly actions and open tasks tell the skill what it is about
+		doc = permissions.get_doc_checked("Life Goal", goal, "write")
+		space, horizon = doc.space, horizon or doc.horizon
+		area = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
+		actions = [a.title for a in doc.actions if a.status != "Dropped"][:20]
+		tasks = frappe.get_all("Life Task", filters={"goal": doc.name, "status": ("in", ["Open", "Doing", "Waiting"])}, pluck="title", limit=20)
+	return readings.suggest_measure((title or "").strip()[:300], notes, space, area=area, actions=actions, tasks=tasks, horizon=horizon)
 
 
 @frappe.whitelist(methods=["POST"])

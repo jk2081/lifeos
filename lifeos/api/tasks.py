@@ -351,9 +351,11 @@ def keep_standalone(task: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | None = None, title: str | None = None):
+def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | None = None, title: str | None = None, done_when: str | None = None,
+		measure_kind: str | None = None, measure: str | None = None, unit: str | None = None, start_value: float | str | None = None,
+		target_value: float | str | None = None):
 	"""Make it a goal: one Open goal in `area` (named `title`, else by the assistant when a key is set, else from the task
-	titles) and every one of `tasks` put under it. Only open tasks with no goal in this space are taken."""
+	titles) and every one of `tasks` put under it. With the setting "Require Done when on new goals" on, it needs `done_when` or a number. Only open tasks with no goal in this space are taken."""
 	from lifeos import goal_suggest
 	from lifeos.api import goals
 
@@ -369,7 +371,8 @@ def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | 
 		frappe.throw(_("That area is not in this space."))
 	area = area or next((d.area for d in docs if d.area), None)
 	title = (title or "").strip() or goal_suggest.title_for([d.title for d in docs], space)
-	goal = goals.create(title=title, horizon="Long term", space=space, area=area)
+	goal = goals.create(title=title, horizon="Long term", space=space, area=area, done_when=done_when, measure_kind=measure_kind, measure=measure,
+		unit=unit, start_value=start_value, target_value=target_value)
 	for d in docs:
 		d.goal = goal["name"]
 		d.save()

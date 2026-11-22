@@ -27,7 +27,7 @@ import DoneWhen from './DoneWhen.vue'
 import { api, errorText } from '@/lib/api'
 import { store } from '@/lib/store'
 import { areaOptions, goalOptions, loadLookups, lookups } from '@/lib/lookups'
-import { emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
+import { doneWhenRequired, emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
 
 const props = defineProps({ modelValue: Boolean, areaRequired: Boolean, area: { type: String, default: '' }, horizon: { type: String, default: '' } })
 const emit = defineEmits(['update:modelValue', 'saved', 'habit'])
@@ -67,7 +67,7 @@ watch(open, (o) => emit('update:modelValue', o))
 
 async function submit() {
   if (busy.value) return
-  const problem = !v.title.trim() ? 'Name the goal.' : props.areaRequired && !v.area ? 'Choose an area.' : measureProblem(m)
+  const problem = !v.title.trim() ? 'Name the goal.' : props.areaRequired && !v.area ? 'Choose an area.' : measureProblem(m, doneWhenRequired())
   if (problem) return toast.error(problem)
   busy.value = true
   try {

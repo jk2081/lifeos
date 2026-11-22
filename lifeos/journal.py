@@ -467,13 +467,13 @@ def month_goals(space, year, month) -> list[dict]:
 		"tasks_done": counts.get(r.name, (0, 0))[0], "tasks_counted": counts.get(r.name, (0, 0))[1]} for r in rows]
 
 
-def add_month_goal(space, year, month, title, area=None, carried_from=None, serves=None, ignore_permissions=False):
+def add_month_goal(space, year, month, title, area=None, carried_from=None, serves=None, ignore_permissions=False, done_when=None):
 	"""Add a Month goal dated the last day of the month, at the end of the month's order."""
 	first, last = month_bounds(year, month)
 	top = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s and horizon='Month' and target_date between %s and %s",
 		(space, first, last))[0][0]
 	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": title, "horizon": "Month", "target_date": last, "area": area or None,
-		"sort_order": top + 1, "carried_from": carried_from, "serves": serves or None})
+		"sort_order": top + 1, "carried_from": carried_from, "serves": serves or None, "done_when": (done_when or "").strip() or None})
 	doc.insert(ignore_permissions=ignore_permissions)
 	return doc
 

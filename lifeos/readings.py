@@ -43,15 +43,34 @@ def habit_of(*texts):
 	return None
 
 
-def suggest_measure(title, notes=None, space=None):
+EXAMPLES = {
+	"12 weeks": ["The first three customers are using it and I have their feedback in writing.",
+		"The new routine ran every week of the cycle and its results are filed."],
+	"Month": ["The report is sent and the owner has replied.", "Every open item on the list is closed or has a new date."],
+	"Year": ["The plant has run a full season at the new yield and the numbers are in the books.",
+		"The new system is in daily use and the old one is switched off."],
+	"Long term": ["The business runs without me in the weekly meeting.", "The land is planted, watered and producing."],
+}
+
+
+def examples_for(horizon):
+	"""Two finish lines to start from, for a goal's type: what Suggest shows when no assistant answers."""
+	return EXAMPLES.get(horizon) or EXAMPLES["Long term"]
+
+
+def suggest_measure(title, notes=None, space=None, area=None, actions=None, tasks=None, horizon=None):
 	"""The define-goal skill's proposal for a goal's kind and, for a number, its measure, unit and target, from the title and notes
 	(a Milestone with its finish line, or a Number). `habit` is set when the title reads as a frequency. With no key, or when the skill
 	says nothing, `kind` is None and the owner writes it themselves."""
 	from lifeos.skills import call
 
-	out = {"kind": None, "habit": habit_of(title, notes), "by": None, "done_when": None, "measure": None, "unit": None, "target_value": None,
+	out = {"kind": None, "habit": habit_of(title, notes), "by": None, "examples": examples_for(horizon), "done_when": None, "measure": None, "unit": None, "target_value": None,
 		"start_value": None}
-	got = call.ask("define-goal", {"request": "measure", "title": title, "notes": (notes or "")[:2000]}, space=space)
+	# the goal's area, weekly actions and open tasks go in with its notes, which the skill already reads
+	more = [f"Area: {area}"] if area else []
+	more += [f"Weekly actions: {'; '.join(actions)}"] if actions else []
+	more += [f"Open tasks: {'; '.join(tasks)}"] if tasks else []
+	got = call.ask("define-goal", {"request": "measure", "title": title, "notes": "\n".join([notes or "", *more]).strip()[:2000]}, space=space)
 	kind = got.get("kind")
 	if kind not in ("Milestone", "Number"):
 		return out
@@ -101,6 +120,23 @@ def has_finish_line(goal):
 		return bool((goal.get("done_when") or "").strip())
 	# a goal from before set 7 with a "done when" has a finish line
 	return bool((goal.get("done_when") or "").strip())
+
+
+REQUIRED_MESSAGE = "Write what will be true when this goal is done. Stuck? Use Suggest."
+
+
+def done_when_required():
+	"""The setting "Require Done when on new goals": on unless the owner switched it off (a site that never saved it is on)."""
+	# read the stored value itself: a Check that was never saved reads as 0 from the document, but the setting is on until it is switched off
+	rows = frappe.db.sql("select value from `tabSingles` where doctype = 'Life Settings' and field = 'require_done_when'")
+	return not rows or bool(int(rows[0][0] or 0))
+
+
+def require_finish_line(values):
+	"""Refuse a new goal with no finish line and no number with its target while the setting is on. `values` is a dict of the
+	goal's fields (done_when, measure_kind, measure, start_value, target_value). Existing goals are never checked."""
+	if done_when_required() and not has_finish_line(values):
+		frappe.throw(_(REQUIRED_MESSAGE), frappe.ValidationError)
 
 
 def check_goal(doc):

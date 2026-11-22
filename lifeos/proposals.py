@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import get_datetime, getdate, today
 
-from lifeos import gone_names, journal
+from lifeos import gone_names, journal, readings
 from lifeos.life.doctype.life_check_in.life_check_in import parse_range
 
 TITLE_FIELDS = {
@@ -81,7 +81,7 @@ SCHEMA = {
 	# accepted as a Goal with horizon Month, for one release
 	"Month Goal": {
 		"target": "Life Goal", "filed": False,
-		"fields": {"title": F("text", True), "year": F("int", True), "month": F("int", True), "area": ORG["area"]},
+		"fields": {"title": F("text", True), "year": F("int", True), "month": F("int", True), "area": ORG["area"], "done_when": F("text", help="The finish line, in one line.")},
 		"example": {"title": "GHL visit", "year": 2026, "month": 11, "area": "Tea & Coffee"},
 	},
 	"Habit Log": {
@@ -409,6 +409,7 @@ def apply(kind, payload, item) -> tuple:
 		if kind == "Month Goal":
 			first, last = journal.month_bounds(p["year"], p["month"])
 			p = {**p, "horizon": "Month", "target_date": str(last)}
+		readings.require_finish_line({"done_when": p.get("done_when")})  # the setting: accepted into Needs you, but not filed until it has one
 		doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": p["title"], "horizon": p.get("horizon"), "area": p.get("area"),
 			"target_date": p.get("target_date"), "serves": p.get("serves"), "done_when": p.get("done_when")}).insert()
 	elif kind == "Habit Log":

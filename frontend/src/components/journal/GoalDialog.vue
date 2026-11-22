@@ -26,7 +26,7 @@ import { Button, Dialog, FormControl, TextInput, dialog, toast } from 'frappe-ui
 import { api, tryCall } from '@/lib/api'
 import { areaOptions, loadLookups } from '@/lib/lookups'
 import DoneWhen from '@/components/goals/DoneWhen.vue'
-import { emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
+import { doneWhenRequired, emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
 
 const props = defineProps({ modelValue: Boolean, cycle: String, goal: Object })
 const emit = defineEmits(['update:modelValue', 'saved'])
@@ -45,7 +45,7 @@ watch(() => props.modelValue, (v) => {
 watch(open, (v) => emit('update:modelValue', v))
 async function save() {
   // a new goal needs its finish line or number; an older goal without one may be saved as it is (it shows in the weekly review)
-  const problem = measureProblem(m, !props.goal || !!props.goal.measure_kind)
+  const problem = measureProblem(m, (!props.goal && doneWhenRequired()) || !!props.goal?.measure_kind)
   if (problem) return toast.error(problem)
   const measure = m.measure_kind ? measureArgs(m) : {}
   const res = await tryCall(() => api('journal.save_goal', { goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area || '', actions: form.actions,

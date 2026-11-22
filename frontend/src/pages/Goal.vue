@@ -1,8 +1,9 @@
 <template>
   <template v-if="d">
-    <PageHead :title="g.title" :crumb="{ to: '/goals', label: 'Goals', here: d.cycle ? d.cycle.title : g.horizon }" :sub="sub">
+    <PageHead :title="g.title" :crumb="{ to: '/goals', label: 'Goals', here: cyc ? cyc.title : g.horizon }" :sub="sub">
       <Badge :theme="themeOf(g)" :label="g.is_archived ? `${g.status}, archived` : g.status === 'On Hold' ? 'On hold' : g.status" data-goal-status />
-      <Button v-if="d.cycle" label="Open grid" :route="`/goals/cycles?cycle=${d.cycle.name}`" />
+      <Button v-if="cyc" label="Open grid" data-open-grid :route="`/goals/cycles?cycle=${cyc.name}`" />
+      <Button v-if="writable && !g.is_archived" label="Edit" icon-left="lucide-pencil" data-goal-edit @click="editOpen = true" />
       <template v-if="writable && g.horizon !== '12 weeks'">
         <Button v-if="!g.is_archived" label="New note" @click="noteOpen = true" />
         <Button v-if="g.is_archived" variant="solid" label="Restore" data-goal-restore @click="setStatus('Active')" />
@@ -27,7 +28,8 @@
               <DatePicker v-if="g.horizon !== '12 weeks'" v-model="g.target_date" format="D MMM YYYY" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
               <div class="space-y-1.5"><div class="text-sm text-ink-gray-6">Progress</div><div class="flex h-8 items-center gap-2" data-goal-figure>
                 <div class="min-w-0 flex-1"><Progress size="sm" :value="j.tasks_counted ? Math.round((100 * j.tasks_done) / j.tasks_counted) : 0" /></div>
-                <NumLink class="text-sm" :to="{ path: '/goals/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</NumLink></div></div>
+                <NumLink class="text-sm" :to="{ path: '/goals/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</NumLink></div>
+                <div v-if="j.this_week" class="text-sm text-ink-gray-6" data-goal-week-ticks>Actions this week: {{ j.this_week.done }} of {{ j.this_week.planned }} ticks</div></div>
             </div>
             <!-- what this goal serves, and what serves it (a goal can point to the longer goal it serves) -->
             <div class="flex flex-wrap items-center gap-2" data-goal-serves>
@@ -48,12 +50,12 @@
               <div class="w-20 shrink-0 self-center max-md:w-12"><Progress size="sm" :value="Math.round(s.progress.percent || 0)" /></div>
               <Badge :theme="themeOf(s)" :label="s.status" /></Row></Card>
           </section>
-          <section v-if="d.cycle"><SectionHead>Actions</SectionHead>
+          <section v-if="cyc" data-goal-actions><SectionHead>Actions</SectionHead>
             <Card flush><Row v-for="a in j.goal.actions" :key="a.name">
               <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
-                <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
+                <div class="text-sm text-ink-gray-6" data-action-line>{{ a.per_week }} a week<template v-if="j.this_week && a.status === 'Open'"> · {{ a.ticks[j.this_week.week] || 0 }} of {{ a.per_week }} this week</template> · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
               <Badge v-if="a.status !== 'Open'" :theme="a.status === 'Done' ? 'green' : 'gray'" :label="a.status" /></Row>
-              <Empty v-if="!j.goal.actions.length" title="No actions." hint="Edit the goal under Cycle goals on Goals > Cycles to add weekly actions." /></Card>
+              <Empty v-if="!j.goal.actions.length" title="No actions." hint="Use Edit to add the weekly actions." /></Card>
           </section>
           <section v-if="g.result_note"><SectionHead>Result</SectionHead><Card>{{ g.result_note }}</Card></section>
         </div>
@@ -71,7 +73,7 @@
             <Card><MdField :model-value="g.notes_md || ''" :save="saveNotes" :space="d.space" :readonly="!writable" doctype="Life Goal" :docname="g.name" label="Notes on this goal"
               placeholder="Notes on this goal" /></Card>
           </section>
-          <section v-if="d.cycle && j.history?.length"><SectionHead>History across cycles</SectionHead>
+          <section v-if="cyc && j.history?.length"><SectionHead>History across cycles</SectionHead>
             <Card flush><Row v-for="h in j.history" :key="h.name" class="!items-center">
               <div class="min-w-0 flex-1"><RouterLink class="break-words text-base-medium hover:underline focus-visible:focus-ring" :class="h.name === g.name ? 'text-ink-gray-9' : 'text-ink-blue-8'" :to="`/goals/${h.name}`">{{ h.cycle_title }}</RouterLink>
                 <div class="text-sm text-ink-gray-6">{{ h.cycle_status }}{{ h.result_note ? ' · ' + h.result_note : '' }}</div></div>
@@ -93,6 +95,7 @@
       <p class="text-base text-ink-gray-8">The goal and <b class="font-semibold">{{ d.record_count }} record{{ d.record_count === 1 ? '' : 's' }}</b> filed under it (tasks, notes, captures) move to the Archive.
         Nothing is deleted, and you can restore it from the Archive.</p>
     </Dialog>
+    <GoalEditDialog v-if="writable" v-model="editOpen" :goal="g" :weekly-actions="j.goal?.actions || []" :space="d.space" @saved="changed" />
     <NewRecord v-model="noteOpen" title="New note" action="Create note" :fields="[{ name: 'title', label: 'Title', required: true }]" :save="createNote" />
   </template>
   <div v-else-if="missing" class="page-body"><Card><Empty title="This goal was not found." hint="It may belong to another space." /></Card></div>
@@ -120,6 +123,7 @@ import NotesList from '@/components/lists/NotesList.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import GoalMeasure from '@/components/goals/GoalMeasure.vue'
+import GoalEditDialog from '@/components/goals/GoalEditDialog.vue'
 import { api, db, optimistic, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
@@ -139,11 +143,14 @@ const quick = ref('')
 const confirmOpen = ref(false)
 const confirmStatus = ref('Done')
 const noteOpen = ref(false)
+const editOpen = ref(false)
 const g = computed(() => d.value.goal)
+// the goal's cycle: goals.get names it, journal.goal carries its grid row
+const cyc = computed(() => d.value.cycle || j.value?.cycle || null)
 const writable = computed(() => store.spaces.find((s) => s.name === d.value?.space)?.access === 'Write' && !store.isAgent)
 const arch = computed(() => (g.value.is_archived ? { archived: '1' } : {}))
 const themeOf = (x) => (x.is_archived ? 'gray' : { Active: 'green', 'On Hold': 'amber', Done: 'blue', Someday: 'gray' }[x.status] || 'gray')
-const sub = computed(() => [g.value.area_name, g.value.horizon + ' goal', g.value.target_date && 'by ' + short(g.value.target_date, true),
+const sub = computed(() => [g.value.area_name, g.value.horizon === '12 weeks' ? '12 Week Year goal' : g.value.horizon + ' goal', g.value.target_date && 'by ' + short(g.value.target_date, true),
   g.value.serves_title && 'serves ' + g.value.serves_title, d.value.served_by.length && `served by ${d.value.served_by.length}`].filter(Boolean).join(' · '))
 // a goal can serve any other goal in progress of the space, never itself
 const servesOptions = computed(() => [{ label: 'None', value: '' },

@@ -16,6 +16,7 @@
   "own_domains",
   "month_plan_enabled",
   "planning_period",
+  "require_done_when",
   "cycle_break_week",
   "archive_after_days",
   "stale_task_days",
@@ -117,6 +118,13 @@
    "label": "Plan in 12 Week Years or quarters",
    "options": "12 Week Years\nQuarters",
    "description": "A 12-week goal follows your 12 Week Year cycle, or the calendar quarter."
+  },
+  {
+   "default": "1",
+   "fieldname": "require_done_when",
+   "fieldtype": "Check",
+   "label": "Require \"Done when\" on new goals",
+   "description": "A new goal needs a finish line or a number with its target."
   },
   {
    "default": "1",

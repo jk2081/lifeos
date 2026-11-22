@@ -3,13 +3,18 @@ import { toast } from 'frappe-ui'
 import { api } from './api'
 import { store } from './store'
 
+// The line the server gives when the setting "Require Done when on new goals" refuses a goal
+export const REQUIRED = 'Write what will be true when this goal is done. Stuck? Use Suggest.'
+// whether a new goal must have a finish line: the setting, on unless the owner switched it off
+export const doneWhenRequired = () => store.settings.require_done_when !== 0 && store.settings.require_done_when !== false
+
 export const emptyMeasure = (g = {}) => ({ measure_kind: g.measure_kind || '', done_when: g.done_when || '', measure: g.measure || '', unit: g.unit || '',
   start_value: g.start_value ?? '', target_value: g.target_value ?? '' })
 
 // What is missing before a goal with this measure can be saved; '' when it is complete. A goal with no kind yet is refused
 // only when `required` (a new goal, or an edit of its kind or measure).
 export function measureProblem(m, required = true) {
-  if (!m.measure_kind) return required ? 'Say how you will know this goal is done: a finish line or a number.' : ''
+  if (!m.measure_kind) return required ? REQUIRED : ''
   if (m.measure_kind === 'Milestone' && !(m.done_when || '').trim()) return 'Write the finish line.'
   if (m.measure_kind === 'Number') {
     if (!(m.measure || '').trim()) return 'Say what is measured.'

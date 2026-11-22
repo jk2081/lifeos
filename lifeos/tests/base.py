@@ -34,6 +34,7 @@ class LifeTestCase(IntegrationTestCase):
 	@classmethod
 	def tearDownClass(cls):
 		frappe.set_user("Administrator")
+		frappe.db.set_single_value("Life Settings", "require_done_when", 1)  # the default again, as the tests commit
 		for name in (PRIVATE, SHARED, "Anya's space"):
 			devtools.purge_space(name, drop=True)
 		frappe.db.commit()
@@ -43,6 +44,9 @@ class LifeTestCase(IntegrationTestCase):
 	def setUp(self):
 		permissions.clear_cache()
 		frappe.set_user(OWNER)
+		# issue 56: new goals need a finish line by default; the tests that make goals through the API without one
+		# predate that, and test_issue56_goal_edit switches the setting back on
+		frappe.db.set_single_value("Life Settings", "require_done_when", 0)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")

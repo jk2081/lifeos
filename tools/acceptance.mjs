@@ -244,6 +244,8 @@ bench(`from frappe.installer import update_site_config
 update_site_config("lifeos_fake_ai", 1)
 s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()
 frappe.db.delete("Life Insight"); frappe.db.delete("Life AI Usage")
+# issue 56: new goals need a "Done when" by default; the older checks make goals without one, so it is off for them and I56 switches it on
+frappe.db.set_single_value("Life Settings", "require_done_when", 0)
 for sp in frappe.get_all("Life Space", pluck="name"): frappe.db.set_value("Life Space", sp, {"ask_enabled": 1, "ask_can_read_vault": 0})`)
 // Earlier runs leave their records on the test site. Today lists only the 20 documents that expire soonest, so the vault
 // documents of earlier runs are archived first; otherwise this run's document would not be among them.
@@ -5159,6 +5161,11 @@ print(json.dumps(out))`).split('\n').pop())
       must((await group.locator('[data-suggestion]').innerText()).includes('look like a goal'), 'the suggestion does not say it looks like a goal')
       const before = JSON.parse(bench(`import json\nprint(json.dumps(frappe.db.count("Life Goal", {"space": "${SPACE}"})))`).split('\n').pop())
       await group.locator('[data-make-goal]').click()
+      // issue 56: it asks for the goal's name and its "Done when" first
+      const ask = pg.locator('[data-make-goal-dialog], [role="dialog"]').last()
+      await ask.locator('[data-measure-kind]').getByText('A finish line').click()
+      await ask.locator('[data-measure-done-when] textarea, textarea[data-measure-done-when]').first().fill('The Quillfeather work is finished')
+      await ask.getByRole('button', { name: 'Make goal' }).click()
       await pg.waitForFunction((n) => !document.querySelector(`[data-no-goal-row][data-task="${n}"]`), ids.q0, { timeout: 8000 })
       const res = JSON.parse(bench(`import json
 goals = frappe.get_all("Life Goal", filters={"space": "${SPACE}", "title": ["like", "%Quillfeather%"]}, fields=["name", "area"])
@@ -7470,6 +7477,206 @@ print(json.dumps(rows))`).split('\n').pop())
   }
 }
 
+// Issue 56: edit a goal where you see it, "Done when" required on new goals (a setting, on by default), and a cycle goal's actions on its page.
+// A user made for the run has a space of their own and a cycle of two goals ("I56 ..." titles). I56.6, I56.7 and I56.10 are unit tests (test_issue56_goal_edit).
+for (const width of SET_WIDTHS) {
+  const tag = `I56.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const user = `i56-${width}-${stamp}@lifeos.test`.toLowerCase()
+  const space = `I56 ${width} ${stamp}`
+  const restore = () => bench(`frappe.set_user("Administrator")
+frappe.db.set_single_value("Life Settings", "require_done_when", 0)
+s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()
+for dt in ("Life Note", "Life Task", "Life Goal", "Life Cycle", "Life Action Log"):
+    for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+from lifeos import devtools
+devtools.purge_space("${space}", drop=True)
+frappe.db.delete("DefaultValue", {"parent": "${user}"})
+if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  let one = null
+  try {
+    bench(`from lifeos import devtools
+devtools.make_user("${user}", "Newcomer56", ["Life Admin", "Life User"])
+frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
+frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
+frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user": "${user}", "members": [{"user": "${user}", "access": "Write"}]}).insert(ignore_permissions=True)`)
+    one = await session(user, width)
+    const pg = one.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    const settle = () => pg.waitForTimeout(450)
+    const inField = (root, attr) => root.locator(`[${attr}] input, input[${attr}], [${attr}] textarea, textarea[${attr}]`).first()
+    await one.api('onboarding.complete', { status: 'skipped' })
+    bench('frappe.db.set_single_value("Life Settings", "require_done_when", 1)')
+    const made = JSON.parse(bench(`import json
+from frappe.utils import add_days, today
+space = "${space}"
+areas = frappe.get_all("Life Area", filters={"space": space, "is_life_area": 1, "is_on": 1}, fields=["name", "area_name"])
+career = next(a for a in areas if a.area_name == "Career")
+part = frappe.get_all("Life Area", filters={"space": space, "parent_area": career.name}, fields=["name", "area_name"], limit=1)
+part = part[0] if part else frappe.get_doc({"doctype": "Life Area", "space": space, "area_name": "I56 part ${width}", "parent_area": career.name}).insert(ignore_permissions=True)
+cycle = frappe.get_doc({"doctype": "Life Cycle", "space": space, "title": "I56 cycle ${width}", "start_date": add_days(today(), -3), "status": "Active"}).insert(ignore_permissions=True)
+g = frappe.get_doc({"doctype": "Life Goal", "space": space, "cycle": cycle.name, "title": "I56 RMT ${width}", "area": areas[0].name, "done_when": "The systems run on their own",
+  "actions": [{"title": "I56 audit ${width}", "per_week": 2}, {"title": "I56 newsletter ${width}", "per_week": 1}]}).insert(ignore_permissions=True)
+old = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": "I56 old ${width}", "horizon": "Long term", "area": career.name}).insert(ignore_permissions=True)
+t = frappe.get_doc({"doctype": "Life Task", "space": space, "title": "I56 task ${width}", "goal": g.name, "area": areas[0].name}).insert(ignore_permissions=True)
+n = frappe.get_doc({"doctype": "Life Note", "space": space, "title": "I56 note ${width}", "goal": g.name, "area": areas[0].name, "content_md": "x"}).insert(ignore_permissions=True)
+print(json.dumps({"cycle": cycle.name, "goal": g.name, "old": old.name, "career": career.name, "part": part.name, "actions": [a.name for a in g.actions], "task": t.name, "note": n.name}))`).split('\n').pop())
+    const goalPage = async (name) => { await one.open(`/life/goals/${name}`); await pg.locator('[data-goal-overview]').waitFor({ timeout: 10000 }); await settle() }
+    const dialog = () => pg.locator('[role="dialog"]').last()
+    const openEdit = async () => { await pg.locator('[data-goal-edit]').click(); await dialog().waitFor({ timeout: 8000 }); await settle() }
+    const save = async () => { await dialog().getByRole('button', { name: 'Save goal' }).click(); await dialog().waitFor({ state: 'detached', timeout: 8000 }); await settle() }
+
+    await check(`${tag}.4`, `${width} px: the page of a 12 Week Year goal shows the cycle's name, Open grid and its actions with this week's ticks`, async () => {
+      await goalPage(made.goal)
+      must((await pg.locator('main, [data-main]').first().innerText()).includes(`I56 cycle ${width}`), 'the cycle name is not in the header')
+      const grid = pg.locator('[data-open-grid]')
+      must(await grid.count() === 1, 'Open grid is missing')
+      must((await grid.getAttribute('href') || '').includes(`/goals/cycles?cycle=${made.cycle}`), 'Open grid goes elsewhere')
+      const rows = pg.locator('[data-goal-actions] [data-action-line]')
+      must(await rows.count() === 2, 'the Actions section does not list both actions')
+      must(/0 of 2 this week/.test(await rows.first().innerText()), 'the first action has no ticks this week: ' + await rows.first().innerText())
+      await noSideways()
+    })
+
+    await check(`${tag}.5`, `${width} px: progress on a 12 Week Year goal shows this week's ticks and the tasks done`, async () => {
+      bench(`from lifeos import journal
+journal.set_tick("${made.actions[0]}", journal.current_week(frappe.get_doc("Life Cycle", "${made.cycle}")), 1)`)
+      await goalPage(made.goal)
+      const line = await pg.locator('[data-goal-week-ticks]').innerText()
+      must(/Actions this week: 1 of 3 ticks/.test(line), 'the ticks line says: ' + line)
+      must(/0 of 1 tasks done/.test(await pg.locator('[data-goal-figure]').innerText()), 'the tasks line is missing: ' + await pg.locator('[data-goal-figure]').innerText())
+    })
+
+    await check(`${tag}.1`, `${width} px: Edit renames the goal; its task, note and cycle still show it under the new name`, async () => {
+      await goalPage(made.goal)
+      await openEdit()
+      await inField(dialog(), 'data-edit-title').fill(`I56 RMT systems ${width}`)
+      await save()
+      must((await pg.locator('main, [data-main]').first().innerText()).includes(`I56 RMT systems ${width}`), 'the page does not show the new name')
+      const rows = JSON.parse(bench(`import json
+print(json.dumps([frappe.db.get_value("Life Task", "${made.task}", "goal"), frappe.db.get_value("Life Note", "${made.note}", "goal"), frappe.db.get_value("Life Goal", "${made.goal}", ["cycle", "title"])]))`).split('\n').pop())
+      must(rows[0] === made.goal && rows[1] === made.goal && rows[2][0] === made.cycle && rows[2][1] === `I56 RMT systems ${width}`, 'a link moved: ' + JSON.stringify(rows))
+      await one.open('/life/goals/tasks?goal=' + made.goal + '&status=all&view=list')
+      await pg.waitForTimeout(800)
+      must((await pg.locator('main, [data-main]').first().innerText()).includes(`I56 task ${width}`), 'the task is not under the goal')
+      await one.open(`/life/goals/cycles?cycle=${made.cycle}`)
+      await pg.locator('[data-cycle-goal-list]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-cycle-goal-list]').innerText()).includes(`I56 RMT systems ${width}`), 'the cycle does not show the new name')
+    })
+
+    await check(`${tag}.2`, `${width} px: Edit changes the goal's area to a part of Career; Goals > By area shows it there`, async () => {
+      await goalPage(made.old)
+      await openEdit()
+      await dialog().locator('[data-edit-area] [role="combobox"], [data-edit-area] button, [role="combobox"][data-edit-area]').first().click()
+      await pg.getByRole('option', { name: new RegExp(`I56 part ${width}`) }).first().click()
+      await settle()
+      await save()
+      await one.open('/life/goals?show=open')
+      await pg.locator('[data-goal-card]').first().waitFor({ timeout: 10000 })
+      const card = pg.locator(`[data-goal="${made.old}"]`)
+      must(await card.count() === 1, 'the goal is not on By area')
+      must(Boolean(await card.getAttribute('data-part-name')), 'the card is not under a part')
+      must(await card.getAttribute('data-area-name') === 'Career', 'the card is not in Career: ' + await card.getAttribute('data-area-name'))
+    })
+
+    await check(`${tag}.3`, `${width} px: Edit adds a weekly action and retires another; the cycle grid and Goals > Cycles show the same`, async () => {
+      await goalPage(made.goal)
+      await openEdit()
+      await dialog().locator('[data-edit-add-action]').click()
+      const added = dialog().locator('[data-edit-action]').last()
+      await added.locator('input').first().fill(`I56 training ${width}`)
+      await dialog().locator('[data-edit-action]').first().locator('[data-edit-retire]').click()
+      await save()
+      const text = await pg.locator('[data-goal-actions]').innerText()
+      must(text.includes(`I56 training ${width}`), 'the new action is not on the goal page')
+      await one.open(`/life/goals/cycles?cycle=${made.cycle}`)
+      await pg.locator('[data-cycle-goal-list]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-lead-action]').first().innerText()).includes(`I56 newsletter ${width}`), 'Cycles does not lead with the next open action')
+      await pg.locator('[data-cycle-goals]').click()
+      const body = pg.locator('[data-cycle-goals-body]')
+      await body.waitFor({ timeout: 8000 })
+      const bodyText = await body.innerText()
+      must(bodyText.includes(`I56 training ${width}`) && bodyText.includes(`I56 audit ${width}`), 'the cycle goals list differs: ' + bodyText.slice(0, 300))
+      must(await body.locator('li.line-through', { hasText: `I56 audit ${width}` }).count() === 1, 'the retired action is not struck through')
+    })
+
+    await check(`${tag}.12`, `${width} px: the Edit form works one field after another, actions included, with no sideways scroll`, async () => {
+      await goalPage(made.goal)
+      await openEdit()
+      const box = await dialog().boundingBox()
+      must(box.x >= -1 && box.x + box.width <= width + 1, 'the dialog is wider than the screen')
+      const fields = ['data-edit-title', 'data-edit-area', 'data-edit-type', 'data-edit-cycle', 'data-edit-serves', 'data-edit-actions']
+      let last = -1
+      for (const f of fields) {
+        const at = await dialog().locator(`[${f}]`).first().boundingBox()
+        must(at, f + ' is not in the form')
+        if (phone) must(at.y > last, f + ' is not below the one before it')
+        last = at.y
+      }
+      await dialog().locator('[data-edit-action]').last().scrollIntoViewIfNeeded()
+      must(await dialog().locator('[data-edit-add-action]').isVisible(), 'Add action is out of reach')
+      await noSideways()
+      await dialog().getByRole('button', { name: 'Cancel' }).click()
+    })
+
+    await check(`${tag}.9`, `${width} px: an existing goal without Done when shows "Done when is missing" with Add, and By area marks it`, async () => {
+      await goalPage(made.old)
+      const alert = pg.locator('[data-needs-finish-line]')
+      must((await alert.innerText()).includes('Done when is missing'), 'the page does not say it')
+      await pg.locator('[data-done-when-add]').click()
+      await pg.locator('[data-measure-save]').waitFor({ timeout: 5000 })
+      await one.open('/life/goals?show=open')
+      await pg.locator('[data-goal-card]').first().waitFor({ timeout: 10000 })
+      const line = pg.locator(`[data-goal="${made.old}"] [data-goal-done-when]`)
+      must((await line.innerText()).includes('Done when is missing'), 'By area does not mark it')
+    })
+
+    await check(`${tag}.11`, `${width} px: Suggest with the assistant faked fills a finish line from the goal's title; with no key it shows two examples`, async () => {
+      await goalPage(made.old)
+      await pg.locator('[data-done-when-add]').click()
+      await pg.locator('[data-measure-suggest]').click()
+      await pg.locator('[data-measure-done-when]').waitFor({ timeout: 8000 })
+      must((await inField(pg, 'data-measure-done-when').inputValue()).includes(`I56 old ${width}`), 'the finish line did not come from the title')
+      bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = None; s.save()')
+      try {
+        await goalPage(made.old)
+        await pg.locator('[data-done-when-add]').click()
+        await pg.locator('[data-measure-suggest]').click()
+        await pg.locator('[data-measure-examples]').waitFor({ timeout: 8000 })
+        must(await pg.locator('[data-measure-example]').count() === 2, 'there are not two examples')
+        await pg.locator('[data-measure-example]').first().click()
+        must((await inField(pg, 'data-measure-done-when').inputValue()).length > 10, 'tapping an example did not fill the finish line')
+      } finally {
+        bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()')
+      }
+    })
+
+    await check(`${tag}.8`, `${width} px: the setting is on on a new site and can be switched off in Settings`, async () => {
+      // a site that never saved the setting has the default: on
+      bench('frappe.db.delete("Singles", {"doctype": "Life Settings", "field": "require_done_when"})\nfrappe.clear_cache()')
+      must((await one.api('session.boot')).settings.require_done_when === 1, 'the setting is not on by default')
+      await one.open('/life/settings?tab=rhythms')
+      const row = pg.locator('[data-setting="require_done_when"]')
+      await row.waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-settings-goals]').innerText()).includes('Done when'), 'the Goals section is missing')
+      await row.getByText('Off', { exact: true }).click()
+      await pg.waitForTimeout(900)
+      must(bench('print(frappe.db.get_single_value("Life Settings", "require_done_when"))').split('\n').pop() === '0', 'Off did not save')
+      await row.getByText('On', { exact: true }).click()
+      await pg.waitForTimeout(900)
+      must(bench('print(frappe.db.get_single_value("Life Settings", "require_done_when"))').split('\n').pop() === '1', 'On did not save')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    if (one) await one.ctx.close()
+    restore()
+  }
+}
+
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {
   const code = 'from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))'
@@ -7500,3 +7707,4 @@ await browser.close()
 const failed = results.filter((r) => !r[1])
 console.log(`\n${results.length - failed.length} of ${results.length} acceptance items pass.`)
 process.exit(failed.length ? 1 : 0)
+

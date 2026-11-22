@@ -55,7 +55,7 @@
               <RouterLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`/goals/${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
               <div class="min-w-0">
                 <div class="break-words text-base-medium text-ink-gray-9" data-goal-title>{{ goal.title }}</div>
-                <div class="text-sm text-ink-gray-6" data-goal-done-when>{{ doneWhen(goal) }}</div>
+                <div class="text-sm" :class="goal.done_when_line ? 'text-ink-gray-6' : 'text-ink-amber-9'" data-goal-done-when :data-missing="goal.done_when_line ? 0 : 1">{{ doneWhen(goal) }}</div>
                 <div v-if="goal.serves_title" class="truncate text-sm text-ink-gray-6" data-goal-serves>Serves {{ goal.serves_title }}</div>
               </div>
               <div class="flex min-w-0 flex-col gap-1" data-goal-progress>
@@ -138,7 +138,7 @@ const sub = computed(() => {
 })
 
 const areaLine = (s) => [`${s.count} goal${s.count === 1 ? '' : 's'}`, ...(s.count ? s.groups.filter((g) => g.area).map((g) => g.area.area_name) : [])].join(' · ')
-const doneWhen = (g) => (g.done_when_line ? (g.measure_kind === 'Number' ? `Done when: ${g.measure ? g.measure + ' ' : ''}${g.done_when_line}` : `Done when: ${g.done_when_line}`) : 'No finish line yet')
+const doneWhen = (g) => (g.done_when_line ? (g.measure_kind === 'Number' ? `Done when: ${g.measure ? g.measure + ' ' : ''}${g.done_when_line}` : `Done when: ${g.done_when_line}`) : 'Done when is missing')
 function nextWhen(n) {
   if (n.scheduled_at) return `${weekday(n.scheduled_at, 3)} ${time(n.scheduled_at)}`
   return n.due_date ? short(n.due_date) : ''
