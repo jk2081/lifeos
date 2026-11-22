@@ -18,7 +18,8 @@
       </template>
       <div v-else-if="g.measure_kind === 'Milestone' || g.done_when" class="text-base text-ink-gray-8" data-goal-finish-line>
         <span class="text-sm text-ink-gray-6">Done when </span>{{ g.done_when }}</div>
-      <Alert v-else theme="amber" title="Needs a finish line" description="Say how you will know this goal is done: a finish line or a number." data-needs-finish-line />
+      <Alert v-else theme="amber" title="Done when is missing" description="Say how you will know this goal is done: a finish line or a number." data-needs-finish-line>
+        <template v-if="writable" #actions><Button label="Add" data-done-when-add @click="startEdit" /></template></Alert>
       <Button v-if="writable" class="self-start" size="sm" variant="ghost" icon-left="lucide-pencil" :label="g.measure_kind || g.done_when ? 'Change how it is measured' : 'Set the finish line'"
         data-measure-edit @click="startEdit" />
     </template>
@@ -57,7 +58,7 @@ function startEdit() {
   editing.value = true
 }
 async function save() {
-  const problem = measureProblem(m)
+  const problem = measureProblem(m, true)
   if (problem) return toast.error(problem)
   const a = measureArgs(m)
   const values = { measure_kind: a.measure_kind, done_when: a.done_when ?? props.g.done_when ?? null }

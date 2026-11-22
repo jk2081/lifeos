@@ -2,7 +2,7 @@
 
 A count is {"n", "to": {"path", "query"}, "label"}. `n` is worked out by calling the same list method, with the same
 arguments, that the screen at `to` calls for that query, so the number and the rows cannot disagree. Tasks, the most
-counted, use `tasks.total`, which builds the same WHERE as `tasks.list` without fetching rows. Today's Open band,
+counted, use `tasks.total`, which builds the same WHERE as `tasks.list` without fetching rows. The numbers of Goals, the Library, Brain > Activity,
 Reset, Someday and the sidebar take every number from here; Ask's `counts` tool does too.
 """
 import json
@@ -213,6 +213,32 @@ def open_band(space, area=None):
 	}
 
 
+# Issue 55: Today no longer shows the Open band. Each of its numbers is shown where it counts, from the same helpers.
+
+def task_numbers(space, area=None):
+	"""Goals > All tasks: the open tasks and those untouched for the stuck-after days."""
+	return {"open_tasks": open_tasks(space, area), "stuck": stuck_tasks(space, area), "rules": rules()}
+
+
+def goal_numbers(space, area=None):
+	"""Goals > By area: goals in progress and open-ended goals, with the idle ones."""
+	no_ticks, no_tasks = goal_sets(space, area)
+	return {"open_goals": active_open_goals(space, area), "idle_goals": idle_open_goals(space, area), "goals": goals_in_progress(space, area),
+		"goals_no_ticks": goals(space, area, "with no ticks for 3 weeks", no_ticks), "goals_no_tasks": goals(space, area, "with no tasks", no_tasks), "rules": rules()}
+
+
+def library_numbers(space, area=None):
+	"""The Library: notes and sources, and notes not opened in 90 days."""
+	return {"notes_sources": notes_and_sources(space, area), "notes_unopened": notes_unopened(space, area)}
+
+
+def week_numbers(space, area=None):
+	"""Brain > Activity: this week's in and out."""
+	from lifeos.api import outbox
+
+	return outbox.week_line(space, area)
+
+
 def sidebar(space, area=None):
 	r = rules()
 	stuck = stuck_tasks(space, area)
@@ -277,12 +303,13 @@ def _chats(space, area, lo, hi):
 
 
 def get(space=None, which="open_band", area=None):
-	"""The counts of one screen: open_band (Today), sidebar, inventory (Reset)."""
+	"""The counts of one screen: tasks and goals (Goals), library, week (Brain > Activity), sidebar, inventory (Reset), and open_band (all of the old Open band, kept for Ask)."""
 	from lifeos import permissions
 
 	space = permissions.resolve_space(space)
 	area = lens_area(area)
-	fn = {"open_band": open_band, "sidebar": sidebar, "inventory": inventory}.get(which)
+	fn = {"open_band": open_band, "sidebar": sidebar, "inventory": inventory, "tasks": task_numbers, "goals": goal_numbers,
+		"library": library_numbers, "week": week_numbers}.get(which)
 	if not fn:
 		frappe.throw(frappe._("Unknown set of counts."))
 	return fn(space, area)

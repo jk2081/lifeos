@@ -55,7 +55,17 @@ async function loadCount() {
 watch(() => store.space, loadCount)
 onMounted(loadCount)
 onRecordChanged(loadCount)
-const tabs = computed(() => GOALS_TABS.map((t) => (t.value === 'no-goal' && noGoalCount.value !== null ? { ...t, count: noGoalCount.value, noun: 'tasks without a goal' } : t)))
+// the number on the All tasks tab: the old Open band's "Open tasks" (issue 55)
+const openCount = ref(null)
+async function loadOpen() {
+  const res = await tryCall(() => api('counts.get', { space: store.space, which: 'tasks', area: store.lensArea || undefined }))
+  if (res) openCount.value = res.open_tasks.n
+}
+watch(() => [store.space, store.lensArea], loadOpen)
+onMounted(loadOpen)
+onRecordChanged(loadOpen)
+const tabs = computed(() => GOALS_TABS.map((t) => (t.value === 'no-goal' && noGoalCount.value !== null ? { ...t, count: noGoalCount.value, noun: 'tasks without a goal' }
+  : t.value === 'tasks' && openCount.value !== null ? { ...t, count: openCount.value, noun: 'open tasks' } : t)))
 provide('placeTabs', computed(() => ({ tabs: withPage(tabs.value, current.value, PAGES), current: current.value, label: 'Goals',
   set: (v) => router.push(goalsPath(v)) })))
 </script>

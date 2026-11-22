@@ -14,7 +14,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, now_datetime, today
 
-from lifeos import journal
+from lifeos import journal, readings
 from lifeos.review.record import MONTHS, Review, span_text
 
 MONTHLY, CYCLE, WEEKLY = "Monthly", "12 Weeks", "Weekly"
@@ -297,7 +297,7 @@ class Periodic(Review):
 	# ---- tab 3: the plan ----
 
 	def plan_state(self):
-		return self.state.setdefault("plan", {"extra": [], "habits": None, "edits": {}, "confirmed": False})
+		return self.state.setdefault("plan", {"extra": [], "habits": None, "edits": {}, "confirmed": False, "maintain": []})
 
 	def carried(self):
 		"""The goals carried on, in their current order."""
@@ -312,7 +312,8 @@ class Periodic(Review):
 		st = self.plan_state()
 		goals = [{"id": g["name"], "title": g["title"], "area": g.get("area"), "serves": frappe.db.get_value("Life Goal", g["name"], "serves"),
 			"carried_from": g["name"]} for g in self.carried()]
-		goals += [{"id": x["id"], "title": x["title"], "area": x.get("area"), "serves": x.get("serves"), "carried_from": None} for x in st["extra"]]
+		goals += [{"id": x["id"], "title": x["title"], "area": x.get("area"), "serves": x.get("serves"), "carried_from": None,
+			"done_when": x.get("done_when") or ""} for x in st["extra"]]
 		habits = st["habits"]
 		if habits is None:  # next month starts from this month's habits, the ones still tracked at its end
 			habits = [{"habit": h["habit"], "days_per_week": h["days_per_week"]} for h in journal.habits_month(self.doc.space, y, m)["habits"] if not h["removed"]]
@@ -342,6 +343,8 @@ class Periodic(Review):
 				out.append("Every goal needs a title")
 			elif not g.get("area"):
 				out.append(f"{g['title']}: choose an area")
+			elif not g["carried_from"] and readings.done_when_required() and not (g.get("done_when") or "").strip():
+				out.append(f"{g['title']}: say when it is done")
 		return out
 
 	def plan_cycle(self):
@@ -368,8 +371,12 @@ class Periodic(Review):
 		settings = frappe.get_cached_doc("Life Settings")
 		days = {"start": str(start), "end": str(end), "title": journal.cycle_title(start),
 			"break_week": [str(add_days(getdate(cyc.end_date), 1)), str(add_days(start, -1))] if settings.cycle_break_week and add_days(start, -1) > add_days(getdate(cyc.end_date), 1) else None}
+		from lifeos.api import focus  # issue 57: each active focus with no goal in the next cycle gets one question
+
+		maintain = set(st.get("maintain") or [])
+		asked = [f for f in focus.focuses_without_goal(self.doc.space, {g["area"] for g in goals}) if f.name not in maintain]
 		return {"dates": days, "goals": goals, "confirmed": bool(st.get("confirmed")), "problems": self.cycle_plan_problems(goals),
-			"serves_options": self.serves_options()}
+			"serves_options": self.serves_options(), "focuses": asked, "maintained": sorted(maintain)}
 
 	def cycle_plan_problems(self, goals):
 		out = []
@@ -384,8 +391,10 @@ class Periodic(Review):
 				out.append(f"{g['title']}: add a lead action")
 		return out
 
-	def plan_save(self, extra=None, habits=None, edits=None, confirm=False):
+	def plan_save(self, extra=None, habits=None, edits=None, confirm=False, maintain=None):
 		st = self.plan_state()
+		if maintain is not None:
+			st["maintain"] = [m for m in maintain if isinstance(m, str)][:200]
 		if extra is not None:
 			clean = []
 			for x in extra:
@@ -393,8 +402,8 @@ class Periodic(Review):
 					continue
 				row = {"id": x.get("id") or uuid.uuid4().hex[:10], "title": (x.get("title") or "").strip()[:140], "area": x.get("area") or None,
 					"serves": x.get("serves") or None}
+				row["done_when"] = (x.get("done_when") or "").strip()[:500]
 				if self.kind == CYCLE:
-					row["done_when"] = (x.get("done_when") or "").strip()[:500]
 					row["actions"] = _clean_actions(x.get("actions"))
 				clean.append(row)
 			st["extra"] = clean
@@ -419,7 +428,7 @@ class Periodic(Review):
 					cur["target"] = None if e["target"] in (None, "") else flt(e["target"])
 		if confirm:
 			st["confirmed"] = True
-		elif extra is not None or habits is not None or edits is not None:
+		elif extra is not None or habits is not None or edits is not None or maintain is not None:
 			st["confirmed"] = False
 
 	# ---- tab states ----
@@ -527,7 +536,7 @@ def lock_month(rv):
 			old.save()
 			frappe.db.sql("update `tabLife Task` set goal=%s where goal=%s and status in ('Open', 'Doing', 'Waiting')", (new.name, old.name))
 		else:
-			new = journal.add_month_goal(space, ny, nm, g["title"], g["area"], serves=g.get("serves"))
+			new = journal.add_month_goal(space, ny, nm, g["title"], g["area"], serves=g.get("serves"), done_when=g.get("done_when"))
 		made.append({"goal": new.name, "title": new.title, "carried": bool(g["carried_from"])})
 	if plan["habits"]:
 		journal.set_month_habits(space, ny, nm, [{"habit": h["habit"], "days_per_week": h["days_per_week"]} for h in plan["habits"]])

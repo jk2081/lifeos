@@ -2,7 +2,8 @@
   <template v-if="d">
     <div class="flex flex-wrap items-center gap-2"><Badge :theme="info?.goal.on_hold && d.goal.outcome === 'In Progress' ? 'amber' : d.goal.outcome === 'In Progress' ? 'blue' : 'gray'"
       :label="info?.goal.on_hold && d.goal.outcome === 'In Progress' ? 'On hold' : d.goal.outcome" />
-      <span class="text-sm text-ink-gray-6">{{ headline }}</span></div>
+      <span class="text-sm text-ink-gray-6">{{ headline }}</span>
+      <Button v-if="writable && info && !info.goal.is_archived" class="ml-auto" size="sm" icon-left="lucide-pencil" label="Edit" data-pane-goal-edit @click="editOpen = true" /></div>
     <!-- what this goal serves and what serves it (UX fixes, set 6) -->
     <div v-if="info" class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6" data-pane-serves>
       <span>Serves</span>
@@ -60,6 +61,7 @@
     </section>
     <Backlinks v-if="on('links')" tab doctype="Life Goal" :name="d.goal.name" :items="links" />
 
+    <GoalEditDialog v-if="info && writable" v-model="editOpen" :goal="info.goal" :weekly-actions="d.goal.actions || []" :space="info.space" @saved="async () => { await load(); emit('changed') }" />
     <Dialog v-model:open="closeOpen" title="Close goal" size="sm" :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Close goal', variant: 'solid', onClick: closeGoal }]">
       <div class="flex flex-col gap-3">
         <Select v-model="outcome" :options="OUTCOMES" aria-label="Outcome" data-goal-outcome />
@@ -85,6 +87,7 @@ import Empty from '../Empty.vue'
 import Backlinks from '../Backlinks.vue'
 import Pick from '../Pick.vue'
 import GoalMeasure from '../goals/GoalMeasure.vue'
+import GoalEditDialog from '../goals/GoalEditDialog.vue'
 import { api, tryCall } from '@/lib/api'
 import { loadBacklinks } from '@/lib/links'
 import { canWrite, store } from '@/lib/store'
@@ -103,6 +106,7 @@ const info = ref(null) // goals.get: serves, served by, on hold, done when
 const links = ref([])
 const quick = ref('')
 const closeOpen = ref(false)
+const editOpen = ref(false)
 const moveOpen = ref(false)
 const outcome = ref('Achieved')
 const note = ref('')

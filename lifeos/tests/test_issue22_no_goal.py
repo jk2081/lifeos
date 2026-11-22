@@ -59,7 +59,7 @@ class TestNoGoal(LifeTestCase):
 		other = self.make("Life Task", title="i22 other", area=self.career).name
 		out = tasks.make_goal(ts, space=PRIVATE, area=self.career)
 		goal = frappe.get_doc("Life Goal", out["goal"])
-		self.assertEqual((goal.area, goal.horizon, goal.outcome), (self.career, "Long term", "In Progress"))
+		self.assertEqual((goal.area, goal.horizon, goal.outcome), (self.career, "Year", "In Progress"))
 		self.assertEqual(frappe.db.count("Life Goal", {"space": PRIVATE}), 1)
 		for t in ts:
 			self.assertEqual(frappe.db.get_value("Life Task", t, "goal"), goal.name)

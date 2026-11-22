@@ -140,6 +140,7 @@ def load(space="Private", key=SEED_KEY):
 	if json.loads(frappe.db.get_default(key) or "[]"):
 		return "Seed is already loaded. Run lifeos.seed.remove first to reload it."
 	ensure_structure()
+	frappe.db.set_single_value("Life Settings", "use_focuses", 1)  # the owner's site uses focuses (issue 57); a new site does not
 	areas = make_areas(space, SHARED_AREAS if space == "Shared" else PRIVATE_AREAS)
 	# the lens's defaults (set 6): a colour for every area and the top-level areas pinned, as the migration gives older sites
 	from lifeos.patches.v7 import lens_areas

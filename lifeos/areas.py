@@ -3,6 +3,8 @@ deep. An area that is off is hidden with its parts and their goals and tasks, an
 import frappe
 from frappe import _
 
+from lifeos.focus_defaults import KINDS, offered
+
 # (name, one-line description, colour of its dot), in the order the pickers list them
 LIFE_AREAS = [
 	("Career", "Work, businesses, roles you hold", "blue"),
@@ -48,11 +50,28 @@ def life_areas(space):
 	return dict(frappe.get_all("Life Area", filters={"space": space, "is_life_area": 1}, fields=["area_name", "name"], as_list=True))
 
 
+def use_focuses():
+	"""The setting "Use focuses" (issue 57): off for a new site. While off, no focus is offered, shown or required."""
+	return bool(frappe.db.get_single_value("Life Settings", "use_focuses"))
+
+
+def hidden_focuses(space):
+	"""Names of the focuses of a space while "Use focuses" is off: existing focuses are hidden, not deleted."""
+	if use_focuses():
+		return []
+	return frappe.get_all("Life Area", filters={"space": space, "is_focus": 1}, pluck="name", limit=5000)
+
+
 def off(space):
-	"""Names of the areas of a space that are hidden: those switched off, and the parts of a life area that is off."""
+	"""Names of the areas of a space that are hidden: those switched off, and everything below an area that is off (its parts,
+	and their focuses). Focuses hidden by the setting are not here: their goals stay with their part (`hidden_focuses`)."""
 	rows = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "parent_area", "is_on"], limit=5000)
 	hidden = {r.name for r in rows if not r.is_on}
-	return sorted(hidden | {r.name for r in rows if r.parent_area in hidden})
+	while True:  # a part of an area that is off, and a focus of a part that is off
+		more = {r.name for r in rows if r.parent_area in hidden and r.name not in hidden}
+		if not more:
+			return sorted(hidden)
+		hidden |= more
 
 
 def is_off(space, area):
@@ -74,6 +93,7 @@ def validate_area(doc):
 	same space, one level deep. Only a person switches an area on or off: the Brain files only into areas that are on."""
 	from lifeos import permissions
 
+	check_focus_change(doc)
 	if not doc.is_new() and doc.has_value_changed("is_on") and permissions.is_agent():
 		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError)
 	if doc.is_life_area:
@@ -88,41 +108,90 @@ def validate_area(doc):
 	if not doc.parent_area:
 		frappe.throw(_("{0} must be a part of one of the seven areas of life: Career, Health, Relationships, Money, Emotions, Mind or Environment.")
 			.format(doc.area_name))
-	parent = frappe.db.get_value("Life Area", doc.parent_area, ["space", "is_life_area", "area_name"], as_dict=True)
+	parent = frappe.db.get_value("Life Area", doc.parent_area, ["space", "is_life_area", "area_name", "is_focus", "parent_area"], as_dict=True)
 	if not parent or parent.space != doc.space:
 		frappe.throw(_("The area {0} is not in this space.").format(doc.parent_area))
+	if parent.is_focus:
+		frappe.throw(_("{0} is a focus. Nothing goes below a focus.").format(parent.area_name))
+	if doc.is_focus:  # a focus sits under a part, or under an area of life where there are no parts
+		if frappe.db.exists("Life Area", {"parent_area": doc.name}) and not doc.is_new():
+			frappe.throw(_("Nothing goes below a focus: {0} holds areas of its own.").format(doc.area_name))
+		return
 	if not parent.is_life_area:
 		frappe.throw(_("{0} is a part, not an area of life. Parts sit only under Career, Health, Relationships, Money, Emotions, Mind or Environment, one level deep.")
 			.format(parent.area_name))
-	if frappe.db.exists("Life Area", {"parent_area": doc.name}) and not doc.is_new():
+	if frappe.db.exists("Life Area", {"parent_area": doc.name, "is_focus": 0}) and not doc.is_new():
 		frappe.throw(_("Parts are one level deep: {0} holds parts of its own.").format(doc.area_name))
+	if doc.part_kind and doc.part_kind not in KINDS:
+		frappe.throw(_("Unknown kind of part."))
 
 
-FIELDS = ["name", "area_name", "parent_area", "is_life_area", "is_on", "description", "sort_order", "colour", "is_pinned", "is_archived"]
+def check_focus_change(doc):
+	"""Only a person creates, changes or switches a focus (issue 57). The Brain may file under one and propose goals under it."""
+	from lifeos import permissions
+
+	before = doc.get_doc_before_save()
+	if not permissions.is_agent() or not (doc.is_focus or (before and before.is_focus)):
+		return
+	watched = ("is_focus", "is_on", "area_name", "standard", "parent_area", "is_archived")
+	if before is None or any(doc.has_value_changed(f) for f in watched) or [p.line for p in doc.principles] != [p.line for p in before.principles]:
+		frappe.throw(_("Only a person can create, change or switch a focus."), frappe.PermissionError)
 
 
-def ordered(space, include_off=False, include_archived=False, fields=FIELDS):
-	"""The areas of a space in picker order: each of the seven, then its parts. Areas that are off (and the parts of an area
-	that is off) are left out unless `include_off`."""
+FIELDS = ["name", "area_name", "parent_area", "is_life_area", "is_on", "description", "sort_order", "colour", "is_pinned", "is_archived",
+	"is_focus", "part_kind"]
+
+
+def ordered(space, include_off=False, include_archived=False, fields=FIELDS, focuses=None):
+	"""The areas of a space in picker order: each of the seven, then its parts, each part followed by its focuses. Areas that are
+	off (and what is below them) are left out unless `include_off`. Focuses are left out while "Use focuses" is off, unless
+	`focuses=True`."""
 	filters = {"space": space}
 	if not include_archived:
 		filters["is_archived"] = 0
 	rows = frappe.get_all("Life Area", filters=filters, fields=list(dict.fromkeys([*fields, "name", "parent_area", "is_life_area"])),
 		order_by="sort_order asc, area_name asc", limit=5000)
 	hidden = set() if include_off else set(off(space))
+	if not (use_focuses() if focuses is None else focuses):
+		hidden |= set(hidden_focuses(space))
 	rows = [r for r in rows if r.name not in hidden]
-	parts = {}
+	kids = {}
 	for r in rows:
 		if r.parent_area:
-			parts.setdefault(r.parent_area, []).append(r)
+			kids.setdefault(r.parent_area, []).append(r)
 	out = []
+
+	def add(r):
+		out.append(r)
+		for k in kids.pop(r.name, []):
+			add(k)
+
 	for r in rows:
 		if not r.parent_area:
-			out.append(r)
-			out.extend(parts.pop(r.name, []))
-	for rest in parts.values():  # parts whose area of life is archived or missing
-		out.extend(rest)
+			add(r)
+	for orphans in list(kids.values()):  # parts whose area of life is archived or missing
+		for r in orphans:
+			if all(r.name != x.name for x in out):
+				add(r)
 	return out
+
+
+def add_offered_focuses(part, chosen=None):
+	"""Create the focuses its kind offers under a part (issue 57), each with its suggested standard: those named in `chosen`, or
+	all of them when `chosen` is None. A focus the part already has is left alone. Does nothing while "Use focuses" is off.
+	Returns the names created."""
+	row = frappe.db.get_value("Life Area", part, ["space", "part_kind", "sort_order"], as_dict=True)
+	if not row or not use_focuses():
+		return []
+	have = {n.lower() for n in frappe.get_all("Life Area", filters={"parent_area": part}, pluck="area_name")}
+	made = []
+	for i, (name, standard) in enumerate(offered(row.part_kind)):
+		if (chosen is not None and name not in chosen) or name.lower() in have:
+			continue
+		doc = frappe.get_doc({"doctype": "Life Area", "space": row.space, "area_name": name, "parent_area": part, "is_focus": 1,
+			"standard": standard, "sort_order": i + 1})
+		made.append(doc.insert().name)
+	return made
 
 
 # Issue 12: archiving a part with open work asks where that work goes
@@ -170,13 +239,13 @@ def move_work(area, to):
 
 
 def goal_counts(space):
-	"""{area: goals in progress filed there}, where an area of life also counts the goals of its parts."""
+	"""{area: goals in progress filed there}, where each area also counts the goals of what is below it."""
 	rows = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "parent_area"], limit=0)
 	parent = {r.name: r.parent_area for r in rows}
 	out = {}
 	for a, n in frappe.get_all("Life Goal", filters={"space": space, "outcome": "In Progress", "is_someday": 0, "is_archived": 0,
 			"area": ("is", "set")}, fields=["area", {"COUNT": "*"}], group_by="area", as_list=True):
-		out[a] = out.get(a, 0) + n
-		if parent.get(a):
-			out[parent[a]] = out.get(parent[a], 0) + n
+		while a:  # the area, then each area above it (a focus, its part, its area of life)
+			out[a] = out.get(a, 0) + n
+			a = parent.get(a)
 	return out

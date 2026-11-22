@@ -9,6 +9,9 @@
         @change="(e) => setQuery({ goal: e.target.value || undefined })"><option v-for="o in goalChoices" :key="o.value" :value="o.value">{{ o.label }}</option></select>
       <select class="h-8 w-36 max-w-full rounded border border-outline-gray-2 bg-surface-base px-2 py-0 text-sm leading-5 text-ink-gray-8 focus-visible:focus-ring max-md:h-10 max-md:flex-1" :value="source" aria-label="Source" data-lib-source
         @change="(e) => setQuery({ source: e.target.value || undefined })"><option v-for="o in sourceChoices" :key="o.value" :value="o.value">{{ o.label }}</option></select>
+      <Button :variant="unopened ? 'solid' : 'subtle'" :label="`Not opened in 90 days${numbers ? ' ' + numbers.notes_unopened.n : ''}`" :aria-pressed="unopened" data-lib-unopened
+        @click="setQuery({ unopened: unopened ? undefined : 1 })" />
+      <span v-if="numbers" class="text-sm text-ink-gray-6" data-lib-numbers>Notes and sources <b class="tabular-nums text-ink-gray-9" data-lib-number="notes_sources">{{ numbers.notes_sources.n.toLocaleString() }}</b></span>
       <span v-if="loaded" class="ml-auto text-sm tabular-nums text-ink-gray-6" data-lib-count>{{ data.total.toLocaleString() }} item{{ data.total === 1 ? '' : 's' }}</span>
     </div>
 
@@ -73,7 +76,8 @@ const area = computed(() => route.query.area || '')
 const goal = computed(() => route.query.goal || '')
 const source = computed(() => route.query.source || '')
 const writable = computed(() => canWrite())
-const filtered = computed(() => !!(route.query.q || area.value || goal.value || source.value))
+const unopened = computed(() => route.query.unopened === '1' || route.query.unopened === 1)
+const filtered = computed(() => !!(route.query.q || area.value || goal.value || source.value || unopened.value))
 const areaChoices = computed(() => [{ label: 'Area', value: '' }, ...areaOptions()])
 const goalChoices = computed(() => [{ label: 'Goal', value: '' }, { label: 'No goal', value: 'none' }, ...goalOptions(lookups.goals, { empty: null })])
 const sourceChoices = computed(() => [{ label: 'Source', value: '' }, { label: 'Made by me', value: 'me' }, { label: 'Kept by the Brain', value: 'brain' },
@@ -89,9 +93,15 @@ function clear() { q.value = ''; router.replace({ query: { space: route.query.sp
 
 async function fetchRows(start) {
   return tryCall(() => api('everything.list', { space: store.space, tab: props.tab, q: route.query.q || undefined, area: area.value || store.lensArea || undefined,
-    goal: goal.value || undefined, source: source.value || undefined, start, page_length: PAGE }))
+    goal: goal.value || undefined, source: source.value || undefined, unopened: unopened.value ? 1 : undefined, start, page_length: PAGE }))
+}
+// the old Open band's note numbers (issue 55): notes and sources, and notes not opened in 90 days
+const numbers = ref(null)
+async function loadNumbers() {
+  numbers.value = (await tryCall(() => api('counts.get', { space: store.space, which: 'library', area: store.lensArea || undefined }))) || numbers.value
 }
 async function load() {
+  loadNumbers()
   const res = await fetchRows(0)
   if (res) { data.value = res; rows.value = res.rows }
   loaded.value = true
@@ -102,7 +112,7 @@ async function loadMore() {
   if (res) { data.value = { ...res, sources: res.sources }; rows.value = [...rows.value, ...res.rows] }
   more.value = false
 }
-watch(() => [route.query.q, route.query.area, route.query.goal, route.query.source, store.space, store.lensArea, props.tab], load)
+watch(() => [route.query.q, route.query.area, route.query.goal, route.query.source, route.query.unopened, store.space, store.lensArea, props.tab], load)
 onRecordChanged(load)
 onMounted(() => { loadLookups(); load() })
 </script>

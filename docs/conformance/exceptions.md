@@ -19,7 +19,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | --- | --- | --- |
 | `lifeos/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
 | `lifeos/install.py` | 66 | after_install: the spaces and index DDL must be kept before install-app goes on |
-| `lifeos/install.py` | 151 | a bench execute command: the user and the space are kept when it ends |
+| `lifeos/install.py` | 155 | a bench execute command: the user and the space are kept when it ends |
 | `lifeos/loadtest.py` | 114 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 258 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/loadtest.py` | 317 | load test: its removal must stick even when run inside a test |
@@ -36,7 +36,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/settings.py` | 220 | the site's own backup folder, names only |
+| `lifeos/api/settings.py` | 233 | the site's own backup folder, names only |
 | `lifeos/files.py` | 90 | local_path keeps the path inside the site's files folders |
 | `lifeos/patches/v10/file_hashes.py` | 23 | local_path keeps the path inside the site's files folders |
 | `lifeos/pwa.py` | 18 | a fixed file of this app; no part of the path comes from the request |
@@ -76,9 +76,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/archive.py` | 74 | fixed fragments, std_clause columns checked against meta, vault_guard constant; values are parameters |
 | `lifeos/api/ask.py` | 195 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
 | `lifeos/api/ask.py` | 200 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
-| `lifeos/api/brain.py` | 137 | WHERE is constant SQL plus area_filter; values are parameters |
-| `lifeos/api/brain.py` | 143 | WHERE is constant SQL plus area_filter; values are parameters |
-| `lifeos/api/brain.py` | 158 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 140 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 146 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 161 | WHERE is constant SQL plus area_filter; values are parameters |
 | `lifeos/api/chats.py` | 25 | vault_guard is a constant fragment; values are parameters |
 | `lifeos/api/chats.py` | 144 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 150 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
@@ -86,16 +86,16 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/chats.py` | 154 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 259 | sensitive_guard is a constant fragment; values are parameters |
 | `lifeos/api/chats.py` | 263 | as above |
-| `lifeos/api/everything.py` | 53 | WHERE from fixed fragments (TAB_SQL) and area_filter; every value is a parameter |
-| `lifeos/api/everything.py` | 55 | WHERE from fixed fragments (TAB_SQL) and area_filter; every value is a parameter |
-| `lifeos/api/goals.py` | 38 | `sp` is one of two constant fragments; values are parameters |
-| `lifeos/api/goals.py` | 100 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
-| `lifeos/api/goals.py` | 109 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
-| `lifeos/api/goals.py` | 181 | SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters |
-| `lifeos/api/goals.py` | 369 | `off` is off_clause's fixed SQL; values are parameters |
-| `lifeos/api/inbox.py` | 370 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 375 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/inbox.py` | 377 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/everything.py` | 56 | WHERE from fixed fragments (TAB_SQL) and area_filter; every value is a parameter |
+| `lifeos/api/everything.py` | 58 | WHERE from fixed fragments (TAB_SQL) and area_filter; every value is a parameter |
+| `lifeos/api/goals.py` | 39 | `sp` is one of two constant fragments; values are parameters |
+| `lifeos/api/goals.py` | 101 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
+| `lifeos/api/goals.py` | 110 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
+| `lifeos/api/goals.py` | 182 | SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters |
+| `lifeos/api/goals.py` | 416 | `off` is off_clause's fixed SQL; values are parameters |
+| `lifeos/api/inbox.py` | 375 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
+| `lifeos/api/inbox.py` | 380 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 382 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |
@@ -120,12 +120,12 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/tasks.py` | 125 | the WHERE comes from where_clause (fixed fragments); values are parameters |
 | `lifeos/api/tasks.py` | 143 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
 | `lifeos/api/tasks.py` | 179 | where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters |
-| `lifeos/api/tasks.py` | 230 | ALL_SHOWS is a constant map, base and off are fixed SQL; values are parameters |
-| `lifeos/api/tasks.py` | 292 | NO_GOAL is a constant fragment |
-| `lifeos/api/tasks.py` | 460 | open_loops_where() is a constant fragment |
+| `lifeos/api/tasks.py` | 234 | ALL_SHOWS is a constant map, base and off are fixed SQL; values are parameters |
+| `lifeos/api/tasks.py` | 297 | NO_GOAL is a constant fragment |
+| `lifeos/api/tasks.py` | 493 | open_loops_where() is a constant fragment |
 | `lifeos/api/timeline.py` | 38 | ROW_FIELDS and vault_guard are constants; callers pass fixed WHERE and ORDER fragments; values are parameters |
 | `lifeos/api/timeline.py` | 71 | fixed fragments, std_filters columns checked against meta; values are parameters |
-| `lifeos/api/today.py` | 58 | `lens` is area_filter's fixed SQL; values are parameters |
+| `lifeos/api/today.py` | 67 | `lens` is area_filter's fixed SQL; values are parameters |
 | `lifeos/api/utils.py` | 242 | `base` and the tab conditions are fixed SQL from the list methods; values are parameters |
 | `lifeos/api/utils.py` | 281 | columns pass column() (DocType meta), aggregates an allowlist, `base` is fixed SQL; values are parameters |
 | `lifeos/api/utils.py` | 284 | as above |

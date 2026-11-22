@@ -2,7 +2,7 @@
 import frappe
 from frappe.utils import today
 
-from lifeos import permissions
+from lifeos import areas, permissions, readings
 
 
 @frappe.whitelist(methods=["GET"])
@@ -28,6 +28,8 @@ def boot():
 			# Settings > Rhythms (set 6)
 			"start_of_day": str(s.start_of_day or "06:00:00"), "week_starts_on": s.week_starts_on or "Monday",
 			"month_plan_enabled": int(s.month_plan_enabled if s.month_plan_enabled is not None else 1),
+			"require_done_when": int(readings.done_when_required()),
+			"use_focuses": int(areas.use_focuses()),
 		},
 		"today": today(),
 		"time_zone": frappe.utils.get_system_timezone(),

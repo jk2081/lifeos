@@ -4,6 +4,10 @@
       <span class="text-sm text-ink-gray-6">Done when…<span v-if="by" class="text-ink-gray-5" data-measure-by> · Suggested by {{ by }}</span><span v-else-if="nothing" class="text-ink-gray-5" data-measure-none> · No suggestion. Write it yourself.</span></span>
       <Button v-if="title && !hideSuggest" size="sm" variant="ghost" icon-left="lucide-sparkles" label="Suggest" :loading="busy" data-measure-suggest @click="suggest" />
     </div>
+    <div v-if="examples.length" class="flex flex-col gap-1.5 rounded-md bg-surface-gray-1 p-2.5" data-measure-examples>
+      <span class="text-sm text-ink-gray-6">Two examples for this kind of goal. Tap one to start from it.</span>
+      <button v-for="(x, i) in examples" :key="i" type="button" class="text-left text-sm text-ink-gray-8 hover:underline focus-visible:focus-ring" data-measure-example @click="useExample(x)">{{ x }}</button>
+    </div>
     <TabButtons :model-value="m.measure_kind || ''" :options="KINDS" data-measure-kind @update:model-value="setKind" />
     <FormControl v-if="m.measure_kind === 'Milestone'" v-model="m.done_when" type="textarea" :rows="2" label="Finish line" :disabled="disabled"
       placeholder="What will be true when this goal is done" data-measure-done-when />
@@ -18,7 +22,7 @@
       </div>
       <p v-if="direction" class="text-sm text-ink-gray-6">{{ direction }}</p>
     </template>
-    <Alert v-if="habit && !habitDismissed" theme="blue" title="This looks like a habit" data-habit-hint
+    <Alert v-if="habit && !habitDismissed && !noHabit" theme="blue" title="This looks like a habit" data-habit-hint
       :description="`“${habit.title}” reads as something you do ${habit.days_per_week === 7 ? 'every day' : habit.days_per_week + ' times a week'}. A habit is ticked each day; a goal has a finish line.`">
       <template #actions><div class="flex gap-2">
         <Button label="Keep as a goal" @click="habitDismissed = true" />
@@ -36,13 +40,14 @@ import { Alert, Button, FormControl, TabButtons } from 'frappe-ui'
 import { api, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 
-const props = defineProps({ modelValue: { type: Object, required: true }, title: String, notes: String, space: String, disabled: Boolean, hideSuggest: Boolean })
+const props = defineProps({ modelValue: { type: Object, required: true }, title: String, notes: String, space: String, disabled: Boolean, hideSuggest: Boolean, goal: String, horizon: String, noHabit: Boolean })
 const emit = defineEmits(['update:modelValue', 'habit'])
 const KINDS = [{ label: 'A finish line', value: 'Milestone' }, { label: 'A number', value: 'Number' }]
 const m = props.modelValue
 const busy = ref(false)
 const by = ref('')
 const nothing = ref(false)
+const examples = ref([])
 const habitDismissed = ref(false)
 const suggestedHabit = ref(null)
 
@@ -65,19 +70,26 @@ const direction = computed(() => {
   if (m.start_value === '' || m.target_value === '' || m.start_value == null || m.target_value == null || Number.isNaN(s) || Number.isNaN(t) || s === t) return ''
   return `${s < t ? 'Goes up' : 'Goes down'} from ${s} to ${t}${m.unit ? ' ' + m.unit : ''}.`
 })
+function useExample(text) {
+  m.measure_kind = 'Milestone'
+  m.done_when = text
+  examples.value = []
+  emit('update:modelValue', m)
+}
 function setKind(v) {
   m.measure_kind = v
   emit('update:modelValue', m)
 }
 async function suggest() {
   busy.value = true
-  const r = await tryCall(() => api('goals.suggest_measure', { title: props.title, notes: props.notes || undefined, space: props.space || store.space }))
+  examples.value = []
+  const r = await tryCall(() => api('goals.suggest_measure', { title: props.title, notes: props.notes || undefined, space: props.space || store.space, goal: props.goal || undefined, horizon: props.horizon || undefined }))
   busy.value = false
   if (!r) return
   by.value = r.by || ''
   nothing.value = !r.kind
   if (r.habit) { suggestedHabit.value = r.habit; habitDismissed.value = false }
-  if (!r.kind) return
+  if (!r.kind) { examples.value = r.examples || []; return }
   m.measure_kind = r.kind
   if (r.kind === 'Number') {
     for (const k of ['measure', 'unit', 'target_value', 'start_value']) if (r[k] !== null && r[k] !== undefined) m[k] = r[k]

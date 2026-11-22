@@ -5,9 +5,10 @@ Nothing here decides anything: Keep, Change and Drop use review.decide and revie
 import math
 
 import frappe
+from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
-from lifeos import permissions, proposals, wiki_check
+from lifeos import permissions, proposals, readings, wiki_check
 from lifeos.api.utils import area_filter, lens_area, names_map, page
 from lifeos.skills import lessons
 
@@ -75,6 +76,8 @@ def needs_you(space: str | None = None, limit: int = MAX_ROWS):
 			"kind_label": kind_label(r.kind), "preview": r.preview, "confidence": r.confidence, "payload": data,
 			"area": area, "area_name": areas.get(area), "alt_area": r.alt_area, "alt_area_name": areas.get(r.alt_area),
 			"takes_area": takes_area, "unfiled": takes_area and not area, "item_pending": r.item_pending,
+			# a Goal with no "Done when" while the setting is on waits for the owner to write one (Change opens the capture)
+			"blocked": _(readings.REQUIRED_MESSAGE) if r.kind in ("Goal", "Month Goal") and not readings.has_finish_line(data) and readings.done_when_required() else None,
 		})
 	waiting = frappe.db.sql("""select count(*) from `tabLife Inbox Item` i where i.space = %(space)s and i.is_archived = 0
 		and i.status in ('New', 'Processing') and """ + SEES, args)[0][0]

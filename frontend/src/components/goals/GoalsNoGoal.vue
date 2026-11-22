@@ -4,6 +4,13 @@
   </PageHead>
   <div class="page-body flex max-w-6xl flex-col gap-4" data-no-goal :data-loaded="loaded ? 1 : 0">
     <Alert theme="blue" title="Every task gets an area, even without a goal." description="The Brain guesses it from what the task is about and who it involves. Change any guess with Area; it learns from that." />
+    <Dialog v-model:open="goalOpen" title="Make it a goal" size="lg" data-make-goal-dialog
+      :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Make goal', variant: 'solid', loading: !!making, onClick: makeGoal }]">
+      <div class="flex flex-col gap-3">
+        <FormControl v-model="goalTitle" label="Goal" required data-make-goal-title />
+        <DoneWhen :model-value="m" :title="goalTitle" :space="store.space" no-habit />
+      </div>
+    </Dialog>
     <Card v-if="adding && writable" class="flex flex-col gap-2" data-no-goal-add>
       <TextInput ref="addInput" v-model="addText" placeholder="Add a task and press Enter. The Brain guesses its area." aria-label="Add a task" @keydown.enter="add" />
     </Card>
@@ -24,7 +31,7 @@
         </div>
         <div v-if="g.suggestion && writable" class="mb-1 flex flex-col gap-2 rounded-md bg-surface-violet-1 px-3 py-2 sm:flex-row sm:items-center sm:justify-between" data-suggestion>
           <span class="text-sm text-ink-violet-8">✦ These {{ g.suggestion.tasks.length }} look like a goal: <strong>{{ g.suggestion.title }}</strong>?</span>
-          <Button size="sm" variant="solid" label="Make it a goal" :loading="making === g.key" data-make-goal @click="makeGoal(g)" />
+          <Button size="sm" variant="solid" label="Make it a goal" :loading="making === g.key" data-make-goal @click="askGoal(g)" />
         </div>
         <ul class="flex flex-col">
           <li v-for="t in g.tasks" :key="t.name" class="flex flex-col gap-2 border-b border-outline-gray-1 py-3 last:border-b-0 md:flex-row md:items-center md:gap-4"
@@ -64,8 +71,10 @@
 // Per task: Area (confirm or move), Fine as is (stays without a goal, leaves this list) and Add to goal (that area's goals first).
 // Per group: when three or more tasks share a word, Make it a goal, which creates the goal and attaches them. Nothing happens
 // without the click.
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { Alert, Button, Checkbox, Dropdown, TextInput, toast } from 'frappe-ui'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { Alert, Button, Checkbox, Dialog, Dropdown, FormControl, TextInput, toast } from 'frappe-ui'
+import DoneWhen from '@/components/goals/DoneWhen.vue'
+import { doneWhenRequired, emptyMeasure, measureArgs, measureProblem } from '@/lib/goals'
 import AreaGuess from '@/components/AreaGuess.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
@@ -116,10 +125,25 @@ function goalMenu(t, g) {
 const fine = (t) => act(() => api('tasks.keep_standalone', { task: t.name }))
 const done = (t) => act(() => api('tasks.set_status', { task: t.name, status: 'Done' }))
 const onConfirmed = () => load()
-async function makeGoal(g) {
+// Make it a goal asks for the goal's name and its "Done when" (required while the setting is on), then makes it
+const goalOpen = ref(false)
+const goalTitle = ref('')
+const goalGroup = ref(null)
+const m = reactive(emptyMeasure())
+function askGoal(g) {
+  goalGroup.value = g
+  goalTitle.value = g.suggestion.title
+  Object.assign(m, emptyMeasure())
+  goalOpen.value = true
+}
+async function makeGoal() {
+  const g = goalGroup.value
+  const problem = !goalTitle.value.trim() ? 'Name the goal.' : measureProblem(m, doneWhenRequired())
+  if (problem) return toast.error(problem)
   making.value = g.key
   try {
-    const res = await api('tasks.make_goal', { tasks: g.suggestion.tasks, space: store.space, area: g.area || undefined })
+    const res = await api('tasks.make_goal', { tasks: g.suggestion.tasks, space: store.space, area: g.area || undefined, title: goalTitle.value.trim() === g.suggestion.title ? undefined : goalTitle.value.trim(), ...measureArgs(m) })
+    goalOpen.value = false
     toast.success(`Made the goal "${res.title}" with ${res.tasks.length} tasks`)
     await load()
   } catch (e) {

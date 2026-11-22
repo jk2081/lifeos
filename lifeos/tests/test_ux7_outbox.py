@@ -3,10 +3,9 @@ and the backfill."""
 import frappe
 from frappe.utils import add_days, getdate, now_datetime, today
 
-from lifeos import outbox, trash
+from lifeos import counts, outbox, trash
 from lifeos.api import goals, inbox, review, someday, tasks
 from lifeos.api import outbox as outbox_api
-from lifeos.api import today as today_api
 from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, LifeTestCase
 
 
@@ -161,7 +160,7 @@ class TestInAndOut(OutboxCase):
 	def test_today_line_matches_its_lists(self):
 		t = self.task("ux7 line")
 		tasks.set_status(t.name, "Done")
-		line = today_api.get(space=PRIVATE)["inout"]
+		line = counts.get(space=PRIVATE, which="week")  # issue 55: the line moved from Today to Brain > Activity
 		for key, pile in (("in", "in"), ("out", "all")):
 			door = line[key]
 			self.assertEqual(door["to"]["path"], "/library/outbox")

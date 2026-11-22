@@ -85,7 +85,10 @@ def save_goal(goal: str | None = None, cycle: str | None = None, title: str | No
 	if goal:
 		doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	else:
+		from lifeos import readings
+
 		c = permissions.get_doc_checked("Life Cycle", cycle, "write")
+		readings.require_finish_line({"done_when": done_when, **measure_values(measure_kind or None, done_when, measure, unit, start_value, target_value)})
 		last = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where cycle=%s", c.name)[0][0]
 		doc = frappe.get_doc({"doctype": "Life Goal", "space": c.space, "cycle": c.name, "sort_order": last + 1})
 	if title is not None:
@@ -204,8 +207,25 @@ def goal(goal: str):
 		return {"goal": g, "cycle": None, "cycles": cycles, "history": [], **common}
 	g = next((x for x in rules.grid(doc.cycle)["goals"] if x["name"] == doc.name), None)
 	cycle = frappe.db.get_value("Life Cycle", doc.cycle, ["title", "status", "start_date", "end_date"], as_dict=True)
-	return {"goal": g, "cycle": {"name": doc.cycle, "title": cycle.title, "status": cycle.status},
+	return {"goal": g, "cycle": {"name": doc.cycle, "title": cycle.title, "status": cycle.status}, "this_week": _this_week(doc.cycle, g),
 		"history": rules.goal_history(doc.name), **common}
+
+
+def _this_week(cycle_name, g):
+	"""The ticks a 12 Week Year goal's actions have this week against what is planned: {week, done, planned}, or None outside a running cycle.
+	Each action's ticks count up to its times a week, as the week score counts them; a retired action, or one finished in an earlier week, is not planned."""
+	cycle = frappe.get_cached_doc("Life Cycle", cycle_name)
+	week = rules.current_week(cycle)
+	if cycle.status == "Closed" or not 1 <= rules.week_of(cycle) <= rules.WEEKS:
+		return None
+	done = planned = 0
+	for a in g["actions"]:
+		if a["status"] == "Dropped" or (a["status"] == "Done" and week > (a["done_week"] or rules.WEEKS)):
+			continue
+		p = a["per_week"]
+		planned += p
+		done += min(a["ticks"].get(str(week), 0), p)
+	return {"week": week, "done": done, "planned": planned}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -288,7 +308,7 @@ def month(space: str | None = None, year: int | None = None, month: int | None =
 
 @frappe.whitelist(methods=["POST"])
 def save_month_goal(plan: str, row: str | None = None, title: str | None = None, status: str | None = None, area: str | None = None,
-		delete: bool | int = 0, move: int | None = None):
+		delete: bool | int = 0, move: int | None = None, done_when: str | None = None):
 	"""Add, change, move (`move` -1 up or 1 down, the priority order) or remove one Month goal of a month plan."""
 	doc = permissions.get_doc_checked("Life Month Plan", plan, "write")
 	if row:
@@ -318,7 +338,10 @@ def save_month_goal(plan: str, row: str | None = None, title: str | None = None,
 	else:
 		if not (title or "").strip():
 			frappe.throw(_("Type a title for the goal."))
-		rules.add_month_goal(doc.space, doc.year, doc.month, title.strip(), area)
+		from lifeos import readings
+
+		readings.require_finish_line({"done_when": done_when})
+		rules.add_month_goal(doc.space, doc.year, doc.month, title.strip(), area, done_when=done_when)
 	return _plan_dict(doc)
 
 

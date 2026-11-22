@@ -39,6 +39,7 @@ const routes = [
   { path: '/item/:id', name: 'Item', component: page('Item'), props: true },
   { path: `/goals/:tab(${GOALS.join('|')})?`, name: 'Goals', component: page('GoalsPlace'), props: true },
   { path: '/goals/:id', name: 'Goal', component: page('Goal'), props: true },
+  { path: '/focus/:id', name: 'Focus', component: page('Focus'), props: true },
   // /library?view=tree was the Notes screen's tree before set 6. ?view=list is now Library > Everything's own list view, so it stays.
   { path: `/library/:tab(${LIBRARY.join('|')})?`, name: 'Library', component: page('LibraryPlace'), props: true,
     beforeEnter: (r) => (!r.params.tab && r.query.view === 'tree' ? { path: '/library/notes', query: r.query } : true) },

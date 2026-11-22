@@ -9,7 +9,7 @@
     </PageHead>
 
     <div class="page-body !gap-5">
-      <!-- a rhythm that is due (UX fixes, set 6): at most one line, above the Open band, with Skip until its next occurrence -->
+      <!-- a rhythm that is due (UX fixes, set 6): at most one line, above the list, with Skip until its next occurrence -->
       <div v-if="d.banner" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-4 py-2.5" role="status"
         data-rhythm-banner :data-banner="d.banner.key">
         <span class="lucide-bell size-4 text-ink-gray-7" aria-hidden="true" />
@@ -35,9 +35,9 @@
 
       <div class="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_18.5rem]">
         <!-- Next: one list in a fixed order, the order written at the top -->
-        <section data-next>
+        <section class="md:col-start-1" data-next>
           <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base"><span class="font-semibold text-ink-gray-9">Today</span>
-            <span class="text-sm text-ink-gray-6 max-md:hidden">the top three, what is due today, overdue folded, this week's 12 Week Year actions, then decisions</span></h2>
+            <span class="text-sm text-ink-gray-6 max-md:hidden">the top three, what is due today, overdue folded, then this week's tasks under your goals</span></h2>
           <Card flush class="!px-4">
             <template v-for="g in visibleGroups" :key="g.key">
               <div class="flex items-center gap-2 border-b border-outline-gray-1 pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-gray-6" :data-next-group="g.key">
@@ -58,7 +58,8 @@
                   <span v-if="r.why === 'Top three'" class="lucide-star size-4 shrink-0 text-ink-amber-9" role="img" aria-label="One of this week's top three" data-top-three />
                   <div class="min-w-0 flex-1">
                     <div class="break-words text-base text-ink-gray-9" :class="r._done && 'text-ink-gray-6 line-through'">{{ r.title }}</div>
-                    <div class="flex min-w-0 items-center gap-1.5 text-sm text-ink-gray-6"><AreaGuess :task="r" :readonly="!canWrite()" /><span class="truncate">{{ taskLine(r) }}</span></div>
+                    <div class="flex min-w-0 items-center gap-1.5 text-sm text-ink-gray-6"><AreaGuess :task="r" :readonly="!canWrite()" /><span class="truncate">{{ taskLine(r) }}</span>
+                      <RouterLink v-if="r.goal && r.goal_title" class="relative shrink-0 truncate text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/goals/${r.goal}`" data-task-goal-link>{{ r.goal_title }}</RouterLink></div>
                   </div>
                   <Dropdown v-if="r.why === 'Overdue' && canWrite()" :options="triage(r)"><Button class="relative md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100" variant="ghost" size="sm"
                     icon="lucide-calendar-clock" :label="'Reschedule ' + r.title" data-triage /></Dropdown>
@@ -73,40 +74,30 @@
                   </div>
                   <Badge label="Event" data-why />
                 </Row>
-                <Row v-else-if="r.type === 'action'" class="!items-center" data-next-row data-why="12WY" :data-action="r.name">
-                  <Checkbox :model-value="r.count >= r.per_week" :disabled="!canWrite()" :aria-label="`Tick ${r.title}, ${r.count} of ${r.per_week} this week`" data-week-tick @update:model-value="tick(r)" />
-                  <span v-if="!phone" class="w-14 shrink-0" />
-                  <div class="min-w-0 flex-1">
-                    <div class="break-words text-base text-ink-gray-9" :class="r.count >= r.per_week && 'text-ink-gray-6 line-through'">{{ r.title }}</div>
-                    <div class="truncate text-sm text-ink-gray-6">{{ r.goal_title }} · {{ r.count }} of {{ r.per_week }} this week</div>
-                  </div>
-                  <Badge theme="blue" label="12WY" data-why />
-                </Row>
-                <Row v-else-if="r.type === 'insight'" :pane="r.evidence[0]?.ref || null" :label="r.title" class="flex-wrap !items-center" data-next-row :data-why="r.why" :data-insight="r.name">
-                  <span v-if="!phone" class="w-[4.75rem] shrink-0" />
-                  <div class="min-w-0 flex-[1_1_16rem]">
-                    <div class="break-words text-base text-ink-gray-9">{{ r.title }}</div>
-                    <div class="text-sm text-ink-gray-6">Insight · {{ r.based_on.replace(/^Based on /, 'based on ') }}</div>
-                  </div>
-                  <Badge :theme="KIND_THEME[r.kind] || 'gray'" :label="phone && r.kind === 'Waiting on you' ? 'Waiting' : r.kind" data-why />
-                  <div v-if="canWrite() && !phone" class="relative flex items-center gap-1">
-                    <Button v-for="(a, i) in r.actions.slice(0, 2)" :key="i" :variant="i === 0 ? 'subtle' : 'ghost'" :label="a.label" :data-insight-action="a.kind" @click="runAction(r, i)" />
-                    <Button variant="ghost" label="Dismiss" data-insight-dismiss @click="dismiss(r)" />
-                  </div>
-                </Row>
               </template>
             </template>
+            <p v-if="d.no_plan" class="py-2.5 text-sm text-ink-gray-6" data-no-plan :data-count="d.no_plan">{{ d.no_plan }} cycle goal{{ d.no_plan === 1 ? ' has' : 's have' }} nothing planned this week ·
+              <RouterLink class="text-ink-blue-8 hover:underline focus-visible:focus-ring" to="/goals/cycles" data-no-plan-link>Plan</RouterLink></p>
             <div v-if="hidden > 0" class="py-2.5"><Button variant="ghost" class="!px-0 !text-ink-blue-8" :label="`${hidden} more`" data-next-more @click="showAll = true" /></div>
             <Empty v-if="!groups.length && onboarding.empty" title="Nothing here yet." data-today-empty>
               <p class="mt-1">Capture something with + Capture, or connect a source. Your tasks for the day will show up here.</p>
               <Button v-if="canWrite()" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-today-capture @click="store.captureOpen = true" />
             </Empty>
-            <Empty v-else-if="!groups.length" title="Nothing is next." hint="No overdue tasks, nothing today, every action of the week ticked and no decision waiting." />
+            <Empty v-else-if="!groups.length" title="Nothing is next." hint="No overdue tasks, nothing due today and nothing planned for this week." />
           </Card>
+        </section>
+        <!-- the day's habits: one compact row of ticks with their names (issue 55) -->
+        <section v-if="d.habits.length" class="md:col-start-1" data-today-habits>
+          <h2 class="mb-2 flex items-baseline gap-2 text-base"><span class="font-semibold text-ink-gray-9">Habits</span>
+            <span class="text-sm text-ink-gray-6" data-habit-count>{{ d.habits.filter((x) => x.done).length }} of {{ d.habits.length }} today</span></h2>
+          <div class="flex flex-wrap gap-2">
+            <Button v-for="x in d.habits" :key="x.habit" size="sm" :variant="x.done ? 'solid' : 'outline'" :disabled="!canWrite()" :label="x.title" :aria-pressed="x.done"
+              :aria-label="`${x.title}, ${x.done ? 'done' : 'not done'} today`" :data-habit="x.habit" @click="toggleHabit(x)" />
+          </div>
         </section>
 
         <!-- the right rail; on a phone it moves below Next -->
-        <aside class="flex flex-col gap-5" data-rail>
+        <aside class="flex flex-col gap-5 md:col-start-2 md:row-span-2 md:row-start-1" data-rail>
           <section data-rail-today>
             <h2 class="mb-2 text-base font-semibold text-ink-gray-9">Meetings and time blocks</h2>
             <ol class="flex flex-col" aria-label="Today's events">
@@ -135,44 +126,13 @@
           </section>
           <section v-if="d.rail.insights_total" data-rail-insights>
             <h2 class="mb-1 flex items-baseline gap-2 text-base"><span class="font-semibold text-ink-gray-9">Insights</span>
-              <span class="text-sm text-ink-gray-6">{{ d.rail.insights_total }} more · <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/ask', query: { tab: 'insights' } }">see all</RouterLink></span></h2>
-            <p class="text-sm text-ink-gray-6">{{ d.rail.insights.map((i) => i.title).join(' · ') }}</p>
+              <span class="text-sm text-ink-gray-6">{{ d.rail.insights_total }} · <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/ask', query: { tab: 'insights' } }">see all</RouterLink></span></h2>
+            <ul class="flex flex-col gap-1 text-sm text-ink-gray-6">
+              <li v-for="i in d.rail.insights" :key="i.name" data-rail-insight>{{ i.title }}</li>
+            </ul>
           </section>
         </aside>
       </div>
-
-      <!-- below the fold (issue 15): the Open band, everything still open, each number a door; amber when the stuck count is over the limit -->
-      <section data-open-band :data-over-limit="band.over_limit || undefined">
-        <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base" data-band-head>
-          <span class="font-semibold text-ink-gray-9">Open</span>
-          <span class="text-sm text-ink-gray-6 max-md:hidden">everything still open{{ lensAreaName !== 'All of life' ? ' in ' + lensAreaName : manySpaces ? ' in ' + store.space : '' }} · each number opens its list</span>
-          <span v-if="band.over_limit" class="text-sm text-ink-amber-9" data-band-amber> · <CountLink :count="band.stuck" tone="text-ink-amber-9 font-medium" count-key="band:stuck-head" /> tasks stuck<span class="max-md:hidden">, above your limit of {{ band.rules.stuck_limit }}</span></span>
-          <Button class="ml-auto md:hidden" size="sm" :variant="band.over_limit ? 'subtle' : 'ghost'" :class="band.over_limit && '!bg-surface-amber-2 !text-ink-amber-9'" label="Reset" route="/today/reset" data-band-reset-phone />
-        </h2>
-        <!-- desktop: one row of tiles and the Reset button; phone: the four most important as a grid, the rest scroll sideways -->
-        <div class="overflow-hidden rounded-5 border border-outline-gray-2 max-md:hidden" data-band-row>
-          <div class="grid grid-cols-[repeat(5,minmax(0,1fr))_minmax(0,1.1fr)_minmax(0,1.25fr)_auto]">
-            <Tile v-for="t in tiles" :key="t.key" :tile="t" class="border-r border-outline-gray-1" />
-            <div class="flex items-center px-4" :class="band.over_limit ? 'bg-surface-amber-1' : ''">
-              <Button :variant="band.over_limit ? 'solid' : 'subtle'" label="Reset" route="/today/reset" data-band-reset />
-            </div>
-          </div>
-        </div>
-        <div class="md:hidden" data-band-phone>
-          <div class="grid grid-cols-2 gap-2">
-            <Tile v-for="t in phoneMain" :key="t.key" :tile="t" class="rounded-5 border border-outline-gray-2" />
-          </div>
-          <div class="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1" data-band-scroll>
-            <Tile v-for="t in phoneRest" :key="t.key" :tile="t" class="w-40 flex-none rounded-5 border border-outline-gray-2" />
-          </div>
-        </div>
-        <!-- in and out this week (set 7): each number opens its list in Library > Outbox -->
-        <p v-if="d.inout" class="mt-2 flex flex-wrap items-center gap-x-1 text-sm text-ink-gray-7" data-inout>
-          <span class="lucide-arrow-left-right size-3.5 text-ink-gray-6" aria-hidden="true" /><span>This week:</span>
-          <CountLink :count="d.inout.in" :aria-label="`${d.inout.in.n} came in this week`" count-key="inout:in" /><span>in,</span>
-          <CountLink :count="d.inout.out" :aria-label="`${d.inout.out.n} left the plate this week`" count-key="inout:out" /><span>out</span>
-        </p>
-      </section>
 
     </div>
     <Dialog v-model:open="moveAllOpen" title="Move all overdue tasks to today?" size="sm"
@@ -184,11 +144,10 @@
 </template>
 
 <script setup>
-// Today (UX fixes, set 5): three questions. What is open (the Open band, each number a door), what is next (one list in
-// a fixed order: overdue, today, this week's 12 Week Year actions, decisions), and what is around it (today's events,
-// this week's dates, the other insights). Someday items never appear.
-import { computed, h, onMounted, onUnmounted, ref } from 'vue'
-import { lensAreaName, manySpaces } from '@/lib/lens'
+// Today (issue 55): tasks only. The Needs you line, the list (the top three, today, overdue folded, tasks planned this week under a
+// goal of the cycle; never a goal or a lead action), the habits row, then the rail (events, this week, insights). A goal with nothing
+// planned is one quiet line. The old Open band lives where each number counts. Someday items never appear.
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, Dialog, Dropdown, Skeleton, toast } from 'frappe-ui'
@@ -198,7 +157,7 @@ import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import Row from '@/components/ui/Row.vue'
 import AreaGuess from '@/components/AreaGuess.vue'
-import { api, errorText, optimistic, tryCall } from '@/lib/api'
+import { api, optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onboarding } from '@/lib/onboarding'
 import { addDays, long, short, startOfWeek, weekday } from '@/lib/dates'
@@ -211,68 +170,11 @@ const phone = useMediaQuery('(max-width: 767px)')
 const d = ref(null)
 const showAll = ref(false)
 const moveAllOpen = ref(false)
-const KIND_THEME = { Stuck: 'red', 'Waiting on you': 'amber', Promise: 'amber', Someday: 'violet' }
 askScope(lensScope) // the lens's area, or everything in the space (set 6)
 
-const band = computed(() => d.value.band)
-// a tile: label, the big number (a door), the line under it (a door too, amber when it is a warning)
-const tiles = computed(() => {
-  const b = band.value
-  const c = d.value.cycle
-  const goalLine = b.goals_no_ticks.n ? { count: b.goals_no_ticks, text: 'with no ticks for 3 weeks' } : { count: b.goals_no_tasks, text: 'with no tasks' }
-  return [
-    { key: 'open', label: 'Open tasks', count: b.open_tasks, sub: { count: b.stuck, text: `untouched ${b.rules.stuck_after_days}+ days`, warn: b.stuck.n > 0 } },
-    { key: 'open_goals', label: 'Open-ended goals', count: b.open_goals, pre: 'active · ', sub: { count: b.idle_goals, text: `idle ${b.rules.stuck_after_days}+ days` } },
-    { key: 'goals', label: 'Goals', count: b.goals, pre: 'in progress · ', sub: goalLine },
-    { key: 'inbox', label: 'Inbox', count: b.inbox, pre: 'to review · ', sub: { count: b.inbox_old, text: 'older than a week', warn: b.inbox_old.n > 0 } },
-    { key: 'notes', label: 'Notes and sources', count: b.notes_sources, sub: { count: b.notes_unopened, text: 'notes not opened in 90 days' } },
-    { key: 'week', label: c && c.week ? `Week ${c.week} of 12` : 'Week score', week: true },
-    { key: 'habits', label: `Habits today · ${d.value.habits.filter((x) => x.done).length} of ${d.value.habits.length}`, habits: true },
-  ]
-})
-const phoneMain = computed(() => tiles.value.filter((t) => ['open', 'inbox', 'week', 'habits'].includes(t.key)))
-const phoneRest = computed(() => tiles.value.filter((t) => !['open', 'inbox', 'week', 'habits'].includes(t.key)))
-
-const Tile = (props) => {
-  const t = props.tile
-  const box = 'flex min-w-0 flex-col gap-0.5 px-4 py-3'
-  if (t.week) {
-    const c = d.value.cycle
-    const pct = c && c.week ? Math.round(c.score) : null
-    return h('div', { class: box, 'data-tile': t.key }, [
-      h('div', { class: 'truncate text-sm text-ink-gray-7' }, t.label),
-      h('div', { class: 'flex items-baseline gap-2' }, [
-        h(RouterLinkNum, { to: '/goals/cycles', text: pct === null ? '—' : pct + '%', aria: `Week score ${pct}%` }),
-        h('span', { class: 'text-sm text-ink-gray-6' }, phone.value ? `/ ${d.value.target}%` : `target ${d.value.target}%`)]),
-      pct === null ? null : h('div', { class: 'relative mt-1.5 h-1.5 rounded-full bg-surface-gray-3', role: 'img', 'aria-label': `${pct}% of the ${d.value.target}% target`, 'data-score-bar': '' }, [
-        h('div', { class: 'h-full rounded-full ' + (pct >= d.value.target ? 'bg-surface-green-7' : 'bg-surface-gray-9'), style: { width: Math.min(pct, 100) + '%' } }),
-        h('div', { class: 'absolute -top-1 h-3.5 w-0.5 rounded-full bg-surface-blue-7', style: { left: `calc(${d.value.target}% - 1px)` }, 'aria-hidden': 'true' })]),
-    ])
-  }
-  if (t.habits) {
-    return h('div', { class: box, 'data-tile': t.key, 'data-today-habits': '' }, [
-      h('div', { class: 'truncate text-sm text-ink-gray-7', 'data-habit-count': '' }, t.label),
-      h('div', { class: 'mt-1 flex flex-wrap gap-1' }, d.value.habits.map((x) => h(Button, {
-        class: '!size-6 !p-0 text-xs', variant: x.done ? 'solid' : 'outline', disabled: !canWrite(), 'aria-pressed': x.done, 'aria-label': `${x.title}, ${x.done ? 'done' : 'not done'} today`,
-        tooltip: x.title, 'data-habit': x.habit, onClick: () => toggleHabit(x) }, () => x.title.charAt(0).toUpperCase()))),
-    ])
-  }
-  return h('div', { class: box, 'data-tile': t.key }, [
-    h('div', { class: 'truncate text-sm text-ink-gray-7' }, t.label),
-    h(CountLink, { count: t.count, tone: 'text-2xl-semibold text-ink-gray-9', countKey: 'band:' + t.key }),
-    h('div', { class: 'text-sm ' + (t.sub.warn ? 'text-ink-amber-9' : 'text-ink-gray-6') }, [
-      phone.value ? null : t.pre || null,
-      h(CountLink, { count: t.sub.count, tone: t.sub.warn ? 'text-ink-amber-9' : 'text-ink-gray-6', countKey: 'band:' + t.key + ':sub', ariaLabel: `${t.sub.count.n} ${t.sub.text}` }),
-      ' ' + (phone.value && t.key === 'open' ? 'stuck' : t.sub.text)]),
-  ])
-}
-Tile.props = ['tile']
-const RouterLinkNum = (p) => h(RouterLink, { to: p.to, class: 'rounded-1 text-2xl-semibold tabular-nums text-ink-gray-9 hover:underline focus-visible:focus-ring', 'aria-label': p.aria, 'data-week-score': '' }, () => p.text)
-RouterLinkNum.props = ['to', 'text', 'aria']
-
 // Next: about 8 rows across the groups in order, then "N more"
-// issue 15: today's plate reads top three, today, overdue (folded until asked for), 12 Week Year actions, decisions
-const PLATE_ORDER = ['top', 'today', 'overdue', 'twy', 'decisions']
+// today's plate reads top three, today, overdue (folded until asked for), then the week's tasks under goals
+const PLATE_ORDER = ['top', 'today', 'overdue', 'week']
 const overdueOpen = ref(false)
 // events are in the calendar beside the plate, not twice
 const groups = computed(() => d.value.next.groups.map((g) => (g.key === 'today' ? { ...g, rows: g.rows.filter((r) => r.type !== 'event') } : g))
@@ -291,7 +193,7 @@ const plateCount = computed(() => (d.value.next.groups.find((g) => g.key === 'to
 const meetingCount = computed(() => d.value.rail.events.filter((e) => e.source !== 'task').length)
 const hidden = computed(() => groups.value.filter((g) => g.key !== 'overdue' || overdueOpen.value).reduce((n, g) => n + g.rows.length, 0) - visibleGroups.value.reduce((n, g) => n + g.shown.length, 0))
 // a guessed area shows as its own chip before the line (issue 13)
-const taskLine = (r) => [!r.area_guessed && r.area_name, r.goal_title, r.source_title && 'from ' + r.source_title, r.status === 'Waiting' && r.waiting_on && 'waiting on ' + r.waiting_on].filter(Boolean).join(' · ') || (r.area_guessed ? '' : 'Unfiled')
+const taskLine = (r) => [!r.area_guessed && r.area_name, r.goal ? '' : r.goal_title, r.source_title && 'from ' + r.source_title, r.status === 'Waiting' && r.waiting_on && 'waiting on ' + r.waiting_on].filter(Boolean).join(' · ') || (r.area_guessed ? '' : 'Unfiled')
 function duration(e) {
   if (e.all_day || !e.start || !e.end) return ''
   const m = Math.round((new Date(e.end.replace(' ', 'T')) - new Date(e.start.replace(' ', 'T'))) / 60000)
@@ -352,40 +254,9 @@ async function moveAll({ close }) {
   if (out) { toast.success(`${out.moved} task${out.moved === 1 ? '' : 's'} moved to today`); load() }
 }
 // ticking a 12 Week Year action records the week's tick; the week score follows
-async function tick(a) {
-  const c = d.value.cycle
-  const before = a.count
-  const next = before >= a.per_week ? 0 : before + 1
-  try {
-    await optimistic(() => (a.count = next), () => (a.count = before), async () => {
-      const score = await api('journal.tick', { action: a.name, week: c.week, count: next })
-      Object.assign(c, { done: score.done, planned: score.planned, score: score.percent })
-    })
-  } catch { /* told by optimistic */ }
-}
 function toggleHabit(x) {
   optimistic(() => (x.done = !x.done), () => (x.done = !x.done),
     () => api('journal.toggle_habit', { habit: x.habit, date: d.value.date, done: x.done ? 1 : 0 })).catch(() => {})
-}
-// an insight's buttons: nothing changes until clicked; a click calls the normal API and offers Undo where it can
-async function runAction(r, i) {
-  const a = r.actions[i]
-  if (a.kind === 'open_reset') return router.push({ path: '/today/reset' })
-  if (a.kind === 'open_list') return router.push(a.to)
-  if (a.kind === 'open_record') return openRef(a.ref)
-  try {
-    const out = await api('insights.act', { insight: r.name, index: i })
-    if (out.undo) toast.success(`${a.label}: done.`, { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('reset.undo', { log: JSON.stringify(out.undo) }); await api('insights.restore', { insight: r.name }); load() } } })
-    else toast.success(a.kind === 'make_task' ? 'Task made.' : 'Done.')
-    load()
-  } catch (e) { toast.error(errorText(e)) }
-}
-async function dismiss(r) {
-  try {
-    await api('insights.dismiss', { insight: r.name })
-    toast.success('Dismissed. It will not come back unless something changes.', { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('insights.restore', { insight: r.name }); load() } } })
-    load()
-  } catch (e) { toast.error(errorText(e)) }
 }
 let clock = null
 onMounted(() => { load(); clock = setInterval(() => (nowTime.value = new Date().toTimeString().slice(0, 5)), 60000) })

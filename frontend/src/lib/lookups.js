@@ -21,9 +21,14 @@ export function areaLabel(a) {
 // them in that order and leaves out the areas that are off. `title` is the full name, for the chosen value.
 export const PART_INDENT = '\u2003'
 export function areaOptionsOf(areas) {
-  return (areas || []).map((a) => {
+  // a part sits one step in, and a focus (issue 57) under it two
+  const path = (a) => {
     const parent = a.parent_area && areas.find((x) => x.name === a.parent_area)
-    return { value: a.name, label: (a.parent_area ? PART_INDENT : '') + a.area_name, title: (parent ? parent.area_name + ' / ' : '') + a.area_name }
+    return parent ? [...path(parent), a] : [a]
+  }
+  return (areas || []).map((a) => {
+    const chain = path(a)
+    return { value: a.name, label: PART_INDENT.repeat(chain.length - 1) + a.area_name, title: chain.map((x) => x.area_name).join(' / ') }
   })
 }
 export const areaOptions = () => areaOptionsOf(lookups.areas)

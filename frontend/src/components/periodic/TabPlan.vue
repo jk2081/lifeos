@@ -29,6 +29,8 @@
                 <FormControl type="select" :label="monthly ? 'Serves (optional)' : 'Serves (optional)'" :model-value="g.serves || ''" :options="[{ label: '—', value: '' }, ...(d.serves_options || goalChoices)]"
                   @update:model-value="(v) => edit(g, { serves: v })" />
               </div>
+              <FormControl v-if="monthly && !g.carried_from && store.settings.require_done_when" type="text" label="Done when" :model-value="g.done_when" placeholder="What is true when it is done"
+                data-plan-done-when @update:model-value="(v) => edit(g, { done_when: v })" />
               <template v-if="!monthly">
                 <FormControl type="text" label="Done when" :model-value="g.done_when" placeholder="What is true when it is done" data-plan-done-when @update:model-value="(v) => edit(g, { done_when: v })" />
                 <FormControl v-if="g.carried_from && g.measure_kind === 'Number'" class="max-w-xs" type="number" :label="`Target${g.unit ? ' (' + g.unit + ')' : ''}`" :model-value="g.target"
@@ -47,6 +49,17 @@
           </ol>
           <Empty v-if="!d.goals.length" :title="monthly ? 'No goals for next month yet.' : 'No goals for the next cycle yet.'" hint="Add one, or carry a goal on in the step before." />
           <div><Button icon-left="lucide-plus" label="Add a goal" data-plan-add @click="add" /></div>
+        </Card>
+        <Card v-if="!monthly && d.focuses?.length" class="flex min-w-0 flex-col gap-3" data-plan-focuses>
+          <div>
+            <h3 class="text-base-medium text-ink-gray-9">Focuses with no goal this cycle</h3>
+            <p class="text-sm text-ink-gray-6">One question each: set a goal this cycle, or just maintain it.</p>
+          </div>
+          <div v-for="f in d.focuses" :key="f.name" class="flex flex-wrap items-center gap-2 rounded-5 border border-outline-gray-2 p-3" data-plan-focus :data-focus="f.area_name">
+            <div class="min-w-0 flex-1"><div class="text-base-medium text-ink-gray-9">{{ f.area_name }}</div><div v-if="f.standard" class="text-sm text-ink-gray-6">{{ f.standard }}</div></div>
+            <Button size="sm" variant="subtle" icon-left="lucide-plus" label="Set a goal this cycle" data-plan-focus-goal @click="goalFor(f)" />
+            <Button size="sm" variant="ghost" label="Just maintain it" data-plan-focus-maintain @click="maintain(f)" />
+          </div>
         </Card>
         <Card v-if="monthly" class="flex min-w-0 flex-col gap-3" data-plan-habits>
           <h3 class="text-base-medium text-ink-gray-9">Habits for {{ d.title }}</h3>
@@ -74,6 +87,7 @@ import ReviewFooter from '@/components/weekly/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 import { areaOptions, goalOptions, loadLookups } from '@/lib/lookups'
 import { long, short } from '@/lib/dates'
+import { store } from '@/lib/store'
 
 const emit = defineEmits(['go'])
 const r = useReview()
@@ -99,7 +113,7 @@ const edits = () => Object.fromEntries(d.value.goals.filter((g) => g.carried_fro
 function payload() {
   const out = { extra: extras().map((g) => ({ id: g.id, title: g.title, area: g.area, serves: g.serves, done_when: g.done_when, actions: g.actions })) }
   if (monthly.value) out.habits = d.value.habits.map((h) => ({ habit: h.habit, days_per_week: h.days_per_week }))
-  else out.edits = edits()
+  else { out.edits = edits(); out.maintain = d.value.maintained || [] }
   return out
 }
 function queue() {
@@ -124,6 +138,16 @@ const addAction = (g) => edit(g, { actions: [...g.actions, { title: '', per_week
 const removeAction = (g, k) => edit(g, { actions: g.actions.filter((_, i) => i !== k) })
 function add() {
   d.value.goals.push({ id: 'new' + Date.now(), title: '', area: '', serves: '', done_when: '', actions: monthly.value ? [] : [{ title: '', per_week: 3 }], carried_from: null })
+  queue()
+}
+function goalFor(f) {
+  d.value.goals.push({ id: 'new' + Date.now(), title: '', area: f.name, serves: '', done_when: '', actions: [{ title: '', per_week: 3 }], carried_from: null })
+  d.value.focuses = d.value.focuses.filter((x) => x.name !== f.name)
+  queue()
+}
+function maintain(f) {
+  d.value.maintained = [...(d.value.maintained || []), f.name]
+  d.value.focuses = d.value.focuses.filter((x) => x.name !== f.name)
   queue()
 }
 function remove(g) { d.value.goals = d.value.goals.filter((x) => x !== g); queue() }

@@ -9,7 +9,7 @@ import builtins
 import frappe
 from frappe import _
 
-from lifeos import permissions
+from lifeos import counts, permissions
 from lifeos.api.utils import area_filter, flag, page
 from lifeos.api.sources import agent_users
 
@@ -30,7 +30,7 @@ def _like(text: str) -> str:
 	return "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
-def _index_rows(space, tab, q, area, goal, source, include_archived, limit):
+def _index_rows(space, tab, q, area, goal, source, include_archived, limit, unopened=False):
 	where, values = ["x.space = %(space)s", TAB_SQL[tab]], {"space": space}
 	where.append("1=1" + permissions.vault_guard(space, "x."))
 	if not flag(include_archived):
@@ -43,6 +43,9 @@ def _index_rows(space, tab, q, area, goal, source, include_archived, limit):
 	if goal:
 		where.append("x.goal = %(goal)s")
 		values["goal"] = "" if goal == "none" else goal
+	if unopened:  # notes not opened in 90 days (the Library's "Not opened in 90 days" filter)
+		where.append("(x.ref_doctype = 'Life Note' and exists (select 1 from `tabLife Note` un where un.name = x.ref_name and un.last_opened_on <= %(unopened_cut)s))")
+		values["unopened_cut"] = counts.ago(90)
 	if source in ("me", "brain"):
 		where.append(("" if source == "brain" else "not ") + "(x.record_owner in %(agents)s or x.collection = 'Wiki')")
 		values["agents"] = agent_users()
@@ -130,12 +133,12 @@ def _decorate(rows):
 
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, tab: str | None = "all", q: str | None = None, area: str | None = None, goal: str | None = None, source: str | None = None,
-		include_archived: bool | int | None = 0, start: int | None = 0, page_length: int | None = 50):
+		include_archived: bool | int | None = 0, start: int | None = 0, page_length: int | None = 50, unopened: bool | int | None = 0):
 	"""Everything kept in a space: notes (and wiki pages), documents (Vault documents and kept files), people and chats, newest first.
 	tab: all, notes, documents, people (Life Person and wiki pages about people), chats. q: a word in the title or the body.
 	area (with its parts, or "none"), goal (or "none"), source: me, brain (kept by an agent or the wiki), or a system such as gmail.
 	Each row has: ref, kind (note, person, document, chat), letter (N, P, D, C), title, line, area_name, goal_title, date, sensitive, by_brain.
-	`total` is what the filters match; `sources` lists the systems things came from."""
+	unopened=1 keeps notes not opened in 90 days (people are left out). `total` is what the filters match; `sources` lists the systems things came from."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	tab = tab or "all"
@@ -143,8 +146,8 @@ def list(space: str | None = None, tab: str | None = "all", q: str | None = None
 		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)))
 	q = (q or "").strip()[:200]
 	limit = start + page_length
-	idx, idx_total = _index_rows(space, tab, q, area, goal, source, include_archived, limit)
-	people, people_total = _person_rows(space, tab, q, area, goal, source, include_archived, limit)
+	idx, idx_total = _index_rows(space, tab, q, area, goal, source, include_archived, limit, flag(unopened))
+	people, people_total = ([], 0) if flag(unopened) else _person_rows(space, tab, q, area, goal, source, include_archived, limit)
 	rows = _decorate(idx)
 	for row, r in zip(rows, idx):
 		row["_at"] = str(r.modified)

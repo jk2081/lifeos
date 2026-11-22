@@ -37,7 +37,7 @@ const route = useRoute()
 const router = useRouter()
 const current = computed(() => props.tab || 'all')
 // the list's kind each tab holds ('' for any kind)
-const OWN_QUERY = ['space', 'area', 'goal', 'source', 'q', 'open', 'ptab']
+const OWN_QUERY = ['space', 'area', 'goal', 'source', 'q', 'open', 'ptab', 'unopened']
 const own = computed(() => current.value === 'all' && Object.keys(route.query).every((k) => OWN_QUERY.includes(k)))
 const KIND = { all: '', documents: 'documents', chats: 'chats' }
 const LINKS = [

@@ -25,9 +25,10 @@
             <Dropdown v-if="canWrite()" :options="goalMenu(g)"><Button variant="ghost" icon="lucide-ellipsis" :label="'Actions for ' + g.title" /></Dropdown>
           </Row>
           <Empty v-if="!d.plan.goals.length" title="No goals this month." hint="Add what you want done this month. The order is your priority." />
-          <Row v-if="canWrite()">
-            <TextInput v-model="newGoal" class="min-w-0 flex-1" placeholder="Add a goal for the month" aria-label="New goal" @keydown.enter="addGoal" />
-          </Row>
+          <Row v-if="canWrite()"><div class="flex min-w-0 flex-1 flex-wrap gap-2">
+            <TextInput v-model="newGoal" class="min-w-0 flex-1 max-sm:basis-full" placeholder="Add a goal for the month" aria-label="New goal" @keydown.enter="addGoal" />
+            <TextInput v-if="doneWhenRequired()" v-model="newDone" class="min-w-0 flex-1 max-sm:basis-full" placeholder="Done when…" aria-label="Done when" data-month-done-when @keydown.enter="addGoal" />
+          </div></Row>
         </Card>
       </section>
       <section>
@@ -72,6 +73,7 @@ import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
+import { doneWhenRequired } from '@/lib/goals'
 import { MONTHS, long, parse } from '@/lib/dates'
 
 // `embedded`: opened over Goals > Cycles, with no header buttons to teleport to
@@ -82,6 +84,7 @@ const year = ref(now.getFullYear())
 const month = ref(now.getMonth() + 1)
 const d = ref(null)
 const newGoal = ref('')
+const newDone = ref('')
 const editing = ref(false)
 const sweep = ref('')
 const saveState = ref('')
@@ -107,9 +110,8 @@ async function setGoal(g, values) {
 async function addGoal() {
   const title = newGoal.value.trim()
   if (!title) return
-  newGoal.value = ''
-  const res = await tryCall(() => api('journal.save_month_goal', { plan: d.value.plan.name, title }))
-  if (res) d.value.plan = res
+  const res = await tryCall(() => api('journal.save_month_goal', { plan: d.value.plan.name, title, done_when: newDone.value.trim() || undefined }))
+  if (res) { d.value.plan = res; newGoal.value = ''; newDone.value = '' }
 }
 function goalMenu(g) {
   const items = []

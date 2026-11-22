@@ -55,7 +55,7 @@ class TestAllTasks(LifeTestCase):
 		self.make("Life Task", title="i21 wait", area=self.career, status="Waiting", waiting_on="Mr. Rao")
 		self.make("Life Task", title="i21 done", area=self.career, status="Done")
 		counts = tasks.all_tasks(space=PRIVATE)["counts"]
-		self.assertEqual(counts, {"open": 3, "due": 1, "waiting": 1, "someday": 0, "done": 1})
+		self.assertEqual(counts, dict(open=3, due=1, waiting=1, stuck=0, someday=0, done=1))
 		for show, n in (("due", 1), ("waiting", 1), ("done", 1)):
 			self.assertEqual(tasks.all_tasks(space=PRIVATE, show=show)["total"], n)
 		self.assertEqual(tasks.all_tasks(space=PRIVATE, q="soon")["total"], 1)
