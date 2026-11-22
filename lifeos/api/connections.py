@@ -72,7 +72,6 @@ def _out(c):
 	quiet = bool(c.active and (not c.last_received_on or c.last_received_on < add_to_date(now_datetime(), hours=-hours)))
 	return {"name": c.name, "system": c.system, "label": c.label or c.system.title(), "default_area": c.default_area, "default_area_name": area,
 		"default_goal": c.default_goal, "default_goal_title": goal, "default_intent": c.default_intent or "Process",
-		"default_project": c.default_goal,  # the old name, for one set after projects became goals (set 6)
 		"active": int(c.active or 0), "last_received_on": str(c.last_received_on) if c.last_received_on else None,
 		"last_received_what": c.last_received_what, "quiet": quiet, "quiet_hours": hours}
 
@@ -122,11 +121,11 @@ def sources(space: str | None = None):
 @frappe.whitelist(methods=["GET"])
 def defaults(space: str | None = None, system: str | None = None):
 	"""The filing defaults for what arrives from `system` in `space`: default_area, default_goal, default_intent and active.
-	A system with no connection row answers Process with no area or goal. default_project repeats default_goal for one set."""
+	A system with no connection row answers Process with no area or goal."""
 	space = permissions.resolve_space(space)
 	c = connection(space, system)
 	if not c:
-		return {"system": (system or "").lower(), "default_area": None, "default_goal": None, "default_project": None, "default_intent": "Process",
+		return {"system": (system or "").lower(), "default_area": None, "default_goal": None, "default_intent": "Process",
 			"active": 1, "known": 0}
 	return {**_out(c), "known": 1}
 
@@ -144,7 +143,7 @@ def list(space: str | None = None):
 @frappe.whitelist(methods=["POST"])
 def save(space: str | None = None, system: str | None = None, name: str | None = None, label: str | None = None,
 		default_area: str | None = None, default_goal: str | None = None, default_intent: str | None = None,
-		active: bool | int | None = None, default_project: str | None = None):
+		active: bool | int | None = None):
 	"""Create or change a connection. People with Write access only; agents read the defaults and cannot change them."""
 	if permissions.is_agent():
 		frappe.throw(_("Only a person can change a connection."), frappe.PermissionError)
@@ -162,10 +161,6 @@ def save(space: str | None = None, system: str | None = None, name: str | None =
 		doc.label = label
 	if default_area is not None:
 		doc.default_area = default_area or None
-	if default_goal is None and default_project is not None:  # the old name, for one set: a project names the goal it became
-		from lifeos.proposals import goal_for_project
-
-		default_goal = (goal_for_project(default_project, doc.space) or default_project) if default_project else ""
 	if default_goal is not None:
 		doc.default_goal = default_goal or None
 	if default_intent is not None:

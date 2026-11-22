@@ -107,7 +107,7 @@ const SHORTCUTS = [
 
 useColorScheme() // light and dark come from frappe-ui: it follows the system setting and stamps data-theme on <html>
 
-// a new goal from the New menu: open-ended by default (what a project was before set 6); a 12 Week Year goal is added on the grid
+// a new goal from the New menu: open-ended by default; a 12 Week Year goal is added on the grid
 async function createNote(v) {
   const note = await db.insert({ doctype: 'Life Note', space: store.space, title: v.title, content_md: '' })
   store.newKind = ''

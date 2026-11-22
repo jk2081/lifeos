@@ -5,7 +5,6 @@ import frappe
 from frappe import _
 
 from lifeos import links, permissions
-from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, extra_columns, flag, in_area, lens_area, names_map, page, parse, std_clause, std_filters, std_order, summarise
 from lifeos.api.utils import order_by as sort_order
 
@@ -55,9 +54,9 @@ SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modi
 
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, area: str | None = None, goal: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
-		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, collection: str | None = "My notes", project: str | None = None):
+		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, collection: str | None = "My notes"):
 	"""Notes of a space as a flat list, newest first. Reads Life Index. With collection "all" the list also holds journal pages (`kind` "Journal page").
-	Filters: area (with its sub-areas, or "none"), goal (a goal, or "none" for reference notes; `project` names the goal a project became),
+	Filters: area (with its sub-areas, or "none"), goal (a goal, or "none" for reference notes),
 	collection (My notes, the default; Wiki; or "all").
 	`total` is the number of notes the filters match."""
 	space = permissions.resolve_space(space)
@@ -72,8 +71,6 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 		where.append("x.is_archived = 0")
 	if area:
 		where.append(area_filter(space, area, "x.area", values, also_in="index"))
-	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
-		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	if goal:
 		where.append("x.goal = %(goal)s")
 		values["goal"] = "" if goal == "none" else goal

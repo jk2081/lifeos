@@ -12,7 +12,6 @@ from lifeos.life.doctype.life_goal.life_goal import HORIZONS, derive_horizon, pl
 from lifeos.areas import off as areas_off
 from lifeos.areas import off_clause
 from lifeos.api.utils import area_filter, names_map, parse, page, std_clause, std_order, summarise, tab_counts
-from lifeos.proposals import goal_for_project
 from lifeos.api.utils import order_by as sort_order
 
 TYPES = ("12 weeks", "Month", "Year", "Long term")  # the order lists show them in
@@ -87,8 +86,7 @@ def list(space: str | None = None, state: str | None = "in_progress", horizon: s
 	"""Goals of a space of every type. state: in_progress (default), achieved, closed (Partly Achieved, Not Achieved,
 	Carried, Dropped) or all. Each row has tasks_done and tasks_counted, and `score` (the 12 Week Year percentage; None
 	for other types). `tabs` counts each state under the other filters; `summary_line` has goals in progress and tasks
-	done out of counted across the goals the filters match. `serves` keeps the goals that serve one goal. Former projects are
-	goals of type Open (set 6): each row also has on_hold, done_when, serves and its title, and last_activity_on."""
+	done out of counted across the goals the filters match. `serves` keeps the goals that serve one goal. Each row also has on_hold, done_when, serves and its title, and last_activity_on."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	where, values = where_clause(space, state, horizon, area, cycle, target_from, target_to, serves)
@@ -301,14 +299,14 @@ def suggest_horizon(space: str | None = None, target_date: str | None = None, cy
 
 
 @frappe.whitelist(methods=["POST"])
-def create(title: str, horizon: str | None = None, space: str | None = None, area: str | None = None, project: str | None = None, target_date: str | None = None,
+def create(title: str, horizon: str | None = None, space: str | None = None, area: str | None = None, target_date: str | None = None,
 		cycle: str | None = None, serves: str | None = None, done_when: str | None = None, notes_md: str | None = None,
 		measure_kind: str | None = None, measure: str | None = None, unit: str | None = None, start_value: float | str | None = None,
 		target_value: float | str | None = None):
 	"""Create a goal. Its horizon (Long term, Year, 12 weeks, Month) is worked out from the target date and the cycle when
 	not given. A 12-week goal needs a cycle (or, planning in quarters, a date in the quarter); a Year or Month goal needs a
 	target date. `serves` is the longer goal it
-	serves; `project` is read as the goal that project became, for one set (set 6). Key results (set 7): `measure_kind`
+	serves; Key results (set 7): `measure_kind`
 	Milestone needs `done_when`; Number needs `measure`, `start_value` and `target_value` (with `unit`)."""
 	_person_only()
 	if cycle:
@@ -320,7 +318,7 @@ def create(title: str, horizon: str | None = None, space: str | None = None, are
 		frappe.throw(_("Unknown horizon."))
 	last = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s", space)[0][0]
 	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": (title or "").strip(), "horizon": horizon, "area": area or None,
-		"serves": serves or (project and goal_for_project(project, space)) or None, "done_when": done_when or None, "notes_md": notes_md or None,
+		"serves": serves or None, "done_when": done_when or None, "notes_md": notes_md or None,
 		"target_date": target_date or None, "cycle": cycle if horizon == "12 weeks" else None, "sort_order": last + 1,
 		**measure_values(measure_kind, done_when, measure, unit, start_value, target_value)})
 	doc.insert()
@@ -518,16 +516,6 @@ def update(goal: str, values: str | dict):
 		doc.measure_kind = "Milestone"
 	doc.save()
 	return get(doc.name)
-
-
-@frappe.whitelist(methods=["GET"])
-def for_project(project: str):
-	"""The goal a project became (set 6), for old links to a project. People only: projects are hidden from agents."""
-	_person_only()
-	doc = permissions.get_doc_checked("Life Project", project)
-	if not doc.migrated_to:
-		frappe.throw(_("This project has not been moved to a goal yet."), frappe.DoesNotExistError)
-	return {"project": doc.name, "goal": doc.migrated_to}
 
 
 # ---- key results (set 7): suggestions, habits, readings ----

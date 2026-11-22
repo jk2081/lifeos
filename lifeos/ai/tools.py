@@ -19,7 +19,7 @@ show so than that the their them then there these they this to up was we were wh
 still open here stuck tell give list find about any all""".split())
 
 KIND_DOCTYPE = {"task": "Life Task", "note": "Life Note", "source": "Life Inbox Item", "chat": "Life Chat Log", "document": "Life Vault Document",
-	"journal page": "Life Journal Page", "project": "Life Goal", "goal": "Life Goal", "insight": "Life Insight"}
+	"journal page": "Life Journal Page", "goal": "Life Goal", "insight": "Life Insight"}
 INDEX_KIND = {"task": "Task", "note": "Note", "source": "Inbox", "chat": "Chat", "document": "Document", "journal page": "Journal Page",
 	"check-in": "Check-in", "month plan": "Month Plan"}
 
@@ -32,10 +32,10 @@ TOOLS = [
 			"required": ["query"]}},
 	{"name": "get_record", "description": "One record's fields and text (truncated), by its reference (R3) or doctype and name.",
 		"input_schema": {"type": "object", "properties": {"ref": {"type": "string"}, "doctype": {"type": "string"}, "name": {"type": "string"}}}},
-	{"name": "list_records", "description": "Rows of one kind, at most 50: tasks, goals (projects are open-ended goals), notes, sources, chats, someday (parked tasks, goals and notes), insights.",
+	{"name": "list_records", "description": "Rows of one kind, at most 50: tasks, goals, notes, sources, chats, someday (parked tasks, goals and notes), insights.",
 		"input_schema": {"type": "object", "properties": {
-			"kind": {"type": "string", "enum": ["tasks", "goals", "projects", "notes", "sources", "chats", "someday", "insights"]},
-			"filters": {"type": "object", "description": "For tasks: status (open, waiting, done, someday, overdue, due_today, stuck), area, goal. For goals: state (in_progress, achieved, closed, someday), type (12 Week Year, Annual, Open), area. projects lists open-ended goals. Others: area."},
+			"kind": {"type": "string", "enum": ["tasks", "goals", "notes", "sources", "chats", "someday", "insights"]},
+			"filters": {"type": "object", "description": "For tasks: status (open, waiting, done, someday, overdue, due_today, stuck), area, goal. For goals: state (in_progress, achieved, closed, someday), type (12 Week Year, Annual, Open), area. Others: area."},
 			"order": {"type": "string", "enum": ["oldest", "newest", "due"]}, "limit": {"type": "integer"}},
 			"required": ["kind"]}},
 	{"name": "counts", "description": "A count with the list it opens: open_tasks, stuck_tasks, overdue_tasks, due_today_tasks, open_goals, idle_goals, goals_in_progress, inbox_to_review, inbox_old, someday, someday_due.",
@@ -93,7 +93,7 @@ class Context:
 			from lifeos.index import also_in_sql
 
 			return f" and ({alias}area in %(scope_ids)s or {also_in_sql('scope_ids', alias)})", values
-		if k in ("goal", "project") and s.get("name"):  # a goal: what is filed under it, and what links to it
+		if k in ("goal",) and s.get("name"):  # a goal: what is filed under it, and what links to it
 			return f" and ({alias}goal = %(scope_goal)s or {alias}ref_name in %(scope_names)s)", {"scope_goal": s["name"], "scope_names": self.scope_names() or [""]}
 		if k in ("record", "items") and self.scope_names():
 			return f" and {alias}ref_name in %(scope_names)s", {"scope_names": self.scope_names()}
@@ -261,7 +261,7 @@ def t_list(ctx, kind, filters=None, order=None, limit=20):
 	scope = ctx.scope
 	if scope.get("kind") == "area" and not area:
 		area = scope.get("name")
-	goal = filters.get("goal") or filters.get("project") or (scope.get("name") if scope.get("kind") in ("goal", "project") else None)
+	goal = filters.get("goal") or (scope.get("name") if scope.get("kind") in ("goal",) else None)
 	if kind == "tasks":
 		st = str(filters.get("status") or "open").lower()
 		args = {"space": ctx.space, "area": area, "goal": goal, "page_length": limit}
@@ -289,8 +289,8 @@ def t_list(ctx, kind, filters=None, order=None, limit=20):
 			args["filters"] = json.dumps([*(json.loads(args.get("filters") or "[]")), ["name", "in", ctx.scope_names()]])
 		res = tasks.list(**args)
 		return {"total": res["total"], "rows": _rows_out(ctx, "Life Task", res["tasks"], extra=("status", "due_date", "goal_title", "last_touched_on", "waiting_on"))}
-	if kind in ("goals", "projects"):  # projects are open-ended goals since set 6
-		horizon = filters.get("type") or ("Long term" if kind == "projects" else None)
+	if kind == "goals":
+		horizon = filters.get("type")
 		res = goals.list(space=ctx.space, state=filters.get("state") or "in_progress", horizon=horizon if horizon in goals.TYPES else None,
 			area=area, page_length=limit)
 		return {"total": res["total"], "rows": _rows_out(ctx, "Life Goal", res["goals"], extra=("horizon", "outcome", "tasks_done", "tasks_counted", "score"))}

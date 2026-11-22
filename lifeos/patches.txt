@@ -15,3 +15,4 @@ lifeos.patches.v11.life_areas
 lifeos.patches.v12.task_areas
 lifeos.patches.v13.link_people
 lifeos.patches.v14.one_goal_horizon
+lifeos.patches.v15.remove_life_project

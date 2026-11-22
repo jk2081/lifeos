@@ -629,12 +629,13 @@ await check('S2', 'Security: the PWA manifest and icons are served; an agent can
 const uxArea = areaId('Tea & Coffee')
 const ux = {}
 {
-  // records the checks need, made through the API as the owner. Set 6: a project became an open-ended goal (type Open);
-  // ux.project is a former project of the area and ux.goal the goal it became.
+  // records the checks need, made through the API as the owner. ux.goal is an open-ended goal of the area (what a project was
+  // before set 6); ux.oldProject is the id an old project link carries (the table is gone since issue 48).
   const former = JSON.parse(bench(`import json
-print(json.dumps(frappe.db.sql("select p.name, p.migrated_to from \`tabLife Project\` p join \`tabLife Goal\` g on g.name = p.migrated_to where p.space='${SPACE}' and g.area='${uxArea}' and g.outcome='In Progress' and g.is_archived=0 and g.is_someday=0 order by p.creation limit 1")))`).split('\n').pop())
-  must(former.length, 'no former project of Tea & Coffee on the acceptance site')
-  ;[[ux.project, ux.goal]] = former
+print(json.dumps(frappe.db.sql("select name from \`tabLife Goal\` where space='${SPACE}' and area='${uxArea}' and horizon='Long term' and outcome='In Progress' and is_archived=0 and is_someday=0 order by creation limit 1")))`).split('\n').pop())
+  must(former.length, 'no open-ended goal of Tea & Coffee on the acceptance site')
+  ux.goal = former[0][0]
+  ux.oldProject = 'PRJ-0001'
   ux.goalTitle = (await owner.api('goals.get', { goal: ux.goal })).goal.title
   ux.task = (await owner.api('tasks.quick_add', { text: `UX door task ${stamp}`, space: SPACE, goal: ux.goal, area: uxArea, priority: 'I', due_date: addDays(-2) })).name
   await owner.api('tasks.quick_add', { text: `UX due today ${stamp}`, space: SPACE, area: uxArea, due_date: today })
@@ -821,8 +822,8 @@ for (const width of UX_WIDTHS) {
       await settle()
       must(new URL(pg.url()).pathname === `/life/item/${ux.inbox}` && !(await pane.isVisible()), "Open full page did not open the item page")
       // every pane type opens from its reference
-      // set 6: goal: and a former project: (the goal it became) open in the pane too
-      for (const ref of [`task:${ux.task}`, `note:${ux.note}`, `vault:${ux.vault}`, `goal:${ux.goal}`, `project:${ux.project}`, `chat:${ux.chat}`, `day:${today}`]) {
+      // set 6: goal: opens in the pane too
+      for (const ref of [`task:${ux.task}`, `note:${ux.note}`, `vault:${ux.vault}`, `goal:${ux.goal}`, `chat:${ux.chat}`, `day:${today}`]) {
         await s.open('/life/library/timeline?open=' + encodeURIComponent(ref))
         must(await pane.isVisible() && !(await pg.locator('[data-pane-title]').innerText()).match(/Loading|Not found/), `the pane did not load ${ref}`)
       }
@@ -1512,7 +1513,6 @@ for (const width of UX_WIDTHS) {
       ['note:' + leaf, ['Note', 'Links']],
       ['goal:' + one('Life Goal', "horizon='12 weeks'"), null], // Actions, Tasks, History across cycles, Links
       ['goal:' + ux.goal, ['Tasks', 'Links']], // an open-ended goal (a project before set 6) has no actions
-      ['project:' + ux.project, ['Tasks', 'Links']], // a link to a project opens the goal it became
       ['chat:' + one('Life Chat Log', "is_archived=0 and ifnull(transcript_md, '')=''"), ['Summary', 'Open items', 'Made from this', 'Links']],
       ['page:' + one('Life Journal Page'), ['Page', 'Transcript', 'Created from this page']],
       ['vault:' + one('Life Vault Document', 'is_archived=0'), ['Details', 'File']],
@@ -2456,9 +2456,8 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
     ['/tasks?priority=I&view=list', '/goals/tasks', { priority: 'I', view: 'list' }],
     ['/goals?status=achieved', '/goals', { status: 'achieved' }],
     ['/someday?tab=notes', '/goals/someday', { tab: 'notes' }],
-    ['/projects?status=On%20Hold', '/goals', { type: 'Long term', status: 'in_progress' }],
-    ['/projects?status=Done', '/goals', { type: 'Long term', status: 'achieved' }],
-    [`/projects/${ux.project}?tab=tasks`, `/goals/${ux.goal}`, { tab: 'tasks' }],
+    ['/projects', '/goals', {}], // issue 48: the old Projects screen and a project's page land on Goals
+    [`/projects/${ux.oldProject}?tab=tasks`, '/goals', {}],
     ['/reset', '/today/week', { view: 'review', tab: 'tasks' }], // set 8: set 7's Reset step is the review's Tasks tab
     ['/calendar/week?date=2026-12-02', '/today/week', { view: 'calendar', date: '2026-12-02' }],
     ['/calendar/agenda', '/today/week', { view: 'agenda' }],
@@ -2491,7 +2490,7 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
   const bad = []
   for (const [from, to, q] of ROUTES) {
     await owner.open('/life' + from)
-    for (let i = 0; i < 20 && pathOf(pg).startsWith('/life/projects/'); i++) await pg.waitForTimeout(200) // waits for goals.for_project
+    await pg.waitForTimeout(200)
     const u = new URL(pg.url())
     const wrong = [pathOf(pg) !== ('/life' + to).replace(/\/$/, '') && `path ${u.pathname}`, ...Object.entries(q).map(([k, v]) => u.searchParams.get(k) !== v && `${k}=${u.searchParams.get(k)}`)].filter(Boolean)
     if (!wrong.length && q.open) { if (!(await pg.locator('[data-pane]').isVisible())) wrong.push('no pane') }
@@ -2503,23 +2502,12 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
   return `${ROUTES.length} routes`
 })
 
-await check('S6.3', 'A former project opens as an open-ended goal with its tasks; a goal shows what it serves and what serves it, and cannot serve its own servant', async () => {
+await check('S6.3', 'An open-ended goal opens with its tasks; a goal shows what it serves and what serves it, and cannot serve its own servant', async () => {
   const pg = owner.page
-  const proj = JSON.parse(bench(`import json
-p = frappe.db.get_value("Life Project", "${ux.project}", ["title", "migrated_to"], as_dict=True)
-cols = frappe.db.get_table_columns("Life Task")
-left = frappe.db.sql("select count(*) from \`tabLife Task\` where project=%s and ifnull(goal, '') not in (%s, '')", ("${ux.project}", p.migrated_to))[0][0] if "project" in cols else 0
-before = frappe.db.sql("select count(*) from \`tabLife Task\` where project=%s", "${ux.project}")[0][0] if "project" in cols else None
-print(json.dumps({"title": p.title, "goal": p.migrated_to, "unmoved": left, "had": before}))`).split('\n').pop())
-  must(proj.goal === ux.goal, 'the project has no goal')
   const got = await owner.api('goals.get', { goal: ux.goal })
-  must(got.goal.title === proj.title && got.goal.horizon === 'Long term', `the goal is "${got.goal.title}" (${got.goal.horizon}), the project was "${proj.title}"`)
-  // the project's tasks are the goal's (the old column is left in the table: every task that had the project has the goal, or a goal that serves it)
-  must(!proj.unmoved || proj.unmoved === 0, `${proj.unmoved} of the project's tasks are not under its goal`)
-  await owner.open(`/life/projects/${ux.project}`)
-  for (let i = 0; i < 20 && pathOf(pg).startsWith('/life/projects/'); i++) await pg.waitForTimeout(200)
-  must(pathOf(pg) === `/life/goals/${ux.goal}`, `/projects/:id went to ${pathOf(pg)}`)
-  must((await pg.locator('h1').first().innerText()).includes(proj.title), 'the goal page does not show the project title')
+  must(got.goal.horizon === 'Long term', `the goal is ${got.goal.horizon}`)
+  await owner.open(`/life/goals/${ux.goal}`)
+  must((await pg.locator('h1').first().innerText()).includes(got.goal.title), 'the goal page does not show the goal title')
   await pg.locator('[data-page-tabs] [data-tab="tasks"]').click()
   await pg.waitForLoadState('networkidle')
   await pg.waitForTimeout(500)
@@ -2538,7 +2526,7 @@ print(json.dumps({"title": p.title, "goal": p.migrated_to, "unmoved": left, "had
   must(row.length === 1 && row[0].name === shorter.name && row[0].serves_title === `S5 longer goal ${stamp}` && row[0].done_when === 'It is done.', 'goals.list does not list what serves the goal')
   const loop = await owner.api('goals.update', { goal: longer.name, values: { serves: shorter.name } }, { raw: true })
   must(!loop.ok(), 'a goal could serve the goal that serves it')
-  return `${proj.title}: ${open} open tasks`
+  return `${got.goal.title}: ${open} open tasks`
 })
 
 await check('S6.4', 'A Vault document is a capture of kind Document, marked sensitive, with its expiry; the agent cannot read it, nor a note marked sensitive, while the switch is off; only the owner unmarks', async () => {
@@ -2641,7 +2629,7 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
   }
 })
 
-await check('S6.6', 'The fake agent runs end to end with the goal-based API: tasks it proposes are filed under the open-ended goal of their area; project= still maps to the goal for one set', async () => {
+await check('S6.6', 'The fake agent runs end to end with the goal-based API: tasks it proposes are filed under the open-ended goal of their area', async () => {
   const goals = (await owner.api('goals.list', { space: SPACE, horizon: 'Long term', area: uxArea })).goals.map((g) => g.name)
   must(goals.length, 'Tea & Coffee has no open-ended goal')
   const item = await owner.api('inbox.create_item', { title: `S5 agent pdf ${stamp}.pdf`, space: SPACE, instruction: 'summarise and extract to-dos' })
@@ -2655,15 +2643,15 @@ await check('S6.6', 'The fake agent runs end to end with the goal-based API: tas
   const made = (await owner.api('inbox.get', { item: item.name })).proposals.map((p) => p.created_name)
   const under = (await owner.api('tasks.list', { space: SPACE, goal, status: 'all', page_length: 200 })).tasks.map((t) => t.name)
   must(made.length === 3 && made.every((n) => under.includes(n)), 'the accepted tasks are not under the goal')
-  // the agent's own reads with its key: Today, the goal's tasks, and project= mapped to its goal
+  // the agent's own reads with its key: Today and the goal's tasks; the old `project` argument is refused with an error that names `goal`
   const asAgentHttp = (m, args) => agentFetch(m, args).then(async (r) => [r.status, await r.json().catch(() => ({}))])
   const [ts] = await asAgentHttp('today.get', { space: SPACE })
   must(ts === 200, `today.get answered the agent ${ts}`)
   const [, byGoal] = await asAgentHttp('tasks.list', { space: SPACE, goal: ux.goal, status: 'all', page_length: 1 })
-  const [, byProject] = await asAgentHttp('tasks.list', { space: SPACE, project: ux.project, status: 'all', page_length: 1 })
-  must(byGoal.message && byProject.message && byGoal.message.total === byProject.message.total && byGoal.message.total > 0, `project= gives ${byProject.message?.total}, goal= ${byGoal.message?.total}`)
-  const [ps] = await asAgentHttp('goals.for_project', { project: ux.project })
-  must(ps >= 400, 'an agent can read a project')
+  must(byGoal.message && byGoal.message.total > 0, `goal= gives ${byGoal.message?.total}`)
+  const [ps, pj] = await asAgentHttp('tasks.list', { space: SPACE, project: ux.goal, status: 'all', page_length: 1 })
+  must(ps === 417 || ps === 400 || ps === 417, `project= answered ${ps}`)
+  must(JSON.stringify(pj).includes('goal'), 'the error for project= does not name goal')
   return `3 tasks under ${goal}`
 })
 
@@ -3233,12 +3221,8 @@ def goal(title, **kw):
     g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": title, "area": area, **kw})
     g.flags.ignore_permissions = True
     return g.insert().name
-# a project, migrated as set 6 did: an open-ended goal with no finish line and no measure
-p = frappe.get_doc({"doctype": "Life Project", "space": "${SPACE}", "title": "BF1 project ${W}", "area": area, "status": "Active"})
-p.flags.allow_migration = True
-p.insert(ignore_permissions=True)
+# an open-ended goal with no finish line and no measure, as the migrated projects were
 migrated = goal("BF1 migrated ${W}", horizon="Long term")
-frappe.db.set_value("Life Project", p.name, "migrated_to", migrated)
 number = goal("BF1 number ${W}", horizon="Long term", measure_kind="Number", measure="BF1 weight", unit="kg", start_value=84, target_value=78)
 readings.suggest(number, 81, excerpt="Weighed 81 kg this morning.", by="Agent")
 milestone = goal("BF1 milestone ${W}", horizon="12 weeks", cycle=cycle, measure_kind="Milestone", done_when="Signed")
@@ -6963,6 +6947,18 @@ print(json.dumps({"status": cyc.status, "score": cyc.final_score, "next": nxt.st
     await s.ctx.close()
   }
 }
+
+// Issue 48: the old Life Project table and the project aliases are gone. (I48.1 to I48.5 and I48.7 are unit tests in
+// lifeos/tests/test_issue48_project_removed.py.)
+await check('I48.6', '/life/projects and an old project link land on Goals', async () => {
+  const pg = owner.page
+  for (const from of ['/life/projects', '/life/projects?status=Done', `/life/projects/${ux.oldProject}`, `/life/projects/${ux.oldProject}?tab=tasks`]) {
+    await owner.open(from)
+    for (let i = 0; i < 20 && pathOf(pg).startsWith('/life/projects'); i++) await pg.waitForTimeout(200)
+    must(pathOf(pg) === '/life/goals', `${from} went to ${pathOf(pg)}`)
+    must(!/not found/i.test(await pg.locator('[data-main]').innerText()), `${from} shows "not found"`)
+  }
+})
 
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {

@@ -7,7 +7,6 @@ import frappe
 from frappe import _
 
 from lifeos import links, permissions
-from lifeos.proposals import goal_for_project
 from lifeos.api.utils import flag
 from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
@@ -122,22 +121,20 @@ def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, 
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, tab: str | None = None, area: str | None = None, goal: str | None = None, from_date: str | None = None, to_date: str | None = None, status: str | None = None, intent: str | None = None,
 		system: str | None = None, assistant: str | None = None, include_archived: bool | int | None = 0, open_items: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
-		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, project: str | None = None,
+		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None,
 		scope: str | None = "captures", sensitive: bool | int | None = 0, by: str | None = None):
 	"""Every capture of a space, newest first: inbox items, chat logs, Vault documents (kind Document, always sensitive)
 	and journal pages (Library > Captures). scope="all" adds the notes (Library > All).
 	tab: all (default), notes (scope all), chats, voice, documents (with Vault documents), pages (journal pages), photos,
 	articles, email (emails and email digests), text. sensitive=1 keeps the sensitive items; by=me or assistant keeps
 	what a person or an agent wrote (the assistant's notes count as the assistant's).
-	Filters: area (with its sub-areas, or "none"), goal (`project` names the goal a project became), from_date and to_date (received), status (inbox, done, failed),
+	Filters: area (with its sub-areas, or "none"), goal, from_date and to_date (received), status (inbox, done, failed),
 	intent (Process, Add to wiki, Just keep), system (gmail, claude…), assistant (for chats), open_items=1 (chats with an open item),
 	include_archived=1 (archived sources too; they are left out otherwise, as on every list).
 	Each row has: doctype, name, title, kind, received, area, status (In Inbox, Done, Failed), made (records made from it), thumbnail.
 	`tabs` counts each tab under the same filters."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
-		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	tab = tab or "all"
 	scope = "all" if scope == "all" else "captures"
 	if tab not in TABS:

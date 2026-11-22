@@ -178,7 +178,7 @@ DEBRIS_PREFIXES = [
 ]
 DEBRIS_FILE_PREFIXES = ["journal-", "production-"]
 _TITLED = {
-	"Life Area": "area_name", "Life Project": "title", "Life Inbox Item": "title", "Life Task": "title", "Life Note": "title",
+	"Life Area": "area_name", "Life Inbox Item": "title", "Life Task": "title", "Life Note": "title",
 	"Life Important Date": "title", "Life Goal": "title", "Life Vault Document": "title", "Life Chat Log": "title",
 	"Life Person": "full_name", "Life Proposal": "preview",
 	# UX fixes, set 5
@@ -199,7 +199,7 @@ def find_test_debris(site_check=True):
 	"""Every record the acceptance scripts left, by DocType: {doctype: set(names)}, plus the run stamps found.
 
 	Finds titles made by the scripts, then everything that hangs off them: proposals and the records they created,
-	records made from a debris inbox item, filed under a debris area, project, goal or parent note."""
+	records made from a debris inbox item, filed under a debris area, goal or parent note."""
 	import re
 
 	rx = _stamp_re()
@@ -220,7 +220,7 @@ def find_test_debris(site_check=True):
 		for s in stamps:
 			debris[dt].update(frappe.get_all(dt, filters={field: ["like", f"%{s}%"]}, pluck="name"))
 	# follow what hangs off them until nothing new turns up
-	follow = [("inbox_item", "Life Inbox Item"), ("area", "Life Area"), ("project", "Life Project"), ("goal", "Life Goal"),
+	follow = [("inbox_item", "Life Inbox Item"), ("area", "Life Area"), ("goal", "Life Goal"),
 		("parent_note", "Life Note"), ("parent_area", "Life Area")]
 	from lifeos.constants import SPACE_DOCTYPES
 

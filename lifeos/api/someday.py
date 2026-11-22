@@ -1,5 +1,5 @@
 """Someday, the one parking lot: park tasks, goals and notes out of the way, and bring them back, keep them for longer, or
-purge them. An open-ended goal (what a project was before set 6) takes its open tasks with it. Parking keeps `creation`.
+purge them. An open-ended goal takes its open tasks with it. Parking keeps `creation`.
 Agents may only propose parking."""
 import builtins
 from datetime import date
@@ -14,8 +14,7 @@ from lifeos.counts import rules
 
 PARKABLE = ("Life Task", "Life Goal", "Life Note")
 TYPE_OF = {"Life Task": "Task", "Life Goal": "Goal", "Life Note": "Note"}
-# "projects" is read as "goals" for one set (projects became goals in set 6)
-TAB_TYPE = {"tasks": "Life Task", "goals": "Life Goal", "projects": "Life Goal", "notes": "Life Note"}
+TAB_TYPE = {"tasks": "Life Task", "goals": "Life Goal", "notes": "Life Note"}
 TABS = ("all", "due", "tasks", "goals", "notes")
 # the SQL that says "parked" for each kind
 PARKED = {"Life Task": "x.status = 'Someday' and x.is_archived = 0", "Life Goal": "x.is_someday = 1 and x.is_archived = 0",
@@ -56,7 +55,7 @@ def list(space: str | None = None, tab: str | None = "all", area: str | None = N
 	filters: standard filters on the fields every parked kind has (title, area, someday_on, someday_review_on, name,
 	creation). `tabs` counts each tab under the same filters."""
 	space = permissions.resolve_space(space)
-	tab = "goals" if tab == "projects" else tab if tab in TABS else "all"
+	tab = tab if tab in TABS else "all"
 	start, page_length = page(start, page_length)
 	filters = parse(filters, [])
 	values = {"space": space, "today": getdate(today())}

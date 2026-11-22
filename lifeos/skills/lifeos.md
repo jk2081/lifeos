@@ -40,13 +40,12 @@ Most sites have one space, Private. On such a site you may pass `space` or leave
 
 Every goal says how it will be known to be done: a finish line (`measure_kind` Milestone, with `done_when`), or a number (`measure_kind` Number, with `measure`, `unit`, `start_value`, `target_value`; `current_value` and `current_on` are the latest confirmed reading). The context of `claim_next` gives each number goal its `measure` as `{measure, unit, start, target, current}`. When an item states a value of a measure plainly, send a **Reading** proposal (see "Writing proposals"). A task you propose may carry the goal as usual; you cannot create goals or change their measures.
 
-## Goals, not projects
+## Goals
 
-There is one kind of goal, with a **horizon**: Long term, Year, 12 weeks or Month. Projects became long-term goals. There are four things: goals, tasks, notes and captures (what arrives in the Inbox). A goal can **serve** a goal one horizon up (`serves`): a Month goal a 12-week goal, that a Year goal, and so on.
+There is one kind of goal, with a **horizon**: Long term, Year, 12 weeks or Month. There are four things: goals, tasks, notes and captures (what arrives in the Inbox). A goal can **serve** a goal one horizon up (`serves`): a Month goal a 12-week goal, that a Year goal, and so on.
 
-- File a record under a goal with `goal` (its name or exact title). Every field and argument that said `project` now says `goal`: on proposals (Task, Note, Vault Document, Journal Page, Chat), `chats.log`, `inbox.create_item`, `wiki.create_page`, and the lists (`tasks.list`, `library.list`, `sources.list`, `vault.list`, `chats.list`).
-- **For one set only** the old names still work: a `project` argument or payload field is read as the goal that project became (by the project's name or title), a Someday proposal with `record_type` Project parks that goal, and `connections.defaults` answers `default_project` beside `default_goal`. Move to `goal` now; the old names go in the next set.
-- Projects themselves are not readable by agents any more.
+- File a record under a goal with `goal` (its name or exact title). Use `goal` on proposals (Task, Note, Vault Document, Journal Page, Chat), `chats.log`, `inbox.create_item`, `wiki.create_page`, and the lists (`tasks.list`, `library.list`, `sources.list`, `vault.list`, `chats.list`).
+- `project` is not accepted anywhere any more (nor `default_project`): a call that sends it is refused with an error that names `goal`.
 
 ## Polling
 

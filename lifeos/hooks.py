@@ -63,7 +63,7 @@ doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
 extend_doctype_class = {"File": ["lifeos.files.LifeFile"]}
 override_whitelisted_methods = {"upload_file": "lifeos.files.upload_file", "frappe.handler.upload_file": "lifeos.files.upload_file"}
 doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
-before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.strict_get.before_request"]
+before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.strict_get.before_request", "lifeos.gone_names.before_request"]
 
 scheduler_events = {
 	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.trash.purge_old"],

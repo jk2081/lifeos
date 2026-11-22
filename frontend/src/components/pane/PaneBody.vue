@@ -47,7 +47,6 @@ import Card from '../ui/Card.vue'
 import Empty from '../Empty.vue'
 import TaskPane from './TaskPane.vue'
 import VaultPane from './VaultPane.vue'
-import ProjectPane from './ProjectPane.vue'
 import GoalPane from './GoalPane.vue'
 import PagePane from './PagePane.vue'
 import ChatPane from './ChatPane.vue'
@@ -80,6 +79,5 @@ async function toggleSensitive() {
 async function toSomeday() {
   if (await park(props.meta.someday.doctype, props.meta.someday.name, props.meta.title)) emit('reload')
 }
-const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, project: ProjectPane, // ProjectPane hands over to the goal the project became
-  goal: GoalPane, page: PagePane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, checkin: PlainPane, month: PlainPane }
+const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, page: PagePane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, checkin: PlainPane, month: PlainPane }
 </script>

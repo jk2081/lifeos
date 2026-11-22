@@ -6,7 +6,6 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
@@ -88,15 +87,13 @@ def expiry_counts(space):
 def list(space: str | None = None, include_archived: bool | int = 0, start: int = 0, page_length: int = 100, holder: str | None = None,
 		doc_type: str | None = None, expiry: str | None = None, area: str | None = None, goal: str | None = None, sort: str | None = None,
 		dir: str | None = None, filters: str | builtins.list | builtins.dict | None = None, order_by: str | None = None, fields: str | builtins.list | None = None,
-		summary: str | builtins.dict | None = None, project: str | None = None):
+		summary: str | builtins.dict | None = None):
 	"""Vault documents of a space, soonest expiry first, as a flat list and grouped by holder.
-	Filters: holder (a person, or "none"), doc_type, expiry (expired, soon = within 60 days, later, none), area, goal (`project` names the goal a project became).
+	Filters: holder (a person, or "none"), doc_type, expiry (expired, soon = within 60 days, later, none), area, goal.
 	`total` is the number of documents the filters match.
 	`tabs` counts all documents, those expiring within 60 days and the expired ones, under the same filters."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
-		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	if permissions.vault_hidden(space):
 		# an agent, and this space's Vault is closed to agents: the same answer as an empty Vault
 		empty = {"tabs": {"all": 0, "soon": 0, "expired": 0}, "expired": 0, "soon": 0}
