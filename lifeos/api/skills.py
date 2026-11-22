@@ -234,21 +234,6 @@ def test(name: str, instructions: str | None = None):
 
 
 @frappe.whitelist(methods=["POST"])
-def add_example(name: str, title: str, input: str | dict, checks: str | builtins.list):
-	"""The owner's own example for a skill: a sample capture and the checks on what it makes of it."""
-	_admin_only()
-	_skill(name)
-	sample, rules = parse(input), parse(checks)
-	if not isinstance(sample, dict) or not sample.get("text"):
-		frappe.throw(_("The example needs a capture with text."))
-	if not isinstance(rules, builtins.list) or not rules:
-		frappe.throw(_("The example needs at least one check."))
-	doc = frappe.get_doc({"doctype": "Life Skill Example", "skill": name, "title": title[:140], "input": json.dumps(sample), "expected": json.dumps(rules),
-		"source": "Owner"}).insert(ignore_permissions=True)
-	return {"name": doc.name}
-
-
-@frappe.whitelist(methods=["POST"])
 def save_auto_file(threshold: float, kinds: str | builtins.list):
 	"""What the Brain may file on its own: the confidence above which, and the kinds of proposal. Default: none."""
 	_admin_only()

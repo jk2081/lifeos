@@ -20,7 +20,7 @@
     <div class="page-body">
       <div class="mx-auto flex w-full max-w-[860px] flex-col gap-6" data-item-page>
         <div v-if="item.area || item.goal || item.status !== 'Done'" class="-mt-2 flex flex-wrap items-center gap-2" data-item-chips>
-          <Button v-if="item.area" size="sm" variant="outline" icon-left="lucide-folder" :label="item.area_name || 'Area'" :route="`/areas/${item.area}`" data-item-area />
+          <Button v-if="item.area" size="sm" variant="outline" icon-left="lucide-folder" :label="item.area_name || 'Area'" :route="`/today?area=${item.area}`" data-item-area />
           <Button v-if="item.goal" size="sm" variant="outline" icon-left="lucide-target" :label="item.goal_title || item.goal" :route="`/goals/${item.goal}`" data-item-goal />
           <Badge :theme="STATUS[item.status]?.[1] || 'gray'" :label="STATUS[item.status]?.[0] || item.status" data-item-status />
         </div>

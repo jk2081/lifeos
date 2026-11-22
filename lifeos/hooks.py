@@ -74,7 +74,10 @@ before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.strict_get.befo
 
 scheduler_events = {
 	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.trash.purge_old", "lifeos.wiki_check.run_weekly"],
-	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims", "lifeos.skills.triggers.run_due"],
+	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims", "lifeos.skills.triggers.run_due",
+		"lifeos.skills.triggers.route_unclaimed"],
+		# issue 58: Life OS reads the connected mailboxes (read only)
+		"*/15 * * * *": ["lifeos.gmail.fetch_all"],
 		# insights: nightly at 06:00 site time (the owner's time zone is the site's, Asia/Kolkata)
 		"0 6 * * *": ["lifeos.insights.run_nightly"],
 		# set 7: Inbox items left too long, before the morning

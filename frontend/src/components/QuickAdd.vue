@@ -3,7 +3,7 @@
     <TextInput ref="input" v-model="text" size="md" placeholder="New task. Add a date word such as tomorrow or fri." aria-label="New task" @keydown.enter="add" />
     <Select v-if="(lookups.goals || []).length" v-model="goal" class="mt-2" :options="goalOptions(lookups.goals, { empty: 'No goal' })" aria-label="Goal" data-quick-goal />
     <div class="mt-2 flex flex-wrap justify-between gap-2 text-sm text-ink-gray-6">
-      <span>Enter to add to {{ store.space }}. <RouterLink class="text-ink-blue-8 hover:underline" to="/inbox" @click="open = false">Add a file to the Inbox instead</RouterLink></span>
+      <span>Enter to add to {{ store.space }}. <RouterLink class="text-ink-blue-8 hover:underline" to="/brain" @click="open = false">Add a file in the Brain instead</RouterLink></span>
       <span v-if="last">Added “{{ last }}”</span>
     </div>
   </Dialog>

@@ -10,25 +10,9 @@ const BRAIN = ['activity', 'captures', 'sources', 'skills', 'outbox', 'queue']
 const GOALS = ['tasks', 'no-goal', 'cycles', 'someday']
 const LIBRARY = ['notes', 'documents', 'people', 'chats', 'files', 'timeline', 'archive']
 
-// an old route that lands on a tab with its query carried over, and a few parameters of its own
-const to = (path, extra = {}) => (r) => ({ path, query: { ...r.query, ...(typeof extra === 'function' ? extra(r) : extra) }, hash: r.hash })
-// Captures (set 6) is the list at Brain > Captures (Activity, issue 18, is the feed beside it): everything that came in. Opened on Documents or Chats it is that tab of the
-// Library, and on notes Library > Notes; any other kind stays a kind of Activity.
-const KIND_TAB = { documents: '/library/documents', chats: '/library/chats', notes: '/library/notes' }
-const libraryKind = (r, extra = {}) => {
-  const q = { ...r.query, ...extra }
-  return { path: KIND_TAB[q.tab] || '/brain/captures', query: q, hash: r.hash }
-}
-// Plan's old tabs, by their new homes
-const PLAN_HOME = { week: '/today/week', month: '/today/month', year: '/today/year', goals: '/goals', tasks: '/goals/tasks', someday: '/goals/someday' }
-
-// the month plan and the 12 Week Year grid, which Goals > Cycles replaced
-const asksForCycles = (tab, view) => (tab === 'month' && view === 'plan') || (tab === 'year' && view === 'cycle')
-
 const routes = [
-  { path: '/', redirect: to('/today') },
-  { path: `/today/:tab(${TODAY.join('|')})?`, name: 'Today', component: page('TodayPlace'), props: true,
-    beforeEnter: (r) => (asksForCycles(r.params.tab, r.query.view) ? { path: '/goals/cycles', query: { ...r.query, view: undefined }, hash: r.hash } : true) },
+  { path: '/', redirect: '/today' },
+  { path: `/today/:tab(${TODAY.join('|')})?`, name: 'Today', component: page('TodayPlace'), props: true },
   { path: '/today/reset', name: 'Reset', component: page('Reset') },
   { path: `/brain/:tab(${BRAIN.join('|')})?`, name: 'Brain', component: page('BrainPlace'), props: true },
   { path: '/brain/skills/:name', name: 'Skill', component: page('Skill'), props: true },
@@ -40,9 +24,7 @@ const routes = [
   { path: `/goals/:tab(${GOALS.join('|')})?`, name: 'Goals', component: page('GoalsPlace'), props: true },
   { path: '/goals/:id', name: 'Goal', component: page('Goal'), props: true },
   { path: '/focus/:id', name: 'Focus', component: page('Focus'), props: true },
-  // /library?view=tree was the Notes screen's tree before set 6. ?view=list is now Library > Everything's own list view, so it stays.
-  { path: `/library/:tab(${LIBRARY.join('|')})?`, name: 'Library', component: page('LibraryPlace'), props: true,
-    beforeEnter: (r) => (!r.params.tab && r.query.view === 'tree' ? { path: '/library/notes', query: r.query } : true) },
+  { path: `/library/:tab(${LIBRARY.join('|')})?`, name: 'Library', component: page('LibraryPlace'), props: true },
   { path: '/library/people/:person', name: 'Person', component: page('LibraryPlace'), props: (r) => ({ tab: 'people', person: r.params.person }) },
   { path: '/library/:id', name: 'Note', component: page('Library'), props: true },
   // the weekly review: in the sidebar once one is locked, or on its day
@@ -52,69 +34,12 @@ const routes = [
   { path: '/ask', name: 'Ask', component: page('Ask') },
   { path: '/settings', name: 'Settings', component: page('Settings') },
 
-  // ---- every route from before issue 14 lands on its new home, with its query ----
-  // a bare /inbox is Needs you; one with a filter or a state (a count's door) is the Queue, the list that count is of
-  { path: '/inbox', redirect: (r) => {
-    const { all, area, space, ...rest } = r.query
-    return { path: Object.keys(rest).length ? '/brain/queue' : '/brain', query: r.query, hash: r.hash }
-  } },
-  { path: '/inbox/:id/review', redirect: (r) => ({ path: `/brain/review/${r.params.id}`, query: r.query }) },
-  // an inbox item opens in the pane over the list; old links to /inbox/:id still work
-  { path: '/inbox/:id', redirect: (r) => ({ path: '/brain/queue', query: { ...r.query, open: `inbox:${r.params.id}` } }) },
-  { path: '/plan', redirect: to('/today/week') },
-  { path: '/plan/goals/:id', redirect: (r) => ({ path: `/goals/${r.params.id}`, query: r.query, hash: r.hash }) },
-  { path: '/plan/reset', redirect: to('/today/reset') },
-  { path: '/plan/12-weeks', redirect: to('/goals/cycles') },
-  // Plan's month and year, when they ask for the plan (not the calendar), are Goals > Cycles
-  { path: '/plan/:tab(week|month|year|goals|tasks|someday)', redirect: (r) => (asksForCycles(r.params.tab, r.query.view)
-    ? { path: '/goals/cycles', query: { ...r.query, view: undefined }, hash: r.hash } : { path: PLAN_HOME[r.params.tab], query: r.query, hash: r.hash }) },
-  { path: '/library/captures', redirect: (r) => libraryKind(r) },
-  { path: '/library/outbox', redirect: to('/brain/outbox') },
-  { path: '/tasks', redirect: to('/goals/tasks') },
-  { path: '/someday', redirect: to('/goals/someday') },
-  { path: '/outbox', redirect: to('/brain/outbox') },
-  // the old Projects screen and a project's page: projects were goals from set 6 and the table is gone (issue 48)
-  { path: '/projects/:id?', redirect: '/goals' },
-  { path: '/reset', redirect: to('/today/week', { view: 'review', step: 'reset' }) },
-  { path: '/calendar/:view?', redirect: (r) => {
-    const v = r.params.view
-    if (v === 'year') return { path: '/today/year', query: r.query }
-    if (v === 'month') return { path: '/today/month', query: { ...r.query, view: 'calendar' } }
-    return { path: '/today/week', query: { ...r.query, view: v === 'agenda' ? 'agenda' : 'calendar' } }
-  } },
-  { path: '/journal/goals/:id', redirect: (r) => ({ path: `/goals/${r.params.id}`, query: r.query }) },
-  // journal pages are captures now: a page opens in the pane over Library > Everything
-  { path: '/journal/pages/:id', redirect: (r) => ({ path: '/library/notes', query: { ...r.query, view: 'list', open: `page:${r.params.id}` } }) },
-  { path: '/journal/:tab?', redirect: (r) => {
-    const t = r.params.tab
-    const map = { goals: ['/goals/cycles', {}], month: ['/goals/cycles', {}], habits: ['/today/month', { view: 'habits' }],
-      checkins: ['/today/month', { view: 'checkins' }], review: ['/today/week', { view: 'review' }], pages: ['/library/notes', { view: 'list' }] }
-    const [path, extra] = map[t] || ['/goals/cycles', {}]
-    return { path, query: { ...r.query, ...extra } }
-  } },
-  // the old Sources page (the captures list) is Brain > Sources now; an old link with a filter still opens the captures it asked for
-  { path: '/sources', redirect: (r) => (Object.keys(r.query).filter((k) => k !== 'area' && k !== 'space').length ? libraryKind(r) : { path: '/brain/sources', query: r.query, hash: r.hash }) },
-  // Chats were a tab of Sources (set 4): filters carry over; the old report (group=day) is the By day view
-  { path: '/chats', redirect: (r) => {
-    const { group, open, view, ...rest } = r.query
-    return { path: '/library/chats', query: { ...rest, tab: 'chats', ...(group === 'day' || view === 'report' ? { view: 'day' } : {}),
-      ...(open ? { open: String(open).includes(':') ? open : 'chat:' + open } : {}) } }
-  } },
-  { path: '/wiki', redirect: to('/library/notes', (r) => ({ by: 'assistant', ...(r.query.tab && r.query.tab !== 'pages' ? { view: r.query.tab } : {}), tab: undefined })) },
-  { path: '/vault', redirect: to('/library/documents', (r) => ({ tab: 'documents', sensitive: '1',
-    ...(r.query.open && !String(r.query.open).includes(':') ? { open: 'vault:' + r.query.open } : {}) })) },
-  { path: '/graph', redirect: to('/library/notes', { view: 'graph' }) },
-  { path: '/timeline', redirect: to('/library/timeline') },
-  { path: '/archive', redirect: to('/library/archive') },
-  // area pages became the lens: an area opens Today narrowed to it; the list of areas is in Settings
-  { path: '/areas', redirect: to('/settings', { tab: 'areas' }) },
-  { path: '/areas/:id', redirect: (r) => ({ path: '/today', query: { ...r.query, tab: undefined, area: r.params.id } }) },
-
   // development only: the editor on a sample note (owner only, not in the sidebar)
   { path: '/dev/editor', name: 'EditorDev', component: () => import('./pages/dev/EditorDev.vue') },
   // development only: a screen that fails on purpose, for the error boundary's check (bug fix 1)
   { path: '/dev/throw', name: 'ThrowDev', component: () => import('./pages/dev/ThrowDev.vue') },
-  { path: '/:rest(.*)*', redirect: '/today' },
+  // any address that is not a screen lands on Today, which says the page moved (issue 61)
+  { path: '/:rest(.*)*', redirect: { path: '/today', query: { moved: '1' } } },
 ]
 
 // Opening or closing the pane and changing a filter only change the query: the list keeps its scroll position.

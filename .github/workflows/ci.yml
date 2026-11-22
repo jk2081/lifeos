@@ -1,5 +1,5 @@
 # Runs on every pull request and every push to main: the full unit suite on a fresh Frappe 16 bench, the scan with
-# Frappe's semgrep rules over the whole app, and the acceptance walk (tools/acceptance.mjs) at 1440 px and 390 px.
+# Frappe's semgrep rules over the whole app, and the acceptance walk (tools/acceptance.mjs) at 1440 px and 390 px, one job per place.
 name: CI
 
 on:
@@ -106,9 +106,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # the walk in three parts side by side, each on its own bench (`--part=` in tools/acceptance.mjs): the UX checks
-        # of sets 1 to 6 at 1440 px, the same at 390 px, and everything else at both widths
-        part: [1440, 390, sets]
+        # the walk, one job per place side by side, each on its own bench (`--part=` in tools/acceptance.mjs; the checks of a place
+        # are in tools/acceptance/<place>.mjs). `tooling` checks the setup switches and this workflow.
+        part: [today, brain, goals, library, review, settings, phone, tooling]
     defaults:
       run:
         # bash with pipefail, so a failed walk fails its step through `tee`
@@ -186,7 +186,7 @@ jobs:
           bench get-app --skip-assets lifeos "$GITHUB_WORKSPACE"
           bench setup requirements --dev
           bench build --app lifeos
-          # the owner's test site: the walk's last checks look for debris there (S4.0)
+          # the owner's test site: the walk's last checks look for debris there (END.2)
           bench new-site --db-root-password "$LIFEOS_DB_ROOT_PASSWORD" --admin-password "$(openssl rand -hex 16)" \
             --mariadb-user-host-login-scope='%' --install-app lifeos lifeos.localhost
 

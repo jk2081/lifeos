@@ -11,7 +11,7 @@ def left_your_plate(review):
 
 	def door(pile, label):
 		n = outbox_api.total(space, pile, from_date=a, to_date=b)
-		return {"n": int(n), "label": label, "to": {"path": "/library/outbox", "query": {"pile": pile, "from": a, "to": b}}}
+		return {"n": int(n), "label": label, "to": {"path": "/brain/outbox", "query": {"pile": pile, "from": a, "to": b}}}
 
 	return {"piles": [{"pile": p, "line": LINES[p], **door(p, f"{p.lower()} in this review's period")} for p in PILES],
-		"in": door("in", "came in"), "out": door("all", "went out"), "outbox": {"path": "/library/outbox", "query": {"pile": "all", "from": a, "to": b}}}
+		"in": door("in", "came in"), "out": door("all", "went out"), "outbox": {"path": "/brain/outbox", "query": {"pile": "all", "from": a, "to": b}}}

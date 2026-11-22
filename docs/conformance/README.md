@@ -49,7 +49,7 @@ Also, 83 of 171 whitelisted methods had no `methods=[...]`; now none lack it. Th
 python3 tools/scan_exceptions.py       # rewrite exceptions.md from the inline nosemgrep comments (--check to compare)
 python3 scripts/http-methods.py        # rewrite the front end's list of GET methods after changing a decorator (--check to compare)
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost run-tests --app lifeos'
-node tools/acceptance.mjs              # ends with the scan (C.1); GETs are read-only on its site
+node tools/acceptance.mjs              # ends with the scan (END.3); GETs are read-only on its site
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost execute lifeos.loadtest.run_sources'
 scripts/get-frappe-skills.sh           # the skills, pinned; then work through deep-app-audit and frappe-code-review as in audit.md and review.md
 ```

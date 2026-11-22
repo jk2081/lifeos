@@ -20,7 +20,7 @@
       <h2 class="break-words text-lg-semibold text-ink-gray-9" data-pane-title>{{ meta.title || (missing ? 'Not found' : 'Loading…') }}</h2>
     </div>
     <div v-if="meta.area || meta.goal || meta.sub" class="flex flex-wrap items-center gap-2">
-      <Button v-if="meta.area" size="sm" variant="outline" icon-left="lucide-folder" :label="meta.area_name || 'Area'" :route="`/areas/${meta.area}`" />
+      <Button v-if="meta.area" size="sm" variant="outline" icon-left="lucide-folder" :label="meta.area_name || 'Area'" :route="`/today?area=${meta.area}`" />
       <Button v-if="meta.goal" size="sm" variant="outline" icon-left="lucide-target" :label="meta.goal_title || meta.goal" data-pane-goal @click="openRef('goal:' + meta.goal)" />
       <span v-if="meta.sub" class="text-sm text-ink-gray-6">{{ meta.sub }}</span>
     </div>

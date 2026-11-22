@@ -8,26 +8,82 @@ from frappe.utils import add_days, add_to_date, getdate, now_datetime, today
 
 from lifeos import devtools, journal, permissions, seed
 
+DEMO_AREAS = ["Business That Works", "Family", "Learning", "Money & Legal", "Personal", "Tea & Coffee", "Unstoppable & Content"]
+CYCLE_TITLE = "Oct to Dec 2026"
+CYCLE_START = "2026-10-05"  # first Monday of October 2026
+HABITS = ["Meditate", "Walk", "Journal", "Workout"]
+
+# (goal, area, [actions]); an action ending in "*" is already done
+GOALS = [
+	("Launch the new website", "Business That Works", ["Write the launch plan", "Pick a designer", "Draft the home page", "Set up analytics"]),
+	("Tidy up loose ends", "Personal", ["File the tax return", "Renew the licence", "Book the passport photo*", "Fix the bookshelf", "Back up the photos"]),
+	("Run a 10 km race", "Personal", ["Run three times a week", "Stretch after each run", "Buy new shoes"]),
+	("Build a savings buffer", "Money & Legal", ["Meet the adviser", "Set up a monthly transfer"]),
+	("Improve the tea blend", "Tea & Coffee", ["Taste five samples", "Write the tasting notes", "Visit the supplier", "Agree the new blend"]),
+	("Get stronger", "Personal", ["Cut sugar", "Eat more protein", "Strength session", "Walk daily"]),
+	("Learn a new skill", "Learning", ["Finish the course", "Do the exercises", "Read three books [?]", "Build a small project"]),
+]
+# (goal, status, area) for the October plan, in priority order
+OCTOBER = [
+	("Hire a part-time assistant", "Carried", "Business That Works"), ("Publish the first newsletter", "Carried", "Business That Works"),
+	("Renew the driving licence", "Carried", "Personal"), ("File the tax return", "Open", "Money & Legal"),
+	("Book the passport photo", "Done", "Family"), ("Finish the course", "Carried", "Learning"), ("Agree the new blend", "Open", "Tea & Coffee"),
+]
+MINDSWEEP = ["Training for the team", "Cash visibility", "A second supplier", "New products"]
+
 # ticks per action for the weeks so far: x done, - missed
 TICKS = {
-	"Start internal audit": "--xxxx", "Start RMT newsletter": "-----x", "Start training programme": "-x-xxx",
-	"Ruchi ITR": "---xxx", "Anya passport": "--x", "300-ball hitting practice with one club, 6 iron": "x-xx-x",
-	"Practise 5-footers": "xx-xxx", "Complete a usable MoneyOS": "-xxxxx", "Make a detailed plan for poor sections": "--xxxx",
-	"Visit leased gardens": "---x--", "Burpees and workout": "x--x-x", "Walking": "xx-xxx", "Agentic certification": "-xxxxx",
-	"Accounting in ERPNext": "--xx-x",
+	"Write the launch plan": "--xxxx", "Pick a designer": "-----x", "Draft the home page": "-x-xxx",
+	"File the tax return": "---xxx", "Book the passport photo": "--x", "Run three times a week": "x-xx-x",
+	"Stretch after each run": "xx-xxx", "Set up a monthly transfer": "-xxxxx", "Taste five samples": "--xxxx",
+	"Visit the supplier": "---x--", "Strength session": "x--x-x", "Walk daily": "xx-xxx", "Finish the course": "-xxxxx",
+	"Do the exercises": "--xx-x",
 }
-HABIT_MISSES = {"Japa": {4, 10}, "Mala": {2, 4, 9, 10}, "Journal": {1, 3, 4, 6, 8, 10, 12}, "Workout": {1, 2, 4, 5, 7, 9, 10, 12}}
+HABIT_MISSES = {"Meditate": {4, 10}, "Walk": {2, 4, 9, 10}, "Journal": {1, 3, 4, 6, 8, 10, 12}, "Workout": {1, 2, 4, 5, 7, 9, 10, 12}}
 
 
 def _user(email):
 	return email if frappe.db.exists("User", email) else "Administrator"
 
 
+def load_cycle(space):
+	"""The active cycle with its goals and actions, the habits, October's goals and the October and November month plans."""
+	from frappe.utils import add_days as _add
+
+	seed.ensure_structure()
+	frappe.db.set_single_value("Life Settings", "use_focuses", 1)  # the demo site uses focuses (issue 57); a new site does not
+	areas = seed.make_areas(space, DEMO_AREAS)
+	t = seed.Tracker(seed.DEMO_KEY)
+	habits = []
+	for title in HABITS:
+		name = frappe.db.get_value("Life Habit", {"space": space, "title": title})
+		habits.append(name or t.insert({"doctype": "Life Habit", "space": space, "title": title}).name)
+	cycle = t.insert({"doctype": "Life Cycle", "space": space, "title": CYCLE_TITLE, "start_date": CYCLE_START, "status": "Active"})
+	for i, (title, area, actions) in enumerate(GOALS):
+		rows = []
+		for a in actions:
+			done = a.endswith("*")
+			rows.append({"title": a.rstrip("*"), "per_week": 1, "status": "Done" if done else "Open",
+				"done_on": _add(CYCLE_START, 14) if done else None})
+		t.insert({"doctype": "Life Goal", "space": space, "cycle": cycle.name, "title": title, "area": areas.get(area),
+			"sort_order": i + 1, "actions": rows})
+	habit_rows = [{"habit": h, "days_per_week": 7, "sort_order": i + 1} for i, h in enumerate(habits)]
+	for order, (title, status, area_name) in enumerate(OCTOBER, 1):
+		t.insert({"doctype": "Life Goal", "space": space, "title": title, "horizon": "Month", "target_date": "2026-10-31", "sort_order": order,
+			"area": areas.get(area_name), "outcome": {"Done": "Achieved", "Carried": "Carried"}.get(status, "In Progress")})
+	t.insert({"doctype": "Life Month Plan", "space": space, "year": 2026, "month": 10,
+		"habits": [dict(r, tracked_from="2026-10-01") for r in habit_rows],
+		"mindsweep_md": "\n\n".join(f"## {topic}" for topic in MINDSWEEP) + "\n"})
+	t.insert({"doctype": "Life Month Plan", "space": space, "year": 2026, "month": 11,
+		"habits": [dict(r, tracked_from="2026-11-01") for r in habit_rows]})
+	t.save()
+
+
 def load(space="Private"):
 	if frappe.parse_json(frappe.db.get_default(seed.DEMO_KEY) or "[]"):
 		return "Demo data is already loaded. Run lifeos.demo.remove first."
-	if not frappe.db.exists("Life Cycle", {"space": space, "title": seed.CYCLE_TITLE}):
-		seed.load(space)
+	if not frappe.db.exists("Life Cycle", {"space": space, "title": CYCLE_TITLE}):
+		load_cycle(space)
 	owner, agent = _user(devtools.OWNER), _user(devtools.AGENT)
 	frappe.set_user(owner)  # nosemgrep: frappe-setuser -- demo data: records are made through the API as the owner and the agent would make them
 	permissions.clear_cache()
@@ -71,7 +127,7 @@ def load(space="Private"):
 	task("Download Merrill statements for Ruchi ITR", "Money & Legal", due_date=add_days(now, -2))
 	task("Send quote request to data vendors", "Business That Works", due_date=now, priority="I", goal=funnel)
 	task("Six questions to Mithun on the blend sheets", "Business That Works", due_date=now, priority="I", goal=dalmia)
-	task("Practise 5-footers, 30 minutes", "Personal", due_date=now, goal=goals.get("Golf: hit 5 birdies"))
+	task("Run 5 km, easy pace", "Personal", due_date=now, goal=goals.get("Run a 10 km race"))
 	task("Make detailed plan for poor sections", "Tea & Coffee", due_date=add_days(now, 5), priority="I", goal=ghl)
 	task("Visit leased gardens", "Tea & Coffee", age=20, priority="I", goal=ghl)
 	task("Decide the main deity for the sanctum", "Tea & Coffee", age=7, goal=mandir)

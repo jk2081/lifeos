@@ -23,8 +23,8 @@ class LifeTestCase(IntegrationTestCase):
 			if not frappe.db.exists("Life Space", name):
 				frappe.get_doc({"doctype": "Life Space", "space_name": name, "owner_user": OWNER,
 					"members": [{"user": u, "access": "Write"} for u in members]}).insert()
-		cls.areas = seed.make_areas(PRIVATE, ["Tea", "Personal", "Money"])
-		cls.shared_areas = seed.make_areas(SHARED, ["Family", "Work"])
+		cls.areas = seed.make_areas(PRIVATE, ["Tea", "Personal", "Money"], under={"Personal": "Health"})
+		cls.shared_areas = seed.make_areas(SHARED, ["Family", "Work"], under={"Family": "Relationships"})
 		# issue 11: the seven areas of life of each space; "Tea" and "Work" are parts of Career, "Personal" of Health
 		cls.life = areas.life_areas(PRIVATE)
 		cls.shared_life = areas.life_areas(SHARED)
@@ -45,10 +45,13 @@ class LifeTestCase(IntegrationTestCase):
 		permissions.clear_cache()
 		frappe.set_user(OWNER)
 		# issue 56: new goals need a finish line by default; the tests that make goals through the API without one
-		# predate that, and test_issue56_goal_edit switches the setting back on
+		# predate that, and test_goals switches the setting back on
 		frappe.db.set_single_value("Life Settings", "require_done_when", 0)
-		# issue 57: Open goals are retired; the tests that make one through the API predate that, and test_issue57_focuses switches it off
+		# issue 57: Open goals are retired; the tests that make one through the API predate that, and test_goals switches it off
 		frappe.flags.lifeos_allow_open_goals = True
+		# issue 58: process-capture ships on, so every new capture would start a Brain run; the tests that predate it are about agents
+		# and the Inbox, and the tests that want the Brain (test_skills, test_brain) switch it on themselves
+		frappe.db.set_value("Life Skill", "process-capture", "active", 0)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")

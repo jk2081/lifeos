@@ -15,7 +15,7 @@ export function setRail(on) {
 }
 
 // the pages that live inside a place without being one of its tabs
-const HOME = { '/item': '/brain', '/inbox': '/brain' }
+const HOME = { '/item': '/brain' }
 /** The place the route belongs to: '/today', '/brain', '/goals', '/library', '/review', '/settings', '/ask' or ''. */
 export const activePlace = computed(() => {
   const first = '/' + router.currentRoute.value.path.split('/')[1]

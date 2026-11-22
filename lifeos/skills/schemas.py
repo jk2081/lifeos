@@ -46,6 +46,7 @@ SCHEMAS.update({
 		"readings": _list(_obj(["goal", "value", "record", "excerpt"], {"goal": _S, "value": _N, "date": _S, "record": _S, "excerpt": _S}))}),
 	"goal-definition": _obj(["kind"], {"kind": {"type": "string", "enum": ["Milestone", "Number", "Title"]}, "done_when": _S, "measure": _S,
 		"unit": _S, "target_value": _N, "start_value": _N, "title": _S}),
+	"email-triage": _obj(["keep", "reason"], {"keep": {"type": "boolean"}, "reason": _S}),
 	"reflect-result": _obj(["sentence"], {"sentence": _S}),
 	"area-guess": _obj(["area", "confidence"], {"area": _S, "confidence": {"type": "integer"}}),
 	"wiki-check": _obj(["orphans", "missing", "stale", "contradictions"], {

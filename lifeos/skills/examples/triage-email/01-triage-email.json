@@ -1,0 +1,33 @@
+{
+ "title": "A client asks for a quote",
+ "input": {
+  "data": {
+   "from": "Meera Shah <meera@shahandsons.example>",
+   "to": "owner@example.com",
+   "subject": "Quote for 200 kg of the estate blend?",
+   "snippet": "Hi, could you send me a quote for 200 kg of the estate blend by Friday? We are planning the festival order.",
+   "mailbox": "owner@example.com",
+   "messages_in_thread": 1
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "keep",
+    "equals": true
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"keep\": true, \"reason\": \"A client asking for a quote\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "ecd985e1eec1c178"
+}

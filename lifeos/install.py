@@ -37,9 +37,6 @@ def make_file_fields():
 
 def after_install():
 	setup()
-	from lifeos.patches.v7 import lens_areas
-
-	lens_areas.execute()  # the starter areas get their colours and are pinned, as on sites migrated in set 6
 
 
 def after_migrate():

@@ -15,6 +15,8 @@
             <Switch class="relative" :model-value="!!c.active" :disabled="!writable" :label="c.active ? 'On' : 'Off'" data-source-switch @update:model-value="(v) => toggle(c, v)" />
           </div>
           <p class="text-sm text-ink-gray-6" data-source-line>{{ c.line }}</p>
+          <p class="text-sm text-ink-gray-8" data-processed-by>{{ c.processed_by }}</p>
+          <p v-if="c.error" class="text-sm text-ink-red-4" data-source-error>{{ c.error }}</p>
           <p v-if="c.active && c.quiet" class="text-sm text-ink-amber-9" data-source-quiet>Nothing has arrived for a while.</p>
         </Card>
       </div>
@@ -31,9 +33,10 @@
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div v-for="t in available" :key="t.system" class="relative flex flex-col items-center gap-0.5 rounded-5 border border-dashed border-outline-gray-2 px-3 py-4 text-center"
           :class="t.always_on ? '' : 'hover:bg-surface-gray-1'" data-source-tile :data-system="t.system" :data-always-on="t.always_on ? 1 : 0">
-          <button v-if="writable && !t.always_on" type="button" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="`Add ${t.label}`" data-tile-add @click="add(t)" />
+          <button v-if="writable && !t.always_on" type="button" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="t.system === 'gmail' ? 'Connect Gmail' : `Add ${t.label}`" data-tile-add @click="add(t)" />
           <span class="text-base-medium text-ink-gray-9">{{ t.label }}</span>
           <span class="text-sm text-ink-gray-6">{{ t.hint }}</span>
+          <span v-if="t.processed_by" class="mt-0.5 text-xs text-ink-gray-5" data-processed-by>{{ t.processed_by }}</span>
           <Badge v-if="t.always_on" class="mt-1" theme="green" label="Always on" />
         </div>
         <div class="relative flex flex-col items-center gap-0.5 rounded-5 border border-dashed border-outline-gray-2 px-3 py-4 text-center hover:bg-surface-gray-1" data-source-tile data-system="other-agent">
@@ -60,7 +63,27 @@
           <span data-settings-area><Pick v-model="draft.default_area" :options="areaOptions()" placeholder="No default area" :disabled="!writable" @update:model-value="draft.default_goal = null" /></span></div>
         <div class="flex flex-wrap items-center gap-2"><span class="w-24 text-sm text-ink-gray-6">Default goal</span>
           <span data-settings-goal><Pick v-model="draft.default_goal" :options="goalOptions" placeholder="No default goal" :disabled="!writable" /></span></div>
-        <p class="text-sm text-ink-gray-6">What this source sends without an area, goal or intent of its own is filed with these. No passwords or keys are kept here.</p>
+        <p class="text-sm text-ink-gray-6" data-settings-processed>{{ current.processed_by }}. {{ current.lands }}</p>
+        <template v-if="current.system === 'gmail' && current.mailbox">
+          <div data-gmail-label><FormControl v-model="draft.label_name" label="Only mail with this Gmail label" placeholder="Empty reads the Inbox, for example Life OS" :disabled="!writable" /></div>
+          <div data-gmail-include><FormControl v-model="draft.always_include" type="textarea" :rows="2" label="Always include" placeholder="Senders or domains, one per line" :disabled="!writable" /></div>
+          <div data-gmail-skip><FormControl v-model="draft.always_skip" type="textarea" :rows="2" label="Always skip" placeholder="Senders or domains, one per line" :disabled="!writable" /></div>
+          <div data-gmail-sensitive><FormControl v-model="draft.always_sensitive" type="textarea" :rows="2" label="Always sensitive" placeholder="Their mail is marked sensitive" :disabled="!writable" /></div>
+          <Switch v-model="draft.attach_files" :disabled="!writable" label="Keep attachments (up to 10 MB each)" data-gmail-attach />
+          <p class="text-sm text-ink-gray-6">Life OS only reads this mailbox. It never marks, labels, moves or deletes mail. By default it skips Promotions, Social, Updates and Forums, mailing lists and no-reply senders.</p>
+          <Button v-if="writable" variant="subtle" theme="red" label="Remove this mailbox" data-gmail-remove @click="removeGmail" />
+        </template>
+        <p v-else class="text-sm text-ink-gray-6">What this source sends without an area, goal or intent of its own is filed with these. No passwords or keys are kept here.</p>
+      </div>
+    </template>
+  </Dialog>
+
+  <Dialog v-model:open="gmailOpen" title="Connect Gmail" :actions="gmailSetup?.ready && writable ? [{ label: 'Continue to Google', variant: 'solid', onClick: connectGmail }] : []">
+    <template #default>
+      <div class="flex flex-col gap-2" data-gmail-connect>
+        <p class="text-sm text-ink-gray-8">You sign in with Google in this browser. Life OS asks for <strong>read-only</strong> access to this mailbox and nothing else: it never marks, labels, moves, deletes or sends mail. Several mailboxes can be connected, one card each.</p>
+        <p v-if="gmailSetup && !gmailSetup.ready" class="text-sm text-ink-amber-9" data-gmail-not-ready>Google sign-in is not set up yet. In Frappe, open Google Settings and enter the OAuth client (client ID and secret), then come back here.</p>
+        <p v-else-if="gmailSetup" class="text-sm text-ink-gray-6">If Google says the redirect address does not match, add this one to the OAuth client in Google Cloud: <span class="break-all font-mono text-xs" data-gmail-redirect>{{ gmailSetup.redirect_uri }}</span></p>
       </div>
     </template>
   </Dialog>
@@ -79,6 +102,7 @@
 // (a Life Connection), tiles for what can be added, and "Coming" tiles for what is not built yet. A source that is off
 // makes the server refuse its captures; nothing it brought in is deleted.
 import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dialog, FormControl, Switch } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
@@ -101,6 +125,10 @@ const current = ref(null)
 const draft = ref({})
 const otherOpen = ref(false)
 const otherName = ref('')
+const gmailOpen = ref(false)
+const gmailSetup = ref(null)
+const route = useRoute()
+const router = useRouter()
 
 const goalOptions = computed(() => (lookups.goals || []).filter((g) => !draft.value.default_area || g.area === draft.value.default_area).map((g) => ({ value: g.name, label: g.title })))
 const toAddMore = () => more.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -120,22 +148,48 @@ async function toggle(c, on) {
 }
 function openSettings(c) {
   current.value = c
-  draft.value = { active: !!c.active, default_intent: c.default_intent || 'Process', default_area: c.default_area || null, default_goal: c.default_goal || null }
+  draft.value = { active: !!c.active, default_intent: c.default_intent || 'Process', default_area: c.default_area || null, default_goal: c.default_goal || null,
+    label_name: c.label_name || '', always_include: c.always_include || '', always_skip: c.always_skip || '', always_sensitive: c.always_sensitive || '', attach_files: !!c.attach_files }
   settingsOpen.value = true
 }
 async function save() {
   const d = draft.value
-  const res = await tryCall(() => api('connections.save', { name: current.value.name, active: d.active ? 1 : 0, default_intent: d.default_intent, default_area: d.default_area || '', default_goal: d.default_goal || '' }), 'Saved.')
+  const extra = current.value.system === 'gmail' && current.value.mailbox
+    ? { label_name: d.label_name || '', always_include: d.always_include || '', always_skip: d.always_skip || '', always_sensitive: d.always_sensitive || '', attach_files: d.attach_files ? 1 : 0 } : {}
+  const res = await tryCall(() => api('connections.save', { name: current.value.name, active: d.active ? 1 : 0, default_intent: d.default_intent, default_area: d.default_area || '', default_goal: d.default_goal || '', ...extra }), 'Saved.')
   if (!res) return
   settingsOpen.value = false
   await load()
 }
 async function add(t) {
+  if (t.system === 'gmail') return openGmail()
   const res = await tryCall(() => api('connections.save', { space: store.space, system: t.system, active: 1 }), `${t.label} is on.`)
   if (!res) return
   await load()
   const c = connected.value.find((x) => x.system === t.system)
   if (c) openSettings(c)
+}
+async function openGmail() {
+  gmailSetup.value = null
+  gmailOpen.value = true
+  gmailSetup.value = await tryCall(() => api('connections.gmail_setup'))
+}
+async function connectGmail() {
+  const res = await tryCall(() => api('connections.gmail_connect', { space: store.space, success_uri: '/life/brain/sources' }))
+  if (res?.url) window.location.assign(res.url) // Google's own sign-in; Frappe brings the browser back here with ?gmail=<card>
+}
+async function finishGmail(name) {
+  await router.replace({ path: route.path, query: { ...route.query, gmail: undefined } })
+  const res = await tryCall(() => api('connections.gmail_finish', { name }), 'Gmail is connected. Life OS reads new mail every 15 minutes.')
+  await load()
+  const c = res && connected.value.find((x) => x.name === res.name)
+  if (c) openSettings(c)
+}
+async function removeGmail() {
+  const res = await tryCall(() => api('connections.gmail_remove', { name: current.value.name }), 'Mailbox removed. What it brought in stays.')
+  if (!res) return
+  settingsOpen.value = false
+  await load()
 }
 async function addOther() {
   const system = otherName.value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
@@ -148,5 +202,5 @@ async function addOther() {
   const c = connected.value.find((x) => x.system === system)
   if (c) openSettings(c)
 }
-watch(() => store.space, load, { immediate: true })
+watch(() => store.space, async () => { await load(); if (route.query.gmail) await finishGmail(String(route.query.gmail)) }, { immediate: true })
 </script>
