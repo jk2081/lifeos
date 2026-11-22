@@ -1,12 +1,13 @@
 <template>
   <PageHead title="Goals" :sub="sub">
+    <Button variant="subtle" label="Reset" route="/today/reset" data-all-tasks-reset />
     <Button v-if="writable" variant="solid" icon-left="lucide-plus" label="Task" data-new-task @click="openTopAdd" />
   </PageHead>
   <div class="page-body flex max-w-6xl flex-col gap-4" data-all-tasks :data-loaded="loaded ? 1 : 0">
     <div class="flex flex-wrap items-center gap-x-4 gap-y-2" data-task-controls>
       <TextInput v-model="search" class="w-full sm:w-56" type="search" placeholder="Search tasks" aria-label="Search tasks" data-task-search />
       <nav class="flex flex-wrap items-center gap-2" aria-label="Show" data-task-shows>
-        <Button v-for="s in SHOWS" :key="s.value" :variant="show === s.value ? 'solid' : 'subtle'" :label="`${s.label} ${data?.counts?.[s.value] ?? ''}`.trim()"
+        <Button v-for="s in shows" :key="s.value" :variant="show === s.value ? 'solid' : 'subtle'" :label="`${s.label} ${data?.counts?.[s.value] ?? ''}`.trim()"
           :data-task-show="s.value" @click="go({ show: s.value === 'open' ? undefined : s.value })" />
       </nav>
       <div class="flex items-center gap-2" role="group" aria-label="Group by" data-task-group>
@@ -95,10 +96,13 @@ import { onRecordChanged, openRef } from '@/lib/pane'
 
 const SHOWS = [{ label: 'All open', value: 'open' }, { label: 'Due', value: 'due' }, { label: 'Waiting on someone', value: 'waiting' },
   { label: 'Someday', value: 'someday' }, { label: 'Done', value: 'done' }]
+// the old Open band's "untouched 30+ days" (issue 55) is a filter here, after Due
+const shows = computed(() => [...SHOWS.slice(0, 2), { label: `Untouched ${data.value?.stuck_days || 30}+ days`, value: 'stuck' }, ...SHOWS.slice(2)])
 const GROUPS = [{ label: 'Area', value: 'area' }, { label: 'Goal', value: 'goal' }, { label: 'Due date', value: 'due' }]
 const HINT = {
   open: ['No open tasks.', 'Tasks you add, and tasks the Brain finds in what you capture, will show here under the area of life they belong to.'],
   due: ['Nothing is due this week.', 'Open tasks that are overdue or due by the end of this week show here.'],
+  stuck: ['Nothing has been left untouched.', 'Open tasks nobody has touched for a month show here, ready for Reset.'],
   waiting: ['Nothing is waiting on someone.', 'A task you are waiting on someone for shows here, with who.'],
   someday: ['Nothing is parked on Someday.', 'Tasks you park for later show here, and come back for review after a while.'],
   done: ['No done tasks yet.', 'Tasks you tick off show here, newest first.'],
@@ -114,7 +118,7 @@ const topAdd = ref(false)
 const topText = ref('')
 const emptyText = ref('')
 const topInput = ref(null)
-const show = computed(() => (SHOWS.some((s) => s.value === route.query.show) ? route.query.show : 'open'))
+const show = computed(() => ([...SHOWS, { value: 'stuck' }].some((s) => s.value === route.query.show) ? route.query.show : 'open'))
 const group = computed(() => (GROUPS.some((g) => g.value === route.query.group) ? route.query.group : 'area'))
 const writable = computed(() => canWrite())
 const area = computed(() => only.value || store.lensArea || '')

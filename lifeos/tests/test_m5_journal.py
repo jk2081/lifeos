@@ -327,16 +327,14 @@ class TestCheckinsPagesReview(JournalCase):
 
 
 class TestTodayThisWeek(JournalCase):
-	def test_today_lists_this_weeks_actions_and_a_tick_moves_the_score(self):
+	def test_a_tick_moves_the_score_and_lead_actions_are_not_rows(self):  # issue 55: Today lists tasks, not a goal's weekly actions
 		cycle, (goal,) = self.make_cycle(status="Active", goals=[("Fit", [("Walk", 1), ("Workout", 3), ("Dropped one", 1)])])
 		walk, workout, dropped = goal.actions
 		journal.set_action_status(dropped.name, "Dropped")
-		data = today_api.get(space=PRIVATE)["cycle"]
-		self.assertEqual(data["week"], 4)
-		acts = {a["name"]: a for a in data["actions"]}
-		self.assertEqual(set(acts), {walk.name, workout.name})
-		self.assertEqual((acts[workout.name]["per_week"], acts[workout.name]["count"], acts[workout.name]["goal_title"]), (3, 0, "Fit"))
+		data = today_api.get(space=PRIVATE)
+		self.assertEqual(data["cycle"]["week"], 4)
+		self.assertNotIn("actions", data["cycle"])
+		self.assertFalse([g for g in data["next"]["groups"] if g["key"] == "twy"])
 		journal.tick(workout.name, 4, 2)
 		data = today_api.get(space=PRIVATE)["cycle"]
-		self.assertEqual({a["name"]: a["count"] for a in data["actions"]}[workout.name], 2)
 		self.assertEqual((data["done"], data["planned"]), (2, 4))

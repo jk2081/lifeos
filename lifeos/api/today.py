@@ -21,22 +21,31 @@ def task_lens(space, area):
 	return f" and {area_filter(space, area, 't.area', values, also_in='Life Task')} ", values
 
 
-def week_actions(cycle, week, space=None, area=None):
-	"""The actions planned in a week of a cycle, with the ticks they have, for the This week card on Today. Under the lens,
-	only the actions of goals in the area."""
-	doc = frappe.get_cached_doc("Life Cycle", cycle.name)
-	actions, ticks = journal._actions(cycle.name), journal._ticks(cycle.name)
-	goal_filter = {"cycle": cycle.name}
-	if area:
-		goal_filter["area"] = ("in", descendants(space, area))
-	goals = dict(frappe.get_all("Life Goal", filters=goal_filter, fields=["name", "title"], as_list=True))
-	out = []
-	for a in actions:
-		if not journal.planned_in_week(doc, a, week) or (area and a.goal not in goals):
-			continue
-		out.append({"name": a.name, "title": a.title, "goal": a.goal, "goal_title": goals.get(a.goal), "status": a.status,
-			"per_week": int(a.per_week or 1), "count": ticks.get(a.name, {}).get(week, 0)})
-	return out
+def planned_this_week(space, now, area=None, cycle=None, limit=None):
+	"""Open tasks planned this week (due or scheduled Monday to Sunday) under a goal of the active cycle (the weekly review's goal
+	work), in the lens. Each carries its goal as `goal` and `goal_title`."""
+	if not cycle:
+		return []
+	lens, lens_values = task_lens(space, area)
+	start = add_days(now, -now.weekday())
+	values = {"cycle": cycle, "wk_a": str(start), "wk_b": str(add_days(start, 6)), "wk_end": str(add_days(start, 7)), **lens_values}
+	return task_api.query(space, lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 "
+		"and t.goal in (select g.name from `tabLife Goal` g where g.cycle = %(cycle)s) "
+		"and (t.due_date between %(wk_a)s and %(wk_b)s or (t.scheduled_at >= %(wk_a)s and t.scheduled_at < %(wk_end)s))", values,
+		"t.due_date is null, t.due_date asc, t.scheduled_at asc, t.creation asc", 0, limit or GROUP_MAX)
+
+
+def goals_without_plan(space, now, area=None, cycle=None):
+	"""How many active goals of the current cycle have no task planned this week."""
+	if not cycle:
+		return 0
+	goals = frappe.get_all("Life Goal", filters={"space": space, "cycle": cycle, "outcome": "In Progress", "is_archived": 0, "on_hold": 0, "is_someday": 0},
+		pluck="name")
+	if area and goals:
+		keep = in_area(space, area, "Life Goal", goals)
+		goals = [g for g in goals if g in keep]
+	planned = {t.goal for t in planned_this_week(space, now, area, cycle, limit=1000)}
+	return len([g for g in goals if g not in planned])
 
 
 @frappe.whitelist(methods=["GET"])
@@ -109,7 +118,7 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		if 1 <= week <= journal.WEEKS:
 			score = journal.week_score(cycle.name, week)
 			cycle_out = {"name": cycle.name, "title": cycle.title, "week": week, "weeks": journal.WEEKS, "score": score["percent"],
-				"done": score["done"], "planned": score["planned"], "actions": week_actions(cycle, week, space, area)}
+				"done": score["done"], "planned": score["planned"]}
 		else:
 			cycle_out = {"name": cycle.name, "title": cycle.title, "week": None, "weeks": journal.WEEKS, "ended": week > journal.WEEKS,
 				"start_date": str(cycle.start_date)}
@@ -123,13 +132,10 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		coming.append({"kind": "important", "name": d["name"], "title": d["label"], "date": d["date"], "date_kind": d["kind"],
 			"days": (getdate(d["date"]) - now).days})
 
-	from lifeos import counts
-
-	band = counts.open_band(space, area)
 	nxt = next_list(space, now, cycle_out, events, area)
 	rail = rail_of(space, now, events, area)
 	return {
-		"band": band, "next": nxt, "rail": rail, "days_left": 6 - now.weekday(),
+		"no_plan": goals_without_plan(space, now, area, cycle.name if cycle else None), "next": nxt, "rail": rail, "days_left": 6 - now.weekday(),
 		"date": str(now), "space": space,
 		"cycle": cycle_out, "target": frappe.db.get_single_value("Life Settings", "score_target") or 85,
 		"to_review": {"count": to_review, "proposals": proposals_waiting, "items": review_items},
@@ -138,7 +144,6 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		"events": events, "habits": habits,
 		"open_loops": task_api.open_loops_count(space), "area": area,
 		"banner": None if permissions.is_agent() else rhythms.banner(space, at),
-		"inout": None if permissions.is_agent() else _inout(space, area),
 		"auto_inbox": None if permissions.is_agent() else old_inbox.recent_auto(space, area),
 		"coming_up": coming,
 		"vault_soon": vault_api.expiry_counts(space)["soon"],
@@ -151,10 +156,9 @@ GROUP_MAX = 30
 
 
 def next_list(space, now, cycle, events, area=None):
-	"""One list in a fixed order: Overdue, Today (events at their times and tasks due today), 12 Week Year this week
-	(planned actions not yet ticked), Needs a decision (actionable insights). Someday items never appear."""
+	"""Tasks only, in a fixed order: the top three, Overdue, Today (events at their times and tasks due today), and tasks planned this
+	week under a goal of the cycle. No goal and no lead action is a row. Someday items never appear."""
 	from lifeos import counts
-	from lifeos.api import insights as insight_api
 
 	lens, lens_values = task_lens(space, area)
 	# set 8: the week's top three come first, starred, until the next review is locked
@@ -190,34 +194,24 @@ def next_list(space, now, cycle, events, area=None):
 		if t.get("scheduled_at") and str(t.scheduled_at)[:10] == str(now):
 			t["lead"] = str(t.scheduled_at)[11:16]
 		today_rows.append(t)
-	twy = []
-	if cycle and cycle.get("week"):
-		for a in cycle["actions"]:
-			if a["status"] == "Open" and a["count"] < a["per_week"]:
-				twy.append({**a, "type": "action", "why": "12WY", "week": cycle["week"]})
-	# insights are for people (set 5); an agent's Today has none
-	ins = {"rows": [], "total": 0} if permissions.is_agent() else insight_api.list(space=space, status="New", actionable=1, area=area, page_length=GROUP_MAX)
-	for r in ins["rows"]:
-		r["type"] = "insight"
-		r["why"] = r.kind
+	# issue 55: tasks planned this week under a goal of the cycle, once each; a goal with nothing planned has no row
+	shown = tops | {t.name for t in overdue} | {t.name for t in due_today} | {r["name"] for r in today_rows if r.get("type") == "task"}
+	week = [{**t, "type": "task", "why": "This week"} for t in planned_this_week(space, now, area, cycle["name"] if cycle else None) if t.name not in shown]
 	return {
-		"order": ["top", "overdue", "today", "twy", "decisions"],
+		"order": ["top", "overdue", "today", "week"],
 		"groups": [
 			{"key": "top", "label": "This week's top three", "rows": top, "total": len(top)},
 			{"key": "overdue", "label": "Overdue", "rows": overdue, "total": counts.overdue_tasks(space, area)["n"], "door": counts.overdue_tasks(space, area)},
 			{"key": "today", "label": "Today", "rows": today_rows, "total": len(today_rows), "tasks": counts.due_today_tasks(space, area),
 				"events": len(today_rows) - len(due_today)},
-			{"key": "twy", "label": "12 Week Year · this week", "rows": twy, "total": len(twy)},
-			{"key": "decisions", "label": "Needs a decision", "rows": ins["rows"], "total": ins["total"],
-				"door": {"n": ins["total"], "to": {"path": "/ask", "query": {"tab": "insights", "actionable": 1, **({"area": area} if area else {})}},
-					"label": "need a decision"}},
+			{"key": "week", "label": "This week · under your goals", "rows": week, "total": len(week)},
 		],
 		"show": NEXT_ROWS,
 	}
 
 
 def rail_of(space, now, events, area=None):
-	"""Today's events as a timeline, this week's important dates, renewals and the weekly review, and the other insights."""
+	"""Today's events as a timeline, this week's important dates, renewals and the weekly review, and the insights (each text once, at most three)."""
 	from lifeos.api import insights as insight_api
 
 	week_end = add_days(now, 6 - now.weekday())
@@ -237,7 +231,7 @@ def rail_of(space, now, events, area=None):
 	week.append({"kind": "review", "title": "Weekly review", "date": str(review_on), "time": str(s.weekly_review_time or "18:00:00")[:5],
 		"day": day[:3]})
 	week.sort(key=lambda x: str(x.get("date") or ""))
-	other = {"rows": [], "total": 0} if permissions.is_agent() else insight_api.list(space=space, status="New", actionable=0, area=area, page_length=5)
+	other = {"rows": [], "total": 0} if permissions.is_agent() else unique_insights(insight_api.list(space=space, status="New", area=area, page_length=50)["rows"])
 	timeline = [e for e in events if not e.get("date") or str(e["date"]) == str(now)]
 	for t in scheduled_today(space, now, area):  # planned tasks on the timeline too (set 7)
 		start = get_datetime(t.scheduled_at)
@@ -245,6 +239,17 @@ def rail_of(space, now, events, area=None):
 			"end": str(start + timedelta(minutes=t.duration_min or 60))[:19]})
 	timeline.sort(key=lambda e: (not e.get("all_day"), str(e.get("start") or "")))
 	return {"events": timeline, "week": week, "insights": other["rows"], "insights_total": other["total"]}
+
+
+def unique_insights(rows, limit=3):
+	"""The Insights of the rail: each text once (the first, in rank order), at most `limit`; `total` counts the distinct texts."""
+	seen, out = set(), []
+	for r in rows:
+		key = " ".join(str(r.get("title") or "").lower().split())
+		if key not in seen:
+			seen.add(key)
+			out.append(r)
+	return {"rows": out[:limit], "total": len(out)}
 
 
 OCCURRENCE = re.compile(r"^(review:\d{4}-\d{2}-\d{2}|month:\d{4}-\d{2}|(plan-next|close):[\w-]{1,40})$")
@@ -259,13 +264,6 @@ def skip_banner(occurrence: str, how: str = "skipped"):
 	if how not in ("skipped", "done") or not OCCURRENCE.match(str(occurrence or "")):
 		frappe.throw(frappe._("Unknown banner."))
 	return rhythms.dismiss(occurrence, how)
-
-
-def _inout(space, area):
-	"""This week's in and out (set 7), for the line under the Open band."""
-	from lifeos.api import outbox
-
-	return outbox.week_line(space, area)
 
 
 def scheduled_today(space, now, area=None):

@@ -7,6 +7,12 @@
       <TabButtons :model-value="show" :options="SHOWS" data-goal-show @update:model-value="(v) => go({ show: v })" />
       <Select class="w-44" :model-value="sort" :options="SORTS" aria-label="Sort goals" data-goal-sort @update:model-value="(v) => go({ sort: v })" />
     </div>
+    <!-- the old Open band's goal numbers (issue 55): goals in progress, open-ended goals and the idle ones, each as the helper counts them -->
+    <p v-if="numbers && (numbers.goals.n || numbers.open_goals.n)" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-7" data-goal-numbers>
+      <span>Goals in progress <b class="tabular-nums text-ink-gray-9" data-goal-number="goals">{{ numbers.goals.n }}</b></span>
+      <span>Open-ended goals <b class="tabular-nums text-ink-gray-9" data-goal-number="open_goals">{{ numbers.open_goals.n }}</b></span>
+      <span>idle {{ numbers.rules.stuck_after_days }}+ days <b class="tabular-nums text-ink-gray-9" data-goal-number="idle_goals">{{ numbers.idle_goals.n }}</b></span>
+    </p>
     <!-- one chip for each of the seven areas; an area that is off is dimmed and has no section -->
     <nav class="flex flex-wrap items-center gap-2" aria-label="Areas" data-area-chips>
       <Button :variant="only ? 'subtle' : 'solid'" :label="`All ${data?.total ?? 0}`" data-area-chip="all" @click="only = ''" />
@@ -138,9 +144,11 @@ function nextWhen(n) {
   return n.due_date ? short(n.due_date) : ''
 }
 const go = (q) => router.push({ query: { ...route.query, ...q } })
+const numbers = ref(null)
 async function load() {
   const res = await tryCall(() => api('goals.by_area', { space: store.space, show: show.value, sort: sort.value }))
   if (res) data.value = res
+  numbers.value = (await tryCall(() => api('counts.get', { space: store.space, which: 'goals', area: store.lensArea || undefined }))) || numbers.value
   loaded.value = true
 }
 function addGoal(area) {

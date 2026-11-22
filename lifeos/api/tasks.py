@@ -185,6 +185,7 @@ ALL_SHOWS = {
 	"open": "t.status in ('Open', 'Doing', 'Waiting')",
 	"due": "t.status in ('Open', 'Doing', 'Waiting') and t.due_date is not null and t.due_date <= %(week_end)s",
 	"waiting": "t.status = 'Waiting'",
+	"stuck": "t.status in ('Open', 'Doing', 'Waiting') and t.last_touched_on <= %(stuck_cut)s",
 	"someday": "t.status = 'Someday'",
 	"done": "t.status = 'Done'",
 }
@@ -202,7 +203,7 @@ def _due_group(task, now, week_end):
 @frappe.whitelist(methods=["GET"])
 def all_tasks(space: str | None = None, group: str = "area", show: str = "open", area: str | None = None, q: str | None = None):
 	"""Goals → All tasks: the tasks of one filter in groups, each task once. `show`: open (Open, Doing and Waiting), due (open and
-	due by the end of this week), waiting, someday or done. `group`: area (the areas that are on, each with its parts; tasks with
+	due by the end of this week), stuck (open and untouched for the stuck-after days, 30 by default), waiting, someday or done. `group`: area (the areas that are on, each with its parts; tasks with
 	no area last), goal (a group for each goal, then no goal) or due (overdue, today, this week, later, no date). `area` keeps one area
 	of life with its parts; `q` searches titles. `counts` gives the tasks under each filter for the same area and search.
 	At most 1,000 tasks come back (`truncated`); Done keeps the newest first."""
@@ -212,7 +213,10 @@ def all_tasks(space: str | None = None, group: str = "area", show: str = "open",
 	if group not in ("area", "goal", "due"):
 		frappe.throw(_("Unknown grouping."))
 	now = getdate(today())
-	values = {"today": now, "week_end": add_days(now, 6 - now.weekday())}
+	from lifeos import counts
+
+	stuck_days = counts.rules()["stuck_after_days"]
+	values = {"today": now, "week_end": add_days(now, 6 - now.weekday()), "stuck_cut": add_days(now, -stuck_days)}
 	base = " and t.is_archived = 0"
 	if area:
 		base += " and " + area_filter(space, area, "t.area", values)
@@ -228,12 +232,12 @@ def all_tasks(space: str | None = None, group: str = "area", show: str = "open",
 	cond = ", ".join(f"ifnull(sum({c}), 0)" for c in ALL_SHOWS.values())
 	off = off_clause(space, "t.area", values, "count_off_areas")
 	# nosemgrep: frappe-sql-format-injection -- ALL_SHOWS is a constant map, base and off are fixed SQL; values are parameters
-	counts = dict(zip(ALL_SHOWS, [int(n) for n in frappe.db.sql(
+	tab_numbers = dict(zip(ALL_SHOWS, [int(n) for n in frappe.db.sql(
 		f"select {cond} from `tabLife Task` t where t.space=%(space)s {base} {off}", {**values, "space": space})[0]]))
 	groups = {"area": _by_area, "goal": _by_goal, "due": _by_due}[group](space, rows, show, now, values["week_end"])
 	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0, "is_life_area": 1}, fields=["name", "area_name", "colour", "is_on"],
 		order_by="sort_order asc, area_name asc", limit=50)
-	return {"space": space, "group": group, "show": show, "total": len(rows), "truncated": truncated, "counts": counts, "groups": groups,
+	return {"space": space, "group": group, "show": show, "total": len(rows), "truncated": truncated, "counts": tab_numbers, "stuck_days": stuck_days, "groups": groups,
 		"areas": [a for a in areas if a.is_on], "today": str(now)}
 
 
@@ -409,11 +413,36 @@ def set_status(task: str, status: str, waiting_on: str | None = None):
 
 		someday.park("Life Task", task)
 		return get(task)
+	was_done = doc.status == "Done"
 	doc.status = status
 	if waiting_on is not None:
 		doc.waiting_on = waiting_on
 	doc.save()
+	if status == "Done" and not was_done:
+		tick_lead_action(doc)
 	return get(doc.name)
+
+
+def tick_lead_action(task):
+	"""Issue 55: finishing a task planned under a goal of the active cycle ticks the goal's lead action of the same title for
+	this week, once more (up to its times a week). A task with no matching lead action ticks nothing."""
+	if not task.goal:
+		return
+	cycle = frappe.db.get_value("Life Goal", task.goal, "cycle")
+	if not cycle or frappe.db.get_value("Life Cycle", cycle, "status") != "Active":
+		return
+	week = journal.week_of(frappe.get_doc("Life Cycle", cycle), getdate(today()))
+	if not 1 <= week <= journal.WEEKS:
+		return
+	title = (task.title or "").strip().lower()
+	for a in frappe.get_all("Life Goal Action", filters={"parent": task.goal, "status": "Open"}, fields=["name", "title", "per_week"]):
+		if (a.title or "").strip().lower() == title:
+			have = journal._ticks(cycle).get(a.name, {}).get(week, 0)
+			try:
+				journal.set_tick(a.name, week, have + 1)
+			except frappe.PermissionError:  # someone who may finish the task but not change the goal's ticks
+				pass
+			return
 
 
 @frappe.whitelist(methods=["POST"])
