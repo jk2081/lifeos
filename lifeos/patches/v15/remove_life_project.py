@@ -8,6 +8,7 @@ given its goal. Before anything is removed this checks both, and stops with the 
 Then it deletes the DocType and its table and drops the columns itself (not `bench trim-tables`, so the check and the
 removal are one step that either happens or does not). Back the site up first: dropping a column cannot be undone."""
 import frappe
+from frappe import _
 
 # every table that had a `project` column; Life Index mirrors the others and has no goal column to check
 WITH_PROJECT = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Journal Page", "Life Vault Document", "Life Idea", "Life Goal", "Life Index")
@@ -42,7 +43,7 @@ def problems() -> list[str]:
 def execute():
 	found = problems()
 	if found:
-		frappe.throw("The old projects cannot be removed yet. Nothing was changed. Fix these first:<br>" + "<br>".join(found[:200]))
+		frappe.throw(_("The old projects cannot be removed yet. Nothing was changed. Fix these first:") + "<br>" + "<br>".join(found[:200]))
 	if frappe.db.exists("DocType", "Life Project"):
 		frappe.delete_doc("DocType", "Life Project", force=True, ignore_missing=True, delete_permanently=True)
 	frappe.db.sql_ddl("drop table if exists `tabLife Project`")
