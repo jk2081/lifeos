@@ -6948,6 +6948,156 @@ print(json.dumps({"status": cyc.status, "score": cyc.final_score, "next": nxt.st
   }
 }
 
+// Issue 49: the first-run guide and the empty states on a brand-new site. I49.1 and I49.2 are unit tests (test_i49_first_run). A user made for
+// the run, with a space of their own and nothing in it, stands for a new person's site. Titles start "I49 ".
+for (const width of SET_WIDTHS) {
+  const tag = `I49.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const user = `i49-${width}-${stamp}@lifeos.test`.toLowerCase()
+  const space = `I49 ${width} ${stamp}`
+  const zoneWas = bench('print(frappe.db.get_single_value("System Settings", "time_zone"))').split('\n').pop()
+  const reset = () => bench(`frappe.defaults.clear_default("lifeos_onboarding", parent="${user}")`)
+  const restore = () => bench(`frappe.set_user("Administrator")
+frappe.db.set_single_value("System Settings", "time_zone", "${zoneWas}")
+for dt in ("Life Task",):
+    for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+from lifeos import devtools
+devtools.purge_space("${space}", drop=True)
+frappe.db.delete("DefaultValue", {"parent": "${user}"})
+if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  let one = null
+  try {
+    bench(`from lifeos import devtools
+devtools.make_user("${user}", "Newcomer", ["Life Admin", "Life User"])
+frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
+frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
+frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user": "${user}", "members": [{"user": "${user}", "access": "Write"}]}).insert(ignore_permissions=True)`)
+    one = await session(user, width)
+    const pg = one.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    const stepKey = () => pg.locator('[data-guide]').getAttribute('data-step')
+    const guideOpens = async () => { await one.open('/life'); await pg.locator('[data-guide]').waitFor({ timeout: 10000 }) }
+    const path = () => new URL(pg.url()).pathname
+
+    await check(`${tag}.3`, `${width} px: the first visit opens the guide; skipping every step lands on Today and the guide does not return`, async () => {
+      await guideOpens()
+      must(await stepKey() === 'welcome', 'the guide does not open on Welcome')
+      must((await pg.locator('[data-guide-flow] li').count()) === 3, 'Welcome does not show Sources, Brain and Plan')
+      await pg.locator('[data-guide-next]').click()
+      for (const key of ['you', 'areas', 'things']) {
+        must(await stepKey() === key, `expected the ${key} step, at ${await stepKey()}`)
+        await pg.locator('[data-guide-skip]').click()
+      }
+      must(await stepKey() === 'next', 'the last step is not Next step')
+      await pg.locator('[data-guide-today]').click()
+      await pg.waitForFunction(() => location.pathname === '/life/today', null, { timeout: 8000 })
+      must(await pg.locator('[data-guide]').count() === 0, 'the guide is still open')
+      await one.open('/life')
+      await pg.waitForTimeout(1200)
+      must(await pg.locator('[data-guide]').count() === 0, 'the guide came back after a reload')
+      must((await one.api('onboarding.state')).status === 'skipped', 'the guide is not recorded as skipped')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    if (phone) {
+      reset()
+      await check(`${tag}.7`, `${width} px: the guide shows one screen at a time and each screen fits the phone`, async () => {
+        await guideOpens()
+        for (const key of ['welcome', 'you', 'areas', 'things', 'next']) {
+          must(await stepKey() === key, `expected ${key}, at ${await stepKey()}`)
+          must(await pg.locator('[data-guide-step]:visible').count() === 1, `${key}: more than one screen is shown`)
+          must(!(await pg.evaluate(() => document.querySelector('[data-guide]').scrollWidth > window.innerWidth + 1)), `${key}: the screen scrolls sideways`)
+          if (key !== 'next') {
+            const box = await pg.locator('[data-guide-next]').boundingBox()
+            must(box && box.x >= 0 && box.x + box.width <= width, `${key}: the Next button is off the screen`)
+            await pg.locator('[data-guide-skip], [data-guide-next]').last().click()
+            await pg.waitForFunction((k) => document.querySelector('[data-guide]')?.dataset.step !== k, key, { timeout: 8000 })
+          }
+        }
+        await pg.locator('[data-guide-close]').click()
+        await pg.waitForFunction(() => !document.querySelector('[data-guide]'), null, { timeout: 8000 })
+        must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      })
+    }
+
+    await check(`${tag}.5`, `${width} px: Today, Brain, Goals and Library on a fresh site each show their empty state with one action`, async () => {
+      reset()
+      for (const [p, sel] of [['/life/today', '[data-today-empty]'], ['/life/brain', '[data-needs-empty]'], ['/life/goals', '[data-goals-empty]'], ['/life/library', '[data-lib-empty]']]) {
+        await one.open(p)
+        // the guide opens on a new site: close it to see the screen under it
+        const g = pg.locator('[data-guide-close]')
+        if (await g.count() || await g.waitFor({ timeout: 1500 }).then(() => true, () => false)) { await g.click(); await pg.waitForFunction(() => !document.querySelector('[data-guide]'), null, { timeout: 8000 }) }
+        await pg.locator(sel).waitFor({ timeout: 10000 })
+        const text = await pg.locator(sel).innerText()
+        must(text.length > 20, `${p}: the empty state says ${JSON.stringify(text)}`)
+        must(await pg.locator(`${sel} button, ${sel} a`).count() === 1, `${p}: the empty state has ${await pg.locator(`${sel} button, ${sel} a`).count()} actions`)
+        await noSideways()
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.4`, `${width} px: going through the guide sets the name and time zone, switches on a third area and turns three typed things into tasks with areas`, async () => {
+      reset()
+      await guideOpens()
+      await pg.locator('[data-guide-next]').click() // Start
+      const name = `Asha Newcomer ${stamp}`
+      await pg.locator('[data-guide-name] input, input[data-guide-name]').first().fill(name)
+      await pg.locator('[data-guide-zone] select, select[data-guide-zone]').first().selectOption('Asia/Dubai')
+      await pg.locator('[data-guide-next]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'areas', null, { timeout: 8000 })
+      must(await pg.locator('[data-guide-area][data-on="1"]').count() === 2, 'Career and Health are not the two areas on')
+      await pg.locator('[data-guide-switch="Mind"]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide-area="Mind"]')?.dataset.on === '1', null, { timeout: 8000 })
+      await pg.locator('[data-guide-part-title] input, input[data-guide-part-title]').first().fill(`I49 part ${stamp}`)
+      await pg.locator('[data-guide-part-add]').click()
+      await pg.locator('[data-guide-parts]').waitFor({ timeout: 8000 })
+      await pg.locator('[data-guide-next]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'things', null, { timeout: 8000 })
+      const things = [`I49 book the dentist ${stamp}`, `I49 pay the electricity bill ${stamp}`, `I49 read a chapter of my book ${stamp}`]
+      for (const [i, t] of things.entries()) await pg.locator(`[data-guide-thing="${i}"] input, input[data-guide-thing="${i}"]`).first().fill(t)
+      await pg.locator('[data-guide-next]').click()
+      await pg.locator('[data-guide-made]').waitFor({ timeout: 10000 })
+      must(await pg.locator('[data-guide-task]').count() === 3, 'three tasks were not made')
+      const areas = await pg.locator('[data-guide-task-area]').allInnerTexts()
+      must(areas.every((a) => a && a !== 'No area'), 'a task has no area: ' + areas.join())
+      await pg.locator('[data-guide-next]').click() // Continue
+      await pg.locator('[data-guide-today]').click()
+      await pg.waitForFunction(() => location.pathname === '/life/today', null, { timeout: 8000 })
+      const out = JSON.parse(bench(`import json
+doc = frappe.get_doc("User", "${user}")
+on = frappe.get_all("Life Area", filters={"space": "${space}", "is_life_area": 1, "is_on": 1}, pluck="area_name")
+tasks = frappe.get_all("Life Task", filters={"space": "${space}"}, fields=["title", "area"])
+print(json.dumps({"name": doc.full_name, "zone": frappe.db.get_single_value("System Settings", "time_zone"), "on": sorted(on),
+  "tasks": len(tasks), "unfiled": len([t for t in tasks if not t.area]),
+  "part": frappe.db.exists("Life Area", {"space": "${space}", "area_name": "I49 part ${stamp}"}) is not None}))`).split('\n').pop())
+      must(out.name === name, 'the name is ' + out.name)
+      must(out.zone === 'Asia/Dubai', 'the time zone is ' + out.zone)
+      must(out.on.join() === 'Career,Health,Mind', 'the areas on are ' + out.on.join())
+      must(out.tasks === 3 && out.unfiled === 0, `tasks: ${out.tasks}, without an area: ${out.unfiled}`)
+      must(out.part, 'the part was not made')
+      must((await one.api('onboarding.state')).status === 'done', 'the guide is not recorded as done')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.6`, `${width} px: after the guide the ladder card shows level 1 and connect a source`, async () => {
+      await one.open('/life/today')
+      if (phone) await pg.locator('[data-more-title]').click()
+      const card = pg.locator('[data-setup-card]:visible')
+      await card.waitFor({ timeout: 10000 })
+      const t = await card.innerText()
+      must(t.includes('level 1 of 6'), 'the card says: ' + t)
+      must(/connect a source/i.test(t), 'the next step is not to connect a source: ' + t)
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    if (one) await one.ctx.close()
+    restore()
+  }
+}
+
 // Issue 48: the old Life Project table and the project aliases are gone. (I48.1 to I48.5 and I48.7 are unit tests in
 // lifeos/tests/test_issue48_project_removed.py.)
 await check('I48.6', '/life/projects and an old project link land on Goals', async () => {

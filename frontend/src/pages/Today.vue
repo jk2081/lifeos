@@ -97,7 +97,11 @@
               </template>
             </template>
             <div v-if="hidden > 0" class="py-2.5"><Button variant="ghost" class="!px-0 !text-ink-blue-8" :label="`${hidden} more`" data-next-more @click="showAll = true" /></div>
-            <Empty v-if="!groups.length" title="Nothing is next." hint="No overdue tasks, nothing today, every action of the week ticked and no decision waiting." />
+            <Empty v-if="!groups.length && onboarding.empty" title="Nothing here yet." data-today-empty>
+              <p class="mt-1">Capture something with + Capture, or connect a source. Your tasks for the day will show up here.</p>
+              <Button v-if="canWrite()" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-today-capture @click="store.captureOpen = true" />
+            </Empty>
+            <Empty v-else-if="!groups.length" title="Nothing is next." hint="No overdue tasks, nothing today, every action of the week ticked and no decision waiting." />
           </Card>
         </section>
 
@@ -196,6 +200,7 @@ import Row from '@/components/ui/Row.vue'
 import AreaGuess from '@/components/AreaGuess.vue'
 import { api, errorText, optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
+import { onboarding } from '@/lib/onboarding'
 import { addDays, long, short, startOfWeek, weekday } from '@/lib/dates'
 import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
 import { askScope, lensScope } from '@/lib/ask'

@@ -384,6 +384,14 @@
               <span class="text-sm tabular-nums text-ink-gray-6">{{ (f.size / 1024).toFixed(0) }} KB</span></Row></Card></section>
           <p class="text-sm text-ink-gray-6">Backups hold the database (every record, including Life OS) and, when files are included, the uploaded files.</p>
           </template>
+          <template v-if="advPart === 'guide'">
+          <Card flush data-guide-settings>
+            <SettingRow label="Welcome guide" :help="`The short guide a new person sees on first opening Life OS. It is ${onboarding.status ? (onboarding.status === 'done' ? 'done' : 'skipped') : 'not yet done'} for you now. Showing it again opens it only while the site has no tasks, goals or captures.`">
+              <Button label="Show it again" :disabled="!onboarding.isSystemManager || !onboarding.status" data-guide-reset @click="resetGuide" />
+            </SettingRow>
+            <p v-if="!onboarding.isSystemManager" class="pb-3 text-sm text-ink-gray-6">Only a System Manager can reset it.</p>
+          </Card>
+          </template>
           <template v-if="advPart === 'archive'">
           <Card flush>
             <SettingRow label="Archive after" help="Done and dropped tasks, and inbox items that are done, move to the Archive this many days after they were closed. Notes, documents, chats, journal pages and goals are never archived automatically."
@@ -468,6 +476,7 @@ import LifeLink from '@/framework/LifeLink.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { boot, store } from '@/lib/store'
 import { loadLookups } from '@/lib/lookups'
+import { loadOnboarding, onboarding } from '@/lib/onboarding'
 import { dateTime, short } from '@/lib/dates'
 
 const COLOURS = ['blue', 'green', 'amber', 'red', 'violet', 'teal', 'orange', 'pink', 'cyan', 'gray'].map((c) => ({ label: c[0].toUpperCase() + c.slice(1), value: c }))
@@ -526,7 +535,11 @@ const MENU = [
   { key: 'advanced', label: '', items: [{ value: 'advanced', label: 'Advanced', level: 1, admin: true }] },
 ]
 const ADVANCED = [{ label: 'AI key and cost', value: 'ai' }, { label: 'Import and export', value: 'import' }, { label: 'Backups', value: 'backups' },
-  { label: 'Archive', value: 'archive' }]
+  { label: 'Archive', value: 'archive' }, { label: 'First-run guide', value: 'guide' }]
+async function resetGuide() {
+  await tryCall(() => api('onboarding.reset'), 'The guide will show again.')
+  await loadOnboarding()
+}
 const ready = computed(() => !!d.value && ladder.loaded)
 const isAdmin = computed(() => !!d.value?.is_admin)
 // items that need a Life Admin (Members, Advanced) are never shown to anyone else; the rest by the person's level

@@ -40,6 +40,7 @@
 
       <NewRecord v-if="store.newKind === 'someday'" :model-value="true" title="Park on Someday" action="Park on Someday" :fields="somedayFields" :save="createSomeday"
         @update:model-value="(v) => !v && (store.newKind = '')" />
+      <OnboardingGuide v-if="onboarding.show" />
       <MoreSheet v-model:open="moreOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
       <RecordPane />
       <AskPanel />
@@ -87,6 +88,8 @@ import CaptureSheet from './components/CaptureSheet.vue'
 import { boot, store } from './lib/store'
 import { initLens, manySpaces } from './lib/lens'
 import MoreSheet from './components/MoreSheet.vue'
+import OnboardingGuide from './components/OnboardingGuide.vue'
+import { loadOnboarding, onboarding } from './lib/onboarding'
 import { errorText } from './lib/api'
 import { stepTab } from './lib/tabs'
 
@@ -170,6 +173,7 @@ onMounted(async () => {
   window.addEventListener('keydown', onKey)
   try {
     await boot({ beforeReady: initLens })
+    if (store.isAdmin && !store.isAgent) loadOnboarding() // the first-run guide (issue 49) and whether the site is still empty
   } catch (e) {
     bootError.value = errorText(e) || 'Could not load Life OS.'
   }

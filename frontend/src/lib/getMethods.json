@@ -63,6 +63,7 @@
  "lifeos.api.meta.space_context",
  "lifeos.api.meta.setup_level",
  "lifeos.api.old_items.suggested",
+ "lifeos.api.onboarding.state",
  "lifeos.api.outbox.list",
  "lifeos.api.outbox.chart",
  "lifeos.api.people.list",
