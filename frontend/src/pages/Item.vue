@@ -24,6 +24,7 @@
           <Button v-if="item.goal" size="sm" variant="outline" icon-left="lucide-target" :label="item.goal_title || item.goal" :route="`/goals/${item.goal}`" data-item-goal />
           <Badge :theme="STATUS[item.status]?.[1] || 'gray'" :label="STATUS[item.status]?.[0] || item.status" data-item-status />
         </div>
+        <p v-if="item.source_type === 'Voice Note' && !item.transcript_md" class="-mt-2 text-sm text-ink-gray-6" data-item-untranscribed>Voice note, not transcribed yet</p>
         <Alert v-if="item.is_archived" title="This item is archived. It is shown read-only." />
 
         <ItemSection name="came-in" title="What came in" :phone="phone" :open="!phone">
@@ -131,7 +132,7 @@ const SYSTEMS = { gmail: ['Gmail', 'lucide-mail'], hermes: ['Hermes', 'lucide-bo
   chatgpt: ['ChatGPT', 'lucide-sparkles'], telegram: ['Telegram', 'lucide-send'], whatsapp: ['WhatsApp', 'lucide-message-circle'],
   calendar: ['Calendar', 'lucide-calendar'], upload: ['Upload', 'lucide-upload'] }
 const TYPES = { Upload: 'lucide-upload', 'Journal Photo': 'lucide-camera', 'Voice Note': 'lucide-mic', Email: 'lucide-mail', 'Email Digest': 'lucide-mail',
-  Chat: 'lucide-message-square', Message: 'lucide-message-circle', Web: 'lucide-globe' }
+  Chat: 'lucide-message-square', Message: 'lucide-message-circle', Web: 'lucide-globe', Phone: 'lucide-smartphone' }
 const STATUS = { New: ['Waiting for the Brain', 'gray'], Processing: ['Being read', 'blue'], 'To Review': ['Needs you', 'amber'], Done: ['Done', 'green'], Failed: ['Failed', 'red'] }
 const source = computed(() => {
   const it = item.value

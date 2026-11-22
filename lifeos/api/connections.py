@@ -28,7 +28,7 @@ UPLOAD = {"label": "Upload", "kind": "Always on", "hint": "Files, photos, voice 
 # shown as "Coming" tiles: not built, so they cannot be switched on
 COMING = {"github": ("GitHub", "PRs and issues"), "whatsapp": ("WhatsApp", "Starred chats"), "wearable": ("Wearable", "Voice all day"),
 	"tally": ("Tally", "Overdue bills"), "drive": ("Drive", "Shared docs"), "erpnext": ("ERPNext", "Overdue orders and approvals")}
-ALWAYS_ON = ("upload",)
+ALWAYS_ON = ("upload", "phone")
 
 
 def require_on(space, system):
@@ -53,7 +53,7 @@ def connection(space, system):
 def touch(space, system, what=None):
 	"""Something arrived from a system: note when, creating the connection row on first contact."""
 	system = (system or "").strip().lower()
-	if not system:
+	if not system or system == "phone":  # the phone is the person's own device, not a connection to switch on or off (issue 50)
 		return
 	name = frappe.db.get_value("Life Connection", {"space": space, "system": system})
 	values = {"last_received_on": now_datetime(), "last_received_what": (what or "")[:140]}

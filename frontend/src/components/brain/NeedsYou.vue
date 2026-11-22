@@ -15,7 +15,7 @@
       </Stat>
     </div>
 
-    <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length" class="py-2" data-needs-empty>
+    <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length && !contradictions.length" class="py-2" data-needs-empty>
       <Empty title="Nothing needs you.">
         <p class="mt-1">Things you capture or connect will show up here.</p>
         <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-needs-capture @click="store.captureOpen = true" />
@@ -58,6 +58,16 @@
         </div>
       </div>
     </Card>
+
+    <section v-if="contradictions.length" class="flex flex-col gap-2" data-needs-contradictions>
+      <div>
+        <h2 class="text-base-medium text-ink-gray-9">Pages disagree</h2>
+        <p class="text-sm text-ink-gray-6">The weekly check found two facts that cannot both be true. Keep one and the pages follow it.</p>
+      </div>
+      <Card flush>
+        <ContradictionCard v-for="c in contradictions" :key="c.name" :finding="c" :can-edit="writable" @changed="load" />
+      </Card>
+    </section>
 
     <section v-if="lessons.length" class="flex flex-col gap-2" data-needs-lessons>
       <div>
@@ -128,6 +138,7 @@ import Card from '@/components/ui/Card.vue'
 import Stat from '@/components/ui/Stat.vue'
 import OldItems from '@/components/inbox/OldItems.vue'
 import LessonCard from '@/components/brain/LessonCard.vue'
+import ContradictionCard from '@/components/brain/ContradictionCard.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
@@ -141,6 +152,7 @@ const allBusy = ref(false)
 const writable = computed(() => canWrite() && !store.isAgent)
 const rows = computed(() => data.value?.rows || [])
 const lessons = computed(() => data.value?.lessons || [])
+const contradictions = computed(() => data.value?.contradictions || [])
 // a proposal that takes an area and has none cannot be kept as it is: it sits under Unfiled until you choose one
 const unfiled = computed(() => rows.value.filter((r) => r.unfiled))
 const asked = computed(() => rows.value.filter((r) => !r.unfiled))

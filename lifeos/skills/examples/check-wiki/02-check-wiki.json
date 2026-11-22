@@ -1,0 +1,64 @@
+{
+ "title": "Two pages that give different counts for the same thing are one contradiction",
+ "input": {
+  "data": {
+   "pages": [
+    {
+     "id": "P1",
+     "title": "Mehi Motors",
+     "summary": "Car dealership in Ranchi",
+     "text": "Mehi Motors has 4 dealerships in Jharkhand.",
+     "linked_from": 1,
+     "links_to": 1,
+     "orphan": false
+    },
+    {
+     "id": "P2",
+     "title": "Ranchi accounts",
+     "summary": "Accounts in Ranchi",
+     "text": "Mehi Motors has 6 dealerships in Jharkhand.",
+     "linked_from": 1,
+     "links_to": 1,
+     "orphan": false
+    }
+   ],
+   "captures": [],
+   "known_names": [
+    "Mehi Motors",
+    "Ranchi accounts"
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "contradictions",
+    "count": {
+     "min": 1,
+     "max": 1
+    }
+   }
+  },
+  {
+   "answer": {
+    "path": "orphans",
+    "count": {
+     "min": 0,
+     "max": 0
+    }
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"orphans\": [], \"missing\": [], \"stale\": [], \"contradictions\": [{\"topic\": \"Mehi Motors' dealership count\", \"question\": \"Two pages disagree on Mehi Motors' dealership count: keep which?\", \"options\": [{\"page\": \"P1\", \"fact\": \"Mehi Motors has 4 dealerships in Jharkhand.\"}, {\"page\": \"P2\", \"fact\": \"Mehi Motors has 6 dealerships in Jharkhand.\"}]}]}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "8c1919f3e79e1758"
+}

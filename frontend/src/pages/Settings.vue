@@ -63,6 +63,15 @@
             <TabButtons :model-value="colorScheme" :options="SCHEMES" aria-label="Theme" data-theme-switch @update:model-value="setColorScheme" />
           </SettingRow>
         </Card>
+          <!-- issue 50: install Life OS on the phone's home screen, share to it, capture offline -->
+          <SectionHead>Install on this phone</SectionHead>
+        <Card flush data-settings-install>
+          <SettingRow label="Android (Chrome)" help="Open the menu (three dots), then Install app or Add to Home screen. Life OS then opens full screen, and appears in the Share list of other apps: photos, PDFs, links and text."
+            data-install-android><Badge v-if="platform === 'android'" theme="blue" label="This phone" /></SettingRow>
+          <SettingRow label="iPhone and iPad (Safari)" help="Tap Share, then Add to Home Screen. Text and links can be shared to Life OS from other apps. iOS does not yet let a web app receive shared photos or files, so add those with + Capture."
+            data-install-ios><Badge v-if="platform === 'ios'" theme="blue" label="This phone" /></SettingRow>
+          <p class="pb-3 text-sm text-ink-gray-6">With no connection, + Capture keeps what you capture on the phone and sends it when you are back online. Nothing else works offline.</p>
+        </Card>
           <SectionHead>Reminders</SectionHead>
         <Card flush data-settings-notifications>
           <SettingRow label="Reminders on Today" help="The weekly review, the month plan and the 12 Week cycle show as one line at the top of Today when they are due. Each has Skip.">
@@ -216,6 +225,9 @@
         </template>
         <!-- Rules: the note rules page, then who may read sensitive items -->
         <template v-if="show('rules')">
+          <SectionHead>What agents know about you</SectionHead>
+          <p class="text-sm text-ink-gray-6">The first thing an agent reads. Life OS writes it from your areas, goals, the 12 Week Year and your rules, and rebuilds it when they change. You cannot edit it here; change what it is made from.</p>
+          <Card data-agent-card :data-words="agentCard?.words"><Md v-if="agentCard" :text="agentCard.card" /><Empty v-else title="Nothing to show yet." hint="It appears as soon as your areas and goals are set." /></Card>
           <SectionHead>Note rules</SectionHead>
           <p class="text-sm text-ink-gray-6">The assistant reads this page before it writes its notes. People edit it; agents cannot. It is also pinned at the top of the assistant's notes in the Library.</p>
           <NoteEditor v-if="rulesDoc" :key="rulesDoc.name" :note="rulesDoc" data-settings-rules />
@@ -384,6 +396,14 @@
               <span class="text-sm tabular-nums text-ink-gray-6">{{ (f.size / 1024).toFixed(0) }} KB</span></Row></Card></section>
           <p class="text-sm text-ink-gray-6">Backups hold the database (every record, including Life OS) and, when files are included, the uploaded files.</p>
           </template>
+          <template v-if="advPart === 'guide'">
+          <Card flush data-guide-settings>
+            <SettingRow label="Welcome guide" :help="`The short guide a new person sees on first opening Life OS. It is ${onboarding.status ? (onboarding.status === 'done' ? 'done' : 'skipped') : 'not yet done'} for you now. Showing it again opens it only while the site has no tasks, goals or captures.`">
+              <Button label="Show it again" :disabled="!onboarding.isSystemManager || !onboarding.status" data-guide-reset @click="resetGuide" />
+            </SettingRow>
+            <p v-if="!onboarding.isSystemManager" class="pb-3 text-sm text-ink-gray-6">Only a System Manager can reset it.</p>
+          </Card>
+          </template>
           <template v-if="advPart === 'archive'">
           <Card flush>
             <SettingRow label="Archive after" help="Done and dropped tasks, and inbox items that are done, move to the Archive this many days after they were closed. Notes, documents, chats, journal pages and goals are never archived automatically."
@@ -457,6 +477,7 @@ import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
+import Md from '@/components/Md.vue'
 import CalendarSection from '@/components/settings/CalendarSection.vue'
 import AreasSection from '@/components/settings/AreasSection.vue'
 import SettingRow from '@/components/settings/SettingRow.vue'
@@ -468,6 +489,7 @@ import LifeLink from '@/framework/LifeLink.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { boot, store } from '@/lib/store'
 import { loadLookups } from '@/lib/lookups'
+import { loadOnboarding, onboarding } from '@/lib/onboarding'
 import { dateTime, short } from '@/lib/dates'
 
 const COLOURS = ['blue', 'green', 'amber', 'red', 'violet', 'teal', 'orange', 'pink', 'cyan', 'gray'].map((c) => ({ label: c[0].toUpperCase() + c.slice(1), value: c }))
@@ -505,6 +527,7 @@ const route = useRoute()
 const router = useRouter()
 const phone = useMediaQuery('(max-width: 767px)')
 const { colorScheme, setColorScheme } = useColorScheme()
+const platform = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'ios' : /Android/.test(navigator.userAgent) ? 'android' : ''
 const d = ref(null)
 const errors = reactive({})
 const newOpen = ref(false)
@@ -526,7 +549,11 @@ const MENU = [
   { key: 'advanced', label: '', items: [{ value: 'advanced', label: 'Advanced', level: 1, admin: true }] },
 ]
 const ADVANCED = [{ label: 'AI key and cost', value: 'ai' }, { label: 'Import and export', value: 'import' }, { label: 'Backups', value: 'backups' },
-  { label: 'Archive', value: 'archive' }]
+  { label: 'Archive', value: 'archive' }, { label: 'First-run guide', value: 'guide' }]
+async function resetGuide() {
+  await tryCall(() => api('onboarding.reset'), 'The guide will show again.')
+  await loadOnboarding()
+}
 const ready = computed(() => !!d.value && ladder.loaded)
 const isAdmin = computed(() => !!d.value?.is_admin)
 // items that need a Life Admin (Members, Advanced) are never shown to anyone else; the rest by the person's level
@@ -617,6 +644,9 @@ const memberTabs = computed(() => {
 const shownMembers = computed(() => (mSpace.value?.members || []).filter((m) => memberKind.value === 'all' || m.is_agent === (memberKind.value === 'agents')))
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
 
+// What agents know about you (issue 54): the core card, read only
+const agentCard = ref(null)
+watch(() => section.value, async (sec) => { if (sec === 'rules' && !agentCard.value) agentCard.value = await tryCall(() => api('context.card')) }, { immediate: true })
 // Note rules: the rules page of the assistant's notes in this space
 const rulesDoc = ref(null)
 watch(() => [section.value, d.value?.rules_note], async ([sec, name]) => {

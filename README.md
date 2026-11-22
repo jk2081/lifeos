@@ -75,6 +75,25 @@ Files and jobs filed before issues 6 to 8 may hold the same file several times, 
 
    It first takes a backup with files (as `bench backup --with-files`) and stops, changing nothing, if that fails. Then it keeps the oldest copy of each duplicate and points every record at it, removes the copies nothing uses any more, moves input files to reusable assets and links them from the job, and puts the Failed items back to New. Every change is written to `sites/SITE/logs/lifeos_tidy.log` and as a comment on the record it changed, and the run ends with a list of them. Running it again changes nothing. Nothing a record still uses is deleted, and no note, task or proposal is deleted at all.
 
+## Setting up Life OS for a new person
+
+Each person gets their own site. Whoever creates it does these steps once; nothing is loaded for the person (no seed, no demo data) and no password is typed on the command line.
+
+```
+cd ~/frappe-bench
+bench new-site SITE --admin-password '<a long random password for the site admin>'   # the site's own admin, kept by whoever runs the site
+bench --site SITE install-app lifeos
+bench --site SITE migrate
+bench build --app lifeos                                  # only if get-app did not build
+bench --site SITE execute lifeos.install.new_owner --kwargs "{'email': 'person@example.com', 'full_name': 'Their Name'}"
+```
+
+`new_owner` makes the person's user with the roles `Life Admin` and `Life User` and makes them the owner of the space `Private`. It sets no password: Frappe sends its own welcome email, and the person chooses a password from the link in it. If the site cannot send email yet, the command says so and still makes the user; send a password reset link to them from the user's record (User → Actions) once outgoing email works. Run it again and nothing changes. Set up outgoing email in Frappe (Email Account) before running it if you want the welcome email to go.
+
+What the person sees: a site with one space (Private, which is not mentioned anywhere), the seven areas of life with Career and Health on, the default rhythms, and no goals, tasks or captures. The first time they open `/life` a short guide of five screens opens: a welcome with the Sources → Brain → Plan picture, their name and time zone, their areas (and parts of an area, such as a business under Career), up to three things on their mind that become tasks with an area guessed for each, and a next step (connect email or calendar, or start using Today). Every screen can be skipped and the guide can be closed at any point; it does not come back. They land on Today, where the "Your setup" card shows level 1 of 6 and the next step. Until something is captured, Today, Brain, Goals and Library each say what will appear there and offer the one action that fills it.
+
+To show the guide again (while the site is still empty), a System Manager opens Settings → Advanced → First-run guide.
+
 ## Try the pipeline without a model
 
 `agent/fake_agent.py` uses the same methods a real agent would and returns canned results.
@@ -174,6 +193,9 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
+| `context.get` | `space=None, task=None, budget=1500` | The first call of a job (issue 54): the core card and the index; with `task`, the card, the matching index lines and the top pages' summaries within `budget` words. Sensitive pages are left out for an agent unless the space allows them. |
+| `context.card` | `space=None` | The core card alone, as Settings, Rules shows it. |
+| `context.decide` | `finding, choice` | People only: keep one fact of a wiki contradiction. |
 | `jobs.file_job` | `job_id, space=None, title=None, area=None, goal=None, instruction=None, raw_text=None, inputs=None, outputs=None, transcript_md=None, summary_md=None, proposals=None, wiki=None, chat=None, source_system=None` | File a finished piece of work as one inbox item in one call (issue 8, the `lifeos-file-work` skill): outputs on the item, reusable inputs kept once each and linked as inputs, proposals waiting for the owner, wiki pages and a chat log citing the item. The same `job_id` again updates the job. All or nothing: an invalid part refuses the call and names the field. |
 
 **`lifeos.api.journal`**

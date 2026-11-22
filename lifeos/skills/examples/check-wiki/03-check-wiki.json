@@ -1,0 +1,60 @@
+{
+ "title": "A tidy wiki gets no changes",
+ "input": {
+  "data": {
+   "pages": [
+    {
+     "id": "P1",
+     "title": "Mehi Motors",
+     "summary": "Car dealership in Ranchi",
+     "text": "Mehi Motors is a car dealership in Ranchi.",
+     "linked_from": 1,
+     "links_to": 1,
+     "orphan": false
+    }
+   ],
+   "captures": [
+    {
+     "id": "C1",
+     "title": "Call",
+     "text": "Spoke to Mehi Motors about the demo."
+    }
+   ],
+   "known_names": [
+    "Mehi Motors"
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "missing",
+    "count": {
+     "min": 0,
+     "max": 0
+    }
+   }
+  },
+  {
+   "answer": {
+    "path": "contradictions",
+    "count": {
+     "min": 0,
+     "max": 0
+    }
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"orphans\": [], \"missing\": [], \"stale\": [], \"contradictions\": []}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "8c1919f3e79e1758"
+}

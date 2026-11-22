@@ -7,7 +7,7 @@ import math
 import frappe
 from frappe.utils import add_to_date, now_datetime
 
-from lifeos import permissions, proposals
+from lifeos import permissions, proposals, wiki_check
 from lifeos.api.utils import area_filter, lens_area, names_map, page
 from lifeos.skills import lessons
 
@@ -78,7 +78,8 @@ def needs_you(space: str | None = None, limit: int = MAX_ROWS):
 		})
 	waiting = frappe.db.sql("""select count(*) from `tabLife Inbox Item` i where i.space = %(space)s and i.is_archived = 0
 		and i.status in ('New', 'Processing') and """ + SEES, args)[0][0]
-	out.update({"lessons": lessons.proposed(space) if not permissions.is_agent() else [], "total": total, "waiting": waiting, "rows": rows, "minutes": minutes(len(rows)), "unfiled": _failed(space), "max_rows": limit})
+	out.update({"lessons": lessons.proposed(space) if not permissions.is_agent() else [],
+		"contradictions": wiki_check.open_findings(space) if not permissions.is_agent() else [], "total": total, "waiting": waiting, "rows": rows, "minutes": minutes(len(rows)), "unfiled": _failed(space), "max_rows": limit})
 	return out
 
 
@@ -106,7 +107,7 @@ OUTCOME_SQL = """case when i.status = 'Failed' then 'failed' when i.status in ('
 	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Rejected') > 0 then 'dropped'
 	else 'filed' end"""
 MADE_EACH = 4
-SOURCE_TYPES = ("Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web")
+SOURCE_TYPES = ("Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web", "Phone")
 
 
 def _activity_where(space, days, source, area):

@@ -133,7 +133,8 @@ def _source_arg(source, space):
 
 
 def _page_out(doc, with_text=True):
-	srcs = [{"doctype": r.source_doctype, "name": r.source_name, "title": links.title_of(r.source_doctype, r.source_name)} for r in doc.sources]
+	srcs = [{"doctype": r.source_doctype, "name": r.source_name, "title": links.title_of(r.source_doctype, r.source_name),
+		"added_on": str(r.added_on) if r.get("added_on") else None} for r in doc.sources]
 	out = {"name": doc.name, "space": doc.space, "title": doc.title, "summary": doc.summary, "collection": doc.collection, "is_rules": doc.is_rules,
 		"area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 		"goal": doc.goal, "parent_note": doc.parent_note, "sources": srcs, "links": links.outgoing(doc), "version": version_of(doc),

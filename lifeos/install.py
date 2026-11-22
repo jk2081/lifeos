@@ -118,6 +118,40 @@ def set_owner(user):
 		space.save(ignore_permissions=True)
 
 
+def new_owner(email, full_name, send_welcome_email=1, space="Private"):
+	"""Set up a new person's site (issue 49), once, by whoever made the site: a user with Life Admin who owns Private.
+
+	No password is passed or set here: the person sets their own through Frappe's welcome email, or a reset link sent from
+	the User record. If the site cannot send email yet, the command says so and the user is still made.
+
+	Run: bench --site SITE execute lifeos.install.new_owner --kwargs "{'email': 'you@example.com', 'full_name': 'Your Name'}"
+	"""
+	email = (email or "").strip().lower()
+	full_name = " ".join((full_name or "").split())
+	if not email or "@" not in email or not full_name:
+		frappe.throw(frappe._("An email address and a full name are needed."))
+	if not frappe.db.exists("Life Space", space):
+		setup()
+	first, _sep, last = full_name.partition(" ")
+	if not frappe.db.exists("User", email):
+		frappe.get_doc({"doctype": "User", "email": email, "first_name": first, "last_name": last, "user_type": "System User",
+			"send_welcome_email": 0}).insert(ignore_permissions=True)
+		if int(send_welcome_email or 0):
+			try:
+				frappe.get_doc("User", email).send_welcome_mail_to_user()
+			except Exception:
+				frappe.clear_messages()
+				print(f"The welcome email could not be sent. Send a password reset link to {email} from the User record once the site can send email.")
+	frappe.get_doc("User", email).add_roles("Life Admin", "Life User")
+	doc = frappe.get_doc("Life Space", space)
+	doc.owner_user = email
+	if email not in [m.user for m in doc.members]:
+		doc.append("members", {"user": email, "access": "Write"})
+	doc.save(ignore_permissions=True)
+	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- a bench execute command: the user and the space are kept when it ends
+	return {"user": email, "space": space}
+
+
 def add_member(space, user, access="Write", role="Life User"):
 	"""Add a user to a space and give them a role.
 

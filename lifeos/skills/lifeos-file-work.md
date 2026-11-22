@@ -5,7 +5,7 @@ when_to_use: The owner asks to file, keep or save work done with him in chat (a 
 trigger: Served
 output: Answer
 model: Smart
-version: 1
+version: 2
 ---
 
 # Filing work into Life OS
@@ -23,6 +23,7 @@ Follow the `lifeos` skill for every rule and refusal. This file only says how to
 
 ## Before the call
 
+- Call `lifeos.api.context.get` first (the `lifeos` skill says how): the core card and the index tell you who the owner is and which pages exist, so you do not guess or ask. Open only the pages you need.
 - Call `lifeos.api.meta.proposal_schema` once, and `lifeos.api.meta.space_context` for the space's areas and goals.
 - Decide the **space** (Private unless the owner says otherwise) and the **area** from the context. Never invent an area.
 - Pick the **job id**: `<organisation-or-topic>-<what>-<YYYY-MM-DD>`, lower case, for example `mehi-motors-pitch-2026-11-19`. Keep it: filing the same job id again **updates** the job and creates nothing new.

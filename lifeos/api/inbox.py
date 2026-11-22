@@ -11,7 +11,7 @@ from lifeos.api.utils import order_by as sort_order
 
 CLAIM_MINUTES = 30
 LIST = list  # this module defines its own `list` method below
-SOURCE_TYPES = ["Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web"]
+SOURCE_TYPES = ["Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web", "Phone"]
 
 
 def _item_dict(item, with_files=True):

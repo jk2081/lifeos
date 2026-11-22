@@ -16,3 +16,5 @@ app.use(router)
 app.config.errorHandler = appErrorHandler
 router.onError((err, to) => routerErrorHandler(err, to && router.resolve(to)))
 app.mount('#app')
+// the phone app (issue 50): a service worker for /life that caches only the app's own static files and takes what other apps share
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/life/sw.js', { scope: '/life/' }).catch(() => {})

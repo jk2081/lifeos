@@ -11,6 +11,11 @@
           <Button class="min-w-0 !justify-start" variant="ghost" size="md" :label="manySpaces ? `Life OS · ${store.space}` : 'Life OS'" icon-right="lucide-chevron-down"
             aria-haspopup="dialog" data-more-title @click="moreOpen = true" />
         </div>
+        <!-- issue 50: offline, only capture works; what was captured waits on the phone and is sent when the connection returns -->
+        <div v-if="!online || queue.waiting" class="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-b border-outline-gray-1 bg-surface-amber-2 px-4 py-1.5 text-sm text-ink-amber-9" role="status" data-offline-note>
+          <span v-if="!online" data-offline>You are offline. Only capture works until the connection returns; other screens need one.</span>
+          <span v-if="queue.waiting" data-queue-note>{{ queue.waiting }} waiting to send<template v-if="queue.failed"> ({{ queue.failed }} could not be sent)</template></span>
+        </div>
         <RouterView v-slot="{ Component }">
           <ScreenBoundary><component :is="Component" :key="store.space + ':' + store.lensArea + ':' + route.path" /></ScreenBoundary>
         </RouterView>
@@ -40,6 +45,7 @@
 
       <NewRecord v-if="store.newKind === 'someday'" :model-value="true" title="Park on Someday" action="Park on Someday" :fields="somedayFields" :save="createSomeday"
         @update:model-value="(v) => !v && (store.newKind = '')" />
+      <OnboardingGuide v-if="onboarding.show" />
       <MoreSheet v-model:open="moreOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
       <RecordPane />
       <AskPanel />
@@ -87,8 +93,11 @@ import CaptureSheet from './components/CaptureSheet.vue'
 import { boot, store } from './lib/store'
 import { initLens, manySpaces } from './lib/lens'
 import MoreSheet from './components/MoreSheet.vue'
+import OnboardingGuide from './components/OnboardingGuide.vue'
+import { loadOnboarding, onboarding } from './lib/onboarding'
 import { errorText } from './lib/api'
 import { stepTab } from './lib/tabs'
+import { clearOffline, queue, startQueue } from './lib/offline'
 
 const route = useRoute()
 const router = useRouter()
@@ -129,9 +138,18 @@ function goalCreated(g) {
 // the sidebar's areas come from the space's lookups, read again when the space changes or Settings changes them
 watch(() => [store.ready, store.space], ([ready]) => ready && loadLookups(true), { immediate: true })
 
+// issue 50: the phone's queue of captures is emptied before the session ends, so the next person to sign in sends none of it
+const online = ref(navigator.onLine)
+const setOnline = () => (online.value = navigator.onLine)
+window.addEventListener('online', setOnline)
+window.addEventListener('offline', setOnline)
 async function logout() {
-  await fetch('/api/method/logout', { method: 'POST', headers: { 'X-Frappe-CSRF-Token': window.csrf_token || '' } })
-  window.location.href = '/login'
+  await clearOffline()
+  try {
+    await fetch('/api/method/logout', { method: 'POST', headers: { 'X-Frappe-CSRF-Token': window.csrf_token || '' } })
+  } finally {
+    window.location.href = '/login'
+  }
 }
 
 watch(() => route.fullPath, () => (moreOpen.value = false))
@@ -170,6 +188,8 @@ onMounted(async () => {
   window.addEventListener('keydown', onKey)
   try {
     await boot({ beforeReady: initLens })
+    startQueue() // issue 50: send what was captured offline, now and whenever the connection returns
+    if (store.isAdmin && !store.isAgent) loadOnboarding() // the first-run guide (issue 49) and whether the site is still empty
   } catch (e) {
     bootError.value = errorText(e) || 'Could not load Life OS.'
   }
