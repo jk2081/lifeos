@@ -1,6 +1,6 @@
 <template>
   <PageHead :title="section ? 'Notes' : 'Wiki'">
-    <template #sub>{{ section ? "The assistant's notes" : 'Pages an agent writes from your sources' }}, in {{ store.space }}. Every change the assistant makes is logged and can be undone.</template>
+    <template #sub>{{ section ? "The assistant's notes" : 'Pages an agent writes from your sources' }}{{ inSpace }}. Every change the assistant makes is logged and can be undone.</template>
     <TabButtons v-if="section" :model-value="section" :options="NOTES_VIEWS" data-library-views />
     <TabButtons v-else-if="active === 'pages'" model-value="list" :options="VIEWS" data-wiki-views />
     <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New page" data-new-wiki-page @click="newOpen = true" />
@@ -81,6 +81,7 @@
   <NewRecord v-model="newOpen" title="New wiki page" action="Create page" :fields="NEW_FIELDS" :save="create" />
 </template>
 <script setup>
+import { inSpace } from '@/lib/lens'
 // The Wiki (UX fixes, set 4): Pages, Changes, Health and Rules. A page opens in the pane and on the full page as notes do.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'

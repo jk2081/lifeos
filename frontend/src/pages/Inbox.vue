@@ -3,7 +3,7 @@
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => 'inbox:' + r.name"
     :empty-title="EMPTY[list?.tab] || 'The queue is empty.'" empty-hint="Anything you capture is read by the agent and shows here until it is decided."
     @loaded="(res) => (pendingTotal = res.pending_total)">
-    <template #sub>{{ store.space }} · everything the agent has not finished, and what it asks you<template v-if="pendingTotal"> ·
+    <template #sub>{{ manySpaces ? `${store.space} · Everything` : 'Everything' }} the agent has not finished, and what it asks you<template v-if="pendingTotal"> ·
       <span data-lv-sum>{{ pendingTotal }}</span> proposal{{ pendingTotal === 1 ? '' : 's' }} pending in this list</template> ·
       <RouterLink class="text-ink-gray-7 underline decoration-outline-gray-3 underline-offset-2 hover:text-ink-gray-9" :to="{ path: '/brain/captures', query: { status: 'done' } }" data-finished-link>Finished items are in Captures</RouterLink></template>
     <template #cell-title="{ row }">
@@ -41,6 +41,7 @@
 </template>
 
 <script setup>
+import { manySpaces } from '@/lib/lens'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Avatar, Badge, Button } from 'frappe-ui'

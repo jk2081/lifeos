@@ -399,7 +399,7 @@
           </Card>
           <p class="text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/library/archive" data-archive-link>Archived records are in Library, Archive</RouterLink>,
             and deleted ones in its <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/library/archive', query: { type: 'trash' } }" data-trash-link>Trash</RouterLink>.
-            Below are the headings archived from Areas, Habits and Check-ins in {{ spaceSel }}.</p>
+            Below are the headings archived from Areas, Habits and Check-ins{{ manySpaces ? ` in ${spaceSel}` : '' }}.</p>
           <section v-for="l in LISTS" :key="l.kind" :data-archived-group="l.kind">
             <SectionHead :count="archived(l).length">{{ l.label }}</SectionHead>
             <Card flush>
@@ -581,7 +581,7 @@ const pickSpace = (v) => router.replace({ query: { ...route.query, space: v === 
 const spaceGroup = ['areas', 'habits', 'rhythms', 'rules']
 const heading = computed(() => {
   const label = section.value === 'areas' ? 'Areas of life' : MENU.flatMap((g) => g.items).find((s) => s.value === section.value)?.label || ''
-  return spaceGroup.includes(section.value) ? `${label} in ${spaceSel.value}` : label
+  return spaceGroup.includes(section.value) && manySpaces.value ? `${label} in ${spaceSel.value}` : label
 })
 const canEdit = computed(() => d.value?.spaces.find((s) => s.name === spaceSel.value)?.access === 'Write')
 const rowsOf = (l) => (d.value?.[l.key] || []).map((x) => ({ ...x, title: x[l.field] }))

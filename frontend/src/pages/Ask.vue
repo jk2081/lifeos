@@ -22,7 +22,7 @@
             <div class="text-sm text-ink-gray-6">{{ [c.kind, c.date && short(c.date)].filter(Boolean).join(' · ') }}</div></div>
         </div>
       </section>
-      <p class="text-sm text-ink-gray-6">Ask reads only what you can see in {{ store.space }}<template v-if="st && !st.vault">, never the Vault</template>. It never changes anything until you click a suggested action.</p>
+      <p class="text-sm text-ink-gray-6">Ask reads only what you can see{{ inSpace }}<template v-if="st && !st.vault">, never the Vault</template>. It never changes anything until you click a suggested action.</p>
       <section v-if="st?.suggested">
         <h2 class="mb-1.5 text-base-medium text-ink-gray-9">Try asking</h2>
         <Button v-for="q in st.suggested" :key="q" variant="ghost" class="!h-auto w-full !justify-start !whitespace-normal py-1.5 text-left !font-normal !text-ink-gray-7" :label="q"
@@ -97,6 +97,7 @@
 </template>
 
 <script setup>
+import { inSpace } from '@/lib/lens'
 // The Ask page (UX fixes, set 5): Ask (a thread, the records it used, questions to try), Insights and History.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -134,7 +135,7 @@ const tab = useUrlTab('tab', TABS_SHOWN)
 const istatus = computed(() => route.query.istatus || 'New')
 const lastAnswer = computed(() => [...ask.messages].reverse().find((m) => m.role === 'assistant'))
 const sub = computed(() => tab.current.value === 'insights' ? 'Insights are written every morning at 06:00 and when you click Refresh'
-  : `Answers come from your records in ${store.space}${st.value && !st.value.vault ? ' · Vault excluded' : ''}`)
+  : `Answers come from your records${inSpace.value}${st.value && !st.value.vault ? ' · Vault excluded' : ''}`)
 const statusText = (r) => r.status === 'Snoozed' ? `Snoozed to ${short(r.snooze_until)}` : r.status === 'Acted' ? `Acted${r.acted_note ? ' · ' + r.acted_note : ''}`
   : r.status === 'Dismissed' ? `Dismissed${r.dismiss_reason ? ' · ' + r.dismiss_reason.toLowerCase() : ''}` : 'New'
 const setQuery = (q) => router.replace({ query: { ...route.query, ...q } })

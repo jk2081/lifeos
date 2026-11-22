@@ -2,7 +2,7 @@
   <ListView ref="list" title="Outbox" noun="records" screen="outbox" doctype="Life Exit" :spec="SPEC" :tabs="TABS" :quick="['kind']" :synthetic="SYNTHETIC"
     :hidden="HIDDEN" :fetch="fetch" :row-ref="rowRef" :row-label="(r) => r.title" :groupable="false" :watch-keys="['period', 'from', 'to']"
     :empty-title="EMPTY[tab] || 'Nothing left the plate in this period.'" empty-hint="Done, delegated, parked and discarded records show here, with when they left." @loaded="loaded">
-    <template #sub><span data-outbox-sub>{{ store.space }} · what left your plate {{ PERIOD_LABEL[period] }}{{ range ? ` (${range})` : '' }}<span class="max-md:hidden"> · a record, not a place to work</span></span></template>
+    <template #sub><span data-outbox-sub>{{ manySpaces ? `${store.space} · What` : 'What' }} left your plate {{ PERIOD_LABEL[period] }}{{ range ? ` (${range})` : '' }}<span class="max-md:hidden"> · a record, not a place to work</span></span></template>
     <template #bar><TabButtons :model-value="period" :options="periods" data-outbox-period @update:model-value="setPeriod" /></template>
     <template #above>
       <Card v-if="chart.length" data-outbox-chart-card><InOutChart :weeks="chart" /></Card>
@@ -29,6 +29,7 @@
   </ListView>
 </template>
 <script setup>
+import { manySpaces } from '@/lib/lens'
 // Library > Outbox (set 7): what left the plate in a period, in four piles, and what came in; an 8-week chart of in against
 // out. The only action is Bring back, where the record allows it (reopen, back from Someday, restore from the trash).
 import { computed, ref } from 'vue'
