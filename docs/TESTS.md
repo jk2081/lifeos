@@ -158,7 +158,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.16` completing, delegating, parking and dropping a task each add to the right Outbox pile; Bring back reverses; Brain > Activity's in and out match the Outbox lists
 - `GOALS.17` goal work planned the way Lock the week plans it makes a scheduled task that shows on Today and in the week calendar, and a delegated one that shows as Waiting
 - `GOALS.18` Inbox items left too long: on Suggest an old item gets a suggested decision and the batch confirms it; on Park and Discard the job acts and Today's Undo restores
-- `GOALS.19` no set 7 screen scrolls sideways
+- `GOALS.19` nothing in the goal dialog, readings, Outbox or old-items work scrolls sideways
 - `GOALS.20` a quick-captured task shows its guessed area with ✦ and the confidence; one tap confirms it and the ✦ goes
 - `GOALS.21` with no goals By area says what will appear and offers + Goal
 - `GOALS.22` with eight goals over Career (two parts), Health, Money and Mind each appears under its area and part

@@ -734,7 +734,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
   })
 
   if (phone) {
-    await check('GOALS.19', `${width} px: no set 7 screen scrolls sideways`, async () => {
+    await check('GOALS.19', `${width} px: nothing in the goal dialog, readings, Outbox or old-items work scrolls sideways`, async () => {
       const bad = []
       for (const p of ['/life', '/life/goals', '/life/today/week?view=review', '/life/brain/outbox', '/life/brain/outbox?pile=in&period=12weeks',
         '/life/goals/cycles', '/life/settings?tab=rhythms', '/life/settings?tab=reset']) {
