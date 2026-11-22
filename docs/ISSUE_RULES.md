@@ -15,14 +15,15 @@ From 20 November 2026, build work comes from GitHub issues in `jk2081/lifeos`, n
 - Keep the change to what the issue asks. If you find something else broken, note it in the pull request under "Found, not fixed"; do not fix it here.
 - Every screen works at 390 px and 1440 px, light and dark.
 - Every screen you build or change has an **empty state** for a brand-new user with no data: one line on what will appear there, and the one action that fills it (for example "Nothing needs you. Things you capture or connect will show up here." with + Capture). Add an acceptance check that opens the screen on an empty space and sees it.
-- Run only the tests that touch your change: the unit test modules you add or change (`scripts/test.sh <module>`), the acceptance checks for this issue (`node tools/acceptance.mjs --only=I<n>`), and `./tools/scan.sh <changed files>`. Do not run the full suites after every edit.
-- Every acceptance test in the issue becomes a test: a unit test (`IntegrationTestCase`) or an acceptance check numbered `I<n>.<k>` in `tools/acceptance.mjs`, matching the issue's list in order.
+- Run only the tests that touch your change: the unit test modules you add or change (`scripts/test.sh <module>`, for example `scripts/test.sh test_goals`), the acceptance checks of the places you changed (`node tools/acceptance.mjs --only=GOALS`, or one check, `--only=GOALS.12`), and `./tools/scan.sh <changed files>`. Do not run the full suites after every edit.
+- Every acceptance test in the issue becomes a test: a unit test (`IntegrationTestCase`) or an acceptance check. Tests are grouped by place, never by issue or set. A unit test goes into the module of its place (`lifeos/tests/test_<place>.py`: `capture`, `brain`, `skills`, `goals`, `tasks`, `today`, `review`, `library`, `people`, `settings`, `permissions`, `calendar`, `gmail`, `agents`, `load`; helpers shared by two modules go in `lifeos/tests/helpers.py`). An acceptance check goes into the file of its place (`tools/acceptance/<place>.mjs`: `today`, `brain`, `goals`, `library`, `review`, `settings`, `phone`) and is numbered by place, `GOALS.<k>`, with the next free number in that file (a check that is not a place's, such as one of the tooling, goes in `tooling.mjs`). Neither a file nor a check name an issue or a set; an issue number may stay in a comment only where it explains why the test exists. Keep `docs/TESTS.md` in step: every feature has at least one unit test and one acceptance check, listed under its place.
+- Deleting a feature deletes its tests in the same change (unit tests and acceptance checks).
 - Commit in small steps with messages that start `#<n>:`.
 
 ## Before you finish
 
 1. Run the full unit suite once (`scripts/test.sh`). GitHub Actions runs it again on the pull request.
-2. Run the acceptance checks for this issue, plus `--only=` for the checks of any screen you changed.
+2. Run the acceptance checks of every place you changed (`node tools/acceptance.mjs --only=<PLACE>`).
 3. Run `./tools/scan.sh` on every changed file: no new findings.
 4. Review the whole diff (`git diff main...HEAD`) against `.claude/skills/frappe-code-review` and fix what it finds.
 5. Record anything that differs from the issue in `DECISIONS.md` under "Issue <n>". Add a line for the issue to `STATUS.md`.

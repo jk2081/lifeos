@@ -1,6 +1,6 @@
 // Walks the app as a person would, against the throwaway site acceptance.localhost (http://localhost:19000): a logged-in
 // browser for the owner and for a second user, and agent/fake_agent.py over HTTP with an API key.
-//   node tools/acceptance.mjs                          every place, then the clean-up and the scan
+//   node tools/acceptance.mjs                          every place on its own fresh site, one after another, each with the clean-up and the scan
 //   node tools/acceptance.mjs --only=TODAY             one place's checks (TODAY, BRAIN, GOALS, LIBRARY, REVIEW, SETTINGS, PHONE, TOOLING)
 //   node tools/acceptance.mjs --only=TODAY.3,BRAIN.7   single checks
 //   node tools/acceptance.mjs --part=today             one place, with the clean-up: what each parallel job of CI runs
@@ -111,6 +111,22 @@ async function walkReview(page, origin, width) {
   return { seen, failures }
 }
 if (process.argv.includes('--owner-read-only')) process.exit(await ownerReadOnly())
+
+// A full run is every place on its own fresh site, one after another, as CI runs them side by side: a place never meets the
+// records of another, so it passes alone, in a full run and in CI alike.
+const { PLACES } = await import('./acceptance/places.mjs')
+if (!process.argv.some((a) => a.startsWith('--part=') || a.startsWith('--only='))) {
+  const failed = []
+  for (const place of PLACES) {
+    console.log(`\n== ${place} ==`)
+    try {
+      execFileSync(process.execPath, [process.argv[1], `--part=${place}`, ...process.argv.slice(2)], { stdio: 'inherit' })
+    } catch { failed.push(place) }
+  }
+  console.log(failed.length ? `\nFailed: ${failed.join(', ')}.` : `\nEvery place passes.`)
+  process.exit(failed.length ? 1 : 0)
+}
+
 if (!process.argv.includes('--no-reset')) execFileSync(path.join(root, 'scripts/acceptance-site.sh'), { stdio: 'inherit' })
 
 const C = await import('./acceptance/context.mjs')

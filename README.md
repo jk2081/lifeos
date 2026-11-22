@@ -115,7 +115,7 @@ docker exec -d lifeos-bench bash -lc 'cd ~/frappe-bench && bench serve --port 80
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench/apps/lifeos/frontend && yarn install && yarn build'   # rebuild the front end, inside the bench
 scripts/test.sh                                   # the test suite, short summary
 node tools/shot.mjs today=/life --widths 1440,390 # screenshots into screenshots/
-node tools/acceptance.mjs                         # walks the acceptance list of SPEC.md section 13
+node tools/acceptance.mjs                         # walks every place; --only=TODAY runs one place, --only=TODAY.3 one check
 ```
 
 `tools/` needs `npm install` once and Google Chrome. Test users come from `lifeos.devtools.setup_users`; their password is in the git-ignored `.env`.

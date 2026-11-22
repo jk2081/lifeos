@@ -83,7 +83,8 @@ export async function session(user, width = 1440) {
 // ---- which checks run -----------------------------------------------------------------------------------------------------
 // `--only=TODAY` runs one place's checks, `--only=TODAY.3` one check, `--only=TODAY.3,BRAIN.7` several. `--part=today` runs one
 // place (the unit of the parallel jobs in .github/workflows/ci.yml); without either, every place runs, one after another.
-export const PLACES = ['today', 'brain', 'goals', 'library', 'review', 'settings', 'phone', 'tooling']
+export { PLACES } from './places.mjs'
+import { PLACES } from './places.mjs'
 export const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7)
 export const PART = (process.argv.find((a) => a.startsWith('--part=')) || '').slice(7)
 if (PART && !PLACES.includes(PART)) throw new Error(`--part= takes one of ${PLACES.join(', ')}`)
