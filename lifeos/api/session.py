@@ -48,7 +48,16 @@ def counts(space: str | None = None, area: str | None = None):
 	# (Open, Doing and Waiting), the Someday list, and the stuck count behind Reset's amber dot
 	c = count_rules.sidebar(space, lens_area(area))
 	return {"to_review": c["inbox"]["n"], "due": c["tasks"]["n"], "doors": {k: c[k] for k in ("inbox", "tasks", "someday", "stuck")},
-		"over_limit": c["over_limit"], "reviewed": has_locked_review()}
+		"over_limit": c["over_limit"], "reviewed": has_locked_review(), "review_due": monthly_or_cycle_due(space)}
+
+
+def monthly_or_cycle_due(space: str) -> int:
+	"""How many monthly or 12-week reviews are due now (issue 47): Review joins the sidebar while one is."""
+	from lifeos.review import periodic
+
+	if permissions.is_agent():
+		return 0
+	return sum(1 for d in periodic.due(space, frappe.session.user) if d["kind"] != "weekly")
 
 
 def has_locked_review(user: str | None = None) -> bool:

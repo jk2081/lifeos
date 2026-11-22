@@ -29,6 +29,6 @@ export function isReviewDay() {
   if (!store.today) return false
   return DAYS[new Date(store.today + 'T12:00').getDay()] === (store.settings?.weekly_review_day || 'Sunday')
 }
-/** Review joins the menu after the person's first locked weekly review, and on the review's day before that. */
-export const reviewShown = computed(() => !store.isAgent && (!!store.counts.reviewed || isReviewDay()))
+/** Review joins the menu after the person's first locked weekly review, on the review's day before that, and whenever a monthly or 12-week review is due. */
+export const reviewShown = computed(() => !store.isAgent && (!!store.counts.reviewed || isReviewDay() || !!store.counts.review_due))
 whenViewsLoaded(restore)

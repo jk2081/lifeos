@@ -6669,6 +6669,298 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I46 task 
   }
 }
 
+// Issue 47: the monthly and the 12-week review in the weekly review's shell. They run in the Shared space, which has no plan or cycle of
+// its own on the acceptance site: last month's plan and an ended 12 Week Year are made here and removed after. Titles start "I47 ".
+// (I47.1 and I47.5, the due rules, are unit tests in lifeos/tests/test_issue47_reviews.py.)
+for (const width of SET_WIDTHS) {
+  const tag = `I47.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const S = 'Shared'
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I47 ${what} ${width} ${stamp}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const sb = (code) => bench(`import json
+from frappe.utils import add_days, getdate, today
+from lifeos import journal
+SP = "${S}"
+OWNER = "owner@lifeos.test"
+now = getdate(today())
+last = add_days(now.replace(day=1), -1)
+${code}`).split('\n').pop()
+  const open = (p, extra = '') => s.open(`/life${p}${p.includes('?') ? '&' : '?'}space=${S}${extra}`)
+  const cleanup = () => sb(`frappe.set_user("Administrator")
+for r in frappe.get_all("Life Review", filters={"space": SP, "user": OWNER}, pluck="name"): frappe.delete_doc("Life Review", r, force=1, ignore_permissions=True)
+for g in frappe.get_all("Life Goal", filters={"space": SP, "title": ["like", "I47 % ${width} ${stamp}"]}, pluck="name"):
+    frappe.db.delete("Life Task", {"goal": g})
+    frappe.db.set_value("Life Goal", g, {"carried_from": None, "serves": None})
+for c in frappe.get_all("Life Cycle", filters={"space": SP}, pluck="name"):
+    for g in frappe.get_all("Life Goal", filters={"cycle": c}, pluck="name"): frappe.db.set_value("Life Goal", g, "carried_from", None)
+for g in frappe.get_all("Life Goal", filters={"space": SP, "title": ["like", "I47 % ${width} ${stamp}"]}, pluck="name"):
+    frappe.db.delete("Life Goal Action", {"parent": g})
+    frappe.db.delete("Life Goal", {"name": g})
+for c in frappe.get_all("Life Cycle", filters={"space": SP}, pluck="name"):
+    frappe.db.delete("Life Action Log", {"cycle": c})
+    frappe.db.delete("Life Cycle", {"name": c})
+frappe.db.sql("delete from \`tabLife Month Plan Habit\` where parent like %s", SP + "-%")
+frappe.db.delete("Life Month Plan", {"space": SP})
+frappe.db.delete("Life Habit", {"space": SP, "title": ["like", "I47 %"]})
+print("{}")`)
+  const area = () => sb('print(json.dumps(frappe.db.get_value("Life Area", {"space": SP, "is_on": 1}, "name") or frappe.db.get_value("Life Area", {"space": SP}, "name")))').replace(/"/g, '')
+  // last month's plan: one goal done, three open, a habit; and a closed cycle that covers it, with ticks, so its weeks have scores
+  const seedMonth = () => JSON.parse(sb(`frappe.set_user(OWNER)
+a = frappe.db.get_value("Life Area", {"space": SP, "is_on": 1}, "name") or frappe.db.get_value("Life Area", {"space": SP}, "name")
+journal.get_month_plan(SP, last.year, last.month, create=True)
+goals = {}
+for key in ("done", "carry", "drop", "finish"):
+    goals[key] = journal.add_month_goal(SP, last.year, last.month, "I47 goal " + key + " ${width} ${stamp}", a).name
+frappe.db.set_value("Life Goal", goals["done"], "outcome", "Achieved")
+habit = frappe.get_doc({"doctype": "Life Habit", "space": SP, "title": "I47 habit ${width} ${stamp}"}).insert().name
+plan = journal.get_month_plan(SP, last.year, last.month)
+plan.append("habits", {"habit": habit, "days_per_week": 5, "sort_order": 1})
+plan.save()
+start = add_days(last.replace(day=1), -last.replace(day=1).weekday())
+cyc = frappe.get_doc({"doctype": "Life Cycle", "space": SP, "title": "I47 look ${width} ${stamp}", "start_date": start, "status": "Planned"}).insert()
+g = frappe.get_doc({"doctype": "Life Goal", "space": SP, "cycle": cyc.name, "horizon": "12 weeks", "title": "I47 look goal ${width} ${stamp}", "done_when": "x", "actions": [{"title": "I47 look act", "per_week": 3, "status": "Open"}]}).insert()
+for w in (1, 2, 3, 4): journal.set_tick(g.actions[0].name, w, 2)
+frappe.db.set_value("Life Cycle", cyc.name, "status", "Closed")
+print(json.dumps({"month": last.month, "year": last.year, "goals": goals, "habit": habit}))`))
+  // an ended 12 Week Year: it ended today, with two goals, ticks, and lead actions
+  const seedCycle = () => JSON.parse(sb(`frappe.set_user(OWNER)
+a = frappe.db.get_value("Life Area", {"space": SP, "is_on": 1}, "name") or frappe.db.get_value("Life Area", {"space": SP}, "name")
+for c in frappe.get_all("Life Cycle", filters={"space": SP, "status": "Active"}, pluck="name"): frappe.db.set_value("Life Cycle", c, "status", "Closed")
+cyc = frappe.get_doc({"doctype": "Life Cycle", "space": SP, "title": "I47 cycle ${width} ${stamp}", "start_date": add_days(now, -84), "status": "Active"}).insert()
+out = {}
+for key, per in (("done", 3), ("carry", 2), ("drop", 1)):
+    g = frappe.get_doc({"doctype": "Life Goal", "space": SP, "cycle": cyc.name, "horizon": "12 weeks", "title": "I47 cg " + key + " ${width} ${stamp}", "area": a, "done_when": "Finished " + key,
+        "sort_order": 10 + per, "actions": [{"title": "I47 act " + key, "per_week": per, "status": "Open"}]}).insert()
+    out[key] = g.name
+    for w in (1, 2, 3, 5): journal.set_tick(g.actions[0].name, w, per)
+actions, ticks = journal._actions(cyc.name), journal._ticks(cyc.name)
+print(json.dumps({"cycle": cyc.name, "goals": out, "expected": journal.cycle_average(cyc, actions, ticks, journal.WEEKS)}))`))
+  const next = async () => { await pg.locator('[data-review-next]').click(); await pg.waitForTimeout(700) }
+  const tabNow = () => pg.locator('[data-review]').first().getAttribute('data-review-tab')
+  const choose = (goal, pile) => pg.locator(`[data-decide-goal][data-goal="${goal}"] [data-choose="${pile}"]`).click()
+  try {
+    cleanup()
+    await check(`${tag}.2`, `${width} px: the monthly review's Look back shows the month's goals, habits and weekly scores`, async () => {
+      seedMonth()
+      await open('/review?kind=monthly')
+      await pg.locator('[data-review-look]').waitFor({ timeout: 20000 })
+      await pg.waitForTimeout(800)
+      const rows = await pg.locator('[data-look-goal]').evaluateAll((els) => els.map((e) => [e.innerText, e.getAttribute('data-result')]))
+      must(rows.length === 4, `Look back lists ${rows.length} goals, not 4: ${JSON.stringify(rows)}`)
+      must(rows.some(([t, r]) => t.includes(T('goal done')) && r === 'done'), 'the done goal is not marked done')
+      must(rows.some(([t, r]) => t.includes(T('goal carry')) && r === 'missed'), 'an open goal with no tasks is not marked missed')
+      must((await pg.locator('[data-look-habit]').allInnerTexts()).some((t) => t.includes(`I47 habit ${width} ${stamp}`)), 'the habit is not shown')
+      const look = await s.api('periodic.look', { space: S, kind: 'monthly' })
+      must(look.weeks.length >= 3, 'the server gives no weeks for the month')
+      must(await pg.locator('[data-look-week]').count() === look.weeks.length, `Look back shows ${await pg.locator('[data-look-week]').count()} weeks, the server ${look.weeks.length}`)
+      must((await pg.locator('[data-look-week]').first().innerText()).includes(Math.round(look.weeks[0].percent) + '%'), 'the first weekly score is not the server\'s')
+      must(await pg.locator('[data-review-title]').innerText() === 'Monthly review', 'the title is not Monthly review')
+      await noSideways()
+    })
+
+    await check(`${tag}.3`, `${width} px: Decide: carry one goal and drop another with a reason; after Lock the plan holds the carried goal and the dropped one is dropped`, async () => {
+      const g = JSON.parse(sb(`print(json.dumps({k: frappe.db.get_value("Life Goal", {"space": SP, "title": "I47 goal " + k + " ${width} ${stamp}"}) for k in ("done", "carry", "drop", "finish")}))`))
+      await open('/review?kind=monthly&tab=decide')
+      await pg.locator('[data-review-decide]').waitFor({ timeout: 20000 })
+      must(await pg.locator('[data-decide-goal]').count() === 3, 'Decide does not list the three goals that are not done')
+      must(!(await pg.locator(`[data-decide-goal][data-goal="${g.done}"]`).count()), 'the done goal is up for decision')
+      must(await pg.locator('[data-review-next]').isDisabled(), 'Next is open with goals undecided')
+      await choose(g.carry, 'carry')
+      await choose(g.drop, 'drop')
+      await choose(g.finish, 'finish')
+      await pg.waitForTimeout(600)
+      const counts = await pg.locator('[data-pile-key]').evaluateAll((els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-pile-key'), e.querySelector('[data-pile-count]').innerText.trim()])))
+      must(counts.finish === '1' && counts.carry === '1' && counts.drop === '1', `the piles read ${JSON.stringify(counts)}`)
+      must(await pg.locator('[data-review-next]').isDisabled(), 'Next is open with a reason and a date missing')
+      await pg.locator(`[data-decide-goal][data-goal="${g.drop}"] [data-decide-reason] input, input[data-decide-reason]`).first().fill('Not worth the time')
+      await pg.locator(`[data-decide-goal][data-goal="${g.finish}"] input[data-decide-date], [data-decide-goal][data-goal="${g.finish}"] [data-decide-date] input`).first().fill(addDays(5))
+      await pg.keyboard.press('Tab')
+      await pg.waitForTimeout(1800)
+      must(await pg.locator('[data-review-next]').isEnabled(), 'Next stays shut: ' + (await pg.locator('[data-review-footer-line]').innerText()))
+      await next()
+      await pg.locator('[data-review-plan]').waitFor({ timeout: 10000 })
+      const first = await pg.locator('[data-plan-goal]').first().innerText()
+      must(first.includes('goal carry') && (await pg.locator('[data-plan-goal]').first().getAttribute('data-carried')) === '1', 'the carried goal is not first in the plan')
+      // Plan: two goals in the order given, and a habit
+      const a = await area()
+      for (const n of ['one', 'two']) {
+        await pg.locator('[data-plan-add]').click()
+        const row = pg.locator('[data-plan-goal]').last()
+        await row.locator('[data-plan-title] input, input[data-plan-title]').first().fill(T('plan ' + n))
+        await row.locator('[data-plan-area]').first().click(); await pg.getByRole('option').first().click()
+      }
+      await pg.waitForTimeout(1800)
+      must(await pg.locator('[data-review-next]').isEnabled(), 'Plan stays shut: ' + (await pg.locator('[data-review-footer-line]').innerText()))
+      await next()
+      await pg.locator('[data-review-reflect]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-went-well] textarea, textarea[data-went-well]').first().fill('I47 went well')
+      await pg.locator('[data-review-next]').click()
+      await pg.locator('[data-review-done]').waitFor({ timeout: 20000 })
+      const out = JSON.parse(sb(`print(json.dumps({"carry": frappe.db.get_value("Life Goal", "${g.carry}", "outcome"), "drop": frappe.db.get_value("Life Goal", "${g.drop}", ["outcome", "result_note"]),
+  "finish": str(frappe.db.get_value("Life Goal", "${g.finish}", "target_date")), "next": [x["title"] for x in journal.month_goals(SP, now.year, now.month)]}))`))
+      must(out.carry === 'Carried', `the carried goal is ${out.carry}`)
+      must(out.drop[0] === 'Dropped' && out.drop[1] === 'Not worth the time', `the dropped goal is ${JSON.stringify(out.drop)}`)
+      must(out.finish === addDays(5), `the finish date is ${out.finish}`)
+      must(out.next.some((t) => t.endsWith('goal carry ' + width + ' ' + stamp)), `this month's plan lacks the carried goal: ${out.next}`)
+    })
+
+    await check(`${tag}.4`, `${width} px: the goals made in Plan are in the order given, and Goals > Cycles shows them`, async () => {
+      const order = JSON.parse(sb(`print(json.dumps([x["title"] for x in journal.month_goals(SP, now.year, now.month) if x["title"].startswith("I47 ") and x["title"].endswith("${width} ${stamp}") and " finish " not in x["title"]]))`))
+      must(order.length === 3 && order[0].includes('goal carry') && order[1].endsWith(`plan one ${width} ${stamp}`) && order[2].endsWith(`plan two ${width} ${stamp}`), `this month's goals are ${order}`)
+      await open('/goals/cycles')
+      await pg.locator('[data-cycles][data-loaded="1"]').waitFor({ timeout: 15000 })
+      const shown = (await pg.locator('[data-month-goal]').allInnerTexts()).filter((t) => !t.includes(' finish ')).map((t) => t.split('\n').find((l) => l.startsWith('I47 ')))
+      must(JSON.stringify(shown.filter(Boolean)) === JSON.stringify(order), `Cycles shows ${shown}, not ${order}`)
+      const reviewed = await s.api('periodic.due', { space: S })
+      must(!reviewed.due.some((d) => d.kind === 'monthly'), 'the monthly review is still due after Lock')
+      must(reviewed.past.some((p) => p.kind === 'Monthly'), 'the locked review is not among the past reviews')
+    })
+
+    cleanup()
+    await check(`${tag}.E`, `${width} px: with no month to look back on, the monthly review says nothing is due`, async () => {
+      await open('/review?kind=monthly')
+      await pg.locator('[data-review-not-due]').waitFor({ timeout: 15000 })
+      must((await pg.locator('[data-review-not-due]').innerText()).includes('No monthly review is due'), 'the empty state does not say so')
+      await noSideways()
+    })
+
+    await check(`${tag}.6`, `${width} px: the 12-week review's Score shows the twelve weekly scores and the cycle view's average`, async () => {
+      const c = seedCycle()
+      await open('/review?kind=12-weeks')
+      await pg.locator('[data-review-score]').waitFor({ timeout: 20000 })
+      await pg.waitForTimeout(800)
+      const grid = await s.api('journal.grid', { space: S, cycle: c.cycle })
+      must(await pg.locator('[data-score-week]').count() === 12, 'Score does not show twelve weeks')
+      const got = await pg.locator('[data-score-week]').evaluateAll((els) => els.map((e) => Number(e.getAttribute('data-score'))))
+      must(JSON.stringify(got) === JSON.stringify(grid.weeks.map((w) => Math.round(w.percent))), `the weeks read ${got}, the grid ${grid.weeks.map((w) => Math.round(w.percent))}`)
+      must((await pg.locator('[data-score-average]').innerText()).trim() === Math.round(grid.average) + '%', 'the average is not the grid\'s')
+      must(await pg.locator('[data-score-goal]').count() === 3, 'Score does not list the three goals')
+      must(await pg.locator('[data-review-title]').innerText() === '12-week review', 'the title is not 12-week review')
+      await noSideways()
+    })
+
+    await check(`${tag}.8`, `${width} px: Goals > Cycles offers the 12-week review, and there is no Close cycle pop-up (its link opens the review)`, async () => {
+      await open('/goals/cycles')
+      await pg.locator('[data-cycles][data-loaded="1"]').waitFor({ timeout: 15000 })
+      const card = pg.locator('[data-review-due][data-review-kind="12-weeks"]')
+      must(await card.isVisible(), 'Cycles does not say the 12-week review is due')
+      must((await card.innerText()).includes('The 12-week review is due'), 'the card does not say so')
+      await open('/today/year?view=goals')
+      await pg.locator('[data-open-cycle-review]').waitFor({ timeout: 15000 })
+      must(!(await pg.getByRole('button', { name: 'Close cycle', exact: true }).count()), 'a Close cycle button is still there')
+      await pg.locator('[data-open-cycle-review]').click()
+      await pg.waitForURL((u) => u.pathname === '/life/review' && u.searchParams.get('kind') === '12-weeks', { timeout: 10000 })
+      await pg.locator('[data-review-kind="12-weeks"], [data-review-not-due]').first().waitFor({ timeout: 20000 })
+      must(await pg.locator('[data-review-kind="12-weeks"]').isVisible(), 'the link did not open the 12-week review')
+    })
+
+    await check(`${tag}.11`, `${width} px: both reviews show ${phone ? 'one tab at a time behind a step bar' : 'numbered tabs'}, and nothing scrolls sideways`, async () => {
+      for (const kind of ['12-weeks', 'monthly']) {
+        if (kind === 'monthly') { seedMonth() }
+        await open(`/review?kind=${kind}`)
+        await pg.locator(`[data-review-kind="${kind}"] [data-review-head]`).waitFor({ timeout: 20000 })
+        const bar = await pg.locator('[data-review-stepbar]').isVisible()
+        const tabs = await pg.locator('[data-review-tab-btn]').first().isVisible()
+        must(phone ? bar && !tabs : !bar && tabs, `${kind}: the step bar is ${bar} and the tabs ${tabs}`)
+        must(await pg.locator('[data-review-score], [data-review-look], [data-review-decide], [data-review-plan], [data-review-reflect]').count() === 1, `${kind}: more than one tab is shown`)
+        if (phone) must(/Step \d of 4/.test(await pg.locator('[data-review-stepbar]').innerText()), `${kind}: the step bar does not say Step n of 4`)
+        await noSideways()
+      }
+      must(!errors.length, 'page errors: ' + errors.join('; '))
+    })
+
+    await check(`${tag}.10`, `${width} px: when a weekly and a monthly review are both due, Review shows the weekly first, then the monthly`, async () => {
+      // no cycle: only the weekly (an open one) and the monthly are due
+      cleanup()
+      seedMonth()
+      sb(`for c in frappe.get_all("Life Cycle", filters={"space": SP, "status": "Active"}, pluck="name"): frappe.db.set_value("Life Cycle", c, "status", "Closed")
+from lifeos.review.record import Review
+Review.start(SP, OWNER)`)
+      const due = (await s.api('periodic.due', { space: S })).due.map((d) => d.kind)
+      must(JSON.stringify(due) === JSON.stringify(['weekly', 'monthly']), `the server says ${due}`)
+      await open('/review')
+      await pg.locator('[data-review-strip]').waitFor({ timeout: 20000 })
+      const chips = await pg.locator('[data-due-kind]').evaluateAll((els) => els.map((e) => e.getAttribute('data-due-kind')))
+      must(JSON.stringify(chips) === JSON.stringify(['weekly', 'monthly']), `the strip shows ${chips}`)
+      await pg.locator('[data-review]').first().waitFor({ timeout: 20000 })
+      must(!(await pg.locator('[data-review-kind]').count()), 'Review did not open on the weekly review')
+      await pg.locator('[data-due-kind="monthly"]').click()
+      await pg.locator('[data-review-kind="monthly"]').waitFor({ timeout: 20000 })
+    })
+
+    await check(`${tag}.9`, `${width} px: a review left after step 2 resumes at step 2 with its decisions kept`, async () => {
+      sb(`frappe.db.delete("Life Review", {"space": SP, "user": OWNER, "kind": "Weekly"})`)
+      const g = JSON.parse(sb(`print(json.dumps({k: frappe.db.get_value("Life Goal", {"space": SP, "title": "I47 goal " + k + " ${width} ${stamp}"}) for k in ("done", "carry", "drop", "finish")}))`))
+      await open('/review?kind=monthly&tab=decide')
+      await pg.locator('[data-review-decide]').waitFor({ timeout: 20000 })
+      await choose(g.carry, 'carry')
+      await choose(g.drop, 'drop')
+      await pg.waitForTimeout(800)
+      await s.open('/life')
+      await open('/review?kind=monthly')
+      await pg.locator('[data-review-decide]').waitFor({ timeout: 20000 })
+      must((await tabNow()) === 'decide', `the review resumed at ${await tabNow()}`)
+      must((await pg.locator(`[data-decide-goal][data-goal="${g.carry}"] [data-choose="carry"]`).getAttribute('aria-pressed')) === 'true', 'the carry decision was lost')
+      must((await pg.locator(`[data-decide-goal][data-goal="${g.drop}"]`).getAttribute('data-pile')) === 'drop', 'the drop decision was lost')
+      must(Number(sb(`print(frappe.db.count("Life Review", {"space": SP, "user": OWNER, "kind": "Monthly", "status": "Open"}))`)) === 1, 'there is more than one open monthly review')
+    })
+
+    await check(`${tag}.7`, `${width} px: deciding each goal and locking closes the cycle with journal.close_cycle's score and makes the next cycle with the carried goals and their lead actions`, async () => {
+      cleanup()
+      const c = seedCycle()
+      await open('/review?kind=12-weeks')
+      await pg.locator('[data-review-score]').waitFor({ timeout: 20000 })
+      await next()
+      await pg.locator('[data-review-decide]').waitFor({ timeout: 10000 })
+      await choose(c.goals.done, 'done')
+      await choose(c.goals.carry, 'carry')
+      await choose(c.goals.drop, 'drop')
+      await pg.locator(`[data-decide-goal][data-goal="${c.goals.drop}"] [data-decide-reason] input, input[data-decide-reason]`).first().fill('Out of scope')
+      await pg.waitForTimeout(1800)
+      await next()
+      await pg.locator('[data-review-plan]').waitFor({ timeout: 10000 })
+      const carried = pg.locator('[data-plan-goal][data-carried="1"]')
+      must(await carried.count() === 1, 'the plan does not hold the one carried goal')
+      await carried.locator('[data-plan-done-when] input, input[data-plan-done-when]').first().fill('I47 shipped by March')
+      await carried.locator('[data-plan-action] input').first().fill('I47 weekly push')
+      await pg.locator('[data-plan-add]').click()
+      const fresh = pg.locator('[data-plan-goal]').last()
+      await fresh.locator('[data-plan-title] input, input[data-plan-title]').first().fill(T('new cycle goal'))
+      await fresh.locator('[data-plan-area]').first().click(); await pg.getByRole('option').first().click()
+      await fresh.locator('[data-plan-done-when] input, input[data-plan-done-when]').first().fill('It is live')
+      await fresh.locator('[data-plan-action] input').first().fill('I47 write')
+      await pg.waitForTimeout(1800)
+      await next()
+      await pg.locator('[data-review-reflect]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-went-well] textarea, textarea[data-went-well]').first().fill('I47 cycle learned')
+      await pg.locator('[data-review-next]').click()
+      await pg.locator('[data-review-done]').waitFor({ timeout: 30000 })
+      const out = JSON.parse(sb(`cyc = frappe.get_doc("Life Cycle", "${c.cycle}")
+nxt = frappe.db.get_value("Life Cycle", {"space": SP, "start_date": journal.next_monday(cyc.end_date)}, ["name", "status"], as_dict=True)
+goals = frappe.get_all("Life Goal", filters={"cycle": nxt.name}, fields=["name", "title", "done_when", "carried_from"], order_by="sort_order asc")
+acts = {g.name: [(a.title, a.per_week) for a in frappe.get_doc("Life Goal", g.name).actions] for g in goals}
+print(json.dumps({"status": cyc.status, "score": cyc.final_score, "next": nxt.status, "goals": goals, "acts": acts,
+  "outcomes": {k: frappe.db.get_value("Life Goal", v, "outcome") for k, v in ${JSON.stringify(c.goals)}.items()}}))`))
+      must(out.status === 'Closed' && out.score === c.expected, `the cycle is ${out.status} with score ${out.score}, journal.close_cycle gives ${c.expected}`)
+      must(out.outcomes.done === 'Achieved' && out.outcomes.carry === 'Carried' && out.outcomes.drop === 'Dropped', `the outcomes are ${JSON.stringify(out.outcomes)}`)
+      must(out.next === 'Planned' && out.goals.length === 2, `the next cycle is ${out.next} with ${out.goals.length} goals`)
+      const kept = out.goals.find((g) => g.carried_from === c.goals.carry)
+      must(kept && kept.done_when === 'I47 shipped by March', 'the carried goal is not in the next cycle with its new Done when')
+      must(JSON.stringify(out.acts[kept.name]) === JSON.stringify([['I47 weekly push', 2]]), `the carried goal's lead actions are ${JSON.stringify(out.acts[kept.name])}`)
+      must(out.goals.some((g) => g.title.includes('new cycle goal')), 'the goal added in Plan is not in the next cycle')
+    })
+  } finally {
+    try { cleanup() } catch (e) { /* reported by the debris check */ }
+    await s.ctx.close()
+  }
+}
+
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {
   const code = 'from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))'
