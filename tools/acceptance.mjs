@@ -7110,6 +7110,61 @@ await check('I48.6', '/life/projects and an old project link land on Goals', asy
   }
 })
 
+// Issue 54: context for agents. I54.1 to I54.6 are unit tests (test_issue54_context). Settings > Rules shows the card; a contradiction in Needs you,
+// once decided, leaves the page with the chosen fact and its source. Titles start "I54 " (the debris finder knows them).
+for (const width of SET_WIDTHS) {
+  const tag = `I54.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  let one = null
+  try {
+    one = await session('owner@lifeos.test', width)
+    const pg = one.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    await check(`${tag}.7`, `${width} px: Settings, Rules shows "What agents know about you" with the current card`, async () => {
+      const card = (await one.api('context.card', { space: SPACE })).card
+      await one.open('/life/settings?tab=rules')
+      const el = pg.locator('[data-agent-card]')
+      await el.waitFor({ timeout: 10000 })
+      must(/What agents know about you/.test(await pg.locator('[data-main]').innerText()), 'the heading is missing')
+      const text = await el.innerText()
+      must(text.includes('Areas that are on') && text.includes('Active goals'), 'the card lacks its sections: ' + text.slice(0, 200))
+      must(text.includes(card.split('\n')[0].replace(/^#\s*/, '')), 'the card is not the current one')
+      must(!(await el.locator('input, textarea').count()), 'the card can be edited')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.8`, `${width} px: a contradiction in Needs you, once decided, leaves the page with the chosen fact and its source`, async () => {
+      const made = JSON.parse(bench(`import json
+from frappe.utils import today
+space = ${JSON.stringify(SPACE)}
+item = frappe.get_doc({"doctype": "Life Inbox Item", "space": space, "title": "I54 invoice ${width} ${stamp}", "source_type": "Upload", "status": "Done", "raw_text": "Six dealerships", "received_on": today()}).insert(ignore_permissions=True)
+a = frappe.get_doc({"doctype": "Life Note", "space": space, "collection": "Wiki", "title": "I54 Mehi ${width} ${stamp}", "summary": "Dealer", "content_md": "Mehi has 4 dealerships."}).insert(ignore_permissions=True)
+b = frappe.get_doc({"doctype": "Life Note", "space": space, "collection": "Wiki", "title": "I54 Ranchi ${width} ${stamp}", "summary": "Accounts", "content_md": "Mehi has 6 dealerships.", "sources": [{"source_doctype": "Life Inbox Item", "source_name": item.name}]}).insert(ignore_permissions=True)
+f = frappe.get_doc({"doctype": "Life Wiki Finding", "space": space, "topic": "I54 count ${width} ${stamp}", "question": "Two pages disagree on Mehi's dealership count: keep which?", "status": "Open",
+  "options": json.dumps([{"page": a.name, "title": a.title, "fact": "Mehi has 4 dealerships.", "source_doctype": None, "source_name": None},
+    {"page": b.name, "title": b.title, "fact": "Mehi has 6 dealerships.", "source_doctype": "Life Inbox Item", "source_name": item.name}])}).insert(ignore_permissions=True)
+print(json.dumps({"a": a.name, "b": b.name, "f": f.name, "item": item.name}))`).split('\n').pop())
+      await one.open('/life/brain')
+      const row = pg.locator(`[data-contradiction="${made.f}"]`)
+      await row.waitFor({ timeout: 10000 })
+      must((await row.innerText()).includes('keep which?'), 'the question is not shown')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      await row.locator('[data-contradiction-keep="1"]').click()
+      await row.waitFor({ state: 'detached', timeout: 10000 })
+      const got = JSON.parse(bench(`import json
+a = frappe.get_doc("Life Note", "${made.a}")
+print(json.dumps({"text": a.content_md, "sources": [s.source_name for s in a.sources], "status": frappe.db.get_value("Life Wiki Finding", "${made.f}", "status")}))`).split('\n').pop())
+      must(got.text.includes('6 dealerships') && !got.text.includes('4 dealerships'), 'the page says: ' + got.text)
+      must(got.sources.includes(made.item), 'the page does not cite the chosen fact\'s source')
+      must(got.status === 'Decided', 'the finding is ' + got.status)
+    })
+    // the empty state of Needs you with nothing to decide is I17's; this screen adds a section only when there is a contradiction
+  } finally {
+    if (one) await one.ctx.close()
+  }
+}
+
 // Issue 50: Life OS on the phone: install, share to it, capture offline, voice. One browser with a fake microphone and a phone profile.
 // Titles start "I50 " (the debris finder knows them); the voice note is named by its file, so it is removed by its instruction.
 const run50 = [1, 2, 3, 4, 5, 6, 7].some((k) => inPart(`I50.${k}`) && (!ONLY || ONLY.split(',').some((o) => `I50.${k}`.endsWith(o) || `I50.${k}`.startsWith(o))))

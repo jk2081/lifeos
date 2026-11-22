@@ -76,9 +76,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/archive.py` | 74 | fixed fragments, std_clause columns checked against meta, vault_guard constant; values are parameters |
 | `lifeos/api/ask.py` | 195 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
 | `lifeos/api/ask.py` | 200 | WHERE is one of two fixed fragments; user, space and the search text are parameters |
-| `lifeos/api/brain.py` | 136 | WHERE is constant SQL plus area_filter; values are parameters |
-| `lifeos/api/brain.py` | 142 | WHERE is constant SQL plus area_filter; values are parameters |
-| `lifeos/api/brain.py` | 157 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 137 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 143 | WHERE is constant SQL plus area_filter; values are parameters |
+| `lifeos/api/brain.py` | 158 | WHERE is constant SQL plus area_filter; values are parameters |
 | `lifeos/api/chats.py` | 25 | vault_guard is a constant fragment; values are parameters |
 | `lifeos/api/chats.py` | 144 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/api/chats.py` | 150 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
@@ -134,24 +134,24 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/vault.py` | 75 | clause from where_clause: fixed fragments, the EXPIRY allowlist and area_filter; every value is a parameter |
 | `lifeos/api/vault.py` | 115 | columns and filters checked against the DocType meta, order from std_order or the SORTS allowlist; values are parameters |
 | `lifeos/api/vault.py` | 119 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/wiki.py` | 177 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
-| `lifeos/api/wiki.py` | 182 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
-| `lifeos/api/wiki.py` | 208 | WHERE from fixed fragments and area_filter; the order comes from a fixed map; values are parameters |
-| `lifeos/api/wiki.py` | 212 | WHERE from fixed fragments and area_filter; values are parameters |
-| `lifeos/api/wiki.py` | 250 | WHERE from fixed fragments and vault_guard; the search text is the %(q)s parameter |
-| `lifeos/api/wiki.py` | 255 | WHERE and LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
-| `lifeos/api/wiki.py` | 446 | CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
-| `lifeos/api/wiki.py` | 449 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/wiki.py` | 178 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/wiki.py` | 183 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/wiki.py` | 209 | WHERE from fixed fragments and area_filter; the order comes from a fixed map; values are parameters |
+| `lifeos/api/wiki.py` | 213 | WHERE from fixed fragments and area_filter; values are parameters |
+| `lifeos/api/wiki.py` | 251 | WHERE from fixed fragments and vault_guard; the search text is the %(q)s parameter |
+| `lifeos/api/wiki.py` | 256 | WHERE and LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
+| `lifeos/api/wiki.py` | 447 | CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
+| `lifeos/api/wiki.py` | 450 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters |
 | `lifeos/archive.py` | 14 | the table is one of ORG_DOCTYPES (checked above) and `where` a fixed fragment; values are parameters |
 | `lifeos/archive.py` | 76 | `dt` comes from the constant ORG_DOCTYPES |
 | `lifeos/archive.py` | 89 | `dt` comes from the constant ORG_DOCTYPES |
 | `lifeos/devtools.py` | 68 | development tool: dt comes from the SPACE_DOCTYPES constant; values are parameters |
 | `lifeos/devtools.py` | 73 | development tool: table names from SPACE_DOCTYPES and their meta's table fields; values are parameters |
 | `lifeos/devtools.py` | 76 | development tool: dt comes from the SPACE_DOCTYPES constant; space is a parameter |
-| `lifeos/devtools.py` | 209 | development tool: DocType and field from the _TITLED constant |
-| `lifeos/devtools.py` | 259 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
-| `lifeos/devtools.py` | 282 | development tool: child table names from the meta of a checked DocType; values are parameters |
-| `lifeos/devtools.py` | 297 | development tool: dt is checked to be an existing DocType; names are a parameter |
+| `lifeos/devtools.py` | 211 | development tool: DocType and field from the _TITLED constant |
+| `lifeos/devtools.py` | 261 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
+| `lifeos/devtools.py` | 284 | development tool: child table names from the meta of a checked DocType; values are parameters |
+| `lifeos/devtools.py` | 299 | development tool: dt is checked to be an existing DocType; names are a parameter |
 | `lifeos/index.py` | 96 | column names come from the fixed COLUMNS list; every value is a %s parameter |
 | `lifeos/insights.py` | 203 | only the code-owned vault fragment of the tool context is inserted; the rest are parameters |
 | `lifeos/old_inbox.py` | 227 | WHERE is constant SQL plus area_filter's fixed fragment; values are parameters |

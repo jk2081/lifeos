@@ -7,7 +7,7 @@
     </template>
     <section v-if="on('sources')" data-wiki-sources>
       <Card flush><Row v-for="s in note.sources" :key="s.doctype + s.name" :pane="(s.doctype === 'Life Chat Log' ? 'chat:' : 'source:') + s.name" :label="s.title">
-        <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ s.title || s.name }}</div><div class="text-sm text-ink-gray-6">{{ s.doctype === 'Life Chat Log' ? 'AI chat' : 'Source' }}</div></div></Row>
+        <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ s.title || s.name }}</div><div class="text-sm text-ink-gray-6">{{ s.doctype === 'Life Chat Log' ? 'AI chat' : 'Source' }}<template v-if="s.added_on"> · added {{ s.added_on }}</template></div></div></Row>
         <Empty v-if="!note.sources.length" title="No sources yet." hint="A wiki page cites the sources it was written from." /></Card></section>
     <section v-if="on('history')" data-wiki-history>
       <Card flush><Row v-for="c in history" :key="c.name" :pane="'change:' + c.name" :label="c.change_type + ' by ' + c.by">

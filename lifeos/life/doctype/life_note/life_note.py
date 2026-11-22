@@ -45,5 +45,6 @@ class LifeNote(Document):
 				frappe.throw(_("{0} {1} does not exist.").format(r.source_doctype, r.source_name))
 			if space != self.space:
 				frappe.throw(_("A page can only cite sources from its own space."))
+			r.added_on = r.get("added_on") or (str(r.creation)[:10] if r.get("creation") else frappe.utils.today())  # Life OS records the day; the agent passes nothing (issue 54)
 			rows.append(r)
 		self.set("sources", rows)

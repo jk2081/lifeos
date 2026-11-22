@@ -22,6 +22,8 @@
  "lifeos.api.connections.defaults",
  "lifeos.api.connections.list",
  "lifeos.api.connections.import_status",
+ "lifeos.api.context.get",
+ "lifeos.api.context.card",
  "lifeos.api.counts.get",
  "lifeos.api.everything.list",
  "lifeos.api.files.list",

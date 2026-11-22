@@ -48,6 +48,12 @@ SCHEMAS.update({
 		"unit": _S, "target_value": _N, "start_value": _N, "title": _S}),
 	"reflect-result": _obj(["sentence"], {"sentence": _S}),
 	"area-guess": _obj(["area", "confidence"], {"area": _S, "confidence": {"type": "integer"}}),
+	"wiki-check": _obj(["orphans", "missing", "stale", "contradictions"], {
+		"orphans": _list(_obj(["page", "action"], {"page": _S, "action": {"type": "string", "enum": ["link", "archive"]}, "link_to": _S, "reason": _S})),
+		"missing": _list(_obj(["name", "summary"], {"name": _S, "summary": _S})),
+		"stale": _list(_obj(["page", "summary"], {"page": _S, "summary": _S})),
+		"contradictions": _list(_obj(["topic", "question", "options"], {"topic": _S, "question": _S,
+			"options": _list(_obj(["page", "fact"], {"page": _S, "fact": _S}))}))}),
 })
 
 

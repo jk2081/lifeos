@@ -193,6 +193,9 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
+| `context.get` | `space=None, task=None, budget=1500` | The first call of a job (issue 54): the core card and the index; with `task`, the card, the matching index lines and the top pages' summaries within `budget` words. Sensitive pages are left out for an agent unless the space allows them. |
+| `context.card` | `space=None` | The core card alone, as Settings, Rules shows it. |
+| `context.decide` | `finding, choice` | People only: keep one fact of a wiki contradiction. |
 | `jobs.file_job` | `job_id, space=None, title=None, area=None, goal=None, instruction=None, raw_text=None, inputs=None, outputs=None, transcript_md=None, summary_md=None, proposals=None, wiki=None, chat=None, source_system=None` | File a finished piece of work as one inbox item in one call (issue 8, the `lifeos-file-work` skill): outputs on the item, reusable inputs kept once each and linked as inputs, proposals waiting for the owner, wiki pages and a chat log citing the item. The same `job_id` again updates the job. All or nothing: an invalid part refuses the call and names the field. |
 
 **`lifeos.api.journal`**

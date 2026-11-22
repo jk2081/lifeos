@@ -60,6 +60,11 @@ doc_events["Life Inbox Item"]["after_insert"] = [*doc_events["Life Inbox Item"][
 for _dt in ("Life Task", "Life Goal", "Life Note"):
 	doc_events[_dt]["on_update"] = [*([doc_events[_dt]["on_update"]] if isinstance(doc_events[_dt]["on_update"], str) else doc_events[_dt]["on_update"]),
 		"lifeos.skills.triggers.record_changed"]
+# issue 54: the core card and the index are rebuilt when a record they are made from changes
+for _dt in ("Life Note", "Life Person", "Life Goal", "Life Area", "Life Cycle", "Life Space", "Life Settings"):
+	for _event in ("on_update", "after_insert", "on_trash"):
+		_have = doc_events.setdefault(_dt, {}).get(_event)
+		doc_events[_dt][_event] = [*([_have] if isinstance(_have, str) else _have or []), "lifeos.context.changed"]
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
 # issue 7: a Life OS record's file is stored once per space by content, and the same file sent again is not attached twice
 extend_doctype_class = {"File": ["lifeos.files.LifeFile"]}
@@ -68,7 +73,7 @@ doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
 before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.strict_get.before_request", "lifeos.gone_names.before_request"]
 
 scheduler_events = {
-	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.trash.purge_old"],
+	"daily": ["lifeos.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.trash.purge_old", "lifeos.wiki_check.run_weekly"],
 	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims", "lifeos.skills.triggers.run_due"],
 		# insights: nightly at 06:00 site time (the owner's time zone is the site's, Asia/Kolkata)
 		"0 6 * * *": ["lifeos.insights.run_nightly"],

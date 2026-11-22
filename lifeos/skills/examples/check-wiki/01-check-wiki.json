@@ -1,0 +1,83 @@
+{
+ "title": "An orphan is linked, a name seen in three captures gets a page, a stale summary is rewritten",
+ "input": {
+  "data": {
+   "pages": [
+    {
+     "id": "P1",
+     "title": "Mehi Motors",
+     "summary": "Car dealership in Ranchi",
+     "text": "Mehi Motors is a car dealership in Ranchi. We pitched them a dealer deck.",
+     "linked_from": 2,
+     "links_to": 1,
+     "orphan": false
+    },
+    {
+     "id": "P2",
+     "title": "Dealer deck",
+     "summary": "Draft pricing",
+     "text": "The dealer deck now holds the final pricing and the demo plan for Mehi Motors.",
+     "linked_from": 0,
+     "links_to": 0,
+     "orphan": true
+    }
+   ],
+   "captures": [
+    {
+     "id": "C1",
+     "title": "Call with Suresh",
+     "text": "Suresh Rao from Ghatia Estate wants tea samples."
+    },
+    {
+     "id": "C2",
+     "title": "Email",
+     "text": "Ghatia Estate sent the invoice."
+    },
+    {
+     "id": "C3",
+     "title": "Note",
+     "text": "Visit Ghatia Estate on Friday."
+    }
+   ],
+   "known_names": [
+    "Dealer deck",
+    "Mehi Motors"
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "orphans.0.action",
+    "equals": "link"
+   }
+  },
+  {
+   "answer": {
+    "path": "missing.0.name",
+    "equals": "Ghatia Estate"
+   }
+  },
+  {
+   "answer": {
+    "path": "stale",
+    "count": {
+     "min": 1,
+     "max": 1
+    }
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"orphans\": [{\"page\": \"P2\", \"action\": \"link\", \"link_to\": \"P1\", \"reason\": \"The deck is the pitch to Mehi Motors.\"}], \"missing\": [{\"name\": \"Ghatia Estate\", \"summary\": \"Tea estate that sends invoices and wants samples\"}], \"stale\": [{\"page\": \"P2\", \"summary\": \"Final pricing and demo plan for Mehi Motors\"}], \"contradictions\": []}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "8c1919f3e79e1758"
+}

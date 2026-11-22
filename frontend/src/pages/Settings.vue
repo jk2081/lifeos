@@ -225,6 +225,9 @@
         </template>
         <!-- Rules: the note rules page, then who may read sensitive items -->
         <template v-if="show('rules')">
+          <SectionHead>What agents know about you</SectionHead>
+          <p class="text-sm text-ink-gray-6">The first thing an agent reads. Life OS writes it from your areas, goals, the 12 Week Year and your rules, and rebuilds it when they change. You cannot edit it here; change what it is made from.</p>
+          <Card data-agent-card :data-words="agentCard?.words"><Md v-if="agentCard" :text="agentCard.card" /><Empty v-else title="Nothing to show yet." hint="It appears as soon as your areas and goals are set." /></Card>
           <SectionHead>Note rules</SectionHead>
           <p class="text-sm text-ink-gray-6">The assistant reads this page before it writes its notes. People edit it; agents cannot. It is also pinned at the top of the assistant's notes in the Library.</p>
           <NoteEditor v-if="rulesDoc" :key="rulesDoc.name" :note="rulesDoc" data-settings-rules />
@@ -474,6 +477,7 @@ import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
+import Md from '@/components/Md.vue'
 import CalendarSection from '@/components/settings/CalendarSection.vue'
 import AreasSection from '@/components/settings/AreasSection.vue'
 import SettingRow from '@/components/settings/SettingRow.vue'
@@ -640,6 +644,9 @@ const memberTabs = computed(() => {
 const shownMembers = computed(() => (mSpace.value?.members || []).filter((m) => memberKind.value === 'all' || m.is_agent === (memberKind.value === 'agents')))
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
 
+// What agents know about you (issue 54): the core card, read only
+const agentCard = ref(null)
+watch(() => section.value, async (sec) => { if (sec === 'rules' && !agentCard.value) agentCard.value = await tryCall(() => api('context.card')) }, { immediate: true })
 // Note rules: the rules page of the assistant's notes in this space
 const rulesDoc = ref(null)
 watch(() => [section.value, d.value?.rules_note], async ([sec, name]) => {
