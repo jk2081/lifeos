@@ -3188,7 +3188,10 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     must(made.some((x) => x.status === 'Waiting' && x.waiting_on === 'Vivek'), 'the delegated plan is not Waiting on Vivek')
     const weekCal = await s.api('calendar.get', { space: SPACE, from_date: addDays(0), to_date: addDays(8) })
     must(scheduled.every((x) => weekCal.items.some((i) => i.name === x.name && i.scheduled)), 'a scheduled task is not in Plan > Week')
-    await s.open('/life/today/week?view=calendar')
+    // the plans fall on the days ahead, which on a Friday to Sunday run are in next week: open the week of the earliest one
+    const firstDay = scheduled.map((x) => String(x.scheduled_at).slice(0, 10)).sort()[0]
+    await s.open(`/life/today/week?date=${firstDay}`)
+    await pg.locator('[data-week-item]').first().waitFor({ timeout: 20000 })
     const text = await pg.locator('[data-main]').innerText()
     must(scheduled.some((x) => text.includes(x.title)), 'no scheduled task on the Week calendar')
     // the next review starts after this one
