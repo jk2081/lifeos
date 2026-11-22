@@ -106,7 +106,7 @@ OUTCOME_SQL = """case when i.status = 'Failed' then 'failed' when i.status in ('
 	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Rejected') > 0 then 'dropped'
 	else 'filed' end"""
 MADE_EACH = 4
-SOURCE_TYPES = ("Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web")
+SOURCE_TYPES = ("Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web", "Phone")
 
 
 def _activity_where(space, days, source, area):

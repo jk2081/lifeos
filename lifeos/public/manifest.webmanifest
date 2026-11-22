@@ -1,8 +1,9 @@
 {
   "name": "Life OS",
   "short_name": "Life OS",
-  "description": "A personal operating system: inbox, tasks, calendar, journal, library and vault.",
-  "start_url": "/life",
+  "description": "A personal operating system: capture, tasks, calendar, journal, library and vault.",
+  "id": "/life",
+  "start_url": "/life/today",
   "scope": "/life",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -13,8 +14,19 @@
     { "src": "/assets/lifeos/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Inbox", "url": "/life/inbox" },
+    { "name": "Brain", "url": "/life/brain" },
     { "name": "Tasks", "url": "/life/tasks" },
-    { "name": "Journal", "url": "/life/journal" }
-  ]
+    { "name": "Today", "url": "/life/today" }
+  ],
+  "share_target": {
+    "action": "/life/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [{ "name": "files", "accept": ["image/*", "application/pdf", "audio/*", "text/plain", "text/markdown", "text/csv"] }]
+    }
+  }
 }

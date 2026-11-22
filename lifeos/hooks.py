@@ -15,6 +15,8 @@ add_to_apps_screen = [
 after_install = "lifeos.install.after_install"
 after_migrate = "lifeos.install.after_migrate"
 
+# issue 50: /life/sw.js is the phone app's service worker
+page_renderer = ["lifeos.pwa.ServiceWorkerPage"]
 website_route_rules = [{"from_route": "/life/<path:app_path>", "to_route": "life"}]
 
 # Link search for the filing DocTypes: the current space and active records only (lifeos/queries.py)

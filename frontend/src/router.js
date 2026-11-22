@@ -33,6 +33,8 @@ const routes = [
   { path: `/brain/:tab(${BRAIN.join('|')})?`, name: 'Brain', component: page('BrainPlace'), props: true },
   { path: '/brain/skills/:name', name: 'Skill', component: page('Skill'), props: true },
   { path: '/brain/review/:id', name: 'ItemReview', component: page('Review'), props: true },
+  // issue 50: the screen the phone's share target opens
+  { path: '/share', name: 'Share', component: page('Share') },
   // issue 10: one page per capture, with its source, files, summary, decisions and what came of it
   { path: '/item/:id', name: 'Item', component: page('Item'), props: true },
   { path: `/goals/:tab(${GOALS.join('|')})?`, name: 'Goals', component: page('GoalsPlace'), props: true },

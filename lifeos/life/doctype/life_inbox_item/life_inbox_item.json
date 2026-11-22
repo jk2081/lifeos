@@ -65,7 +65,7 @@
    "fieldname": "source_type",
    "fieldtype": "Select",
    "label": "Source Type",
-   "options": "Upload\nJournal Photo\nVoice Note\nEmail\nEmail Digest\nChat\nMessage\nWeb",
+   "options": "Upload\nJournal Photo\nVoice Note\nEmail\nEmail Digest\nChat\nMessage\nWeb\nPhone",
    "default": "Upload"
   },
   {

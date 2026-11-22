@@ -8,10 +8,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | --- | --- |
 | frappe-manual-commit | 8 |
 | frappe-missing-translate-function-python | 1 |
-| frappe-security-file-traversal | 6 |
+| frappe-security-file-traversal | 7 |
 | frappe-setuser | 16 |
 | frappe-sql-format-injection | 89 |
-| Total | 120 |
+| Total | 121 |
 
 ## frappe-manual-commit
 
@@ -39,6 +39,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/settings.py` | 220 | the site's own backup folder, names only |
 | `lifeos/files.py` | 90 | local_path keeps the path inside the site's files folders |
 | `lifeos/patches/v10/file_hashes.py` | 23 | local_path keeps the path inside the site's files folders |
+| `lifeos/pwa.py` | 18 | a fixed file of this app; no part of the path comes from the request |
 | `lifeos/sources.py` | 103 | a fixed name in a temporary folder made here |
 | `lifeos/sources.py` | 113 | pdftoppm's own output in a temporary folder made here |
 | `lifeos/tools/tidy_files.py` | 170 | _path_of keeps the path inside the site's files folders |

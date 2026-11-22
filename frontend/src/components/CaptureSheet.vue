@@ -20,22 +20,28 @@
       </section>
       <TabButtons v-model="intent" :options="INTENTS" aria-label="What to do with it" data-intent />
       <div class="flex flex-wrap gap-2">
-        <Button variant="solid" label="Add as a task" :loading="busy === 'task'" :disabled="!text.trim() || !!busy || !!files.length" data-capture-task @click="asTask" />
+        <Button variant="solid" label="Add as a task" :loading="busy === 'task'" :disabled="!text.trim() || !!busy || !!files.length || !online" data-capture-task @click="asTask" />
         <Button label="Send to the Brain" :loading="busy === 'brain'" :disabled="(!text.trim() && !files.length) || !!busy" data-capture-brain @click="toBrain" />
       </div>
       <div class="flex flex-wrap items-center gap-2 border-t border-outline-gray-1 pt-3" data-capture-more>
         <span class="text-sm text-ink-gray-6">Or add</span>
         <Button v-for="m in MORE" :key="m.key" size="sm" variant="subtle" :icon-left="m.icon" :label="m.label" :data-capture-kind="m.key" @click="m.run" />
+        <!-- issue 50: record a voice note; it is kept as an audio capture, transcribed when transcription is built (#33) -->
+        <Button v-if="canRecord" size="sm" :variant="recording ? 'solid' : 'subtle'" :theme="recording ? 'red' : 'gray'" :icon-left="recording ? 'lucide-square' : 'lucide-mic'"
+          :label="recording ? `Stop recording ${clock(seconds)}` : 'Voice note'" data-capture-voice @click="recording ? stopVoice() : startVoice()" />
       </div>
+      <p v-if="voiceError" class="text-sm text-ink-red-7" role="alert" data-capture-voice-error>{{ voiceError }}</p>
+      <p v-if="!online" class="text-sm text-ink-gray-7" data-capture-offline>You are offline. Send to the Brain keeps it on this phone and sends it when you are back online.</p>
     </div>
     <p v-else class="text-base text-ink-gray-7">You can read {{ store.space }} but not add to it.</p>
   </Dialog>
 </template>
 <script setup>
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Dialog, TabButtons, TextInput, Textarea, toast } from 'frappe-ui'
 import { api, errorText, tryCall } from '@/lib/api'
+import { submitCapture } from '@/lib/offline'
 import { fileKind, fileSize, uploadFile } from '@/lib/upload'
 import { saveView, savedView } from '@/lib/views'
 import { canWrite, store } from '@/lib/store'
@@ -98,10 +104,11 @@ async function toBrain() {
   try {
     const f = files.value
     const title = f.length ? (f.length === 1 ? f[0].name : `${f[0].name} and ${f.length - 1} more`) : value.split('\n')[0].slice(0, 80)
-    const item = await api('inbox.create_item', { title, source_type: sourceOf(), space: store.space, instruction: instruction.value, raw_text: value, intent: intent.value })
-    for (const file of f) await uploadFile(file, 'Life Inbox Item', item.name)
+    // sent now, or kept on the phone and sent when the connection returns (issue 50)
+    const how = await submitCapture({ title, source_type: sourceOf(), space: store.space, instruction: instruction.value, raw_text: value, intent: intent.value, files: f })
     window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))
-    toast.success(intent.value === 'Just keep' ? 'Kept. The Brain makes it searchable and files it under Activity.' : 'Sent to the Brain. It files it and asks you only if it needs to.')
+    if (how === 'queued') toast.success('Kept on this phone. It is sent when you are back online.')
+    else toast.success(intent.value === 'Just keep' ? 'Kept. The Brain makes it searchable and files it under Activity.' : 'Sent to the Brain. It files it and asks you only if it needs to.')
     text.value = ''
     instruction.value = ''
     files.value = []
@@ -113,6 +120,56 @@ async function toBrain() {
     busy.value = ''
   }
 }
+// voice note: MediaRecorder on the microphone; the recording joins the files and is sent like any file
+const online = ref(navigator.onLine)
+const goOnline = () => (online.value = navigator.onLine)
+window.addEventListener('online', goOnline)
+window.addEventListener('offline', goOnline)
+const canRecord = computed(() => !!(navigator.mediaDevices?.getUserMedia && window.MediaRecorder))
+const recording = ref(false)
+const seconds = ref(0)
+const voiceError = ref('')
+let recorder = null
+let stream = null
+let timer = null
+const clock = (n) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`
+async function startVoice() {
+  voiceError.value = ''
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  } catch {
+    voiceError.value = 'Life OS could not use the microphone. Allow it in your browser settings and try again.'
+    return
+  }
+  const chunks = []
+  recorder = new MediaRecorder(stream)
+  recorder.ondataavailable = (e) => e.data?.size && chunks.push(e.data)
+  recorder.onstop = () => {
+    const type = recorder.mimeType || 'audio/webm'
+    const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm'
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
+    if (chunks.length) files.value.push(new File(chunks, `voice-note-${stamp}.${ext}`, { type }))
+    showFiles.value = true
+    release()
+  }
+  recorder.start()
+  seconds.value = 0
+  timer = setInterval(() => seconds.value++, 1000)
+  recording.value = true
+}
+function stopVoice() {
+  if (recorder && recorder.state !== 'inactive') recorder.stop()
+  recording.value = false
+}
+function release() {
+  clearInterval(timer)
+  stream?.getTracks().forEach((t) => t.stop())
+  stream = null
+  recording.value = false
+}
+onUnmounted(release)
+watch(open, (on) => { if (!on && recording.value) stopVoice() })
+
 watch(open, async (on) => {
   if (!on) return
   await nextTick()

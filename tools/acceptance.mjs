@@ -608,7 +608,7 @@ await check('S3', 'Security: the family and agent users land on /life from /app;
 
 await check('S2', 'Security: the PWA manifest and icons are served; an agent cannot decide or delete', async () => {
   const m = await (await owner.page.request.get(base + '/assets/lifeos/manifest.webmanifest')).json()
-  must(m.start_url === '/life' && m.display === 'standalone' && m.icons.length >= 2, 'manifest is incomplete')
+  must(m.start_url === '/life/today' && m.display === 'standalone' && m.icons.length >= 2, 'manifest is incomplete')
   for (const i of m.icons) must((await owner.page.request.get(base + i.src)).ok(), 'missing icon ' + i.src)
   must((await owner.page.content()).includes('rel="manifest"'), 'the page does not link the manifest')
   const auth = { Authorization: `token ${agentKey}:${agentSecret}`, 'Content-Type': 'application/json' }
@@ -7109,6 +7109,160 @@ await check('I48.6', '/life/projects and an old project link land on Goals', asy
     must(!/not found/i.test(await pg.locator('[data-main]').innerText()), `${from} shows "not found"`)
   }
 })
+
+// Issue 50: Life OS on the phone: install, share to it, capture offline, voice. One browser with a fake microphone and a phone profile.
+// Titles start "I50 " (the debris finder knows them); the voice note is named by its file, so it is removed by its instruction.
+const run50 = [1, 2, 3, 4, 5, 6, 7].some((k) => inPart(`I50.${k}`) && (!ONLY || ONLY.split(',').some((o) => `I50.${k}`.endsWith(o) || `I50.${k}`.startsWith(o))))
+if (run50 && !ONLY_UX) {
+  const pb = await chromium.launch({ executablePath: SETUP.chrome, headless: true, args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] })
+  const ctx = await pb.newContext({ viewport: { width: 390, height: 844 }, timezoneId: 'Asia/Kolkata', isMobile: true, hasTouch: true, permissions: ['microphone'] })
+  // a fake microphone: a tone from the Web Audio API stands in for getUserMedia, the same on every machine
+  await ctx.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = async () => {
+      const ac = new AudioContext(); const osc = ac.createOscillator(); const dest = ac.createMediaStreamDestination()
+      osc.connect(dest); osc.start(); return dest.stream
+    }
+  })
+  const pg = await ctx.newPage()
+  const apiCalls = []
+  pg.on('request', (r) => { if (/inbox\.create_item|upload_file/.test(r.url())) apiCalls.push(r.url()) })
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const items = (where) => JSON.parse(bench(`import json
+rows = frappe.db.sql("select name, source_type, source_system, external_id, title, instruction from \`tabLife Inbox Item\` where ${where}", as_dict=True)
+for r in rows: r["files"] = frappe.db.count("File", {"attached_to_doctype": "Life Inbox Item", "attached_to_name": r["name"], "attached_to_field": ["is", "not set"]})
+print(json.dumps(rows))`).split('\n').pop())
+  const queued = () => pg.evaluate(() => new Promise((res) => { const r = indexedDB.open('lifeos-phone', 1)
+    r.onupgradeneeded = () => { for (const n of ['queue', 'shares']) if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n, { keyPath: 'id' }) }
+    r.onsuccess = () => { const q = r.result.transaction('queue').objectStore('queue').count(); q.onsuccess = () => { r.result.close(); res(q.result) } } }))
+  const openCapture = async () => { await pg.locator('[data-tab-capture]').click(); await pg.locator('[data-capture-text]').waitFor() }
+  const typeAndSend = async (text) => { await pg.locator('[data-capture-text] textarea, textarea[data-capture-text]').first().fill(text); await pg.locator('[data-capture-brain]').click() }
+  const waitCount = (n) => pg.waitForFunction((n) => (document.querySelector('[data-queue-note]')?.textContent.match(/(\d+) waiting/) || [0, 0])[1] == n, n, { timeout: 15000 })
+  const where = `title like 'I50 %${stamp}%'`
+  try {
+    const res = await ctx.request.post(base + '/api/method/login', { form: { usr: 'owner@lifeos.test', pwd: env.LIFEOS_DEV_PASSWORD } })
+    must(res.ok(), 'login failed')
+    await pg.goto(base + '/life/today', { waitUntil: 'networkidle' })
+    await pg.evaluate(() => navigator.serviceWorker.ready)
+    await pg.reload({ waitUntil: 'networkidle' }) // now the worker controls the page
+    await pg.locator('[data-tab-capture]').waitFor()
+
+    await check('I50.1', 'The manifest is valid and the service worker is registered (phone profile)', async () => {
+      const m = await (await ctx.request.get(base + '/assets/lifeos/manifest.webmanifest')).json()
+      must(m.name === 'Life OS' && m.display === 'standalone' && m.start_url === '/life/today', 'manifest name, display or start_url is wrong')
+      must(m.icons.some((i) => i.sizes === '512x512') && m.icons.some((i) => i.sizes === '192x192') && m.theme_color, 'manifest icons or theme colour missing')
+      must(m.share_target?.action === '/life/share' && m.share_target.method === 'POST', 'manifest has no share target')
+      must(await pg.evaluate(() => document.querySelector('link[rel=manifest]')?.href.endsWith('/assets/lifeos/manifest.webmanifest')), 'the page does not link the manifest')
+      for (const i of m.icons) must((await ctx.request.get(base + i.src)).ok(), 'icon not served: ' + i.src)
+      const sw = await pg.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration('/life/'); return { scope: r?.scope, active: !!r?.active, controlled: !!navigator.serviceWorker.controller } })
+      must(sw.scope === base + '/life/' && sw.active && sw.controlled, 'the service worker is not registered and in control: ' + JSON.stringify(sw))
+    })
+
+    await check('I50.2', "The service worker's cache holds only static app files, never an /api/ response", async () => {
+      for (const p of ['/life/today', '/life/brain', '/life/goals', '/life/settings']) await pg.goto(base + p, { waitUntil: 'networkidle' })
+      const urls = await pg.evaluate(async () => { const out = []; for (const k of await caches.keys()) for (const r of await (await caches.open(k)).keys()) out.push(r.url); return out })
+      must(urls.length > 0, 'nothing is cached')
+      const bad = urls.filter((u) => !new URL(u).pathname.startsWith('/assets/lifeos/') || /\/api\//.test(u))
+      must(!bad.length, 'cached and not static: ' + bad.slice(0, 3).join(' '))
+    })
+
+    await check('I50.3', 'Posting to the share target with a photo and text opens the capture screen; Save makes one capture with the file', async () => {
+      const png = await pg.screenshot()
+      const url = await pg.evaluate(async ({ stamp, bytes }) => {
+        const f = new FormData()
+        f.append('title', `I50 shared ${stamp}`); f.append('text', `Look at this ${stamp}`); f.append('url', 'https://example.com/i50')
+        f.append('files', new File([new Uint8Array(bytes)], `shared-${stamp}.png`, { type: 'image/png' }))
+        const r = await fetch('/life/share', { method: 'POST', body: f })
+        return r.url
+      }, { stamp, bytes: [...png] })
+      must(/\/life\/share\?id=/.test(url), 'the share was not taken: ' + url)
+      await pg.goto(url, { waitUntil: 'networkidle' })
+      await pg.locator('[data-share-what]').waitFor()
+      const t = await pg.locator('[data-share-what]').innerText()
+      must(t.includes(`I50 shared ${stamp}`) && t.includes(`Look at this ${stamp}`) && t.includes(`shared-${stamp}.png`), 'the capture screen does not show what was shared: ' + t)
+      must(await pg.locator('[data-share-what] img').count() === 1, 'no photo preview')
+      must(items(where).length === 0, 'something was sent before Save')
+      await pg.getByLabel('Instruction (optional)').fill('I50 summarise')
+      await pg.locator('[data-share-save]').click()
+      await pg.waitForFunction(() => location.pathname.startsWith('/life/brain'), null, { timeout: 15000 })
+      const rows = items(where)
+      must(rows.length === 1 && rows[0].source_type === 'Phone' && rows[0].files === 1 && rows[0].instruction === 'I50 summarise', 'the capture is wrong: ' + JSON.stringify(rows))
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check('I50.4', 'Offline, two captures are queued ("2 waiting to send"); back online both are sent, once each', async () => {
+      await pg.goto(base + '/life/today', { waitUntil: 'networkidle' })
+      await ctx.setOffline(true)
+      await pg.waitForFunction(() => !navigator.onLine)
+      await openCapture()
+      await typeAndSend(`I50 offline one ${stamp}`)
+      await pg.locator('[data-capture-text]').waitFor({ state: 'hidden' })
+      await openCapture()
+      await typeAndSend(`I50 offline two ${stamp}`)
+      await pg.locator('[data-capture-text]').waitFor({ state: 'hidden' })
+      await waitCount(2)
+      must((await pg.locator('[data-queue-note]').innerText()).includes('2 waiting to send'), 'the note does not say "2 waiting to send"')
+      must(await pg.locator('[data-offline]').count() === 1, 'no offline note on the screen')
+      must(items(`title like 'I50 offline %${stamp}%'`).length === 0, 'something reached the server while offline')
+      await ctx.setOffline(false)
+      await pg.waitForFunction(() => !document.querySelector('[data-queue-note]'), null, { timeout: 20000 })
+      const rows = items(`title like 'I50 offline %${stamp}%'`)
+      must(rows.length === 2 && new Set(rows.map((r) => r.title)).size === 2 && rows.every((r) => r.source_type !== undefined), 'each capture should be in Brain once: ' + JSON.stringify(rows))
+      await pg.goto(base + '/life/brain/captures', { waitUntil: 'networkidle' })
+      must(await queued() === 0, 'the queue is not empty')
+    })
+
+    await ctx.setOffline(false)
+    await check('I50.5', 'Recording on + Capture (fake microphone) makes an audio capture marked not transcribed yet', async () => {
+      await pg.goto(base + '/life/today', { waitUntil: 'networkidle' })
+      await openCapture()
+      await pg.locator('[data-capture-voice]').click()
+      await pg.waitForFunction(() => /Stop recording/.test(document.querySelector('[data-capture-voice]')?.textContent || ''), null, { timeout: 10000 })
+      await pg.waitForTimeout(1500)
+      await pg.locator('[data-capture-voice]').click()
+      await pg.locator('[data-capture-files]').getByText(/voice-note-/).first().waitFor({ timeout: 10000 }).catch(async (e) => { await pg.screenshot({ path: '/tmp/i50-5.png' }); throw e })
+      must(/voice-note-.*\.(webm|m4a|ogg)/.test(await pg.locator('[data-capture-files]').innerText()), 'the recording is not among the files')
+      await pg.locator('[data-capture-files] input[aria-label="Instruction"]').fill(`I50 voice ${stamp}`)
+      await pg.locator('[data-capture-brain]').click()
+      await pg.locator('[data-capture-text]').waitFor({ state: 'hidden' })
+      let rows = []
+      for (let i = 0; i < 20 && !rows.length; i++) { rows = items(`instruction = 'I50 voice ${stamp}'`); if (!rows.length) await pg.waitForTimeout(500) }
+      must(rows.length === 1 && rows[0].source_type === 'Voice Note' && rows[0].files === 1, 'the audio capture is wrong: ' + JSON.stringify(rows))
+      await pg.goto(`${base}/life/item/${rows[0].name}`, { waitUntil: 'networkidle' })
+      await pg.locator('[data-item-untranscribed]').waitFor({ timeout: 10000 })
+      must(/not transcribed yet/.test(await pg.locator('[data-item-untranscribed]').innerText()), 'the capture does not say it is not transcribed yet')
+    })
+
+    await check('I50.6', 'Logging out empties the offline queue', async () => {
+      await pg.goto(base + '/life/today', { waitUntil: 'networkidle' })
+      await pg.route('**/api/method/lifeos.api.inbox.create_item', (r) => r.abort('connectionfailed')) // sending fails: it stays queued
+      await openCapture()
+      await typeAndSend(`I50 queued at logout ${stamp}`)
+      await pg.locator('[data-capture-text]').waitFor({ state: 'hidden' })
+      await waitCount(1)
+      must(await queued() === 1, 'one capture should be waiting')
+      await pg.locator('[data-more-title]').click()
+      await pg.getByRole('button', { name: 'Log out' }).click()
+      await pg.waitForFunction(() => location.pathname === '/login', null, { timeout: 15000 })
+      must(await queued() === 0, 'the queue still holds a capture after logging out')
+      await pg.unroute('**/api/method/lifeos.api.inbox.create_item')
+      must(items(`title like 'I50 queued at logout %${stamp}%'`).length === 0, 'the queued capture was sent')
+    })
+
+    await check('I50.7', 'The share target while logged out goes to login and sends nothing', async () => {
+      const before = apiCalls.length
+      await pg.goto(base + `/life/share?id=none`, { waitUntil: 'networkidle' })
+      must(new URL(pg.url()).pathname === '/login', 'went to ' + pg.url())
+      await pg.waitForTimeout(1500)
+      must(apiCalls.length === before, 'something was sent: ' + apiCalls.slice(before).join(' '))
+      must(items(`title = 'I50 shared ${stamp}'`).length === 1 && items(`title like 'I50 queued%${stamp}%'`).length === 0, 'no new capture should exist') // the one saved in I50.3
+    })
+  } finally {
+    bench(`for n in frappe.get_all("Life Inbox Item", filters={"instruction": "I50 voice ${stamp}"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await ctx.close()
+    await pb.close()
+  }
+}
 
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {

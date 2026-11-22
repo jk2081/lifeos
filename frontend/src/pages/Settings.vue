@@ -63,6 +63,15 @@
             <TabButtons :model-value="colorScheme" :options="SCHEMES" aria-label="Theme" data-theme-switch @update:model-value="setColorScheme" />
           </SettingRow>
         </Card>
+          <!-- issue 50: install Life OS on the phone's home screen, share to it, capture offline -->
+          <SectionHead>Install on this phone</SectionHead>
+        <Card flush data-settings-install>
+          <SettingRow label="Android (Chrome)" help="Open the menu (three dots), then Install app or Add to Home screen. Life OS then opens full screen, and appears in the Share list of other apps: photos, PDFs, links and text."
+            data-install-android><Badge v-if="platform === 'android'" theme="blue" label="This phone" /></SettingRow>
+          <SettingRow label="iPhone and iPad (Safari)" help="Tap Share, then Add to Home Screen. Text and links can be shared to Life OS from other apps. iOS does not yet let a web app receive shared photos or files, so add those with + Capture."
+            data-install-ios><Badge v-if="platform === 'ios'" theme="blue" label="This phone" /></SettingRow>
+          <p class="pb-3 text-sm text-ink-gray-6">With no connection, + Capture keeps what you capture on the phone and sends it when you are back online. Nothing else works offline.</p>
+        </Card>
           <SectionHead>Reminders</SectionHead>
         <Card flush data-settings-notifications>
           <SettingRow label="Reminders on Today" help="The weekly review, the month plan and the 12 Week cycle show as one line at the top of Today when they are due. Each has Skip.">
@@ -514,6 +523,7 @@ const route = useRoute()
 const router = useRouter()
 const phone = useMediaQuery('(max-width: 767px)')
 const { colorScheme, setColorScheme } = useColorScheme()
+const platform = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 'ios' : /Android/.test(navigator.userAgent) ? 'android' : ''
 const d = ref(null)
 const errors = reactive({})
 const newOpen = ref(false)
