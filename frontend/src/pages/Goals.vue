@@ -3,7 +3,7 @@
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => 'goal:' + r.name" :watch-keys="['by']" :group-by="route.query.by === 'serves' ? (r) => (r.serves_title ? 'Serves ' + r.serves_title : 'Serves no longer goal') : null"
     :empty-title="EMPTY[tab] || 'No goals here.'" empty-hint="A goal can sit in a 12 Week cycle, have a year-end date, or be open-ended. Projects are open-ended goals with tasks. Add one with New goal."
     @loaded="(res) => (line = res.summary_line || line)">
-    <template #sub><span data-goals-sub>{{ line ? `${line.in_progress} in progress · ${line.tasks_done} of ${line.tasks_counted} tasks done across the goals shown` : store.space }}</span></template>
+    <template #sub><span data-goals-sub>{{ line ? `${line.in_progress} in progress · ${line.tasks_done} of ${line.tasks_counted} tasks done across the goals shown` : manySpaces ? store.space : '' }}</span></template>
     <template #actions><Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New goal" data-new-goal @click="newOpen = true" /></template>
     <template #bar>
       <Select class="w-44" :model-value="['completion', 'serves'].includes(route.query.by) ? route.query.by : ''" :options="ORDERS" aria-label="Order" data-goal-order
@@ -33,6 +33,7 @@
   <NewGoalDialog v-model="newOpen" @saved="created" @habit="list?.reload()" />
 </template>
 <script setup>
+import { manySpaces } from '@/lib/lens'
 import { computed, h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Progress, Select } from 'frappe-ui'

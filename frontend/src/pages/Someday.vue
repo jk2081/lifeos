@@ -2,7 +2,7 @@
   <ListView ref="list" title="Someday" noun="items" screen="someday" doctype="Life Task" :spec="SPEC" :tabs="TABS" :quick="['area', 'someday_on']"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => r.ref" :groupable="false"
     :empty-title="EMPTY[tab] || 'Nothing is parked.'" empty-hint="Park a task, goal or note from its pane or from Reset, or add something with New. Each comes back for review after a while.">
-    <template #sub><span data-someday-sub>{{ store.space }} · parked, not forgotten · each item comes back for review {{ months }} months after it was parked</span></template>
+    <template #sub><span data-someday-sub>{{ manySpaces ? `${store.space} · Parked` : 'Parked' }}, not forgotten · each item comes back for review {{ months }} months after it was parked</span></template>
     <template #actions><Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New" data-new-someday @click="store.newKind = 'someday'" /></template>
     <template #bar><span class="text-sm text-ink-gray-6 max-sm:hidden">Sorted by review date, oldest first</span></template>
     <template #cell-title="{ row }"><div class="min-w-0"><div class="break-words font-medium text-ink-gray-9">{{ row.title }}</div>
@@ -33,6 +33,7 @@
     :initial="bringBack.initial" :save="doBringBack" @saved="list?.reload()" />
 </template>
 <script setup>
+import { manySpaces } from '@/lib/lens'
 import { computed, h, onMounted, ref } from 'vue'
 import { Badge, Button, Dropdown } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'

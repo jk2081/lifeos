@@ -25,6 +25,8 @@ export const lensAreaName = computed(() => (lens.area ? lensArea.value?.area_nam
 
 /** True when the site has two or more spaces that are not archived: only then is a space shown anywhere. */
 export const manySpaces = computed(() => store.spaces.length > 1)
+/** " in <space>" for a sentence, and nothing with one space. */
+export const inSpace = computed(() => (manySpaces.value ? ` in ${store.space}` : ''))
 
 const remember = () => saveView('lens', { space: store.space }, '')
 const known = (s) => s && store.spaces.some((x) => x.name === s)

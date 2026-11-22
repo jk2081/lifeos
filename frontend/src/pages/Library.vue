@@ -12,7 +12,7 @@
   <!-- the tree with the reader: /library and /library/<id> -->
   <template v-else>
     <PageHead title="Notes">
-      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length + journalPages }} note{{ notes.length + journalPages === 1 ? '' : 's' }}</NumLink> in {{ store.space }}</template>
+      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length + journalPages }} note{{ notes.length + journalPages === 1 ? '' : 's' }}</NumLink>{{ inSpace }}</template>
       <TabButtons model-value="tree" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
     </PageHead>
@@ -73,6 +73,7 @@
   </Dialog>
 </template>
 <script setup>
+import { inSpace } from '@/lib/lens'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Dialog, Dropdown, Select, TabButtons, TextInput, Tree, dialog, toast } from 'frappe-ui'
