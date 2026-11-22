@@ -244,15 +244,16 @@ def all_tasks(space: str | None = None, group: str = "area", show: str = "open",
 def _by_area(space, rows, show, now, week_end):
 	from lifeos.areas import off as areas_off
 
-	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour"],
+	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour", "is_focus"],
 		order_by="sort_order asc, area_name asc", limit=5000)
 	hidden = set(areas_off(space))
+	focus_part = {x.name: x.parent_area for x in tree if x.is_focus}  # a task under a focus is listed under its part (issue 57)
 	by = {}
 	for r in rows:
-		by.setdefault(r.area or "", []).append(r)
+		by.setdefault(focus_part.get(r.area) or r.area or "", []).append(r)
 	out = []
 	for a in [x for x in tree if not x.parent_area and x.name not in hidden]:
-		parts = [x for x in tree if x.parent_area == a.name and x.name not in hidden]
+		parts = [x for x in tree if x.parent_area == a.name and x.name not in hidden and not x.is_focus]
 		subs = [{"name": "", "label": "", "area": a.name, "tasks": by.pop(a.name, [])}]
 		subs += [{"name": p.name, "label": p.area_name, "area": p.name, "tasks": by.pop(p.name, [])} for p in parts]
 		subs = [s for s in subs if s["tasks"]]
@@ -371,7 +372,7 @@ def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | 
 		frappe.throw(_("That area is not in this space."))
 	area = area or next((d.area for d in docs if d.area), None)
 	title = (title or "").strip() or goal_suggest.title_for([d.title for d in docs], space)
-	goal = goals.create(title=title, horizon="Long term", space=space, area=area, done_when=done_when, measure_kind=measure_kind, measure=measure,
+	goal = goals.create(title=title, horizon="Year", target_date=goals.year_end(), space=space, area=area, done_when=done_when, measure_kind=measure_kind, measure=measure,
 		unit=unit, start_value=start_value, target_value=target_value)
 	for d in docs:
 		d.goal = goal["name"]

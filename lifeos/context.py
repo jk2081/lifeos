@@ -67,7 +67,7 @@ def _owner(space):
 
 
 def _areas_lines(space):
-	rows = frappe.get_all("Life Area", filters={"space": space, "is_on": 1, "is_archived": 0}, fields=["name", "area_name", "parent_area", "description"],
+	rows = frappe.get_all("Life Area", filters={"space": space, "is_on": 1, "is_archived": 0, "is_focus": 0}, fields=["name", "area_name", "parent_area", "description"],
 		order_by="sort_order asc, creation asc", limit=200)
 	parts = {}
 	for r in rows:
@@ -79,6 +79,29 @@ def _areas_lines(space):
 			continue
 		sub = ", ".join(p.area_name for p in parts.get(r.name, []))
 		lines.append(f"- **{r.area_name}**" + (f" ({sub})" if sub else "") + (f": {clip(r.description, 18)}" if r.description else ""))
+	return lines
+
+
+def _focus_lines(space):
+	"""Each active focus with its standard and principles (issue 57), so agents work within them; none while "Use focuses" is off."""
+	from lifeos import areas
+
+	if not areas.use_focuses():
+		return []
+	hidden = set(areas.off(space))
+	lines = []
+	for f in frappe.get_all("Life Area", filters={"space": space, "is_on": 1, "is_archived": 0, "is_focus": 1}, fields=["name", "area_name", "parent_area", "standard"],
+			order_by="sort_order asc, creation asc", limit=100):
+		if f.name in hidden:
+			continue
+		part = frappe.db.get_value("Life Area", f.parent_area, "area_name")
+		bits = [f"- **{f.area_name}** ({part})"]
+		if f.standard:
+			bits.append(f"Standard: {clip(f.standard, 30)}")
+		rules = frappe.get_all("Life Area Principle", filters={"parent": f.name, "parenttype": "Life Area"}, pluck="line", order_by="idx")
+		if rules:
+			bits.append("Principles: " + " ".join(f"{i}. {clip(r, 20)}" for i, r in enumerate(rules, 1)))
+		lines.append(" ".join(bits))
 	return lines
 
 
@@ -137,6 +160,9 @@ def _build_card(space, hidden):
 	out = [f"# {name or _('The owner')}", ""]
 	out.append(" · ".join(b for b in [role, f"Time zone {zone}" if zone else None, f"Today is {today()}"] if b))
 	out += ["", "## Areas that are on", *(_areas_lines(space) or [_("- None yet.")]), "", "## Active goals", *(_goal_lines(space) or [_("- None yet.")])]
+	focuses = _focus_lines(space)
+	if focuses:
+		out += ["", "## Focuses (ongoing work: work within these)", *focuses]
 	cycle = _cycle_line(space)
 	if cycle:
 		out += ["", "## The 12 Week Year", cycle]

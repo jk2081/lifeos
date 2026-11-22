@@ -37,6 +37,8 @@ else
 fi
 # GETs to Life OS methods run read-only here, so a read that writes fails the run (lifeos/strict_get.py)
 $B "bench --site $SITE set-config -p lifeos_strict_get 1 >/dev/null"
+# issue 57: checks that predate the retirement of the Open goal still make one through the API; the site itself refuses it otherwise
+$B "bench --site $SITE set-config -p lifeos_allow_open_goals 1 >/dev/null"
 # set 8: a fixture calendar stands in for Google here
 $B "bench --site $SITE set-config -p lifeos_fake_calendar 1 >/dev/null"
 # the rhythm banners' clock may be moved here (today.get's `at`), and only here (UX fixes, set 6)

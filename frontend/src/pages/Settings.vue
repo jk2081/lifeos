@@ -215,7 +215,7 @@
         </template>
         <!-- Areas (issue 12) -->
         <template v-if="show('areas')">
-          <AreasSection :space="spaceSel" :rows="d.areas" :is-admin="!!d.is_admin" @changed="changed" />
+          <AreasSection :space="spaceSel" :rows="d.areas" :is-admin="!!d.is_admin" :use-focuses="!!d.settings.use_focuses" @changed="changed" @use-focuses="(v) => setOne('use_focuses', v)" />
           <!-- each area's colour (its dot on goals and chips); issue 46 removed the pins with the lens -->
           <section id="pins" data-area-pins>
             <SectionHead>Colours</SectionHead>
@@ -713,7 +713,8 @@ async function setOne(field, value) {
   try {
     await api('settings.save', { values: { [field]: v } })
     toast.success('Saved')
-    if (field === 'default_space' || field === 'require_done_when') boot()
+    if (field === 'default_space' || field === 'require_done_when' || field === 'use_focuses') boot()
+    if (field === 'use_focuses') changed()
   } catch (e) {
     errors[field] = errorText(e)
     d.value.settings[field] = before

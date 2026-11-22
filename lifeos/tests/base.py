@@ -47,10 +47,13 @@ class LifeTestCase(IntegrationTestCase):
 		# issue 56: new goals need a finish line by default; the tests that make goals through the API without one
 		# predate that, and test_issue56_goal_edit switches the setting back on
 		frappe.db.set_single_value("Life Settings", "require_done_when", 0)
+		# issue 57: Open goals are retired; the tests that make one through the API predate that, and test_issue57_focuses switches it off
+		frappe.flags.lifeos_allow_open_goals = True
 
 	def tearDown(self):
 		frappe.set_user("Administrator")
 		frappe.flags.lifeos_allow_early_close = False
+		frappe.flags.lifeos_allow_open_goals = False
 
 	def as_user(self, user):
 		permissions.clear_cache()

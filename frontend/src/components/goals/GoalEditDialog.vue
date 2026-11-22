@@ -43,7 +43,9 @@ import { emptyMeasure, measureArgs, measureProblem } from '@/lib/goals'
 // `goal` is the goals.get goal; `actions` the goal's weekly actions as journal.goal gives them
 const props = defineProps({ modelValue: Boolean, goal: { type: Object, required: true }, weeklyActions: { type: Array, default: () => [] }, space: String })
 const emit = defineEmits(['update:modelValue', 'saved'])
-const TYPES = [{ label: '12 Week Year', value: '12 weeks' }, { label: 'Year', value: 'Year' }, { label: 'Month', value: 'Month' }, { label: 'Long term (open)', value: 'Long term' }]
+const BASE_TYPES = [{ label: '12 Week Year', value: '12 weeks' }, { label: 'Year', value: 'Year' }, { label: 'Month', value: 'Month' }]
+// an Open goal keeps its type here until it is sorted; no goal can be made Open (issue 57)
+const TYPES = computed(() => (v.horizon === 'Long term' ? [...BASE_TYPES, { label: 'Long term (open, to sort)', value: 'Long term' }] : BASE_TYPES))
 const open = ref(false)
 const busy = ref(false)
 const quarters = ref(false)

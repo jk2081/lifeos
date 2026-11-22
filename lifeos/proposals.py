@@ -70,8 +70,8 @@ SCHEMA = {
 	"Goal": {
 		"target": "Life Goal", "filed": False,
 		"fields": {
-			"title": F("text", True), "horizon": F("select", options=["Long term", "Year", "12 weeks", "Month"],
-				help="Optional. Worked out from target_date when left out. A 12-weeks goal joins the active cycle."),
+			"title": F("text", True), "horizon": F("select", options=["Year", "12 weeks", "Month"],
+				help="Optional. Worked out from target_date when left out. A 12-weeks goal joins the active cycle. Ongoing work is a focus, which only a person creates."),
 			"target_date": F("date", help="ISO date. A Year or Month goal needs one."), "area": ORG["area"],
 			"serves": F("link", help="Optional. The longer goal it serves, one horizon up.", doctype="Life Goal"),
 			"done_when": F("text", help="The finish line, in one line."),
@@ -410,6 +410,8 @@ def apply(kind, payload, item) -> tuple:
 			first, last = journal.month_bounds(p["year"], p["month"])
 			p = {**p, "horizon": "Month", "target_date": str(last)}
 		readings.require_finish_line({"done_when": p.get("done_when")})  # the setting: accepted into Needs you, but not filed until it has one
+		if not p.get("horizon") and not p.get("target_date"):  # no horizon and no date would be an Open goal, which is retired (issue 57)
+			raise PayloadError(_("Give the goal a horizon (Year, 12 weeks or Month) or a target date."))
 		doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": p["title"], "horizon": p.get("horizon"), "area": p.get("area"),
 			"target_date": p.get("target_date"), "serves": p.get("serves"), "done_when": p.get("done_when")}).insert()
 	elif kind == "Habit Log":

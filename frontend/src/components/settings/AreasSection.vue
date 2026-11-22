@@ -2,6 +2,15 @@
   <!-- Settings > Your life > Areas (issue 12): the seven areas of life, each switched on or off, with their parts -->
   <div class="flex flex-col gap-4" data-areas-section>
     <p class="text-sm text-ink-gray-6">Seven areas cover a whole life. Switch on the ones you want the Brain to sort into. Add parts to an area for the things you run inside it.</p>
+    <Card v-if="isAdmin || useFocuses" flush data-use-focuses-card>
+      <div class="flex items-center gap-3 py-3">
+        <Switch :model-value="useFocuses" :disabled="!isAdmin" aria-label="Use focuses" data-use-focuses @update:model-value="(v) => emit('use-focuses', v ? 1 : 0)" />
+        <div class="min-w-0 flex-1">
+          <div class="text-base font-medium text-ink-gray-9">Use focuses</div>
+          <div class="text-sm text-ink-gray-6">A focus is ongoing work under a part, like Systems or Yield. It has a standard, principles and an annual goal. Off hides every focus; nothing is deleted.</div>
+        </div>
+      </div>
+    </Card>
     <Card flush data-areas-card>
       <div v-for="a in life" :key="a.name" class="border-b border-outline-gray-1 py-3 last:border-b-0" :data-life-area="a.area_name" :data-on="a.is_on ? 1 : 0">
         <div class="flex items-center gap-3">
@@ -19,12 +28,24 @@
           <Badge v-if="ON_BY_DEFAULT.includes(a.area_name)" class="max-md:hidden" label="On by default" data-on-by-default />
         </div>
         <div v-if="a.is_on && (partsOf(a).length || isAdmin)" class="flex flex-col gap-0.5 pb-1 pl-11 pt-2 max-md:pl-6" :data-parts-of="a.area_name">
-          <div v-for="p in partsOf(a)" :key="p.name" class="flex min-h-7 items-center gap-2" :data-part="p.name" :data-part-name="p.area_name">
-            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
-              <Badge size="md" :label="p.area_name" />
-              <span class="text-sm text-ink-gray-6">{{ [p.description, goalsText(p.goals) || 'no goals'].filter(Boolean).join(' · ') }}</span>
-            </span>
-            <Button v-if="isAdmin" size="sm" variant="ghost" class="!text-ink-blue-8" label="Edit" :aria-label="`Edit ${p.area_name}`" :data-edit-part="p.name" @click="edit(p)" />
+          <template v-for="p in partsOf(a)" :key="p.name">
+            <div class="flex min-h-7 items-center gap-2" :data-part="p.name" :data-part-name="p.area_name">
+              <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+                <Badge size="md" :label="p.area_name" />
+                <span class="text-sm text-ink-gray-6">{{ [p.part_kind, p.description, goalsText(p.goals) || 'no goals'].filter(Boolean).join(' · ') }}</span>
+              </span>
+              <Button v-if="isAdmin" size="sm" variant="ghost" class="!text-ink-blue-8" label="Edit" :aria-label="`Edit ${p.area_name}`" :data-edit-part="p.name" @click="edit(p)" />
+            </div>
+            <div v-if="useFocuses" class="flex flex-col gap-0.5 pl-6" :data-focuses-of="p.area_name">
+              <FocusRow v-for="f in focusesOf(p)" :key="f.name" :f="f" :is-admin="isAdmin" :busy="busy === f.name" @switch="(v) => switchArea(f, v)" @edit="editFocus(f)" />
+              <div v-if="isAdmin"><Button size="sm" variant="ghost" class="-ml-2 !text-ink-blue-8" icon-left="lucide-plus" :aria-label="`Add a focus to ${p.area_name}`" label="Add a focus" :data-add-focus="p.area_name" @click="addFocus(p)" /></div>
+            </div>
+          </template>
+          <div v-if="useFocuses && (focusesOf(a).length)" class="flex flex-col gap-0.5" :data-focuses-of="a.area_name">
+            <FocusRow v-for="f in focusesOf(a)" :key="f.name" :f="f" :is-admin="isAdmin" :busy="busy === f.name" @switch="(v) => switchArea(f, v)" @edit="editFocus(f)" />
+          </div>
+          <div v-if="isAdmin && useFocuses && !partsOf(a).length">
+            <Button size="sm" variant="ghost" class="-ml-2 !text-ink-blue-8" icon-left="lucide-plus" :aria-label="`Add a focus to ${a.area_name}`" label="Add a focus" :data-add-focus="a.area_name" @click="addFocus(a)" />
           </div>
           <div v-if="isAdmin">
             <Button size="sm" variant="ghost" class="-ml-2 !text-ink-blue-8" icon-left="lucide-plus" :label="`Add a part of ${a.area_name}`" :data-add-part="a.area_name" @click="add(a)" />
@@ -37,18 +58,27 @@
   </div>
 
   <!-- add or edit a part: name, a short description, colour; Archive from the edit form -->
-  <Dialog v-model:open="formOpen" :title="form.name ? `Edit ${form.was}` : `Add a part of ${form.parentTitle}`" size="sm"
+  <Dialog v-model:open="formOpen" :title="form.name ? `Edit ${form.was}` : form.focus ? `Add a focus to ${form.parentTitle}` : `Add a part of ${form.parentTitle}`" size="sm"
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: form.name ? 'Save' : 'Add', variant: 'solid', onClick: savePart }]">
     <div class="flex flex-col gap-3" data-part-form>
-      <TextInput v-model="form.title" label="Name" placeholder="For example CIS Board" data-part-title @keydown.enter="savePart" />
-      <TextInput v-model="form.description" label="Short description" placeholder="For example Vice Chair" data-part-description @keydown.enter="savePart" />
-      <div class="flex items-center gap-2">
+      <TextInput v-model="form.title" label="Name" :placeholder="form.focus ? 'For example Systems' : 'For example CIS Board'" data-part-title @keydown.enter="savePart" />
+      <TextInput v-if="!form.focus" v-model="form.description" label="Short description" placeholder="For example Vice Chair" data-part-description @keydown.enter="savePart" />
+      <Select v-if="!form.focus" v-model="form.kind" :options="KINDS" label="Kind of part" aria-label="Kind of part" data-part-kind @update:model-value="loadOffers" />
+      <div v-if="!form.focus && useFocuses && offers.length" class="flex flex-col gap-2" data-focus-offers>
+        <div class="text-sm text-ink-gray-6">Focuses for a {{ form.kind.toLowerCase() }}. Switch off the ones you do not want.</div>
+        <div v-for="o in offers" :key="o.name" class="flex items-start gap-2" :data-focus-offer="o.name">
+          <Switch v-model="o.on" :aria-label="o.name" />
+          <div class="min-w-0"><div class="text-base text-ink-gray-9">{{ o.name }}</div><div class="text-sm text-ink-gray-6">{{ o.standard }}</div></div>
+        </div>
+      </div>
+      <TextInput v-if="form.focus" v-model="form.standard" label="Standard" placeholder="What good looks like, in a line or two" data-focus-standard @keydown.enter="savePart" />
+      <div v-if="!form.focus" class="flex items-center gap-2">
         <span class="size-2.5 rounded-full" :class="dotClass({ colour: form.colour })" aria-hidden="true" />
         <Select class="w-36" v-model="form.colour" :options="COLOURS" aria-label="Colour" data-part-colour />
       </div>
       <ErrorMessage v-if="formError" :message="formError" data-part-error />
       <div v-if="form.name" class="border-t border-outline-gray-1 pt-3">
-        <Button theme="red" variant="subtle" icon-left="lucide-archive" label="Archive this part" data-archive-part @click="askArchive" />
+        <Button theme="red" variant="subtle" icon-left="lucide-archive" :label="form.focus ? 'Archive this focus' : 'Archive this part'" data-archive-part @click="askArchive" />
       </div>
     </div>
   </Dialog>
@@ -69,17 +99,19 @@ import { computed, reactive, ref } from 'vue'
 import { Badge, Button, Dialog, ErrorMessage, Select, Switch, TextInput, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import { dotClass } from '@/lib/lens'
+import FocusRow from '@/components/settings/FocusRow.vue'
 import { api, errorText } from '@/lib/api'
 
-const props = defineProps({ space: { type: String, required: true }, rows: { type: Array, default: () => [] }, isAdmin: Boolean })
-const emit = defineEmits(['changed'])
+const props = defineProps({ space: { type: String, required: true }, rows: { type: Array, default: () => [] }, isAdmin: Boolean, useFocuses: Boolean })
+const emit = defineEmits(['changed', 'use-focuses'])
 const ON_BY_DEFAULT = ['Career', 'Health']
 const COLOURS = ['blue', 'green', 'amber', 'red', 'violet', 'teal', 'orange', 'pink', 'cyan', 'gray'].map((c) => ({ label: c[0].toUpperCase() + c.slice(1), value: c }))
 
 const live = computed(() => props.rows.filter((r) => !r.is_archived))
 // the areas that are on first, each group in its own order, as in the mockup
 const life = computed(() => live.value.filter((r) => r.is_life_area).sort((x, y) => (y.is_on || 0) - (x.is_on || 0) || (x.sort_order || 0) - (y.sort_order || 0)))
-const partsOf = (a) => live.value.filter((r) => r.parent_area === a.name)
+const partsOf = (a) => live.value.filter((r) => r.parent_area === a.name && !r.is_focus)
+const focusesOf = (a) => live.value.filter((r) => r.parent_area === a.name && r.is_focus)
 const goalsText = (n, noun = 'goal') => (n ? `${n} ${noun}${n === 1 ? '' : 's'}` : '')
 
 const busy = ref('')
@@ -101,23 +133,43 @@ async function switchArea(a, on) {
 
 const formOpen = ref(false)
 const formError = ref('')
-const form = reactive({ name: '', was: '', parent: '', parentTitle: '', title: '', description: '', colour: 'gray' })
+const KINDS = [{ label: 'No kind', value: '' }, ...['Company', 'Estate', 'Household', 'Other'].map((k) => ({ label: k, value: k }))]
+const form = reactive({ name: '', was: '', parent: '', parentTitle: '', title: '', description: '', colour: 'gray', kind: '', focus: false, standard: '' })
+const offers = ref([])
+// the focuses a kind of part offers, each with its suggested standard, all on (issue 57)
+async function loadOffers() {
+  offers.value = form.kind && props.useFocuses && !form.name ? (await api('settings.focus_offers', { kind: form.kind })).map((o) => ({ ...o, on: true })) : []
+}
 function add(a) {
-  Object.assign(form, { name: '', was: '', parent: a.name, parentTitle: a.area_name, title: '', description: '', colour: a.colour || 'gray' })
+  Object.assign(form, { name: '', was: '', parent: a.name, parentTitle: a.area_name, title: '', description: '', colour: a.colour || 'gray', kind: '', focus: false, standard: '' })
+  offers.value = []
+  formError.value = ''
+  formOpen.value = true
+}
+function addFocus(parent) {
+  Object.assign(form, { name: '', was: '', parent: parent.name, parentTitle: parent.area_name, title: '', description: '', colour: parent.colour || 'gray', kind: '', focus: true, standard: '' })
   formError.value = ''
   formOpen.value = true
 }
 function edit(p) {
-  Object.assign(form, { name: p.name, was: p.area_name, parent: p.parent_area, parentTitle: '', title: p.area_name, description: p.description || '', colour: p.colour || 'gray' })
+  Object.assign(form, { name: p.name, was: p.area_name, parent: p.parent_area, parentTitle: '', title: p.area_name, description: p.description || '', colour: p.colour || 'gray', kind: p.part_kind || '', focus: false, standard: '' })
+  offers.value = []
+  formError.value = ''
+  formOpen.value = true
+  loadOffers()
+}
+function editFocus(f) {
+  Object.assign(form, { name: f.name, was: f.area_name, parent: f.parent_area, parentTitle: '', title: f.area_name, description: '', colour: 'gray', kind: '', focus: true, standard: f.standard || '' })
   formError.value = ''
   formOpen.value = true
 }
 async function savePart() {
   if (!form.title.trim()) return (formError.value = 'A name is needed.')
-  const values = { kind: 'area', title: form.title, description: form.description, colour: form.colour }
+  const values = form.focus ? { kind: 'area', title: form.title, standard: form.standard } : { kind: 'area', title: form.title, description: form.description, colour: form.colour, part_kind: form.kind }
+  if (!form.focus && offers.value.length) values.focuses = offers.value.filter((o) => o.on).map((o) => o.name)
   try {
     if (form.name) await api('settings.save_item', { ...values, name: form.name })
-    else await api('settings.save_item', { ...values, space: props.space, parent_area: form.parent, sort_order: 100 + partsOf({ name: form.parent }).length })
+    else await api('settings.save_item', { ...values, space: props.space, parent_area: form.parent, ...(form.focus ? { is_focus: 1 } : {}), sort_order: 100 + partsOf({ name: form.parent }).length })
     toast.success(form.name ? 'Saved' : 'Added')
     formOpen.value = false
     emit('changed')

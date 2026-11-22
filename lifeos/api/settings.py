@@ -9,7 +9,7 @@ SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "s
 	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
 	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
 	# UX fixes, set 6: Rhythms
-	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week", "planning_period", "require_done_when",
+	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week", "planning_period", "require_done_when", "use_focuses",
 	# set 7: working hours, for the weekly review's goal work
 	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days", "own_domains")
 TIME_FIELDS = ("weekly_review_time", "start_of_day", "work_start", "work_end")
@@ -139,6 +139,15 @@ def _spaces(names):
 
 
 @frappe.whitelist(methods=["GET"])
+def focus_offers(kind: str):
+	"""The focuses offered for a kind of part (Company, Estate, Household, Other), each with its suggested standard: [{name, standard}]."""
+	permissions.require_login()
+	from lifeos import focus_defaults
+
+	return [{"name": n, "standard": st} for n, st in focus_defaults.offered(kind)]
+
+
+@frappe.whitelist(methods=["GET"])
 def get(space: str | None = None):
 	"""Everything the Settings screen shows for one space: the plain settings, the four lists with a count per row (archived
 	rows too, for the Archived section), the spaces with everyone in them (people and agents, `is_agent` on each row), and
@@ -148,7 +157,8 @@ def get(space: str | None = None):
 	s = frappe.get_cached_doc("Life Settings")
 	lists = {}
 	for kind, (doctype, field, key, extra, order) in {
-		"area": ("Life Area", "area_name", "areas", ["parent_area", "sort_order", "colour", "is_pinned", "is_life_area", "is_on", "description"],
+		"area": ("Life Area", "area_name", "areas", ["parent_area", "sort_order", "colour", "is_pinned", "is_life_area", "is_on", "description",
+			"is_focus", "standard", "part_kind"],
 			"sort_order, area_name"),
 		"habit": ("Life Habit", "title", "habits", [], "title"),
 		"dimension": ("Life Dimension", "dimension_name", "dimensions", ["sort_order"], "sort_order, dimension_name"),
@@ -161,6 +171,8 @@ def get(space: str | None = None):
 		lists[key] = rows
 	from lifeos import areas
 
+	hidden = set(areas.hidden_focuses(space))  # existing focuses are hidden, not deleted, while "Use focuses" is off
+	lists["areas"] = [r for r in lists["areas"] if r.name not in hidden]
 	goals = areas.goal_counts(space)  # issue 12: the goal count beside each area and part
 	for r in lists["areas"]:
 		r["goals"] = goals.get(r.name, 0)
@@ -352,7 +364,8 @@ ARCHIVABLE = ("area", "habit", "dimension")
 def save_item(kind: str, space: str | None = None, name: str | None = None, title: str | None = None, parent_area: str | None = None,
 		relation: str | None = None, sort_order: int | None = None, is_archived: bool | int | None = None, delete: bool | int = 0,
 		with_children: bool | int = 1, colour: str | None = None, is_pinned: bool | int | None = None, is_on: bool | int | None = None,
-		description: str | None = None, move_to: str | None = None):
+		description: str | None = None, move_to: str | None = None, part_kind: str | None = None, is_focus: bool | int | None = None,
+		standard: str | None = None, principles: str | list | None = None, focuses: str | list | None = None):
 	"""Add, rename, reorder, nest, archive or restore one area, dimension or habit of a space, or a person.
 	Archiving sets archived_on to today; records filed under the heading are not changed. Archiving an area archives its
 	parts with it. Restoring an area puts it back under its old area of life, and with_children=1 restores the parts
@@ -362,6 +375,9 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	their goals and tasks without deleting anything.
 	Issue 12: only Life Admin changes areas. Archiving a part that holds open goals or tasks needs `move_to`: its own area
 	of life or another of its parts, where they are moved first.
+	Issue 57: `is_focus` makes the area a focus under `parent_area` (a part, or an area of life), with its `standard` and its
+	`principles` (a list of short lines, in order). `part_kind` (Company, Estate, Household, Other) is the kind of a part; with
+	"Use focuses" on, the focuses its kind offers are created under it, or only those named in `focuses`.
 	delete=1 removes the row for good; the Settings screen does not offer it, agents and tests may use it."""
 	if kind not in LISTS:
 		frappe.throw(_("Unknown list."))
@@ -399,6 +415,14 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 		doc.colour = colour or None
 	if kind == "area" and is_pinned is not None:  # "Focus on an area" in the sidebar (set 6)
 		doc.is_pinned = 1 if int(is_pinned or 0) else 0
+	if kind == "area" and is_focus is not None and not name:
+		doc.is_focus = 1 if int(is_focus or 0) else 0
+	if kind == "area" and part_kind is not None:
+		doc.part_kind = part_kind or None
+	if kind == "area" and standard is not None:
+		doc.standard = standard.strip()
+	if kind == "area" and principles is not None:
+		doc.set("principles", [{"line": ln.strip()} for ln in (parse(principles, []) or []) if str(ln).strip()])
 	if kind == "person" and relation is not None:
 		doc.relation = relation
 	if sort_order is not None and doc.meta.has_field("sort_order"):
@@ -432,7 +456,13 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 						frappe.db.set_value("Life Area", child, {"is_archived": 0, "archived_on": None})
 						restored.append(child)
 	doc.save() if name else doc.insert()
-	return {"name": doc.name, "title": doc.get(field), "archived_children": archived, "restored_children": restored}
+	made = []
+	if kind == "area" and doc.part_kind and not doc.is_focus and (part_kind is not None or not name):
+		from lifeos import areas
+
+		wanted = parse(focuses, None)
+		made = areas.add_offered_focuses(doc.name, wanted if isinstance(wanted, list) else None)
+	return {"name": doc.name, "title": doc.get(field), "archived_children": archived, "restored_children": restored, "focuses": made}
 
 
 def _areas_admin_only(is_on=None):

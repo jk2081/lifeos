@@ -15,7 +15,11 @@
   "is_archived",
   "archived_on",
   "colour",
-  "is_pinned"
+  "is_pinned",
+  "is_focus",
+  "part_kind",
+  "standard",
+  "principles"
  ],
  "fields": [
   {
@@ -90,10 +94,37 @@
    "fieldtype": "Check",
    "label": "Pinned to the sidebar",
    "description": "Shown under \"Focus on an area\" as a one-click lens."
+  },
+  {
+   "default": "0",
+   "fieldname": "is_focus",
+   "fieldtype": "Check",
+   "label": "Focus",
+   "description": "A focus is ongoing work under a part (or an area of life): it has a standard and principles, and expects an annual goal. Nothing goes below it."
+  },
+  {
+   "fieldname": "part_kind",
+   "fieldtype": "Select",
+   "label": "Kind of part",
+   "options": "\nCompany\nEstate\nHousehold\nOther",
+   "description": "The kind of part decides which focuses Life OS offers for it."
+  },
+  {
+   "fieldname": "standard",
+   "fieldtype": "Small Text",
+   "label": "Standard",
+   "description": "One or two lines on what good looks like."
+  },
+  {
+   "fieldname": "principles",
+   "fieldtype": "Table",
+   "label": "Principles",
+   "options": "Life Area Principle",
+   "description": "Short lines on how to work, in order."
   }
  ],
  "links": [],
- "modified": "2026-11-20 12:00:00.000000",
+ "modified": "2026-11-22 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Life",
  "name": "Life Area",

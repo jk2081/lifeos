@@ -190,7 +190,12 @@ def space_context(space):
 	names the areas of life that are switched off; nothing may be filed there, and their goals are left out."""
 	from lifeos import areas as life
 
-	areas = life.ordered(space, fields=["name", "area_name", "parent_area", "is_life_area", "description", "colour", "is_pinned"])
+	areas = life.ordered(space, fields=["name", "area_name", "parent_area", "is_life_area", "description", "colour", "is_pinned", "is_focus", "standard"])
+	for a in areas:  # focuses (issue 57) only when the owner uses them: the standard and principles agents work within
+		if a.is_focus:
+			a["principles"] = frappe.get_all("Life Area Principle", filters={"parent": a.name, "parenttype": "Life Area"}, pluck="line", order_by="idx")
+		else:
+			a.pop("is_focus", None), a.pop("standard", None)
 	off = set(life.off(space))
 	areas_off = [a.area_name for a in life.ordered(space, include_off=True, fields=["name", "area_name"]) if a.is_life_area and a.name in off]
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)

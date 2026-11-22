@@ -118,11 +118,13 @@ def set_owner(user):
 		space.save(ignore_permissions=True)
 
 
-def new_owner(email, full_name, send_welcome_email=1, space="Private"):
+def new_owner(email, full_name, send_welcome_email=1, space="Private", use_focuses=0):
 	"""Set up a new person's site (issue 49), once, by whoever made the site: a user with Life Admin who owns Private.
 
 	No password is passed or set here: the person sets their own through Frappe's welcome email, or a reset link sent from
 	the User record. If the site cannot send email yet, the command says so and the user is still made.
+
+	`use_focuses=1` switches on "Use focuses" (issue 57), for an owner who asks for it; it is off for a new person.
 
 	Run: bench --site SITE execute lifeos.install.new_owner --kwargs "{'email': 'you@example.com', 'full_name': 'Your Name'}"
 	"""
@@ -148,6 +150,8 @@ def new_owner(email, full_name, send_welcome_email=1, space="Private"):
 	if email not in [m.user for m in doc.members]:
 		doc.append("members", {"user": email, "access": "Write"})
 	doc.save(ignore_permissions=True)
+	if int(use_focuses or 0):
+		frappe.db.set_single_value("Life Settings", "use_focuses", 1)
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- a bench execute command: the user and the space are kept when it ends
 	return {"user": email, "space": space}
 

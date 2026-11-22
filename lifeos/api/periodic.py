@@ -105,11 +105,11 @@ def plan(space: str | None = None, kind: str = "monthly", at: str | None = None)
 
 @frappe.whitelist(methods=["POST"])
 def plan_save(space: str | None = None, kind: str = "monthly", extra: str | list | None = None, habits: str | list | None = None,
-	edits: str | dict | None = None, confirm: bool | int = 0, at: str | None = None):
+	edits: str | dict | None = None, confirm: bool | int = 0, at: str | None = None, maintain: str | list | None = None):
 	"""Save the plan as it is made. `extra`: the goals added here, in order; `habits`: next month's habits; `edits`: what was
-	changed on carried goals (a cycle's Done when, lead actions, target). `confirm` marks the tab done."""
+	changed on carried goals (a cycle's Done when, lead actions, target); `maintain`: the focuses the owner will only maintain this cycle. `confirm` marks the tab done."""
 	rv = _open(space, kind, at)
-	rv.plan_save(extra=parse(extra), habits=parse(habits), edits=parse(edits), confirm=bool(int(confirm or 0)))
+	rv.plan_save(extra=parse(extra), habits=parse(habits), edits=parse(edits), confirm=bool(int(confirm or 0)), maintain=parse(maintain))
 	return _saved(rv, **rv.plan())
 
 

@@ -8,7 +8,7 @@
         <FormControl v-model="v.horizon" type="select" label="Horizon" :options="HORIZONS" data-goal-horizon @update:model-value="horizonChosen" />
       </div>
       <div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
-        <FormControl v-model="v.area" type="select" label="Area" :required="areaRequired" placeholder="Choose" :options="areaOptions()" />
+        <FormControl v-model="v.area" type="select" label="Area" :required="areaRequired" placeholder="Choose" :options="areaOptions()" @update:model-value="suggestServes" />
         <FormControl v-if="v.horizon === '12 weeks' && !quarters" v-model="v.cycle" type="select" label="12 Week Year" placeholder="Choose"
           :options="cycles.map((c) => ({ label: `${c.title} (${c.status.toLowerCase()})`, value: c.name }))" />
       </div>
@@ -19,24 +19,24 @@
   </Dialog>
 </template>
 <script setup>
-// New goal: title, target date, the horizon the date suggests (Long term, Year, 12 weeks or Month; changeable), area, "Done when…"
+// New goal: title, target date, the horizon the date suggests (Year, 12 weeks or Month; changeable), area, "Done when…"
 // (a finish line or a number, with Suggest and the habit check), and the goal it serves, one horizon up. Used by Plan > Goals and the New menu.
 import { computed, reactive, ref, watch } from 'vue'
 import { DatePicker, Dialog, FormControl, toast } from 'frappe-ui'
 import DoneWhen from './DoneWhen.vue'
-import { api, errorText } from '@/lib/api'
+import { api, errorText, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { areaOptions, goalOptions, loadLookups, lookups } from '@/lib/lookups'
 import { doneWhenRequired, emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
 
 const props = defineProps({ modelValue: Boolean, areaRequired: Boolean, area: { type: String, default: '' }, horizon: { type: String, default: '' } })
 const emit = defineEmits(['update:modelValue', 'saved', 'habit'])
-const HORIZONS = ['Long term', 'Year', '12 weeks', 'Month']
-const UP = { Month: '12 weeks', '12 weeks': 'Year', Year: 'Long term' }
+const HORIZONS = ['Year', '12 weeks', 'Month'] // Open (Long term) goals are retired (issue 57)
+const UP = { Month: '12 weeks', '12 weeks': 'Year' }
 const open = ref(false)
 const busy = ref(false)
 const quarters = ref(false)
-const v = reactive({ title: '', horizon: 'Long term', area: '', target_date: '', cycle: '', serves: '' })
+const v = reactive({ title: '', horizon: 'Year', area: '', target_date: '', cycle: '', serves: '' })
 const m = reactive(emptyMeasure())
 const cycles = ref([])
 const parentHorizon = computed(() => UP[v.horizon] || '')
@@ -49,15 +49,21 @@ const parentOptions = computed(() => {
 async function suggest() {
   const res = await api('goals.suggest_horizon', { space: store.space, target_date: v.target_date || undefined })
   quarters.value = res.quarters
-  if (!props.horizon) v.horizon = res.horizon
+  if (!props.horizon) v.horizon = res.horizon === 'Long term' ? 'Year' : res.horizon
   if (v.horizon === '12 weeks') pickCycle()
 }
-function horizonChosen() { v.serves = ''; if (v.horizon === '12 weeks') pickCycle() }
+function horizonChosen() { v.serves = ''; if (v.horizon === '12 weeks') pickCycle(); suggestServes() }
+// a 12 Week Year goal under a focus serves that focus's annual goal (issue 57)
+async function suggestServes() {
+  if (v.horizon !== '12 weeks' || !v.area || v.serves) return
+  const annual = await tryCall(() => api('focus.annual_for', { area: v.area }))
+  if (annual && !v.serves) v.serves = annual.name
+}
 function pickCycle() { if (!v.cycle) v.cycle = cycles.value[0]?.name || '' }
 watch(() => props.modelValue, async (o) => {
   open.value = o
   if (!o) return
-  Object.assign(v, { title: '', horizon: props.horizon || 'Long term', area: props.area || store.lensArea || '', target_date: '', cycle: '', serves: '' })
+  Object.assign(v, { title: '', horizon: props.horizon || 'Year', area: props.area || store.lensArea || '', target_date: '', cycle: '', serves: '' })
   Object.assign(m, emptyMeasure())
   loadLookups()
   cycles.value = (await api('goals.cycles', { space: store.space })) || []

@@ -136,7 +136,7 @@ class TestAgentProposals(LifeTestCase):
 		now = getdate(today())
 		out = inbox.submit_result(made["name"], summary_md="s", proposals=[
 			{"kind": "Month Goal", "payload": {"title": "i60 old kind", "year": now.year, "month": now.month, "area": "Tea"}},
-			{"kind": "Goal", "payload": {"title": "i60 new kind", "horizon": "Long term"}}])
+			{"kind": "Goal", "payload": {"title": "i60 new kind", "horizon": "Year", "target_date": "2027-03-01"}}])
 		self.assertEqual(out["errors"], [])
 		self.as_user(OWNER)
 		from lifeos.api import review
@@ -145,4 +145,4 @@ class TestAgentProposals(LifeTestCase):
 		goal = frappe.get_doc("Life Goal", {"title": "i60 old kind", "space": PRIVATE})
 		self.assertEqual((goal.horizon, getdate(goal.target_date).month), ("Month", now.month))
 		self.assertIn(goal.name, [g["row"] for g in rules.month_goals(PRIVATE, now.year, now.month)])
-		self.assertEqual(frappe.db.get_value("Life Goal", {"title": "i60 new kind"}, "horizon"), "Long term")
+		self.assertEqual(frappe.db.get_value("Life Goal", {"title": "i60 new kind"}, "horizon"), "Year")

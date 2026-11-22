@@ -17,6 +17,7 @@
   "month_plan_enabled",
   "planning_period",
   "require_done_when",
+  "use_focuses",
   "cycle_break_week",
   "archive_after_days",
   "stale_task_days",
@@ -125,6 +126,13 @@
    "fieldtype": "Check",
    "label": "Require \"Done when\" on new goals",
    "description": "A new goal needs a finish line or a number with its target."
+  },
+  {
+   "default": "0",
+   "fieldname": "use_focuses",
+   "fieldtype": "Check",
+   "label": "Use focuses",
+   "description": "Focuses are ongoing work under a part, each with a standard, principles and an annual goal. Off for a new site."
   },
   {
    "default": "1",

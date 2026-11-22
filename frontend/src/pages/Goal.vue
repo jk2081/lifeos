@@ -23,7 +23,7 @@
           <Card class="flex flex-col gap-3" data-goal-overview>
             <GoalMeasure :g="g" :readings="d.readings" :suggested="d.suggested" :space="d.space" :writable="writable && !g.is_archived" @changed="changed" />
             <div class="form-grid">
-              <FormControl v-if="g.horizon !== '12 weeks'" v-model="g.horizon" type="select" label="Horizon" :options="['Long term', 'Year', 'Month']" :disabled="!writable" data-goal-horizon
+              <FormControl v-if="g.horizon !== '12 weeks'" v-model="g.horizon" type="select" label="Horizon" :options="g.horizon === 'Long term' ? ['Long term', 'Year', 'Month'] : ['Year', 'Month']" :disabled="!writable" data-goal-horizon
                 @update:model-value="saveField('horizon')" />
               <DatePicker v-if="g.horizon !== '12 weeks'" v-model="g.target_date" format="D MMM YYYY" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
               <div class="space-y-1.5"><div class="text-sm text-ink-gray-6">Progress</div><div class="flex h-8 items-center gap-2" data-goal-figure>

@@ -48,9 +48,10 @@ Every goal says how it will be known to be done: a finish line (`measure_kind` M
 
 ## Goals
 
-There is one kind of goal, with a **horizon**: Long term, Year, 12 weeks or Month. There are four things: goals, tasks, notes and captures (what arrives in the Inbox). A goal can **serve** a goal one horizon up (`serves`): a Month goal a 12-week goal, that a Year goal, and so on.
+There is one kind of goal, with a **horizon**: Year (an annual goal), 12 weeks or Month (an older Open goal has horizon Long term; do not create one: ongoing work is a **focus**, which only the owner creates or changes). There are four things: goals, tasks, notes and captures (what arrives in the Inbox). A goal can **serve** a goal one horizon up (`serves`): a Month goal a 12-week goal, that a Year goal, and so on.
 
 - File a record under a goal with `goal` (its name or exact title). Use `goal` on proposals (Task, Note, Vault Document, Journal Page, Chat), `chats.log`, `inbox.create_item`, `wiki.create_page`, and the lists (`tasks.list`, `library.list`, `sources.list`, `vault.list`, `chats.list`).
+- A **focus** is ongoing work under a part (for example Systems or Yield): an area with `is_focus`, a `standard` and `principles`, in `space_context` only when the owner uses focuses. You may file a task, note or capture under a focus and propose goals under it, working within its standard and principles. You may not create, change or switch a focus. A focus expects an annual goal.
 - `project` is not accepted anywhere any more (nor `default_project`): a call that sends it is refused with an error that names `goal`.
 
 ## Polling
@@ -119,7 +120,7 @@ Send everything in one call: `lifeos.api.inbox.submit_result` with `item`, `tran
 - **Dates are in ISO form**: `2026-11-20`, or `2026-11-20 16:30:00` for a time, in the site's time zone (Asia/Kolkata).
 - **Never invent a due date.** Set `due_date` only when the source states one. The same goes for expiry dates and birthdays.
 - **Filing.** Give every Task, Note and Vault Document an `area` from the context. Add `also_in` only when the record clearly matters to a second area. Set `goal` (a goal's name from the context) when the record belongs to that goal.
-- **Goal** proposes a goal: `title`, `horizon` (Long term, Year, 12 weeks or Month; left out, it follows `target_date`), `target_date` (a Year or Month goal needs one), `area`, `serves` (a goal one horizon up) and `done_when`. A 12-weeks goal joins the active cycle. **Month Goal** (`title`, `year`, `month`, `area`) is still accepted for one release, as a Goal with horizon Month.
+- **Goal** proposes a goal: `title`, `horizon` (Year, 12 weeks or Month; left out, it follows `target_date`, and a goal with neither is refused), `target_date` (a Year or Month goal needs one), `area`, `serves` (a goal one horizon up) and `done_when`. A 12-weeks goal joins the active cycle. **Month Goal** (`title`, `year`, `month`, `area`) is still accepted for one release, as a Goal with horizon Month.
 - **No tags.** Where a record belongs is said by its area, goal and links, never by a tag.
 - A check-in score may be a single number or a range the owner wrote, such as 2-3. Send low and high.
 - The response lists `created` proposals and `errors`. An invalid proposal is refused and the rest are kept. Read the errors; do not resubmit the whole result.

@@ -7677,6 +7677,187 @@ print(json.dumps([frappe.db.get_value("Life Task", "${made.task}", "goal"), frap
   }
 }
 
+// Issue 57: focuses, an optional level under each part. A user made for the run has a space of their own with an estate part, two focuses
+// under it (one with an annual goal), a goal under the part and an Open goal with a task. I57.1 to I57.3, I57.7 and I57.9 are unit tests (test_issue57_focuses).
+for (const width of SET_WIDTHS) {
+  const tag = `I57.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const user = `i57-${width}-${stamp}@lifeos.test`.toLowerCase()
+  const space = `I57 ${width} ${stamp}`
+  const restore = () => bench(`frappe.set_user("Administrator")
+frappe.db.set_single_value("Life Settings", "use_focuses", 1)
+for dt in ("Life Note", "Life Task", "Life Goal", "Life Cycle", "Life Action Log"):
+    for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+from lifeos import devtools
+devtools.purge_space("${space}", drop=True)
+frappe.db.delete("DefaultValue", {"parent": "${user}"})
+if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  let one = null
+  try {
+    bench(`from lifeos import devtools
+devtools.make_user("${user}", "Newcomer57", ["Life Admin", "Life User"])
+frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
+frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
+frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user": "${user}", "members": [{"user": "${user}", "access": "Write"}]}).insert(ignore_permissions=True)
+frappe.db.set_single_value("Life Settings", "use_focuses", 1)`)
+    one = await session(user, width)
+    const pg = one.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    const settle = () => pg.waitForTimeout(450)
+    const inField = (root, attr) => root.locator(`[${attr}] input, input[${attr}], [${attr}] textarea, textarea[${attr}]`).first()
+    await one.api('onboarding.complete', { status: 'skipped' })
+    const made = JSON.parse(bench(`import json
+from frappe.utils import add_days, today
+space = "${space}"
+career = frappe.get_all("Life Area", filters={"space": space, "is_life_area": 1, "area_name": "Career"}, pluck="name")[0]
+frappe.db.set_value("Life Area", career, "is_on", 1)
+def area(name, parent, **kw):
+    return frappe.get_doc({"doctype": "Life Area", "space": space, "area_name": name, "parent_area": parent, **kw}).insert(ignore_permissions=True)
+part = area("I57 Estate ${width}", career, part_kind="Estate")
+yld = area("I57 Yield ${width}", part.name, is_focus=1, standard="Above 1,700 kg/ha on a 12-month basis", principles=[{"line": "One system"}, {"line": "Fix the process first"}])
+qual = area("I57 Quality ${width}", part.name, is_focus=1, standard="Every lot meets its grade")
+def goal(title, **kw):
+    return frappe.get_doc({"doctype": "Life Goal", "space": space, "title": title, "done_when": "Done", **kw}).insert(ignore_permissions=True)
+cycle = frappe.get_doc({"doctype": "Life Cycle", "space": space, "title": "I57 cycle ${width}", "start_date": add_days(today(), -3), "status": "Active"}).insert(ignore_permissions=True)
+annual = goal("I57 annual ${width}", horizon="Year", target_date=add_days(today(), 200), area=yld.name)
+twelve = goal("I57 twelve ${width}", horizon="12 weeks", cycle=cycle.name, area=yld.name, serves=annual.name)
+old_done = goal("I57 finished ${width}", horizon="Year", target_date=add_days(today(), -30), area=yld.name, outcome="Achieved")
+direct = goal("I57 part goal ${width}", horizon="Year", target_date=add_days(today(), 100), area=part.name)
+open_goal = goal("I57 open ${width}", horizon="Long term", area=part.name)
+task = frappe.get_doc({"doctype": "Life Task", "space": space, "title": "I57 task ${width}", "goal": open_goal.name, "area": part.name}).insert(ignore_permissions=True)
+print(json.dumps({"part": part.name, "yield": yld.name, "quality": qual.name, "annual": annual.name, "twelve": twelve.name, "direct": direct.name, "open": open_goal.name, "task": task.name, "career": career}))`).split('\n').pop())
+    const block = (name) => pg.locator(`[data-focus-block][data-focus="${name}"]`)
+    const byArea = async () => { await one.open('/life/goals?show=open'); await pg.locator('[data-goals-by-area][data-loaded="1"]').waitFor({ timeout: 10000 }); await settle() }
+
+    await check(`${tag}.4`, `${width} px: Goals > By area shows each focus as a heading in its part, its annual goal first, then 12 Week Year goals, then part-level goals`, async () => {
+      await byArea()
+      const yb = block(`I57 Yield ${width}`)
+      await yb.waitFor({ timeout: 8000 })
+      must((await yb.locator('[data-focus-tag]').innerText()).includes('FOCUS'), 'the FOCUS tag is missing')
+      must((await yb.locator('[data-focus-standard]').innerText()).includes('Above 1,700 kg/ha'), 'the standard is missing')
+      const titles = await yb.locator('[data-goal-title]').allInnerTexts()
+      must(titles[0] === `I57 annual ${width}` && titles[1] === `I57 twelve ${width}`, 'the goals under the focus are in the wrong order: ' + JSON.stringify(titles))
+      const order = await pg.evaluate(([f, d]) => {
+        const a = document.querySelector(`[data-focus-block][data-focus="${f}"]`)
+        const b = document.querySelector(`[data-goal="${d}"]:not([data-focus-goal])`)
+        return !!(a && b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING))
+      }, [`I57 Yield ${width}`, made.direct])
+      must(order, 'the part-level goal does not come after the focus')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.5`, `${width} px: a focus with no active Annual goal shows "No annual goal" and + Annual goal; adding one clears it`, async () => {
+      await byArea()
+      const qb = block(`I57 Quality ${width}`)
+      must(await qb.locator('[data-focus-no-annual]').count() === 1, 'No annual goal is not shown')
+      must(await block(`I57 Yield ${width}`).locator('[data-focus-no-annual]').count() === 0, 'a focus with an annual goal says it has none')
+      await qb.locator('[data-focus-add-annual]').click()
+      await pg.locator('[role="dialog"]').last().waitFor({ timeout: 8000 })
+      must((await pg.locator('[role="dialog"]').last().innerText()).includes('Year'), 'the new goal does not start as a Year goal')
+      await pg.keyboard.press('Escape')
+      await one.api('goals.create', { space, title: `I57 new annual ${width}`, horizon: 'Year', target_date: bench('from frappe.utils import add_days, today\nprint(add_days(today(), 120))').split('\n').pop(), area: made.quality, done_when: 'Done' })
+      await byArea()
+      must(await block(`I57 Quality ${width}`).locator('[data-focus-no-annual]').count() === 0, 'No annual goal is still shown after adding one')
+    })
+
+    await check(`${tag}.6`, `${width} px: a focus page shows the standard, numbered principles (edit and reorder) and goals by horizon`, async () => {
+      await one.open(`/life/focus/${made.yield}`)
+      await pg.locator('[data-focus-page][data-loaded="1"]').waitFor({ timeout: 10000 })
+      await settle()
+      must((await pg.locator('[data-standard-text]').innerText()).includes('Above 1,700 kg/ha'), 'the standard is not shown')
+      must(await pg.locator('[data-principle]').count() === 2, 'the principles are not listed')
+      must((await pg.locator('[data-principle]').first().innerText()).includes('1') , 'the principles are not numbered')
+      const tags = await pg.locator('[data-goal-tag]').allInnerTexts()
+      must(tags[0] === 'Annual' && tags[1] === '12 Week Year' && tags[tags.length - 1].startsWith('Done'), 'goals are not by horizon: ' + JSON.stringify(tags))
+      must(await pg.locator('[data-focus-goal].opacity-60').count() === 1, 'the finished goal is not greyed')
+      await pg.locator('[data-principles-edit]').click()
+      await pg.locator('[data-principles-editor]').waitFor({ timeout: 5000 })
+      await pg.locator('[data-principle-down]').first().click()
+      await pg.locator('[data-principle-add]').click()
+      await inField(pg.locator('[data-principle-row]').last(), 'data-principle-input').fill(`Every report has an owner ${width}`)
+      await pg.locator('[data-principles-save]').click()
+      await pg.locator('[data-principles-editor]').waitFor({ state: 'detached', timeout: 8000 })
+      await pg.getByText(`Every report has an owner ${width}`).first().waitFor({ timeout: 8000 })
+      const lines = await pg.locator('[data-principle]').allInnerTexts()
+      must(lines[0].includes('Fix the process first') && lines[1].includes('One system') && lines[2].includes(`Every report has an owner ${width}`), 'the order did not change: ' + JSON.stringify(lines))
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.8`, `${width} px: an existing Open goal shows To sort; Make it a focus creates the focus and an Annual goal holding the old goal's tasks`, async () => {
+      await byArea()
+      const card = pg.locator(`[data-goal="${made.open}"]`).first()
+      must(await card.locator('[data-to-sort-tag]').count() === 1, 'To sort is not shown')
+      must(await card.locator('[data-sort-annual]').count() === 1 && await card.locator('[data-sort-drop]').count() === 1, 'the three choices are not all there')
+      await card.locator('[data-sort-focus]').click()
+      const dlg = pg.locator('[role="dialog"]').last()
+      await dlg.waitFor({ timeout: 8000 })
+      await inField(dlg, 'data-sort-title').fill(`I57 systems annual ${width}`)
+      await inField(dlg, 'data-sort-done-when').fill('All stores on one system')
+      await pg.getByRole('button', { name: 'Make a focus' }).click()
+      await dlg.waitFor({ state: 'detached', timeout: 8000 })
+      const got = JSON.parse(bench(`import json
+focus = frappe.db.get_value("Life Area", {"space": "${space}", "area_name": "I57 open ${width}"}, ["name", "is_focus", "parent_area"], as_dict=True)
+annual = frappe.db.get_value("Life Goal", {"space": "${space}", "title": "I57 systems annual ${width}"}, ["name", "horizon", "area"], as_dict=True)
+print(json.dumps({"focus": focus, "annual": annual, "task_goal": frappe.db.get_value("Life Task", "${made.task}", "goal"), "old": frappe.db.get_value("Life Goal", "${made.open}", "outcome")}))`).split('\n').pop())
+      must(got.focus && got.focus.is_focus === 1 && got.focus.parent_area === made.part, 'the focus was not made under the part: ' + JSON.stringify(got))
+      must(got.annual && got.annual.horizon === 'Year' && got.annual.area === got.focus.name && got.task_goal === got.annual.name, 'the annual goal does not hold the task: ' + JSON.stringify(got))
+      must(got.old === 'Dropped', 'the old goal is still open')
+      await byArea()
+      must(await block(`I57 open ${width}`).count() === 1, 'the new focus is not on Goals')
+    })
+
+    await check(`${tag}.10`, `${width} px: Settings > Areas shows focuses under each part, with switches and + Add a focus`, async () => {
+      await one.open('/life/settings?tab=areas')
+      await pg.locator('[data-areas-section]').waitFor({ timeout: 10000 })
+      await settle()
+      const rowsOf = pg.locator(`[data-focuses-of="I57 Estate ${width}"]`)
+      must(await rowsOf.locator('[data-focus-switch]').count() >= 2, 'the focuses are not under the part')
+      must(await rowsOf.locator(`[data-add-focus="I57 Estate ${width}"]`).count() === 1, '+ Add a focus is missing')
+      await rowsOf.locator(`[data-focus-switch="I57 Quality ${width}"]`).click()
+      await pg.waitForTimeout(900)
+      must(bench(`print(frappe.db.get_value("Life Area", ${JSON.stringify(made.quality)}, "is_on"))`).split('\n').pop() === '0', 'the switch did not save')
+      await rowsOf.locator(`[data-focus-switch="I57 Quality ${width}"]`).click()
+      await pg.waitForTimeout(900)
+      await rowsOf.locator(`[data-add-focus="I57 Estate ${width}"]`).click()
+      const dlg = pg.locator('[role="dialog"]').last()
+      await dlg.waitFor({ timeout: 8000 })
+      await inField(dlg, 'data-part-title').fill(`I57 People ${width}`)
+      await dlg.getByRole('button', { name: 'Add', exact: true }).click()
+      await dlg.waitFor({ state: 'detached', timeout: 8000 })
+      must(bench(`print(frappe.db.exists("Life Area", {"space": "${space}", "area_name": "I57 People ${width}", "is_focus": 1, "parent_area": "${made.part}"}) is not None)`).split('\n').pop() === 'True', 'the focus was not added')
+      // switched off, no focus is shown anywhere in Settings
+      await one.api('settings.save', { values: { use_focuses: 0 } })
+      await one.open('/life/settings?tab=areas')
+      await pg.locator('[data-areas-section]').waitFor({ timeout: 10000 })
+      await settle()
+      must(await pg.locator('[data-focus-switch]').count() === 0, 'focuses are shown with Use focuses off')
+      await one.api('settings.save', { values: { use_focuses: 1 } })
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.11`, `${width} px: focus headings and their goals stack on a phone and the focus page is one column`, async () => {
+      await byArea()
+      await noSideways()
+      await one.open(`/life/focus/${made.yield}`)
+      await pg.locator('[data-focus-page][data-loaded="1"]').waitFor({ timeout: 10000 })
+      await settle()
+      const cols = await pg.locator('[data-focus-page]').evaluate((el) => (el.children[1].getBoundingClientRect().left > el.children[0].getBoundingClientRect().left + 10 ? 2 : 1))
+      must(phone ? cols === 1 : cols === 2, `the focus page has ${cols} columns at ${width} px`)
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    if (one) await one.ctx.close()
+    restore()
+  }
+}
+
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {
   const code = 'from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))'

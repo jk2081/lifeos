@@ -29,25 +29,50 @@
         <Button class="mt-3" variant="solid" label="Manage areas" route="/settings?tab=areas" />
       </Empty>
     </Card>
-    <Card v-else-if="loaded && data && !data.total" class="py-2" data-goals-empty>
+    <Card v-else-if="loaded && data && !data.total && !data.focus_count" class="py-2" data-goals-empty>
       <Empty :title="HINT[show][0]">
         <p class="mt-1">{{ HINT[show][1] }}</p>
         <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Goal" data-goals-empty-add @click="addGoal('')" />
       </Empty>
     </Card>
-    <section v-for="s in (data?.total ? shown : [])" :key="s.area" class="flex flex-col gap-2" data-area-section :data-area="s.area_name">
+    <section v-for="s in (data?.total || data?.focus_count ? shown : [])" :key="s.area" class="flex flex-col gap-2" data-area-section :data-area="s.area_name">
       <div class="flex flex-wrap items-center gap-2 border-b border-outline-gray-2 pb-2">
         <span class="size-2.5 rounded-full" :class="dotClass(s)" aria-hidden="true" />
         <h2 class="text-base-medium text-ink-gray-9">{{ s.area_name }}</h2>
         <span class="text-sm text-ink-gray-6" data-area-line>{{ areaLine(s) }}</span>
         <Button v-if="writable && s.count" class="ml-auto" size="sm" variant="ghost" icon-left="lucide-plus" label="Goal" :aria-label="`New goal in ${s.area_name}`" @click="addGoal(s.area)" />
       </div>
-      <div v-if="!s.count" class="flex flex-wrap items-center gap-3 py-1" data-area-empty>
+      <div v-if="!s.count && !s.groups.length" class="flex flex-wrap items-center gap-3 py-1" data-area-empty>
         <span class="text-sm text-ink-gray-6">No goals yet</span>
         <Button v-if="writable" size="sm" variant="subtle" icon-left="lucide-plus" label="Goal" :aria-label="`New goal in ${s.area_name}`" data-area-add @click="addGoal(s.area)" />
       </div>
       <template v-for="g in s.groups" :key="g.area?.name || 'direct'">
         <h3 v-if="g.area" class="mt-1 text-sm-medium text-ink-gray-7" data-part-head :data-part="g.area.area_name">{{ g.area.area_name }}</h3>
+        <!-- each focus (issue 57): a heading with its standard, then its annual goal first and the goals under it -->
+        <div v-for="f in g.focuses" :key="f.name" class="flex flex-col gap-1.5 rounded-5 border border-outline-gray-2 p-3" data-focus-block :data-focus="f.area_name">
+          <div class="flex flex-wrap items-center gap-2">
+            <Badge theme="blue" label="FOCUS" data-focus-tag />
+            <RouterLink class="text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/focus/${f.name}`" data-focus-title>{{ f.area_name }}</RouterLink>
+            <span class="text-sm text-ink-gray-6">· {{ f.goals.length }} goal{{ f.goals.length === 1 ? '' : 's' }}</span>
+            <Badge v-if="!f.has_annual" theme="orange" label="No annual goal" data-focus-no-annual />
+            <Button v-if="writable && !f.has_annual" size="sm" variant="subtle" icon-left="lucide-plus" label="Annual goal" :aria-label="`New annual goal for ${f.area_name}`" data-focus-add-annual @click="addGoal(f.name, 'Year')" />
+            <RouterLink class="ml-auto text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/focus/${f.name}`" data-focus-open>Open</RouterLink>
+          </div>
+          <p v-if="f.standard" class="text-sm text-ink-gray-6" data-focus-standard>Standard: {{ f.standard }}</p>
+          <ul class="flex flex-col gap-1.5">
+            <li v-for="goal in f.goals" :key="goal.name" data-goal-card :data-goal="goal.name" :data-focus-goal="f.area_name">
+              <Card class="relative flex flex-col gap-1 hover:bg-surface-gray-1 md:flex-row md:items-center md:justify-between md:gap-4">
+                <RouterLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`/goals/${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
+                <div class="min-w-0">
+                  <div class="break-words text-base-medium text-ink-gray-9"><span data-goal-title>{{ goal.title }}</span> <Badge :label="horizonLabel(goal)" data-goal-horizon-tag /></div>
+                  <div class="text-sm" :class="goal.done_when_line ? 'text-ink-gray-6' : 'text-ink-amber-9'" data-goal-done-when>{{ doneWhen(goal) }}</div>
+                </div>
+                <span class="text-sm tabular-nums text-ink-gray-7">{{ goal.progress.label }}</span>
+              </Card>
+            </li>
+          </ul>
+          <p v-if="!f.has_annual" class="text-sm text-ink-gray-6" data-focus-hint>No goal serves this focus yet. Set an annual goal for it.</p>
+        </div>
         <ul class="flex flex-col gap-2" :data-goal-list="s.area_name">
           <li v-for="(goal, i) in g.goals" :key="goal.name" class="group" :draggable="canDrag" data-goal-card :data-goal="goal.name" :data-area-name="s.area_name" :data-part-name="g.area?.area_name || ''"
             @dragstart="dragged = goal" @dragover.prevent="over(g.goals, goal)" @drop.prevent="drop(g.goals)" @dragend="dragged = null">
@@ -75,6 +100,12 @@
                 </template>
               </div>
             </Card>
+            <div v-if="goal.to_sort" class="mt-1 flex flex-wrap items-center gap-1.5 px-1" data-to-sort>
+              <Badge theme="orange" label="To sort" data-to-sort-tag />
+              <Button v-if="writable && data.use_focuses && store.isAdmin" size="sm" variant="subtle" label="Make it a focus" data-sort-focus @click="sortOpen(goal, 'focus')" />
+              <Button v-if="writable" size="sm" variant="subtle" label="Make it an annual goal" data-sort-annual @click="sortOpen(goal, 'annual')" />
+              <Button v-if="writable" size="sm" variant="ghost" label="Drop it" data-sort-drop @click="sortOpen(goal, 'drop')" />
+            </div>
           </li>
         </ul>
       </template>
@@ -88,7 +119,8 @@
         </Card></li></ul>
     </section>
   </div>
-  <NewGoalDialog v-model="newOpen" :area="newArea" @saved="created" @habit="load" />
+  <NewGoalDialog v-model="newOpen" :area="newArea" :horizon="newHorizon" @saved="created" @habit="load" />
+  <SortOpenDialog v-model="sortOpenShown" :goal="sorting" :mode="sortMode" @done="load" />
 </template>
 <script setup>
 // Goals > By area (issue 20): one section for each area that is on, its parts as sub-groups, and a card for each goal with its
@@ -101,6 +133,7 @@ import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'
+import SortOpenDialog from '@/components/goals/SortOpenDialog.vue'
 import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { dotClass } from '@/lib/lens'
@@ -122,6 +155,10 @@ const loaded = ref(false)
 const only = ref('')
 const newOpen = ref(false)
 const newArea = ref('')
+const newHorizon = ref('')
+const sortOpenShown = ref(false)
+const sorting = ref(null)
+const sortMode = ref('annual')
 const dragged = ref(null)
 const show = computed(() => (SHOWS.some((s) => s.value === route.query.show) ? route.query.show : 'cycle'))
 const sort = computed(() => (route.query.sort === 'score' ? 'score' : 'order'))
@@ -134,10 +171,11 @@ const sub = computed(() => {
   if (!data.value) return store.space
   const n = data.value.total
   const areas = sections.value.filter((s) => s.count).length
-  return `${n} goal${n === 1 ? '' : 's'} across ${areas} area${areas === 1 ? '' : 's'} of life.`
+  const f = data.value.focus_count
+  return `${n} goal${n === 1 ? '' : 's'} across ${areas} area${areas === 1 ? '' : 's'} of life${f ? ` · ${f} focus${f === 1 ? '' : 'es'}` : ''}.`
 })
 
-const areaLine = (s) => [`${s.count} goal${s.count === 1 ? '' : 's'}`, ...(s.count ? s.groups.filter((g) => g.area).map((g) => g.area.area_name) : [])].join(' · ')
+const areaLine = (s) => [`${s.count} goal${s.count === 1 ? '' : 's'}`, ...(s.groups.filter((g) => g.area).map((g) => g.area.area_name))].join(' · ')
 const doneWhen = (g) => (g.done_when_line ? (g.measure_kind === 'Number' ? `Done when: ${g.measure ? g.measure + ' ' : ''}${g.done_when_line}` : `Done when: ${g.done_when_line}`) : 'Done when is missing')
 function nextWhen(n) {
   if (n.scheduled_at) return `${weekday(n.scheduled_at, 3)} ${time(n.scheduled_at)}`
@@ -151,10 +189,17 @@ async function load() {
   numbers.value = (await tryCall(() => api('counts.get', { space: store.space, which: 'goals', area: store.lensArea || undefined }))) || numbers.value
   loaded.value = true
 }
-function addGoal(area) {
+function addGoal(area, horizon = '') {
   newArea.value = area
+  newHorizon.value = horizon
   newOpen.value = true
 }
+function sortOpen(goal, mode) {
+  sorting.value = goal
+  sortMode.value = mode
+  sortOpenShown.value = true
+}
+const horizonLabel = (g) => (g.horizon === '12 weeks' ? '12 Week Year' : g.horizon === 'Year' ? `Annual${g.target_date ? ' · ' + short(g.target_date, true) : ''}` : g.horizon)
 async function created(g) {
   await load()
   router.push(`/goals/${g.name}`)

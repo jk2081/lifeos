@@ -56,7 +56,7 @@ class TestGoalEdit(LifeTestCase):
 		item = inbox.create_item(space=PRIVATE, title="Idea", source_type="Message", raw_text="Start the nursery")
 		self.as_user(AGENT)
 		inbox.claim_next(space=PRIVATE)
-		out = inbox.submit_result(item["name"], summary_md="x", proposals=[{"kind": "Goal", "preview": "Nursery", "payload": {"title": "i56 nursery", "horizon": "Long term"}}])
+		out = inbox.submit_result(item["name"], summary_md="x", proposals=[{"kind": "Goal", "preview": "Nursery", "payload": {"title": "i56 nursery", "horizon": "Year", "target_date": "2027-03-01"}}])
 		self.assertEqual(len(out["proposals"]) if "proposals" in out else 1, 1)  # accepted into Needs you
 		prop = frappe.get_all("Life Proposal", filters={"inbox_item": item["name"]}, pluck="name")[0]
 		self.as_user(OWNER)
@@ -67,7 +67,7 @@ class TestGoalEdit(LifeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			review.decide(prop, "accept")
 		self.assertEqual(frappe.db.get_value("Life Proposal", prop, "status"), "Pending")
-		done = review.decide(prop, "accept", {"title": "i56 nursery", "horizon": "Long term", "done_when": "The nursery is planted"})
+		done = review.decide(prop, "accept", {"title": "i56 nursery", "horizon": "Year", "target_date": "2027-03-01", "done_when": "The nursery is planted"})
 		self.assertEqual(done["status"], "Accepted")
 		self.assertEqual(frappe.db.get_value("Life Goal", done["created_name"], "done_when"), "The nursery is planted")
 

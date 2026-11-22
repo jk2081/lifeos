@@ -4,12 +4,13 @@ import builtins
 
 import frappe
 from frappe import _
-from frappe.utils import getdate
+from frappe.utils import getdate, today
 
 from lifeos import journal as rules
 from lifeos import permissions, readings
 from lifeos.life.doctype.life_goal.life_goal import HORIZONS, derive_horizon, planning_in_quarters
 from lifeos.areas import off as areas_off
+from lifeos.areas import use_focuses
 from lifeos.areas import off_clause
 from lifeos.api.utils import area_filter, names_map, parse, page, std_clause, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
@@ -205,29 +206,55 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 		r["cycle_start"] = str(r.cycle_start) if r.cycle_start else None
 	if sort == "score":
 		rows.sort(key=lambda r: -(r.score if r.score is not None else (r.progress.get("percent") or 0)))
-	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "is_life_area", "is_on", "colour", "sort_order"],
-		order_by="sort_order asc, area_name asc", limit=5000)
+	for r in rows:  # "To sort" (issue 57): an Open goal is kept, and the owner chooses what it becomes
+		r["to_sort"] = int(r.horizon == "Long term" and r.outcome == "In Progress")
+	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "is_life_area", "is_on", "colour",
+		"sort_order", "is_focus", "standard"], order_by="sort_order asc, area_name asc", limit=5000)
 	top = [a for a in tree if not a.parent_area]
 	hidden = set(areas_off(space))
+	use = use_focuses()
+	parent_of = {a.name: a.parent_area for a in tree}
+	hidden_focus = {a.name for a in tree if a.is_focus} if not use else set()
 	by_area_name = {}
 	for r in rows:
-		by_area_name.setdefault(r.area or "", []).append(r)
+		area = r.area or ""
+		if area in hidden_focus:  # "Use focuses" is off: a goal under a focus sits under its part or area
+			area = parent_of.get(area) or ""
+		by_area_name.setdefault(area, []).append(r)
+	with_annual = annual_focuses(space) if use else set()
+	order = {h: i for i, h in enumerate(("Year", "12 weeks", "Month", "Long term"))}
+
+	def focus_entries(parent):
+		out = []
+		for f in tree:
+			if f.parent_area == parent and f.is_focus and f.name not in hidden and use:
+				goals = sorted(by_area_name.get(f.name, []), key=lambda r: order.get(r.horizon, 9))
+				out.append({"name": f.name, "area_name": f.area_name, "standard": f.standard, "goals": goals, "has_annual": f.name in with_annual})
+		return out
+
 	sections = []
 	for a in top:
 		if a.name in hidden:
 			continue
-		parts = [p for p in tree if p.parent_area == a.name and p.name not in hidden]
-		groups = [{"area": None, "goals": by_area_name.get(a.name, [])}]
-		groups += [{"area": {"name": p.name, "area_name": p.area_name}, "goals": by_area_name.get(p.name, [])} for p in parts]
-		groups = [g for g in groups if g["goals"]]
-		n = sum(len(g["goals"]) for g in groups)
+		parts = [p for p in tree if p.parent_area == a.name and p.name not in hidden and not p.is_focus]
+		groups = [{"area": None, "focuses": focus_entries(a.name), "goals": by_area_name.get(a.name, [])}]
+		groups += [{"area": {"name": p.name, "area_name": p.area_name}, "focuses": focus_entries(p.name), "goals": by_area_name.get(p.name, [])} for p in parts]
+		groups = [g for g in groups if g["goals"] or g["focuses"]]
+		n = sum(len(g["goals"]) + sum(len(f["goals"]) for f in g["focuses"]) for g in groups)
 		sections.append({"area": a.name, "area_name": a.area_name, "colour": a.colour, "count": n,
-			"parts": [{"name": p.name, "area_name": p.area_name} for p in parts], "groups": groups if n else []})
+			"parts": [{"name": p.name, "area_name": p.area_name} for p in parts], "groups": groups})
 	known = {a.name for a in tree}
 	loose = [r for r in rows if not r.area or r.area not in known]
-	return {"space": space, "show": show, "sort": sort, "total": len(rows), "sections": sections,
+	return {"space": space, "show": show, "sort": sort, "total": len(rows), "sections": sections, "use_focuses": int(use),
+		"focus_count": sum(len(g["focuses"]) for s in sections for g in s["groups"]),
 		"no_area": loose, "areas_on": len([s for s in sections if s["area"]]),
 		"off": [{"name": a.name, "area_name": a.area_name} for a in top if a.name in hidden]}
+
+
+def annual_focuses(space):
+	"""Names of the focuses of a space that have at least one active Annual goal (horizon Year, in progress, not parked or archived)."""
+	return set(frappe.db.sql_list("""select distinct g.area from `tabLife Goal` g join `tabLife Area` a on a.name = g.area and a.is_focus = 1
+		where g.space = %s and g.horizon = 'Year' and g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0""", space))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -298,6 +325,23 @@ def suggest_horizon(space: str | None = None, target_date: str | None = None, cy
 	return {"horizon": derive_horizon(target_date, cycle, space), "quarters": planning_in_quarters()}
 
 
+def year_end():
+	"""The default target date of an Annual goal made without one: the end of this year, or of next when this one is nearly over."""
+	d = getdate(today())
+	end = getdate(f"{d.year}-12-31")
+	return str(end if (end - d).days > 30 else getdate(f"{d.year + 1}-12-31"))
+
+
+OPEN_RETIRED = "Open goals are retired. Make it a 12 Week Year goal or an Annual goal with a target date, or, for ongoing work, a focus."
+
+
+def refuse_open(horizon):
+	"""The Open goal (horizon Long term) is retired (issue 57): a new goal is a 12 Week Year, Annual or Month goal. Tests and the
+	acceptance site that predate this switch it back on with `lifeos_allow_open_goals`; records already Open are kept."""
+	if horizon == "Long term" and not (frappe.flags.get("lifeos_allow_open_goals") or frappe.conf.get("lifeos_allow_open_goals")):
+		frappe.throw(_(OPEN_RETIRED), frappe.ValidationError)
+
+
 @frappe.whitelist(methods=["POST"])
 def create(title: str, horizon: str | None = None, space: str | None = None, area: str | None = None, target_date: str | None = None,
 		cycle: str | None = None, serves: str | None = None, done_when: str | None = None, notes_md: str | None = None,
@@ -316,6 +360,7 @@ def create(title: str, horizon: str | None = None, space: str | None = None, are
 	horizon = horizon or derive_horizon(target_date, cycle, space)
 	if horizon not in HORIZONS:
 		frappe.throw(_("Unknown horizon."))
+	refuse_open(horizon)
 	measure_fields = measure_values(measure_kind, done_when, measure, unit, start_value, target_value)
 	readings.require_finish_line({"done_when": done_when, **measure_fields})
 	last = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s", space)[0][0]
@@ -505,6 +550,8 @@ def _apply_values(doc, values, allowed):
 			frappe.throw(_("Field {0} cannot be changed here.").format(k))
 		if k == "horizon" and v not in ("Long term", "Year", "Month", "12 weeks"):
 			frappe.throw(_("Choose Long term, Year, Month or 12 weeks."))
+		if k == "horizon" and v != doc.horizon:
+			refuse_open(v)
 		doc.set(k, _float(v) if k in ("start_value", "target_value") else (v if v == 0 else v or None))
 	if "measure_kind" not in values and values.get("done_when") and not doc.measure_kind:
 		doc.measure_kind = "Milestone"
