@@ -2663,6 +2663,8 @@ for (const width of SET_WIDTHS) {
       await settle()
       const dlg = pg.locator('[role="dialog"]').last()
       await field(dlg, 'data-goal-title').fill(title)
+      // Open goals are retired (issue 57): a goal here is a 12 Week Year goal, which needs no target date
+      await pick(dlg, 'Horizon', '12 weeks', 'data-goal-horizon')
       await fill(dlg)
       await dlg.getByRole('button', { name: 'Add goal' }).click()
       await pg.waitForLoadState('networkidle')
