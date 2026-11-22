@@ -7,7 +7,6 @@ from frappe import _
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
@@ -18,7 +17,6 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 	The same records come back under each group_by."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	group_by = "goal" if group_by == "project" else group_by
 	if group_by not in ("day", "area", "goal"):
 		frappe.throw(_("group_by must be day, area or goal."))
 	end = getdate(to_date or today())
@@ -122,16 +120,13 @@ def _chat_rows(rows):
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, area: str | None = None, goal: str | None = None, open_items: bool | int | None = 0, from_date: str | None = None, to_date: str | None = None, include_archived: bool | int | None = 0,
 		group_by: str = "day", sort: str | None = None, dir: str | None = None, start: int | None = 0, page_length: int | None = 50, filters: str | builtins.list | dict | None = None,
-		order_by: str | None = None, summary: str | dict | None = None, project: str | None = None):
+		order_by: str | None = None, summary: str | dict | None = None):
 	"""Chat logs of a space as one list, newest first, ordered so that the groups of group_by (day, area, goal) stay together.
-	Filters: area (with its sub-areas, or "none"), goal (`project` names the goal a project became), open_items=1 for chats that still have an open item, from_date, to_date.
+	Filters: area (with its sub-areas, or "none"), goal, open_items=1 for chats that still have an open item, from_date, to_date.
 	`total` is the number of chats the filters match. `with_open_items` and `by_area` count inside the same filters.
 	`tabs` counts all chats and those with open items under the same filters, whatever open_items was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	group_by = "goal" if group_by == "project" else group_by
-	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
-		goal = project if project == "none" else (goal_for_project(project, space) or project)
 	if group_by not in GROUP_ORDER:
 		frappe.throw(_("group_by must be day, area or goal."))
 	clause, values = where_clause(space, area, goal, open_items, from_date, to_date, include_archived)
@@ -183,9 +178,9 @@ ASSISTANTS = ("Claude", "ChatGPT", "Codex", "Claude Code", "Other")
 def log(space: str | None = None, title: str | None = None, date: str | datetime.date | None = None, url: str | None = None, assistant: str | None = "Claude",
 		summary_md: str | None = None, open_items: str | builtins.list | None = None, area: str | None = None, goal: str | None = None,
 		also_in: str | builtins.list | None = None, source_system: str | None = None, external_id: str | None = None, transcript_md: str | None = None,
-		updated_on: str | datetime.datetime | None = None, project: str | None = None):
+		updated_on: str | datetime.datetime | None = None):
 	"""Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal.
-	open_items is a list of strings. area and goal take a name or a title; `project` names the goal a project became.
+	open_items is a list of strings. area and goal take a name or a title.
 
 	With source_system (claude, chatgpt…) and external_id (the chat's ID there), a chat already logged is updated instead of
 	logged twice: title, updated_on, url, summary and transcript change when given, and open items are merged by their text
@@ -240,8 +235,6 @@ def log(space: str | None = None, title: str | None = None, date: str | datetime
 			doc.area = proposals.resolve_link("Life Area", area, space)
 		elif conn and conn.default_area:
 			doc.area = conn.default_area
-		if project and not goal:
-			goal = goal_for_project(project, space) or project
 		if goal:
 			doc.goal = proposals.resolve_link("Life Goal", goal, space)
 		elif conn and conn.default_goal and not area:

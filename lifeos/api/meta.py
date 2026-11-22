@@ -13,7 +13,7 @@ def proposal_schema():
 
 @frappe.whitelist(methods=["GET"])
 def space_context(space: str | None = None):
-	"""Areas, projects, people, habits, dimensions and active goals of a space, for filing proposals."""
+	"""Areas, people, habits, dimensions and active goals of a space, for filing proposals."""
 	from lifeos.api.inbox import space_context as ctx
 
 	return ctx(permissions.resolve_space(space))

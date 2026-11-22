@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import get_datetime, getdate, today
 
-from lifeos import journal
+from lifeos import gone_names, journal
 from lifeos.life.doctype.life_check_in.life_check_in import parse_range
 
 TITLE_FIELDS = {
@@ -22,7 +22,7 @@ def F(type_, required=False, help="", **kw):
 ORG = {
 	"area": F("link", help="The one area where the record lives. Name or title of a Life Area in the item's space.", doctype="Life Area"),
 	"also_in": F("links", help="Other areas where the record is relevant.", doctype="Life Area"),
-	"goal": F("link", help="Optional. The goal the record belongs to (projects became open-ended goals in set 6).", doctype="Life Goal"),
+	"goal": F("link", help="Optional. The goal the record belongs to.", doctype="Life Goal"),
 }
 
 SCHEMA = {
@@ -293,8 +293,8 @@ def validate(kind, payload, space, ctx=None) -> dict:
 			raise PayloadError(_("payload is not valid JSON."))
 	if not isinstance(payload, dict):
 		raise PayloadError(_("payload must be an object of field values."))
-	payload = project_alias(payload, space)
 	fields = SCHEMA[kind]["fields"]
+	gone_names.refuse(payload)
 	if "owner" in payload:
 		raise PayloadError(_("A payload cannot set owner."))
 	if "space" in payload:
@@ -314,29 +314,6 @@ def validate(kind, payload, space, ctx=None) -> dict:
 		out[name] = _coerce(name, spec, value, space, ctx)
 	_cross_checks(kind, out, space)
 	return out
-
-
-def project_alias(payload, space):
-	"""For one set after projects became goals (set 6): a payload's `project` is taken as its `goal`. A project's name or
-	title maps to the goal it became; anything else is read as a goal's name or title."""
-	if not payload.get("project"):
-		payload.pop("project", None)
-		return payload
-	payload = dict(payload)
-	value = payload.pop("project")
-	if not payload.get("goal"):
-		payload["goal"] = goal_for_project(value, space) or value
-	return payload
-
-
-def goal_for_project(value, space=None):
-	"""The goal a project became, from the project's name or title; None when `value` names no project."""
-	value = str(value or "").strip()
-	if not value or not frappe.db.table_exists("Life Project"):
-		return None
-	filters = {"space": space} if space else {}
-	name = value if frappe.db.exists("Life Project", {"name": value, **filters}) else frappe.db.get_value("Life Project", {"title": value, **filters})
-	return frappe.db.get_value("Life Project", name, "migrated_to") if name else None
 
 
 def _cross_checks(kind, p, space):
@@ -463,8 +440,7 @@ def apply(kind, payload, item) -> tuple:
 	return doc.doctype, doc.name
 
 
-# "Project" is still accepted for one set: projects are open-ended goals now (set 6)
-SOMEDAY_TYPES = {"Task": "Life Task", "Project": "Life Goal", "Goal": "Life Goal", "Note": "Life Note"}
+SOMEDAY_TYPES = {"Task": "Life Task", "Goal": "Life Goal", "Note": "Life Note"}
 
 
 def _apply_someday(p, item):
@@ -484,10 +460,8 @@ def _apply_someday(p, item):
 		return doc.doctype, doc.name
 	doctype = SOMEDAY_TYPES.get(kind)
 	if not doctype or not p.get("record"):
-		raise PayloadError(_("Say which task or goal to park."))
+		raise PayloadError(_("Say which task or goal to park. record_type is Task, Goal, New task or New note."))
 	value = str(p["record"]).strip()
-	if kind == "Project":
-		value = goal_for_project(value, item.space) or value
 	name = value if frappe.db.exists(doctype, {"name": value, "space": item.space}) else frappe.db.get_value(doctype, {"title": value, "space": item.space})
 	if not name:
 		raise PayloadError(_("{0} '{1}' was not found in this space.").format(kind, value))

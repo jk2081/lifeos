@@ -4,7 +4,7 @@ import { DUE_PRESETS, EXPIRY_PRESETS, activeCount, canonical, filtersToQuery, or
 
 const TODAY = '2026-11-15'
 const TASKS = [
-  { key: 'area', field: 'area', kind: 'link' }, { key: 'project', field: 'project', kind: 'link' }, { key: 'tag', field: 'tag', kind: 'value' },
+  { key: 'area', field: 'area', kind: 'link' }, { key: 'tag', field: 'tag', kind: 'value' },
   { key: 'priority', field: 'priority', kind: 'link' }, { key: 'goal', field: 'goal', kind: 'value' },
   { key: 'due', field: 'due_date', kind: 'preset', presets: DUE_PRESETS }, { key: 'status', field: 'status', kind: 'value' },
   { key: 'completed_from', field: 'completed_on', kind: 'from' }, { key: 'completed_to', field: 'completed_on', kind: 'to' },
@@ -23,8 +23,8 @@ test('short parameters become wire filters', () => {
 test('every existing count link round-trips', () => {
   const links = [
     { status: 'To Review' }, { due: 'today,overdue' }, { due: 'overdue' }, { due: 'today' }, { due: 'week' }, { due: 'none' },
-    { project: 'p1', done: '1', archived: '1' }, { area: 'none' }, { area: 'a1', priority: 'I' }, { tag: 't1', goal: 'g1' },
-    { status: 'Done', completed_from: '2026-11-09', completed_to: '2026-11-15' }, { status: 'Carried' }, { project: 'none' },
+    { goal: 'p1', done: '1', archived: '1' }, { area: 'none' }, { area: 'a1', priority: 'I' }, { tag: 't1', goal: 'g1' },
+    { status: 'Done', completed_from: '2026-11-09', completed_to: '2026-11-15' }, { status: 'Carried' }, { goal: 'none' },
   ]
   for (const q of links) {
     const { wire, flags } = queryToFilters(q, TASKS, TODAY)

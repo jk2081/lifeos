@@ -3,6 +3,10 @@
     <Button v-if="writable" variant="solid" icon-left="lucide-plus" label="Goal" data-new-goal @click="newOpen = true" />
   </PageHead>
   <div class="page-body" data-cycles :data-loaded="loaded ? 1 : 0">
+   <Card v-for="r in reviewsDue" :key="r.kind" tint class="flex max-w-[1400px] flex-wrap items-center gap-3 !p-3" data-review-due :data-review-kind="r.kind">
+     <span class="min-w-0 flex-1 text-base text-ink-gray-9">{{ r.text }}<span v-if="r.detail" class="text-ink-gray-6"> · {{ r.detail }}</span></span>
+     <Button variant="solid" label="Start the review" :route="{ path: '/review', query: { kind: r.kind } }" data-review-start />
+   </Card>
    <div class="grid max-w-[1400px] items-start gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
     <!-- left: the 12 Week Year -->
     <Card class="flex min-w-0 flex-col gap-4 !p-4 md:!p-5" data-cycle-card>
@@ -138,6 +142,7 @@ const loaded = ref(false)
 const goalsOpen = ref(false)
 const editOpen = ref(false)
 const newOpen = ref(false)
+const reviewsDue = ref([])
 const pct = (n) => Math.round(n || 0) + '%'
 const closed = computed(() => g.value?.cycle.status === 'Closed')
 const writable = computed(() => canWrite() && !store.isAgent)
@@ -216,8 +221,13 @@ async function loadMonth() {
   const res = await tryCall(() => api('journal.month', { space: store.space, area: store.lensArea || undefined }))
   if (res) mp.value = res
 }
+// the monthly and the 12-week review, when one is due (issue 47)
+async function loadDue() {
+  const res = writable.value ? await tryCall(() => api('periodic.due', { space: store.space })) : null
+  reviewsDue.value = (res?.due || []).filter((r) => r.kind !== 'weekly')
+}
 async function load() {
-  await Promise.all([loadLookups(), loadGrid(), loadMonth()])
+  await Promise.all([loadLookups(), loadGrid(), loadMonth(), loadDue()])
   loaded.value = true
 }
 watch(() => [store.space, store.lensArea, route.query.cycle], load)

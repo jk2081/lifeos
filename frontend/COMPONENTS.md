@@ -263,19 +263,15 @@ Both live in `pages/Today.vue` and read `today.get`. The band (`data-open-band`)
 
 ## UX fixes, set 6: the lens, the four places, Plan and Library
 
-### The lens
+### The page's area, and the space (issue 46: the lens is gone)
 
-`lib/lens.js` holds the space and area every place narrows to. It is `space=` and `area=` on every URL: a router guard adds them to any navigation that has none, and a URL that names them (a copied link, Back) sets the lens. It is remembered per user in the view state `lens` (no space). Change it only with `setLens({ space, area })` or `clearArea()`, which empty the state first so the guard does not put the old area back.
+`lib/lens.js` is small. `?area=` names the area a page narrows to; each page reads it (`store.lensArea`, set by a router guard from the URL being opened) and it is **not** carried to the next page. A page without an area filter of its own shows it as a removable chip beside the title (`PageHead`, `data-lens-chip`). `ListView` passes it to a list whose spec has an `area` entry; other screens pass `store.lensArea` to their method. `?space=` is honoured, and carried to every page, only when the user has two or more spaces (`manySpaces`); with one space nothing about spaces is shown: no picker, chip, breadcrumb, Settings space select or Spaces view. With two or more, the sidebar's logo opens the space picker (`data-space-picker`) and the phone's title opens `MoreSheet.vue` (spaces, Settings, shortcuts, Log out).
 
-- **The picker** is frappe-ui's `SidebarHeader` with the menu from `components/lens/lensMenu.js` (spaces, All of life, every active area with sub-areas indented and a colour dot, "Pin areas to the sidebar", "Manage areas"). On a phone the lens is the title bar at the top of every screen (`App.vue`, `data-lens-bar`), and tapping it opens `components/lens/LensSheet.vue`, which also holds Settings, the shortcuts and Log out.
-- **The header** (`PageHead`) shows the lens as its breadcrumb and, while an area is chosen, a removable chip beside the title (`data-lens-chip`).
-- **Lists** need nothing: `ListView` treats `area=` as the lens. A list whose spec has an `area` entry passes the lens's area to its list method, and the area leaves its controls, its remembered view and its Clear. A list with `fixed` ignores the lens.
-- **Other screens** pass `store.lensArea` to their method (`today.get`, `calendar.get`, `journal.grid`, `journal.month`, `library.tree`, `graph.get`, `search.query`). The page component is keyed on the lens, so a new lens mounts the screen again; no screen watches it.
 - **Area colours** are frappe-ui surface tokens, chosen with `dotClass(area)`; never write a colour class from data.
 
 ### The four places
 
-The sidebar (`components/AppSidebar.vue`) is the lens, + New, Today, Inbox, Plan (open to its tabs), Library, "Focus on an area" with the pinned areas, then Settings and the user with Help. The phone's bar is Today, Inbox, Plan, Library and Ask. `lib/nav.js` lists the places, Plan's and Library's tabs and the G shortcuts (`GO`).
+The sidebar (`components/AppSidebar.vue`) is the logo (a space picker only with two or more spaces), + New, Today, Inbox, Plan (open to its tabs), Library, then Settings and the user with Help. The phone's bar is Today, Inbox, Plan, Library and Ask. `lib/nav.js` lists the places, Plan's and Library's tabs and the G shortcuts (`GO`).
 
 A place's tabs are paths (`/plan/goals`, `/library/notes`). The place page (`pages/Plan.vue`, `pages/LibraryPlace.vue`) provides `placeTabs` (`{ tabs, current, label, set }`) and renders the screen of the open tab; that screen's `PageHead` draws the tabs under its header (`data-place-tabs`), so each screen keeps its own title, count and actions. Plan's tabs carry `group` (time, lists): `TabBar` puts a gap between groups.
 

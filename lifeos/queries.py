@@ -5,7 +5,7 @@ This one keeps to active records, and to one space when the filters name it. The
 adds the current space to every search for these DocTypes. Filters it understands:
   space             only this space
   include_archived  also archived records (and finished goals), labelled "(archived)" or with their outcome
-  goal_outcome      goals: a list of outcomes to allow instead of "In Progress" (projects became goals in set 6)
+  goal_outcome      goals: a list of outcomes to allow instead of "In Progress"
 Any other plain filter on a real field is applied as given.
 """
 import json

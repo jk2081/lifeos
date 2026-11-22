@@ -73,10 +73,10 @@ def set_action_status(action: str, status: str):
 
 @frappe.whitelist(methods=["POST"])
 def save_goal(goal: str | None = None, cycle: str | None = None, title: str | None = None, area: str | None = None, serves: str | None = None,
-		actions: str | list | None = None, project: str | None = None, done_when: str | None = None, measure_kind: str | None = None,
+		actions: str | list | None = None, done_when: str | None = None, measure_kind: str | None = None,
 		measure: str | None = None, unit: str | None = None, start_value: float | str | None = None, target_value: float | str | None = None):
 	"""Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}. `serves` is the longer goal
-	it serves; `project` is read as the goal that project became, for one set (set 6). The key result (set 7): `measure_kind`
+	it serves; The key result (set 7): `measure_kind`
 	Milestone with `done_when`, or Number with `measure`, `unit`, `start_value` and `target_value`; left out, it is unchanged."""
 	from lifeos.api.goals import measure_values
 
@@ -92,10 +92,6 @@ def save_goal(goal: str | None = None, cycle: str | None = None, title: str | No
 		doc.title = title
 	if area is not None:
 		doc.area = area or None
-	if serves is None and project is not None:
-		from lifeos.proposals import goal_for_project
-
-		serves = goal_for_project(project, doc.space) or project
 	if serves is not None:
 		doc.serves = serves or None
 	if done_when is not None:

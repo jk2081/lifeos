@@ -11,7 +11,6 @@ from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import links, permissions
-from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 from lifeos.life.doctype.life_note.life_note import MAX_MD, SOURCE_DOCTYPES
@@ -156,13 +155,11 @@ PAGE_SORTS = {"title": "n.title", "modified": "n.modified", "creation": "n.creat
 
 @frappe.whitelist(methods=["GET"])
 def pages(space: str | None = None, area: str | None = None, goal: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0, page_length: int | None = 50,
-		filters: str | list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, project: str | None = None):
+		filters: str | list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None):
 	"""The assistant's notes (the Wiki before set 6): title, summary, area, sources count, updated. Newest first. Filters: area
-	(with its sub-areas, or "none"), goal (`project` names the goal a project became), and standard filters on Life Note."""
+	(with its sub-areas, or "none"), goal, and standard filters on Life Note."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	if project and not goal:  # for one set after projects became goals (set 6): a project names the goal it became
-		goal = project if project == "none" else (goal_for_project(project, space) or project)
 
 	where, values = ["n.space = %(space)s", "n.collection = 'Wiki'" + permissions.sensitive_guard(space, "n.")], {"space": space}
 	if not int(include_archived or 0):
@@ -279,12 +276,12 @@ def _about(doc, about):
 
 @frappe.whitelist(methods=["POST"])
 def create_page(space: str | None = None, title: str | None = None, content_md: str | None = None, summary: str | None = None, area: str | None = None, goal: str | None = None,
-		parent_note: str | None = None, sources: str | list | None = None, change_note: str | None = None, source: str | dict | None = None, project: str | None = None, about: str | None = None):
+		parent_note: str | None = None, sources: str | list | None = None, change_note: str | None = None, source: str | dict | None = None, about: str | None = None):
 	"""Create a Wiki page and a Created change. Refuses a title that already exists in the space's Wiki (edit that page instead).
 	sources: [{doctype, name}] the page cites. source: the one source that prompted this change, if any.
 	about: Person or Organisation when the page describes one; the page is linked to a Life Person, made if there is none."""
 	space = permissions.resolve_space(space, write=True)
-	goal = goal or (project and goal_for_project(project, space)) or None
+	goal = goal or None
 	title = (title or "").strip()
 	if not title:
 		frappe.throw(_("A page needs a title."))

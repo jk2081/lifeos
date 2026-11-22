@@ -161,8 +161,8 @@ async function session(user, width = 1440) {
     if (!r.ok()) throw new Error('upload failed ' + r.status())
     return (await r.json()).message
   }
-  // Set 6: the lens (space= and area=) is remembered per user and added to every URL. A path that names no area opens on
-  // All of life (area= empty clears the lens), so one check's lens never narrows the next; the lens checks name it.
+  // Issue 46: `area=` is each page's own filter and is not carried; a path that names none opens on all of life, and the checks that
+  // narrow by area name it.
   const open = async (p) => {
     const u = new URL(base + p)
     if (u.pathname.startsWith('/life') && !u.searchParams.has('area')) u.searchParams.set('area', '')
@@ -629,12 +629,13 @@ await check('S2', 'Security: the PWA manifest and icons are served; an agent can
 const uxArea = areaId('Tea & Coffee')
 const ux = {}
 {
-  // records the checks need, made through the API as the owner. Set 6: a project became an open-ended goal (type Open);
-  // ux.project is a former project of the area and ux.goal the goal it became.
+  // records the checks need, made through the API as the owner. ux.goal is an open-ended goal of the area (what a project was
+  // before set 6); ux.oldProject is the id an old project link carries (the table is gone since issue 48).
   const former = JSON.parse(bench(`import json
-print(json.dumps(frappe.db.sql("select p.name, p.migrated_to from \`tabLife Project\` p join \`tabLife Goal\` g on g.name = p.migrated_to where p.space='${SPACE}' and g.area='${uxArea}' and g.outcome='In Progress' and g.is_archived=0 and g.is_someday=0 order by p.creation limit 1")))`).split('\n').pop())
-  must(former.length, 'no former project of Tea & Coffee on the acceptance site')
-  ;[[ux.project, ux.goal]] = former
+print(json.dumps(frappe.db.sql("select name from \`tabLife Goal\` where space='${SPACE}' and area='${uxArea}' and horizon='Long term' and outcome='In Progress' and is_archived=0 and is_someday=0 order by creation limit 1")))`).split('\n').pop())
+  must(former.length, 'no open-ended goal of Tea & Coffee on the acceptance site')
+  ux.goal = former[0][0]
+  ux.oldProject = 'PRJ-0001'
   ux.goalTitle = (await owner.api('goals.get', { goal: ux.goal })).goal.title
   ux.task = (await owner.api('tasks.quick_add', { text: `UX door task ${stamp}`, space: SPACE, goal: ux.goal, area: uxArea, priority: 'I', due_date: addDays(-2) })).name
   await owner.api('tasks.quick_add', { text: `UX due today ${stamp}`, space: SPACE, area: uxArea, due_date: today })
@@ -733,31 +734,9 @@ for (const width of UX_WIDTHS) {
     }
   }
 
-  // the lens (set 6): the picker in the sidebar's header on a wide screen, the sheet behind the title bar on a phone
-  const openLens = async () => {
-    if (phone) await pg.locator('[data-lens-title]').click()
-    else await pg.locator('[data-lens-picker] button, [data-lens-picker]').first().click()
-    await pg.waitForTimeout(400)
-  }
-  const closeLens = async () => { if (await pg.locator('[data-lens-sheet]:visible, [role="menu"]:visible').count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(300) } }
-  // the picker's menu items are frappe-ui dropdown items (their data- attributes are not passed on): found by role and name
-  const lensItems = () => (phone ? pg.locator('[data-lens-sheet] [data-lens-item]') : pg.getByRole('menuitem'))
-  const lensOptions = async () => {
-    await openLens()
-    const texts = phone ? await pg.locator('[data-lens-sheet] [data-lens-item^="area:"]').allInnerTexts() : await lensItems().allInnerTexts()
-    await closeLens()
-    return texts.map((t) => t.trim())
-  }
-  const pickLens = async (area) => { // area: a Life Area name, or '' for All of life
-    await openLens()
-    if (phone) await pg.locator(`[data-lens-sheet] [data-lens-item="area:${area}"]`).first().click()
-    else {
-      const label = area ? (await s.api('area.tree', { space: SPACE })).areas.find((x) => x.name === area).area_name : 'All of life'
-      await pg.getByRole('menuitem', { name: label, exact: true }).first().click()
-    }
-    await pg.waitForLoadState('networkidle')
-    await settle()
-  }
+  // issue 46: no lens. The phone's menu sheet (behind "Life OS" at the top) holds Settings and, on two or more spaces, the spaces
+  const openMore = async () => { await pg.locator('[data-more-title]').click(); await pg.waitForTimeout(400) }
+  const closeMore = async () => { if (await pg.locator('[data-more-sheet]:visible').count()) { await pg.keyboard.press('Escape'); await pg.waitForTimeout(300) } }
 
   await check(`${tag}.1`, `${width} px: a row opens a pane on every list screen and the list stays in the page`, async () => {
     for (const [name, p, sel] of LISTS) {
@@ -843,8 +822,8 @@ for (const width of UX_WIDTHS) {
       await settle()
       must(new URL(pg.url()).pathname === `/life/item/${ux.inbox}` && !(await pane.isVisible()), "Open full page did not open the item page")
       // every pane type opens from its reference
-      // set 6: goal: and a former project: (the goal it became) open in the pane too
-      for (const ref of [`task:${ux.task}`, `note:${ux.note}`, `vault:${ux.vault}`, `goal:${ux.goal}`, `project:${ux.project}`, `chat:${ux.chat}`, `day:${today}`]) {
+      // set 6: goal: opens in the pane too
+      for (const ref of [`task:${ux.task}`, `note:${ux.note}`, `vault:${ux.vault}`, `goal:${ux.goal}`, `chat:${ux.chat}`, `day:${today}`]) {
         await s.open('/life/library/timeline?open=' + encodeURIComponent(ref))
         must(await pane.isVisible() && !(await pg.locator('[data-pane-title]').innerText()).match(/Loading|Not found/), `the pane did not load ${ref}`)
       }
@@ -1371,13 +1350,13 @@ for (const width of UX_WIDTHS) {
       const due = (await s.api('session.counts', { space: SPACE })).doors.inbox.n
       const badge = pg.locator('[data-tabbar] [data-tab-count="Brain"]')
       must(due === 0 ? !(await badge.count()) : num(await badge.innerText()) === due, `the Brain tab says ${await badge.count() ? await badge.innerText() : 'nothing'}, the count helper says ${due}`)
-      step = 'the lens sheet holds Settings'
-      await pg.locator('[data-lens-title]').click()
+      step = 'the menu sheet holds Settings'
+      await pg.locator('[data-more-title]').click()
       await settle()
-      must(await pg.locator('[data-lens-sheet]').isVisible(), 'the lens title did not open the sheet')
-      await pg.locator('[data-lens-settings]').click()
+      must(await pg.locator('[data-more-sheet]').isVisible(), 'the title did not open the menu sheet')
+      await pg.locator('[data-more-settings]').click()
       await settle()
-      must(path() === '/life/settings', `Settings in the lens sheet opened ${path()}`)
+      must(path() === '/life/settings', `Settings in the menu sheet opened ${path()}`)
     } else {
       await s.api('views.save', { screen: 'sidebar', space: '', state: { rail: false } })
       await s.open('/life')
@@ -1385,7 +1364,7 @@ for (const width of UX_WIDTHS) {
       const navItems = () => pg.locator('[data-nav-places] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')).filter((x) => x !== 'Review'))
       must(JSON.stringify(await navItems()) === JSON.stringify(PLACES), `the places are ${await navItems()}`)
       must(JSON.stringify(await pg.locator('[data-nav-bottom] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')))) === JSON.stringify(['Settings']), 'the bottom is not Settings')
-      must(await pg.locator('[data-lens-picker]').count() && await pg.locator('[data-nav-capture]').count() && await pg.locator('[data-ask-box]').count(), 'the lens, Capture or the header box is missing')
+      must(await pg.locator('[data-nav-capture]').count() && await pg.locator('[data-ask-box]').count(), 'Capture or the header box is missing')
       step = 'each place opens and is the active item'
       const active = () => pg.locator('[data-sidebar] [aria-current="page"]').evaluateAll((els) => [...new Set(els.map((e) =>
         (e.closest('[data-nav-item]') || e.querySelector('[data-nav-item]'))?.getAttribute('data-nav-item')).filter(Boolean))])
@@ -1534,7 +1513,6 @@ for (const width of UX_WIDTHS) {
       ['note:' + leaf, ['Note', 'Links']],
       ['goal:' + one('Life Goal', "horizon='12 weeks'"), null], // Actions, Tasks, History across cycles, Links
       ['goal:' + ux.goal, ['Tasks', 'Links']], // an open-ended goal (a project before set 6) has no actions
-      ['project:' + ux.project, ['Tasks', 'Links']], // a link to a project opens the goal it became
       ['chat:' + one('Life Chat Log', "is_archived=0 and ifnull(transcript_md, '')=''"), ['Summary', 'Open items', 'Made from this', 'Links']],
       ['page:' + one('Life Journal Page'), ['Page', 'Transcript', 'Created from this page']],
       ['vault:' + one('Life Vault Document', 'is_archived=0'), ['Details', 'File']],
@@ -1957,32 +1935,6 @@ while d <= last:
 
   // ---------- UX fixes, set 4 ----------
   // Area filters: no archived area and no area of another space, on every list with an Area filter; the Archive lists archived ones
-  await check(`${tag}.20`, `${width} px: the lens offers only active areas of this space (the Area filter of set 4 is the lens since set 6)`, async () => {
-    const made = []
-    try {
-      const mk = async (space, title, archived) => {
-        const a = (await s.api('settings.save_item', { kind: 'area', space, title: `${title} ${width} ${stamp}` })).name
-        made.push(a)
-        if (archived) await s.api('settings.save_item', { kind: 'area', name: a, is_archived: 1 })
-        return a
-      }
-      const active = await mk(SPACE, 'S4 active area', false)
-      await mk(SPACE, 'S4 archived area', true)
-      await mk('Shared', 'S4 shared area', false)
-      await s.open('/life/goals/tasks')
-      const opts = await lensOptions()
-      must(opts.some((o) => o.startsWith('S4 active area')), `the lens does not offer the active area (${opts.filter((o) => o.startsWith('S4'))})`)
-      must(!opts.some((o) => /S4 (archived|shared) area/.test(o)), `the lens offers ${opts.filter((o) => o.startsWith('S4')).join(', ')}`)
-      // the archived area's records stay findable in the Archive, which is narrowed by the lens like every list
-      must(active, '')
-      return `${opts.length} entries`
-    } finally {
-      await closeLens()
-      for (const a of made) await s.api('settings.save_item', { kind: 'area', name: a, delete: 1 }).catch(() => {})
-    }
-  })
-
-
   // Python on the acceptance site as the agent, answering JSON on its last line
   const asAgent = (code) => JSON.parse(bench(`frappe.set_user("hermes@lifeos.test")\nimport json\nfrom lifeos.api import wiki, library, sources, inbox, chats\nfrom lifeos import permissions\npermissions.clear_cache()\n${code}`).split('\n').pop())
   const editorEnd = async () => { await pg.locator('[data-live-editor] .cm-content').first().click(); await pg.keyboard.press('ControlOrMeta+End') }
@@ -2289,14 +2241,14 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
   })
 
   // ---------- UX fixes, set 6: the lens, the four places, Plan and Library (U<width>.40 and up) ----------
-  await check(`${tag}.40`, `${width} px: the lens: an area chosen in the ${phone ? 'lens sheet' : "sidebar's picker"} narrows Today, Inbox, every Plan tab and every Library tab; each count matches its rows and the server; the chip and the URL show it; it survives a reload; clearing it restores every count`, async () => {
+  await check(`${tag}.40`, `${width} px: ?area= narrows Today, Inbox, every Plan tab and every Library tab; each count matches its rows and the server; the chip and the URL show it; it survives a reload; clearing it restores every count`, async () => {
     let step = 'start'
     const calls = []
     const onReq = (r) => { const u = r.url(); if (u.includes('/api/method/lifeos.api.')) calls.push({ m: u.split('/api/method/lifeos.api.')[1].split('?')[0], url: u, body: r.postData() || '' }) }
     const carries = (m) => calls.some((c) => (!m || c.m === m) && (new URL(c.url).searchParams.get('area') === uxArea || c.body.includes(`"area":"${uxArea}"`)))
     const lensIn = () => new URL(pg.url()).searchParams.get('area')
     const areaName = areas.find((x) => x.name === uxArea).area_name
-    const goto = async (p) => { calls.length = 0; await pg.goto(base + p, { waitUntil: 'networkidle' }); await settle() } // no area= here: the lens decides
+    const goto = async (p, area = uxArea) => { calls.length = 0; await pg.goto(base + p + (p.includes('?') ? '&' : '?') + 'area=' + area, { waitUntil: 'networkidle' }); await settle() } // issue 46: the area is each page's own `?area=`, not carried
     const band = async () => Number(await pg.locator('[data-count-key="band:open"]:visible').first().getAttribute('data-count-n'))
     const total = (m, args) => s.api(m, { space: SPACE, page_length: 1, ...args }).then((r) => r.total)
     // [name, path, list method, the server's count under an area]
@@ -2319,16 +2271,14 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
     try {
       step = 'the counts on All of life'
       const before = {}
+      await s.open('/life') // a first visit to Today makes what it needs (a record Library > All lists), so it is made before counting
       for (const [name, p] of L) { step = `the counts on All of life: ${name}`; await s.open(p); before[name] = await count() }
       await s.open('/life')
       const band0 = await band()
-      step = 'choose the area in the lens'
-      calls.length = 0
-      await pickLens(uxArea)
+      step = 'open Today with the area'
+      await goto('/life')
       must(lensIn() === uxArea, `the URL has area=${lensIn()}`)
       must((await pg.locator('[data-lens-chip]:visible').innerText()).includes(areaName), 'the header has no chip for the area')
-      if (phone) must((await pg.locator('[data-lens-title]').innerText()).includes(areaName), 'the phone title does not show the area')
-      else must((await pg.locator('[data-lens-picker]').innerText()).includes(areaName), "the sidebar's picker does not show the area")
       step = 'Today under the lens'
       must(carries('today.get'), 'Today did not ask for the area')
       const c = await s.api('counts.get', { space: SPACE, area: uxArea })
@@ -2375,15 +2325,16 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
       await settle()
       must(lensIn() === uxArea && await pg.locator('[data-lens-chip]:visible').count(), 'the lens was lost on reload')
       step = 'clear the area'
-      if (phone) await pickLens('')
-      else { await pg.locator('[data-lens-chip]:visible').first().click(); await pg.waitForLoadState('networkidle'); await settle() }
+      await pg.locator('[data-lens-chip]:visible').first().click(); await pg.waitForLoadState('networkidle'); await settle()
       must(!lensIn() && !(await pg.locator('[data-lens-chip]:visible').count()), `clearing left area=${lensIn()} or the chip`)
       for (const [name, p] of L) {
-        await goto(p)
+        await goto(p, '')
         must(!lensIn(), `${name}: the cleared lens came back`)
-        must((await count()) === before[name], `${name}: ${await count()} after clearing, ${before[name]} before`)
+        const server = L.find((x) => x[0] === name)[3]
+        const want = server ? await server(undefined) : before[name] // the server's own count: a record made while the check ran is not a failure of clearing
+        must((await count()) === want, `${name}: ${await count()} after clearing, ${want} expected (${before[name]} before)`)
       }
-      await goto('/life')
+      await goto('/life', '')
       must((await band()) === band0, `Today says ${await band()} open tasks after clearing, ${band0} before`)
       return done.join(', ')
     } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) } finally {
@@ -2411,9 +2362,9 @@ print(json.dumps({"listed": any(r["name"] == "${item.name}" for r in rows), "get
     }
     if (phone) { // the lens sheet and the Ask sheet too
       await s.open('/life')
-      await openLens()
-      if ((await overflow()) > 0) bad.push('the lens sheet')
-      await closeLens()
+      await openMore()
+      if ((await overflow()) > 0) bad.push('the menu sheet')
+      await closeMore()
     }
     must(!bad.length, 'scrolls sideways: ' + bad.join('; '))
     must(errors.length === before, 'script errors: ' + errors.slice(before).join(' | ').slice(0, 300))
@@ -2505,9 +2456,8 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
     ['/tasks?priority=I&view=list', '/goals/tasks', { priority: 'I', view: 'list' }],
     ['/goals?status=achieved', '/goals', { status: 'achieved' }],
     ['/someday?tab=notes', '/goals/someday', { tab: 'notes' }],
-    ['/projects?status=On%20Hold', '/goals', { type: 'Long term', status: 'in_progress' }],
-    ['/projects?status=Done', '/goals', { type: 'Long term', status: 'achieved' }],
-    [`/projects/${ux.project}?tab=tasks`, `/goals/${ux.goal}`, { tab: 'tasks' }],
+    ['/projects', '/goals', {}], // issue 48: the old Projects screen and a project's page land on Goals
+    [`/projects/${ux.oldProject}?tab=tasks`, '/goals', {}],
     ['/reset', '/today/week', { view: 'review', tab: 'tasks' }], // set 8: set 7's Reset step is the review's Tasks tab
     ['/calendar/week?date=2026-12-02', '/today/week', { view: 'calendar', date: '2026-12-02' }],
     ['/calendar/agenda', '/today/week', { view: 'agenda' }],
@@ -2540,7 +2490,7 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
   const bad = []
   for (const [from, to, q] of ROUTES) {
     await owner.open('/life' + from)
-    for (let i = 0; i < 20 && pathOf(pg).startsWith('/life/projects/'); i++) await pg.waitForTimeout(200) // waits for goals.for_project
+    await pg.waitForTimeout(200)
     const u = new URL(pg.url())
     const wrong = [pathOf(pg) !== ('/life' + to).replace(/\/$/, '') && `path ${u.pathname}`, ...Object.entries(q).map(([k, v]) => u.searchParams.get(k) !== v && `${k}=${u.searchParams.get(k)}`)].filter(Boolean)
     if (!wrong.length && q.open) { if (!(await pg.locator('[data-pane]').isVisible())) wrong.push('no pane') }
@@ -2552,23 +2502,12 @@ await check('S6.2', 'Every old route lands on its new home with its query (secti
   return `${ROUTES.length} routes`
 })
 
-await check('S6.3', 'A former project opens as an open-ended goal with its tasks; a goal shows what it serves and what serves it, and cannot serve its own servant', async () => {
+await check('S6.3', 'An open-ended goal opens with its tasks; a goal shows what it serves and what serves it, and cannot serve its own servant', async () => {
   const pg = owner.page
-  const proj = JSON.parse(bench(`import json
-p = frappe.db.get_value("Life Project", "${ux.project}", ["title", "migrated_to"], as_dict=True)
-cols = frappe.db.get_table_columns("Life Task")
-left = frappe.db.sql("select count(*) from \`tabLife Task\` where project=%s and ifnull(goal, '') not in (%s, '')", ("${ux.project}", p.migrated_to))[0][0] if "project" in cols else 0
-before = frappe.db.sql("select count(*) from \`tabLife Task\` where project=%s", "${ux.project}")[0][0] if "project" in cols else None
-print(json.dumps({"title": p.title, "goal": p.migrated_to, "unmoved": left, "had": before}))`).split('\n').pop())
-  must(proj.goal === ux.goal, 'the project has no goal')
   const got = await owner.api('goals.get', { goal: ux.goal })
-  must(got.goal.title === proj.title && got.goal.horizon === 'Long term', `the goal is "${got.goal.title}" (${got.goal.horizon}), the project was "${proj.title}"`)
-  // the project's tasks are the goal's (the old column is left in the table: every task that had the project has the goal, or a goal that serves it)
-  must(!proj.unmoved || proj.unmoved === 0, `${proj.unmoved} of the project's tasks are not under its goal`)
-  await owner.open(`/life/projects/${ux.project}`)
-  for (let i = 0; i < 20 && pathOf(pg).startsWith('/life/projects/'); i++) await pg.waitForTimeout(200)
-  must(pathOf(pg) === `/life/goals/${ux.goal}`, `/projects/:id went to ${pathOf(pg)}`)
-  must((await pg.locator('h1').first().innerText()).includes(proj.title), 'the goal page does not show the project title')
+  must(got.goal.horizon === 'Long term', `the goal is ${got.goal.horizon}`)
+  await owner.open(`/life/goals/${ux.goal}`)
+  must((await pg.locator('h1').first().innerText()).includes(got.goal.title), 'the goal page does not show the goal title')
   await pg.locator('[data-page-tabs] [data-tab="tasks"]').click()
   await pg.waitForLoadState('networkidle')
   await pg.waitForTimeout(500)
@@ -2587,7 +2526,7 @@ print(json.dumps({"title": p.title, "goal": p.migrated_to, "unmoved": left, "had
   must(row.length === 1 && row[0].name === shorter.name && row[0].serves_title === `S5 longer goal ${stamp}` && row[0].done_when === 'It is done.', 'goals.list does not list what serves the goal')
   const loop = await owner.api('goals.update', { goal: longer.name, values: { serves: shorter.name } }, { raw: true })
   must(!loop.ok(), 'a goal could serve the goal that serves it')
-  return `${proj.title}: ${open} open tasks`
+  return `${got.goal.title}: ${open} open tasks`
 })
 
 await check('S6.4', 'A Vault document is a capture of kind Document, marked sensitive, with its expiry; the agent cannot read it, nor a note marked sensitive, while the switch is off; only the owner unmarks', async () => {
@@ -2690,7 +2629,7 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
   }
 })
 
-await check('S6.6', 'The fake agent runs end to end with the goal-based API: tasks it proposes are filed under the open-ended goal of their area; project= still maps to the goal for one set', async () => {
+await check('S6.6', 'The fake agent runs end to end with the goal-based API: tasks it proposes are filed under the open-ended goal of their area', async () => {
   const goals = (await owner.api('goals.list', { space: SPACE, horizon: 'Long term', area: uxArea })).goals.map((g) => g.name)
   must(goals.length, 'Tea & Coffee has no open-ended goal')
   const item = await owner.api('inbox.create_item', { title: `S5 agent pdf ${stamp}.pdf`, space: SPACE, instruction: 'summarise and extract to-dos' })
@@ -2704,15 +2643,15 @@ await check('S6.6', 'The fake agent runs end to end with the goal-based API: tas
   const made = (await owner.api('inbox.get', { item: item.name })).proposals.map((p) => p.created_name)
   const under = (await owner.api('tasks.list', { space: SPACE, goal, status: 'all', page_length: 200 })).tasks.map((t) => t.name)
   must(made.length === 3 && made.every((n) => under.includes(n)), 'the accepted tasks are not under the goal')
-  // the agent's own reads with its key: Today, the goal's tasks, and project= mapped to its goal
+  // the agent's own reads with its key: Today and the goal's tasks; the old `project` argument is refused with an error that names `goal`
   const asAgentHttp = (m, args) => agentFetch(m, args).then(async (r) => [r.status, await r.json().catch(() => ({}))])
   const [ts] = await asAgentHttp('today.get', { space: SPACE })
   must(ts === 200, `today.get answered the agent ${ts}`)
   const [, byGoal] = await asAgentHttp('tasks.list', { space: SPACE, goal: ux.goal, status: 'all', page_length: 1 })
-  const [, byProject] = await asAgentHttp('tasks.list', { space: SPACE, project: ux.project, status: 'all', page_length: 1 })
-  must(byGoal.message && byProject.message && byGoal.message.total === byProject.message.total && byGoal.message.total > 0, `project= gives ${byProject.message?.total}, goal= ${byGoal.message?.total}`)
-  const [ps] = await asAgentHttp('goals.for_project', { project: ux.project })
-  must(ps >= 400, 'an agent can read a project')
+  must(byGoal.message && byGoal.message.total > 0, `goal= gives ${byGoal.message?.total}`)
+  const [ps, pj] = await asAgentHttp('tasks.list', { space: SPACE, project: ux.goal, status: 'all', page_length: 1 })
+  must(ps === 417 || ps === 400 || ps === 417, `project= answered ${ps}`)
+  must(JSON.stringify(pj).includes('goal'), 'the error for project= does not name goal')
   return `3 tasks under ${goal}`
 })
 
@@ -3282,12 +3221,8 @@ def goal(title, **kw):
     g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": title, "area": area, **kw})
     g.flags.ignore_permissions = True
     return g.insert().name
-# a project, migrated as set 6 did: an open-ended goal with no finish line and no measure
-p = frappe.get_doc({"doctype": "Life Project", "space": "${SPACE}", "title": "BF1 project ${W}", "area": area, "status": "Active"})
-p.flags.allow_migration = True
-p.insert(ignore_permissions=True)
+# an open-ended goal with no finish line and no measure, as the migrated projects were
 migrated = goal("BF1 migrated ${W}", horizon="Long term")
-frappe.db.set_value("Life Project", p.name, "migrated_to", migrated)
 number = goal("BF1 number ${W}", horizon="Long term", measure_kind="Number", measure="BF1 weight", unit="kg", start_value=84, target_value=78)
 readings.suggest(number, 81, excerpt="Weighed 81 kg this morning.", by="Agent")
 milestone = goal("BF1 milestone ${W}", horizon="12 weeks", cycle=cycle, measure_kind="Milestone", done_when="Signed")
@@ -3817,17 +3752,6 @@ for (const width of SET_WIDTHS) {
     await pg.waitForLoadState('networkidle')
     await pg.waitForTimeout(700)
   }
-  // what the lens offers: the sidebar's menu, or the phone's sheet
-  const lensLabels = async () => {
-    if (phone) await pg.locator('[data-lens-title]').click()
-    else await pg.locator('[data-lens-picker] button, [data-lens-picker]').first().click()
-    await pg.waitForTimeout(400)
-    const items = phone ? pg.locator('[data-lens-sheet] [data-lens-item]') : pg.getByRole('menuitem')
-    const out = (await items.allInnerTexts()).map((t) => t.trim())
-    await pg.keyboard.press('Escape')
-    await pg.waitForTimeout(300)
-    return out
-  }
   // what the area picker of a task offers
   let pickTask = null
   const pickerLabels = async () => {
@@ -3840,7 +3764,7 @@ for (const width of SET_WIDTHS) {
     return out
   }
 
-  await check(`${tag}.1`, `${width} px: switching Money on shows it in the lens and the task area picker; off hides it; its goals come back when it is on again`, async () => {
+  await check(`${tag}.1`, `${width} px: switching Money on shows it in the task area picker; off hides it; its goals come back when it is on again`, async () => {
     const was = (await lifeArea('Money')).is_on
     let goal = null
     try {
@@ -3850,8 +3774,6 @@ for (const width of SET_WIDTHS) {
       must((await pg.locator('[data-life-area="Money"]').getAttribute('data-on')) === '0', 'Money does not show as off')
       await flip('Money')
       must((await lifeArea('Money')).is_on, 'the switch did not turn Money on')
-      await s.open('/life')
-      must((await lensLabels()).includes('Money'), 'Money is on but not in the lens')
       must((await pickerLabels()).includes('Money'), 'Money is on but not in the task area picker')
       goal = (await s.api('goals.create', { title: `I12 goal in Money ${width} ${stamp}`, horizon: 'Long term', space: SPACE, area: (await lifeArea('Money')).name })).name
       const listed = async () => (await s.api('goals.list', { space: SPACE, page_length: 100, area: (await lifeArea('Money')).name }).catch(() => ({ goals: [] }))).goals.some((g) => g.name === goal)
@@ -3860,8 +3782,6 @@ for (const width of SET_WIDTHS) {
       must(/\d+ goals?/.test(await pg.locator('[data-life-area="Money"] [data-area-goals]').innerText()), 'Money shows no goal count')
       await flip('Money')
       must(!(await lifeArea('Money')).is_on, 'the switch did not turn Money off')
-      await s.open('/life')
-      must(!(await lensLabels()).includes('Money'), 'Money is off but still in the lens')
       must(!(await pickerLabels()).includes('Money'), 'Money is off but still in the task area picker')
       must(!(await s.api('goals.list', { space: SPACE, page_length: 100 })).goals.some((g) => g.name === goal), 'the goal of Money is listed while Money is off')
       await areasPage()
@@ -3888,8 +3808,6 @@ for (const width of SET_WIDTHS) {
     must(await row.count(), 'the new part is not listed under Career')
     must((await row.innerText()).includes('Vice Chair · no goals'), 'the new part does not show its description and goal count: ' + await row.innerText())
     must((await pickerLabels()).includes(name), 'the new part is not in the task area picker')
-    await s.open('/life')
-    must((await lensLabels()).includes(name), 'the new part is not in the lens')
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
   })
 
@@ -5735,10 +5653,10 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task 
     const errors = []
     pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
     const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
-    // the card is in the sidebar on a desktop and in the focus sheet (the logo) on a phone
+    // the card is in the sidebar on a desktop and in the menu sheet (the title) on a phone
     const openCard = async () => {
       await s.open('/life/today')
-      if (phone) await pg.locator('[data-lens-title]').click()
+      if (phone) await pg.locator('[data-more-title]').click()
       return pg.locator('[data-setup-card]:visible')
     }
     await check(`${tag}.3`, `${width} px: the setup card shows the level and the next step, and links to How it works`, async () => {
@@ -5769,7 +5687,7 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task 
       await pg.waitForFunction(() => !document.querySelector('[data-setup-card]'), null, { timeout: 8000 })
       await s.open('/life/today')
       await pg.waitForTimeout(800)
-      if (phone) await pg.locator('[data-lens-title]').click()
+      if (phone) await pg.locator('[data-more-title]').click()
       must((await pg.locator('[data-setup-card]').count()) === 0, 'the card came back after a reload')
       await s.open('/life/settings?tab=places')
       await pg.locator('[data-settings-how]').click()
@@ -6582,6 +6500,465 @@ print(p.name)`).split('\n').pop()
     await s.ctx.close()
   }
 }
+
+// Issue 46: one space on new sites, and no lens. I46.1 and I46.2 are unit tests (test_i46_one_space). A user made for the run, with
+// their own single space, stands for a new site (the acceptance site keeps two spaces, for I46.4 and I46.6). Titles start "I46 ".
+for (const width of SET_WIDTHS) {
+  const tag = `I46.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const user = `i46-${width}-${stamp}@lifeos.test`.toLowerCase()
+  const space = `I46 ${width} ${stamp}`
+  const restore = () => bench(`frappe.set_user("Administrator")
+for dt in ("Life Task",):
+    for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+from lifeos import devtools
+devtools.purge_space("${space}", drop=True)
+frappe.db.delete("DefaultValue", {"parent": "${user}"})
+if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  let one = null
+  const owner = await session('owner@lifeos.test', width)
+  try {
+    bench(`from lifeos import devtools
+devtools.make_user("${user}", "One", ["Life Admin", "Life User"])
+frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
+frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
+frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user": "${user}", "members": [{"user": "${user}", "access": "Write"}]}).insert(ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I46 task ${width} ${stamp}"}).insert(ignore_permissions=True)`)
+    one = await session(user, width)
+    const pg = one.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const settle = () => pg.waitForTimeout(700)
+    const spaceUi = '[data-space-picker] button, [data-space-item], [data-space-sheet], [data-settings-space], [data-space-card], [data-member-spaces], [data-new-space], [data-space-chip]'
+
+    await check(`${tag}.3`, `${width} px: on a one-space site no space picker, chip or Spaces view appears on any screen`, async () => {
+      const screens = ['/life', '/life/brain', '/life/brain/captures', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/goals/cycles', '/life/library',
+        '/life/library/notes', '/life/library/people', '/life/library/timeline', '/life/library/archive', '/life/today/week?view=calendar', '/life/ask',
+        ...['profile', 'appearance', 'calendar', 'areas', 'rhythms', 'habits', 'rules', 'members', 'sources', 'advanced'].map((t) => `/life/settings?tab=${t}`),
+        '/life/settings?tab=members&view=spaces', '/life/settings?tab=spaces']
+      for (const p of screens) {
+        await one.open(p)
+        await settle()
+        must(await pg.locator(spaceUi).count() === 0, `${p}: a space control is shown`)
+        const text = await pg.locator('[data-main]').innerText()
+        must(!/\bSpaces\b/.test(text) && !/Default space/.test(text) && !/Space for these settings/.test(text), `${p}: the page mentions spaces`)
+        must(!/[Nn]o space/.test(text) && !text.includes(space), `${p}: the page shows a space name`)
+      }
+      if (phone) {
+        await one.open('/life')
+        await pg.locator('[data-more-title]').click()
+        await pg.locator('[data-more-sheet]').waitFor()
+        must(await pg.locator('[data-space-sheet]').count() === 0, 'the menu sheet lists spaces')
+        must((await pg.locator('[data-more-title]').innerText()).trim() === 'Life OS', 'the title shows a space')
+        await pg.keyboard.press('Escape')
+      } else {
+        must(!(await pg.locator('[data-sidebar] [data-slot="sidebar-header"]').innerText()).includes(space), 'the sidebar shows the space')
+      }
+      await one.open('/life/settings?tab=members')
+      await settle()
+      const tabs = await pg.locator('[data-member-filter]').innerText()
+      must(!/Spaces/.test(tabs), `Members offers ${tabs.replace(/\s+/g, ' ')}`)
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check(`${tag}.5`, `${width} px: on a one-space site Ask is switched in Advanced and "Agents may open sensitive items" in Rules, and each takes effect`, async () => {
+      const get = async () => (await one.api('settings.get', { space })).spaces.find((x) => x.name === space)
+      const was = await get()
+      try {
+        await one.open('/life/settings?tab=advanced')
+        const ask = pg.locator('[data-ai-ask] [data-ask-switch]')
+        await ask.waitFor({ timeout: 10000 })
+        await ask.click()
+        await pg.waitForLoadState('networkidle')
+        await settle()
+        must(!!(await get()).ask_enabled !== !!was.ask_enabled, 'the Ask switch did not change the setting')
+        await one.open('/life/settings?tab=rules')
+        const vault = pg.locator('[data-sensitive-agents] [data-vault-switch]')
+        await vault.waitFor({ timeout: 10000 })
+        await vault.click()
+        await pg.waitForLoadState('networkidle')
+        await settle()
+        must(!!(await get()).agents_can_read_vault !== !!was.agents_can_read_vault, 'the sensitive-items switch did not change the setting')
+        must(await pg.locator('[data-sensitive] [data-ask-vault-switch]').count() === 1, 'Ask may read sensitive items is not in Rules')
+      } finally {
+        await one.api('settings.set_space_ask', { space, ask_enabled: was.ask_enabled ? 1 : 0 }).catch(() => {})
+        await one.api('settings.set_agent_vault', { space, allowed: was.agents_can_read_vault ? 1 : 0 }).catch(() => {})
+      }
+    })
+
+    await check(`${tag}.2`, `${width} px: a capture sent without a space on a one-space site lands in that space`, async () => {
+      const made = await one.api('inbox.create_item', { title: `I46 capture ${width} ${stamp}`, raw_text: 'one space' })
+      must(made.space === space, `the capture went to ${made.space}`)
+    })
+  } finally {
+    if (one) await one.ctx.close()
+    restore()
+  }
+
+  const pg = owner.page
+  const settle = () => pg.waitForTimeout(700)
+  try {
+    await check(`${tag}.4`, `${width} px: the sidebar has no lens and no pinned areas; ?area= on Goals and Library is that page's area filter`, async () => {
+      const area = (await owner.api('area.tree', { space: SPACE })).areas.find((a) => a.is_life_area && a.area_name === 'Career')
+      must(area, 'no Career area')
+      const calls = []
+      const onReq = (r) => { const u = r.url(); if (u.includes('/api/method/lifeos.api.')) calls.push({ url: u, body: r.postData() || '' }) }
+      pg.on('request', onReq)
+      try {
+        await owner.open('/life')
+        must(await pg.locator('[data-lens-picker], [data-lens-bar], [data-lens-sheet]').count() === 0, 'a lens control is shown')
+        if (!phone) {
+          const side = await pg.locator('[data-sidebar]').innerText()
+          must(!/Focus on an area|All of life/.test(side), 'the sidebar still has the lens')
+          must(await pg.locator('[data-sidebar] [data-pinned-area]').count() === 0, 'pinned areas are in the sidebar')
+        }
+        for (const p of ['/life/goals', '/life/goals/tasks', '/life/library']) {
+          calls.length = 0
+          await pg.goto(`${base}${p}${p.includes('?') ? '&' : '?'}area=${area.name}`, { waitUntil: 'networkidle' })
+          await settle()
+          must(new URL(pg.url()).searchParams.get('area') === area.name, `${p}: the area left the URL`)
+          must(calls.some((c) => new URL(c.url).searchParams.get('area') === area.name || c.body.includes(area.name)), `${p}: no request asked for the area`)
+          await pg.locator('[data-main] a[href^="/life/"]').first().waitFor({ timeout: 5000 }).catch(() => {})
+        }
+        // a link to another page does not carry the area along: it is that page's filter
+        await pg.goto(`${base}/life/goals/tasks?area=${area.name}`, { waitUntil: 'networkidle' })
+        await (phone ? pg.locator('[data-tabbar] [data-tab-item="Library"]') : pg.locator('[data-sidebar] [data-nav-item="Library"]')).first().click()
+        await pg.waitForURL((u) => u.pathname.startsWith('/life/library'), { timeout: 10000 })
+        await pg.waitForLoadState('networkidle')
+        must(!new URL(pg.url()).searchParams.get('area'), `the area was carried to the next page (${pg.url()})`)
+      } finally {
+        pg.off('request', onReq)
+      }
+    })
+
+    await check(`${tag}.6`, `${width} px: on the acceptance site, which keeps two spaces, the space is picked in the ${phone ? 'menu sheet' : "sidebar's picker"} and Settings still shows Spaces`, async () => {
+      must((await owner.api('session.boot')).spaces.length >= 2, 'the owner has fewer than two spaces')
+      await owner.open('/life')
+      if (phone) {
+        await pg.locator('[data-more-title]').click()
+        await pg.locator('[data-space-sheet]').waitFor({ timeout: 8000 })
+        await pg.locator('[data-space-sheet] [data-space-item="Shared"]').click()
+      } else {
+        await pg.locator('[data-space-picker] button, [data-space-picker]').first().click()
+        await pg.getByRole('menuitem', { name: 'Shared', exact: true }).click()
+      }
+      await pg.waitForLoadState('networkidle')
+      await settle()
+      must(new URL(pg.url()).searchParams.get('space') === 'Shared', 'the URL does not name Shared')
+      await owner.open('/life/settings?tab=members&view=spaces&space=Private')
+      must(await pg.locator('[data-space-card]').count() >= 2, 'Settings > Members > Spaces does not list the spaces')
+      must(await pg.locator('[data-settings-space]').count() >= 1 || phone, 'the space picker of Settings is gone')
+    })
+  } finally {
+    await owner.api('views.save', { screen: 'lens', space: '', state: { space: SPACE } }).catch(() => {})
+    await owner.ctx.close()
+  }
+}
+
+// Issue 47: the monthly and the 12-week review in the weekly review's shell. They run in the Shared space, which has no plan or cycle of
+// its own on the acceptance site: last month's plan and an ended 12 Week Year are made here and removed after. Titles start "I47 ".
+// (I47.1 and I47.5, the due rules, are unit tests in lifeos/tests/test_issue47_reviews.py.)
+for (const width of SET_WIDTHS) {
+  const tag = `I47.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const phone = width < 800
+  const S = 'Shared'
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I47 ${what} ${width} ${stamp}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const sb = (code) => bench(`import json
+from frappe.utils import add_days, getdate, today
+from lifeos import journal
+SP = "${S}"
+OWNER = "owner@lifeos.test"
+now = getdate(today())
+last = add_days(now.replace(day=1), -1)
+${code}`).split('\n').pop()
+  const open = (p, extra = '') => s.open(`/life${p}${p.includes('?') ? '&' : '?'}space=${S}${extra}`)
+  const cleanup = () => sb(`frappe.set_user("Administrator")
+for r in frappe.get_all("Life Review", filters={"space": SP, "user": OWNER}, pluck="name"): frappe.delete_doc("Life Review", r, force=1, ignore_permissions=True)
+for g in frappe.get_all("Life Goal", filters={"space": SP, "title": ["like", "I47 % ${width} ${stamp}"]}, pluck="name"):
+    frappe.db.delete("Life Task", {"goal": g})
+    frappe.db.set_value("Life Goal", g, {"carried_from": None, "serves": None})
+for c in frappe.get_all("Life Cycle", filters={"space": SP}, pluck="name"):
+    for g in frappe.get_all("Life Goal", filters={"cycle": c}, pluck="name"): frappe.db.set_value("Life Goal", g, "carried_from", None)
+for g in frappe.get_all("Life Goal", filters={"space": SP, "title": ["like", "I47 % ${width} ${stamp}"]}, pluck="name"):
+    frappe.db.delete("Life Goal Action", {"parent": g})
+    frappe.db.delete("Life Goal", {"name": g})
+for c in frappe.get_all("Life Cycle", filters={"space": SP}, pluck="name"):
+    frappe.db.delete("Life Action Log", {"cycle": c})
+    frappe.db.delete("Life Cycle", {"name": c})
+frappe.db.sql("delete from \`tabLife Month Plan Habit\` where parent like %s", SP + "-%")
+frappe.db.delete("Life Month Plan", {"space": SP})
+frappe.db.delete("Life Habit", {"space": SP, "title": ["like", "I47 %"]})
+print("{}")`)
+  const area = () => sb('print(json.dumps(frappe.db.get_value("Life Area", {"space": SP, "is_on": 1}, "name") or frappe.db.get_value("Life Area", {"space": SP}, "name")))').replace(/"/g, '')
+  // last month's plan: one goal done, three open, a habit; and a closed cycle that covers it, with ticks, so its weeks have scores
+  const seedMonth = () => JSON.parse(sb(`frappe.set_user(OWNER)
+a = frappe.db.get_value("Life Area", {"space": SP, "is_on": 1}, "name") or frappe.db.get_value("Life Area", {"space": SP}, "name")
+journal.get_month_plan(SP, last.year, last.month, create=True)
+goals = {}
+for key in ("done", "carry", "drop", "finish"):
+    goals[key] = journal.add_month_goal(SP, last.year, last.month, "I47 goal " + key + " ${width} ${stamp}", a).name
+frappe.db.set_value("Life Goal", goals["done"], "outcome", "Achieved")
+habit = frappe.get_doc({"doctype": "Life Habit", "space": SP, "title": "I47 habit ${width} ${stamp}"}).insert().name
+plan = journal.get_month_plan(SP, last.year, last.month)
+plan.append("habits", {"habit": habit, "days_per_week": 5, "sort_order": 1})
+plan.save()
+start = add_days(last.replace(day=1), -last.replace(day=1).weekday())
+cyc = frappe.get_doc({"doctype": "Life Cycle", "space": SP, "title": "I47 look ${width} ${stamp}", "start_date": start, "status": "Planned"}).insert()
+g = frappe.get_doc({"doctype": "Life Goal", "space": SP, "cycle": cyc.name, "horizon": "12 weeks", "title": "I47 look goal ${width} ${stamp}", "done_when": "x", "actions": [{"title": "I47 look act", "per_week": 3, "status": "Open"}]}).insert()
+for w in (1, 2, 3, 4): journal.set_tick(g.actions[0].name, w, 2)
+frappe.db.set_value("Life Cycle", cyc.name, "status", "Closed")
+print(json.dumps({"month": last.month, "year": last.year, "goals": goals, "habit": habit}))`))
+  // an ended 12 Week Year: it ended today, with two goals, ticks, and lead actions
+  const seedCycle = () => JSON.parse(sb(`frappe.set_user(OWNER)
+a = frappe.db.get_value("Life Area", {"space": SP, "is_on": 1}, "name") or frappe.db.get_value("Life Area", {"space": SP}, "name")
+for c in frappe.get_all("Life Cycle", filters={"space": SP, "status": "Active"}, pluck="name"): frappe.db.set_value("Life Cycle", c, "status", "Closed")
+cyc = frappe.get_doc({"doctype": "Life Cycle", "space": SP, "title": "I47 cycle ${width} ${stamp}", "start_date": add_days(now, -84), "status": "Active"}).insert()
+out = {}
+for key, per in (("done", 3), ("carry", 2), ("drop", 1)):
+    g = frappe.get_doc({"doctype": "Life Goal", "space": SP, "cycle": cyc.name, "horizon": "12 weeks", "title": "I47 cg " + key + " ${width} ${stamp}", "area": a, "done_when": "Finished " + key,
+        "sort_order": 10 + per, "actions": [{"title": "I47 act " + key, "per_week": per, "status": "Open"}]}).insert()
+    out[key] = g.name
+    for w in (1, 2, 3, 5): journal.set_tick(g.actions[0].name, w, per)
+actions, ticks = journal._actions(cyc.name), journal._ticks(cyc.name)
+print(json.dumps({"cycle": cyc.name, "goals": out, "expected": journal.cycle_average(cyc, actions, ticks, journal.WEEKS)}))`))
+  const next = async () => { await pg.locator('[data-review-next]').click(); await pg.waitForTimeout(700) }
+  const tabNow = () => pg.locator('[data-review]').first().getAttribute('data-review-tab')
+  const choose = (goal, pile) => pg.locator(`[data-decide-goal][data-goal="${goal}"] [data-choose="${pile}"]`).click()
+  try {
+    cleanup()
+    await check(`${tag}.2`, `${width} px: the monthly review's Look back shows the month's goals, habits and weekly scores`, async () => {
+      seedMonth()
+      await open('/review?kind=monthly')
+      await pg.locator('[data-review-look]').waitFor({ timeout: 20000 })
+      await pg.waitForTimeout(800)
+      const rows = await pg.locator('[data-look-goal]').evaluateAll((els) => els.map((e) => [e.innerText, e.getAttribute('data-result')]))
+      must(rows.length === 4, `Look back lists ${rows.length} goals, not 4: ${JSON.stringify(rows)}`)
+      must(rows.some(([t, r]) => t.includes(T('goal done')) && r === 'done'), 'the done goal is not marked done')
+      must(rows.some(([t, r]) => t.includes(T('goal carry')) && r === 'missed'), 'an open goal with no tasks is not marked missed')
+      must((await pg.locator('[data-look-habit]').allInnerTexts()).some((t) => t.includes(`I47 habit ${width} ${stamp}`)), 'the habit is not shown')
+      const look = await s.api('periodic.look', { space: S, kind: 'monthly' })
+      must(look.weeks.length >= 3, 'the server gives no weeks for the month')
+      must(await pg.locator('[data-look-week]').count() === look.weeks.length, `Look back shows ${await pg.locator('[data-look-week]').count()} weeks, the server ${look.weeks.length}`)
+      must((await pg.locator('[data-look-week]').first().innerText()).includes(Math.round(look.weeks[0].percent) + '%'), 'the first weekly score is not the server\'s')
+      must(await pg.locator('[data-review-title]').innerText() === 'Monthly review', 'the title is not Monthly review')
+      await noSideways()
+    })
+
+    await check(`${tag}.3`, `${width} px: Decide: carry one goal and drop another with a reason; after Lock the plan holds the carried goal and the dropped one is dropped`, async () => {
+      const g = JSON.parse(sb(`print(json.dumps({k: frappe.db.get_value("Life Goal", {"space": SP, "title": "I47 goal " + k + " ${width} ${stamp}"}) for k in ("done", "carry", "drop", "finish")}))`))
+      await open('/review?kind=monthly&tab=decide')
+      await pg.locator('[data-review-decide]').waitFor({ timeout: 20000 })
+      must(await pg.locator('[data-decide-goal]').count() === 3, 'Decide does not list the three goals that are not done')
+      must(!(await pg.locator(`[data-decide-goal][data-goal="${g.done}"]`).count()), 'the done goal is up for decision')
+      must(await pg.locator('[data-review-next]').isDisabled(), 'Next is open with goals undecided')
+      await choose(g.carry, 'carry')
+      await choose(g.drop, 'drop')
+      await choose(g.finish, 'finish')
+      await pg.waitForTimeout(600)
+      const counts = await pg.locator('[data-pile-key]').evaluateAll((els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-pile-key'), e.querySelector('[data-pile-count]').innerText.trim()])))
+      must(counts.finish === '1' && counts.carry === '1' && counts.drop === '1', `the piles read ${JSON.stringify(counts)}`)
+      must(await pg.locator('[data-review-next]').isDisabled(), 'Next is open with a reason and a date missing')
+      await pg.locator(`[data-decide-goal][data-goal="${g.drop}"] [data-decide-reason] input, input[data-decide-reason]`).first().fill('Not worth the time')
+      await pg.locator(`[data-decide-goal][data-goal="${g.finish}"] input[data-decide-date], [data-decide-goal][data-goal="${g.finish}"] [data-decide-date] input`).first().fill(addDays(5))
+      await pg.keyboard.press('Tab')
+      await pg.waitForTimeout(1800)
+      must(await pg.locator('[data-review-next]').isEnabled(), 'Next stays shut: ' + (await pg.locator('[data-review-footer-line]').innerText()))
+      await next()
+      await pg.locator('[data-review-plan]').waitFor({ timeout: 10000 })
+      const first = await pg.locator('[data-plan-goal]').first().innerText()
+      must(first.includes('goal carry') && (await pg.locator('[data-plan-goal]').first().getAttribute('data-carried')) === '1', 'the carried goal is not first in the plan')
+      // Plan: two goals in the order given, and a habit
+      const a = await area()
+      for (const n of ['one', 'two']) {
+        await pg.locator('[data-plan-add]').click()
+        const row = pg.locator('[data-plan-goal]').last()
+        await row.locator('[data-plan-title] input, input[data-plan-title]').first().fill(T('plan ' + n))
+        await row.locator('[data-plan-area]').first().click(); await pg.getByRole('option').first().click()
+      }
+      await pg.waitForTimeout(1800)
+      must(await pg.locator('[data-review-next]').isEnabled(), 'Plan stays shut: ' + (await pg.locator('[data-review-footer-line]').innerText()))
+      await next()
+      await pg.locator('[data-review-reflect]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-went-well] textarea, textarea[data-went-well]').first().fill('I47 went well')
+      await pg.locator('[data-review-next]').click()
+      await pg.locator('[data-review-done]').waitFor({ timeout: 20000 })
+      const out = JSON.parse(sb(`print(json.dumps({"carry": frappe.db.get_value("Life Goal", "${g.carry}", "outcome"), "drop": frappe.db.get_value("Life Goal", "${g.drop}", ["outcome", "result_note"]),
+  "finish": str(frappe.db.get_value("Life Goal", "${g.finish}", "target_date")), "next": [x["title"] for x in journal.month_goals(SP, now.year, now.month)]}))`))
+      must(out.carry === 'Carried', `the carried goal is ${out.carry}`)
+      must(out.drop[0] === 'Dropped' && out.drop[1] === 'Not worth the time', `the dropped goal is ${JSON.stringify(out.drop)}`)
+      must(out.finish === addDays(5), `the finish date is ${out.finish}`)
+      must(out.next.some((t) => t.endsWith('goal carry ' + width + ' ' + stamp)), `this month's plan lacks the carried goal: ${out.next}`)
+    })
+
+    await check(`${tag}.4`, `${width} px: the goals made in Plan are in the order given, and Goals > Cycles shows them`, async () => {
+      const order = JSON.parse(sb(`print(json.dumps([x["title"] for x in journal.month_goals(SP, now.year, now.month) if x["title"].startswith("I47 ") and x["title"].endswith("${width} ${stamp}") and " finish " not in x["title"]]))`))
+      must(order.length === 3 && order[0].includes('goal carry') && order[1].endsWith(`plan one ${width} ${stamp}`) && order[2].endsWith(`plan two ${width} ${stamp}`), `this month's goals are ${order}`)
+      await open('/goals/cycles')
+      await pg.locator('[data-cycles][data-loaded="1"]').waitFor({ timeout: 15000 })
+      const shown = (await pg.locator('[data-month-goal]').allInnerTexts()).filter((t) => !t.includes(' finish ')).map((t) => t.split('\n').find((l) => l.startsWith('I47 ')))
+      must(JSON.stringify(shown.filter(Boolean)) === JSON.stringify(order), `Cycles shows ${shown}, not ${order}`)
+      const reviewed = await s.api('periodic.due', { space: S })
+      must(!reviewed.due.some((d) => d.kind === 'monthly'), 'the monthly review is still due after Lock')
+      must(reviewed.past.some((p) => p.kind === 'Monthly'), 'the locked review is not among the past reviews')
+    })
+
+    cleanup()
+    await check(`${tag}.E`, `${width} px: with no month to look back on, the monthly review says nothing is due`, async () => {
+      await open('/review?kind=monthly')
+      await pg.locator('[data-review-not-due]').waitFor({ timeout: 15000 })
+      must((await pg.locator('[data-review-not-due]').innerText()).includes('No monthly review is due'), 'the empty state does not say so')
+      await noSideways()
+    })
+
+    await check(`${tag}.6`, `${width} px: the 12-week review's Score shows the twelve weekly scores and the cycle view's average`, async () => {
+      const c = seedCycle()
+      await open('/review?kind=12-weeks')
+      await pg.locator('[data-review-score]').waitFor({ timeout: 20000 })
+      await pg.waitForTimeout(800)
+      const grid = await s.api('journal.grid', { space: S, cycle: c.cycle })
+      must(await pg.locator('[data-score-week]').count() === 12, 'Score does not show twelve weeks')
+      const got = await pg.locator('[data-score-week]').evaluateAll((els) => els.map((e) => Number(e.getAttribute('data-score'))))
+      must(JSON.stringify(got) === JSON.stringify(grid.weeks.map((w) => Math.round(w.percent))), `the weeks read ${got}, the grid ${grid.weeks.map((w) => Math.round(w.percent))}`)
+      must((await pg.locator('[data-score-average]').innerText()).trim() === Math.round(grid.average) + '%', 'the average is not the grid\'s')
+      must(await pg.locator('[data-score-goal]').count() === 3, 'Score does not list the three goals')
+      must(await pg.locator('[data-review-title]').innerText() === '12-week review', 'the title is not 12-week review')
+      await noSideways()
+    })
+
+    await check(`${tag}.8`, `${width} px: Goals > Cycles offers the 12-week review, and there is no Close cycle pop-up (its link opens the review)`, async () => {
+      await open('/goals/cycles')
+      await pg.locator('[data-cycles][data-loaded="1"]').waitFor({ timeout: 15000 })
+      const card = pg.locator('[data-review-due][data-review-kind="12-weeks"]')
+      must(await card.isVisible(), 'Cycles does not say the 12-week review is due')
+      must((await card.innerText()).includes('The 12-week review is due'), 'the card does not say so')
+      await open('/today/year?view=goals')
+      await pg.locator('[data-open-cycle-review]').waitFor({ timeout: 15000 })
+      must(!(await pg.getByRole('button', { name: 'Close cycle', exact: true }).count()), 'a Close cycle button is still there')
+      await pg.locator('[data-open-cycle-review]').click()
+      await pg.waitForURL((u) => u.pathname === '/life/review' && u.searchParams.get('kind') === '12-weeks', { timeout: 10000 })
+      await pg.locator('[data-review-kind="12-weeks"], [data-review-not-due]').first().waitFor({ timeout: 20000 })
+      must(await pg.locator('[data-review-kind="12-weeks"]').isVisible(), 'the link did not open the 12-week review')
+    })
+
+    await check(`${tag}.11`, `${width} px: both reviews show ${phone ? 'one tab at a time behind a step bar' : 'numbered tabs'}, and nothing scrolls sideways`, async () => {
+      for (const kind of ['12-weeks', 'monthly']) {
+        if (kind === 'monthly') { seedMonth() }
+        await open(`/review?kind=${kind}`)
+        await pg.locator(`[data-review-kind="${kind}"] [data-review-head]`).waitFor({ timeout: 20000 })
+        const bar = await pg.locator('[data-review-stepbar]').isVisible()
+        const tabs = await pg.locator('[data-review-tab-btn]').first().isVisible()
+        must(phone ? bar && !tabs : !bar && tabs, `${kind}: the step bar is ${bar} and the tabs ${tabs}`)
+        must(await pg.locator('[data-review-score], [data-review-look], [data-review-decide], [data-review-plan], [data-review-reflect]').count() === 1, `${kind}: more than one tab is shown`)
+        if (phone) must(/Step \d of 4/.test(await pg.locator('[data-review-stepbar]').innerText()), `${kind}: the step bar does not say Step n of 4`)
+        await noSideways()
+      }
+      must(!errors.length, 'page errors: ' + errors.join('; '))
+    })
+
+    await check(`${tag}.10`, `${width} px: when a weekly and a monthly review are both due, Review shows the weekly first, then the monthly`, async () => {
+      // no cycle: only the weekly (an open one) and the monthly are due
+      cleanup()
+      seedMonth()
+      sb(`for c in frappe.get_all("Life Cycle", filters={"space": SP, "status": "Active"}, pluck="name"): frappe.db.set_value("Life Cycle", c, "status", "Closed")
+from lifeos.review.record import Review
+Review.start(SP, OWNER)`)
+      const due = (await s.api('periodic.due', { space: S })).due.map((d) => d.kind)
+      must(JSON.stringify(due) === JSON.stringify(['weekly', 'monthly']), `the server says ${due}`)
+      await open('/review')
+      await pg.locator('[data-review-strip]').waitFor({ timeout: 20000 })
+      const chips = await pg.locator('[data-due-kind]').evaluateAll((els) => els.map((e) => e.getAttribute('data-due-kind')))
+      must(JSON.stringify(chips) === JSON.stringify(['weekly', 'monthly']), `the strip shows ${chips}`)
+      await pg.locator('[data-review]').first().waitFor({ timeout: 20000 })
+      must(!(await pg.locator('[data-review-kind]').count()), 'Review did not open on the weekly review')
+      await pg.locator('[data-due-kind="monthly"]').click()
+      await pg.locator('[data-review-kind="monthly"]').waitFor({ timeout: 20000 })
+    })
+
+    await check(`${tag}.9`, `${width} px: a review left after step 2 resumes at step 2 with its decisions kept`, async () => {
+      sb(`frappe.db.delete("Life Review", {"space": SP, "user": OWNER, "kind": "Weekly"})`)
+      const g = JSON.parse(sb(`print(json.dumps({k: frappe.db.get_value("Life Goal", {"space": SP, "title": "I47 goal " + k + " ${width} ${stamp}"}) for k in ("done", "carry", "drop", "finish")}))`))
+      await open('/review?kind=monthly&tab=decide')
+      await pg.locator('[data-review-decide]').waitFor({ timeout: 20000 })
+      await choose(g.carry, 'carry')
+      await choose(g.drop, 'drop')
+      await pg.waitForTimeout(800)
+      await s.open('/life')
+      await open('/review?kind=monthly')
+      await pg.locator('[data-review-decide]').waitFor({ timeout: 20000 })
+      must((await tabNow()) === 'decide', `the review resumed at ${await tabNow()}`)
+      must((await pg.locator(`[data-decide-goal][data-goal="${g.carry}"] [data-choose="carry"]`).getAttribute('aria-pressed')) === 'true', 'the carry decision was lost')
+      must((await pg.locator(`[data-decide-goal][data-goal="${g.drop}"]`).getAttribute('data-pile')) === 'drop', 'the drop decision was lost')
+      must(Number(sb(`print(frappe.db.count("Life Review", {"space": SP, "user": OWNER, "kind": "Monthly", "status": "Open"}))`)) === 1, 'there is more than one open monthly review')
+    })
+
+    await check(`${tag}.7`, `${width} px: deciding each goal and locking closes the cycle with journal.close_cycle's score and makes the next cycle with the carried goals and their lead actions`, async () => {
+      cleanup()
+      const c = seedCycle()
+      await open('/review?kind=12-weeks')
+      await pg.locator('[data-review-score]').waitFor({ timeout: 20000 })
+      await next()
+      await pg.locator('[data-review-decide]').waitFor({ timeout: 10000 })
+      await choose(c.goals.done, 'done')
+      await choose(c.goals.carry, 'carry')
+      await choose(c.goals.drop, 'drop')
+      await pg.locator(`[data-decide-goal][data-goal="${c.goals.drop}"] [data-decide-reason] input, input[data-decide-reason]`).first().fill('Out of scope')
+      await pg.waitForTimeout(1800)
+      await next()
+      await pg.locator('[data-review-plan]').waitFor({ timeout: 10000 })
+      const carried = pg.locator('[data-plan-goal][data-carried="1"]')
+      must(await carried.count() === 1, 'the plan does not hold the one carried goal')
+      await carried.locator('[data-plan-done-when] input, input[data-plan-done-when]').first().fill('I47 shipped by March')
+      await carried.locator('[data-plan-action] input').first().fill('I47 weekly push')
+      await pg.locator('[data-plan-add]').click()
+      const fresh = pg.locator('[data-plan-goal]').last()
+      await fresh.locator('[data-plan-title] input, input[data-plan-title]').first().fill(T('new cycle goal'))
+      await fresh.locator('[data-plan-area]').first().click(); await pg.getByRole('option').first().click()
+      await fresh.locator('[data-plan-done-when] input, input[data-plan-done-when]').first().fill('It is live')
+      await fresh.locator('[data-plan-action] input').first().fill('I47 write')
+      await pg.waitForTimeout(1800)
+      await next()
+      await pg.locator('[data-review-reflect]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-went-well] textarea, textarea[data-went-well]').first().fill('I47 cycle learned')
+      await pg.locator('[data-review-next]').click()
+      await pg.locator('[data-review-done]').waitFor({ timeout: 30000 })
+      const out = JSON.parse(sb(`cyc = frappe.get_doc("Life Cycle", "${c.cycle}")
+nxt = frappe.db.get_value("Life Cycle", {"space": SP, "start_date": journal.next_monday(cyc.end_date)}, ["name", "status"], as_dict=True)
+goals = frappe.get_all("Life Goal", filters={"cycle": nxt.name}, fields=["name", "title", "done_when", "carried_from"], order_by="sort_order asc")
+acts = {g.name: [(a.title, a.per_week) for a in frappe.get_doc("Life Goal", g.name).actions] for g in goals}
+print(json.dumps({"status": cyc.status, "score": cyc.final_score, "next": nxt.status, "goals": goals, "acts": acts,
+  "outcomes": {k: frappe.db.get_value("Life Goal", v, "outcome") for k, v in ${JSON.stringify(c.goals)}.items()}}))`))
+      must(out.status === 'Closed' && out.score === c.expected, `the cycle is ${out.status} with score ${out.score}, journal.close_cycle gives ${c.expected}`)
+      must(out.outcomes.done === 'Achieved' && out.outcomes.carry === 'Carried' && out.outcomes.drop === 'Dropped', `the outcomes are ${JSON.stringify(out.outcomes)}`)
+      must(out.next === 'Planned' && out.goals.length === 2, `the next cycle is ${out.next} with ${out.goals.length} goals`)
+      const kept = out.goals.find((g) => g.carried_from === c.goals.carry)
+      must(kept && kept.done_when === 'I47 shipped by March', 'the carried goal is not in the next cycle with its new Done when')
+      must(JSON.stringify(out.acts[kept.name]) === JSON.stringify([['I47 weekly push', 2]]), `the carried goal's lead actions are ${JSON.stringify(out.acts[kept.name])}`)
+      must(out.goals.some((g) => g.title.includes('new cycle goal')), 'the goal added in Plan is not in the next cycle')
+    })
+  } finally {
+    try { cleanup() } catch (e) { /* reported by the debris check */ }
+    await s.ctx.close()
+  }
+}
+
+// Issue 48: the old Life Project table and the project aliases are gone. (I48.1 to I48.5 and I48.7 are unit tests in
+// lifeos/tests/test_issue48_project_removed.py.)
+await check('I48.6', '/life/projects and an old project link land on Goals', async () => {
+  const pg = owner.page
+  for (const from of ['/life/projects', '/life/projects?status=Done', `/life/projects/${ux.oldProject}`, `/life/projects/${ux.oldProject}?tab=tasks`]) {
+    await owner.open(from)
+    for (let i = 0; i < 20 && pathOf(pg).startsWith('/life/projects'); i++) await pg.waitForTimeout(200)
+    must(pathOf(pg) === '/life/goals', `${from} went to ${pathOf(pg)}`)
+    must(!/not found/i.test(await pg.locator('[data-main]').innerText()), `${from} shows "not found"`)
+  }
+})
 
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {

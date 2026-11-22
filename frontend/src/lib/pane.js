@@ -9,7 +9,6 @@ export const TYPES = {
   change: { label: 'Wiki change' },
   note: { label: 'Note', doctype: 'Life Note' },
   vault: { label: 'Vault document', doctype: 'Life Vault Document' },
-  project: { label: 'Goal' }, // a link to a project from before set 6: the pane opens the goal it became
   goal: { label: 'Goal', doctype: 'Life Goal' },
   page: { label: 'Journal page', doctype: 'Life Journal Page' },
   chat: { label: 'AI chat', doctype: 'Life Chat Log' },
@@ -46,7 +45,6 @@ export function refOfRoute(path) {
   if ((m = /^\/(tasks|vault|chats)\?open=([^&]+)/.exec(p))) return `${{ tasks: 'task', vault: 'vault', chats: 'chat' }[m[1]]}:${decodeURIComponent(m[2])}`
   if ((m = /^\/library\/([^/?]+)$/.exec(p))) return `note:${m[1]}`
   if ((m = /^\/inbox\/([^/?]+)$/.exec(p))) return `inbox:${m[1]}`
-  if ((m = /^\/projects\/([^/?]+)$/.exec(p))) return `project:${m[1]}`
   if ((m = /^\/(?:journal|plan)\/goals\/([^/?]+)$/.exec(p))) return `goal:${m[1]}`
   if ((m = /^\/journal\/pages\/([^/?]+)$/.exec(p))) return `page:${m[1]}`
   return null

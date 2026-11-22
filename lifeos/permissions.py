@@ -160,8 +160,6 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 		return False
 	if doc.doctype == "Life Review" and doc.get("user") and doc.user != user:
 		return False  # a review is its reviewer's own (set 8)
-	if doc.doctype == "Life Project" and ptype not in ("read", "select", "report", "print", "export"):
-		return False  # read-only since projects became goals (set 6); only the migration patch writes, as Administrator
 	if doc.doctype == "Life Wiki Change" and doc.get("note") and vault_hidden(doc.get("space"), user) \
 			and frappe.db.get_value("Life Note", doc.note, "is_sensitive"):
 		return False

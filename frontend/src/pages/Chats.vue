@@ -4,7 +4,7 @@
     :group-by="groupLabel" :watch-keys="['group']" empty-title="No chats yet."
     empty-hint="Your agent logs each AI chat here with a summary and open items. Nothing needs review; open items become tasks only when you press Make task."
     @loaded="(res) => (extra = res)">
-    <template #sub>AI chats in {{ store.space }}<template v-if="extra.with_open_items !== undefined"> ·
+    <template #sub>AI chats{{ inSpace }}<template v-if="extra.with_open_items !== undefined"> ·
       <NumLink :to="{ query: { ...route.query, open_items: '1', open: undefined } }" data-door="chats-open">{{ extra.with_open_items }} with open items</NumLink></template></template>
     <template #bar>
       <span class="text-sm text-ink-gray-6">Listed by</span>
@@ -32,6 +32,7 @@
   </ListView>
 </template>
 <script setup>
+import { inSpace } from '@/lib/lens'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, TabButtons } from 'frappe-ui'

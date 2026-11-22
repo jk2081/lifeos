@@ -2,7 +2,7 @@
   <Teleport defer to="#jr-actions">
     <Button label="All goals" icon-right="lucide-arrow-right" :route="{ path: '/goals', query: { status: 'all' } }" data-all-goals />
     <template v-if="active && canWrite()">
-      <Button v-if="active.past_end" label="Close cycle" @click="openClose" />
+      <Button v-if="active.past_end" label="12-week review" :route="{ path: '/review', query: { kind: '12-weeks' } }" data-open-cycle-review />
       <Button label="Plan next cycle" @click="openPlan" />
       <Button variant="solid" label="Add goal" @click="goalOpen = true" />
     </template>
@@ -48,19 +48,10 @@
       </Checkbox>
     </Row>
   </Dialog>
-
-  <Dialog v-model:open="closeOpen" title="Close cycle" size="2xl" :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Close cycle', variant: 'solid', onClick: closeCycle }]">
-    <p class="mb-2.5 text-sm text-ink-gray-6">Give each goal an outcome and a note. The final score is stored and the cycle becomes read-only.</p>
-    <Row v-for="o in outcomes" :key="o.goal" class="flex-wrap !items-center">
-      <div class="flex-[1_1_180px] font-medium text-ink-gray-9">{{ o.title }} <span class="text-sm font-normal text-ink-gray-6">{{ Math.round(o.percent) }}%</span></div>
-      <Select v-model="o.outcome" class="w-44" :options="OUTCOMES" :aria-label="`Outcome for ${o.title}`" />
-      <TextInput v-model="o.result_note" class="flex-[2_1_200px]" placeholder="Note" :aria-label="`Note for ${o.title}`" />
-    </Row>
-  </Dialog>
 </template>
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Badge, Button, Checkbox, Dialog, Progress, Select, TabButtons, TextInput, toast } from 'frappe-ui'
+import { Badge, Button, Checkbox, Dialog, Progress, TabButtons, toast } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
@@ -71,15 +62,12 @@ import { long } from '@/lib/dates'
 
 const emit = defineEmits(['sub'])
 const OUTCOME = { 'In Progress': 'blue', Achieved: 'green', 'Partly Achieved': 'green', 'Not Achieved': 'red', Carried: 'amber', Dropped: 'red', Draft: 'gray' }
-const OUTCOMES = ['Achieved', 'Partly Achieved', 'Not Achieved', 'Carried', 'Dropped']
 const ALL = '__all__' // the "All areas" choice of the area switch
 const d = ref(null)
 const area = ref('')
 const goalOpen = ref(false)
 const planOpen = ref(false)
-const closeOpen = ref(false)
 const carry = ref([])
-const outcomes = ref([])
 const all = ref(null) // unfiltered, for the dialogs
 const active = computed(() => (all.value || d.value)?.cycles.find((c) => c.status === 'Active'))
 
@@ -118,19 +106,6 @@ async function plan() {
   if (res) {
     toast.success(`${res.title} is planned, starting ${long(res.start_date, true)}.`)
     planOpen.value = false
-    area.value = ''
-    load()
-  }
-}
-function openClose() {
-  outcomes.value = active.value.goals.map((g) => ({ goal: g.name, title: g.title, percent: g.percent, outcome: g.outcome === 'In Progress' ? (g.percent >= d.value.target ? 'Achieved' : 'Partly Achieved') : g.outcome, result_note: g.result_note || '' }))
-  closeOpen.value = true
-}
-async function closeCycle() {
-  const res = await tryCall(() => api('journal.close_cycle', { cycle: active.value.name, outcomes: outcomes.value }))
-  if (res) {
-    toast.success(`Cycle closed with a final score of ${Math.round(res.final_score)}%.`)
-    closeOpen.value = false
     area.value = ''
     load()
   }

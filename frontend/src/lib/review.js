@@ -46,6 +46,8 @@ export function provideReview() {
 }
 
 export const useReview = () => inject(KEY)
+// the monthly and 12-week reviews (issue 47) provide their own state of the same shape, so the shell's header and footer are shared
+export const provideShell = (r) => provide(KEY, r)
 
 export const PILE_TEXT = {
   keep: { title: 'Keep', dot: 'bg-surface-green-7', verb: 'Keep all', done: 'kept', inbox: { line: 'proposals accepted as they are', verb: 'Accept all', done: 'accepted' },

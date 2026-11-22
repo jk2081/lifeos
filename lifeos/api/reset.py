@@ -199,9 +199,6 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 	_person()
 	if decision not in DECISIONS:
 		frappe.throw(_("decision must be one of: {0}.").format(", ".join(DECISIONS)))
-	doctype = "Life Goal" if doctype == "Life Project" else doctype  # for one set: a project is the goal it became
-	if doctype == "Life Goal" and frappe.db.exists("Life Project", name):
-		name = frappe.db.get_value("Life Project", name, "migrated_to") or name
 	if doctype not in ("Life Task", "Life Goal"):
 		frappe.throw(_("Reset decides on tasks and goals."))
 	doc = permissions.get_doc_checked(doctype, name, "delete" if decision == "delete" else "write")

@@ -1,14 +1,10 @@
 """UX fixes, set 5: fill the new dates on existing rows, so the counts that read them see every record.
-- Life Project.last_activity_on: the later of the project's own last change and its tasks' last change.
 - Life Note.last_opened_on: the day it was made (nobody's opening was recorded before).
 - Life Task.last_touched_on, where empty: the day it was made."""
 import frappe
 
 
 def execute():
-	frappe.db.sql("""update `tabLife Project` p set p.last_activity_on = greatest(date(p.modified),
-		ifnull((select max(ifnull(t.last_touched_on, date(t.modified))) from `tabLife Task` t where t.project = p.name), date(p.modified)))
-		where p.last_activity_on is null""")
 	frappe.db.sql("update `tabLife Note` set last_opened_on = date(creation) where last_opened_on is null")
 	frappe.db.sql("""update `tabLife Index` x join `tabLife Note` n on n.name = x.ref_name and x.ref_doctype = 'Life Note'
 		set x.last_opened_on = n.last_opened_on where x.last_opened_on is null""")

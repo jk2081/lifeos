@@ -94,7 +94,7 @@ class TestSomeday(LifeTestCase):
 		self.assertTrue({t.name, p.name, g.name, idea["name"], thought["name"]} <= got)
 		self.assertEqual(lst["tabs"]["notes"], 1)
 		self.assertEqual(lst["tabs"]["goals"], 2)
-		self.assertEqual(someday.list(space=PRIVATE, tab="projects")["total"], 2)  # "projects" is read as "goals" for one set
+		self.assertEqual(someday.list(space=PRIVATE, tab="goals")["total"], 2)
 		row = next(r for r in lst["rows"] if r.name == p.name)
 		self.assertEqual(row["tasks"], 2)
 		self.assertEqual(lst["tabs"]["due"], 0)

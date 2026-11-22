@@ -6,7 +6,6 @@ from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import files, links, permissions, proposals
-from lifeos.proposals import goal_for_project
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts, user_names
 from lifeos.api.utils import order_by as sort_order
 
@@ -66,11 +65,11 @@ INTENTS = ("Process", "Add to wiki", "Just keep")
 @frappe.whitelist(methods=["POST"])
 def create_item(title: str | None = None, source_type: str = "Upload", space: str | None = None, raw_text: str | None = None,
 		instruction: str | None = None, source_url: str | None = None, intent: str | None = None, source_system: str | None = None,
-		external_id: str | None = None, area: str | None = None, goal: str | None = None, project: str | None = None):
+		external_id: str | None = None, area: str | None = None, goal: str | None = None):
 	"""Create an inbox item. Attach files afterwards with /api/method/upload_file (doctype, docname, is_private=1).
 
 	intent: Process (the default), Add to wiki or Just keep. With source_system (gmail, claude, upload…) the space's connection for
-	that system gives the default intent, area and goal (`project` names the goal a project became). With source_system and external_id (the original's ID in that system)
+	that system gives the default intent, area and goal. With source_system and external_id (the original's ID in that system)
 	an item that already exists is updated instead of created: every argument passed (title, raw_text, source_url, instruction,
 	intent, area, goal) replaces the old value and an argument left out keeps it. A Done item whose content changed, or a Done or
 	Failed item whose intent changed, goes back to New so the agent processes it again. The answer carries `created` and `updated`
@@ -84,8 +83,6 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 		frappe.throw(_("intent must be one of: {0}.").format(", ".join(INTENTS)))
 	system = (source_system or "").strip().lower() or None
 	connections.require_on(space, system)
-	if project and not goal:
-		goal = goal_for_project(project, space)
 	existing = frappe.db.get_value("Life Inbox Item", {"space": space, "source_system": system, "external_id": external_id.strip()}) \
 		if system and (external_id or "").strip() else None
 	if existing:
@@ -188,8 +185,7 @@ def claim_next(space: str | None = None):
 
 
 def space_context(space):
-	"""What an agent needs to file proposals: the space's areas, people, habits, dimensions and goals in progress (projects
-	became open-ended goals in set 6).
+	"""What an agent needs to file proposals: the space's areas, people, habits, dimensions and goals in progress.
 	`areas` (issue 11) holds the areas of life that are on, each followed by its parts: file only into these. `areas_off`
 	names the areas of life that are switched off; nothing may be filed there, and their goals are left out."""
 	from lifeos import areas as life

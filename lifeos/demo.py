@@ -44,20 +44,17 @@ def load(space="Private"):
 	for name, relation in (("Jai", "Self"), ("Ruchi", "Wife"), ("Anya", "Daughter"), ("Vivek", "Accountant")):
 		people[name] = t.insert({"doctype": "Life Person", "space": space, "full_name": name, "relation": relation}).name
 
-	def project(title, area_name, status="Active", outcome=None, target=None):
-		# what were projects before set 6 are open-ended goals; the project itself is kept, read-only, pointing at the goal it
-		# became, as the set 6 migration leaves it (old links to a project still find its goal)
+	def open_goal(title, area_name, status="Active", outcome=None, target=None):
+		# an open-ended goal: a long-term goal with a finish line
 		goal = t.insert({"doctype": "Life Goal", "space": space, "title": title, "area": area[area_name], "horizon": "Long term",
 			"on_hold": 1 if status == "On Hold" else 0, "done_when": outcome, "measure_kind": "Milestone" if outcome else None, "target_date": target}).name
-		t.insert({"doctype": "Life Project", "space": space, "title": title, "area": area[area_name], "status": status, "outcome": outcome,
-			"target_date": target, "migrated_to": goal}, allow_migration=True)
 		return goal
 
-	ghl = project("Ghillidary turnaround", "Tea & Coffee", outcome="A drainage and replanting plan for the poor sections", target="2026-12-31")
-	mandir = project("Ghatia mandir", "Tea & Coffee", outcome="Contractor appointed within the budget")
-	audit = project("RMT internal audit", "Tea & Coffee", "On Hold", "First internal audit completed")
-	funnel = project("Owner outreach funnel", "Business That Works", outcome="Twenty owner conversations booked")
-	dalmia = project("Dalmia Gold", "Business That Works", outcome="Blend blueprint agreed with Mithun")
+	ghl = open_goal("Ghillidary turnaround", "Tea & Coffee", outcome="A drainage and replanting plan for the poor sections", target="2026-12-31")
+	mandir = open_goal("Ghatia mandir", "Tea & Coffee", outcome="Contractor appointed within the budget")
+	audit = open_goal("RMT internal audit", "Tea & Coffee", "On Hold", "First internal audit completed")
+	funnel = open_goal("Owner outreach funnel", "Business That Works", outcome="Twenty owner conversations booked")
+	dalmia = open_goal("Dalmia Gold", "Business That Works", outcome="Blend blueprint agreed with Mithun")
 
 	goals = {g.title: g.name for g in frappe.get_all("Life Goal", filters={"space": space, "cycle": ("like", "%")}, fields=["name", "title", "cycle"])
 		if frappe.db.get_value("Life Cycle", g.cycle, "status") == "Active"}

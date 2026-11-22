@@ -4,7 +4,7 @@
     :virtual="VIRTUAL" :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => r.ref" :row-key="(r) => r.ref" :row-label="(r) => r.title || 'Untitled'"
     :quiet="['open_items', 'archived']" :flag-labels="{ sensitive: 'Sensitive only', open_items: 'With open items', archived: 'Include archived' }" :group-by="groupBy" :empty-title="EMPTY[list?.tab] || 'No sources yet.'" :watch-keys="['view', 'by']" @loaded="(res) => (extra = res)"
     empty-hint="Everything captured lands here: files, voice notes, photos, pasted text, links, emails and AI chats. Add some from the Inbox.">
-    <template #sub>{{ place === 'all' ? 'Every note and capture' : 'Everything captured' }} in {{ store.space }}, finished or not. The Inbox holds what is still to do.<template v-if="extra.with_open_items !== undefined"> ·
+    <template #sub>{{ place === 'all' ? 'Every note and capture' : 'Everything captured' }}{{ inSpace }}, finished or not. The Inbox holds what is still to do.<template v-if="extra.with_open_items !== undefined"> ·
       <NumLink :to="{ query: { ...route.query, open_items: '1', open: undefined } }" data-door="chats-open">{{ extra.with_open_items }} with open items</NumLink></template></template>
     <template #actions>
       <Select v-if="!embed" class="w-48" :model-value="route.query.by || ''" :options="WRITTEN_BY" aria-label="Written by" data-captures-by
@@ -76,6 +76,7 @@
   </Dialog>
 </template>
 <script setup>
+import { inSpace } from '@/lib/lens'
 // Sources: the library of every capture, finished or not (UX fixes, set 4). Inbox items and chat logs, read from Life Index.
 // Tabs by kind; List by default, a Grid of thumbnails on Photos (and as a view on All), and By day on Chats (the old chats report).
 import { computed, h, onMounted, ref } from 'vue'

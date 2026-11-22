@@ -4,7 +4,7 @@
     :virtual="VIRTUAL" :hidden="HIDDEN" :quick="['title', 'area', 'goal']" :fetch="fetchList" :row-ref="(r) => (r.kind === 'Journal page' ? 'page:' : 'note:') + r.name" :watch-keys="embed ? [] : ['by']"
     :empty-title="collection === 'Wiki' ? 'No wiki pages here yet.' : 'No notes yet.'"
     :empty-hint="collection === 'Wiki' ? 'The agent writes wiki pages from the sources you add with Add to wiki.' : 'Notes hold reference material and notes on your goals, in Markdown. Add one with New note.'">
-    <template #sub>{{ by === 'assistant' ? 'Notes the assistant keeps from your sources, in' : by === 'me' ? 'Notes you wrote, in' : 'Every note in' }} {{ store.space }}</template>
+    <template #sub>{{ by === 'assistant' ? 'Notes the assistant keeps from your sources' : by === 'me' ? 'Notes you wrote' : 'Every note' }}{{ inSpace }}</template>
     <template #actions><slot name="actions" /></template>
     <!-- the rules the assistant follows, pinned at the top of its notes -->
     <template v-if="by === 'assistant' && rules" #above>
@@ -27,6 +27,7 @@
   </ListView>
 </template>
 <script setup>
+import { inSpace } from '@/lib/lens'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Badge } from 'frappe-ui'

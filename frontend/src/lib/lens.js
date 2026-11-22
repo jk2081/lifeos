@@ -1,16 +1,16 @@
-// The lens (UX fixes, set 6): the space and area every place narrows to. It lives in the URL as `space=` and `area=`,
-// so a reload, Back and a copied link keep it, and it is remembered per user with the other view state (lib/views.js,
-// screen "lens", across spaces). Choosing an area includes its sub-areas; the server does that (lifeos.api.utils.area_filter).
-//
-// Links built anywhere in the app need not carry the lens: the guard below adds it to every navigation that has none.
-// Clearing the area goes through setLens, which empties the state first so the guard does not put it back.
+// Issue 46: there is no lens. What is left of it:
+//  - `?area=` names the area a page narrows to. Each page reads it as its own area filter, and it is not carried to the
+//    next page; a page without an area filter of its own shows it as a chip in its header (clearArea removes it).
+//  - `?space=` is honoured only when the site has two or more spaces (a one-space site never shows a space), and then
+//    it is carried to every page and remembered, as before.
+// Choosing an area includes its sub-areas; the server does that (lifeos.api.utils.area_filter).
 import { computed } from 'vue'
 import router from '@/router'
 import { store } from './store'
 import { lookups } from './lookups'
 import { saveView, savedView } from './views'
 
-// the state is the store's lensArea, so lib/store.js can count under the lens without importing this module
+// the state is the store's lensArea (the page's area from the URL), so lib/store.js can count under it without importing this module
 export const lens = { get area() { return store.lensArea }, set area(v) { store.lensArea = v || '' } }
 
 // the dot of an area: a frappe-ui surface token, written out so Tailwind keeps every class
@@ -22,78 +22,59 @@ export const dotClass = (area) => DOTS[area?.colour] || DOTS.gray
 
 export const lensArea = computed(() => (lens.area && (lookups.areas || []).find((a) => a.name === lens.area)) || null)
 export const lensAreaName = computed(() => (lens.area ? lensArea.value?.area_name || 'This area' : 'All of life'))
-/** "Private · All of life": the lens in words, for the picker and the phone's title. */
-export const lensLabel = computed(() => `${store.space || 'No space'} · ${lensAreaName.value}`)
-/** The lens as list arguments: { area } or {}. */
-export const lensArgs = () => (lens.area ? { area: lens.area } : {})
 
-/** The active areas of the space as a tree: top-level areas in their order, each with its sub-areas. */
-export const lensTree = computed(() => {
-  const all = lookups.areas || []
-  const top = all.filter((a) => !a.parent_area || !all.some((p) => p.name === a.parent_area))
-  const below = (a, depth) => all.filter((c) => c.parent_area === a.name).flatMap((c) => [{ ...c, depth }, ...below(c, depth + 1)])
-  return top.flatMap((a) => [{ ...a, depth: 0 }, ...below(a, 1)])
-})
-/** The areas pinned to the sidebar under "Focus on an area", in the areas' order. */
-export const pinnedAreas = computed(() => (lookups.areas || []).filter((a) => a.is_pinned))
+/** True when the site has two or more spaces that are not archived: only then is a space shown anywhere. */
+export const manySpaces = computed(() => store.spaces.length > 1)
+/** " in <space>" for a sentence, and nothing with one space. */
+export const inSpace = computed(() => (manySpaces.value ? ` in ${store.space}` : ''))
 
-const remember = () => saveView('lens', { space: store.space, area: lens.area }, '')
+const remember = () => saveView('lens', { space: store.space }, '')
+const known = (s) => s && store.spaces.some((x) => x.name === s)
 
-/** Change the lens. A new space starts on All of life unless an area of it is given. */
-export function setLens({ space, area } = {}) {
-  if (space !== undefined && space !== store.space) {
-    store.space = space
-    lens.area = area || ''
-  } else if (area !== undefined) {
-    lens.area = area || ''
-  }
+/** Change the space (two or more spaces only). */
+export function setSpace(space) {
+  if (!manySpaces.value || space === store.space) return
+  store.space = space
+  lens.area = ''
   remember()
   const cur = router.currentRoute.value
-  router.push({ path: cur.path, query: { ...cur.query, space: store.space || undefined, area: lens.area || undefined }, hash: cur.hash })
+  router.push({ path: cur.path, query: { ...cur.query, space, area: undefined }, hash: cur.hash })
 }
-export const clearArea = () => setLens({ area: '' })
+/** Remove the page's area filter. */
+export function clearArea() {
+  const cur = router.currentRoute.value
+  const { area: _a, ...query } = cur.query
+  lens.area = ''
+  router.push({ path: cur.path, query, hash: cur.hash })
+}
 
-/** Once the session is known: take the lens from the URL, or the remembered one, and write it into the URL. */
+/** Once the session is known: take the space from the URL, or the remembered one (two or more spaces only). */
 export async function initLens() {
-  // the first navigation must be resolved first: before it, the current route is the start route "/", and replacing with
-  // it sent a deep link (a reload, a copied URL) to Today
+  // the first navigation must be resolved first: before it, the current route is the start route "/"
   await router.isReady()
   const q = router.currentRoute.value.query
-  const saved = savedView('lens', '') || {}
-  const known = (s) => s && store.spaces.some((x) => x.name === s)
-  if (known(q.space)) store.space = String(q.space)
-  else if (known(saved.space)) store.space = saved.space
-  if (q.area !== undefined) lens.area = String(q.area || '')
-  else if (saved.space === store.space && saved.area) lens.area = saved.area
-  const cur = router.currentRoute.value
-  router.replace({ path: cur.path, query: { ...cur.query, space: store.space || undefined, area: lens.area || undefined }, hash: cur.hash })
+  if (manySpaces.value) {
+    const saved = savedView('lens', '') || {}
+    if (known(q.space)) store.space = String(q.space)
+    else if (known(saved.space)) store.space = saved.space
+  }
+  lens.area = String(q.area || '')
+  if (manySpaces.value) {
+    const cur = router.currentRoute.value
+    router.replace({ path: cur.path, query: { ...cur.query, space: store.space || undefined }, hash: cur.hash })
+  }
 }
 
-// Every navigation carries the lens. A URL that names one (a copied link, Back) sets it.
+// Every page takes its area from its own URL. On a site with two or more spaces the space is carried to every page.
 router.beforeEach((to) => {
   if (!store.ready || to.path.startsWith('/dev/')) return true
-  const q = { ...to.query }
-  let add = false
-  if (q.space && q.space !== store.space && store.spaces.some((x) => x.name === q.space)) {
-    store.space = String(q.space)
-    if (q.area === undefined) lens.area = ''
+  lens.area = String(to.query.area || '')
+  if (!manySpaces.value) return true
+  if (known(to.query.space) && to.query.space !== store.space) {
+    store.space = String(to.query.space)
     remember()
-  } else if (!q.space && store.space) {
-    q.space = store.space
-    add = true
+    return true
   }
-  if (q.area !== undefined) {
-    if (String(q.area || '') !== lens.area) {
-      lens.area = String(q.area || '')
-      remember()
-    }
-    if (!q.area) {
-      delete q.area
-      add = true
-    }
-  } else if (lens.area) {
-    q.area = lens.area
-    add = true
-  }
-  return add ? { path: to.path, query: q, hash: to.hash } : true
+  if (!to.query.space && store.space) return { path: to.path, query: { ...to.query, space: store.space }, hash: to.hash }
+  return true
 })

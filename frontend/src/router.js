@@ -10,12 +10,6 @@ const BRAIN = ['activity', 'captures', 'sources', 'skills', 'outbox', 'queue']
 const GOALS = ['tasks', 'no-goal', 'cycles', 'someday']
 const LIBRARY = ['notes', 'documents', 'people', 'chats', 'files', 'timeline', 'archive']
 
-// the Projects screen's query on the Goals tab: open-ended goals, and a project's status as a goal state
-const STATE = { Active: 'in_progress', 'On Hold': 'in_progress', Done: 'achieved', Dropped: 'closed', Someday: 'someday', all: 'all', current: 'in_progress' }
-function projectQuery(q) {
-  const { status, ...rest } = q
-  return { ...rest, type: 'Long term', ...(status ? { status: STATE[status] || 'in_progress' } : {}) }
-}
 // an old route that lands on a tab with its query carried over, and a few parameters of its own
 const to = (path, extra = {}) => (r) => ({ path, query: { ...r.query, ...(typeof extra === 'function' ? extra(r) : extra) }, hash: r.hash })
 // Captures (set 6) is the list at Brain > Captures (Activity, issue 18, is the feed beside it): everything that came in. Opened on Documents or Chats it is that tab of the
@@ -76,8 +70,8 @@ const routes = [
   { path: '/tasks', redirect: to('/goals/tasks') },
   { path: '/someday', redirect: to('/goals/someday') },
   { path: '/outbox', redirect: to('/brain/outbox') },
-  { path: '/projects', redirect: (r) => ({ path: '/goals', query: projectQuery(r.query) }) },
-  { path: '/projects/:id', name: 'Project', component: page('ProjectRedirect'), props: true },
+  // the old Projects screen and a project's page: projects were goals from set 6 and the table is gone (issue 48)
+  { path: '/projects/:id?', redirect: '/goals' },
   { path: '/reset', redirect: to('/today/week', { view: 'review', step: 'reset' }) },
   { path: '/calendar/:view?', redirect: (r) => {
     const v = r.params.view

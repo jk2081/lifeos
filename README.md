@@ -1,6 +1,6 @@
 # Life OS
 
-A personal operating system on Frappe v16: inbox and review, tasks, calendar, a journal that mirrors a paper journal, areas and projects, a library, a vault, and a chat log. Agents capture and propose; the owner approves.
+A personal operating system on Frappe v16: inbox and review, tasks, calendar, a journal that mirrors a paper journal, areas and goals, a library, a vault, and a chat log. Agents capture and propose; the owner approves.
 
 - The app is `lifeos`, served at `/life`. It needs Frappe Framework v16 and nothing else (no ERPNext). It installs beside Folio and touches none of its DocTypes.
 - `docs/DIRECTION.md` is the target design; work comes from GitHub issues (`docs/BUILDING.md`). The original build spec is `docs/history/SPEC.md`. `DECISIONS.md` lists every default and every difference from it. `STATUS.md` says what works, what is stubbed and what is untested.
@@ -118,15 +118,15 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `archive.set` | `doctype, name, archived=1` | Archive or restore one record. For a project, its records follow. |
-| `archive.restore` | `doctype, name` | Bring an archived record back. Restoring a project restores the records archived with it. |
-| `archive.list` | `space=None, area=None, start=0, page_length=50` | Archived records by area, newest first, plus archived projects. `tabs` in the answer counts the records of each type under the same filters. |
+| `archive.set` | `doctype, name, archived=1` | Archive or restore one record. For a goal, the records filed under it follow. |
+| `archive.restore` | `doctype, name` | Bring an archived record back. Restoring a goal restores the records archived with it. |
+| `archive.list` | `space=None, area=None, start=0, page_length=50` | Archived records by area, newest first, plus archived goals. `tabs` in the answer counts the records of each type under the same filters. |
 
 **`lifeos.api.area`**
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `area.get` | `area, include_archived=0` | An area page: sub-areas, active projects, open tasks, reference notes, documents, recent chats with their open items, the last 20 timeline entries, the goals of the active cycle, and records from other areas that are also filed here. |
+| `area.get` | `area, include_archived=0` | An area page: sub-areas, open-ended goals, open tasks, reference notes, documents, recent chats with their open items, the last 20 timeline entries, the goals of the active cycle, and records from other areas that are also filed here. |
 | `area.tree` | `space=None, include_archived=0, include_off=0` | Every area of a space with its parent and small counts, for the Areas screen and for pickers: each area of life followed by its parts. Areas that are off are left out unless `include_off=1`. |
 
 **`lifeos.api.calendar`**
@@ -143,8 +143,8 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `chats.report` | `space=None, from_date=None, to_date=None, group_by='day', start=0, page_length=100` | Chat logs between two dates (default: the last seven days), grouped by day, area or project, with their open items rolled up. The same records come back under each group_by. |
-| `chats.log` | `space=None, title=None, date=None, url=None, assistant='Claude', summary_md=None, open_items=None, area=None, project=None, also_in=None` | Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal. open_items is a list of strings. area, project and tags take a name or a title. |
+| `chats.report` | `space=None, from_date=None, to_date=None, group_by='day', start=0, page_length=100` | Chat logs between two dates (default: the last seven days), grouped by day, area or goal, with their open items rolled up. The same records come back under each group_by. |
+| `chats.log` | `space=None, title=None, date=None, url=None, assistant='Claude', summary_md=None, open_items=None, area=None, also_in=None` | Record an AI chat. Agents may call this directly: a chat log is a record of what happened, not a proposal. open_items is a list of strings. area and goal take a name or a title. |
 | `chats.make_task` | `chat, row` | Turn an open item into a task. People only: an open item becomes a task only when the owner asks. |
 | `chats.close_item` | `chat, row, reopen=0` | Close an open item without making a task, or open it again. |
 
@@ -184,11 +184,11 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `journal.tick` | `action, week, count` | Set the ticks of a goal action in a week. Returns that week's score. |
 | `journal.week_score` | `cycle=None, week=None, space=None` | Done over planned for a week of a cycle. Defaults: the active cycle and its current week. |
 | `journal.set_action_status` | `action, status` | Mark an action Done once and for all, Dropped, or Open again. |
-| `journal.save_goal` | `goal=None, cycle=None, title=None, area=None, project=None, actions=None` | Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}. |
+| `journal.save_goal` | `goal=None, cycle=None, title=None, area=None, actions=None` | Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}. |
 | `journal.delete_goal` | `goal` |  |
 | `journal.goals` | `space=None, area=None` | Every goal across every cycle, grouped by cycle: planned, active, then closed, newest first. |
 | `goals.list` | `space=None, state='in_progress', horizon=None, area=None, cycle=None, target_from=None, target_to=None, start=0, page_length=50, filters=None, order_by=None, summary=None` | Goals of every type with `tasks_done`, `tasks_counted` and `score` (12 Week Year only), the state `tabs` and a `summary_line`. |
-| `goals.create` | `title, horizon=None, space=None, area=None, project=None, target_date=None, cycle=None` | Create a goal. The horizon (Long term, Year, 12 weeks, Month) follows the target date and cycle when not given; Year and Month need a target date. Not for agents. |
+| `goals.create` | `title, horizon=None, space=None, area=None, target_date=None, cycle=None` | Create a goal. The horizon (Long term, Year, 12 weeks, Month) follows the target date and cycle when not given; Year and Month need a target date. Not for agents. |
 | `goals.suggest_horizon` | `space=None, target_date=None, cycle=None` | The horizon the goal form sets from the date, and whether 12-week goals follow the quarter. |
 | `goals.close` | `goal, outcome, result_note=None` | Set the outcome of a goal that is not a 12-week goal. Not for agents. |
 | `goals.add_to_cycle` | `goal, cycle` | Move a goal into the active or a planned 12 Week Year, with its tasks. Not for agents. |
@@ -221,9 +221,9 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `library.tree` | `space=None, include_archived=0` | Every note of a space with what the tree needs: title, parent, area and project. At most 100 per call would hide notes, so the tree returns light rows only and is capped at 2,000. |
+| `library.tree` | `space=None, include_archived=0` | Every note of a space with what the tree needs: title, parent, area and goal. At most 100 per call would hide notes, so the tree returns light rows only and is capped at 2,000. |
 | `library.get` | `note` | One note with its links resolved to current titles. |
-| `library.save` | `note=None, space=None, title=None, content_md=None, area=None, project=None, parent_note=None, also_in=None` | Create or change a note. On save its [[Title]] links are parsed and stored in Life Link. |
+| `library.save` | `note=None, space=None, title=None, content_md=None, area=None, parent_note=None, also_in=None` | Create or change a note. On save its [[Title]] links are parsed and stored in Life Link. |
 | `library.versions` | `note` | Saved versions of a note, from Frappe's document versioning. |
 
 **`lifeos.api.links`**
@@ -231,7 +231,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | Method | Arguments | Does |
 | --- | --- | --- |
 | `links.backlinks` | `doctype, name` | Records that link to this one with [[Title]], plus records tied to it by a field. |
-| `links.suggest` | `space=None, text='', limit=12` | Records for the [[ picker: notes, tasks, people, vault documents, chat logs, goals and projects whose title matches. |
+| `links.suggest` | `space=None, text='', limit=12` | Records for the [[ picker: notes, tasks, people, vault documents, chat logs, goals whose title matches. |
 | `links.outgoing` | `doctype, name` | The stored links of a record, with each target's current title, for rendering. |
 
 **`lifeos.api.meta`**
@@ -240,15 +240,6 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | --- | --- | --- |
 | `meta.proposal_schema` |  | For each proposal kind: the allowed payload fields and an example. Call once before the first submission. |
 | `meta.space_context` | `space=None` | Areas, people, habits, dimensions and active goals of a space, for filing proposals. `areas` holds the areas of life that are on, each followed by its parts; `areas_off` names those that are off. |
-
-**`lifeos.api.projects`**
-
-| Method | Arguments | Does |
-| --- | --- | --- |
-| `projects.list` | `space=None, include_done=0` | Every active project of a space, grouped by area. On hold projects are included; done ones on request. `tabs` in the answer counts the projects on each state tab (Active, On Hold, Done, Dropped, all) under the same filters. |
-| `projects.get` | `project` | A project page: its tasks, notes, documents and chats. |
-| `projects.completion_info` | `project` | How many records will move to the Archive when the project is completed. Shown in the confirm dialog. |
-| `projects.set_status` | `project, status` | Change a project's status. Done or Dropped archives it at once with every record whose project points to it. |
 
 **`lifeos.api.review`**
 
@@ -289,9 +280,9 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `tasks.list` | `space=None, status='open', area=None, project=None, priority=None, goal=None, month_plan=None, include_archived=0, start=0, page_length=50` | Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first. `status=open_doing` leaves Waiting tasks out. `tabs` in the answer counts the tasks on each state tab (open = Open and Doing, loops, Waiting, Done, all) under the same filters. |
+| `tasks.list` | `space=None, status='open', area=None, priority=None, goal=None, month_plan=None, include_archived=0, start=0, page_length=50` | Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first. `status=open_doing` leaves Waiting tasks out. `tabs` in the answer counts the tasks on each state tab (open = Open and Doing, loops, Waiting, Done, all) under the same filters. |
 | `tasks.get` | `task` |  |
-| `tasks.quick_add` | `text, space=None, area=None, project=None, goal=None, due_date=None, priority=None, month_plan=None` | Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date. |
+| `tasks.quick_add` | `text, space=None, area=None, goal=None, due_date=None, priority=None, month_plan=None` | Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date. |
 | `tasks.set_status` | `task, status, waiting_on=None` | Change a task's status. Done fills completed_on. Waiting needs waiting_on. |
 | `tasks.update` | `task, values` | Change fields of a task. Only task fields a person edits are accepted. |
 | `tasks.confirm_area` | `task, area=None` | Confirm the area the Brain guessed for a task (a task saved without an area gets one, marked `area_guessed` with `area_confidence`), or move it to `area`. Either clears the mark; a move is kept as an area correction in `Life Action Log`. |
