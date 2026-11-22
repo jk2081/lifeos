@@ -23,8 +23,8 @@ class LifeTestCase(IntegrationTestCase):
 			if not frappe.db.exists("Life Space", name):
 				frappe.get_doc({"doctype": "Life Space", "space_name": name, "owner_user": OWNER,
 					"members": [{"user": u, "access": "Write"} for u in members]}).insert()
-		cls.areas = seed.make_areas(PRIVATE, ["Tea", "Personal", "Money"])
-		cls.shared_areas = seed.make_areas(SHARED, ["Family", "Work"])
+		cls.areas = seed.make_areas(PRIVATE, ["Tea", "Personal", "Money"], under={"Personal": "Health"})
+		cls.shared_areas = seed.make_areas(SHARED, ["Family", "Work"], under={"Family": "Relationships"})
 		# issue 11: the seven areas of life of each space; "Tea" and "Work" are parts of Career, "Personal" of Health
 		cls.life = areas.life_areas(PRIVATE)
 		cls.shared_life = areas.life_areas(SHARED)

@@ -26,7 +26,7 @@ export const libraryPath = tabPath('/library', LIBRARY_TABS)
 // (I, once the Inbox, opens the Brain; P, once Plan, opens Today's Week; U, once Captures, opens Brain > Activity).
 export const GO = [
   ...PLACES, REVIEW,
-  { label: 'Plan, now Today: Week', to: '/today/week', key: 'p' }, { label: 'Today: Week', to: '/today/week', key: 'w' },
+  { label: 'Today: Week', to: '/today/week', key: 'p' }, { label: 'Today: Week', to: '/today/week', key: 'w' },
   { label: 'Today: Month', to: '/today/month', key: 'm' }, { label: 'Goals: Cycles (12 Weeks)', to: '/goals/cycles', key: 'j' },
   { label: 'Today: Year', to: '/today/year', key: 'c' }, { label: 'Today: Reset', to: '/today/reset', key: 'e' },
   { label: 'Goals: All tasks', to: '/goals/tasks', key: 'k' }, { label: 'Goals: Someday', to: '/goals/someday', key: 'y' },

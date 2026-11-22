@@ -511,15 +511,6 @@ def tab_counts_of(space, goal, include_archived=0):
 	}
 
 
-@frappe.whitelist(methods=["GET"])
-def completion_info(goal: str):
-	"""How many records will move to the Archive when an open-ended goal is completed. Shown in the confirm dialog."""
-	from lifeos import archive
-
-	doc = permissions.get_doc_checked("Life Goal", goal)
-	return {"goal": doc.name, "title": doc.title, "records": archive.goal_record_count(doc.name)}
-
-
 @frappe.whitelist(methods=["POST"])
 def set_status(goal: str, status: str):
 	"""Change an open-ended goal's state as a project's was changed: Active, On Hold, Done or Dropped. Done or Dropped

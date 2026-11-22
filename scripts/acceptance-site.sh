@@ -1,5 +1,5 @@
 #!/bin/bash
-# (Re)create the throwaway site acceptance.localhost on the local bench, with the test users, the seed and the demo data.
+# (Re)create the throwaway site acceptance.localhost on the local bench, with the test users and the demo data.
 # tools/acceptance.mjs runs against it (http://localhost:19000), so lifeos.localhost stays clean for the owner.
 #   scripts/acceptance-site.sh          fresh site from a saved snapshot (made on first use)
 #   scripts/acceptance-site.sh --new    drop the snapshot and build the site from scratch
@@ -30,7 +30,6 @@ else
       bench --site $SITE set-config allow_tests true >/dev/null
       bench --site $SITE execute lifeos.devtools.prepare_site >>/tmp/acc-site.log 2>&1
       bench --site $SITE execute lifeos.devtools.setup_users --kwargs \"{'password': '\$LIFEOS_PW'}\" >>/tmp/acc-site.log 2>&1
-      bench --site $SITE execute lifeos.seed.load >>/tmp/acc-site.log 2>&1
       bench --site $SITE execute lifeos.demo.load >>/tmp/acc-site.log 2>&1
       rm -rf $SNAPDIR && mkdir -p $SNAPDIR && bench --site $SITE backup --backup-path $SNAPDIR >>/tmp/acc-site.log 2>&1
       mv \$(ls $SNAPDIR/*-database.sql.gz | head -1) $SNAP && rm -f $SNAPDIR/*.json"

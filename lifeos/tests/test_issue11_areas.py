@@ -1,13 +1,12 @@
 """Issue 11: the seven areas of life, with parts, switchable on and off."""
 import frappe
 
-from lifeos import areas, devtools, queries, seed
+from lifeos import areas, devtools, queries
 from lifeos.api import area as area_api
 from lifeos.api import goals, inbox, meta, settings, tasks
-from lifeos.patches.v11 import life_areas as patch
 from lifeos.tests.base import AGENT, PRIVATE, LifeTestCase
 
-NEW_SPACE, SEED_COPY = "I11 New Space", "I11 Seed Copy"
+NEW_SPACE = "I11 New Space"
 SEVEN = ["Career", "Health", "Relationships", "Money", "Emotions", "Mind", "Environment"]
 
 
@@ -15,7 +14,7 @@ class TestLifeAreas(LifeTestCase):
 	@classmethod
 	def tearDownClass(cls):
 		frappe.set_user("Administrator")
-		for name in (NEW_SPACE, SEED_COPY):
+		for name in (NEW_SPACE,):
 			devtools.purge_space(name, drop=True)
 		frappe.db.commit()
 		super().tearDownClass()
@@ -58,45 +57,6 @@ class TestLifeAreas(LifeTestCase):
 		# a part added in Settings with no area of life named goes under Career
 		added = settings.save_item("area", space=PRIVATE, title="i11 Added in settings")
 		self.assertEqual(frappe.db.get_value("Life Area", added["name"], "parent_area"), self.life["Career"])
-
-	# 3
-	def test_the_patch_turns_the_seed_areas_into_parts(self):
-		frappe.set_user("Administrator")
-		devtools.purge_space(SEED_COPY, drop=True)
-		frappe.get_doc({"doctype": "Life Space", "space_name": SEED_COPY, "owner_user": devtools.OWNER,
-			"members": [{"user": devtools.OWNER, "access": "Write"}]}).insert()
-		frappe.db.delete("Life Area", {"space": SEED_COPY})  # as before the change: the seed's areas and no areas of life
-		old = {}
-		for i, name in enumerate([*seed.PRIVATE_AREAS, "Health", "i11 Unknown venture"]):
-			doc = frappe.get_doc({"doctype": "Life Area", "space": SEED_COPY, "area_name": name, "sort_order": i + 1})
-			doc.db_insert()
-			old[name] = doc.name
-		sub = frappe.get_doc({"doctype": "Life Area", "space": SEED_COPY, "area_name": "Ghatia", "parent_area": old["Tea & Coffee"]})
-		sub.db_insert()
-		old["Ghatia"] = sub.name
-		filed = []
-		for name, area in old.items():
-			for doctype, extra in (("Life Task", {}), ("Life Goal", {"horizon": "Long term"}), ("Life Note", {})):
-				doc = frappe.get_doc({"doctype": doctype, "space": SEED_COPY, "title": f"i11 {doctype} in {name}", "area": area, **extra})
-				doc.insert()
-				filed.append((doctype, doc.name, area))
-
-		missed = patch.run([SEED_COPY])
-
-		self.assertEqual(missed, {SEED_COPY: ["i11 Unknown venture"]})
-		life = areas.life_areas(SEED_COPY)
-		self.assertEqual(sorted(life), sorted(SEVEN))
-		self.assertEqual(life["Health"], old["Health"])  # already one of the seven by name: reused
-		expected = {"Business That Works": "Career", "Tea & Coffee": "Career", "Ghatia": "Career", "Family": "Relationships",
-			"Money & Legal": "Money", "Personal": "Health", "Learning": "Mind", "Unstoppable & Content": "Emotions",
-			"i11 Unknown venture": "Career"}
-		for name, target in expected.items():
-			self.assertEqual(frappe.db.get_value("Life Area", old[name], "parent_area"), life[target], name)
-		for doctype, name, area in filed:
-			self.assertEqual(frappe.db.get_value(doctype, name, "area"), area, f"{doctype} {name}")
-		on = {n for n, row in life.items() if frappe.db.get_value("Life Area", row, "is_on")}
-		self.assertEqual(on, {"Career", "Health", "Relationships", "Money", "Mind", "Emotions"})  # Environment got nothing
-		self.assertEqual(patch.run([SEED_COPY]), {})  # a second run changes nothing
 
 	# 4
 	def test_an_area_that_is_off_is_hidden_and_comes_back(self):

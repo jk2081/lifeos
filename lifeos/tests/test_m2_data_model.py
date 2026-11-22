@@ -202,31 +202,25 @@ class TestSeed(LifeTestCase):
 			self.assertEqual(top, ["Career", "Health", "Relationships", "Money", "Emotions", "Mind", "Environment"])
 		self.assertEqual(frappe.db.count("Life Dimension", {"space": "Private"}), 8)
 
-	def test_load_and_remove(self):
+	def test_the_demo_cycle_loads_and_removes(self):
+		from unittest.mock import patch
+
+		from lifeos import demo
+
 		frappe.set_user("Administrator")
 		key = "lifeos_seed_test"
-		seed.remove(key)
-		seed.load(PRIVATE, key)
-		cycle = frappe.get_doc("Life Cycle", {"space": PRIVATE, "title": seed.CYCLE_TITLE})
-		self.assertEqual((str(cycle.start_date), str(cycle.end_date), cycle.status), ("2026-10-05", "2026-12-27", "Active"))
-		goals = frappe.get_all("Life Goal", filters={"cycle": cycle.name}, fields=["name", "title", "area"], order_by="sort_order")
-		self.assertEqual([g.title for g in goals], [g[0] for g in seed.GOALS])
-		loops = frappe.get_doc("Life Goal", goals[1].name)
-		self.assertEqual(len(loops.actions), 6)
-		self.assertEqual([a.status for a in loops.actions if a.title == "Anya passport"], ["Done"])
-		self.assertEqual(frappe.db.get_value("Life Area", goals[0].area, "area_name"), "Tea & Coffee")
-		october = frappe.get_doc("Life Month Plan", f"{PRIVATE}-2026-10")
-		goals = rules.month_goals(PRIVATE, 2026, 10)
-		self.assertEqual(len(goals), 14)
-		self.assertEqual(sum(1 for g in goals if g["status"] == "Carried"), 9)
-		self.assertEqual(len(october.habits), 4)
-		self.assertIn("## Land monetisation", october.mindsweep_md)
-		november = frappe.get_doc("Life Month Plan", f"{PRIVATE}-2026-11")
-		self.assertEqual([frappe.db.get_value("Life Habit", h.habit, "title") for h in november.habits], seed.HABITS)
-		self.assertEqual(frappe.db.count("Life Check-in", {"space": PRIVATE}), 0)
-		self.assertEqual(frappe.db.count("Life Important Date", {"space": PRIVATE}), 0)
-		self.assertIn("already loaded", seed.load(PRIVATE, key))
-		seed.remove(key)
-		self.assertFalse(frappe.db.exists("Life Cycle", cycle.name))
-		self.assertFalse(frappe.db.exists("Life Month Plan", f"{PRIVATE}-2026-10"))
-		self.assertEqual(frappe.db.count("Life Habit", {"space": PRIVATE, "title": ("in", seed.HABITS)}), 0)
+		with patch.object(seed, "DEMO_KEY", key):
+			seed._remove(key)
+			demo.load_cycle(PRIVATE)
+			cycle = frappe.get_doc("Life Cycle", {"space": PRIVATE, "title": demo.CYCLE_TITLE})
+			self.assertEqual((str(cycle.start_date), str(cycle.end_date), cycle.status), ("2026-10-05", "2026-12-27", "Active"))
+			goals = frappe.get_all("Life Goal", filters={"cycle": cycle.name}, fields=["name", "title", "area"], order_by="sort_order")
+			self.assertEqual([g.title for g in goals], [g[0] for g in demo.GOALS])
+			self.assertEqual([a.status for a in frappe.get_doc("Life Goal", goals[1].name).actions if a.title == "Book the passport photo"], ["Done"])
+			self.assertEqual(len(rules.month_goals(PRIVATE, 2026, 10)), len(demo.OCTOBER))
+			november = frappe.get_doc("Life Month Plan", f"{PRIVATE}-2026-11")
+			self.assertEqual([frappe.db.get_value("Life Habit", h.habit, "title") for h in november.habits], demo.HABITS)
+			seed._remove(key)
+			self.assertFalse(frappe.db.exists("Life Cycle", cycle.name))
+			self.assertFalse(frappe.db.exists("Life Month Plan", f"{PRIVATE}-2026-10"))
+			self.assertEqual(frappe.db.count("Life Habit", {"space": PRIVATE, "title": ("in", demo.HABITS)}), 0)

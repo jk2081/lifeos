@@ -6,7 +6,6 @@ import frappe
 from lifeos import area_guess
 from lifeos.ai import fake
 from lifeos.api import tasks
-from lifeos.patches.v12 import task_areas as patch
 from lifeos.tests.base import OWNER, PRIVATE, LifeTestCase
 
 
@@ -136,31 +135,3 @@ class TestTaskAreas(LifeTestCase):
 		# a task filed by a person is not marked
 		self.assertFalse(self.task("Zqxv four", area=self.life["Health"]).area_guessed)
 
-	# 6
-	def test_the_patch_fills_every_task_without_an_area_and_calls_no_model(self):
-		goal = self.make("Life Goal", title="i13 Patch goal", horizon="Long term", area=self.areas["Tea"])
-		made = {}
-		for title, values in (("Zqxv patch goal task", {"goal": goal.name}), ("Patch the personal things", {}),
-				("Zqxv patch", {}), ("Zqxv patch done", {"status": "Done"})):
-			t = self.make("Life Task", title=title, **{"status": "Open", **values})
-			frappe.db.set_value("Life Task", t.name, {"area": None, "area_guessed": 0, "area_confidence": 0})
-			made[title] = t.name
-		set_key("sk-test-not-real")
-		frappe.flags.lifeos_ai_backend = NoModel()
-		calls = NoModel.calls
-		frappe.set_user("Administrator")
-		patch.execute()
-		self.assertEqual(NoModel.calls, calls)
-		self.assertFalse(frappe.db.count("Life Task", {"area": ("is", "not set"), "status": ("in", ["Open", "Doing", "Waiting"]),
-			"space": PRIVATE}))
-		got = {r.name: r for r in frappe.get_all("Life Task", filters={"name": ("in", list(made.values()))},
-			fields=["name", "area", "area_guessed"])}
-		self.assertEqual(got[made["Zqxv patch goal task"]].area, self.areas["Tea"])
-		self.assertEqual(got[made["Patch the personal things"]].area, self.areas["Personal"])
-		self.assertEqual(got[made["Zqxv patch"]].area, self.life["Career"])
-		self.assertTrue(all(r.area_guessed for r in got.values()))
-		# the index row follows
-		self.assertEqual(frappe.db.get_value("Life Index", {"ref_doctype": "Life Task", "ref_name": made["Zqxv patch"]}, "area"),
-			self.life["Career"])
-		set_key("")
-		frappe.set_user(OWNER)

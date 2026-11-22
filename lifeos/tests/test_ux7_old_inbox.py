@@ -88,7 +88,7 @@ class TestSuggest(OldCase):
 		self.assertEqual({r["name"]: r["by"] for r in listed["rows"] if r["name"] in (task, note, empty)}, {task: "tidy-backlog v1", note: "tidy-backlog v1"})
 		batch = next(b for b in reset.rule_batches(PRIVATE) if b["key"] == "inbox_decisions")
 		self.assertEqual(batch["count"], listed["total"])
-		self.assertEqual(batch["review"], {"path": "/inbox", "query": {"decisions": "1"}})
+		self.assertEqual(batch["review"], {"path": "/brain/queue", "query": {"decisions": "1"}})
 
 	def test_with_the_assistant(self):
 		from lifeos.ai import fake

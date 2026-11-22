@@ -264,7 +264,6 @@ class TestArchive(LifeTestCase):
 		chat = self.make("Life Chat Log", title="Goal chat m7", date=today(), area=self.areas["Tea"], goal=goal.name)
 		outside = self.make("Life Task", title="Not under the goal m7", area=self.areas["Tea"])
 		already = self.make("Life Note", title="Archived before m7", area=self.areas["Tea"], goal=goal.name, is_archived=1, archive_reason="Manual")
-		self.assertEqual(goal_api.completion_info(goal.name)["records"], 3)
 		out = goal_api.set_status(goal.name, "Done")
 		self.assertEqual((out["is_archived"], out["archived_records"]), (1, 3))
 		for doc in (task, note, chat):

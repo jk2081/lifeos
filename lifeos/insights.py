@@ -145,7 +145,7 @@ def detect_habits(space):
 			rate = lambda x: round(7.0 * x["done"] / max(x["tracked_days"], 1), 1)
 			out.append(candidate("Habit", f"{h['title']} slipped from {rate(before):g} days a week last month to {rate(h):g} so far this month",
 				[ev("Life Habit", h["habit"], h["title"])], body=f"{before['percent']}% last month, {h['percent']}% this month.",
-				actions=[{"kind": "open_list", "label": "Open habits", "to": {"path": "/journal/habits", "query": {}}}]))
+				actions=[{"kind": "open_list", "label": "Open habits", "to": {"path": "/today/month", "query": {"view": "habits"}}}]))
 	return out
 
 
@@ -167,10 +167,10 @@ def detect_checkins(space):
 		evidence = [ev("Life Check-in", n, str(d)) for n, d, _ in last3]
 		if all(v <= LOW_SCORE for _, _, v in last3):
 			out.append(candidate("Check-in", f"{label} has scored {LOW_SCORE} or lower in three check-ins in a row", evidence,
-				actions=[{"kind": "open_list", "label": "Open check-ins", "to": {"path": "/journal/checkins", "query": {}}}]))
+				actions=[{"kind": "open_list", "label": "Open check-ins", "to": {"path": "/today/month", "query": {"view": "checkins"}}}]))
 		elif last3[0][2] < last3[1][2] < last3[2][2]:
 			out.append(candidate("Check-in", f"{label} is trending down: {last3[2][2]:g}, {last3[1][2]:g}, {last3[0][2]:g}", evidence,
-				actions=[{"kind": "open_list", "label": "Open check-ins", "to": {"path": "/journal/checkins", "query": {}}}]))
+				actions=[{"kind": "open_list", "label": "Open check-ins", "to": {"path": "/today/month", "query": {"view": "checkins"}}}]))
 	return out
 
 

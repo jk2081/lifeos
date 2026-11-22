@@ -4,7 +4,7 @@ A personal operating system on Frappe v16: inbox and review, tasks, calendar, a 
 
 - The app is `lifeos`, served at `/life`. It needs Frappe Framework v16 and nothing else (no ERPNext). It installs beside Folio and touches none of its DocTypes.
 - `docs/DIRECTION.md` is the target design; work comes from GitHub issues (`docs/BUILDING.md`). The original build spec is `docs/history/SPEC.md`. `DECISIONS.md` lists every default and every difference from it. `STATUS.md` says what works, what is stubbed and what is untested.
-- This repository holds the owner's personal goals as seed data. Keep it private.
+- Nothing personal is loaded into a new site: install makes the seven areas of life and the default rhythms, and no goals or data. Keep this repository private all the same.
 
 ## Install on an existing bench
 
@@ -25,9 +25,9 @@ Install creates the roles `Life Admin`, `Life User` and `Life Agent`, the spaces
 # make yourself the owner, if you installed as Administrator
 bench --site SITE execute lifeos.install.set_owner --kwargs "{'user': 'you@example.com'}"
 
-# load the seed of section 11: the Oct to Dec 2026 cycle with its goals, the October plan, the habits
-bench --site SITE execute lifeos.seed.load
-bench --site SITE execute lifeos.seed.remove            # takes exactly those records out again
+# fictional example records for screenshots and the acceptance site (never on a real site)
+bench --site SITE execute lifeos.demo.load
+bench --site SITE execute lifeos.demo.remove            # takes exactly those records out again
 
 # set the site time zone to Asia/Kolkata in System Settings
 ```
@@ -185,7 +185,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `inbox.file_myself` | `item` | The owner takes a capture the Brain could not process: its pending proposals go, it is marked Done, and they file it by hand. People only. |
 | `skills.list` / `skills.get` | `space=None` / `name, space=None` | Issue 28: the active skills for the caller's spaces with their version, and one skill's instructions. Agents are served `lifeos` and `lifeos-file-work` here. |
 | `skills.run` | `skill, input` | Start a skill whose trigger is a Button on one record, in a background job. |
-| `skills.overview`, `detail`, `run_log`, `save`, `create`, `set_active`, `rollback`, `accept_update`, `test`, `add_example`, `save_auto_file` | | Brain > Skills (people; changes are the owner's). |
+| `skills.overview`, `detail`, `run_log`, `save`, `create`, `set_active`, `rollback`, `accept_update`, `test`, `save_auto_file` | | Brain > Skills (people; changes are the owner's). |
 | `inbox.list` | `space=None, status=None, include_archived=0, start=0, page_length=30` | Inbox items of a space, newest first, with proposal counts. `tabs` in the answer counts the items on each state tab (To Review, Waiting, Failed, Done, all) under the same filters. |
 | `inbox.get` | `item` | One inbox item with its files, proposals and the choices for the filing chips. A job's item also has `inputs`, `job_chat` and `wiki_pages`. |
 | `inbox.update_transcript` | `item, transcript_md` | Correct the transcript of an item, for example words marked [?]. |

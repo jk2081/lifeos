@@ -60,7 +60,7 @@ def came_in(space, start, end):
 	def src(label, key, tab="all", conds=()):
 		n = sources.list(space=space, tab=tab, from_date=a, to_date=b, filters=f(*conds), page_length=1)["total"]
 		query = {k: v for k, v in {"tab": None if tab == "all" else tab, "from": a, "to": b, "f": f(*conds)}.items() if v}
-		return {"key": key, "label": label, "n": int(n), "to": {"path": "/library/captures", "query": query}}
+		return {"key": key, "label": label, "n": int(n), "to": {"path": "/library/chats" if tab == "chats" else "/brain/captures", "query": query}}
 
 	# one condition on the kind, which the Captures list keeps as it is (it has no control for the record type)
 	captures = src("Captures and voice notes", "captures", conds=[("media_kind", "in", ["Voice", "Photo", "Document", "Article", "Text"])])

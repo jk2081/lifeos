@@ -163,7 +163,7 @@ class TestInAndOut(OutboxCase):
 		line = counts.get(space=PRIVATE, which="week")  # issue 55: the line moved from Today to Brain > Activity
 		for key, pile in (("in", "in"), ("out", "all")):
 			door = line[key]
-			self.assertEqual(door["to"]["path"], "/library/outbox")
+			self.assertEqual(door["to"]["path"], "/brain/outbox")
 			self.assertEqual(door["to"]["query"]["pile"], pile)
 			rows = outbox_api.list(space=PRIVATE, pile=pile, period="week", page_length=500)
 			self.assertEqual(door["n"], len(rows["rows"]))
@@ -215,30 +215,3 @@ class TestBringBack(OutboxCase):
 		self.assertRaises(frappe.PermissionError, outbox_api.list, space=PRIVATE)
 		self.as_user(FAMILY)
 		self.assertRaises(frappe.PermissionError, outbox_api.bring_back, e)
-
-
-class TestBackfill(OutboxCase):
-	def test_backfill_from_existing_dates(self):
-		from lifeos.patches.v8 import outbox_backfill
-
-		t = self.task("ux7 old done")
-		frappe.db.set_value("Life Task", t.name, {"status": "Done", "completed_on": add_days(today(), -20)})  # as before set 7: no exit
-		p = self.task("ux7 old parked")
-		frappe.db.set_value("Life Task", p.name, {"status": "Someday", "someday_on": add_days(today(), -5)})
-		old = self.task("ux7 too old")
-		frappe.db.set_value("Life Task", old.name, {"status": "Done", "completed_on": add_days(today(), -200)})
-		g = goals.create("ux7 old goal", "Year", space=PRIVATE, target_date=add_days(today(), 30), done_when="x")["name"]
-		frappe.db.set_value("Life Goal", g, {"outcome": "Achieved", "closed_on": add_days(today(), -3)})
-		gone = self.task("ux7 old deleted")
-		gone.flags.no_exit = True
-		gone.delete()
-		frappe.db.delete("Life Exit", {"record_name": ("in", [t.name, p.name, old.name, g, gone.name])})
-		outbox_backfill.execute()
-		self.assertEqual(exits("Life Task", t.name), ["Done"])
-		self.assertEqual(str(frappe.db.get_value("Life Exit", {"record_name": t.name}, "exited_on"))[:10], add_days(today(), -20))
-		self.assertEqual(exits("Life Task", p.name), ["Parked"])
-		self.assertEqual(exits("Life Task", old.name), [])
-		self.assertEqual(exits("Life Goal", g), ["Done"])
-		self.assertEqual(exits("Life Task", gone.name), ["Discarded"])
-		outbox_backfill.execute()  # again: nothing twice
-		self.assertEqual(exits("Life Task", t.name), ["Done"])

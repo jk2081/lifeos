@@ -269,7 +269,7 @@ await check(1, 'Log in, open /life, Today is filled from seed data', async () =>
   const text = await owner.page.locator('[data-main]').innerText()
   must(/Week \d+ of 12/.test(text), 'no 12 Week Year week on Today')
   const habitNames = await owner.page.locator('[data-today-habits] [data-habit]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).join(' '))
-  must(text.includes('Habits') && habitNames.includes('Japa'), 'habits are missing on Today')
+  must(text.includes('Habits') && habitNames.includes('Meditate'), 'habits are missing on Today')
   const t = await owner.api('today.get', { space: SPACE })
   must(t.cycle && t.habits.length === 4, 'today.get has no cycle or habits')
   return `week ${t.cycle.week}, ${t.habits.length} habits, ${t.tasks.due} tasks due`
@@ -285,7 +285,7 @@ await check(2, 'Journal photo: agent submits 5 proposals; accept 3, edit 1, reje
   must(got.status === 'To Review', 'item is ' + got.status)
   must(got.transcript_md && got.proposals.length === 5, `expected 5 proposals, got ${got.proposals.length}`)
   // accept the first and reject the second with the buttons on the Review screen
-  await owner.open('/life/inbox/' + item.name)
+  await owner.open('/life/brain/queue?open=inbox:' + item.name)
   await owner.page.getByRole('button', { name: 'Accept', exact: true }).first().click()
   await owner.page.waitForTimeout(800)
   await owner.page.getByRole('button', { name: 'Reject', exact: true }).first().click()
@@ -444,11 +444,10 @@ await check(11, 'A second user who is only in Shared sees nothing from Private, 
     const r = await fam.api(m, { ...args, space: SPACE }, { raw: true })
     must(r.status() === 403, `${m} with space=Private answered ${r.status()}`)
     const own = JSON.stringify(await fam.api(m, args)) || ''
-    must(!own.includes(stamp) && !own.includes('Ruchi ITR') && !own.includes('Japa'), `${m} leaks Private records`)
+    must(!own.includes(stamp) && !own.includes('Ruchi ITR') && !own.includes('Meditate'), `${m} leaks Private records`)
   }
   const privateGoal = (await owner.api('goals.list', { space: SPACE, horizon: 'Long term', page_length: 1 })).goals[0].name
-  for (const [m, args] of [['inbox.get', { item: photoItem }], ['goals.get', { goal: privateGoal }], ['goals.completion_info', { goal: privateGoal }],
-    ['links.backlinks', { doctype: 'Life Inbox Item', name: photoItem }]]) {
+  for (const [m, args] of [['inbox.get', { item: photoItem }], ['goals.get', { goal: privateGoal }], ['links.backlinks', { doctype: 'Life Inbox Item', name: photoItem }]]) {
     must((await fam.api(m, args, { raw: true })).status() === 403, `${m} is readable`)
   }
   for (const word of ['Nowrojee', 'Ruchi', stamp, 'Merrill']) {
@@ -460,14 +459,14 @@ await check(11, 'A second user who is only in Shared sees nothing from Private, 
   must(!JSON.stringify(await list.json()).includes('Private'), 'the REST list shows Private tasks')
   let screens = 0
   // every place, tab and view (set 6), and a Private goal's page and Private area in the URL
-  for (const p of ['', '/inbox', '/plan/week?view=review', '/plan/week?view=calendar', '/plan/week?view=agenda', '/plan/month?view=plan', '/plan/month?view=habits',
-    '/plan/month?view=checkins', '/plan/month?view=calendar', '/plan/12-weeks', '/plan/year?view=calendar', '/plan/year?view=goals', '/plan/goals', '/plan/tasks',
-    '/plan/someday', '/plan/reset', '/library', '/library/notes', '/library/notes?view=tree', '/library/notes?view=graph', '/library/notes?by=assistant',
-    '/library/captures', '/library/captures?tab=documents&sensitive=1', '/library/captures?tab=chats', '/library/captures?tab=pages', '/library/timeline',
-    '/library/archive', '/ask', '/settings', `/plan/goals/${privateGoal}`, `/?area=${areaId('Tea & Coffee')}`]) {
+  for (const p of ['', '/brain', '/brain/queue', '/today/week?view=review', '/today/week?view=calendar', '/today/week?view=agenda', '/goals/cycles', '/today/month?view=habits',
+    '/today/month?view=checkins', '/today/month?view=calendar', '/today/year?view=calendar', '/today/year?view=goals', '/goals', '/goals/tasks',
+    '/goals/someday', '/today/reset', '/library', '/library/notes', '/library/notes?view=tree', '/library/notes?view=graph', '/library/notes?by=assistant',
+    '/library/documents?sensitive=1', '/library/chats', '/library/notes?view=list', '/library/timeline',
+    '/library/archive', '/ask', '/settings', `/goals/${privateGoal}`, `/?area=${areaId('Tea & Coffee')}`]) {
     await fam.open('/life' + p)
     const text = await fam.page.locator('[data-app]').innerText()
-    must(!/Ruchi|Merrill|Japa|Tea & Coffee|Private/.test(text) && !text.includes(stamp), `screen ${p || '/'} shows Private content`)
+    must(!/Ruchi|Merrill|Meditate|Tea & Coffee|Private/.test(text) && !text.includes(stamp), `screen ${p || '/'} shows Private content`)
     screens++
   }
   await fam.ctx.close()
@@ -484,7 +483,7 @@ await check(12, 'At review, change the area with one tap and add a second: the r
     must((await owner.page.locator('[data-main]').innerText()).includes(title), `not on Plan > Tasks with ${name} in the lens`)
   }
   const item = await owner.api('inbox.list', { space: SPACE, status: 'To Review' })
-  await owner.open('/life/inbox/' + item.items[0].name)
+  await owner.open('/life/brain/queue?open=inbox:' + item.items[0].name)
   must(await owner.page.locator('text=also in').count() > 0, 'the Review screen has no area chips')
 })
 
@@ -519,8 +518,6 @@ await check(14, 'Timeline shows everything captured on one day', async () => {
 await check(15, 'Complete an open-ended goal (a project before set 6): it and its records move to Archive. Restore it', async () => {
   const g = await owner.api('goals.create', { space: SPACE, title: `Open goal ${stamp}`, horizon: 'Long term', area: areaId('Learning') })
   const task = await owner.api('tasks.quick_add', { text: `Goal task ${stamp}`, space: SPACE, goal: g.name })
-  const info = await owner.api('goals.completion_info', { goal: g.name })
-  must(info.records >= 1, 'the confirm dialog has no count')
   await owner.api('goals.set_status', { goal: g.name, status: 'Done' })
   let arch = await owner.api('archive.list', { space: SPACE, page_length: 100 })
   must(arch.goals.some((p) => p.name === g.name), 'the goal is not in Archive')
@@ -776,9 +773,9 @@ for (const width of UX_WIDTHS) {
       must(await pane.isVisible(), `${name}: reload did not reopen the pane`)
       must((await paneTitle()) === title, `${name}: reload opened another record`)
     }
-    await s.open('/life/inbox/' + ux.inbox)
-    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/brain/queue' && await pg.locator(ROW).count(), '/inbox/:id does not show the list with the pane open')
-    must((await pg.locator('[data-pane-title]').innerText()).includes('UX inbox'), '/inbox/:id opened another item')
+    await s.open('/life/brain/queue?open=inbox:' + ux.inbox)
+    must(await pane.isVisible() && new URL(pg.url()).pathname === '/life/brain/queue' && await pg.locator(ROW).count(), 'an inbox item does not show the list with the pane open')
+    must((await pg.locator('[data-pane-title]').innerText()).includes('UX inbox'), 'the pane opened another item')
   })
 
   if (phone) {
@@ -818,7 +815,7 @@ for (const width of UX_WIDTHS) {
       await settle()
       must(!(await pane.isVisible()), 'Esc did not close the pane')
       must((await pg.evaluate(() => document.activeElement?.getAttribute('data-ref'))) === third, 'focus did not return to the row')
-      await s.open('/life/inbox/' + ux.inbox)
+      await s.open('/life/brain/queue?open=inbox:' + ux.inbox)
       must(Math.round((await pane.boundingBox()).width) === 760, 'an inbox pane is not 760 px wide')
       await pg.locator('[data-pane-full]').click()
       await settle()
@@ -1146,7 +1143,7 @@ for (const width of UX_WIDTHS) {
   })
 
   await check(`${tag}.11`, `${width} px: the review screen and the journal page show tabs on a phone only`, async () => {
-    await s.open('/life/inbox/' + ux.inbox)
+    await s.open('/life/brain/queue?open=inbox:' + ux.inbox)
     const review = pg.locator('[data-review-tabs]')
     if (!phone) must(!(await review.count()), 'the review screen shows tabs at 1440 px')
     else {
@@ -1156,15 +1153,15 @@ for (const width of UX_WIDTHS) {
       await review.locator('[data-tab="original"]').click()
       await settle()
       must(new URL(pg.url()).searchParams.get('ptab') === 'original', 'the review tab is not in the URL as ptab= in the pane')
-      await s.open(`/life/inbox/${ux.inbox}/review?tab=transcript`) // the full page uses tab=
+      await s.open(`/life/brain/review/${ux.inbox}?tab=transcript`) // the full page uses tab=
       must((await pg.locator('[data-review-tabs]').getAttribute('data-tab-current')) === 'transcript', 'the full review page does not open on tab=transcript')
       if (pendingNow) must(await pg.getByRole('button', { name: /Accept all/ }).isVisible(), 'Accept all is hidden on the Original tab')
     }
     // set 6: a journal page is a capture; its old link opens it in the pane over Library > Everything, Journal pages, on its tabs (issue 14)
     const jp = bench(`print(frappe.db.sql("select name from \`tabLife Journal Page\` where space='${SPACE}' limit 1")[0][0])`).split('\n').pop()
-    await s.open('/life/journal/pages/' + jp)
+    await s.open(`/life/library/notes?view=list&open=page:${jp}`)
     must(new URL(pg.url()).pathname === '/life/library/notes' && new URL(pg.url()).searchParams.get('view') === 'list' && await pane.isVisible(),
-      `/journal/pages/:id went to ${new URL(pg.url()).pathname}${new URL(pg.url()).search}`)
+      `a journal page went to ${new URL(pg.url()).pathname}${new URL(pg.url()).search}`)
     const jt = pg.locator('[data-pane-tabs]')
     await jt.locator('[data-tab="transcript"]').click()
     await settle()
@@ -1404,10 +1401,10 @@ for (const width of UX_WIDTHS) {
         await pg.keyboard.press('Escape')
       }
     }
-    // /graph is the Graph view of Library > Notes
-    step = '/graph is the Graph view of Notes'
-    await s.open('/life/graph')
-    must(path() === '/life/library/notes' && new URL(pg.url()).searchParams.get('view') === 'graph', `/graph went to ${pg.url()}`)
+    // the Graph view of Library > Notes
+    step = 'the Graph view of Notes'
+    await s.open('/life/library/notes?view=graph')
+    must(path() === '/life/library/notes' && new URL(pg.url()).searchParams.get('view') === 'graph', `the graph went to ${pg.url()}`)
     must((await pg.locator('[data-library-views] [aria-checked="true"], [data-library-views] [data-state="checked"], [data-library-views] [data-state="on"]').first().innerText()).includes('Graph'), '/graph is not the Graph view of Notes')
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     } catch (e) { throw new Error(`[${step}] ${String(e.message || e).split('\n')[0]}`) }
@@ -1995,9 +1992,9 @@ while d <= last:
     const madeText = await pg.locator('[data-source-made]').innerText()
     must(madeText.includes(`S4 made ${width} ${stamp}`) && madeText.includes(`S4 cites ${width} ${stamp}`), 'Made from this does not list the task and the wiki page')
     must(made.name, 'no page')
-    // /chats lands on the Chats tab, with its filters
-    await s.open(`/life/chats?area=${uxArea}`)
-    must(/\/life\/library\/chats\?/.test(pg.url()) && pg.url().includes('tab=chats') && pg.url().includes(`area=${uxArea}`), `/chats went to ${pg.url()}`)
+    // the Chats tab keeps its filters
+    await s.open(`/life/library/chats?tab=chats&area=${uxArea}`)
+    must(/\/life\/library\/chats\?/.test(pg.url()) && pg.url().includes('tab=chats') && pg.url().includes(`area=${uxArea}`), `Chats went to ${pg.url()}`)
     return `${Object.keys(res.tabs).length} tabs`
   })
 
@@ -2365,8 +2362,8 @@ print(json.dumps(p))`)
     must((await count()) === (await s.api('library.list', { space: SPACE, collection: 'Wiki', page_length: 1 })).total, "the count is not the number of the assistant's notes")
     await s.open('/life/library/notes?view=list&by=me')
     must(!(await pg.locator(ROW, { hasText: title }).count()), 'Written by me lists the assistant\'s note')
-    await s.open('/life/wiki') // the old Wiki lands on the assistant's notes
-    must(new URL(pg.url()).pathname === '/life/library/notes' && new URL(pg.url()).searchParams.get('by') === 'assistant', `/wiki went to ${pg.url()}`)
+    await s.open('/life/library/notes?view=list&by=assistant')
+    must(new URL(pg.url()).pathname === '/life/library/notes' && new URL(pg.url()).searchParams.get('by') === 'assistant', `the assistant's notes went to ${pg.url()}`)
     // Changes: the agent's edit with its diff; Undo puts the text back
     const change = (await s.api('wiki.changes', { space: SPACE, note: page.name })).changes[0]
     await s.open('/life/library/notes?view=changes')
@@ -2427,58 +2424,19 @@ await check('S6.1', 'Keyboard: G then T, I, O or L opens a place; the older G le
   return done.join(' ')
 })
 
-await check('S6.2', 'Every old route lands on its new home with its query (section 2 of the brief; the homes of issue 14)', async () => {
+await check('S6.2', 'An address that is not a screen (every old route) lands on Today with "That page moved" (issue 61)', async () => {
   const pg = owner.page
-  const goal12 = (await owner.api('goals.list', { space: SPACE, horizon: '12 weeks', page_length: 1 })).goals[0].name
-  const jp = bench(`print(frappe.db.sql("select name from \`tabLife Journal Page\` where space='${SPACE}' limit 1")[0][0])`).split('\n').pop()
-  const ROUTES = [
-    ['/tasks?priority=I&view=list', '/goals/tasks', { priority: 'I', view: 'list' }],
-    ['/goals?status=achieved', '/goals', { status: 'achieved' }],
-    ['/someday?tab=notes', '/goals/someday', { tab: 'notes' }],
-    ['/projects', '/goals', {}], // issue 48: the old Projects screen and a project's page land on Goals
-    [`/projects/${ux.oldProject}?tab=tasks`, '/goals', {}],
-    ['/reset', '/today/week', { view: 'review', tab: 'tasks' }], // set 8: set 7's Reset step is the review's Tasks tab
-    ['/calendar/week?date=2026-12-02', '/today/week', { view: 'calendar', date: '2026-12-02' }],
-    ['/calendar/agenda', '/today/week', { view: 'agenda' }],
-    ['/calendar/month?date=2026-12-02', '/today/month', { view: 'calendar', date: '2026-12-02' }],
-    ['/calendar/year', '/today/year', {}],
-    ['/journal', '/goals/cycles', {}],
-    ['/journal/goals', '/goals/cycles', {}],
-    ['/journal/month', '/goals/cycles', {}],
-    ['/journal/habits', '/today/month', { view: 'habits' }],
-    ['/journal/checkins', '/today/month', { view: 'checkins' }],
-    ['/journal/review', '/today/week', { view: 'review' }],
-    ['/journal/pages', '/library/notes', { view: 'list' }],
-    [`/journal/pages/${jp}`, '/library/notes', { view: 'list', open: `page:${jp}` }],
-    [`/journal/goals/${goal12}`, `/goals/${goal12}`, {}],
-    [`/sources?tab=chats&from=${addDays(-6)}`, '/library/chats', { tab: 'chats', from: addDays(-6) }],
-    ['/chats?group=day', '/library/chats', { tab: 'chats', view: 'day' }],
-    [`/chats?open=${ux.chat}`, '/library/chats', { tab: 'chats', open: `chat:${ux.chat}` }],
-    ['/wiki', '/library/notes', { by: 'assistant' }],
-    ['/wiki?tab=changes', '/library/notes', { by: 'assistant', view: 'changes' }],
-    ['/vault', '/library/documents', { tab: 'documents', sensitive: '1' }],
-    [`/vault?open=${ux.vault}`, '/library/documents', { tab: 'documents', sensitive: '1', open: `vault:${ux.vault}` }],
-    ['/graph', '/library/notes', { view: 'graph' }],
-    [`/timeline?from=${addDays(-3)}`, '/library/timeline', { from: addDays(-3) }],
-    ['/archive?type=trash', '/library/archive', { type: 'trash' }],
-    ['/areas', '/settings', { tab: 'areas' }],
-    [`/areas/${uxArea}`, '/today', { area: uxArea }],
-    ['/library?view=tree', '/library/notes', { view: 'tree' }],
-    [`/inbox/${ux.inbox}`, '/brain/queue', { open: `inbox:${ux.inbox}` }],
-  ]
   const bad = []
-  for (const [from, to, q] of ROUTES) {
+  for (const from of ['/tasks?priority=I&view=list', '/plan/goals?status=achieved', '/someday', '/projects', '/calendar/year', '/journal/habits', '/chats?group=day',
+    '/wiki', '/vault', '/graph', '/timeline', '/archive', '/areas', `/inbox/${ux.inbox}`, '/library/captures/x/y']) {
     await owner.open('/life' + from)
     await pg.waitForTimeout(200)
-    const u = new URL(pg.url())
-    const wrong = [pathOf(pg) !== ('/life' + to).replace(/\/$/, '') && `path ${u.pathname}`, ...Object.entries(q).map(([k, v]) => u.searchParams.get(k) !== v && `${k}=${u.searchParams.get(k)}`)].filter(Boolean)
-    if (!wrong.length && q.open) { if (!(await pg.locator('[data-pane]').isVisible())) wrong.push('no pane') }
-    if (!wrong.length && /not found/i.test(await pg.locator('[data-main]').innerText())) wrong.push('not found')
-    if (wrong.length) bad.push(`${from} → ${wrong.join(', ')}`)
+    if (pathOf(pg) !== '/life/today') bad.push(`${from} went to ${pathOf(pg)}`)
+    else if (!(await pg.locator('[data-moved-note]').isVisible())) bad.push(`${from}: no "That page moved" note`)
   }
   await owner.open('/life?area=')
   must(!bad.length, bad.join('; '))
-  return `${ROUTES.length} routes`
+  return '15 old addresses'
 })
 
 await check('S6.3', 'An open-ended goal opens with its tasks; a goal shows what it serves and what serves it, and cannot serve its own servant', async () => {
@@ -3460,7 +3418,7 @@ for (const width of SET_WIDTHS) {
     const again = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v1)
     must(again.name === first.name, 'the same file sent again was attached a second time')
     must((await s.api('inbox.get', { item: item.name })).files.length === 1, 'the item has more than one attachment')
-    await s.open(`/life/inbox/${item.name}/review?tab=original`) // phones open on the summary
+    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the summary
     must(await pg.locator(`${original} a[href="${first.file_url}"]`).count() === 1, 'the review does not show the one attachment once')
     must(!(await pg.locator('[data-file-versions]').count()), 'a file with one version shows versions')
     // a changed file of the same name: one current file and the old one as an earlier version
@@ -3468,7 +3426,7 @@ for (const width of SET_WIDTHS) {
     const second = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v2)
     const got = await s.api('inbox.get', { item: item.name })
     must(got.files.length === 1 && got.files[0].file_url === second.file_url && got.files[0].versions.length === 1, 'not one current file with one earlier version: ' + JSON.stringify(got.files))
-    await s.open(`/life/inbox/${item.name}/review?tab=original`) // phones open on the summary
+    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the summary
     const toggle = pg.locator('[data-file-versions-toggle]')
     must(/^2 versions, latest \d+ \w{3}$/.test((await toggle.innerText()).trim()), 'the versions line says: ' + (await toggle.innerText()))
     await toggle.click()
@@ -3509,7 +3467,7 @@ for (const width of SET_WIDTHS) {
     await s.open('/life/brain/queue')
     const shown = await pg.locator('[data-row]', { hasText: title }).count()
     must(shown === 1, `the Inbox shows the job in ${shown} rows`)
-    await s.open(`/life/inbox/${item.name}/review?tab=original`) // phones open on the proposals
+    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the proposals
     must(await pg.locator('[data-review-outputs]').count() === 1, 'no Outputs section')
     for (const ext of ['txt', 'html'])
       must(await pg.locator('[data-review-original] a', { hasText: `${title}.${ext}` }).count() === 1, `the output ${title}.${ext} is not shown once`)
@@ -3519,9 +3477,9 @@ for (const width of SET_WIDTHS) {
     must(inputText.includes('Standard sales deck.txt') && inputText.includes('Brand guidelines.txt'), 'the inputs are not named')
     must(!(await pg.locator('[data-review-original] a', { hasText: 'Standard sales deck.txt' }).count()), 'an input is listed as an output')
     must(await pg.locator('[data-review-filed-with]').count() === 1, 'the wiki page and chat log filed with it are not shown')
-    await s.open(`/life/inbox/${item.name}/review?tab=summary`)
+    await s.open(`/life/brain/review/${item.name}?tab=summary`)
     must((await pg.locator('body').innerText()).includes('An owner-first deck'), 'the summary is not shown')
-    await s.open(`/life/inbox/${item.name}/review?tab=proposals`)
+    await s.open(`/life/brain/review/${item.name}?tab=proposals`)
     must(await pg.locator('[data-proposal="Pending"]').count() === 2, 'the two proposals are not shown')
     const overflow = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
     must(!overflow, 'the page scrolls sideways')
@@ -3981,7 +3939,7 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
         must(listed === inboxTotal, `the list says ${listed} to review; the Inbox has ${inboxTotal}`)
         return `${n}`
       })
-      await check(`${tag}.4`, `${width} px: every route of the old router redirects to its new home, which loads without an error`, async () => {
+      await check(`${tag}.4`, `${width} px: an old address lands on Today with the moved note, and every route of the router loads without an error`, async () => {
         const goal = (await s.api('goals.list', { space: SPACE, horizon: 'Long term', page_length: 1 })).goals[0].name
         const area = areaId('Career') || areas[0].name
         const OLD = [['/life', '/life/today'], ['/life/inbox', '/life/brain'], [`/life/inbox/${item.name}`, '/life/brain/queue'],
@@ -3992,7 +3950,7 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
           ['/life/someday', '/life/goals/someday'], ['/life/outbox', '/life/brain/outbox'], ['/life/archive', '/life/library/archive'],
           ['/life/wiki', '/life/library/notes'], ['/life/vault', '/life/library/documents'], ['/life/graph', '/life/library/notes'],
           ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/sources'], ['/life/chats', '/life/library/chats'],
-          ['/life/library/captures', '/life/brain/captures'], ['/life/library/outbox', '/life/brain/outbox'], ['/life/projects', '/life/goals'],
+          ['/life/projects', '/life/goals'],
           ['/life/reset', '/life/today/week'], ['/life/calendar', '/life/today/week'], ['/life/calendar/month', '/life/today/month'],
           ['/life/calendar/year', '/life/today/year'], ['/life/calendar/agenda', '/life/today/week'], ['/life/journal', '/life/goals/cycles'],
           ['/life/journal/goals', '/life/goals/cycles'], ['/life/journal/month', '/life/goals/cycles'], ['/life/journal/habits', '/life/today/month'],
@@ -4000,10 +3958,11 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
           [`/life/journal/goals/${goal}`, `/life/goals/${goal}`], ['/life/areas', '/life/settings'], [`/life/areas/${area}`, '/life/today'],
           ['/life/no-such-page', '/life/today']]
         const bad = []
-        for (const [from, want] of OLD) {
+        for (const [from] of OLD) {
           const before = errors.length
           await s.open(from)
-          if (path(pg) !== want) { bad.push(`${from} went to ${path(pg)}`); continue }
+          if (path(pg) !== '/life/today') { bad.push(`${from} went to ${path(pg)}`); continue }
+          if (from !== '/life' && !(await pg.locator('[data-moved-note]').isVisible())) { bad.push(`${from}: no "That page moved" note`); continue }
           try { await loaded(pg, from) } catch (e) { bad.push(e.message) }
           if (errors.length > before) bad.push(`${from}: ${errors.slice(before).join(' | ')}`)
         }
@@ -6128,8 +6087,6 @@ for (const width of SET_WIDTHS) {
         await s.open(`/life/settings?tab=${old}`)
         must(new URL(pg.url()).pathname === path, `?tab=${old} opened ${pg.url()}, not ${path}`)
       }
-      await s.open('/life/areas')
-      must(new URL(pg.url()).pathname === '/life/settings' && (await cur()) === 'areas', '/areas does not open Settings, Areas')
     })
 
     await check(`${tag}.5`, `${width} px: Members lists people and agents with filters and a Spaces view that still switches Ask and sensitive-item access`, async () => {
@@ -6431,17 +6388,7 @@ frappe.delete_doc("Life Journal Page", "${jp}", force=1, ignore_permissions=True
       }
     })
 
-    await check(`${tag}.10`, `${width} px: the old Plan month, year, 12 Weeks and journal routes land on Goals > Cycles or the page in Library`, async () => {
-      const jp = bench(`p = frappe.get_doc({"doctype": "Life Journal Page", "space": "${SPACE}", "page_date": frappe.utils.today(), "transcript_md": "${T('route page')}"}).insert(ignore_permissions=True)
-print(p.name)`).split('\n').pop()
-      const bad = []
-      for (const [from, to] of [['/life/plan/month?view=plan', '/life/goals/cycles'], ['/life/plan/year?view=cycle', '/life/goals/cycles'], ['/life/plan/12-weeks', '/life/goals/cycles'],
-        ['/life/today/month?view=plan', '/life/goals/cycles'], ['/life/today/year?view=cycle', '/life/goals/cycles'], ['/life/journal', '/life/goals/cycles'],
-        ['/life/journal/goals', '/life/goals/cycles'], ['/life/journal/month', '/life/goals/cycles'], [`/life/journal/pages/${jp}`, '/life/library/notes']]) {
-        await s.open(from)
-        if (new URL(pg.url()).pathname !== to) bad.push(`${from} → ${new URL(pg.url()).pathname}`)
-      }
-      must(!bad.length, bad.join('; '))
+    await check(`${tag}.10`, `${width} px: the Month and Year headers link to Goals > Cycles`, async () => {
       for (const [from, link] of [['/life/today/month', 'Month plan'], ['/life/today/year', '12 Week Year']]) {
         await s.open(from)
         await pg.locator('[data-view-links]').waitFor({ timeout: 10000 })
@@ -7080,13 +7027,13 @@ print(json.dumps({"name": doc.full_name, "zone": frappe.db.get_single_value("Sys
 
 // Issue 48: the old Life Project table and the project aliases are gone. (I48.1 to I48.5 and I48.7 are unit tests in
 // lifeos/tests/test_issue48_project_removed.py.)
-await check('I48.6', '/life/projects and an old project link land on Goals', async () => {
+await check('I48.6', '/life/projects and an old project link land on Today with the moved note', async () => {
   const pg = owner.page
   for (const from of ['/life/projects', '/life/projects?status=Done', `/life/projects/${ux.oldProject}`, `/life/projects/${ux.oldProject}?tab=tasks`]) {
     await owner.open(from)
     for (let i = 0; i < 20 && pathOf(pg).startsWith('/life/projects'); i++) await pg.waitForTimeout(200)
-    must(pathOf(pg) === '/life/goals', `${from} went to ${pathOf(pg)}`)
-    must(!/not found/i.test(await pg.locator('[data-main]').innerText()), `${from} shows "not found"`)
+    must(pathOf(pg) === '/life/today', `${from} went to ${pathOf(pg)}`)
+    must(await pg.locator('[data-moved-note]').isVisible(), `${from} shows no "That page moved" note`)
   }
 })
 
@@ -7953,6 +7900,62 @@ await check('S4.0', 'No test debris on lifeos.localhost after the run', async ()
   const d = JSON.parse(out)
   must(!Object.keys(d).length, 'debris on lifeos.localhost: ' + out)
 })
+
+// Issue 61: every route of the router loads without an error, and an address that is not a screen lands on Today with "That page moved".
+// I61.2 to I61.5 are unit tests (test_i61_cleanup).
+for (const width of SET_WIDTHS) {
+  const tag = `I61.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  try {
+    await check(`${tag}.1`, `${width} px: every route in the router loads without an error; an unknown address lands on Today with "That page moved"`, async () => {
+      const ids = JSON.parse(bench(`import json
+first = lambda dt, **f: frappe.db.get_value(dt, {"space": "${SPACE}", **f}) or "none"
+print(json.dumps({"item": first("Life Inbox Item"), "goal": first("Life Goal"), "area": first("Life Area"), "note": first("Life Note"),
+	"person": first("Life Person"), "skill": frappe.db.get_value("Life Skill", {}) or "process-capture"}))`).split('\n').pop())
+      // router path -> an address that opens it
+      const ROUTES = {
+        '/': '/life', '/today/:tab(week|month|year)?': '/life/today/month', '/today/reset': '/life/today/reset', '/brain/:tab(...)?': '/life/brain/activity',
+        '/brain/skills/:name': `/life/brain/skills/${ids.skill}`, '/brain/review/:id': `/life/brain/review/${ids.item}`, '/share': '/life/share',
+        '/item/:id': `/life/item/${ids.item}`, '/goals/:tab(...)?': '/life/goals/cycles', '/goals/:id': `/life/goals/${ids.goal}`,
+        '/focus/:id': `/life/focus/${ids.area}`, '/library/:tab(...)?': '/life/library/notes', '/library/people/:person': `/life/library/people/${ids.person}`,
+        '/library/:id': `/life/library/${ids.note}`, '/review': '/life/review', '/how-it-works': '/life/how-it-works', '/ask': '/life/ask', '/settings': '/life/settings',
+        '/dev/editor': '/life/dev/editor',
+      }
+      const source = fs.readFileSync(path.join(root, 'frontend/src/router.js'), 'utf8')
+      const declared = [...source.matchAll(/\{ path: (`[^`]*`|'[^']*'),\s*(?:name|redirect|component)/g)].map((m) => m[1].slice(1, -1).replace(/\$\{[^}]*\}/g, '...'))
+        .filter((x) => x !== '/:rest(.*)*' && x !== '/dev/throw')
+      const norm = (x) => x.replace(/\(([^)]*)\)/g, '(...)')
+      const covered = new Set(Object.keys(ROUTES).map(norm))
+      const missing = declared.map(norm).filter((x) => !covered.has(x))
+      must(!missing.length, `routes with no address in this check: ${missing.join(', ')}`)
+      const bad = []
+      for (const [route, address] of Object.entries(ROUTES)) {
+        const before = errors.length
+        await s.open(address)
+        await pg.locator('[data-main], [data-app]').first().waitFor({ timeout: 10000 }).catch(() => {})
+        await pg.waitForTimeout(300)
+        if (pathOf(pg) === '/life/today' && address !== '/life' && !address.startsWith('/life/today')) bad.push(`${route}: ${address} was sent to Today`)
+        if (await pg.locator('[data-screen-error]').count()) bad.push(`${route}: the screen shows the error message`)
+        if (errors.length > before) bad.push(`${route}: ${errors.slice(before).join(' | ')}`)
+      }
+      must(!bad.length, bad.slice(0, 5).join('; '))
+      for (const from of ['/life/no-such-page', '/life/plan/week', '/life/library/x/y']) {
+        await s.open(from)
+        must(pathOf(pg) === '/life/today', `${from} went to ${pathOf(pg)}`)
+        must((await pg.locator('[data-moved-note]').innerText()).includes('That page moved'), `${from} has no "That page moved" note`)
+      }
+      await pg.locator('[data-moved-note] button').click()
+      await pg.waitForTimeout(300)
+      must(!(await pg.locator('[data-moved-note]').count()) && !new URL(pg.url()).searchParams.has('moved'), 'Dismiss does not remove the note')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      return `${Object.keys(ROUTES).length} routes`
+    })
+  } finally { await s.ctx.close() }
+}
 
 // Pre-step 6: Frappe's semgrep rules find nothing in the app, apart from the inline exceptions in docs/conformance/exceptions.md
 await check('C.1', "Frappe's semgrep rules report no finding (tools/scan.sh)", async () => {

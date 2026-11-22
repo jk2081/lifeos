@@ -238,7 +238,7 @@ def run_action(message: str, index: int | str):
 		res = reset.apply_batch("someday", a.get("items") or [], space=t.space)
 		return {"kind": kind, "done": res["done"], "undo": res["undo"]}
 	if kind == "open_reset":
-		return {"kind": kind, "to": {"path": "/plan/reset"}, "names": [i["name"] for i in a.get("items") or []]}
+		return {"kind": kind, "to": {"path": "/today/reset"}, "names": [i["name"] for i in a.get("items") or []]}
 	if kind == "open_list":
 		return {"kind": kind, "to": a.get("to")}
 	if kind in ("snooze_insight", "dismiss_insight"):

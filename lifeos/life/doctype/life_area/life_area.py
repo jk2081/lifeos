@@ -28,7 +28,7 @@ class LifeArea(Document):
 
 	def default_colour(self):
 		"""A sub-area takes its parent's colour; a top-level area the next colour its space has used least."""
-		from lifeos.patches.v7.lens_areas import COLOURS
+		from lifeos.areas import COLOURS
 
 		if self.parent_area:
 			return frappe.db.get_value("Life Area", self.parent_area, "colour") or "gray"

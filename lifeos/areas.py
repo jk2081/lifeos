@@ -15,6 +15,8 @@ LIFE_AREAS = [
 	("Mind", "Learning, reading, skills", "violet"),
 	("Environment", "Home, places, things you own", "teal"),
 ]
+# the colours a dot can take; a new area gets the one its space has used least
+COLOURS = ["blue", "green", "amber", "violet", "red", "teal", "orange", "pink", "cyan", "gray"]
 NAMES = [a[0] for a in LIFE_AREAS]
 ON_BY_DEFAULT = ("Career", "Health")
 DEFAULT_PARENT = "Career"

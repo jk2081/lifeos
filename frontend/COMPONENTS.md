@@ -66,7 +66,6 @@ Before using a library component, read its source and types: `node_modules/frapp
 | `.st` in `.stats` | `Stat` inside `<div class="stats">` |
 | `.br` progress | `Progress` |
 | `.empty` | `Empty.vue` inside a `Card`; `Alert` for a notice with an action |
-| `Ico.vue` | Lucide names |
 | `.only-phone`, `.only-desktop` | `md:hidden`, `max-md:hidden` |
 | `.lbl` + control | the control's own `label` prop |
 | Loading text | `Skeleton`, `LoadingIndicator` |
@@ -97,7 +96,7 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `SetupCard.vue` (issue 26) | "Your setup · level n of 6": the next step, Go, How it works and a dismiss button, from `lib/ladder.js`. In the sidebar and the phone's focus sheet; do not build another | `RouterLink` |
 | `ui/Card.vue` | frappe-ui has no card | `rounded-5 border border-outline-gray-2 bg-surface-base` |
 | `ui/SectionHead.vue`, `ui/NumLink.vue` | A section heading whose count links to the list it counts | `text-sm-medium text-ink-gray-7`, `text-ink-blue-8` |
-| `ui/Row.vue`, `TaskRow.vue`, `IndexRow.vue` | Rows of mixed content inside a section card, opening the pane | The stretched-button pattern of frappe-ui's list guide, `Checkbox`, `Badge` |
+| `ui/Row.vue`, `TaskRow.vue` | Rows of mixed content inside a section card, opening the pane | The stretched-button pattern of frappe-ui's list guide, `Checkbox`, `Badge` |
 | `ui/Stat.vue` | A number with a label | `Card`, `text-3xl-semibold` |
 | `Empty.vue` | Empty states that say what belongs here | token text classes |
 | `ScreenBoundary.vue`, `ScreenErrorMessage.vue` (bug fix 1) | The error boundary around the routed page: a screen that fails shows "This screen could not be shown." with Reload and a reference; the rest of the app keeps working (`lib/screenError.js`) | `Card`, `Button` |
@@ -112,7 +111,7 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `ChangeView.vue` | One wiki change: who, when, why, the source, the diff, and Undo (with the "changed since" choice) | `Alert`, `Badge`, `Button`, `DiffView` |
 | `DigestView.vue` | An email digest as headed lists, each item's Gmail link an "Open in Gmail" button | `Md`, `Button` |
 | The Sources grid (in `pages/Sources.vue`, `ListView`'s `#body` slot) | Thumbnails of photos and scans as cards; the server's 480 px thumbnail, never the full image | `rounded-5 border-outline-gray-2` cards with the stretched-button pattern, `aspect-[4/3]` image, a Lucide icon when there is no thumbnail |
-| `HabitBoxes.vue`, the 12 Week Year grid, habit month boxes, the year calendar | Purpose-built journal grids | `Button`-sized cells; `bg-surface-gray-9 text-ink-base` done, `bg-surface-gray-2` missed, `border-outline-gray-4` current, `text-ink-gray-4` future |
+| The 12 Week Year grid, habit month boxes, the year calendar | Purpose-built journal grids | `Button`-sized cells; `bg-surface-gray-9 text-ink-base` done, `bg-surface-gray-2` missed, `border-outline-gray-4` current, `text-ink-gray-4` future |
 | `LineChart.vue`, the graph | Small SVG chart; Cytoscape canvas | token variables, `tokenColor()` |
 | `SearchPalette.vue`, `QuickAdd.vue`, `Backlinks.vue` | App features | `CommandPalette` family, `Dialog`, `TextInput`, `Row` |
 | `goals/DoneWhen.vue` (set 7) | "Done when…": a finish line or a number, Suggest, and the habit check, in every place a goal's measure is set | `TabButtons`, `FormControl`, `Button`, `Alert` |
@@ -168,7 +167,7 @@ Frappe organises information with tabs in three ways, and so does Life OS. All t
 | Pattern | Where the open tab lives | Used by |
 | --- | --- | --- |
 | Tabs on a record or page | `tab=` | The goal page (Overview, Tasks, Notes, Captures, Links), Settings (vertical, one section at a time), and on a phone only the review screen (Original, Transcript, Summary, Proposals) |
-| A place's tabs | the path | Plan (`/plan/week` … `/plan/someday`) and Library (`/library`, `/library/notes` …). The place provides them and `PageHead` draws them under the header of whichever screen is open there (see "The four places" below) |
+| A place's tabs | the path | Today (`/today/week` …), Brain, Goals (`/goals/tasks` …) and Library (`/library/notes` …). The place provides them and `PageHead` draws them under the header of whichever screen is open there (see "The four places" below) |
 | Tabs in the record pane | `ptab=`, so the pane and the page behind it do not collide. Changing it replaces the history entry; opening another record or closing the pane drops it (`lib/pane.js`) | Task (Details, Notes, Links), note (Note, Notes under this one, Links), the assistant's note (Page, Sources, Links, History), source (Original, Text, Summary, Made from this, Details), goal (Actions, Tasks, History across cycles, Links; Tasks and Links for Annual and Open goals), chat (Summary, Open items, Links), journal page (Page, Transcript, Created from this page), vault document (Details, File), an inbox item on a phone. Day, entry and plain panes have none |
 | State tabs on a list | the short parameter of the field the tabs are a preset on: `status=`, `type=`, `expiry=`, `open_items=`, `tab=` | Inbox, Tasks, Goals, Someday, Archive, Captures and All (by kind) |
 
@@ -271,15 +270,17 @@ Both live in `pages/Today.vue` and read `today.get`. The band (`data-open-band`)
 
 ### The four places
 
-The sidebar (`components/AppSidebar.vue`) is the logo (a space picker only with two or more spaces), + New, Today, Inbox, Plan (open to its tabs), Library, then Settings and the user with Help. The phone's bar is Today, Inbox, Plan, Library and Ask. `lib/nav.js` lists the places, Plan's and Library's tabs and the G shortcuts (`GO`).
+The sidebar (`components/AppSidebar.vue`) is the Life OS logo (which opens the lens), + Capture, Today, Brain (with the Needs you count), Goals, Review (once a review is locked, or on its day) and Library, then Settings and the user with Help. The phone's bar is Today, Brain, Goals and Library, with a More sheet. `lib/nav.js` lists the places, their tabs and the G shortcuts (`GO`).
 
-A place's tabs are paths (`/plan/goals`, `/library/notes`). The place page (`pages/Plan.vue`, `pages/LibraryPlace.vue`) provides `placeTabs` (`{ tabs, current, label, set }`) and renders the screen of the open tab; that screen's `PageHead` draws the tabs under its header (`data-place-tabs`), so each screen keeps its own title, count and actions. Plan's tabs carry `group` (time, lists): `TabBar` puts a gap between groups.
+A place's tabs are paths (`/goals/tasks`, `/library/notes`). The place pages (`pages/TodayPlace.vue`, `BrainPlace.vue`, `GoalsPlace.vue`, `LibraryPlace.vue`) provide `placeTabs` (`{ tabs, current, label, set }`) and render the screen of the open tab; that screen's `PageHead` draws the tabs under its header (`data-place-tabs`), so each screen keeps its own title, count and actions. Pages that are not tabs live inside the place they belong to: Reset under Today, the Outbox under Brain, Someday under Goals, the Timeline and the trash and archive under Library.
 
-### Plan
+**Routes** are the ones in `src/router.js` and no others. There are no redirects for old addresses (issue 61): an address that is not a screen lands on Today with "That page moved" (`?moved=1`, drawn by `TodayPlace.vue`, dismissable). Every `.vue` and `.js` file under `src` is imported by `main.js` or by a file it imports, or is routed; `test_i61_cleanup` fails on one that is not.
+
+### Today's rhythms and Goals
 
 - **Rhythm tabs** (Week, Month, 12 Weeks, Year) are `components/plan/PlanRhythm.vue`: a view switch (`view=`, `TabButtons`) between the journal's screens (`components/journal/*`, which teleport their buttons into `#jr-actions` in the header) and the calendar (`components/plan/Calendar.vue`, with `place` and `switch-options`). Week: Review, Calendar, Agenda, with `WeekScore` above the calendar and the Reset button. Month: Plan, Habits, Check-ins, Calendar. 12 Weeks: the cycle grid. Year: Calendar, Goals across cycles.
-- **List tabs** are the Goals, Tasks and Someday screens as before.
-- **A goal's page** is `/plan/goals/<id>` (`pages/Goal.vue`): what a project page and a goal page each had, with "Serves" and "Served by". Reset is `/plan/reset`.
+- **List tabs** are the Goals, All tasks and Someday screens (`pages/Goals.vue`, `Tasks.vue`, `Someday.vue`, inside `GoalsPlace.vue`).
+- **A goal's page** is `/goals/<id>` (`pages/Goal.vue`): what a project page and a goal page each had, with "Serves" and "Served by". Reset is `/today/reset`.
 
 ### Library
 
@@ -332,7 +333,7 @@ The Inbox's `#above` slot starts with `inbox/OldItems.vue`: an amber `Alert` (`d
 
 | Component | What it is | Built from |
 | --- | --- | --- |
-| `ReviewPage.vue` | The review at `/plan/week?view=review&tab=…`: loads the header (`weekly.get`, then `weekly.start`, which resumes or starts it; a site that refuses writes keeps the unsaved review), opens the first unfinished tab, refuses a tab ahead whose tabs before it are not done (Library never blocks), Pause | `Skeleton`, `toast` |
+| `ReviewPage.vue` | The review at `/today/week?view=review&tab=…`: loads the header (`weekly.get`, then `weekly.start`, which resumes or starts it; a site that refuses writes keeps the unsaved review), opens the first unfinished tab, refuses a tab ahead whose tabs before it are not done (Library never blocks), Pause | `Skeleton`, `toast` |
 | `ReviewHeader.vue` | Title, period ("Week of 16 to 22 November", or "Covers … (you skipped last week)"), numbered tabs ticked when done (a step bar "Step 2 of 4 · Tasks" on a phone), "About 35 minutes · saved as you go", Pause | `PageHeader`, `Tabs`, `TabList`, `TabTrigger` (`#prefix` for the number or tick), `Button` |
 | `ReviewFooter.vue` | Back, the line of what is left, the one primary button | `Button` |
 | `piles/PileBoard.vue` | Needs you and the three piles for one key (`inbox` in Library, `tasks` in Tasks); owns the pile drawer | `NeedsYou`, `PileCard`, `PileDrawer` |

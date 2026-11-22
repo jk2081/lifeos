@@ -587,9 +587,3 @@ def overview(space: str | None = None):
 	h = frappe.cache.get_value(_health_key(space)) or None
 	issues = None if not h else len(h["orphans"]) + len(h["broken"]) + len(h["no_sources"]) + len(h["duplicates"])
 	return {"space": space, "rules": rules_name, "pages": pages, "changes": changes_n, "health_issues": issues}
-
-
-@frappe.whitelist(methods=["POST"])
-def new_page(space: str | None = None, title: str | None = None, summary: str | None = None, area: str | None = None):
-	"""A person creates a wiki page from the Wiki screen."""
-	return create_page(space=space, title=title, content_md="", summary=summary or title, area=area)

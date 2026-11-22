@@ -19,8 +19,6 @@ export const TYPES = {
   day: { label: 'Day' },
 }
 const BY_DOCTYPE = Object.fromEntries(Object.entries(TYPES).filter(([, t]) => t.doctype).map(([k, t]) => [t.doctype, k]))
-// links written before the pane existed: /tasks?open=NAME, /vault?open=NAME, /chats?open=NAME
-const LEGACY = { Tasks: 'task', Vault: 'vault', Chats: 'chat' }
 
 // the rows of the list on screen, in order, so the pane can step to the previous and next one
 export const paneNav = reactive({ rows: [] })
@@ -30,9 +28,7 @@ export function parseOpen(route) {
   if (!v) return null
   const s = String(v)
   const i = s.indexOf(':')
-  if (i > 0 && TYPES[s.slice(0, i)]) return { type: s.slice(0, i), name: s.slice(i + 1), ref: s }
-  const type = LEGACY[route.name]
-  return type ? { type, name: s, ref: `${type}:${s}` } : null
+  return i > 0 && TYPES[s.slice(0, i)] ? { type: s.slice(0, i), name: s.slice(i + 1), ref: s } : null
 }
 export const current = computed(() => parseOpen(router.currentRoute.value))
 export const refOf = (doctype, name) => (BY_DOCTYPE[doctype] ? `${BY_DOCTYPE[doctype]}:${name}` : null)
@@ -42,11 +38,8 @@ export function refOfRoute(path) {
   const p = String(path || '').replace(/^\/life/, '')
   let m
   if ((m = /[?&]open=([a-z]+(?:%3A|:)[^&]+)/.exec(p))) return decodeURIComponent(m[1])
-  if ((m = /^\/(tasks|vault|chats)\?open=([^&]+)/.exec(p))) return `${{ tasks: 'task', vault: 'vault', chats: 'chat' }[m[1]]}:${decodeURIComponent(m[2])}`
   if ((m = /^\/library\/([^/?]+)$/.exec(p))) return `note:${m[1]}`
-  if ((m = /^\/inbox\/([^/?]+)$/.exec(p))) return `inbox:${m[1]}`
-  if ((m = /^\/(?:journal|plan)\/goals\/([^/?]+)$/.exec(p))) return `goal:${m[1]}`
-  if ((m = /^\/journal\/pages\/([^/?]+)$/.exec(p))) return `page:${m[1]}`
+  if ((m = /^\/goals\/([^/?]+)$/.exec(p))) return `goal:${m[1]}`
   return null
 }
 

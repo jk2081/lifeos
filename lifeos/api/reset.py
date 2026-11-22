@@ -92,13 +92,13 @@ def rule_batches(space):
 	if waiting:
 		out.append(_batch("inbox_decisions", f"Inbox items older than {rule['days']} days", "Each has a suggested decision and a reason: accept its proposals, park it in Someday, or discard it.",
 			[_item("Life Inbox Item", i.name, f"{i.title} ({i.suggested_decision.lower()})") for i in waiting], "review_inbox_decisions", "Review {n}",
-			review={"path": "/inbox", "query": {"decisions": "1"}}))
+			review={"path": "/brain/queue", "query": {"decisions": "1"}}))
 	# 6. Someday items due for review
 	due = someday.list(space=space, tab="due", page_length=100)
 	if due["total"]:
 		out.append(_batch("someday_due", "Someday items due for review", "Parked long enough to look at again: bring back, keep for longer, or purge.",
 			[_item(r.doctype, r.name, f"{r.title} ({r.type.lower()}, parked {r.someday_on})") for r in due["rows"]], "review_someday", "Review {n}",
-			review={"path": "/plan/someday", "query": {"tab": "due"}}))
+			review={"path": "/goals/someday", "query": {"tab": "due"}}))
 	return out
 
 
@@ -378,15 +378,3 @@ def _unaccept(proposal):
 	item.reload()
 	item.status, item.finished_on = "To Review", None
 	item.save(ignore_permissions=True)  # saved, so the Outbox reverses the item's exit (set 7)
-
-
-@frappe.whitelist(methods=["GET"])
-def short(space: str | None = None):
-	"""The weekly review's first step: the stuck count, the batches by title and count, and Someday items due for review."""
-	_person()
-	space = permissions.resolve_space(space)
-	r = counts.rules()
-	stuck = counts.stuck_tasks(space)
-	return {"stuck": stuck, "over_limit": stuck["n"] > r["stuck_limit"], "rules": r, "open": counts.open_tasks(space),
-		"batches": [{"key": b["key"], "title": b["title"], "count": b["count"], "action_label": b["action_label"]} for b in rule_batches(space)],
-		"someday_due": counts.someday_due(space)}

@@ -38,7 +38,6 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | --- | --- | --- |
 | `lifeos/api/settings.py` | 233 | the site's own backup folder, names only |
 | `lifeos/files.py` | 90 | local_path keeps the path inside the site's files folders |
-| `lifeos/patches/v10/file_hashes.py` | 23 | local_path keeps the path inside the site's files folders |
 | `lifeos/pwa.py` | 18 | a fixed file of this app; no part of the path comes from the request |
 | `lifeos/sources.py` | 103 | a fixed name in a temporary folder made here |
 | `lifeos/sources.py` | 113 | pdftoppm's own output in a temporary folder made here |
@@ -155,6 +154,4 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/index.py` | 96 | column names come from the fixed COLUMNS list; every value is a %s parameter |
 | `lifeos/insights.py` | 203 | only the code-owned vault fragment of the tool context is inserted; the rest are parameters |
 | `lifeos/old_inbox.py` | 227 | WHERE is constant SQL plus area_filter's fixed fragment; values are parameters |
-| `lifeos/patches/v15/remove_life_project.py` | 19 | `dt` is a constant DocType name |
-| `lifeos/patches/v15/remove_life_project.py` | 38 | `dt` comes from the constant WITH_PROJECT |
 | `lifeos/review/library.py` | 137 | dt and the date column come from the fixed tuple above; values are parameters |

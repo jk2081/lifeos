@@ -243,20 +243,3 @@ class TestPiles(ReviewCase):
 		for fn, kw in ((weekly.get, {}), (weekly.start, {}), (weekly.pile_accept, {"pile": "park"})):
 			with self.assertRaises(frappe.PermissionError):
 				fn(space=PRIVATE, **kw)
-
-
-class TestMigration(ReviewCase):
-	def test_review_notes_become_locked_reviews(self):
-		from lifeos.patches.v9 import review_notes
-
-		note = self.make("Life Note", title="Weekly review, 9 Nov 2026", content_md="Closed the blend sheet.")
-		odd = self.make("Life Note", title="Weekly review, sometime", content_md="?")
-		review_notes.execute()
-		review_notes.execute()  # a second run changes nothing
-		rows = frappe.get_all("Life Review", filters={"note": note.name}, fields=["status", "period_start", "period_end", "went_well", "user"])
-		self.assertEqual(len(rows), 1)
-		self.assertEqual((rows[0].status, str(rows[0].period_start), str(rows[0].period_end)), ("Locked", "2026-11-09", "2026-11-15"))
-		self.assertEqual((rows[0].went_well, rows[0].user), ("Closed the blend sheet.", OWNER))
-		self.assertFalse(frappe.db.exists("Life Review", {"note": odd.name}))
-		# the next review starts after the migrated week
-		self.assertEqual(str(Review.period(PRIVATE, OWNER, "2026-11-22")[0]), "2026-11-16")

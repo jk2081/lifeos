@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import frappe
 
-from lifeos import areas, demo, install, permissions, seed
+from lifeos import areas, demo, install, permissions
 from lifeos.api import onboarding
 from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, LifeTestCase
 
@@ -34,12 +34,11 @@ class TestFirstRun(LifeTestCase):
 		# I49.1
 		self.assertEqual(install.STARTING_SPACES, ("Private",))
 		source = inspect.getsource(install.after_install) + inspect.getsource(install.setup) + inspect.getsource(install.make_spaces)
-		self.assertNotIn("seed.load", source)
 		self.assertNotIn("demo.load", source)
+		self.assertNotIn("load_cycle", source)
 		counts = {dt: frappe.db.count(dt) for dt in ("Life Task", "Life Goal", "Life Inbox Item", "Life Cycle")}
-		with patch.object(seed, "load") as s, patch.object(demo, "load") as d:
+		with patch.object(demo, "load") as d:
 			install.setup()
-		s.assert_not_called()
 		d.assert_not_called()
 		self.assertEqual(counts, {dt: frappe.db.count(dt) for dt in counts})
 		# a new space, as install makes Private: the seven areas, Career and Health on, nothing else

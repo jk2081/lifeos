@@ -202,7 +202,6 @@ class TestAreasGoalsTimeline(LifeTestCase):
 		self.assertEqual((page["tabs"]["tasks"], page["tabs"]["notes"]), (1, 1))
 		self.assertEqual([t["name"] for t in tasks.list(space=PRIVATE, goal=goal.name)["tasks"]], [t1.name])
 		self.assertEqual(page["record_count"], 3)
-		self.assertEqual(goal_api.completion_info(goal.name)["records"], 3)
 		self.as_user(FAMILY)
 		self.assertRaises(frappe.PermissionError, goal_api.get, goal.name)
 
