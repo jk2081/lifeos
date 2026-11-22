@@ -194,8 +194,10 @@ class TestIndex(LifeTestCase):
 
 class TestSeed(LifeTestCase):
 	def test_structure_is_created_at_install(self):
-		# issue 11: the two spaces have the seven areas of life at the top; the owner's own areas come with the seed, as parts
-		for space in ("Private", "Shared"):
+		# issue 11: every space has the seven areas of life at the top; the owner's own areas come with the seed, as parts.
+		# issue 46: a new site has one space (Private); Shared exists only where setup_users made it
+		self.assertTrue(frappe.db.exists("Life Space", "Private"))
+		for space in frappe.get_all("Life Space", filters={"name": ("in", ("Private", "Shared"))}, pluck="name"):
 			top = frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set")}, pluck="area_name", order_by="sort_order")
 			self.assertEqual(top, ["Career", "Health", "Relationships", "Money", "Emotions", "Mind", "Environment"])
 		self.assertEqual(frappe.db.count("Life Dimension", {"space": "Private"}), 8)
