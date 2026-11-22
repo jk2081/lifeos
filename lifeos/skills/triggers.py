@@ -1,6 +1,6 @@
 """When a skill runs: a document event, a schedule, or a button. Always in a background job on the long queue, never in the web request."""
 import frappe
-from frappe.utils import get_datetime, now_datetime
+from frappe.utils import add_to_date, get_datetime, now_datetime
 
 from lifeos.skills import runner
 
@@ -28,13 +28,53 @@ def _fire(event, doc, extra=None):
 		queue(frappe.get_doc("Life Skill", row.name), {"doctype": doc.doctype, "name": doc.name, "space": doc.get("space"), **(extra or {})}, event)
 
 
+UNCLAIMED_MINUTES = 30  # an agent's capture nobody claimed in this long goes to the Brain
+
+
+def agent_acts(user: str | None = None) -> bool:
+	"""True when `user` is an agent other than the Brain itself: what it files is its own."""
+	from lifeos import permissions
+
+	user = user or frappe.session.user
+	return user != permissions.BRAIN_USER and permissions.is_agent(user)
+
+
 def capture_created(doc, method=None):
-	"""A capture is created that no agent has claimed (it is New). #58 will refine which captures are the Brain's."""
+	"""The one rule for who processes a capture (issue 58). What an agent files itself is that agent's: it claims it, or files the
+	finished job in one call. Everything else (+ Capture, the phone, email read by Life OS, a retry by a person) is the Brain's, now.
+	A capture an agent made and did not claim goes to the Brain after 30 minutes (`route_unclaimed`)."""
 	if doc.status != "New" or doc.is_archived:
 		return
-	_fire("Capture created", doc)
+	if agent_acts():
+		return
+	route(doc)
+
+
+def route(doc):
+	"""Hand a New capture to the Brain: the skills that wait for a new capture (switched off ones are skipped, and the capture waits
+	for an agent). One run for each saved version of the capture, so a reply that brings a Done capture back is processed again."""
+	extra = {"at": str(doc.modified)}
+	_fire("Capture created", doc, extra)
 	if doc.source_type in EMAIL_SOURCES:
-		_fire("Email filed", doc)
+		_fire("Email filed", doc, extra)
+
+
+def route_unclaimed():
+	"""Every 5 minutes: captures an agent made or last filed, still New after 30 minutes, are the Brain's."""
+	from lifeos import permissions
+
+	cutoff = add_to_date(now_datetime(), minutes=-UNCLAIMED_MINUTES)
+	agents = [u for u in frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent") if u != permissions.BRAIN_USER]
+	if not agents:
+		return 0
+	n = 0
+	for name in frappe.get_all("Life Inbox Item", filters={"status": "New", "is_archived": 0, "modified": ("<", cutoff)}, or_filters=[
+			["owner", "in", agents], ["modified_by", "in", agents]], pluck="name", limit=50):
+		doc = frappe.get_doc("Life Inbox Item", name)
+		before = frappe.db.count("Life Skill Run", {"input_name": name})
+		route(doc)
+		n += frappe.db.count("Life Skill Run", {"input_name": name}) - before
+	return n
 
 
 def record_changed(doc, method=None):

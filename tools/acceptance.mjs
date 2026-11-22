@@ -7858,6 +7858,86 @@ print(json.dumps({"focus": focus, "annual": annual, "task_goal": frappe.db.get_v
   }
 }
 
+// Issue 58: Brain > Sources says who processes each source and offers Connect Gmail; a connected mailbox shows its week's counts; a capture the Brain
+// could not process shows Retry and File it myself in Needs you. Titles start "I58 ". The space's own connections are put aside for each width
+// and brought back after; the Brain is switched on for the check and off again (the acceptance site starts like one with an agent).
+// I58.1 to I58.8 and I58.10 are unit tests (test_issue58_routing).
+for (const width of SET_WIDTHS) {
+  const tag = `I58.${width}`
+  if (ONLY && !ONLY.split(',').some((o) => tag.startsWith(o) || o.startsWith('.'))) continue
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const ASIDE = `zz-i58-aside-${width}`
+  const made = JSON.parse(bench(`import json
+aside = frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name")
+for n in aside: frappe.db.set_value("Life Connection", n, "space", "${ASIDE}", update_modified=False)
+frappe.db.set_value("Life Skill", "process-capture", "active", 1)
+print(json.dumps({"aside": aside}))`).split('\n').pop())
+  const openSources = async () => { await s.open('/life/brain/sources'); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  try {
+    await check(`${tag}.9`, `${width} px: Sources offers Connect Gmail, a connected mailbox shows its week's counts and "Processed by: the Brain", every card has a Processed by line`, async () => {
+      await openSources()
+      must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state on an empty space')
+      must((await pg.locator('[data-source-tile][data-system="upload"] [data-processed-by]').innerText()).includes('Processed by: the Brain'), 'the Upload tile has no Processed by line')
+      const tile = pg.locator('[data-source-tile][data-system="gmail"]')
+      must((await tile.innerText()).includes('Connect Gmail'), 'the Gmail tile does not say Connect Gmail: ' + await tile.innerText())
+      await tile.locator('[data-tile-add]').click()
+      await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
+      const t = await pg.locator('[data-gmail-connect]').innerText()
+      must(t.includes('read-only') && /never marks, labels, moves, deletes or sends/.test(t), 'the dialog does not say it is read only: ' + t)
+      await pg.keyboard.press('Escape')
+      bench(`from frappe.utils import add_days, getdate
+d = getdate()
+frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "gmail", "mailbox": "i58-${width}@example.com", "label": "i58-${width}@example.com", "active": 1,
+  "week_start": add_days(d, -d.weekday()), "seen_week": 218, "kept_week": 31}).insert(ignore_permissions=True)
+for system in ("hermes", "claude", "google-calendar"):
+    frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": system, "active": 1}).insert(ignore_permissions=True)`)
+      await openSources()
+      const mail = pg.locator('[data-source-card][data-system="gmail"]')
+      must((await mail.locator('[data-source-line]').innerText()).includes('218 this week · 31 kept'), 'the mailbox line says: ' + await mail.locator('[data-source-line]').innerText())
+      must((await mail.locator('[data-processed-by]').innerText()) === 'Processed by: the Brain', 'the mailbox does not say the Brain processes it')
+      const lines = await pg.locator('[data-source-card] [data-processed-by]').allInnerTexts()
+      must(lines.length === 4 && lines.every((x) => /^(Processed by|Not processed)/.test(x)), 'every card needs a Processed by line: ' + lines.join(' | '))
+      must(lines.includes('Processed by: Hermes') && lines.filter((x) => x === 'Not processed: kept as is').length === 2, 'the lines are wrong: ' + lines.join(' | '))
+      await mail.locator('[data-source-open]').click()
+      await pg.locator('[data-source-settings][data-system="gmail"]').waitFor({ timeout: 5000 })
+      must(await pg.locator('[data-gmail-include]').isVisible() && await pg.locator('[data-gmail-skip]').isVisible(), 'the always include and always skip lists are missing')
+      await pg.keyboard.press('Escape')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check(`${tag}.10`, `${width} px: a capture the Brain could not process is in Needs you with Retry and File it myself; File it myself takes it out`, async () => {
+      const item = JSON.parse(bench(`import json
+d = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "I58 not processed ${width} ${stamp}", "source_type": "Upload", "raw_text": "x", "status": "Failed",
+  "error": "Not processed: no AI key"}).insert(ignore_permissions=True)
+print(json.dumps(d.name))`).split('\n').pop())
+      await s.open('/life/brain')
+      const row = pg.locator(`[data-failed-row][data-item="${item}"]`)
+      await row.waitFor({ timeout: 10000 })
+      must((await row.innerText()).includes('Not processed: no AI key'), 'the reason is not shown')
+      must(await row.locator('[data-retry]').isVisible() && await row.locator('[data-file-myself]').isVisible(), 'Retry and File it myself are not both shown')
+      await row.locator('[data-file-myself]').click()
+      await pg.waitForURL(new RegExp(`/item/${item}`), { timeout: 10000 })
+      const status = bench(`print(frappe.db.get_value("Life Inbox Item", "${item}", "status"))`).split('\n').pop()
+      must(status === 'Done', 'the capture is ' + status)
+      await s.open('/life/brain')
+      must(!(await pg.locator(`[data-failed-row][data-item="${item}"]`).count()), 'it is still in Needs you')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I58 %${width} ${stamp}"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)
+for c in frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc("Life Connection", c, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.aside)}: frappe.db.set_value("Life Connection", n, "space", "${SPACE}", update_modified=False)
+frappe.db.set_value("Life Skill", "process-capture", "active", 0)`)
+    await s.ctx.close()
+  }
+}
+
 // every check cleans up: this run's records go from the acceptance site too, and none is left
 await check('S4.1', "This run's records are removed from the acceptance site", async () => {
   const code = 'from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))'

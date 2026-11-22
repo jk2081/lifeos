@@ -108,6 +108,7 @@
           </div>
           <div class="flex flex-wrap items-center gap-2 max-md:w-full">
             <Button v-if="writable" label="Retry" data-retry @click="retry(u)" />
+            <Button v-if="writable && notProcessed(u)" label="File it myself" data-file-myself @click="fileMyself(u)" />
             <Button label="Open" @click="router.push(`/item/${u.item}`)" />
           </div>
         </div>
@@ -216,8 +217,13 @@ async function fileAll() {
   }
   await load()
 }
+// a capture the Brain could not process ("Not processed: no AI key", "Sensitive, not read by the Brain"): Retry sends it back, File it myself takes it
+const notProcessed = (u) => /^(Not processed|Sensitive, not read)/.test(u.reason || '')
 async function retry(u) {
-  if (await tryCall(() => api('inbox.retry', { item: u.item }), 'Sent back to the agent.')) await load()
+  if (await tryCall(() => api('inbox.retry', { item: u.item }), 'Sent back to be processed.')) await load()
+}
+async function fileMyself(u) {
+  if (await tryCall(() => api('inbox.file_myself', { item: u.item }))) router.push(`/item/${u.item}`)
 }
 onMounted(async () => { await loadLookups(); await load() })
 watch(() => [store.space], load)

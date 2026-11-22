@@ -49,6 +49,9 @@ class LifeTestCase(IntegrationTestCase):
 		frappe.db.set_single_value("Life Settings", "require_done_when", 0)
 		# issue 57: Open goals are retired; the tests that make one through the API predate that, and test_issue57_focuses switches it off
 		frappe.flags.lifeos_allow_open_goals = True
+		# issue 58: process-capture ships on, so every new capture would start a Brain run; the tests that predate it are about agents
+		# and the Inbox, and the tests that want the Brain (test_issue28_skills, test_issue58_routing) switch it on themselves
+		frappe.db.set_value("Life Skill", "process-capture", "active", 0)
 
 	def tearDown(self):
 		frappe.set_user("Administrator")

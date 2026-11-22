@@ -1,0 +1,33 @@
+{
+ "title": "A cold sales pitch is skipped",
+ "input": {
+  "data": {
+   "from": "Rohan <rohan@growthleadsfast.example>",
+   "to": "owner@example.com",
+   "subject": "10x your leads this quarter",
+   "snippet": "Hello, I help companies like yours get more leads. Can we hop on a 15 minute call this week? Let me know.",
+   "mailbox": "owner@example.com",
+   "messages_in_thread": 1
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "keep",
+    "equals": false
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"keep\": false, \"reason\": \"Cold sales outreach\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "ecd985e1eec1c178"
+}

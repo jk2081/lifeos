@@ -166,6 +166,13 @@ def prepare_site(time_zone="Asia/Kolkata"):
 	return "Site prepared."
 
 
+def brain_off():
+	"""The acceptance site works like a site with an agent (the fake agent claims what is dropped in): the built-in Brain starts off
+	there, and the checks of issue 58 and the skills switch it on for themselves."""
+	frappe.db.set_value("Life Skill", "process-capture", "active", 0)  # `bench execute` commits
+	return "The Brain is off."
+
+
 # ---------- test debris ----------
 # Title prefixes the acceptance scripts (tools/*.mjs) give their records, each followed by the run's stamp: Date.now() in
 # base 36, eight characters starting with "m" in 2026. Some carry the screen width or a number before the stamp.

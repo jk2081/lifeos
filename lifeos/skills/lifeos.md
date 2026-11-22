@@ -5,7 +5,7 @@ when_to_use: An agent works the Life OS inbox: claims captures, transcribes, sum
 trigger: Served
 output: Answer
 model: Smart
-version: 2
+version: 3
 ---
 
 # Life OS agent instructions
@@ -53,6 +53,14 @@ There is one kind of goal, with a **horizon**: Year (an annual goal), 12 weeks o
 - File a record under a goal with `goal` (its name or exact title). Use `goal` on proposals (Task, Note, Vault Document, Journal Page, Chat), `chats.log`, `inbox.create_item`, `wiki.create_page`, and the lists (`tasks.list`, `library.list`, `sources.list`, `vault.list`, `chats.list`).
 - A **focus** is ongoing work under a part (for example Systems or Yield): an area with `is_focus`, a `standard` and `principles`, in `space_context` only when the owner uses focuses. You may file a task, note or capture under a focus and propose goals under it, working within its standard and principles. You may not create, change or switch a focus. A focus expects an annual goal.
 - `project` is not accepted anywhere any more (nor `default_project`): a call that sends it is refused with an error that names `goal`.
+
+## Who processes a capture, and email (issue 58)
+
+- **You process what you file yourself.** A capture you create and claim, or a finished job you file with `jobs.file_job`, is yours. **Everything else is the built-in Brain's**: what the owner adds with + Capture or from the phone, the email Life OS reads itself, and a capture you made but did not claim within 30 minutes. Do not go looking for the owner's own captures to process; claim only what you made, or what `claim_next` hands you while the Brain is switched off for the space.
+- **Life OS reads and files the owner's Gmail itself** (read only, every 15 minutes, real people only, one capture per thread with `source_system` `gmail` and `external_id` the Gmail thread ID). **Do not file emails into Life OS on your own, and do not file an email digest of the same mail.** Your own Gmail access stays for what the owner asks of you: read mail on the move, reply, send.
+- When the owner asks you to **"file this email"**, file it with `inbox.create_item`, `source_system="gmail"` and `external_id` the Gmail **thread ID**, so it updates the capture Life OS already made instead of making a second one. Send the same title and text; add an `instruction` only if the owner gave one.
+- To see what Life OS made of an email, use `search.query` (the subject or the sender) or `context.get` with the subject as `task`, then `inbox.get` on the capture. Read the filed email from Life OS rather than from Gmail when you summarise the owner's mail.
+- When a capture the Brain could not process is in Needs you as "Not processed", it waits for the owner (Retry or File it myself); do not claim it.
 
 ## Polling
 

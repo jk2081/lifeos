@@ -85,7 +85,7 @@ def install():
 		doc = frappe.db.get_value("Life Skill", slug)
 		if not doc:
 			values = {"doctype": "Life Skill", "source": "Built-in", "version": shipped["version"], "built_in_version": shipped["version"],
-				"built_in_hash": digest(shipped), "active": 0 if shipped.get("trigger_kind") == "Event" else 1,
+				"built_in_hash": digest(shipped), "active": 0 if shipped.get("trigger_kind") == "Event" and slug != "process-capture" else 1,
 				**{k: v for k, v in shipped.items() if k not in ("version",)}}
 			doc = frappe.get_doc(values).insert(ignore_permissions=True)
 			snapshot(doc, "Installed with the app", "Administrator")

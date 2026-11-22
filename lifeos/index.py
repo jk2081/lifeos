@@ -153,7 +153,11 @@ def ensure_indexes():
 	# UX fixes, set 4: original IDs are unique per space and system; one connection per space and system
 	frappe.db.add_unique("Life Inbox Item", ["space", "source_system", "external_id"], "life_inbox_external_id")
 	frappe.db.add_unique("Life Chat Log", ["space", "source_system", "external_id"], "life_chat_external_id")
-	frappe.db.add_unique("Life Connection", ["space", "system"], "life_connection_system")
+	# issue 58: several Gmail mailboxes share the system "gmail", so the mailbox is part of the key (empty for every other system; the
+	# document's own check keeps one connection for each of those)
+	if frappe.db.has_index("tabLife Connection", "life_connection_system"):
+		frappe.db.sql_ddl("alter table `tabLife Connection` drop index life_connection_system")
+	frappe.db.add_unique("Life Connection", ["space", "system", "mailbox"], "life_connection_mailbox")
 	frappe.db.add_index("Life Index", ["space", "ref_doctype", "is_archived", "record_date"], "life_index_space_type_date")
 	# covering indexes for the counts (tab counts, totals, the timeline's and an area's counts): with text of up to 60,000
 	# characters a row, a count must not read the rows themselves

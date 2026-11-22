@@ -13,7 +13,20 @@
   "default_intent",
   "active",
   "last_received_on",
-  "last_received_what"
+  "last_received_what",
+  "mailbox",
+  "connected_app",
+  "connected_by",
+  "label_name",
+  "always_include",
+  "always_skip",
+  "always_sensitive",
+  "attach_files",
+  "fetched_until",
+  "week_start",
+  "seen_week",
+  "kept_week",
+  "last_error"
  ],
  "fields": [
   {
@@ -76,6 +89,87 @@
    "fieldname": "last_received_what",
    "fieldtype": "Data",
    "label": "Last Received What",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mailbox",
+   "fieldtype": "Data",
+   "label": "Mailbox",
+   "read_only": 1,
+   "description": "The Gmail address, read from Google once connected."
+  },
+  {
+   "fieldname": "connected_app",
+   "fieldtype": "Link",
+   "label": "Connected App",
+   "options": "Connected App",
+   "read_only": 1
+  },
+  {
+   "fieldname": "connected_by",
+   "fieldtype": "Link",
+   "label": "Connected By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "label_name",
+   "fieldtype": "Data",
+   "label": "Only mail with this Gmail label",
+   "description": "Empty reads the Inbox."
+  },
+  {
+   "fieldname": "always_include",
+   "fieldtype": "Small Text",
+   "label": "Always include",
+   "description": "Senders or domains, one per line."
+  },
+  {
+   "fieldname": "always_skip",
+   "fieldtype": "Small Text",
+   "label": "Always skip",
+   "description": "Senders or domains, one per line."
+  },
+  {
+   "fieldname": "always_sensitive",
+   "fieldtype": "Small Text",
+   "label": "Always sensitive",
+   "description": "Senders or domains, one per line. Their mail is marked sensitive."
+  },
+  {
+   "fieldname": "attach_files",
+   "fieldtype": "Check",
+   "label": "Keep attachments",
+   "default": "1"
+  },
+  {
+   "fieldname": "fetched_until",
+   "fieldtype": "Datetime",
+   "label": "Fetched Until",
+   "read_only": 1
+  },
+  {
+   "fieldname": "week_start",
+   "fieldtype": "Date",
+   "label": "Week Start",
+   "read_only": 1
+  },
+  {
+   "fieldname": "seen_week",
+   "fieldtype": "Int",
+   "label": "Seen This Week",
+   "read_only": 1
+  },
+  {
+   "fieldname": "kept_week",
+   "fieldtype": "Int",
+   "label": "Kept This Week",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Data",
+   "label": "Last Error",
    "read_only": 1
   }
  ],

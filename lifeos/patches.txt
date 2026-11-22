@@ -16,3 +16,4 @@ lifeos.patches.v12.task_areas
 lifeos.patches.v13.link_people
 lifeos.patches.v14.one_goal_horizon
 lifeos.patches.v15.remove_life_project
+lifeos.patches.v16.brain_processes_captures

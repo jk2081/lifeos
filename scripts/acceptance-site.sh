@@ -35,6 +35,8 @@ else
       rm -rf $SNAPDIR && mkdir -p $SNAPDIR && bench --site $SITE backup --backup-path $SNAPDIR >>/tmp/acc-site.log 2>&1
       mv \$(ls $SNAPDIR/*-database.sql.gz | head -1) $SNAP && rm -f $SNAPDIR/*.json"
 fi
+# issue 58: process-capture ships on; this site starts like one with an agent working the Inbox
+$B "bench --site $SITE execute lifeos.devtools.brain_off >/dev/null 2>&1"
 # GETs to Life OS methods run read-only here, so a read that writes fails the run (lifeos/strict_get.py)
 $B "bench --site $SITE set-config -p lifeos_strict_get 1 >/dev/null"
 # issue 57: checks that predate the retirement of the Open goal still make one through the API; the site itself refuses it otherwise

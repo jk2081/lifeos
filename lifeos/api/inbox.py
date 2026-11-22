@@ -131,6 +131,10 @@ def _refile(name, system, source_type, values):
 	elif changed_fields:
 		item.add_comment("Info", _("Updated from {0} ({1}).").format(system, ", ".join(changed_fields)))
 	item.save()
+	if item.status == "New" and changed_fields:  # back with the Brain, or with the agent that filed it (issue 58)
+		from lifeos.skills import triggers
+
+		triggers.capture_created(item)
 	connections.touch(item.space, system, item.title)
 	return {**_item_dict(item), "created": False, "updated": True, "changed": bool(changed_fields), "changed_fields": changed_fields}
 
@@ -321,6 +325,23 @@ def retry(item: str):
 	from lifeos.skills import triggers
 
 	triggers.capture_created(doc)  # the Brain's skill, when it is on, takes it again
+	return {"item": doc.name, "status": doc.status}
+
+
+@frappe.whitelist(methods=["POST"])
+def file_myself(item: str):
+	"""The owner takes a capture the Brain could not process (Needs you, Unfiled): it leaves the queue as Done, and they file it by hand
+	from its page. Its pending proposals, if any, are removed. People only."""
+	if permissions.is_agent():
+		frappe.throw(_("Only a person can file a capture by hand."), frappe.PermissionError)
+	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
+	if doc.status not in ("Failed", "New"):
+		frappe.throw(_("Only a capture that was not processed can be filed by hand."))
+	for name in frappe.get_all("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name"):
+		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)
+	doc.status, doc.error = "Done", None
+	doc.add_comment("Info", _("Filed by hand: the Brain did not process it."))
+	doc.save()
 	return {"item": doc.name, "status": doc.status}
 
 

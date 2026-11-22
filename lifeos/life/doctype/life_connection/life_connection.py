@@ -10,5 +10,13 @@ class LifeConnection(Document):
 			frappe.throw(_("A connection needs a system, for example gmail."))
 		self.label = (self.label or "").strip() or self.system.title()
 		self.default_intent = self.default_intent or "Process"
-		if frappe.db.get_value("Life Connection", {"space": self.space, "system": self.system, "name": ["!=", self.name or ""]}):
-			frappe.throw(_("This space already has a connection for {0}.").format(self.system), frappe.DuplicateEntryError)
+		other = {"space": self.space, "system": self.system, "name": ["!=", self.name or ""]}
+		if self.system == "gmail":  # several mailboxes, one card each (issue 58)
+			if self.mailbox:
+				other["mailbox"] = self.mailbox
+			elif self.connected_app:  # a sign-in under way
+				return
+			else:  # the bare row of defaults for what agents file as gmail: one for a space
+				other["mailbox"], other["connected_app"] = ["is", "not set"], ["is", "not set"]
+		if frappe.db.get_value("Life Connection", other):
+			frappe.throw(_("This space already has a connection for {0}.").format(self.mailbox or self.system), frappe.DuplicateEntryError)

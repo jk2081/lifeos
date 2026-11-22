@@ -93,9 +93,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/goals.py` | 110 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
 | `lifeos/api/goals.py` | 182 | SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters |
 | `lifeos/api/goals.py` | 416 | `off` is off_clause's fixed SQL; values are parameters |
-| `lifeos/api/inbox.py` | 375 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 380 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/inbox.py` | 382 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 396 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
+| `lifeos/api/inbox.py` | 401 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 403 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |
@@ -148,10 +148,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/devtools.py` | 68 | development tool: dt comes from the SPACE_DOCTYPES constant; values are parameters |
 | `lifeos/devtools.py` | 73 | development tool: table names from SPACE_DOCTYPES and their meta's table fields; values are parameters |
 | `lifeos/devtools.py` | 76 | development tool: dt comes from the SPACE_DOCTYPES constant; space is a parameter |
-| `lifeos/devtools.py` | 211 | development tool: DocType and field from the _TITLED constant |
-| `lifeos/devtools.py` | 261 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
-| `lifeos/devtools.py` | 284 | development tool: child table names from the meta of a checked DocType; values are parameters |
-| `lifeos/devtools.py` | 299 | development tool: dt is checked to be an existing DocType; names are a parameter |
+| `lifeos/devtools.py` | 218 | development tool: DocType and field from the _TITLED constant |
+| `lifeos/devtools.py` | 268 | development tool: dt is checked to be an existing DocType with a table; values are parameters |
+| `lifeos/devtools.py` | 291 | development tool: child table names from the meta of a checked DocType; values are parameters |
+| `lifeos/devtools.py` | 306 | development tool: dt is checked to be an existing DocType; names are a parameter |
 | `lifeos/index.py` | 96 | column names come from the fixed COLUMNS list; every value is a %s parameter |
 | `lifeos/insights.py` | 203 | only the code-owned vault fragment of the tool context is inserted; the rest are parameters |
 | `lifeos/old_inbox.py` | 227 | WHERE is constant SQL plus area_filter's fixed fragment; values are parameters |

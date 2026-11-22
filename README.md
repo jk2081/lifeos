@@ -182,6 +182,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `inbox.submit_result` | `item, transcript_md=None, summary_md=None, proposals=None` | Store the transcript, summary and proposals, and set the item To Review. Each proposal is {kind, preview, payload, confidence}. An invalid proposal is refused with a clear error; the rest are kept. |
 | `inbox.fail_item` | `item, error=None` | Mark a claimed item Failed, with the reason. |
 | `inbox.retry` | `item` | Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed. When the process-capture skill is on, it runs again. When the process-capture skill is on, it runs again. |
+| `inbox.file_myself` | `item` | The owner takes a capture the Brain could not process: its pending proposals go, it is marked Done, and they file it by hand. People only. |
 | `skills.list` / `skills.get` | `space=None` / `name, space=None` | Issue 28: the active skills for the caller's spaces with their version, and one skill's instructions. Agents are served `lifeos` and `lifeos-file-work` here. |
 | `skills.run` | `skill, input` | Start a skill whose trigger is a Button on one record, in a background job. |
 | `skills.overview`, `detail`, `run_log`, `save`, `create`, `set_active`, `rollback`, `accept_update`, `test`, `add_example`, `save_auto_file` | | Brain > Skills (people; changes are the owner's). |
