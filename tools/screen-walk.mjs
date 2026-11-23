@@ -47,7 +47,13 @@ export async function walkScreens(page, { width, settle = () => page.waitForTime
   }
   const view = async (label) => {
     if (!label) return
-    if (label === 'Review' && await page.locator('[data-review]').count()) return
+    if (label === 'Review' && await page.locator('[data-review]').count()) {
+      // already on the review: let it finish loading before the next click (CI once timed out on the tab bar here)
+      await page.waitForLoadState('networkidle')
+      await page.locator(phone ? '[data-tab-item]' : '[data-nav-item]').first().waitFor({ state: 'visible' })
+      await settle()
+      return
+    }
     await leaveReview()
     // issue 16: Week, Month and Year open on screens of their own; the older views are reached by `view=` until the switch shows
     if (!(await page.locator('[data-plan-views]:visible').count())) {
