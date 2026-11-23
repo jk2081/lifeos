@@ -272,3 +272,53 @@ def scheduled_today(space, now, area=None):
 	lens, lens_values = task_lens(space, area)
 	return task_api.query(space, lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.scheduled_at >= %(a)s and t.scheduled_at < %(b)s",
 		{"a": str(now), "b": str(add_days(now, 1)), **lens_values}, "t.scheduled_at asc", 0, 50)
+
+
+@frappe.whitelist(methods=["GET"])
+def week_summary(space: str | None = None, week_start: str | None = None):
+	"""Everything an agent needs to run the weekly review in chat, for one week (Monday to Sunday): the cycle's score, habits,
+	tasks done and carried, open loops, stale tasks to decide, and what the archive job archived."""
+	from lifeos import archive
+
+	space = permissions.resolve_space(space)
+	now = getdate(today())
+	start = getdate(week_start) if week_start else add_days(now, -now.weekday())
+	start = add_days(start, -start.weekday())
+	end = add_days(start, 6)
+
+	cycle_out = None
+	cycle = frappe.db.sql(
+		"select name, title, status from `tabLife Cycle` where space=%s and start_date <= %s and end_date >= %s order by start_date desc limit 1",
+		(space, end, start), as_dict=True)
+	if cycle:
+		c = frappe.get_doc("Life Cycle", cycle[0].name)
+		week = min(max(cycles.week_of(c, min(end, getdate(c.end_date))), 1), cycles.WEEKS)
+		cycle_out = {"name": c.name, "title": c.title, "week": week, **cycles.week_score(c.name, week)}
+
+	habit_rows, seen = [], set()
+	for y, m in sorted({(start.year, start.month), (end.year, end.month)}):
+		for h in habit_rules.habits_month(space, y, m)["habits"]:
+			if h["habit"] in seen:
+				continue
+			seen.add(h["habit"])
+			done = frappe.db.count("Life Habit Log", {"habit": h["habit"], "date": ("between", [start, end]), "done": 1})
+			habit_rows.append({"habit": h["habit"], "title": h["title"], "done": done, "target": h["days_per_week"]})
+
+	done_tasks = task_api.query(space, "and t.status = 'Done' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
+	carried = task_api.query(space, "and t.status = 'Carried' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
+	loops = task_api.open_loops(space=space, page_length=20)
+	return {
+		"space": space, "week_start": str(start), "week_end": str(end), "cycle": cycle_out, "habits": habit_rows,
+		"done_total": _count_tasks(space, "Done", start, end), "carried_total": _count_tasks(space, "Carried", start, end),
+		"done": done_tasks, "carried": carried, "open_loops": loops["tasks"], "open_loops_total": loops["total"],
+		"decide": task_api.stale_tasks(space, 30),
+		"archived": archive.archived_in_week(space, start, end),
+		"stale_days": frappe.db.get_single_value("Life Settings", "stale_task_days") or 90,
+		"target": frappe.db.get_single_value("Life Settings", "score_target") or 85,
+	}
+
+
+def _count_tasks(space, status, start, end):
+	"""How many tasks closed with this status in the week, for the numbers that lead to the Tasks screen (the lists show 100)."""
+	return frappe.db.sql("select count(*) from `tabLife Task` t where t.space=%s and t.status=%s and t.completed_on between %s and %s",
+		(space, status, start, end))[0][0]

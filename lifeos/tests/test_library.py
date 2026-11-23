@@ -6,7 +6,7 @@ from frappe.utils import add_days, getdate, today
 
 from lifeos import archive, permissions
 from lifeos.ai.tools import Context, t_get_record
-from lifeos.api import archive as archive_api, chats, everything, files as files_api, goals as goal_api, graph, inbox, jobs, library, links, search, sources, timeline, vault, weekly, wiki
+from lifeos.api import archive as archive_api, chats, everything, files as files_api, goals as goal_api, graph, inbox, jobs, library, links, search, sources, timeline, today as today_api, vault, wiki
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import item, task, upload
 
@@ -233,7 +233,7 @@ class TestArchive(LifeTestCase):
 		for doc in (done_old, stale_open, vault_doc, note, person):
 			self.assertTrue(frappe.db.exists(doc.doctype, doc.name))  # nothing is ever deleted
 		# the stale open task is listed under Decide, and the week's archive shows with Undo
-		review = weekly.week_summary(space=PRIVATE)
+		review = today_api.week_summary(space=PRIVATE)
 		self.assertIn(stale_open.name, [t["name"] for t in review["decide"]])
 		self.assertIn(done_old.name, [a["name"] for a in review["archived"]])
 		archive_api.restore("Life Task", done_old.name)

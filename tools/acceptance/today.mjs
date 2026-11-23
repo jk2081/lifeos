@@ -138,15 +138,15 @@ for (const width of WIDTHS) {
 
   await check('TODAY.6', `${width} px: counts: every number on Today, Reset, Someday and the sidebar opens a list with exactly that many rows`, async () => {
     let n = 0
-    for (const from of ['/life', '/life/today/reset', '/life/goals/someday?all=1']) {
+    for (const from of ['/life', '/life/settings?tab=data', '/life/goals/someday?all=1']) {
       await s.open(from)
-      if (phone && from === '/life/today/reset') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
+      if (phone && from === '/life/settings?tab=data') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
       const keys = await pg.locator('[data-count-door]:visible').evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute('data-count-key')))])
       // Someday's own numbers are its tab counts, which U.8 clicks; here only the doors on the page (the sidebar's on a wide screen)
       must(keys.length || from.includes('someday'), `no counts on ${from}`)
       for (const key of keys) {
         await s.open(from)
-        if (phone && from === '/life/today/reset') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
+        if (phone && from === '/life/settings?tab=data') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
         const el = pg.locator(`[data-count-key="${key}"]:visible`).first()
         const want = Number(await el.getAttribute('data-count-n'))
         await el.click()
@@ -183,15 +183,12 @@ for (const width of WIDTHS) {
   if (!phone) await check('TODAY.7', 'Insights: rules make Stuck, 12 Week Year and Habit insights from seeded data; a dismissed one does not return; a snoozed one returns after its date; at most 12 new a day', async () => {
     bench('frappe.db.delete("Life Insight", {"space": "Private"})')
     // a habit done every day last month and never this month
-    bench(`from lifeos import journal
+    bench(`from lifeos import cycles, habits
 frappe.set_user("owner@lifeos.test")
 h = frappe.get_doc({"doctype": "Life Habit", "space": "Private", "title": "${S5('habit')}"}).insert()
 now = frappe.utils.getdate(frappe.utils.today()); prev = frappe.utils.add_months(now, -1)
-for y, m in ((prev.year, prev.month), (now.year, now.month)):
-    plan = journal.get_month_plan("Private", y, m, create=True)
-    if h.name not in [r.habit for r in plan.habits]:
-        plan.append("habits", {"habit": h.name, "days_per_week": 7}); plan.save()
-first, last = journal.month_bounds(prev.year, prev.month); d = first
+habits.set_month_habits("Private", prev.year, prev.month, [{"habit": h.name, "days_per_week": 7}])
+first, last = cycles.month_bounds(prev.year, prev.month); d = first
 while d <= last:
     frappe.get_doc({"doctype": "Life Habit Log", "space": "Private", "habit": h.name, "date": d, "done": 1}).insert(); d = frappe.utils.add_days(d, 1)`)
     const ids = []
@@ -231,7 +228,7 @@ while d <= last:
     must(dupes && dupes.items.some((i) => i.name === b.name) && !dupes.items.some((i) => i.name === a.name), 'the duplicate batch is wrong')
     must(got.batches.some((x) => x.key.startsWith('old:') && old.every((n) => x.items.some((i) => i.name === n))), 'the old tasks are not in a batch')
     // a batch from its card: confirm, exactly the listed items change, Undo from the toast
-    await s.open('/life/today/reset')
+    await s.open('/life/settings?tab=data')
     const card = pg.locator('[data-batch="duplicates"]')
     const listed = (await s.api('reset.get', { space: SPACE })).batches.find((x) => x.key === 'duplicates').items.map((i) => i.name)
     await card.locator('[data-batch-apply]').click()
@@ -257,7 +254,7 @@ while d <= last:
     // Delete one of this run's tasks with X (or the button), then Restore it from the Trash tab
     const del = await s.api('tasks.quick_add', { text: S5('delete me'), space: SPACE, area: uxArea })
     bench(`frappe.db.set_value("Life Task", "${del.name}", "last_touched_on", "2000-01-01")`)
-    await s.open('/life/today/reset')
+    await s.open('/life/settings?tab=data')
     if (phone) { await pg.locator('[role="tab"]', { hasText: 'One by one' }).first().click(); await settle() }
     must((await pg.locator('[data-obo-title]').innerText()).trim() === S5('delete me'), 'the oldest untouched item is not first')
     if (phone) await pg.locator('[data-obo="delete"]').click()
@@ -268,9 +265,9 @@ while d <= last:
     await pg.locator(ROW, { hasText: S5('delete me') }).locator('[data-trash-restore]:visible').first().click()
     await pg.waitForTimeout(1000)
     must(await s.api('frappe.client.get_count', { doctype: 'Life Task', filters: { name: del.name } }), 'Restore from the trash did not bring it back')
-    // set 8: Reset's place in the weekly review is its second tab, Tasks, with the stuck tasks in piles
+    // the weekly review's second tab, Tasks, lists the stale tasks with Keep, Someday and Drop (issue 72)
     await s.open('/life/today/week?view=review&tab=tasks')
-    must(await pg.locator('[data-pile-board][data-pile-key="tasks"]').count(), "the weekly review's Tasks tab has no piles")
+    must(await pg.locator('[data-stale-tasks]').count(), "the weekly review's Tasks tab has no stale tasks list")
     return 'batches, undo, one by one, trash, weekly review'
   })
 
@@ -291,28 +288,22 @@ while d <= last:
   await s.ctx.close()
 }
 
-await check('TODAY.10', "Rhythm banners: the weekly review, Plan <month>, Plan your next 12 weeks and Close this cycle each show on Today on their day (the clock moved with at=); Skip hides each until its next occurrence; month plans off hides that one", async () => {
+await check('TODAY.10', "Rhythm banners: the weekly review, Plan your next 12 weeks and Close this cycle each show on Today on their day (the clock moved with at=); Skip hides each until its next occurrence", async () => {
   const pg = owner.page
   const was = (await owner.api('settings.get', { space: SPACE })).settings
   bench(`frappe.db.delete("Life View State", {"user": "owner@lifeos.test", "screen": "rhythm-banners"})`)
-  await owner.api('settings.save', { values: { month_plan_enabled: 1 } })
   try {
     const info = JSON.parse(bench(`import json
 c = frappe.db.get_value("Life Cycle", {"space": "${SPACE}", "status": "Active"}, ["name", "start_date"], as_dict=True)
 planned = frappe.db.exists("Life Cycle", {"space": "${SPACE}", "status": "Planned", "start_date": (">", c.start_date)})
-plans = [f"{y}-{m:02d}" for y, m in frappe.db.sql("select year, month from \`tabLife Month Plan\` where space=%s", "${SPACE}")]
-print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans": plans}))`).split('\n').pop())
+print(json.dumps({"start": str(c.start_date), "planned": bool(planned)}))`).split('\n').pop())
     must(!info.planned, 'a next cycle is already planned on the acceptance site')
     const review = nextWeekday(was.weekly_review_day || 'Sunday', 1)
     const afterReview = `${String(was.weekly_review_time || '18:00:00').slice(0, 2) === '23' ? '23:59:00' : '23:30:00'}`
-    // a month from next month on with no plan yet: its 2nd, in the morning (before any review time)
-    let month = null
-    for (let i = 1; i < 24 && !month; i++) { const d = new Date(Date.parse(today + 'T12:00:00Z')); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + i); const k = d.toISOString().slice(0, 7); if (!info.plans.includes(k)) month = k }
-    // a day of weeks 11 and 12 that is not the 1st to 3rd of a month, in the morning
-    const inWeek = (w) => { for (let n = 0; n < 7; n++) { const d = plusDays(info.start, (w - 1) * 7 + n); if (Number(d.slice(8)) > 3) return d } }
+    // a day of weeks 11 and 12, in the morning
+    const inWeek = (w) => plusDays(info.start, (w - 1) * 7 + 2)
     const CASES = [
       ['review', `${review} ${afterReview}`, 'Your weekly review is ready', '/life/today/week'],
-      ['month', `${month}-02 08:00:00`, 'Plan ', '/life/goals/cycles'],
       ['plan-next', `${inWeek(11)} 08:00:00`, 'Plan your next 12 weeks', '/life/goals/cycles'],
       ['close', `${inWeek(12)} 08:00:00`, 'Close this cycle', '/life/goals/cycles'],
     ]
@@ -320,12 +311,6 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
     for (const [key, at, text, to] of CASES) {
       const b = (await owner.api('today.get', { space: SPACE, at })).banner
       must(b && b.key === key && b.text.startsWith(text), `at ${at} today.get gives ${JSON.stringify(b)}, not ${key}`)
-      if (key === 'month') { // month plans off: no month banner
-        await owner.api('settings.save', { values: { month_plan_enabled: 0 } })
-        const off = (await owner.api('today.get', { space: SPACE, at })).banner
-        await owner.api('settings.save', { values: { month_plan_enabled: 1 } })
-        must(!off || off.key !== 'month', 'the month banner shows with month plans off')
-      }
       await owner.open(`/life?at=${encodeURIComponent(at)}`)
       const banner = pg.locator(`[data-rhythm-banner][data-banner="${key}"]`)
       must(await banner.isVisible(), `no ${key} banner on Today at ${at}`)
@@ -351,7 +336,7 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned), "plans":
     // without the test clock (a moment of now), the answer does not depend on at= on another site: here it just works
     return done.join(', ')
   } finally {
-    await owner.api('settings.save', { values: { month_plan_enabled: was.month_plan_enabled ? 1 : 0 } })
+    bench(`frappe.db.delete("Life View State", {"user": "owner@lifeos.test", "screen": "rhythm-banners"})`)
   }
 })
 
@@ -753,7 +738,7 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I55 lead 
     })
 
     await check('TODAY.26', `${width} px: the Open band is gone from Today; the habits row shows today's habits by name and ticks them`, async () => {
-      await one.api('journal.set_month_habits', { space, year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)), habits: [{ title: `I55 Walk ${width}` }, { title: `I55 Read ${width}` }] })
+      await one.api('goals.set_month_habits', { space, year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)), habits: [{ title: `I55 Walk ${width}` }, { title: `I55 Read ${width}` }] })
       await today55()
       must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is on Today')
       must(await pg.locator('[data-tile]').count() === 0, 'a tile of the band is on Today')

@@ -43,16 +43,12 @@ for (const width of opt('widths', '1440,390').split(',').map(Number)) {
     await shot('library')
     const meet = pg.locator('[data-strip-meeting]:visible').first()
     if (await meet.count()) { await meet.click(); await shot('meeting'); await pg.keyboard.press('Escape') }
-    await pg.locator('[data-review-the-piles]').click(); await shot('inbox-piles'); await pg.keyboard.press('Escape')
     await open('view=review&tab=tasks')
     await shot('tasks')
-    await pg.locator('[data-pile-card][data-pile="park"] [data-pile-open]').click(); await shot('pile-drawer')
-    await pg.locator('[data-pile-accept]').click(); await pg.waitForTimeout(800); await shot('pile-accepted')
-    // clear the rest through the API, then Goals
+    // decide the stale tasks through the API, then Goals
     const get = async (m, a) => (await (await pg.request.get(`${base}/api/method/lifeos.api.${m}`, { params: a })).json()).message
-    const sum = await get('weekly.pile_summary', { space: 'Private', key: 'tasks' })
-    for (const n of sum.needs.filter((x) => !x.settled)) await api('weekly.pile_settle', { space: 'Private', key: 'tasks', ref: n.ref, decision: 'keep' })
-    for (const p of ['keep', 'letgo', 'park']) await api('weekly.pile_accept', { space: 'Private', key: 'tasks', pile: p })
+    const stale = await get('weekly.stale_tasks', { space: 'Private' })
+    for (const t of stale.tasks) await api('weekly.settle_stale', { space: 'Private', task: t.name, decision: 'keep' })
     await open('view=review&tab=goals')
     await shot('goals')
     await pg.locator('[data-goal-row] button').first().click(); await shot('goal-drawer'); await pg.keyboard.press('Escape')

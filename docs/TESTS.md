@@ -7,9 +7,9 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | File | What it covers |
 | --- | --- |
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures |
-| `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources, old items, Reset, Someday, the wiki and its rules, chat imports, task areas |
+| `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources, old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the one gateway for model calls (cost and caps), Ask, insights |
-| `test_goals.py` | Goals: cycles, the grid, the month plan, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday |
+| `test_goals.py` | Goals: cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
 | `test_review.py` | The weekly, monthly and 12-week reviews |
@@ -54,7 +54,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.2` Add a birthday and see it on the calendar this year and next
 - `TODAY.3` Vault document expiring in 30 days shows a badge on Today
 - `TODAY.4` every number is a door, and the list count equals the number clicked
-- `TODAY.5` Today: no Open band, the list of tasks in order, the rail; Someday never shows; the amber dot on the Week's Reset
+- `TODAY.5` Today: no Open band, the list of tasks in order, the rail; Someday never shows; the amber dot on the Week's Reset button
 - `TODAY.6` counts: every number on Today, Reset, Someday and the sidebar opens a list with exactly that many rows
 - `TODAY.7` Insights: rules make Stuck, 12 Week Year and Habit insights from seeded data; a dismissed one does not return; a snoozed one returns after its date; at most 12 new a day
 - `TODAY.8` Reset: each rule batch finds its seeded items; a batch changes exactly those and Undo reverts; one by one with the keys; Delete then Restore from the trash; stuck task…
@@ -86,7 +86,7 @@ Capture and the Brain's filing, Needs you, Activity, Sources, the item page, job
 
 Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py`
 
-- `BRAIN.1` Journal photo: agent submits 5 proposals; accept 3, edit 1, reject 1; records link back
+- `BRAIN.1` Journal photo: agent submits 5 proposals; accept 3, edit 1, reject 1; records link back; the journal page is a note in Library > Notes
 - `BRAIN.2` PDF with "summarise and extract to-dos" gives tasks through review
 - `LIBRARY.1` Note with a [[link]]: the target shows the backlink, both are in the graph
 - `BRAIN.3` Search for a word in a transcript finds the inbox item
@@ -95,7 +95,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `TODAY.4` Timeline shows everything captured on one day
 - `BRAIN.6` Security: the family and agent users land on /life from /app; the agent works without desk access and cannot read a closed Vault
 - `BRAIN.7` Security: the PWA manifest and icons are served; an agent cannot decide or delete
-- `BRAIN.8` Ask: from Today, Today under an area, a goal page, Reset and a record pane, with the scope of the screen; citations open their records; Make task only when clicked; th…
+- `BRAIN.8` Ask: from Today, Today under an area, a goal page and a record pane, with the scope of the screen; citations open their records; Make task only when clicked; th…
 - `BRAIN.9` Ask: with no key it says it is not set up; at the cap it refuses and shows the spend; the family user never gets a Private record; a Vault document is never sent while…
 - `BRAIN.10` streams: chats.log twice with one external_id leaves one log; importing the Claude and ChatGPT fixtures creates the expected logs, and again creates and updates none
 - `BRAIN.11` an Email Digest renders its sections and Open in Gmail buttons; the proposed reply task shows Open in Gmail
@@ -142,7 +142,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 
 - `GOALS.1` Tick a habit at phone width and see the month count change
 - `GOALS.2` Tick week cells in the 12 Week Year grid and see the week score change
-- `GOALS.3` Carry an open October goal into November
+- `GOALS.3` Carry an open October goal into November: the month card of Cycles shows it with where it came from
 - `GOALS.4` Tea & Coffee in the lens: Plan and Library show its open-ended goals, tasks, notes and chats together
 - `GOALS.5` Complete an open-ended goal: it and its records move to Archive. Restore it
 - `GOALS.6` state tabs: each count equals the rows its tab shows, with and without another filter; links land on their tab
@@ -183,18 +183,18 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.41` Fine as is leaves the list and keeps the task without a goal
 - `GOALS.42` a Month goal created with a parent 12-week goal shows under it on its page and in Goals > By area
 - `GOALS.43` no screen shows a tag, a tag picker or Settings > Tags
-- `GOALS.44` the month plan shows this month's Month goals in priority order, with the habits
+- `GOALS.44` Cycles lists this month's Month goals in priority order, with the habits
 - `GOALS.45` Goals shows four tabs, and Cycles opens at /life/goals/cycles
 - `GOALS.46` the week bars show the scores of the grid, with this week marked "so far"
 - `GOALS.47` ticking a lead action records the tick and the week's score so far changes
 - `GOALS.48` each cycle goal shows its lead action and this week's ticks, as the goal page does
-- `GOALS.49` the month plan lists the month goals in priority order with their status; a goal carried from last month says so
-- `GOALS.50` Edit on the month plan changes a goal's status, and Cycles shows it
-- `GOALS.51` with the month plan switched off in Rhythms, the month plan panel is hidden
+- `GOALS.49` Cycles lists the month goals in priority order with their status; a goal carried from last month says so
+- `GOALS.50` a month goal marked Achieved shows Done on Cycles; its title opens the goal page
+- `GOALS.51` on an empty space (an area with nothing in it) Cycles says what will appear and how to add it
 - `GOALS.52` a closed cycle chosen from the picker is shown read-only
-- `GOALS.53` journal pages appear in Library > Notes as "Journal page" and open with their image
+- `GOALS.53` a journal page is a note in Library > Notes and opens with its photo and its date
 - `GOALS.54` the Month and Year headers link to Goals > Cycles
-- `GOALS.55` two columns, the 12 Week Year beside the month plan
+- `GOALS.55` two columns, the 12 Week Year beside the month goals
 - `GOALS.56` Cycles on a space with no cycle shows what will appear and the one action
 - `GOALS.57` the page of a 12 Week Year goal shows the cycle's name, Open grid and its actions with this week's ticks
 - `GOALS.58` progress on a 12 Week Year goal shows this week's ticks and the tasks done
@@ -212,7 +212,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.70` Settings > Areas shows focuses under each part, with switches and + Add a focus
 - `GOALS.71` focus headings and their goals stack on a phone and the focus page is one column
 
-### Library (`tools/acceptance/library.mjs`, 37 checks)
+### Library (`tools/acceptance/library.mjs`, 38 checks)
 
 Everything, Notes, Documents, People, Chats, files, search and the graph, and the list screens' panes, filters and remembered views.
 
@@ -255,6 +255,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.35` an organisation page lists its people
 - `LIBRARY.36` the facts sit beside the text and mentions
 - `LIBRARY.37` with no people the screen says what will appear and offers + Capture
+- `LIBRARY.38` a photo of a journal page captured from the phone becomes a note with the photo, the transcript and its date; search finds it and its goal shows it
 
 ### Review (`tools/acceptance/review.mjs`, 23 checks)
 
@@ -262,13 +263,13 @@ The weekly review (Library, Tasks, Goals, Reflect and Lock), the monthly and 12-
 
 Unit tests: `test_review.py`
 
-- `REVIEW.1` Archive job archives done tasks; a stale open task waits in the weekly review's piles
-- `REVIEW.2` the review screen and the journal page show tabs on a phone only
+- `REVIEW.1` Archive job archives done tasks; a stale open task waits in the weekly review's list of stale tasks
+- `REVIEW.2` the review screen shows tabs on a phone only
 - `REVIEW.3` the review opens from Today's banner on Library, with its period in the header; Goals cannot open before Tasks is done
 - `REVIEW.4` a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's drawer and the Revelations list
 - `REVIEW.5` a reading confirmed from Revelations shows its value on the goal's row in Goals
-- `REVIEW.6` the Park pile: one moved to Keep, the rest parked; the card's done state; the Outbox counts match; Undo restores both
-- `REVIEW.7` Needs you settled and every pile accepted; Next: Goals opens
+- `REVIEW.6` the Tasks tab lists each stale task once with Keep, Someday and Drop; each button does what it says; the Outbox counts match
+- `REVIEW.7` every stale task decided (the empty list says what will appear here); Next: Goals opens
 - `REVIEW.8` every cycle goal gets a next action or a skip with a reason; exactly three stars; more than the free time shows the warning
 - `REVIEW.9` Pause and reopen: everything is where it was left; no tab scrolls the page at 1440 x 900 or sideways at 390
 - `REVIEW.10` what went well; Lock; the done screen; Today shows the top three first; the scheduled tasks are on Today and in Plan > Week
@@ -284,9 +285,9 @@ Unit tests: `test_review.py`
 - `REVIEW.20` both reviews show numbered tabs, and nothing scrolls sideways
 - `REVIEW.21` when a weekly and a monthly review are both due, Review shows the weekly first, then the monthly
 - `REVIEW.22` a review left after step 2 resumes at step 2 with its decisions kept
-- `REVIEW.23` deciding each goal and locking closes the cycle with journal.close_cycle's score and makes the next cycle with the carried goals and their lead actions
+- `REVIEW.23` deciding each goal and locking closes the cycle with cycles.close_cycle's score and makes the next cycle with the carried goals and their lead actions
 
-### Settings (`tools/acceptance/settings.mjs`, 38 checks)
+### Settings (`tools/acceptance/settings.mjs`, 39 checks)
 
 Profile, Areas, Rhythms, Members, Sources, Rules, Skills, Cost, the setup ladder, the calendar connection and the one-space site.
 
@@ -314,7 +315,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.20` removing an accepted lesson makes a new version without it
 - `SETTINGS.21` Settings > Calendar lists the account's calendars and saves the one to write to
 - `SETTINGS.22` the owner's menu is Profile, Calendar, Areas, Rhythms, Habits, Sources, Rules, Members in four groups, and Advanced at the bottom
-- `SETTINGS.23` Rhythms holds the weekly review, check-in dimensions, old items, working hours, the month and the 12 Week Year, and each saves the same setting
+- `SETTINGS.23` Rhythms holds the weekly review, old items, working hours and the 12 Week Year, and each saves the same setting
 - `SETTINGS.24` Profile shows Look and Reminders, and the theme takes effect
 - `SETTINGS.25` every old ?tab= value lands on its new place
 - `SETTINGS.26` Members lists people and agents with filters and a Spaces view that still switches Ask and sensitive-item access
@@ -330,6 +331,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.36` Settings, Rules shows "What agents know about you" with the current card
 - `SETTINGS.37` a contradiction in Needs you, once decided, leaves the page with the chosen fact and its source
 - `SETTINGS.38` Skills: every built-in skill has its card, and Test passes the examples of each
+- `SETTINGS.39` Settings > Data holds the Reset section; /today/reset lands on Today and says that page moved
 
 ### Phone (`tools/acceptance/phone.mjs`, 24 checks)
 

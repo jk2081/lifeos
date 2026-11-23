@@ -6,7 +6,7 @@
 // the views of Today's rhythms (Plan's before issue 14; the month plan and 12 Weeks moved to Goals > Cycles in issue 45) and, for the journal screens, a button each puts into the header's #jr-actions
 const RHYTHMS = {
   week: [['Review'], ['Calendar'], ['Agenda']], // set 8: the review is its own screen; Pause leaves it for the Calendar
-  month: [['Habits', 'Previous month'], ['Check-ins'], ['Calendar']],
+  month: [['Habits', 'Previous month'], ['Calendar']],
   year: [['Calendar'], ['Goals across cycles', 'All goals']],
 }
 // issue 14: the four places, each tab, and the pages linked at the foot of a place
@@ -51,7 +51,7 @@ export async function walkScreens(page, { width, settle = () => page.waitForTime
     await leaveReview()
     // issue 16: Week, Month and Year open on screens of their own; the older views are reached by `view=` until the switch shows
     if (!(await page.locator('[data-plan-views]:visible').count())) {
-      const KEYS = { 'Check-ins': 'checkins', 'Goals across cycles': 'goals' }
+      const KEYS = { 'Goals across cycles': 'goals' }
       await page.goto(new URL(`/life/today/${current}?view=${KEYS[label] || label.toLowerCase()}`, page.url()).href)
     } else await page.locator('[data-plan-views]:visible').first().getByText(label, { exact: true }).click()
     await page.waitForLoadState('networkidle')

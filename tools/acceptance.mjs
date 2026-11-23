@@ -28,7 +28,7 @@ if (SITE === 'lifeos.localhost') throw new Error('acceptance runs on its own sit
 async function ownerReadOnly() {
   const ownerBase = process.env.LIFEOS_OWNER_URL || 'http://localhost:18000'
   // reads the screens send as POST; everything else that is not a GET is refused
-  const READS = /\/api\/method\/(frappe\.desk\.form\.load\.getdoctype|frappe\.desk\.search\.search_link|lifeos\.api\.(journal\.month|week\.goal_plan|wiki\.overview))$/
+  const READS = /\/api\/method\/(frappe\.desk\.form\.load\.getdoctype|frappe\.desk\.search\.search_link|lifeos\.api\.(wiki\.overview))$/
   const snapshot = () => benchPython(`import frappe, json; frappe.init("lifeos.localhost"); frappe.connect()
 out = {}
 for (t,) in frappe.db.sql("show tables like 'tabLife %'") + (("tabError Log",),):
@@ -45,8 +45,7 @@ print(json.dumps(out))`).trim().split('\n').pop()
     const refused = new Set()
     await page.route(/\/api\//, (r) => {
       const req = r.request()
-      const create = req.method() !== 'GET' && /journal\.month$/.test(req.url()) && /"create":\s*(1|true)/.test(req.postData() || '')
-      if (req.method() === 'GET' || (READS.test(req.url()) && !create)) return r.continue()
+      if (req.method() === 'GET' || READS.test(req.url())) return r.continue()
       refused.add(new URL(req.url()).pathname.replace('/api/method/', ''))
       return r.abort()
     })
@@ -97,10 +96,9 @@ async function walkReview(page, origin, width) {
     await look(`review > ${tab}`, `[data-review-${tab}]`)
     if (tab === 'library') {
       await drawer('a meeting', '[data-strip-meeting]:visible')
-      await drawer('the Inbox piles', '[data-review-the-piles]')
       await drawer('the meetings that matter', '[data-meetings-door]')
     } else if (tab === 'tasks') {
-      for (const p of ['keep', 'park', 'letgo']) await drawer(`the ${p} pile`, `[data-pile-card][data-pile="${p}"] [data-pile-open]`)
+      // the Tasks tab lists its stale tasks in the page itself: no drawer
     } else if (tab === 'goals') {
       await drawer('a goal', '[data-goal-row] button')
       await drawer('other goals', '[data-goals-plan-any]')

@@ -1,6 +1,6 @@
 // Library: Everything, Notes, Documents, People, Chats, files, search, the graph and the list screens' panes and filters.
 // Checks are numbered LIBRARY.<n> in the order they appear here; `node tools/acceptance.mjs --only=LIBRARY` runs this file's checks.
-import { SPACE, WIDTHS, ensureJournalPage, addDays, agentFetch, areaId, base, bench, browser, check, must, owner, path, runAgent, session, stamp, today } from './context.mjs'
+import { SPACE, WIDTHS, addDays, agentFetch, areaId, base, bench, browser, check, must, owner, path, runAgent, session, stamp, today } from './context.mjs'
 import { FILTERS, LISTS, ROW, num, ux, uxArea, uxKit } from './ux.mjs'
 
 await check('LIBRARY.1', 'Security: rendered Markdown is sanitised', async () => {
@@ -156,7 +156,7 @@ for (const width of WIDTHS) {
       ['Goals cards', '/life/goals?view=cards'], ['Notes tree', '/life/library/notes?view=tree'], ['Goal page', '/life/goals/' + ux.goal],
       ['Today', '/life'], ['Today under an area', '/life?area=' + uxArea], ['Week review', '/life/today/week?view=review'], ['Week calendar', '/life/today/week?view=calendar'],
       ['Week agenda', '/life/today/week?view=agenda'], ['Cycles', '/life/goals/cycles'], ['Habits', '/life/today/month?view=habits'],
-      ['Check-ins', '/life/today/month?view=checkins'], ['Month calendar', '/life/today/month?view=calendar'], ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'], ['Journal pages', '/life/brain/captures?tab=pages'],
+      ['Month calendar', '/life/today/month?view=calendar'], ['Year calendar', '/life/today/year?view=calendar'], ['Goals across cycles', '/life/today/year?view=goals'],
       ['Graph', '/life/library/notes?view=graph'], ['Settings', '/life/settings']]
     for (const [name, p] of screens) {
       await s.open(p)
@@ -245,7 +245,6 @@ for (const width of WIDTHS) {
       ['goal:' + one('Life Goal', "horizon='12 weeks'"), null], // Actions, Tasks, History across cycles, Links
       ['goal:' + ux.goal, ['Tasks', 'Links']], // an open-ended goal (a project before set 6) has no actions
       ['chat:' + one('Life Chat Log', "is_archived=0 and ifnull(transcript_md, '')=''"), ['Summary', 'Open items', 'Made from this', 'Links']],
-      ['page:' + ensureJournalPage(), ['Page', 'Transcript', 'Created from this page']],
       ['vault:' + one('Life Vault Document', 'is_archived=0'), ['Details', 'File']],
       ['day:' + today, []], ['vault:new', []],
     ]
@@ -296,7 +295,7 @@ for (const width of WIDTHS) {
   await check('LIBRARY.10', `${width} px: no sideways scrolling and no script errors on the new screens`, async () => {
     const before = errors.length
     const bad = []
-    for (const p of ['/life', '/life/today/reset', '/life/goals/someday', '/life/ask', '/life/ask?tab=insights', '/life/ask?tab=history', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
+    for (const p of ['/life', '/life/settings?tab=data', '/life/goals/someday', '/life/ask', '/life/ask?tab=insights', '/life/ask?tab=history', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
       await s.open(p)
       if ((await overflow()) > 0) bad.push(`${p} scrolls sideways by ${await overflow()} px`)
     }
@@ -994,6 +993,58 @@ print(json.dumps(out))`).split('\n').pop()))
     })
   } finally {
     restore()
+    await s.ctx.close()
+  }
+}
+
+
+// Issue 72: a photo of a journal page, captured from the phone, becomes a note in My notes: the photo attached, the Brain's
+// transcript as its text, the page date, the area and goal it was filed to. It is found by search and shows on its goal's page.
+{
+  const s = await session('owner@lifeos.test', 390)
+  const pg = s.page
+  const name = `journal-i72-${stamp}.png`
+  let item = null
+  let note = null
+  try {
+    await check('LIBRARY.38', '390 px: a photo of a journal page captured from the phone becomes a note with the photo, the transcript and its date; search finds it and its goal shows it', async () => {
+      await s.open('/life')
+      await pg.locator('[data-tabbar] [data-tab-capture]').click()
+      await pg.locator('[data-capture-kind="files"]').click()
+      await pg.locator('[data-capture-files] input[type="file"]').setInputFiles({ name, mimeType: 'image/png', buffer: await pg.screenshot() })
+      await pg.locator('[data-capture-files] input[aria-label="Instruction"]').fill('transcribe and update my journal')
+      await pg.locator('[data-capture-brain]').click()
+      await pg.waitForTimeout(2500)
+      item = bench(`print(frappe.db.get_value("Life Inbox Item", {"title": "${name}"}, "name"))`).split('\n').pop()
+      must(item && item !== 'None', 'the capture was not made')
+      runAgent() // the fake AI reads the photo
+      const got = await owner.api('inbox.get', { item })
+      must(got.source_type === 'Journal Photo' && got.transcript_md.includes('MoneyOS'), 'the Brain did not transcribe the photo')
+      const page = got.proposals.find((p) => p.kind === 'Journal Page')
+      must(page, 'no journal page proposal')
+      for (const p of got.proposals.filter((x) => x !== page)) await owner.api('review.decide', { proposal: p.name, decision: 'reject' })
+      await owner.api('review.decide', { proposal: page.name, decision: 'accept', payload: { ...page.payload, area: uxArea, goal: ux.goal } })
+      note = (await owner.api('inbox.get', { item })).proposals.find((p) => p.kind === 'Journal Page').created_name
+      const n = await owner.api('library.get', { note })
+      must(n.collection === 'My notes' && n.page_date === today && n.content_md.includes('MoneyOS') && n.inbox_item === item, 'the note is not the page: ' + JSON.stringify({ c: n.collection, d: n.page_date }))
+      must(n.area === uxArea && n.goal === ux.goal, 'the note was not filed to the chosen area and goal')
+      must(n.image && (await pg.request.get(base + n.image)).ok(), 'the photo is not attached')
+      // found by a word of the transcript
+      const found = await owner.api('search.query', { text: 'MoneyOS', space: SPACE, limit: 100 })
+      must(found.results.some((r) => r.ref_name === note), 'search does not find the page by a word of its transcript')
+      // listed in Library > Notes, and on its goal's page
+      await s.open('/life/library/notes?view=list&all=1')
+      await pg.getByText(n.title).first().waitFor({ timeout: 15000 })
+      const onGoal = await owner.api('library.list', { space: SPACE, goal: ux.goal, page_length: 100 })
+      must(onGoal.notes.some((r) => r.name === note), "the page is not among its goal's notes")
+      await s.open(`/life/goals/${ux.goal}?tab=notes`)
+      await pg.getByText(n.title).first().waitFor({ timeout: 15000 })
+      return `note ${note}`
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for dt, n in (("Life Note", "${note || ''}"), ("Life Inbox Item", "${item || ''}")):
+    if n and frappe.db.exists(dt, n): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

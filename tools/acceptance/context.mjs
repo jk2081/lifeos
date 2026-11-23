@@ -35,15 +35,6 @@ export function bench(code, site = SITE) {
   return benchPython(script).trim()
 }
 
-// a journal page to open: the Brain's photo check makes one, and a place walked on its own makes this one
-export const ensureJournalPage = () => bench(`r = frappe.db.sql("select name from \`tabLife Journal Page\` where space='${SPACE}' limit 1")
-if not r:
-    d = frappe.get_doc({"doctype": "Life Journal Page", "space": "${SPACE}", "page_date": frappe.utils.today(), "transcript_md": "A page for the checks."})
-    d.flags.ignore_permissions = True
-    d.insert()
-    r = [[d.name]]
-print(r[0][0])`).split('\n').pop()
-
 export const browser = await chromium.launch({ executablePath: SETUP.chrome, headless: true })
 
 export async function session(user, width = 1440) {

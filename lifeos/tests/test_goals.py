@@ -275,7 +275,7 @@ class TestWeeklyReview(JournalCase):
 		done.save()
 		stale = self.make("Life Task", title="Stale open task")
 		frappe.db.set_value("Life Task", stale.name, "last_touched_on", add_days(now, -200), update_modified=False)
-		data = weekly.week_summary(space=PRIVATE)
+		data = today_api.week_summary(space=PRIVATE)
 		self.assertEqual((data["week_start"], data["week_end"]), (str(monday), str(add_days(monday, 6))))
 		self.assertEqual((data["cycle"]["week"], data["cycle"]["percent"]), (2, 50.0))
 		self.assertIn(done.name, [t["name"] for t in data["done"]])

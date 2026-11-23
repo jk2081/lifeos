@@ -138,12 +138,12 @@ for (const width of WIDTHS) {
     const before = errors.length
     const bad = []
     const screens = ['/life', '/life/brain', '/life/today/week?view=review', '/life/today/week?view=calendar', '/life/today/week?view=agenda', '/life/goals/cycles',
-      '/life/today/month?view=habits', '/life/today/month?view=checkins', '/life/today/month?view=calendar', '/life/today/year?view=calendar',
-      '/life/today/year?view=goals', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/today/reset', '/life/library', '/life/library/notes',
+      '/life/today/month?view=habits', '/life/today/month?view=calendar', '/life/today/year?view=calendar',
+      '/life/today/year?view=goals', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/library', '/life/library/notes',
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
-      '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/brain/captures?tab=pages', '/life/library/timeline',
+      '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/library/timeline',
       '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
-      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'connections', 'ai', 'cost', 'sensitive',
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'connections', 'ai', 'cost', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
       if (area && p.includes('settings')) continue
@@ -168,7 +168,7 @@ await check('PHONE.4', 'Keyboard: G then T, I, O or L opens a place; the older G
   const pg = owner.page
   const done = []
   for (const [key, want, q] of [['t', '/life/today'], ['i', '/life/brain'], ['p', '/life/today/week'], ['l', '/life/library'], ['k', '/life/goals/tasks'], ['o', '/life/goals'],
-    ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/goals/cycles'], ['c', '/life/today/year'], ['e', '/life/today/reset'],
+    ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/goals/cycles'], ['c', '/life/today/year'], ['e', '/life/settings', { tab: 'data' }],
     ['n', '/life/library/notes'], ['u', '/life/brain/activity'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
     ['x', '/life/library/notes', { by: 'assistant' }], ['g', '/life/library/notes', { view: 'graph' }], ['r', '/life/library/archive'], ['b', '/life/brain/outbox'], ['d', '/life/review'],
     ['q', '/life/ask'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
@@ -271,12 +271,12 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
           [`/life/inbox/${item.name}/review`, `/life/brain/review/${item.name}`], ['/life/plan', '/life/today/week'], ['/life/plan/week', '/life/today/week'],
           ['/life/plan/month', '/life/today/month'], ['/life/plan/12-weeks', '/life/goals/cycles'], ['/life/plan/year', '/life/today/year'],
           ['/life/plan/goals', '/life/goals'], [`/life/plan/goals/${goal}`, `/life/goals/${goal}`], ['/life/plan/tasks', '/life/goals/tasks'],
-          ['/life/plan/someday', '/life/goals/someday'], ['/life/plan/reset', '/life/today/reset'], ['/life/tasks', '/life/goals/tasks'],
+          ['/life/plan/someday', '/life/goals/someday'], ['/life/plan/reset', '/life/today/week'], ['/life/tasks', '/life/goals/tasks'],
           ['/life/someday', '/life/goals/someday'], ['/life/outbox', '/life/brain/outbox'], ['/life/archive', '/life/library/archive'],
           ['/life/wiki', '/life/library/notes'], ['/life/vault', '/life/library/documents'], ['/life/graph', '/life/library/notes'],
           ['/life/timeline', '/life/library/timeline'], ['/life/sources', '/life/brain/sources'], ['/life/chats', '/life/library/chats'],
           ['/life/projects', '/life/goals'],
-          ['/life/reset', '/life/today/week'], ['/life/calendar', '/life/today/week'], ['/life/calendar/month', '/life/today/month'],
+          ['/life/reset', '/life/today/week'], ['/life/today/reset', '/life/today'], ['/life/calendar', '/life/today/week'], ['/life/calendar/month', '/life/today/month'],
           ['/life/calendar/year', '/life/today/year'], ['/life/calendar/agenda', '/life/today/week'], ['/life/journal', '/life/goals/cycles'],
           ['/life/journal/goals', '/life/goals/cycles'], ['/life/journal/month', '/life/goals/cycles'], ['/life/journal/habits', '/life/today/month'],
           ['/life/journal/checkins', '/life/today/month'], ['/life/journal/review', '/life/today/week'], ['/life/journal/pages', '/life/library/notes'],
@@ -310,8 +310,8 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
         await via('/life/library/notes', '[data-place-link="graph"]', '/life/library/notes', { view: 'graph' })
         await via('/life/library', '[data-place-link="timeline"]', '/life/library/timeline')
         await via('/life/library/documents', '[data-place-link="sensitive"]', '/life/library/documents', { sensitive: '1', tab: 'documents' })
-        await via('/life/goals/tasks', '[data-all-tasks-reset]', '/life/today/reset') // issue 55: Reset moved from Today's band to All tasks
-        await via('/life/today/week?view=calendar', '[data-plan-reset]', '/life/today/reset')
+        await via('/life/goals/tasks', '[data-all-tasks-reset]', '/life/settings', { tab: 'data' }) // issue 55: Reset moved from Today's band to All tasks; issue 72: it is Settings > Data
+        await via('/life/today/week?view=calendar', '[data-plan-reset]', '/life/settings', { tab: 'data' })
         // Settings > Data lists every page with no other home
         await s.open('/life/settings?tab=places')
         const listed = await pg.locator('[data-settings-places] [data-elsewhere]').evaluateAll((els) => els.map((e) => e.getAttribute('data-elsewhere')))
@@ -637,7 +637,7 @@ print(json.dumps({"item": first("Life Inbox Item"), "goal": first("Life Goal"), 
 	"person": first("Life Person"), "skill": frappe.db.get_value("Life Skill", {}) or "process-capture"}))`).split('\n').pop())
       // router path -> an address that opens it
       const ROUTES = {
-        '/': '/life', '/today/:tab(week|month|year)?': '/life/today/month', '/today/reset': '/life/today/reset', '/brain/:tab(...)?': '/life/brain/activity',
+        '/': '/life', '/today/:tab(week|month|year)?': '/life/today/month', '/brain/:tab(...)?': '/life/brain/activity',
         '/brain/skills/:name': `/life/brain/skills/${ids.skill}`, '/brain/review/:id': `/life/brain/review/${ids.item}`, '/share': '/life/share',
         '/item/:id': `/life/item/${ids.item}`, '/goals/:tab(...)?': '/life/goals/cycles', '/goals/:id': `/life/goals/${ids.goal}`,
         '/focus/:id': `/life/focus/${ids.area}`, '/library/:tab(...)?': '/life/library/notes', '/library/people/:person': `/life/library/people/${ids.person}`,

@@ -28,7 +28,7 @@ await check('GOALS.2', 'Tick week cells in the 12 Week Year grid and see the wee
   await owner.page.locator('[data-week-so-far]').waitFor({ timeout: 10000 })
   const stat = () => owner.page.locator('[data-week-so-far]').first().innerText()
   const before = (await stat()).replace(/\n/g, ' ')
-  const g = await owner.api('journal.grid', { space: SPACE })
+  const g = await owner.api('goals.grid', { space: SPACE })
   const col = g.current_week
   // an empty tick of the current week (issue 45: the ticks are on Goals > Cycles)
   const cells = owner.page.locator('[data-tick]:not([disabled])')
@@ -38,25 +38,24 @@ await check('GOALS.2', 'Tick week cells in the 12 Week Year grid and see the wee
   await owner.page.waitForTimeout(800)
   const after = (await stat()).replace(/\n/g, ' ')
   must(before !== after, 'score stayed at ' + before)
-  const g2 = await owner.api('journal.grid', { space: SPACE })
+  const g2 = await owner.api('goals.grid', { space: SPACE })
   must(JSON.stringify(g2.weeks?.[col - 1] ?? g2.average) !== JSON.stringify(g.weeks?.[col - 1] ?? g.average) || before !== after, 'server score unchanged')
   return `${before} -> ${after}`
 })
 
-await check('GOALS.3', 'Carry an open October goal into November', async () => {
-  const oct = await owner.api('journal.month', { space: SPACE, year: 2026, month: 10 })
-  let goal = oct.plan.goals.find((x) => x.status === 'Open')
-  if (!goal) { // an earlier run carried them all: add one more open goal to October
-    await owner.api('journal.save_month_goal', { plan: oct.plan.name, title: `October goal ${stamp}`, priority: 'II' })
-    goal = (await owner.api('journal.month', { space: SPACE, year: 2026, month: 10 })).plan.goals.find((x) => x.status === 'Open')
-  }
-  must(goal, 'no open goal in October')
-  await owner.api('journal.carry_month_goal', { plan: oct.plan.name, row: goal.row })
-  const oct2 = await owner.api('journal.month', { space: SPACE, year: 2026, month: 10 })
-  const nov = await owner.api('journal.month', { space: SPACE, year: 2026, month: 11 })
-  must(oct2.plan.goals.find((x) => x.row === goal.row).status === 'Carried', 'the October goal is not marked Carried')
-  must(nov.plan.goals.some((x) => x.title === goal.title && x.carried_from), 'the goal is not in November')
-  return goal.title
+await check('GOALS.3', 'Carry an open October goal into November: the month card of Cycles shows it with where it came from', async () => {
+  // a month goal is a goal with the Month horizon; carrying is what the monthly review does, so this calls the rule it calls
+  const old = (await owner.api('goals.create', { space: SPACE, title: `October goal ${stamp}`, horizon: 'Month', target_date: '2026-10-31', done_when: 'Done' })).name
+  const out = JSON.parse(bench(`import json
+from lifeos import cycles
+frappe.set_user("owner@lifeos.test")
+print(json.dumps(cycles.carry_month_goal("${old}")))`).split('\n').pop())
+  const oct = await owner.api('goals.this_month', { space: SPACE, year: 2026, month: 10 })
+  const nov = await owner.api('goals.this_month', { space: SPACE, year: 2026, month: 11 })
+  must(oct.goals.find((x) => x.row === old).status === 'Carried', 'the October goal is not marked Carried')
+  const moved = nov.goals.find((x) => x.row === out.row)
+  must(moved && moved.title === `October goal ${stamp}` && moved.carried_from === old && moved.carried_from_month === 10, 'the goal is not in November, carried from October')
+  return moved.title
 })
 
 await check('GOALS.4', 'Tea & Coffee in the lens: Plan and Library show its open-ended goals, tasks, notes and chats together', async () => {
@@ -170,7 +169,7 @@ for (const width of WIDTHS) {
     else must((await pg.locator('[data-active-filters]').innerText()).includes('1 filter'), 'status=Dropped is not shown as a filter')
     if (phone) {
       // seven tabs are wider than a phone: the row scrolls sideways, the page does not, and the open tab is in view
-      await s.open('/life/library/archive?type=Life+Journal+Page')
+      await s.open('/life/library/archive?type=Life+Vault+Document')
       const m = await bar.evaluate((el) => { const t = el.querySelector('[data-state="active"]').getBoundingClientRect(); return { wide: el.scrollWidth > el.clientWidth, inView: t.left >= 0 && t.right <= window.innerWidth, h: t.height } })
       must(m.wide && m.inView, `the tab row does not scroll with the open tab in view: ${JSON.stringify(m)}`)
       must(m.h >= 44, `a tab is ${m.h} px high on a phone`)
@@ -271,7 +270,7 @@ for (const width of WIDTHS) {
     step = 'the 12 Week Year grid does not show them; moving the open'
     const tf = await s.api('today.get', { space: SPACE })
     const cycle = tf.cycle?.name || tf.cycle?.cycle
-    const gridHas = async (n) => { const g = await s.api('journal.goals', { space: SPACE }); return g.cycles.some((c) => c.goals.some((x) => x.name === n)) }
+    const gridHas = async (n) => { const g = await s.api('goals.across_cycles', { space: SPACE }); return g.cycles.some((c) => c.goals.some((x) => x.name === n)) }
     must(!(await gridHas(open.name)) && !(await gridHas(annual.name)), 'a goal without a cycle shows in the 12 Week Year')
     const cycles = await s.api('goals.cycles', { space: SPACE })
     const active = cycles.find((c) => c.status === 'Active') || cycles[0]
@@ -498,7 +497,7 @@ for (const width of WIDTHS) {
     await pg.getByRole('option', { name: option, exact: true }).first().click()
     await settle()
   }
-  const cycle = (await owner.api('journal.grid', { space: SPACE })).cycle
+  const cycle = (await owner.api('goals.grid', { space: SPACE })).cycle
 
   await check('GOALS.12', `${width} px: New goal asks "Done when…": a milestone goal and a number goal through the dialog; a frequency offers Make it a habit`, async () => {
     const make = async (title, fill) => {
@@ -539,7 +538,7 @@ for (const width of WIDTHS) {
     await dlg.locator('[data-make-habit]').click()
     await pg.waitForLoadState('networkidle')
     await settle()
-    const habits = await s.api('journal.habits', { space: SPACE })
+    const habits = await s.api('goals.month_habits', { space: SPACE })
     must(habits.habits.some((h) => h.title === `S7 walk 3 times a week ${W}` && h.days_per_week === 3), 'the habit is not in this month')
     must(!(await s.api('goals.list', { space: SPACE, state: 'all', filters: [['title', 'like', `S7 walk%${stamp}%`]] })).goals.length, 'a goal was made for the habit')
     return 'milestone, number 84 → 78 kg, habit 3 a week'
@@ -575,9 +574,9 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     must(cycle, 'no active cycle')
     const long = (await s.api('goals.create', { space: SPACE, title: `S7 long goal ${W}`, horizon: 'Year', target_date: addDays(200), area: areaId('Tea & Coffee'),
       done_when: 'A new client signed' })).name
-    const g = (await s.api('journal.save_goal', { cycle: cycle.name, title: `S7 cycle goal ${W}`, area: areaId('Tea & Coffee'), serves: long, measure_kind: 'Milestone',
+    const g = (await s.api('goals.save_goal', { cycle: cycle.name, title: `S7 cycle goal ${W}`, area: areaId('Tea & Coffee'), serves: long, measure_kind: 'Milestone',
       done_when: 'Ten pitches made', actions: [{ title: `S7 calls ${W}`, per_week: 4 }] })).goal
-    action = (await s.api('journal.goal', { goal: g })).goal.actions[0]
+    action = (await s.api('goals.detail', { goal: g })).goal.actions[0]
     await s.open('/life/goals/cycles')
     const line = pg.locator('[data-grid-serves]', { hasText: `S7 long goal ${W}` })
     await line.first().waitFor({ timeout: 10000 }).catch(() => {})
@@ -592,9 +591,9 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
 
   await check('GOALS.15', `${width} px: ticking a 4-a-week action once shows 1 of 4 and raises the week score`, async () => {
     must(action, 'no action from the check before')
-    const g = await s.api('journal.grid', { space: SPACE })
+    const g = await s.api('goals.grid', { space: SPACE })
     const wk = g.current_week
-    const before = await s.api('journal.week_score', { cycle: cycle.name, week: wk })
+    const before = await s.api('goals.week_score', { cycle: cycle.name, week: wk })
     await s.open('/life/goals/cycles')
     const cell = pg.locator(`button[data-tick][aria-label^="S7 calls ${W}, tick 1 "]`).first()
     await cell.waitFor({ timeout: 10000 }).catch(() => {})
@@ -604,7 +603,7 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     await settle()
     must((await cell.getAttribute('aria-pressed')) === 'true', 'the first tick of the action is not set')
     must((await pg.locator('[data-cycle-goal]', { hasText: `S7 calls ${W}` }).locator('[data-tick-count]').innerText()).startsWith('1 of 4'), 'the goal row does not say 1 of 4')
-    const after = await s.api('journal.week_score', { cycle: cycle.name, week: wk })
+    const after = await s.api('goals.week_score', { cycle: cycle.name, week: wk })
     must(after.done === before.done + 1 && after.percent > before.percent, `score ${before.percent}% → ${after.percent}%`)
     await s.open('/life')
     const row = pg.locator('[data-next] [data-why="12WY"]', { hasText: `S7 calls ${W}` })
@@ -656,9 +655,16 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, horizon: 'Long term', area: areaId('Personal'), done_when: 'Handed over' })).name
     const now = iso(new Date()) // the run may cross midnight
     const at = `${now} 23:${phone ? '30' : '00'}:00`
-    const task = await s.api('week.add_goal_work', { goal: a, title: `S7 plan step ${W}`, scheduled_at: at, duration_min: 30, note: 'the soil report' })
+    // the weekly review's Goals tab makes this work; the call it makes is lifeos.weekplan.add
+    const addWork = (args) => JSON.parse(bench(`import json
+from lifeos import weekplan
+frappe.set_user("owner@lifeos.test")
+args = json.loads(${JSON.stringify(JSON.stringify(args))})
+d = weekplan.add(args.pop("goal"), **args)
+print(json.dumps({"task": d.name, "status": d.status, "waiting_on": d.waiting_on, "scheduled_at": str(d.scheduled_at)[:19] if d.scheduled_at else None}))`).split('\n').pop())
+    const task = addWork({ goal: a, title: `S7 plan step ${W}`, scheduled_at: at, duration_min: 30, note: 'the soil report' })
     must(task.scheduled_at && task.scheduled_at.slice(0, 10) === now, 'no task scheduled today: ' + JSON.stringify(task))
-    const handed = await s.api('week.add_goal_work', { goal: b, title: `S7 handoff step ${W}`, who: 'Vivek' })
+    const handed = addWork({ goal: b, title: `S7 handoff step ${W}`, who: 'Vivek' })
     must(handed.status === 'Waiting' && handed.waiting_on === 'Vivek', 'the delegated task is not Waiting on Vivek: ' + JSON.stringify(handed))
     must((await s.api('outbox.list', { space: SPACE, pile: 'Delegated', page_length: 500 })).rows.some((r) => r.record === handed.task), 'not in Delegated')
     await s.open('/life')
@@ -1263,12 +1269,12 @@ print(json.dumps(t.name))`).split('\n').pop())
       must(!/\btags?\b/i.test(await pg.locator('body').innerText()), 'the task pane shows a tag picker')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
-    await check('GOALS.44', `${width} px: the month plan shows this month's Month goals in priority order, with the habits`, async () => {
-      const plan = await s.api('journal.month', { space: SPACE, create: 1 })
-      for (const w of ['first', 'second', 'third']) await s.api('journal.save_month_goal', { plan: plan.plan.name, title: T(w) })
-      const now = await s.api('journal.month', { space: SPACE })
-      const third = now.plan.goals.find((g) => g.title === T('third'))
-      await s.api('journal.save_month_goal', { plan: plan.plan.name, row: third.row, move: -1 })
+    await check('GOALS.44', `${width} px: Cycles lists this month's Month goals in priority order, with the habits`, async () => {
+      const [y, m] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))]
+      const last = `${today.slice(0, 8)}${new Date(Date.UTC(y, m, 0)).getUTCDate()}`
+      const made = {}
+      for (const w of ['first', 'second', 'third']) made[w] = (await s.api('goals.create', { space: SPACE, title: T(w), horizon: 'Month', target_date: last, done_when: 'Done' })).name
+      await s.api('goals.reorder', { goals: [made.first, made.third, made.second] })
       await s.open('/life/goals/cycles')
       await pg.locator('[data-month-goal]').first().waitFor({ timeout: 10000 })
       const titles = (await pg.locator('[data-month-goal]').allInnerTexts()).map((x) => x.split('\n').find((l) => l.startsWith('I60 '))).filter((x) => [T('first'), T('second'), T('third')].includes(x))
@@ -1284,7 +1290,7 @@ print(json.dumps(t.name))`).split('\n').pop())
 
 
 // Issue 45: Goals > Cycles. The 12 Week Year (week bars, each goal's lead action and this week's ticks) beside this month's plan; the Plan
-// section's month, year, 12 Weeks and journal routes land here; journal pages are a kind in Library > Notes. Titles start "I45 ".
+// section's month, year, 12 Weeks and journal routes land here; journal pages are notes in Library > Notes. Titles start "I45 ".
 for (const width of WIDTHS) {
   const tag = `I45.${width}`
   const phone = width < 800
@@ -1330,7 +1336,7 @@ print(json.dumps({"cycle": cycle, "goal": g.name}))`).split('\n').pop())
 
     await check('GOALS.46', `${width} px: the week bars show the scores of the grid, with this week marked "so far"`, async () => {
       seed()
-      const g = await s.api('journal.grid', { space: SPACE })
+      const g = await s.api('goals.grid', { space: SPACE })
       await s.open('/life/goals/cycles')
       await ready()
       must(await pg.locator('[data-week-bar]').count() === 12, 'there are not twelve week bars')
@@ -1357,7 +1363,7 @@ print(json.dumps({"cycle": cycle, "goal": g.name}))`).split('\n').pop())
       const after = (await pg.locator('[data-week-so-far]').innerText()).trim()
       must(before !== after, `the score so far stayed at ${before}`)
       must((await row.locator('[data-tick-count]').innerText()).startsWith('1 of 3'), 'the row does not say 1 of 3')
-      const g = await s.api('journal.grid', { space: SPACE, cycle })
+      const g = await s.api('goals.grid', { space: SPACE, cycle })
       const a = g.goals.find((x) => x.name === goal).actions[0]
       must(a.ticks[String(g.current_week)] === 1, 'the tick was not recorded on the server')
       must(Math.round(g.weeks[g.current_week - 1].percent) + '%' === after, `the server says ${Math.round(g.weeks[g.current_week - 1].percent)}%, the page ${after}`)
@@ -1368,14 +1374,14 @@ print(json.dumps({"cycle": cycle, "goal": g.name}))`).split('\n').pop())
 
     await check('GOALS.48', `${width} px: each cycle goal shows its lead action and this week's ticks, as the goal page does`, async () => {
       const { cycle, goal } = seed()
-      await s.api('journal.tick', { action: (await s.api('journal.goal', { goal })).goal.actions[0].name, week: (await s.api('journal.grid', { space: SPACE, cycle })).current_week, count: 2 })
+      await s.api('goals.tick', { action: (await s.api('goals.detail', { goal })).goal.actions[0].name, week: (await s.api('goals.grid', { space: SPACE, cycle })).current_week, count: 2 })
       await s.open('/life/goals/cycles')
       await ready()
       const row = pg.locator(`[data-cycle-goal][data-goal="${goal}"]`)
       must((await row.locator('[data-lead-action]').innerText()).includes(T('lead')) && (await row.locator('[data-lead-action]').innerText()).includes('3/wk'), 'the row does not show the lead action and how often')
       must((await row.locator('[data-tick-count]').innerText()).startsWith('2 of 3') && await row.locator('[data-tick][aria-pressed="true"]').count() === 2, 'the row does not show 2 of 3 ticks')
       // every goal of the cycle has a row with the lead action the grid gives it
-      const g = await s.api('journal.grid', { space: SPACE, cycle })
+      const g = await s.api('goals.grid', { space: SPACE, cycle })
       for (const x of g.goals) {
         const lead = x.actions.find((a) => a.status === 'Open')
         const rows = pg.locator(`[data-cycle-goal][data-goal="${x.name}"]`)
@@ -1385,65 +1391,61 @@ print(json.dumps({"cycle": cycle, "goal": g.name}))`).split('\n').pop())
       await s.open(`/life/goals/${goal}`)
       await pg.getByText(T('lead')).first().waitFor({ timeout: 10000 }).catch(() => {})
       // what the goal page reads (journal.goal) names the same lead action, with the same ticks
-      const asked = (await s.api('journal.goal', { goal })).goal.actions.find((x) => x.status === 'Open')
+      const asked = (await s.api('goals.detail', { goal })).goal.actions.find((x) => x.status === 'Open')
       must(asked && asked.title === T('lead') && asked.per_week === 3 && Object.values(asked.ticks).reduce((x, y) => x + y, 0) === 2, 'the goal page data does not match the row')
     })
 
-    // the month plan checks use goals in this month and last month's plan
-    await check('GOALS.49', `${width} px: the month plan lists the month goals in priority order with their status; a goal carried from last month says so`, async () => {
-      const now = new Date(Date.parse(today + 'T12:00:00Z'))
-      const py = now.getUTCMonth() === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear(), pm = now.getUTCMonth() === 0 ? 12 : now.getUTCMonth()
-      const last = await s.api('journal.month', { space: SPACE, year: py, month: pm, create: 1 })
-      await s.api('journal.save_month_goal', { plan: last.plan.name, title: T('carried') })
-      const lastGoal = (await s.api('journal.month', { space: SPACE, year: py, month: pm })).plan.goals.find((x) => x.title === T('carried'))
-      await s.api('journal.carry_month_goal', { plan: last.plan.name, row: lastGoal.row })
-      const cur = await s.api('journal.month', { space: SPACE, create: 1 })
-      for (const w of ['second', 'third']) await s.api('journal.save_month_goal', { plan: cur.plan.name, title: T(w) })
-      const goals = (await s.api('journal.month', { space: SPACE })).plan.goals.filter((x) => x.title.startsWith('I45 ') && x.title.endsWith(`${width} ${stamp}`))
-      const third = goals.find((x) => x.title === T('third'))
-      await s.api('journal.save_month_goal', { plan: cur.plan.name, row: third.row, move: -1 })
-      const order = (await s.api('journal.month', { space: SPACE })).plan.goals.map((x) => x.title).filter((t) => t.startsWith('I45 ') && t.endsWith(`${width} ${stamp}`))
+    // the month card lists Month goals: goals with the Month horizon, this month's and the ones carried from last month
+    await check('GOALS.49', `${width} px: Cycles lists the month goals in priority order with their status; a goal carried from last month says so`, async () => {
+      const [y, m] = [Number(today.slice(0, 4)), Number(today.slice(5, 7))]
+      const [py, pm] = m === 1 ? [y - 1, 12] : [y, m - 1]
+      const lastDay = (yy, mm) => `${yy}-${String(mm).padStart(2, '0')}-${new Date(Date.UTC(yy, mm, 0)).getUTCDate()}`
+      const old = (await s.api('goals.create', { space: SPACE, title: T('carried'), horizon: 'Month', target_date: lastDay(py, pm), done_when: 'Done' })).name
+      bench(`from lifeos import cycles
+frappe.set_user("owner@lifeos.test")
+cycles.carry_month_goal("${old}")`)
+      const made = {}
+      for (const w of ['second', 'third']) made[w] = (await s.api('goals.create', { space: SPACE, title: T(w), horizon: 'Month', target_date: lastDay(y, m), done_when: 'Done' })).name
+      await s.api('goals.reorder', { goals: [made.third, made.second] })
+      const order = (await s.api('goals.this_month', { space: SPACE })).goals.map((x) => x.title).filter((x) => x.startsWith('I45 ') && x.endsWith(`${width} ${stamp}`))
       await s.open('/life/goals/cycles')
       await ready()
       const rows = await pg.locator('[data-month-goal]').evaluateAll((els) => els.map((e) => ({ text: e.innerText, status: e.querySelector('[data-month-status]')?.innerText })))
       const mine = rows.filter((r) => r.text.includes(`${width} ${stamp}`))
       must(mine.map((r) => r.text.split('\n').find((l) => l.startsWith('I45 '))).join('|') === order.join('|'), `the month goals are in the order ${mine.map((r) => r.text.split('\n').find((l) => l.startsWith('I45 ')))}, not ${order}`)
+      must(order.indexOf(T('third')) < order.indexOf(T('second')), 'the reorder did not put the third before the second')
       must(mine.some((r) => /Carried from/.test(r.status || '') && r.text.includes(T('carried'))), 'the goal carried from last month does not say so')
       must(mine.filter((r) => r.text.includes(T('second'))).every((r) => /In progress|\d+ of \d+/.test(r.status)), 'an open goal does not say In progress')
-      must((await pg.locator('[data-month-title]').innerText()).endsWith('plan') && /month goals? ·/.test(await pg.locator('[data-month-card]').innerText()), 'the month plan has no title or count')
-      must(await pg.locator('[data-month-habits]').count() > 0 || (await pg.locator('[data-month-card]').innerText()).length > 0, 'the habits are missing')
-      must(/plan opens on 1 /.test(await pg.locator('[data-month-next]').innerText()), 'no note on when next month opens')
+      must((await pg.locator('[data-month-title]').innerText()).endsWith('goals') && /month goals? ·/.test(await pg.locator('[data-month-card]').innerText()), 'the month card has no title or count')
+      must(await pg.locator('[data-month-edit], [data-month-start], [data-month-next]').count() === 0, 'the month plan record is still on screen')
     })
 
-    await check('GOALS.50', `${width} px: Edit on the month plan changes a goal's status, and Cycles shows it`, async () => {
+    await check('GOALS.50', `${width} px: a month goal marked Achieved shows Done on Cycles; its title opens the goal page`, async () => {
+      const goal = (await s.api('goals.this_month', { space: SPACE })).goals.find((x) => x.title === T('second')).row
+      await s.api('goals.close', { goal, outcome: 'Achieved' })
       await s.open('/life/goals/cycles')
       await ready()
-      await pg.locator('[data-month-edit]').click()
-      const dialog = pg.locator('[data-month-edit-body]')
-      await dialog.locator('[data-month-goal]', { hasText: T('second') }).waitFor({ timeout: 10000 })
-      await dialog.locator('[data-month-goal]', { hasText: T('second') }).getByRole('checkbox').click()
-      await settle()
-      await pg.keyboard.press('Escape')
-      await settle()
       const row = pg.locator('[data-month-card] [data-month-goal]', { hasText: T('second') })
       await row.locator('[data-month-status]', { hasText: 'Done' }).waitFor({ timeout: 10000 })
-      const done = (await s.api('journal.month', { space: SPACE })).plan.goals.find((x) => x.title === T('second'))
-      must(done.status === 'Done', 'the server did not record Done')
+      await row.getByRole('link', { name: T('second') }).click()
+      await pg.waitForURL((u) => u.pathname === `/life/goals/${goal}`, { timeout: 10000 })
     })
 
-    await check('GOALS.51', `${width} px: with the month plan switched off in Rhythms, the month plan panel is hidden`, async () => {
+    await check('GOALS.51', `${width} px: on an empty space (an area with nothing in it) Cycles says what will appear and how to add it`, async () => {
+      const area = bench(`a = frappe.get_doc({"doctype": "Life Area", "space": "${SPACE}", "area_name": "${T('empty area')}", "parent_area": frappe.db.get_value("Life Area", {"space": "${SPACE}", "is_life_area": 1}, "name")}).insert(ignore_permissions=True)
+print(a.name)`).split('\n').pop()
       try {
-        await s.api('settings.save', { values: { month_plan_enabled: 0 } })
-        await s.open('/life/goals/cycles')
+        await s.open(`/life/goals/cycles?area=${area}`)
         await ready()
-        must(await pg.locator('[data-month-card]').count() === 0, 'the month plan is shown with the month plan off')
-        must(await pg.locator('[data-cycle-card]').isVisible(), 'the 12 Week Year is gone too')
+        const card = pg.locator('[data-month-card]')
+        must((await card.innerText()).includes('No goals this month.'), 'the month card has no empty state')
+        must(await card.getByRole('button', { name: 'Goal' }).count() === 1, 'the month card has no Goal button')
+        must(await pg.locator('[data-cycle-card]').isVisible(), 'the 12 Week Year card is gone')
+        await noSideways()
       } finally {
-        await s.api('settings.save', { values: { month_plan_enabled: was.month_plan_enabled ? 1 : 0 } })
+        bench(`frappe.set_user("Administrator")
+frappe.delete_doc("Life Area", "${area}", force=1, ignore_permissions=True)`)
       }
-      await s.open('/life/goals/cycles')
-      await ready()
-      if (was.month_plan_enabled) must(await pg.locator('[data-month-card]').count() === 1, 'the month plan did not come back')
     })
 
     await check('GOALS.52', `${width} px: a closed cycle chosen from the picker is shown read-only`, async () => {
@@ -1466,31 +1468,29 @@ print(c.name)`).split('\n').pop()
       await pg.keyboard.press('Escape')
     })
 
-    await check('GOALS.53', `${width} px: journal pages appear in Library > Notes as "Journal page" and open with their image`, async () => {
+    await check('GOALS.53', `${width} px: a journal page is a note in Library > Notes and opens with its photo and its date`, async () => {
       // a page of its own, with a photograph, so that this check does not depend on another check having made one
-      const jp = bench(`p = frappe.get_doc({"doctype": "Life Journal Page", "space": "${SPACE}", "page_date": frappe.utils.today(), "page_number": "9${width}", "transcript_md": "${T('page words')}"}).insert(ignore_permissions=True)
+      const jp = bench(`p = frappe.get_doc({"doctype": "Life Note", "space": "${SPACE}", "title": "${T('journal page')}", "collection": "My notes", "page_date": frappe.utils.today(), "content_md": "${T('page words')}"}).insert(ignore_permissions=True)
 print(p.name)`).split('\n').pop()
-      const file = (await s.upload('Life Journal Page', jp, `i45-${width}-${stamp}.png`, 'image/png', await pg.screenshot())).file_url
-      bench(`frappe.db.set_value("Life Journal Page", "${jp}", "image", "${file}")`)
+      const file = (await s.upload('Life Note', jp, `i45-${width}-${stamp}.png`, 'image/png', await pg.screenshot())).file_url
+      bench(`frappe.db.set_value("Life Note", "${jp}", "image", "${file}")`)
       try {
         await s.api('views.save', { screen: 'library', space: SPACE, state: {} }) // an earlier check left "Written by the assistant" remembered
         await s.open('/life/library/notes?view=list')
-        await pg.locator('[data-journal-page-badge]:visible').first().waitFor({ timeout: 15000 })
-        must((await pg.locator('[data-journal-page-badge]:visible').first().innerText()).includes('Journal page'), 'the kind is not "Journal page"')
-        await s.open(`/life/library/notes?view=list&open=page:${jp}`)
+        await pg.getByText(T('journal page')).first().waitFor({ timeout: 15000 })
+        await s.open(`/life/library/notes?view=list&open=note:${jp}`)
         await pg.locator('[data-pane]').waitFor({ timeout: 10000 })
-        await pg.locator('[data-pane] img[alt="Photographed journal page"]').waitFor({ timeout: 10000 })
-        must(await pg.locator('[data-pane-tabs] [data-tab="transcript"]').count() === 1, 'the pane has no transcript tab')
-        await pg.locator('[data-pane-tabs] [data-tab="transcript"]').click()
+        await pg.locator('[data-pane] [data-note-image] img[alt="Photographed journal page"]').waitFor({ timeout: 10000 })
         await pg.getByText(T('page words')).first().waitFor({ timeout: 10000 })
+        must((await s.api('library.get', { note: jp })).page_date === today, 'the note does not carry its page date')
       } finally {
         bench(`frappe.set_user("Administrator")
-frappe.delete_doc("Life Journal Page", "${jp}", force=1, ignore_permissions=True)`)
+frappe.delete_doc("Life Note", "${jp}", force=1, ignore_permissions=True)`)
       }
     })
 
     await check('GOALS.54', `${width} px: the Month and Year headers link to Goals > Cycles`, async () => {
-      for (const [from, link] of [['/life/today/month', 'Month plan'], ['/life/today/year', '12 Week Year']]) {
+      for (const [from, link] of [['/life/today/month', 'Month goals'], ['/life/today/year', '12 Week Year']]) {
         await s.open(from)
         await pg.locator('[data-view-links]').waitFor({ timeout: 10000 })
         must(await pg.locator('[data-view-links] a', { hasText: link }).first().getAttribute('href') === '/life/goals/cycles', `${from}'s header does not link to Goals > Cycles`)
@@ -1524,7 +1524,6 @@ frappe.delete_doc("Life Journal Page", "${jp}", force=1, ignore_permissions=True
     })
   } finally {
     cleanup()
-    await s.api('settings.save', { values: { month_plan_enabled: was.month_plan_enabled ? 1 : 0 } })
     await s.ctx.close()
   }
 }
@@ -1594,8 +1593,8 @@ print(json.dumps({"cycle": cycle.name, "goal": g.name, "old": old.name, "career"
     })
 
     await check('GOALS.58', `${width} px: progress on a 12 Week Year goal shows this week's ticks and the tasks done`, async () => {
-      bench(`from lifeos import journal
-journal.set_tick("${made.actions[0]}", journal.current_week(frappe.get_doc("Life Cycle", "${made.cycle}")), 1)`)
+      bench(`from lifeos import cycles
+cycles.set_tick("${made.actions[0]}", cycles.current_week(frappe.get_doc("Life Cycle", "${made.cycle}")), 1)`)
       await goalPage(made.goal)
       const line = await pg.locator('[data-goal-week-ticks]').innerText()
       must(/Actions this week: 1 of 3 ticks/.test(line), 'the ticks line says: ' + line)

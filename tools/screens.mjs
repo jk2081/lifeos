@@ -97,7 +97,7 @@ for (const scheme of schemes) {
     }
     const area = await first('Life Area', { space: 'Private', area_name: 'Tea & Coffee' })
     const openGoal = await first('Life Goal', { space: 'Private', title: 'Ghillidary turnaround' })
-    const goal = await first('Life Goal', { horizon: '12 weeks' }), jpage = await first('Life Journal Page'), note = await first('Life Note'), task = await first('Life Task', { space: 'Private', status: 'Long term' })
+    const goal = await first('Life Goal', { horizon: '12 weeks' }), note = await first('Life Note'), task = await first('Life Task', { space: 'Private', status: 'Long term' })
     const vault = await first('Life Vault Document'), chat = await first('Life Chat Log')
     const review = await first('Life Inbox Item', { space: 'Private', status: 'To Review' })
     const wikiPage = await first('Life Note', { space: 'Private', collection: 'Wiki', is_rules: 0 }).catch(() => null)
@@ -112,12 +112,12 @@ for (const scheme of schemes) {
        ['review', `/life/inbox/${review}/review`], ['item', `/life/item/${review}`],
       ...['week', 'month', 'year'].map((v) => [`today-${v}`, `/life/today/${v}?area=`]), ['today-other-day', '/life/today?area=&date=2026-12-02'], // issue 16
       ...['review', 'calendar', 'agenda'].map((v) => [`plan-week-${v}`, `/life/plan/week?view=${v}&area=`]),
-      ...['plan', 'habits', 'checkins', 'calendar'].map((v) => [`plan-month-${v}`, `/life/plan/month?view=${v}&area=`]),
+      ...['plan', 'habits', 'calendar'].map((v) => [`plan-month-${v}`, `/life/plan/month?view=${v}&area=`]),
       ['plan-12-weeks', '/life/plan/12-weeks?area='], ['plan-12-weeks-lens', `/life/plan/12-weeks?${lens}`],
       ...['calendar', 'goals'].map((v) => [`plan-year-${v}`, `/life/plan/year?view=${v}&area=`]),
       ['plan-goals', '/life/plan/goals?status=all&area='], ['plan-goals-lens', `/life/plan/goals?${lens}`], ['plan-tasks', '/life/plan/tasks?view=list&area='],
       ['plan-tasks-board', '/life/plan/tasks?view=board&area='], ['plan-tasks-pane', `/life/plan/tasks?view=list&area=&open=task:${task}`],
-      ['plan-someday', '/life/plan/someday?area='], ['plan-reset', '/life/plan/reset?area='], ...['inventory', 'one'].map((t) => [`plan-reset-${t}`, `/life/plan/reset?tab=${t}&area=`]),
+      ['plan-someday', '/life/plan/someday?area='], ['settings-data', '/life/settings?tab=data'], ...['inventory', 'one'].map((t) => [`settings-data-${t}`, `/life/settings?tab=data&rtab=${t}`]),
       ['goal-open', `/life/plan/goals/${openGoal}`], ...['tasks', 'notes', 'captures', 'links'].map((t) => [`goal-open-${t}`, `/life/plan/goals/${openGoal}?tab=${t}`]),
       ['goal-12wy', `/life/plan/goals/${goal}`], ['goal-pane', `/life/plan/goals?status=all&area=&open=goal:${openGoal}`],
       ['library-all', '/life/library?all=1&area='], ['library-all-lens', `/life/library?all=1&${lens}`], ['library-all-grid', '/life/library?view=grid&all=1&area='],
@@ -128,7 +128,6 @@ for (const scheme of schemes) {
       ['library-timeline', '/life/library/timeline?all=1&area='], ['library-archive', '/life/library/archive?all=1&area='], ['library-archive-trash', '/life/library/archive?type=trash&all=1&area='],
       ['note', `/life/library/${note}`], ['note-pane', `/life/library/notes?view=list&all=1&area=&open=note:${note}`],
       ['vault-pane', `/life/library/captures?tab=documents&all=1&area=&open=vault:${vault}`], ['chat-pane', `/life/library/captures?tab=chats&all=1&area=&open=chat:${chat}`],
-      ...(jpage ? [['page-pane', `/life/library/captures?tab=pages&area=&open=page:${jpage}&ptab=transcript`]] : []),
       ...['original', 'text', 'summary', 'made', 'details'].map((t) => [`source-pane-${t}`, `/life/library/captures?all=1&area=&open=source:${review}&ptab=${t}`]),
       ...(wikiPage ? ['note', 'sources', 'links', 'history'].map((t) => [`assistant-pane-${t}`, `/life/library/notes?by=assistant&area=&open=note:${wikiPage}&ptab=${t}`]) : []),
       ...(wikiChange ? [['assistant-change', `/life/library/notes?view=changes&area=&open=change:${wikiChange}`]] : []),
@@ -140,7 +139,7 @@ for (const scheme of schemes) {
       ['library-outbox', '/life/library/outbox?area='], ['library-outbox-in', '/life/library/outbox?pile=in&period=12weeks&area='],
       ...(numberGoal ? [['goal-number', `/life/plan/goals/${numberGoal}`], ['goal-number-pane', `/life/plan/goals?status=all&area=&open=goal:${numberGoal}`]] : []),
       ['new-goal', '/life/plan/goals?area='], ['inbox-old', '/life/brain?all=1&area=&decisions=1'],
-      ...['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'dimensions', 'reset', 'agents', 'connections', 'ai', 'sensitive',
+      ...['profile', 'appearance', 'notifications', 'shortcuts', 'areas', 'rhythms', 'habits', 'data', 'agents', 'connections', 'ai', 'sensitive',
         'note-rules', 'spaces', 'members', 'archive', 'import', 'backups'].map((t) => [`settings-${t}`, `/life/settings?tab=${t}&area=`]),
     ].filter(([n]) => !only.length || only.includes(n))
     for (const [name, p] of SCREENS) {
