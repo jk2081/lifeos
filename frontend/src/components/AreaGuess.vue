@@ -8,9 +8,10 @@
 </template>
 <script setup>
 // Issue 13: an area the Brain guessed for a task, with how sure it was. One tap confirms it and the mark goes.
+import { todayData } from '@/data/today'
 import { computed, ref } from 'vue'
 import { Button, toast } from 'frappe-ui'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
 
 const props = defineProps({ task: Object, readonly: Boolean, full: Boolean })
 const emit = defineEmits(['confirmed'])
@@ -20,7 +21,7 @@ const percent = computed(() => Math.round(props.task.area_confidence || 0))
 async function confirmArea() {
   busy.value = true
   try {
-    const res = await api('tasks.confirm_area', { task: props.task.name })
+    const res = await todayData.tasks.confirm_area({ task: props.task.name })
     // the row is the list's own object: clearing the mark here updates it in place
     Object.assign(props.task, { area_guessed: 0, area_confidence: 0 })
     emit('confirmed', res)

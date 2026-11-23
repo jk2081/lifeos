@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Outbox" noun="records" screen="outbox" doctype="Life Exit" :spec="SPEC" :tabs="TABS" :quick="['kind']" :synthetic="SYNTHETIC"
+  <ListView ref="list" title="Outbox" :path="[{ label: 'Brain', to: '/brain' }]" noun="records" screen="outbox" doctype="Life Exit" :spec="SPEC" :tabs="TABS" :quick="['kind']" :synthetic="SYNTHETIC"
     :hidden="HIDDEN" :fetch="fetch" :row-ref="rowRef" :row-label="(r) => r.title" :groupable="false" :watch-keys="['period', 'from', 'to']"
     :empty-title="EMPTY[tab] || 'Nothing left the plate in this period.'" empty-hint="Done, delegated, parked and discarded records show here, with when they left." @loaded="loaded">
     <template #sub><span data-outbox-sub>{{ manySpaces ? `${store.space} · What` : 'What' }} left your plate {{ PERIOD_LABEL[period] }}{{ range ? ` (${range})` : '' }}<span class="max-md:hidden"> · a record, not a place to work</span></span></template>
@@ -29,6 +29,7 @@
   </ListView>
 </template>
 <script setup>
+import { todayData } from '@/data/today'
 import { manySpaces } from '@/lib/lens'
 // Library > Outbox (set 7): what left the plate in a period, in four piles, and what came in; an 8-week chart of in against
 // out. The only action is Bring back, where the record allows it (reopen, back from Someday, restore from the trash).
@@ -38,7 +39,7 @@ import { Badge, Button, TabButtons } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import Card from '@/components/ui/Card.vue'
 import InOutChart from '@/components/outbox/InOutChart.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { dateTime, short } from '@/lib/dates'
 import { onRecordChanged, refOf } from '@/lib/pane'
@@ -70,8 +71,8 @@ function setPeriod(v) {
   router.push({ query: { ...route.query, period: v === 'week' ? undefined : v, from: undefined, to: undefined, open: undefined } })
 }
 async function fetch({ params: p, tab: t, filters, start, page_length }) {
-  const [res, c] = await Promise.all([api('outbox.list', { space: store.space, pile: t, period: custom.value ? undefined : period.value, area: p.area,
-    filters: filters?.length ? filters : undefined, from_date: custom.value?.from, to_date: custom.value?.to, start, page_length }), start ? null : api('outbox.chart', { space: store.space, area: p.area })])
+  const [res, c] = await Promise.all([todayData.outbox.list({ space: store.space, pile: t, period: custom.value ? undefined : period.value, area: p.area,
+    filters: filters?.length ? filters : undefined, from_date: custom.value?.from, to_date: custom.value?.to, start, page_length }), start ? null : todayData.outbox.chart({ space: store.space, area: p.area })])
   if (c) chart.value = c.weeks
   return { rows: res.rows, total: res.total, tabs: res.tabs, from: res.from, to: res.to }
 }
@@ -79,7 +80,7 @@ function loaded(res) {
   range.value = res?.from ? `${short(res.from)} to ${short(res.to)}` : ''
 }
 async function bringBack(r) {
-  if (await tryCall(() => api('outbox.bring_back', { exit: r.name }), `${r.title} is back`)) list.value?.reload()
+  if (await tryCall(() => todayData.outbox.bring_back({ exit: r.name }), `${r.title} is back`)) list.value?.reload()
 }
 onRecordChanged(() => list.value?.reload())
 askScope({ kind: 'space', label: 'Everything in this space' })

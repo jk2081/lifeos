@@ -59,13 +59,14 @@
 </template>
 
 <script setup>
+import { todayData } from '@/data/today'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Checkbox, Select, TextInput } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import AreaGuess from '@/components/AreaGuess.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import { api, optimistic, tryCall } from '@/lib/api'
+import { optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short, startOfWeek, addDays } from '@/lib/dates'
 import { OPEN, taskMeta, taskPill } from '@/lib/tasks'
@@ -137,14 +138,14 @@ async function fetch({ params: p, tab: t, filters, order_by, fields, summary, st
   if (v === 'board' && !summary) {
     // the board shows its columns; each column's count is the number of tasks with that status under the same filters
     const cols = t === 'open' ? ['Open', 'Doing'] : BOARD
-    const res = await api('tasks.list', { ...base, status, start, page_length: 100 })
+    const res = await todayData.tasks.list({ ...base, status, start, page_length: 100 })
     const tasks = res.tasks.filter((x) => cols.includes(x.status))
-    const counts = await Promise.all(cols.map((s) => (status !== 'all' && status !== 'open_doing' && status !== s ? { total: 0 } : api('tasks.list', { ...base, status: s, page_length: 1 }))))
+    const counts = await Promise.all(cols.map((s) => (status !== 'all' && status !== 'open_doing' && status !== s ? { total: 0 } : todayData.tasks.list({ ...base, status: s, page_length: 1 }))))
     boardCounts.value = Object.fromEntries(cols.map((s, i) => [s, counts[i].total]))
     // the heading counts what the columns hold, so it agrees with the column counts; Show more brings the next cards
     return { rows: tasks, total: counts.reduce((n, c) => n + c.total, 0), today: res.today, tabs: res.tabs }
   }
-  const res = await api('tasks.list', { ...base, status, loops: t === 'loops' ? 1 : 0,
+  const res = await todayData.tasks.list({ ...base, status, loops: t === 'loops' ? 1 : 0,
     order_by: order_by || (t === 'loops' ? 'creation asc' : undefined), fields, summary, start, page_length })
   return summary ? res : { rows: res.tasks, total: res.total, today: res.today, tabs: res.tabs }
 }
@@ -154,21 +155,21 @@ async function add() {
   quick.value = ''
   const q = { ...route.query, ...(props.embed?.fixed || {}) }
   const area = q.area && q.area !== 'none' ? q.area : undefined
-  const t = await tryCall(() => api('tasks.quick_add', { text, space: props.embed?.space || store.space, area, goal: q.goal && q.goal !== 'none' ? q.goal : undefined }))
+  const t = await tryCall(() => todayData.tasks.quick_add({ text, space: props.embed?.space || store.space, area, goal: q.goal && q.goal !== 'none' ? q.goal : undefined }))
   if (t) list.value.reload()
   else quick.value = text
 }
 function toggle(t) {
   const before = t.status
   const next = before === 'Done' ? 'Open' : 'Done'
-  optimistic(() => (t.status = next), () => (t.status = before), () => api('tasks.set_status', { task: t.name, status: next }))
+  optimistic(() => (t.status = next), () => (t.status = before), () => todayData.tasks.set_status({ task: t.name, status: next }))
     .then(() => setTimeout(() => list.value?.reload(), 500)).catch(() => {})
 }
 function move(t, status) {
   if (!status || status === t.status) return
   if (status === 'Waiting' && !t.waiting_on) return openRef('task:' + t.name) // the pane asks who or what it waits on
   const before = t.status
-  optimistic(() => (t.status = status), () => (t.status = before), () => api('tasks.set_status', { task: t.name, status }))
+  optimistic(() => (t.status = status), () => (t.status = before), () => todayData.tasks.set_status({ task: t.name, status }))
     .then(() => list.value?.reload()).catch(() => {})
 }
 function drop(col) {

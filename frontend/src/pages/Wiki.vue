@@ -81,6 +81,7 @@
   <NewRecord v-model="newOpen" title="New wiki page" action="Create page" :fields="NEW_FIELDS" :save="create" />
 </template>
 <script setup>
+import { libraryData } from '@/data/library'
 import { inSpace } from '@/lib/lens'
 // The Wiki (UX fixes, set 4): Pages, Changes, Health and Rules. A page opens in the pane and on the full page as notes do.
 import { computed, onMounted, ref, watch } from 'vue'
@@ -95,7 +96,7 @@ import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { dateTime, long, short } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
@@ -119,7 +120,7 @@ const PAGE_VIRTUAL = []
 const PAGE_HIDDEN = ['content_md', 'inbox_item', 'collection', 'is_rules', 'parent_note', 'sources', 'also_in', 'archive_reason']
 const PAGE_SYNTHETIC = [{ key: '_sources', label: 'Sources', width: '6rem', align: 'right', place: 'end' }, { key: '_updated', label: 'Updated', width: '8rem', place: 'end' }]
 async function fetchPages({ params: p, filters, order_by, summary, start, page_length }) {
-  const res = await api('wiki.pages', { space: store.space, area: p.area, goal: p.goal, filters, order_by, summary, start, page_length })
+  const res = await libraryData.wiki.pages({ space: store.space, area: p.area, goal: p.goal, filters, order_by, summary, start, page_length })
   return summary ? res : { rows: res.pages, total: res.total }
 }
 
@@ -130,7 +131,7 @@ const CHANGE_HIDDEN = ['before_md', 'after_md', 'reverts', 'source_doctype', 'sp
 const CHANGE_SYNTHETIC = [{ key: '_source', label: 'Source', width: 'minmax(0, 1fr)', place: 'end' }]
 const CHANGE_THEME = { Created: 'green', Edited: 'blue', Reverted: 'amber', 'Moved to My notes': 'gray', 'Moved to Wiki': 'gray' }
 async function fetchChanges({ params: p, filters, order_by, summary, start, page_length }) {
-  const res = await api('wiki.changes', { space: store.space, note: p.page, by: p.by, source: p.source, from_date: p.from, to_date: p.to, filters, order_by, summary, start, page_length })
+  const res = await libraryData.wiki.changes({ space: store.space, note: p.page, by: p.by, source: p.source, from_date: p.from, to_date: p.to, filters, order_by, summary, start, page_length })
   return summary ? res : { rows: res.changes, total: res.total }
 }
 
@@ -138,7 +139,7 @@ const health = ref(null)
 const healthBusy = ref(false)
 async function loadHealth(refresh = 0) {
   healthBusy.value = true
-  const res = await tryCall(() => api('wiki.health', { space: store.space, refresh }))
+  const res = await tryCall(() => libraryData.wiki.health({ space: store.space, refresh }))
   healthBusy.value = false
   if (res) {
     health.value = res
@@ -146,9 +147,9 @@ async function loadHealth(refresh = 0) {
   }
 }
 const rules = ref(null)
-async function loadRules() { rules.value = await tryCall(() => api('library.get', { note: counts.value.rules })) }
+async function loadRules() { rules.value = await tryCall(() => libraryData.library.get({ note: counts.value.rules })) }
 async function loadOverview() {
-  const res = await tryCall(() => api('wiki.overview', { space: store.space }))
+  const res = await tryCall(() => libraryData.wiki.overview({ space: store.space }))
   if (res) counts.value = { ...counts.value, ...res, health_issues: res.health_issues ?? counts.value.health_issues }
 }
 
@@ -156,11 +157,11 @@ const newOpen = ref(false)
 const NEW_FIELDS = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'summary', label: 'Summary, one line', required: true },
   { name: 'area', label: 'Area', options: areaOptions() }])
 async function create(v) {
-  const res = await api('wiki.create_page', { space: store.space, title: v.title, summary: v.summary, area: v.area || undefined, content_md: '' })
+  const res = await libraryData.wiki.create_page({ space: store.space, title: v.title, summary: v.summary, area: v.area || undefined, content_md: '' })
   router.push(`/library/${res.name}`)
 }
 async function createFromLink(title) {
-  const res = await tryCall(() => api('wiki.create_page', { space: store.space, title, summary: title, content_md: '' }), 'Page created.')
+  const res = await tryCall(() => libraryData.wiki.create_page({ space: store.space, title, summary: title, content_md: '' }), 'Page created.')
   if (res) { await loadHealth(1); openRef('note:' + res.name) }
 }
 

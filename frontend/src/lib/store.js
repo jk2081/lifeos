@@ -1,5 +1,5 @@
 import { reactive, watch } from 'vue'
-import { api } from './api'
+import { todayData } from '@/data/today'
 import { loadViews } from './views'
 import { loadLadder } from './ladder'
 
@@ -22,7 +22,7 @@ export const store = reactive({
 })
 
 export async function boot({ beforeReady } = {}) {
-  const data = await api('session.boot')
+  const data = await todayData.session.boot()
   Object.assign(store, {
     user: data.user, fullName: data.full_name, isAdmin: data.is_admin, isAgent: data.is_agent, spaces: data.spaces,
     settings: data.settings, today: data.today,
@@ -38,7 +38,7 @@ export async function boot({ beforeReady } = {}) {
 export async function refreshCounts() {
   if (!store.space) return
   try {
-    store.counts = await api('session.counts', { space: store.space, area: store.lensArea || undefined })
+    store.counts = await todayData.session.counts({ space: store.space, area: store.lensArea || undefined })
     if (!store.isAgent) loadLadder()
   } catch (e) { /* the badge is not worth an error */ }
 }

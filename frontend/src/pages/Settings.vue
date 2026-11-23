@@ -459,6 +459,7 @@
   </Dialog>
 </template>
 <script setup>
+import { settingsData } from '@/data/settings'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
@@ -484,7 +485,7 @@ import ConnectionsSection from '@/components/settings/ConnectionsSection.vue'
 import MemberRow from '@/components/settings/MemberRow.vue'
 import AddMemberDialog from '@/components/settings/AddMemberDialog.vue'
 import LifeLink from '@/framework/LifeLink.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
 import { boot, store } from '@/lib/store'
 import { loadLookups } from '@/lib/lookups'
 import { loadOnboarding, onboarding } from '@/lib/onboarding'
@@ -546,7 +547,7 @@ const MENU = [
 const ADVANCED = [{ label: 'AI key and cost', value: 'ai' }, { label: 'Import and export', value: 'import' }, { label: 'Backups', value: 'backups' },
   { label: 'Archive', value: 'archive' }, { label: 'First-run guide', value: 'guide' }]
 async function resetGuide() {
-  await tryCall(() => api('onboarding.reset'), 'The guide will show again.')
+  await tryCall(() => settingsData.onboarding.reset(), 'The guide will show again.')
   await loadOnboarding()
 }
 const ready = computed(() => !!d.value && ladder.loaded)
@@ -641,21 +642,21 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
 
 // What agents know about you (issue 54): the core card, read only
 const agentCard = ref(null)
-watch(() => section.value, async (sec) => { if (sec === 'rules' && !agentCard.value) agentCard.value = await tryCall(() => api('context.card')) }, { immediate: true })
+watch(() => section.value, async (sec) => { if (sec === 'rules' && !agentCard.value) agentCard.value = await tryCall(() => settingsData.context.card()) }, { immediate: true })
 // Note rules: the rules page of the assistant's notes in this space
 const rulesDoc = ref(null)
 watch(() => [section.value, d.value?.rules_note], async ([sec, name]) => {
-  if (sec === 'note-rules' && name && rulesDoc.value?.name !== name) rulesDoc.value = await tryCall(() => api('library.get', { note: name }))
+  if (sec === 'note-rules' && name && rulesDoc.value?.name !== name) rulesDoc.value = await tryCall(() => settingsData.library.get({ note: name }))
 }, { immediate: true })
 // an area's colour
 async function saveArea(a, values) {
   const before = { colour: a.colour }
   Object.assign(a, values)
-  if (await tryCall(() => api('settings.save_item', { kind: 'area', name: a.name, ...values }), 'Saved')) changed()
+  if (await tryCall(() => settingsData.settings.save_item({ kind: 'area', name: a.name, ...values }), 'Saved')) changed()
   else Object.assign(a, before)
 }
 async function load() {
-  const res = await tryCall(() => api('settings.get', { space: spaceSel.value }))
+  const res = await tryCall(() => settingsData.settings.get({ space: spaceSel.value }))
   if (!res) return
   if (res.settings.weekly_review_time) res.settings.weekly_review_time = String(res.settings.weekly_review_time).padStart(8, '0').slice(0, 5)
   if (!manySpaces.value) { // issue 46: one space is not shown as a space; an owner of the site may be sent others, which this person does not see
@@ -675,21 +676,21 @@ async function changed() {
 // ---- plain settings: each saves on its own; an error shows under the field and the old value comes back ----
 const aiKey = ref('')
 async function saveKey(clear = false) {
-  const res = await tryCall(() => api('settings.set_ai_key', { key: clear === true ? '' : aiKey.value }), clear === true ? 'Key removed' : 'Key saved')
+  const res = await tryCall(() => settingsData.settings.set_ai_key({ key: clear === true ? '' : aiKey.value }), clear === true ? 'Key removed' : 'Key saved')
   aiKey.value = ''
   if (res) await load()
 }
 async function setPrice(pr, field, value) {
   pr[field] = Number(value)
-  if (await tryCall(() => api('settings.set_ai_price', { model: pr.model, input_per_mtok: pr.input_per_mtok, output_per_mtok: pr.output_per_mtok, cached_per_mtok: pr.cached_per_mtok }), 'Saved')) await load()
+  if (await tryCall(() => settingsData.settings.set_ai_price({ model: pr.model, input_per_mtok: pr.input_per_mtok, output_per_mtok: pr.output_per_mtok, cached_per_mtok: pr.cached_per_mtok }), 'Saved')) await load()
 }
 async function setFeatureCap(f, value) {
-  if (await tryCall(() => api('settings.set_feature_cap', { feature: f.feature, cap: Number(value) || 0 }), 'Saved')) await load()
+  if (await tryCall(() => settingsData.settings.set_feature_cap({ feature: f.feature, cap: Number(value) || 0 }), 'Saved')) await load()
 }
 async function setSpaceAsk(sp, field, value) {
   const before = sp[field]
   sp[field] = value ? 1 : 0
-  if (!(await tryCall(() => api('settings.set_space_ask', { space: sp.name, [field]: value ? 1 : 0 }), 'Saved'))) sp[field] = before
+  if (!(await tryCall(() => settingsData.settings.set_space_ask({ space: sp.name, [field]: value ? 1 : 0 }), 'Saved'))) sp[field] = before
 }
 async function setOne(field, value) {
   const before = d.value.settings[field]
@@ -699,7 +700,7 @@ async function setOne(field, value) {
   let v = value
   if (['weekly_review_time', 'start_of_day', 'work_start', 'work_end'].includes(field) && v && v.length === 5) v += ':00'
   try {
-    await api('settings.save', { values: { [field]: v } })
+    await settingsData.settings.save({ values: { [field]: v } })
     toast.success('Saved')
     if (field === 'default_space' || field === 'require_done_when' || field === 'use_focuses') boot()
     if (field === 'use_focuses') changed()
@@ -716,10 +717,10 @@ function openNew(l) {
   newOpen.value = true
 }
 async function rename(l, r, title) {
-  if (await tryCall(() => api('settings.save_item', { kind: l.kind, name: r.name, title }), 'Renamed')) changed()
+  if (await tryCall(() => settingsData.settings.save_item({ kind: l.kind, name: r.name, title }), 'Renamed')) changed()
 }
 async function reorder(l, names, parent) {
-  if (await tryCall(() => api('settings.reorder', { kind: l.kind, names, parent_area: l.kind === 'area' ? parent || '' : undefined }), 'Saved')) changed()
+  if (await tryCall(() => settingsData.settings.reorder({ kind: l.kind, names, parent_area: l.kind === 'area' ? parent || '' : undefined }), 'Saved')) changed()
 }
 async function create() {
   const l = newList.value
@@ -727,7 +728,7 @@ async function create() {
   if (!title) return
   const n = active(l).length
   const extra = l.ordered ? { sort_order: n + 1 } : {}
-  if (await tryCall(() => api('settings.save_item', { kind: l.kind, space: spaceSel.value, title, ...extra }), 'Added')) {
+  if (await tryCall(() => settingsData.settings.save_item({ kind: l.kind, space: spaceSel.value, title, ...extra }), 'Added')) {
     newOpen.value = false
     draft.title = ''
     changed()
@@ -740,7 +741,7 @@ function askArchive(l, r) {
 async function archive() {
   const { l, row } = archiving.value
   archiveOpen.value = false
-  if (await tryCall(() => api('settings.save_item', { kind: l.kind, name: row.name, is_archived: 1 }), 'Archived')) changed()
+  if (await tryCall(() => settingsData.settings.save_item({ kind: l.kind, name: row.name, is_archived: 1 }), 'Archived')) changed()
 }
 function askRestore(l, r) {
   const kids = l.kind === 'area' ? archived(l).filter((x) => x.parent_area === r.name && (!r.archived_on || x.archived_on === r.archived_on)) : []
@@ -752,12 +753,12 @@ function askRestore(l, r) {
   })
 }
 async function restore(l, r, withChildren) {
-  if (await tryCall(() => api('settings.save_item', { kind: l.kind, name: r.name, is_archived: 0, with_children: withChildren }), 'Restored')) changed()
+  if (await tryCall(() => settingsData.settings.save_item({ kind: l.kind, name: r.name, is_archived: 0, with_children: withChildren }), 'Restored')) changed()
 }
 
 // ---- members, spaces and agents ----
 async function setMember(space, user, access, remove = 0) {
-  if (await tryCall(() => api('settings.set_member', { space, user, access, remove }), remove ? 'Removed' : 'Saved')) {
+  if (await tryCall(() => settingsData.settings.set_member({ space, user, access, remove }), remove ? 'Removed' : 'Saved')) {
     await load()
     return true
   }
@@ -772,7 +773,7 @@ function showMembers(space) {
 }
 async function createSpace() {
   if (!newSpace.name.trim()) return toast.error('A name is needed.')
-  if (await tryCall(() => api('settings.create_space', { space_name: newSpace.name, owner_user: newSpace.owner || undefined }), 'Space created')) {
+  if (await tryCall(() => settingsData.settings.create_space({ space_name: newSpace.name, owner_user: newSpace.owner || undefined }), 'Space created')) {
     spaceOpen.value = false
     memberSpace.value = newSpace.name.trim()
     newSpace.name = ''
@@ -787,7 +788,7 @@ async function setAgent(space, user, access, before) {
   await setMember(space, user, access || before, access ? 0 : 1)
 }
 async function setVault(s, on) {
-  if (await tryCall(() => api('settings.set_agent_vault', { space: s.name, allowed: on ? 1 : 0 }), 'Saved')) load()
+  if (await tryCall(() => settingsData.settings.set_agent_vault({ space: s.name, allowed: on ? 1 : 0 }), 'Saved')) load()
 }
 
 onMounted(loadLadder)

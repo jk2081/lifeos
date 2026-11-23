@@ -3,17 +3,17 @@ import { computed, onMounted, onUnmounted, reactive } from 'vue'
 import router from '@/router'
 
 export const TYPES = {
-  task: { label: 'Task', doctype: 'Life Task' },
-  inbox: { label: 'Inbox item', doctype: 'Life Inbox Item' },
-  source: { label: 'Source' }, // an inbox item seen as a source, from the Sources screen
-  change: { label: 'Wiki change' },
-  note: { label: 'Note', doctype: 'Life Note' },
-  vault: { label: 'Vault document', doctype: 'Life Vault Document' },
-  goal: { label: 'Goal', doctype: 'Life Goal' },
-  chat: { label: 'AI chat', doctype: 'Life Chat Log' },
-  event: { label: 'Event', doctype: 'Event' },
-  date: { label: 'Important date' },
-  day: { label: 'Day' },
+  task: { place: 'Goals', label: 'Task', doctype: 'Life Task' },
+  inbox: { place: 'Brain', label: 'Inbox item', doctype: 'Life Inbox Item' },
+  source: { place: 'Brain', label: 'Source' }, // an inbox item seen as a source, from the Sources screen
+  change: { place: 'Library', label: 'Wiki change' },
+  note: { place: 'Library', label: 'Note', doctype: 'Life Note' },
+  vault: { place: 'Library', label: 'Vault document', doctype: 'Life Vault Document' },
+  goal: { place: 'Goals', label: 'Goal', doctype: 'Life Goal' },
+  chat: { place: 'Library', label: 'AI chat', doctype: 'Life Chat Log' },
+  event: { place: 'Today', label: 'Event', doctype: 'Event' },
+  date: { place: 'Today', label: 'Important date' },
+  day: { place: 'Today', label: 'Day' },
 }
 const BY_DOCTYPE = Object.fromEntries(Object.entries(TYPES).filter(([, t]) => t.doctype).map(([k, t]) => [t.doctype, k]))
 

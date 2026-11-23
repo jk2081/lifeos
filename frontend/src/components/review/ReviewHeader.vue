@@ -1,11 +1,8 @@
 <template>
-  <PageHeader class="!min-h-0 py-3" data-review-head>
-    <div class="flex w-full min-w-0 flex-col">
-    <div class="flex w-full min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
-      <div class="min-w-0 md:w-[240px]">
-        <h1 class="text-base-medium text-ink-gray-9" data-review-title>{{ title }}</h1>
-        <div class="text-sm text-ink-gray-6" data-review-period>{{ h.period_text }}</div>
-      </div>
+  <!-- the review's header is the shared one: title and period in it, the numbered tabs, the estimate and Pause as its actions -->
+  <div data-review-head>
+    <PageHead :title="title">
+      <template #sub><span data-review-period>{{ h.period_text }}</span></template>
       <!-- desktop: numbered tabs, ticked when done (board 28) -->
       <Tabs class="max-md:hidden" :model-value="tab" @update:model-value="(v) => emit('go', v)">
         <TabList aria-label="Review steps">
@@ -20,13 +17,11 @@
           </TabTrigger>
         </TabList>
       </Tabs>
-      <div class="ml-auto flex items-center gap-3">
-        <span class="text-sm text-ink-gray-6 max-lg:hidden" data-review-estimate>About {{ h.minutes }} minutes · {{ r.readOnly ? 'read only' : (r.saving === 'Saving…' ? 'saving…' : 'saved as you go') }}</span>
-        <Button variant="ghost" label="Pause" data-review-pause @click="emit('pause')" />
-      </div>
-    </div>
+      <span class="text-sm text-ink-gray-6 max-lg:hidden" data-review-estimate>About {{ h.minutes }} minutes · {{ r.readOnly ? 'read only' : (r.saving === 'Saving…' ? 'saving…' : 'saved as you go') }}</span>
+      <Button variant="ghost" label="Pause" data-review-pause @click="emit('pause')" />
+    </PageHead>
     <!-- phone: a step bar, "Step 2 of 4 · Tasks", four segments with ticks on the done ones -->
-    <div class="mt-2 md:hidden" data-review-stepbar>
+    <div class="px-4 pb-2 md:hidden" data-review-stepbar>
       <div class="mb-1.5 text-sm text-ink-gray-7">Step {{ cur.n }} of {{ tabs.length }} · {{ cur.label }}</div>
       <div class="grid grid-cols-4 gap-1.5">
         <Button v-for="t in tabs" :key="t.value" size="sm" :variant="t.value === tab ? 'solid' : 'subtle'" :label="`${t.n} ${t.label}`"
@@ -36,13 +31,13 @@
         </Button>
       </div>
     </div>
-    </div>
-  </PageHeader>
+  </div>
 </template>
 <script setup>
-// The review's header: title and period, the four numbered tabs (a step bar on a phone), the estimate, and Pause.
+// The review's header (the shared PageHead): title and period, the four numbered tabs (a step bar on a phone), the estimate, and Pause.
 import { computed } from 'vue'
-import { Button, PageHeader, TabList, Tabs, TabTrigger } from 'frappe-ui'
+import { Button, TabList, Tabs, TabTrigger } from 'frappe-ui'
+import PageHead from '@/components/PageHead.vue'
 import { TABS, useReview } from '@/lib/review'
 
 // the weekly review's tabs and title unless the monthly or 12-week review passes its own

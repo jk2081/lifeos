@@ -104,6 +104,7 @@
 // for the 12 Week Years with each cycle's score; a lane for each area that is on (a part gets its own row) with each goal as a bar
 // across its dates, finished, carried and dropped ones in grey; key dates as pins; one tick for each weekly review; three cards.
 // On a phone it is a list of months with their goals. `year=` is in the URL.
+import { todayData } from '@/data/today'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Button } from 'frappe-ui'
@@ -113,7 +114,7 @@ import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import ViewLinks from './ViewLinks.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { onRecordChanged } from '@/lib/pane'
 import { MONTHS, long, parse, short } from '@/lib/dates'
@@ -126,7 +127,7 @@ const year = computed(() => Number(route.query.year) || thisYear)
 const d = ref(null)
 const failed = ref(false)
 async function load() {
-  const res = await tryCall(() => api('calendar.year_plan', { space: store.space, year: year.value, area: store.lensArea || undefined }))
+  const res = await tryCall(() => todayData.calendar.year_plan({ space: store.space, year: year.value, area: store.lensArea || undefined }))
   failed.value = !res
   if (res) d.value = res
 }

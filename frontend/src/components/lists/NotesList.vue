@@ -25,6 +25,7 @@
   </ListView>
 </template>
 <script setup>
+import { libraryData } from '@/data/library'
 import { inSpace } from '@/lib/lens'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
@@ -32,7 +33,6 @@ import { Badge } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
-import { api } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 
@@ -46,7 +46,7 @@ const by = computed(() => (props.embed ? '' : ['me', 'assistant'].includes(route
 const collectionOf = () => (by.value === 'assistant' ? 'Wiki' : by.value === 'me' ? 'My notes' : props.collection)
 const rules = ref('')
 onMounted(async () => {
-  if (!props.embed && props.collection === 'all') rules.value = (await api('wiki.overview', { space: store.space }).catch(() => ({})))?.rules || ''
+  if (!props.embed && props.collection === 'all') rules.value = (await libraryData.wiki.overview({ space: store.space }).catch(() => ({})))?.rules || ''
 })
 // the short URL parameters of the list (lib/filterUrl.js). reference=1 is "Reference only": notes with no goal
 const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'goal', field: 'goal', kind: 'link' },
@@ -54,7 +54,7 @@ const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'goal', field
 const VIRTUAL = [{ fieldname: 'area', label: 'Area', fieldtype: 'Link', options: 'Life Area' }, { fieldname: 'goal', label: 'Goal', fieldtype: 'Link', options: 'Life Goal' }]
 const HIDDEN = ['ref_doctype', 'ref_name', 'kind', 'search_text', 'also_in_csv', 'status', 'record_owner', 'vault_locked']
 async function fetchList({ params: p, filters, order_by, summary, start, page_length }) {
-  const res = await api('library.list', { space: props.embed?.space || store.space, area: p.area, goal: p.reference ? 'none' : p.goal,
+  const res = await libraryData.library.list({ space: props.embed?.space || store.space, area: p.area, goal: p.reference ? 'none' : p.goal,
     include_archived: p.archived ? 1 : 0, collection: collectionOf(), filters, order_by, summary, start, page_length })
   return summary ? res : { rows: res.notes, total: res.total }
 }

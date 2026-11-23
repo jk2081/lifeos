@@ -21,10 +21,11 @@
 // Add member (issue 1): searches every user, people and agents alike (settings.find_users), and shows each one's kind.
 // Access defaults to Can edit for a person and Can view for an agent. A user with no Life OS access is offered the access
 // that fits (a person or an agent), given only when the owner presses Add.
+import { settingsData } from '@/data/settings'
 import { computed, ref, watch } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { Badge, Combobox, Dialog, Select, TabButtons } from 'frappe-ui'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 
 const props = defineProps({ space: { type: String, required: true } })
 const open = defineModel('open', { type: Boolean, default: false })
@@ -50,7 +51,7 @@ let asked = 0
 const search = useDebounceFn(async (q) => {
   const id = ++asked
   loading.value = true
-  const rows = await tryCall(() => api('settings.find_users', { txt: q || '', space: props.space }))
+  const rows = await tryCall(() => settingsData.settings.find_users({ txt: q || '', space: props.space }))
   if (id !== asked) return
   loading.value = false
   // keep the chosen user among the options, so the field still shows its name
@@ -66,13 +67,13 @@ watch(open, (o) => {
   query.value = ''
   found.value = []
   asked++
-  tryCall(() => api('settings.find_users', { txt: '', space: props.space })).then((rows) => { if (!user.value) found.value = rows || [] })
+  tryCall(() => settingsData.settings.find_users({ txt: '', space: props.space })).then((rows) => { if (!user.value) found.value = rows || [] })
 })
 
 async function add({ close } = {}) {
   if (!canAdd.value) return
   const grant = picked.value.kind ? undefined : GRANT[role.value]
-  const res = await tryCall(() => api('settings.set_member', { space: props.space, user: user.value, access: access.value, grant_role: grant }), 'Added')
+  const res = await tryCall(() => settingsData.settings.set_member({ space: props.space, user: user.value, access: access.value, grant_role: grant }), 'Added')
   if (!res) return
   emit('added', res)
   close ? close() : (open.value = false)

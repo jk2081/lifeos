@@ -22,7 +22,6 @@
 // Today > Day for another date (issue 16): Week and Month open a day here. Today's own Day (the plate) is Today.vue; for any other date
 // this lists what the calendar holds that day. `date=` is in the URL; Today returns to the plate.
 import { computed } from 'vue'
-
 import { Button } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Empty from '@/components/Empty.vue'

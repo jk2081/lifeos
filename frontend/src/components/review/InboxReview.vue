@@ -1,6 +1,6 @@
 <template>
   <template v-if="item">
-    <PageHead v-if="page" :title="item.title" :crumb="{ to: '/brain', label: 'Brain', here: item.source_type }">
+    <PageHead v-if="page" :title="item.title" :path="[{ label: 'Brain', to: '/brain' }, { label: 'Needs you', to: '/brain' }]">
       <template #sub><span class="flex flex-wrap items-center gap-1">{{ headParts.text }}<template v-if="headParts.who"> · {{ headParts.verb }}
         <Avatar size="xs" :label="headParts.who" />{{ headParts.who }}</template></span></template>
       <template v-if="pending.length && writable">

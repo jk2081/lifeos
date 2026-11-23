@@ -19,10 +19,11 @@
 <script setup>
 // One wiki change: who, when, why, the source that prompted it, and a line diff of the text before and after.
 // Undo puts the text from before back if the page has not changed since; otherwise it shows what changed since and asks.
+import { libraryData } from '@/data/library'
 import { computed, ref, watch } from 'vue'
 import { Alert, Badge, Button } from 'frappe-ui'
 import DiffView from './DiffView.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { openRef, recordChanged } from '@/lib/pane'
@@ -35,11 +36,11 @@ const canUndo = computed(() => c.value && !c.value.reverted && ['Created', 'Edit
   && store.spaces.find((s) => s.name === c.value.space)?.access === 'Write')
 async function load() {
   conflict.value = null
-  c.value = await tryCall(() => api('wiki.change', { name: props.name }))
+  c.value = await tryCall(() => libraryData.wiki.change({ name: props.name }))
   if (c.value) emit('loaded', c.value)
 }
 async function undo(force) {
-  const res = await tryCall(() => api('wiki.undo', { change: c.value.name, force }))
+  const res = await tryCall(() => libraryData.wiki.undo({ change: c.value.name, force }))
   if (!res) return
   if (res.conflict) { conflict.value = res; return }
   recordChanged('note:' + c.value.note)

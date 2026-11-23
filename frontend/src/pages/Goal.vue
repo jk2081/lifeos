@@ -1,8 +1,7 @@
 <template>
   <template v-if="d">
-    <PageHead :title="g.title" :crumb="{ to: '/goals', label: 'Goals', here: cyc ? cyc.title : g.horizon }" :sub="sub">
+    <PageHead :title="g.title" :path="path" :sub="sub">
       <Badge :theme="themeOf(g)" :label="g.is_archived ? `${g.status}, archived` : g.status === 'On Hold' ? 'On hold' : g.status" data-goal-status />
-      <Button v-if="cyc" label="Open grid" data-open-grid :route="`/goals/cycles?cycle=${cyc.name}`" />
       <Button v-if="writable && !g.is_archived" label="Edit" icon-left="lucide-pencil" data-goal-edit @click="editOpen = true" />
       <template v-if="writable && g.horizon !== '12 weeks'">
         <Button v-if="!g.is_archived" label="New note" @click="noteOpen = true" />
@@ -27,9 +26,14 @@
                 @update:model-value="saveField('horizon')" />
               <DatePicker v-if="g.horizon !== '12 weeks'" v-model="g.target_date" format="D MMM YYYY" label="Target date" clearable :disabled="!writable" @change="saveField('target_date')" />
               <div class="space-y-1.5"><div class="text-sm text-ink-gray-6">Progress</div><div class="flex h-8 items-center gap-2" data-goal-figure>
-                <div class="min-w-0 flex-1"><Progress size="sm" :value="j.tasks_counted ? Math.round((100 * j.tasks_done) / j.tasks_counted) : 0" /></div>
-                <NumLink class="text-sm" :to="{ path: '/goals/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</NumLink></div>
-                <div v-if="j.this_week" class="text-sm text-ink-gray-6" data-goal-week-ticks>Actions this week: {{ j.this_week.done }} of {{ j.this_week.planned }} ticks</div></div>
+                <template v-if="byActions">
+                  <div class="min-w-0 flex-1"><Progress size="sm" :value="Math.round(j.average || 0)" /></div>
+                  <span class="text-sm tabular-nums text-ink-gray-8" data-goal-week-ticks><template v-if="j.this_week">{{ j.this_week.done }} of {{ j.this_week.planned }} this week · </template>cycle {{ Math.round(j.average || 0) }}%</span>
+                </template>
+                <template v-else>
+                  <div class="min-w-0 flex-1"><Progress size="sm" :value="j.tasks_counted ? Math.round((100 * j.tasks_done) / j.tasks_counted) : 0" /></div>
+                  <NumLink class="text-sm" :to="{ path: '/goals/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</NumLink>
+                </template></div></div>
             </div>
             <!-- what this goal serves, and what serves it (a goal can point to the longer goal it serves) -->
             <div class="flex flex-wrap items-center gap-2" data-goal-serves>
@@ -50,12 +54,9 @@
               <div class="w-20 shrink-0 self-center max-md:w-12"><Progress size="sm" :value="Math.round(s.progress.percent || 0)" /></div>
               <Badge :theme="themeOf(s)" :label="s.status" /></Row></Card>
           </section>
-          <section v-if="cyc" data-goal-actions><SectionHead>Actions</SectionHead>
-            <Card flush><Row v-for="a in j.goal.actions" :key="a.name">
-              <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
-                <div class="text-sm text-ink-gray-6" data-action-line>{{ a.per_week }} a week<template v-if="j.this_week && a.status === 'Open'"> · {{ a.ticks[j.this_week.week] || 0 }} of {{ a.per_week }} this week</template> · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
-              <Badge v-if="a.status !== 'Open'" :theme="a.status === 'Done' ? 'green' : 'gray'" :label="a.status" /></Row>
-              <Empty v-if="!j.goal.actions.length" title="No actions." hint="Use Edit to add the weekly actions." /></Card>
+          <section v-if="cyc" data-goal-actions><SectionHead>Actions by week</SectionHead>
+            <Card class="!p-3 md:!p-4"><GoalGrid :goal="j.goal" :weeks="j.weeks" :current-week="j.current_week" :average="j.average" :target="j.target" :closed="cyc.status === 'Closed'"
+              :can-edit="writable && !g.is_archived && cyc.status !== 'Closed'" @changed="load" @edit="editOpen = true" /></Card>
           </section>
           <section v-if="g.result_note"><SectionHead>Result</SectionHead><Card>{{ g.result_note }}</Card></section>
         </div>
@@ -104,6 +105,7 @@
 // A goal's page (UX fixes, set 6): what a project page and a goal page each did. Every goal shows what it serves and what
 // serves it; an open-ended goal (a project before set 6) is put on hold, completed or dropped here, and completing it
 // archives it with what is filed under it. The tabs are the main screens' lists with this goal fixed.
+import { goalsData } from '@/data/goals'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, DatePicker, Dialog, FormControl, Progress, TextInput, toast } from 'frappe-ui'
@@ -124,7 +126,8 @@ import Backlinks from '@/components/Backlinks.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import GoalMeasure from '@/components/goals/GoalMeasure.vue'
 import GoalEditDialog from '@/components/goals/GoalEditDialog.vue'
-import { api, db, optimistic, tryCall } from '@/lib/api'
+import GoalGrid from '@/components/goals/GoalGrid.vue'
+import { db, optimistic, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { askScope } from '@/lib/ask'
@@ -145,7 +148,11 @@ const confirmStatus = ref('Done')
 const noteOpen = ref(false)
 const editOpen = ref(false)
 const g = computed(() => d.value.goal)
+// a 12 Week Year goal is measured by its weekly actions: this week's ticks and the cycle score, not tasks done
+const byActions = computed(() => g.value.horizon === '12 weeks' && !!cyc.value)
 // the goal's cycle: goals.get names it, goals.detail carries its grid row
+// Goals / <area>: the area opens the goals of that area (issue 83)
+const path = computed(() => [{ label: 'Goals', to: '/goals' }, ...(g.value.area ? [{ label: g.value.area_name || 'Area', to: { path: '/goals', query: { area: g.value.area } } }] : [])])
 const cyc = computed(() => d.value.cycle || j.value?.cycle || null)
 const writable = computed(() => store.spaces.find((s) => s.name === d.value?.space)?.access === 'Write' && !store.isAgent)
 const arch = computed(() => (g.value.is_archived ? { archived: '1' } : {}))
@@ -173,7 +180,7 @@ function embed(t) {
 }
 async function load() {
   try {
-    ;[d.value, j.value] = await Promise.all([api('goals.get', { goal: props.id }), api('goals.detail', { goal: props.id })])
+    ;[d.value, j.value] = await Promise.all([goalsData.goals.get({ goal: props.id }), goalsData.goals.detail({ goal: props.id })])
     stamp.value++
   } catch (e) {
     missing.value = true
@@ -184,7 +191,7 @@ function askComplete(status) {
   confirmOpen.value = true
 }
 async function setStatus(status) {
-  const res = await tryCall(() => api('goals.set_status', { goal: g.value.name, status }))
+  const res = await tryCall(() => goalsData.goals.set_status({ goal: g.value.name, status }))
   confirmOpen.value = false
   if (!res) return
   if (res.is_archived) toast.success(`Archived with ${res.archived_records} record${res.archived_records === 1 ? '' : 's'}. Restore it from the Archive.`)
@@ -193,23 +200,23 @@ async function setStatus(status) {
   load()
 }
 async function saveField(field) {
-  await tryCall(() => api('goals.update', { goal: g.value.name, values: { [field]: g.value[field] || null } }))
+  await tryCall(() => goalsData.goals.update({ goal: g.value.name, values: { [field]: g.value[field] || null } }))
 }
 async function saveServes(v) {
-  if (await tryCall(() => api('goals.update', { goal: g.value.name, values: { serves: v || null } }), v ? 'Linked to the goal it serves' : 'No longer serves a goal')) load()
+  if (await tryCall(() => goalsData.goals.update({ goal: g.value.name, values: { serves: v || null } }), v ? 'Linked to the goal it serves' : 'No longer serves a goal')) load()
 }
 async function saveNotes(v) {
-  await tryCall(() => api('goals.update', { goal: g.value.name, values: { notes_md: v } }))
+  await tryCall(() => goalsData.goals.update({ goal: g.value.name, values: { notes_md: v } }))
 }
 function toggle(t) {
   const next = t.status === 'Done' ? 'Open' : 'Done'
-  optimistic(() => {}, () => {}, () => api('tasks.set_status', { task: t.name, status: next })).then(load).catch(() => {})
+  optimistic(() => {}, () => {}, () => goalsData.tasks.set_status({ task: t.name, status: next })).then(load).catch(() => {})
 }
 async function addTask() {
   const text = quick.value.trim()
   if (!text) return
   quick.value = ''
-  if (await tryCall(() => api('tasks.quick_add', { text, space: d.value.space, area: g.value.area || undefined, goal: g.value.name }))) load()
+  if (await tryCall(() => goalsData.tasks.quick_add({ text, space: d.value.space, area: g.value.area || undefined, goal: g.value.name }))) load()
   else quick.value = text
 }
 async function createNote(v) {

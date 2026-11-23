@@ -97,6 +97,7 @@
 </template>
 
 <script setup>
+import { brainData } from '@/data/brain'
 import { inSpace } from '@/lib/lens'
 // The Ask page (UX fixes, set 5): Ask (a thread, the records it used, questions to try), Insights and History.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
@@ -109,7 +110,7 @@ import AskComposer from '@/components/ask/AskComposer.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import Empty from '@/components/Empty.vue'
-import { api, db, errorText } from '@/lib/api'
+import { db, errorText } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
@@ -152,14 +153,14 @@ async function openThread(name) {
 }
 async function loadInsights() {
   try {
-    ins.value = await api('insights.list', { space: store.space, status: istatus.value === 'all' ? 'all' : istatus.value, kind: route.query.kind, area: route.query.area,
+    ins.value = await brainData.insights.list({ space: store.space, status: istatus.value === 'all' ? 'all' : istatus.value, kind: route.query.kind, area: route.query.area,
       actionable: route.query.actionable ? 1 : undefined, page_length: 100 })
   } catch (e) { toast.error(errorText(e)) }
 }
 async function refresh() {
   refreshing.value = true
   try {
-    const s = await api('insights.refresh', { space: store.space })
+    const s = await brainData.insights.refresh({ space: store.space })
     toast.success(`${s.created} new insight${s.created === 1 ? '' : 's'}${s.ai ? '. ' + s.ai : ''}`)
     await loadInsights()
   } catch (e) { toast.error(errorText(e)) } finally { refreshing.value = false }
@@ -170,9 +171,9 @@ async function act(r, i) {
   if (a.kind === 'open_list') return router.push(a.to)
   if (a.kind === 'open_record') return openRef(a.ref)
   try {
-    const out = await api('insights.act', { insight: r.name, index: i })
+    const out = await brainData.insights.act({ insight: r.name, index: i })
     toast.success(out.kind === 'make_task' ? 'Task made.' : `${a.label}: done.`, out.undo ? { duration: 60000, action: { label: 'Undo', onClick: async () => {
-      await api('reset.undo', { log: JSON.stringify(out.undo) }); await db.set('Life Insight', r.name, { status: 'New' }); loadInsights() } } } : undefined)
+      await brainData.reset.undo({ log: JSON.stringify(out.undo) }); await db.set('Life Insight', r.name, { status: 'New' }); loadInsights() } } } : undefined)
     loadInsights()
   } catch (e) { toast.error(errorText(e)) }
 }
@@ -189,11 +190,11 @@ async function dismiss(r, reason) {
 }
 async function restore(r) { await db.set('Life Insight', r.name, { status: 'New' }); loadInsights() }
 async function loadHistory() {
-  try { Object.assign(hist, await api('ask.threads', { space: store.space, q: hq.value || undefined })) } catch (e) { /* shown as empty */ }
+  try { Object.assign(hist, await brainData.ask.threads({ space: store.space, q: hq.value || undefined })) } catch (e) { /* shown as empty */ }
 }
 function remove(t) {
   dialog.danger({ title: 'Delete this question?', message: `“${t.title}” and its answers are deleted for good.`, confirmLabel: 'Delete',
-    onConfirm: async () => { await api('ask.delete_thread', { name: t.name }); if (ask.thread === t.name) { ask.thread = null; ask.messages = [] } loadHistory() } })
+    onConfirm: async () => { await brainData.ask.delete_thread({ name: t.name }); if (ask.thread === t.name) { ask.thread = null; ask.messages = [] } loadHistory() } })
 }
 watch(() => [route.query.istatus, route.query.kind, route.query.area, route.query.actionable], loadInsights)
 watch(() => tab.current.value, (v) => { if (v === 'history') loadHistory() })
@@ -201,7 +202,7 @@ watch(() => route.query.thread, (v) => { if (v) loadThread(String(v)) }, { immed
 onMounted(async () => {
   loadLookups()
   if (!ask.scope) ask.scope = scopeFromRoute()
-  try { st.value = await api('ask.status', { space: store.space }) } catch (e) { st.value = null }
+  try { st.value = await brainData.ask.status({ space: store.space }) } catch (e) { st.value = null }
   loadInsights()
   if (tab.current.value === 'history') loadHistory()
 })

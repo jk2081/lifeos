@@ -11,6 +11,7 @@
 <script setup>
 // Goals, one of the four places (issue 14): By area (the goals list), All tasks, and No goal (the tasks with no goal).
 // Someday is a page of Goals, linked under every tab. Until each tab's own issue lands, it shows the nearest screen.
+import { goalsData } from '@/data/goals'
 import { computed, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GoalsByArea from '@/components/goals/GoalsByArea.vue'
@@ -21,7 +22,7 @@ import Goals from '@/pages/Goals.vue'
 import Tasks from '@/pages/Tasks.vue'
 import Someday from '@/pages/Someday.vue'
 import PlaceLinks from '@/components/PlaceLinks.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { onRecordChanged } from '@/lib/pane'
 import { GOALS_TABS, goalsPath, withPage } from '@/lib/nav'
@@ -49,7 +50,7 @@ const PAGES = { someday: 'Someday' }
 // the number on the No goal tab: open tasks with no goal that nobody has marked as fine without one
 const noGoalCount = ref(null)
 async function loadCount() {
-  const res = await tryCall(() => api('tasks.no_goal_total', { space: store.space }))
+  const res = await tryCall(() => goalsData.tasks.no_goal_total({ space: store.space }))
   if (res) noGoalCount.value = res.count
 }
 watch(() => store.space, loadCount)
@@ -58,7 +59,7 @@ onRecordChanged(loadCount)
 // the number on the All tasks tab: the old Open band's "Open tasks" (issue 55)
 const openCount = ref(null)
 async function loadOpen() {
-  const res = await tryCall(() => api('counts.get', { space: store.space, which: 'tasks', area: store.lensArea || undefined }))
+  const res = await tryCall(() => goalsData.counts.get({ space: store.space, which: 'tasks', area: store.lensArea || undefined }))
   if (res) openCount.value = res.open_tasks.n
 }
 watch(() => [store.space, store.lensArea], loadOpen)

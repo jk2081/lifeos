@@ -33,13 +33,13 @@
   <NewGoalDialog v-model="newOpen" @saved="created" @habit="list?.reload()" />
 </template>
 <script setup>
+import { goalsData } from '@/data/goals'
 import { manySpaces } from '@/lib/lens'
 import { computed, h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Progress, Select } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'
-import { api } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
@@ -93,7 +93,7 @@ function created(g) {
   openRef('goal:' + g.name)
 }
 async function fetch({ params: p, tab: t, filters, order_by, summary, start, page_length }) {
-  const res = await api('goals.list', { space: store.space, state: t, horizon: p.type, area: p.area, cycle: p.cycle, serves: p.serves, target_from: p.target_from, target_to: p.target_to,
+  const res = await goalsData.goals.list({ space: store.space, state: t, horizon: p.type, area: p.area, cycle: p.cycle, serves: p.serves, target_from: p.target_from, target_to: p.target_to,
     filters, order_by: route.query.by === 'completion' ? 'completion desc' : route.query.by === 'serves' ? undefined : order_by,
     sort: route.query.by === 'serves' ? 'serves' : undefined, summary, start, page_length })
   return summary ? res : { rows: res.goals, total: res.total, tabs: res.tabs, summary_line: res.summary_line }

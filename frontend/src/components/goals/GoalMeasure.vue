@@ -20,7 +20,7 @@
         <span class="text-sm text-ink-gray-6">Done when </span>{{ g.done_when }}</div>
       <Alert v-else theme="amber" title="Done when is missing" description="Say how you will know this goal is done: a finish line or a number." data-needs-finish-line>
         <template v-if="writable" #actions><Button label="Add" data-done-when-add @click="startEdit" /></template></Alert>
-      <Button v-if="writable" class="self-start" size="sm" variant="ghost" icon-left="lucide-pencil" :label="g.measure_kind || g.done_when ? 'Change how it is measured' : 'Set the finish line'"
+      <Button v-if="writable && (g.measure_kind || g.done_when)" class="self-start" size="sm" variant="ghost" icon-left="lucide-pencil" label="Edit"
         data-measure-edit @click="startEdit" />
     </template>
     <template v-else>

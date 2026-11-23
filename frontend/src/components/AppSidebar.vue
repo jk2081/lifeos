@@ -20,7 +20,7 @@
       <SetupCard v-if="!nav.rail && !store.isAgent" />
     </div>
     <div class="flex flex-col gap-0.5 border-t border-outline-gray-1 px-2 pb-3 pt-2" data-nav-bottom>
-      <SidebarItem :label="SETTINGS.label" :icon="SETTINGS.icon" :route="SETTINGS.to" :active="activePlace === '/settings'" data-nav-item="Settings" />
+      <SidebarItem :label="SETTINGS.label" :icon="SETTINGS.icon" :route="SETTINGS.to" :active="activePlace === '/settings'" :aria-current="activePlace === '/settings' ? 'page' : undefined" data-nav-item="Settings" />
       <!-- the user, with Help (the shortcuts and where things are) and Log out -->
       <div v-if="!nav.rail" class="flex items-center gap-1" data-nav-user>
         <Dropdown :options="userMenu">

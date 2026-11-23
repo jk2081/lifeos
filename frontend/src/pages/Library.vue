@@ -11,7 +11,7 @@
 
   <!-- the tree with the reader: /library and /library/<id> -->
   <template v-else>
-    <PageHead title="Notes">
+    <PageHead title="Notes" :path="[{ label: 'Library', to: '/library' }]">
       <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink>{{ inSpace }}</template>
       <TabButtons model-value="tree" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
@@ -73,6 +73,7 @@
   </Dialog>
 </template>
 <script setup>
+import { libraryData } from '@/data/library'
 import { inSpace } from '@/lib/lens'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -88,7 +89,7 @@ import Card from '@/components/ui/Card.vue'
 import NumLink from '@/components/ui/NumLink.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import { api, db, tryCall } from '@/lib/api'
+import { db, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
@@ -154,7 +155,7 @@ watch(nodes, (list_) => {
 }, { immediate: true })
 
 async function loadTree() {
-  const res = await tryCall(() => api('library.tree', { space: store.space, area: store.lensArea || undefined, collection: { me: 'My notes', assistant: 'Wiki' }[route.query.by] || 'all' }))
+  const res = await tryCall(() => libraryData.library.tree({ space: store.space, area: store.lensArea || undefined, collection: { me: 'My notes', assistant: 'Wiki' }[route.query.by] || 'all' }))
   if (res) {
     notes.value = res.notes
     areas.value = res.areas
@@ -170,7 +171,7 @@ async function loadNote() {
   missing.value = false
   if (!props.id) return
   try {
-    note.value = await api('library.get', { note: props.id })
+    note.value = await libraryData.library.get({ note: props.id })
     if (route.query.edit) router.replace({ query: { ...route.query, edit: undefined } }) // old links: there are no modes now
   } catch (e) {
     missing.value = true
@@ -182,7 +183,7 @@ function onSaved(res) {
   reloadKey.value++
 }
 async function create(v) {
-  const res = await api('library.save', { space: store.space, title: v.title, area: v.area || '', content_md: '' })
+  const res = await libraryData.library.save({ space: store.space, title: v.title, area: v.area || '', content_md: '' })
   await loadTree()
   router.push(`/library/${res.name}?edit=1`)
 }
@@ -191,7 +192,7 @@ async function selectionToSomeday() {
   const text = (editorRef.value?.selection?.() || '').trim()
   if (!text) return toast.info('Select the text that can wait first.')
   const [first, ...rest] = text.split('\n')
-  await tryCall(() => api('someday.create', { space: note.value.space, title: first.replace(/^[-*#\s]+/, '').slice(0, 140), as_note: 1, body_md: [rest.join('\n').trim(), `From [[${note.value.title}]]`].filter(Boolean).join('\n\n'),
+  await tryCall(() => libraryData.someday.create({ space: note.value.space, title: first.replace(/^[-*#\s]+/, '').slice(0, 140), as_note: 1, body_md: [rest.join('\n').trim(), `From [[${note.value.title}]]`].filter(Boolean).join('\n\n'),
     area: note.value.area || undefined }), 'Parked on the Someday list.')
 }
 const noteMenu = computed(() => [
@@ -200,24 +201,24 @@ const noteMenu = computed(() => [
     ? { label: 'Keep in My notes', icon: 'lucide-lock', onClick: () => move('My notes') }
     : { label: 'Hand to the wiki', icon: 'lucide-book-open', onClick: () => move('Wiki') }] : []),
   ...(writable.value && !store.isAgent ? [{ label: 'Selection to Someday', icon: 'lucide-lightbulb', onClick: selectionToSomeday }] : []),
-  { label: 'Earlier versions', icon: 'lucide-history', onClick: async () => { versions.value = (await tryCall(() => api('library.versions', { note: note.value.name }))) || []; versionsOpen.value = true } },
+  { label: 'Earlier versions', icon: 'lucide-history', onClick: async () => { versions.value = (await tryCall(() => libraryData.library.versions({ note: note.value.name }))) || []; versionsOpen.value = true } },
   { label: note.value?.is_archived ? 'Restore from archive' : 'Archive', icon: note.value?.is_archived ? 'lucide-archive-restore' : 'lucide-archive', onClick: async () => {
-    if (await tryCall(() => api('archive.set', { doctype: 'Life Note', name: note.value.name, archived: note.value.is_archived ? 0 : 1 }), note.value.is_archived ? 'Restored.' : 'Archived.')) { await loadTree(); router.push('/library/notes') } } },
+    if (await tryCall(() => libraryData.archive.set({ doctype: 'Life Note', name: note.value.name, archived: note.value.is_archived ? 0 : 1 }), note.value.is_archived ? 'Restored.' : 'Archived.')) { await loadTree(); router.push('/library/notes') } } },
   { label: 'Delete', icon: 'lucide-trash-2', onClick: () => dialog.danger({
     title: 'Delete this note?', message: `“${note.value.title}” moves to the trash. Restore it from Archive, Trash, within 30 days.`,
     onConfirm: async () => {
-      if ((await tryCall(() => api('trash.delete', { doctype: 'Life Note', name: note.value.name }), 'Moved to the trash.')) !== undefined) { await loadTree(); router.push('/library/notes') }
+      if ((await tryCall(() => libraryData.trash.delete({ doctype: 'Life Note', name: note.value.name }), 'Moved to the trash.')) !== undefined) { await loadTree(); router.push('/library/notes') }
     },
   }) },
 ])
 async function move(to) {
   await flush()
-  const res = await tryCall(() => api('wiki.move', { name: note.value.name, to }), to === 'Wiki' ? 'Handed to the wiki.' : 'Kept in My notes. Agents can no longer change it.')
-  if (res) { Object.assign(note.value, await api('library.get', { note: note.value.name })); loadTree() }
+  const res = await tryCall(() => libraryData.wiki.move({ name: note.value.name, to }), to === 'Wiki' ? 'Handed to the wiki.' : 'Kept in My notes. Agents can no longer change it.')
+  if (res) { Object.assign(note.value, await libraryData.library.get({ note: note.value.name })); loadTree() }
 }
 async function restore(v) {
   await flush()
-  const res = await tryCall(() => api('library.save', { note: note.value.name, content_md: v.previous_content }), 'Restored.')
+  const res = await tryCall(() => libraryData.library.save({ note: note.value.name, content_md: v.previous_content }), 'Restored.')
   if (res) Object.assign(note.value, res)
   versionsOpen.value = false
 }

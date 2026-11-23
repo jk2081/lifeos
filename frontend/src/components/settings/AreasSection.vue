@@ -95,12 +95,13 @@
   </Dialog>
 </template>
 <script setup>
+import { settingsData } from '@/data/settings'
 import { computed, reactive, ref } from 'vue'
 import { Badge, Button, Dialog, ErrorMessage, Select, Switch, TextInput, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import { dotClass } from '@/lib/lens'
 import FocusRow from '@/components/settings/FocusRow.vue'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
 
 const props = defineProps({ space: { type: String, required: true }, rows: { type: Array, default: () => [] }, isAdmin: Boolean, useFocuses: Boolean })
 const emit = defineEmits(['changed', 'use-focuses'])
@@ -120,7 +121,7 @@ async function switchArea(a, on) {
   const was = a.is_on
   a.is_on = on ? 1 : 0
   try {
-    await api('settings.save_item', { kind: 'area', name: a.name, is_on: on ? 1 : 0 })
+    await settingsData.settings.save_item({ kind: 'area', name: a.name, is_on: on ? 1 : 0 })
     toast.success(`${a.area_name} ${on ? 'on' : 'off'}`)
     emit('changed')
   } catch (e) {
@@ -138,7 +139,7 @@ const form = reactive({ name: '', was: '', parent: '', parentTitle: '', title: '
 const offers = ref([])
 // the focuses a kind of part offers, each with its suggested standard, all on (issue 57)
 async function loadOffers() {
-  offers.value = form.kind && props.useFocuses && !form.name ? (await api('settings.focus_offers', { kind: form.kind })).map((o) => ({ ...o, on: true })) : []
+  offers.value = form.kind && props.useFocuses && !form.name ? (await settingsData.settings.focus_offers({ kind: form.kind })).map((o) => ({ ...o, on: true })) : []
 }
 function add(a) {
   Object.assign(form, { name: '', was: '', parent: a.name, parentTitle: a.area_name, title: '', description: '', colour: a.colour || 'gray', kind: '', focus: false, standard: '' })
@@ -168,8 +169,8 @@ async function savePart() {
   const values = form.focus ? { kind: 'area', title: form.title, standard: form.standard } : { kind: 'area', title: form.title, description: form.description, colour: form.colour, part_kind: form.kind }
   if (!form.focus && offers.value.length) values.focuses = offers.value.filter((o) => o.on).map((o) => o.name)
   try {
-    if (form.name) await api('settings.save_item', { ...values, name: form.name })
-    else await api('settings.save_item', { ...values, space: props.space, parent_area: form.parent, ...(form.focus ? { is_focus: 1 } : {}), sort_order: 100 + partsOf({ name: form.parent }).length })
+    if (form.name) await settingsData.settings.save_item({ ...values, name: form.name })
+    else await settingsData.settings.save_item({ ...values, space: props.space, parent_area: form.parent, ...(form.focus ? { is_focus: 1 } : {}), sort_order: 100 + partsOf({ name: form.parent }).length })
     toast.success(form.name ? 'Saved' : 'Added')
     formOpen.value = false
     emit('changed')
@@ -188,7 +189,7 @@ const moveTo = ref('')
 async function askArchive() {
   const p = live.value.find((r) => r.name === form.name)
   try {
-    const res = await api('settings.area_open_work', { area: p.name })
+    const res = await settingsData.settings.area_open_work({ area: p.name })
     Object.assign(work, { goals: res.goals, tasks: res.tasks })
     targets.value = res.targets.map((t) => ({ label: t.is_life_area ? `${t.area_name} itself` : t.area_name, value: t.name }))
     moveTo.value = targets.value[0]?.value || ''
@@ -203,7 +204,7 @@ async function askArchive() {
 async function archive() {
   const p = archiving.value
   try {
-    await api('settings.save_item', { kind: 'area', name: p.name, is_archived: 1, move_to: work.goals || work.tasks ? moveTo.value : undefined })
+    await settingsData.settings.save_item({ kind: 'area', name: p.name, is_archived: 1, move_to: work.goals || work.tasks ? moveTo.value : undefined })
     const where = targets.value.find((t) => t.value === moveTo.value)?.label
     toast.success(work.goals || work.tasks ? `Archived; its open work moved to ${where}` : 'Archived')
     archiveOpen.value = false

@@ -92,7 +92,7 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | --- | --- | --- |
 | `ListView.vue` | The wrapper every list screen uses. It owns the view switch, the URL form of the filters (`lib/filterUrl.js`), the open row and the remembered state (`lib/views.js`). The libraries give the parts, not this composition | `frappe-ui/list` (`List`, `ListHeader`, `ListHeaderCellSort`, `ListGroup`, `ListRow`, `ListCell`), `TabButtons`, `Checkbox`, `Badge`, `Button`, `BottomSheet`, `Skeleton`, and the `Life*` wrappers |
 | `item/RecordPane.vue`, `item/PaneBody.vue` | A slide-over that keeps the list usable beside it. frappe-ui has `Dialog` (modal) and `BottomSheet` (phones) | Desktop: an `aside` with `bg-surface-base`, `border-outline-gray-2`, `shadow-2xl`. Phone: `BottomSheet`. Header: `Button`. Notice: `Alert` |
-| `PageHead.vue` | A thin composition, so every screen has the same header | `PageHeader`, `PageHeaderTitle`, `Breadcrumbs`, `Badge` |
+| `PageHead.vue` (issue 83) | A thin composition, so every screen has the same header. **Every new page uses it and gives its `path`**: its ancestors as `[{ label, to }]`, place first (`[Goals, Career]` for a goal). A page below a place shows a back button (to the last ancestor, never browser history) and the path above its title, each part a link; a place's own page gives no path. It also sets the browser tab's title, the path in reverse (`lib/trail.js`). No page draws an `<h1>` or `PageHeader` of its own (`tests/trail.test.js`) | `PageHeader`, `PageHeaderTitle`, `Breadcrumbs`, `Badge` |
 | `SetupCard.vue` (issue 26) | "Your setup · level n of 6": the next step, Go, How it works and a dismiss button, from `lib/ladder.js`. In the sidebar and the phone's focus sheet; do not build another | `RouterLink` |
 | `ui/Card.vue` | frappe-ui has no card | `rounded-5 border border-outline-gray-2 bg-surface-base` |
 | `ui/SectionHead.vue`, `ui/NumLink.vue` | A section heading whose count links to the list it counts | `text-sm-medium text-ink-gray-7`, `text-ink-blue-8` |
@@ -196,7 +196,7 @@ A state tab is a preset on one field. Give `ListView` a `tabs` prop and return t
 const TABS = { key: 'status', field: 'status', label: 'Task state',
   items: [{ value: 'open', label: 'Open' }, { value: 'loops', label: 'Open loops' }, { value: 'Waiting', label: 'Waiting' }, { value: 'Done', label: 'Done' }, { value: 'all', label: 'All' }] }
 async function fetch({ params, tab, filters, ... }) {            // `tab` is the open tab's value
-  const res = await api('tasks.list', { status: tab === 'open' ? 'open_doing' : ..., ... })
+  const res = await todayData.tasks.list({ status: tab === 'open' ? 'open_doing' : ..., ... })
   return { rows: res.tasks, total: res.total, tabs: res.tabs }   // tabs: { open: 12, loops: 3, Waiting: 1, Done: 40, all: 60 }
 }
 ```
@@ -363,16 +363,14 @@ After Lock, the week's three starred goal tasks (`is_top_three`) are the first g
 Library > Outbox also takes a review's period as `from=` and `to=` (shown as a fourth choice, "Review period"), so the review's counts open lists with exactly those rows.
 
 
-## Folder map after issue 74 (partly done)
+## Folder map and server calls (after issue 82)
 
 - `components/review/`: the weekly review (`Review*`, `Weekly*`), the monthly and 12-week review (`Periodic*`) and the inbox item review (`InboxReview.vue`).
-- `components/item/`: the record side pane (`RecordPane`, `PaneBody`, `*Pane`) and the item page parts.
-- `components/goals/`: the goal screens plus the calendar and rhythm tabs that were in `plan/`.
+- `components/item/`: the record side pane (`ItemView`, `*Pane`) and the item page parts.
+- `components/goals/`: the goal screens plus the calendar and rhythm tabs.
 - `components/settings/Reset*.vue`: the Reset section parts.
+- `components/ui/`: only Life OS's own parts (`Card`, `Row`, `SectionHead`, `Stat`, `NumLink`, `CountLink`, `Drawer`). Buttons, dialogs, inputs, dropdowns, lists and tabs are frappe-ui's.
 
-## Folder map after issue 74 (partly done)
+**A component or page never calls `api(`.** Every server call is a named function of a module in `src/data/`, made by `data/call.js` (a frappe-ui `createResource`, GET for the methods in `getMethods.json`): `todayData` (Today, Tasks, Timeline, Archive, Outbox, Someday, quick add and capture, the session), `goalsData`, `reviewData`, `itemData`, `brainData`, `libraryData` and `settingsData`. Add a method to the group of its namespace, then call it as `todayData.tasks.list({ ... })`. A call that shows its own error is wrapped in `tryCall`. `lib/store.js` is the one store (the signed-in user, the spaces, the settings, the counts). `tests/test_load.py` `TestFrontEndFiles` checks the rule and that no `.vue` file is dead.
 
-- `components/review/`: the weekly review (`Review*`, `Weekly*`), the monthly and 12-week review (`Periodic*`) and the inbox item review (`InboxReview.vue`).
-- `components/item/`: the record side pane (`RecordPane`, `PaneBody`, `*Pane`) and the item page parts.
-- `components/goals/`: the goal screens plus the calendar and rhythm tabs that were in `plan/`.
-- `components/settings/Reset*.vue`: the Reset section parts.
+**Kept, and why.** `reka-ui` (only `ui/Drawer.vue`: frappe-ui has no side sheet), `cytoscape` (only `pages/Graph.vue`), `src/experimental/` (the search palette's `CommandPalette`) and `src/framework/` (the list controls that know about a DocType) are each used, so they stay.

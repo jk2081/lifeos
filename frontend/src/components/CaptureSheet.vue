@@ -37,10 +37,11 @@
   </Dialog>
 </template>
 <script setup>
+import { todayData } from '@/data/today'
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Dialog, TabButtons, TextInput, Textarea, toast } from 'frappe-ui'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
 import { submitCapture } from '@/lib/offline'
 import { fileKind, fileSize, uploadFile } from '@/lib/upload'
 import { saveView, savedView } from '@/lib/views'
@@ -89,7 +90,7 @@ async function asTask() {
   const value = text.value.trim()
   if (!value || busy.value) return
   busy.value = 'task'
-  const t = await tryCall(() => api('tasks.quick_add', { text: value, space: store.space }))
+  const t = await tryCall(() => todayData.tasks.quick_add({ text: value, space: store.space }))
   busy.value = ''
   if (!t) return
   window.dispatchEvent(new CustomEvent('lifeos-task-added', { detail: t }))

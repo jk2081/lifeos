@@ -45,6 +45,7 @@
 <script setup>
 // Reset (UX fixes, set 5), now Settings > Data (issue 72): clear the backlog. The goal bar, suggested batches (rules, and up to three
 // from the AI on request), the Inventory of counts and one-by-one decisions. On a phone, Batches, One by one and Inventory are tabs.
+import { settingsData } from '@/data/settings'
 import { computed, onMounted, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useRouter } from 'vue-router'
@@ -57,7 +58,7 @@ import Empty from '@/components/Empty.vue'
 import BatchCard from '@/components/settings/ResetBatchCard.vue'
 import Inventory from '@/components/settings/ResetInventory.vue'
 import OneByOne from '@/components/settings/ResetOneByOne.vue'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged } from '@/lib/pane'
 import { useUrlTab } from '@/lib/tabs'
@@ -83,7 +84,7 @@ const phoneTabs = computed(() => [{ value: 'batches', label: 'Batches', count: s
 const tab = useUrlTab('rtab', phoneTabs)
 
 async function load(ai = aiAsked.value) {
-  d.value = await api('reset.get', { space: store.space, ai: ai ? 1 : 0 })
+  d.value = await settingsData.reset.get({ space: store.space, ai: ai ? 1 : 0 })
 }
 let timer = null
 function refreshSoon() { clearTimeout(timer); timer = setTimeout(() => load(), 600) }
@@ -103,7 +104,7 @@ function askApply(b) {
 async function apply(b) {
   busy.value = b.key
   try {
-    const res = await api('reset.apply_batch', { space: store.space, action: b.action, items: JSON.stringify(b.items.map((i) => ({ doctype: i.doctype, name: i.name }))) })
+    const res = await settingsData.reset.apply_batch({ space: store.space, action: b.action, items: JSON.stringify(b.items.map((i) => ({ doctype: i.doctype, name: i.name }))) })
     decidedCount.value += res.done
     toast.success(`${b.action_label}: done for ${res.done}.`, { duration: 60000, action: { label: 'Undo', onClick: () => undo(res.undo, res.done) } })
     window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))
@@ -113,7 +114,7 @@ async function apply(b) {
 }
 async function undo(log, n) {
   try {
-    await api('reset.undo', { log: JSON.stringify(log) })
+    await settingsData.reset.undo({ log: JSON.stringify(log) })
     decidedCount.value = Math.max(decidedCount.value - n, 0)
     toast.success('Undone.')
     window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))
@@ -132,6 +133,6 @@ function review(b) {
 onRecordChanged(() => refreshSoon())
 onMounted(async () => {
   await load()
-  try { aiReady.value = (await api('ask.status', { space: store.space })).ready } catch (e) { aiReady.value = false }
+  try { aiReady.value = (await settingsData.ask.status({ space: store.space })).ready } catch (e) { aiReady.value = false }
 })
 </script>

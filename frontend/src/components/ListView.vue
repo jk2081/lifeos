@@ -1,5 +1,5 @@
 <template>
-  <PageHead v-if="title" :title="title" :crumb="crumb" :count="loaded && !grouped ? total : null">
+  <PageHead v-if="title" :title="title" :path="path" :count="loaded && !grouped ? total : null">
     <template #sub><slot name="sub">{{ sub }}</slot></template>
     <TabButtons v-if="views.length" class="max-md:hidden" :model-value="view" :options="viewOptions" data-views @update:model-value="setView" />
     <slot name="actions" />
@@ -136,7 +136,7 @@ import { activeCount, canonical, filtersToQuery, orderByToQuery, parseWire, quer
 import { saveView, savedView, viewsLoaded, whenViewsLoaded } from '@/lib/views'
 
 const props = defineProps({
-  title: String, sub: String, crumb: Object,
+  title: String, sub: String, path: Array,
   noun: { type: String, default: 'records' },
   screen: { type: String, required: true }, // the key the view is remembered under: 'tasks'
   doctype: { type: String, required: true }, // whose fields the controls offer: 'Life Task', or 'Life Index' for a cross-type list

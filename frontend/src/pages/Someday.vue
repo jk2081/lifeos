@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Someday" noun="items" screen="someday" doctype="Life Task" :spec="SPEC" :tabs="TABS" :quick="['area', 'someday_on']"
+  <ListView ref="list" title="Someday" :path="[{ label: 'Goals', to: '/goals' }]" noun="items" screen="someday" doctype="Life Task" :spec="SPEC" :tabs="TABS" :quick="['area', 'someday_on']"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => r.ref" :groupable="false"
     :empty-title="EMPTY[tab] || 'Nothing is parked.'" empty-hint="Park a task, goal or note from its pane or from Reset, or add something with New. Each comes back for review after a while.">
     <template #sub><span data-someday-sub>{{ manySpaces ? `${store.space} · Parked` : 'Parked' }}, not forgotten · each item comes back for review {{ months }} months after it was parked</span></template>
@@ -33,13 +33,13 @@
     :initial="bringBack.initial" :save="doBringBack" @saved="list?.reload()" />
 </template>
 <script setup>
+import { todayData } from '@/data/today'
 import { manySpaces } from '@/lib/lens'
 import { computed, h, onMounted, ref } from 'vue'
 import { Badge, Button, Dropdown } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import Card from '@/components/ui/Card.vue'
-import { api } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { onRecordChanged } from '@/lib/pane'
@@ -80,7 +80,7 @@ const RowActions = (p) => {
 RowActions.props = ['row']
 
 async function fetch({ params: p, tab: t, filters, order_by, start, page_length }) {
-  const res = await api('someday.list', { space: store.space, tab: t, area: p.area, filters, order_by, start, page_length })
+  const res = await todayData.someday.list({ space: store.space, tab: t, area: p.area, filters, order_by, start, page_length })
   months.value = res.review_months || 3
   return { rows: res.rows, total: res.total, tabs: res.tabs }
 }

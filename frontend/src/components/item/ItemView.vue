@@ -17,7 +17,8 @@
         <Button class="shrink-0" :size="btnSize" icon="lucide-x" label="Close" tooltip="Close" data-pane-close @click="closePane" />
       </div>
       <div class="min-w-0">
-        <div class="text-sm text-ink-gray-6">{{ label }}</div>
+        <!-- issue 83: the item's path inside the pane, the place it lives in first -->
+        <div class="text-sm text-ink-gray-6" data-pane-path>{{ place }} / {{ label }}</div>
         <h2 class="break-words text-lg-semibold text-ink-gray-9" data-pane-title>{{ meta.title || (missing ? 'Not found' : 'Loading…') }}</h2>
       </div>
       <div v-if="meta.area || meta.goal || meta.sub" class="flex flex-wrap items-center gap-2">
@@ -88,6 +89,7 @@ const el = ref(null)
 const meta = ref({})
 const missing = ref(false)
 const stamp = ref(0)
+const place = computed(() => (cur.value ? TYPES[cur.value.type].place : ''))
 const label = computed(() => (cur.value ? meta.value?.kind || TYPES[cur.value.type].label : ''))
 let lastRef = ''
 let opener = null

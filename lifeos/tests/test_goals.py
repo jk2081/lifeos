@@ -872,6 +872,14 @@ class TestEditGoal(LifeTestCase):
 		self.assertEqual(week["planned"], 3)
 		self.assertEqual(week["done"], 0)
 
+	def test_the_goal_page_carries_the_cycles_weeks_for_its_own_grid(self):
+		page = goals.detail(self.goal)
+		self.assertEqual(len(page["weeks"]), 12)
+		self.assertEqual(page["current_week"], page["this_week"]["week"])
+		self.assertIn("average", page)
+		self.assertIn("target", page)
+		self.assertEqual(page["cycle"]["status"], "Active")
+
 	def test_only_a_writer_can_edit(self):
 		self.as_user("family@lifeos.test")
 		with self.assertRaises(frappe.PermissionError):

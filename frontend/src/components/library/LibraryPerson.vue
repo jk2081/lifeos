@@ -1,7 +1,5 @@
 <template>
-  <PageHead :title="person?.title || 'Person'" :crumb="{ label: 'People', to: '/library/people', here: person?.title || '...' }">
-    <Button v-if="person" label="All people" icon-left="lucide-arrow-left" data-person-back @click="router.push({ path: '/library/people', query: { space: route.query.space } })" />
-  </PageHead>
+  <PageHead :title="person?.title || 'Person'" :path="[{ label: 'Library', to: '/library' }, { label: 'People', to: '/library/people' }]" />
   <div class="page-body max-w-6xl" data-library-person :data-loaded="person ? 1 : 0" :data-kind="person?.kind">
     <Card v-if="missing" class="py-2" data-person-missing><Empty title="Not found." hint="This person or organisation is gone, or is not in a space you can see." /></Card>
     <div v-else-if="person" class="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]" data-person-grid>

@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Archive" noun="archived records" screen="archive" doctype="Life Index" :spec="SPEC" :tabs="TABS" :quick="['area', 'title']" :virtual="VIRTUAL"
+  <ListView ref="list" title="Archive" :path="[{ label: 'Library', to: '/library' }]" noun="archived records" screen="archive" doctype="Life Index" :spec="SPEC" :tabs="TABS" :quick="['area', 'title']" :virtual="VIRTUAL"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => (r.trash ? null : refOf(r.ref_doctype, r.ref_name))" :row-key="(r) => r.ref_doctype + r.ref_name"
     :row-label="(r) => r.title || 'Untitled'" :group-by="(r) => (route.query.sort ? '' : r.area_name || 'Unfiled')" empty-title="Nothing is archived."
     empty-hint="Done tasks, finished inbox items and quiet chats move here after the number of days in Settings. A completed goal moves here at once with its records."
@@ -33,6 +33,7 @@
   </ListView>
 </template>
 <script setup>
+import { todayData } from '@/data/today'
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Button } from 'frappe-ui'
@@ -40,7 +41,7 @@ import ListView from '@/components/ListView.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { useLinkScope } from '@/framework/linkScope'
 import { short } from '@/lib/dates'
@@ -74,20 +75,20 @@ const list = ref(null)
 const goals = ref([])
 async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
   if (tab === 'trash') {
-    const [t, a] = await Promise.all([api('trash.list', { space: store.space, start, page_length }), api('archive.list', { space: store.space, page_length: 1 })])
+    const [t, a] = await Promise.all([todayData.trash.list({ space: store.space, start, page_length }), todayData.archive.list({ space: store.space, page_length: 1 })])
     const rows = t.rows.map((r) => ({ ...r, ref_doctype: r.doctype, ref_name: r.record, trash: r.name, kind: r.kind, archived_on: r.deleted_on, archive_reason: '' }))
     return { rows, total: t.total, goals: [], tabs: { ...a.tabs, trash: t.total } }
   }
-  const trashCount = api('trash.list', { space: store.space, page_length: 1 }).then((t) => t.total).catch(() => 0)
-  const res = await api('archive.list', { space: store.space, doctype: tab === 'all' ? undefined : tab, area: p.area, reason: p.reason, archived_from: p.archived_from, archived_to: p.archived_to,
+  const trashCount = todayData.trash.list({ space: store.space, page_length: 1 }).then((t) => t.total).catch(() => 0)
+  const res = await todayData.archive.list({ space: store.space, doctype: tab === 'all' ? undefined : tab, area: p.area, reason: p.reason, archived_from: p.archived_from, archived_to: p.archived_to,
     filters, order_by, summary, start, page_length })
   return summary ? res : { rows: res.records, total: res.total, goals: res.goals, tabs: { ...res.tabs, trash: await trashCount } }
 }
 async function restoreTrash(row) {
-  if (await tryCall(() => api('trash.restore', { name: row.trash }), 'Restored.')) list.value.reload()
+  if (await tryCall(() => todayData.trash.restore({ name: row.trash }), 'Restored.')) list.value.reload()
 }
 async function restore(doctype, name) {
-  if (await tryCall(() => api('archive.restore', { doctype, name }), 'Restored.')) list.value.reload()
+  if (await tryCall(() => todayData.archive.restore({ doctype, name }), 'Restored.')) list.value.reload()
 }
 onMounted(loadLookups)
 </script>
