@@ -1509,7 +1509,7 @@ frappe.delete_doc("Life Note", "${jp}", force=1, ignore_permissions=True)`)
       }
     })
 
-    await check('GOALS.55', `${width} px: ${phone ? 'one column, and the week bars scroll inside their card, not the page' : 'two columns, the 12 Week Year beside the month plan'}`, async () => {
+    await check('GOALS.55', `${width} px: ${phone ? 'one column, and the week bars fit inside their card' : 'two columns, the 12 Week Year beside the month plan'}`, async () => {
       await s.open('/life/goals/cycles')
       await ready()
       const left = await pg.locator('[data-cycle-card]').boundingBox(), right = await pg.locator('[data-month-card]').boundingBox()
@@ -1517,7 +1517,7 @@ frappe.delete_doc("Life Note", "${jp}", force=1, ignore_permissions=True)`)
       if (phone) {
         must(right.y >= left.y + left.height - 2 && Math.abs(right.x - left.x) < 2, 'the cards are not one column, the 12 Week Year first')
         const sc = await pg.locator('[data-week-bars-scroll]').evaluate((e) => ({ inner: e.scrollWidth, outer: e.clientWidth }))
-        must(sc.inner > sc.outer, `the week bars do not scroll inside their card (${sc.inner} in ${sc.outer})`)
+        must(sc.inner <= sc.outer + 1, `the week bars do not fit their card (${sc.inner} in ${sc.outer})`)
       } else must(right.x > left.x + left.width - 2 && Math.abs(right.y - left.y) < 4, 'the cards are not side by side')
       await noSideways()
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
