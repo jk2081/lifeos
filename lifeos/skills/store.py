@@ -122,7 +122,6 @@ def save(slug: str, values: dict, note: str | None = None):
 	for k in ("active", "space"):
 		if k in values:
 			doc.set(k, values[k])
-	validate(doc)
 	if digest(doc.as_dict()) != before:
 		doc.version += 1
 		doc.save(ignore_permissions=True)
@@ -135,7 +134,6 @@ def save(slug: str, values: dict, note: str | None = None):
 def create(values: dict):
 	doc = frappe.get_doc({"doctype": "Life Skill", "source": "Owner", "version": 1, "active": 0, "trigger_kind": "Button", "output_kind": "Answer",
 		"model_tier": "Fast", "cost_limit": 0.25, "tools": "[]", **values})
-	validate(doc)
 	doc.insert(ignore_permissions=True)
 	snapshot(doc, _("Created"))
 	return doc

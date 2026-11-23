@@ -1138,3 +1138,15 @@ class TestRuleInsights(LifeTestCase):
 			api.list(space=PRIVATE)
 		with self.assertRaises(frappe.PermissionError):
 			frappe.get_list("Life Insight", filters={"space": PRIVATE})
+
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a skill straight through frappe.get_doc applies the same rules as the API."""
+
+	def test_skill_through_get_doc_refuses_an_unknown_trigger_and_tool(self):
+		values = {"doctype": "Life Skill", "slug": "t75-direct", "title": "t75", "source": "Owner", "version": 1, "trigger_kind": "Button",
+			"output_kind": "Answer", "model_tier": "Fast", "tools": "[]", "instructions": "x"}
+		with self.assertRaises(frappe.ValidationError):
+			frappe.get_doc({**values, "trigger_kind": "Whenever"}).insert()
+		with self.assertRaises(frappe.ValidationError):
+			frappe.get_doc({**values, "tools": '["delete_everything"]'}).insert()

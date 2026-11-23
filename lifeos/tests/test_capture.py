@@ -782,3 +782,14 @@ class TestPhone(LifeTestCase):
 		inbox.create_item(title="I50 from the phone", source_type="Phone", space=PRIVATE, source_system="phone")
 		self.assertFalse(frappe.db.exists("Life Connection", {"space": PRIVATE, "system": "phone"}))
 		connections.require_on(PRIVATE, "phone")  # does not raise
+
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a capture straight through frappe.get_doc applies the same rule as the API."""
+
+	def test_done_capture_through_get_doc_gets_its_finish_date(self):
+		doc = frappe.get_doc({"doctype": "Life Inbox Item", "space": PRIVATE, "title": "75 direct", "source_type": "Message", "raw_text": "x"}).insert()
+		self.assertEqual(doc.intent, "Process")
+		doc.status = "Done"
+		doc.save()
+		self.assertTrue(doc.finished_on)

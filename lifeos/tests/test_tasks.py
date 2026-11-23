@@ -1163,3 +1163,15 @@ class TestRecordPageTabs(LifeTestCase):
 		p = self.make("Life Goal", title="ux3 hidden goal", horizon="Long term", area=tea)
 		self.as_user(FAMILY)
 		self.assertRaises(frappe.PermissionError, goals.get, p.name)
+
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a task straight through frappe.get_doc applies the same rule as the API."""
+
+	def test_waiting_task_through_get_doc_needs_a_reason(self):
+		doc = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "75 waiting", "status": "Waiting"})
+		with self.assertRaises(frappe.MandatoryError):
+			doc.insert()
+		doc.waiting_on = "The plumber"
+		doc.insert()
+		self.assertEqual(frappe.db.get_value("Life Task", doc.name, "status"), "Waiting")

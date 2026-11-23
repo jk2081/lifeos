@@ -58,6 +58,10 @@ class LifeGoal(Document):
 			self.on_hold = 0
 		self.check_serves()
 		self.check_measure()
+		if self.is_new() and not self.flags.from_restore:
+			from lifeos.goals import readings
+
+			readings.require_finish_line(self)  # the setting "Require Done when on new goals"; existing goals are never checked
 		check_cycle_open(self.cycle, self.flags)
 		for a in self.actions:
 			a.per_week = max(1, int(a.per_week or 1))

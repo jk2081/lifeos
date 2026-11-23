@@ -51,3 +51,15 @@ class TestLoad(IntegrationTestCase):
 		frappe.set_user(FAMILY)
 		self.assertEqual(search.query(loadtest.RARE_WORD)["results"], [])
 		frappe.set_user("Administrator")
+
+
+class TestCodeShape(IntegrationTestCase):
+	"""The shape of the code: modules grouped by place."""
+
+	TOP = {"__init__", "constants", "hooks", "install", "permissions"}
+
+	def test_no_loose_module_at_the_top(self):
+		from pathlib import Path
+
+		top = {p.stem for p in Path(frappe.get_app_path("lifeos")).glob("*.py")}
+		self.assertEqual(top - self.TOP, set())

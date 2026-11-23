@@ -747,7 +747,8 @@ class TestGoalEdit(LifeTestCase):
 			goals.create(title="i56 never saved", horizon="Long term", space=PRIVATE)
 
 	def test_existing_goals_without_done_when_are_not_blocked(self):
-		g = self.make("Life Goal", title="i56 old", horizon="Long term").name
+		g = self.make("Life Goal", title="i56 old", horizon="Long term", done_when="x").name
+		frappe.db.set_value("Life Goal", g, "done_when", None)  # a goal saved before the rule existed
 		out = goals.update(g, {"title": "i56 old renamed"})
 		self.assertEqual(out["goal"]["title"], "i56 old renamed")
 		self.assertFalse(out["goal"]["has_finish_line"])
@@ -799,7 +800,7 @@ class TestGoalEdit(LifeTestCase):
 		from lifeos.tests.helpers import set_key
 
 		cycle = self.make("Life Cycle", title="i56 s cycle", start_date="2026-11-02", end_date="2027-01-24", status="Active").name
-		g = self.make("Life Goal", title="i56 systems", horizon="12 weeks", cycle=cycle, area=self.life["Career"],
+		g = self.make("Life Goal", title="i56 systems", horizon="12 weeks", cycle=cycle, area=self.life["Career"], done_when="Audit run",
 			actions=[{"title": "Start the internal audit", "per_week": 2, "status": "Open"}]).name
 		self.make("Life Task", title="i56 draft the audit plan", goal=g)
 		set_key("sk-test-not-real")
@@ -1372,3 +1373,16 @@ class TestGoals(LifeTestCase):
 		self.assertRaises(frappe.PermissionError, goals.list, space=PRIVATE)
 		self.assertEqual(goals.task_counts([g]), {})
 		self.assertNotIn(g, [x.name for x in goals.list(space=SHARED, state="all")["goals"]])
+
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a goal straight through frappe.get_doc applies the same rule as the API."""
+
+	def test_new_goal_through_get_doc_needs_done_when(self):
+		set_required(True)
+		doc = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "75 no finish line", "horizon": "Long term"})
+		with self.assertRaises(frappe.ValidationError):
+			doc.insert()
+		doc.done_when = "It is finished"
+		doc.insert()
+		self.assertTrue(doc.name)
