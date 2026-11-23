@@ -278,6 +278,24 @@ def ask_has_permission(doc, ptype=None, user=None, debug=False):
 	return not owner or owner == user
 
 
+def mail_query_conditions(user=None, doctype=None):
+	"""A person's mail accounts and searches are theirs alone, the site owner included. Agents read none: an agent reaches an inbox only through
+	`lifeos.mail`, which names the person it acts for."""
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return ""
+	if is_agent(user):
+		return "1=0"
+	return f"`tab{doctype}`.`user` = {frappe.db.escape(user)}"
+
+
+def mail_has_permission(doc, ptype=None, user=None, debug=False):
+	user = user or frappe.session.user
+	if user == "Administrator":
+		return True
+	return not is_agent(user) and (not doc.get("user") or doc.get("user") == user)
+
+
 # ---- helpers for API methods ----
 
 def require_login():

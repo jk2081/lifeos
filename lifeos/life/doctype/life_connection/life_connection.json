@@ -21,11 +21,6 @@
   "always_include",
   "always_skip",
   "always_sensitive",
-  "attach_files",
-  "fetched_until",
-  "week_start",
-  "seen_week",
-  "kept_week",
   "last_error"
  ],
  "fields": [
@@ -135,36 +130,6 @@
    "fieldtype": "Small Text",
    "label": "Always sensitive",
    "description": "Senders or domains, one per line. Their mail is marked sensitive."
-  },
-  {
-   "fieldname": "attach_files",
-   "fieldtype": "Check",
-   "label": "Keep attachments",
-   "default": "1"
-  },
-  {
-   "fieldname": "fetched_until",
-   "fieldtype": "Datetime",
-   "label": "Fetched Until",
-   "read_only": 1
-  },
-  {
-   "fieldname": "week_start",
-   "fieldtype": "Date",
-   "label": "Week Start",
-   "read_only": 1
-  },
-  {
-   "fieldname": "seen_week",
-   "fieldtype": "Int",
-   "label": "Seen This Week",
-   "read_only": 1
-  },
-  {
-   "fieldname": "kept_week",
-   "fieldtype": "Int",
-   "label": "Kept This Week",
-   "read_only": 1
   },
   {
    "fieldname": "last_error",

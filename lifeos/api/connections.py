@@ -1,6 +1,6 @@
 """Connections (UX fixes, set 4): one row per space and outside system (gmail, claude, chatgpt, google-calendar) with the
 defaults agents use when filing what arrives from it, and when something last arrived. No credentials are stored here: an
-agent holds its own access, and Life OS's own read of Gmail (issue 58, `lifeos/brain/gmail.py`) keeps its token in Frappe's Token Cache,
+agent holds its own access, and Life OS's own read of Gmail (issue 58, `lifeos/mail/gmail.py`) keeps its token in Frappe's Token Cache,
 one mailbox for each Gmail card."""
 import frappe
 from frappe import _
@@ -122,8 +122,7 @@ def _week_counts(space, system):
 	return int(n), int(jobs)
 
 
-GMAIL_FIELDS = ["mailbox", "connected_app", "label_name", "always_include", "always_skip", "always_sensitive", "attach_files", "last_error",
-	"seen_week", "kept_week", "week_start"]
+GMAIL_FIELDS = ["mailbox", "connected_app", "label_name", "always_include", "always_skip", "always_sensitive", "last_error"]
 FIELDS = ["name", "system", "label", "default_area", "default_goal", "default_intent", "active", "last_received_on", "last_received_what"]
 
 
@@ -142,15 +141,13 @@ def _card(space, row):
 
 
 def _gmail_card(row, out, meta):
-	"""A mailbox: "218 this week · 31 kept" (counted since Monday), its lists and settings, and an error when Google refused."""
-	this_week = row.week_start and getdate(row.week_start) == getdate(_week_start())
-	seen, kept = (row.seen_week or 0, row.kept_week or 0) if this_week else (0, 0)
+	"""A mailbox: when it was last read for the digest, its lists and settings, and an error when Google refused."""
 	pending = not row.mailbox
-	line = _("Waiting for you to finish signing in with Google.") if pending else f"{seen} this week · {kept} kept"
-	return {**out, "kind": meta["kind"], "icon": meta["icon"], "this_week": kept, "line": line, "pending": int(pending), "mailbox": row.mailbox,
+	line = _("Waiting for you to finish signing in with Google.") if pending else _("Daily digest, and searched live by Ask and your agent")
+	return {**out, "kind": meta["kind"], "icon": meta["icon"], "this_week": 0, "line": line, "pending": int(pending), "mailbox": row.mailbox,
 		"label_name": row.label_name or "", "always_include": row.always_include or "", "always_skip": row.always_skip or "",
-		"always_sensitive": row.always_sensitive or "", "attach_files": int(row.attach_files or 0), "error": row.last_error,
-		"processed_by": processed_by("gmail"), "lands": LANDS["gmail"], "seen_week": seen, "kept_week": kept}
+		"always_sensitive": row.always_sensitive or "", "error": row.last_error,
+		"processed_by": processed_by("gmail"), "lands": LANDS["gmail"]}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -198,10 +195,10 @@ def list(space: str | None = None):
 def save(space: str | None = None, system: str | None = None, name: str | None = None, label: str | None = None,
 		default_area: str | None = None, default_goal: str | None = None, default_intent: str | None = None,
 		active: bool | int | None = None, label_name: str | None = None, always_include: str | None = None, always_skip: str | None = None,
-		always_sensitive: str | None = None, attach_files: bool | int | None = None):
+		always_sensitive: str | None = None):
 	"""Create or change a connection. People with Write access only; agents read the defaults and cannot change them.
-	A Gmail mailbox also takes label_name (read only mail with this Gmail label; empty reads the Inbox), the always_include, always_skip
-	and always_sensitive lists (senders or domains, one per line) and attach_files."""
+	A Gmail mailbox also takes label_name (the digest reads mail with this Gmail label; empty reads the Inbox), and the always_include, always_skip
+	and always_sensitive lists (senders or domains, one per line)."""
 	if permissions.is_agent():
 		frappe.throw(_("Only a person can change a connection."), frappe.PermissionError, title=_("Only people change connections"))
 	if name:
@@ -228,11 +225,13 @@ def save(space: str | None = None, system: str | None = None, name: str | None =
 		for field, value in (("label_name", label_name), ("always_include", always_include), ("always_skip", always_skip), ("always_sensitive", always_sensitive)):
 			if value is not None:
 				doc.set(field, value.strip()[:2000])
-		if attach_files is not None:
-			doc.attach_files = 1 if flag(attach_files) else 0
 	if active is not None:
 		doc.active = 1 if flag(active) else 0
 	doc.save() if name else doc.insert()
+	if doc.system == "gmail" and doc.mailbox:  # the mailbox's mail account follows its switch and its name
+		from lifeos import mail
+
+		mail.account_for_connection(doc)
 	return _out(connection(doc.space, doc.system)) if doc.system != "gmail" else _out(frappe.get_doc("Life Connection", doc.name))
 
 
@@ -246,21 +245,22 @@ def _people_only():
 
 @frappe.whitelist(methods=["GET"])
 def gmail_setup():
-	"""What Connect Gmail shows before it sends you to Google: whether Google sign-in is set up (Google Settings, the OAuth client), the one
-	permission asked for, and the redirect address to allow in Google Cloud for the next mailbox."""
-	from lifeos.brain import gmail
+	"""What Connect Gmail shows before it sends you to Google: whether Google sign-in is set up (Google Settings, the OAuth client), the permissions
+	asked for, and the redirect address to allow in Google Cloud for the next mailbox."""
+	from lifeos.mail import gmail
 
 	permissions.require_login()
-	return {"ready": int(gmail.configured()), "scope": gmail.SCOPE, "redirect_uri": gmail.redirect_uri(gmail.free_app_name()),
-		"nothing_changes": _("Life OS only reads. It never marks, labels, moves or deletes your mail.")}
+	return {"ready": int(gmail.configured()), "scope": gmail.SCOPE, "scopes": [*gmail.SCOPES],
+		"redirect_uri": gmail.redirect_uri(gmail.free_app_name()),
+		"nothing_changes": _("Life OS reads your mail only when you or your agent search it, and copies none of it. It sends, drafts, archives or labels mail and changes your calendar only when you ask your agent to, or approve what it suggests. It never deletes.")}
 
 
 @frappe.whitelist(methods=["POST"])
 def gmail_connect(space: str | None = None, success_uri: str | None = None):
 	"""Start Connect Gmail: a card for the mailbox, a Connected App for it from Google Settings, and Google's sign-in address for the
-	signed-in person (read only: gmail.readonly). The browser goes there; Frappe stores the token and returns to `success_uri`
+	signed-in person (read, and what an agent acts with: see gmail.SCOPES). The browser goes there; Frappe stores the token and returns to `success_uri`
 	(a path in this site). Finish with gmail_finish. Nothing secret is typed or shown."""
-	from lifeos.brain import gmail
+	from lifeos.mail import gmail
 
 	_people_only()
 	space = permissions.resolve_space(space, write=True)
@@ -277,7 +277,7 @@ def gmail_connect(space: str | None = None, success_uri: str | None = None):
 @frappe.whitelist(methods=["POST"])
 def gmail_finish(name: str):
 	"""After Google sends the person back: read the mailbox's address and switch it on. A card whose sign-in was abandoned is removed."""
-	from lifeos.brain import gmail
+	from lifeos.mail import gmail
 
 	_people_only()
 	conn = permissions.get_doc_checked("Life Connection", name, "write")
@@ -305,6 +305,8 @@ def gmail_remove(name: str):
 	if conn.system != "gmail":
 		frappe.throw(_("This is not a Gmail connection."), title=_("Not a Gmail connection"))
 	app = conn.connected_app
+	for account in frappe.get_all("Life Mail Account", filters={"connection": conn.name}, pluck="name"):  # system: the account goes with its sign-in; the space write check is above
+		frappe.delete_doc("Life Mail Account", account, ignore_permissions=True, force=True)  # system: as above
 	for cache in frappe.get_all("Token Cache", filters={"connected_app": app}, pluck="name") if app else []:  # system: Frappe's token cache, not a space record
 		frappe.delete_doc("Token Cache", cache, ignore_permissions=True, force=True)  # system: admin-only screen; the space write check is above
 	frappe.delete_doc("Life Connection", conn.name, ignore_permissions=True, force=True)  # system: admin-only screen; the space write check is above

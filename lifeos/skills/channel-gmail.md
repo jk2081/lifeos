@@ -7,13 +7,13 @@ tools: []
 output: Proposals
 model: Fast
 cost_limit: 0.25
-version: 1
+version: 2
 ---
 These are the rules for mail read from Gmail. They come after the shared rules and before the rules of the kind of thing it is.
 
 ## What arrives
 
-Threads from a connected mailbox, read only, every 15 minutes. Life OS never marks, labels, moves or deletes mail.
+Mail is not copied into Life OS. Each morning one digest lists the mail from real people, grouped by inbox (on Sundays a second one rolls up the week), each with the sender, the subject, one line and a File it button. Anything else is found by searching the inbox live when the owner or an agent asks, and kept only when the owner says so. Life OS itself only reads; an agent sends, drafts, archives or labels only through the tools the owner switched on.
 
 ## Let in
 
@@ -26,7 +26,7 @@ Threads from a connected mailbox, read only, every 15 minutes. Life OS never mar
 - Not Promotions, Social, Updates or Forums
 - Not a mailing list or a no-reply sender
 - The always-include and always-skip lists of the mailbox
-- Whether the thread is worth a capture
+- Whether the thread is worth a line in the digest
 
 ## Who may send
 
@@ -35,7 +35,7 @@ Threads from a connected mailbox, read only, every 15 minutes. Life OS never mar
 
 ## Where it goes
 
-- Mail kept goes to Needs you, or is filed on its own when it is sure enough
+- The digest is one item; filing a line from it makes the Brain item for that thread
 - Mail from the always-sensitive list is marked sensitive
 
 ## What to propose
@@ -46,8 +46,8 @@ Threads from a connected mailbox, read only, every 15 minutes. Life OS never mar
 
 ## Never
 
-- Do not reply, mark, label, move or delete mail
-- Do not keep bulk mail that slipped through the filters
+- Do not reply, mark, label, move or delete mail on your own: an act goes through the agent tools, and the owner's switches decide
+- Do not list bulk mail that slipped through the filters
 
 ## Examples
 

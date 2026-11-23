@@ -17,7 +17,7 @@ SPACE_DOCTYPES = [
 # DocTypes an agent never reads or writes (UX fixes, set 5): insights, and Ask's threads, which belong to one person.
 NO_AGENT_DOCTYPES = ["Life Insight", "Life Ask Thread", "Life Ask Message", "Life AI Usage", "Life Exit",
 	"Life Review", "Life Meeting Link", "Life Wiki Finding",
-	"Life Agent Config", "Life Agent Fact", "Life Agent Job", "Life Agent Change", "Life Agent Action"]
+	"Life Agent Config", "Life Agent Fact", "Life Agent Job", "Life Agent Change", "Life Agent Action", "Life Mail Account", "Life Mail Search"]
 
 # DocTypes that carry the organisation fields of section 4a.
 ORG_DOCTYPES = [

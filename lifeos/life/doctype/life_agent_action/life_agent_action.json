@@ -16,7 +16,14 @@
   "happened_on",
   "decided_by",
   "decided_on",
-  "delivered"
+  "delivered",
+  "asked_by",
+  "request",
+  "params",
+  "result",
+  "undo",
+  "undone",
+  "error"
  ],
  "fields": [
   {
@@ -69,7 +76,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Waiting\nApproved\nDeclined\nDone",
+   "options": "Waiting\nApproved\nDeclined\nDone\nFailed",
    "default": "Waiting",
    "in_list_view": 1
   },
@@ -100,6 +107,47 @@
    "fieldtype": "Check",
    "label": "Delivered",
    "description": "The agent has picked up the decision"
+  },
+  {
+   "fieldname": "asked_by",
+   "fieldtype": "Select",
+   "label": "Asked By",
+   "options": "\nowner\nagent",
+   "description": "owner: the owner told the agent to do it; agent: its own idea"
+  },
+  {
+   "fieldname": "request",
+   "fieldtype": "Small Text",
+   "label": "Owner's Message",
+   "description": "What the owner said, for a request the owner made"
+  },
+  {
+   "fieldname": "params",
+   "fieldtype": "Long Text",
+   "label": "Parameters",
+   "description": "What is sent to Google (JSON); cleared when the request is declined"
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Small Text",
+   "label": "Result",
+   "description": "What Google answered, in a line"
+  },
+  {
+   "fieldname": "undo",
+   "fieldtype": "Small Text",
+   "label": "Undo",
+   "description": "How to take it back where Google allows it (JSON)"
+  },
+  {
+   "fieldname": "undone",
+   "fieldtype": "Check",
+   "label": "Undone"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error"
   }
  ],
  "links": [],
