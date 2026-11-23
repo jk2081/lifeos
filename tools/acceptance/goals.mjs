@@ -1477,7 +1477,7 @@ print(p.name)`).split('\n').pop()
       try {
         await s.api('views.save', { screen: 'library', space: SPACE, state: {} }) // an earlier check left "Written by the assistant" remembered
         await s.open('/life/library/notes?view=list')
-        await pg.getByText(T('journal page')).first().waitFor({ timeout: 15000 })
+        await pg.getByText(T('journal page')).filter({ visible: true }).first().waitFor({ timeout: 15000 })
         await s.open(`/life/library/notes?view=list&open=note:${jp}`)
         await pg.locator('[data-pane]').waitFor({ timeout: 10000 })
         await pg.locator('[data-pane] [data-note-image] img[alt="Photographed journal page"]').waitFor({ timeout: 10000 })

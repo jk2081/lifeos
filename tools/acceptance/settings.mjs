@@ -10,7 +10,7 @@ for (const width of WIDTHS) {
     const problems = []
     try {
     // issue 44: eight pages and Advanced (Sources is the Brain's screen)
-    const SECTIONS = ['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules', 'members', 'advanced']
+    const SECTIONS = ['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'sources', 'rules', 'members', 'advanced']
     const PAGES = SECTIONS.filter((x) => x !== 'sources')
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
@@ -30,7 +30,9 @@ for (const width of WIDTHS) {
       must((await cur()) === sec && (phone ? !(await pg.locator('[data-settings-menu]').count()) : true), `the menu did not open ${sec}`)
       must((await overflow()) <= 0, `${sec}: the page scrolls sideways`)
       const text = await pg.locator('[data-main]').innerText()
-      must(!/Life (Agent|User|Admin)|Administrator/.test(text), `${sec}: a role name or Administrator shows`)
+      // a recorded AI call names the user who made it (the Brain's own runs are Administrator's), so that name is data, not a role label
+      const shown = text.replace(/ · Administrator$/gm, '')
+      must(!/Life (Agent|User|Admin)|Administrator/.test(shown), `${sec}: a role name or Administrator shows`)
     }
     // areas (issue 12): Settings > Areas lists the seven with their parts; a part is renamed in its Edit dialog and archived
     // there, its open tasks moving to the place chosen. Rename in place stays for habits.
@@ -833,10 +835,10 @@ for (const width of WIDTHS) {
   const was = (await s.api('settings.get', { space: SPACE })).settings
   const save = (values) => s.api('settings.save', { values })
   try {
-    await check('SETTINGS.22', `${width} px: the owner's menu is Profile, Calendar, Areas, Rhythms, Habits, Sources, Rules, Members in four groups, and Advanced at the bottom`, async () => {
+    await check('SETTINGS.22', `${width} px: the owner's menu is Profile, Calendar, Areas, Rhythms, Habits, Data, Sources, Rules, Members in four groups, and Advanced at the bottom`, async () => {
       await s.open('/life/settings')
       await pg.locator('[data-settings-menu] [data-section]').first().waitFor()
-      must(JSON.stringify(await items()) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules', 'members', 'advanced']), `the menu lists ${await items()}`)
+      must(JSON.stringify(await items()) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'sources', 'rules', 'members', 'advanced']), `the menu lists ${await items()}`)
       const groups = await pg.locator('[data-settings-menu] [data-settings-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-settings-group')))
       must(JSON.stringify(groups) === JSON.stringify(['me', 'space', 'brain', 'people']), `the groups are ${groups}`)
       must(!(await pg.locator('[data-settings-later]').count()), 'a Life Admin is told more settings come later')
@@ -961,9 +963,9 @@ for (const width of WIDTHS) {
         const one = await levelAt(1)
         must(JSON.stringify(one) === JSON.stringify(['profile', 'areas', 'sources']), `level 1 shows ${one}`)
         const line = await fam.page.locator('[data-settings-later]').innerText()
-        must(/More settings appear as you go up the ladder/.test(line) && /Rhythms at level 4/.test(line), `the footer says "${line}"`)
+        must(/More settings appear as you go up the ladder/.test(line) && /Rhythms and Data at level 4/.test(line), `the footer says "${line}"`)
         const four = await levelAt(4)
-        must(JSON.stringify(four) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules']), `level 4 shows ${four}`)
+        must(JSON.stringify(four) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'sources', 'rules']), `level 4 shows ${four}`)
         // a page that is not in the menu yet is still reached by its link
         await fam.open('/life/settings?tab=habits')
         await fam.page.locator('[data-settings-section]').waitFor()

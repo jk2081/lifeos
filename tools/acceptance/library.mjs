@@ -1034,11 +1034,11 @@ print(json.dumps(out))`).split('\n').pop()))
       must(found.results.some((r) => r.ref_name === note), 'search does not find the page by a word of its transcript')
       // listed in Library > Notes, and on its goal's page
       await s.open('/life/library/notes?view=list&all=1')
-      await pg.getByText(n.title).first().waitFor({ timeout: 15000 })
+      await pg.getByText(n.title).filter({ visible: true }).first().waitFor({ timeout: 15000 })
       const onGoal = await owner.api('library.list', { space: SPACE, goal: ux.goal, page_length: 100 })
       must(onGoal.notes.some((r) => r.name === note), "the page is not among its goal's notes")
       await s.open(`/life/goals/${ux.goal}?tab=notes`)
-      await pg.getByText(n.title).first().waitFor({ timeout: 15000 })
+      await pg.getByText(n.title).filter({ visible: true }).first().waitFor({ timeout: 15000 })
       return `note ${note}`
     })
   } finally {
