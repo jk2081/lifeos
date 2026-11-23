@@ -4,11 +4,14 @@ import datetime
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts
-from lifeos.api.utils import order_by as sort_order
+from lifeos.api.timeline import index_rows
+from lifeos.api.utils import (area_criterion, count_tabs, count_where, filter_criteria, flag, group_summary, list_query, names_map, order_terms, page, parse,
+	sort_terms)
 
 
 @frappe.whitelist(methods=["GET"])
@@ -21,21 +24,15 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 		frappe.throw(_("group_by must be day, area or goal."), title=_("Unknown grouping"))
 	end = getdate(to_date or today())
 	begin = getdate(from_date) if from_date else add_days(end, -6)
-	guard = permissions.vault_guard(space)
-	# nosemgrep: frappe-sql-format-injection -- vault_guard is a constant fragment; values are parameters
-	index = frappe.db.sql(
-		f"""select ref_name, title, record_date, area, goal from `tabLife Index`
-		where space=%s and kind='Chat' and is_archived=0 and record_date between %s and %s{guard}
-		order by record_date desc, modified desc limit %s, %s""", (space, begin, end, start, page_length), as_dict=True)
+	x = frappe.qb.DocType("Life Index")
+	where = [x.kind == "Chat", x.is_archived == 0, x.record_date.between(begin, end)]
+	index = index_rows(space, where, [(x.record_date, Order.desc), (x.modified, Order.desc)], start, page_length)
 	names = [r.ref_name for r in index]
 	details, items = {}, {}
 	if names:
 		for r in frappe.get_list("Life Chat Log", filters={"name": ("in", names)}, fields=["name", "url", "assistant", "summary_md"]):
 			details[r.name] = r
-		for r in frappe.db.sql(
-			"select parent, name, text, status, task from `tabLife Chat Open Item` where parenttype='Life Chat Log' and parent in %s order by parent, idx",
-			(names,), as_dict=True):
-			items.setdefault(r.parent, []).append({"row": r.name, "text": r.text, "status": r.status, "task": r.task})
+		items = open_items_of(names)
 	areas = names_map("Life Area", [r.area for r in index], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in index], "title")
 	chats = []
@@ -66,45 +63,63 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 		"counts_by_area": [{"area_name": k, "count": v} for k, v in sorted(counts.items(), key=lambda kv: -kv[1])], "open_items": open_items}
 
 
-OPEN_ITEM = "exists (select 1 from `tabLife Chat Open Item` oi where oi.parent = c.name and oi.parenttype = 'Life Chat Log' and oi.status = 'Open')"
-SORTS = {"date": "c.date", "title": "c.title", "assistant": "c.assistant"}
+def has_open_item(c):
+	"""The criterion for a chat that still has an open item."""
+	oi = frappe.qb.DocType("Life Chat Open Item")
+	return c.name.isin(frappe.qb.from_(oi).select(oi.parent).where((oi.parenttype == "Life Chat Log") & (oi.status == "Open")))
+
+
+def open_items_of(names):
+	"""{chat: [open item rows]} in the order they were written."""
+	items = {}
+	rows = frappe.get_list("Life Chat Open Item", filters={"parenttype": "Life Chat Log", "parent": ("in", names)}, fields=["parent", "name", "text", "status", "task"],
+		order_by="parent, idx", parent_doctype="Life Chat Log", limit=0)
+	for r in rows:
+		items.setdefault(r.parent, []).append({"row": r.name, "text": r.text, "status": r.status, "task": r.task})
+	return items
+
+
+def area_name_of(c):
+	a = frappe.qb.DocType("Life Area")
+	return frappe.qb.from_(a).select(a.area_name).where(a.name == c.area)
+
+
+def goal_title_of(c):
+	g = frappe.qb.DocType("Life Goal")
+	return frappe.qb.from_(g).select(g.title).where(g.name == c.goal)
+
+
+SORTS = {"date": lambda c: [c.date], "title": lambda c: [c.title], "assistant": lambda c: [c.assistant]}
 GROUP_ORDER = {
-	"day": "c.date desc",
-	"area": "(c.area is null or c.area = ''), (select area_name from `tabLife Area` a where a.name = c.area), c.area, c.date desc",
-	"goal": "(c.goal is null or c.goal = ''), (select title from `tabLife Goal` p where p.name = c.goal), c.goal, c.date desc",
+	"day": lambda c: [(c.date, Order.desc)],
+	"area": lambda c: [(c.area.isnull() | (c.area == ""), Order.asc), (area_name_of(c), Order.asc), (c.area, Order.asc), (c.date, Order.desc)],
+	"goal": lambda c: [(c.goal.isnull() | (c.goal == ""), Order.asc), (goal_title_of(c), Order.asc), (c.goal, Order.asc), (c.date, Order.desc)],
 }
 
 
-def where_clause(space, area=None, goal=None, open_items=0, from_date=None, to_date=None, include_archived=0):
-	where, values = [], {}
+def where_criteria(space, area=None, goal=None, open_items=0, from_date=None, to_date=None, include_archived=0):
+	c = frappe.qb.DocType("Life Chat Log")
+	where = [c.space == space]
 	if permissions.vault_hidden(space):  # sensitive chats are closed to an agent while the space's switch is off (set 6)
-		where.append("c.is_sensitive = 0")
+		where.append(c.is_sensitive == 0)
 	if not flag(include_archived):
-		where.append("c.is_archived = 0")
+		where.append(c.is_archived == 0)
 	if area:
-		where.append(area_filter(space, area, "c.area", values, also_in="Life Chat Log"))
+		where.append(area_criterion(space, area, c, also_in="Life Chat Log"))
 	if goal:
-		where.append("ifnull(c.goal, '') = %(goal)s")
-		values["goal"] = "" if goal == "none" else goal
+		where.append(fn.IfNull(c.goal, "") == ("" if goal == "none" else goal))
 	if flag(open_items):
-		where.append(OPEN_ITEM)
+		where.append(has_open_item(c))
 	if from_date:
-		where.append("c.date >= %(from_date)s")
-		values["from_date"] = getdate(from_date)
+		where.append(c.date >= getdate(from_date))
 	if to_date:
-		where.append("c.date <= %(to_date)s")
-		values["to_date"] = getdate(to_date)
-	return "".join(" and " + w for w in where), values
+		where.append(c.date <= getdate(to_date))
+	return where
 
 
 def _chat_rows(rows):
 	names = [r.name for r in rows]
-	items = {}
-	if names:
-		for r in frappe.db.sql(
-			"select parent, name, text, status, task from `tabLife Chat Open Item` where parenttype='Life Chat Log' and parent in %s order by parent, idx",
-			(names,), as_dict=True):
-			items.setdefault(r.parent, []).append({"row": r.name, "text": r.text, "status": r.status, "task": r.task})
+	items = open_items_of(names) if names else {}
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows], "title")
 	for r in rows:
@@ -129,30 +144,24 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 	start, page_length = page(start, page_length)
 	if group_by not in GROUP_ORDER:
 		frappe.throw(_("group_by must be day, area or goal."), title=_("Unknown grouping"))
-	clause, values = where_clause(space, area, goal, open_items, from_date, to_date, include_archived)
-	extra, values = std_clause("Life Chat Log", filters, "c", values)
-	clause += extra
-	values["space"] = space
+	c = frappe.qb.DocType("Life Chat Log")
+	extra = filter_criteria("Life Chat Log", filters, c)
+	where = where_criteria(space, area, goal, open_items, from_date, to_date, include_archived) + extra
 	# the state tabs of the Chats screen (all, open = with open items), counted under every filter but the open-items switch
-	t_clause, t_values = where_clause(space, area, goal, 0, from_date, to_date, include_archived)
-	tabs = tab_counts(f"from `tabLife Chat Log` c where c.space=%(space)s {t_clause}{extra}", {**t_values, **values}, {"all": None, "open": OPEN_ITEM})
+	tabs = count_tabs("Life Chat Log", where_criteria(space, area, goal, 0, from_date, to_date, include_archived) + extra, {"all": None, "open": has_open_item(c)})
 	if summary:
-		return {"summary": summarise("Life Chat Log", f"from `tabLife Chat Log` c where c.space=%(space)s {clause}", values, "c", summary, start, page_length),
-			"tabs": tabs}
-	order = std_order("Life Chat Log", order_by, "c", SORTS) or sort_order(sort, dir, SORTS, None)
-	order = f"{order}, c.creation desc" if order else f"{GROUP_ORDER[group_by]}, c.modified desc"
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	rows = _chat_rows(frappe.db.sql(
-		f"""select c.name, c.title, c.date, c.url, c.assistant, c.summary_md, c.area, c.goal, c.is_archived
-		from `tabLife Chat Log` c where c.space=%(space)s {clause} order by {order} limit %(start)s, %(len)s""",
-		{**values, "start": start, "len": page_length}, as_dict=True))
-	base = f"from `tabLife Chat Log` c where c.space=%(space)s {clause}"
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	total = frappe.db.sql(f"select count(*) {base}", values)[0][0]
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	with_open = frappe.db.sql(f"select count(*) {base} and {OPEN_ITEM}", values)[0][0]
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	by_area = frappe.db.sql(f"select ifnull(c.area, ''), count(*) {base} group by ifnull(c.area, '') order by count(*) desc", values)
+		return {"summary": group_summary("Life Chat Log", where, summary, start, page_length), "tabs": tabs}
+	terms = order_terms("Life Chat Log", order_by, c, SORTS) or sort_terms(sort, dir, SORTS, c)
+	terms = [*terms, (c.creation, Order.desc)] if terms else [*GROUP_ORDER[group_by](c), (c.modified, Order.desc)]
+	fields = ["name", "title", "date", "url", "assistant", "summary_md", "area", "goal", "is_archived"]
+	rows = _chat_rows(list_query("Life Chat Log", fields, where, terms).limit(page_length).offset(start).run(as_dict=True))
+	total = count_where("Life Chat Log", where)
+	with_open = count_where("Life Chat Log", [*where, has_open_item(c)])
+	area_of = fn.IfNull(c.area, "")
+	by_area = frappe.qb.get_query("Life Chat Log", fields=[area_of, fn.Count("*")], ignore_permissions=False)
+	for crit in where:
+		by_area = by_area.where(crit)
+	by_area = by_area.groupby(area_of).orderby(fn.Count("*"), order=Order.desc).run()
 	area_names = names_map("Life Area", [a for a, n in by_area], "area_name")
 	return {"space": space, "chats": rows, "total": total, "with_open_items": with_open, "group_by": group_by, "tabs": tabs,
 		"by_area": [{"area": a or "none", "area_name": area_names.get(a) or "No area", "count": n} for a, n in by_area]}
@@ -255,12 +264,15 @@ def needs_summary(space: str | None = None, start: int | None = 0, page_length: 
 	lifeos.api.chats.save_summary. Each row has name, title, date, updated_on, assistant, url and the transcript's length."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	guard = permissions.sensitive_guard(space)
-	# nosemgrep: frappe-sql-format-injection -- sensitive_guard is a constant fragment; values are parameters
-	rows = frappe.db.sql(f"""select name, title, date, updated_on, assistant, url, char_length(ifnull(transcript_md, '')) as transcript_length
-		from `tabLife Chat Log` where space=%(space)s and ifnull(summary_md, '') = ''{guard} order by ifnull(updated_on, date) desc
-		limit %(start)s, %(len)s""", {"space": space, "start": start, "len": page_length}, as_dict=True)
-	total = frappe.db.sql("select count(*) from `tabLife Chat Log` where space=%s and ifnull(summary_md, '') = ''" + permissions.sensitive_guard(space), space)[0][0]  # nosemgrep: frappe-sql-format-injection -- as above
+	c = frappe.qb.DocType("Life Chat Log")
+	where = [c.space == space, fn.IfNull(c.summary_md, "") == ""]
+	guard = permissions.sensitive_criterion(space, c)
+	if guard is not None:
+		where.append(guard)
+	fields = ["name", "title", "date", "updated_on", "assistant", "url"]
+	rows = list_query("Life Chat Log", fields, where, [(fn.IfNull(c.updated_on, c.date), Order.desc)])
+	rows = rows.select(fn.Function("char_length", fn.IfNull(c.transcript_md, "")).as_("transcript_length")).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Chat Log", where)
 	for r in rows:
 		r["date"] = str(r.date) if r.date else None
 		r["updated_on"] = str(r.updated_on) if r.updated_on else None
