@@ -32,7 +32,7 @@
       <section><SectionHead>Actions</SectionHead>
         <Card flush><Row v-for="a in d.goal.actions" :key="a.name">
           <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
-            <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ Object.values(a.ticks).reduce((x, y) => x + y, 0) }} ticks so far</div></div>
+            <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ plural(Object.values(a.ticks).reduce((x, y) => x + y, 0), 'tick') }} so far</div></div>
           <Badge v-if="a.status !== 'Open'" :theme="a.status === 'Done' ? 'green' : 'gray'" :label="a.status" /></Row>
           <Empty v-if="!d.goal.actions.length" title="No actions." hint="Edit the goal under Cycle goals on Goals > Cycles to add weekly actions." /></Card>
       </section>
@@ -93,6 +93,7 @@ import { itemData } from '@/data/item'
 import { loadBacklinks } from '@/lib/links'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
+import { plural } from '@/lib/plural'
 import { loadLookups, lookups, parentOptions } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 

@@ -1593,25 +1593,26 @@ print(json.dumps({"cycle": cycle.name, "goal": g.name, "old": old.name, "career"
     const openEdit = async () => { await pg.locator('[data-goal-edit]').click(); await dialog().waitFor({ timeout: 8000 }); await settle() }
     const save = async () => { await dialog().getByRole('button', { name: 'Save goal' }).click(); await dialog().waitFor({ state: 'detached', timeout: 8000 }); await settle() }
 
-    await check('GOALS.57', `${width} px: the page of a 12 Week Year goal shows the cycle's name, Open grid and its actions with this week's ticks`, async () => {
+    await check('GOALS.57', `${width} px: the page of a 12 Week Year goal shows the cycle's name and its own grid: its actions as rows, the weeks as columns, no Open grid`, async () => {
       await goalPage(made.goal)
       must((await pg.locator('main, [data-main]').first().innerText()).includes(`I56 cycle ${width}`), 'the cycle name is not in the header')
-      const grid = pg.locator('[data-open-grid]')
-      must(await grid.count() === 1, 'Open grid is missing')
-      must((await grid.getAttribute('href') || '').includes(`/goals/cycles?cycle=${made.cycle}`), 'Open grid goes elsewhere')
-      const rows = pg.locator('[data-goal-actions] [data-action-line]')
-      must(await rows.count() === 2, 'the Actions section does not list both actions')
-      must(/0 of 2 this week/.test(await rows.first().innerText()), 'the first action has no ticks this week: ' + await rows.first().innerText())
+      must(await pg.locator('[data-open-grid]').count() === 0, 'Open grid is still there')
+      const rows = pg.locator('[data-goal-actions] [data-grid-action]')
+      must(await rows.count() === 2, 'the grid does not list both actions')
+      must(/2 a week · 0 ticks so far/.test(await rows.first().locator('[data-action-line]').innerText()), 'the first action line says: ' + await rows.first().locator('[data-action-line]').innerText())
+      const heads = await pg.locator('[data-goal-actions] [data-grid-head]').count()
+      must(heads === (phone ? 3 : 12), `the grid has ${heads} week columns at ${width} px`)
+      must(await pg.locator('[data-goal-actions] [data-grid-head][data-now="1"]').count() === 1, 'this week is not highlighted')
       await noSideways()
     })
 
-    await check('GOALS.58', `${width} px: progress on a 12 Week Year goal shows this week's ticks and the tasks done`, async () => {
+    await check('GOALS.58', `${width} px: progress on a 12 Week Year goal counts this week's actions and the cycle score, not tasks`, async () => {
       bench(`from lifeos.goals import cycles
 cycles.set_tick("${made.actions[0]}", cycles.current_week(frappe.get_doc("Life Cycle", "${made.cycle}")), 1)`)
       await goalPage(made.goal)
-      const line = await pg.locator('[data-goal-week-ticks]').innerText()
-      must(/Actions this week: 1 of 3 ticks/.test(line), 'the ticks line says: ' + line)
-      must(/0 of 1 tasks done/.test(await pg.locator('[data-goal-figure]').innerText()), 'the tasks line is missing: ' + await pg.locator('[data-goal-figure]').innerText())
+      const line = await pg.locator('[data-goal-figure]').innerText()
+      must(/1 of 3 this week · cycle \d+%/.test(line), 'the progress line says: ' + line)
+      must(!/tasks done/.test(line), 'the progress line counts tasks: ' + line)
     })
 
     await check('GOALS.59', `${width} px: Edit renames the goal; its task, note and cycle still show it under the new name`, async () => {
@@ -1690,6 +1691,7 @@ print(json.dumps([frappe.db.get_value("Life Task", "${made.task}", "goal"), frap
       await goalPage(made.old)
       const alert = pg.locator('[data-needs-finish-line]')
       must((await alert.innerText()).includes('Done when is missing'), 'the page does not say it')
+      must(await pg.getByText('Set the finish line').count() === 0 && await pg.locator('[data-measure-edit]').count() === 0, 'a second prompt for Done when shows with the warning')
       await pg.locator('[data-done-when-add]').click()
       await pg.locator('[data-measure-save]').waitFor({ timeout: 5000 })
       await one.open('/life/goals?show=open')
@@ -1716,6 +1718,59 @@ print(json.dumps([frappe.db.get_value("Life Task", "${made.task}", "goal"), frap
       } finally {
         bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()')
       }
+    })
+
+    await check('GOALS.72', `${width} px: ticking this week's cell on the goal page updates the week's score there and in Cycles`, async () => {
+      await goalPage(made.goal)
+      const score = () => pg.locator('[data-grid-week-percent]').innerText()
+      const before = await score()
+      await pg.locator('[data-goal-actions] [data-grid-cell][data-tickable]').nth(1).click()
+      await pg.waitForFunction((b) => document.querySelector('[data-grid-week-percent]')?.innerText !== b, before, { timeout: 8000 })
+      const after = await score()
+      await one.open(`/life/goals/cycles?cycle=${made.cycle}`)
+      await pg.locator('[data-week-so-far]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-week-so-far]').innerText()).trim() === after.trim(), `Cycles says ${await pg.locator('[data-week-so-far]').innerText()}, the page ${after}`)
+    })
+
+    await check('GOALS.73', `${width} px: a goal without Done when shows one prompt; once set, the finish line shows with Edit`, async () => {
+      await goalPage(made.old)
+      must(await pg.locator('[data-needs-finish-line]').count() === 1, 'there is not exactly one prompt')
+      must(await pg.locator('[data-measure-edit]').count() === 0, 'an edit link shows beside the prompt')
+      await one.api('goals.update', { goal: made.old, values: { done_when: 'The old goal is wrapped up' } })
+      await goalPage(made.old)
+      must(await pg.locator('[data-needs-finish-line]').count() === 0, 'the prompt stays after Done when is set')
+      must((await pg.locator('[data-goal-finish-line]').innerText()).includes('The old goal is wrapped up'), 'the finish line is not shown')
+      must((await pg.locator('[data-measure-edit]').innerText()).includes('Edit'), 'the finish line has no Edit')
+    })
+
+    await check('GOALS.74', `${width} px: in Cycles a goal's name opens its goal page`, async () => {
+      await one.open(`/life/goals/cycles?cycle=${made.cycle}`)
+      await pg.locator('[data-cycle-goal-list]').waitFor({ timeout: 10000 })
+      await pg.locator(`[data-cycle-goal][data-goal="${made.goal}"] a`).first().click()
+      await pg.locator('[data-goal-overview]').waitFor({ timeout: 10000 })
+      must(pg.url().includes(`/life/goals/${made.goal}`), 'opened ' + pg.url())
+    })
+
+    await check('GOALS.75', `${width} px: Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone`, async () => {
+      await one.open(`/life/goals/cycles?cycle=${made.cycle}`)
+      await pg.locator('[data-week-bar]').first().waitFor({ timeout: 10000 })
+      must(await pg.locator('[data-week-bar]').count() === 12, 'Cycles does not show 12 weeks')
+      const box = await pg.locator('[data-week-bars-scroll]').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
+      must(box, 'the weekly scores scroll sideways')
+      await noSideways()
+      await goalPage(made.goal)
+      const all = pg.locator('[data-grid-all]')
+      if (phone) {
+        must(await pg.locator('[data-goal-actions] [data-grid-head]').count() === 3, 'the goal page does not show three weeks')
+        await all.click()
+        const sheet = pg.locator('[role="dialog"]').last()
+        await sheet.locator('[data-grid-head]').first().waitFor({ timeout: 5000 })
+        must(await sheet.locator('[data-grid-head]').count() === 12, 'All 12 weeks does not show 12 weeks')
+        await pg.keyboard.press('Escape')
+      } else {
+        must(!(await all.isVisible().catch(() => false)), 'All 12 weeks shows on a wide screen')
+      }
+      await noSideways()
     })
 
     await check('GOALS.65', `${width} px: the setting is on on a new site and can be switched off in Settings`, async () => {

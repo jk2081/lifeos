@@ -894,9 +894,12 @@ def detail(goal: str):
 			"serves": doc.serves, "actions": [], "percent": None, "outcome": doc.outcome, "result_note": doc.result_note, "carried_from": None}
 		cycles = frappe.get_list("Life Cycle", filters={"space": doc.space, "status": ("in", ["Active", "Planned"])}, fields=["name", "title", "status"], order_by="start_date")
 		return {"goal": g, "cycle": None, "cycles": cycles, "history": [], **common}
-	g = next((x for x in rules.grid(doc.cycle)["goals"] if x["name"] == doc.name), None)
-	cycle = frappe.db.get_value("Life Cycle", doc.cycle, ["title", "status", "start_date", "end_date"], as_dict=True)
-	return {"goal": g, "cycle": {"name": doc.cycle, "title": cycle.title, "status": cycle.status}, "this_week": _this_week(doc.cycle, g),
+	cycle_grid = rules.grid(doc.cycle)
+	g = next((x for x in cycle_grid["goals"] if x["name"] == doc.name), None)
+	c = cycle_grid["cycle"]
+	# the cycle's own scores go with the goal's grid: the week scores, the average and the target, as Cycles shows them
+	return {"goal": g, "cycle": {"name": doc.cycle, "title": c["title"], "status": c["status"]}, "this_week": _this_week(doc.cycle, g),
+		"weeks": cycle_grid["weeks"], "current_week": cycle_grid["current_week"], "average": cycle_grid["average"], "target": cycle_grid["target"],
 		"history": rules.goal_history(doc.name), **common}
 
 

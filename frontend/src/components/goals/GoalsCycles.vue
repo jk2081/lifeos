@@ -21,13 +21,13 @@
         </div>
         <p v-if="closed" class="rounded-5 bg-surface-gray-1 px-3 py-2 text-sm text-ink-gray-7" data-cycle-closed>This cycle is closed: the scores are final and it is read-only.</p>
 
-        <div class="overflow-x-auto" data-week-bars-scroll>
-          <ol class="flex min-w-[520px] items-end gap-2" aria-label="Weekly scores">
+        <div data-week-bars-scroll>
+          <ol class="flex items-end gap-2 max-md:gap-0.5" aria-label="Weekly scores">
             <li v-for="w in g.weeks" :key="w.week" class="flex min-w-0 flex-1 flex-col items-center gap-1" :data-week-bar="w.week" :data-week-state="state(w.week)"
               :data-score="state(w.week) === 'future' ? '' : Math.round(w.percent)">
-              <span class="h-4 text-xs tabular-nums text-ink-gray-6">{{ state(w.week) === 'now' ? 'so far' : state(w.week) === 'past' ? pct(w.percent) : '' }}</span>
+              <span class="h-4 max-w-full truncate text-xs tabular-nums text-ink-gray-6 max-md:text-[10px]">{{ state(w.week) === 'now' ? 'so far' : state(w.week) === 'past' ? pct(w.percent) : '' }}</span>
               <div class="flex h-20 w-full items-end"><div class="w-full rounded-4" :class="barClass(w.week)" :style="{ height: barHeight(w) }" /></div>
-              <span class="text-xs text-ink-gray-6">W{{ w.week }}</span>
+              <span class="text-xs text-ink-gray-6 max-md:text-[10px]"><span class="max-md:hidden">W</span>{{ w.week }}</span>
             </li>
           </ol>
         </div>

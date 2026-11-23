@@ -9,7 +9,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc` |
 | `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources, old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
-| `test_goals.py` | Goals: cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
+| `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
@@ -196,8 +196,8 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.54` the Month and Year headers link to Goals > Cycles
 - `GOALS.55` two columns, the 12 Week Year beside the month goals
 - `GOALS.56` Cycles on a space with no cycle shows what will appear and the one action
-- `GOALS.57` the page of a 12 Week Year goal shows the cycle's name, Open grid and its actions with this week's ticks
-- `GOALS.58` progress on a 12 Week Year goal shows this week's ticks and the tasks done
+- `GOALS.57` the page of a 12 Week Year goal shows the cycle's name and its own grid (actions as rows, weeks as columns, three weeks on a phone), no Open grid
+- `GOALS.58` progress on a 12 Week Year goal counts this week's actions and the cycle score, not tasks
 - `GOALS.59` Edit renames the goal; its task, note and cycle still show it under the new name
 - `GOALS.60` Edit changes the goal's area to a part of Career; Goals > By area shows it there
 - `GOALS.61` Edit adds a weekly action and retires another; the cycle grid and Goals > Cycles show the same
@@ -211,6 +211,10 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.69` an existing Open goal shows To sort; Make it a focus creates the focus and an Annual goal holding the old goal's tasks
 - `GOALS.70` Settings > Areas shows focuses under each part, with switches and + Add a focus
 - `GOALS.71` focus headings and their goals stack on a phone and the focus page is one column
+- `GOALS.72` ticking this week's cell on the goal page updates the week's score there and in Cycles
+- `GOALS.73` a goal without Done when shows one prompt; once set, the finish line shows with Edit
+- `GOALS.74` in Cycles a goal's name opens its goal page
+- `GOALS.75` Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone
 
 ### Library (`tools/acceptance/library.mjs`, 38 checks)
 
