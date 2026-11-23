@@ -258,7 +258,8 @@ def _check_wiki(space, value):
 
 
 def _wiki_page(space, title):
-	rows = frappe.db.sql("select name from `tabLife Note` where space=%s and collection='Wiki' and lower(title)=lower(%s) limit 1", (space, title))
+	n = frappe.qb.DocType("Life Note")
+	rows = frappe.qb.from_(n).select(n.name).where((n.space == space) & (n.collection == "Wiki") & (frappe.query_builder.functions.Lower(n.title) == title.lower())).limit(1).run()  # system: the page is looked up in the space the job writes to
 	return rows[0][0] if rows else None
 
 

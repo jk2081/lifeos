@@ -4,6 +4,8 @@ agent holds its own access, and Life OS's own read of Gmail (issue 58, `lifeos/b
 one mailbox for each Gmail card."""
 import frappe
 from frappe import _
+from frappe.query_builder import Case
+from frappe.query_builder import functions as fn
 from frappe.utils import add_to_date, getdate, now_datetime, nowdate
 
 from lifeos import permissions
@@ -112,12 +114,11 @@ def _week_start():
 
 def _week_counts(space, system):
 	"""Captures that came in from `system` since Monday: all of them, and how many were a finished piece of work (a job)."""
-	if system == "upload":
-		cond, args = "(source_system is null or source_system in ('', 'upload'))", []
-	else:
-		cond, args = "source_system = %s", [system]
-	n, jobs = frappe.db.sql(f"select count(*), coalesce(sum(job_id is not null and job_id != ''), 0) from `tabLife Inbox Item` "
-		f"where space = %s and creation >= %s and {cond}", [space, _week_start(), *args])[0]
+	i = frappe.qb.DocType("Life Inbox Item")
+	cond = (i.source_system.isnull() | i.source_system.isin(["", "upload"])) if system == "upload" else (i.source_system == system)
+	has_job = fn.Sum(Case().when(fn.IfNull(i.job_id, "") != "", 1).else_(0))
+	n, jobs = frappe.qb.get_query("Life Inbox Item", fields=[fn.Count("*"), fn.Coalesce(has_job, 0)], ignore_permissions=False).where(
+		(i.space == space) & (i.creation >= _week_start()) & cond).run()[0]
 	return int(n), int(jobs)
 
 
