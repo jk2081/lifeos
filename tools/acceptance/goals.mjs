@@ -1434,6 +1434,13 @@ cycles.carry_month_goal("${old}")`)
     await check('GOALS.51', `${width} px: on an empty space (an area with nothing in it) Cycles says what will appear and how to add it`, async () => {
       const area = bench(`a = frappe.get_doc({"doctype": "Life Area", "space": "${SPACE}", "area_name": "${T('empty area')}", "parent_area": frappe.db.get_value("Life Area", {"space": "${SPACE}", "is_life_area": 1}, "name")}).insert(ignore_permissions=True)
 print(a.name)`).split('\n').pop()
+      // a month goal with no area shows under every area, so park the ones earlier checks left, then put them back
+      const parked = bench(`from frappe.utils import get_first_day, get_last_day, today
+names = frappe.get_all("Life Goal", filters={"space": "${SPACE}", "horizon": "Month", "is_archived": 0, "area": ("is", "not set"), "target_date": ("between", [get_first_day(today()), get_last_day(today())])}, pluck="name")
+for n in names:
+    frappe.db.set_value("Life Goal", n, "area", frappe.db.get_value("Life Area", "${area}", "parent_area"), update_modified=False)
+frappe.db.commit()
+print(",".join(names))`).split('\n').pop()
       try {
         await s.open(`/life/goals/cycles?area=${area}`)
         await ready()
@@ -1445,6 +1452,10 @@ print(a.name)`).split('\n').pop()
         await noSideways()
       } finally {
         bench(`frappe.set_user("Administrator")
+for n in "${parked}".split(","):
+    if n:
+        frappe.db.set_value("Life Goal", n, "area", None, update_modified=False)
+frappe.db.commit()
 frappe.delete_doc("Life Area", "${area}", force=1, ignore_permissions=True)`)
       }
     })
