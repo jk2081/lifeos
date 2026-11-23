@@ -112,7 +112,8 @@ import NewRecord from '@/components/NewRecord.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
 import { MONTHS, addDays, iso, long, parse, short, startOfWeek as mondayOf, time, weekday } from '@/lib/dates'
@@ -221,11 +222,11 @@ const monthsWithEntries = computed(() => Array.from({ length: 12 }, (_, i) => i 
 
 async function reload() {
   if (mode.value === 'year') {
-    const res = await tryCall(() => api('calendar.year', { space: store.space, year: year.value }))
+    const res = await tryCall(() => goalsData.calendar.year({ space: store.space, year: year.value }))
     if (res) yearData.value = res
-    if (!google.value) google.value = (await tryCall(() => api('calendar.get', { space: store.space, from_date: store.today, to_date: store.today })))?.google
+    if (!google.value) google.value = (await tryCall(() => goalsData.calendar.get({ space: store.space, from_date: store.today, to_date: store.today })))?.google
   } else {
-    const res = await tryCall(() => api('calendar.get', { space: store.space, from_date: range.value[0], to_date: range.value[1], area: store.lensArea || undefined }))
+    const res = await tryCall(() => goalsData.calendar.get({ space: store.space, from_date: range.value[0], to_date: range.value[1], area: store.lensArea || undefined }))
     if (res) {
       data.value = res
       google.value = res.google
@@ -265,12 +266,12 @@ async function saveEvent(v) {
   let ends = null
   if (allDay && v.end_date) ends = `${v.end_date} 23:59:59`
   else if (!allDay && v.end_time) ends = `${v.date} ${v.end_time}:00`
-  const res = await api('calendar.add_event', { space: store.space, subject: v.subject, starts_on: starts, ends_on: ends, all_day: allDay ? 1 : 0 })
+  const res = await goalsData.calendar.add_event({ space: store.space, subject: v.subject, starts_on: starts, ends_on: ends, all_day: allDay ? 1 : 0 })
   toast.success('Event added.')
 }
 async function saveDate(v) {
   const d = parse(v.date)
-  await api('calendar.add_important_date', { space: store.space, title: v.title, kind: v.kind, day: d.getDate(), month: d.getMonth() + 1, year: v.year || null })
+  await goalsData.calendar.add_important_date({ space: store.space, title: v.title, kind: v.kind, day: d.getDate(), month: d.getMonth() + 1, year: v.year || null })
   toast.success('Added. It shows on this day every year.')
 }
 watch([mode, cursor], reload, { immediate: true })

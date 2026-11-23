@@ -1405,3 +1405,30 @@ class TestRulesOnTheDocType(LifeTestCase):
 		frappe.flags.lifeos_allow_open_goals = False
 		with self.assertRaises(frappe.ValidationError):
 			frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "77 open", "done_when": "x"}).insert()
+
+
+class TestGoalsFolder(LifeTestCase):
+	"""The goals screens live in one folder and reach the server through frontend/src/data/goals.js."""
+
+	GOALS = os.path.join(REPO, "frontend", "src", "components", "goals")
+	COMPONENTS = os.path.join(REPO, "frontend", "src", "components")
+
+	def test_no_goals_file_calls_api_directly(self):
+		import re
+
+		bad = []
+		for name in sorted(os.listdir(self.GOALS)):
+			if not name.endswith((".vue", ".js")):
+				continue
+			source = open(os.path.join(self.GOALS, name), encoding="utf-8").read()
+			if re.search(r"\bapi\(", source) or re.search(r"import\s*\{[^}]*\bapi\b[^}]*\}\s*from\s*'@/lib/api'", source):
+				bad.append(name)
+		self.assertEqual(bad, [], "these goals components call api( directly; use data/goals.js")
+
+	def test_old_folders_hold_no_goal_components(self):
+		for folder in ("journal", "plan", "periodic"):
+			path = os.path.join(self.COMPONENTS, folder)
+			if not os.path.isdir(path):
+				continue
+			goalish = [f for f in os.listdir(path) if "goal" in f.lower() or f.startswith(("Habit", "Cycle"))]
+			self.assertEqual(goalish, [], f"components/{folder} holds goal components")

@@ -33,7 +33,8 @@ import { ref } from 'vue'
 import { Badge, Button, Dialog, Dropdown } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
 import GoalDialog from '@/components/goals/GoalDialog.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 
 const open = defineModel({ type: Boolean })
 const props = defineProps({ grid: Object, writable: Boolean })
@@ -45,7 +46,7 @@ function edit(goal) {
   goalOpen.value = true
 }
 function menu(a) {
-  const set = (status) => async () => { if (await tryCall(() => api('goals.set_action_status', { action: a.name, status }))) emit('changed') }
+  const set = (status) => async () => { if (await tryCall(() => goalsData.goals.set_action_status({ action: a.name, status }))) emit('changed') }
   const items = []
   if (a.status !== 'Done') items.push({ label: 'Finished for good', onClick: set('Done') })
   if (a.status !== 'Dropped') items.push({ label: 'Drop this action', onClick: set('Dropped') })
@@ -53,6 +54,6 @@ function menu(a) {
   return items
 }
 async function start() {
-  if (await tryCall(() => api('goals.start_cycle', { cycle: props.grid.cycle.name }), 'Cycle started.')) emit('changed')
+  if (await tryCall(() => goalsData.goals.start_cycle({ cycle: props.grid.cycle.name }), 'Cycle started.')) emit('changed')
 }
 </script>

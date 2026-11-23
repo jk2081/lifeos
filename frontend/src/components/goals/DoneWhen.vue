@@ -37,7 +37,8 @@
 // finish line that reads as a frequency ("daily", "3 times a week") offers Make it a habit instead.
 import { computed, ref, watch } from 'vue'
 import { Alert, Button, FormControl, TabButtons } from 'frappe-ui'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { store } from '@/lib/store'
 
 const props = defineProps({ modelValue: { type: Object, required: true }, title: String, notes: String, space: String, disabled: Boolean, hideSuggest: Boolean, goal: String, horizon: String, noHabit: Boolean })
@@ -83,7 +84,7 @@ function setKind(v) {
 async function suggest() {
   busy.value = true
   examples.value = []
-  const r = await tryCall(() => api('goals.suggest_measure', { title: props.title, notes: props.notes || undefined, space: props.space || store.space, goal: props.goal || undefined, horizon: props.horizon || undefined }))
+  const r = await tryCall(() => goalsData.goals.suggest_measure({ title: props.title, notes: props.notes || undefined, space: props.space || store.space, goal: props.goal || undefined, horizon: props.horizon || undefined }))
   busy.value = false
   if (!r) return
   by.value = r.by || ''

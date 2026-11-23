@@ -113,7 +113,8 @@ import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
 import CycleGoalsDialog from '@/components/goals/CycleGoalsDialog.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged } from '@/lib/pane'
 import { areaName, loadLookups } from '@/lib/lookups'
@@ -163,7 +164,7 @@ async function tap(a, i) {
   const next = i === before ? i - 1 : i
   a.ticks[String(w)] = next
   try {
-    const score = await api('goals.tick', { action: a.name, week: w, count: next })
+    const score = await goalsData.goals.tick({ action: a.name, week: w, count: next })
     Object.assign(g.value.weeks[w - 1], score)
     const scores = g.value.weeks.slice(0, w).map((x) => x.percent)
     g.value.average = scores.reduce((x, y) => x + y, 0) / scores.length
@@ -185,20 +186,20 @@ function statusOf(m) {
   return { label: 'In progress', theme: 'green' }
 }
 async function createCycle() {
-  if (await tryCall(() => api('goals.create_cycle', { space: store.space }), 'Cycle created.')) load()
+  if (await tryCall(() => goalsData.goals.create_cycle({ space: store.space }), 'Cycle created.')) load()
 }
 
 async function loadGrid() {
-  const res = await tryCall(() => api('goals.grid', { space: store.space, cycle: route.query.cycle || undefined, area: store.lensArea || undefined }))
+  const res = await tryCall(() => goalsData.goals.grid({ space: store.space, cycle: route.query.cycle || undefined, area: store.lensArea || undefined }))
   g.value = res || null
 }
 async function loadMonth() {
-  const res = await tryCall(() => api('goals.this_month', { space: store.space, area: store.lensArea || undefined }))
+  const res = await tryCall(() => goalsData.goals.this_month({ space: store.space, area: store.lensArea || undefined }))
   if (res) mp.value = res
 }
 // the monthly and the 12-week review, when one is due (issue 47)
 async function loadDue() {
-  const res = writable.value ? await tryCall(() => api('periodic.due', { space: store.space })) : null
+  const res = writable.value ? await tryCall(() => goalsData.periodic.due({ space: store.space })) : null
   reviewsDue.value = (res?.due || []).filter((r) => r.kind !== 'weekly')
 }
 async function load() {

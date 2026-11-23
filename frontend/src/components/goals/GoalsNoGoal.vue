@@ -79,7 +79,8 @@ import AreaGuess from '@/components/AreaGuess.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { dotClass } from '@/lib/lens'
 import { areaLabel, loadLookups, lookups } from '@/lib/lookups'
@@ -96,7 +97,7 @@ const addInput = ref(null)
 const writable = computed(() => canWrite())
 
 async function load() {
-  const res = await tryCall(() => api('tasks.no_goal', { space: store.space }))
+  const res = await tryCall(() => goalsData.tasks.no_goal({ space: store.space }))
   if (res) data.value = res
   loaded.value = true
   emit('changed')
@@ -110,20 +111,20 @@ async function act(fn) {
   }
 }
 const areaMenu = (t) => lookups.areas.map((a) => ({ label: areaLabel(a), icon: a.name === t.area ? 'lucide-check' : undefined,
-  onClick: () => act(() => api('tasks.confirm_area', { task: t.name, area: a.name })) }))
+  onClick: () => act(() => goalsData.tasks.confirm_area({ task: t.name, area: a.name })) }))
 // goals of the task's area first, then the others (the server's order within each)
 function goalMenu(t, g) {
   const goals = data.value?.goals || []
   const own = goals.filter((x) => x.area && x.area === (t.area || g.area))
   const rest = goals.filter((x) => !own.includes(x))
-  const item = (x) => ({ label: x.title, onClick: () => act(() => api('tasks.update', { task: t.name, values: { goal: x.name } })) })
+  const item = (x) => ({ label: x.title, onClick: () => act(() => goalsData.tasks.update({ task: t.name, values: { goal: x.name } })) })
   const out = []
   if (own.length) out.push({ group: `Goals in ${g.label}`, options: own.map(item) })
   if (rest.length) out.push({ group: own.length ? 'Other goals' : 'Goals', options: rest.map(item) })
   return out.length ? out : [{ label: 'No goals yet. Make one on By area.', disabled: true }]
 }
-const fine = (t) => act(() => api('tasks.keep_standalone', { task: t.name }))
-const done = (t) => act(() => api('tasks.set_status', { task: t.name, status: 'Done' }))
+const fine = (t) => act(() => goalsData.tasks.keep_standalone({ task: t.name }))
+const done = (t) => act(() => goalsData.tasks.set_status({ task: t.name, status: 'Done' }))
 const onConfirmed = () => load()
 // Make it a goal asks for the goal's name and its "Done when" (required while the setting is on), then makes it
 const goalOpen = ref(false)
@@ -142,7 +143,7 @@ async function makeGoal() {
   if (problem) return toast.error(problem)
   making.value = g.key
   try {
-    const res = await api('tasks.make_goal', { tasks: g.suggestion.tasks, space: store.space, area: g.area || undefined, title: goalTitle.value.trim() === g.suggestion.title ? undefined : goalTitle.value.trim(), ...measureArgs(m) })
+    const res = await goalsData.tasks.make_goal({ tasks: g.suggestion.tasks, space: store.space, area: g.area || undefined, title: goalTitle.value.trim() === g.suggestion.title ? undefined : goalTitle.value.trim(), ...measureArgs(m) })
     goalOpen.value = false
     toast.success(`Made the goal "${res.title}" with ${res.tasks.length} tasks`)
     await load()
@@ -154,7 +155,7 @@ async function makeGoal() {
 }
 async function addTask(text, clear) {
   if (!text || !text.trim()) return
-  const res = await tryCall(() => api('tasks.quick_add', { text: text.trim(), space: store.space }))
+  const res = await tryCall(() => goalsData.tasks.quick_add({ text: text.trim(), space: store.space }))
   if (!res) return
   clear()
   await load()

@@ -79,7 +79,8 @@ import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import { api, optimistic, tryCall } from '@/lib/api'
+import { optimistic, tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { MONTHS, parse, short } from '@/lib/dates'
 
@@ -122,15 +123,15 @@ function toggle(day) {
   const h = current.value
   const was = isDone(day)
   const flip = (on) => { h.done_days = on ? [...h.done_days, day].sort((a, b) => a - b) : h.done_days.filter((x) => x !== day); recount(h) }
-  optimistic(() => flip(!was), () => flip(was), () => api('goals.toggle_habit', { habit: h.habit, date: iso(day), done: was ? 0 : 1 })).catch(() => {})
+  optimistic(() => flip(!was), () => flip(was), () => goalsData.goals.toggle_habit({ habit: h.habit, date: iso(day), done: was ? 0 : 1 })).catch(() => {})
 }
 async function load() {
   if (yearView.value) {
-    yearData.value = await tryCall(() => api('goals.habits_year', { space: store.space, year: year.value }))
+    yearData.value = await tryCall(() => goalsData.goals.habits_year({ space: store.space, year: year.value }))
     emit('sub', `Habits in ${year.value}`)
     return
   }
-  const res = await tryCall(() => api('goals.month_habits', { space: store.space, year: year.value, month: month.value }))
+  const res = await tryCall(() => goalsData.goals.month_habits({ space: store.space, year: year.value, month: month.value }))
   if (res) d.value = res
   emit('sub', `${MONTHS[month.value - 1]} ${year.value}`)
 }
@@ -148,12 +149,12 @@ function toggleYear() {
 }
 async function openManage() {
   yearView.value = false
-  library.value = (await tryCall(() => api('goals.habit_library', { space: store.space }))) || []
+  library.value = (await tryCall(() => goalsData.goals.habit_library({ space: store.space }))) || []
   draft.value = (d.value?.habits || []).filter((h) => !h.removed).map((h) => ({ habit: h.habit, title: h.title, days_per_week: h.days_per_week }))
   manageOpen.value = true
 }
 async function saveManage() {
-  const res = await tryCall(() => api('goals.set_month_habits', { space: store.space, year: year.value, month: month.value, habits: draft.value }), 'Habits saved for this month.')
+  const res = await tryCall(() => goalsData.goals.set_month_habits({ space: store.space, year: year.value, month: month.value, habits: draft.value }), 'Habits saved for this month.')
   if (res) {
     d.value = res
     manageOpen.value = false

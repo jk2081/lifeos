@@ -24,7 +24,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { DatePicker, Dialog, FormControl, toast } from 'frappe-ui'
 import DoneWhen from './DoneWhen.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { store } from '@/lib/store'
 import { areaOptions, goalOptions, loadLookups, lookups } from '@/lib/lookups'
 import { doneWhenRequired, emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
@@ -47,7 +48,7 @@ const parentOptions = computed(() => {
   return [{ label: 'None', value: '' }, ...goalOptions(first, { empty: null }), ...goalOptions(all.filter((g) => !first.includes(g)), { empty: null })]
 })
 async function suggest() {
-  const res = await api('goals.suggest_horizon', { space: store.space, target_date: v.target_date || undefined })
+  const res = await goalsData.goals.suggest_horizon({ space: store.space, target_date: v.target_date || undefined })
   quarters.value = res.quarters
   if (!props.horizon) v.horizon = res.horizon === 'Long term' ? 'Year' : res.horizon
   if (v.horizon === '12 weeks') pickCycle()
@@ -56,7 +57,7 @@ function horizonChosen() { v.serves = ''; if (v.horizon === '12 weeks') pickCycl
 // a 12 Week Year goal under a focus serves that focus's annual goal (issue 57)
 async function suggestServes() {
   if (v.horizon !== '12 weeks' || !v.area || v.serves) return
-  const annual = await tryCall(() => api('focus.annual_for', { area: v.area }))
+  const annual = await tryCall(() => goalsData.focus.annual_for({ area: v.area }))
   if (annual && !v.serves) v.serves = annual.name
 }
 function pickCycle() { if (!v.cycle) v.cycle = cycles.value[0]?.name || '' }
@@ -66,8 +67,8 @@ watch(() => props.modelValue, async (o) => {
   Object.assign(v, { title: '', horizon: props.horizon || 'Year', area: props.area || store.lensArea || '', target_date: '', cycle: '', serves: '' })
   Object.assign(m, emptyMeasure())
   loadLookups()
-  cycles.value = (await api('goals.cycles', { space: store.space })) || []
-  quarters.value = (await api('goals.suggest_horizon', { space: store.space })).quarters
+  cycles.value = (await goalsData.goals.cycles({ space: store.space })) || []
+  quarters.value = (await goalsData.goals.suggest_horizon({ space: store.space })).quarters
 }, { immediate: true })
 watch(open, (o) => emit('update:modelValue', o))
 
@@ -77,7 +78,7 @@ async function submit() {
   if (problem) return toast.error(problem)
   busy.value = true
   try {
-    const g = await api('goals.create', { space: store.space, title: v.title.trim(), horizon: v.horizon, area: v.area || undefined,
+    const g = await goalsData.goals.create({ space: store.space, title: v.title.trim(), horizon: v.horizon, area: v.area || undefined,
       target_date: v.target_date || undefined, cycle: v.horizon === '12 weeks' && !quarters.value ? v.cycle || undefined : undefined, serves: v.serves || undefined, ...measureArgs(m) })
     open.value = false
     await loadLookups(true)

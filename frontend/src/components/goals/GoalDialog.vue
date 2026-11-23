@@ -23,7 +23,8 @@
 <script setup>
 import { reactive, ref, watch } from 'vue'
 import { Button, Dialog, FormControl, TextInput, dialog, toast } from 'frappe-ui'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { areaOptions, loadLookups } from '@/lib/lookups'
 import DoneWhen from '@/components/goals/DoneWhen.vue'
 import { doneWhenRequired, emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
@@ -48,7 +49,7 @@ async function save() {
   const problem = measureProblem(m, (!props.goal && doneWhenRequired()) || !!props.goal?.measure_kind)
   if (problem) return toast.error(problem)
   const measure = m.measure_kind ? measureArgs(m) : {}
-  const res = await tryCall(() => api('goals.save_goal', { goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area || '', actions: form.actions,
+  const res = await tryCall(() => goalsData.goals.save_goal({ goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area || '', actions: form.actions,
     ...measure, measure_kind: m.measure_kind || undefined }), 'Goal saved.')
   if (res) {
     open.value = false
@@ -64,7 +65,7 @@ function remove() {
     message: 'Delete this goal and its ticks?',
     confirmLabel: 'Delete goal',
     onConfirm: async () => {
-      if (await tryCall(() => api('goals.delete_goal', { goal: props.goal.name }), 'Goal deleted.')) {
+      if (await tryCall(() => goalsData.goals.delete_goal({ goal: props.goal.name }), 'Goal deleted.')) {
         open.value = false
         emit('saved')
       }

@@ -28,7 +28,8 @@
 import { reactive, ref } from 'vue'
 import { Button, DatePicker, FormControl } from 'frappe-ui'
 import Row from '../ui/Row.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { short } from '@/lib/dates'
 import { openRef, refOf } from '@/lib/pane'
 
@@ -43,11 +44,11 @@ function startEdit(r) {
   editing.value = r.name
 }
 async function confirmReading(r, values) {
-  const res = await tryCall(() => api('goals.confirm_reading', { reading: r.name, value: values ? values.value : undefined, date: values ? values.date : undefined }), 'Reading confirmed')
+  const res = await tryCall(() => goalsData.goals.confirm_reading({ reading: r.name, value: values ? values.value : undefined, date: values ? values.date : undefined }), 'Reading confirmed')
   if (res) { editing.value = ''; emit('changed', res) }
 }
 async function reject(r) {
-  const res = await tryCall(() => api('goals.reject_reading', { reading: r.name }), 'Reading rejected')
+  const res = await tryCall(() => goalsData.goals.reject_reading({ reading: r.name }), 'Reading rejected')
   if (res) emit('changed', res)
 }
 function openSource(r) {
