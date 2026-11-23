@@ -1,6 +1,6 @@
 // Settings: Profile, Areas, Rhythms, Members, Sources, Rules, Skills, Cost, the ladder and the calendar connection.
 // Checks are numbered SETTINGS.<n> in the order they appear here; `node tools/acceptance.mjs --only=SETTINGS` runs this file's checks.
-import { SPACE, WIDTHS, areaId, areas, base, bench, check, must, owner, path, results, session, stamp, today } from './context.mjs'
+import { SPACE, WIDTHS, areaId, areas, base, bench, check, must, owner, pathOf, results, session, stamp, today } from './context.mjs'
 import { uxKit } from './ux.mjs'
 
 for (const width of WIDTHS) {
@@ -1263,7 +1263,7 @@ for (const width of WIDTHS) {
       must(!(await pg.locator('[data-reset]').count()), 'Rhythms still holds Reset')
       // the old route
       await s.open('/life/today/reset')
-      must(path(pg) === '/life/today', `/today/reset opened ${path(pg)}`)
+      must(pathOf(pg) === '/life/today', `/today/reset opened ${pathOf(pg)}`)
       must(await pg.locator('[data-moved-note]').isVisible(), 'no "That page moved" note')
       must((await pg.locator('[data-moved-note]').innerText()).includes('That page moved'), 'the note does not say that page moved')
       must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
