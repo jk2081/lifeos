@@ -9,6 +9,8 @@ finding carries its source, and the model is told to leave out what it is unsure
 import json
 
 import frappe
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, getdate, today
 
 from lifeos.review import insights
@@ -36,9 +38,9 @@ def add(space, kind, title, evidence, actions, meeting=None, reading=None, sourc
 
 def detect_readings(space):
 	"""A Goal reading finding for each Suggested reading of a goal in progress."""
-	rows = frappe.db.sql("""select r.name, r.goal, r.value, r.date, r.excerpt, r.source_doctype, r.source_name, g.title, g.unit, g.area, g.current_value,
-		g.current_on from `tabLife Goal Reading` r join `tabLife Goal` g on g.name = r.goal
-		where r.space = %s and r.status = 'Suggested' and g.outcome = 'In Progress'""", space, as_dict=True)
+	r, g = frappe.qb.DocType("Life Goal Reading"), frappe.qb.DocType("Life Goal")
+	rows = (frappe.qb.from_(r).join(g).on(g.name == r.goal).select(r.name, r.goal, r.value, r.date, r.excerpt, r.source_doctype, r.source_name, g.title, g.unit, g.area,
+		g.current_value, g.current_on).where((r.space == space) & (r.status == "Suggested") & (g.outcome == "In Progress")).run(as_dict=True))  # system: the weekly review reads the owner's own space
 	for r in rows:
 		if frappe.db.exists("Life Insight", {"reading": r.name}):
 			continue
@@ -90,9 +92,9 @@ def _source_line(doctype, name, on=None):
 # ---- the revelations of a review ----
 
 def pool(space, start):
-	return frappe.db.sql("""select name from `tabLife Insight` where space = %(space)s and status = 'New' and kind in %(kinds)s
-		and (found_on >= %(start)s or found_for = %(start)s or kind = 'Goal reading') order by `rank` asc, found_on desc, creation desc limit 50""",
-		{"space": space, "kinds": REVELATIONS, "start": getdate(start)}, pluck=True)
+	i = frappe.qb.DocType("Life Insight")
+	where = (i.space == space) & (i.status == "New") & i.kind.isin(REVELATIONS) & ((i.found_on >= getdate(start)) | (i.found_for == getdate(start)) | (i.kind == "Goal reading"))
+	return frappe.qb.from_(i).select(i.name).where(where).orderby(i.rank).orderby(i.found_on, order=Order.desc).orderby(i.creation, order=Order.desc).limit(50).run(pluck=True)  # system: the weekly review reads the owner's own space
 
 
 def revelations(review):
@@ -203,7 +205,8 @@ def reading_changed(doc, method=None):
 
 def counts(space, start, end):
 	"""Findings acted on and dismissed in the period, for the week's numbers."""
-	rows = frappe.db.sql("""select status, count(*) from `tabLife Insight` where space = %s and kind in %s and status in ('Acted', 'Dismissed')
-		and modified between %s and %s group by status""", (space, REVELATIONS, getdate(start), add_days(getdate(end), 1)))
+	i = frappe.qb.DocType("Life Insight")
+	where = (i.space == space) & i.kind.isin(REVELATIONS) & i.status.isin(["Acted", "Dismissed"]) & i.modified.between(getdate(start), add_days(getdate(end), 1))
+	rows = frappe.qb.from_(i).select(i.status, fn.Count("*")).where(where).groupby(i.status).run()  # system: the weekly review reads the owner's own space
 	got = dict(rows)
 	return {"acted": int(got.get("Acted") or 0), "dismissed": int(got.get("Dismissed") or 0)}

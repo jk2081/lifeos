@@ -2,6 +2,7 @@
 import re
 
 import frappe
+from frappe.query_builder import Order
 
 from lifeos.constants import LINKABLE
 
@@ -30,9 +31,11 @@ def find_target(space, title, name=None):
 		if name:
 			filters["name"] = name.strip()
 		if dt == "Life Note":  # a Wiki page first, then a My notes page (UX fixes, set 4)
-			found = frappe.db.sql("""select name from `tabLife Note` where space=%(space)s and title=%(title)s
-				and (%(name)s = '' or name=%(name)s) order by (collection = 'Wiki') desc, creation asc limit 1""",
-				{"space": space, "title": title, "name": (name or "").strip()})
+			n = frappe.qb.DocType("Life Note")
+			query = frappe.qb.from_(n).select(n.name).where((n.space == space) & (n.title == title))  # system: a link is resolved inside the record's own space
+			if (name or "").strip():
+				query = query.where(n.name == name.strip())
+			found = query.orderby(n.collection == "Wiki", order=Order.desc).orderby(n.creation).limit(1).run()
 			found = found[0][0] if found else None
 		else:
 			found = frappe.db.get_value(dt, filters, "name", order_by="creation asc")
@@ -74,10 +77,8 @@ def rebuild(doc):
 
 
 def remove(doctype, name):
-	frappe.db.sql(
-		"delete from `tabLife Link` where (from_doctype=%s and from_name=%s) or (to_doctype=%s and to_name=%s)",
-		(doctype, name, doctype, name),
-	)
+	lk = frappe.qb.DocType("Life Link")
+	frappe.qb.from_(lk).delete().where(((lk.from_doctype == doctype) & (lk.from_name == name)) | ((lk.to_doctype == doctype) & (lk.to_name == name))).run()
 
 
 def on_rename(doc):
@@ -90,9 +91,7 @@ def on_rename(doc):
 			_adopt_unresolved(doc, field)
 		return
 	old, new = before.get(field), doc.get(field)
-	rows = frappe.db.sql(
-		"select name, from_doctype, from_name from `tabLife Link` where to_doctype=%s and to_name=%s", (doc.doctype, doc.name), as_dict=True
-	)
+	rows = frappe.get_all("Life Link", filters={"to_doctype": doc.doctype, "to_name": doc.name}, fields=["name", "from_doctype", "from_name"], limit=0)
 	pattern = re.compile(r"\[\[\s*" + re.escape(old) + r"\s*(#[^\[\]\n]+?)?\]\]")
 	for row in rows:
 		if not frappe.db.exists(row.from_doctype, row.from_name):
@@ -137,10 +136,7 @@ def route_of(doctype, name):
 def outgoing(doc):
 	"""Links stored for this record: link text, target and the target's current title. `ambiguous` is set when more than one
 	wiki page has the link's title (the link resolves to the oldest; the screen shows a warning)."""
-	rows = frappe.db.sql(
-		"select to_doctype, to_name, link_text from `tabLife Link` where from_doctype=%s and from_name=%s",
-		(doc.doctype, doc.name), as_dict=True,
-	)
+	rows = frappe.get_all("Life Link", filters={"from_doctype": doc.doctype, "from_name": doc.name}, fields=["to_doctype", "to_name", "link_text"], limit=0)
 	pinned = {m.group(1).strip().lower() for m in LINK_RE.finditer("\n".join(doc.get(f) or "" for f in md_fields(doc))) if m.group(2)}
 	out = []
 	for r in rows:

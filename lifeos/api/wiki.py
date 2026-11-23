@@ -8,12 +8,14 @@ import re
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos.library import links
 from lifeos import permissions
-from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
-from lifeos.api.utils import order_by as sort_order
+from lifeos.api.utils import (FullText, area_criterion, count_where, filter_criteria, group_summary, list_query, names_map, order_terms, page, parse,
+	sort_terms)
 from lifeos.life.doctype.life_note.life_note import MAX_MD, SOURCE_DOCTYPES
 
 MAX_SOURCES = 50
@@ -152,7 +154,13 @@ def _check_text(content_md):
 
 # ---------- reading ----------
 
-PAGE_SORTS = {"title": "n.title", "modified": "n.modified", "creation": "n.creation"}
+PAGE_SORTS = {k: (lambda n, k=k: [n[k]]) for k in ("title", "modified", "creation")}
+
+
+def source_count(n):
+	"""The number of sources a page cites, as a select term."""
+	s = frappe.qb.DocType("Life Note Source")
+	return frappe.qb.from_(s).select(fn.Count("*")).where((s.parent == n.name) & (s.parenttype == "Life Note"))
 
 
 @frappe.whitelist(methods=["GET"])
@@ -163,31 +171,31 @@ def pages(space: str | None = None, area: str | None = None, goal: str | None = 
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 
-	where, values = ["n.space = %(space)s", "n.collection = 'Wiki'" + permissions.sensitive_guard(space, "n.")], {"space": space}
+	n = frappe.qb.DocType("Life Note")
+	where = [n.space == space, n.collection == "Wiki"]
+	guard = permissions.sensitive_criterion(space, n)
+	if guard is not None:
+		where.append(guard)
 	if not int(include_archived or 0):
-		where.append("n.is_archived = 0")
+		where.append(n.is_archived == 0)
 	if area:
-		where.append(area_filter(space, area, "n.area", values, also_in="Life Note"))
+		where.append(area_criterion(space, area, n, also_in="Life Note"))
 	if goal:
-		where.append("ifnull(n.goal, '') = %(goal)s")
-		values["goal"] = "" if goal == "none" else goal
-	conds, values = std_filters("Life Note", filters, "n", values)
-	clause = " and ".join(where + conds)
+		where.append(fn.IfNull(n.goal, "") == ("" if goal == "none" else goal))
+	where += filter_criteria("Life Note", filters, n)
 	if summary:
-		return {"summary": summarise("Life Note", f"from `tabLife Note` n where {clause}", values, "n", summary, start, page_length)}
-	order = std_order("Life Note", order_by, "n", PAGE_SORTS) or sort_order(sort, dir, PAGE_SORTS, "n.modified desc")
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	rows = frappe.db.sql(f"""select n.name, n.title, n.summary, n.area, n.goal, n.is_rules, n.modified, n.is_archived,
-		(select count(*) from `tabLife Note Source` s where s.parent = n.name and s.parenttype = 'Life Note') as sources_count
-		from `tabLife Note` n where {clause} order by n.is_rules desc, {order}, n.name limit %(start)s, %(len)s""",
-		{**values, "start": start, "len": page_length}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	total = frappe.db.sql(f"select count(*) from `tabLife Note` n where {clause}", values)[0][0]
+		return {"summary": group_summary("Life Note", where, summary, start, page_length)}
+	terms = order_terms("Life Note", order_by, n, PAGE_SORTS) or sort_terms(sort, dir, PAGE_SORTS, n, [(n.modified, Order.desc)])
+	fields = ["name", "title", "summary", "area", "goal", "is_rules", "modified", "is_archived"]
+	rows = list_query("Life Note", fields, where, [(n.is_rules, Order.desc), *terms, (n.name, Order.asc)])
+	rows = rows.select(source_count(n).as_("sources_count")).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Note", where)
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	for r in rows:
 		r["area_name"] = areas.get(r.area)
 		r["modified"] = str(r.modified)[:19]
 	return {"space": space, "pages": rows, "total": total}
+
 
 @frappe.whitelist(methods=["POST"])
 def rules(space: str | None = None):
@@ -202,17 +210,17 @@ def index(space: str | None = None, area: str | None = None, start: int | None =
 	"""Wiki pages of a space: name, title, summary, area, sources count, updated. By title. Paginated (at most 500 a call)."""
 	space = permissions.resolve_space(space)
 	start, page_length = int(start or 0), min(max(int(page_length or 100), 1), 500)
-	values = {"space": space}
-	where = ["n.space = %(space)s", "n.collection = 'Wiki'", "n.is_archived = 0" + permissions.sensitive_guard(space, "n.")]
+	n = frappe.qb.DocType("Life Note")
+	where = [n.space == space, n.collection == "Wiki", n.is_archived == 0]
+	guard = permissions.sensitive_criterion(space, n)
+	if guard is not None:
+		where.append(guard)
 	if area:
-		where.append(area_filter(space, area, "n.area", values, also_in="Life Note"))
-	order = {"updated": "n.modified desc", "title": "n.title asc"}.get(order_by or "title", "n.title asc")
-	# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments and area_filter; the order comes from a fixed map; values are parameters
-	rows = frappe.db.sql(f"""select n.name, n.title, n.summary, n.area, n.is_rules, n.modified,
-		(select count(*) from `tabLife Note Source` s where s.parent = n.name and s.parenttype = 'Life Note') as sources
-		from `tabLife Note` n where {' and '.join(where)} order by {order} limit %(start)s, %(len)s""", {**values, "start": start, "len": page_length}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments and area_filter; values are parameters
-	total = frappe.db.sql(f"select count(*) from `tabLife Note` n where {' and '.join(where)}", values)[0][0]
+		where.append(area_criterion(space, area, n, also_in="Life Note"))
+	order = (n.modified, Order.desc) if order_by == "updated" else (n.title, Order.asc)
+	rows = list_query("Life Note", ["name", "title", "summary", "area", "is_rules", "modified"], where, [order])
+	rows = rows.select(source_count(n).as_("sources")).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Note", where)
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	for r in rows:
 		r["area_name"] = areas.get(r.area)
@@ -237,26 +245,23 @@ def search(space: str | None = None, query: str | None = None, collection: str |
 	words = [w.lower() for w in WORD.findall(query or "")][:8]
 	if not words:
 		return {"results": []}
-	where = ["space = %(space)s", "is_archived = 0"]
-	kinds = ["(kind = 'Note'" + (" and collection = %(collection)s)" if collection else ")")]
+	x = frappe.qb.DocType("Life Index")
+	kinds = (x.kind == "Note") & (x.collection == collection) if collection else (x.kind == "Note")
 	if int(include_sources or 0):
-		kinds.append("(kind in ('Inbox', 'Chat'))")
-	where.append("(" + " or ".join(kinds) + ")")
-	where.append("1=1" + permissions.vault_guard(space))
-	likes = " and ".join(f"(title like %(w{i})s or search_text like %(w{i})s)" for i in range(len(words)))
-	values = {"space": space, "collection": collection, "limit": limit, **{f"w{i}": f"%{w}%" for i, w in enumerate(words)}}
+		kinds = kinds | x.kind.isin(["Inbox", "Chat"])
+	where = [x.space == space, x.is_archived == 0, kinds]
+	guard = permissions.vault_criterion(space, x)
+	if guard is not None:
+		where.append(guard)
+	likes = [(x.title.like(f"%{w}%") | x.search_text.like(f"%{w}%")) for w in words]
 	long_words = [re.sub(r"[^\w]", "", w) for w in words if len(w) >= 3]
+	fields = ["ref_doctype", "ref_name", "title", "collection", "search_text"]
 	rows = []
 	if long_words:
-		values["q"] = " ".join(f"+{w}*" for w in long_words if w)
-		# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments and vault_guard; the search text is the %(q)s parameter
-		rows = frappe.db.sql(f"""select ref_doctype, ref_name, title, collection, search_text from `tabLife Index`
-			where {' and '.join(where)} and match(title, search_text) against (%(q)s in boolean mode) order by (title like %(w0)s) desc,
-			match(title, search_text) against (%(q)s in boolean mode) desc limit %(limit)s""", values, as_dict=True)
+		match = FullText([x.title, x.search_text], " ".join(f"+{w}*" for w in long_words if w))
+		rows = list_query("Life Index", fields, [*where, match], [(x.title.like(f"%{words[0]}%"), Order.desc), (match, Order.desc)]).limit(limit).run(as_dict=True)
 	if not rows:
-		# nosemgrep: frappe-sql-format-injection -- WHERE and LIKE placeholders are fixed fragments; each word is a %(wN)s parameter
-		rows = frappe.db.sql(f"""select ref_doctype, ref_name, title, collection, search_text from `tabLife Index`
-			where {' and '.join(where)} and {likes} order by record_date desc limit %(limit)s""", values, as_dict=True)
+		rows = list_query("Life Index", fields, [*where, *likes], [(x.record_date, Order.desc)]).limit(limit).run(as_dict=True)
 	summaries = dict(frappe.get_list("Life Note", filters={"name": ["in", [r.ref_name for r in rows if r.ref_doctype == "Life Note"] or [""]]},
 		fields=["name", "summary"], as_list=True))
 	return {"results": [{"doctype": r.ref_doctype, "name": r.ref_name, "title": r.title, "collection": r.collection or None,
@@ -288,9 +293,10 @@ def create_page(space: str | None = None, title: str | None = None, content_md: 
 	if not title:
 		frappe.throw(_("A page needs a title."), title=_("Page needs a title"))
 	_check_text(content_md)
-	existing = frappe.db.sql("select name from `tabLife Note` where space=%s and collection='Wiki' and lower(title)=lower(%s) limit 1", (space, title))
+	n = frappe.qb.DocType("Life Note")
+	existing = frappe.qb.from_(n).select(n.name).where((n.space == space) & (n.collection == "Wiki") & (fn.Lower(n.title) == title.lower())).limit(1).run(pluck=True)  # system: the page names are checked in the caller's own space
 	if existing:
-		frappe.throw(_("The wiki already has a page called {0} ({1}). Edit it with update_page.").format(title, existing[0][0]), frappe.DuplicateEntryError, title=_("Page already exists"))
+		frappe.throw(_("The wiki already has a page called {0} ({1}). Edit it with update_page.").format(title, existing[0]), frappe.DuplicateEntryError, title=_("Page already exists"))
 	srcs = _sources(sources, space)
 	src = _source_arg(source, space)
 	if src and src not in srcs:
@@ -421,36 +427,28 @@ def changes(space: str | None = None, note: str | None = None, by: str | None = 
 	from_date, to_date, and standard filters on Life Wiki Change. Paginated."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = ["c.space = %(space)s"], {"space": space}
+	c = frappe.qb.DocType("Life Wiki Change")
+	where = [c.space == space]
 	if permissions.vault_hidden(space):  # changes to a sensitive page are closed to an agent (set 6)
-		where.append("not exists (select 1 from `tabLife Note` sn where sn.name = c.note and sn.is_sensitive = 1)")
-	conds, values = std_filters("Life Wiki Change", filters, "c", values)
-	where += conds
+		sn = frappe.qb.DocType("Life Note")
+		where.append(c.note.notin(frappe.qb.from_(sn).select(sn.name).where(sn.is_sensitive == 1)))
+	where += filter_criteria("Life Wiki Change", filters, c)
 	if note:
-		where.append("c.note = %(note)s")
-		values["note"] = note
+		where.append(c.note == note)
 	if by:
-		where.append("c.changed_by = %(by)s")
-		values["by"] = by
+		where.append(c.changed_by == by)
 	if source:
-		where.append("c.source_name = %(source)s")
-		values["source"] = str(source).split(":", 1)[-1]
+		where.append(c.source_name == str(source).split(":", 1)[-1])
 	if from_date:
-		where.append("date(c.changed_on) >= %(from_date)s")
-		values["from_date"] = frappe.utils.getdate(from_date)
+		where.append(fn.Date(c.changed_on) >= frappe.utils.getdate(from_date))
 	if to_date:
-		where.append("date(c.changed_on) <= %(to_date)s")
-		values["to_date"] = frappe.utils.getdate(to_date)
-	clause = " and ".join(where)
+		where.append(fn.Date(c.changed_on) <= frappe.utils.getdate(to_date))
 	if summary:
-		return {"summary": summarise("Life Wiki Change", f"from `tabLife Wiki Change` c where {clause}", values, "c", summary, start, page_length)}
-	order = std_order("Life Wiki Change", order_by, "c", {"changed_on": "c.changed_on"}) or "c.changed_on desc"
-	# nosemgrep: frappe-sql-format-injection -- CHANGE_FIELDS is a fixed list; WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	rows = frappe.db.sql(f"""select {', '.join('c.' + f for f in CHANGE_FIELDS)} from `tabLife Wiki Change` c where {clause}
-		order by {order}, c.creation desc limit %(start)s, %(len)s""", {**values, "start": start, "len": page_length}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	total = frappe.db.sql(f"select count(*) from `tabLife Wiki Change` c where {clause}", values)[0][0]
-	people = frappe.db.sql("select distinct changed_by from `tabLife Wiki Change` where space=%s limit 50", space, pluck=True)
+		return {"summary": group_summary("Life Wiki Change", where, summary, start, page_length)}
+	terms = order_terms("Life Wiki Change", order_by, c, {"changed_on": lambda t: [t.changed_on]}) or [(c.changed_on, Order.desc)]
+	rows = list_query("Life Wiki Change", CHANGE_FIELDS, where, [*terms, (c.creation, Order.desc)]).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Wiki Change", where)
+	people = list_query("Life Wiki Change", ["changed_by"], [c.space == space]).distinct().limit(50).run(pluck=True)
 	return {"space": space, "changes": _decorate_changes(rows), "total": total, "people": [{"user": u, "name": n} for u, n in
 		[(p, ("Life OS" if p == "Administrator" else None)) for p in people]]}
 
@@ -494,15 +492,14 @@ def undo(change: str, force: bool | int | None = 0):
 
 def compute_health(space):
 	"""Orphans, broken links, pages without sources and near-duplicate titles of a space's wiki, and the health reports."""
-	pages = frappe.db.sql("""select name, title, summary, content_md, is_rules from `tabLife Note`
-		where space=%s and collection='Wiki' and is_archived=0""", space, as_dict=True)
+	pages = frappe.get_all("Life Note", filters={"space": space, "collection": "Wiki", "is_archived": 0},  # system: the health check reads the whole wiki
+		fields=["name", "title", "summary", "content_md", "is_rules"], limit=0)
 	names = [p.name for p in pages]
-	incoming = set(frappe.db.sql_list("""select distinct to_name from `tabLife Link` where space=%s and to_doctype='Life Note'
-		and from_name != to_name""", space)) if names else set()
-	cited = set(frappe.db.sql_list("""select distinct parent from `tabLife Note Source` where parenttype='Life Note' and parent in %s""",
-		(names,))) if names else set()
+	lk, src = frappe.qb.DocType("Life Link"), frappe.qb.DocType("Life Note Source")
+	incoming = set(frappe.qb.from_(lk).select(lk.to_name).distinct().where((lk.space == space) & (lk.to_doctype == "Life Note") & (lk.from_name != lk.to_name)).run(pluck=True)) if names else set()  # system: the whole wiki
+	cited = set(frappe.qb.from_(src).select(src.parent).distinct().where((src.parenttype == "Life Note") & src.parent.isin(names)).run(pluck=True)) if names else set()  # system: the whole wiki
 	resolved = {}
-	for f, text in frappe.db.sql("select from_name, lower(link_text) from `tabLife Link` where space=%s and from_doctype='Life Note'", space):
+	for f, text in frappe.qb.from_(lk).select(lk.from_name, fn.Lower(lk.link_text)).where((lk.space == space) & (lk.from_doctype == "Life Note")).run():  # system: the whole wiki
 		resolved.setdefault(f, set()).add(text)
 	broken, ambiguous = [], []
 	for p in pages:
@@ -519,9 +516,8 @@ def compute_health(space):
 	for p in pages:
 		groups.setdefault(_norm_title(p.title), []).append({"name": p.name, "title": p.title})
 	# a health report is a wiki page titled "Wiki health ..."
-	reports = frappe.db.sql("""select n.name, n.title, n.summary, n.modified from `tabLife Note` n
-		where n.space = %s and n.collection = 'Wiki' and n.title like 'Wiki health%%' and n.is_archived = 0
-		order by n.modified desc limit 10""", space, as_dict=True)
+	reports = frappe.get_all("Life Note", filters={"space": space, "collection": "Wiki", "title": ("like", "Wiki health%"), "is_archived": 0},  # system: the whole wiki
+		fields=["name", "title", "summary", "modified"], order_by="modified desc", limit=10)
 	for r in reports:
 		r["modified"] = str(r.modified)[:19]
 	return {

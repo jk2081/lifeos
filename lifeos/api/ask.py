@@ -5,10 +5,12 @@ import time
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import cint, now_datetime
 
 from lifeos import permissions
-from lifeos.api.utils import page, parse
+from lifeos.api.utils import count_where, list_query, page, parse
 
 SUGGESTED = ["What did I promise people this week?", "What is stuck, and what should I do about it?",
 	"How am I doing on my 12 Week Year goals this cycle?", "What came in this week that I have not acted on?"]
@@ -188,17 +190,15 @@ def threads(space: str | None = None, q: str | None = None, start: int | str | N
 	_person()
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = "t.user=%(user)s and t.space=%(space)s", {"user": frappe.session.user, "space": space}
+	t, m = frappe.qb.DocType("Life Ask Thread"), frappe.qb.DocType("Life Ask Message")
+	where = [t.user == frappe.session.user, t.space == space]
 	if q:
-		where += " and (t.title like %(q)s or exists (select 1 from `tabLife Ask Message` m where m.thread=t.name and m.text like %(q)s))"
-		values["q"] = f"%{q}%"
-	# nosemgrep: frappe-sql-format-injection -- WHERE is one of two fixed fragments; user, space and the search text are parameters
-	rows = frappe.db.sql(f"""select t.name, t.title, t.scope_label, t.last_message_on, t.creation,
-		(select count(*) from `tabLife Ask Message` m where m.thread=t.name and m.role='user') as questions
-		from `tabLife Ask Thread` t where {where} order by ifnull(t.last_message_on, t.creation) desc limit %(s)s, %(l)s""",
-		{**values, "s": start, "l": page_length}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- WHERE is one of two fixed fragments; user, space and the search text are parameters
-	total = frappe.db.sql(f"select count(*) from `tabLife Ask Thread` t where {where}", values)[0][0]
+		said = frappe.qb.from_(m).select(m.thread).where(m.text.like(f"%{q}%"))
+		where.append(t.title.like(f"%{q}%") | t.name.isin(said))
+	questions = frappe.qb.from_(m).select(fn.Count("*")).where((m.thread == t.name) & (m.role == "user")).as_("questions")
+	rows = list_query("Life Ask Thread", ["name", "title", "scope_label", "last_message_on", "creation"], where, [(fn.IfNull(t.last_message_on, t.creation), Order.desc)])
+	rows = rows.select(questions).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Ask Thread", where)
 	for r in rows:
 		r["last_message_on"] = str(r.last_message_on or r.creation)[:16]
 		r.pop("creation", None)

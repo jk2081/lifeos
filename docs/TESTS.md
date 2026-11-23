@@ -9,18 +9,18 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc` |
 | `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources, old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
-| `test_goals.py` | Goals: cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
+| `test_goals.py` | Goals: cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
-| `test_review.py` | The weekly, monthly and 12-week reviews |
-| `test_library.py` | Library: notes, the vault, search, the graph, Everything, files, the sensitive mark |
+| `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
+| `test_library.py` | Library: notes, the vault, search, the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions |
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder, one space |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read refusing another space's records, the scan guard, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it |
 | `test_gmail.py` | Life OS reading Gmail: connect, fetch, triage, one capture per thread |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check |
-| `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/` |
+| `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings |
 
 ## Skills
 

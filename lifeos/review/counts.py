@@ -10,7 +10,7 @@ import json
 import frappe
 from frappe.utils import add_days, add_months, cint, getdate, today
 
-from lifeos.api.utils import area_filter, lens_area
+from lifeos.api.utils import lens_area
 
 OPEN = ["Open", "Doing", "Waiting"]
 
@@ -131,9 +131,11 @@ def goal_sets(space, area=None):
 			ticked = set(frappe.get_all("Life Action Log", filters={"goal": ("in", in_progress or ["-"]), "date": [">=", since],
 				"count": [">", 0]}, pluck="goal", distinct=True))
 			no_ticks = [g for g in in_progress if g not in ticked]
-	no_tasks = frappe.db.sql_list("""select g.name from `tabLife Goal` g where g.space=%s and g.outcome='In Progress' and g.is_someday=0
-		and not exists (select 1 from `tabLife Task` t where t.goal = g.name and t.status in ('Open', 'Doing', 'Waiting', 'Done'))
-		and not exists (select 1 from `tabLife Goal Action` a where a.parent = g.name and a.status = 'Open')""", space)
+	g, t, a = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Task"), frappe.qb.DocType("Life Goal Action")
+	has_tasks = frappe.qb.from_(t).select(t.goal).where(t.status.isin(["Open", "Doing", "Waiting", "Done"]) & t.goal.isnotnull())
+	has_actions = frappe.qb.from_(a).select(a.parent).where(a.status == "Open")
+	no_tasks = (frappe.qb.from_(g).select(g.name).where((g.space == space) & (g.outcome == "In Progress") & (g.is_someday == 0) & g.name.notin(has_tasks) & g.name.notin(has_actions))
+		.run(pluck=True))  # system: the counts read the owner's own space
 	return no_ticks, no_tasks
 
 

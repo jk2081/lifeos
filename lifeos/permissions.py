@@ -19,9 +19,8 @@ def _spaces_of(user) -> dict:
 	if user == BRAIN_USER:  # the built-in Brain works in every space, as an agent
 		out = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}  # system: the Brain user sees every space
 	elif user and user != "Guest":
-		for row in frappe.db.sql(
-			"select parent, access from `tabLife Space Member` where user=%s and parenttype='Life Space'", user
-		):
+		member = frappe.qb.DocType("Life Space Member")
+		for row in frappe.qb.from_(member).select(member.parent, member.access).where((member.user == user) & (member.parenttype == "Life Space")).run():  # system: the permission layer itself
 			if row[1] == "Write" or row[0] not in out:
 				out[row[0]] = row[1]
 		for name in frappe.get_all("Life Space", filters={"owner_user": user}, pluck="name"):  # system: the permission layer itself
@@ -141,16 +140,18 @@ def vault_locked(doc) -> bool:
 	return False
 
 
-def sensitive_guard(space, alias="", user=None) -> str:
-	"""SQL for a query on a capture or note table of one space: leaves sensitive rows out when the space's switch keeps
-	sensitive items from the user (an agent)."""
-	return f" and {alias}is_sensitive = 0" if vault_hidden(space, user) else ""
+def sensitive_criterion(space, table, user=None):
+	"""A criterion that leaves sensitive rows of a capture or note table out when the space's switch keeps them from the user
+	(an agent); None when they are open."""
+	return (table.is_sensitive == 0) if vault_hidden(space, user) else None
 
 
-def vault_guard(space, alias="", user=None) -> str:
-	"""SQL for a query on Life Index rows of one space: leaves Vault rows, and sources of Vault documents, out when the
-	Vault is closed to the user."""
-	return f" and {alias}vault_locked = 0 and {alias}ref_doctype != 'Life Vault Document'" if vault_hidden(space, user) else ""
+def vault_criterion(space, table, user=None):
+	"""A criterion over a table of Life Index rows (`frappe.qb.DocType("Life Index")`) that leaves Vault rows, and sources of Vault
+	documents, out when the Vault is closed to the user; None when it is open. Use it with a space on the same query."""
+	if not vault_hidden(space, user):
+		return None
+	return (table.vault_locked == 0) & (table.ref_doctype != "Life Vault Document")
 
 
 def has_permission(doc, ptype=None, user=None, debug=False):

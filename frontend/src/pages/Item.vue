@@ -114,7 +114,8 @@ import FileView from '@/components/item/FileView.vue'
 import ItemSection from '@/components/item/ItemSection.vue'
 import ProposalCards from '@/components/item/ProposalCards.vue'
 import RecordRow from '@/components/item/RecordRow.vue'
-import { api, db, tryCall } from '@/lib/api'
+import { db, tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { decideAll as decideAllOf } from '@/lib/items'
@@ -154,7 +155,7 @@ const relatedGroups = computed(() => [{ key: 'pages', label: 'Wiki pages and not
   { key: 'chats', label: 'Chat logs', rows: item.value.related.chats }, { key: 'meetings', label: 'Meetings', rows: item.value.related.meetings }])
 const relatedCount = computed(() => relatedGroups.value.reduce((n, g) => n + g.rows.length, 0))
 
-const fetchItem = () => api('inbox.item_page', { item: props.id })
+const fetchItem = () => itemData.inbox.item_page({ item: props.id })
 async function load() {
   try {
     item.value = await fetchItem()
@@ -171,7 +172,7 @@ async function refresh() {
 }
 const decideAll = (decision) => decideAllOf(item.value, decision, load)
 async function retry() {
-  if (await tryCall(() => api('inbox.retry', { item: item.value.name }), 'Sent back to the agent.')) await load()
+  if (await tryCall(() => itemData.inbox.retry({ item: item.value.name }), 'Sent back to the agent.')) await load()
 }
 const saveTranscript = (text) => db.set('Life Inbox Item', item.value.name, { transcript_md: text })
 const openLink = () => window.open(safeLink.value, '_blank', 'noopener,noreferrer')

@@ -63,3 +63,30 @@ class TestCodeShape(IntegrationTestCase):
 
 		top = {p.stem for p in Path(frappe.get_app_path("lifeos")).glob("*.py")}
 		self.assertEqual(top - self.TOP, set())
+
+
+class TestRawSql(IntegrationTestCase):
+	"""Raw SQL is rare: at most 30 `frappe.db.sql` calls outside tests, each with a reason comment, and at most 10 silenced
+	`frappe-sql-format-injection` findings (issue 81). Everything else goes through `frappe.qb`, `get_list` or `get_value`."""
+
+	APP = __import__("pathlib").Path(__file__).resolve().parents[1]
+
+	def sources(self):
+		for path in self.APP.rglob("*.py"):
+			if "tests" not in path.relative_to(self.APP).parts:
+				yield path, path.read_text().splitlines()
+
+	def test_there_are_at_most_30_raw_queries_each_with_a_reason(self):
+		calls = []
+		for path, lines in self.sources():
+			for i, line in enumerate(lines):
+				code = line.split("#")[0]
+				if "frappe.db.sql(" in code:
+					above = lines[i - 1].strip() if i else ""
+					calls.append((f"{path.name}:{i + 1}", "#" in line or above.startswith("#")))
+		self.assertLessEqual(len(calls), 30, calls)
+		self.assertEqual([c for c, reasoned in calls if not reasoned], [], "a raw query needs a one-line reason comment")
+
+	def test_at_most_10_sql_injection_findings_are_silenced(self):
+		silenced = [f"{path.name}:{i + 1}" for path, lines in self.sources() for i, line in enumerate(lines) if "nosemgrep: frappe-sql-format-injection" in line]
+		self.assertLessEqual(len(silenced), 10, silenced)

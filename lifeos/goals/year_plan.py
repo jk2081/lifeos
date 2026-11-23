@@ -154,8 +154,8 @@ def noticed(space):
 	"""The Brain's most important observation about the year, or None. An agent never sees insights (api/insights)."""
 	if permissions.is_agent():
 		return None
-	row = frappe.db.sql("""select name, title, body from `tabLife Insight` where space=%s and status='New' and kind in %s
-		order by rank asc, creation desc limit 1""", (space, INSIGHT_KINDS), as_dict=True)
+	row = frappe.get_list("Life Insight", filters={"space": space, "status": "New", "kind": ("in", INSIGHT_KINDS)},
+		fields=["name", "title", "body"], order_by="rank asc, creation desc", limit=1)
 	return {"name": row[0].name, "title": row[0].title, "body": row[0].body} if row else None
 
 

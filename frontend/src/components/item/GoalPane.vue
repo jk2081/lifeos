@@ -88,7 +88,8 @@ import Backlinks from '@/components/Backlinks.vue'
 import Pick from '@/components/Pick.vue'
 import GoalMeasure from '@/components/goals/GoalMeasure.vue'
 import GoalEditDialog from '@/components/goals/GoalEditDialog.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { loadBacklinks } from '@/lib/links'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
@@ -119,8 +120,8 @@ const headline = computed(() => {
 })
 async function load() {
   try {
-    ;[d.value, links.value, info.value] = await Promise.all([api('goals.detail', { goal: props.name }), loadBacklinks('Life Goal', props.name),
-      api('goals.get', { goal: props.name })])
+    ;[d.value, links.value, info.value] = await Promise.all([itemData.goals.detail({ goal: props.name }), loadBacklinks('Life Goal', props.name),
+      itemData.goals.get({ goal: props.name })])
     loadLookups()
     const x = d.value
     const g = x.goal
@@ -141,30 +142,30 @@ const servesOptions = computed(() => [{ label: 'None', value: '' },
   ...parentOptions({ name: props.name, horizon: info.value?.goal.horizon }),
   ...(info.value?.goal.serves && !(lookups.goals || []).some((x) => x.name === info.value.goal.serves) ? [{ label: info.value.goal.serves_title, value: info.value.goal.serves }] : [])])
 async function saveServes(v) {
-  if (await tryCall(() => api('goals.update', { goal: props.name, values: { serves: v || null } }))) { await load(); emit('changed') }
+  if (await tryCall(() => itemData.goals.update({ goal: props.name, values: { serves: v || null } }))) { await load(); emit('changed') }
 }
 async function setStatus(status) {
-  if (await tryCall(() => api('goals.set_status', { goal: props.name, status }), status === 'On Hold' ? 'On hold' : 'Resumed')) { await load(); emit('changed') }
+  if (await tryCall(() => itemData.goals.set_status({ goal: props.name, status }), status === 'On Hold' ? 'On hold' : 'Resumed')) { await load(); emit('changed') }
 }
 async function addTask() {
   const text = quick.value.trim()
   if (!text) return
   quick.value = ''
-  if (await tryCall(() => api('tasks.quick_add', { text, space: d.value.space, area: d.value.goal.area || undefined, goal: d.value.goal.name }))) {
+  if (await tryCall(() => itemData.tasks.quick_add({ text, space: d.value.space, area: d.value.goal.area || undefined, goal: d.value.goal.name }))) {
     await load()
     emit('changed')
   } else quick.value = text
 }
 async function closeGoal() {
   closeOpen.value = false
-  if (await tryCall(() => api('goals.close', { goal: props.name, outcome: outcome.value, result_note: note.value }), 'Goal closed')) { await load(); emit('changed') }
+  if (await tryCall(() => itemData.goals.close({ goal: props.name, outcome: outcome.value, result_note: note.value }), 'Goal closed')) { await load(); emit('changed') }
 }
 async function reopen() {
-  if (await tryCall(() => api('goals.close', { goal: props.name, outcome: 'In Progress' }), 'Reopened')) { await load(); emit('changed') }
+  if (await tryCall(() => itemData.goals.close({ goal: props.name, outcome: 'In Progress' }), 'Reopened')) { await load(); emit('changed') }
 }
 async function moveToCycle() {
   moveOpen.value = false
-  if (await tryCall(() => api('goals.add_to_cycle', { goal: props.name, cycle: cycle.value }), 'Added to the 12 Week Year')) {
+  if (await tryCall(() => itemData.goals.add_to_cycle({ goal: props.name, cycle: cycle.value }), 'Added to the 12 Week Year')) {
     toast.info('Add its weekly actions on the 12 Week Year grid.')
     await load()
     emit('changed')

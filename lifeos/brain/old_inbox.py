@@ -5,6 +5,7 @@ items, are never acted on. Parking and discarding record their Outbox exits with
 (for seven days) read."""
 import frappe
 from frappe import _
+from frappe.query_builder import Order, functions as fn
 from frappe.utils import add_days, cint, getdate, now_datetime, today
 
 from lifeos import permissions
@@ -26,11 +27,10 @@ def rule():
 def candidates(space, days, limit=MAX_PER_RUN):
 	"""Items To Review, and New items no agent has claimed, received more than `days` days ago."""
 	cutoff = add_days(getdate(today()), -int(days))
-	return frappe.db.sql("""select name, title, status, area, summary_md, raw_text, suggested_decision, suggested_reason, suggested_by, suggested_on, received_on
-		from `tabLife Inbox Item`
-		where space = %(space)s and is_archived = 0 and date(ifnull(received_on, creation)) < %(cutoff)s
-		and (status = 'To Review' or (status = 'New' and ifnull(claimed_by, '') = ''))
-		order by ifnull(received_on, creation) asc limit %(limit)s""", {"space": space, "cutoff": cutoff, "limit": limit}, as_dict=True)
+	i = frappe.qb.DocType("Life Inbox Item")
+	when = fn.IfNull(i.received_on, i.creation)
+	return (frappe.qb.from_(i).select(i.name, i.title, i.status, i.area, i.summary_md, i.raw_text, i.suggested_decision, i.suggested_reason, i.suggested_by, i.suggested_on, i.received_on).where((i.space == space) & (i.is_archived == 0) & (fn.Date(when) < cutoff)
+		& ((i.status == "To Review") | ((i.status == "New") & (fn.IfNull(i.claimed_by, "") == "")))).orderby(when).limit(limit).run(as_dict=True))  # system: the rule works on the owner's own space
 
 
 def _pending(items):
@@ -218,14 +218,11 @@ def _reopen(item, status):
 
 def recent_auto(space, area=None):
 	"""What the rule parked or discarded on its own in the last seven days and is not undone, for Today's line."""
-	from lifeos.api.utils import area_filter
+	from lifeos.api.utils import area_criterion
 
-	values = {"space": space, "since": add_days(now_datetime(), -UNDO_DAYS), "rule": RULE}
-	where = "e.space = %(space)s and e.auto_rule = %(rule)s and e.reversed = 0 and e.exited_on >= %(since)s"
-	if area:
-		where += " and " + area_filter(space, area, "e.area", values)
-	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter's fixed fragment; values are parameters
-	rows = frappe.db.sql(f"select e.record_name, e.pile, e.exited_on from `tabLife Exit` e where {where} order by e.exited_on desc", values, as_dict=True)
+	e = frappe.qb.DocType("Life Exit")
+	where = (e.space == space) & (e.auto_rule == RULE) & (e.reversed == 0) & (e.exited_on >= add_days(now_datetime(), -UNDO_DAYS)) & (area_criterion(space, area, e) if area else e.name.isnotnull())
+	rows = frappe.qb.from_(e).select(e.record_name, e.pile, e.exited_on).where(where).orderby(e.exited_on, order=Order.desc).run(as_dict=True)  # system: Today's line reads the owner's own exits
 	if not rows:
 		return None
 	parked = [r.record_name for r in rows if r.pile == "Parked"]

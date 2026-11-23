@@ -76,16 +76,16 @@ def came_of_it(doc):
 def related(doc):
 	"""Wiki pages (and notes) that cite the item, chat logs that cite it or it was filed with, and the meetings it is linked to."""
 	pages = []
-	for n in frappe.db.sql("""select distinct n.name, n.collection from `tabLife Note Source` s join `tabLife Note` n on n.name = s.parent
-			where s.parenttype = 'Life Note' and s.source_doctype = %s and s.source_name = %s order by n.title limit %s""",
-			(ITEM, doc.name, LIMIT), as_dict=True):
+	n, s = frappe.qb.DocType("Life Note"), frappe.qb.DocType("Life Note Source")
+	cites = (frappe.qb.from_(s).join(n).on(n.name == s.parent).select(n.name, n.collection).distinct().where((s.parenttype == "Life Note") & (s.source_doctype == ITEM) & (s.source_name == doc.name))
+		.orderby(n.title).limit(LIMIT).run(as_dict=True))  # system: each page is checked with _readable below
+	for n in cites:
 		if _readable("Life Note", n.name, doc.space):
 			pages.append(_entry("Wiki page" if n.collection == "Wiki" else "Note", "Life Note", n.name))
 	chats = []
 	names = [doc.job_chat] if doc.get("job_chat") else []
 	names += frappe.get_all("Life Chat Log", filters={"inbox_item": doc.name}, pluck="name", limit=LIMIT)
-	names += [r[0] for r in frappe.db.sql("""select from_name from `tabLife Link` where from_doctype = 'Life Chat Log'
-		and to_doctype = %s and to_name = %s limit %s""", (ITEM, doc.name, LIMIT))]
+	names += frappe.get_all("Life Link", filters={"from_doctype": "Life Chat Log", "to_doctype": ITEM, "to_name": doc.name}, pluck="from_name", limit=LIMIT)
 	for name in dict.fromkeys(names):
 		if _readable("Life Chat Log", name, doc.space):
 			chats.append({**_entry("Chat", "Life Chat Log", name), "state": frappe.db.get_value("Life Chat Log", name, "assistant") or "Chat",

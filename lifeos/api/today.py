@@ -3,6 +3,8 @@ import re
 from datetime import timedelta
 
 import frappe
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, get_datetime, getdate, today
 
 from lifeos.calendar import calendar_data
@@ -12,17 +14,22 @@ from lifeos import permissions
 from lifeos.goals import habits as habit_rules
 from lifeos.api import tasks as task_api
 from lifeos.api import vault as vault_api
-from lifeos.api.utils import area_filter, descendants, in_area, lens_area, user_names
+from lifeos.api.utils import area_criterion, count_by, descendants, in_area, lens_area, user_names
 
 GROUP_ROWS = 7
 
 
+OPEN = ("Open", "Doing", "Waiting")
+
+
 def task_lens(space, area):
-	"""The lens as SQL on tasks (alias t): an " and ..." fragment and its values, or nothing for All of life."""
-	if not area:
-		return "", {}
-	values = {}
-	return f" and {area_filter(space, area, 't.area', values, also_in='Life Task')} ", values
+	"""The lens as criteria on tasks: a list, empty for All of life."""
+	return [area_criterion(space, area, frappe.qb.DocType("Life Task"), also_in="Life Task")] if area else []
+
+
+def open_tasks(t, space, area):
+	"""The criteria of open, unarchived tasks in the lens."""
+	return [*task_lens(space, area), t.status.isin(OPEN), t.is_archived == 0]
 
 
 def planned_this_week(space, now, area=None, cycle=None, limit=None):
@@ -30,13 +37,13 @@ def planned_this_week(space, now, area=None, cycle=None, limit=None):
 	work), in the lens. Each carries its goal as `goal` and `goal_title`."""
 	if not cycle:
 		return []
-	lens, lens_values = task_lens(space, area)
+	t, g = frappe.qb.DocType("Life Task"), frappe.qb.DocType("Life Goal")
 	start = add_days(now, -now.weekday())
-	values = {"cycle": cycle, "wk_a": str(start), "wk_b": str(add_days(start, 6)), "wk_end": str(add_days(start, 7)), **lens_values}
-	return task_api.query(space, lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 "
-		"and t.goal in (select g.name from `tabLife Goal` g where g.cycle = %(cycle)s) "
-		"and (t.due_date between %(wk_a)s and %(wk_b)s or (t.scheduled_at >= %(wk_a)s and t.scheduled_at < %(wk_end)s))", values,
-		"t.due_date is null, t.due_date asc, t.scheduled_at asc, t.creation asc", 0, limit or GROUP_MAX)
+	a, b, end = str(start), str(add_days(start, 6)), str(add_days(start, 7))
+	where = [*open_tasks(t, space, area), t.goal.isin(frappe.qb.from_(g).select(g.name).where(g.cycle == cycle)),
+		t.due_date.between(a, b) | ((t.scheduled_at >= a) & (t.scheduled_at < end))]
+	return task_api.query(space, where, [(t.due_date.isnull(), Order.asc), (t.due_date, Order.asc), (t.scheduled_at, Order.asc), (t.creation, Order.asc)],
+		0, limit or GROUP_MAX)
 
 
 def goals_without_plan(space, now, area=None, cycle=None):
@@ -61,17 +68,13 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 	space = permissions.resolve_space(space)
 	area = lens_area(area)
 	now = getdate(today())
-	lens, lens_values = task_lens(space, area)
-
-	open_due = lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date "
-	due = task_api.query(space, open_due + "<= %(today)s", {"today": now, **lens_values}, None, 0, 30)
+	t = frappe.qb.DocType("Life Task")
+	open_now = open_tasks(t, space, area)
+	due = task_api.query(space, [*open_now, t.due_date <= now], (), 0, 30)
 	# the screen shows two groups of at most GROUP_ROWS: due today first, then overdue (oldest first)
-	due_today = task_api.query(space, open_due + "= %(today)s", {"today": now, **lens_values}, None, 0, GROUP_ROWS)
-	overdue_rows = task_api.query(space, open_due + "< %(today)s", {"today": now, **lens_values}, None, 0, GROUP_ROWS)
-	# nosemgrep: frappe-sql-format-injection -- `lens` is area_filter's fixed SQL; values are parameters
-	oldest = frappe.db.sql("select min(t.due_date) from `tabLife Task` t where t.space=%(space)s and t.status in ('Open', 'Doing', 'Waiting') "
-		f"and t.is_archived = 0 and t.due_date < %(today)s {lens}",
-		{"space": space, "today": now, **lens_values})[0][0]
+	due_today = task_api.query(space, [*open_now, t.due_date == now], (), 0, GROUP_ROWS)
+	overdue_rows = task_api.query(space, [*open_now, t.due_date < now], (), 0, GROUP_ROWS)
+	oldest = list_query_one("Life Task", fn.Min(t.due_date), [t.space == space, *open_now, t.due_date < now])
 	# the numbers are counted with the filters their links lead to, not from the rows shown
 	due_count = task_api.count(space, due="today,overdue", area=area)
 	today_count = task_api.count(space, due="today", area=area)
@@ -89,13 +92,10 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		fields=["name", "title", "source_type", "received_on", "owner", "claimed_by", "transcript_md", "summary_md"], order_by="received_on desc", limit=5)
 	pending = {}
 	if review_items:
-		pending = dict(frappe.db.sql(
-			"select inbox_item, count(*) from `tabLife Proposal` where inbox_item in %s group by inbox_item", ([r.name for r in review_items],)))
+		pending = proposal_counts([r.name for r in review_items])
 	waiting = {}
 	if review_items:
-		waiting = dict(frappe.db.sql(
-			"select inbox_item, count(*) from `tabLife Proposal` where inbox_item in %s and status='Pending' group by inbox_item",
-			([r.name for r in review_items],)))
+		waiting = proposal_counts([r.name for r in review_items], "Pending")
 	users = user_names([r.claimed_by for r in review_items])
 	for r in review_items:
 		r["proposals"] = pending.get(r.name, 0)
@@ -105,9 +105,9 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		r["processed_by"] = users.get(r.claimed_by)
 		r["received_on"] = str(r.received_on)[:19]
 	to_review = inbox_lens["total"] if inbox_lens is not None else frappe.db.count("Life Inbox Item", {"space": space, "status": "To Review", "is_archived": 0})
-	proposals_waiting = frappe.db.sql(
-		"select count(*) from `tabLife Proposal` p join `tabLife Inbox Item` i on i.name = p.inbox_item "
-		"where p.space=%s and p.status='Pending' and i.status='To Review' and i.is_archived=0", space)[0][0]
+	p, i = frappe.qb.DocType("Life Proposal"), frappe.qb.DocType("Life Inbox Item")
+	proposals_waiting = frappe.qb.from_(p).join(i).on(i.name == p.inbox_item).select(fn.Count("*")).where(
+		(p.space == space) & (p.status == "Pending") & (i.status == "To Review") & (i.is_archived == 0)).run()[0][0]
 
 	events = [e for e in calendar_data.events_between(space, now, add_days(now, 1))]
 	events.sort(key=lambda e: e["start"])
@@ -164,20 +164,19 @@ def next_list(space, now, cycle, events, area=None):
 	week under a goal of the cycle. No goal and no lead action is a row. Someday items never appear."""
 	from lifeos.review import counts
 
-	lens, lens_values = task_lens(space, area)
+	task = frappe.qb.DocType("Life Task")
+	open_now = open_tasks(task, space, area)
 	# set 8: the week's top three come first, starred, until the next review is locked
-	top = task_api.query(space, lens + "and t.is_top_three = 1 and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0", lens_values,
-		"t.scheduled_at asc, t.creation asc", 0, 3)
+	top = task_api.query(space, [*open_now, task.is_top_three == 1], [(task.scheduled_at, Order.asc), (task.creation, Order.asc)], 0, 3)
 	for t in top:
 		t.update({"why": "Top three", "type": "task", "lead": str(t.scheduled_at)[11:16] if t.get("scheduled_at") else ""})
 	tops = {t.name for t in top}
-	open_due = lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.due_date "
-	overdue = task_api.query(space, open_due + "< %(today)s", {"today": now, **lens_values}, "t.due_date asc, t.creation asc", 0, GROUP_MAX)
+	overdue = task_api.query(space, [*open_now, task.due_date < now], [(task.due_date, Order.asc), (task.creation, Order.asc)], 0, GROUP_MAX)
 	for t in overdue:
 		t["why"] = "Overdue"
 		t["lead"] = f"{(now - getdate(t.due_date)).days} day{'s' if (now - getdate(t.due_date)).days != 1 else ''}"
 	overdue = [t for t in overdue if t.name not in tops]
-	due_today = [t for t in task_api.query(space, open_due + "= %(today)s", {"today": now, **lens_values}, None, 0, GROUP_MAX) if t.name not in tops]
+	due_today = [t for t in task_api.query(space, [*open_now, task.due_date == now], (), 0, GROUP_MAX) if t.name not in tops]
 	today_rows = []
 	for e in events:
 		if e.get("date") and str(e["date"]) != str(now):
@@ -272,9 +271,9 @@ def skip_banner(occurrence: str, how: str = "skipped"):
 
 def scheduled_today(space, now, area=None):
 	"""Open tasks planned at a time today, in the lens, earliest first."""
-	lens, lens_values = task_lens(space, area)
-	return task_api.query(space, lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.scheduled_at >= %(a)s and t.scheduled_at < %(b)s",
-		{"a": str(now), "b": str(add_days(now, 1)), **lens_values}, "t.scheduled_at asc", 0, 50)
+	t = frappe.qb.DocType("Life Task")
+	where = [*open_tasks(t, space, area), t.scheduled_at >= str(now), t.scheduled_at < str(add_days(now, 1))]
+	return task_api.query(space, where, [(t.scheduled_at, Order.asc)], 0, 50)
 
 
 @frappe.whitelist(methods=["GET"])
@@ -290,9 +289,8 @@ def week_summary(space: str | None = None, week_start: str | None = None):
 	end = add_days(start, 6)
 
 	cycle_out = None
-	cycle = frappe.db.sql(
-		"select name, title, status from `tabLife Cycle` where space=%s and start_date <= %s and end_date >= %s order by start_date desc limit 1",
-		(space, end, start), as_dict=True)
+	cycle = frappe.get_list("Life Cycle", filters={"space": space, "start_date": ("<=", end), "end_date": (">=", start)}, fields=["name", "title", "status"],
+		order_by="start_date desc", limit=1)
 	if cycle:
 		c = frappe.get_doc("Life Cycle", cycle[0].name)
 		week = min(max(cycles.week_of(c, min(end, getdate(c.end_date))), 1), cycles.WEEKS)
@@ -306,13 +304,14 @@ def week_summary(space: str | None = None, week_start: str | None = None):
 			seen.add(h["habit"])
 			habit_rows.append({"habit": h["habit"], "title": h["title"], "done": 0, "target": h["days_per_week"]})
 	if habit_rows:  # one query for every habit's ticks
-		ticks = dict(frappe.db.sql("select habit, count(*) from `tabLife Habit Log` where habit in %s and date between %s and %s and done = 1 group by habit",
-			([h["habit"] for h in habit_rows], start, end)))
+		log = frappe.qb.DocType("Life Habit Log")
+		ticks = count_by("Life Habit Log", "habit", [log.habit.isin([h["habit"] for h in habit_rows]), log.date.between(start, end), log.done == 1])
 		for h in habit_rows:
 			h["done"] = ticks.get(h["habit"], 0)
 
-	done_tasks = task_api.query(space, "and t.status = 'Done' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
-	carried = task_api.query(space, "and t.status = 'Carried' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
+	t = frappe.qb.DocType("Life Task")
+	done_tasks = task_api.query(space, [t.status == "Done", t.completed_on.between(start, end)], [(t.completed_on, Order.desc)], 0, 100)
+	carried = task_api.query(space, [t.status == "Carried", t.completed_on.between(start, end)], [(t.completed_on, Order.desc)], 0, 100)
 	loops = task_api.open_loops(space=space, page_length=20)
 	return {
 		"space": space, "week_start": str(start), "week_end": str(end), "cycle": cycle_out, "habits": habit_rows,
@@ -327,5 +326,20 @@ def week_summary(space: str | None = None, week_start: str | None = None):
 
 def _count_tasks(space, status, start, end):
 	"""How many tasks closed with this status in the week, for the numbers that lead to the Tasks screen (the lists show 100)."""
-	return frappe.db.sql("select count(*) from `tabLife Task` t where t.space=%s and t.status=%s and t.completed_on between %s and %s",
-		(space, status, start, end))[0][0]
+	t = frappe.qb.DocType("Life Task")
+	return task_api.count_where([t.space == space, t.status == status, t.completed_on.between(start, end)])
+
+
+def proposal_counts(items, status=None):
+	"""The proposals of each inbox item, as {item: count}; with `status`, only those in that status."""
+	p = frappe.qb.DocType("Life Proposal")
+	return count_by("Life Proposal", "inbox_item", [p.inbox_item.isin(items), *([p.status == status] if status else [])])
+
+
+def list_query_one(doctype, field, where):
+	"""One aggregate over the DocType's rows the user may read."""
+	query = frappe.qb.get_query(doctype, fields=[field], ignore_permissions=False)
+	for crit in where:
+		query = query.where(crit)
+	return query.run()[0][0]
+

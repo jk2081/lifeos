@@ -6,10 +6,13 @@ from datetime import date
 
 import frappe
 from frappe import _
+from frappe.query_builder import Case, Field, Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_months, cint, getdate, today
+from pypika.terms import ValueWrapper
 
 from lifeos import permissions
-from lifeos.api.utils import names_map, page, parse, std_filters
+from lifeos.api.utils import area_criterion, filter_criteria, names_map, page, parse
 from lifeos.review.counts import rules
 
 PARKABLE = ("Life Task", "Life Goal", "Life Note")
@@ -17,8 +20,13 @@ TYPE_OF = {"Life Task": "Task", "Life Goal": "Goal", "Life Note": "Note"}
 TAB_TYPE = {"tasks": "Life Task", "goals": "Life Goal", "notes": "Life Note"}
 TABS = ("all", "due", "tasks", "goals", "notes")
 # the SQL that says "parked" for each kind
-PARKED = {"Life Task": "x.status = 'Someday' and x.is_archived = 0", "Life Goal": "x.is_someday = 1 and x.is_archived = 0",
-	"Life Note": "x.is_someday = 1 and x.is_archived = 0"}
+
+
+def parked(x, doctype):
+	"""The criterion that says "parked" for each kind."""
+	if doctype == "Life Task":
+		return (x.status == "Someday") & (x.is_archived == 0)
+	return (x.is_someday == 1) & (x.is_archived == 0)
 
 
 def _person():
@@ -31,21 +39,23 @@ def review_date(on=None):
 	return str(add_months(getdate(on or today()), rules()["someday_review_months"]))
 
 
-def _sub(doctype, space, filters, values, i, area=None):
+def _sub(doctype, space, filters, area=None):
 	"""One branch of the union: the parked rows of one DocType with the common columns."""
-	where = [f"x.space = %(space)s", PARKED[doctype]]
-	conds, values = std_filters(doctype, filters, "x", values, prefix=f"s{i}_")
+	x = frappe.qb.DocType(doctype)
+	where = [x.space == space, parked(x, doctype), *filter_criteria(doctype, filters, x)]
 	if area:
-		from lifeos.api.utils import area_filter
-
-		where.append(area_filter(space, area, "x.area", values, also_in="Life Task" if doctype == "Life Task" else None))
-	extra = "''"
+		where.append(area_criterion(space, area, x, also_in="Life Task" if doctype == "Life Task" else None))
 	if doctype == "Life Goal":
-		extra = "(select count(*) from `tabLife Task` t where t.someday_with = x.name and t.status = 'Someday')"
+		t = frappe.qb.DocType("Life Task")
+		extra = frappe.qb.from_(t).select(fn.Count("*")).where((t.someday_with == x.name) & (t.status == "Someday"))
 	elif doctype == "Life Task":
-		extra = "ifnull(x.goal, '')"
-	return (f"select '{doctype}' as doctype, x.name, x.title, x.area, x.creation, x.someday_on, x.someday_review_on, "
-		f"x.someday_note, {extra} as extra from `tab{doctype}` x where {' and '.join(where + conds)}"), values
+		extra = fn.IfNull(x.goal, "")
+	else:
+		extra = ValueWrapper("")
+	query = frappe.qb.from_(x).select(ValueWrapper(doctype).as_("doctype"), x.name, x.title, x.area, x.creation, x.someday_on, x.someday_review_on, x.someday_note, extra.as_("extra"))  # system: the user's own space, checked by resolve_space
+	for crit in where:
+		query = query.where(crit)
+	return query
 
 
 @frappe.whitelist(methods=["GET"])
@@ -58,29 +68,25 @@ def list(space: str | None = None, tab: str | None = "all", area: str | None = N
 	tab = tab if tab in TABS else "all"
 	start, page_length = page(start, page_length)
 	filters = parse(filters, [])
-	values = {"space": space, "today": getdate(today())}
-	parts = []
-	for i, dt in enumerate(PARKABLE):
-		sql, values = _sub(dt, space, filters, values, i, area)
-		parts.append(sql)
-	union = " union all ".join(parts)
-	# nosemgrep: frappe-sql-format-injection -- each branch is _sub's fixed SQL over a PARKABLE table, with std_filters columns checked against meta
-	counts = frappe.db.sql(f"""select doctype, count(*), sum(ifnull(someday_review_on, '2999-01-01') <= %(today)s)
-		from ({union}) u group by doctype""", values)
+	now = getdate(today())
+	union = None
+	for dt in PARKABLE:
+		part = _sub(dt, space, filters, area)
+		union = part if union is None else union.union_all(part)
+	u = frappe.qb.from_(union.as_("u"))
+	review = fn.IfNull(Field("someday_review_on"), "2999-01-01")
+	counts = u.select(Field("doctype"), fn.Count("*"), fn.Sum(Case().when(review <= now, 1).else_(0))).groupby(Field("doctype")).run()
 	by = {r[0]: int(r[1]) for r in counts}
 	due = sum(int(r[2] or 0) for r in counts)
 	tabs = {"all": sum(by.values()), "due": due, **{k: by.get(TAB_TYPE[k], 0) for k in TABS if k in TAB_TYPE}}
-	where = ""
+	rows = frappe.qb.from_(union.as_("u")).select("*")
 	if tab == "due":
-		where = "where ifnull(someday_review_on, '2999-01-01') <= %(today)s"
+		rows = rows.where(review <= now)
 	elif tab in TAB_TYPE:
-		where = "where doctype = %(tab_type)s"
-		values["tab_type"] = TAB_TYPE[tab]
+		rows = rows.where(Field("doctype") == TAB_TYPE[tab])
 	order = {"creation": "creation", "someday_on": "someday_on", "title": "title"}.get(str(order_by or "").split(" ")[0], "someday_review_on")
-	way = "desc" if " desc" in str(order_by or "") else "asc"
-	# nosemgrep: frappe-sql-format-injection -- the union as above; `order` and `way` come from fixed allowlists; values are parameters
-	rows = frappe.db.sql(f"select * from ({union}) u {where} order by {order} {way}, creation asc limit %(start)s, %(len)s",
-		{**values, "start": start, "len": page_length}, as_dict=True)
+	way = Order.desc if " desc" in str(order_by or "") else Order.asc
+	rows = rows.orderby(Field(order), order=way).orderby(Field("creation"), order=Order.asc).limit(page_length).offset(start).run(as_dict=True)
 	total = tabs[tab]
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	parents = names_map("Life Area", [r.area for r in rows], "parent_area")

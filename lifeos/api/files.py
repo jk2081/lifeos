@@ -61,7 +61,8 @@ def _jobs_by_asset(asset_items):
 	if not asset_items:
 		return {}
 	out = {}
-	for asset, parent in frappe.db.sql("select asset, parent from `tabLife Job Input` where parenttype = 'Life Inbox Item' and asset in %s order by idx", (builtins.list(asset_items),)):
+	ji = frappe.qb.DocType("Life Job Input")
+	for asset, parent in frappe.qb.from_(ji).select(ji.asset, ji.parent).where((ji.parenttype == "Life Inbox Item") & ji.asset.isin(builtins.list(asset_items))).orderby(ji.idx).run():  # system: the items were read by the caller
 		out.setdefault(asset, [])
 		if parent not in out[asset] and parent != asset:
 			out[asset].append(parent)

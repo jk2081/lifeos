@@ -6,13 +6,15 @@ import math
 
 import frappe
 from frappe import _
+from frappe.query_builder import Case, Field, Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import permissions
 from lifeos.brain import proposals
 from lifeos.goals import readings
 from lifeos.library import wiki_check
-from lifeos.api.utils import area_filter, lens_area, names_map, page
+from lifeos.api.utils import area_criterion, lens_area, names_map, page
 from lifeos.skills import lessons
 
 MAX_ROWS = 7
@@ -25,8 +27,27 @@ def kind_label(kind):
 	return KIND_LABEL.get(kind, kind)
 
 
-# an agent never reads the source a Vault document was made from, nor a capture marked sensitive: `%(open)s` is 1 for everyone else
-SEES = "(%(open)s = 1 or (ifnull(i.vault_document, '') = '' and i.is_sensitive = 0))"
+def sees(space, i):
+	"""The criterion for the captures the user reads: an agent never reads the source a Vault document was made from, nor a capture
+	marked sensitive. None for everyone else."""
+	return (fn.IfNull(i.vault_document, "") == "") & (i.is_sensitive == 0) if permissions.vault_hidden(space) else None
+
+
+def captures(fields, where):
+	"""A permission-checked select on the inbox items of a space that the user reads, with the criteria."""
+	query = frappe.qb.get_query("Life Inbox Item", fields=fields, ignore_permissions=False)
+	for crit in where:
+		query = query.where(crit)
+	return query
+
+
+def proposals_of(i, *criteria):
+	"""A count of the proposals of the inbox item `i` (correlated), as a select term."""
+	q = frappe.qb.DocType("Life Proposal").as_("q")
+	query = frappe.qb.from_(q).select(fn.Count("*")).where(q.inbox_item == i.name)
+	for crit in criteria:
+		query = query.where(crit(q))
+	return query
 
 
 def _open(space):
@@ -37,11 +58,10 @@ def _day_numbers(space):
 	"""Captures of the last 24 hours (not archived): how many, from how many sources, and how many the Brain filed with no
 	decision from the owner (Done, and no proposal the owner accepted or rejected), under how many areas and goals."""
 	since = add_to_date(now_datetime(), hours=-24)
-	rows = frappe.db.sql(
-		"""select i.name, i.source_type, i.status, i.area, i.goal,
-			(select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status != 'Pending' and ifnull(p.filed_by, '') = '') as decided
-		from `tabLife Inbox Item` i where i.space = %(space)s and i.is_archived = 0 and i.received_on >= %(since)s and """ + SEES,
-		{"space": space, "since": since, "open": _open(space)}, as_dict=True)
+	i = frappe.qb.DocType("Life Inbox Item")
+	where = [i.space == space, i.is_archived == 0, i.received_on >= since, *([g] if (g := sees(space, i)) is not None else [])]
+	decided = proposals_of(i, lambda q: q.status != "Pending", lambda q: fn.IfNull(q.filed_by, "") == "").as_("decided")
+	rows = captures([i.name, i.source_type, i.status, i.area, i.goal, decided], where).run(as_dict=True)
 	own = [r for r in rows if r.status == "Done" and not r.decided]
 	return {
 		"came_in": {"count": len(rows), "sources": len({r.source_type for r in rows})},
@@ -57,16 +77,21 @@ def needs_you(space: str | None = None, limit: int = MAX_ROWS):
 	space = permissions.resolve_space(space)
 	limit = max(1, min(int(limit or MAX_ROWS), 50))
 	out = _day_numbers(space)
-	args = {"space": space, "limit": limit, "open": _open(space)}
-	total = frappe.db.sql("""select count(*) from `tabLife Proposal` p join `tabLife Inbox Item` i on i.name = p.inbox_item
-		where p.status = 'Pending' and i.space = %(space)s and i.is_archived = 0 and """ + SEES, args)[0][0]
-	found = frappe.db.sql(
-		"""select p.name as proposal, p.kind, p.preview, p.payload, p.confidence, p.reason, p.alt_area, i.name as item, i.title as item_title,
-			i.source_type, i.received_on, i.is_sensitive,
-			(select count(*) from `tabLife Proposal` q where q.inbox_item = i.name and q.status = 'Pending') as item_pending
-		from `tabLife Proposal` p join `tabLife Inbox Item` i on i.name = p.inbox_item
-		where p.status = 'Pending' and i.space = %(space)s and i.is_archived = 0 and """ + SEES + """
-		order by i.received_on asc, i.creation asc, p.sort_order asc, p.creation asc limit %(limit)s""", args, as_dict=True)
+	i, p = frappe.qb.DocType("Life Inbox Item"), frappe.qb.DocType("Life Proposal")
+	guard = sees(space, i)
+	where = [p.status == "Pending", i.space == space, i.is_archived == 0, *([guard] if guard is not None else [])]
+	query = frappe.qb.get_query("Life Proposal", fields=[fn.Count("*")], ignore_permissions=False).join(i).on(i.name == p.inbox_item)
+	for crit in where:
+		query = query.where(crit)
+	total = query.run()[0][0]
+	pending = proposals_of(i, lambda q: q.status == "Pending").as_("item_pending")
+	found = frappe.qb.get_query("Life Proposal", fields=[p.name.as_("proposal"), p.kind, p.preview, p.payload, p.confidence, p.reason, p.alt_area],
+		ignore_permissions=False).join(i).on(i.name == p.inbox_item)
+	# get_query drops fields that are not the DocType's own, so the joined ones are selected on the query
+	found = found.select(i.name.as_("item"), i.title.as_("item_title"), i.source_type, i.received_on, i.is_sensitive, pending)
+	for crit in where:
+		found = found.where(crit)
+	found = found.orderby(i.received_on).orderby(i.creation).orderby(p.sort_order).orderby(p.creation).limit(limit).run(as_dict=True)
 	areas = names_map("Life Area", [x for r in found for x in (_payload(r).get("area"), r.alt_area) if x], "area_name")
 	rows = []
 	for r in found:
@@ -82,8 +107,7 @@ def needs_you(space: str | None = None, limit: int = MAX_ROWS):
 			# a Goal with no "Done when" while the setting is on waits for the owner to write one (Change opens the capture)
 			"blocked": _(readings.REQUIRED_MESSAGE) if r.kind in ("Goal", "Month Goal") and not readings.has_finish_line(data) and readings.done_when_required() else None,
 		})
-	waiting = frappe.db.sql("""select count(*) from `tabLife Inbox Item` i where i.space = %(space)s and i.is_archived = 0
-		and i.status in ('New', 'Processing') and """ + SEES, args)[0][0]
+	waiting = captures([fn.Count("*")], [i.space == space, i.is_archived == 0, i.status.isin(["New", "Processing"]), *([guard] if guard is not None else [])]).run()[0][0]
 	out.update({"lessons": lessons.proposed(space) if not permissions.is_agent() else [],
 		"contradictions": wiki_check.open_findings(space) if not permissions.is_agent() else [], "total": total, "waiting": waiting, "rows": rows, "minutes": minutes(len(rows)), "unfiled": _failed(space), "max_rows": limit})
 	return out
@@ -99,32 +123,40 @@ def _payload(r):
 
 def _failed(space):
 	"""Captures the agent could not process: not placed, and never lost. Retry sends them back."""
-	return frappe.db.sql(
-		"""select i.name as item, i.title, i.source_type as source, i.error as reason, i.received_on from `tabLife Inbox Item` i
-		where i.space = %(space)s and i.is_archived = 0 and i.status = 'Failed' and """ + SEES + " order by i.received_on asc limit 20",
-		{"space": space, "open": _open(space)}, as_dict=True)
+	i = frappe.qb.DocType("Life Inbox Item")
+	guard = sees(space, i)
+	where = [i.space == space, i.is_archived == 0, i.status == "Failed", *([guard] if guard is not None else [])]
+	fields = [i.name.as_("item"), i.title, i.source_type.as_("source"), i.error.as_("reason"), i.received_on]
+	return captures(fields, where).orderby(i.received_on).limit(20).run(as_dict=True)
 
 
 # Brain > Activity (issue 18): the feed of what came in and what the Brain did with it.
 OUTCOMES = ("filed", "waiting", "dropped", "failed")
-OUTCOME_SQL = """case when i.status = 'Failed' then 'failed' when i.status in ('New', 'Processing') then 'working'
-	when i.status = 'To Review' then 'waiting'
-	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Accepted' and ifnull(p.filed_by, '') = '') > 0 then 'decided'
-	when (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Rejected') > 0 then 'dropped'
-	else 'filed' end"""
+
+
+def outcome_term(i):
+	"""What the Brain did with a capture, as a select term."""
+	accepted = proposals_of(i, lambda q: q.status == "Accepted", lambda q: fn.IfNull(q.filed_by, "") == "")
+	rejected = proposals_of(i, lambda q: q.status == "Rejected")
+	return (Case().when(i.status == "Failed", "failed").when(i.status.isin(["New", "Processing"]), "working").when(i.status == "To Review", "waiting")
+		.when(accepted > 0, "decided").when(rejected > 0, "dropped").else_("filed"))
+
+
 MADE_EACH = 4
 SOURCE_TYPES = ("Upload", "Journal Photo", "Voice Note", "Email", "Email Digest", "Chat", "Message", "Web", "Phone")
 
 
 def _activity_where(space, days, source, area):
-	where = "i.space = %(space)s and i.is_archived = 0 and i.received_on >= %(since)s and " + SEES
-	values = {"space": space, "open": _open(space), "since": add_to_date(now_datetime(), days=-days)}
+	i = frappe.qb.DocType("Life Inbox Item")
+	where = [i.space == space, i.is_archived == 0, i.received_on >= add_to_date(now_datetime(), days=-days)]
+	guard = sees(space, i)
+	if guard is not None:
+		where.append(guard)
 	if source:
-		where += " and i.source_type = %(source)s"
-		values["source"] = source
+		where.append(i.source_type == source)
 	if area:
-		where += " and " + area_filter(space, area, "i.area", values)
-	return where, values
+		where.append(area_criterion(space, area, i))
+	return where
 
 
 @frappe.whitelist(methods=["GET"])
@@ -139,18 +171,18 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 	area = lens_area(area)
 	days = max(1, min(int(days or 14), 120))
 	start, page_length = page(start, page_length)
-	where, values = _activity_where(space, days, source if source in SOURCE_TYPES else None, area)
-	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter; values are parameters
-	counts = dict(frappe.db.sql(f"select o, count(*) from (select {OUTCOME_SQL} as o from `tabLife Inbox Item` i where {where}) t group by o", values))
+	i = frappe.qb.DocType("Life Inbox Item")
+	where = _activity_where(space, days, source if source in SOURCE_TYPES else None, area)
+	counts = dict(frappe.qb.from_(captures([outcome_term(i).as_("o")], where).as_("t")).select(Field("o"), fn.Count("*")).groupby(Field("o")).run())  # system: wrapped query, permissions applied inside
 	total = sum(counts.values())
 	counts = {k: int(counts.get(k, 0)) for k in (*OUTCOMES, "decided", "working")}
+	fields = [i.name.as_("item"), i.title, i.source_type.as_("source"), i.media_kind, i.received_on, i.status, i.error, i.intent, i.area, i.goal,
+		i.is_sensitive, i.processed_by, outcome_term(i).as_("outcome")]
+	inner = captures(fields, where).as_("t")
+	rows = frappe.qb.from_(inner).select(inner.star)
 	if outcome in OUTCOMES:
-		values["outcome"] = outcome
-	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter; values are parameters
-	rows = frappe.db.sql(f"""select * from (select i.name as item, i.title, i.source_type as source, i.media_kind, i.received_on, i.status, i.error,
-			i.intent, i.area, i.goal, i.is_sensitive, i.processed_by, {OUTCOME_SQL} as outcome from `tabLife Inbox Item` i where {where}) t
-		{'where outcome = %(outcome)s' if outcome in OUTCOMES else ''} order by received_on desc, item desc limit %(s)s, %(n)s""",
-		{**values, "s": start, "n": page_length}, as_dict=True)
+		rows = rows.where(Field("outcome") == outcome)
+	rows = rows.orderby(Field("received_on"), order=Order.desc).orderby(Field("item"), order=Order.desc).limit(page_length).offset(start).run(as_dict=True)  # system: wrapped query, permissions applied inside
 	areas = names_map("Life Area", [r.area for r in rows if r.area], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows if r.goal], "title")
 	made = _made(space, [r.item for r in rows])
@@ -160,9 +192,7 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 		r.update(received_on=str(r.received_on)[:19], area_name=areas.get(r.area), goal_title=goals.get(r.goal), made=made.get(r.item, []),
 			filed_by=r.processed_by if r.item in own else None)
 		r.pop("processed_by", None)
-	every, every_values = _activity_where(space, days, None, area)
-	# nosemgrep: frappe-sql-format-injection -- WHERE is constant SQL plus area_filter; values are parameters
-	sources = [x[0] for x in frappe.db.sql(f"select distinct i.source_type from `tabLife Inbox Item` i where {every} order by 1", every_values)]
+	sources = captures([i.source_type], _activity_where(space, days, None, area)).distinct().orderby(i.source_type).run(pluck=True)
 	shown = counts[outcome] if outcome in OUTCOMES else total
 	return {"rows": rows, "total": shown, "all": total, "counts": counts, "sources": sources, "days": days, "plate": plate(space, area)}
 

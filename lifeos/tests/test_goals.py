@@ -1350,6 +1350,19 @@ class TestGoals(LifeTestCase):
 		self.assertEqual(tabs, {"in_progress": 0, "achieved": 0, "closed": 1, "someday": 0, "all": 1})
 		self.assertEqual(goals.list(space=PRIVATE, state="closed", filters=mine)["total"], 1)
 
+	def test_goal_list_summary_order_and_area_run_on_the_query_builder(self):
+		a = goals.create("qb1 first", "Long term", space=PRIVATE)["name"]
+		b = goals.create("qb1 second", "Year", space=PRIVATE, target_date=add_days(today(), 30))["name"]
+		mine = frappe.as_json([["title", "like", "qb1"]])
+		out = goals.list(space=PRIVATE, filters=mine, order_by="title desc")
+		self.assertEqual([r.name for r in out["goals"]], [b, a])
+		self.assertEqual([r.name for r in goals.list(space=PRIVATE, filters=mine, sort="target_date")["goals"]], [b, a])
+		summary = goals.list(space=PRIVATE, filters=mine, summary={"fields": ["horizon"], "aggregates": [{"function": "count"}], "order_by": "horizon asc"})
+		self.assertEqual({r["horizon"]: r["_aggregate_0"] for r in summary["summary"]["rows"]}, {"Long term": 1, "Year": 1})
+		self.assertEqual(summary["summary"]["total"], 2)
+		self.assertEqual(goals.list(space=PRIVATE, filters=mine, area="none")["total"], 2)
+		self.assertRaises(frappe.ValidationError, goals.list, space=PRIVATE, order_by="title; drop table tabUser")
+
 	def test_add_to_cycle_keeps_tasks(self):
 		cycle = frappe.get_doc({"doctype": "Life Cycle", "space": PRIVATE, "title": "ux3 cycle", "start_date": add_days(today(), -7), "status": "Active"}).insert()
 		g = goals.create("ux3 moving", "Long term", space=PRIVATE)["name"]

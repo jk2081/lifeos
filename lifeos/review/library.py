@@ -4,6 +4,8 @@ from collections import Counter
 from datetime import timedelta
 
 import frappe
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, get_datetime, getdate
 
 from lifeos.review import findings, gcal, meetings
@@ -119,9 +121,10 @@ def _goal_for(links):
 
 
 def goal_options(space):
-	return frappe.db.sql("""select g.name as value, g.title as label from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
-		where g.space = %s and g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0
-		and (g.horizon != '12 weeks' or c.status = 'Active') order by g.horizon = '12 weeks' desc, g.title limit 100""", space, as_dict=True)
+	g, c = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Cycle")
+	where = (g.space == space) & (g.outcome == "In Progress") & (g.is_someday == 0) & (g.is_archived == 0) & ((g.horizon != "12 weeks") | (c.status == "Active"))
+	return (frappe.qb.from_(g).left_join(c).on(c.name == g.cycle).select(g.name.as_("value"), g.title.as_("label")).where(where)  # system: the weekly review reads the owner's own space
+		.orderby(g.horizon == "12 weeks", order=Order.desc).orderby(g.title).limit(100).run(as_dict=True))
 
 
 def candidates(space, ev, recs):
@@ -132,10 +135,10 @@ def candidates(space, ev, recs):
 	from lifeos.web.pane_refs import ref_of
 
 	out = []
-	for dt, when in (("Life Inbox Item", "ifnull(received_on, creation)"), ("Life Chat Log", "creation"), ("Life Note", "creation")):
-		# nosemgrep: frappe-sql-format-injection -- dt and the date column come from the fixed tuple above; values are parameters
-		for name, title in frappe.db.sql(f"select name, title from `tab{dt}` where space = %s and {when} between %s and %s order by {when} limit 30",
-				(space, a, b)):
+	for dt in ("Life Inbox Item", "Life Chat Log", "Life Note"):
+		t = frappe.qb.DocType(dt)
+		when = fn.IfNull(t.received_on, t.creation) if dt == "Life Inbox Item" else t.creation
+		for name, title in frappe.qb.from_(t).select(t.name, t.title).where((t.space == space) & when.between(a, b)).orderby(when).limit(30).run():  # system: the weekly review reads the owner's own space
 			if (dt, name) not in have:
 				out.append({"doctype": dt, "name": name, "title": title, "kind": meetings.label_of(dt, name), "ref": ref_of(dt, name)})
 	return out[:40]

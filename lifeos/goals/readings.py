@@ -158,8 +158,8 @@ def check_goal(doc):
 
 def refresh_current(goal):
 	"""current_value and current_on always equal the latest Confirmed reading (by date, then the latest entered)."""
-	row = frappe.db.sql("""select value, date from `tabLife Goal Reading` where goal=%s and status='Confirmed'
-		order by date desc, creation desc limit 1""", goal, as_dict=True)
+	row = frappe.get_all("Life Goal Reading", filters={"goal": goal, "status": "Confirmed"}, fields=["value", "date"],
+		order_by="date desc, creation desc", limit=1)  # system: the goal's own readings, whoever asks
 	value, on = (row[0].value, row[0].date) if row else (0, None)  # Float columns are never null: no reading is current_on unset
 	frappe.db.set_value("Life Goal", goal, {"current_value": value, "current_on": on}, update_modified=False)
 	return value, on
@@ -271,8 +271,8 @@ def stale_number_goals(space, goals=None):
 	"""Number goals in progress with no Confirmed reading in the last 14 days."""
 	cutoff = getdate(add_days(today(), -STALE_DAYS))
 	goals = goals if goals is not None else number_goals(space)
-	lasts = dict(frappe.db.sql("""select goal, max(date) from `tabLife Goal Reading` where goal in %s and status='Confirmed'
-		group by goal""", ([g.name for g in goals] or [""],))) if goals else {}
+	lasts = dict(frappe.get_all("Life Goal Reading", filters={"goal": ("in", [g.name for g in goals]), "status": "Confirmed"},
+		fields=["goal", {"MAX": "date"}], group_by="goal", as_list=True)) if goals else {}  # system: the readings of goals the caller already read
 	out = []
 	for g in goals:
 		last = lasts.get(g.name)

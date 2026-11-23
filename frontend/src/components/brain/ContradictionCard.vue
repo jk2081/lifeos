@@ -20,7 +20,8 @@
 // and cites its source (context.decide).
 import { ref } from 'vue'
 import { Badge, Button, toast } from 'frappe-ui'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
+import { brainData } from '@/data/brain'
 
 const props = defineProps({ finding: { type: Object, required: true }, canEdit: Boolean })
 const emit = defineEmits(['changed'])
@@ -28,7 +29,7 @@ const busy = ref(null)
 async function keep(i) {
   busy.value = i
   try {
-    await api('context.decide', { finding: props.finding.name, choice: i })
+    await brainData.context.decide({ finding: props.finding.name, choice: i })
     toast.success('Kept. The pages now agree.')
     emit('changed')
   } catch (e) {

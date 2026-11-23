@@ -55,7 +55,8 @@ import { Badge, Button, TextInput } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { libraryData } from '@/data/library'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, goalOptions, loadLookups, lookups } from '@/lib/lookups'
@@ -92,13 +93,13 @@ watch(q, () => { clearTimeout(timer); timer = setTimeout(applyQuery, 300) })
 function clear() { q.value = ''; router.replace({ query: { space: route.query.space, open: route.query.open } }) }
 
 async function fetchRows(start) {
-  return tryCall(() => api('everything.list', { space: store.space, tab: props.tab, q: route.query.q || undefined, area: area.value || store.lensArea || undefined,
+  return tryCall(() => libraryData.everything.list({ space: store.space, tab: props.tab, q: route.query.q || undefined, area: area.value || store.lensArea || undefined,
     goal: goal.value || undefined, source: source.value || undefined, unopened: unopened.value ? 1 : undefined, start, page_length: PAGE }))
 }
 // the old Open band's note numbers (issue 55): notes and sources, and notes not opened in 90 days
 const numbers = ref(null)
 async function loadNumbers() {
-  numbers.value = (await tryCall(() => api('counts.get', { space: store.space, which: 'library', area: store.lensArea || undefined }))) || numbers.value
+  numbers.value = (await tryCall(() => libraryData.counts.get({ space: store.space, which: 'library', area: store.lensArea || undefined }))) || numbers.value
 }
 async function load() {
   loadNumbers()

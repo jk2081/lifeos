@@ -36,12 +36,12 @@ def _excerpt(text, n=PAGE_WORDS) -> str:
 
 # ---- what the skill is shown ----
 def _link_counts(space) -> dict:
-	rows = frappe.db.sql("""select name, sum(out_n) as out_n, sum(in_n) as in_n from (
-		select from_name as name, count(*) as out_n, 0 as in_n from `tabLife Link` where space = %(s)s and from_doctype = 'Life Note' and to_name != from_name group by from_name
-		union all
-		select to_name, 0, count(*) from `tabLife Link` where space = %(s)s and to_doctype = 'Life Note' and to_name != from_name group by to_name) x group by name""",
-		{"s": space}, as_dict=True)
-	return {r.name: (int(r.in_n or 0), int(r.out_n or 0)) for r in rows}
+	from lifeos.api.utils import count_by
+
+	lk = frappe.qb.DocType("Life Link")
+	out = count_by("Life Link", "from_name", [lk.space == space, lk.from_doctype == "Life Note", lk.to_name != lk.from_name])
+	into = count_by("Life Link", "to_name", [lk.space == space, lk.to_doctype == "Life Note", lk.to_name != lk.from_name])
+	return {name: (int(into.get(name, 0)), int(out.get(name, 0))) for name in {*out, *into}}
 
 
 def pages_for(space) -> list:

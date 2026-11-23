@@ -19,7 +19,8 @@ import { Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import Empty from '@/components/Empty.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { canWrite, store } from '@/lib/store'
 import { long, short, time, weekday } from '@/lib/dates'
 import { onRecordChanged } from '@/lib/pane'
@@ -31,7 +32,7 @@ const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
 const items = ref([])
 const loaded = ref(false)
 async function load() {
-  const res = await tryCall(() => api('calendar.get', { space: store.space, from_date: props.name, to_date: props.name }))
+  const res = await tryCall(() => itemData.calendar.get({ space: store.space, from_date: props.name, to_date: props.name }))
   items.value = res ? res.items : []
   loaded.value = true
 }

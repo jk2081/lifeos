@@ -3,13 +3,15 @@ import builtins
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos.library import files, links
 from lifeos import permissions
 from lifeos.brain import proposals
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts, user_names
-from lifeos.api.utils import order_by as sort_order
+from lifeos.api.utils import (area_criterion, count_by, count_tabs, count_where, filter_criteria, flag, group_summary, in_order_of, list_query, names_map, order_terms,
+	page, parse, sort_terms, user_names)
 
 CLAIM_MINUTES = 30
 LIST = list  # this module defines its own `list` method below
@@ -49,11 +51,14 @@ def _job_parts(item):
 	chat = frappe.db.get_value("Life Chat Log", item.job_chat, ["name", "title"], as_dict=True) if item.job_chat else None
 	if chat:
 		chat["route"] = links.route_of("Life Chat Log", chat.name)
-	pages = frappe.db.sql("""select n.name, n.title from `tabLife Note` n join `tabLife Note Source` s on s.parent = n.name
-		and s.parenttype = 'Life Note' where s.source_doctype = 'Life Inbox Item' and s.source_name = %s and n.collection = 'Wiki'
-		order by n.title limit 50""", item.name, as_dict=True)
-	for page in pages:
-		page["route"] = links.route_of("Life Note", page.name)
+	n, ns = frappe.qb.DocType("Life Note"), frappe.qb.DocType("Life Note Source")
+	where = [ns.parenttype == "Life Note", ns.source_doctype == "Life Inbox Item", ns.source_name == item.name, n.collection == "Wiki"]
+	pages = frappe.qb.get_query("Life Note", fields=[n.name, n.title], ignore_permissions=False).join(ns).on(ns.parent == n.name)  # the pages the user may read
+	for crit in where:
+		pages = pages.where(crit)
+	pages = pages.orderby(n.title).limit(50).run(as_dict=True)
+	for wiki_page in pages:
+		wiki_page["route"] = links.route_of("Life Note", wiki_page.name)
 	return {"inputs": inputs, "job_chat": chat, "wiki_pages": pages}
 
 
@@ -159,10 +164,10 @@ def claim_next(space: str | None = None):
 		return None
 	# a source a Vault document was made from is hidden from an agent while that Vault is closed to it
 	closed = [sp for sp in spaces if permissions.vault_hidden(sp)] or [""]
-	rows = frappe.db.sql(
-		"select name from `tabLife Inbox Item` where status='New' and is_archived=0 and space in %s "
-		"and not ((ifnull(vault_document, '') != '' or is_sensitive = 1) and space in %s) "
-		"order by received_on asc, creation asc limit 1 for update skip locked", (spaces, closed))
+	i = frappe.qb.DocType("Life Inbox Item")
+	hidden = fn.IfNull(i.vault_document, "") != ""
+	rows = (frappe.qb.from_(i).select(i.name).where((i.status == "New") & (i.is_archived == 0) & i.space.isin(spaces) & ~((hidden | (i.is_sensitive == 1)) & i.space.isin(closed)))
+		.orderby(i.received_on).orderby(i.creation).limit(1).for_update(skip_locked=True).run())  # system: the queue is claimed by whoever asks, the spaces were chosen above
 	if not rows:
 		return None
 	item = frappe.get_doc("Life Inbox Item", rows[0][0])
@@ -209,10 +214,11 @@ def space_context(space):
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)
 	# every goal in progress, of every type, for filing a task under it; 12 Week Year goals of the active cycle carry their actions
 	goals = []
-	rows = frappe.db.sql("""select g.name, g.title, g.area, g.horizon, g.cycle, g.measure_kind, g.measure, g.unit, g.start_value,
-			g.target_value, g.current_value, g.current_on from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
-			where g.space=%s and g.outcome='In Progress' and (ifnull(g.cycle, '') = '' or c.status in ('Active', 'Planned'))
-			order by field(g.horizon, '12 weeks', 'Month', 'Year', 'Long term'), g.sort_order, g.title""", space, as_dict=True)
+	g, c = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Cycle")
+	where = [g.space == space, g.outcome == "In Progress", (fn.IfNull(g.cycle, "") == "") | c.status.isin(["Active", "Planned"])]
+	fields = ["name", "title", "area", "horizon", "cycle", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"]
+	rows = list_query("Life Goal", fields, where, [(in_order_of(g.horizon, ("12 weeks", "Month", "Year", "Long term")), Order.asc), (g.sort_order, Order.asc), (g.title, Order.asc)])
+	rows = rows.left_join(c).on(c.name == g.cycle).run(as_dict=True)
 	cycle_goals = [g.name for g in rows if g.cycle and g.area not in off]
 	actions = {}
 	if cycle_goals:
@@ -355,13 +361,14 @@ def file_myself(item: str):
 	return {"item": doc.name, "status": doc.status}
 
 
-SORTS = {"received_on": "i.received_on", "title": "i.title", "status": "i.status", "source_type": "i.source_type"}
+SORTS = {k: (lambda i, k=k: [i[k]]) for k in ("received_on", "title", "status", "source_type")}
 
 
-# the Inbox is a queue (UX fixes, set 4): its tabs are what is not finished. Done items are in Sources; `Done` and `all` stay
-# here for agents and old links.
-TABS = {"To Review": "i.status = 'To Review'", "Waiting": "i.status in ('New', 'Processing')", "Failed": "i.status = 'Failed'",
-	"Done": "i.status = 'Done'", "all": None}
+def tab_criteria(i):
+	"""The state tabs of the Inbox screen: it is a queue (UX fixes, set 4), so its tabs are what is not finished. Done items are in
+	Sources; `Done` and `all` stay here for agents and old links."""
+	return {"To Review": i.status == "To Review", "Waiting": i.status.isin(["New", "Processing"]), "Failed": i.status == "Failed", "Done": i.status == "Done",
+		"all": None}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -376,47 +383,41 @@ def list(space: str | None = None, status: str | builtins.list | None = None, in
 	under the same filters, whatever status was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = ["i.space = %(space)s"], {"space": space}
+	i = frappe.qb.DocType("Life Inbox Item")
+	where = [i.space == space]
 	if permissions.vault_hidden(space):  # an agent never lists the source a Vault document was made from (pre-step 6 audit)
-		where.append("ifnull(i.vault_document, '') = '' and i.is_sensitive = 0")
+		where.append((fn.IfNull(i.vault_document, "") == "") & (i.is_sensitive == 0))
 	if not flag(include_archived):
-		where.append("i.is_archived = 0")
+		where.append(i.is_archived == 0)
 	if source_type:
-		where.append("i.source_type = %(source_type)s")
-		values["source_type"] = source_type
+		where.append(i.source_type == source_type)
 	if area:
-		where.append(area_filter(space, area, "i.area", values, also_in="Life Inbox Item"))
+		where.append(area_criterion(space, area, i, also_in="Life Inbox Item"))
 	if from_date:
-		where.append("date(i.received_on) >= %(from_date)s")
-		values["from_date"] = frappe.utils.getdate(from_date)
+		where.append(fn.Date(i.received_on) >= frappe.utils.getdate(from_date))
 	if to_date:
-		where.append("date(i.received_on) <= %(to_date)s")
-		values["to_date"] = frappe.utils.getdate(to_date)
-	conds, values = std_filters("Life Inbox Item", filters, "i", values)
+		where.append(fn.Date(i.received_on) <= frappe.utils.getdate(to_date))
+	where += filter_criteria("Life Inbox Item", filters, i)
 	# the state tabs of the Inbox screen, counted under every filter but the status itself
-	tabs = tab_counts(f"from `tabLife Inbox Item` i where {' and '.join(where + conds)}", values, TABS)
+	tabs = count_tabs("Life Inbox Item", where, tab_criteria(i))
 	if status:
 		statuses = parse(status) if str(status).startswith("[") else [status]
-		where.append("i.status in %(statuses)s")
-		values["statuses"] = statuses or [""]
-	clause = " and ".join(where + conds)
+		where.append(i.status.isin(statuses or [""]))
 	if summary:
-		return {"summary": summarise("Life Inbox Item", f"from `tabLife Inbox Item` i where {clause}", values, "i", summary, start, page_length), "tabs": tabs}
-	order = std_order("Life Inbox Item", order_by, "i", SORTS) or sort_order(sort, dir, SORTS, "i.received_on desc")
-	# nosemgrep: frappe-sql-format-injection -- clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist
-	rows = frappe.db.sql(
-		f"""select i.name, i.title, i.source_type, i.status, i.received_on, i.instruction, i.claimed_by, i.error, i.owner, i.area,
-			i.summary_md, i.transcript_md from `tabLife Inbox Item` i where {clause} order by {order}, i.creation desc limit %(start)s, %(len)s""",
-		{**values, "start": start, "len": page_length}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- clause from fixed fragments and std_filters (columns checked against meta, values as parameters)
-	total = frappe.db.sql(f"select count(*) from `tabLife Inbox Item` i where {clause}", values)[0][0]
-	# nosemgrep: frappe-sql-format-injection -- clause from fixed fragments and std_filters (columns checked against meta, values as parameters)
-	pending_total = frappe.db.sql(
-		f"select count(*) from `tabLife Proposal` p join `tabLife Inbox Item` i on i.name = p.inbox_item where p.status = 'Pending' and {clause}", values)[0][0]
+		return {"summary": group_summary("Life Inbox Item", where, summary, start, page_length), "tabs": tabs}
+	terms = order_terms("Life Inbox Item", order_by, i, SORTS) or sort_terms(sort, dir, SORTS, i, [(i.received_on, Order.desc)])
+	fields = ["name", "title", "source_type", "status", "received_on", "instruction", "claimed_by", "error", "owner", "area", "summary_md", "transcript_md"]
+	rows = list_query("Life Inbox Item", fields, where, [*terms, (i.creation, Order.desc)]).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Inbox Item", where)
+	p = frappe.qb.DocType("Life Proposal")
+	pending = frappe.qb.get_query("Life Proposal", fields=[fn.Count("*")], ignore_permissions=False).join(i).on(i.name == p.inbox_item).where(p.status == "Pending")
+	for crit in where:
+		pending = pending.where(crit)
+	pending_total = pending.run()[0][0]
 	counts = {}
 	if rows:
-		for item, st, n in frappe.db.sql(
-			"select inbox_item, status, count(*) from `tabLife Proposal` where inbox_item in %s group by inbox_item, status", ([r.name for r in rows],)):
+		per = frappe.qb.get_query("Life Proposal", fields=[p.inbox_item, p.status, fn.Count("*")], ignore_permissions=False).where(p.inbox_item.isin([r.name for r in rows]))
+		for item, st, n in per.groupby(p.inbox_item, p.status).run():
 			counts.setdefault(item, {})[st] = n
 	users = user_names([r.owner for r in rows] + [r.claimed_by for r in rows])
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
@@ -430,7 +431,7 @@ def list(space: str | None = None, status: str | builtins.list | None = None, in
 		r["filed_by"] = users.get(r.owner)
 		r["processed_by"] = users.get(r.claimed_by)
 		r["area_name"] = areas.get(r.area)
-	totals = dict(frappe.db.sql("select status, count(*) from `tabLife Inbox Item` where space=%s and is_archived=0 group by status", space))
+	totals = count_by("Life Inbox Item", "status", [i.space == space, i.is_archived == 0])
 	return {"items": rows, "total": total, "pending_total": pending_total, "totals": totals, "tabs": tabs, "start": start, "page_length": page_length}
 
 

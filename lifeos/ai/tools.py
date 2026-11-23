@@ -5,10 +5,11 @@ import json
 import re
 
 import frappe
+from frappe.query_builder import Case, Order
 from frappe.utils import add_days, cint, getdate, today
 
 from lifeos import permissions
-from lifeos.api.utils import descendants
+from lifeos.api.utils import area_criterion, count_where, descendants, list_query
 from lifeos.web.pane_refs import ref_of
 
 TEXT_CAP = 6000  # characters of a record's text sent to the model
@@ -83,22 +84,24 @@ class Context:
 		if r in self.refs and r not in self.read:
 			self.read.append(r)
 
-	# ---- the scope as SQL on Life Index rows ----
-	def scope_sql(self, alias="x."):
-		s, values = self.scope, {}
+	# ---- the space, the Vault rule and the scope as criteria on Life Index rows ----
+	def scope_criteria(self, x):
+		"""The question's scope as a list of criteria over `frappe.qb.DocType("Life Index")`."""
+		s = self.scope
 		k = s.get("kind")
 		if k == "area" and s.get("name"):
-			values["scope_ids"] = descendants(self.space, s["name"])
-			from lifeos.library.index import also_in_sql
-
-			return f" and ({alias}area in %(scope_ids)s or {also_in_sql('scope_ids', alias)})", values
+			return [area_criterion(self.space, s["name"], x, also_in="index")]
 		if k in ("goal",) and s.get("name"):  # a goal: what is filed under it, and what links to it
-			return f" and ({alias}goal = %(scope_goal)s or {alias}ref_name in %(scope_names)s)", {"scope_goal": s["name"], "scope_names": self.scope_names() or [""]}
+			return [(x.goal == s["name"]) | x.ref_name.isin(self.scope_names() or [""])]
 		if k in ("record", "items") and self.scope_names():
-			return f" and {alias}ref_name in %(scope_names)s", {"scope_names": self.scope_names()}
+			return [x.ref_name.isin(self.scope_names())]
 		if k == "notes":
-			return f" and {alias}kind = 'Note'", {}
-		return "", {}
+			return [x.kind == "Note"]
+		return []
+
+	def index_criteria(self, x):
+		"""The criteria every read of Life Index rows starts with: the space, the Vault rule (`vault_criteria`) and the scope."""
+		return [x.space == self.space, *self.vault_criteria(x), *self.scope_criteria(x)]
 
 	def scope_names(self):
 		"""For a record scope: the record and the records linked to it, either way. For items: the items on screen."""
@@ -110,8 +113,9 @@ class Context:
 			names = [i.get("name") for i in s.get("items") or [] if i.get("name")]
 		elif s.get("doctype") and s.get("name"):
 			names = [s["name"]]
-			for a, b in frappe.db.sql("""select to_name, from_name from `tabLife Link` where space=%s and
-				((from_doctype=%s and from_name=%s) or (to_doctype=%s and to_name=%s))""", (self.space, s["doctype"], s["name"], s["doctype"], s["name"])):
+			lk = frappe.qb.DocType("Life Link")
+			mine = (lk.from_doctype == s["doctype"]) & (lk.from_name == s["name"]) | (lk.to_doctype == s["doctype"]) & (lk.to_name == s["name"])
+			for a, b in frappe.qb.from_(lk).select(lk.to_name, lk.from_name).where((lk.space == self.space) & mine).run():  # system: the links of the record in the question's own space
 				names += [a, b]
 			if s["doctype"] == "Life Goal":
 				names += frappe.get_all("Life Task", filters={"goal": s["name"]}, pluck="name", limit=200)
@@ -123,8 +127,9 @@ class Context:
 		self._scope_names = sorted({n for n in names if n})
 		return self._scope_names
 
-	def vault_sql(self, alias="x."):
-		return "" if self.vault_ok else f" and {alias}vault_locked = 0 and {alias}ref_doctype != 'Life Vault Document'"
+	def vault_criteria(self, x):
+		"""Leaves Vault rows, and sources of Vault documents, out unless the space lets Ask read the Vault."""
+		return [] if self.vault_ok else [(x.vault_locked == 0) & (x.ref_doctype != "Life Vault Document")]
 
 
 def run_tool(ctx, name, args):
@@ -154,27 +159,24 @@ def t_search(ctx, query, kinds=None, date_from=None, date_to=None, limit=15):
 	words = _words(query)
 	if not words:
 		return {"results": [], "note": "No search words."}
-	where = f"x.space = %(space)s and x.kind != 'Task Done' and x.is_archived = 0{ctx.vault_sql()}"
-	values = {"space": ctx.space, "limit": min(cint(limit) or 15, 25)}
-	sql, v = ctx.scope_sql()
-	where += sql
-	values.update(v)
+	x = frappe.qb.DocType("Life Index")
+	where = [*ctx.index_criteria(x), x.kind != "Task Done", x.is_archived == 0]
 	if kinds:
-		values["kinds"] = [INDEX_KIND[k] for k in kinds if k in INDEX_KIND] or [""]
-		where += " and x.kind in %(kinds)s"
+		where.append(x.kind.isin([INDEX_KIND[k] for k in kinds if k in INDEX_KIND] or [""]))
 	if date_from:
-		where += " and x.record_date >= %(df)s"
-		values["df"] = getdate(date_from)
+		where.append(x.record_date >= getdate(date_from))
 	if date_to:
-		where += " and x.record_date <= %(dt)s"
-		values["dt"] = getdate(date_to)
+		where.append(x.record_date <= getdate(date_to))
 	# any of the words, best match first; a plain match for short words and for rows the full-text index has not seen yet
-	likes = " or ".join(f"x.title like %(w{i})s or x.search_text like %(w{i})s" for i in range(len(words)))
-	values.update({f"w{i}": f"%{w}%" for i, w in enumerate(words)})
-	score = " + ".join(f"(x.title like %(w{i})s) * 3 + (x.search_text like %(w{i})s)" for i in range(len(words)))
-	# nosemgrep: frappe-sql-format-injection -- WHERE, LIKE and score are fixed fragments with numbered placeholders; the model's words, kinds and dates are parameters
-	rows = frappe.db.sql(f"""select x.ref_doctype, x.ref_name, x.title, x.kind, x.record_date, x.area, x.status, x.search_text, ({score}) as score
-		from `tabLife Index` x where {where} and ({likes}) order by score desc, x.record_date desc limit %(limit)s""", values, as_dict=True)
+	likes = [x.title.like(f"%{w}%") | x.search_text.like(f"%{w}%") for w in words]
+	any_word = likes[0]
+	for like in likes[1:]:
+		any_word = any_word | like
+	score = Case().when(x.title.like(f"%{words[0]}%"), 3).else_(0) + Case().when(x.search_text.like(f"%{words[0]}%"), 1).else_(0)
+	for w in words[1:]:
+		score = score + Case().when(x.title.like(f"%{w}%"), 3).else_(0) + Case().when(x.search_text.like(f"%{w}%"), 1).else_(0)
+	fields = ["ref_doctype", "ref_name", "title", "kind", "record_date", "area", "status", "search_text"]
+	rows = list_query("Life Index", fields, [*where, any_word], [(score, Order.desc), (x.record_date, Order.desc)]).select(score.as_("score")).limit(min(cint(limit) or 15, 25)).run(as_dict=True)
 	from lifeos.api.search import _snippet
 
 	out = []
@@ -306,19 +308,13 @@ def t_list(ctx, kind, filters=None, order=None, limit=20):
 	index_kind = {"notes": "Note", "sources": "Inbox", "chats": "Chat"}.get(kind)
 	if not index_kind:
 		return {"error": "Unknown kind."}
-	where = f"x.space=%(space)s and x.kind=%(kind)s and x.is_archived=0{ctx.vault_sql()}"
-	values = {"space": ctx.space, "kind": index_kind, "limit": limit}
-	sql, v = ctx.scope_sql()
-	where += sql
-	values.update(v)
+	x = frappe.qb.DocType("Life Index")
+	where = [*ctx.index_criteria(x), x.kind == index_kind, x.is_archived == 0]
 	if area and ctx.scope.get("kind") != "area":
-		values["areas"] = descendants(ctx.space, area)
-		where += " and x.area in %(areas)s"
-	# nosemgrep: frappe-sql-format-injection -- fixed fragments (vault and scope SQL from the tool context, code-owned); every value, including model-chosen ones, is a parameter; order is 'asc' or 'desc' only
-	rows = frappe.db.sql(f"""select x.ref_doctype, x.ref_name, x.title, x.record_date, x.area, x.status from `tabLife Index` x where {where}
-		order by x.record_date {'asc' if order == 'oldest' else 'desc'} limit %(limit)s""", values, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- fixed fragments (vault and scope SQL from the tool context, code-owned); every value, including model-chosen ones, is a parameter
-	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {where}", values)[0][0]
+		where.append(x.area.isin(descendants(ctx.space, area)))
+	fields = ["ref_doctype", "ref_name", "title", "record_date", "area", "status"]
+	rows = list_query("Life Index", fields, where, [(x.record_date, Order.asc if order == "oldest" else Order.desc)]).limit(limit).run(as_dict=True)
+	total = count_where("Life Index", where)
 	return {"total": total, "rows": [{"ref": ctx.ref(r.ref_doctype, r.ref_name, r.title, index_kind, r.record_date, r.area), "title": r.title,
 		"date": str(r.record_date), "area": _area(r.area), "status": r.status or None} for r in rows]}
 
@@ -368,15 +364,11 @@ def habits_this_month(space, now):
 
 def t_timeline(ctx, date_from, date_to=None):
 	date_to = date_to or today()
-	where = f"x.space=%(space)s and x.record_date between %(a)s and %(b)s{ctx.vault_sql()}"
-	values = {"space": ctx.space, "a": getdate(date_from), "b": getdate(date_to)}
-	sql, v = ctx.scope_sql()
-	where += sql
-	values.update(v)
-	# nosemgrep: frappe-sql-format-injection -- fixed fragments (vault and scope SQL from the tool context, code-owned); every value, including model-chosen ones, is a parameter
-	rows = frappe.db.sql(f"""select x.ref_doctype, x.ref_name, x.title, x.kind, x.record_date, x.area from `tabLife Index` x where {where}
-		order by x.record_date desc limit 60""", values, as_dict=True)
-	return {"from": str(values["a"]), "to": str(values["b"]), "rows": [{"ref": ctx.ref(r.ref_doctype, r.ref_name, r.title, r.kind, r.record_date, r.area),
+	x = frappe.qb.DocType("Life Index")
+	a, b = getdate(date_from), getdate(date_to)
+	where = [*ctx.index_criteria(x), x.record_date.between(a, b)]
+	rows = list_query("Life Index", ["ref_doctype", "ref_name", "title", "kind", "record_date", "area"], where, [(x.record_date, Order.desc)]).limit(60).run(as_dict=True)
+	return {"from": str(a), "to": str(b), "rows": [{"ref": ctx.ref(r.ref_doctype, r.ref_name, r.title, r.kind, r.record_date, r.area),
 		"kind": r.kind, "title": r.title, "date": str(r.record_date)} for r in rows]}
 
 

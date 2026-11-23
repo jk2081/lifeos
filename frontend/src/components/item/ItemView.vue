@@ -1,0 +1,164 @@
+<template>
+  <DefineInner>
+    <header class="flex flex-none flex-col gap-2.5 border-outline-gray-1 px-4 pb-3 md:px-5" :class="[phone ? 'pt-0' : 'pt-3.5', tabs.length > 1 ? '' : 'border-b']">
+      <!-- the actions on their own line with Close pinned at the end; the kind and title below at the pane's full width,
+           so the title never shares a row with buttons -->
+      <div class="flex items-start gap-1.5">
+        <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5" data-pane-actions>
+        <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" :size="btnSize" icon-left="lucide-sparkles" :label="phone ? 'Ask' : 'Ask about this'" data-pane-ask
+          @click="askAbout(ASKABLE[cur.type], cur.name, meta.title)" />
+        <!-- the sensitive mark (UX fixes, set 6): a lock while it is on; anyone who may edit marks it, only the space's owner unmarks it -->
+        <Button v-if="meta.sensitive && !store.isAgent" :size="btnSize" :icon-left="meta.sensitive.on ? 'lucide-lock' : 'lucide-lock-open'" :variant="meta.sensitive.on ? 'subtle' : 'ghost'"
+          :label="phone ? '' : meta.sensitive.on ? 'Sensitive' : 'Mark sensitive'" :tooltip="meta.sensitive.on ? 'Sensitive: follows the Vault rules. Click to unmark (the space owner only).' : 'Mark sensitive'"
+          :aria-pressed="meta.sensitive.on" data-pane-sensitive @click="toggleSensitive" />
+        <Button v-if="meta.someday" :size="btnSize" icon-left="lucide-clock" :label="phone ? 'Someday' : 'Move to Someday'" data-pane-someday @click="toSomeday" />
+        <Button v-if="meta.fullPage" :size="btnSize" label="Open full page" :route="meta.fullPage" data-pane-full />
+        </div>
+        <Button class="shrink-0" :size="btnSize" icon="lucide-x" label="Close" tooltip="Close" data-pane-close @click="closePane" />
+      </div>
+      <div class="min-w-0">
+        <div class="text-sm text-ink-gray-6">{{ label }}</div>
+        <h2 class="break-words text-lg-semibold text-ink-gray-9" data-pane-title>{{ meta.title || (missing ? 'Not found' : 'Loading…') }}</h2>
+      </div>
+      <div v-if="meta.area || meta.goal || meta.sub" class="flex flex-wrap items-center gap-2">
+        <Button v-if="meta.area" size="sm" variant="outline" icon-left="lucide-folder" :label="meta.area_name || 'Area'" :route="`/today?area=${meta.area}`" />
+        <Button v-if="meta.goal" size="sm" variant="outline" icon-left="lucide-target" :label="meta.goal_title || meta.goal" data-pane-goal @click="openRef('goal:' + meta.goal)" />
+        <span v-if="meta.sub" class="text-sm text-ink-gray-6">{{ meta.sub }}</span>
+      </div>
+    </header>
+    <!-- the pane's own tabs (ptab=), under the header; a pane with one tab shows no bar -->
+    <TabBar v-if="tabs.length > 1" class="flex-none" list-class="px-4 md:px-5" :tabs="tabs" :model-value="ptab.current.value"
+      :label="label + ' sections'" :level="2" data-pane-tabs @update:model-value="ptab.set" />
+    <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 md:px-5" data-pane-body>
+      <Alert v-if="meta.archived" title="This record is archived. It is shown read-only."
+        :primary-action="meta.canRestore ? { label: 'Restore', onClick: () => restore() } : undefined" />
+      <Card v-if="missing"><Empty title="This record was not found." hint="It may be in another space, or it was removed." /></Card>
+      <component :is="VIEW[cur.type]" v-else :key="cur.ref + ':' + stamp" :name="cur.name" :type="cur.type" :tab="tabs.length ? ptab.current.value : undefined" @meta="(m) => (meta = m)" @missing="missing = true"
+        @changed="changed()" @close="closePane" />
+    </div>
+  </DefineInner>
+  <!-- Desktop: a slide-over on the right; the list stays usable beside it. -->
+  <Transition v-if="!phone" enter-active-class="transition-transform duration-200 ease-out motion-reduce:transition-none" leave-active-class="transition-transform duration-200 ease-out motion-reduce:transition-none"
+    enter-from-class="translate-x-full" leave-to-class="translate-x-full">
+    <aside v-if="cur" ref="el" class="fixed inset-y-0 right-0 z-40 flex flex-col border-l border-outline-gray-2 bg-surface-base shadow-2xl outline-none"
+      :class="cur.type === 'inbox' ? 'w-[min(760px,100vw)]' : 'w-[min(520px,100vw)]'" role="dialog" :aria-label="meta.title || label" tabindex="-1" data-pane :data-pane-ref="cur.ref">
+      <ItemInner />
+    </aside>
+  </Transition>
+  <!-- Phone: frappe-ui's BottomSheet. Swipe down, tap outside or use the close button. -->
+  <BottomSheet v-else :open="!!cur" @update:open="(v) => !v && closePane()">
+    <div v-if="cur" ref="el" class="flex h-[82dvh] flex-col outline-none" role="group" :aria-label="meta.title || label" tabindex="-1" data-pane :data-pane-ref="cur.ref">
+      <ItemInner />
+    </div>
+  </BottomSheet>
+</template>
+
+<script setup>
+// The item view: what one record is, in a header (type, title, filing, buttons) and the content for its kind. Desktop: our
+// slide-over from the right, the list still usable beside it. Phone: frappe-ui's BottomSheet. Which record is open lives in
+// the URL (lib/pane.js). The inside is defined once and used in both places.
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
+import { Alert, BottomSheet, Button } from 'frappe-ui'
+import TabBar from '@/components/TabBar.vue'
+import Card from '@/components/ui/Card.vue'
+import Empty from '@/components/Empty.vue'
+import TaskPane from '@/components/item/TaskPane.vue'
+import VaultPane from '@/components/item/VaultPane.vue'
+import GoalPane from '@/components/item/GoalPane.vue'
+import ChatPane from '@/components/item/ChatPane.vue'
+import EntryPane from '@/components/item/EntryPane.vue'
+import DayPane from '@/components/item/DayPane.vue'
+import NotePane from '@/components/item/NotePane.vue'
+import SourcePane from '@/components/item/SourcePane.vue'
+import ChangePane from '@/components/item/ChangePane.vue'
+import { itemData } from '@/data/item'
+import { tryCall } from '@/lib/api'
+import { TYPES, closePane, current as cur, openRef, paneNav, recordChanged } from '@/lib/pane'
+import { useUrlTab } from '@/lib/tabs'
+import { park } from '@/lib/someday'
+import { askAbout } from '@/lib/ask'
+import { store } from '@/lib/store'
+
+const [DefineInner, ItemInner] = createReusableTemplate()
+const router = useRouter()
+const phone = useMediaQuery('(max-width: 767px)')
+const el = ref(null)
+const meta = ref({})
+const missing = ref(false)
+const stamp = ref(0)
+const label = computed(() => (cur.value ? meta.value?.kind || TYPES[cur.value.type].label : ''))
+let lastRef = ''
+let opener = null
+
+// Each kind of record says its tabs in its meta: [{ value, label, count }]. The open one is ptab= in the URL; the first is the default.
+const tabs = computed(() => (missing.value ? [] : meta.value.tabs || []))
+// the header's buttons: small beside a desktop pane's title, full size (40 px) to tap on a phone
+const btnSize = computed(() => (phone.value ? 'md' : 'sm'))
+const ptab = useUrlTab('ptab', tabs, { replace: true })
+// "Ask about this": the record and the records linked to it are the question's scope
+const ASKABLE = { task: 'Life Task', note: 'Life Note', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
+  inbox: 'Life Inbox Item', vault: 'Life Vault Document' }
+const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('@/components/review/InboxReview.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane }
+
+watch(() => cur.value?.ref, async (now, before) => {
+  meta.value = {}
+  missing.value = false
+  if (now && !before) opener = document.activeElement
+  if (now) {
+    lastRef = now
+    await nextTick()
+    el.value?.focus({ preventScroll: true })
+    document.querySelector(`[data-ref="${CSS.escape(now)}"]`)?.scrollIntoView({ block: 'nearest' })
+  } else {
+    // focus goes back to the row the pane was opened from
+    await nextTick()
+    const row = lastRef && document.querySelector(`[data-ref="${CSS.escape(lastRef)}"]`)
+    ;(row || (opener && document.contains(opener) ? opener : null))?.focus?.({ preventScroll: true })
+  }
+}, { immediate: true })
+
+function changed() {
+  if (cur.value) recordChanged(cur.value.ref)
+}
+function reload() {
+  stamp.value++
+  changed()
+}
+async function restore() {
+  if (await tryCall(() => itemData.archive.restore({ doctype: TYPES[cur.value.type].doctype || 'Life Inbox Item', name: cur.value.name }), 'Restored.')) reload()
+}
+async function toggleSensitive() {
+  const s = meta.value.sensitive
+  if (await tryCall(() => itemData.library.set_sensitive({ doctype: s.doctype, name: s.name, sensitive: s.on ? 0 : 1 }), s.on ? 'No longer sensitive.' : 'Marked sensitive.')) reload()
+}
+async function toSomeday() {
+  if (await park(meta.value.someday.doctype, meta.value.someday.name, meta.value.title)) reload()
+}
+const otherDialog = () => [...document.querySelectorAll('[role="dialog"]')].some((d) => !d.hasAttribute('data-pane') && d.offsetParent !== null)
+function step(n) {
+  const i = paneNav.rows.indexOf(cur.value.ref)
+  const next = paneNav.rows[i + n]
+  if (i < 0 || !next) return
+  router.replace({ query: { ...router.currentRoute.value.query, open: next, focus: undefined, ptab: undefined } })
+}
+function onKey(e) {
+  if (!cur.value || e.metaKey || e.ctrlKey || e.altKey) return
+  const t = e.target
+  if (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || (t.closest && t.closest('.cm-editor, [role="listbox"], [role="menu"], [role="combobox"], [role="tablist"], [role="radiogroup"]'))) return
+  if (otherDialog()) return
+  if (e.key === 'ArrowDown' || e.key === 'j') { e.preventDefault(); step(1) }
+  else if (e.key === 'ArrowUp' || e.key === 'k') { e.preventDefault(); step(-1) }
+}
+const onEsc = () => { if (cur.value && !otherDialog()) closePane() }
+
+onMounted(() => {
+  window.addEventListener('keydown', onKey)
+  window.addEventListener('lifeos-escape', onEsc)
+})
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKey)
+  window.removeEventListener('lifeos-escape', onEsc)
+})
+</script>

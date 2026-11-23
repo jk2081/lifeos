@@ -29,9 +29,9 @@ import Empty from '@/components/Empty.vue'
 import { Button } from 'frappe-ui'
 import { dateTime } from '@/lib/dates'
 import { tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { recordChanged } from '@/lib/pane'
 import Backlinks from '@/components/Backlinks.vue'
-import { api } from '@/lib/api'
 import { loadBacklinks } from '@/lib/links'
 import { store } from '@/lib/store'
 
@@ -47,16 +47,16 @@ const movable = computed(() => writable.value && !store.isAgent && !note.value?.
 const history = ref([])
 async function move() {
   const to = note.value.collection === 'Wiki' ? 'My notes' : 'Wiki'
-  const res = await tryCall(() => api('wiki.move', { name: note.value.name, to }), to === 'Wiki' ? 'Handed to the wiki.' : 'Kept in My notes. Agents can no longer change it.')
+  const res = await tryCall(() => itemData.wiki.move({ name: note.value.name, to }), to === 'Wiki' ? 'Handed to the wiki.' : 'Kept in My notes. Agents can no longer change it.')
   if (res) { note.value.collection = res.collection; note.value.version = res.version; recordChanged('note:' + note.value.name) }
 }
 onMounted(async () => {
   try {
-    const [n, l] = await Promise.all([api('library.get', { note: props.name }), loadBacklinks('Life Note', props.name)])
+    const [n, l] = await Promise.all([itemData.library.get({ note: props.name }), loadBacklinks('Life Note', props.name)])
     note.value = n
     links.value = l
     const wiki = n.collection === 'Wiki'
-    if (wiki) history.value = (await api('wiki.changes', { space: n.space, note: n.name, page_length: 100 })).changes
+    if (wiki) history.value = (await itemData.wiki.changes({ space: n.space, note: n.name, page_length: 100 })).changes
     emit('meta', { title: n.title, kind: wiki ? 'Wiki page' : 'Note', fullPage: `/library/${n.name}`, archived: !!n.is_archived, canRestore: canRestore.value, sensitive: { doctype: 'Life Note', name: n.name, on: !!n.is_sensitive },
       tabs: wiki
         ? [{ value: 'note', label: 'Page' }, { value: 'sources', label: 'Sources', count: n.sources.length, noun: 'sources' },

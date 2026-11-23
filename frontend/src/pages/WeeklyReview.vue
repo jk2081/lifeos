@@ -6,8 +6,7 @@
       <Button v-if="past.length" class="ml-auto" size="sm" variant="ghost" label="Past reviews" icon-left="lucide-history" data-past-open @click="pastOpen = true" />
     </div>
     <div v-if="!loaded" class="page-body"><Skeleton class="h-8 w-80" /><Skeleton class="h-64 w-full" /></div>
-    <ReviewPage v-else-if="kind === 'weekly'" />
-    <PeriodicReviewPage v-else :key="kind" :kind="kind" />
+    <ReviewPage v-else :key="kind" :kind="kind" />
   </div>
   <Dialog v-model:open="pastOpen" title="Past reviews" size="lg">
     <div data-past-list>
@@ -28,8 +27,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dialog, Skeleton } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
 import ReviewPage from '@/components/review/ReviewPage.vue'
-import PeriodicReviewPage from '@/components/review/PeriodicReviewPage.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { reviewData } from '@/data/review'
 import { store } from '@/lib/store'
 import { long } from '@/lib/dates'
 
@@ -45,7 +44,7 @@ const kind = computed(() => (KINDS.includes(route.query.kind) ? route.query.kind
 const showStrip = computed(() => loaded.value && (due.value.length > 1 || past.value.length > 0 || kind.value !== 'weekly'))
 function pick(k) { router.push({ path: '/review', query: { kind: k } }) }
 async function load() {
-  const res = await tryCall(() => api('periodic.due', { space: store.space }))
+  const res = await tryCall(() => reviewData.due({ space: store.space }))
   if (res) { due.value = res.due; past.value = res.past }
   loaded.value = true
 }

@@ -47,7 +47,7 @@
         @update:model-value="(v) => !v && (store.newKind = '')" />
       <OnboardingGuide v-if="onboarding.show" />
       <MoreSheet v-model:open="moreOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
-      <RecordPane />
+      <ItemView />
       <AskPanel />
       <SearchPalette v-model:open="store.searchOpen" />
       <QuickAdd v-model:open="store.quickAdd" />
@@ -85,7 +85,7 @@ import { api, db } from './lib/api'
 import { recordChanged } from './lib/pane'
 import { areaOptions, loadLookups } from './lib/lookups'
 import SearchPalette from './components/SearchPalette.vue'
-import RecordPane from '@/components/item/RecordPane.vue'
+import ItemView from '@/components/item/ItemView.vue'
 import ScreenBoundary from './components/ScreenBoundary.vue'
 import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'

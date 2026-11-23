@@ -4,6 +4,7 @@ A level is reached when the one before it is in use, so levels never skip. The r
 minutes; `forget` clears it.
 """
 import frappe
+from frappe.query_builder import functions as fn
 
 from lifeos import permissions
 
@@ -36,19 +37,21 @@ def _done(user: str) -> list[bool]:
 	spaces = tuple(permissions.user_spaces(user))
 	if not spaces:
 		return [False] * 6
-	v = {"spaces": spaces, "user": user}
+	spaces = list(spaces)
 
-	def one(sql):
-		return bool(frappe.db.sql(sql + " limit 1", v))
+	def one(doctype, make):
+		t = frappe.qb.DocType(doctype)
+		return bool(frappe.qb.from_(t).select(1).where(make(t)).limit(1).run())  # system: the ladder asks only whether something exists
 
+	area = frappe.qb.DocType("Life Area")
+	areas = frappe.qb.from_(area).select(fn.Count("*")).where(area.space.isin(spaces) & (area.is_life_area == 1) & (area.is_on == 1) & (fn.IfNull(area.is_archived, 0) == 0)).run()[0][0]  # system: the ladder
 	return [
-		one("select 1 from `tabLife Task` where space in %(spaces)s"),
-		one("select 1 from `tabLife Inbox Item` where space in %(spaces)s and (ifnull(source_system, '') not in ('', 'upload') or source_type != 'Upload')"),
-		frappe.db.sql("select count(*) from `tabLife Area` where space in %(spaces)s and is_life_area = 1 and is_on = 1 and ifnull(is_archived, 0) = 0", v)[0][0] >= 3
-			and one("select 1 from `tabLife Goal` where space in %(spaces)s"),
-		one("select 1 from `tabLife Review` where user = %(user)s and kind = 'Weekly' and status = 'Locked'"),
-		one("select 1 from `tabLife Inbox Item` where space in %(spaces)s and status in ('To Review', 'Done') and (ifnull(job_id, '') != '' or ifnull(claimed_by, '') != '')"),
-		one("select 1 from `tabLife Space Member` where parenttype = 'Life Space' and parent in %(spaces)s and access = 'Write' and user != %(user)s"),
+		one("Life Task", lambda t: t.space.isin(spaces)),
+		one("Life Inbox Item", lambda t: t.space.isin(spaces) & (~fn.IfNull(t.source_system, "").isin(["", "upload"]) | (t.source_type != "Upload"))),
+		areas >= 3 and one("Life Goal", lambda t: t.space.isin(spaces)),
+		one("Life Review", lambda t: (t.user == user) & (t.kind == "Weekly") & (t.status == "Locked")),
+		one("Life Inbox Item", lambda t: t.space.isin(spaces) & t.status.isin(["To Review", "Done"]) & ((fn.IfNull(t.job_id, "") != "") | (fn.IfNull(t.claimed_by, "") != ""))),
+		one("Life Space Member", lambda t: (t.parenttype == "Life Space") & t.parent.isin(spaces) & (t.access == "Write") & (t.user != user)),
 	]
 
 

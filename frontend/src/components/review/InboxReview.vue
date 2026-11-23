@@ -103,7 +103,8 @@ import Backlinks from '@/components/Backlinks.vue'
 import TabBar from '@/components/TabBar.vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useUrlTab } from '@/lib/tabs'
-import { api, db, tryCall } from '@/lib/api'
+import { db, tryCall } from '@/lib/api'
+import { reviewData } from '@/data/review'
 import { store } from '@/lib/store'
 import { decideAll as decideAllOf } from '@/lib/items'
 import { dateTime } from '@/lib/dates'
@@ -153,7 +154,7 @@ const headSub = computed(() => [headParts.value.text, headParts.value.who && `${
 
 async function load() {
   try {
-    const it = (item.value = await api('inbox.get', { item: itemName.value }))
+    const it = (item.value = await reviewData.inbox.get({ item: itemName.value }))
     emit('meta', { title: it.title, area: it.area, area_name: it.area_name, goal: it.goal, goal_title: it.goal_title, sub: headSub.value,
       fullPage: `/item/${it.name}`, archived: !!it.is_archived, canRestore: canRestore.value,
       sensitive: { doctype: 'Life Inbox Item', name: it.name, on: !!it.is_sensitive } })
@@ -175,7 +176,7 @@ async function decideAll(decision) {
 }
 
 async function retry() {
-  if (await tryCall(() => api('inbox.retry', { item: item.value.name }), 'Sent back to the agent.')) {
+  if (await tryCall(() => reviewData.inbox.retry({ item: item.value.name }), 'Sent back to the agent.')) {
     await load()
     if (!props.page) recordChanged('inbox:' + item.value.name)
   }

@@ -7,10 +7,12 @@ import re
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
 
 from lifeos.library import people as rules
 from lifeos import permissions
-from lifeos.api.utils import descendants, names_map, page
+from lifeos.api.timeline import index_where
+from lifeos.api.utils import count_by, descendants, list_query, names_map, page
 from lifeos.life.doctype.life_person.life_person import split_aliases
 
 KINDS = rules.KINDS
@@ -40,17 +42,16 @@ def _mentions(space, person, limit=MENTION_CAP):
 	found = {}
 	terms = _terms(person)
 	if terms:
-		values = {"space": space, "kinds": INDEX_KINDS, "pat": _pattern(terms), "wiki": person.get("wiki_page") or ""}
-		guard = permissions.vault_guard(space, "x.")
-		where = (f"x.space = %(space)s and x.is_archived = 0 and x.kind in %(kinds)s and x.ref_name != %(wiki)s{guard} "
-			"and (x.title regexp %(pat)s or x.search_text regexp %(pat)s)")
-		# nosemgrep: frappe-sql-format-injection -- the only formatted part is vault_guard's fixed SQL; every value is a parameter
-		for r in frappe.db.sql(f"select x.ref_doctype, x.ref_name, x.kind, x.title, x.record_date, x.modified from `tabLife Index` x where {where} "
-				"order by x.record_date desc, x.modified desc limit %(n)s", {**values, "n": limit}, as_dict=True):
+		pat = _pattern(terms)
+		x = frappe.qb.DocType("Life Index")
+		where = index_where(space, [x.is_archived == 0, x.kind.isin(INDEX_KINDS), x.ref_name != (person.get("wiki_page") or ""), x.title.regexp(pat) | x.search_text.regexp(pat)])
+		query = list_query("Life Index", ["ref_doctype", "ref_name", "kind", "title", "record_date", "modified"], where, [(x.record_date, Order.desc), (x.modified, Order.desc)])
+		for r in query.limit(limit).run(as_dict=True):
 			found[(r.ref_doctype, r.ref_name)] = {"doctype": r.ref_doctype, "name": r.ref_name, "kind": LABEL[r.kind], "title": r.title or "Untitled",
 				"date": str(r.record_date), "at": str(r.modified), "how": None, "ref": REF[r.kind] + r.ref_name}
-		for ev in frappe.db.sql("select name, subject, starts_on from `tabEvent` where life_space = %(space)s and (subject regexp %(pat)s or description regexp %(pat)s) "
-				"order by starts_on desc limit %(n)s", {**values, "n": limit}, as_dict=True):
+		e = frappe.qb.DocType("Event")
+		events = frappe.qb.from_(e).select(e.name, e.subject, e.starts_on).where((e.life_space == space) & (e.subject.regexp(pat) | e.description.regexp(pat)))  # system: the person's mentions in the space, as the Timeline reads them
+		for ev in events.orderby(e.starts_on, order=Order.desc).limit(limit).run(as_dict=True):
 			found[("Event", ev.name)] = {"doctype": "Event", "name": ev.name, "kind": "Meeting", "title": ev.subject or "Meeting", "date": str(ev.starts_on)[:10],
 				"at": str(ev.starts_on), "how": None, "ref": "event:" + ev.name}
 	for field, how in (("waiting_on_person", "Waiting on them"), ("delegated_to", "Delegated to them")):
@@ -99,8 +100,8 @@ def list(space: str | None = None, kind: str | None = None, q: str | None = None
 	org_names = names_map("Life Person", [r.organisation for r in rows], "full_name")
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	summaries = names_map("Life Note", [r.wiki_page for r in rows], "summary")
-	members = dict(frappe.db.sql("select organisation, count(*) from `tabLife Person` where space = %s and organisation in %s group by organisation",
-		(space, [r.name for r in rows] or [""])))
+	p = frappe.qb.DocType("Life Person")
+	members = count_by("Life Person", "organisation", [p.space == space, p.organisation.isin([r.name for r in rows] or [""])])
 	aliases = names_map("Life Person", [r.name for r in rows], "aliases")
 	out = []
 	for r in rows:

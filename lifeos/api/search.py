@@ -2,13 +2,15 @@
 import re
 
 import frappe
+from frappe.query_builder import Order
+from pypika.terms import Criterion, ValueWrapper
 
 from lifeos import permissions
 from lifeos.api.timeline import decorate
-from lifeos.api.utils import area_filter, flag, lens_area
+from lifeos.api.utils import FullText, area_criterion, flag, lens_area
 
 WORD = re.compile(r"[\w][\w'’-]*", re.UNICODE)
-FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, goal, is_archived, status, record_owner, also_in_csv, space, search_text"
+FIELDS = ["ref_doctype", "ref_name", "kind", "title", "record_date", "area", "goal", "is_archived", "status", "record_owner", "also_in_csv", "space", "search_text"]
 
 
 def _snippet(text, words, width=140):
@@ -22,6 +24,15 @@ def _snippet(text, words, width=140):
 	start = max(0, at - width // 3)
 	end = min(len(text), start + width)
 	return ("…" if start else "") + text[start:end] + ("…" if end < len(text) else "")
+
+
+def find(x, where, order, score, limit):
+	"""The index rows of one search. The spaces in `where` are the user's own (`require_space`, `user_spaces`), so the query builder runs without the
+	permission query: it would add a membership test to every row of the full-text match, which took the common word from 45 to 750 ms."""
+	query = frappe.qb.from_(x).select(*[x[f] for f in FIELDS], score).where(Criterion.all(where))  # system: the spaces were chosen from the user's own
+	for term, way in order:
+		query = query.orderby(term, order=way)
+	return query.limit(limit).run(as_dict=True)
 
 
 @frappe.whitelist(methods=["GET"])
@@ -40,37 +51,27 @@ def query(text: str, limit: int | None = 20, space: str | None = None, include_a
 	words = [w.lower() for w in WORD.findall(text or "")][:8]
 	if not words or not spaces:
 		return {"text": text, "results": []}
-	where = "space in %(spaces)s and kind != 'Task Done'"
+	x = frappe.qb.DocType("Life Index")
+	where = [x.space.isin(spaces), x.kind != "Task Done"]
 	closed = [s for s in spaces if permissions.vault_hidden(s)]  # an agent's spaces whose Vault is closed to it
 	if closed:
-		where += " and not ((vault_locked = 1 or ref_doctype = 'Life Vault Document') and space in %(closed)s)"
+		where.append(~(((x.vault_locked == 1) | (x.ref_doctype == "Life Vault Document")) & x.space.isin(closed)))
 	if not flag(include_archived):
-		where += " and is_archived = 0"
-	values = {"spaces": spaces, "limit": limit, "closed": closed or [""]}
+		where.append(x.is_archived == 0)
 	area = lens_area(area)
 	if area and len(spaces) == 1:
-		where += " and " + area_filter(spaces[0], area, "area", values, also_in="index")
+		where.append(area_criterion(spaces[0], area, x, also_in="index"))
 	rows = []
 	long_words = [w for w in words if len(w) >= 3]
 	if long_words:
-		clean = [re.sub(r"[^\w]", "", w) for w in long_words]
-		values["q"] = " ".join(f"+{w}*" for w in clean if w)
-		# nosemgrep: frappe-sql-format-injection -- FIELDS and WHERE are fixed fragments; the search text is the %(q)s parameter
-		rows = frappe.db.sql(
-			f"""select {FIELDS}, match(title, search_text) against (%(q)s in boolean mode) as score from `tabLife Index`
-			where {where} and match(title, search_text) against (%(q)s in boolean mode)
-			order by (title like %(starts)s) desc, score desc, record_date desc limit %(limit)s""",
-			{**values, "starts": f"%{words[0]}%"}, as_dict=True)
+		match = FullText([x.title, x.search_text], " ".join(f"+{re.sub(r'[^\w]', '', w)}*" for w in long_words if re.sub(r"[^\w]", "", w)))
+		rows = find(x, [*where, match], [(x.title.like(f"%{words[0]}%"), Order.desc), (match, Order.desc), (x.record_date, Order.desc)], match.as_("score"), limit)
 	if not rows and (len(long_words) < len(words) or not long_words or frappe.flags.in_test):
 		# short words the full-text index does not hold: fall back to a plain match. When every word is long enough and the
 		# full-text index found nothing, a plain match would read every row's text and find nothing more (UX fixes, set 4).
 		# Tests search rows of their own open transaction, which InnoDB's full-text index sees only after a commit.
-		likes = " and ".join(f"(title like %(w{i})s or search_text like %(w{i})s)" for i in range(len(words)))
-		like_values = {f"w{i}": f"%{w}%" for i, w in enumerate(words)}
-		# nosemgrep: frappe-sql-format-injection -- FIELDS, WHERE and the LIKE placeholders are fixed fragments; each word is a %(wN)s parameter
-		rows = frappe.db.sql(
-			f"select {FIELDS}, 0 as score from `tabLife Index` where {where} and {likes} order by record_date desc limit %(limit)s",
-			{**values, **like_values}, as_dict=True)
+		likes = [x.title.like(f"%{w}%") | x.search_text.like(f"%{w}%") for w in words]
+		rows = find(x, [*where, *likes], [(x.record_date, Order.desc)], ValueWrapper(0).as_("score"), limit)
 	for r in rows:
 		r["snippet"] = _snippet(r.pop("search_text"), words)
 		r.pop("score", None)

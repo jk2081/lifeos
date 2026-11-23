@@ -16,7 +16,8 @@
 // An event or an important date in the pane.
 import { computed, onMounted, ref } from 'vue'
 import { Button, dialog } from 'frappe-ui'
-import { api, db, tryCall } from '@/lib/api'
+import { db, tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { store } from '@/lib/store'
 import { MONTHS, long, time } from '@/lib/dates'
 
@@ -34,7 +35,7 @@ function remove() {
   dialog.danger({ title: 'Remove', message: `Remove “${e.value.title}”?`, confirmLabel: 'Remove', onConfirm: doRemove })
 }
 async function doRemove() {
-  const ok = await tryCall(() => api('calendar.delete_event', { event: e.value.name }), 'Removed.')  // an important date is a yearly Event
+  const ok = await tryCall(() => itemData.calendar.delete_event({ event: e.value.name }), 'Removed.')  // an important date is a yearly Event
   if (ok !== undefined) {
     emit('changed')
     emit('close')
@@ -42,7 +43,7 @@ async function doRemove() {
 }
 onMounted(async () => {
   try {
-    e.value = await api('calendar.entry', { kind: props.type, name: props.name })
+    e.value = await itemData.calendar.entry({ kind: props.type, name: props.name })
     emit('meta', { title: e.value.title, fullPage: '/today/week?view=calendar' })
   } catch (err) {
     emit('missing')

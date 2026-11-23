@@ -6,6 +6,7 @@ in the review's state, for the week's numbers.
 """
 import frappe
 from frappe import _
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, getdate, today
 
 from lifeos.review import counts
@@ -21,11 +22,10 @@ MAX_ITEMS = 100
 def candidates(space, period_start):
 	"""The stale tasks of a space, oldest first, each with its area and how many days it has stood."""
 	cutoff = add_days(today(), -counts.rules()["stuck_after_days"])
-	rows = frappe.db.sql("""select name, title, area, goal, status, waiting_on, ifnull(last_touched_on, date(creation)) as touched
-		from `tabLife Task` where space = %(space)s and is_archived = 0 and status in ('Open', 'Doing', 'Waiting')
-		and date(creation) < %(start)s and ifnull(last_touched_on, date(creation)) <= %(cutoff)s
-		order by touched asc limit %(limit)s""", {"space": space, "start": getdate(period_start), "cutoff": cutoff, "limit": MAX_ITEMS},
-		as_dict=True)
+	t = frappe.qb.DocType("Life Task")
+	touched = fn.IfNull(t.last_touched_on, fn.Date(t.creation))
+	rows = (frappe.qb.from_(t).select(t.name, t.title, t.area, t.goal, t.status, t.waiting_on, touched.as_("touched")).where((t.space == space) & (t.is_archived == 0)  # system: the weekly review reads the owner's own space
+		& t.status.isin(["Open", "Doing", "Waiting"]) & (fn.Date(t.creation) < getdate(period_start)) & (touched <= cutoff)).orderby(touched).limit(MAX_ITEMS).run(as_dict=True))
 	areas = names_map("Life Area", list({r.area for r in rows if r.area}), "area_name")
 	return [{"name": r.name, "title": r.title, "area": r.area, "area_name": areas.get(r.area), "goal": r.goal, "status": r.status,
 		"waiting_on": r.waiting_on, "age": (getdate(today()) - getdate(r.touched)).days} for r in rows]

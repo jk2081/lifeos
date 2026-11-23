@@ -14,6 +14,7 @@ import re
 from datetime import timedelta
 
 import frappe
+from frappe.query_builder import functions as fn
 from frappe import _
 from frappe.utils import get_datetime, getdate
 
@@ -133,15 +134,19 @@ def _how(m, r, names):
 
 def _records(space, lo, hi):
 	out = []
-	for i in frappe.db.sql("""select name, title, source_type, ifnull(received_on, creation) as at, concat_ws(' ', title, raw_text, transcript_md, summary_md) as text
-		from `tabLife Inbox Item` where space = %s and ifnull(received_on, creation) between %s and %s""", (space, lo, hi), as_dict=True):
+	ib, ch, nt = frappe.qb.DocType("Life Inbox Item"), frappe.qb.DocType("Life Chat Log"), frappe.qb.DocType("Life Note")
+	at = fn.IfNull(ib.received_on, ib.creation)
+	text = fn.Function("concat_ws", " ", ib.title, ib.raw_text, ib.transcript_md, ib.summary_md)
+	for i in frappe.qb.from_(ib).select(ib.name, ib.title, ib.source_type, at.as_("at"), text.as_("text")).where((ib.space == space) & at.between(lo, hi)).run(as_dict=True):  # system: the weekly review reads the owner's own space
 		kind = "email" if i.source_type in EMAILS else "capture" if i.source_type in CAPTURES else "chat"
 		out.append(frappe._dict(doctype="Life Inbox Item", name=i.name, title=i.title, at=i.at, text=i.text or "", kind=kind))
-	for c in frappe.db.sql("""select name, title, ifnull(updated_on, creation) as at, concat_ws(' ', title, summary_md, left(transcript_md, 20000)) as text
-		from `tabLife Chat Log` where space = %s and ifnull(updated_on, creation) between %s and %s""", (space, lo, hi), as_dict=True):
+	at = fn.IfNull(ch.updated_on, ch.creation)
+	text = fn.Function("concat_ws", " ", ch.title, ch.summary_md, fn.Function("left", ch.transcript_md, 20000))
+	for c in frappe.qb.from_(ch).select(ch.name, ch.title, at.as_("at"), text.as_("text")).where((ch.space == space) & at.between(lo, hi)).run(as_dict=True):  # system: the weekly review reads the owner's own space
 		out.append(frappe._dict(doctype="Life Chat Log", name=c.name, title=c.title, at=c.at, text=c.text or "", kind="chat"))
-	for n in frappe.db.sql("""select name, title, creation as at, concat_ws(' ', title, content_md) as text from `tabLife Note`
-		where space = %s and creation between %s and %s and title not like 'Weekly review, %%'""", (space, lo, hi), as_dict=True):
+	text = fn.Function("concat_ws", " ", nt.title, nt.content_md)
+	for n in frappe.qb.from_(nt).select(nt.name, nt.title, nt.creation.as_("at"), text.as_("text")).where(
+			(nt.space == space) & nt.creation.between(lo, hi) & nt.title.not_like("Weekly review, %")).run(as_dict=True):  # system: the weekly review reads the owner's own space
 		out.append(frappe._dict(doctype="Life Note", name=n.name, title=n.title, at=n.at, text=n.text or "", kind="note"))
 	return out
 

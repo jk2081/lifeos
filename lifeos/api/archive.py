@@ -5,9 +5,10 @@ import frappe
 
 from lifeos.library import archive as rules
 from lifeos import permissions
-from lifeos.api.timeline import index_rows
-from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_filters, std_order, summarise, tab_counts
-from lifeos.api.utils import order_by as sort_order
+from frappe.query_builder import Order
+
+from lifeos.api.timeline import index_rows, index_where
+from lifeos.api.utils import area_criterion, count_tabs, count_where, filter_criteria, flag, group_summary, names_map, order_terms, page, sort_terms
 
 
 @frappe.whitelist(methods=["POST"])
@@ -25,7 +26,7 @@ def restore(doctype: str, name: str):
 
 
 TYPES = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document")
-SORTS = {"title": "title", "kind": "kind", "record_date": "record_date", "area": "area"}
+SORTS = {k: (lambda x, k=k: [x[k]]) for k in ("title", "kind", "record_date", "area")}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -38,41 +39,43 @@ def list(space: str | None = None, area: str | None = None, start: int = 0, page
 	`tabs` counts the records of each type (and all) under the same filters."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = "and is_archived = 1 and kind != 'Task Done'", {}
+	x = frappe.qb.DocType("Life Index")
+	where = [x.is_archived == 1, x.kind != "Task Done"]
 	if area:
-		where += " and " + area_filter(space, area, "area", values, also_in="index")
+		where.append(area_criterion(space, area, x, also_in="index"))
 	if reason or archived_from or archived_to:
 		# the reason and the day live on the records themselves, so each type is checked in its own table
 		parts = []
 		for dt in rules.AUTO_DOCTYPES + tuple(t for t in TYPES if t not in rules.AUTO_DOCTYPES):
 			if not frappe.get_meta(dt).has_field("archive_reason"):
 				continue
-			cond = "x.name = ref_name"
+			r = frappe.qb.DocType(dt)
+			conds = []
 			if reason:
-				cond += " and x.archive_reason = %(reason)s"
+				conds.append(r.archive_reason == reason)
 			if archived_from:
-				cond += " and x.archived_on >= %(archived_from)s"
+				conds.append(r.archived_on >= archived_from)
 			if archived_to:
-				cond += " and x.archived_on <= %(archived_to)s"
-			parts.append(f"(ref_doctype = '{dt}' and exists (select 1 from `tab{dt}` x where {cond}))")
-		where += " and (" + (" or ".join(parts) or "1=0") + ")"
-		values.update({"reason": reason, "archived_from": archived_from, "archived_to": archived_to})
-	extra, values = std_clause("Life Index", filters, "", values)
-	where += extra + permissions.vault_guard(space)
+				conds.append(r.archived_on <= archived_to)
+			names = frappe.qb.from_(r).select(r.name)
+			for c in conds:
+				names = names.where(c)
+			parts.append((x.ref_doctype == dt) & x.ref_name.isin(names))
+		crit = parts[0] if parts else x.name.isnull()  # no type to look in: nothing matches
+		for p in parts[1:]:
+			crit = crit | p
+		where.append(crit)
+	where += filter_criteria("Life Index", filters, x)
 	# the state tabs of the Archive screen: one per record type, counted under every filter but the type itself
-	tabs = tab_counts(f"from `tabLife Index` where space=%(space)s {where}", {"space": space, **values},
-		{"all": None, **{dt: f"ref_doctype = '{dt}'" for dt in TYPES}})
+	tabs = count_tabs("Life Index", index_where(space, where), {"all": None, **{dt: x.ref_doctype == dt for dt in TYPES}})
 	if doctype:
-		where += " and ref_doctype = %(doctype)s"
-		values["doctype"] = doctype
+		where.append(x.ref_doctype == doctype)
 	if summary:
-		return {"summary": summarise("Life Index", f"from `tabLife Index` where space=%(space)s {where}", {"space": space, **values}, "", summary, start, page_length),
-			"tabs": tabs}
-	order = std_order("Life Index", order_by, "", SORTS) or sort_order(sort, dir, SORTS, None)
-	rows = index_rows(space, where, values, order=(order + ", modified desc") if order else "area asc, record_date desc, modified desc",
-		start=start, page_length=page_length)
-	# nosemgrep: frappe-sql-format-injection -- fixed fragments, std_clause columns checked against meta, vault_guard constant; values are parameters
-	total = frappe.db.sql(f"select count(*) from `tabLife Index` where space=%(space)s {where}", {"space": space, **values})[0][0]
+		return {"summary": group_summary("Life Index", index_where(space, where), summary, start, page_length), "tabs": tabs}
+	terms = order_terms("Life Index", order_by, x, SORTS) or sort_terms(sort, dir, SORTS, x)
+	terms = [*terms, (x.modified, Order.desc)] if terms else [(x.area, Order.asc), (x.record_date, Order.desc), (x.modified, Order.desc)]
+	rows = index_rows(space, where, terms, start=start, page_length=page_length)
+	total = count_where("Life Index", index_where(space, where))
 	reasons = {}
 	for dt in {r.ref_doctype for r in rows}:
 		names = [r.ref_name for r in rows if r.ref_doctype == dt]

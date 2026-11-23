@@ -3,11 +3,12 @@ import builtins
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
 
 from lifeos.library import links
 from lifeos import permissions
-from lifeos.api.utils import area_filter, extra_columns, flag, in_area, lens_area, names_map, page, parse, std_clause, std_filters, std_order, summarise
-from lifeos.api.utils import order_by as sort_order
+from lifeos.api.timeline import index_where
+from lifeos.api.utils import area_criterion, count_where, filter_criteria, flag, group_summary, in_area, lens_area, list_query, names_map, order_terms, page, parse, sort_terms
 
 
 @frappe.whitelist(methods=["GET"])
@@ -37,7 +38,7 @@ def tree(space: str | None = None, include_archived: bool | int | None = 0, coll
 	return {"space": space, "notes": notes, "areas": areas}
 
 
-SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modified"}
+SORTS = {k: (lambda x, k=k: [x[k]]) for k in ("title", "record_date", "modified")}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -49,30 +50,24 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 	`total` is the number of notes the filters match."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = ["x.space = %(space)s", "x.kind = 'Note'" + permissions.vault_guard(space, "x.")], {"space": space}
+	x = frappe.qb.DocType("Life Index")
+	where = [x.kind == "Note"]
 	if collection and collection != "all":
-		where.append("x.collection = %(collection)s")
-		values["collection"] = collection
+		where.append(x.collection == collection)
 	if not flag(include_archived):
-		where.append("x.is_archived = 0")
+		where.append(x.is_archived == 0)
 	if area:
-		where.append(area_filter(space, area, "x.area", values, also_in="index"))
+		where.append(area_criterion(space, area, x, also_in="index"))
 	if goal:
-		where.append("x.goal = %(goal)s")
-		values["goal"] = "" if goal == "none" else goal
-	conds, values = std_filters("Life Index", filters, "x", values)
-	clause = " and ".join(where + conds)
+		where.append(x.goal == ("" if goal == "none" else goal))
+	where = index_where(space, where + filter_criteria("Life Index", filters, x))
 	if summary:
-		return {"summary": summarise("Life Index", f"from `tabLife Index` x where {clause}", values, "x", summary, start, page_length)}
-	order = std_order("Life Index", order_by, "x", SORTS) or sort_order(sort, dir, SORTS, "x.modified desc")
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	rows = frappe.db.sql(
-		f"""select x.ref_name as name, x.title, x.area, x.goal, x.record_date, x.modified, x.is_archived, x.collection, x.vault_locked,
-		'Note' as kind from `tabLife Index` x
-		where {clause} order by {order}, x.ref_name limit %(start)s, %(len)s""",
-		{**values, "start": start, "len": page_length}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {clause}", values)[0][0]
+		return {"summary": group_summary("Life Index", where, summary, start, page_length)}
+	terms = order_terms("Life Index", order_by, x, SORTS) or sort_terms(sort, dir, SORTS, x, [(x.modified, Order.desc)])
+	fields = ["area", "goal", "record_date", "modified", "is_archived", "collection", "vault_locked"]
+	rows = list_query("Life Index", ["title", *fields], where, [*terms, (x.ref_name, Order.asc)])
+	rows = rows.select(x.ref_name.as_("name"), x.kind.as_("kind")).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Index", where)
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows], "title")
 	for r in rows:

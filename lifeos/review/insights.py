@@ -9,6 +9,9 @@ import hashlib
 import json
 
 import frappe
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
+from pypika.terms import Criterion
 from frappe.utils import add_days, add_months, cint, getdate, now_datetime, today
 
 from lifeos.review import counts
@@ -45,9 +48,10 @@ def detect_stuck(space):
 	r = counts.rules()
 	days = r["stuck_after_days"]
 	cutoff = add_days(today(), -days)
-	rows = frappe.db.sql("""select t.name, t.title, t.area, t.goal, ifnull(t.last_touched_on, date(t.creation)) as touched
-		from `tabLife Task` t where t.space=%s and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived=0
-		and ifnull(t.last_touched_on, date(t.creation)) <= %s order by touched""", (space, cutoff), as_dict=True)
+	t = frappe.qb.DocType("Life Task")
+	touched = fn.IfNull(t.last_touched_on, fn.Date(t.creation))
+	rows = (frappe.qb.from_(t).select(t.name, t.title, t.area, t.goal, touched.as_("touched"))  # system: the nightly job reads the owner's own space
+		.where((t.space == space) & t.status.isin(["Open", "Doing", "Waiting"]) & (t.is_archived == 0) & (touched <= cutoff)).orderby(touched).run(as_dict=True))
 	groups = {}
 	for t in rows:
 		key = ("Life Goal", t.goal) if t.goal else ("Life Area", t.area or "")
@@ -64,14 +68,16 @@ def detect_stuck(space):
 			[ev("Life Task", i.name, i.title) for i in items[:200]], body=f"The oldest has not changed since {oldest.strftime('%-d %b %Y')}.",
 			actions=[{"kind": "open_reset", "label": "Open in Reset", "names": names}, {"kind": "move_someday", "label": "Move all to Someday",
 				"items": [{"doctype": "Life Task", "name": n} for n in names]}], area=area))
-	idle = frappe.db.sql("""select name, title, area from `tabLife Goal` where space=%s and horizon='Long term' and outcome='In Progress'
-		and on_hold=0 and is_someday=0 and is_archived=0 and ifnull(last_activity_on, date(modified)) <= %s""", (space, cutoff), as_dict=True)
+	g = frappe.qb.DocType("Life Goal")
+	idle = (frappe.qb.from_(g).select(g.name, g.title, g.area).where((g.space == space) & (g.horizon == "Long term") & (g.outcome == "In Progress")  # system: the nightly job
+		& (g.on_hold == 0) & (g.is_someday == 0) & (g.is_archived == 0) & (fn.IfNull(g.last_activity_on, fn.Date(g.modified)) <= cutoff)).run(as_dict=True))
 	for p in idle:
 		out.append(candidate("Stuck", f"The goal {p.title} has had no activity for {days} days", [ev("Life Goal", p.name, p.title)],
 			actions=[{"kind": "open_record", "label": "Open goal", "ref": "goal:" + p.name},
 				{"kind": "move_someday", "label": "Move to Someday", "items": [{"doctype": "Life Goal", "name": p.name}]}], area=p.area))
-	old_inbox = frappe.db.sql("""select name, title from `tabLife Inbox Item` where space=%s and status='To Review' and is_archived=0
-		and received_on < %s order by received_on""", (space, add_days(today(), -7)), as_dict=True)
+	ib = frappe.qb.DocType("Life Inbox Item")
+	old_inbox = (frappe.qb.from_(ib).select(ib.name, ib.title).where((ib.space == space) & (ib.status == "To Review") & (ib.is_archived == 0)  # system: the nightly job
+		& (ib.received_on < add_days(today(), -7))).orderby(ib.received_on).run(as_dict=True))
 	if len(old_inbox) >= STUCK_GROUP_MIN:
 		out.append(candidate("Stuck", f"{len(old_inbox)} inbox items have waited more than a week for review",
 			[ev("Life Inbox Item", i.name, i.title) for i in old_inbox[:200]], actions=[{"kind": "open_list", "label": "Open the Inbox",
@@ -81,9 +87,9 @@ def detect_stuck(space):
 
 def detect_waiting(space):
 	"""Chat open items still open after a few days: someone is waiting on the owner."""
-	rows = frappe.db.sql("""select c.name as chat, c.title as chat_title, c.area, c.date, o.name as row, o.text
-		from `tabLife Chat Open Item` o join `tabLife Chat Log` c on c.name = o.parent
-		where c.space=%s and o.status='Open' and c.is_archived=0 and c.date <= %s order by c.date""", (space, add_days(today(), -WAITING_DAYS)), as_dict=True)
+	o, c = frappe.qb.DocType("Life Chat Open Item"), frappe.qb.DocType("Life Chat Log")
+	rows = (frappe.qb.from_(o).join(c).on(c.name == o.parent).select(c.name.as_("chat"), c.title.as_("chat_title"), c.area, c.date, o.name.as_("row"), o.text)  # system: the nightly job
+		.where((c.space == space) & (o.status == "Open") & (c.is_archived == 0) & (c.date <= add_days(today(), -WAITING_DAYS))).orderby(c.date).run(as_dict=True))
 	by_chat = {}
 	for r in rows:
 		by_chat.setdefault(r.chat, []).append(r)
@@ -176,9 +182,9 @@ def recent_records(ctx, space, kinds, days, limit, chars):
 	"""The records of the last `days` days of these kinds, read through get_record, so the space, Vault and permission rules apply."""
 	from lifeos.ai.tools import t_get_record
 
-	# nosemgrep: frappe-sql-format-injection -- only the code-owned vault fragment of the tool context is inserted; the rest are parameters
-	rows = frappe.db.sql(f"""select ref_doctype, ref_name from `tabLife Index` x where x.space=%s and x.is_archived=0 and x.kind in %s
-		and x.modified >= %s{ctx.vault_sql()} order by x.modified desc limit %s""", (space, kinds, add_days(today(), -days), limit), as_dict=True)
+	x = frappe.qb.DocType("Life Index")
+	where = [x.space == space, x.is_archived == 0, x.kind.isin(kinds), x.modified >= add_days(today(), -days), *ctx.vault_criteria(x)]
+	rows = frappe.qb.from_(x).select(x.ref_doctype, x.ref_name).where(Criterion.all(where)).orderby(x.modified, order=Order.desc).limit(limit).run(as_dict=True)  # system: each row is read through get_record, which checks the user
 	out = []
 	for r in rows:
 		try:
@@ -260,8 +266,8 @@ def run(space, ai=True, user=None):
 		frappe.db.set_value("Life Insight", name, {"status": "New", "snooze_until": None})
 		stats["returned"] += 1
 	cands = []
-	for fn in RULES:
-		cands += fn(space)
+	for rule in RULES:
+		cands += rule(space)
 	if ai:
 		got, note = noticed(space, user)
 		cands += got
@@ -295,8 +301,7 @@ def run(space, ai=True, user=None):
 		stats["created"] += 1
 	# rule insights still New whose finding is no longer true are removed (their evidence changed or went away)
 	# (the weekly review's own rule findings, set 8, are kept current by lifeos/review/findings.py, not here)
-	for name, fp in frappe.db.sql("""select name, fingerprint from `tabLife Insight` where space=%s and status='New' and source='Rule'
-			and kind in %s""", (space, KINDS)):
+	for name, fp in frappe.get_all("Life Insight", filters={"space": space, "status": "New", "source": "Rule", "kind": ("in", KINDS)}, fields=["name", "fingerprint"], as_list=True):  # system: the nightly job
 		if fp not in seen:
 			frappe.delete_doc("Life Insight", name, ignore_permissions=True, delete_permanently=True)
 	frappe.db.set_single_value("Life Settings", "insights_run_on", now_datetime())

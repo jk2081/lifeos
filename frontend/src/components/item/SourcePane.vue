@@ -53,7 +53,8 @@ import MdField from '@/components/MdField.vue'
 import DigestView from '@/components/DigestView.vue'
 import FileVersions from '@/components/FileVersions.vue'
 import Empty from '@/components/Empty.vue'
-import { api, db } from '@/lib/api'
+import { db } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { fileKind, fileSize } from '@/lib/upload'
@@ -80,7 +81,7 @@ function openLink() { window.open(safeLink.value, '_blank', 'noopener,noreferrer
 async function saveText(text) { await db.set('Life Inbox Item', s.value.name, { transcript_md: text }) }
 onMounted(async () => {
   try {
-    const [item, m] = await Promise.all([api('inbox.get', { item: props.name }), api('sources.made_from', { doctype: 'Life Inbox Item', name: props.name })])
+    const [item, m] = await Promise.all([itemData.inbox.get({ item: props.name }), itemData.sources.made_from({ doctype: 'Life Inbox Item', name: props.name })])
     s.value = item
     made.value = m
     emit('meta', { title: item.title, area: item.area, area_name: item.area_name, goal: item.goal, goal_title: item.goal_title,

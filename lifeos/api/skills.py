@@ -5,6 +5,7 @@ import json
 
 import frappe
 from frappe import _
+from frappe.query_builder import functions as fn
 from frappe.utils import get_first_day, now_datetime
 
 from lifeos import permissions
@@ -83,8 +84,9 @@ def run(skill: str, input: str | dict | None = None):
 # ---- Brain > Skills ----
 def _month_rows():
 	start = get_first_day(now_datetime())
-	return {r.skill: r for r in frappe.db.sql("select skill, count(*) as runs, sum(cost) as cost from `tabLife Skill Run` where creation >= %s group by skill",
-		start, as_dict=True)}
+	run = frappe.qb.DocType("Life Skill Run")
+	rows = frappe.qb.get_query("Life Skill Run", fields=[run.skill, fn.Count("*").as_("runs"), fn.Sum(run.cost).as_("cost")], ignore_permissions=False)
+	return {r.skill: r for r in rows.where(run.creation >= start).groupby(run.skill).run(as_dict=True)}
 
 
 def _card(doc, month):

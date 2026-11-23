@@ -82,6 +82,7 @@ def _write(rows):
 	updates = ", ".join(f"`{c}`=values(`{c}`)" for c in COLUMNS if c not in ("name", "creation", "owner"))
 	placeholders = ", ".join(["(" + ", ".join(["%s"] * len(COLUMNS)) + ")"] * len(values))
 	flat = [v for row in values for v in row]
+	# raw SQL: one multi-row upsert (`on duplicate key update`) on every save, all values parameters; kept as it was so the hottest write is not changed unmeasured
 	# nosemgrep: frappe-sql-format-injection -- column names come from the fixed COLUMNS list; every value is a %s parameter
 	frappe.db.sql(f"insert into `tabLife Index` ({cols}) values {placeholders} on duplicate key update {updates}", flat)
 
@@ -89,9 +90,7 @@ def _write(rows):
 def update(doc):
 	rows = build_rows(doc)
 	keep = [row_name(r["ref_doctype"], r["ref_name"], r["kind"]) for r in rows]
-	frappe.db.sql(
-		"delete from `tabLife Index` where ref_doctype=%s and ref_name=%s and name not in %s", (doc.doctype, doc.name, keep)
-	)
+	frappe.db.delete("Life Index", {"ref_doctype": doc.doctype, "ref_name": doc.name, "name": ("not in", keep)})
 	_write(rows)
 
 
@@ -117,14 +116,6 @@ def rebuild():
 			total += len(rows)
 			start += 500
 	return total
-
-
-def also_in_sql(param="area", alias=""):
-	"""SQL for "this index row's record is also filed in the area(s) named by %(param)s" (one name, or a tuple with `in`).
-	It reads the indexed child table Life Also In, so it never scans the rows' text."""
-	op = "in" if param.endswith("ids") else "="
-	return (f"({alias}ref_doctype, {alias}ref_name) in (select ai.parenttype, ai.parent from `tabLife Also In` ai "
-		f"where ai.area {op} %({param})s)")
 
 
 def ensure_indexes():
@@ -160,7 +151,7 @@ def ensure_indexes():
 	frappe.db.add_index("Life Index", ["space", "area", "is_archived", "kind", "ref_doctype", "vault_locked"], "life_index_area_counts")
 	frappe.db.add_index("Life Index", ["space", "is_archived", "record_date", "modified"], "life_index_timeline")
 	frappe.db.add_index("Life Index", ["space", "is_archived", "area", "ref_doctype", "ref_name", "kind", "vault_locked"], "life_index_area_refs")
-	# "also filed in" is matched through the records' own child rows, not by scanning also_in_csv (see also_in_sql)
+	# "also filed in" is matched through the records' own child rows, not by scanning also_in_csv (see utils.area_criterion)
 	frappe.db.add_index("Life Also In", ["area", "parenttype", "parent"], "life_also_in_area")
 	frappe.db.add_index("Life Wiki Change", ["space", "changed_on"], "life_wiki_change_space_on")
 	# pre-step 6: the Notes list and its "not opened in 90 days" count on Today; the Inbox's state tabs and totals
@@ -170,5 +161,5 @@ def ensure_indexes():
 	frappe.db.add_index("Life Task", ["goal", "status"], "life_task_goal_status")
 	frappe.db.add_index("Life Proposal", ["owner", "creation"], "life_proposal_owner_creation")
 	frappe.db.add_index("Life Chat Log", ["owner", "creation"], "life_chat_owner_creation")
-	if not frappe.db.sql("show index from `tabLife Index` where Key_name='life_index_fulltext'"):
+	if not frappe.db.has_index("tabLife Index", "life_index_fulltext"):
 		frappe.db.sql_ddl("alter table `tabLife Index` add fulltext index `life_index_fulltext` (`title`, `search_text`)")

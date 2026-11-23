@@ -42,9 +42,8 @@ def _rows(space=None):
 	spaces = permissions.user_spaces()
 	if space:
 		spaces = {space: spaces.get(space)} if space in spaces else {}
-	rows = frappe.db.sql("""select name, deleted_doctype, deleted_name, data, creation, owner from `tabDeleted Document`
-		where restored = 0 and deleted_doctype in %(types)s and creation >= %(since)s order by creation desc limit 1000""",
-		{"types": TRASHABLE, "since": add_days(now_datetime(), -DAYS)}, as_dict=True)
+	rows = frappe.get_all("Deleted Document", filters={"restored": 0, "deleted_doctype": ("in", TRASHABLE), "creation": (">=", add_days(now_datetime(), -DAYS))},  # system: the trash is filtered to the user's spaces below
+		fields=["name", "deleted_doctype", "deleted_name", "data", "creation", "owner"], order_by="creation desc", limit=1000)
 	out = []
 	for r in rows:
 		try:
