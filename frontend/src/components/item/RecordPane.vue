@@ -22,7 +22,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 import { BottomSheet } from 'frappe-ui'
-import PaneBody from './pane/PaneBody.vue'
+import PaneBody from '@/components/item/PaneBody.vue'
 import { api, tryCall } from '@/lib/api'
 import { TYPES, closePane, current as cur, paneNav, recordChanged } from '@/lib/pane'
 

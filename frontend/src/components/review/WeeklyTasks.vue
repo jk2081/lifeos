@@ -55,7 +55,7 @@ import { Button, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import Empty from '@/components/Empty.vue'
-import ReviewFooter from './ReviewFooter.vue'
+import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 
 const emit = defineEmits(['go'])

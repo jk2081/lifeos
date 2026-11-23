@@ -21,7 +21,7 @@
 <script setup>
 // One suggested batch on Reset: its count, the reason, three samples, the primary action, Review one by one and Skip.
 import { Badge, Button } from 'frappe-ui'
-import Card from '../ui/Card.vue'
+import Card from '@/components/ui/Card.vue'
 defineProps({ batch: Object, writable: Boolean, busy: Boolean, phone: Boolean })
 defineEmits(['apply', 'review', 'skip'])
 </script>

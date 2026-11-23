@@ -48,9 +48,9 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Badge, Button, DatePicker, FormControl, TextInput, dialog, toast } from 'frappe-ui'
-import Pick from '../Pick.vue'
-import Backlinks from '../Backlinks.vue'
-import LiveEditor from '../LiveEditor.vue'
+import Pick from '@/components/Pick.vue'
+import Backlinks from '@/components/Backlinks.vue'
+import LiveEditor from '@/components/LiveEditor.vue'
 import { safeUrl } from '@/lib/editor/livePreview'
 import { loadBacklinks } from '@/lib/links'
 import { openRef } from '@/lib/pane'

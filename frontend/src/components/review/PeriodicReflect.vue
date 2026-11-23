@@ -38,7 +38,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { FormControl, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import ReviewFooter from '@/components/weekly/ReviewFooter.vue'
+import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 import { refreshCounts } from '@/lib/store'
 import { long } from '@/lib/dates'

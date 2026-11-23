@@ -47,7 +47,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Badge, Progress, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import ReviewFooter from '@/components/weekly/ReviewFooter.vue'
+import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 
 const emit = defineEmits(['go'])

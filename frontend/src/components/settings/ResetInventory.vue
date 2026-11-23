@@ -23,8 +23,8 @@
 <script setup>
 // Reset's Inventory: rows by kind, columns by time untouched. A cell past the stuck threshold with something in it is
 // highlighted. Every number opens exactly those items.
-import Card from '../ui/Card.vue'
-import CountLink from '../ui/CountLink.vue'
+import Card from '@/components/ui/Card.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 const props = defineProps({ inv: Object })
 const OLD = { under_30: 0, '30_90': 30, '90_180': 90, over_180: 180 }
 const hot = (r, key) => key !== 'total' && r.key !== 'notes' && OLD[key] >= (props.inv.stuck_after_days || 30) && r.cells[key].n > 0
