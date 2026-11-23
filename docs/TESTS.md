@@ -16,7 +16,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_library.py` | Library: notes, the vault, search, the graph, Everything, files, the sensitive mark |
 | `test_people.py` | People and organisations, the person page and its mentions |
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder, one space |
-| `test_permissions.py` | Spaces and members, what each kind of user sees, the conventions of every whitelisted method, navigation, the router, no old code left |
+| `test_permissions.py` | Spaces and members, what each kind of user sees, every read refusing another space's records, the scan guard, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it |
 | `test_gmail.py` | Life OS reading Gmail: connect, fetch, triage, one capture per thread |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check |
