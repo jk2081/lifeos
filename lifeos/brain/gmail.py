@@ -7,7 +7,7 @@ profile, all with GET. Nothing in Gmail is marked read, labelled, moved or delet
 
 Every 15 minutes `fetch_all` reads each connected mailbox's new threads (the Inbox, or one label). Cheap rules in code first: Gmail's
 Promotions, Social, Updates and Forums, `List-Unsubscribe`, `Precedence: bulk` and no-reply senders are skipped, and each mailbox has an
-always-include and an always-skip list. What is left goes to the `triage-email` skill, which decides what matters. A kept thread is one
+always-include and an always-skip list. What is left goes to the `ingest-email` skill, which decides what matters. A kept thread is one
 capture (source gmail, external_id the thread's ID); a new reply updates it, and a finished one goes back to the Brain.
 """
 import base64
@@ -271,13 +271,13 @@ def link_of(thread_id: str, mailbox: str) -> str:
 
 
 def triage(conn, thread):
-	"""The triage-email skill's say on a thread that passed the cheap rules: (keep, reason). With no answer (no key, over the cap,
+	"""The ingest-email skill's say on a thread that passed the cheap rules: (keep, reason). With no answer (no key, over the cap,
 	the skill switched off or failed) it is kept: mail from a real person is never dropped because the AI could not look."""
 	from lifeos.skills import call
 
 	latest = (thread.get("messages") or [{}])[-1]
 	head = headers_of(latest)
-	answer = call.ask("triage-email", {"from": head.get("from", ""), "to": head.get("to", ""), "subject": subject_of(thread),
+	answer = call.ask("ingest-email", {"from": head.get("from", ""), "to": head.get("to", ""), "subject": subject_of(thread),
 		"snippet": text_of(latest)[:600], "mailbox": conn.mailbox, "messages_in_thread": len(thread.get("messages") or [])}, conn.space)
 	if not answer:
 		return True, ""

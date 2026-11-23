@@ -7,8 +7,8 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | File | What it covers |
 | --- | --- |
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc` |
-| `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources, old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
-| `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
+| `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources (two groups, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
+| `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
@@ -37,7 +37,9 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `reflect` | `test_review` (Reflect), `test_skills.TestNewSkillsExamples` | `SETTINGS.38` |
 | `ask` | `test_skills.TestAnswer` | `SETTINGS.38` |
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
-| `triage-email` | `test_gmail.TestGmail` | `SETTINGS.38` |
+| `ingest-email` (was `triage-email`) | `test_gmail.TestGmail`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
+| `ingest-document`, `ingest-photo`, `ingest-video`, `ingest-link`, `ingest-voice` | `test_skills.TestSourceSkills`, `test_brain.TestSourcePages` | `BRAIN.46` to `BRAIN.48` |
+| `channel-upload`, `channel-phone`, `channel-gmail`, `channel-calendar`, `channel-email-in`, `channel-agent` | `test_skills.TestSourceSkills` | `BRAIN.46` to `BRAIN.48` |
 | `improve-skill` | `test_skills.TestCorrections` | `SETTINGS.38` |
 | `lifeos` | `test_skills.TestServing` | `SETTINGS.38` |
 | `lifeos-file-work` | `test_skills.TestServing` | `SETTINGS.38` |
@@ -80,7 +82,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.28` the order is Needs you, the list, habits, then the rail
 - `TODAY.29` each moved number is in its new place with the count the old card had (All tasks, Goals, Library, Brain Activity)
 
-### Brain (`tools/acceptance/brain.mjs`, 47 checks)
+### Brain (`tools/acceptance/brain.mjs`, 50 checks)
 
 Capture and the Brain's filing, Needs you, Activity, Sources, the item page, jobs from agents, Ask, and the checks that need the records of the first photo capture.
 
@@ -133,6 +135,9 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.43` the cards sit in a grid and nothing scrolls sideways
 - `BRAIN.44` Sources offers Connect Gmail, a connected mailbox shows its week's counts and "Processed by: the Brain", every card has a Processed by line
 - `BRAIN.45` a capture the Brain could not process is in Needs you with Retry and File it myself; File it myself takes it out
+- `BRAIN.46` Sources shows channels and kinds with counts and switches; each row opens its page with the path Brain / Sources / <name>, the strip and the five tabs
+- `BRAIN.47` Rules: add a Skip chip and save to see version n+1, go back restores it; Try it on a sample PDF (fake AI) shows the result and files nothing until File it for real
+- `BRAIN.48` on a new site the sources say Nothing yet and how to connect each
 
 ### Goals (`tools/acceptance/goals.mjs`, 71 checks)
 

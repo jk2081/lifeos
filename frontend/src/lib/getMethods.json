@@ -91,6 +91,8 @@
  "lifeos.api.skills.detail",
  "lifeos.api.skills.run_log",
  "lifeos.api.someday.list",
+ "lifeos.api.source_page.get",
+ "lifeos.api.source_page.groups",
  "lifeos.api.sources.list",
  "lifeos.api.sources.made_from",
  "lifeos.api.tasks.list",

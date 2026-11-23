@@ -14,6 +14,7 @@ const routes = [
   { path: '/', redirect: '/today' },
   { path: `/today/:tab(${TODAY.join('|')})?`, name: 'Today', component: page('TodayPlace'), props: true },
   { path: `/brain/:tab(${BRAIN.join('|')})?`, name: 'Brain', component: page('BrainPlace'), props: true },
+  { path: '/brain/sources/:key', name: 'Source', component: page('SourcePage') },
   { path: '/brain/skills/:name', name: 'Skill', component: page('Skill'), props: true },
   { path: '/brain/review/:id', name: 'ItemReview', component: page('Review'), props: true },
   // issue 50: the screen the phone's share target opens

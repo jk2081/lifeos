@@ -95,7 +95,7 @@ import { areaOptions, loadLookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 
 const KINDS = [{ value: 'all', label: 'All' }, { value: 'chats', label: 'Chats' },
-  { value: 'voice', label: 'Voice' }, { value: 'documents', label: 'Documents' }, { value: 'photos', label: 'Photos' },
+  { value: 'voice', label: 'Voice' }, { value: 'documents', label: 'Documents' }, { value: 'photos', label: 'Photos' }, { value: 'videos', label: 'Videos' },
   { value: 'articles', label: 'Articles' }, { value: 'email', label: 'Email' }, { value: 'text', label: 'Text' }]
 const SPEC = [
   { key: 'tab', field: 'media_kind', kind: 'value' },
@@ -118,7 +118,7 @@ const VIRTUAL = [
 ]
 const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'record_owner', 'thumbnail', 'vault_locked', 'collection', 'kind', 'ref_doctype']
 const SYNTHETIC = [{ key: '_status', label: 'Status', width: '7.5rem', place: 'end' }, { key: '_made', label: 'Made from it', width: '7rem', place: 'end' }]
-const ICON = { Chat: 'lucide-messages-square', Voice: 'lucide-mic', Document: 'lucide-file-text', Photo: 'lucide-image', Article: 'lucide-globe',
+const ICON = { Chat: 'lucide-messages-square', Voice: 'lucide-mic', Document: 'lucide-file-text', Photo: 'lucide-image', Video: 'lucide-video', Article: 'lucide-globe',
   Email: 'lucide-mail', 'Email Digest': 'lucide-mails', Text: 'lucide-text', Note: 'lucide-file-text' }
 const KIND_LABEL = { 'Email Digest': 'Email digest' }
 const STATUS_THEME = { 'In Inbox': 'amber', Done: 'green', Failed: 'red' }
@@ -127,7 +127,7 @@ const Lock = () => h('span', { class: 'lucide-lock size-3.5 flex-none text-ink-g
 // a Vault document as a capture: its holder, the last four characters and its expiry
 const vaultLine = (r) => (r.doctype === 'Life Vault Document' ? [r.doc_type, r.holder_name, r.number_last4 && 'ending ' + r.number_last4,
   r.expiry_date && 'expires ' + short(r.expiry_date, true)].filter(Boolean).join(' · ') : '')
-const EMPTY = { notes: 'No notes yet.', chats: 'No chats yet.', voice: 'No voice notes yet.', documents: 'No documents yet.', photos: 'No photos yet.', articles: 'No articles yet.',
+const EMPTY = { notes: 'No notes yet.', chats: 'No chats yet.', voice: 'No voice notes yet.', documents: 'No documents yet.', photos: 'No photos yet.', videos: 'No videos yet.', articles: 'No articles yet.',
   email: 'No emails yet.', text: 'No text yet.' }
 
 // inside a record page's tab (the goal page): { screen, space, fixed: { goal }, active(route), writable }

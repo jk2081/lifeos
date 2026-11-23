@@ -7,7 +7,7 @@ SPACE_DOCTYPES = [
 	"Life Cycle", "Life Goal", "Life Habit", "Life Habit Log",
 	"Life Note", "Life Vault Document",
 	"Life Chat Log", "Life Link", "Life Index", "Life Action Log",
-	"Life Wiki Change", "Life Connection",
+	"Life Wiki Change", "Life Connection", "Life Source Setting",
 	"Life Insight",
 	"Life Goal Reading", "Life Exit",
 	"Life Review", "Life Meeting Link", "Life Wiki Finding",

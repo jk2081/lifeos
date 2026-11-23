@@ -1,18 +1,37 @@
 <template>
   <PageHead title="Brain" sub="Where information comes from. The Brain reads only what you switch on." />
   <div class="page-body flex max-w-6xl flex-col gap-6" data-brain-sources :data-loaded="loaded ? 1 : 0">
-    <section class="flex flex-col gap-3" data-connected>
+    <!-- issue 84: two groups. Channels are where a thing comes from, kinds are what it is; a thing passes its channel's rules first, then its kind's. -->
+    <div class="flex flex-col gap-1" data-source-groups>
+      <div class="inline-flex w-fit rounded-5 bg-surface-gray-2 p-0.5" role="tablist" aria-label="Sources">
+        <button v-for="g in GROUPS" :key="g.value" type="button" role="tab" :aria-selected="group === g.value" class="min-h-9 rounded-4 px-3 text-sm focus-visible:focus-ring"
+          :class="group === g.value ? 'bg-surface-base text-ink-gray-9 shadow-sm' : 'text-ink-gray-7'" :data-group="g.value" @click="setGroup(g.value)">{{ g.label }} <span class="tabular-nums text-ink-gray-6" :data-group-count="g.value">{{ g.count }}</span></button>
+      </div>
+      <p class="text-sm text-ink-gray-6">{{ group === 'kinds' ? 'What it is. After the rules of the channel it came by, a thing is read with the rules of its kind.' : 'Where it comes from. Everything passes its channel\'s rules first.' }}</p>
+    </div>
+
+    <section v-if="group === 'kinds'" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" data-kinds>
+      <Card v-for="k in kinds" :key="k.key" class="relative flex flex-col gap-1.5 hover:bg-surface-gray-1" data-kind-card :data-kind="k.key" :data-week="k.this_week">
+        <RouterLink :to="`/brain/sources/${k.key}`" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="`Open ${k.title}`" data-kind-open />
+        <div class="text-base-medium text-ink-gray-9">{{ k.title }}</div>
+        <div class="text-sm text-ink-gray-6">{{ k.line }}</div>
+        <div class="flex flex-wrap items-center gap-x-2 text-sm text-ink-gray-8"><span data-kind-line>{{ k.this_week ? `${k.this_week} this week` : 'Nothing yet' }}</span><span class="text-ink-gray-5">{{ k.skill }} v{{ k.version }}</span></div>
+      </Card>
+    </section>
+
+    <section v-if="group === 'channels'" class="flex flex-col gap-3" data-connected>
       <div class="flex items-center justify-between gap-2">
         <h2 class="text-base-medium text-ink-gray-9">Connected · <span data-connected-count>{{ connected.length }}</span></h2>
         <Button v-if="writable" variant="solid" icon-left="lucide-plus" label="Add a source" data-add-source @click="toAddMore" />
       </div>
       <div v-if="connected.length" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <Card v-for="c in connected" :key="c.name" class="relative flex flex-col gap-2 hover:bg-surface-gray-1" data-source-card :data-system="c.system" :data-active="c.active" :data-week="c.this_week">
-          <button type="button" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="`Open ${c.label}`" data-source-open @click="openSettings(c)" />
+          <RouterLink :to="`/brain/sources/${c.system}`" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="`Open ${c.label}`" data-source-page />
           <div class="flex items-center gap-3">
             <span class="flex size-9 flex-none items-center justify-center rounded-4 bg-surface-gray-2 text-sm-medium text-ink-gray-8" aria-hidden="true">{{ c.icon }}</span>
             <div class="min-w-0 flex-1"><div class="truncate text-base-medium text-ink-gray-9">{{ c.label }}</div><div class="truncate text-sm text-ink-gray-6">{{ c.kind }}</div></div>
             <Switch class="relative" :model-value="!!c.active" :disabled="!writable" :label="c.active ? 'On' : 'Off'" data-source-switch @update:model-value="(v) => toggle(c, v)" />
+            <Button class="relative" variant="ghost" icon="lucide-settings-2" :aria-label="`Settings of ${c.label}`" data-source-open @click="openSettings(c)" />
           </div>
           <p class="text-sm text-ink-gray-6" data-source-line>{{ c.line }}</p>
           <p class="text-sm text-ink-gray-8" data-processed-by>{{ c.processed_by }}</p>
@@ -28,7 +47,7 @@
       </Card>
     </section>
 
-    <section ref="more" class="flex flex-col gap-3" data-add-more>
+    <section v-if="group === 'channels'" ref="more" class="flex flex-col gap-3" data-add-more>
       <h2 class="text-base-medium text-ink-gray-9">Add more <span class="text-sm font-normal text-ink-gray-6">One click each. Nothing is read until you switch it on.</span></h2>
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div v-for="t in available" :key="t.system" class="relative flex flex-col items-center gap-0.5 rounded-5 border border-dashed border-outline-gray-2 px-3 py-4 text-center"
@@ -38,6 +57,7 @@
           <span class="text-sm text-ink-gray-6">{{ t.hint }}</span>
           <span v-if="t.processed_by" class="mt-0.5 text-xs text-ink-gray-5" data-processed-by>{{ t.processed_by }}</span>
           <Badge v-if="t.always_on" class="mt-1" theme="green" label="Always on" />
+          <RouterLink :to="`/brain/sources/${t.system}`" class="relative mt-1 text-xs underline focus-visible:focus-ring" :aria-label="`Rules of ${t.label}`" data-tile-rules>Rules</RouterLink>
         </div>
         <div class="relative flex flex-col items-center gap-0.5 rounded-5 border border-dashed border-outline-gray-2 px-3 py-4 text-center hover:bg-surface-gray-1" data-source-tile data-system="other-agent">
           <button v-if="writable" type="button" class="absolute inset-0 rounded-5 focus-visible:focus-ring" aria-label="Add another agent" data-tile-other @click="otherOpen = true" />
@@ -50,7 +70,7 @@
         </div>
       </div>
     </section>
-    <section class="flex flex-col gap-3" data-email-in :data-configured="emailIn.configured ? 1 : 0">
+    <section v-if="group === 'channels'" class="flex flex-col gap-3" data-email-in :data-configured="emailIn.configured ? 1 : 0">
       <h2 class="text-base-medium text-ink-gray-9">Email-in address <span class="text-sm font-normal text-ink-gray-6">Optional. Forward an email to capture it.</span></h2>
       <Card class="flex flex-col gap-2">
         <p class="text-sm text-ink-gray-8" data-email-in-address>
@@ -152,6 +172,11 @@ const sendersText = ref('')
 const accountName = ref('')
 const route = useRoute()
 const router = useRouter()
+const channels = ref([])
+const kinds = ref([])
+const group = computed(() => (route.query.group === 'kinds' ? 'kinds' : 'channels'))
+const GROUPS = computed(() => [{ value: 'channels', label: 'Channels', count: channels.value.length }, { value: 'kinds', label: 'Kinds', count: kinds.value.length }])
+const setGroup = (v) => router.replace({ query: { ...route.query, group: v === 'channels' ? undefined : v } })
 
 const goalOptions = computed(() => (lookups.goals || []).filter((g) => !draft.value.default_area || g.area === draft.value.default_area).map((g) => ({ value: g.name, label: g.title })))
 const toAddMore = () => more.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -161,6 +186,8 @@ function lastReceived(c) {
 }
 async function load() {
   loadLookups()
+  const g = await tryCall(() => brainData.sourcePage.groups({ space: store.space }))
+  if (g) { channels.value = g.channels; kinds.value = g.kinds }
   const res = await tryCall(() => brainData.connections.sources({ space: store.space }))
   if (res) {
     connected.value = res.connected; available.value = res.available; coming.value = res.coming

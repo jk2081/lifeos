@@ -1407,3 +1407,112 @@ class TestLinkQuery(LifeTestCase):
 		got = [r["value"] for r in search_link("Life Area", "ux4 hidden", filters={"space": PRIVATE})]
 		self.assertNotIn(gone.name, got)
 		self.assertTrue(permissions)
+
+
+# ---- sources: channels and kinds, one page each (issue 84) ----
+class TestSourcePages(SkillCase):
+	def video(self, size):
+		item = self.capture(text="Recorded call with the accountant.", source_type="Upload")
+		f = attach("Life Inbox Item", item.name, "call.mp4", b"not really a video")
+		frappe.db.set_value("File", f.name, "file_size", size)
+		item.reload()
+		return item
+
+	def test_a_video_over_500_mb_is_refused_with_a_message_and_a_smaller_one_gets_a_transcript(self):
+		big = self.video(600 * 1024 * 1024)
+		frappe.flags.lifeos_ai_backend = NoModel()
+		self.process(big)
+		self.assertEqual(big.status, "Failed")
+		self.assertIn("call.mp4 is 600 MB", big.error)
+		self.assertIn("up to 500 MB", big.error)
+		small = self.video(40 * 1024 * 1024)
+		self.script(answer("A call about the audit.", transcript="Accountant: send the ledgers by Friday."))
+		self.process(small)
+		self.assertEqual(small.status, "Done")
+		self.assertEqual(small.transcript_md, "Accountant: send the ledgers by Friday.")
+		self.assertEqual(small.media_kind, "Video")
+
+	def test_sources_come_in_two_groups_with_counts_and_a_new_site_has_nothing_yet(self):
+		from lifeos.api import source_page
+
+		groups = source_page.groups(PRIVATE)
+		self.assertEqual([c["key"] for c in groups["channels"]][:5], ["upload", "phone", "gmail", "google-calendar", "email"])
+		self.assertEqual([k["key"] for k in groups["kinds"]], ["kind-document", "kind-photo", "kind-video", "kind-link", "kind-voice", "kind-email"])
+		self.assertEqual([c["connected"] for c in groups["channels"]], [1, 1, 0, 0, 0])
+		self.assertTrue(all(c["how_to"] for c in groups["channels"]))
+		self.assertTrue(all(g["skill"] and g["version"] for g in (*groups["channels"], *groups["kinds"])))
+
+	def test_a_source_page_counts_its_week_and_the_share_filed_without_you(self):
+		from lifeos.api import source_page
+
+		before = source_page.get("kind-document", PRIVATE)["strip"]
+		item = self.capture(text="Policy renewal due 1 March.", source_type="Upload")
+		attach("Life Inbox Item", item.name, "policy.pdf", pdf_bytes())
+		page = source_page.get("kind-document", PRIVATE)
+		self.assertEqual(page["strip"]["this_week"], before["this_week"] + 1)
+		self.assertEqual((page["group"], page["title"], page["skill"], page["strip"]["skill_label"]), ("kind", "Documents (PDF)", "ingest-document", "ingest-document v1"))
+		self.assertEqual(page["strip"]["active"], 1)
+		agent = source_page.get("upload", PRIVATE)
+		self.assertEqual((agent["group"], agent["skill"]), ("channel", "channel-upload"))
+		with self.assertRaises(frappe.DoesNotExistError):
+			source_page.get("nonsense", PRIVATE)
+		frappe.set_user(AGENT)
+		with self.assertRaises(frappe.PermissionError):
+			source_page.get("kind-document", PRIVATE)
+
+	def test_a_sources_own_confidence_decides_what_is_filed_without_you_and_agents_can_be_taken_off_it(self):
+		from lifeos.api import source_page
+		from lifeos.skills import filing
+
+		frappe.db.set_single_value("Life Settings", "brain_auto_kinds", json.dumps(["Task"]))
+		frappe.clear_cache(doctype="Life Settings")
+		self.assertEqual(source_page.get("kind-document", PRIVATE)["settings"]["auto_file_confidence"], 85)  # follows Settings until it is set
+		out = source_page.save_settings("kind-document", auto_file_confidence=95, space=PRIVATE)
+		self.assertEqual((out["auto_file_confidence"], out["own"]), (95, True))
+		item = self.capture(text="Pay the fee.", source_type="Upload")
+		attach("Life Inbox Item", item.name, "fee.pdf", pdf_bytes())
+		item.reload()
+		self.script(task("Pay the school fees", confidence=0.9), answer("A fee notice."))
+		self.process(item)
+		self.assertEqual(frappe.db.get_value("Life Proposal", {"inbox_item": item.name}, "status"), "Pending")  # 90 is under the document's 95
+		source_page.save_settings("kind-document", auto_file_confidence=80, space=PRIVATE)
+		item2 = self.capture(text="Pay the fee again.", source_type="Upload")
+		attach("Life Inbox Item", item2.name, "fee2.pdf", pdf_bytes())
+		item2.reload()
+		self.script(task("Pay the hostel fees", confidence=0.9), answer("A fee notice."))
+		self.process(item2)
+		self.assertEqual(frappe.db.get_value("Life Proposal", {"inbox_item": item2.name}, "status"), "Accepted")
+		with self.assertRaises(frappe.ValidationError):
+			source_page.save_settings("kind-document", auto_file_confidence=120, space=PRIVATE)
+		# which agents may read it
+		hermes = source_page.get("kind-document", PRIVATE)["settings"]["agents"]
+		self.assertIn(AGENT, [a["user"] for a in hermes])
+		source_page.save_settings("kind-document", readers=[], space=PRIVATE)
+		frappe.set_user(AGENT)
+		names = [s["name"] for s in sources.list(space=PRIVATE, page_length=200)["sources"]]
+		self.assertNotIn(item2.name, names)
+		frappe.set_user(OWNER)
+		source_page.save_settings("kind-document", readers=[a["user"] for a in hermes], space=PRIVATE)
+		frappe.set_user(AGENT)
+		self.assertIn(item2.name, [s["name"] for s in sources.list(space=PRIVATE, page_length=200)["sources"]])
+
+	def test_try_it_shows_what_it_would_do_and_files_nothing_until_file_it_for_real(self):
+		from lifeos.api import source_page
+
+		items = frappe.db.count("Life Inbox Item", {"space": PRIVATE})
+		self.script(task("Pay the Try-it fees", confidence=0.9), {"content": [{"type": "text", "text": json.dumps(
+			{"transcript_md": "", "summary_md": "A fee notice.", "skipped": ["The letterhead"]})}], "stop_reason": "end_turn"})
+		res = source_page.try_it("kind-document", title="Fee notice", text="School fees of Rs 20,000 are due on 5 December.", space=PRIVATE)
+		self.assertEqual((res["summary"], res["skipped"]), ("A fee notice.", ["The letterhead"]))
+		self.assertEqual(res["proposals"][0]["title"], "Pay the Try-it fees")
+		self.assertEqual(res["skills_used"], "process-capture v1, channel-upload v1, ingest-document v1")
+		self.assertEqual(frappe.db.count("Life Inbox Item", {"space": PRIVATE}), items)
+		self.assertFalse(frappe.db.exists("Life Proposal", {"preview": "Pay the Try-it fees"}))
+		made = source_page.file_it("kind-document", title="Fee notice", text="School fees of Rs 20,000 are due on 5 December.", space=PRIVATE)
+		self.assertEqual(frappe.db.count("Life Inbox Item", {"space": PRIVATE}), items + 1)
+		self.assertEqual(frappe.db.get_value("Life Inbox Item", made["name"], "status"), "New")
+		with self.assertRaises(frappe.ValidationError):
+			source_page.try_it("kind-document", space=PRIVATE)  # nothing to try
+		set_key("")
+		with self.assertRaises(frappe.ValidationError):
+			source_page.try_it("kind-document", text="x", space=PRIVATE)

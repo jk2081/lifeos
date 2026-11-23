@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "source",
+  "auto_file_confidence",
+  "readers"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Data",
+   "label": "Source",
+   "reqd": 1,
+   "in_list_view": 1,
+   "length": 60,
+   "description": "A channel's system (gmail, hermes, upload) or a kind (kind-document, kind-photo)"
+  },
+  {
+   "fieldname": "auto_file_confidence",
+   "fieldtype": "Int",
+   "label": "Files without you above (%)",
+   "default": "80",
+   "description": "What this source brings is filed without the owner when the Brain is at least this sure"
+  },
+  {
+   "fieldname": "readers",
+   "fieldtype": "Small Text",
+   "label": "Agents that may read it",
+   "description": "A JSON list of agent users; empty means every agent"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Source Setting",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "source"
+}

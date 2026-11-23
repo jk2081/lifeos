@@ -110,7 +110,7 @@
    "fieldname": "media_kind",
    "fieldtype": "Select",
    "label": "Kind of source",
-   "options": "\nVoice\nDocument\nPhoto\nArticle\nEmail\nEmail Digest\nText\nChat"
+   "options": "\nVoice\nDocument\nPhoto\nVideo\nArticle\nEmail\nEmail Digest\nText\nChat"
   },
   {
    "fieldname": "source_system",

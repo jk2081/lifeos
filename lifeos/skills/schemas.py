@@ -11,6 +11,7 @@ SCHEMAS = {
 		"properties": {
 			"transcript_md": {"type": "string", "description": "The text of the capture, cleaned up; empty when the capture is already text."},
 			"summary_md": {"type": "string", "description": "A short summary in Markdown, in the owner's words. Mention anything odd in the capture."},
+			"skipped": {"type": "array", "items": {"type": "string"}, "description": "What was left out on purpose, one short line each."},
 		},
 	},
 	"lesson-result": {

@@ -16,4 +16,5 @@ export const brainData = {
   reset: group('reset', ['undo']),
   ask: group('ask', ['delete_thread', 'status', 'threads']),
   sources: group('sources', ['list', 'refile']),
+  sourcePage: group('source_page', ['file_it', 'get', 'go_back', 'groups', 'save_rules', 'save_settings', 'teach', 'try_it']),
 }

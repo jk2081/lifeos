@@ -30,7 +30,7 @@ def base_criteria(x, scope="captures"):
 
 
 # the kind tabs of Captures and All, each a condition on the index row
-TAB_NAMES = ("all", "notes", "chats", "voice", "documents", "photos", "articles", "email", "text")
+TAB_NAMES = ("all", "notes", "chats", "voice", "documents", "photos", "videos", "articles", "email", "text")
 
 
 def tab_criteria(x):
@@ -41,6 +41,7 @@ def tab_criteria(x):
 		"voice": x.media_kind == "Voice",
 		"documents": (x.media_kind == "Document") | (x.ref_doctype == "Life Vault Document"),
 		"photos": x.media_kind == "Photo",
+		"videos": x.media_kind == "Video",
 		"articles": x.media_kind == "Article",
 		"email": x.media_kind.isin(["Email", "Email Digest"]),
 		"text": x.media_kind == "Text",
@@ -164,6 +165,10 @@ def list(space: str | None = None, tab: str | None = None, area: str | None = No
 		tabs.pop("notes", None)
 	if tab_criteria(x)[tab] is not None:
 		where.append(tab_criteria(x)[tab])
+	if permissions.is_agent():  # an agent the owner took off a source's readers does not see what came from it (issue 84)
+		from lifeos.brain import source_page
+
+		where += source_page.agent_blocked(space, x)
 	where = index_where(space, where)
 	if summary:
 		return {"summary": group_summary("Life Index", where, summary, start, page_length), "tabs": tabs}

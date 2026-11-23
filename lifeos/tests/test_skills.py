@@ -1164,3 +1164,77 @@ class TestInsightRulesOnTheDocType(LifeTestCase):
 		doc.status = "New"
 		doc.save()
 		self.assertEqual((doc.snooze_until, doc.dismiss_reason), (None, ""))
+
+
+# ---- sources: one template, one skill each (issue 84) ----
+class TestSourceSkills(SkillCase):
+	def test_every_source_skill_has_the_templates_sections_and_the_base_rules_apply_to_all(self):
+		"""A schema test: kinds and channels each carry the template's sections; a run is given the base's rules, then its channel's, then its kind's."""
+		from lifeos.skills import template
+
+		self.assertEqual(len(template.source_skills()), 12)
+		for slug in template.source_skills():
+			text = store.instructions_of(slug)
+			self.assertEqual(template.missing(slug, text), [], f"{slug} lacks sections of the template")
+			self.assertTrue(frappe.db.get_value("Life Skill", slug, "active"), slug)
+		self.assertFalse(frappe.db.exists("Life Skill", "triage-email"))  # renamed, not copied
+		base = store.instructions_of(template.BASE)
+		for channel in ("upload", "phone", "gmail", "hermes"):
+			for media in ("Document", "Photo", "Video", "Article", "Voice", "Email", None):
+				text, used = template.put_together(base, template.channel_skill(channel), template.kind_skill(media))
+				self.assertTrue(text.startswith(base))
+				self.assertIn("Never", text)
+				self.assertEqual(used[0], template.channel_skill(channel))
+				self.assertEqual(len(used), 2 if media else 1)
+		text, _used = template.put_together(base, "channel-agent", "ingest-document")
+		self.assertLess(text.index("Rules of the channel"), text.index("Rules of the kind"))
+
+	def test_a_pdf_sent_through_an_agent_runs_the_agents_rules_and_then_the_documents_and_records_both_versions(self):
+		from lifeos.ai import fake
+		from lifeos.tools.devtools import attach, pdf_bytes
+
+		item = self.capture(text="", source_type="Upload", source_system="hermes")
+		attach("Life Inbox Item", item.name, "policy.pdf", pdf_bytes())
+		item.reload()
+		self.assertEqual((item.media_kind, item.source_system), ("Document", "hermes"))
+		self.script(answer("A policy."))
+		fake.clear_received()
+		log = self.process(item)
+		self.assertEqual(log.status, "Done", f"{log.error} {item.error}")
+		self.assertEqual(log.skills_used, "process-capture v1, channel-agent v1, ingest-document v1")
+		system = next(r["system"] for r in fake.received() if "Rules of the channel: channel-agent" in (r["system"] or ""))
+		self.assertLess(system.index("Rules of the channel: channel-agent"), system.index("Rules of the kind: ingest-document"))
+
+	def test_saving_the_rules_makes_a_new_version_and_going_back_restores_the_old_one(self):
+		from lifeos.api import source_page as api
+		from lifeos.skills import template
+
+		before = frappe.db.get_value("Life Skill", "ingest-document", "instructions")
+		page = api.get("kind-document", PRIVATE)
+		keep = next(s for s in page["rules"]["sections"] if s["title"] == "Skip")
+		self.assertEqual(page["version"], 1)
+		res = api.save_rules("kind-document", {"Skip": [*keep["items"], "Fax cover sheets"]}, "Ask before filing anything over Rs 1,00,000.", PRIVATE)
+		self.assertEqual(res["version"], 2)
+		now = frappe.db.get_value("Life Skill", "ingest-document", "instructions")
+		self.assertIn("- Fax cover sheets", template.sections_of(now)["Skip"])
+		self.assertIn("Rs 1,00,000", template.sections_of(now)["Anything else"])
+		self.assertEqual(template.missing("ingest-document", now), [])
+		self.assertEqual(api.save_rules("kind-document", {"Skip": [*keep["items"], "Fax cover sheets"]}, None, PRIVATE)["version"], 2)  # unchanged: no version
+		back = api.go_back("kind-document", 1, PRIVATE)
+		self.assertEqual(back["version"], 3)
+		self.assertEqual(frappe.db.get_value("Life Skill", "ingest-document", "instructions"), before)
+		frappe.set_user(FAMILY)
+		with self.assertRaises(frappe.PermissionError):
+			api.save_rules("kind-document", {"Skip": ["x"]}, None, SHARED)
+
+	def test_the_lessons_stay_in_their_section_when_the_rules_are_saved(self):
+		from lifeos.api import source_page as api
+		from lifeos.skills import template
+
+		doc = frappe.get_doc("Life Skill", "ingest-photo")
+		doc.instructions = lessons.apply(doc.instructions, "LSN-TEST", "Receipts from the chemist are Health, not Money.")
+		doc.save()
+		api.save_rules("kind-photo", {"Keep": ["Receipts"]}, None, PRIVATE)
+		text = frappe.db.get_value("Life Skill", "ingest-photo", "instructions")
+		self.assertEqual(text.count(template.LESSONS_HEADING), 1)
+		self.assertIn("chemist", template.sections_of(text)[template.LESSONS])

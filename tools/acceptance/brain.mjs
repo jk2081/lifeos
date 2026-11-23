@@ -1086,3 +1086,116 @@ frappe.db.set_value("Life Skill", "process-capture", "active", 0)`)
     await s.ctx.close()
   }
 }
+
+
+// Brain > Sources in two groups and one page for each source: its strip, Rules (saved as a version of the skill), Try it. Titles start "I84 ".
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const pathOf = async () => (await pg.locator('[data-page-path]').innerText()).replace(/\s+/g, ' ').trim()
+  const version = () => Number(bench('print(frappe.db.get_value("Life Skill", "ingest-document", "version"))').split('\n').pop())
+  const openSources = async (query = '') => { await s.open('/life/brain/sources' + query); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const pdfName = `I84 sample ${width} ${stamp}.pdf`
+  try {
+    await check('BRAIN.46', `${width} px: Sources shows channels and kinds with counts and switches; each row opens its page with the path Brain / Sources / <name>`, async () => {
+      await openSources()
+      const channels = Number(await pg.locator('[data-group-count="channels"]').innerText())
+      must(channels >= 5 && (await pg.locator('[data-group-count="kinds"]').innerText()) === '6', `the counts are ${channels} and ${await pg.locator('[data-group-count="kinds"]').innerText()}`)
+      must((await pg.locator('[data-group][aria-selected="true"]').getAttribute('data-group')) === 'channels', 'Channels is not the first group')
+      await pg.locator('[data-group="kinds"]').click()
+      await pg.locator('[data-kinds]').waitFor({ timeout: 5000 })
+      must((await pg.locator('[data-kind-card]').count()) === 6, 'expected six kinds')
+      must(!(await pg.locator('[data-connected]').count()), 'the channels still show with Kinds open')
+      await pg.locator('[data-kind-card][data-kind="kind-document"] [data-kind-open]').click()
+      await pg.locator('[data-source-page][data-source="kind-document"]').waitFor({ timeout: 10000 })
+      must(/^Brain \/ Sources/.test(await pathOf()) && (await pg.locator('[data-page-title]').innerText()) === 'Documents (PDF)', 'the path says: ' + await pathOf())
+      const strip = await pg.locator('[data-source-strip]').innerText()
+      for (const word of ['Arrives from', 'This week', 'Filed without you', 'AI cost this week', 'Skill']) must(strip.includes(word), `the strip lacks ${word}: ${strip}`)
+      must(strip.includes('ingest-document v'), 'the strip does not name the skill and its version')
+      for (const t of ['Overview', 'Rules', 'Examples & lessons', 'Activity', 'Try it']) must(await pg.locator(`[data-tab-bar] >> text="${t}"`).first().isVisible(), `no ${t} tab`)
+      await pg.locator('[data-page-back]').click()
+      await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 })
+      await openSources()
+      await pg.locator('[data-source-tile][data-system="upload"] [data-tile-rules]').click()
+      await pg.locator('[data-source-page][data-source="upload"]').waitFor({ timeout: 10000 })
+      must((await pathOf()).startsWith('Brain / Sources') && (await pg.locator('[data-page-title]').innerText()) === 'Upload', 'the Upload path says: ' + await pathOf())
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.47', `${width} px: Rules: add a Skip chip and save to see version n+1, go back restores it; Try it on a sample PDF (fake AI) files nothing until File it for real`, async () => {
+      await s.open('/life/brain/sources/kind-document?tab=rules')
+      await pg.locator('[data-rule-section][data-section="Skip"]').waitFor({ timeout: 10000 })
+      const before = version()
+      const chip = `Fax cover sheets ${width}`
+      await pg.locator('[data-section="Skip"] [data-chip-input]').fill(chip)
+      await pg.locator('[data-section="Skip"] [data-chip-add]').click()
+      must(await pg.locator(`[data-section="Skip"] [data-chip]:has-text("${chip}")`).count() === 1, 'the chip was not added')
+      await pg.locator('[data-rules-anything]').fill('Ask before filing anything over Rs 1,00,000.')
+      await pg.locator('[data-rules-save]').click()
+      await pg.locator(`[data-rules-version]:has-text("Version ${before + 1}")`).waitFor({ timeout: 10000 })
+      must(version() === before + 1, `the skill is at version ${version()}, expected ${before + 1}`)
+      must(bench('print(frappe.db.get_value("Life Skill", "ingest-document", "instructions"))').includes(`- ${chip}`), 'the chip is not in the skill text')
+      await pg.reload()
+      await pg.locator(`[data-section="Skip"] [data-chip]:has-text("${chip}")`).waitFor({ timeout: 10000 })
+      await pg.locator(`[data-version-row][data-version="${before}"] [data-version-back]`).click()
+      await pg.locator(`[data-rules-version]:has-text("Version ${before + 2}")`).waitFor({ timeout: 10000 })
+      must(!bench('print(frappe.db.get_value("Life Skill", "ingest-document", "instructions"))').includes(chip), 'going back did not restore the old text')
+      // Try it
+      const count = () => Number(bench(`print(frappe.db.count("Life Inbox Item", {"space": "${SPACE}", "title": ["like", "I84 sample%${stamp}%"]}))`).split('\n').pop())
+      await s.open('/life/brain/sources/kind-document?tab=try')
+      await pg.locator('[data-try-file]').setInputFiles({ name: pdfName, mimeType: 'application/pdf', buffer: PDF })
+      await pg.locator('[data-try-drop]:has-text("I84 sample")').waitFor({ timeout: 10000 })
+      await pg.locator('[data-try-run]').click()
+      await pg.locator('[data-try-result], [data-sonner-toast][data-type="error"]').first().waitFor({ timeout: 30000 })
+      if (!(await pg.locator('[data-try-result]').count())) must(false, 'Try it said: ' + await pg.locator('[data-sonner-toast]').first().innerText())
+      must((await pg.locator('[data-try-summary]').innerText()).includes('stand-in model'), 'the summary says: ' + await pg.locator('[data-try-summary]').innerText())
+      must((await pg.locator('[data-try-proposal]').count()) >= 1, 'no proposal shown')
+      must((await pg.locator('[data-try-result]').innerText()).includes('ingest-document v'), 'the result does not name the skills used')
+      must(count() === 0, 'Try it filed something')
+      await pg.locator('[data-try-file-it]').click()
+      await pg.locator('[data-try-result]').waitFor({ state: 'detached', timeout: 10000 })
+      must(count() === 1, `File it for real made ${count()} captures`)
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.48', `${width} px: on a new site the sources say Nothing yet and how to connect each`, async () => {
+      const aside = `zz-i84-aside-${width}`
+      const moved = JSON.parse(bench(`import json
+from frappe.utils import add_days, getdate
+d = getdate()
+names = frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "creation": [">=", add_days(d, -d.weekday())]}, pluck="name")
+for n in names: frappe.db.set_value("Life Inbox Item", n, "space", "${aside}", update_modified=False)
+conns = frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name")
+for n in conns: frappe.db.set_value("Life Connection", n, "space", "${aside}", update_modified=False)
+print(json.dumps({"names": names, "conns": conns}))`).split('\n').pop())
+      try {
+        await openSources('?group=kinds')
+        for (const k of ['kind-document', 'kind-photo', 'kind-video', 'kind-link', 'kind-voice', 'kind-email'])
+          must((await pg.locator(`[data-kind-card][data-kind="${k}"] [data-kind-line]`).innerText()) === 'Nothing yet', `${k} does not say Nothing yet`)
+        await openSources()
+        must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state')
+        must(await pg.locator('[data-email-in]').isVisible(), 'the email-in address does not say how to set it up')
+        for (const sys of ['gmail', 'google-calendar']) must((await pg.locator(`[data-source-tile][data-system="${sys}"]`).innerText()).length > 10, `${sys} has no hint`)
+        await s.open('/life/brain/sources/gmail')
+        await pg.locator('[data-source-page][data-source="gmail"]').waitFor({ timeout: 10000 })
+        const t = await pg.locator('[data-source-connect]').innerText()
+        must(t.includes('Nothing yet') && t.includes('Connect Gmail'), 'Gmail does not say how to connect: ' + t)
+        must((await pg.locator('[data-strip="week"]').innerText()) === 'Nothing yet', 'the week does not say Nothing yet')
+        await pg.locator('[data-tab="activity"]').click()
+        await pg.locator('[data-activity-empty]').waitFor({ timeout: 5000 })
+        await noSideways()
+      } finally {
+        bench(`for n in ${JSON.stringify(moved.names)}: frappe.db.set_value("Life Inbox Item", n, "space", "${SPACE}", update_modified=False)
+for n in ${JSON.stringify(moved.conns)}: frappe.db.set_value("Life Connection", n, "space", "${SPACE}", update_modified=False)`)
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I84 %${stamp}%"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
