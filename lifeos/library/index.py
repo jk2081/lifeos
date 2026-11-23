@@ -96,12 +96,12 @@ def update(doc):
 
 
 def remove(doctype, name):
-	frappe.db.sql("delete from `tabLife Index` where ref_doctype=%s and ref_name=%s", (doctype, name))
+	frappe.db.delete("Life Index", {"ref_doctype": doctype, "ref_name": name})
 
 
 def rebuild():
 	"""Rebuild the whole index from the records. Run: bench --site SITE execute lifeos.library.index.rebuild"""
-	frappe.db.sql("delete from `tabLife Index`")
+	frappe.db.delete("Life Index")
 	total = 0
 	for dt in INDEXED_DOCTYPES:
 		start = 0

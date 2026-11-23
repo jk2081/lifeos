@@ -59,7 +59,7 @@ def rebuild(doc):
 	fields = md_fields(doc)
 	if not fields:
 		return
-	frappe.db.sql("delete from `tabLife Link` where from_doctype=%s and from_name=%s", (doc.doctype, doc.name))
+	frappe.db.delete("Life Link", {"from_doctype": doc.doctype, "from_name": doc.name})
 	seen = set()
 	for field in fields:
 		for m in LINK_RE.finditer(doc.get(field) or ""):

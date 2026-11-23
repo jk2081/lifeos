@@ -4,7 +4,10 @@ from datetime import date, timedelta
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Max, Sum
 from frappe.utils import add_days, getdate, today
+
+OPEN_TASK_STATUSES = ("Open", "Doing", "Waiting")
 
 WEEKS = 12
 
@@ -174,7 +177,8 @@ def set_tick(action_id, week, count, inbox_item=None) -> dict:
 
 
 def _update_tick_summary(action_id):
-	total = frappe.db.sql("select ifnull(sum(`count`), 0) from `tabLife Action Log` where action_id=%s", action_id)[0][0]
+	log = frappe.qb.DocType("Life Action Log")
+	total = frappe.qb.from_(log).select(Sum(log.count)).where(log.action_id == action_id).run()[0][0] or 0
 	frappe.db.set_value("Life Goal Action", action_id, "ticks", str(int(total)), update_modified=False)
 
 
@@ -348,11 +352,24 @@ def month_goals(space, year, month) -> list[dict]:
 		"tasks_done": counts.get(r.name, (0, 0))[0], "tasks_counted": counts.get(r.name, (0, 0))[1]} for r in rows]
 
 
+def last_sort_order(**filters):
+	"""The highest sort_order among the goals matching the filters (a value, or an operator and a value); 0 when there are none."""
+	goal = frappe.qb.DocType("Life Goal")
+	query = frappe.qb.from_(goal).select(Max(goal.sort_order))
+	for field, value in filters.items():
+		query = query.where(goal[field].between(*value[1]) if isinstance(value, tuple) else goal[field] == value)
+	return query.run()[0][0] or 0
+
+
+def move_open_tasks(old, new):
+	"""A carried goal's open tasks follow it to the goal it was carried into."""
+	frappe.db.set_value("Life Task", {"goal": old, "status": ("in", OPEN_TASK_STATUSES)}, "goal", new)
+
+
 def add_month_goal(space, year, month, title, area=None, carried_from=None, serves=None, ignore_permissions=False, done_when=None):
 	"""Add a Month goal dated the last day of the month, at the end of the month's order."""
 	first, last = month_bounds(year, month)
-	top = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s and horizon='Month' and target_date between %s and %s",
-		(space, first, last))[0][0]
+	top = last_sort_order(space=space, horizon="Month", target_date=("between", (first, last)))
 	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": title, "horizon": "Month", "target_date": last, "area": area or None,
 		"sort_order": top + 1, "carried_from": carried_from, "serves": serves or None, "done_when": (done_when or "").strip() or None})
 	doc.insert(ignore_permissions=ignore_permissions)
@@ -369,7 +386,7 @@ def carry_month_goal(goal_name) -> dict:
 	new = add_month_goal(old.space, ny, nm, old.title, old.area, carried_from=old.name, serves=old.serves)
 	old.outcome = "Carried"
 	old.save()
-	frappe.db.sql("update `tabLife Task` set goal=%s where goal=%s and status in ('Open', 'Doing', 'Waiting')", (new.name, old.name))
+	move_open_tasks(old.name, new.name)
 	return {"row": new.name, "year": ny, "month": nm}
 
 

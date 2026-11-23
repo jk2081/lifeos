@@ -111,5 +111,4 @@ def restore(name):
 
 def purge_old():
 	"""Daily: remove Life OS deleted documents older than 30 days for good."""
-	frappe.db.sql("delete from `tabDeleted Document` where deleted_doctype like 'Life %%' and creation < %s",
-		add_days(now_datetime(), -DAYS))
+	frappe.db.delete("Deleted Document", {"deleted_doctype": ("like", "Life %"), "creation": ("<", add_days(now_datetime(), -DAYS))})

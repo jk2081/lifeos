@@ -94,7 +94,7 @@ def lock(review):
 			"star": g.name in stars, "status": doc.status, "waiting_on": doc.waiting_on})
 	week = getdate(review.doc.period_end)
 	# last week's top three are cleared in one statement (only the flag; nothing else about the tasks changes)
-	frappe.db.sql("update `tabLife Task` set is_top_three = 0 where space = %s and is_top_three = 1", review.doc.space)
+	frappe.db.set_value("Life Task", {"space": review.doc.space, "is_top_three": 1}, "is_top_three", 0, update_modified=False)
 	for m in made:
 		if m["star"]:
 			frappe.db.set_value("Life Task", m["task"], {"is_top_three": 1, "top_three_week": week}, update_modified=False)

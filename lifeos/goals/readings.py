@@ -128,8 +128,8 @@ REQUIRED_MESSAGE = "Write what will be true when this goal is done. Stuck? Use S
 def done_when_required():
 	"""The setting "Require Done when on new goals": on unless the owner switched it off (a site that never saved it is on)."""
 	# read the stored value itself: a Check that was never saved reads as 0 from the document, but the setting is on until it is switched off
-	rows = frappe.db.sql("select value from `tabSingles` where doctype = 'Life Settings' and field = 'require_done_when'")
-	return not rows or bool(int(rows[0][0] or 0))
+	value = frappe.db.get_value("Singles", {"doctype": "Life Settings", "field": "require_done_when"}, "value", order_by=None)
+	return value is None or bool(int(value or 0))
 
 
 def require_finish_line(values):

@@ -525,7 +525,7 @@ def lock_month(rv):
 			new = cycles.add_month_goal(space, ny, nm, old.title, g.get("area") or old.area, carried_from=old.name, serves=g.get("serves") or old.serves)
 			old.outcome = "Carried"
 			old.save()
-			frappe.db.sql("update `tabLife Task` set goal=%s where goal=%s and status in ('Open', 'Doing', 'Waiting')", (new.name, old.name))
+			cycles.move_open_tasks(old.name, new.name)
 		else:
 			new = cycles.add_month_goal(space, ny, nm, g["title"], g["area"], serves=g.get("serves"), done_when=g.get("done_when"))
 		made.append({"goal": new.name, "title": new.title, "carried": bool(g["carried_from"])})

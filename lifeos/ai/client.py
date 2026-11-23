@@ -11,6 +11,7 @@
 """
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Sum
 from frappe.utils import flt, now_datetime
 
 # US dollars per million tokens, input and output. Editable in Settings > Admin > AI.
@@ -104,9 +105,11 @@ def feature_caps():
 
 
 def spent(m=None, feature=None):
+	usage = frappe.qb.DocType("Life AI Usage")
+	query = frappe.qb.from_(usage).select(Sum(usage.cost)).where(usage.month == (m or month()))
 	if feature:
-		return flt(frappe.db.sql("select sum(cost) from `tabLife AI Usage` where month=%s and purpose=%s", (m or month(), feature))[0][0])
-	return flt(frappe.db.sql("select sum(cost) from `tabLife AI Usage` where month=%s", m or month())[0][0])
+		query = query.where(usage.purpose == feature)
+	return flt(query.run()[0][0])
 
 
 def spend_status():

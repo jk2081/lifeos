@@ -24,7 +24,7 @@ def _spaces_of(user) -> dict:
 		):
 			if row[1] == "Write" or row[0] not in out:
 				out[row[0]] = row[1]
-		for (name,) in frappe.db.sql("select name from `tabLife Space` where owner_user=%s", user):
+		for name in frappe.get_all("Life Space", filters={"owner_user": user}, pluck="name"):  # system: the permission layer itself
 			out[name] = "Write"
 	return out
 
