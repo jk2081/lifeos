@@ -4,11 +4,15 @@ import builtins
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 
 from lifeos.brain import outbox
 from lifeos import permissions
-from lifeos.api.utils import area_filter, lens_area, names_map, page, std_clause
+from pypika.terms import Criterion, ValueWrapper
+
+from lifeos.api.utils import area_criterion, filter_criteria, lens_area, names_map, page
 
 TABS = ("Done", "Delegated", "Parked", "Discarded", "all", "in")
 LABEL = {"Life Task": "Task", "Life Goal": "Goal", "Life Inbox Item": "Capture"}
@@ -21,47 +25,42 @@ def _person():
 
 
 def _out_where(space, area, start, end, pile=None, filters=None):
-	values = {"space": space, "start": start, "end": end}
-	where = "e.space = %(space)s and e.reversed = 0 and e.exited_on >= %(start)s and e.exited_on < %(end)s"
-	if filters:
-		extra, values = std_clause("Life Exit", filters, "e", values)
-		where += extra
+	"""The criteria of the exits of a period: a list over `frappe.qb.DocType("Life Exit")`."""
+	e = frappe.qb.DocType("Life Exit")
+	where = [e.space == space, e.reversed == 0, e.exited_on >= start, e.exited_on < end, *filter_criteria("Life Exit", filters, e)]
 	if pile and pile != "all":
-		where += " and e.pile = %(pile)s"
-		values["pile"] = pile
+		where.append(e.pile == pile)
 	if area:
-		where += " and " + area_filter(space, area, "e.area", values)
-	return where, values
+		where.append(area_criterion(space, area, e))
+	return where
 
 
-# what came in: captures received, and tasks and goals created directly (not from a capture, not carried
-# from an earlier task or goal)
-IN_PARTS = {
-	"Life Inbox Item": "select 'Life Inbox Item' as doctype, x.name, x.title, x.area, x.creation as came_on, x.is_sensitive from `tabLife Inbox Item` x where {w}",
-	"Life Task": """select 'Life Task', x.name, x.title, x.area, x.creation, 0 from `tabLife Task` x where {w} and ifnull(x.inbox_item, '') = ''
-		and ifnull(x.carried_from, '') = ''""",
-	"Life Goal": """select 'Life Goal', x.name, x.title, x.area, x.creation, 0 from `tabLife Goal` x where {w} and ifnull(x.carried_from, '') = ''""",
-}
-
-
-def _in_sql(space, area, start, end):
-	values = {"space": space, "start": start, "end": end}
-	w = "x.space = %(space)s and x.creation >= %(start)s and x.creation < %(end)s"
-	if area:
-		w += " and " + area_filter(space, area, "x.area", values)
-	return " union all ".join(f"({q.format(w=w)})" for q in IN_PARTS.values()), values
+def _in_query(space, area, start, end):
+	"""What came in: captures received, and tasks and goals created directly (not from a capture, not carried from an earlier task or
+	goal), as one query of (doctype, name, title, area, came_on, is_sensitive)."""
+	parts = []
+	for dt in ("Life Inbox Item", "Life Task", "Life Goal"):
+		x = frappe.qb.DocType(dt)
+		where = (x.space == space) & (x.creation >= start) & (x.creation < end)
+		if area:
+			where = where & area_criterion(space, area, x)
+		sensitive = x.is_sensitive if dt == "Life Inbox Item" else ValueWrapper(0)
+		if dt == "Life Task":
+			where = where & (fn.IfNull(x.inbox_item, "") == "") & (fn.IfNull(x.carried_from, "") == "")
+		elif dt == "Life Goal":
+			where = where & (fn.IfNull(x.carried_from, "") == "")
+		parts.append(frappe.qb.from_(x).select(ValueWrapper(dt).as_("doctype"), x.name, x.title, x.area, x.creation.as_("came_on"), sensitive.as_("is_sensitive")).where(where))  # system: the Outbox counts the owner's own space
+	return parts[0].union_all(parts[1]).union_all(parts[2])
 
 
 def in_count(space, area, start, end):
-	sql, values = _in_sql(space, area, start, end)
-	# nosemgrep: frappe-sql-format-injection -- the parts are constant SQL; the area condition comes from area_filter; values are parameters
-	return frappe.db.sql(f"select count(*) from ({sql}) t", values)[0][0]
+	return frappe.qb.from_(_in_query(space, area, start, end).as_("t")).select(fn.Count("*")).run()[0][0]  # system: wrapped query over the owner's own space
 
 
 def out_counts(space, area, start, end, filters=None):
-	where, values = _out_where(space, area, start, end, filters=filters)
-	# nosemgrep: frappe-sql-format-injection -- WHERE from _out_where (constant SQL and area_filter); values are parameters
-	rows = dict(frappe.db.sql(f"select e.pile, count(*) from `tabLife Exit` e where {where} group by e.pile", values))
+	e = frappe.qb.DocType("Life Exit")
+	rows = frappe.qb.from_(e).select(e.pile, fn.Count("*")).where(Criterion.all(_out_where(space, area, start, end, filters=filters))).groupby(e.pile).run()  # system: the Outbox is the owner's own
+	rows = dict(rows)
 	out = {p: int(rows.get(p, 0)) for p in outbox.PILES}
 	out["all"] = sum(out.values())
 	return out
@@ -85,11 +84,10 @@ def list(space: str | None = None, pile: str | None = "Done", period: str | None
 	if pile == "in":
 		rows, total = _in_rows(space, area, start_dt, end_dt, start, page_length), tabs["in"]
 	else:
-		where, values = _out_where(space, area, start_dt, end_dt, pile, filters)
-		# nosemgrep: frappe-sql-format-injection -- WHERE from _out_where (constant SQL and area_filter); values are parameters
-		rows = frappe.db.sql(f"""select e.name, e.record_doctype as doctype, e.record_name as record, e.title, e.kind, e.pile, e.exited_on as `on`,
-			e.exited_by as `by`, e.area, e.note from `tabLife Exit` e where {where} order by e.exited_on desc, e.creation desc
-			limit %(s)s, %(n)s""", {**values, "s": start, "n": page_length}, as_dict=True)
+		e = frappe.qb.DocType("Life Exit")
+		rows = (frappe.qb.from_(e).select(e.name, e.record_doctype.as_("doctype"), e.record_name.as_("record"), e.title, e.kind, e.pile, e.exited_on.as_("on"),
+			e.exited_by.as_("by"), e.area, e.note).where(Criterion.all(_out_where(space, area, start_dt, end_dt, pile, filters)))  # system: the Outbox is the owner's own
+			.orderby(e.exited_on, order=Order.desc).orderby(e.creation, order=Order.desc).limit(page_length).offset(start).run(as_dict=True))
 		total = tabs[pile]
 		_decorate(rows)
 	areas = names_map("Life Area", [r["area"] for r in rows], "area_name")
@@ -101,9 +99,8 @@ def list(space: str | None = None, pile: str | None = "Done", period: str | None
 
 
 def _in_rows(space, area, start_dt, end_dt, start, page_length):
-	sql, values = _in_sql(space, area, start_dt, end_dt)
-	# nosemgrep: frappe-sql-format-injection -- the parts are constant SQL; the area condition comes from area_filter; values are parameters
-	rows = frappe.db.sql(f"select * from ({sql}) t order by came_on desc limit %(s)s, %(n)s", {**values, "s": start, "n": page_length}, as_dict=True)
+	t = _in_query(space, area, start_dt, end_dt).as_("t")
+	rows = frappe.qb.from_(t).select(t.star).orderby(t.came_on, order=Order.desc).limit(page_length).offset(start).run(as_dict=True)  # system: wrapped query over the owner's own space
 	return [{"name": f"in:{r.doctype}:{r.name}", "doctype": r.doctype, "record": r.name, "title": r.title, "kind": LABEL[r.doctype], "pile": "In",
 		"on": r.came_on, "area": r.area, "sensitive": bool(r.is_sensitive), "exists": True, "can_bring_back": False} for r in rows]
 
