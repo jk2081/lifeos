@@ -1,6 +1,8 @@
 """The Settings screen: spaces and members, areas, habits, review time, archive days."""
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 
 from lifeos import permissions
 from lifeos.goals import readings
@@ -35,16 +37,18 @@ def _counts(kind, space, names):
 		return {}
 	if kind == "area":
 		out = {}
-		from lifeos.library.index import also_in_sql
+		from lifeos.api.timeline import index_where
+		from lifeos.api.utils import area_criterion, count_where
 
+		x = frappe.qb.DocType("Life Index")
 		for n in names:  # as the Timeline counts an area: filed there or also filed there
-			# nosemgrep: frappe-sql-format-injection -- also_in_sql and vault_guard return fixed fragments; space and area are parameters
-			out[n] = frappe.db.sql(f"""select count(*) from `tabLife Index` where space=%(space)s and is_archived=0
-				and (area=%(area)s or {also_in_sql('area')}){permissions.vault_guard(space)}""", {"space": space, "area": n})[0][0]
+			out[n] = count_where("Life Index", index_where(space, [x.is_archived == 0, (x.area == n) | area_criterion(space, n, x, also_in="index")]))
 		return out
 	if kind == "habit":
-		return dict(frappe.db.sql("""select habit, count(*) from `tabLife Habit Log`
-			where habit in %s and done = 1 group by habit""", (names,)))
+		from lifeos.api.utils import count_by
+
+		log = frappe.qb.DocType("Life Habit Log")
+		return count_by("Life Habit Log", "habit", [log.habit.isin(names), log.done == 1])
 	return {}
 
 
@@ -243,9 +247,18 @@ def ai_settings():
 
 	s = frappe.get_cached_doc("Life Settings")
 	month = client.month()
-	by_purpose = frappe.db.sql("select purpose, sum(cost), sum(input_tokens), sum(output_tokens) from `tabLife AI Usage` where month=%s group by purpose", month)
-	by_user = frappe.db.sql("select user, sum(cost) from `tabLife AI Usage` where month=%s group by user", month)
-	by_day = frappe.db.sql("select date(creation), sum(cost), count(*) from `tabLife AI Usage` where month=%s group by date(creation) order by date(creation) desc", month)
+	u = frappe.qb.DocType("Life AI Usage")
+	day = fn.Date(u.creation)
+
+	def usage(fields, group, *order):
+		query = frappe.qb.get_query("Life AI Usage", fields=fields, ignore_permissions=False).where(u.month == month).groupby(group)
+		for term in order:
+			query = query.orderby(term, order=Order.desc)
+		return query.run()
+
+	by_purpose = usage([u.purpose, fn.Sum(u.cost), fn.Sum(u.input_tokens), fn.Sum(u.output_tokens)], u.purpose)
+	by_user = usage([u.user, fn.Sum(u.cost)], u.user)
+	by_day = usage([day, fn.Sum(u.cost), fn.Count("*")], day, day)
 	calls = frappe.get_list("Life AI Usage", fields=["creation", "purpose", "model", "input_tokens", "output_tokens", "cached_tokens", "cost", "user",
 		"reference_doctype", "reference_name"], order_by="creation desc, name desc", limit=50)
 	caps = client.feature_caps()

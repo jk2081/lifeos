@@ -4,11 +4,12 @@ from datetime import date
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
 from frappe.utils import add_days, getdate, today
 
 from lifeos.review import insights as rules
 from lifeos import permissions
-from lifeos.api.utils import names_map, page, parse
+from lifeos.api.utils import count_by, count_where, list_query, names_map, page, parse
 
 STATUSES = ("New", "Snoozed", "Acted", "Dismissed")
 
@@ -23,8 +24,8 @@ def _out(rows):
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	ev = {}
 	if rows:
-		for p, dt, n, label in frappe.db.sql("""select parent, ref_doctype, ref_name, label from `tabLife Insight Evidence`
-			where parent in %s order by idx""", ([r.name for r in rows],)):
+		for p, dt, n, label in frappe.get_list("Life Insight Evidence", filters={"parent": ("in", [r.name for r in rows])}, fields=["parent", "ref_doctype", "ref_name", "label"],
+				order_by="idx", parent_doctype="Life Insight", limit=0, as_list=True):
 			ev.setdefault(p, []).append({"doctype": dt, "name": n, "label": label})
 	from lifeos.web.pane_refs import ref_of
 
@@ -64,32 +65,23 @@ def list(space: str | None = None, status: str | None = "New", kind: str | None 
 	_person()
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = ["space=%(space)s"], {"space": space}
+	i = frappe.qb.DocType("Life Insight")
+	where = [i.space == space]
 	if kind:
-		where.append("kind=%(kind)s")
-		values["kind"] = kind
+		where.append(i.kind == kind)
 	if area:
-		where.append("area=%(area)s")
-		values["area"] = area
+		where.append(i.area == area)
 	if actionable not in (None, ""):
-		where.append(("" if int(actionable) else "not ") + "kind in %(act)s")
-		values["act"] = rules.ACTIONABLE
-	base = " and ".join(where)
+		where.append(i.kind.isin(rules.ACTIONABLE) if int(actionable) else i.kind.notin(rules.ACTIONABLE))
 	tabs = {s: 0 for s in STATUSES}
-	# nosemgrep: frappe-sql-format-injection -- WHERE is joined from fixed fragments; every value is a parameter
-	for s, n in frappe.db.sql(f"select status, count(*) from `tabLife Insight` where {base} group by status", values):
-		tabs[s] = n
+	tabs.update(count_by("Life Insight", "status", where))
 	tabs["all"] = sum(tabs.values())
+	kinds = list_query("Life Insight", ["kind"], where).distinct().run(pluck=True)
 	if status and status != "all":
-		where.append("status=%(status)s")
-		values["status"] = status
-	clause = " and ".join(where)
-	# nosemgrep: frappe-sql-format-injection -- WHERE is joined from fixed fragments; every value is a parameter
-	rows = frappe.db.sql(f"""select name, kind, title, body, status, snooze_until, source, area, found_on, actions, dismiss_reason, acted_note, creation
-		from `tabLife Insight` where {clause} order by rank asc, creation desc limit %(start)s, %(len)s""", {**values, "start": start, "len": page_length}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- WHERE is joined from fixed fragments; every value is a parameter
-	total = frappe.db.sql(f"select count(*) from `tabLife Insight` where {clause}", values)[0][0]
-	kinds = frappe.db.sql_list(f"select distinct kind from `tabLife Insight` where {base}", values)
+		where.append(i.status == status)
+	fields = ["name", "kind", "title", "body", "status", "snooze_until", "source", "area", "found_on", "actions", "dismiss_reason", "acted_note", "creation"]
+	rows = list_query("Life Insight", fields, where, [(i.rank, Order.asc), (i.creation, Order.desc)]).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Insight", where)
 	return {"rows": _out(rows), "total": total, "tabs": tabs, "kinds": kinds,
 		"run_on": _run_on()}
 
