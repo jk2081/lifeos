@@ -8,38 +8,60 @@ from frappe import _
 
 from lifeos.library import links
 from lifeos import permissions
-from lifeos.api.utils import flag
-from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
-from lifeos.api.utils import order_by as sort_order
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
+
+from lifeos.api.timeline import index_where
+from lifeos.api.utils import (area_criterion, count_by, count_tabs, count_where, filter_criteria, flag, group_summary, list_query, names_map, order_terms,
+	page, parse, sort_terms)
 
 SOURCE_DOCTYPES = ("Life Inbox Item", "Life Chat Log")
 # Library > Captures (UX fixes, set 6): every source, with Vault documents (kind Document, always sensitive); Library > All adds the notes
 CAPTURE_DOCTYPES = ("Life Inbox Item", "Life Chat Log", "Life Vault Document")
-BASE = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document') "
-	"and x.kind in ('Inbox', 'Chat', 'Document')")
-BASE_ALL = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Note') "
-	"and x.kind in ('Inbox', 'Chat', 'Document', 'Note')")
+SOURCE_KINDS = ("Inbox", "Chat", "Document")
+CAPTURE_REFS = ("Life Inbox Item", "Life Chat Log", "Life Vault Document")
+
+
+def base_criteria(x, scope="captures"):
+	"""The index rows that are sources: every capture, with Vault documents; scope "all" adds the notes."""
+	if scope == "all":
+		return [x.ref_doctype.isin([*CAPTURE_REFS, "Life Note"]), x.kind.isin([*SOURCE_KINDS, "Note"])]
+	return [x.ref_doctype.isin(CAPTURE_REFS), x.kind.isin(SOURCE_KINDS)]
+
+
 # the kind tabs of Captures and All, each a condition on the index row
-TABS = {
-	"all": None,
-	"notes": "x.ref_doctype = 'Life Note'",
-	"chats": "x.ref_doctype = 'Life Chat Log'",
-	"voice": "x.media_kind = 'Voice'",
-	"documents": "(x.media_kind = 'Document' or x.ref_doctype = 'Life Vault Document')",
-	"photos": "x.media_kind = 'Photo'",
-	"articles": "x.media_kind = 'Article'",
-	"email": "x.media_kind in ('Email', 'Email Digest')",
-	"text": "x.media_kind = 'Text'",
-}
+TAB_NAMES = ("all", "notes", "chats", "voice", "documents", "photos", "articles", "email", "text")
+
+
+def tab_criteria(x):
+	return {
+		"all": None,
+		"notes": x.ref_doctype == "Life Note",
+		"chats": x.ref_doctype == "Life Chat Log",
+		"voice": x.media_kind == "Voice",
+		"documents": (x.media_kind == "Document") | (x.ref_doctype == "Life Vault Document"),
+		"photos": x.media_kind == "Photo",
+		"articles": x.media_kind == "Article",
+		"email": x.media_kind.isin(["Email", "Email Digest"]),
+		"text": x.media_kind == "Text",
+	}
+
+
 # where a source is: In Inbox (not finished), Done (finished; every chat log), Failed
-STATUSES = {
-	"inbox": "x.ref_doctype = 'Life Inbox Item' and x.status in ('New', 'Processing', 'To Review')",
-	"done": "(x.ref_doctype != 'Life Inbox Item' or x.status = 'Done')",
-	"failed": "x.status = 'Failed'",
-}
-SORTS = {"record_date": "x.record_date", "title": "x.title", "modified": "x.modified"}
-FIELDS = """x.ref_doctype, x.ref_name, x.title, x.record_date, x.area, x.goal, x.status, x.media_kind, x.source_system, x.intent,
-	x.assistant, x.thumbnail, x.is_archived, x.vault_locked, x.modified, x.collection, x.record_owner"""
+STATUS_NAMES = ("inbox", "done", "failed")
+
+
+def status_criteria(x):
+	return {
+		"inbox": (x.ref_doctype == "Life Inbox Item") & x.status.isin(["New", "Processing", "To Review"]),
+		"done": (x.ref_doctype != "Life Inbox Item") | (x.status == "Done"),
+		"failed": x.status == "Failed",
+	}
+
+
+SORTS = {k: (lambda x, k=k: [x[k]]) for k in ("record_date", "title", "modified")}
+FIELDS = ["ref_doctype", "ref_name", "title", "record_date", "area", "goal", "status", "media_kind", "source_system", "intent",
+	"assistant", "thumbnail", "is_archived", "vault_locked", "modified", "collection", "record_owner"]
 
 
 def status_label(doctype, status):
@@ -55,17 +77,18 @@ def made_counts(rows):
 	items = [r.ref_name for r in rows if r.ref_doctype == "Life Inbox Item"]
 	chats = [r.ref_name for r in rows if r.ref_doctype == "Life Chat Log"]
 	if items:
-		for item, n in frappe.db.sql("""select inbox_item, count(*) from `tabLife Proposal` where inbox_item in %s and status = 'Accepted'
-				and ifnull(created_name, '') != '' group by inbox_item""", (items,)):
-			out[("Life Inbox Item", item)] = n
+		p = frappe.qb.DocType("Life Proposal")
+		made = count_by("Life Proposal", "inbox_item", [p.inbox_item.isin(items), p.status == "Accepted", fn.IfNull(p.created_name, "") != ""])
+		out.update({("Life Inbox Item", item): n for item, n in made.items()})
 	if chats:
-		for chat, n in frappe.db.sql("""select parent, count(*) from `tabLife Chat Open Item` where parenttype = 'Life Chat Log' and parent in %s
-				and ifnull(task, '') != '' group by parent""", (chats,)):
-			out[("Life Chat Log", chat)] = n
+		o = frappe.qb.DocType("Life Chat Open Item")
+		made = count_by("Life Chat Open Item", "parent", [o.parenttype == "Life Chat Log", o.parent.isin(chats), fn.IfNull(o.task, "") != ""])
+		out.update({("Life Chat Log", chat): n for chat, n in made.items()})
 	names = items + chats
 	if names:
-		for dt, name, n in frappe.db.sql("""select s.source_doctype, s.source_name, count(distinct s.parent) from `tabLife Note Source` s
-				where s.parenttype = 'Life Note' and s.source_name in %s group by s.source_doctype, s.source_name""", (names,)):
+		s = frappe.qb.DocType("Life Note Source")
+		rows = frappe.qb.from_(s).select(s.source_doctype, s.source_name, fn.Count(s.parent).distinct())  # a child table: the sources were read
+		for dt, name, n in rows.where((s.parenttype == "Life Note") & s.source_name.isin(names)).groupby(s.source_doctype, s.source_name).run():
 			out[(dt, name)] = out.get((dt, name), 0) + n
 	return out
 
@@ -76,45 +99,38 @@ def agent_users():
 
 def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, status=None, intent=None, system=None, assistant=None,
 		include_archived=0, open_items=0, scope="captures", sensitive=0, by=None):
-	where, values = ["x.space = %(space)s", BASE_ALL if scope == "all" else BASE], {"space": space}
+	x = frappe.qb.DocType("Life Index")
+	where = base_criteria(x, scope)
 	if flag(sensitive):
-		where.append("x.vault_locked = 1")
+		where.append(x.vault_locked == 1)
 	if by == "me":  # written by me: not by an agent, and not one of the assistant's notes
-		where.append("x.record_owner not in %(agents)s and ifnull(x.collection, '') != 'Wiki'")
-		values["agents"] = agent_users()
+		where.append(x.record_owner.notin(agent_users()) & (fn.IfNull(x.collection, "") != "Wiki"))
 	elif by == "assistant":
-		where.append("(x.record_owner in %(agents)s or x.collection = 'Wiki')")
-		values["agents"] = agent_users()
+		where.append(x.record_owner.isin(agent_users()) | (x.collection == "Wiki"))
 	if int(open_items or 0):
-		where.append("x.ref_doctype = 'Life Chat Log' and x.status = 'Open'")
+		where.append((x.ref_doctype == "Life Chat Log") & (x.status == "Open"))
 	if not int(include_archived or 0):
-		where.append("x.is_archived = 0")
+		where.append(x.is_archived == 0)
 	if area:
-		where.append(area_filter(space, area, "x.area", values, also_in="index"))
+		where.append(area_criterion(space, area, x, also_in="index"))
 	if goal:
-		where.append("x.goal = %(goal)s")
-		values["goal"] = "" if goal == "none" else goal
+		where.append(x.goal == ("" if goal == "none" else goal))
 	if from_date:
-		where.append("x.record_date >= %(from_date)s")
-		values["from_date"] = frappe.utils.getdate(from_date)
+		where.append(x.record_date >= frappe.utils.getdate(from_date))
 	if to_date:
-		where.append("x.record_date <= %(to_date)s")
-		values["to_date"] = frappe.utils.getdate(to_date)
+		where.append(x.record_date <= frappe.utils.getdate(to_date))
 	if status:
 		status = str(status).strip().lower().replace("in inbox", "inbox")
-		if status not in STATUSES:
-			frappe.throw(_("status must be one of: {0}.").format(", ".join(STATUSES)), title=_("Unknown source status"))
-		where.append(f"({STATUSES[status]})")
+		if status not in STATUS_NAMES:
+			frappe.throw(_("status must be one of: {0}.").format(", ".join(STATUS_NAMES)), title=_("Unknown source status"))
+		where.append(status_criteria(x)[status])
 	if intent:
-		where.append("x.intent = %(intent)s")
-		values["intent"] = intent
+		where.append(x.intent == intent)
 	if system:
-		where.append("x.source_system = %(system)s")
-		values["system"] = system.lower()
+		where.append(x.source_system == system.lower())
 	if assistant:
-		where.append("x.assistant = %(assistant)s")
-		values["assistant"] = assistant
-	return where, values
+		where.append(x.assistant == assistant)
+	return where
 
 
 @frappe.whitelist(methods=["GET"])
@@ -136,40 +152,35 @@ def list(space: str | None = None, tab: str | None = None, area: str | None = No
 	start, page_length = page(start, page_length)
 	tab = tab or "all"
 	scope = "all" if scope == "all" else "captures"
-	if tab not in TABS:
-		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)), title=_("Unknown source tab"))
+	if tab not in TAB_NAMES:
+		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TAB_NAMES)), title=_("Unknown source tab"))
 	if by not in (None, "", "me", "assistant"):
 		frappe.throw(_("by must be me or assistant."), title=_("Unknown actor filter"))
-	where, values = _where(space, tab, area, goal, from_date, to_date, status, intent, system, assistant, include_archived, open_items, scope,
-		sensitive, by)
-	where.append("1=1" + permissions.vault_guard(space, "x."))
-	conds, values = std_filters("Life Index", filters, "x", values)
-	tabs = tab_counts(f"from `tabLife Index` x where {' and '.join(where + conds)}", values, TABS)
+	x = frappe.qb.DocType("Life Index")
+	where = _where(space, tab, area, goal, from_date, to_date, status, intent, system, assistant, include_archived, open_items, scope, sensitive, by)
+	where += filter_criteria("Life Index", filters, x)
+	tabs = count_tabs("Life Index", index_where(space, where), tab_criteria(x))
 	if scope != "all":
 		tabs.pop("notes", None)
-	if TABS[tab]:
-		where.append(TABS[tab])
-	clause = " and ".join(where + conds)
+	if tab_criteria(x)[tab] is not None:
+		where.append(tab_criteria(x)[tab])
+	where = index_where(space, where)
 	if summary:
-		return {"summary": summarise("Life Index", f"from `tabLife Index` x where {clause}", values, "x", summary, start, page_length), "tabs": tabs}
-	order = std_order("Life Index", order_by, "x", SORTS) or sort_order(sort, dir, SORTS, "x.record_date desc")
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters (TABS and STATUSES are fixed maps)
-	rows = frappe.db.sql(f"select {FIELDS} from `tabLife Index` x where {clause} order by {order}, x.modified desc limit %(start)s, %(len)s",
-		{**values, "start": start, "len": page_length}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {clause}", values)[0][0]
+		return {"summary": group_summary("Life Index", where, summary, start, page_length), "tabs": tabs}
+	terms = order_terms("Life Index", order_by, x, SORTS) or sort_terms(sort, dir, SORTS, x, [(x.record_date, Order.desc)])
+	rows = list_query("Life Index", FIELDS, where, [*terms, (x.modified, Order.desc)]).limit(page_length).offset(start).run(as_dict=True)
+	total = count_where("Life Index", where)
 	out = {"space": space, "tab": tab, "sources": decorate(rows), "total": total, "tabs": tabs, "start": start, "page_length": page_length}
 	if tab == "chats":  # the Chats tab's door: how many of these chats still have an open item
-		# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
-		out["with_open_items"] = frappe.db.sql(f"select count(*) from `tabLife Index` x where {clause} and x.status = 'Open'", values)[0][0]
+		out["with_open_items"] = count_where("Life Index", [*where, x.status == "Open"])
 	return out
 
 
 def decorate(rows):
 	made = made_counts(rows)
 	chats = [r.ref_name for r in rows if r.ref_doctype == "Life Chat Log"]
-	open_items = dict(frappe.db.sql("""select parent, count(*) from `tabLife Chat Open Item` where parenttype = 'Life Chat Log' and parent in %s
-		and status = 'Open' group by parent""", (chats,))) if chats else {}
+	o = frappe.qb.DocType("Life Chat Open Item")
+	open_items = count_by("Life Chat Open Item", "parent", [o.parenttype == "Life Chat Log", o.parent.isin(chats), o.status == "Open"]) if chats else {}
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows], "title")
 	vault = _vault_fields([r.ref_name for r in rows if r.ref_doctype == "Life Vault Document"])
@@ -235,10 +246,15 @@ def made_from(doctype: str, name: str):
 			if i.task and frappe.db.exists("Life Task", i.task):
 				out.append({"kind": "Task", "doctype": "Life Task", "name": i.task, "title": links.title_of("Life Task", i.task),
 					"route": links.route_of("Life Task", i.task)})
-	guard = permissions.sensitive_guard(doc.space, "n.")
-	# nosemgrep: frappe-sql-format-injection -- sensitive_guard is a constant fragment; values are parameters
-	for n in frappe.db.sql(f"""select distinct n.name, n.title, n.collection from `tabLife Note Source` s join `tabLife Note` n on n.name = s.parent
-			where s.parenttype = 'Life Note' and s.source_doctype = %s and s.source_name = %s{guard} order by n.title""", (doctype, doc.name), as_dict=True):
+	n, ns = frappe.qb.DocType("Life Note"), frappe.qb.DocType("Life Note Source")
+	where = [ns.parenttype == "Life Note", ns.source_doctype == doctype, ns.source_name == doc.name]
+	guard = permissions.sensitive_criterion(doc.space, n)
+	if guard is not None:
+		where.append(guard)
+	notes = frappe.qb.get_query("Life Note", fields=[n.name, n.title, n.collection], ignore_permissions=False).join(ns).on(ns.parent == n.name)  # the pages the user may read
+	for crit in where:
+		notes = notes.where(crit)
+	for n in notes.distinct().orderby(n.title).run(as_dict=True):
 		out.append({"kind": "Wiki page" if n.collection == "Wiki" else "Note", "doctype": "Life Note", "name": n.name, "title": n.title,
 			"route": links.route_of("Life Note", n.name)})
 	return out

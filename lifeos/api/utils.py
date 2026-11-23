@@ -460,9 +460,13 @@ def count_where(doctype, where=()):
 
 
 def count_by(doctype, field, where=()):
-	"""{value of `field`: rows} over the DocType's rows the user may read that meet the criteria."""
+	"""{value of `field`: rows} over the DocType's rows the user may read that meet the criteria. A child table has no permissions of its
+	own: it is counted for parents the caller has already read."""
 	table = frappe.qb.DocType(doctype)
-	query = frappe.qb.get_query(doctype, fields=[table[field], fn.Count("*")], ignore_permissions=False)
+	if frappe.get_meta(doctype).istable:
+		query = frappe.qb.from_(table).select(table[field], fn.Count("*"))
+	else:
+		query = frappe.qb.get_query(doctype, fields=[table[field], fn.Count("*")], ignore_permissions=False)
 	for crit in where:
 		query = query.where(crit)
 	return dict(query.groupby(table[field]).run())
