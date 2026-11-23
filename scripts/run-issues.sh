@@ -20,6 +20,7 @@
 #   BATCH_SIZE=3        issues per pull request (1: one pull request per issue, as before)
 #   AUTO_MERGE=1        merge each pull request when CI passes (0: leave it for you; the next batch waits for your merge)
 #   MAX_ROUNDS=5        rounds per issue before it is marked blocked
+#   QUIET_LIMIT=1200    seconds a round may go with no file or commit changing (a long test run) before it is stopped
 #   WAIT_FOR_MORE=0     1: when nothing is ready, check again every 15 minutes instead of stopping
 #   PERMISSION_MODE=auto
 #
@@ -37,7 +38,9 @@ fi
 cd "$RUN_ISSUES_ROOT"
 REPO="${REPO:-jk2081/lifeos}"
 MODEL="${MODEL:-opus}"; AUTO_MERGE="${AUTO_MERGE:-1}"; MAX_ROUNDS="${MAX_ROUNDS:-5}"; BATCH_SIZE="${BATCH_SIZE:-3}"
-WAIT_FOR_MORE="${WAIT_FOR_MORE:-0}"; PERMISSION_MODE="${PERMISSION_MODE:-auto}"
+WAIT_FOR_MORE="${WAIT_FOR_MORE:-0}"; PERMISSION_MODE="${PERMISSION_MODE:-auto}"; QUIET_LIMIT="${QUIET_LIMIT:-1200}"
+# tools/acceptance.mjs refuses the whole walk when this is set: GitHub runs it on every pull request
+export LIFEOS_RUNNER=1
 LOG_DIR="build-logs"; mkdir -p "$LOG_DIR"
 STATE=".git/run-issues.state"
 
@@ -131,6 +134,30 @@ progress() {
   done
 }
 
+# The acceptance checks that failed in .issue/ci-failure.log, comma-separated, for `--only=`.
+failed_checks() {
+  grep -oE 'FAIL +[A-Za-z0-9.]+' .issue/ci-failure.log 2>/dev/null | awk '{print $2}' | sed 's/\.$//' | sort -u | paste -sd, -
+}
+
+# Stops a round whose files and commits have not changed for QUIET_LIMIT seconds (default 20 minutes): almost always a
+# long test run. The work so far is committed and pushed, and GitHub tests it.
+quiet_watch() {
+  local pid="$1" last now quiet_since
+  last=$( { git rev-parse HEAD; git status --porcelain; git diff; } 2>/dev/null | cksum)
+  quiet_since=$(date +%s)
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 60
+    now=$( { git rev-parse HEAD; git status --porcelain; git diff; } 2>/dev/null | cksum)
+    if [ "$now" != "$last" ]; then last="$now"; quiet_since=$(date +%s); continue; fi
+    if [ $(( $(date +%s) - quiet_since )) -ge "$QUIET_LIMIT" ]; then
+      touch .issue/quiet
+      say "No file has changed for $((QUIET_LIMIT / 60)) minutes. Stopping this round so GitHub can test the work."
+      pkill -TERM -P "$pid" 2>/dev/null; kill -TERM "$pid" 2>/dev/null
+      return
+    fi
+  done
+}
+
 issue_prompt() {
   local n="$1" title="$2" branch="$3" round="$4"
   cat <<EOF
@@ -142,6 +169,10 @@ Follow docs/ISSUE_RULES.md exactly, except that the runner, not you, opens the p
 EOF
   [ "$round" -gt 1 ] && echo "
 This is round $round on this issue. Earlier rounds already did part of the work: read the commits starting \"#$n:\" and continue from there."
+  [ -f .issue/quiet ] && echo "
+The last round was stopped after $((QUIET_LIMIT / 60)) minutes with no change to any file, usually a long test run. Do not run long test runs again: run only the checks of what you changed, commit, and finish."
+  echo "
+Tests: run only the checks of the places you changed (node tools/acceptance.mjs --only=<PLACE> or --only=<PLACE>.<k>) and the unit modules you touched; the full unit suite once before you finish. Never run the whole acceptance walk: GitHub runs it on the pull request, and it refuses to start here."
   echo "
 When the issue is finished or you cannot go further, write .issue/result (and .issue/pr.md or .issue/blocked.md) as docs/ISSUE_RULES.md says, then stop. .issue/pr.md is this issue's part of the batch's pull request text.
 Do not stop, restart, remove or change any Docker container, image, volume or network whose name does not start with lifeos-."
@@ -153,7 +184,7 @@ fix_prompt() {
 Nobody is watching this run. Do not ask questions and do not wait for input.
 
 Pull request #$pr in $REPO, on the branch $branch, holds the work for issues $(hashes "$issues"). Its GitHub Actions run failed.
-Read .issue/ci-failure.log, find the cause, fix it on this branch with commits starting "CI fix:", and check the fix locally (the failing tests, then the unit suite). Follow docs/ISSUE_RULES.md. Start the local stack as STATUS.md describes first.
+Read .issue/ci-failure.log, find the cause, fix it on this branch with commits starting "CI fix:", and check the fix locally by rerunning only what failed: the failed acceptance checks with node tools/acceptance.mjs --only=$(failed_checks) and only the unit modules that failed. Do not run the full unit suite or the whole acceptance walk: GitHub runs them again on the pull request as soon as you finish. Follow docs/ISSUE_RULES.md. Start the local stack as STATUS.md describes first.
 When the fix is in, write the single word done to .issue/result. If you cannot fix it, write blocked to .issue/result and the reason to .issue/blocked.md. Then stop.
 Do not stop, restart, remove or change any Docker container, image, volume or network whose name does not start with lifeos-.
 EOF
@@ -162,13 +193,18 @@ EOF
 # Run Claude in rounds until .issue/result exists. Waits out usage limits. Returns 0 on done, 1 on blocked or too many rounds.
 run_rounds() {
   local what="$1" branch="$2" prompt_fn="$3"; shift 3
-  local round=1 started elapsed log short=0 result
+  local round=1 started elapsed log short=0 result prompt head0
+  head0=$(git rev-parse HEAD)
   while [ "$round" -le "$MAX_ROUNDS" ]; do
     log="$LOG_DIR/$(echo "$what" | tr -cs 'A-Za-z0-9' '-')round-$round.log"
     say "$what, round $round"
     started=$(date +%s)
+    prompt=$("$prompt_fn" "$@" "$round"); rm -f .issue/quiet
     progress "$what" "$round" "$branch" "$started" & local PROGRESS=$!
-    claude -p "$("$prompt_fn" "$@" "$round")" --model "$MODEL" --permission-mode "$PERMISSION_MODE" --verbose > "$log" 2>&1
+    claude -p "$prompt" --model "$MODEL" --permission-mode "$PERMISSION_MODE" --verbose > "$log" 2>&1 & local CLAUDE_PID=$!
+    quiet_watch "$CLAUDE_PID" & local QUIET=$!
+    wait "$CLAUDE_PID"
+    kill "$QUIET" 2>/dev/null
     pkill -P "$PROGRESS" 2>/dev/null; kill "$PROGRESS" 2>/dev/null
     elapsed=$(( $(date +%s) - started ))
     say "Round $round ended after $((elapsed / 60)) minutes."
@@ -183,6 +219,10 @@ run_rounds() {
       sleep 1800; continue
     fi
     short=0
+    # a CI fix stopped while it reran tests: if it committed something, let GitHub be the judge
+    if [ -f .issue/quiet ] && [ ! -f .issue/result ] && [ "${what#CI fix}" != "$what" ] && [ "$(git rev-parse HEAD)" != "$head0" ]; then
+      echo done > .issue/result
+    fi
     result=$(tr -d '[:space:]' < .issue/result 2>/dev/null || true)
     [ "$result" = done ] && return 0
     [ "$result" = blocked ] && return 1

@@ -116,6 +116,12 @@ if (process.argv.includes('--owner-read-only')) process.exit(await ownerReadOnly
 // records of another, so it passes alone, in a full run and in CI alike.
 const { PLACES } = await import('./acceptance/places.mjs')
 if (!process.argv.some((a) => a.startsWith('--part=') || a.startsWith('--only='))) {
+  // scripts/run-issues.sh sets LIFEOS_RUNNER: GitHub Actions runs the full walk on every pull request, so a run on the Mac
+  // only costs an hour and proves nothing more
+  if (process.env.LIFEOS_RUNNER) {
+    console.log('The full walk runs on GitHub for every pull request. Here, run only the checks you need: --only=GOALS or --only=GOALS.3,BRAIN.7.')
+    process.exit(2)
+  }
   const failed = []
   for (const place of PLACES) {
     console.log(`\n== ${place} ==`)
