@@ -1091,3 +1091,14 @@ class TestReadsThroughFrappePermissions(LifeTestCase):
 			with self.assertRaises(frappe.FrappeTypeError, msg=method.__module__) as raised:
 				method(**{arg: [["name", "like", "%"]]})
 			self.assertIn(arg, str(raised.exception))
+
+	def test_6_every_throw_shown_to_a_person_has_a_title(self):
+		app = Path(__file__).resolve().parents[1]
+		missing = []
+		for path in app.rglob("*.py"):
+			if "tests" in path.parts:
+				continue
+			for node in ast.walk(ast.parse(path.read_text())):
+				if isinstance(node, ast.Call) and ast.unparse(node.func) == "frappe.throw" and not any(k.arg == "title" for k in node.keywords):
+					missing.append(f"{path.relative_to(app)}:{node.lineno}")
+		self.assertEqual(missing, [])

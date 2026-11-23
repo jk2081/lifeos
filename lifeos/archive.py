@@ -10,7 +10,7 @@ AUTO_DOCTYPES = ("Life Task", "Life Inbox Item", "Life Chat Log")
 
 def _sync_index(doctype, where="1=1", values=()):
 	if doctype not in ORG_DOCTYPES:
-		frappe.throw(_("Not an archivable DocType: {0}").format(doctype))
+		frappe.throw(_("Not an archivable DocType: {0}").format(doctype), title=_("DocType cannot be archived"))
 	# nosemgrep: frappe-sql-format-injection -- the table is one of ORG_DOCTYPES (checked above) and `where` a fixed fragment; values are parameters
 	frappe.db.sql(
 		f"""update `tabLife Index` i join `tab{doctype}` t on t.name = i.ref_name
@@ -52,7 +52,7 @@ def set_archived(doctype, name, archived=True, reason="Manual"):
 			return archive_goal(doc, with_records=doc.horizon == "Long term")
 		return restore_goal(doc)
 	if doctype not in ORG_DOCTYPES:
-		frappe.throw(f"{doctype} cannot be archived.")
+		frappe.throw(f"{doctype} cannot be archived.", title=_("DocType cannot be archived"))
 	doc.is_archived = 1 if archived else 0
 	doc.archived_on = today() if archived else None
 	doc.archive_reason = reason if archived else ""

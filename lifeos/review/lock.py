@@ -75,12 +75,12 @@ def save_words(review, went_well=None, do_differently=None):
 def lock(review):
 	"""Lock the week. Needs Tasks and Goals done and a line on what went well."""
 	if review.doc.status == "Locked":
-		frappe.throw(_("This review is already locked."))
+		frappe.throw(_("This review is already locked."), title=_("Review already locked"))
 	if not (review.doc.went_well or "").strip():
-		frappe.throw(_("Write what went well first."))
+		frappe.throw(_("Write what went well first."), title=_("Went well is empty"))
 	done = review.done()
 	if not done["tasks"] or not done["goals"]:
-		frappe.throw(_("Finish Tasks and Goals first."))
+		frappe.throw(_("Finish Tasks and Goals first."), title=_("Tasks and Goals unfinished"))
 	gp = goals.GoalPlan(review)
 	stars = gp.stars()
 	made = []

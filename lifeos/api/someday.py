@@ -24,7 +24,7 @@ PARKED = {"Life Task": "x.status = 'Someday' and x.is_archived = 0", "Life Goal"
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot park, bring back or purge. They may propose moving something to Someday."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot park, bring back or purge. They may propose moving something to Someday."), frappe.PermissionError, title=_("Agents cannot park items"))
 
 
 def review_date(on=None):
@@ -105,7 +105,7 @@ def count(space):
 
 def _check(doctype):
 	if doctype not in PARKABLE:
-		frappe.throw(_("Only tasks, goals and notes can go on the Someday list."))
+		frappe.throw(_("Only tasks, goals and notes can go on the Someday list."), title=_("Cannot go on Someday"))
 
 
 def _goal_tasks(goal):
@@ -119,11 +119,11 @@ def park_doc(doc, note=None):
 	rev = review_date(day)
 	if doc.doctype == "Life Task":
 		if doc.status not in ("Open", "Doing", "Waiting", "Someday"):
-			frappe.throw(_("Only an open task can go on the Someday list."))
+			frappe.throw(_("Only an open task can go on the Someday list."), title=_("Task is not open"))
 		doc.status = "Someday"
 	elif doc.doctype == "Life Goal":
 		if (doc.outcome or "In Progress") != "In Progress":
-			frappe.throw(_("Only a goal in progress can go on the Someday list."))
+			frappe.throw(_("Only a goal in progress can go on the Someday list."), title=_("Goal is not in progress"))
 		doc.is_someday = 1
 	elif doc.doctype == "Life Note":
 		doc.is_someday = 1
@@ -228,7 +228,7 @@ def create(title: str, space: str | None = None, body_md: str | None = None, are
 	space = permissions.resolve_space(space, write=True)
 	title = " ".join((title or "").split())[:140]
 	if not title:
-		frappe.throw(_("Type what to park."))
+		frappe.throw(_("Type what to park."), title=_("Nothing to park"))
 	fields = {"space": space, "title": title, "area": area or None, "someday_on": today(), "someday_review_on": review_date(), "someday_note": note}
 	if cint(as_note):
 		doc = frappe.get_doc({"doctype": "Life Note", **fields, "content_md": body_md or "", "is_someday": 1}).insert()
@@ -248,7 +248,7 @@ def undo(snapshot: str | dict):
 
 def restore_snapshot(snap):
 	if not isinstance(snap.get("doctype"), str) or not isinstance(snap.get("name"), str):  # a dict name would act as a filter
-		frappe.throw(frappe._("Nothing to undo."))
+		frappe.throw(frappe._("Nothing to undo."), title=_("Nothing to undo"))
 	doc = permissions.get_doc_checked(snap["doctype"], snap["name"], "write")
 	if doc.get("is_archived") and not cint(snap.get("is_archived")) and snap.get("is_archived") is not None:
 		from lifeos import archive

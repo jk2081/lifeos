@@ -16,7 +16,7 @@ LABEL = {"Life Task": "Task", "Life Goal": "Goal", "Life Inbox Item": "Capture"}
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("The Outbox is for people."), frappe.PermissionError)
+		frappe.throw(_("The Outbox is for people."), frappe.PermissionError, title=_("Outbox is for people"))
 
 
 def _out_where(space, area, start, end, pile=None, filters=None):
@@ -151,14 +151,14 @@ def bring_back(exit: str):
 	e = permissions.get_doc_checked("Life Exit", exit)
 	permissions.require_space(e.space, write=True)
 	if e.reversed:
-		frappe.throw(_("This has already been brought back."))
+		frappe.throw(_("This has already been brought back."), title=_("Already brought back"))
 	dt, name = e.record_doctype, e.record_name
 	if not frappe.db.exists(dt, name):
 		from lifeos import trash
 
 		dd = frappe.db.get_value("Deleted Document", {"deleted_doctype": dt, "deleted_name": name, "restored": 0}, "name", order_by="creation desc")
 		if not dd:
-			frappe.throw(_("{0} is no longer in the trash, so it cannot be brought back.").format(frappe.bold(e.title)))
+			frappe.throw(_("{0} is no longer in the trash, so it cannot be brought back.").format(frappe.bold(e.title)), title=_("Record is not in trash"))
 		trash.restore(dd)
 	elif e.pile == "Parked" and dt in ("Life Task", "Life Goal"):
 		from lifeos.api import someday
@@ -174,13 +174,13 @@ def bring_back(exit: str):
 		doc = permissions.get_doc_checked(dt, name, "write")
 		if doc.horizon == "12 weeks":
 			if frappe.db.get_value("Life Cycle", doc.cycle, "status") == "Closed":
-				frappe.throw(_("A goal of a closed cycle cannot be reopened."))
+				frappe.throw(_("A goal of a closed cycle cannot be reopened."), title=_("Goal cycle is closed"))
 			doc.outcome = "In Progress"
 			doc.save()
 		else:
 			goals.set_status(name, "Active")
 	else:
-		frappe.throw(_("{0} cannot be brought back from here.").format(frappe.bold(e.title)))
+		frappe.throw(_("{0} cannot be brought back from here.").format(frappe.bold(e.title)), title=_("Cannot bring back"))
 	e.reload()
 	if not e.reversed:  # the record's state did not take it off the pile (it was changed since): reverse it here
 		outbox.reverse(dt, name, e.pile)
@@ -209,7 +209,7 @@ def bounds(period, from_date=None, to_date=None):
 	if from_date and to_date:
 		a, b = getdate(from_date), getdate(to_date)
 		if b < a or (b - a).days > 400:
-			frappe.throw(_("Choose a period of at most a year."))
+			frappe.throw(_("Choose a period of at most a year."), title=_("Period is too long"))
 		return get_datetime(str(a)), get_datetime(str(add_days(b, 1))), "custom"
 	start_dt, end_dt = outbox.period_bounds(period)
 	return start_dt, end_dt, period if period in outbox.PERIODS else "week"

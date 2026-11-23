@@ -68,7 +68,7 @@ def disconnect(user):
 def set_read(user, ids):
 	acc = account(user)
 	if not acc:
-		frappe.throw(frappe._("Connect Google Calendar first."))
+		frappe.throw(frappe._("Connect Google Calendar first."), title=frappe._("Google Calendar not connected"))
 	ids = [i for i in ids if isinstance(i, str) and i.strip()][:20] or ["primary"]
 	acc.life_read_calendars = json.dumps(ids)
 	acc.save(ignore_permissions=True)

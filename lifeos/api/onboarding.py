@@ -52,7 +52,7 @@ def complete(status: str = "done"):
 	"""Record that the guide was finished ("done") or closed ("skipped"), so it does not show again."""
 	permissions.require_login()
 	if status not in STATUSES:
-		frappe.throw(_("The guide is either done or skipped."))
+		frappe.throw(_("The guide is either done or skipped."), title=_("Guide already finished"))
 	frappe.defaults.set_user_default(KEY, status, frappe.session.user)
 	ladder.forget(frappe.session.user)
 	return state()
@@ -73,12 +73,12 @@ def save_you(full_name: str, time_zone: str):
 	"""Step 2: the person's name, and the site's time zone (a site belongs to one person)."""
 	permissions.require_login()
 	if not permissions.is_admin():
-		frappe.throw(_("Only the owner can set this."), frappe.PermissionError)
+		frappe.throw(_("Only the owner can set this."), frappe.PermissionError, title=_("Only the owner sets this"))
 	full_name = " ".join((full_name or "").split())
 	if not full_name:
-		frappe.throw(_("Type your name."))
+		frappe.throw(_("Type your name."), title=_("Name is missing"))
 	if time_zone not in available_timezones():
-		frappe.throw(_("{0} is not a time zone.").format(time_zone))
+		frappe.throw(_("{0} is not a time zone.").format(time_zone), title=_("Time zone is not valid"))
 	first, _sep, last = full_name.partition(" ")
 	user = frappe.get_doc("User", frappe.session.user)
 	user.first_name, user.last_name = first, last

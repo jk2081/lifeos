@@ -66,7 +66,7 @@ def require_on(space, system):
 	c = connection(space, system)
 	if c and not c.active:
 		frappe.throw(_("{0} is switched off in Brain, Sources, so Life OS is not accepting captures from it. Switch it on there to continue.")
-			.format(c.label or system.title()), frappe.PermissionError)
+			.format(c.label or system.title()), frappe.PermissionError, title=_("Source is switched off"))
 
 
 def connection(space, system):
@@ -200,16 +200,16 @@ def save(space: str | None = None, system: str | None = None, name: str | None =
 	A Gmail mailbox also takes label_name (read only mail with this Gmail label; empty reads the Inbox), the always_include, always_skip
 	and always_sensitive lists (senders or domains, one per line) and attach_files."""
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can change a connection."), frappe.PermissionError)
+		frappe.throw(_("Only a person can change a connection."), frappe.PermissionError, title=_("Only people change connections"))
 	if name:
 		doc = permissions.get_doc_checked("Life Connection", name, "write")
 		if doc.system in COMING and active is not None and flag(active):
-			frappe.throw(_("{0} is not built yet, so it cannot be switched on.").format(COMING[doc.system][0]))
+			frappe.throw(_("{0} is not built yet, so it cannot be switched on.").format(COMING[doc.system][0]), title=_("Source not built yet"))
 	else:
 		space = permissions.resolve_space(space, write=True)
 		key = (system or "").strip().lower()
 		if key in COMING:
-			frappe.throw(_("{0} is not built yet, so it cannot be switched on.").format(COMING[key][0]))
+			frappe.throw(_("{0} is not built yet, so it cannot be switched on.").format(COMING[key][0]), title=_("Source not built yet"))
 		doc = frappe.get_doc({"doctype": "Life Connection", "space": space, "system": system, "label": CATALOG.get(key, {}).get("label")})
 	if label is not None:
 		doc.label = label
@@ -219,7 +219,7 @@ def save(space: str | None = None, system: str | None = None, name: str | None =
 		doc.default_goal = default_goal or None
 	if default_intent is not None:
 		if default_intent not in INTENTS:
-			frappe.throw(_("default_intent must be one of: {0}.").format(", ".join(INTENTS)))
+			frappe.throw(_("default_intent must be one of: {0}.").format(", ".join(INTENTS)), title=_("Intent is not valid"))
 		doc.default_intent = default_intent
 	if doc.system == "gmail":
 		for field, value in (("label_name", label_name), ("always_include", always_include), ("always_skip", always_skip), ("always_sensitive", always_sensitive)):
@@ -238,7 +238,7 @@ def save(space: str | None = None, system: str | None = None, name: str | None =
 def _people_only():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can connect a mailbox."), frappe.PermissionError)
+		frappe.throw(_("Only a person can connect a mailbox."), frappe.PermissionError, title=_("Only people connect mailboxes"))
 
 
 @frappe.whitelist(methods=["GET"])
@@ -262,7 +262,7 @@ def gmail_connect(space: str | None = None, success_uri: str | None = None):
 	_people_only()
 	space = permissions.resolve_space(space, write=True)
 	if not gmail.configured():
-		frappe.throw(_("Google sign-in is not set up yet. In Frappe, open Google Settings and enter the OAuth client (client ID and secret), then try again."))
+		frappe.throw(_("Google sign-in is not set up yet. In Frappe, open Google Settings and enter the OAuth client (client ID and secret), then try again."), title=_("Google sign-in not set up"))
 	app = gmail.make_app(gmail.free_app_name())
 	conn = frappe.get_doc({"doctype": "Life Connection", "space": space, "system": "gmail", "label": "Gmail", "active": 0,
 		"connected_app": app.name, "connected_by": frappe.session.user}).insert()
@@ -279,13 +279,13 @@ def gmail_finish(name: str):
 	_people_only()
 	conn = permissions.get_doc_checked("Life Connection", name, "write")
 	if conn.system != "gmail":
-		frappe.throw(_("This is not a Gmail connection."))
+		frappe.throw(_("This is not a Gmail connection."), title=_("Not a Gmail connection"))
 	try:
 		gmail.finish(conn)
 	except gmail.GmailError as e:
 		if not conn.mailbox:
 			frappe.delete_doc("Life Connection", conn.name, ignore_permissions=True, force=True)  # system: admin-only screen; the space write check is above
-		frappe.throw(str(e))
+		frappe.throw(str(e), title=_("Gmail sign-in failed"))
 	return gmail_card(conn.name)
 
 
@@ -300,7 +300,7 @@ def gmail_remove(name: str):
 	_people_only()
 	conn = permissions.get_doc_checked("Life Connection", name, "write")
 	if conn.system != "gmail":
-		frappe.throw(_("This is not a Gmail connection."))
+		frappe.throw(_("This is not a Gmail connection."), title=_("Not a Gmail connection"))
 	app = conn.connected_app
 	for cache in frappe.get_all("Token Cache", filters={"connected_app": app}, pluck="name") if app else []:  # system: Frappe's token cache, not a space record
 		frappe.delete_doc("Token Cache", cache, ignore_permissions=True, force=True)  # system: admin-only screen; the space write check is above
@@ -317,22 +317,22 @@ def start_import(space: str | None = None, system: str | None = None, file_url: 
 	from lifeos import chat_import
 
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can import a chat export."), frappe.PermissionError)
+		frappe.throw(_("Only a person can import a chat export."), frappe.PermissionError, title=_("Only people import chats"))
 	space = permissions.resolve_space(space, write=True)
 	system = (system or "").strip().lower()
 	if system not in chat_import.SYSTEMS:
-		frappe.throw(_("system must be claude or chatgpt."))
+		frappe.throw(_("system must be claude or chatgpt."), title=_("Chat system not supported"))
 	require_on(space, system)
 	f = frappe.db.get_value("File", {"file_url": file_url}, ["name", "is_private", "file_name"], as_dict=True)
 	if not f:
-		frappe.throw(_("Upload the export first."))
+		frappe.throw(_("Upload the export first."), title=_("Export file missing"))
 	frappe.get_doc("File", f.name).check_permission("read")
 	if not f.is_private:
-		frappe.throw(_("The export must be stored as a private file."))
+		frappe.throw(_("The export must be stored as a private file."), title=_("Export must be private"))
 	cur = chat_import.progress(space, system)
 	if cur and cur.get("status") in ("Reading", "Importing") and cur.get("started_on") and \
 			frappe.utils.get_datetime(cur["started_on"]) > add_to_date(now_datetime(), hours=-2):
-		frappe.throw(_("An import of this kind is already running in this space."))
+		frappe.throw(_("An import of this kind is already running in this space."), title=_("Import already running"))
 	chat_import._set(space, system, status="Queued", file_name=f.file_name, error=None, user=frappe.session.user, started_on=str(now_datetime())[:19])
 	frappe.enqueue("lifeos.chat_import.run", queue="long", timeout=4 * 3600, space=space, system=system, file_url=file_url,
 		user=frappe.session.user, now=bool(frappe.flags.in_test or frappe.flags.lifeos_import_now))

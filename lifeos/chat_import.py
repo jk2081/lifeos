@@ -186,7 +186,7 @@ def run(space, system, file_url, user):
 	# Frappe runs a queued job as the user who queued it, and chats.log checks that user's access to the space; the job
 	# never switches users, so it can only write what its user may.
 	if frappe.session.user != user:
-		frappe.throw(_("A chat import runs as the person who started it."), frappe.PermissionError)
+		frappe.throw(_("A chat import runs as the person who started it."), frappe.PermissionError, title=_("Import needs a person"))
 	_set(space, system, status="Reading", done=0, total=0, created=0, updated=0, unchanged=0, skipped=0, error=None,
 		started_on=str(now_datetime())[:19], finished_on=None, user=user)
 	try:

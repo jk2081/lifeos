@@ -12,12 +12,12 @@ from lifeos.skills import lessons
 def _people_only():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot accept or reject proposals."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot accept or reject proposals."), frappe.PermissionError, title=_("Agents cannot decide proposals"))
 
 
 def _decide(prop, decision, payload=None):
 	if prop.status != "Pending":
-		frappe.throw(_("This proposal was already {0}.").format(prop.status.lower()))
+		frappe.throw(_("This proposal was already {0}.").format(prop.status.lower()), title=_("Proposal already decided"))
 	item = frappe.get_doc("Life Inbox Item", prop.inbox_item)
 	item.check_permission("write")
 	prop.flags.via_review = True
@@ -28,7 +28,7 @@ def _decide(prop, decision, payload=None):
 		try:
 			doctype, name = proposals.apply(prop.kind, data, item)
 		except proposals.PayloadError as e:
-			frappe.throw(str(e), proposals.PayloadError)
+			frappe.throw(str(e), proposals.PayloadError, title=_("Proposal is not valid"))
 		prop.payload = frappe.as_json(proposals.validate(prop.kind, data, item.space, {"allow_new_tags": True}))
 		prop.status = "Accepted"
 		prop.created_doctype, prop.created_name = doctype, name
@@ -47,7 +47,7 @@ def decide(proposal: str, decision: str, payload: str | dict | None = None):
 	"""Accept or reject one proposal. `payload` may carry edited values. People only."""
 	_people_only()
 	if decision not in ("accept", "reject"):
-		frappe.throw(_("decision must be accept or reject."))
+		frappe.throw(_("decision must be accept or reject."), title=_("Unknown decision"))
 	prop = permissions.get_doc_checked("Life Proposal", proposal, "write")
 	item = _decide(prop, decision, parse(payload))
 	status = _finish_if_decided(item)
@@ -63,7 +63,7 @@ def decide_all(item: str, decision: str):
 	"""Accept or reject every pending proposal of an item. A proposal that cannot be accepted stays pending, with its error."""
 	_people_only()
 	if decision not in ("accept", "reject"):
-		frappe.throw(_("decision must be accept or reject."))
+		frappe.throw(_("decision must be accept or reject."), title=_("Unknown decision"))
 	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
 	done, errors = [], []
 	for name in frappe.get_list("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name", order_by="sort_order asc, creation asc"):
@@ -85,11 +85,11 @@ def update_payload(proposal: str, payload: str | dict):
 	_people_only()
 	prop = permissions.get_doc_checked("Life Proposal", proposal, "write")
 	if prop.status != "Pending":
-		frappe.throw(_("A decided proposal cannot be changed."))
+		frappe.throw(_("A decided proposal cannot be changed."), title=_("Proposal already decided"))
 	try:
 		clean = proposals.validate(prop.kind, parse(payload) or {}, prop.space, {"allow_new_tags": True})
 	except proposals.PayloadError as e:
-		frappe.throw(str(e), proposals.PayloadError)
+		frappe.throw(str(e), proposals.PayloadError, title=_("Proposal is not valid"))
 	prop.payload = frappe.as_json(clean)
 	if clean.get("title") and prop.kind in ("Task", "Note", "Vault Document", "Month Goal", "Important Date"):
 		prop.preview = clean["title"]

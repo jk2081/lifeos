@@ -56,7 +56,7 @@ def where_clause(space, state=None, horizon=None, area=None, cycle=None, target_
 	where, values = [], {}
 	if state:
 		if state not in TABS:
-			frappe.throw(_("Unknown state."))
+			frappe.throw(_("Unknown state."), title=_("Unknown goal state"))
 		where.append(TABS[state])
 	if horizon:
 		where.append("g.horizon = %(horizon)s")
@@ -175,9 +175,9 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 	serves. Areas that are off have no section and are listed in `off` for the chips."""
 	space = permissions.resolve_space(space)
 	if show not in SHOWS:
-		frappe.throw(_("Unknown filter."))
+		frappe.throw(_("Unknown filter."), title=_("Unknown goal filter"))
 	if sort not in ("order", "score"):
-		frappe.throw(_("Unknown sort."))
+		frappe.throw(_("Unknown sort."), title=_("Unknown sort order"))
 	values = {"space": space}
 	off = off_clause(space, "g.area", values)
 	# nosemgrep: frappe-sql-format-injection -- SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters
@@ -265,7 +265,7 @@ def reorder(goals: str | builtins.list):
 	_person_only()
 	names = parse(goals, [])
 	if not isinstance(names, builtins.list) or not names or len(names) > 200:
-		frappe.throw(_("Give the goals in their new order."))
+		frappe.throw(_("Give the goals in their new order."), title=_("Goal order missing"))
 	docs = [permissions.get_doc_checked("Life Goal", n) for n in names]
 	slots = sorted(d.sort_order or 0 for d in docs)
 	if len(set(slots)) < len(slots):
@@ -290,7 +290,7 @@ def _scores(rows):
 def _person_only():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot create, close or move goals. Propose a task under a goal instead."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot create, close or move goals. Propose a task under a goal instead."), frappe.PermissionError, title=_("Agents cannot change goals"))
 
 
 MEASURE_FIELDS = ("measure_kind", "measure", "unit", "start_value", "target_value")
@@ -299,7 +299,7 @@ MEASURE_FIELDS = ("measure_kind", "measure", "unit", "start_value", "target_valu
 def measure_values(measure_kind=None, done_when=None, measure=None, unit=None, start_value=None, target_value=None):
 	"""The key-result fields of a new or edited goal (set 7). A finish line given without a kind is a milestone."""
 	if measure_kind and measure_kind not in ("Milestone", "Number"):
-		frappe.throw(_("Choose a finish line or a number."))
+		frappe.throw(_("Choose a finish line or a number."), title=_("Goal needs a finish line"))
 	if not measure_kind and (done_when or "").strip():
 		measure_kind = "Milestone"
 	out = {"measure_kind": measure_kind or None}
@@ -315,7 +315,7 @@ def _float(v):
 	try:
 		return float(v)
 	except (TypeError, ValueError):
-		frappe.throw(_("{0} is not a number.").format(v))
+		frappe.throw(_("{0} is not a number.").format(v), title=_("Value is not a number"))
 
 
 @frappe.whitelist(methods=["GET"])
@@ -340,7 +340,7 @@ def refuse_open(horizon):
 	"""The Open goal (horizon Long term) is retired (issue 57): a new goal is a 12 Week Year, Annual or Month goal. Tests and the
 	acceptance site that predate this switch it back on with `lifeos_allow_open_goals`; records already Open are kept."""
 	if horizon == "Long term" and not (frappe.flags.get("lifeos_allow_open_goals") or frappe.conf.get("lifeos_allow_open_goals")):
-		frappe.throw(_(OPEN_RETIRED), frappe.ValidationError)
+		frappe.throw(_(OPEN_RETIRED), frappe.ValidationError, title=_("Open goals are retired"))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -360,7 +360,7 @@ def create(title: str, horizon: str | None = None, space: str | None = None, are
 	space = permissions.resolve_space(space, write=True)
 	horizon = horizon or derive_horizon(target_date, cycle, space)
 	if horizon not in HORIZONS:
-		frappe.throw(_("Unknown horizon."))
+		frappe.throw(_("Unknown horizon."), title=_("Unknown goal horizon"))
 	refuse_open(horizon)
 	measure_fields = measure_values(measure_kind, done_when, measure, unit, start_value, target_value)
 	readings.require_finish_line({"done_when": done_when, **measure_fields})
@@ -379,9 +379,9 @@ def close(goal: str, outcome: str, result_note: str | None = None):
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	if doc.horizon == "12 weeks":
-		frappe.throw(_("A 12 Week Year goal is closed with its cycle, through Close cycle."))
+		frappe.throw(_("A 12 Week Year goal is closed with its cycle, through Close cycle."), title=_("Close the cycle instead"))
 	if outcome not in OUTCOMES:
-		frappe.throw(_("Unknown outcome."))
+		frappe.throw(_("Unknown outcome."), title=_("Unknown goal outcome"))
 	doc.outcome = outcome
 	if result_note is not None:
 		doc.result_note = result_note
@@ -396,12 +396,12 @@ def add_to_cycle(goal: str, cycle: str):
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	if doc.horizon == "12 weeks":
-		frappe.throw(_("This goal is already in a 12 Week Year."))
+		frappe.throw(_("This goal is already in a 12 Week Year."), title=_("Goal already in a cycle"))
 	c = permissions.get_doc_checked("Life Cycle", cycle, "write")
 	if c.space != doc.space:
-		frappe.throw(_("The cycle is in another space."))
+		frappe.throw(_("The cycle is in another space."), title=_("Cycle is in another space"))
 	if c.status not in ("Active", "Planned"):
-		frappe.throw(_("Choose the current or a planned cycle."))
+		frappe.throw(_("Choose the current or a planned cycle."), title=_("Cycle cannot take goals"))
 	doc.horizon, doc.cycle, doc.target_date = "12 weeks", c.name, doc.target_date
 	doc.sort_order = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where cycle=%s", c.name)[0][0] + 1
 	doc.save()
@@ -521,9 +521,9 @@ def set_status(goal: str, status: str):
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	if status not in STATUS:
-		frappe.throw(_("Unknown status."))
+		frappe.throw(_("Unknown status."), title=_("Unknown status"))
 	if doc.horizon == "12 weeks":
-		frappe.throw(_("A 12 Week Year goal is closed with its cycle, through Close cycle."))
+		frappe.throw(_("A 12 Week Year goal is closed with its cycle, through Close cycle."), title=_("Close the cycle instead"))
 	outcome, on_hold = STATUS[status]
 	records = archive.goal_record_count(doc.name) if outcome != "In Progress" else 0
 	if outcome == "In Progress" and doc.is_archived:
@@ -539,9 +539,9 @@ def _apply_values(doc, values, allowed):
 	"""Set the fields a person edits on a goal. Changing the key result applies the rule of a new goal."""
 	for k, v in values.items():
 		if k not in allowed:
-			frappe.throw(_("Field {0} cannot be changed here.").format(k))
+			frappe.throw(_("Field {0} cannot be changed here.").format(k), title=_("Field cannot be changed"))
 		if k == "horizon" and v not in ("Long term", "Year", "Month", "12 weeks"):
-			frappe.throw(_("Choose Long term, Year, Month or 12 weeks."))
+			frappe.throw(_("Choose Long term, Year, Month or 12 weeks."), title=_("Unknown goal horizon"))
 		if k == "horizon" and v != doc.horizon:
 			refuse_open(v)
 		doc.set(k, _float(v) if k in ("start_value", "target_value") else (v if v == 0 else v or None))
@@ -558,9 +558,9 @@ def update(goal: str, values: str | dict):
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	values = frappe.parse_json(values) or {}
 	if not isinstance(values, dict):
-		frappe.throw(_("values must be an object of fields."))
+		frappe.throw(_("values must be an object of fields."), title=_("Values must be fields"))
 	if values.get("horizon") == "12 weeks":
-		frappe.throw(_("A goal joins a 12 Week Year with Add to a 12 Week Year."))
+		frappe.throw(_("A goal joins a 12 Week Year with Add to a 12 Week Year."), title=_("Use Add to a 12 Week Year"))
 	_apply_values(doc, values, {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note", "horizon", *MEASURE_FIELDS})
 	doc.save()
 	return get(doc.name)
@@ -579,12 +579,12 @@ def edit(goal: str, values: str | dict, actions: str | builtins.list | None = No
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	values = frappe.parse_json(values) or {}
 	if not isinstance(values, dict):
-		frappe.throw(_("values must be an object of fields."))
+		frappe.throw(_("values must be an object of fields."), title=_("Values must be fields"))
 	before = {k: doc.get(k) for k in values}
 	if values.get("cycle"):
 		c = permissions.get_doc_checked("Life Cycle", values["cycle"], "write")
 		if c.space != doc.space:
-			frappe.throw(_("The cycle is in another space."))
+			frappe.throw(_("The cycle is in another space."), title=_("Cycle is in another space"))
 	if values.get("horizon") and values["horizon"] != "12 weeks":
 		values["cycle"] = None
 	_apply_values(doc, values, EDIT_FIELDS)
@@ -603,7 +603,7 @@ def edit(goal: str, values: str | dict, actions: str | builtins.list | None = No
 
 def _set_actions(doc, actions):
 	if doc.horizon != "12 weeks" and actions:
-		frappe.throw(_("Weekly actions belong to 12-week goals."))
+		frappe.throw(_("Weekly actions belong to 12-week goals."), title=_("Actions need a 12-week goal"))
 	rows = {a.name: a for a in doc.actions}
 	ordered, seen = [], set()
 	for a in actions:
@@ -656,7 +656,7 @@ def make_habit(title: str, space: str | None = None, area: str | None = None, da
 	space = permissions.resolve_space(space, write=True)
 	title = (title or "").strip()[:140]
 	if not title:
-		frappe.throw(_("Name the habit."))
+		frappe.throw(_("Name the habit."), title=_("Habit needs a name"))
 	guess = readings.habit_of(title)
 	days = int(days_per_week or (guess and guess["days_per_week"]) or 7)
 	name = frappe.db.get_value("Life Habit", {"space": space, "title": title}) or frappe.get_doc(
@@ -682,7 +682,7 @@ def add_reading(goal: str, value: float | str, date: str | None = None, note: st
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	if doc.measure_kind != "Number":
-		frappe.throw(_("Readings belong to a goal measured by a number."))
+		frappe.throw(_("Readings belong to a goal measured by a number."), title=_("Goal has no number measure"))
 	r = frappe.get_doc({"doctype": "Life Goal Reading", "space": doc.space, "goal": doc.name, "date": date or frappe.utils.today(),
 		"value": _float(value), "status": "Confirmed", "suggested_by": "Owner", "excerpt": (note or "").strip()[:1000] or None}).insert()
 	return _goal_now(doc.name, r.name)
@@ -765,7 +765,7 @@ def week_score(cycle: str | None = None, week: int | None = None, space: str | N
 	"""Done over planned for a week of a cycle. Defaults: the active cycle and its current week."""
 	doc = _cycle(cycle, space)
 	if not doc:
-		frappe.throw(_("No cycle found."))
+		frappe.throw(_("No cycle found."), title=_("No cycle found"))
 	return rules.week_score(doc.name, week or rules.current_week(doc))
 
 
@@ -942,7 +942,7 @@ def start_cycle(cycle: str):
 	"""Make a planned cycle the active one."""
 	doc = permissions.get_doc_checked("Life Cycle", cycle, "write")
 	if doc.status != "Planned":
-		frappe.throw(_("Only a planned cycle can be started."))
+		frappe.throw(_("Only a planned cycle can be started."), title=_("Cycle is not planned"))
 	doc.status = "Active"
 	doc.save()
 	return {"cycle": doc.name, "status": doc.status}
@@ -995,7 +995,7 @@ def set_month_habits(space: str | None = None, year: int | None = None, month: i
 			name = frappe.db.get_value("Life Habit", {"space": space, "title": title}) or frappe.get_doc(
 				{"doctype": "Life Habit", "space": space, "title": title}).insert().name
 		elif frappe.db.get_value("Life Habit", name, "space") != space:
-			frappe.throw(_("That habit belongs to another space."), frappe.PermissionError)
+			frappe.throw(_("That habit belongs to another space."), frappe.PermissionError, title=_("Habit is in another space"))
 		rows.append({"habit": name, "days_per_week": h.get("days_per_week") or 7})
 	return habit_rules.set_month_habits(space, year, month, rows)
 

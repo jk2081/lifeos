@@ -60,7 +60,7 @@ def where_clause(space, holder=None, doc_type=None, expiry=None, area=None, goal
 		values["doc_type"] = doc_type
 	if expiry:
 		if expiry not in EXPIRY:
-			frappe.throw(_("expiry must be one of: {0}.").format(", ".join(EXPIRY)))
+			frappe.throw(_("expiry must be one of: {0}.").format(", ".join(EXPIRY)), title=_("Unknown expiry filter"))
 		where.append(EXPIRY[expiry])
 	if area:
 		where.append(area_filter(space, area, "d.area", values, also_in="Life Vault Document"))
@@ -147,7 +147,7 @@ def save(document: str | None = None, space: str | None = None, values: str | bu
 	values = parse(values, {}) or {}
 	unknown = set(values) - EDITABLE
 	if unknown:
-		frappe.throw(_("Field {0} cannot be set here.").format(", ".join(sorted(unknown))))
+		frappe.throw(_("Field {0} cannot be set here.").format(", ".join(sorted(unknown))), title=_("Field cannot be set"))
 	if document:
 		doc = permissions.get_doc_checked("Life Vault Document", document, "write")
 	else:
@@ -164,7 +164,7 @@ def set_file(document: str, file_url: str):
 	"""Point the document at a file already uploaded to it with upload_file."""
 	doc = permissions.get_doc_checked("Life Vault Document", document, "write")
 	if not frappe.db.exists("File", {"file_url": file_url, "attached_to_doctype": "Life Vault Document", "attached_to_name": doc.name}):
-		frappe.throw(_("Upload the file to this document first."))
+		frappe.throw(_("Upload the file to this document first."), title=_("Upload the file first"))
 	doc.file = file_url
 	doc.save()
 	return get(doc.name)

@@ -101,7 +101,7 @@ def where_clause(space, status="open_doing", area=None, priority=None, goal=None
 	if due:
 		parts = [DUE[d.strip()] for d in str(due).split(",") if d.strip() in DUE]
 		if not parts:
-			frappe.throw(_("due must be one or more of: {0}.").format(", ".join(DUE)))
+			frappe.throw(_("due must be one or more of: {0}.").format(", ".join(DUE)), title=_("Due filter is not valid"))
 		now = getdate(today())
 		values.update({"today": now, "week_start": add_days(now, -now.weekday()), "week_end": add_days(now, 6 - now.weekday())})
 		where.append("(" + " or ".join(parts) + ")")
@@ -206,9 +206,9 @@ def all_tasks(space: str | None = None, group: str = "area", show: str = "open",
 	At most 1,000 tasks come back (`truncated`); Done keeps the newest first."""
 	space = permissions.resolve_space(space)
 	if show not in ALL_SHOWS:
-		frappe.throw(_("Unknown filter."))
+		frappe.throw(_("Unknown filter."), title=_("Filter is not known"))
 	if group not in ("area", "goal", "due"):
-		frappe.throw(_("Unknown grouping."))
+		frappe.throw(_("Unknown grouping."), title=_("Grouping is not known"))
 	now = getdate(today())
 	from lifeos import counts
 
@@ -361,12 +361,12 @@ def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | 
 	names = frappe.parse_json(tasks) if isinstance(tasks, str) else tasks
 	docs = [permissions.get_doc_checked("Life Task", n, "write") for n in names or []]
 	if not docs:
-		frappe.throw(_("Choose the tasks for the goal."))
+		frappe.throw(_("Choose the tasks for the goal."), title=_("Choose tasks for the goal"))
 	for d in docs:
 		if d.space != space or d.goal or d.status not in OPEN:
-			frappe.throw(_("{0} is not an open task without a goal.").format(frappe.bold(d.title)))
+			frappe.throw(_("{0} is not an open task without a goal.").format(frappe.bold(d.title)), title=_("Task cannot join goal"))
 	if area and frappe.db.get_value("Life Area", area, "space") != space:
-		frappe.throw(_("That area is not in this space."))
+		frappe.throw(_("That area is not in this space."), title=_("Area is in another space"))
 	area = area or next((d.area for d in docs if d.area), None)
 	title = (title or "").strip() or goal_suggest.title_for([d.title for d in docs], space)
 	goal = goals.create(title=title, horizon="Year", target_date=goals.year_end(), space=space, area=area, done_when=done_when, measure_kind=measure_kind, measure=measure,
@@ -397,7 +397,7 @@ def quick_add(text: str, space: str | None = None, area: str | None = None, goal
 	space = permissions.resolve_space(space, write=True)
 	title, when = datewords.parse(text)
 	if not title:
-		frappe.throw(_("Type a title for the task."))
+		frappe.throw(_("Type a title for the task."), title=_("Task needs a title"))
 	if goal and not area:
 		area = frappe.db.get_value("Life Goal", goal, "area")
 	doc = frappe.get_doc({"doctype": "Life Task", "space": space, "title": title[:140], "due_date": due_date or when, "area": area,
@@ -459,7 +459,7 @@ def update(task: str, values: str | dict):
 		elif k in allowed:
 			doc.set(k, v or None)
 		else:
-			frappe.throw(_("Field {0} cannot be changed here.").format(k))
+			frappe.throw(_("Field {0} cannot be changed here.").format(k), title=_("Field cannot be changed"))
 	doc.save()
 	return get(doc.name)
 
@@ -516,7 +516,7 @@ def reschedule_overdue(space: str | None = None, to_date: str | date | None = No
 	now = getdate(today())
 	to = getdate(to_date) if to_date else now
 	if to < now:
-		frappe.throw(_("Overdue tasks can only be moved to today or later."))
+		frappe.throw(_("Overdue tasks can only be moved to today or later."), title=_("Date is in the past"))
 	names = frappe.db.sql_list(
 		"select name from `tabLife Task` where space=%s and status in ('Open', 'Doing', 'Waiting') and is_archived=0 and due_date < %s",
 		(space, now))

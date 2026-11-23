@@ -137,7 +137,7 @@ def list(space: str | None = None, q: str | None = None, type: str | None = None
 	start, page_length = page(start, page_length)
 	type = (type or "").strip().lower()
 	if type and type not in (*TYPES, "other"):
-		frappe.throw(_("type must be one of: {0}.").format(", ".join((*TYPES, "other"))))
+		frappe.throw(_("type must be one of: {0}.").format(", ".join((*TYPES, "other"))), title=_("Unknown file type"))
 	rows = _build(space, _records(space))
 	systems = sorted({s for r in rows for s in r["systems"]})
 	q = (q or "").strip().lower()[:200]

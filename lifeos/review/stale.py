@@ -33,10 +33,10 @@ def candidates(space, period_start):
 def settle(review, task, decision):
 	"""Carry out one decision on one stale task and remember it in the review."""
 	if decision not in DECISIONS:
-		frappe.throw(_("Choose Keep, Someday or Drop."))
+		frappe.throw(_("Choose Keep, Someday or Drop."), title=_("Decision is not valid"))
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	if doc.status not in OPEN:
-		frappe.throw(_("{0} is no longer open.").format(doc.title))
+		frappe.throw(_("{0} is no longer open.").format(doc.title), title=_("Task is no longer open"))
 	if decision == "someday":
 		someday.park_doc(doc)
 	elif decision == "drop":

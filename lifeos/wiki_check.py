@@ -209,11 +209,11 @@ def decide(finding, choice) -> dict:
 	doc = frappe.get_doc("Life Wiki Finding", finding)
 	permissions.require_space(doc.space, write=True)
 	if doc.status != "Open":
-		frappe.throw(_("This has been decided already."))
+		frappe.throw(_("This has been decided already."), title=_("Already decided"))
 	options = json.loads(doc.options or "[]")
 	choice = int(choice)
 	if not 0 <= choice < len(options):
-		frappe.throw(_("Choose one of the options."))
+		frappe.throw(_("Choose one of the options."), title=_("Option is not valid"))
 	keep = options[choice]
 	changed = []
 	for i, o in enumerate(options):

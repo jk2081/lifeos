@@ -10,7 +10,7 @@ from lifeos.api import goals as goal_api
 def _focus(area):
 	doc = permissions.get_doc_checked("Life Area", area)
 	if not doc.is_focus:
-		frappe.throw(_("{0} is not a focus.").format(doc.area_name))
+		frappe.throw(_("{0} is not a focus.").format(doc.area_name), title=_("Area is not a focus"))
 	return doc
 
 
@@ -88,21 +88,21 @@ def sort_open(goal: str, action: str, title: str | None = None, target_date: str
 	permissions.require_login()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	if doc.horizon != "Long term" or doc.outcome != "In Progress":
-		frappe.throw(_("Only an Open goal in progress is sorted this way."))
+		frappe.throw(_("Only an Open goal in progress is sorted this way."), title=_("Goal cannot be sorted"))
 	if action == "drop":
 		return goal_api.close(goal, "Dropped")
 	if action == "annual":
 		if not target_date:
-			frappe.throw(_("An Annual goal needs a target date."))
+			frappe.throw(_("An Annual goal needs a target date."), title=_("Annual goal needs a date"))
 		doc.horizon, doc.target_date = "Year", target_date
 		doc.save()
 		return {"name": doc.name, "horizon": doc.horizon}
 	if action != "focus":
-		frappe.throw(_("Choose focus, annual or drop."))
+		frappe.throw(_("Choose focus, annual or drop."), title=_("Unknown sorting choice"))
 	if not areas.use_focuses():
-		frappe.throw(_("Switch on Use focuses in Settings → Areas to make a focus."))
+		frappe.throw(_("Switch on Use focuses in Settings → Areas to make a focus."), title=_("Focuses are switched off"))
 	if not permissions.is_admin():
-		frappe.throw(_("Only the owner can make a focus."), frappe.PermissionError)
+		frappe.throw(_("Only the owner can make a focus."), frappe.PermissionError, title=_("Only the owner makes focuses"))
 	parent = doc.area
 	if parent and frappe.db.get_value("Life Area", parent, "is_focus"):
 		parent = frappe.db.get_value("Life Area", parent, "parent_area")

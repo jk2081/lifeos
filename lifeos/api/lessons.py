@@ -12,7 +12,7 @@ def _lesson(name):
 	"""A lesson in a space the caller belongs to."""
 	doc = lessons.get(name)
 	if doc.space and doc.space not in permissions.user_spaces() and not permissions.is_admin():
-		frappe.throw(_("There is no such lesson."), frappe.DoesNotExistError)
+		frappe.throw(_("There is no such lesson."), frappe.DoesNotExistError, title=_("Lesson not found"))
 	return doc
 
 

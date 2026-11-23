@@ -30,7 +30,7 @@ DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 
 def kind_of(slug):
 	if slug not in SLUGS:
-		frappe.throw(_("Unknown review."))
+		frappe.throw(_("Unknown review."), title=_("Unknown review"))
 	return SLUGS[slug]
 
 
@@ -162,7 +162,7 @@ class Periodic(Review):
 			return got
 		got = cls.current(space, user, kind, day)
 		if got is None:
-			frappe.throw(_("This review is not due."))
+			frappe.throw(_("This review is not due."), title=_("Review is not due"))
 		if got.saved:
 			return got  # locked
 		got.state["started_on"] = str(now_datetime())[:19]
@@ -198,9 +198,9 @@ class Periodic(Review):
 
 	def decide(self, goal, pile, date=None, reason=None, target=None):
 		if goal not in {g["name"] if isinstance(g, dict) else g.name for g in self.goals()}:
-			frappe.throw(_("That goal is not up for decision in this review."))
+			frappe.throw(_("That goal is not up for decision in this review."), title=_("Goal not up for decision"))
 		if pile not in PILES[self.kind]:
-			frappe.throw(_("Unknown pile."))
+			frappe.throw(_("Unknown pile."), title=_("Unknown pile"))
 		d = {"pile": pile}
 		if pile == "finish":
 			d["date"] = str(getdate(date)) if date else None
@@ -488,12 +488,12 @@ def _clean_actions(actions):
 
 def lock(rv):
 	if rv.doc.status == "Locked":
-		frappe.throw(_("This review is already locked."))
+		frappe.throw(_("This review is already locked."), title=_("Review already locked"))
 	if not (rv.doc.went_well or "").strip():
-		frappe.throw(_("Write what went well first."))
+		frappe.throw(_("Write what went well first."), title=_("What went well missing"))
 	done = rv.done()
 	if not all(done[t] for t in rv.tabs[:3] if t != rv.tabs[0]):
-		frappe.throw(_("Finish Decide and Plan first.") if rv.kind == MONTHLY else _("Finish Each goal and Plan the next cycle first."))
+		frappe.throw(_("Finish Decide and Plan first.") if rv.kind == MONTHLY else _("Finish Each goal and Plan the next cycle first."), title=_("Review steps unfinished"))
 	made = lock_month(rv) if rv.kind == MONTHLY else lock_cycle(rv)
 	rv.doc.update({"status": "Locked", "locked_on": now_datetime(), **made["numbers"]})
 	rv.state["locked"] = made["summary"]

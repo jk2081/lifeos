@@ -79,7 +79,7 @@ def list(space: str | None = None, kind: str | None = None, q: str | None = None
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	if kind and kind not in KINDS:
-		frappe.throw(_("kind must be Person or Organisation."))
+		frappe.throw(_("kind must be Person or Organisation."), title=_("Unknown kind of contact"))
 	filters = {"space": space}
 	if kind:
 		filters["kind"] = kind

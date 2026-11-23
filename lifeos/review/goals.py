@@ -82,7 +82,7 @@ class GoalPlan:
 
 	def save(self, goal, values):
 		if goal not in [g.name for g in self.goals()]:
-			frappe.throw(_("That goal is not in this review."))
+			frappe.throw(_("That goal is not in this review."), title=_("Goal not in this review"))
 		p = self.plan(goal)
 		for k in ("next_action", "task", "slot", "minutes", "who", "note"):
 			if k not in values:
@@ -90,14 +90,14 @@ class GoalPlan:
 			v = values[k]
 			# the values come from the browser: a dict or a list here would act as a filter later
 			if v is not None and not isinstance(v, (str, int, float)) or (k != "minutes" and isinstance(v, (int, float))):
-				frappe.throw(_("{0} must be text.").format(k))
+				frappe.throw(_("{0} must be text.").format(k), title=_("Value must be text"))
 			p[k] = v
 		p["next_action"] = " ".join(str(p.get("next_action") or "").split())[:140]
 		if p.get("task") and frappe.db.get_value("Life Task", p["task"], "goal") != goal:
-			frappe.throw(_("That task is not under this goal."))
+			frappe.throw(_("That task is not under this goal."), title=_("Task is not under goal"))
 		minutes = cint(p.get("minutes")) or weekplan.DEFAULT_MINUTES
 		if minutes < 5 or minutes > 600:
-			frappe.throw(_("The length must be between 5 minutes and 10 hours."))
+			frappe.throw(_("The length must be between 5 minutes and 10 hours."), title=_("Length out of range"))
 		if p.get("slot"):
 			frappe.utils.get_datetime(p["slot"])  # refuses what is not a date and time
 		p["who"] = " ".join(str(p.get("who") or "Me").split())[:140]
@@ -109,7 +109,7 @@ class GoalPlan:
 	def skip(self, goal, reason):
 		reason = " ".join((reason or "").split())[:200]
 		if not reason:
-			frappe.throw(_("Say why this goal is skipped this week."))
+			frappe.throw(_("Say why this goal is skipped this week."), title=_("Skipped goal needs a reason"))
 		p = self.plan(goal)
 		p.update({"skip": reason, "source": "owner"})
 		self.st["plans"][goal] = p
@@ -122,7 +122,7 @@ class GoalPlan:
 
 	def add_other(self, goal):
 		if goal not in [g.name for g in self.others()] and goal not in self.st["extra"]:
-			frappe.throw(_("That goal is not in progress."))
+			frappe.throw(_("That goal is not in progress."), title=_("Goal is not in progress"))
 		if goal not in self.st["extra"]:
 			self.st["extra"].append(goal)
 		self._goals = None
@@ -148,7 +148,7 @@ class GoalPlan:
 		stars = list(self.stars())
 		if on and goal not in stars:
 			if self.plan(goal).get("skip"):
-				frappe.throw(_("A skipped goal cannot be one of the top three."))
+				frappe.throw(_("A skipped goal cannot be one of the top three."), title=_("Skipped goal cannot be top"))
 			stars.append(goal)
 		elif not on:
 			stars = [s for s in stars if s != goal]
@@ -223,7 +223,7 @@ def detail(review, goal, now=None):
 	gp = GoalPlan(review)
 	g = next((x for x in gp.goals() + gp.others() if x.name == goal), None)
 	if not g:
-		frappe.throw(_("That goal is not in progress."))
+		frappe.throw(_("That goal is not in progress."), title=_("Goal is not in progress"))
 	doc = frappe.get_doc("Life Goal", goal)
 	doc.check_permission("read")
 	r = row(gp, g, gp.stars())

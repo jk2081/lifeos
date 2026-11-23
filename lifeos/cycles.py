@@ -143,7 +143,7 @@ def grid(cycle_name) -> dict:
 def find_action(action_id):
 	row = frappe.db.get_value("Life Goal Action", action_id, ["name", "parent", "per_week", "status", "title"], as_dict=True)
 	if not row:
-		frappe.throw(_("Action not found."), frappe.DoesNotExistError)
+		frappe.throw(_("Action not found."), frappe.DoesNotExistError, title=_("Action not found"))
 	goal = frappe.get_doc("Life Goal", row.parent)
 	return row, goal
 
@@ -154,10 +154,10 @@ def set_tick(action_id, week, count, inbox_item=None) -> dict:
 	goal.check_permission("write")
 	cycle = frappe.get_doc("Life Cycle", goal.cycle)
 	if cycle.status == "Closed":
-		frappe.throw(_("A closed cycle is read-only."))
+		frappe.throw(_("A closed cycle is read-only."), title=_("Cycle already closed"))
 	week = int(week)
 	if not 1 <= week <= WEEKS:
-		frappe.throw(_("Week must be 1 to 12."))
+		frappe.throw(_("Week must be 1 to 12."), title=_("Week out of range"))
 	count = max(0, min(int(count or 0), int(row.per_week or 1)))
 	start, end = week_dates(cycle, week)
 	for name in frappe.get_all("Life Action Log", filters={"action_id": action_id, "week": week}, pluck="name"):
@@ -181,7 +181,7 @@ def _update_tick_summary(action_id):
 def set_action_status(action_id, status) -> dict:
 	"""Mark an action Done once and for all, Dropped, or Open again."""
 	if status not in ("Open", "Done", "Dropped"):
-		frappe.throw(_("Unknown status."))
+		frappe.throw(_("Unknown status."), title=_("Unknown status"))
 	row, goal = find_action(action_id)
 	goal.check_permission("write")
 	for a in goal.actions:
@@ -202,11 +202,11 @@ def close_cycle(cycle_name, outcomes=None) -> dict:
 	cycle = frappe.get_doc("Life Cycle", cycle_name)
 	cycle.check_permission("write")
 	if cycle.status == "Closed":
-		frappe.throw(_("This cycle is already closed."))
+		frappe.throw(_("This cycle is already closed."), title=_("Cycle already closed"))
 	if cycle.status != "Active":
-		frappe.throw(_("Only an active cycle can be closed."))
+		frappe.throw(_("Only an active cycle can be closed."), title=_("Cycle is not active"))
 	if getdate(today()) <= getdate(cycle.end_date) and not frappe.flags.lifeos_allow_early_close:
-		frappe.throw(_("A cycle can be closed after its end date."))
+		frappe.throw(_("A cycle can be closed after its end date."), title=_("Cycle has not ended"))
 	outcomes = {o["goal"]: o for o in (outcomes or [])}
 	actions, ticks = _actions(cycle.name), _ticks(cycle.name)
 	by_goal = {}
@@ -218,7 +218,7 @@ def close_cycle(cycle_name, outcomes=None) -> dict:
 		o = outcomes.get(name) or {}
 		outcome = o.get("outcome") or ("Not Achieved" if goal.outcome == "In Progress" else goal.outcome)
 		if outcome not in allowed:
-			frappe.throw(_("Outcome for {0} must be one of {1}.").format(goal.title, ", ".join(allowed)))
+			frappe.throw(_("Outcome for {0} must be one of {1}.").format(goal.title, ", ".join(allowed)), title=_("Outcome not allowed"))
 		goal.outcome = outcome
 		goal.result_note = o.get("result_note") or goal.result_note
 		goal.final_score = goal_percent(cycle, by_goal.get(name, []), ticks, WEEKS)
@@ -251,7 +251,7 @@ def plan_next_cycle(cycle_name, goals=None, title=None) -> dict:
 	if existing:
 		new = frappe.get_doc("Life Cycle", existing)
 		if new.status == "Closed":
-			frappe.throw(_("The next cycle is already closed."))
+			frappe.throw(_("The next cycle is already closed."), title=_("Next cycle already closed"))
 	else:
 		new = frappe.get_doc({"doctype": "Life Cycle", "space": cycle.space, "title": title or cycle_title(start),
 			"start_date": start, "status": "Planned"}).insert(ignore_permissions=True)
@@ -259,7 +259,7 @@ def plan_next_cycle(cycle_name, goals=None, title=None) -> dict:
 	for name in goals or []:
 		old = frappe.get_doc("Life Goal", name)
 		if old.cycle != cycle.name:
-			frappe.throw(_("{0} is not a goal of this cycle.").format(old.title))
+			frappe.throw(_("{0} is not a goal of this cycle.").format(old.title), title=_("Goal is not in this cycle"))
 		if frappe.db.exists("Life Goal", {"cycle": new.name, "carried_from": old.name}):
 			continue
 		copy = frappe.get_doc({
@@ -364,7 +364,7 @@ def carry_month_goal(goal_name) -> dict:
 	old = frappe.get_doc("Life Goal", goal_name)
 	old.check_permission("write")
 	if old.horizon != "Month" or old.outcome != "In Progress":
-		frappe.throw(_("Only an open month goal can be carried forward."))
+		frappe.throw(_("Only an open month goal can be carried forward."), title=_("Month goal is not open"))
 	ny, nm = next_month(old.target_date.year, old.target_date.month)
 	new = add_month_goal(old.space, ny, nm, old.title, old.area, carried_from=old.name, serves=old.serves)
 	old.outcome = "Carried"
@@ -378,7 +378,7 @@ def carry_task(task_name) -> dict:
 	old = frappe.get_doc("Life Task", task_name)
 	old.check_permission("write")
 	if old.status in ("Done", "Dropped", "Carried"):
-		frappe.throw(_("Only an open task can be carried forward."))
+		frappe.throw(_("Only an open task can be carried forward."), title=_("Task is not open"))
 	new = frappe.copy_doc(old)
 	new.update({"status": "Open", "carried_from": old.name, "completed_on": None,
 		"due_date": None, "is_archived": 0, "archived_on": None, "archive_reason": ""})

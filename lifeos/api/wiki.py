@@ -115,13 +115,13 @@ def _sources(rows, space):
 		if isinstance(r, str) and ":" in r:
 			r = dict(zip(("doctype", "name"), r.split(":", 1)))
 		if not isinstance(r, dict) or r.get("doctype") not in SOURCE_DOCTYPES or not r.get("name"):
-			frappe.throw(_("A source is {doctype, name} with doctype Life Inbox Item or Life Chat Log."))
+			frappe.throw(_("A source is {doctype, name} with doctype Life Inbox Item or Life Chat Log."), title=_("Source is malformed"))
 		doc = permissions.get_doc_checked(r["doctype"], r["name"])
 		if doc.space != space:
-			frappe.throw(_("A page can only cite sources from its own space."))
+			frappe.throw(_("A page can only cite sources from its own space."), title=_("Source is in another space"))
 		out.append((r["doctype"], r["name"]))
 	if len(out) > MAX_SOURCES:
-		frappe.throw(_("At most {0} sources in one call.").format(MAX_SOURCES))
+		frappe.throw(_("At most {0} sources in one call.").format(MAX_SOURCES), title=_("Too many sources"))
 	return out
 
 
@@ -146,7 +146,7 @@ def _page_out(doc, with_text=True):
 
 def _check_text(content_md):
 	if content_md is not None and len(content_md) > MAX_MD:
-		frappe.throw(_("A page can hold at most {0} characters.").format(f"{MAX_MD:,}"))
+		frappe.throw(_("A page can hold at most {0} characters.").format(f"{MAX_MD:,}"), title=_("Page is too long"))
 
 
 # ---------- reading ----------
@@ -271,7 +271,7 @@ def _about(doc, about):
 	if about in (None, ""):
 		return
 	if not people.kind_of(about):
-		frappe.throw(_("about must be Person or Organisation."))
+		frappe.throw(_("about must be Person or Organisation."), title=_("About must be a kind"))
 	people.link_page(doc, about)
 
 
@@ -285,11 +285,11 @@ def create_page(space: str | None = None, title: str | None = None, content_md: 
 	goal = goal or None
 	title = (title or "").strip()
 	if not title:
-		frappe.throw(_("A page needs a title."))
+		frappe.throw(_("A page needs a title."), title=_("Page needs a title"))
 	_check_text(content_md)
 	existing = frappe.db.sql("select name from `tabLife Note` where space=%s and collection='Wiki' and lower(title)=lower(%s) limit 1", (space, title))
 	if existing:
-		frappe.throw(_("The wiki already has a page called {0} ({1}). Edit it with update_page.").format(title, existing[0][0]), frappe.DuplicateEntryError)
+		frappe.throw(_("The wiki already has a page called {0} ({1}). Edit it with update_page.").format(title, existing[0][0]), frappe.DuplicateEntryError, title=_("Page already exists"))
 	srcs = _sources(sources, space)
 	src = _source_arg(source, space)
 	if src and src not in srcs:
@@ -315,11 +315,11 @@ def update_page(name: str, content_md: str | None = None, base_version: str | No
 	the rules page. Writes an Edited change."""
 	doc = _page_doc(name, "write")
 	if doc.collection != "Wiki":
-		frappe.throw(_("This page is in My notes. Only people change My notes; propose a note instead."), frappe.PermissionError)
+		frappe.throw(_("This page is in My notes. Only people change My notes; propose a note instead."), frappe.PermissionError, title=_("Page is in My notes"))
 	if doc.is_rules and permissions.is_agent():
-		frappe.throw(_("The rules page is changed by people only."), frappe.PermissionError)
+		frappe.throw(_("The rules page is changed by people only."), frappe.PermissionError, title=_("Rules page is people only"))
 	if not base_version:
-		frappe.throw(_("Send base_version, the version you read with get_page."))
+		frappe.throw(_("Send base_version, the version you read with get_page."), title=_("Base version missing"))
 	if base_version != version_of(doc):
 		return {"conflict": True, "current": _page_out(doc)}
 	_check_text(content_md)
@@ -354,7 +354,7 @@ def cite(name: str, sources: str | list):
 	"""Add sources to a page without changing its text."""
 	doc = _page_doc(name, "write")
 	if doc.collection != "Wiki" and permissions.is_agent():
-		frappe.throw(_("This page is in My notes. Agents cannot change it."), frappe.PermissionError)
+		frappe.throw(_("This page is in My notes. Agents cannot change it."), frappe.PermissionError, title=_("Page is in My notes"))
 	have = {(r.source_doctype, r.source_name) for r in doc.sources}
 	added = 0
 	for d, n in _sources(sources, doc.space):
@@ -376,12 +376,12 @@ def move(name: str, to: str):
 	"""Keep in My notes (to="My notes") or Hand to the wiki (to="Wiki"). People only. A page moved to My notes can no longer
 	be changed by agents. The rules page stays in the wiki."""
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can move a page between My notes and the wiki."), frappe.PermissionError)
+		frappe.throw(_("Only a person can move a page between My notes and the wiki."), frappe.PermissionError, title=_("Only people move pages"))
 	if to not in ("My notes", "Wiki"):
-		frappe.throw(_("to must be My notes or Wiki."))
+		frappe.throw(_("to must be My notes or Wiki."), title=_("Destination is not valid"))
 	doc = _page_doc(name, "write")
 	if doc.is_rules:
-		frappe.throw(_("The rules page stays in the wiki."))
+		frappe.throw(_("The rules page stays in the wiki."), title=_("Rules page stays in wiki"))
 	if doc.collection == to:
 		return {"name": doc.name, "collection": to}
 	doc.collection = to
@@ -472,9 +472,9 @@ def undo(change: str, force: bool | int | None = 0):
 	ch = frappe.get_doc("Life Wiki Change", change)
 	doc = _page_doc(ch.note, "write")
 	if doc.collection != "Wiki" and permissions.is_agent():
-		frappe.throw(_("This page is in My notes. Agents cannot change it."), frappe.PermissionError)
+		frappe.throw(_("This page is in My notes. Agents cannot change it."), frappe.PermissionError, title=_("Page is in My notes"))
 	if ch.change_type not in ("Created", "Edited", "Reverted"):
-		frappe.throw(_("A move between My notes and the wiki is undone by moving the page back."))
+		frappe.throw(_("A move between My notes and the wiki is undone by moving the page back."), title=_("Move cannot be undone"))
 	if (doc.content_md or "") != (ch.after_md or "") and not int(force or 0):
 		return {"conflict": True, "current_md": doc.content_md or "", "after_md": ch.after_md or ""}
 	before = doc.content_md or ""

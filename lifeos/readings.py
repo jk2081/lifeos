@@ -136,7 +136,7 @@ def require_finish_line(values):
 	"""Refuse a new goal with no finish line and no number with its target while the setting is on. `values` is a dict of the
 	goal's fields (done_when, measure_kind, measure, start_value, target_value). Existing goals are never checked."""
 	if done_when_required() and not has_finish_line(values):
-		frappe.throw(_(REQUIRED_MESSAGE), frappe.ValidationError)
+		frappe.throw(_(REQUIRED_MESSAGE), frappe.ValidationError, title=_("Goal needs a measure"))
 
 
 def check_goal(doc):
@@ -146,14 +146,14 @@ def check_goal(doc):
 	if not kind:
 		return
 	if kind == "Milestone" and not (doc.get("done_when") or "").strip():
-		frappe.throw(_("Say what will be true when this goal is done."), frappe.ValidationError)
+		frappe.throw(_("Say what will be true when this goal is done."), frappe.ValidationError, title=_("Goal needs a finish line"))
 	if kind == "Number":
 		if not (doc.get("measure") or "").strip():
-			frappe.throw(_("Say what is measured, for example Ghillidary yield."), frappe.ValidationError)
+			frappe.throw(_("Say what is measured, for example Ghillidary yield."), frappe.ValidationError, title=_("Measure is missing"))
 		if doc.get("start_value") is None or doc.get("target_value") is None:
-			frappe.throw(_("A number goal needs a start and a target."), frappe.ValidationError)
+			frappe.throw(_("A number goal needs a start and a target."), frappe.ValidationError, title=_("Start and target missing"))
 		if flt(doc.start_value) == flt(doc.target_value):
-			frappe.throw(_("The target must differ from the start."), frappe.ValidationError)
+			frappe.throw(_("The target must differ from the start."), frappe.ValidationError, title=_("Target equals start"))
 
 
 def refresh_current(goal):

@@ -107,7 +107,7 @@ class Review:
 	def save(self):
 		"""Save the state, counting the time since the last change when it is short enough to be work on the review."""
 		if self.doc.status == "Locked" and not self.doc.flags.locking:
-			frappe.throw(_("This review is locked."))
+			frappe.throw(_("This review is locked."), title=_("Review is locked"))
 		now = now_datetime()
 		last = self.state.get("last_active")
 		if last:

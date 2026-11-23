@@ -268,19 +268,19 @@ def ask_has_permission(doc, ptype=None, user=None, debug=False):
 
 def require_login():
 	if frappe.session.user == "Guest":
-		frappe.throw(_("Please log in."), frappe.PermissionError)
+		frappe.throw(_("Please log in."), frappe.PermissionError, title=_("Login required"))
 
 
 def require_space(space, write=False):
 	"""Stop unless the session user is a member of the space (with Write access when asked)."""
 	require_login()
 	if not space or not frappe.db.exists("Life Space", space):
-		frappe.throw(_("Space not found."), frappe.PermissionError)
+		frappe.throw(_("Space not found."), frappe.PermissionError, title=_("Space not found"))
 	if frappe.session.user == "Administrator":
 		return space
 	access = user_spaces().get(space)
 	if not access or (write and access != "Write"):
-		frappe.throw(_("You do not have access to this space."), frappe.PermissionError)
+		frappe.throw(_("You do not have access to this space."), frappe.PermissionError, title=_("No access to this space"))
 	return space
 
 
@@ -303,7 +303,7 @@ def resolve_space(space=None, write=False):
 	"""Return the given space, or the user's default one, after checking membership."""
 	space = space or default_space()
 	if not space:
-		frappe.throw(_("You are not a member of any space."), frappe.PermissionError)
+		frappe.throw(_("You are not a member of any space."), frappe.PermissionError, title=_("Not in any space"))
 	return require_space(space, write=write)
 
 
@@ -345,4 +345,4 @@ def validate_user_roles(doc, method=None):
 	roles = {r.role for r in doc.get("roles") or []}
 	if "Life Agent" in roles and roles & {"Life User", "Life Admin"}:
 		frappe.throw(_("A user cannot have Life Agent together with Life User or Life Admin. Agents and people are separate accounts: "
-			"remove Life Agent, or remove the other Life role."), frappe.ValidationError)
+			"remove Life Agent, or remove the other Life role."), frappe.ValidationError, title=_("Agent role conflict"))

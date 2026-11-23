@@ -143,7 +143,7 @@ def save(note: str | None = None, space: str | None = None, title: str | None = 
 		doc = frappe.get_doc({"doctype": "Life Note", "space": space})
 	if title is not None:
 		if not title.strip():
-			frappe.throw(_("A note needs a title."))
+			frappe.throw(_("A note needs a title."), title=_("Note needs a title"))
 		doc.title = title.strip()
 	before_md = doc.content_md or ""
 	if content_md is not None:
@@ -158,7 +158,7 @@ def save(note: str | None = None, space: str | None = None, title: str | None = 
 	if also_in is not None:
 		doc.set("also_in", [{"area": a} for a in parse(also_in, [])])
 	if doc.parent_note and doc.parent_note == doc.name:
-		frappe.throw(_("A note cannot be its own parent."))
+		frappe.throw(_("A note cannot be its own parent."), title=_("Note cannot be its own parent"))
 	doc.save() if note else doc.insert()
 	if doc.collection == "Wiki":
 		# every change to a wiki page, by anyone, is logged with the text before and after (UX fixes, set 4)
@@ -191,9 +191,9 @@ def set_sensitive(doctype: str, name: str, sensitive: bool | int = 1):
 	"""Mark a capture or note sensitive, or unmark it (UX fixes, set 6). Anyone who may edit it may mark it; only the space's
 	owner may unmark it. A sensitive item follows the Vault rules. People only: an agent cannot change who sees what."""
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot mark or unmark sensitive items."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot mark or unmark sensitive items."), frappe.PermissionError, title=_("Agents cannot mark sensitive"))
 	if doctype not in permissions.SENSITIVE_DOCTYPES:
-		frappe.throw(_("Only captures and notes can be marked sensitive."))
+		frappe.throw(_("Only captures and notes can be marked sensitive."), title=_("Cannot be marked sensitive"))
 	doc = permissions.get_doc_checked(doctype, name, "write")
 	doc.is_sensitive = 1 if flag(sensitive) else 0
 	doc.flags.keep_touched = True

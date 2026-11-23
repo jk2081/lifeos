@@ -22,7 +22,7 @@ SCOPED = {
 @frappe.validate_and_sanitize_search_inputs
 def link_query(doctype: str, txt: str, searchfield: str | None, start: int, page_len: int, filters: str | dict | list | None, **kwargs):
 	if doctype not in SCOPED:
-		frappe.throw(frappe._("Not a filing DocType"))
+		frappe.throw(frappe._("Not a filing DocType"), title=frappe._("Not a filing DocType"))
 	field = SCOPED[doctype]
 	if isinstance(filters, str):
 		filters = json.loads(filters or "{}")

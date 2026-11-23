@@ -311,7 +311,7 @@ def get(space=None, which="open_band", area=None):
 	fn = {"open_band": open_band, "sidebar": sidebar, "inventory": inventory, "tasks": task_numbers, "goals": goal_numbers,
 		"library": library_numbers, "week": week_numbers}.get(which)
 	if not fn:
-		frappe.throw(frappe._("Unknown set of counts."))
+		frappe.throw(frappe._("Unknown set of counts."), title=frappe._("Counts set is not known"))
 	return fn(space, area)
 
 

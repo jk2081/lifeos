@@ -20,7 +20,7 @@ OLD_DAYS = 180
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot use Reset."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot use Reset."), frappe.PermissionError, title=_("Agents cannot use Reset"))
 
 
 def norm(title):
@@ -198,14 +198,14 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 	"""One decision on one item: Do (with a date), Waiting (for whom), Someday, Archive or Delete. Returns what Undo needs."""
 	_person()
 	if decision not in DECISIONS:
-		frappe.throw(_("decision must be one of: {0}.").format(", ".join(DECISIONS)))
+		frappe.throw(_("decision must be one of: {0}.").format(", ".join(DECISIONS)), title=_("Decision is not valid"))
 	if doctype not in ("Life Task", "Life Goal"):
-		frappe.throw(_("Reset decides on tasks and goals."))
+		frappe.throw(_("Reset decides on tasks and goals."), title=_("Record type not supported"))
 	doc = permissions.get_doc_checked(doctype, name, "delete" if decision == "delete" else "write")
 	undo = [_snap(doc)]
 	if decision == "do":
 		if not date:
-			frappe.throw(_("Choose a date."))
+			frappe.throw(_("Choose a date."), title=_("Date is missing"))
 		if doctype == "Life Task":
 			doc.status = "Open" if doc.status == "Waiting" else doc.status
 			doc.due_date = date
@@ -214,7 +214,7 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 		doc.save()
 	elif decision == "waiting":
 		if not (waiting_on or "").strip():
-			frappe.throw(_("Say who or what it is waiting on."))
+			frappe.throw(_("Say who or what it is waiting on."), title=_("Waiting reason is missing"))
 		if doctype == "Life Task":
 			doc.status, doc.waiting_on = "Waiting", waiting_on.strip()
 		else:
@@ -250,7 +250,7 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 	space = permissions.resolve_space(space, write=True)
 	items = parse(items, []) or []
 	if len(items) > MAX_ITEMS:
-		frappe.throw(_("At most {0} items at a time.").format(MAX_ITEMS))
+		frappe.throw(_("At most {0} items at a time.").format(MAX_ITEMS), title=_("Too many items"))
 	undo, done = [], 0
 	for it in items:
 		doctype, name = it.get("doctype"), it.get("name")
@@ -290,7 +290,7 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 		elif action == "keep":
 			someday.keep(doctype, name)
 		else:
-			frappe.throw(_("Unknown batch action."))
+			frappe.throw(_("Unknown batch action."), title=_("Batch action is not known"))
 		done += 1
 	return {"done": done, "undo": undo}
 
@@ -365,7 +365,7 @@ def _unaccept(proposal):
 	from lifeos import index
 
 	if not isinstance(proposal, str) or not proposal:
-		frappe.throw(_("Nothing to undo."))
+		frappe.throw(_("Nothing to undo."), title=_("Nothing to undo"))
 	prop = permissions.get_doc_checked("Life Proposal", proposal, "write")
 	if prop.status != "Accepted":
 		return

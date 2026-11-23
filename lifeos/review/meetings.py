@@ -183,7 +183,7 @@ def link(event, doctype, name):
 	ev.check_permission("write")
 	doc = permissions.get_doc_checked(doctype, name, "read")
 	if doc.get("space") != ev.life_space:
-		frappe.throw(_("That record is in another space."))
+		frappe.throw(_("That record is in another space."), title=_("Record is in another space"))
 	got = frappe.db.get_value("Life Meeting Link", {"event": event, "record_doctype": doctype, "record_name": name})
 	if got:
 		frappe.db.set_value("Life Meeting Link", got, {"removed": 0, "how": "Owner"})

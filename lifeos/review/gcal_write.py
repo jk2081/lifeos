@@ -33,7 +33,7 @@ def choose(user, calendar_id):
 	"""Save the calendar to write to; empty or None turns writing off. The calendar must be one of the account's."""
 	calendar_id = (calendar_id or "").strip() or None
 	if calendar_id and calendar_id not in [c["id"] for c in gcal.source_for(gcal.account(user)).calendars()]:
-		frappe.throw(frappe._("That is not one of your calendars."))
+		frappe.throw(frappe._("That is not one of your calendars."), title=frappe._("Calendar is not yours"))
 	if calendar_id:
 		frappe.defaults.set_user_default(KEY, calendar_id, user)
 	else:

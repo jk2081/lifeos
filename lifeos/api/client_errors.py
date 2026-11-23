@@ -25,7 +25,7 @@ def log(reference: str, message: str, stack: str = "", path: str = "", component
 	fields = {"reference": _clip(reference, LIMITS["reference"]), "kind": _clip(kind, LIMITS["kind"]), "path": path,
 		"component": _clip(component, LIMITS["component"]), "info": _clip(info, LIMITS["info"]), "user": frappe.session.user}
 	if not fields["reference"]:
-		frappe.throw(_("An error reference is required."))
+		frappe.throw(_("An error reference is required."), title=_("Error reference missing"))
 	lines = [f"{k}: {v}" for k, v in fields.items()]
 	body = "\n".join([*lines, "", _clip(message, LIMITS["message"]), "", _clip(stack, LIMITS["stack"])])
 	frappe.log_error(title=f"{TITLE} {fields['reference']}", message=body)

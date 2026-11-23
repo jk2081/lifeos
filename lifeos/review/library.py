@@ -86,7 +86,7 @@ def meeting(review, event):
 	space, start, end = review.doc.space, review.doc.period_start, review.doc.period_end
 	ev = frappe.get_doc("Event", event)
 	if ev.life_space != space or not frappe.has_permission("Event", "read", doc=ev):
-		frappe.throw(frappe._("That meeting is not in this review."), frappe.PermissionError)
+		frappe.throw(frappe._("That meeting is not in this review."), frappe.PermissionError, title=frappe._("Meeting not in review"))
 	links = meetings.linked(event)
 	from lifeos.pane_refs import ref_of
 
@@ -145,10 +145,10 @@ def plan_task(review, event, title, goal=None):
 	"""A line in the meeting drawer becomes a task linked to the meeting, under the goal chosen."""
 	ev = frappe.get_doc("Event", event)
 	if ev.life_space != review.doc.space:
-		frappe.throw(frappe._("That meeting is not in this review."))
+		frappe.throw(frappe._("That meeting is not in this review."), title=frappe._("Meeting not in review"))
 	title = " ".join((title or "").split())[:140]
 	if not title:
-		frappe.throw(frappe._("Type the task."))
+		frappe.throw(frappe._("Type the task."), title=frappe._("Task is empty"))
 	area = frappe.db.get_value("Life Goal", goal, "area") if goal else None
 	t = frappe.get_doc({"doctype": "Life Task", "space": review.doc.space, "title": title, "status": "Open", "goal": goal or None, "area": area}).insert()
 	meetings.link(event, "Life Task", t.name)

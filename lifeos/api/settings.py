@@ -23,7 +23,7 @@ LISTS = {
 def _admin_only():
 	permissions.require_login()
 	if not permissions.is_admin():
-		frappe.throw(_("Only the owner can change this."), frappe.PermissionError)
+		frappe.throw(_("Only the owner can change this."), frappe.PermissionError, title=_("Only the owner can change this"))
 
 
 def _counts(kind, space, names):
@@ -278,7 +278,7 @@ def set_feature_cap(feature: str, cap: float = 0):
 	import json
 
 	if float(cap) < 0:
-		frappe.throw(_("A cap cannot be negative."))
+		frappe.throw(_("A cap cannot be negative."), title=_("Cap cannot be negative"))
 	doc = frappe.get_doc("Life Settings")
 	caps = json.loads(doc.feature_caps or "{}")
 	if float(cap):
@@ -299,7 +299,7 @@ def set_ai_price(model: str, input_per_mtok: float, output_per_mtok: float, cach
 	if cached_per_mtok is not None:
 		row.cached_per_mtok = float(cached_per_mtok)
 	if row.input_per_mtok < 0 or row.output_per_mtok < 0:
-		frappe.throw(_("Prices cannot be negative."))
+		frappe.throw(_("Prices cannot be negative."), title=_("Prices cannot be negative"))
 	doc.save()
 	return {"saved": True}
 
@@ -325,29 +325,29 @@ def save(values: str | dict):
 	doc = frappe.get_doc("Life Settings")
 	for k, v in values.items():
 		if k not in SETTING_FIELDS:
-			frappe.throw(_("Unknown setting {0}.").format(k))
+			frappe.throw(_("Unknown setting {0}.").format(k), title=_("Unknown setting"))
 		doc.set(k, v)
 	for f in ("score_target", "archive_after_days", "stale_task_days", "stuck_after_days", "someday_review_months"):
 		if int(doc.get(f) or 0) <= 0:
-			frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label(f)))
+			frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label(f)), title=_("Number must be positive"))
 	for f in ("stuck_limit", "open_task_goal"):
 		if int(doc.get(f) or 0) < 0:
-			frappe.throw(_("{0} cannot be negative.").format(doc.meta.get_label(f)))
+			frappe.throw(_("{0} cannot be negative.").format(doc.meta.get_label(f)), title=_("Number cannot be negative"))
 	if float(doc.get("monthly_cap_usd") or 0) < 0:
-		frappe.throw(_("The monthly cap cannot be negative."))
+		frappe.throw(_("The monthly cap cannot be negative."), title=_("Monthly cap cannot be negative"))
 	if doc.get("old_inbox_mode") not in (None, "", "Suggest", "Park", "Discard"):
-		frappe.throw(_("Choose Suggest, Park or Discard."))
+		frappe.throw(_("Choose Suggest, Park or Discard."), title=_("Unknown old inbox action"))
 	if "old_inbox_days" in values and int(doc.get("old_inbox_days") or 0) <= 0:
-		frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label("old_inbox_days")))
+		frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label("old_inbox_days")), title=_("Number must be positive"))
 	if "work_days" in values:
 		days = [d.strip() for d in str(doc.work_days or "").split(",") if d.strip()]
 		if not days or any(d not in WEEKDAYS for d in days):
-			frappe.throw(_("Choose at least one working day."))
+			frappe.throw(_("Choose at least one working day."), title=_("Working day needed"))
 		doc.work_days = ",".join(d for d in WEEKDAYS if d in days)
 	if doc.work_start and doc.work_end and str(doc.work_end).zfill(8) <= str(doc.work_start).zfill(8):
-		frappe.throw(_("The working day must end after it starts."))
+		frappe.throw(_("The working day must end after it starts."), title=_("Working day ends too early"))
 	if int(doc.score_target) > 100:
-		frappe.throw(_("The score target is a percentage."))
+		frappe.throw(_("The score target is a percentage."), title=_("Score target is a percentage"))
 	doc.save()
 	return {"saved": True}
 
@@ -375,7 +375,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	"Use focuses" on, the focuses its kind offers are created under it, or only those named in `focuses`.
 	delete=1 removes the row for good; the Settings screen does not offer it, agents and tests may use it."""
 	if kind not in LISTS:
-		frappe.throw(_("Unknown list."))
+		frappe.throw(_("Unknown list."), title=_("Unknown list"))
 	if kind == "area":
 		_areas_admin_only(is_on)
 	doctype, field = LISTS[kind]
@@ -387,14 +387,15 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 				doc.delete()
 			except frappe.LinkExistsError:
 				frappe.throw(_("{0} is still used by other records. Remove it from them first{1}.").format(
-					doc.get(field), _(", or archive it") if kind in ARCHIVABLE else ""))
+					doc.get(field), _(", or archive it") if kind in ARCHIVABLE else ""),
+					title=_("Still used by other records"))
 			return {"deleted": name}
 	else:
 		space = permissions.resolve_space(space, write=True)
 		doc = frappe.get_doc({"doctype": doctype, "space": space})
 	if title is not None:
 		if not title.strip():
-			frappe.throw(_("A name is needed."))
+			frappe.throw(_("A name is needed."), title=_("Name needed"))
 		doc.set(field, title.strip())
 	if kind == "area" and parent_area is not None:
 		doc.parent_area = parent_area or None
@@ -427,7 +428,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	if is_archived is not None and kind in ARCHIVABLE and int(is_archived) != int(doc.get("is_archived") or 0):
 		if int(is_archived):
 			if kind == "area" and doc.is_life_area:
-				frappe.throw(_("{0} is one of the seven areas of life. Switch it off instead of archiving it.").format(doc.area_name))
+				frappe.throw(_("{0} is one of the seven areas of life. Switch it off instead of archiving it.").format(doc.area_name), title=_("Core area cannot be archived"))
 			if kind == "area":
 				_move_open_work(doc, move_to)
 			doc.is_archived, doc.archived_on = 1, frappe.utils.today()
@@ -466,8 +467,8 @@ def _areas_admin_only(is_on=None):
 	if permissions.is_admin():
 		return
 	if is_on is not None and permissions.is_agent():
-		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError)
-	frappe.throw(_("Only the owner can change areas."), frappe.PermissionError)
+		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError, title=_("Only a person can switch areas"))
+	frappe.throw(_("Only the owner can change areas."), frappe.PermissionError, title=_("Only the owner can change areas"))
 
 
 def _move_open_work(doc, move_to):
@@ -480,7 +481,8 @@ def _move_open_work(doc, move_to):
 	if not move_to:
 		goals, tasks = len(work["goals"]), len(work["tasks"])
 		frappe.throw(_("{0} has {1} and {2}. Choose where to move them before archiving it.").format(doc.area_name,
-			_("1 open goal") if goals == 1 else _("{0} open goals").format(goals), _("1 open task") if tasks == 1 else _("{0} open tasks").format(tasks)))
+			_("1 open goal") if goals == 1 else _("{0} open goals").format(goals), _("1 open task") if tasks == 1 else _("{0} open tasks").format(tasks)),
+			title=_("Area still has open records"))
 	areas.move_work(doc.name, move_to)
 
 
@@ -504,7 +506,7 @@ def create_space(space_name: str, owner_user: str | None = None):
 
 	owner_user = owner_user or frappe.session.user
 	if not frappe.db.exists("User", owner_user):
-		frappe.throw(_("User {0} does not exist.").format(owner_user))
+		frappe.throw(_("User {0} does not exist.").format(owner_user), title=_("User does not exist"))
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name.strip(), "owner_user": owner_user,
 		"members": [{"user": owner_user, "access": "Write"}]}).insert()
 	return {"name": doc.name}
@@ -520,22 +522,22 @@ def set_member(space: str, user: str, access: str | None = None, remove: bool | 
 	_admin_only()
 	doc = frappe.get_doc("Life Space", space)
 	if user in ("Administrator", "Guest"):
-		frappe.throw(_("This account cannot be a member."))
+		frappe.throw(_("This account cannot be a member."), title=_("Account cannot be a member"))
 	if not frappe.db.exists("User", user):
-		frappe.throw(_("User {0} does not exist. Create the user in Frappe first.").format(user))
+		frappe.throw(_("User {0} does not exist. Create the user in Frappe first.").format(user), title=_("User does not exist"))
 	if access not in (None, "", "Read", "Write"):
-		frappe.throw(_("Access is Read or Write."))
+		frappe.throw(_("Access is Read or Write."), title=_("Access level not recognised"))
 	row = next((m for m in doc.members if m.user == user), None)
 	if grant_role:
 		_check_grant(user, grant_role)
 	if int(remove or 0):
 		if user == doc.owner_user:
-			frappe.throw(_("The owner of a space cannot be removed from it."))
+			frappe.throw(_("The owner of a space cannot be removed from it."), title=_("Space owner cannot be removed"))
 		if row:
 			doc.remove(row)
 	elif row:
 		if user == doc.owner_user and access == "Read":
-			frappe.throw(_("The owner of a space always has Can edit."))
+			frappe.throw(_("The owner of a space always has Can edit."), title=_("Space owner must edit"))
 		row.access = access or row.access
 	else:
 		_give_role(user, grant_role)
@@ -553,9 +555,9 @@ def _check_grant(user, grant_role):
 	"""Add member's role rule (issue 1): only Life User or Life Agent, and only to a user with no Life role yet. So an agent
 	is never given Life User or Life Admin here."""
 	if grant_role not in GRANTABLE.values():
-		frappe.throw(_("Add member gives only the person or the agent role."), frappe.PermissionError)
+		frappe.throw(_("Add member gives only the person or the agent role."), frappe.PermissionError, title=_("Role not allowed for member"))
 	if _life_roles(user) - {grant_role}:
-		frappe.throw(_("{0} already has a Life OS role. Change roles in Frappe.").format(user), frappe.PermissionError)
+		frappe.throw(_("{0} already has a Life OS role. Change roles in Frappe.").format(user), frappe.PermissionError, title=_("User already has a role"))
 
 
 def _give_role(user, grant_role):
@@ -563,7 +565,7 @@ def _give_role(user, grant_role):
 	if _life_roles(user):
 		return
 	if not grant_role:
-		frappe.throw(_("{0} has no Life OS role yet. Choose whether they are a person or an agent.").format(user))
+		frappe.throw(_("{0} has no Life OS role yet. Choose whether they are a person or an agent.").format(user), title=_("Member needs a role"))
 	u = frappe.get_doc("User", user)
 	u.flags.ignore_permissions = True  # system: Life Admin only (checked by the caller); _check_grant allowed only Life User or Life Agent
 	u.add_roles(grant_role)
@@ -601,7 +603,7 @@ def reorder(kind: str, names: str | list, parent_area: str | None = None):
 	from lifeos.api.utils import parse
 
 	if kind != "area":
-		frappe.throw(_("Only areas have an order."))
+		frappe.throw(_("Only areas have an order."), title=_("Only areas have an order"))
 	_areas_admin_only()
 	doctype = LISTS[kind][0]
 	names = parse(names, []) or []

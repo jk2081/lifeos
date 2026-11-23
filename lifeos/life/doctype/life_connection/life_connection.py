@@ -7,7 +7,7 @@ class LifeConnection(Document):
 	def validate(self):
 		self.system = (self.system or "").strip().lower()
 		if not self.system:
-			frappe.throw(_("A connection needs a system, for example gmail."))
+			frappe.throw(_("A connection needs a system, for example gmail."), title=_("Connection needs a system"))
 		self.label = (self.label or "").strip() or self.system.title()
 		self.default_intent = self.default_intent or "Process"
 		other = {"space": self.space, "system": self.system, "name": ["!=", self.name or ""]}
@@ -19,4 +19,4 @@ class LifeConnection(Document):
 			else:  # the bare row of defaults for what agents file as gmail: one for a space
 				other["mailbox"], other["connected_app"] = ["is", "not set"], ["is", "not set"]
 		if frappe.db.get_value("Life Connection", other):
-			frappe.throw(_("This space already has a connection for {0}.").format(self.mailbox or self.system), frappe.DuplicateEntryError)
+			frappe.throw(_("This space already has a connection for {0}.").format(self.mailbox or self.system), frappe.DuplicateEntryError, title=_("Connection already exists"))

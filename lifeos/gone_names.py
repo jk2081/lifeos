@@ -14,7 +14,7 @@ def refuse(values) -> None:
 	"""Raise a ValidationError that names the replacement when `values` (a dict of arguments) holds a removed name."""
 	for old, new in GONE.items():
 		if values and old in values:
-			frappe.throw(_("Projects are goals now: send `{0}`, not `{1}`.").format(new, old), frappe.ValidationError)
+			frappe.throw(_("Projects are goals now: send `{0}`, not `{1}`.").format(new, old), frappe.ValidationError, title=_("Projects are goals now"))
 
 
 def before_request() -> None:

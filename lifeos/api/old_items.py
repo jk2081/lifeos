@@ -12,7 +12,7 @@ from lifeos.api.utils import lens_area, page, parse
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Only a person decides what happens to Inbox items."), frappe.PermissionError)
+		frappe.throw(_("Only a person decides what happens to Inbox items."), frappe.PermissionError, title=_("Only people decide Inbox items"))
 
 
 @frappe.whitelist(methods=["GET"])

@@ -13,7 +13,7 @@ SOURCES = ("Life Inbox Item", "Life Chat Log", "Life Note")  # what a reading ca
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("The weekly review is for people."), frappe.PermissionError)
+		frappe.throw(_("The weekly review is for people."), frappe.PermissionError, title=_("Reviews are for people"))
 
 
 def _in_lens(space, area, rows, key="name"):

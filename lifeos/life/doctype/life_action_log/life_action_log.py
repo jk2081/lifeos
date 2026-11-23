@@ -25,11 +25,11 @@ class LifeActionLog(Document):
 	def validate(self):
 		if self.kind == AREA_CORRECTION:
 			if not (self.task and self.new_area):
-				frappe.throw(_("An area correction names the task and the area it moved to."), frappe.MandatoryError)
+				frappe.throw(_("An area correction names the task and the area it moved to."), frappe.MandatoryError, title=_("Correction is incomplete"))
 			return
 		for field in ("goal", "action_id", "cycle", "week"):
 			if not self.get(field) and self.get(field) != 0:
-				frappe.throw(_("{0} is required.").format(_(self.meta.get_label(field))), frappe.MandatoryError)
+				frappe.throw(_("{0} is required.").format(_(self.meta.get_label(field))), frappe.MandatoryError, title=_("Field is required"))
 		check_cycle_open(self.cycle, self.flags)
 
 	def on_trash(self):

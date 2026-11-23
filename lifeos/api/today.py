@@ -261,9 +261,9 @@ def skip_banner(occurrence: str, how: str = "skipped"):
 	"""Hide Today's rhythm banner until its next occurrence: `how` is skipped, or done (the weekly review's Finish)."""
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(frappe._("Agents have no Today."), frappe.PermissionError)
+		frappe.throw(frappe._("Agents have no Today."), frappe.PermissionError, title=frappe._("Agents have no Today"))
 	if how not in ("skipped", "done") or not OCCURRENCE.match(str(occurrence or "")):
-		frappe.throw(frappe._("Unknown banner."))
+		frappe.throw(frappe._("Unknown banner."), title=frappe._("Unknown banner"))
 	return rhythms.dismiss(occurrence, how)
 
 

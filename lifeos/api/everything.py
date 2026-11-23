@@ -147,7 +147,7 @@ def list(space: str | None = None, tab: str | None = "all", q: str | None = None
 	start, page_length = page(start, page_length)
 	tab = tab or "all"
 	if tab not in TABS:
-		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)))
+		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)), title=_("Unknown tab"))
 	q = (q or "").strip()[:200]
 	limit = start + page_length
 	idx, idx_total = _index_rows(space, tab, q, area, goal, source, include_archived, limit, flag(unopened))

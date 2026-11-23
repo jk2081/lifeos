@@ -13,4 +13,4 @@ class LifeHabitLog(Document):
 
 	def validate(self):
 		if frappe.db.exists("Life Habit Log", {"habit": self.habit, "date": self.date, "name": ("!=", self.name or "")}):
-			frappe.throw(_("This habit already has a log for that date."), frappe.DuplicateEntryError)
+			frappe.throw(_("This habit already has a log for that date."), frappe.DuplicateEntryError, title=_("Habit already logged"))

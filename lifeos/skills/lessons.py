@@ -144,17 +144,17 @@ def without(instructions: str, lesson_name: str) -> str:
 # ---- the owner's decisions ----
 def get(name):
 	if not frappe.db.exists("Life Skill Lesson", name):
-		frappe.throw(_("There is no such lesson."), frappe.DoesNotExistError)
+		frappe.throw(_("There is no such lesson."), frappe.DoesNotExistError, title=_("Lesson not found"))
 	return frappe.get_doc("Life Skill Lesson", name)
 
 
 def edit(name, text):
 	lesson = get(name)
 	if lesson.status != "Proposed":
-		frappe.throw(_("Only a proposed lesson can be edited."))
+		frappe.throw(_("Only a proposed lesson can be edited."), title=_("Lesson is not proposed"))
 	text = clean(text)
 	if not text:
-		frappe.throw(_("A lesson needs some words."))
+		frappe.throw(_("A lesson needs some words."), title=_("Lesson needs words"))
 	if text != lesson.text:
 		lesson.text, lesson.edited = text, 1
 		lesson.save(ignore_permissions=True)
@@ -168,13 +168,13 @@ def accept(name, text=None):
 
 	lesson = edit(name, text) if text is not None else get(name)
 	if lesson.status != "Proposed":
-		frappe.throw(_("This lesson was already {0}.").format(lesson.status.lower()))
+		frappe.throw(_("This lesson was already {0}.").format(lesson.status.lower()), title=_("Lesson already decided"))
 	current = frappe.get_doc("Life Skill", lesson.skill)
 	new_text = apply(current.instructions, lesson.name, lesson.text)
 	failing = [r for r in examples.run_all(lesson.skill, {"instructions": new_text}) if not r["passed"]]
 	if failing:
 		frappe.throw(_("This lesson would break {0}: {1}. Edit it or reject it.").format(
-			_("an example of the skill") if len(failing) == 1 else _("{0} examples of the skill").format(len(failing)), "; ".join(_failure(r) for r in failing)))
+			_("an example of the skill") if len(failing) == 1 else _("{0} examples of the skill").format(len(failing)), "; ".join(_failure(r) for r in failing)), title=_("Lesson breaks an example"))
 	saved = store.save(lesson.skill, {"instructions": new_text}, _("Lesson: {0}").format(lesson.summary or lesson.text[:60]))
 	lesson.db_set({"status": "Accepted", "skill_version": saved.version, "decided_by": frappe.session.user, "decided_on": now_datetime()})
 	return lesson
@@ -188,7 +188,7 @@ def _failure(result) -> str:
 def reject(name):
 	lesson = get(name)
 	if lesson.status != "Proposed":
-		frappe.throw(_("Only a proposed lesson can be rejected."))
+		frappe.throw(_("Only a proposed lesson can be rejected."), title=_("Lesson is not proposed"))
 	lesson.db_set({"status": "Rejected", "decided_by": frappe.session.user, "decided_on": now_datetime()})
 	return lesson
 
@@ -199,7 +199,7 @@ def remove(name):
 
 	lesson = get(name)
 	if lesson.status != "Accepted":
-		frappe.throw(_("Only an accepted lesson can be removed."))
+		frappe.throw(_("Only an accepted lesson can be removed."), title=_("Lesson is not accepted"))
 	current = frappe.get_doc("Life Skill", lesson.skill)
 	saved = store.save(lesson.skill, {"instructions": without(current.instructions, lesson.name)}, _("Removed lesson: {0}").format(lesson.summary or lesson.text[:60]))
 	lesson.db_set({"status": "Removed", "removed_version": saved.version, "decided_by": frappe.session.user, "decided_on": now_datetime()})

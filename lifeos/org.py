@@ -19,11 +19,12 @@ def _check_links(doc, parent_space, label_prefix=""):
 			continue
 		other = _space_of(df.options, value)
 		if other is None:
-			frappe.throw(_("{0}{1}: {2} {3} does not exist.").format(label_prefix, df.label, df.options, value), frappe.ValidationError)
+			frappe.throw(_("{0}{1}: {2} {3} does not exist.").format(label_prefix, df.label, df.options, value), frappe.ValidationError, title=_("Linked record not found"))
 		if other != parent_space:
 			frappe.throw(
 				_("{0}{1} belongs to another space. A record can only use records from its own space.").format(label_prefix, df.label),
 				frappe.ValidationError,
+				title=_("Record is in another space"),
 			)
 
 
@@ -31,9 +32,9 @@ def validate_common(doc, method=None):
 	if doc.doctype in SKIP:
 		return
 	if not doc.space:
-		frappe.throw(_("Space is required."))
+		frappe.throw(_("Space is required."), title=_("Space is required"))
 	if not doc.is_new() and doc.has_value_changed("space") and not frappe.flags.lifeos_allow_space_change:
-		frappe.throw(_("A record cannot be moved to another space."))
+		frappe.throw(_("A record cannot be moved to another space."), title=_("Record cannot change space"))
 	_check_links(doc, doc.space)
 	for tf in doc.meta.get_table_fields():
 		for row in doc.get(tf.fieldname) or []:
@@ -50,14 +51,14 @@ def check_sensitive(doc):
 	from lifeos.permissions import is_agent
 
 	if is_agent() and int(doc.is_sensitive or 0) != int(stored or 0):
-		frappe.throw(_("Agents cannot mark or unmark sensitive items."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot mark or unmark sensitive items."), frappe.PermissionError, title=_("Agents cannot mark sensitive"))
 	if doc.is_new() or doc.is_sensitive:
 		return
 	if not frappe.db.get_value(doc.doctype, doc.name, "is_sensitive"):
 		return
 	user = frappe.session.user
 	if user != "Administrator" and frappe.db.get_value("Life Space", doc.space, "owner_user") != user:
-		frappe.throw(_("Only the owner of the space can unmark a sensitive item."), frappe.PermissionError)
+		frappe.throw(_("Only the owner of the space can unmark a sensitive item."), frappe.PermissionError, title=_("Only the owner can unmark"))
 
 
 def validate_org(doc):

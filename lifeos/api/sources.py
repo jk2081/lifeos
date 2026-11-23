@@ -102,7 +102,7 @@ def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, 
 	if status:
 		status = str(status).strip().lower().replace("in inbox", "inbox")
 		if status not in STATUSES:
-			frappe.throw(_("status must be one of: {0}.").format(", ".join(STATUSES)))
+			frappe.throw(_("status must be one of: {0}.").format(", ".join(STATUSES)), title=_("Unknown source status"))
 		where.append(f"({STATUSES[status]})")
 	if intent:
 		where.append("x.intent = %(intent)s")
@@ -136,9 +136,9 @@ def list(space: str | None = None, tab: str | None = None, area: str | None = No
 	tab = tab or "all"
 	scope = "all" if scope == "all" else "captures"
 	if tab not in TABS:
-		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)))
+		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)), title=_("Unknown source tab"))
 	if by not in (None, "", "me", "assistant"):
-		frappe.throw(_("by must be me or assistant."))
+		frappe.throw(_("by must be me or assistant."), title=_("Unknown actor filter"))
 	where, values = _where(space, tab, area, goal, from_date, to_date, status, intent, system, assistant, include_archived, open_items, scope,
 		sensitive, by)
 	where.append("1=1" + permissions.vault_guard(space, "x."))
@@ -214,7 +214,7 @@ def _vault_fields(names):
 def made_from(doctype: str, name: str):
 	"""What was made from one source: records created from it, and the wiki pages citing it."""
 	if doctype not in SOURCE_DOCTYPES:
-		frappe.throw(_("Not a source."))
+		frappe.throw(_("Not a source."), title=_("Not a source"))
 	doc = permissions.get_doc_checked(doctype, name)
 	out = []
 	if doctype == "Life Inbox Item":
@@ -248,10 +248,10 @@ def refile(sources: str | builtins.list, area: str | None = None, goal: str | No
 	"""Set the area (and goal) of many sources at once, from the Sources list. `sources` is a list of
 	{doctype, name}. People only."""
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can re-file sources in bulk."), frappe.PermissionError)
+		frappe.throw(_("Only a person can re-file sources in bulk."), frappe.PermissionError, title=_("Only a person can re-file"))
 	rows = parse(sources, []) or []
 	if len(rows) > 500:
-		frappe.throw(_("At most 500 sources at a time."))
+		frappe.throw(_("At most 500 sources at a time."), title=_("Too many sources at once"))
 	done = 0
 	for r in rows:
 		if r.get("doctype") not in SOURCE_DOCTYPES:

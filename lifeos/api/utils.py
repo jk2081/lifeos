@@ -77,7 +77,7 @@ def area_filter(space, area, column, values, also_in=None):
 		sql = f"({sql} or {also_in_sql('area_ids', alias)})"
 	elif also_in:
 		if also_in not in ALSO_IN:
-			frappe.throw(frappe._("Unknown filed DocType {0}.").format(also_in))
+			frappe.throw(frappe._("Unknown filed DocType {0}.").format(also_in), title=frappe._("Unknown filed DocType"))
 		sql = (f"({sql} or exists (select 1 from `tabLife Also In` ai where ai.parent = {alias}name "
 			f"and ai.parenttype = '{also_in}' and ai.area in %(area_ids)s))")
 	return sql
@@ -119,7 +119,7 @@ def column(doctype, fieldname, alias=""):
 	meta = frappe.get_meta(doctype)
 	field = meta.get_field(fieldname)
 	if fieldname not in STANDARD_COLUMNS and (not field or field.fieldtype in NO_COLUMN):
-		frappe.throw(frappe._("{0} has no field {1}.").format(doctype, frappe.bold(fieldname)), frappe.ValidationError)
+		frappe.throw(frappe._("{0} has no field {1}.").format(doctype, frappe.bold(fieldname)), frappe.ValidationError, title=frappe._("Field does not exist"))
 	return f"{alias}.`{fieldname}`" if alias else f"`{fieldname}`"
 
 
@@ -141,18 +141,18 @@ def std_filters(doctype, filters, alias="", values=None, prefix="sf"):
 	if isinstance(filters, dict):
 		filters = [[k, "=", v] if not isinstance(v, (list, tuple)) else [k, v[0], v[1]] for k, v in filters.items()]
 	if not isinstance(filters, (list, tuple)) or len(filters) > MAX_FILTERS:
-		frappe.throw(frappe._("filters must be a list of at most {0} conditions.").format(MAX_FILTERS), frappe.ValidationError)
+		frappe.throw(frappe._("filters must be a list of at most {0} conditions.").format(MAX_FILTERS), frappe.ValidationError, title=frappe._("Too many filters"))
 	for i, f in enumerate(filters):
 		if not isinstance(f, (list, tuple)) or len(f) not in (3, 4):
-			frappe.throw(frappe._("Each filter is [fieldname, operator, value]."), frappe.ValidationError)
+			frappe.throw(frappe._("Each filter is [fieldname, operator, value]."), frappe.ValidationError, title=frappe._("Filter shape is wrong"))
 		if len(f) == 4:
 			if f[0] != doctype:
-				frappe.throw(frappe._("Filters on {0} are not supported here.").format(frappe.bold(str(f[0]))), frappe.ValidationError)
+				frappe.throw(frappe._("Filters on {0} are not supported here.").format(frappe.bold(str(f[0]))), frappe.ValidationError, title=frappe._("Filter field not supported"))
 			f = f[1:]
 		fieldname, op, value = f
 		op = OPERATORS.get(str(op or "").strip().lower())
 		if not op:
-			frappe.throw(frappe._("Unknown filter operator {0}.").format(frappe.bold(str(f[1]))), frappe.ValidationError)
+			frappe.throw(frappe._("Unknown filter operator {0}.").format(frappe.bold(str(f[1]))), frappe.ValidationError, title=frappe._("Unknown filter operator"))
 		col = column(doctype, fieldname, alias)
 		ftype = _fieldtype(doctype, fieldname)
 		key = f"{prefix}{i}"
@@ -175,13 +175,13 @@ def std_filters(doctype, filters, alias="", values=None, prefix="sf"):
 				except Exception:
 					value = None
 			if not isinstance(value, (list, tuple)) or len(value) != 2 or not value[0] or not value[1]:
-				frappe.throw(frappe._("{0} needs a start and an end.").format(frappe.bold(op)), frappe.ValidationError)
+				frappe.throw(frappe._("{0} needs a start and an end.").format(frappe.bold(op)), frappe.ValidationError, title=frappe._("Range needs two values"))
 			values[key + "a"], values[key + "b"] = frappe.utils.getdate(value[0]), frappe.utils.getdate(value[1])
 			target = f"date({col})" if ftype == "Datetime" else col
 			out.append(f"{target} between %({key}a)s and %({key}b)s")
 		else:
 			if isinstance(value, (list, tuple, dict)):
-				frappe.throw(frappe._("The value of {0} must be a single value.").format(frappe.bold(fieldname)), frappe.ValidationError)
+				frappe.throw(frappe._("The value of {0} must be a single value.").format(frappe.bold(fieldname)), frappe.ValidationError, title=frappe._("Value must be single"))
 			if op in ("like", "not like"):
 				value = str(value or "")
 				if "%" not in value:
@@ -209,7 +209,7 @@ def std_order(doctype, order_by, alias="", smart=None):
 		fieldname = bits[0].split(".")[-1]
 		way = "desc" if len(bits) > 1 and bits[1].lower() == "desc" else "asc"
 		if len(bits) > 2 or (len(bits) == 2 and bits[1].lower() not in ("asc", "desc")):
-			frappe.throw(frappe._("order_by must look like: fieldname asc, fieldname desc."), frappe.ValidationError)
+			frappe.throw(frappe._("order_by must look like: fieldname asc, fieldname desc."), frappe.ValidationError, title=frappe._("Order by is malformed"))
 		if smart and fieldname in smart:
 			parts += [f"{p.strip()} {way}" for p in smart[fieldname].split(",")]
 		else:
@@ -254,13 +254,13 @@ def summarise(doctype, base, values, alias, summary, start=0, page_length=20):
 	summary = parse(summary, {}) or {}
 	fields = [str(f) for f in (summary.get("fields") or [])][:3]
 	if not fields:
-		frappe.throw(frappe._("A summary needs at least one field to group by."), frappe.ValidationError)
+		frappe.throw(frappe._("A summary needs at least one field to group by."), frappe.ValidationError, title=frappe._("Summary needs a group"))
 	cols = [column(doctype, f, alias) for f in fields]
 	aggs = []
 	for i, a in enumerate((summary.get("aggregates") or [])[:6]):
 		fn = str((a or {}).get("function") or "").lower()
 		if fn not in AGGREGATES:
-			frappe.throw(frappe._("Unknown aggregate {0}.").format(frappe.bold(fn)), frappe.ValidationError)
+			frappe.throw(frappe._("Unknown aggregate {0}.").format(frappe.bold(fn)), frappe.ValidationError, title=frappe._("Unknown aggregate"))
 		expr = "count(*)" if fn == "count" else f"{fn}({column(doctype, a.get('fieldname'), alias)})"
 		aggs.append(f"{expr} as `_aggregate_{i}`")
 	order = []
@@ -308,7 +308,7 @@ def in_area(space, area, doctype, names):
 	if not area or not names:
 		return set(names)
 	if doctype not in ALSO_IN and doctype not in ("Life Goal", "Life Habit", "Life Insight"):
-		frappe.throw(frappe._("Unknown filed DocType {0}.").format(doctype))
+		frappe.throw(frappe._("Unknown filed DocType {0}.").format(doctype), title=frappe._("Unknown filed DocType"))
 	values = {"names": names}
 	cond = area_filter(space, area, "x.area", values, also_in=doctype if doctype in ALSO_IN else None)
 	# nosemgrep: frappe-sql-format-injection -- the DocType is one of a fixed list; the condition is area_filter's fixed SQL; values are parameters

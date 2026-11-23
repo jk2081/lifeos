@@ -56,14 +56,14 @@ def add_yearly_date(space, title, day, month, year=None, kind=None):
 	Event starts in 2000, so every year anyone looks at shows it. Core repeats 29 February on 28 February outside leap years."""
 	day, month = int(day or 0), int(month or 0)
 	if not 1 <= month <= 12 or not 1 <= day <= 31:
-		frappe.throw(frappe._("Give a day and a month."))
+		frappe.throw(frappe._("Give a day and a month."), title=frappe._("Day and month missing"))
 	first = int(year) if year else UNKNOWN_YEAR
 	if (month, day) == (2, 29) and not calendar.isleap(first):
 		day = 28  # a first occurrence in a year with no 29 February
 	try:
 		starts = date(first, month, day)
 	except ValueError:
-		frappe.throw(frappe._("That day does not exist in that month."))
+		frappe.throw(frappe._("That day does not exist in that month."), title=frappe._("Day not in month"))
 	doc = frappe.get_doc({"doctype": "Event", "subject": title, "starts_on": f"{starts} 00:00:00", "all_day": 1, "event_type": "Public",
 		"repeat_this_event": 1, "repeat_on": "Yearly", "description": kind if kind in DATE_KINDS else "Other", "life_space": space})
 	doc.insert()

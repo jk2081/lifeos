@@ -11,7 +11,7 @@ from lifeos.review import gcal, gcal_write
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Calendars are connected by people."), frappe.PermissionError)
+		frappe.throw(_("Calendars are connected by people."), frappe.PermissionError, title=_("Calendars are for people"))
 	return frappe.session.user
 
 
@@ -26,7 +26,7 @@ def connect():
 	"""Start Frappe's OAuth flow for this user's calendar (read by Life OS only). Returns {"url"} to open."""
 	user = _person()
 	if not gcal.configured():
-		frappe.throw(_("Google is not set up on this site. The owner enters the OAuth client in Google Settings first."))
+		frappe.throw(_("Google is not set up on this site. The owner enters the OAuth client in Google Settings first."), title=_("Google is not set up"))
 	return gcal.connect(user)
 
 

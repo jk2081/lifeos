@@ -17,7 +17,7 @@ SUGGESTED = ["What did I promise people this week?", "What is stuck, and what sh
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot use Ask."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot use Ask."), frappe.PermissionError, title=_("Agents cannot use Ask"))
 
 
 @frappe.whitelist(methods=["GET"])
@@ -52,10 +52,10 @@ def _scope(scope, space):
 	if s.get("doctype") and s.get("name"):
 		doc = permissions.get_doc_checked(s["doctype"], s["name"])
 		if doc.get("space") and doc.space != space:
-			frappe.throw(_("That record is in another space."))
+			frappe.throw(_("That record is in another space."), title=_("Record is in another space"))
 	if s.get("kind") == "area" and s.get("name"):
 		if frappe.db.get_value("Life Area", s["name"], "space") != space:
-			frappe.throw(_("That area is in another space."))
+			frappe.throw(_("That area is in another space."), title=_("Area is in another space"))
 	if s.get("items"):
 		s["items"] = [{"doctype": i.get("doctype"), "name": i.get("name")} for i in s["items"][:200] if isinstance(i, dict)]
 	return s
@@ -78,7 +78,7 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 	_person()
 	question = " ".join((question or "").split())
 	if not question:
-		frappe.throw(_("Type a question."))
+		frappe.throw(_("Type a question."), title=_("Question is empty"))
 	if thread:
 		t = _thread(thread)
 		space = t.space
@@ -225,7 +225,7 @@ def run_action(message: str, index: int | str):
 	try:
 		a = actions[int(index)]
 	except (IndexError, ValueError, TypeError):
-		frappe.throw(_("No such action."))
+		frappe.throw(_("No such action."), title=_("Action not found"))
 	kind = a.get("kind")
 	if kind == "make_task":
 		from lifeos.api import tasks
@@ -246,7 +246,7 @@ def run_action(message: str, index: int | str):
 
 		(insights.snooze if kind == "snooze_insight" else insights.dismiss)(a["insight"])
 		return {"kind": kind, "insight": a["insight"]}
-	frappe.throw(_("Unknown action."))
+	frappe.throw(_("Unknown action."), title=_("Unknown action"))
 
 
 @frappe.whitelist(methods=["POST"])

@@ -33,4 +33,4 @@ def decide(finding: str, choice: int):
 def _people_only():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Contradictions are decided by people."), frappe.PermissionError)
+		frappe.throw(_("Contradictions are decided by people."), frappe.PermissionError, title=_("Only people decide contradictions"))

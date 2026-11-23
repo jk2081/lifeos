@@ -14,7 +14,7 @@ MAX_SCREEN = 60
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Agents have no saved views."), frappe.PermissionError)
+		frappe.throw(_("Agents have no saved views."), frappe.PermissionError, title=_("Agents have no saved views"))
 	return frappe.session.user
 
 
@@ -39,16 +39,16 @@ def save(screen: str, space: str | None = None, state: str | dict | None = None)
 	user = _person()
 	screen = str(screen or "").strip()
 	if not screen or len(screen) > MAX_SCREEN:
-		frappe.throw(_("screen is required."), frappe.ValidationError)
+		frappe.throw(_("screen is required."), frappe.ValidationError, title=_("Screen name missing"))
 	if space:
 		permissions.require_space(space)
 	state = parse(state, {})
 	if not isinstance(state, dict):
-		frappe.throw(_("state must be an object."), frappe.ValidationError)
+		frappe.throw(_("state must be an object."), frappe.ValidationError, title=_("View state must be an object"))
 	state.pop("open", None)  # the open record is never saved
 	text = json.dumps(state, separators=(",", ":"))
 	if len(text) > MAX_STATE:
-		frappe.throw(_("This view is too large to save."), frappe.ValidationError)
+		frappe.throw(_("This view is too large to save."), frappe.ValidationError, title=_("View too large to save"))
 	name = frappe.db.get_value("Life View State", {"user": user, "screen": screen, "space": space or ("is", "not set")}, "name")
 	if name:
 		frappe.db.set_value("Life View State", name, "state", text)

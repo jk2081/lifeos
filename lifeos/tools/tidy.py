@@ -109,7 +109,7 @@ class Tidy:
 		try:
 			paths = self.backup()
 		except Exception as e:
-			frappe.throw(_("The backup failed, so nothing was changed: {0}").format(str(e)), TidyRefused)
+			frappe.throw(_("The backup failed, so nothing was changed: {0}").format(str(e)), TidyRefused, title=_("Backup failed"))
 		self.log(None, None, "Backup taken: " + ", ".join(str(p) for p in paths))
 		return [str(p) for p in paths]
 

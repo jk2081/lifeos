@@ -26,7 +26,10 @@ def findings(paths) -> list[str]:
 
 def files(paths):
 	for p in map(pathlib.Path, paths):
-		yield from sorted(p.rglob("*.py")) if p.is_dir() else [p]
+		if p.is_dir():
+			yield from sorted(p.rglob("*.py"))
+		else:
+			yield p
 
 
 def main() -> int:

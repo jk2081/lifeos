@@ -97,35 +97,35 @@ def validate_area(doc):
 
 	check_focus_change(doc)
 	if not doc.is_new() and doc.has_value_changed("is_on") and permissions.is_agent():
-		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError)
+		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError, title=_("Only a person can switch areas"))
 	if doc.is_life_area:
 		if not doc.is_new() and doc.has_value_changed("area_name"):
-			frappe.throw(_("The seven areas of life cannot be renamed."))
+			frappe.throw(_("The seven areas of life cannot be renamed."), title=_("Area of life cannot be renamed"))
 		if not life_area_name(doc.area_name):
-			frappe.throw(_("Only Career, Health, Relationships, Money, Emotions, Mind and Environment are areas of life."))
+			frappe.throw(_("Only Career, Health, Relationships, Money, Emotions, Mind and Environment are areas of life."), title=_("Not an area of life"))
 		doc.area_name = life_area_name(doc.area_name)
 		if doc.parent_area:
-			frappe.throw(_("{0} is an area of life and cannot be a part of another area.").format(doc.area_name))
+			frappe.throw(_("{0} is an area of life and cannot be a part of another area.").format(doc.area_name), title=_("Area of life cannot be nested"))
 		return
 	if not doc.parent_area:
 		frappe.throw(_("{0} must be a part of one of the seven areas of life: Career, Health, Relationships, Money, Emotions, Mind or Environment.")
-			.format(doc.area_name))
+			.format(doc.area_name), title=_("Part needs an area of life"))
 	parent = frappe.db.get_value("Life Area", doc.parent_area, ["space", "is_life_area", "area_name", "is_focus", "parent_area"], as_dict=True)
 	if not parent or parent.space != doc.space:
-		frappe.throw(_("The area {0} is not in this space.").format(doc.parent_area))
+		frappe.throw(_("The area {0} is not in this space.").format(doc.parent_area), title=_("Area is in another space"))
 	if parent.is_focus:
-		frappe.throw(_("{0} is a focus. Nothing goes below a focus.").format(parent.area_name))
+		frappe.throw(_("{0} is a focus. Nothing goes below a focus.").format(parent.area_name), title=_("Nothing goes below a focus"))
 	if doc.is_focus:  # a focus sits under a part, or under an area of life where there are no parts
 		if frappe.db.exists("Life Area", {"parent_area": doc.name}) and not doc.is_new():
-			frappe.throw(_("Nothing goes below a focus: {0} holds areas of its own.").format(doc.area_name))
+			frappe.throw(_("Nothing goes below a focus: {0} holds areas of its own.").format(doc.area_name), title=_("Focus holds areas"))
 		return
 	if not parent.is_life_area:
 		frappe.throw(_("{0} is a part, not an area of life. Parts sit only under Career, Health, Relationships, Money, Emotions, Mind or Environment, one level deep.")
-			.format(parent.area_name))
+			.format(parent.area_name), title=_("Part is under the wrong area"))
 	if frappe.db.exists("Life Area", {"parent_area": doc.name, "is_focus": 0}) and not doc.is_new():
-		frappe.throw(_("Parts are one level deep: {0} holds parts of its own.").format(doc.area_name))
+		frappe.throw(_("Parts are one level deep: {0} holds parts of its own.").format(doc.area_name), title=_("Parts are one level deep"))
 	if doc.part_kind and doc.part_kind not in KINDS:
-		frappe.throw(_("Unknown kind of part."))
+		frappe.throw(_("Unknown kind of part."), title=_("Unknown kind of part"))
 
 
 def check_focus_change(doc):
@@ -137,7 +137,7 @@ def check_focus_change(doc):
 		return
 	watched = ("is_focus", "is_on", "area_name", "standard", "parent_area", "is_archived")
 	if before is None or any(doc.has_value_changed(f) for f in watched) or [p.line for p in doc.principles] != [p.line for p in before.principles]:
-		frappe.throw(_("Only a person can create, change or switch a focus."), frappe.PermissionError)
+		frappe.throw(_("Only a person can create, change or switch a focus."), frappe.PermissionError, title=_("Only a person can change a focus"))
 
 
 FIELDS = ["name", "area_name", "parent_area", "is_life_area", "is_on", "description", "sort_order", "colour", "is_pinned", "is_archived",
@@ -226,10 +226,10 @@ def move_work(area, to):
 	few open records, so one save each is fine. Returns the counts moved."""
 	src = frappe.db.get_value("Life Area", area, ["space", "area_name", "parent_area"], as_dict=True)
 	if to not in {t.name for t in move_targets(area)}:
-		frappe.throw(_("Move the open goals and tasks of {0} to its area of life or to another of its parts.").format(src.area_name))
+		frappe.throw(_("Move the open goals and tasks of {0} to its area of life or to another of its parts.").format(src.area_name), title=_("Open work must move first"))
 	dest = frappe.db.get_value("Life Area", to, ["area_name"], as_dict=True)
 	if is_off(src.space, to):
-		frappe.throw(_("{0} is switched off. Choose an area that is on.").format(dest.area_name))
+		frappe.throw(_("{0} is switched off. Choose an area that is on.").format(dest.area_name), title=_("Target area is switched off"))
 	work = open_work(area)
 	for doctype, key in (("Life Goal", "goals"), ("Life Task", "tasks")):
 		for name in work[key]:

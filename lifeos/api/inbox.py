@@ -78,9 +78,9 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 
 	space = permissions.resolve_space(space, write=True)
 	if source_type not in SOURCE_TYPES:
-		frappe.throw(_("source_type must be one of: {0}.").format(", ".join(SOURCE_TYPES)))
+		frappe.throw(_("source_type must be one of: {0}.").format(", ".join(SOURCE_TYPES)), title=_("Unknown source type"))
 	if intent and intent not in INTENTS:
-		frappe.throw(_("intent must be one of: {0}.").format(", ".join(INTENTS)))
+		frappe.throw(_("intent must be one of: {0}.").format(", ".join(INTENTS)), title=_("Unknown intent"))
 	system = (source_system or "").strip().lower() or None
 	connections.require_on(space, system)
 	existing = frappe.db.get_value("Life Inbox Item", {"space": space, "source_system": system, "external_id": external_id.strip()}) \
@@ -243,9 +243,9 @@ def space_context(space):
 def _claimed_item(item_name):
 	item = permissions.get_doc_checked("Life Inbox Item", item_name, "write")
 	if item.status != "Processing":
-		frappe.throw(_("This item is not being processed. Claim it first."))
+		frappe.throw(_("This item is not being processed. Claim it first."), title=_("Item not claimed"))
 	if item.claimed_by != frappe.session.user and not permissions.is_admin():
-		frappe.throw(_("This item is claimed by someone else."), frappe.PermissionError)
+		frappe.throw(_("This item is claimed by someone else."), frappe.PermissionError, title=_("Item claimed by someone else"))
 	return item
 
 
@@ -260,11 +260,11 @@ def submit_result(item: str, transcript_md: str | None = None, summary_md: str |
 	doc = _claimed_item(item)
 	rows = parse(proposals, []) or []
 	if not isinstance(rows, LIST):
-		frappe.throw(_("proposals must be a list."))
+		frappe.throw(_("proposals must be a list."), title=_("Proposals must be a list"))
 	if rows and doc.intent == "Just keep":
-		frappe.throw(_("This item is to be kept only (intent Just keep). Send its text with no proposals."))
+		frappe.throw(_("This item is to be kept only (intent Just keep). Send its text with no proposals."), title=_("Item is kept only"))
 	if doc.intent == "Add to wiki" and any(isinstance(r, dict) and r.get("kind") == "Note" for r in rows):
-		frappe.throw(_("This item is for the wiki (intent Add to wiki). Write wiki pages with lifeos.api.wiki instead of proposing notes."))
+		frappe.throw(_("This item is for the wiki (intent Add to wiki). Write wiki pages with lifeos.api.wiki instead of proposing notes."), title=_("Item is for the wiki"))
 	created, errors, ctx, readings_made = [], [], {}, []
 	for i, row in enumerate(rows):
 		try:
@@ -326,9 +326,9 @@ def retry(item: str):
 	"""Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed."""
 	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can retry an item."), frappe.PermissionError)
+		frappe.throw(_("Only a person can retry an item."), frappe.PermissionError, title=_("Only a person can retry"))
 	if doc.status not in ("Failed", "To Review", "Processing"):
-		frappe.throw(_("Only a failed item can be retried."))
+		frappe.throw(_("Only a failed item can be retried."), title=_("Item has not failed"))
 	for name in frappe.get_list("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name"):
 		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)  # system: inbox processing is the Brain's and agents' own work; the space check is above
 	doc.status = "New"
@@ -345,10 +345,10 @@ def file_myself(item: str):
 	"""The owner takes a capture the Brain could not process (Needs you, Unfiled): it leaves the queue as Done, and they file it by hand
 	from its page. Its pending proposals, if any, are removed. People only."""
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can file a capture by hand."), frappe.PermissionError)
+		frappe.throw(_("Only a person can file a capture by hand."), frappe.PermissionError, title=_("Only a person can file"))
 	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
 	if doc.status not in ("Failed", "New"):
-		frappe.throw(_("Only a capture that was not processed can be filed by hand."))
+		frappe.throw(_("Only a capture that was not processed can be filed by hand."), title=_("Capture was processed"))
 	for name in frappe.get_list("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name"):
 		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)  # system: inbox processing is the Brain's and agents' own work; the space check is above
 	doc.status, doc.error = "Done", None

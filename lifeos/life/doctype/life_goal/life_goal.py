@@ -33,7 +33,7 @@ def check_cycle_open(cycle, flags=None):
 	if flags and flags.allow_closed:
 		return
 	if cycle and frappe.db.get_value("Life Cycle", cycle, "status") == "Closed":
-		frappe.throw(_("A closed cycle is read-only."))
+		frappe.throw(_("A closed cycle is read-only."), title=_("Cycle already closed"))
 
 
 class LifeGoal(Document):
@@ -72,13 +72,13 @@ class LifeGoal(Document):
 		if self.horizon == "12 weeks" and not self.cycle and not planning_in_quarters():
 			self.cycle = frappe.db.get_value("Life Cycle", {"space": self.space, "status": "Active"}) if self.target_date else None
 			if not self.cycle:
-				frappe.throw(_("A 12-week goal belongs to a cycle."))
+				frappe.throw(_("A 12-week goal belongs to a cycle."), title=_("Goal needs a cycle"))
 		if self.horizon != "12 weeks" and self.cycle:
-			frappe.throw(_("Only a 12-week goal belongs to a cycle. Use Add to a 12 Week Year to move it into one."))
+			frappe.throw(_("Only a 12-week goal belongs to a cycle. Use Add to a 12 Week Year to move it into one."), title=_("Goal cannot have a cycle"))
 		if self.horizon in ("Year", "Month") and not self.target_date:
-			frappe.throw(_("A {0} goal needs a target date.").format(_(self.horizon).lower()))
+			frappe.throw(_("A {0} goal needs a target date.").format(_(self.horizon).lower()), title=_("Goal needs a target date"))
 		if self.horizon != "12 weeks" and self.actions:
-			frappe.throw(_("Weekly actions belong to 12-week goals."))
+			frappe.throw(_("Weekly actions belong to 12-week goals."), title=_("Actions need a 12-week goal"))
 
 	def check_measure(self):
 		"""Key results (set 7): a milestone goal needs its finish line, a number goal its measure, start and target. The
@@ -97,14 +97,15 @@ class LifeGoal(Document):
 		if not self.serves:
 			return
 		if self.serves == self.name:
-			frappe.throw(_("A goal cannot serve itself."), frappe.ValidationError)
+			frappe.throw(_("A goal cannot serve itself."), frappe.ValidationError, title=_("Goal cannot serve itself"))
 		if frappe.db.get_value("Life Goal", self.serves, "space") != self.space:
-			frappe.throw(_("A goal can only serve a goal of the same space."), frappe.ValidationError)
+			frappe.throw(_("A goal can only serve a goal of the same space."), frappe.ValidationError, title=_("Goal is in another space"))
 		seen, cur = {self.name}, self.serves
 		while cur:
 			if cur in seen:
 				frappe.throw(_("{0} already serves this goal, so this goal cannot serve it.").format(
-					frappe.bold(frappe.db.get_value("Life Goal", self.serves, "title"))), frappe.ValidationError)
+					frappe.bold(frappe.db.get_value("Life Goal", self.serves, "title"))), frappe.ValidationError,
+					title=_("Goals serve each other"))
 			seen.add(cur)
 			cur = frappe.db.get_value("Life Goal", cur, "serves")
 
