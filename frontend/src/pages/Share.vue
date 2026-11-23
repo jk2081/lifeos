@@ -1,5 +1,5 @@
 <template>
-  <PageHead title="Save to Life OS" sub="Something shared from another app" :crumb="{ to: '/brain', label: 'Brain', here: 'Share' }" />
+  <PageHead title="Save to Life OS" sub="Something shared from another app" :path="[{ label: 'Brain', to: '/brain' }]" />
   <div class="page-body" data-share>
     <div class="mx-auto flex w-full max-w-[640px] flex-col gap-4">
       <Skeleton v-if="share === undefined" class="h-24 w-full rounded-4" />

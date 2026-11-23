@@ -507,7 +507,7 @@ print(json.dumps({"cycle": cyc.name, "goals": out, "expected": cycles.cycle_aver
       must(look.weeks.length >= 3, 'the server gives no weeks for the month')
       must(await pg.locator('[data-look-week]').count() === look.weeks.length, `Look back shows ${await pg.locator('[data-look-week]').count()} weeks, the server ${look.weeks.length}`)
       must((await pg.locator('[data-look-week]').first().innerText()).includes(Math.round(look.weeks[0].percent) + '%'), 'the first weekly score is not the server\'s')
-      must(await pg.locator('[data-review-title]').innerText() === 'Monthly review', 'the title is not Monthly review')
+      must(await pg.locator('[data-review-head] [data-page-title]').innerText() === 'Monthly review', 'the title is not Monthly review')
       await noSideways()
     })
 
@@ -588,7 +588,7 @@ print(json.dumps({"cycle": cyc.name, "goals": out, "expected": cycles.cycle_aver
       must(JSON.stringify(got) === JSON.stringify(grid.weeks.map((w) => Math.round(w.percent))), `the weeks read ${got}, the grid ${grid.weeks.map((w) => Math.round(w.percent))}`)
       must((await pg.locator('[data-score-average]').innerText()).trim() === Math.round(grid.average) + '%', 'the average is not the grid\'s')
       must(await pg.locator('[data-score-goal]').count() === 3, 'Score does not list the three goals')
-      must(await pg.locator('[data-review-title]').innerText() === '12-week review', 'the title is not 12-week review')
+      must(await pg.locator('[data-review-head] [data-page-title]').innerText() === '12-week review', 'the title is not 12-week review')
       await noSideways()
     })
 

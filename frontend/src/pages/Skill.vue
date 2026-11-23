@@ -1,6 +1,5 @@
 <template>
-  <PageHead :title="d?.title || 'Skill'" :sub="d ? `${d.trigger} · version ${d.version}` : ''">
-    <Button label="All skills" icon-left="lucide-arrow-left" @click="router.push('/brain/skills')" />
+  <PageHead :title="d?.title || 'Skill'" :path="[{ label: 'Brain', to: '/brain' }, { label: 'Skills', to: '/brain/skills' }]" :sub="d ? `${d.trigger} · version ${d.version}` : ''">
     <Switch v-if="d" :model-value="d.active" :disabled="!d.can_edit" :label="d.active ? 'On' : 'Off'" data-skill-active @update:model-value="toggle" />
   </PageHead>
   <div v-if="d" class="page-body flex max-w-4xl flex-col gap-6" data-skill-page :data-skill="d.name" :data-version="d.version">
@@ -101,7 +100,6 @@
 // a diff and Roll back, and its recent runs, each opening its log.
 import { settingsData } from '@/data/settings'
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { Badge, Button, Dialog, FormControl, Switch } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import DiffView from '@/components/DiffView.vue'
@@ -113,7 +111,6 @@ import { tryCall } from '@/lib/api'
 import { dateTime } from '@/lib/dates'
 
 const props = defineProps({ name: String })
-const router = useRouter()
 const STATUS = { Done: 'green', Failed: 'red', Skipped: 'gray', Running: 'blue', Queued: 'gray' }
 const d = ref(null)
 const missing = ref(false)

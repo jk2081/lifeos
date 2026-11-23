@@ -1,6 +1,6 @@
 <template>
   <template v-if="item">
-    <PageHead :title="item.title || 'Untitled'" :crumb="{ to: '/brain', label: 'Brain', here: 'Item' }">
+    <PageHead :title="item.title || 'Untitled'" :path="[{ label: 'Brain', to: '/brain' }, { label: 'Activity', to: '/brain/activity' }]">
       <template #sub>
         <span class="flex flex-wrap items-center gap-x-1.5 gap-y-1" data-item-head>
           <span class="inline-flex items-center gap-1" data-item-source><span :class="source.icon" class="size-4" aria-hidden="true" />{{ source.label }}</span>
@@ -92,7 +92,7 @@
     </div>
   </template>
   <template v-else-if="missing">
-    <PageHead title="Not found" :crumb="{ to: '/brain', label: 'Brain', here: 'Item' }" />
+    <PageHead title="Not found" :path="[{ label: 'Brain', to: '/brain' }, { label: 'Activity', to: '/brain/activity' }]" />
     <div class="page-body"><Card data-item-missing><Empty title="Not found." hint="There is no such item, or it is in a space you cannot open." /></Card></div>
   </template>
   <div v-else class="page-body"><Skeleton class="h-40 w-full" /></div>
@@ -159,7 +159,6 @@ const fetchItem = () => itemData.inbox.item_page({ item: props.id })
 async function load() {
   try {
     item.value = await fetchItem()
-    document.title = `${item.value.title || 'Item'} · Life OS`
   } catch (e) {
     missing.value = true
   }

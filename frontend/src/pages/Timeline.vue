@@ -1,5 +1,5 @@
 <template>
-  <ListView :title="embed ? null : 'Timeline'" sub="Everything captured, by day, newest first" noun="records" :screen="embed ? embed.screen + '-timeline' : 'timeline'"
+  <ListView :title="embed ? null : 'Timeline'" :path="[{ label: 'Library', to: '/library' }]" sub="Everything captured, by day, newest first" noun="records" :screen="embed ? embed.screen + '-timeline' : 'timeline'"
     :fixed="embed?.fixed" :active="embed ? embed.active : true" doctype="Life Index" mode="feed" :spec="SPEC"
     :flag-labels="{ archived: 'Include archived' }" :quick="['ref_doctype', 'area', 'title']" :virtual="VIRTUAL" :hidden="HIDDEN" :fetch="fetch" :page-size="60"
     :row-ref="(r) => refOf(r.ref_doctype, r.ref_name)" :row-key="(r) => r.ref_doctype + r.ref_name + r.kind" :row-label="(r) => r.title || 'Untitled'"

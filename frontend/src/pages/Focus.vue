@@ -1,6 +1,6 @@
 <template>
   <template v-if="d">
-    <PageHead :title="d.title" :crumb="{ to: '/goals', label: 'Goals', here: 'Focus' }" :sub="sub">
+    <PageHead :title="d.title" :path="[{ label: 'Goals', to: '/goals' }, { label: 'Focus', to: '/goals' }]" :sub="sub">
       <Button v-if="writable" label="Edit" icon-left="lucide-pencil" data-focus-edit @click="editOpen = true" />
       <Button v-if="canAddGoal" variant="solid" icon-left="lucide-plus" label="Goal for this focus" data-focus-add-goal @click="goalOpen = true" />
     </PageHead>

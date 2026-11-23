@@ -1,6 +1,6 @@
 <template>
   <template v-if="d">
-    <PageHead :title="g.title" :crumb="{ to: '/goals', label: 'Goals', here: cyc ? cyc.title : g.horizon }" :sub="sub">
+    <PageHead :title="g.title" :path="path" :sub="sub">
       <Badge :theme="themeOf(g)" :label="g.is_archived ? `${g.status}, archived` : g.status === 'On Hold' ? 'On hold' : g.status" data-goal-status />
       <Button v-if="writable && !g.is_archived" label="Edit" icon-left="lucide-pencil" data-goal-edit @click="editOpen = true" />
       <template v-if="writable && g.horizon !== '12 weeks'">
@@ -151,6 +151,8 @@ const g = computed(() => d.value.goal)
 // a 12 Week Year goal is measured by its weekly actions: this week's ticks and the cycle score, not tasks done
 const byActions = computed(() => g.value.horizon === '12 weeks' && !!cyc.value)
 // the goal's cycle: goals.get names it, goals.detail carries its grid row
+// Goals / <area>: the area opens the goals of that area (issue 83)
+const path = computed(() => [{ label: 'Goals', to: '/goals' }, ...(g.value.area ? [{ label: g.value.area_name || 'Area', to: { path: '/goals', query: { area: g.value.area } } }] : [])])
 const cyc = computed(() => d.value.cycle || j.value?.cycle || null)
 const writable = computed(() => store.spaces.find((s) => s.name === d.value?.space)?.access === 'Write' && !store.isAgent)
 const arch = computed(() => (g.value.is_archived ? { archived: '1' } : {}))

@@ -1,5 +1,5 @@
 <template>
-  <PageHead :title="route.query.collection === 'Wiki' ? 'Wiki' : 'Notes'" :sub="d ? `Graph: ${d.nodes.length} records · ${d.edges.length} links${center ? ' · two steps around one record' : ''}` : ''">
+  <PageHead :path="[{ label: 'Library', to: '/library' }]" :title="route.query.collection === 'Wiki' ? 'Wiki' : 'Notes'" :sub="d ? `Graph: ${d.nodes.length} records · ${d.edges.length} links${center ? ' · two steps around one record' : ''}` : ''">
     <TabButtons model-value="graph" :options="route.query.collection === 'Wiki' ? WIKI_VIEWS : NOTES_VIEWS" data-library-views />
     <Button v-if="center" label="Show the whole space" @click="setCenter('')" />
   </PageHead>

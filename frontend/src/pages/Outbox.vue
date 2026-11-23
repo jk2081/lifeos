@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Outbox" noun="records" screen="outbox" doctype="Life Exit" :spec="SPEC" :tabs="TABS" :quick="['kind']" :synthetic="SYNTHETIC"
+  <ListView ref="list" title="Outbox" :path="[{ label: 'Brain', to: '/brain' }]" noun="records" screen="outbox" doctype="Life Exit" :spec="SPEC" :tabs="TABS" :quick="['kind']" :synthetic="SYNTHETIC"
     :hidden="HIDDEN" :fetch="fetch" :row-ref="rowRef" :row-label="(r) => r.title" :groupable="false" :watch-keys="['period', 'from', 'to']"
     :empty-title="EMPTY[tab] || 'Nothing left the plate in this period.'" empty-hint="Done, delegated, parked and discarded records show here, with when they left." @loaded="loaded">
     <template #sub><span data-outbox-sub>{{ manySpaces ? `${store.space} · What` : 'What' }} left your plate {{ PERIOD_LABEL[period] }}{{ range ? ` (${range})` : '' }}<span class="max-md:hidden"> · a record, not a place to work</span></span></template>

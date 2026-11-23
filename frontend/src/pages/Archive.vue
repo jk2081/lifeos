@@ -1,5 +1,5 @@
 <template>
-  <ListView ref="list" title="Archive" noun="archived records" screen="archive" doctype="Life Index" :spec="SPEC" :tabs="TABS" :quick="['area', 'title']" :virtual="VIRTUAL"
+  <ListView ref="list" title="Archive" :path="[{ label: 'Library', to: '/library' }]" noun="archived records" screen="archive" doctype="Life Index" :spec="SPEC" :tabs="TABS" :quick="['area', 'title']" :virtual="VIRTUAL"
     :synthetic="SYNTHETIC" :hidden="HIDDEN" :fetch="fetch" :row-ref="(r) => (r.trash ? null : refOf(r.ref_doctype, r.ref_name))" :row-key="(r) => r.ref_doctype + r.ref_name"
     :row-label="(r) => r.title || 'Untitled'" :group-by="(r) => (route.query.sort ? '' : r.area_name || 'Unfiled')" empty-title="Nothing is archived."
     empty-hint="Done tasks, finished inbox items and quiet chats move here after the number of days in Settings. A completed goal moves here at once with its records."

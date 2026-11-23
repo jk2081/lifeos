@@ -11,7 +11,7 @@
 
   <!-- the tree with the reader: /library and /library/<id> -->
   <template v-else>
-    <PageHead title="Notes">
+    <PageHead title="Notes" :path="[{ label: 'Library', to: '/library' }]">
       <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink>{{ inSpace }}</template>
       <TabButtons model-value="tree" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
