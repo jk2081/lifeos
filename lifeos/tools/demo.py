@@ -84,9 +84,11 @@ def load(space="Private"):
 	they are made, and left as it was."""
 	was = frappe.db.get_value("Singles", {"doctype": "Life Settings", "field": "require_done_when"}, "value", order_by=None)
 	frappe.db.set_single_value("Life Settings", "require_done_when", 0)
+	frappe.flags.lifeos_allow_open_goals = True  # the demo's open-ended goals predate the retirement of the Open goal (issue 57)
 	try:
 		return _load(space)
 	finally:
+		frappe.flags.lifeos_allow_open_goals = False
 		frappe.db.delete("Singles", {"doctype": "Life Settings", "field": "require_done_when"})
 		if was is not None:
 			frappe.db.set_single_value("Life Settings", "require_done_when", was)
