@@ -85,8 +85,10 @@ def needs_you(space: str | None = None, limit: int = MAX_ROWS):
 		query = query.where(crit)
 	total = query.run()[0][0]
 	pending = proposals_of(i, lambda q: q.status == "Pending").as_("item_pending")
-	found = frappe.qb.get_query("Life Proposal", fields=[p.name.as_("proposal"), p.kind, p.preview, p.payload, p.confidence, p.reason, p.alt_area,
-		i.name.as_("item"), i.title.as_("item_title"), i.source_type, i.received_on, i.is_sensitive, pending], ignore_permissions=False).join(i).on(i.name == p.inbox_item)
+	found = frappe.qb.get_query("Life Proposal", fields=[p.name.as_("proposal"), p.kind, p.preview, p.payload, p.confidence, p.reason, p.alt_area],
+		ignore_permissions=False).join(i).on(i.name == p.inbox_item)
+	# get_query drops fields that are not the DocType's own, so the joined ones are selected on the query
+	found = found.select(i.name.as_("item"), i.title.as_("item_title"), i.source_type, i.received_on, i.is_sensitive, pending)
 	for crit in where:
 		found = found.where(crit)
 	found = found.orderby(i.received_on).orderby(i.creation).orderby(p.sort_order).orderby(p.creation).limit(limit).run(as_dict=True)
