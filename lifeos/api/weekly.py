@@ -8,7 +8,7 @@ import frappe
 from frappe import _
 
 from lifeos import permissions
-from lifeos.review import piles
+from lifeos.review import stale
 from lifeos.review.record import TABS, Review
 
 
@@ -49,15 +49,13 @@ def get(space: str | None = None):
 
 @frappe.whitelist(methods=["POST"])
 def start(space: str | None = None, fresh: bool | int = 0):
-	"""Resume the Open review or start one (a review locked in the last days is returned as it is, unless `fresh`). Sorting
-	the piles may call the assistant, within the cap."""
+	"""Resume the Open review or start one (a review locked in the last days is returned as it is, unless `fresh`). Preparing
+	the goals may call the assistant, within the cap."""
 	_person()
 	space = permissions.resolve_space(space, write=True)
 	rv = Review.start(space, frappe.session.user, fresh=bool(int(fresh or 0)))
 	if rv.doc.status == "Open":
 		_refresh(rv)
-		for key in piles.KEYS:
-			piles.PileSet(rv, key).load(ai=_ai(space))
 		from lifeos.review import goals as goals_mod
 
 		gp = goals_mod.GoalPlan(rv)
@@ -100,60 +98,11 @@ def visit(space: str | None = None, tab: str | None = None):
 	return rv.header()
 
 
-# ---- piles ----
-
-@frappe.whitelist(methods=["GET"])
-def pile_summary(space: str | None = None, key: str = "tasks"):
-	rv = _current(space)
-	return piles.PileSet(rv, key).summary()
-
-
-@frappe.whitelist(methods=["GET"])
-def pile_drawer(space: str | None = None, key: str = "tasks", pile: str = "keep"):
-	rv = _current(space)
-	return piles.PileSet(rv, key).drawer(pile)
-
-
-@frappe.whitelist(methods=["POST"])
-def pile_settle(space: str | None = None, key: str = "tasks", ref: str = "", decision: str = "keep", chase: bool | int | None = None):
-	"""Settle one item now: Keep, Park or Let go (Keep with `chase` for a waiting item)."""
-	rv = _open(space)
-	ps = piles.PileSet(rv, key)
-	ps.settle(ref, decision, None if chase is None else bool(int(chase)))
-	rv.save()
-	return {"summary": ps.summary(), "header": rv.header()}
-
-
-@frappe.whitelist(methods=["POST"])
-def pile_accept(space: str | None = None, key: str = "tasks", pile: str = "keep"):
-	"""Apply a pile's decision to every item still in it."""
-	rv = _open(space)
-	ps = piles.PileSet(rv, key)
-	n = ps.accept(pile)
-	rv.save()
-	return {"done": n, "summary": ps.summary(), "header": rv.header()}
-
-
-@frappe.whitelist(methods=["POST"])
-def pile_undo(space: str | None = None, key: str = "tasks", ref: str | None = None, pile: str | None = None):
-	"""Undo one item (`ref`) or a whole pile (`pile`), reversing every exit it recorded."""
-	rv = _open(space)
-	ps = piles.PileSet(rv, key)
-	if ref:
-		ps.undo(ref)
-	elif pile:
-		ps.undo_pile(pile)
-	else:
-		frappe.throw(_("Say what to undo."))
-	rv.save()
-	return {"summary": ps.summary(), "header": rv.header()}
-
-
 # ---- tab 1: Library ----
 
 @frappe.whitelist(methods=["GET"])
 def library(space: str | None = None):
-	"""The calendar strip, what came in, the Inbox piles' split and the revelations."""
+	"""The calendar strip, what came in and the revelations."""
 	from lifeos.review import library as lib
 
 	rv = _current(space)
@@ -256,6 +205,21 @@ def finding_act(space: str | None = None, insight: str = "", index: int = 0, tit
 
 
 # ---- tab 2: Tasks ----
+
+@frappe.whitelist(methods=["GET"])
+def stale_tasks(space: str | None = None):
+	"""The stale tasks to decide in the Tasks tab, and how many this review has decided."""
+	return stale.tab(_current(space))
+
+
+@frappe.whitelist(methods=["POST"])
+def settle_stale(task: str, decision: str, space: str | None = None):
+	"""Keep, Someday or Drop one stale task."""
+	rv = _open(space)
+	stale.settle(rv, task, decision)
+	rv.save()
+	return {"stale": stale.tab(rv), "header": rv.header()}
+
 
 @frappe.whitelist(methods=["GET"])
 def plate(space: str | None = None):
@@ -383,3 +347,56 @@ def done(space: str | None = None):
 	if rv.doc.status != "Locked":
 		frappe.throw(_("This review is not locked yet."))
 	return lock_mod.summary(rv)
+
+
+@frappe.whitelist(methods=["GET"])
+def week_summary(space: str | None = None, week_start: str | None = None):
+	"""Everything an agent needs to run the weekly review in chat, for one week (Monday to Sunday): the cycle's score, habits,
+	tasks done and carried, open loops, stale tasks to decide, and what the archive job archived."""
+	from frappe.utils import add_days, getdate, today
+
+	from lifeos import archive, cycles, habits
+	from lifeos.api import tasks as task_api
+
+	space = permissions.resolve_space(space)
+	now = getdate(today())
+	start = getdate(week_start) if week_start else add_days(now, -now.weekday())
+	start = add_days(start, -start.weekday())
+	end = add_days(start, 6)
+
+	cycle_out = None
+	cycle = frappe.db.sql(
+		"select name, title, status from `tabLife Cycle` where space=%s and start_date <= %s and end_date >= %s order by start_date desc limit 1",
+		(space, end, start), as_dict=True)
+	if cycle:
+		c = frappe.get_doc("Life Cycle", cycle[0].name)
+		week = min(max(cycles.week_of(c, min(end, getdate(c.end_date))), 1), cycles.WEEKS)
+		cycle_out = {"name": c.name, "title": c.title, "week": week, **cycles.week_score(c.name, week)}
+
+	habit_rows, seen = [], set()
+	for y, m in sorted({(start.year, start.month), (end.year, end.month)}):
+		for h in habits.habits_month(space, y, m)["habits"]:
+			if h["habit"] in seen:
+				continue
+			seen.add(h["habit"])
+			done = frappe.db.count("Life Habit Log", {"habit": h["habit"], "date": ("between", [start, end]), "done": 1})
+			habit_rows.append({"habit": h["habit"], "title": h["title"], "done": done, "target": h["days_per_week"]})
+
+	done_tasks = task_api.query(space, "and t.status = 'Done' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
+	carried = task_api.query(space, "and t.status = 'Carried' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
+	loops = task_api.open_loops(space=space, page_length=20)
+	return {
+		"space": space, "week_start": str(start), "week_end": str(end), "cycle": cycle_out, "habits": habit_rows,
+		"done_total": _count_tasks(space, "Done", start, end), "carried_total": _count_tasks(space, "Carried", start, end),
+		"done": done_tasks, "carried": carried, "open_loops": loops["tasks"], "open_loops_total": loops["total"],
+		"decide": task_api.stale_tasks(space, 30),
+		"archived": archive.archived_in_week(space, start, end),
+		"stale_days": frappe.db.get_single_value("Life Settings", "stale_task_days") or 90,
+		"target": frappe.db.get_single_value("Life Settings", "score_target") or 85,
+	}
+
+
+def _count_tasks(space, status, start, end):
+	"""How many tasks closed with this status in the week, for the numbers that lead to the Tasks screen (the lists show 100)."""
+	return frappe.db.sql("select count(*) from `tabLife Task` t where t.space=%s and t.status=%s and t.completed_on between %s and %s",
+		(space, status, start, end))[0][0]

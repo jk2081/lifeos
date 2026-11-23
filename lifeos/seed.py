@@ -1,4 +1,4 @@
-"""What a fresh site needs: the seven areas of life and the check-in dimensions, made for every space at install.
+"""What a fresh site needs: the seven areas of life, made for every space at install.
 
 Nothing personal is loaded. Example records for screenshots and tests are in `lifeos/demo.py`.
 `Tracker` and `_remove` keep a list of the records a demo load made, so it can take them out again.
@@ -7,8 +7,6 @@ import json
 
 import frappe
 
-DIMENSIONS = ["Physical Health", "Emotions", "Mind", "Environment", "Money", "Relationships", "Career",
-	"Community and Spiritual Development"]
 
 DEMO_KEY = "lifeos_demo_records"
 
@@ -37,20 +35,12 @@ def make_areas(space, names, under=None):
 	return out
 
 
-def make_dimensions(space):
-	for i, name in enumerate(DIMENSIONS):
-		if not frappe.db.exists("Life Dimension", {"space": space, "dimension_name": name}):
-			frappe.get_doc({"doctype": "Life Dimension", "space": space, "dimension_name": name, "sort_order": i + 1}).insert(ignore_permissions=True)
-
-
 def ensure_structure():
-	"""The seven areas of life and the check-in dimensions for every space."""
+	"""The seven areas of life for every space."""
 	from lifeos import areas
 
 	for space in frappe.get_all("Life Space", pluck="name"):
 		areas.ensure(space)
-		if not frappe.db.exists("Life Dimension", {"space": space}):
-			make_dimensions(space)
 
 
 # ---------- tracking what a seed created ----------
@@ -65,6 +55,11 @@ class Tracker:
 		for k, v in flags.items():
 			doc.flags[k] = v
 		doc.insert(ignore_permissions=True)
+		self.records.append([doc.doctype, doc.name])
+		return doc
+
+	def track(self, doc):
+		"""Remember a record made elsewhere, so removing the demo takes it out too."""
 		self.records.append([doc.doctype, doc.name])
 		return doc
 

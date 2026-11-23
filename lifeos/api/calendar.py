@@ -158,12 +158,10 @@ def delete_event(event: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def add_important_date(space: str | None = None, title: str | None = None, day: int | None = None, month: int | None = None, year: int | str | None = None, kind: str | None = "Birthday",
-		person: str | None = None):
-	"""Add a birthday, anniversary or other date that repeats every year."""
+def add_important_date(space: str | None = None, title: str | None = None, day: int | None = None, month: int | None = None, year: int | str | None = None, kind: str | None = "Birthday"):
+	"""Add a birthday, anniversary or other date that repeats every year: an all-day Event that repeats yearly."""
 	space = permissions.resolve_space(space, write=True)
-	doc = frappe.get_doc({"doctype": "Life Important Date", "space": space, "title": title, "day": day, "month": month,
-		"year": year or None, "kind": kind or "Birthday", "person": person}).insert()
+	doc = data.add_yearly_date(space, title, day, month, year, kind or "Birthday")
 	return {"name": doc.name}
 
 
@@ -177,8 +175,9 @@ def entry(kind: str, name: str):
 			"description": frappe.utils.strip_html(doc.description or ""), "repeats": bool(doc.repeat_this_event),
 			"synced_to_google": bool(doc.get("pulled_from_google_calendar"))}
 	if kind == "date":
-		doc = permissions.get_doc_checked("Life Important Date", name)
-		return {"kind": "date", "name": doc.name, "title": doc.title, "space": doc.space, "day": doc.day, "month": doc.month, "year": doc.year,
-			"date_kind": doc.kind, "person": doc.person,
-			"person_name": frappe.db.get_value("Life Person", doc.person, "full_name") if doc.person else None}
+		doc = permissions.get_doc_checked("Event", name, "read")
+		first = getdate(doc.starts_on)
+		note = frappe.utils.strip_html(doc.description or "").strip()
+		return {"kind": "date", "name": doc.name, "title": doc.subject, "space": doc.get("life_space"), "day": first.day, "month": first.month,
+			"year": None, "date_kind": note if note in data.DATE_KINDS else "Other"}
 	frappe.throw(_("kind must be event or date."))

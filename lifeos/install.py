@@ -175,5 +175,4 @@ def make_personal_space(user, space_name=None):
 	space_name = space_name or f"{frappe.db.get_value('User', user, 'first_name') or user}'s space"
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name, "owner_user": user,
 		"members": [{"user": user, "access": "Write"}]}).insert(ignore_permissions=True)
-	seed.make_dimensions(doc.name)
 	return doc.name

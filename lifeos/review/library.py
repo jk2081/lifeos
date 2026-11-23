@@ -1,5 +1,5 @@
-"""Tab 1, Library (set 8): last week's calendar strip, what came in by source (each count opens its list), the Inbox piles'
-suggested split, and the revelations. A meeting opened shows what is linked to it, its follow-ups, and a line to plan from it."""
+"""Tab 1, Library (set 8): last week's calendar strip, what came in by source (each count opens its list), and the
+revelations. A meeting opened shows what is linked to it, its follow-ups, and a line to plan from it."""
 from collections import Counter
 from datetime import timedelta
 
@@ -14,12 +14,11 @@ DAY = "%a %-d"
 def data(review, user):
 	space, start, end = review.doc.space, getdate(review.doc.period_start), getdate(review.doc.period_end)
 	from lifeos.ai import client
-	from lifeos.review.piles import PileSet
 
 	ai = client.is_set_up() and bool(frappe.db.get_value("Life Space", space, "ask_enabled"))
 	shown = findings.revelations(review)
 	rows = findings.rows(shown)
-	return {"strip": strip(space, start, end, user), "came_in": came_in(space, start, end), "inbox": PileSet(review, "inbox").split(),
+	return {"strip": strip(space, start, end, user), "came_in": came_in(space, start, end),
 		"revelations": [_revelation(r) for r in rows if r.status == "New"], "revelations_shown": len(rows), "ai": ai}
 
 

@@ -1,10 +1,9 @@
-"""The weekly review's new steps (set 7): step 1's key results (readings to confirm, goals that need a finish line, number goals
-with no recent reading) and step 3's goal work for the coming week. People only."""
+"""The weekly review's step 1: key results (readings to confirm, goals that need a finish line, number goals with no recent
+reading). People only."""
 import frappe
 from frappe import _
-from frappe.utils import cint
 
-from lifeos import permissions, readings, weekplan
+from lifeos import permissions, readings
 from lifeos.api.utils import in_area, lens_area
 
 
@@ -54,24 +53,3 @@ def key_results(space: str | None = None, area: str | None = None):
 	stale = [{"name": g["name"], "title": g["title"], "measure": g["measure"], "unit": g["unit"], "last_reading_on": g.get("last_reading_on"),
 		"progress": readings.summary(g)} for g in readings.stale_number_goals(space, [g for g in goals if g.measure_kind == "Number"])]
 	return {"readings": to_confirm, "needs_finish_line": no_line, "stale": stale}
-
-
-@frappe.whitelist(methods=["POST"])
-def goal_plan(space: str | None = None, area: str | None = None):
-	"""Step 3 of the weekly review: one card per active goal in the lens, with a suggested next action, slot and length. POST:
-	the suggestions may call the assistant, which is recorded against the month's spend."""
-	_person()
-	space = permissions.resolve_space(space, write=True)
-	space_ai = frappe.db.get_value("Life Space", space, "ask_enabled")
-	return weekplan.cards(space, lens_area(area), ai=bool(space_ai))
-
-
-@frappe.whitelist(methods=["POST"])
-def add_goal_work(goal: str, title: str | None = None, task: str | None = None, scheduled_at: str | None = None, duration_min: int | None = None,
-		who: str | None = None, note: str | None = None):
-	"""Create or update the task under a goal from its card: `scheduled_at` (empty for no set time), `duration_min`, the note in
-	its notes, and `who` (empty or Me for the owner; anyone else makes the task Waiting on them)."""
-	_person()
-	doc = weekplan.add(goal, title, task, scheduled_at, cint(duration_min) or None, who, note)
-	return {"task": doc.name, "title": doc.title, "status": doc.status, "waiting_on": doc.waiting_on,
-		"scheduled_at": str(doc.scheduled_at)[:19] if doc.scheduled_at else None, "duration_min": doc.duration_min}

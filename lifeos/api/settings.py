@@ -1,4 +1,4 @@
-"""The Settings screen: spaces and members, areas, dimensions, habits, review time, archive days."""
+"""The Settings screen: spaces and members, areas, habits, review time, archive days."""
 import frappe
 from frappe import _
 
@@ -9,13 +9,13 @@ SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "s
 	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
 	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
 	# UX fixes, set 6: Rhythms
-	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week", "planning_period", "require_done_when", "use_focuses",
+	"start_of_day", "week_starts_on", "cycle_break_week", "planning_period", "require_done_when", "use_focuses",
 	# set 7: working hours, for the weekly review's goal work
 	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days", "own_domains")
 TIME_FIELDS = ("weekly_review_time", "start_of_day", "work_start", "work_end")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 LISTS = {
-	"area": ("Life Area", "area_name"), "dimension": ("Life Dimension", "dimension_name"),
+	"area": ("Life Area", "area_name"),
 	"habit": ("Life Habit", "title"), "person": ("Life Person", "full_name"),
 }
 
@@ -27,8 +27,7 @@ def _admin_only():
 
 
 def _counts(kind, space, names):
-	"""The quiet count beside each row: areas, active records filed there; habits, months that
-	track it; dimensions, check-ins that scored it."""
+	"""The quiet count beside each row: areas, active records filed there; habits, days ticked."""
 	if not names:
 		return {}
 	if kind == "area":
@@ -41,11 +40,8 @@ def _counts(kind, space, names):
 				and (area=%(area)s or {also_in_sql('area')}){permissions.vault_guard(space)}""", {"space": space, "area": n})[0][0]
 		return out
 	if kind == "habit":
-		return dict(frappe.db.sql("""select habit, count(distinct parent) from `tabLife Month Plan Habit`
-			where habit in %s group by habit""", (names,)))
-	if kind == "dimension":
-		return dict(frappe.db.sql("""select dimension, count(distinct parent) from `tabLife Check-in Score`
-			where dimension in %s group by dimension""", (names,)))
+		return dict(frappe.db.sql("""select habit, count(*) from `tabLife Habit Log`
+			where habit in %s and done = 1 group by habit""", (names,)))
 	return {}
 
 
@@ -161,7 +157,6 @@ def get(space: str | None = None):
 			"is_focus", "standard", "part_kind"],
 			"sort_order, area_name"),
 		"habit": ("Life Habit", "title", "habits", [], "title"),
-		"dimension": ("Life Dimension", "dimension_name", "dimensions", ["sort_order"], "sort_order, dimension_name"),
 	}.items():
 		rows = frappe.get_all(doctype, filters={"space": space}, fields=["name", field, "is_archived", "archived_on", *extra], order_by=order, limit=1000)
 		counts = _counts(kind, space, [r.name for r in rows])
@@ -206,12 +201,12 @@ def get(space: str | None = None):
 
 def _cycle_info(space):
 	"""The current 12 Week cycle for Settings > Rhythms: its dates and this week's number (read-only there)."""
-	from lifeos import journal
+	from lifeos import cycles
 
 	c = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date", "end_date"], as_dict=True)
 	if not c:
 		return None
-	return {"name": c.name, "title": c.title, "start_date": str(c.start_date), "end_date": str(c.end_date), "week": journal.week_of(c)}
+	return {"name": c.name, "title": c.title, "start_date": str(c.start_date), "end_date": str(c.end_date), "week": cycles.week_of(c)}
 
 
 BACKUP_KEYS = ("backup_frequency", "backup_with_files", "backup_path", "encrypt_backup", "keep_backups_for_hours", "backup_limit")
@@ -357,7 +352,7 @@ def save(values: str | dict):
 	return {"saved": True}
 
 
-ARCHIVABLE = ("area", "habit", "dimension")
+ARCHIVABLE = ("area", "habit")
 
 
 @frappe.whitelist(methods=["POST"])
@@ -366,7 +361,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 		with_children: bool | int = 1, colour: str | None = None, is_pinned: bool | int | None = None, is_on: bool | int | None = None,
 		description: str | None = None, move_to: str | None = None, part_kind: str | None = None, is_focus: bool | int | None = None,
 		standard: str | None = None, principles: str | list | None = None, focuses: str | list | None = None):
-	"""Add, rename, reorder, nest, archive or restore one area, dimension or habit of a space, or a person.
+	"""Add, rename, reorder, nest, archive or restore one area or habit of a space, or a person.
 	Archiving sets archived_on to today; records filed under the heading are not changed. Archiving an area archives its
 	parts with it. Restoring an area puts it back under its old area of life, and with_children=1 restores the parts
 	archived on the same day with it.
@@ -502,19 +497,16 @@ def area_open_work(area: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_space(space_name: str, owner_user: str | None = None, starter_areas: bool | int = 1):
+def create_space(space_name: str, owner_user: str | None = None):
 	"""Create a space, for example a private space for a family member. Owner only. Every new space gets the seven areas of
-	life with Career and Health on (issue 11); `starter_areas` (kept for older callers) adds the check-in dimensions."""
+	life with Career and Health on (issue 11)."""
 	_admin_only()
-	from lifeos import seed
 
 	owner_user = owner_user or frappe.session.user
 	if not frappe.db.exists("User", owner_user):
 		frappe.throw(_("User {0} does not exist.").format(owner_user))
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name.strip(), "owner_user": owner_user,
 		"members": [{"user": owner_user, "access": "Write"}]}).insert()
-	if int(starter_areas or 0):
-		seed.make_dimensions(doc.name)
 	return {"name": doc.name}
 
 
@@ -604,19 +596,18 @@ def find_users(txt: str | None = "", space: str | None = None):
 
 @frappe.whitelist(methods=["POST"])
 def reorder(kind: str, names: str | list, parent_area: str | None = None):
-	"""Put the rows of one ordered list (areas, dimensions) in this order, in one call. For areas, `names` are siblings
+	"""Put the rows of one ordered list (areas) in this order, in one call. For areas, `names` are siblings
 	and `parent_area` is their parent ("" for the top level): moving an area into this list nests it there."""
 	from lifeos.api.utils import parse
 
-	if kind not in ("area", "dimension"):
-		frappe.throw(_("Only areas and check-in dimensions have an order."))
-	if kind == "area":
-		_areas_admin_only()
+	if kind != "area":
+		frappe.throw(_("Only areas have an order."))
+	_areas_admin_only()
 	doctype = LISTS[kind][0]
 	names = parse(names, []) or []
 	for i, name in enumerate(names):
 		doc = permissions.get_doc_checked(doctype, name, "write")
-		if kind == "area" and parent_area is not None and (doc.parent_area or "") != (parent_area or ""):
+		if parent_area is not None and (doc.parent_area or "") != (parent_area or ""):
 			save_item("area", name=name, parent_area=parent_area or "")
 			doc.reload()
 		if doc.sort_order != i + 1:

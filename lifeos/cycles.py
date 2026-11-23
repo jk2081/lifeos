@@ -1,12 +1,10 @@
-"""Journal rules: 12 Week Year scores, cycles, month plans and habits. API methods in lifeos.api.journal call these."""
+"""Cycle rules: 12 Week Year scores and ticks, cycles and Month goals. API methods in lifeos.api.goals call these."""
 import calendar
 from datetime import date, timedelta
 
 import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
-
-from lifeos.life.doctype.life_month_plan.life_month_plan import plan_name
 
 WEEKS = 12
 
@@ -312,7 +310,8 @@ def goal_history(goal_name) -> list:
 	return out
 
 
-# ---------- month plans and habits ----------
+# ---------- Month goals: goals with the Month horizon ----------
+
 
 def month_bounds(year, month):
 	first = date(int(year), int(month), 1)
@@ -321,124 +320,6 @@ def month_bounds(year, month):
 
 def next_month(year, month):
 	return (int(year) + 1, 1) if int(month) == 12 else (int(year), int(month) + 1)
-
-
-def get_month_plan(space, year, month, create=False):
-	name = plan_name(space, year, month)
-	if frappe.db.exists("Life Month Plan", name):
-		return frappe.get_doc("Life Month Plan", name)
-	if not create:
-		return None
-	return frappe.get_doc({"doctype": "Life Month Plan", "space": space, "year": int(year), "month": int(month)}).insert(ignore_permissions=True)
-
-
-def habit_stats(row, first, last, done_dates, upto=None) -> dict:
-	"""Score one habit for one month. Only days inside its tracked period, and not in the future, can be missed."""
-	upto = getdate(upto or today())
-	start = max(first, getdate(row.tracked_from)) if row.tracked_from else first
-	end = min(last, getdate(row.tracked_until)) if row.tracked_until else last
-	counted_end = min(end, upto)
-	tracked_days = (counted_end - start).days + 1 if counted_end >= start else 0
-	done = sum(1 for d in done_dates if start <= d <= end)
-	per_week = min(7, max(1, int(row.days_per_week or 7)))
-	target = tracked_days if per_week >= 7 else int(round(tracked_days * per_week / 7.0))
-	if tracked_days and not target:
-		target = 1
-	percent = min(100, round(100.0 * done / target)) if target else 0
-	return {"tracked_from": str(start), "tracked_until": str(end), "tracked_days": tracked_days, "done": done,
-		"target": target, "percent": percent, "days_per_week": per_week}
-
-
-def habits_month(space, year, month) -> dict:
-	first, last = month_bounds(year, month)
-	plan = get_month_plan(space, year, month)
-	out = {"year": int(year), "month": int(month), "plan": plan.name if plan else None, "days_in_month": last.day,
-		"today": today(), "habits": []}
-	if not plan:
-		return out
-	rows = sorted(plan.habits, key=lambda r: (r.sort_order or 0, r.idx))
-	ids = [r.habit for r in rows]
-	logs = {}
-	if ids:
-		for h, d in frappe.db.sql(
-			"select habit, date from `tabLife Habit Log` where habit in %s and date between %s and %s and done=1", (ids, first, last)
-		):
-			logs.setdefault(h, set()).add(getdate(d))
-	titles = dict(frappe.get_all("Life Habit", filters={"name": ("in", ids or [""])}, fields=["name", "title"], as_list=True))
-	for r in rows:
-		done_dates = logs.get(r.habit, set())
-		stats = habit_stats(r, first, last, done_dates)
-		out["habits"].append({"habit": r.habit, "title": titles.get(r.habit, r.habit), "row": r.name, "sort_order": r.sort_order,
-			"removed": bool(r.tracked_until and getdate(r.tracked_until) < last),
-			"done_days": sorted(d.day for d in done_dates), **stats})
-	return out
-
-
-def toggle_habit(habit, on, done=None) -> dict:
-	h = frappe.get_doc("Life Habit", habit)
-	h.check_permission("write")
-	on = getdate(on or today())
-	existing = frappe.db.get_value("Life Habit Log", {"habit": habit, "date": on}, ["name", "done"], as_dict=True)
-	if done is None:
-		done = not (existing and existing.done)
-	done = bool(int(done)) if not isinstance(done, bool) else done
-	if done and on > getdate(today()):
-		frappe.throw(_("A habit cannot be ticked for a day that has not come yet."))
-	if existing and not done:
-		frappe.delete_doc("Life Habit Log", existing.name, ignore_permissions=True, force=True)
-	elif not existing and done:
-		frappe.get_doc({"doctype": "Life Habit Log", "space": h.space, "habit": habit, "date": on, "done": 1}).insert(ignore_permissions=True)
-	return {"habit": habit, "date": str(on), "done": done}
-
-
-def set_month_habits(space, year, month, habits) -> dict:
-	"""Replace the habit list of one month. `habits` is a list of {habit, days_per_week}, in order.
-
-	A habit dropped mid-month keeps its row with `tracked_until` set, so its earlier days still count.
-	"""
-	plan = get_month_plan(space, year, month, create=True)
-	plan.check_permission("write")
-	first, last = month_bounds(year, month)
-	now = getdate(today())
-	in_month = first <= now <= last
-	wanted = {h["habit"]: h for h in habits}
-	order = {h["habit"]: i + 1 for i, h in enumerate(habits)}
-	keep = []
-	for row in plan.habits:
-		if row.habit in wanted:
-			row.days_per_week = wanted[row.habit].get("days_per_week") or row.days_per_week
-			row.sort_order = order[row.habit]
-			if row.tracked_until:  # added back
-				row.tracked_until = None
-			keep.append(row)
-		elif in_month and getdate(row.tracked_from or first) < now and not row.tracked_until:
-			row.tracked_until = add_days(now, -1)
-			row.sort_order = 100 + (row.sort_order or 0)
-			keep.append(row)
-		elif row.tracked_until:
-			keep.append(row)
-		# otherwise the habit is dropped from the month outright
-	have = {r.habit for r in keep}
-	plan.set("habits", keep)
-	for h in habits:
-		if h["habit"] not in have:
-			plan.append("habits", {"habit": h["habit"], "days_per_week": h.get("days_per_week") or 7, "sort_order": order[h["habit"]],
-				"tracked_from": now if in_month else first})
-	plan.save(ignore_permissions=True)
-	return habits_month(space, year, month)
-
-
-def habits_year(space, year) -> dict:
-	"""Each habit's percentage for every month of the year in which it was tracked."""
-	year = int(year)
-	out = {}
-	for month in range(1, 13):
-		data = habits_month(space, year, month)
-		for h in data["habits"]:
-			if h["tracked_days"]:
-				out.setdefault(h["habit"], {"habit": h["habit"], "title": h["title"], "months": {}})["months"][str(month)] = {
-					"percent": h["percent"], "done": h["done"], "target": h["target"]}
-	return {"year": year, "habits": list(out.values())}
 
 
 STATUS_OF = {"In Progress": "Open", "Achieved": "Done", "Dropped": "Dropped", "Carried": "Carried"}
@@ -493,25 +374,15 @@ def carry_month_goal(goal_name) -> dict:
 
 
 def carry_task(task_name) -> dict:
-	"""Copy an open task into next month's plan, mark the old one Carried and set carried_from."""
+	"""Copy an open task, mark the old one Carried and set carried_from."""
 	old = frappe.get_doc("Life Task", task_name)
 	old.check_permission("write")
 	if old.status in ("Done", "Dropped", "Carried"):
 		frappe.throw(_("Only an open task can be carried forward."))
-	now = getdate(today())
-	if old.month_plan:
-		py, pm = frappe.db.get_value("Life Month Plan", old.month_plan, ["year", "month"])
-		ny, nm = next_month(py, pm)
-		if (ny, nm) < (now.year, now.month):
-			ny, nm = next_month(now.year, now.month)
-	else:
-		ny, nm = next_month(now.year, now.month)
-	target = get_month_plan(old.space, ny, nm, create=True)
 	new = frappe.copy_doc(old)
-	new.update({"status": "Open", "carried_from": old.name, "month_plan": target.name, "completed_on": None,
+	new.update({"status": "Open", "carried_from": old.name, "completed_on": None,
 		"due_date": None, "is_archived": 0, "archived_on": None, "archive_reason": ""})
 	new.insert(ignore_permissions=True)
 	old.status = "Carried"
 	old.save(ignore_permissions=True)
-	target.save(ignore_permissions=True)
-	return {"task": new.name, "plan": target.name, "year": ny, "month": nm}
+	return {"task": new.name}

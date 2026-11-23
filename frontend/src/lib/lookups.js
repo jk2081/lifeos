@@ -9,7 +9,7 @@ export async function loadLookups(force = false) {
   if (!force && lookups.loaded && lookups.space === store.space) return lookups
   const ctx = await api('meta.space_context', { space: store.space })
   Object.assign(lookups, { space: store.space, areas: ctx.areas, goals: ctx.goals,
-    people: ctx.people, habits: ctx.habits, dimensions: ctx.dimensions, cycle: ctx.cycle, loaded: true })
+    people: ctx.people, habits: ctx.habits, cycle: ctx.cycle, loaded: true })
   return lookups
 }
 

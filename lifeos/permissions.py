@@ -121,7 +121,7 @@ def vault_hidden(space, user=None) -> bool:
 
 
 # Captures and notes a person can mark sensitive (UX fixes, set 6); Vault documents always are
-SENSITIVE_DOCTYPES = ("Life Note", "Life Inbox Item", "Life Chat Log", "Life Journal Page")
+SENSITIVE_DOCTYPES = ("Life Note", "Life Inbox Item", "Life Chat Log")
 
 
 def vault_locked(doc) -> bool:

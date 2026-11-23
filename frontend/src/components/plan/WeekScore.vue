@@ -18,7 +18,7 @@ import { store } from '@/lib/store'
 const s = ref(null)
 onMounted(async () => {
   try {
-    s.value = await api('journal.week_score', { space: store.space })
+    s.value = await api('goals.week_score', { space: store.space })
     if (!s.value.week || s.value.week > 12) s.value = null
   } catch (e) { /* no active cycle: nothing to score */ }
 })

@@ -3,6 +3,9 @@
     <div class="mx-auto w-full max-w-[720px]">
       <TextInput v-if="full && writable" v-model="note.title" variant="ghost" class="lv-title" aria-label="Title" data-note-title @update:model-value="queue" />
       <h2 v-else-if="full" class="read !text-2xl font-semibold !leading-tight text-ink-gray-9">{{ note.title }}</h2>
+      <!-- a photographed journal page: the photo comes with the transcript, which is the note's text -->
+      <div v-if="note.image" class="mt-2 max-h-[50vh] overflow-auto rounded-5 border border-outline-gray-1 bg-surface-gray-1" data-note-image>
+        <img class="block h-auto w-full" :src="note.image" alt="Photographed journal page" /></div>
       <!-- filing as one line; it opens a small popover with the pickers -->
       <div class="mt-1 flex flex-wrap items-center gap-x-2 pl-1 text-sm text-ink-gray-6">
         <Popover v-if="writable" v-model:open="filingOpen" align="start">

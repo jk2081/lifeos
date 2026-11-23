@@ -84,7 +84,7 @@ function goalNote(g, c) {
   return c.status === 'Closed' ? g.result_note : ''
 }
 async function load() {
-  const res = await tryCall(() => api('journal.goals', { space: store.space, area: area.value || store.lensArea || undefined }))
+  const res = await tryCall(() => api('goals.across_cycles', { space: store.space, area: area.value || store.lensArea || undefined }))
   if (res) {
     d.value = res
     if (!area.value) all.value = res
@@ -102,7 +102,7 @@ function setCarry(name, on) {
   carry.value = on ? [...carry.value.filter((x) => x !== name), name] : carry.value.filter((x) => x !== name)
 }
 async function plan() {
-  const res = await tryCall(() => api('journal.plan_next_cycle', { cycle: active.value.name, goals: carry.value }))
+  const res = await tryCall(() => api('goals.plan_next_cycle', { cycle: active.value.name, goals: carry.value }))
   if (res) {
     toast.success(`${res.title} is planned, starting ${long(res.start_date, true)}.`)
     planOpen.value = false

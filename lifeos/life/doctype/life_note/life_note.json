@@ -11,6 +11,8 @@
   "content_md",
   "inbox_item",
   "collection",
+  "page_date",
+  "image",
   "summary",
   "sources",
   "is_rules",
@@ -73,6 +75,18 @@
    "options": "My notes\nWiki",
    "default": "My notes",
    "search_index": 1
+  },
+  {
+   "fieldname": "page_date",
+   "fieldtype": "Date",
+   "label": "Page Date",
+   "description": "For a photographed journal page: the day the page was written."
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image",
+   "description": "For a photographed journal page: the photo."
   },
   {
    "fieldname": "summary",

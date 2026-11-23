@@ -9,8 +9,7 @@ LINK_RE = re.compile(r"\[\[([^\[\]#|\n]+?)(?:#([^\[\]\n]+?))?\]\]")
 ROUTES = {
 	"Life Note": "/library/{0}", "Life Task": "/goals/tasks?open=task:{0}", "Life Person": "/settings?person={0}",
 	"Life Vault Document": "/library/documents?open=vault:{0}", "Life Chat Log": "/library/chats?open=chat:{0}", "Life Goal": "/goals/{0}",
-	"Life Inbox Item": "/item/{0}", "Life Journal Page": "/library/notes?view=list&open=page:{0}",
-	"Life Check-in": "/today/month?view=checkins", "Life Month Plan": "/today/month",
+	"Life Inbox Item": "/item/{0}",
 }
 
 

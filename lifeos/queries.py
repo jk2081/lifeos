@@ -13,7 +13,7 @@ import json
 import frappe
 
 SCOPED = {
-	"Life Area": "area_name", "Life Habit": "title", "Life Dimension": "dimension_name",
+	"Life Area": "area_name", "Life Habit": "title",
 	"Life Goal": "title",
 }
 

@@ -17,7 +17,7 @@ from frappe.utils import add_days, now_datetime, today
 
 from lifeos import counts, devtools, gone_names, install, permissions, proposals
 from lifeos.ai import fake
-from lifeos.api import archive, ask, chats, client_errors, connections, goals, graph, inbox, journal, library, search, session, settings, someday, sources, tasks, timeline, today as today_api, vault
+from lifeos.api import archive, ask, chats, client_errors, connections, goals, graph, inbox, library, search, session, settings, someday, sources, tasks, timeline, today as today_api, vault
 from lifeos.api.utils import in_area
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import answer, AskCase, item, task, text
@@ -840,7 +840,7 @@ class TestLens(LifeTestCase):
 		self.assertEqual(in_area(PRIVATE, None, "Life Task", list(names)), set(names))
 		g = graph.get(space=PRIVATE, area=self.parent)
 		self.assertIsInstance(g["nodes"], list)
-		self.assertIsNone(journal.grid(space=PRIVATE, area=self.parent)) if not frappe.db.exists("Life Cycle", {"space": PRIVATE}) else None
+		self.assertIsNone(goals.grid(space=PRIVATE, area=self.parent)) if not frappe.db.exists("Life Cycle", {"space": PRIVATE}) else None
 
 	def test_new_area_gets_a_colour(self):
 		a = frappe.get_doc("Life Area", self.life["Mind"])  # issue 11: the seven come with their colours

@@ -6,14 +6,14 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
 
-from lifeos import datewords, gone_names, journal, permissions
+from lifeos import cycles, datewords, gone_names, permissions
 from lifeos.areas import off_clause
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
 OPEN = ("Open", "Doing", "Waiting")
 FIELDS = ["name", "title", "status", "priority", "due_date", "area", "area_guessed", "area_confidence", "goal", "inbox_item", "carried_from", "waiting_on",
-	"waiting_on_person", "delegated_to", "month_plan", "creation", "completed_on", "source_url", "is_archived", "notes_md", "last_touched_on", "owner", "scheduled_at", "duration_min"]
+	"waiting_on_person", "delegated_to", "creation", "completed_on", "source_url", "is_archived", "notes_md", "last_touched_on", "owner", "scheduled_at", "duration_min"]
 PRIORITY_ORDER = "case t.priority when 'I' then 1 when 'II' then 2 when 'III' then 3 when 'IV' then 4 else 5 end"
 OPEN_LOOP_DAYS = 14
 
@@ -67,7 +67,7 @@ TABS = {
 }
 
 
-def where_clause(space, status="open_doing", area=None, priority=None, goal=None, month_plan=None,
+def where_clause(space, status="open_doing", area=None, priority=None, goal=None,
 		include_archived=0, due=None, done=0, loops=0, completed_from=None, completed_to=None):
 	"""The WHERE of a task list. Every count in the app that leads to a task list is made with this, so the two agree.
 	The default status, open_doing, is what the Open tab of the Tasks screen shows; "open" also holds Waiting tasks."""
@@ -98,9 +98,6 @@ def where_clause(space, status="open_doing", area=None, priority=None, goal=None
 	if goal:
 		where.append("ifnull(t.goal, '') = %(goal)s")
 		values["goal"] = "" if goal == "none" else goal
-	if month_plan:
-		where.append("t.month_plan = %(month_plan)s")
-		values["month_plan"] = month_plan
 	if due:
 		parts = [DUE[d.strip()] for d in str(due).split(",") if d.strip() in DUE]
 		if not parts:
@@ -126,10 +123,10 @@ def count(space, **filters):
 	return frappe.db.sql(f"select count(*) from `tabLife Task` t where t.space=%(space)s {clause}", {"space": space, **values})[0][0]
 
 
-def list_clause(space, status="open", area=None, priority=None, goal=None, month_plan=None, include_archived=0,
+def list_clause(space, status="open", area=None, priority=None, goal=None, include_archived=0,
 		due=None, done=0, loops=0, completed_from=None, completed_to=None, filters=None):
 	"""The WHERE of `list`, its values, and the part that came from `filters`."""
-	clause, values = where_clause(space, status, area, priority, goal, month_plan, include_archived, due, done, loops,
+	clause, values = where_clause(space, status, area, priority, goal, include_archived, due, done, loops,
 		completed_from, completed_to)
 	extra, values = std_clause("Life Task", filters, "t", values)
 	return clause + extra, values, extra
@@ -146,7 +143,7 @@ def total(space, status="open", due=None, filters=None, area=None):
 
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, status: str | None = "open", area: str | None = None,
-		priority: str | None = None, goal: str | None = None, month_plan: str | None = None,
+		priority: str | None = None, goal: str | None = None,
 		include_archived: bool | int = 0, start: int | str | None = 0, page_length: int | str | None = 50, due: str | None = None,
 		done: bool | int = 0, loops: bool | int = 0, completed_from: str | date | None = None, completed_to: str | date | None = None,
 		sort: str | None = None, dir: str | None = None, filters: str | builtins.list | dict | None = None, order_by: str | None = None,
@@ -161,10 +158,10 @@ def list(space: str | None = None, status: str | None = "open", area: str | None
 	under the same filters, whatever status was asked for."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	clause, values, extra = list_clause(space, status, area, priority, goal, month_plan, include_archived, due, done,
+	clause, values, extra = list_clause(space, status, area, priority, goal, include_archived, due, done,
 		loops, completed_from, completed_to, filters)
 	# the tab counts: the same filters without the status and the open-loops switch, which are what a tab stands for
-	t_clause, t_values = where_clause(space, "any", area, priority, goal, month_plan, include_archived, due, 0, 0,
+	t_clause, t_values = where_clause(space, "any", area, priority, goal, include_archived, due, 0, 0,
 		completed_from, completed_to)
 	t_values = {**t_values, **values, "space": space, "cutoff": add_days(today(), -OPEN_LOOP_DAYS)}
 	tabs = tab_counts(f"from `tabLife Task` t where t.space=%(space)s {t_clause}{extra}", t_values, TABS)
@@ -395,7 +392,7 @@ def get(task: str):
 
 @frappe.whitelist(methods=["POST"])
 def quick_add(text: str, space: str | None = None, area: str | None = None, goal: str | None = None,
-		due_date: str | date | None = None, priority: str | None = None, month_plan: str | None = None):
+		due_date: str | date | None = None, priority: str | None = None):
 	"""Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date."""
 	space = permissions.resolve_space(space, write=True)
 	title, when = datewords.parse(text)
@@ -404,7 +401,7 @@ def quick_add(text: str, space: str | None = None, area: str | None = None, goal
 	if goal and not area:
 		area = frappe.db.get_value("Life Goal", goal, "area")
 	doc = frappe.get_doc({"doctype": "Life Task", "space": space, "title": title[:140], "due_date": due_date or when, "area": area,
-		"goal": goal, "priority": priority, "month_plan": month_plan, "status": "Open"}).insert()
+		"goal": goal, "priority": priority, "status": "Open"}).insert()
 	return get(doc.name)
 
 
@@ -435,15 +432,15 @@ def tick_lead_action(task):
 	cycle = frappe.db.get_value("Life Goal", task.goal, "cycle")
 	if not cycle or frappe.db.get_value("Life Cycle", cycle, "status") != "Active":
 		return
-	week = journal.week_of(frappe.get_doc("Life Cycle", cycle), getdate(today()))
-	if not 1 <= week <= journal.WEEKS:
+	week = cycles.week_of(frappe.get_doc("Life Cycle", cycle), getdate(today()))
+	if not 1 <= week <= cycles.WEEKS:
 		return
 	title = (task.title or "").strip().lower()
 	for a in frappe.get_all("Life Goal Action", filters={"parent": task.goal, "status": "Open"}, fields=["name", "title", "per_week"]):
 		if (a.title or "").strip().lower() == title:
-			have = journal._ticks(cycle).get(a.name, {}).get(week, 0)
+			have = cycles._ticks(cycle).get(a.name, {}).get(week, 0)
 			try:
-				journal.set_tick(a.name, week, have + 1)
+				cycles.set_tick(a.name, week, have + 1)
 			except frappe.PermissionError:  # someone who may finish the task but not change the goal's ticks
 				pass
 			return
@@ -455,7 +452,7 @@ def update(task: str, values: str | dict):
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	values = frappe.parse_json(values) or {}
 	gone_names.refuse(values)
-	allowed = {"title", "status", "priority", "due_date", "goal", "notes_md", "waiting_on", "waiting_on_person", "delegated_to", "area", "source_url", "month_plan", "scheduled_at", "duration_min"}
+	allowed = {"title", "status", "priority", "due_date", "goal", "notes_md", "waiting_on", "waiting_on_person", "delegated_to", "area", "source_url", "scheduled_at", "duration_min"}
 	for k, v in values.items():
 		if k == "also_in":
 			doc.set("also_in", [{"area": a} for a in v or []])
@@ -480,8 +477,8 @@ def confirm_area(task: str, area: str | None = None):
 
 @frappe.whitelist(methods=["POST"])
 def carry_forward(task: str):
-	"""Copy an open task into next month's plan, mark the old one Carried and set carried_from."""
-	out = journal.carry_task(task)
+	"""Copy an open task, mark the old one Carried and set carried_from."""
+	out = cycles.carry_task(task)
 	return {**out, "new_task": get(out["task"])}
 
 
@@ -505,28 +502,10 @@ def open_loops(space: str | None = None, start: int | str | None = 0, page_lengt
 
 
 def stale_tasks(space, limit=50):
-	"""Open tasks not touched for `stale_task_days`. Never archived; the weekly review lists them under Decide."""
+	"""Open tasks not touched for `stale_task_days`. Never archived."""
 	days = frappe.db.get_single_value("Life Settings", "stale_task_days") or 90
 	return query(space, "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and ifnull(t.last_touched_on, date(t.creation)) <= %(cutoff)s",
 		{"cutoff": add_days(today(), -days)}, "t.creation asc", 0, limit)
-
-
-@frappe.whitelist(methods=["POST"])
-def decide_stale(task: str, decision: str):
-	"""The three buttons under Decide in the weekly review: do (due this week), carry, drop."""
-	doc = permissions.get_doc_checked("Life Task", task, "write")
-	if decision == "do":
-		now = getdate(today())
-		doc.due_date = add_days(now, 6 - now.weekday())
-		doc.save()
-	elif decision == "carry":
-		return carry_forward(task)
-	elif decision == "drop":
-		doc.status = "Dropped"
-		doc.save()
-	else:
-		frappe.throw(_("decision must be do, carry or drop."))
-	return get(doc.name)
 
 
 @frappe.whitelist(methods=["POST"])

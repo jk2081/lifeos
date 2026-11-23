@@ -87,7 +87,7 @@ import { areaOptionsOf, goalOptions } from '@/lib/lookups'
 
 const props = defineProps({ item: Object, writable: Boolean, only: String, emptyTitle: { type: String, default: 'No proposals.' }, emptyHint: String })
 const emit = defineEmits(['decided'])
-const KIND_LABEL = { 'Week Tick': 'Week tick', 'Journal Page': 'Journal page', 'Vault Document': 'Document', 'Important Date': 'Date', 'Month Goal': 'Month goal', 'Habit Log': 'Habit', 'Check-in': 'Check-in' }
+const KIND_LABEL = { 'Week Tick': 'Week tick', 'Journal Page': 'Journal page', 'Vault Document': 'Document', 'Important Date': 'Date', 'Month Goal': 'Month goal', 'Habit Log': 'Habit' }
 
 const schema = ref({})
 const dueFor = ref('')
@@ -96,7 +96,7 @@ const editing = ref(null)
 const draft = ref({})
 
 const shown = computed(() => (props.only === 'pending' ? props.item.proposals.filter((p) => p.status === 'Pending') : props.item.proposals))
-const ctx = computed(() => props.item?.context || { areas: [], goals: [], people: [], habits: [], dimensions: [] })
+const ctx = computed(() => props.item?.context || { areas: [], goals: [], people: [], habits: [] })
 const pct = (c) => Math.round((c || 0) * 100)
 const areaOptions = computed(() => areaOptionsOf(ctx.value.areas))
 const areaName = (id) => ctx.value.areas.find((a) => a.name === id)?.area_name || id
@@ -120,7 +120,6 @@ function factChips(p) {
     if (pl.mark_done) out.push('Finished for good')
   }
   if (p.kind === 'Habit Log') out.push(ctx.value.habits.find((h) => h.name === pl.habit)?.title || pl.habit, pl.date)
-  if (p.kind === 'Check-in') out.push(pl.date, `${(pl.scores || []).length} dimensions`)
   if (p.kind === 'Event') out.push(String(pl.starts_on).slice(0, 16))
   if (p.kind === 'Important Date') out.push(`${pl.day}/${pl.month}`, pl.kind || 'Birthday')
   if (p.kind === 'Month Goal') out.push(`${pl.month}/${pl.year}`)

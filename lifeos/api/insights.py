@@ -41,7 +41,7 @@ def _out(rows):
 
 
 LABEL = {"Life Task": ("task", "tasks"), "Life Goal": ("goal", "goals"), "Life Chat Log": ("chat", "chats"),
-	"Life Inbox Item": ("source", "sources"), "Life Note": ("note", "notes"), "Life Check-in": ("check-in", "check-ins"),
+	"Life Inbox Item": ("source", "sources"), "Life Note": ("note", "notes"),
 	"Life Habit": ("habit log", "habit logs"), "Life Cycle": ("12 Week Year", "12 Week Years")}
 
 

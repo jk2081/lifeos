@@ -197,10 +197,10 @@ def tab(review, now=None):
 
 
 def journal_score(cycle):
-	from lifeos import journal
+	from lifeos import cycles
 
-	week = journal.current_week(cycle)
-	s = journal.week_score(cycle.name, week)
+	week = cycles.current_week(cycle)
+	s = cycles.week_score(cycle.name, week)
 	return {"week": week, "percent": s["percent"], "done": s["done"], "planned": s["planned"]}
 
 

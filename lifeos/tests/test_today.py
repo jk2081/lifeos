@@ -2,8 +2,8 @@
 import frappe
 from frappe.utils import add_days, getdate, now_datetime, today
 
-from lifeos import journal as rules, rhythms, year_plan as plan
-from lifeos.api import calendar as cal, journal, tasks, today as today_api
+from lifeos import calendar_data, cycles as rules, rhythms, year_plan as plan
+from lifeos.api import calendar as cal, goals, tasks, today as today_api
 from lifeos.tests.base import AGENT, LifeTestCase, OWNER, PRIVATE
 from lifeos.tests.helpers import task
 
@@ -24,7 +24,7 @@ class TestTodayViews(LifeTestCase):
 		frappe.db.delete("Life Task", {"space": PRIVATE, "title": ("like", "i16 %")})
 		frappe.db.delete("Life Goal", {"space": PRIVATE})
 		frappe.db.delete("Life Cycle", {"space": PRIVATE, "title": ("like", "i16 %")})
-		frappe.db.delete("Life Important Date", {"space": PRIVATE, "title": ("like", "i16 %")})
+		frappe.db.delete("Event", {"life_space": PRIVATE, "subject": ("like", "i16 %")})
 		frappe.db.delete("Life Review", {"user": OWNER})
 
 	def cycle(self, status="Active", start=None, title="i16 cycle"):
@@ -105,7 +105,7 @@ class TestTodayViews(LifeTestCase):
 		self.assertIsNone(cal.year_plan(PRIVATE, self.year - 1)["next_cycle"])
 
 	def test_key_dates_are_pins(self):
-		self.make("Life Important Date", title="i16 Anya", kind="Birthday", day=14, month=3)
+		calendar_data.add_yearly_date(PRIVATE, "i16 Anya", 14, 3, kind="Birthday")
 		pins = cal.year_plan(PRIVATE, self.year)["key_dates"]
 		self.assertIn(f"{self.year}-03-14", [p["date"] for p in pins if p["title"].startswith("i16 Anya")])
 
@@ -164,7 +164,7 @@ class TestTodayTasksOnly(LifeTestCase):
 		week = rules.week_of(self.cycle)
 		ticks = frappe.db.get_value("Life Action Log", {"action_id": goal.actions[0].name, "week": week}, "count")
 		self.assertEqual(ticks, 1)
-		self.assertEqual(journal.grid(cycle=self.cycle.name, space=PRIVATE)["goals"][0]["actions"][0]["name"], goal.actions[0].name)
+		self.assertEqual(goals.grid(cycle=self.cycle.name, space=PRIVATE)["goals"][0]["actions"][0]["name"], goal.actions[0].name)
 
 	def test_a_task_with_no_matching_lead_action_ticks_nothing(self):
 		task = self.make("Life Task", title="i55 something else", goal=self.goals[1].name, due_date=today())
@@ -188,8 +188,8 @@ class TestBanners(LifeTestCase):
 		super().setUpClass()
 		frappe.set_user("Administrator")
 		s = frappe.get_single("Life Settings")
-		cls.saved = (s.weekly_review_day, s.weekly_review_time, s.month_plan_enabled)
-		s.weekly_review_day, s.weekly_review_time, s.month_plan_enabled = "Sunday", "18:00:00", 1
+		cls.saved = (s.weekly_review_day, s.weekly_review_time)
+		s.weekly_review_day, s.weekly_review_time = "Sunday", "18:00:00"
 		s.save()
 		frappe.conf.lifeos_test_clock = 1
 		# a cycle whose week 11 starts on 2027-03-15 (it started on 2027-01-04)
@@ -201,7 +201,7 @@ class TestBanners(LifeTestCase):
 		frappe.set_user("Administrator")
 		frappe.conf.lifeos_test_clock = 0
 		s = frappe.get_single("Life Settings")
-		s.weekly_review_day, s.weekly_review_time, s.month_plan_enabled = cls.saved
+		s.weekly_review_day, s.weekly_review_time = cls.saved
 		s.save()
 		super().tearDownClass()
 
@@ -225,13 +225,6 @@ class TestBanners(LifeTestCase):
 			"period_end": "2027-02-21", "locked_on": "2027-02-21 18:40:00", "went_well": "done"}).insert()
 		self.assertIsNone(self.banner("2027-02-21 19:00:00"))
 
-	def test_month_plan_in_the_first_three_days(self):
-		b = self.banner("2027-02-02 09:00:00")
-		self.assertEqual((b["key"], b["text"]), ("month", "Plan February"))
-		self.assertIsNone(self.banner("2027-02-04 09:00:00"))
-		frappe.get_doc({"doctype": "Life Month Plan", "space": PRIVATE, "year": 2027, "month": 2}).insert()
-		self.assertIsNone(self.banner("2027-02-02 09:00:00"))
-
 	def test_cycle_weeks_and_precedence(self):
 		frappe.db.set_value("Life Cycle", self.cycle, "status", "Active")
 		other = frappe.get_all("Life Cycle", filters={"space": PRIVATE, "status": "Active", "name": ("!=", self.cycle)}, pluck="name")
@@ -246,11 +239,12 @@ class TestBanners(LifeTestCase):
 
 	def test_skip_through_the_api_and_agents_get_none(self):
 		frappe.set_user(self.owner_user())
-		today_api.skip_banner("month:2027-02")
-		self.assertIsNone(rhythms.banner(PRIVATE, "2027-02-02 09:00:00"))
+		self.assertIsNotNone(rhythms.banner(PRIVATE, "2027-02-14 18:30:00"))
+		today_api.skip_banner("review:2027-02-08")
+		self.assertIsNone(rhythms.banner(PRIVATE, "2027-02-14 18:30:00"))
 		self.assertRaises(frappe.ValidationError, today_api.skip_banner, "anything")
 		self.as_user(AGENT)
-		self.assertIsNone(today_api.get(space=PRIVATE, at="2027-02-02 09:00:00")["banner"])
+		self.assertIsNone(today_api.get(space=PRIVATE, at="2027-02-14 18:30:00")["banner"])
 
 	def test_the_clock_moves_only_on_a_test_site(self):
 		frappe.conf.lifeos_test_clock = 0

@@ -5,12 +5,11 @@ import frappe
 from frappe import _
 from frappe.utils import get_datetime, getdate, today
 
-from lifeos import gone_names, journal, readings
-from lifeos.life.doctype.life_check_in.life_check_in import parse_range
+from lifeos import calendar_data, cycles, gone_names, habits, readings
 
 TITLE_FIELDS = {
 	"Life Area": "area_name", "Life Goal": "title",
-	"Life Person": "full_name", "Life Habit": "title", "Life Dimension": "dimension_name", "Life Note": "title",
+	"Life Person": "full_name", "Life Habit": "title", "Life Note": "title",
 }
 PRIORITY = ["", "I", "II", "III", "IV"]
 
@@ -45,10 +44,10 @@ SCHEMA = {
 		"example": {"subject": "Call with Vivek on the ITR", "starts_on": "2026-11-14 16:30:00"},
 	},
 	"Important Date": {
-		"target": "Life Important Date", "filed": False,
+		"target": "Event", "filed": False,
 		"fields": {
 			"title": F("text", True), "day": F("int", True), "month": F("int", True), "year": F("int", help="Optional year it first happened."),
-			"kind": F("select", options=["Birthday", "Anniversary", "Other"]), "person": F("link", doctype="Life Person"),
+			"kind": F("select", options=["Birthday", "Anniversary", "Other"]),
 		},
 		"example": {"title": "Ruchi", "day": 14, "month": 1, "kind": "Birthday"},
 	},
@@ -89,15 +88,6 @@ SCHEMA = {
 		"fields": {"habit": F("link", True, "Name or title of a Life Habit.", doctype="Life Habit"), "date": F("date", True), "done": F("bool")},
 		"example": {"habit": "Japa", "date": "2026-11-14", "done": True},
 	},
-	"Check-in": {
-		"target": "Life Check-in", "filed": False,
-		"fields": {
-			"date": F("date", True),
-			"scores": F("scores", True, "List of {dimension, habits, situation, note}. A score is 0 to 10, as a number or a range such as '2-3'."),
-			"reflection_md": F("markdown"),
-		},
-		"example": {"date": "2026-11-14", "scores": [{"dimension": "Money", "habits": "2-3", "situation": 7, "note": "PMS pending"}]},
-	},
 	"Week Tick": {
 		"target": "Life Goal", "filed": False,
 		"fields": {
@@ -108,8 +98,9 @@ SCHEMA = {
 		},
 		"example": {"goal": "Close open loops", "action": "Anya passport", "mark_done": True},
 	},
+	# a photographed journal page: a note in My notes, with the photo, the transcript and the day it was written
 	"Journal Page": {
-		"target": "Life Journal Page", "filed": True,
+		"target": "Life Note", "filed": True,
 		"fields": {"page_date": F("date", True), "page_number": F("text", help="For example 187 or 187-188."), "transcript_md": F("markdown"), **ORG},
 		"example": {"page_date": "2026-11-14", "page_number": "187-188", "transcript_md": "Goal Oct to Dec ..."},
 	},
@@ -257,27 +248,6 @@ def _coerce(name, spec, value, space, ctx):
 		if not isinstance(value, list):
 			raise PayloadError(_("{0} must be a list.").format(name))
 		return [_switched_on(spec["doctype"], resolve_link(spec["doctype"], v, space), space) for v in value if v]
-	if t == "scores":
-		if not isinstance(value, list) or not value:
-			raise PayloadError(_("scores must be a list with at least one dimension."))
-		out = []
-		for row in value:
-			if not isinstance(row, dict) or not row.get("dimension"):
-				raise PayloadError(_("Each score needs a dimension."))
-			unknown = set(row) - {"dimension", "habits", "situation", "note", "habits_low", "habits_high", "situation_low", "situation_high"}
-			if unknown:
-				raise PayloadError(_("Unknown score field: {0}.").format(", ".join(sorted(unknown))))
-			item = {"dimension": resolve_link("Life Dimension", row["dimension"], space), "note": str(row.get("note") or "")}
-			for kind in ("habits", "situation"):
-				raw = row.get(kind)
-				if raw is None and row.get(f"{kind}_low") is not None:
-					raw = [row.get(f"{kind}_low"), row.get(f"{kind}_high", row.get(f"{kind}_low"))]
-				low, high = parse_range(raw)
-				if low is not None and not (0 <= low <= 10 and 0 <= high <= 10):
-					raise PayloadError(_("Scores are 0 to 10."))
-				item[f"{kind}_low"], item[f"{kind}_high"] = low, high
-			out.append(item)
-		return out
 	raise PayloadError(_("Unknown field type for {0}.").format(name))
 
 
@@ -385,8 +355,7 @@ def apply(kind, payload, item) -> tuple:
 		from lifeos.review import gcal_write
 		gcal_write.push_event(doc, p.get("attendees"))
 	elif kind == "Important Date":
-		doc = frappe.get_doc({"doctype": "Life Important Date", **base, **{k: p.get(k) for k in ("title", "day", "month", "year", "person")},
-			"kind": p.get("kind") or "Birthday"}).insert()
+		doc = calendar_data.add_yearly_date(space, p["title"], p["day"], p["month"], p.get("year"), p.get("kind") or "Birthday")
 	elif kind == "Note":
 		doc = frappe.get_doc({"doctype": "Life Note", **base, "title": p["title"], "content_md": p.get("content_md"),
 			"parent_note": p.get("parent_note"), **_org(p, space)}).insert()
@@ -407,7 +376,7 @@ def apply(kind, payload, item) -> tuple:
 		index.update(frappe.get_doc("Life Inbox Item", item.name))
 	elif kind in ("Goal", "Month Goal"):
 		if kind == "Month Goal":
-			first, last = journal.month_bounds(p["year"], p["month"])
+			first, last = cycles.month_bounds(p["year"], p["month"])
 			p = {**p, "horizon": "Month", "target_date": str(last)}
 		readings.require_finish_line({"done_when": p.get("done_when")})  # the setting: accepted into Needs you, but not filed until it has one
 		if not p.get("horizon") and not p.get("target_date"):  # no horizon and no date would be an Open goal, which is retired (issue 57)
@@ -415,28 +384,26 @@ def apply(kind, payload, item) -> tuple:
 		doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": p["title"], "horizon": p.get("horizon"), "area": p.get("area"),
 			"target_date": p.get("target_date"), "serves": p.get("serves"), "done_when": p.get("done_when")}).insert()
 	elif kind == "Habit Log":
-		journal.toggle_habit(p["habit"], p["date"], bool(p.get("done", 1)))
+		habits.toggle_habit(p["habit"], p["date"], bool(p.get("done", 1)))
 		name = frappe.db.get_value("Life Habit Log", {"habit": p["habit"], "date": p["date"]})
 		if name:
 			frappe.db.set_value("Life Habit Log", name, "inbox_item", item.name, update_modified=False)
 			return "Life Habit Log", name
 		return "Life Habit", p["habit"]
-	elif kind == "Check-in":
-		doc = frappe.get_doc({"doctype": "Life Check-in", **base, "date": p["date"], "scores": p["scores"],
-			"reflection_md": p.get("reflection_md")}).insert()
 	elif kind == "Week Tick":
 		goal = frappe.get_doc("Life Goal", p["goal"])
 		cycle = frappe.get_doc("Life Cycle", goal.cycle)
-		week = p.get("week") or journal.current_week(cycle)
-		journal.set_tick(p["action"], week, p.get("count") if p.get("count") is not None else 1, inbox_item=item.name)
+		week = p.get("week") or cycles.current_week(cycle)
+		cycles.set_tick(p["action"], week, p.get("count") if p.get("count") is not None else 1, inbox_item=item.name)
 		if p.get("mark_done"):
-			journal.set_action_status(p["action"], "Done")
+			cycles.set_action_status(p["action"], "Done")
 		return "Life Goal", goal.name
 	elif kind == "Someday":
 		return _apply_someday(p, item)
 	elif kind == "Journal Page":
-		doc = frappe.get_doc({"doctype": "Life Journal Page", **base, "page_date": p["page_date"], "page_number": p.get("page_number"),
-			"transcript_md": p.get("transcript_md") or item.transcript_md, **_org(p, space)}).insert()
+		title = f"Journal page {p['page_number']}" if p.get("page_number") else "Journal page"
+		doc = frappe.get_doc({"doctype": "Life Note", **base, "title": f"{title}, {p['page_date']}", "collection": "My notes", "page_date": p["page_date"],
+			"content_md": p.get("transcript_md") or item.transcript_md, **_org(p, space)}).insert()
 		images = [f for f in _item_files(item.name) if (f.file_name or "").lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".gif", ".heic"))]
 		if images:
 			doc.db_set("image", _attach_copy(images[0].file_url, doc.doctype, doc.name, "image"), update_modified=False)

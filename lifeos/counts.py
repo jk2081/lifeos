@@ -119,12 +119,12 @@ def goals_in_progress(space, area=None):
 def goal_sets(space, area=None):
 	"""In-progress 12 Week Year goals of the active cycle with no ticks in the last three weeks (once three weeks have
 	passed), and in-progress goals with no tasks and no open actions."""
-	from lifeos import journal
+	from lifeos import cycles
 
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "start_date", "end_date"], as_dict=True)
 	no_ticks = []
 	if cycle:
-		week = journal.week_of(cycle, getdate(today()))
+		week = cycles.week_of(cycle, getdate(today()))
 		if week >= 4:
 			since = add_days(getdate(today()), -21)
 			in_progress = frappe.get_all("Life Goal", filters={"cycle": cycle.name, "outcome": "In Progress", "is_someday": 0}, pluck="name")

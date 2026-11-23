@@ -23,11 +23,6 @@
                 data-meetings-door :data-count-n="c.n" @click="listOpen = true" />
               <CountLink v-else class="font-semibold" :count="{ n: c.n, to: c.to, label: c.label }" :data-door="'review-came-' + c.key" />
             </div>
-            <div class="mt-3 rounded-4 bg-surface-gray-1 p-3" data-review-inbox>
-              <div class="text-base-medium text-ink-gray-9">Inbox · {{ inboxLeft }} to process</div>
-              <div class="mb-2 text-sm text-ink-gray-6" data-inbox-split>Accept {{ d.inbox.keep }} · Park {{ d.inbox.park }} · Let go {{ d.inbox.letgo }} · {{ d.inbox.needs }} need you</div>
-              <Button class="w-full" label="Review the piles" :disabled="!inboxLeft" data-review-the-piles @click="openInbox" />
-            </div>
           </Card>
           <Card class="flex min-w-0 flex-col" data-revelations>
             <div class="flex flex-wrap items-baseline justify-between gap-2">
@@ -41,7 +36,6 @@
         </div>
       </template>
     </div>
-    <PileBoard ref="inboxBoard" pkey="inbox" hide-cards switchable @summary="loadSoon" />
     <MeetingDrawer :event="meetingName" :m="meeting" :ai="d?.ai" @close="closeMeeting" @go="openMeeting" @act="meetingAct" @finding="act" @done="doneMeeting" @plan="plan" />
     <Drawer :open="listOpen" name="meetings" title="Meetings that matter" sub="In this review's period." @close="listOpen = false">
       <div v-for="m in list" :key="m.name" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-meetings-row>
@@ -56,7 +50,7 @@
   </div>
 </template>
 <script setup>
-// Tab 1, Library (boards 28 and 29): the calendar strip, what came in by source, the Inbox piles, and the revelations.
+// Tab 1, Library (boards 28 and 29): the calendar strip, what came in by source, and the revelations.
 // Library never blocks: its footer button is always "Next: Tasks".
 import { computed, onMounted, ref, watch } from 'vue'
 import { Button, Skeleton } from 'frappe-ui'
@@ -66,7 +60,6 @@ import Drawer from '@/components/ui/Drawer.vue'
 import CalendarStrip from './library/CalendarStrip.vue'
 import FindingRow from './library/FindingRow.vue'
 import MeetingDrawer from './library/MeetingDrawer.vue'
-import PileBoard from './piles/PileBoard.vue'
 import ReviewFooter from './ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 import { dateTime } from '@/lib/dates'
@@ -81,17 +74,13 @@ const meetingName = ref(null)
 const meeting = ref(null)
 const listOpen = ref(false)
 const list = ref([])
-const inboxBoard = ref(null)
-const inboxLeft = computed(() => (d.value ? d.value.inbox.keep + d.value.inbox.park + d.value.inbox.letgo + d.value.inbox.needs : 0))
 const revelationsLabel = computed(() => (d.value.revelations.length < d.value.revelations_shown ? `${d.value.revelations.length} left` : d.value.revelations.length))
-const footerLine = computed(() => d.value ? `${d.value.revelations.length} revelation${d.value.revelations.length === 1 ? '' : 's'} · ${inboxLeft.value} Inbox item${inboxLeft.value === 1 ? '' : 's'} · nothing blocks you from going on` : '')
+const footerLine = computed(() => d.value ? `${d.value.revelations.length} revelation${d.value.revelations.length === 1 ? '' : 's'} · nothing blocks you from going on` : '')
 
 async function load() {
   d.value = await r.read('library')
   if (listOpen.value || !list.value.length) list.value = (await r.read('meetings_list')).rows
 }
-let soon = null
-function loadSoon() { clearTimeout(soon); soon = setTimeout(load, 50) }
 async function openMeeting(name) {
   if (!name) return
   meetingName.value = name
@@ -121,10 +110,6 @@ async function doneMeeting(m) {
   await r.act('meeting_done', { event: m.name })
   if (m.next) openMeeting(m.next)
   else closeMeeting()
-}
-function openInbox() {
-  const s = d.value.inbox
-  inboxBoard.value?.open(s.needs ? 'needs' : s.keep ? 'keep' : s.park ? 'park' : 'letgo')
 }
 watch(() => r.head?.name, load)
 onMounted(load)

@@ -1,6 +1,6 @@
 <template>
   <PageHead title="Goals" :sub="sub">
-    <Button variant="subtle" label="Reset" route="/today/reset" data-all-tasks-reset />
+    <Button variant="subtle" label="Reset" route="/settings?tab=data" data-all-tasks-reset />
     <Button v-if="writable" variant="solid" icon-left="lucide-plus" label="Task" data-new-task @click="openTopAdd" />
   </PageHead>
   <div class="page-body flex max-w-6xl flex-col gap-4" data-all-tasks :data-loaded="loaded ? 1 : 0">

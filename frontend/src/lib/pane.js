@@ -10,12 +10,9 @@ export const TYPES = {
   note: { label: 'Note', doctype: 'Life Note' },
   vault: { label: 'Vault document', doctype: 'Life Vault Document' },
   goal: { label: 'Goal', doctype: 'Life Goal' },
-  page: { label: 'Journal page', doctype: 'Life Journal Page' },
   chat: { label: 'AI chat', doctype: 'Life Chat Log' },
   event: { label: 'Event', doctype: 'Event' },
-  date: { label: 'Important date', doctype: 'Life Important Date' },
-  checkin: { label: 'Check-in', doctype: 'Life Check-in' },
-  month: { label: 'Month plan', doctype: 'Life Month Plan' },
+  date: { label: 'Important date' },
   day: { label: 'Day' },
 }
 const BY_DOCTYPE = Object.fromEntries(Object.entries(TYPES).filter(([, t]) => t.doctype).map(([k, t]) => [t.doctype, k]))

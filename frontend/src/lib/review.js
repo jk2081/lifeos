@@ -48,28 +48,3 @@ export function provideReview() {
 export const useReview = () => inject(KEY)
 // the monthly and 12-week reviews (issue 47) provide their own state of the same shape, so the shell's header and footer are shared
 export const provideShell = (r) => provide(KEY, r)
-
-export const PILE_TEXT = {
-  keep: { title: 'Keep', dot: 'bg-surface-green-7', verb: 'Keep all', done: 'kept', inbox: { line: 'proposals accepted as they are', verb: 'Accept all', done: 'accepted' },
-    tasks: { line: 'stay open' } },
-  park: { title: 'Park in Someday', dot: 'bg-surface-amber-7', verb: 'Park all', done: 'parked in Someday', inbox: { line: 'kept as notes in Someday, back in 3 months' },
-    tasks: { line: 'back for a look in 3 months' } },
-  letgo: { title: 'Let go', dot: 'bg-surface-gray-7', verb: 'Let go of all', done: 'let go', inbox: { line: 'discarded, back from the trash for 30 days' },
-    tasks: { line: 'dropped; bring them back from the Outbox' } },
-}
-PILE_TEXT.needs = { title: 'Needs you', dot: 'bg-surface-red-7', verb: '', done: 'settled', line: 'the assistant could not decide' }
-export const pileText = (pile, key, field) => PILE_TEXT[pile][key]?.[field] ?? PILE_TEXT[pile][field]
-
-// The three choices on a row, worded for its source (Needs you): an Inbox item, a stuck task, a task waiting on someone
-export function choicesFor(row) {
-  if (row.source === 'Inbox') return [{ label: 'Accept', decision: 'keep' }, { label: 'Park', decision: 'park' }, { label: 'Discard', decision: 'letgo' }]
-  if (row.source === 'Waiting') return [{ label: 'Chase', decision: 'keep', chase: 1 }, { label: 'Got it', decision: 'letgo' }, { label: 'Keep waiting', decision: 'keep', chase: 0 }]
-  return [{ label: 'This week', decision: 'keep' }, { label: 'Someday', decision: 'park' }, { label: 'Drop', decision: 'letgo' }]
-}
-
-export function ageText(row) {
-  const d = row.age || 0
-  if (row.source === 'Inbox') return d ? `captured ${d} day${d === 1 ? '' : 's'} ago` : 'captured today'
-  if (row.source === 'Waiting') return `waiting ${d} day${d === 1 ? '' : 's'}${row.waiting_on ? ' on ' + row.waiting_on : ''}`
-  return `untouched ${d} days`
-}

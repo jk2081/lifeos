@@ -189,7 +189,7 @@ def claim_next(space: str | None = None):
 
 
 def space_context(space):
-	"""What an agent needs to file proposals: the space's areas, people, habits, dimensions and goals in progress.
+	"""What an agent needs to file proposals: the space's areas, people, habits and goals in progress.
 	`areas` (issue 11) holds the areas of life that are on, each followed by its parts: file only into these. `areas_off`
 	names the areas of life that are switched off; nothing may be filed there, and their goals are left out."""
 	from lifeos import areas as life
@@ -222,7 +222,6 @@ def space_context(space):
 		"areas_off": areas_off,
 		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], limit=500),
 		"habits": frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title"], limit=200),
-		"dimensions": frappe.get_all("Life Dimension", filters={"space": space, "is_archived": 0}, fields=["name", "dimension_name"], order_by="sort_order", limit=50),
 		"cycle": ({"name": cycle.name, "title": cycle.title, "start_date": str(cycle.start_date)} if cycle else None),
 		"goals": goals,
 	}

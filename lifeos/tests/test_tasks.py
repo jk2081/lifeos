@@ -80,11 +80,7 @@ class TestTasks(LifeTestCase):
 		out = tasks.carry_forward(t.name)
 		old = frappe.get_doc("Life Task", t.name)
 		new = frappe.get_doc("Life Task", out["task"])
-		now = getdate(today())
-		ny, nm = (now.year + 1, 1) if now.month == 12 else (now.year, now.month + 1)
 		self.assertEqual((old.status, new.status, new.carried_from, new.title, new.priority), ("Carried", "Open", old.name, old.title, "I"))
-		self.assertEqual(new.month_plan, f"{PRIVATE}-{ny}-{nm:02d}")
-		self.assertTrue(frappe.db.exists("Life Month Plan", new.month_plan))
 		self.assertRaises(frappe.ValidationError, tasks.carry_forward, t.name)  # already carried
 
 	def test_open_loops(self):
@@ -105,15 +101,8 @@ class TestTasks(LifeTestCase):
 
 class TestToday(LifeTestCase):
 	def test_today_in_one_call(self):
-		habit = self.make("Life Habit", title="Japa m4")
 		now = getdate(today())
-		plan_name = f"{PRIVATE}-{now.year}-{now.month:02d}"
-		if frappe.db.exists("Life Month Plan", plan_name):
-			plan = frappe.get_doc("Life Month Plan", plan_name)
-			plan.append("habits", {"habit": habit.name})
-			plan.save()
-		else:
-			self.make("Life Month Plan", year=now.year, month=now.month, habits=[{"habit": habit.name, "tracked_from": now.replace(day=1)}])
+		habit = self.make("Life Habit", title="Japa m4", tracked_from=now.replace(day=1))
 		self.make("Life Habit Log", habit=habit.name, date=now)
 		due = self.make("Life Task", title="Due today", due_date=now)
 		over = self.make("Life Task", title="Overdue", due_date=add_days(now, -2))
@@ -1064,7 +1053,7 @@ class TestTabCounts(LifeTestCase):
 		def check(**f):
 			get = lambda **a: archive.list(space=PRIVATE, **f, **a)  # noqa: E731
 			tabs = get()["tabs"]
-			self.assertEqual(set(tabs), {"all", "Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document", "Life Journal Page"})
+			self.assertEqual(set(tabs), {"all", "Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document"})
 			for dt in tabs:
 				self.assertEqual(tabs[dt], get(doctype=None if dt == "all" else dt)["total"], dt)
 			self.assertEqual(get(doctype="Life Note")["tabs"], tabs)

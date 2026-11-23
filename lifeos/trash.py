@@ -9,12 +9,12 @@ from frappe.utils import add_days, now_datetime
 from lifeos import permissions
 
 DAYS = 30
-# what the trash lists and restores; areas, habits and dimensions stay archive-only (set 3)
+# what the trash lists and restores; areas and habits stay archive-only (set 3)
 TRASHABLE = ("Life Task", "Life Goal", "Life Note", "Life Inbox Item", "Life Chat Log",
-	"Life Journal Page", "Life Vault Document", "Life Important Date", "Life Person")
+	"Life Vault Document", "Life Person")
 LABELS = {"Life Task": "Task", "Life Goal": "Goal", "Life Note": "Note",
-	"Life Inbox Item": "Source", "Life Chat Log": "Chat", "Life Journal Page": "Journal page", "Life Vault Document": "Vault document",
-	"Life Important Date": "Important date", "Life Person": "Person"}
+	"Life Inbox Item": "Source", "Life Chat Log": "Chat", "Life Vault Document": "Vault document",
+	"Life Person": "Person"}
 
 
 def delete(doctype, name):

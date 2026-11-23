@@ -14,7 +14,6 @@
   "work_start",
   "work_end",
   "own_domains",
-  "month_plan_enabled",
   "planning_period",
   "require_done_when",
   "use_focuses",
@@ -104,13 +103,6 @@
    "fieldtype": "Small Text",
    "label": "Your Domains",
    "description": "Email domains that are yours (one per line). A meeting matters when someone from outside them attends."
-  },
-  {
-   "default": "1",
-   "fieldname": "month_plan_enabled",
-   "fieldtype": "Check",
-   "label": "Month plan",
-   "description": "Plan each month; Today reminds you in its first three days."
   },
   {
    "default": "12 Week Years",

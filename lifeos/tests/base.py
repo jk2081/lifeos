@@ -28,7 +28,6 @@ class LifeTestCase(IntegrationTestCase):
 		# issue 11: the seven areas of life of each space; "Tea" and "Work" are parts of Career, "Personal" of Health
 		cls.life = areas.life_areas(PRIVATE)
 		cls.shared_life = areas.life_areas(SHARED)
-		seed.make_dimensions(PRIVATE)
 		permissions.clear_cache()
 
 	@classmethod

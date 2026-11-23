@@ -1,4 +1,7 @@
-"""Calendar sources for one space: events, important dates, task due dates, vault expiry dates, cycle bounds."""
+"""Calendar sources for one space: events, important dates, task due dates, vault expiry dates, cycle bounds.
+
+An important date (a birthday, an anniversary) is an all-day Event that repeats every year; core's own get_events expands it.
+"""
 import calendar
 from datetime import date, timedelta
 
@@ -8,7 +11,11 @@ from frappe.utils import add_days, get_datetime, getdate
 from lifeos import permissions
 
 
-def events_between(space, start, end):
+DATE_KINDS = ("Birthday", "Anniversary", "Other")
+UNKNOWN_YEAR = 2000  # a leap year, long before anything the calendar shows
+
+
+def _events(space, start, end):
 	"""Core Event records of a space between two dates, with repeats expanded by core's own get_events."""
 	from frappe.desk.doctype.event.event import get_events
 
@@ -23,32 +30,44 @@ def events_between(space, start, end):
 			"source": "event", "name": e.name, "title": e.subject, "start": str(starts)[:19], "end": str(ends)[:19],
 			"date": str(starts.date()), "end_date": str(ends.date()), "all_day": 1 if (e.all_day or multi) else 0,
 			"multi_day": multi, "description": e.description, "repeats": bool(e.repeat_this_event),
+			"yearly_date": bool(e.all_day and not multi and e.repeat_this_event and e.repeat_on == "Yearly"),
 		})
 	return out
 
 
-def date_in_year(day, month, year):
-	"""An important date in a given year. 29 February falls on 28 February outside leap years."""
-	if month == 2 and day == 29 and not calendar.isleap(year):
-		return date(year, 2, 28)
-	return date(year, month, day)
+def events_between(space, start, end):
+	"""The Events of a space between two dates, without its important dates."""
+	return [e for e in _events(space, start, end) if not e["yearly_date"]]
 
 
 def important_dates_between(space, start, end):
-	start, end = getdate(start), getdate(end)
-	rows = frappe.get_all("Life Important Date", filters={"space": space}, fields=["name", "title", "day", "month", "year", "kind", "person"], limit=2000)
+	"""The important dates of a space between two dates: its all-day yearly Events, one entry for each year."""
 	out = []
-	for r in rows:
-		for year in range(start.year, end.year + 1):
-			if r.year and year < r.year:
-				continue
-			d = date_in_year(r.day, r.month, year)
-			if start <= d <= end:
-				label = r.title
-				if r.year and year > r.year:
-					label = f"{r.title} ({year - r.year})"
-				out.append({"source": "important", "name": r.name, "title": r.title, "label": label, "date": str(d), "kind": r.kind, "all_day": 1})
+	for e in _events(space, start, end):
+		if e["yearly_date"]:
+			kind = frappe.utils.strip_html(e["description"] or "").strip()
+			out.append({"source": "important", "name": e["name"], "title": e["title"], "label": e["title"], "date": e["date"],
+				"kind": kind if kind in DATE_KINDS else "Other", "all_day": 1})
 	return out
+
+
+def add_yearly_date(space, title, day, month, year=None, kind=None):
+	"""Add an important date as an all-day Event that repeats every year. `year` is the year it first happened; left out, the
+	Event starts in 2000, so every year anyone looks at shows it. Core repeats 29 February on 28 February outside leap years."""
+	day, month = int(day or 0), int(month or 0)
+	if not 1 <= month <= 12 or not 1 <= day <= 31:
+		frappe.throw(frappe._("Give a day and a month."))
+	first = int(year) if year else UNKNOWN_YEAR
+	if (month, day) == (2, 29) and not calendar.isleap(first):
+		day = 28  # a first occurrence in a year with no 29 February
+	try:
+		starts = date(first, month, day)
+	except ValueError:
+		frappe.throw(frappe._("That day does not exist in that month."))
+	doc = frappe.get_doc({"doctype": "Event", "subject": title, "starts_on": f"{starts} 00:00:00", "all_day": 1, "event_type": "Public",
+		"repeat_this_event": 1, "repeat_on": "Yearly", "description": kind if kind in DATE_KINDS else "Other", "life_space": space})
+	doc.insert()
+	return doc
 
 
 def task_dues_between(space, start, end):

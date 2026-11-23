@@ -40,7 +40,7 @@ import { store } from '@/lib/store'
 import { areaOptions, loadLookups, parentOptions } from '@/lib/lookups'
 import { emptyMeasure, measureArgs, measureProblem } from '@/lib/goals'
 
-// `goal` is the goals.get goal; `actions` the goal's weekly actions as journal.goal gives them
+// `goal` is the goals.get goal; `actions` the goal's weekly actions as goals.detail gives them
 const props = defineProps({ modelValue: Boolean, goal: { type: Object, required: true }, weeklyActions: { type: Array, default: () => [] }, space: String })
 const emit = defineEmits(['update:modelValue', 'saved'])
 const BASE_TYPES = [{ label: '12 Week Year', value: '12 weeks' }, { label: 'Year', value: 'Year' }, { label: 'Month', value: 'Month' }]

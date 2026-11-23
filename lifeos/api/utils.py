@@ -84,7 +84,7 @@ def area_filter(space, area, column, values, also_in=None):
 
 
 # the DocTypes with an "also in" table
-ALSO_IN = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Journal Page", "Life Vault Document")
+ALSO_IN = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document")
 
 
 def lens_area(area):

@@ -9,29 +9,20 @@ from lifeos.constants import LINKABLE
 FIELD_TIES = {
 	"Life Inbox Item": [
 		("Life Task", "inbox_item", "created from this item"), ("Life Note", "inbox_item", "created from this item"),
-		("Life Vault Document", "inbox_item", "created from this item"), ("Life Journal Page", "inbox_item", "created from this item"),
-		("Life Check-in", "inbox_item", "created from this item"), ("Life Important Date", "inbox_item", "created from this item"),
-		("Life Chat Log", "inbox_item", "created from this item"),
+		("Life Vault Document", "inbox_item", "created from this item"), ("Life Chat Log", "inbox_item", "created from this item"),
 	],
 	"Life Goal": [("Life Task", "goal", "task for this goal"), ("Life Goal", "carried_from", "carried into the next cycle"),
 		("Life Note", "goal", "filed under this goal"), ("Life Vault Document", "goal", "filed under this goal"),
 		("Life Chat Log", "goal", "filed under this goal"), ("Life Goal", "serves", "serves this goal")],
 	"Life Note": [("Life Note", "parent_note", "sub-note")],
 	"Life Task": [("Life Task", "carried_from", "carried forward from this task")],
-	"Life Person": [("Life Vault Document", "holder", "document held"), ("Life Important Date", "person", "important date")],
-	"Life Month Plan": [("Life Task", "month_plan", "task in this month")],
+	"Life Person": [("Life Vault Document", "holder", "document held")],
 }
-KIND = {"Life Task": "Task", "Life Note": "Note", "Life Vault Document": "Document", "Life Journal Page": "Journal page",
-	"Life Check-in": "Check-in", "Life Important Date": "Important date", "Life Chat Log": "Chat", "Life Goal": "Goal",
+KIND = {"Life Task": "Task", "Life Note": "Note", "Life Vault Document": "Document", "Life Chat Log": "Chat", "Life Goal": "Goal",
 	"Life Person": "Person", "Life Inbox Item": "Inbox item"}
 
 
 def _title(doctype, name):
-	if doctype == "Life Journal Page":
-		d = frappe.db.get_value(doctype, name, ["page_number", "page_date"], as_dict=True)
-		return f"Journal page {d.page_number or ''} · {frappe.utils.formatdate(d.page_date, 'd MMM yyyy')}".replace("  ", " ")
-	if doctype == "Life Check-in":
-		return f"Check-in, {frappe.utils.formatdate(frappe.db.get_value(doctype, name, 'date'), 'd MMM yyyy')}"
 	return rules.title_of(doctype, name)
 
 

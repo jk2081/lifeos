@@ -96,7 +96,7 @@
         </Card>
         </template>
         <CalendarSection v-if="show('calendar')" />
-        <!-- Rhythms: the weekly review (with the check-in dimensions and the old-items rules), working hours, the month and the 12 Week Year -->
+        <!-- Rhythms: the weekly review (with the old-items rules), working hours and the 12 Week Year -->
         <template v-if="show('rhythms')">
           <p class="text-sm text-ink-gray-6">When each rhythm happens. Today, Plan and the reminders follow these.</p>
           <SectionHead>Daily</SectionHead>
@@ -120,11 +120,6 @@
                 @update:model-value="(v) => setOne('week_starts_on', v)" />
             </SettingRow>
           </Card>
-          <SectionHead :count="active(dimsList).length">Check-in dimensions</SectionHead>
-          <p class="text-sm text-ink-gray-6">Scored 1 to 5 at the start of each review. They show in the check-in form in this order.</p>
-          <SettingsList :kind="dimsList.kind" :rows="active(dimsList)" :noun="dimsList.noun" :hint="dimsList.hint" :ordered="dimsList.ordered" :writable="canEdit" :count-noun="dimsList.countNoun"
-            @rename="(r, t) => rename(dimsList, r, t)" @reorder="(n, par) => reorder(dimsList, n, par)" @archive="(r) => askArchive(dimsList, r)" />
-          <div v-if="canEdit"><Button icon-left="lucide-plus" label="New dimension" data-new @click="openNew(dimsList)" /></div>
           <SectionHead>Old items and stuck work</SectionHead>
         <Card flush data-reset-rules>
           <SettingRow label="Stuck after" help="An open task, open-ended goal or inbox item untouched for this many days counts as stuck: on Today, in Reset and in the insights." :error="errors.stuck_after_days">
@@ -173,13 +168,6 @@
               </div>
             </SettingRow>
           </Card>
-          <SectionHead>Monthly</SectionHead>
-          <Card flush>
-            <SettingRow label="Month plan" help="Plan each month: Today reminds you in its first three days until the plan exists." :error="errors.month_plan_enabled">
-              <TabButtons :model-value="d.settings.month_plan_enabled ? 1 : 0" :options="[{ label: 'On', value: 1 }, { label: 'Off', value: 0 }]" aria-label="Month plan"
-                data-setting="month_plan_enabled" @update:model-value="(v) => d.is_admin && setOne('month_plan_enabled', v)" />
-            </SettingRow>
-          </Card>
           <SectionHead>12 Weeks</SectionHead>
           <Card flush>
             <SettingRow label="Current cycle" :help="d.cycle ? `Week ${d.cycle.week} of 12. The next cycle can be planned from week 11.` : 'No cycle is running. Start one on Goals, Cycles.'">
@@ -207,6 +195,8 @@
           </Card>
           <p class="text-sm text-ink-gray-6">{{ d.is_admin ? 'Changes save as you make them.' : 'Only the owner can change these.' }}</p>
         </template>
+        <!-- Data: Reset, clear the backlog in batches or one by one -->
+        <ResetSection v-if="show('data')" />
         <!-- Habits -->
         <template v-if="show('habits')">
           <SettingsList :kind="habitsList.kind" :rows="active(habitsList)" :noun="habitsList.noun" :hint="habitsList.hint" :ordered="habitsList.ordered" :writable="canEdit" :count-noun="habitsList.countNoun"
@@ -487,6 +477,7 @@ import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
 import CalendarSection from '@/components/settings/CalendarSection.vue'
 import AreasSection from '@/components/settings/AreasSection.vue'
+import ResetSection from '@/components/settings/ResetSection.vue'
 import SettingRow from '@/components/settings/SettingRow.vue'
 import SettingsList from '@/components/settings/SettingsList.vue'
 import ConnectionsSection from '@/components/settings/ConnectionsSection.vue'
@@ -524,12 +515,9 @@ const LISTS = [
     hint: 'Areas are your own filing headings.', countNoun: ['record', 'records'], link: (r) => ({ path: '/library/timeline', query: { area: r.name } }),
     footer: 'Drag the handle to reorder, or to the middle of another area to put it under that one. Alt and the arrow keys move a focused row.' },
   { kind: 'habit', section: 'habits', label: 'Habits', one: 'habit', noun: 'habits', key: 'habits', field: 'title', placeholder: 'For example Walk',
-    hint: 'Habits you may track in a month.', countNoun: ['month', 'months'], footer: 'This is the library of habits ever tracked. Which ones count in a month is set under Journal, Habits, Manage habits.' },
-  { kind: 'dimension', section: 'dimensions', label: 'Check-in dimensions', one: 'dimension', noun: 'dimensions', key: 'dimensions', field: 'dimension_name', ordered: true,
-    placeholder: 'For example Health', hint: 'The life dimensions scored in a check-in.', countNoun: ['check-in', 'check-ins'], footer: 'Dimensions show in the check-in form in this order.' },
+    hint: 'Habits you may track in a month.', countNoun: ['tick', 'ticks'], footer: 'This is the library of habits ever tracked. Which ones count in a month is set under Today, Month, Habits, Manage habits.' },
 ]
 const habitsList = LISTS[1]
-const dimsList = LISTS[2]
 const route = useRoute()
 const router = useRouter()
 const phone = useMediaQuery('(max-width: 767px)')
@@ -550,7 +538,7 @@ const memberSpace = ref('')
 // who is not a Life Admin sees the item; a Life Admin sees all. A page left out of the menu is still reached by its link.
 const MENU = [
   { key: 'me', label: 'Me', items: [{ value: 'profile', label: 'Profile', level: 1 }, { value: 'calendar', label: 'Calendar', level: 2 }] },
-  { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas', level: 1 }, { value: 'rhythms', label: 'Rhythms', level: 4 }, { value: 'habits', label: 'Habits', level: 3 }] },
+  { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas', level: 1 }, { value: 'rhythms', label: 'Rhythms', level: 4 }, { value: 'habits', label: 'Habits', level: 3 }, { value: 'data', label: 'Data', level: 4 }] },
   { key: 'brain', label: 'Brain', items: [{ value: 'sources', label: 'Sources', level: 1 }, { value: 'rules', label: 'Rules', level: 3 }] },
   { key: 'people', label: 'People and agents', items: [{ value: 'members', label: 'Members', level: 6, admin: true }] },
   { key: 'advanced', label: '', items: [{ value: 'advanced', label: 'Advanced', level: 1, admin: true }] },
@@ -573,12 +561,12 @@ const later = computed(() => {
   const levels = [...new Set(hidden.map((it) => it.level))]
   return levels.map((n) => `${hidden.filter((it) => it.level === n).map((it) => it.label).join(' and ')} at level ${n}`).join(', ')
 })
-const PAGES = ['profile', 'calendar', 'areas', 'rhythms', 'habits', 'rules', 'members', 'advanced']
+const PAGES = ['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'rules', 'members', 'advanced']
 const ADMIN_ONLY = ['members', 'advanced']
 // Every old section and where it lives now: a page of Settings (with its part), or another place
 const MOVED = {
   default: { tab: 'profile' }, appearance: { tab: 'profile' }, notifications: { tab: 'profile' }, shortcuts: { tab: 'profile' },
-  review: { tab: 'rhythms' }, dimensions: { tab: 'rhythms' }, reset: { tab: 'rhythms' },
+  review: { tab: 'rhythms' }, reset: { tab: 'data' },
   sensitive: { tab: 'rules' }, 'note-rules': { tab: 'rules' },
   spaces: { tab: 'members', view: 'spaces' }, agents: { tab: 'members', view: 'agents' }, assistants: { tab: 'members', view: 'agents' }, people: { tab: 'members', view: 'people' },
   ai: { tab: 'advanced', part: 'ai' }, cost: { tab: 'advanced', part: 'ai' }, import: { tab: 'advanced', part: 'import' }, backups: { tab: 'advanced', part: 'backups' },

@@ -20,7 +20,7 @@ page_renderer = ["lifeos.pwa.ServiceWorkerPage"]
 website_route_rules = [{"from_route": "/life/<path:app_path>", "to_route": "life"}]
 
 # Link search for the filing DocTypes: the current space and active records only (lifeos/queries.py)
-standard_queries = {dt: "lifeos.queries.link_query" for dt in ("Life Area", "Life Habit", "Life Dimension", "Life Goal")}
+standard_queries = {dt: "lifeos.queries.link_query" for dt in ("Life Area", "Life Habit", "Life Goal")}
 
 permission_query_conditions = {dt: "lifeos.permissions.query_conditions" for dt in SPACE_DOCTYPES}
 permission_query_conditions["Life Space"] = "lifeos.permissions.space_query_conditions"

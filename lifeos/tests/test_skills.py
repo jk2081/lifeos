@@ -8,10 +8,11 @@ from unittest import mock
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos import area_guess, insights, journal, old_inbox, permissions, readings
+from lifeos import area_guess, cycles, insights, old_inbox, permissions, readings
+from lifeos import habits as habit_rules
 from lifeos.ai import batches, client, fake
 from lifeos.api import ask, brain, goals as goals_api, inbox, insights as api, lessons as lessons_api, old_items, reset, review, skills as skills_api, weekly
-from lifeos.review import goals as goals_mod, pile_sort, piles
+from lifeos.review import goals as goals_mod
 from lifeos.review.record import Review
 from lifeos.skills import examples, lessons, runner, store, tools as fixed, triggers
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
@@ -578,7 +579,7 @@ NEW_SKILLS = ("tidy-backlog", "plan-week", "notice", "define-goal", "reflect", "
 
 
 # the Python lines of the modules that held the prompts, before this issue (also in DECISIONS.md, "Issue 59")
-LINES_BEFORE = {"old_inbox.py": 283, "ai/batches.py": 54, "review/pile_sort.py": 166, "weekplan.py": 260, "review/goals.py": 276, "ai/insights.py": 90,
+LINES_BEFORE = {"old_inbox.py": 283, "ai/batches.py": 54, "weekplan.py": 260, "review/goals.py": 276, "ai/insights.py": 90,
 	"review/followups.py": 140, "readings.py": 328, "goal_suggest.py": 58, "review/lock.py": 161, "area_guess.py": 257, "ai/ask.py": 128}
 
 
@@ -624,11 +625,10 @@ def _is_text(node):
 
 
 class TestTidyBacklog(ReviewCase):
-	def test_one_skill_decides_for_old_inbox_items_reset_and_the_review_piles(self):
-		"""Keep, park or drop comes from tidy-backlog for all three; the three old modules no longer decide."""
-		for gone in (old_inbox.__dict__, pile_sort.__dict__, batches.__dict__):
+	def test_one_skill_decides_for_old_inbox_items_and_reset(self):
+		"""Keep, park or drop comes from tidy-backlog for both; the old modules no longer decide."""
+		for gone in (old_inbox.__dict__, batches.__dict__):
 			self.assertFalse({"rule_decision", "fake_decisions", "fake_sort", "SYSTEM", "SCHEMA"} & set(gone))
-		self.assertNotIn("rule", pile_sort.__dict__)
 		old = self.old_item("i59 old task", ["Task"], age=20)
 		tasks = [self.task(f"i59 stuck {i}", age=90) for i in range(4)]
 		table = {"i59 old task": "park", **{f"i59 stuck {i}": "drop" for i in range(4)}}
@@ -640,13 +640,10 @@ class TestTidyBacklog(ReviewCase):
 			backend = frappe.flags.lifeos_ai_backend = skill_answers(("tidy-backlog", decide), ("notice", lambda d: {"insights": [], "follow_ups": [], "readings": []}))
 			got, label = old_inbox.suggest(PRIVATE, [i for i in old_inbox.candidates(PRIVATE, 7) if i.name == old])
 			rows = batches.suggest(PRIVATE, [])
-			weekly.start(space=PRIVATE)
-			items = {i["name"]: i for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").items()}
 			asked = [fake.asked(r)[0] for r in backend.received]
 		self.assertEqual((got[old], label), (("Park", "because"), "tidy-backlog v1"))
 		self.assertEqual([(b["title"], b["action"], b["count"]) for b in rows], [("i59 stuck tasks", "drop", 4)])
-		self.assertEqual({items[t]["pile"] for t in tasks}, {"letgo"})
-		self.assertEqual(asked.count("tidy-backlog"), 4)  # old Inbox, Reset, the review's two tabs
+		self.assertEqual(asked.count("tidy-backlog"), 2)  # old Inbox and Reset
 
 
 class TestPlanWeek(GoalsCase):
@@ -728,7 +725,7 @@ class TestDefineGoal(Keyed):
 
 class TestNoKey(ReviewCase):
 	def test_without_a_key_the_screens_show_their_empty_state_or_the_counts_and_no_errors(self):
-		"""no key: the old-items list is empty, the review opens with its items under Needs you, Reset has no AI batch, no insight
+		"""no key: the old-items list is empty, the review lists its stale tasks, Reset has no AI batch, no insight
 		errors, and every Suggest says there is nothing."""
 		set_key("")
 		frappe.set_user(OWNER)
@@ -742,8 +739,7 @@ class TestNoKey(ReviewCase):
 		self.assertEqual(got["stuck"]["n"], 1)  # the stuck-task count is a count, not a judgment
 		head = weekly.start(space=PRIVATE)
 		self.assertTrue(head["name"])
-		tab = piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").summary()
-		self.assertEqual(([r["ref"] for r in tab["needs"]], tab["by"]), ([f"Life Task:{stuck}"], None))
+		self.assertEqual([r["name"] for r in weekly.stale_tasks(space=PRIVATE)["tasks"] if r["name"] == stuck], [stuck])  # a count, not a judgment
 		self.assertEqual(weekly.goals(space=PRIVATE)["rows"][0]["plan"]["by"] if weekly.goals(space=PRIVATE)["rows"] else None, None)
 		self.assertEqual(insights.run(PRIVATE, ai=True)["ai"], "AI insights skipped: no API key.")
 		self.assertEqual(readings.from_recent(PRIVATE, OWNER), (0, None))
@@ -1062,7 +1058,7 @@ class TestRuleInsights(LifeTestCase):
 	def test_stuck_cycle_and_habit_insights_from_seeded_data(self):
 		self._stuck_tasks()
 		# a cycle in week 5 with a goal that has had no ticks and no tasks
-		start = journal.monday_of(add_days(today(), -28)) if hasattr(journal, "monday_of") else add_days(today(), -28 - getdate(today()).weekday())
+		start = add_days(today(), -28 - getdate(today()).weekday())
 		cyc = self.make("Life Cycle", title="ux5 cycle", start_date=start, status="Active")
 		self.make("Life Goal", cycle=cyc.name, title="ux5 quiet goal", horizon="12 weeks", area=self.areas["Tea"],
 			actions=[{"title": "ux5 action", "per_week": 1}])
@@ -1070,12 +1066,8 @@ class TestRuleInsights(LifeTestCase):
 		h = self.make("Life Habit", title="ux5 Workout")
 		now = getdate(today())
 		prev = frappe.utils.add_months(now, -1)
-		for y, m in ((prev.year, prev.month), (now.year, now.month)):
-			plan = journal.get_month_plan(PRIVATE, y, m, create=True)
-			if h.name not in [r.habit for r in plan.habits]:
-				plan.append("habits", {"habit": h.name, "days_per_week": 7})
-				plan.save()
-		first, last = journal.month_bounds(prev.year, prev.month)
+		habit_rules.set_month_habits(PRIVATE, prev.year, prev.month, [{"habit": h.name, "days_per_week": 7}])
+		first, last = cycles.month_bounds(prev.year, prev.month)
 		d = first
 		while d <= last:
 			self.make("Life Habit Log", habit=h.name, date=d, done=1)

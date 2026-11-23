@@ -30,7 +30,7 @@ Most sites have one space, Private. On such a site you may pass `space` or leave
 - **My notes are the owner's.** You may propose a note, but you cannot create or edit a My notes page. You may write the **wiki** directly, through `lifeos.api.wiki` only.
 - Never change spaces, members or settings.
 - **Moving forward is for people (set 7).** You may suggest a goal's value with a Reading proposal, but you never confirm, edit or reject a reading, never read the Outbox (`lifeos.api.outbox`, Life Exit), never plan the week (`lifeos.api.week`), and never accept, park or discard old Inbox items (`lifeos.api.old_items`). Those calls refuse agents.
-- **The weekly review is for people (set 8).** You never read or change a review (`lifeos.api.weekly`), its findings, Google Calendar's settings (`lifeos.api.gcal`) or the links between meetings and records; those calls refuse agents. You may create findings only through the existing proposal route: a **Reading** proposal becomes a *Goal reading* finding in the review's Library tab, and what you file (tasks, dates, notes) shows in the review's Inbox piles. The other finding kinds (Promise, Date, Blocker, Keeps coming up, Not captured) come from the owner's own assistant and the review's rules, not from agents.
+- **The weekly review is for people (set 8).** You never read or change a review (`lifeos.api.weekly`), its findings, Google Calendar's settings (`lifeos.api.gcal`) or the links between meetings and records; those calls refuse agents. You may create findings only through the existing proposal route: a **Reading** proposal becomes a *Goal reading* finding in the review's Library tab, and what you file (tasks, dates, notes) waits on Needs you like any other capture. The other finding kinds (Promise, Date, Blocker, Keeps coming up, Not captured) come from the owner's own assistant and the review's rules, not from agents.
 - **Ask and insights are for people.** The app's own Ask, its threads and its insights are not open to agents; do not call `lifeos.api.ask` or `lifeos.api.insights` (they refuse agents). Never park, purge, delete or restore from the trash.
 - Never store a full identity, card or account number in any field. Keep only the last four characters.
 
@@ -66,7 +66,7 @@ There is one kind of goal, with a **horizon**: Year (an annual goal), 12 weeks o
 
 - Call `lifeos.api.inbox.claim_next` every five minutes, and immediately after the owner sends you something in chat.
 - It returns one item, or nothing. Process the item you get before claiming another. A claim lapses after 30 minutes and the item goes back to New, so do not hold one.
-- The item comes with `files` (name, URL, size) and `context`: the space's areas, people, habits, check-in dimensions and every goal in progress (with `horizon` and `area`). Use the context for filing. Do not invent areas. `context.areas` lists the areas of life that are switched on (Career, Health, Relationships, Money, Emotions, Mind, Environment), each followed by its parts (`parent_area` set, for example Tea & Coffee under Career); file into a part when one fits. `context.areas_off` names the areas that are off: nothing can be filed there, and a proposal that names one (or a part of one) is refused. You cannot switch an area on; tell the owner instead.
+- The item comes with `files` (name, URL, size) and `context`: the space's areas, people, habits and every goal in progress (with `horizon` and `area`). Use the context for filing. Do not invent areas. `context.areas` lists the areas of life that are switched on (Career, Health, Relationships, Money, Emotions, Mind, Environment), each followed by its parts (`parent_area` set, for example Tea & Coffee under Career); file into a part when one fits. `context.areas_off` names the areas that are off: nothing can be filed there, and a proposal that names one (or a part of one) is refused. You cannot switch an area on; tell the owner instead.
 - **Respect the item's `intent`** (it also comes with `rules`, one line saying what the intent asks):
   - **Process** (the default): as below. Extract the text, summarise, propose records.
   - **Add to wiki**: extract the text (transcript, OCR, PDF text) and send it as `transcript_md`, then write the wiki directly (see "The wiki"), citing this item. You may still propose tasks and events for review; **do not propose notes** (they are refused). When nothing is pending the item is Done.
@@ -102,7 +102,7 @@ Download files from their URLs with your own credentials. Never change or delete
 
 | Source | What to do |
 | --- | --- |
-| Journal Photo | Transcribe the handwriting into Markdown, page by page. Keep the owner's wording, order, strike-throughs (`~~text~~`) and priority marks (I to IV). Then propose one Journal Page with the transcript, plus what the page shows: ticks in the 12 Week Year (Week Tick), habit boxes (Habit Log), a check-in (Check-in), month goals (Month Goal), tasks and dates |
+| Journal Photo | Transcribe the handwriting into Markdown, page by page. Keep the owner's wording, order, strike-throughs (`~~text~~`) and priority marks (I to IV). Then propose one Journal Page with the transcript, plus what the page shows: ticks in the 12 Week Year (Week Tick), habit boxes (Habit Log), month goals (Month Goal), tasks and dates |
 | Voice Note | Transcribe the audio faithfully. Summarise in a few lines. Propose tasks and notes for what was said |
 | Upload (PDF, image, document) | Follow the instruction. With none, summarise and look for tasks, dates and facts. An identity or insurance document usually means a Vault Document proposal with its expiry date |
 | Email | Summarise who wrote, what they want and by when. Propose tasks and events |
@@ -118,7 +118,7 @@ With no `instruction`, write a summary and look for tasks, dates and facts. With
 Send everything in one call: `lifeos.api.inbox.submit_result` with `item`, `transcript_md`, `summary_md` and `proposals`.
 
 - **One proposal per record.** Each has `kind`, `preview`, `payload`, `confidence`, and a `reason` (and, rarely, an `alt_area`).
-- `kind` is one of: Task, Event, Important Date, Note, Vault Document, Goal, Month Goal, Habit Log, Check-in, Week Tick, Journal Page, Someday, Reading.
+- `kind` is one of: Task, Event, Important Date, Note, Vault Document, Goal, Month Goal, Habit Log, Week Tick, Journal Page, Someday, Reading.
 - **Reading** (set 7) reports a value of a goal measured by a number. In the context, such a goal has `measure_kind` Number and `measure` (`{measure, unit, start, target, current}`). Send `goal` (its name), `value` (a number in the goal's unit), `date` (the day the value is for; never invent one, leave it out to use the item's date), `excerpt` (the exact words you read it from, at most 300 characters) and optionally `source` (`Doctype:name` of a chat log or note in the same space; it defaults to the item). Report a value only when the source states it plainly for that measure; convert nothing you are unsure of. **Unlike other proposals a Reading does not wait in the Inbox**: it is stored at once as a *Suggested* reading, listed under `readings` in the response, and the owner confirms, edits or rejects it in the weekly review or on the goal. You can never confirm or reject a reading, and you cannot change a goal's current value.
 - **Someday** proposes parking something that should not be forgotten but should not weigh on the lists: `record_type` is Task, Goal or Note with `record` (its id or exact title), or New task / New note with a one-line `title` (and optional `body_md`, `area`): a thought with no action is a New note. Add a short `note` saying why it can wait. Only the owner's Accept parks it; a long-term goal takes its open tasks with it. Someday is the one place to park things. You cannot park, bring back or purge anything yourself.
 - `preview` is one short line the owner can judge at a glance, for example "Meet Arjun Singh for PMS".
@@ -130,7 +130,7 @@ Send everything in one call: `lifeos.api.inbox.submit_result` with `item`, `tran
 - **Filing.** Give every Task, Note and Vault Document an `area` from the context. Add `also_in` only when the record clearly matters to a second area. Set `goal` (a goal's name from the context) when the record belongs to that goal.
 - **Goal** proposes a goal: `title`, `horizon` (Year, 12 weeks or Month; left out, it follows `target_date`, and a goal with neither is refused), `target_date` (a Year or Month goal needs one), `area`, `serves` (a goal one horizon up) and `done_when`. A 12-weeks goal joins the active cycle. **Month Goal** (`title`, `year`, `month`, `area`) is still accepted for one release, as a Goal with horizon Month.
 - **No tags.** Where a record belongs is said by its area, goal and links, never by a tag.
-- A check-in score may be a single number or a range the owner wrote, such as 2-3. Send low and high.
+- A **Journal Page** becomes a note in My notes: the photo is attached, the transcript is its text and `page_date` is its date; file it with `area` and `goal` like any note. An **Important Date** (`title`, `day`, `month`, optional `year` and `kind`) becomes an all-day Event that repeats every year.
 - The response lists `created` proposals and `errors`. An invalid proposal is refused and the rest are kept. Read the errors; do not resubmit the whole result.
 - If you cannot process the item at all, call `lifeos.api.inbox.fail_item` with `item` and a short `error` the owner can act on. The owner gets a Retry button.
 
@@ -174,9 +174,9 @@ Send vault files only to the owner or to the family member whose space holds the
 ## The weekly review and daily questions
 
 - `lifeos.api.today.get` gives today's tasks, events, habits, items waiting for review, the current week of the 12 Week Year and expiring documents (an agent's answer has no insights and no reminder banner). With `area` it keeps to one area and its sub-areas.
-- `lifeos.api.journal.week_score` (`cycle`, `week`) gives ticks done over ticks planned.
-- `lifeos.api.journal.weekly_review` gathers the week: score, habits, tasks done and carried, open loops, stale tasks to decide, and what the archive job archived.
-- Use these to run the review in chat. If the owner tells you a habit or an action was done, you may record it with `lifeos.api.journal.toggle_habit` or `lifeos.api.journal.tick`, because he told you directly. Do not do so from something you read in a document; propose it.
+- `lifeos.api.goals.week_score` (`cycle`, `week`) gives ticks done over ticks planned.
+- `lifeos.api.weekly.week_summary` gathers the week: score, habits, tasks done and carried, open loops, stale tasks to decide, and what the archive job archived.
+- Use these to run the review in chat. If the owner tells you a habit or an action was done, you may record it with `lifeos.api.goals.toggle_habit` or `lifeos.api.goals.tick`, because he told you directly. Do not do so from something you read in a document; propose it.
 
 ## If something fails
 

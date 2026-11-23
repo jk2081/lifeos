@@ -28,7 +28,7 @@ export const GO = [
   ...PLACES, REVIEW,
   { label: 'Today: Week', to: '/today/week', key: 'p' }, { label: 'Today: Week', to: '/today/week', key: 'w' },
   { label: 'Today: Month', to: '/today/month', key: 'm' }, { label: 'Goals: Cycles (12 Weeks)', to: '/goals/cycles', key: 'j' },
-  { label: 'Today: Year', to: '/today/year', key: 'c' }, { label: 'Today: Reset', to: '/today/reset', key: 'e' },
+  { label: 'Today: Year', to: '/today/year', key: 'c' }, { label: 'Settings: Data (Reset)', to: '/settings?tab=data', key: 'e' },
   { label: 'Goals: All tasks', to: '/goals/tasks', key: 'k' }, { label: 'Goals: Someday', to: '/goals/someday', key: 'y' },
   { label: 'Brain: Activity', to: '/brain/activity', key: 'u' }, { label: 'Brain: Outbox', to: '/brain/outbox', key: 'b' },
   { label: 'Library: Notes', to: '/library/notes', key: 'n' }, { label: 'Library: Chats', to: '/library/chats', key: 'h' },
@@ -45,11 +45,10 @@ export const NOTES_VIEWS = ['list', 'tree', 'graph', 'changes', 'health'].map((v
 export const WRITTEN_BY = [{ label: 'Written by anyone', value: '' }, { label: 'Written by me', value: 'me' }, { label: 'Kept by the assistant', value: 'assistant' }]
 // Settings > Profile > Where things are (issue 14): every page that is not a place or a tab, with the place it lives in
 export const ELSEWHERE = [
-  { key: 'reset', label: 'Reset', home: 'Today, and the weekly review', to: '/today/reset' },
+  { key: 'reset', label: 'Reset', home: 'Settings > Data', to: '/settings?tab=data' },
   { key: 'review', label: 'Weekly review', home: 'Review, once you have locked one; the banner on Today on its day', to: '/review' },
-  { key: 'cycle', label: '12 Weeks and the month plan', home: 'Goals > Cycles', to: '/goals/cycles' },
+  { key: 'cycle', label: '12 Weeks and the month goals', home: 'Goals > Cycles', to: '/goals/cycles' },
   { key: 'habits', label: 'Habits', home: 'Today > Month', to: { path: '/today/month', query: { view: 'habits' } } },
-  { key: 'checkins', label: 'Check-ins', home: 'Today > Month', to: { path: '/today/month', query: { view: 'checkins' } } },
   { key: 'someday', label: 'Someday', home: 'Goals', to: '/goals/someday' },
   { key: 'outbox', label: 'Outbox', home: 'Brain', to: '/brain/outbox' },
   { key: 'timeline', label: 'Timeline', home: 'Library', to: '/library/timeline' },

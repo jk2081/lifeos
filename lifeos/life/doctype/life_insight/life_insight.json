@@ -39,7 +39,7 @@
    "fieldname": "kind",
    "fieldtype": "Select",
    "label": "Kind",
-   "options": "Stuck\nWaiting on you\nPromise\n12 Week Year\nHabit\nCheck-in\nTheme\nSomeday\nGoal reading\nBlocker\nKeeps coming up\nNot captured\nDate",
+   "options": "Stuck\nWaiting on you\nPromise\n12 Week Year\nHabit\nTheme\nSomeday\nGoal reading\nBlocker\nKeeps coming up\nNot captured\nDate",
    "reqd": 1,
    "in_list_view": 1,
    "search_index": 1

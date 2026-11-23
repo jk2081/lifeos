@@ -24,7 +24,7 @@ def restore(doctype: str, name: str):
 	return rules.set_archived(doctype, name, False)
 
 
-TYPES = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document", "Life Journal Page")
+TYPES = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document")
 SORTS = {"title": "title", "kind": "kind", "record_date": "record_date", "area": "area"}
 
 

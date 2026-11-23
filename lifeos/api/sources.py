@@ -12,13 +12,12 @@ from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, s
 from lifeos.api.utils import order_by as sort_order
 
 SOURCE_DOCTYPES = ("Life Inbox Item", "Life Chat Log")
-# Library > Captures (UX fixes, set 6): every source, with Vault documents (kind Document, always sensitive) and journal
-# pages; Library > All adds the notes
-CAPTURE_DOCTYPES = ("Life Inbox Item", "Life Chat Log", "Life Vault Document", "Life Journal Page")
-BASE = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Journal Page') "
-	"and x.kind in ('Inbox', 'Chat', 'Document', 'Journal Page')")
-BASE_ALL = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Journal Page', 'Life Note') "
-	"and x.kind in ('Inbox', 'Chat', 'Document', 'Journal Page', 'Note')")
+# Library > Captures (UX fixes, set 6): every source, with Vault documents (kind Document, always sensitive); Library > All adds the notes
+CAPTURE_DOCTYPES = ("Life Inbox Item", "Life Chat Log", "Life Vault Document")
+BASE = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document') "
+	"and x.kind in ('Inbox', 'Chat', 'Document')")
+BASE_ALL = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Note') "
+	"and x.kind in ('Inbox', 'Chat', 'Document', 'Note')")
 # the kind tabs of Captures and All, each a condition on the index row
 TABS = {
 	"all": None,
@@ -26,7 +25,6 @@ TABS = {
 	"chats": "x.ref_doctype = 'Life Chat Log'",
 	"voice": "x.media_kind = 'Voice'",
 	"documents": "(x.media_kind = 'Document' or x.ref_doctype = 'Life Vault Document')",
-	"pages": "x.ref_doctype = 'Life Journal Page'",
 	"photos": "x.media_kind = 'Photo'",
 	"articles": "x.media_kind = 'Article'",
 	"email": "x.media_kind in ('Email', 'Email Digest')",
@@ -123,9 +121,9 @@ def list(space: str | None = None, tab: str | None = None, area: str | None = No
 		system: str | None = None, assistant: str | None = None, include_archived: bool | int | None = 0, open_items: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
 		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None,
 		scope: str | None = "captures", sensitive: bool | int | None = 0, by: str | None = None):
-	"""Every capture of a space, newest first: inbox items, chat logs, Vault documents (kind Document, always sensitive)
-	and journal pages (Library > Captures). scope="all" adds the notes (Library > All).
-	tab: all (default), notes (scope all), chats, voice, documents (with Vault documents), pages (journal pages), photos,
+	"""Every capture of a space, newest first: inbox items, chat logs and Vault documents (kind Document, always sensitive)
+	(Library > Captures). scope="all" adds the notes (Library > All).
+	tab: all (default), notes (scope all), chats, voice, documents (with Vault documents), photos,
 	articles, email (emails and email digests), text. sensitive=1 keeps the sensitive items; by=me or assistant keeps
 	what a person or an agent wrote (the assistant's notes count as the assistant's).
 	Filters: area (with its sub-areas, or "none"), goal, from_date and to_date (received), status (inbox, done, failed),
@@ -191,8 +189,8 @@ def decorate(rows):
 	return out
 
 
-KIND_OF = {"Life Chat Log": "Chat", "Life Vault Document": "Document", "Life Journal Page": "Journal page", "Life Note": "Note"}
-REF_OF = {"Life Chat Log": "chat:", "Life Vault Document": "vault:", "Life Journal Page": "page:", "Life Note": "note:", "Life Inbox Item": "source:"}
+KIND_OF = {"Life Chat Log": "Chat", "Life Vault Document": "Document", "Life Note": "Note"}
+REF_OF = {"Life Chat Log": "chat:", "Life Vault Document": "vault:", "Life Note": "note:", "Life Inbox Item": "source:"}
 
 
 def _vault_fields(names):

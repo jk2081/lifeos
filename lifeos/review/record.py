@@ -127,12 +127,12 @@ class Review:
 	# ---- tabs ----
 
 	def done(self):
-		"""Which tabs are done: Library once visited; Tasks once Needs you and every pile are cleared; Goals once every cycle
+		"""Which tabs are done: Library once visited; Tasks once no stale task is left to decide; Goals once every cycle
 		goal has a next action or a skip with a reason and the stars are exactly three; Reflect once locked."""
-		from lifeos.review import goals, piles
+		from lifeos.review import goals, stale
 
 		return {"library": bool((self.state.get("visited") or {}).get("library")),
-			"tasks": piles.PileSet(self, "tasks").cleared(),
+			"tasks": stale.cleared(self),
 			"goals": goals.GoalPlan(self).ready()["ok"],
 			"reflect": self.doc.status == "Locked"}
 

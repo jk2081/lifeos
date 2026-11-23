@@ -48,14 +48,12 @@ import Empty from '../Empty.vue'
 import TaskPane from './TaskPane.vue'
 import VaultPane from './VaultPane.vue'
 import GoalPane from './GoalPane.vue'
-import PagePane from './PagePane.vue'
 import ChatPane from './ChatPane.vue'
 import EntryPane from './EntryPane.vue'
 import DayPane from './DayPane.vue'
 import NotePane from './NotePane.vue'
 import SourcePane from './SourcePane.vue'
 import ChangePane from './ChangePane.vue'
-import PlainPane from './PlainPane.vue'
 import { closePane, openRef } from '@/lib/pane'
 import { park } from '@/lib/someday'
 import { askAbout } from '@/lib/ask'
@@ -71,7 +69,7 @@ const ptab = useUrlTab('ptab', tabs, { replace: true })
 const emit = defineEmits(['meta', 'missing', 'changed', 'restore', 'reload'])
 // "Ask about this": the record and the records linked to it are the question's scope
 const ASKABLE = { task: 'Life Task', note: 'Life Note', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
-  inbox: 'Life Inbox Item', page: 'Life Journal Page', vault: 'Life Vault Document' }
+  inbox: 'Life Inbox Item', vault: 'Life Vault Document' }
 async function toggleSensitive() {
   const s = props.meta.sensitive
   if (await tryCall(() => api('library.set_sensitive', { doctype: s.doctype, name: s.name, sensitive: s.on ? 0 : 1 }), s.on ? 'No longer sensitive.' : 'Marked sensitive.')) emit('reload')
@@ -79,5 +77,5 @@ async function toggleSensitive() {
 async function toSomeday() {
   if (await park(props.meta.someday.doctype, props.meta.someday.name, props.meta.title)) emit('reload')
 }
-const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, page: PagePane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, checkin: PlainPane, month: PlainPane }
+const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane }
 </script>

@@ -5,7 +5,8 @@ from datetime import timedelta
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, today
 
-from lifeos import calendar_data, journal, old_inbox, permissions, rhythms
+from lifeos import calendar_data, cycles, old_inbox, permissions, rhythms
+from lifeos import habits as habit_rules
 from lifeos.api import tasks as task_api
 from lifeos.api import vault as vault_api
 from lifeos.api.utils import area_filter, descendants, in_area, lens_area, user_names
@@ -108,19 +109,19 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 	events = [e for e in calendar_data.events_between(space, now, add_days(now, 1))]
 	events.sort(key=lambda e: e["start"])
 
-	month = journal.habits_month(space, now.year, now.month)
+	month = habit_rules.habits_month(space, now.year, now.month)
 	habits = [{"habit": h["habit"], "title": h["title"], "done": now.day in h["done_days"]} for h in month["habits"] if not h["removed"]]
 
 	cycle_out = None
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date", "end_date"], as_dict=True)
 	if cycle:
-		week = journal.week_of(cycle, now)
-		if 1 <= week <= journal.WEEKS:
-			score = journal.week_score(cycle.name, week)
-			cycle_out = {"name": cycle.name, "title": cycle.title, "week": week, "weeks": journal.WEEKS, "score": score["percent"],
+		week = cycles.week_of(cycle, now)
+		if 1 <= week <= cycles.WEEKS:
+			score = cycles.week_score(cycle.name, week)
+			cycle_out = {"name": cycle.name, "title": cycle.title, "week": week, "weeks": cycles.WEEKS, "score": score["percent"],
 				"done": score["done"], "planned": score["planned"]}
 		else:
-			cycle_out = {"name": cycle.name, "title": cycle.title, "week": None, "weeks": journal.WEEKS, "ended": week > journal.WEEKS,
+			cycle_out = {"name": cycle.name, "title": cycle.title, "week": None, "weeks": cycles.WEEKS, "ended": week > cycles.WEEKS,
 				"start_date": str(cycle.start_date)}
 
 	coming = []
@@ -252,7 +253,7 @@ def unique_insights(rows, limit=3):
 	return {"rows": out[:limit], "total": len(out)}
 
 
-OCCURRENCE = re.compile(r"^(review:\d{4}-\d{2}-\d{2}|month:\d{4}-\d{2}|(plan-next|close):[\w-]{1,40})$")
+OCCURRENCE = re.compile(r"^(review:\d{4}-\d{2}-\d{2}|(plan-next|close):[\w-]{1,40})$")
 
 
 @frappe.whitelist(methods=["POST"])

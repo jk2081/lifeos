@@ -186,7 +186,7 @@ DEBRIS_PREFIXES = [
 DEBRIS_FILE_PREFIXES = ["journal-", "production-"]
 _TITLED = {
 	"Life Area": "area_name", "Life Inbox Item": "title", "Life Task": "title", "Life Note": "title",
-	"Life Important Date": "title", "Life Goal": "title", "Life Vault Document": "title", "Life Chat Log": "title",
+	"Life Goal": "title", "Life Vault Document": "title", "Life Chat Log": "title",
 	"Life Person": "full_name", "Life Proposal": "preview",
 	# UX fixes, set 5
 	"Life Habit": "title", "Life Ask Thread": "title",
@@ -294,8 +294,6 @@ def purge_test_debris(dry_run=True):
 		frappe.db.sql("delete from `tabLife Exit` where record_doctype=%s and record_name in %s", (dt, names))  # set 7
 		if dt == "Life Task":  # issue 13: area corrections
 			frappe.db.sql("delete from `tabLife Action Log` where task in %s", (names,))
-		if dt == "Life Habit":
-			frappe.db.sql("delete from `tabLife Month Plan Habit` where habit in %s", (names,))
 		frappe.db.sql("delete from `tabLife Link` where (from_doctype=%s and from_name in %s) or (to_doctype=%s and to_name in %s)",
 			(dt, names, dt, names))
 		files += frappe.get_all("File", filters={"attached_to_doctype": dt, "attached_to_name": ["in", names]}, fields=["name", "file_url", "is_private"])

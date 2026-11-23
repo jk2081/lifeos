@@ -12,7 +12,7 @@
   <!-- the tree with the reader: /library and /library/<id> -->
   <template v-else>
     <PageHead title="Notes">
-      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length + journalPages }} note{{ notes.length + journalPages === 1 ? '' : 's' }}</NumLink>{{ inSpace }}</template>
+      <template #sub><NumLink :to="{ path: '/library/notes', query: { view: 'list', all: '1', by: route.query.by || undefined } }" data-door="library-notes">{{ notes.length }} note{{ notes.length === 1 ? '' : 's' }}</NumLink>{{ inSpace }}</template>
       <TabButtons model-value="tree" :options="SWITCH" data-library-views />
       <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="New note" @click="newOpen = true" />
     </PageHead>
@@ -104,7 +104,6 @@ const list = ref(null)
 const SWITCH = NOTES_VIEWS
 const router = useRouter()
 const notes = ref([])
-const journalPages = ref(0)
 const areas = ref([])
 const loaded = ref(false)
 const filter = ref('')
@@ -158,7 +157,6 @@ async function loadTree() {
   const res = await tryCall(() => api('library.tree', { space: store.space, area: store.lensArea || undefined, collection: { me: 'My notes', assistant: 'Wiki' }[route.query.by] || 'all' }))
   if (res) {
     notes.value = res.notes
-    journalPages.value = res.journal_pages || 0 // the list also holds the journal pages
     areas.value = res.areas
     loaded.value = true
   }

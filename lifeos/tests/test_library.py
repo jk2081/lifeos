@@ -6,7 +6,7 @@ from frappe.utils import add_days, getdate, today
 
 from lifeos import archive, permissions
 from lifeos.ai.tools import Context, t_get_record
-from lifeos.api import archive as archive_api, chats, everything, files as files_api, goals as goal_api, graph, inbox, jobs, library, links, search, sources, timeline, vault, wiki
+from lifeos.api import archive as archive_api, chats, everything, files as files_api, goals as goal_api, graph, inbox, jobs, library, links, search, sources, timeline, vault, weekly, wiki
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import item, task, upload
 
@@ -217,9 +217,7 @@ class TestArchive(LifeTestCase):
 		frappe.db.set_value("Life Vault Document", vault_doc.name, "creation", add_days(today(), -900), update_modified=False)
 		note = self.make("Life Note", title="Old reference note m7")
 		frappe.db.set_value("Life Note", note.name, "creation", add_days(today(), -900), update_modified=False)
-		page = self.make("Life Journal Page", page_date=add_days(today(), -900))
 		person = self.make("Life Person", full_name="Old friend m7")
-		date = self.make("Life Important Date", title="Old date m7", day=1, month=1)
 		out = archive.run_daily()
 		self.assertGreaterEqual(out["Life Task"], 2)
 
@@ -230,13 +228,12 @@ class TestArchive(LifeTestCase):
 			self.assertEqual(state(doc), (1, "Auto"), doc.title)
 			self.assertEqual(str(frappe.db.get_value(doc.doctype, doc.name, "archived_on")), today())
 			self.assertEqual(frappe.db.get_value("Life Index", {"ref_name": doc.name, "kind": ("!=", "Task Done")}, "is_archived"), 1)
-		for doc in (done_new, stale_open, item_review, chat_open, vault_doc, note, page):
+		for doc in (done_new, stale_open, item_review, chat_open, vault_doc, note):
 			self.assertEqual(state(doc)[0], 0, doc.get("title") or doc.doctype)
-		for doc in (done_old, stale_open, vault_doc, note, person, date):
+		for doc in (done_old, stale_open, vault_doc, note, person):
 			self.assertTrue(frappe.db.exists(doc.doctype, doc.name))  # nothing is ever deleted
 		# the stale open task is listed under Decide, and the week's archive shows with Undo
-		from lifeos.api import journal
-		review = journal.weekly_review(space=PRIVATE)
+		review = weekly.week_summary(space=PRIVATE)
 		self.assertIn(stale_open.name, [t["name"] for t in review["decide"]])
 		self.assertIn(done_old.name, [a["name"] for a in review["archived"]])
 		archive_api.restore("Life Task", done_old.name)
@@ -313,7 +310,7 @@ class TestSearch(LifeTestCase):
 			"task": self.make("Life Task", title="Quartzite task m8"),
 			"chat": self.make("Life Chat Log", title="Quartzite chat m8", date=today(), summary_md="s"),
 			"vault": self.make("Life Vault Document", title="Quartzite passport m8"),
-			"page": self.make("Life Journal Page", page_date=today(), transcript_md="quartzite on the page"),
+			"page": self.make("Life Note", title="Journal page m8", page_date=today(), content_md="quartzite on the page"),
 		}
 		frappe.db.commit()
 		got = names(search.query("quartzite"))

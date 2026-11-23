@@ -29,7 +29,6 @@
   <div class="text-sm text-ink-gray-6">
     <div v-if="task.inbox_item">From <a class="text-ink-blue-8 hover:underline" href="#" @click.prevent="openRef('inbox:' + task.inbox_item)">{{ task.source_title || 'an inbox item' }}</a></div>
     <div v-if="safeSource" class="my-1"><Button size="sm" icon-left="lucide-external-link" :label="sourceLabel" data-open-source @click="openSource" /></div>
-    <div v-if="task.month_plan">In the month plan {{ task.month_plan.split('-').slice(-2).join('-') }}</div>
     <div>Created {{ short(task.creation, true) }}<span v-if="task.completed_on"> · closed {{ short(task.completed_on, true) }}</span></div>
   </div>
   <div v-if="writable || canRestore" class="flex flex-wrap items-center gap-2">

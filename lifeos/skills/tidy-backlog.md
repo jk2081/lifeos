@@ -1,7 +1,7 @@
 ---
 name: tidy-backlog
 title: Tidy the backlog
-when_to_use: Things the owner left too long (Inbox items, stuck or waiting tasks, the weekly review's piles, Reset's candidates): decide to keep, park or drop each. One decision, whoever asks.
+when_to_use: Things the owner left too long (Inbox items, stuck or waiting tasks, Reset's candidates): decide to keep, park or drop each. One decision, whoever asks.
 trigger: Button
 tools: []
 output: JSON
