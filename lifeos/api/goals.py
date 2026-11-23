@@ -364,6 +364,7 @@ def create(title: str, horizon: str | None = None, space: str | None = None, are
 		frappe.throw(_("Unknown horizon."), title=_("Unknown goal horizon"))
 	refuse_open(horizon)
 	measure_fields = measure_values(measure_kind, done_when, measure, unit, start_value, target_value)
+	readings.require_finish_line({"done_when": done_when, **measure_fields})
 	last = rules.last_sort_order(space=space)
 	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": (title or "").strip(), "horizon": horizon, "area": area or None,
 		"serves": serves or None, "done_when": done_when or None, "notes_md": notes_md or None,
@@ -789,6 +790,7 @@ def save_goal(goal: str | None = None, cycle: str | None = None, title: str | No
 		doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	else:
 		c = permissions.get_doc_checked("Life Cycle", cycle, "write")
+		readings.require_finish_line({"done_when": done_when, **measure_values(measure_kind or None, done_when, measure, unit, start_value, target_value)})
 		last = rules.last_sort_order(cycle=c.name)
 		doc = frappe.get_doc({"doctype": "Life Goal", "space": c.space, "cycle": c.name, "sort_order": last + 1})
 	if title is not None:
