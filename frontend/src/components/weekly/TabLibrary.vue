@@ -14,7 +14,7 @@
       <Skeleton v-if="!d" class="h-80 w-full" />
       <template v-else>
         <CalendarStrip :strip="d.strip" :open="meetingName" @open="openMeeting" @list="listOpen = true" />
-        <div class="grid items-start gap-4 md:grid-cols-[minmax(280px,1fr)_2fr]">
+        <div class="grid grid-cols-[minmax(0,1fr)] items-start gap-4 md:grid-cols-[minmax(280px,1fr)_2fr]">
           <Card class="flex flex-col gap-1" data-came-in>
             <h3 class="mb-1 text-base-medium text-ink-gray-9">Came in · {{ d.came_in.total }}</h3>
             <div v-for="c in d.came_in.rows" :key="c.key" class="flex items-center justify-between border-b border-outline-gray-1 py-1.5 text-base last:border-b-0" :data-came-in-row="c.key">
