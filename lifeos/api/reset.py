@@ -5,6 +5,8 @@ from datetime import date as Date
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, cint, date_diff, getdate, today
 
 from lifeos.review import counts
@@ -39,11 +41,23 @@ def _batch(key, title, reason, items, action, label, review=None):
 		"review": review, "source": "Rule"}
 
 
+def open_task_rows(space):
+	"""Open tasks, oldest first, each with the day it was last touched."""
+	t = frappe.qb.DocType("Life Task")
+	return (frappe.qb.from_(t).select(t.name, t.title, t.area, t.goal, t.creation, fn.IfNull(t.last_touched_on, fn.Date(t.creation)).as_("touched"))
+		.where((t.space == space) & t.status.isin(OPEN) & (t.is_archived == 0)).orderby(t.creation).run(as_dict=True))  # system: Reset reads the owner's own space
+
+
+def note_titles(space, collection):
+	"""(name, title) of the notes of a collection that are not archived."""
+	n = frappe.qb.DocType("Life Note")
+	return frappe.qb.from_(n).select(n.name, n.title).where((n.space == space) & (n.collection == collection) & (n.is_archived == 0)).run()  # system: Reset reads the owner's own space
+
+
 def rule_batches(space):
 	"""The rule batches of section 6, each over the exact items it lists."""
 	out = []
-	tasks = frappe.db.sql("""select name, title, area, goal, creation, ifnull(last_touched_on, date(creation)) as touched
-		from `tabLife Task` where space=%s and status in ('Open', 'Doing', 'Waiting') and is_archived=0 order by creation asc""", space, as_dict=True)
+	tasks = open_task_rows(space)
 	# 1. exact duplicates: same normalised title, area and goal; the oldest of each group stays
 	groups = {}
 	for t in tasks:
@@ -73,16 +87,16 @@ def rule_batches(space):
 			[_item("Life Task", t.name, t.title) for t in rows], "someday", "Move {n} to Someday"))
 	# 4. inbox items older than a week: accept their note proposals, leave the rest for review
 	week = add_days(today(), -7)
-	items = frappe.db.sql("""select i.name, i.title, (select count(*) from `tabLife Proposal` p where p.inbox_item = i.name and p.status = 'Pending' and p.kind = 'Note') as notes
-		from `tabLife Inbox Item` i where i.space=%s and i.status='To Review' and i.is_archived=0 and i.received_on < %s order by i.received_on""",
-		(space, week), as_dict=True)
+	i, p = frappe.qb.DocType("Life Inbox Item"), frappe.qb.DocType("Life Proposal")
+	notes = frappe.qb.from_(p).select(fn.Count("*")).where((p.inbox_item == i.name) & (p.status == "Pending") & (p.kind == "Note")).as_("notes")
+	items = (frappe.qb.from_(i).select(i.name, i.title, notes).where((i.space == space) & (i.status == "To Review") & (i.is_archived == 0) & (i.received_on < week))
+		.orderby(i.received_on).run(as_dict=True))  # system: Reset reads the owner's own space
 	if items:
 		out.append(_batch("old_inbox", "Inbox items older than a week", "Still waiting for your review. Their note proposals can be accepted at once; tasks and the rest stay for review.",
 			[_item("Life Inbox Item", i.name, i.title, {"notes": i.notes}) for i in items], "accept_notes", "Accept notes, review the rest"))
 	# 5. notes (My notes) with the same title as a wiki page
-	wiki = {norm(t): n for n, t in frappe.db.sql("select name, title from `tabLife Note` where space=%s and collection='Wiki' and is_archived=0", space)}
-	twins = [_item("Life Note", n, t, {"wiki": wiki[norm(t)]}) for n, t in frappe.db.sql(
-		"select name, title from `tabLife Note` where space=%s and collection='My notes' and is_archived=0", space) if norm(t) in wiki]
+	wiki = {norm(t): n for n, t in note_titles(space, "Wiki")}
+	twins = [_item("Life Note", n, t, {"wiki": wiki[norm(t)]}) for n, t in note_titles(space, "My notes") if norm(t) in wiki]
 	if twins:
 		out.append(_batch("wiki_twins", "Notes that repeat wiki pages", "A wiki page has the same title. Merging adds the note's text to the page, keeps both texts in the page's history, and archives the note.",
 			twins, "merge", "Merge {n}"))
@@ -125,25 +139,38 @@ def get(space: str | None = None, ai: bool | int = 0):
 
 # ---- one by one ----
 
+def open_count(Task, space):
+	"""How many open tasks (or open-ended goals in progress) the queue holds."""
+	if Task:
+		t = frappe.qb.DocType("Life Task")
+		return frappe.qb.from_(t).select(fn.Count("*")).where((t.space == space) & t.status.isin(OPEN) & (t.is_archived == 0)).run()[0][0]  # system: Reset reads the owner's own space
+	g = frappe.qb.DocType("Life Goal")
+	return frappe.qb.from_(g).select(fn.Count("*")).where((g.space == space) & (g.horizon == "Long term") & (g.outcome == "In Progress") & (g.is_someday == 0)
+		& (g.is_archived == 0)).run()[0][0]  # system: Reset reads the owner's own space
+
+
 def _queue(space, skip=(), only=None):
 	"""Open tasks and open-ended goals in progress, the oldest untouched first. `only` keeps to the items of one batch."""
 	if only is not None:
 		only = [n for n in only if n not in skip]
 		if not only:
 			return None, 0
-	rows = frappe.db.sql("""select * from (
-		select 'Life Task' as doctype, name, title, area, goal, creation, ifnull(last_touched_on, date(creation)) as touched, inbox_item, status
-			from `tabLife Task` where space=%(space)s and status in ('Open', 'Doing', 'Waiting') and is_archived=0
-		union all
-		select 'Life Goal', name, title, area, '' as goal, creation, ifnull(last_activity_on, date(modified)), '' as inbox_item,
-			if(on_hold, 'On Hold', 'Active') from `tabLife Goal` where space=%(space)s and horizon='Long term' and outcome='In Progress' and is_someday=0 and is_archived=0
-		) q where name not in %(skip)s {only} order by touched asc, creation asc limit 1""".replace("{only}", "and name in %(only)s" if only else ""),
-		{"space": space, "skip": list(skip) or [""], "only": only or [""]}, as_dict=True)
+	t, g = frappe.qb.DocType("Life Task"), frappe.qb.DocType("Life Goal")
+	skipped = list(skip) or [""]
+	tasks = frappe.qb.from_(t).select(t.name, t.title, t.area, t.goal, t.creation, fn.IfNull(t.last_touched_on, fn.Date(t.creation)).as_("touched"), t.inbox_item, t.status).where(
+		(t.space == space) & t.status.isin(OPEN) & (t.is_archived == 0) & t.name.notin(skipped))
+	goals = frappe.qb.from_(g).select(g.name, g.title, g.area, g.creation, fn.IfNull(g.last_activity_on, fn.Date(g.modified)).as_("touched"), g.on_hold).where(
+		(g.space == space) & (g.horizon == "Long term") & (g.outcome == "In Progress") & (g.is_someday == 0) & (g.is_archived == 0) & g.name.notin(skipped))
+	if only:
+		tasks, goals = tasks.where(t.name.isin(only)), goals.where(g.name.isin(only))
+	tasks = tasks.orderby(fn.IfNull(t.last_touched_on, fn.Date(t.creation))).orderby(t.creation).limit(1).run(as_dict=True)  # system: Reset reads the owner's own space
+	goals = goals.orderby(fn.IfNull(g.last_activity_on, fn.Date(g.modified))).orderby(g.creation).limit(1).run(as_dict=True)  # system: Reset reads the owner's own space
+	rows = [{"doctype": "Life Task", **r} for r in tasks] + [{"doctype": "Life Goal", "goal": "", "inbox_item": "", "status": "On Hold" if r.on_hold else "Active",
+		**{k: v for k, v in r.items() if k != "on_hold"}} for r in goals]
+	rows = [frappe._dict(r) for r in sorted(rows, key=lambda r: (str(r["touched"])[:10], str(r["creation"])))[:1]]
 	if only is not None:
 		return (rows[0] if rows else None), len(only)
-	total = frappe.db.sql("""select (select count(*) from `tabLife Task` where space=%(space)s and status in ('Open', 'Doing', 'Waiting') and is_archived=0)
-		+ (select count(*) from `tabLife Goal` where space=%(space)s and horizon='Long term' and outcome='In Progress' and is_someday=0 and is_archived=0)""",
-		{"space": space})[0][0]
+	total = open_count(Task=True, space=space) + open_count(Task=False, space=space)
 	return (rows[0] if rows else None), int(total) - len(skip)
 
 
@@ -177,8 +204,8 @@ def _origin(row):
 		src = frappe.db.get_value("Life Inbox Item", row.inbox_item, ["name", "title", "summary_md", "received_on", "media_kind"], as_dict=True)
 		if src:
 			return {"kind": "Source", "ref": "source:" + src.name, "title": src.title, "date": str(src.received_on)[:10], "excerpt": line(src.summary_md)}
-	chat = frappe.db.sql("""select c.name, c.title, c.date, c.summary_md from `tabLife Chat Open Item` o join `tabLife Chat Log` c on c.name = o.parent
-		where o.task = %s limit 1""", row.name, as_dict=True)
+	o, c = frappe.qb.DocType("Life Chat Open Item"), frappe.qb.DocType("Life Chat Log")
+	chat = frappe.qb.from_(o).join(c).on(c.name == o.parent).select(c.name, c.title, c.date, c.summary_md).where(o.task == row.name).limit(1).run(as_dict=True)  # system: Reset reads the owner's own space
 	if chat:
 		c = chat[0]
 		return {"kind": "Chat", "ref": "chat:" + c.name, "title": c.title, "date": str(c.date), "excerpt": line(c.summary_md)}
@@ -314,7 +341,7 @@ def _merge(note):
 
 	doc = permissions.get_doc_checked("Life Note", note, "write")
 	target = frappe.db.get_value("Life Note", {"space": doc.space, "collection": "Wiki", "is_archived": 0, "title": doc.title}) or next(
-		(n for n, t in frappe.db.sql("select name, title from `tabLife Note` where space=%s and collection='Wiki' and is_archived=0", doc.space) if norm(t) == norm(doc.title)), None)
+		(n for n, t in note_titles(doc.space, "Wiki") if norm(t) == norm(doc.title)), None)
 	if not target:
 		return []
 	page = frappe.get_doc("Life Note", target)

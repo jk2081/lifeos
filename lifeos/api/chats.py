@@ -92,8 +92,8 @@ def goal_title_of(c):
 SORTS = {"date": lambda c: [c.date], "title": lambda c: [c.title], "assistant": lambda c: [c.assistant]}
 GROUP_ORDER = {
 	"day": lambda c: [(c.date, Order.desc)],
-	"area": lambda c: [(c.area.isnull() | (c.area == ""), Order.asc), (area_name_of(c), Order.asc), (c.area, Order.asc), (c.date, Order.desc)],
-	"goal": lambda c: [(c.goal.isnull() | (c.goal == ""), Order.asc), (goal_title_of(c), Order.asc), (c.goal, Order.asc), (c.date, Order.desc)],
+	"area": lambda c: [(c.area.isnull() | (c.area == ""), Order.asc), (fn.IfNull(area_name_of(c), ""), Order.asc), (c.area, Order.asc), (c.date, Order.desc)],
+	"goal": lambda c: [(c.goal.isnull() | (c.goal == ""), Order.asc), (fn.IfNull(goal_title_of(c), ""), Order.asc), (c.goal, Order.asc), (c.date, Order.desc)],
 }
 
 
