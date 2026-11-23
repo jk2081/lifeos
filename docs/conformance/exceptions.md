@@ -39,8 +39,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/settings.py` | 228 | the site's own backup folder, names only |
 | `lifeos/files.py` | 90 | local_path keeps the path inside the site's files folders |
 | `lifeos/pwa.py` | 18 | a fixed file of this app; no part of the path comes from the request |
-| `lifeos/sources.py` | 103 | a fixed name in a temporary folder made here |
-| `lifeos/sources.py` | 113 | pdftoppm's own output in a temporary folder made here |
+| `lifeos/sources.py` | 104 | a fixed name in a temporary folder made here |
+| `lifeos/sources.py` | 114 | pdftoppm's own output in a temporary folder made here |
 | `lifeos/tools/tidy_files.py` | 170 | _path_of keeps the path inside the site's files folders |
 
 ## frappe-setuser
@@ -92,9 +92,9 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/goals.py` | 111 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
 | `lifeos/api/goals.py` | 183 | SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters |
 | `lifeos/api/goals.py` | 417 | `off` is off_clause's fixed SQL; values are parameters |
-| `lifeos/api/inbox.py` | 395 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 400 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/inbox.py` | 402 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 408 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
+| `lifeos/api/inbox.py` | 413 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 415 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |
