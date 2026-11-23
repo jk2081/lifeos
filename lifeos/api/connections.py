@@ -128,7 +128,7 @@ FIELDS = ["name", "system", "label", "default_area", "default_goal", "default_in
 
 def _card(space, row):
 	"""One connected source for the Sources screen: its look, whether it is on, what came in this week, and who processes it."""
-	meta = CATALOG.get(row.system) or {}
+	meta = CATALOG.get(row.system) or ({"label": "Email", "kind": "Email · Forwarded", "icon": "@"} if row.system == "email" else {})
 	out = _out(row)
 	if row.system == "gmail" and (row.connected_app or row.mailbox):  # one Life OS reads itself; a bare gmail row is only the defaults for what agents file
 		return _gmail_card(row, out, meta)
@@ -155,7 +155,7 @@ def _gmail_card(row, out, meta):
 @frappe.whitelist(methods=["GET"])
 def sources(space: str | None = None):
 	"""Brain > Sources. `connected`: one card for each connected source (system, label, kind, active, this_week, line, processed_by,
-	lands and its defaults); each Gmail mailbox is its own card. `available`: sources that can be added (Upload, always on, first), each
+	lands and its defaults); `email_in`: the forwarding address, its allowed senders and how to use it (issue 32); each Gmail mailbox is its own card. `available`: sources that can be added (Upload, always on, first), each
 	with `always_on`; those already connected are left out, except Gmail, which can be connected again for another mailbox.
 	`coming`: sources not built yet; they cannot be switched on."""
 	space = permissions.resolve_space(space)
@@ -165,7 +165,9 @@ def sources(space: str | None = None):
 		"processed_by": processed_by("upload"), "lands": LANDS["upload"]}]
 	available += [{"system": k, "label": v["label"], "hint": "Connect Gmail" if k == "gmail" else v["hint"], "always_on": 0,
 		"processed_by": processed_by(k, v["label"])} for k, v in CATALOG.items() if k not in have or k == "gmail"]
-	return {"space": space, "connected": [_card(space, r) for r in rows], "available": available,
+	from lifeos import email_in
+
+	return {"space": space, "connected": [_card(space, r) for r in rows], "available": available, "email_in": email_in.info(),
 		"coming": [{"system": k, "label": v[0], "hint": v[1]} for k, v in COMING.items()]}
 
 

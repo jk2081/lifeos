@@ -11,7 +11,9 @@ SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "s
 	# UX fixes, set 6: Rhythms
 	"start_of_day", "week_starts_on", "cycle_break_week", "planning_period", "require_done_when", "use_focuses",
 	# set 7: working hours, for the weekly review's goal work
-	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days", "own_domains")
+	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days", "own_domains",
+	# issue 32: the mailbox people forward to, and who may
+	"email_in_account", "email_in_senders")
 TIME_FIELDS = ("weekly_review_time", "start_of_day", "work_start", "work_end")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 LISTS = {

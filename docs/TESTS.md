@@ -6,7 +6,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 
 | File | What it covers |
 | --- | --- |
-| `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures |
+| `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address |
 | `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources, old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the one gateway for model calls (cost and caps), Ask, insights |
 | `test_goals.py` | Goals: cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday |
@@ -287,7 +287,7 @@ Unit tests: `test_review.py`
 - `REVIEW.22` a review left after step 2 resumes at step 2 with its decisions kept
 - `REVIEW.23` deciding each goal and locking closes the cycle with cycles.close_cycle's score and makes the next cycle with the carried goals and their lead actions
 
-### Settings (`tools/acceptance/settings.mjs`, 39 checks)
+### Settings (`tools/acceptance/settings.mjs`, 40 checks)
 
 Profile, Areas, Rhythms, Members, Sources, Rules, Skills, Cost, the setup ladder, the calendar connection and the one-space site.
 
@@ -332,6 +332,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.37` a contradiction in Needs you, once decided, leaves the page with the chosen fact and its source
 - `SETTINGS.38` Skills: every built-in skill has its card, and Test passes the examples of each
 - `SETTINGS.39` Settings > Data holds the Reset section; /today/reset lands on Today and says that page moved
+- `SETTINGS.40` Settings > Sources shows the email-in address and the allowed senders, and the onboarding guide says nothing about forwarding
 
 ### Phone (`tools/acceptance/phone.mjs`, 24 checks)
 

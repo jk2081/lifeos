@@ -1272,3 +1272,36 @@ for (const width of WIDTHS) {
     })
   } finally { await s.ctx.close() }
 }
+
+// Issue 32: the email-in address is shown in Settings > Sources, with the allowed senders, and never in the onboarding guide.
+const EMAIL_IN = 'Acceptance Email-in'
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  try {
+    await check('SETTINGS.40', `${width} px: Settings > Sources shows the email-in address and the allowed senders, and the onboarding guide says nothing about forwarding`, async () => {
+      bench(`from frappe.utils import now
+if not frappe.db.exists("Email Account", "${EMAIL_IN}"):
+    d = frappe.get_doc({"doctype": "Email Account", "email_account_name": "${EMAIL_IN}", "email_id": "life-in-acceptance@example.com", "enable_incoming": 1,
+        "enable_outgoing": 0, "password": "not-a-real-password", "imap_folder": [{"folder_name": "INBOX", "append_to": "Communication"}]})
+    d.flags.ignore_validate = True
+    d.insert(ignore_permissions=True)
+frappe.db.set_single_value("Life Settings", "email_in_account", "${EMAIL_IN}")
+frappe.db.set_single_value("Life Settings", "email_in_senders", "me-acceptance@example.com")
+frappe.clear_cache(doctype="Life Settings")`)
+      await s.open('/life/brain/sources')
+      await pg.locator('[data-email-in]').waitFor({ timeout: 15000 })
+      await pg.locator('[data-email-in-address]:has-text("life-in-acceptance@example.com")').waitFor({ timeout: 15000 })
+      must(await pg.locator('[data-email-in-senders]').inputValue() === 'me-acceptance@example.com', 'the allowed sender is not shown')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      // the guide: no word about an address or forwarding
+      const guide = (await import('node:fs')).readFileSync(new URL('../../frontend/src/components/OnboardingGuide.vue', import.meta.url), 'utf8')
+      must(!/forward|email-in|email in/i.test(guide), 'the onboarding guide mentions email forwarding')
+    })
+  } finally {
+    bench(`frappe.db.set_single_value("Life Settings", "email_in_account", None)
+frappe.db.set_single_value("Life Settings", "email_in_senders", None)
+frappe.clear_cache(doctype="Life Settings")`)
+    await s.ctx.close()
+  }
+}

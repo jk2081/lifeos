@@ -66,6 +66,8 @@ for _dt in ("Life Note", "Life Person", "Life Goal", "Life Area", "Life Cycle", 
 		_have = doc_events.setdefault(_dt, {}).get(_event)
 		doc_events[_dt][_event] = [*([_have] if isinstance(_have, str) else _have or []), "lifeos.context.changed"]
 doc_events["File"] = {"after_insert": "lifeos.files.after_insert"}
+# issue 32: an email read from the email-in mailbox becomes a capture
+doc_events["Communication"] = {"on_update": "lifeos.email_in.communication_received"}
 # issue 7: a Life OS record's file is stored once per space by content, and the same file sent again is not attached twice
 extend_doctype_class = {"File": ["lifeos.files.LifeFile"]}
 override_whitelisted_methods = {"upload_file": "lifeos.files.upload_file", "frappe.handler.upload_file": "lifeos.files.upload_file"}
