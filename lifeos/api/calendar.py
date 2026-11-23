@@ -137,7 +137,7 @@ def add_event(space: str | None = None, subject: str | None = None, starts_on: s
 	doc = frappe.get_doc({"doctype": "Event", "subject": subject.strip(), "starts_on": starts, "ends_on": ends, "all_day": 1 if flag(all_day) else 0,
 		"description": description, "event_type": "Public", "life_space": space})
 	# the space check above is the rule; core Event asks for the Desk User role, which Life User and Life Agent do not have
-	doc.insert(ignore_permissions=True)
+	doc.insert(ignore_permissions=True)  # system: the event is made for the person after the space check above
 	return {"name": doc.name, "synced_to_google": False}
 
 
@@ -153,7 +153,7 @@ def delete_event(event: str):
 	if permissions.is_agent():
 		frappe.throw(_("Agents cannot delete records."), frappe.PermissionError)
 	# an accepted proposal still names the event it made; that is a record of what happened, not a reason to keep the event
-	frappe.delete_doc("Event", doc.name, force=True, ignore_permissions=True)
+	frappe.delete_doc("Event", doc.name, force=True, ignore_permissions=True)  # system: the event is made for the person after the space check above
 	return {"deleted": event}
 
 

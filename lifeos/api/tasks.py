@@ -232,7 +232,7 @@ def all_tasks(space: str | None = None, group: str = "area", show: str = "open",
 	tab_numbers = dict(zip(ALL_SHOWS, [int(n) for n in frappe.db.sql(
 		f"select {cond} from `tabLife Task` t where t.space=%(space)s {base} {off}", {**values, "space": space})[0]]))
 	groups = {"area": _by_area, "goal": _by_goal, "due": _by_due}[group](space, rows, show, now, values["week_end"])
-	areas = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0, "is_life_area": 1}, fields=["name", "area_name", "colour", "is_on"],
+	areas = frappe.get_list("Life Area", filters={"space": space, "is_archived": 0, "is_life_area": 1}, fields=["name", "area_name", "colour", "is_on"],
 		order_by="sort_order asc, area_name asc", limit=50)
 	return {"space": space, "group": group, "show": show, "total": len(rows), "truncated": truncated, "counts": tab_numbers, "stuck_days": stuck_days, "groups": groups,
 		"areas": [a for a in areas if a.is_on], "today": str(now)}
@@ -241,7 +241,7 @@ def all_tasks(space: str | None = None, group: str = "area", show: str = "open",
 def _by_area(space, rows, show, now, week_end):
 	from lifeos.areas import off as areas_off
 
-	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour", "is_focus"],
+	tree = frappe.get_list("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour", "is_focus"],
 		order_by="sort_order asc, area_name asc", limit=5000)
 	hidden = set(areas_off(space))
 	focus_part = {x.name: x.parent_area for x in tree if x.is_focus}  # a task under a focus is listed under its part (issue 57)
@@ -266,7 +266,7 @@ def _by_goal(space, rows, show, now, week_end):
 	by = {}
 	for r in rows:
 		by.setdefault(r.goal or "", []).append(r)
-	goals = frappe.get_all("Life Goal", filters={"name": ("in", [g for g in by if g] or [""])}, fields=["name", "title", "area"], order_by="sort_order asc, creation asc", limit=0)
+	goals = frappe.get_list("Life Goal", filters={"name": ("in", [g for g in by if g] or [""])}, fields=["name", "title", "area"], order_by="sort_order asc, creation asc", limit=0)
 	out = [{"key": g.name, "label": g.title, "colour": None, "goal": g.name, "area": g.area or "", "count": len(by[g.name]),
 		"parts": [{"name": "", "label": "", "area": g.area or "", "tasks": by[g.name]}]} for g in goals]
 	if by.get(""):
@@ -314,7 +314,7 @@ def no_goal(space: str | None = None):
 	rows = query(space, NO_GOAL, {}, None, 0, ALL_CAP + 1, ["standalone"], hide_off=False)
 	truncated = len(rows) > ALL_CAP
 	rows = rows[:ALL_CAP]
-	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour"],
+	tree = frappe.get_list("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour"],
 		order_by="sort_order asc, area_name asc", limit=5000)
 	hidden = set(areas_off(space))
 	top = {a.name: a.parent_area or a.name for a in tree}
@@ -436,7 +436,7 @@ def tick_lead_action(task):
 	if not 1 <= week <= cycles.WEEKS:
 		return
 	title = (task.title or "").strip().lower()
-	for a in frappe.get_all("Life Goal Action", filters={"parent": task.goal, "status": "Open"}, fields=["name", "title", "per_week"]):
+	for a in frappe.get_list("Life Goal Action", filters={"parent": task.goal, "status": "Open"}, fields=["name", "title", "per_week"], parent_doctype="Life Goal"):
 		if (a.title or "").strip().lower() == title:
 			have = cycles._ticks(cycle).get(a.name, {}).get(week, 0)
 			try:

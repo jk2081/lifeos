@@ -165,7 +165,7 @@ def _source(space, value):
 
 def _file_in_space(space, file_url):
 	"""A File row with this URL on a record of this space that the caller can read."""
-	for row in frappe.get_all("File", filters={"file_url": file_url, "attached_to_doctype": ["in", SPACE_DOCTYPES]},
+	for row in frappe.get_all("File", filters={"file_url": file_url, "attached_to_doctype": ["in", SPACE_DOCTYPES]},  # system: background job, runs as the system
 			fields=["name", "attached_to_doctype", "attached_to_name", "life_sha256"], order_by="creation asc"):
 		if files.record_space(row.attached_to_doctype, row.attached_to_name) == space \
 				and frappe.get_doc("File", row.name).has_permission("read"):
@@ -330,7 +330,7 @@ def _attach(doctype, name, file_name, source, written):
 		doc["file_url"] = frappe.db.get_value("File", source["from"].name, "file_url")
 	stored_before = bool(digest) and frappe.db.exists("File", {"life_sha256": digest})
 	# the caller's write access to the record was checked; Frappe's own File permission would ask for the File role
-	f = frappe.get_doc(doc).insert(ignore_permissions=True)
+	f = frappe.get_doc(doc).insert(ignore_permissions=True)  # system: background job, runs as the system
 	if not stored_before and not frappe.db.exists("File", {"file_url": f.file_url, "name": ["!=", f.name]}):
 		written.append(f.file_url)
 	return f, True
@@ -390,7 +390,7 @@ def _asset(space, plan, row):
 def _proposals(item, wanted):
 	"""The proposals of this call wait for the owner. One already there (by kind and payload) is kept, whatever its status;
 	a pending one this call no longer sends is removed. Nothing is ever decided here."""
-	have = frappe.get_all("Life Proposal", filters={"inbox_item": item.name},
+	have = frappe.get_all("Life Proposal", filters={"inbox_item": item.name},  # system: background job, runs as the system
 		fields=["name", "kind", "payload", "status", "preview", "confidence", "reason", "alt_area"], order_by="sort_order asc, creation asc")
 	by_key = {}
 	for p in have:
@@ -413,8 +413,8 @@ def _proposals(item, wanted):
 		made.append(doc.name)
 	removed = [p.name for p in have if p.status == "Pending" and p.name not in used]
 	for name in removed:
-		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)
-	waiting = frappe.get_all("Life Proposal", filters={"inbox_item": item.name, "status": "Pending"},
+		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)  # system: background job, runs as the system
+	waiting = frappe.get_all("Life Proposal", filters={"inbox_item": item.name, "status": "Pending"},  # system: background job, runs as the system
 		fields=["name", "kind", "preview"], order_by="sort_order asc, creation asc")
 	return {"created": made, "kept": kept, "removed": removed, "waiting": waiting}
 
@@ -465,7 +465,7 @@ def _wiki(space, item, chat, page):
 
 
 def _last_written_by(note, item):
-	last = frappe.get_all("Life Wiki Change", filters={"note": note}, fields=["source_doctype", "source_name"],
+	last = frappe.get_all("Life Wiki Change", filters={"note": note}, fields=["source_doctype", "source_name"],  # system: background job, runs as the system
 		order_by="changed_on desc, creation desc", limit=1)
 	return bool(last) and last[0].source_doctype == JOB and last[0].source_name == item
 

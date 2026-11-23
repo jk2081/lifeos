@@ -152,7 +152,7 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 	goals = names_map("Life Goal", [r.goal for r in rows if r.goal], "title")
 	made = _made(space, [r.item for r in rows])
 	# "Filed by process-capture v1": the capture's skill, when it accepted something on its own
-	own = set(frappe.get_all("Life Proposal", filters={"inbox_item": ("in", [r.item for r in rows] or [""]), "filed_by": ("is", "set")}, pluck="inbox_item"))
+	own = set(frappe.get_list("Life Proposal", filters={"inbox_item": ("in", [r.item for r in rows] or [""]), "filed_by": ("is", "set")}, pluck="inbox_item"))
 	for r in rows:
 		r.update(received_on=str(r.received_on)[:19], area_name=areas.get(r.area), goal_title=goals.get(r.goal), made=made.get(r.item, []),
 			filed_by=r.processed_by if r.item in own else None)
@@ -171,7 +171,7 @@ def _made(space, items):
 	if not items:
 		return {}
 	out = {}
-	for p in frappe.get_all("Life Proposal", filters={"inbox_item": ("in", items), "status": "Accepted", "created_name": ("is", "set")},
+	for p in frappe.get_list("Life Proposal", filters={"inbox_item": ("in", items), "status": "Accepted", "created_name": ("is", "set")},
 			fields=["inbox_item", "kind", "preview", "created_doctype", "created_name"], order_by="decided_on asc, creation asc"):
 		bucket = out.setdefault(p.inbox_item, [])
 		if len(bucket) >= MADE_EACH or any(e["name"] == p.created_name for e in bucket) or not item_page._readable(p.created_doctype, p.created_name, space):

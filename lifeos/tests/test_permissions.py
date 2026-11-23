@@ -968,3 +968,126 @@ class TestMembers(LifeTestCase):
 		self.assertFalse(found[FAMILY]["is_member"])
 		self.assertIsNone(found[NEWCOMER]["kind"])
 		self.assertNotIn("Administrator", found)
+
+
+MARKER = "zqprivatemarker"
+# the errors a read may answer with; anything else is a traceback
+ALLOWED = (frappe.PermissionError, frappe.DoesNotExistError, frappe.ValidationError, frappe.NotFound if hasattr(frappe, "NotFound") else frappe.DoesNotExistError)
+
+
+class TestReadsThroughFrappePermissions(LifeTestCase):
+	"""Every read in lifeos/api/ answers a person from another space with nothing of this space's (issue 73)."""
+
+	def setUp(self):
+		super().setUp()
+		self.note = self.make("Life Note", title=f"{MARKER} note", content_md=f"{MARKER} body")
+		self.task = self.make("Life Task", title=f"{MARKER} task")
+		self.person = self.make("Life Person", full_name=f"{MARKER} person")
+		self.item = item(f"{MARKER} capture")
+		self.area = self.areas["Tea"]
+		self.goal = self.make("Life Goal", title=f"{MARKER} goal", horizon="Long term", done_when="Done").name
+		self.args = {"space": PRIVATE, "area": self.area, "goal": self.goal, "task": self.task.name, "note": self.note.name, "item": self.item,
+			"name": self.person.name, "document": "-", "chat": "-", "run": "-", "skill": "-", "client_id": "-", "kind": "Task", "text": MARKER}
+
+	def reads(self):
+		"""Every whitelisted GET method of lifeos/api/, as (dotted name, function, the keyword arguments to call it with)."""
+		import importlib
+		import pkgutil
+
+		import lifeos.api as api_package
+
+		for mod in pkgutil.iter_modules(api_package.__path__):
+			module = importlib.import_module(f"lifeos.api.{mod.name}")
+			for name, fn in vars(module).items():
+				if not callable(fn) or getattr(fn, "__module__", None) != module.__name__ or fn not in frappe.whitelisted:
+					continue
+				if "GET" not in (frappe.allowed_http_methods_for_whitelisted_func.get(fn) or []):
+					continue
+				params = inspect.signature(fn).parameters
+				required = [p for p in params.values() if p.default is inspect.Parameter.empty]
+				kwargs = {}
+				for p in required:
+					if p.name == "name" and "doctype" in params:
+						continue
+					if p.name not in self.args:
+						break
+					kwargs[p.name] = self.args[p.name]
+				else:
+					if "space" in params:
+						kwargs["space"] = PRIVATE
+					if "doctype" in params and "name" in params:
+						kwargs.update(doctype="Life Note", name=self.note.name)
+					if "kind" in params and "name" in params:
+						kwargs.update(kind="Task", name=self.task.name)
+					yield f"{mod.name}.{name}", fn, kwargs
+
+	def test_1_a_person_in_another_space_gets_nothing_from_this_one_from_any_read(self):
+		self.as_user(FAMILY)
+		called = 0
+		for dotted, fn, kwargs in self.reads():
+			try:
+				result = fn(**kwargs)
+			except ALLOWED:
+				called += 1
+				continue
+			called += 1
+			self.assertNotIn(MARKER, json.dumps(result, default=str), dotted)
+		self.assertGreater(called, 50)
+
+	def test_2_the_brain_and_an_agent_read_only_what_they_are_allowed_to(self):
+		frappe.db.set_value("Life Space", PRIVATE, "agents_can_read_vault", 0)
+		self.make("Life Vault Document", title=f"{MARKER} passport", doc_type="ID")
+		for user in (AGENT, permissions.BRAIN_USER):
+			self.as_user(user)
+			names = frappe.get_list("Life Task", filters={"space": PRIVATE}, pluck="name", limit=0)
+			self.assertIn(self.task.name, names, user)
+			self.assertEqual(frappe.get_list("Life Vault Document", filters={"space": PRIVATE}, pluck="name", limit=0), [], user)
+		self.as_user(AGENT)
+		self.assertEqual(frappe.get_list("Life Space", filters={"name": SHARED}, pluck="name"), [SHARED])
+		self.assertEqual(frappe.get_list("Life Person", filters={"space": "Nowhere"}, pluck="name"), [])
+		for dotted, fn, kwargs in self.reads():
+			try:
+				fn(**kwargs)
+			except ALLOWED:
+				pass
+
+	def test_3_the_scan_refuses_a_get_all_in_the_api_unless_it_says_why(self):
+		import subprocess
+		import tempfile
+
+		guard = Path(__file__).resolve().parents[2] / "tools" / "scan_guard.py"
+		with tempfile.TemporaryDirectory() as tmp:
+			api = Path(tmp) / "lifeos" / "api"
+			api.mkdir(parents=True)
+			bad, good = api / "bad.py", api / "good.py"
+			bad.write_text('rows = frappe.get_all("Life Task")\ndoc.save(ignore_permissions=True)\n')
+			good.write_text('rows = frappe.get_all("Life Task")  # system: a background job\ndoc.save(ignore_permissions=True)  # system: seeded\n')
+			refused = subprocess.run(["python3", str(guard), str(bad)], capture_output=True, text=True)
+			passed = subprocess.run(["python3", str(guard), str(good)], capture_output=True, text=True)
+		self.assertEqual(refused.returncode, 1, refused.stdout)
+		self.assertEqual(refused.stdout.count("bad.py"), 2)
+		self.assertEqual(passed.returncode, 0, passed.stdout)
+
+	def test_3b_the_api_has_no_unexplained_get_all(self):
+		import sys
+
+		sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+		try:
+			import scan_guard
+		finally:
+			sys.path.pop(0)
+		self.assertEqual(scan_guard.findings([Path(__file__).resolve().parents[1] / "api"]), [])
+
+	def test_4_no_cache_lives_in_frappe_local_outside_the_permissions_request_cache(self):
+		app = Path(__file__).resolve().parents[1]
+		found = [f"{p.relative_to(app)}:{n}" for p in app.rglob("*.py") if "tests" not in p.parts and p.name != "permissions.py"
+			for n, line in enumerate(p.read_text().splitlines(), 1) if re.search(r"frappe\.local\.(?!request\b|form_dict\b|response\b|flags\b)\w+\s*=[^=]", line)]
+		self.assertEqual(found, [])
+		self.assertIn("@request_cache", (app / "permissions.py").read_text())
+		self.assertNotRegex((app / "permissions.py").read_text(), r"frappe\.local\.\w+\s*=[^=]")
+
+	def test_5_a_filter_list_where_a_string_is_expected_is_refused(self):
+		for method, arg in ((goals.get, "goal"), (tasks.get, "task"), (inbox.get, "item")):
+			with self.assertRaises(frappe.FrappeTypeError, msg=method.__module__) as raised:
+				method(**{arg: [["name", "like", "%"]]})
+			self.assertIn(arg, str(raised.exception))

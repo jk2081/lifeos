@@ -49,7 +49,7 @@ def backlinks(doctype: str, name: str):
 			(doctype, name, doc.space), as_dict=True):
 		add(r.from_doctype, r.from_name, "links here")
 	for dt, field, why in FIELD_TIES.get(doctype, []):
-		for n in frappe.get_all(dt, filters={field: name, "space": doc.space}, pluck="name", limit=50, order_by="creation desc"):
+		for n in frappe.get_list(dt, filters={field: name, "space": doc.space}, pluck="name", limit=50, order_by="creation desc"):
 			add(dt, n, why)
 	for field, why in (("inbox_item", "source"), ("goal", "goal"), ("carried_from", "carried from"), ("parent_note", "parent note")):
 		if doc.meta.has_field(field) and doc.get(field):
@@ -72,7 +72,7 @@ def suggest(space: str | None = None, text: str | None = "", limit: int | None =
 			filters["is_sensitive"] = 0  # sensitive items are closed to the agent while the space's switch is off
 		if text:
 			filters[field] = ("like", f"%{text}%")
-		for r in frappe.get_all(dt, filters=filters, fields=["name", f"{field} as title"], order_by="modified desc", limit=limit):
+		for r in frappe.get_list(dt, filters=filters, fields=["name", f"{field} as title"], order_by="modified desc", limit=limit):
 			out.append({"doctype": dt, "name": r.name, "title": r.title, "kind": KIND[dt]})
 	out.sort(key=lambda r: (not r["title"].lower().startswith(text.lower()), len(r["title"])))
 	out = out[:limit]

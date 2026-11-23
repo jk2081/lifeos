@@ -36,13 +36,13 @@ def _records(space):
 	"""Every current or earlier File row of the space, with the record it is attached to, as {file row: record}."""
 	rows = []
 	for dt in USERS:
-		files = frappe.get_all("File", filters={"attached_to_doctype": dt, "is_folder": 0, "attached_to_field": ["not in", ("preview_image", "thumbnail")]},
+		files = frappe.get_all("File", filters={"attached_to_doctype": dt, "is_folder": 0, "attached_to_field": ["not in", ("preview_image", "thumbnail")]},  # system: a File has no space; only files whose record the person can read (get_list below) are kept
 			fields=["name", "file_name", "file_url", "file_size", "creation", "owner", "life_version_of", "attached_to_name"], order_by="creation asc")
 		if not files:
 			continue
 		meta = frappe.get_meta(dt)
 		fields = ["name", "space", meta.title_field or "name"] + [f for f in ("area", "source_system", "intent", "external_id", "is_sensitive") if meta.has_field(f)]
-		recs = {r.name: r for r in frappe.get_all(dt, filters={"name": ["in", builtins.list({f.attached_to_name for f in files})], "space": space}, fields=fields)}
+		recs = {r.name: r for r in frappe.get_list(dt, filters={"name": ["in", builtins.list({f.attached_to_name for f in files})], "space": space}, fields=fields)}
 		for f in files:
 			rec = recs.get(f.attached_to_name)
 			if rec and f.file_url:
@@ -86,7 +86,7 @@ def _build(space, rows):
 	groups = _group(rows)
 	assets = {r.attached_to_name for g in groups.values() for r in g["rows"] if r.doctype == ITEM}
 	jobs = _jobs_by_asset(assets)
-	titles = {n: t for n, t in frappe.get_all(ITEM, filters={"name": ["in", builtins.list({j for js in jobs.values() for j in js})]}, fields=["name", "title"], as_list=True)} if jobs else {}
+	titles = {n: t for n, t in frappe.get_list(ITEM, filters={"name": ["in", builtins.list({j for js in jobs.values() for j in js})]}, fields=["name", "title"], as_list=True)} if jobs else {}
 	agents = set(agent_users())
 	out = []
 	for url, g in groups.items():

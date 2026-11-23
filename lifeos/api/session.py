@@ -11,7 +11,7 @@ def boot():
 	permissions.require_login()
 	spaces = permissions.user_spaces()
 	if frappe.session.user == "Administrator" and not spaces:
-		spaces = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}
+		spaces = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}  # system: the Brain user sees every space
 	s = frappe.get_cached_doc("Life Settings")
 	order = {"Private": 0, "Shared": 1}
 	return {

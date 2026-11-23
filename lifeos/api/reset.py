@@ -51,7 +51,7 @@ def rule_batches(space):
 		out.append(_batch("duplicates", "Duplicate open tasks", "Each has the same title, area and goal as an older open task, which is kept.",
 			dupes, "delete", "Delete {n}"))
 	# 2. open tasks whose open-ended goal (a project before set 6) is achieved or dropped
-	closed = set(frappe.get_all("Life Goal", filters={"space": space, "horizon": "Long term", "outcome": ["not in", ["In Progress", "Carried"]]}, pluck="name"))
+	closed = set(frappe.get_list("Life Goal", filters={"space": space, "horizon": "Long term", "outcome": ["not in", ["In Progress", "Carried"]]}, pluck="name"))
 	orphans = [_item("Life Task", t.name, t.title) for t in tasks if t.goal in closed]
 	if orphans:
 		out.append(_batch("closed_project", "Open tasks of finished goals", "Their open-ended goal is achieved or dropped, but they are still open.",
@@ -299,7 +299,7 @@ def _accept_notes(item):
 	from lifeos.api import review
 
 	out = []
-	for p in frappe.get_all("Life Proposal", filters={"inbox_item": item, "status": "Pending", "kind": "Note"}, pluck="name"):
+	for p in frappe.get_list("Life Proposal", filters={"inbox_item": item, "status": "Pending", "kind": "Note"}, pluck="name"):
 		res = review.decide(p, "accept")
 		out.append({"op": "unaccept", "proposal": p, "doctype": res.get("created_doctype"), "name": res.get("created_name"), "item": item})
 	return out
@@ -372,9 +372,9 @@ def _unaccept(proposal):
 	item = permissions.get_doc_checked("Life Inbox Item", prop.inbox_item, "write")
 	if prop.created_doctype and prop.created_name and frappe.db.exists(prop.created_doctype, prop.created_name):
 		permissions.get_doc_checked(prop.created_doctype, prop.created_name, "delete")
-		frappe.delete_doc(prop.created_doctype, prop.created_name, ignore_permissions=True, delete_permanently=True)
+		frappe.delete_doc(prop.created_doctype, prop.created_name, ignore_permissions=True, delete_permanently=True)  # system: the decision was checked above; the undo restores the owner's own records
 	frappe.db.set_value("Life Proposal", prop.name, {"status": "Pending", "created_doctype": None, "created_name": None,
 		"decided_by": None, "decided_on": None})
 	item.reload()
 	item.status, item.finished_on = "To Review", None
-	item.save(ignore_permissions=True)  # saved, so the Outbox reverses the item's exit (set 7)
+	item.save(ignore_permissions=True)  # saved, so the Outbox reverses the item's exit (set 7)  # system: the decision was checked above; the undo restores the owner's own records

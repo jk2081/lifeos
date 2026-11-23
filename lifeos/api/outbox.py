@@ -117,12 +117,12 @@ def _decorate(rows):
 		fields = ["name", "is_sensitive"] if dt == "Life Inbox Item" else ["name"]
 		if dt == "Life Goal":
 			fields += ["horizon", "cycle"]
-		for x in frappe.get_all(dt, filters={"name": ("in", names)}, fields=fields):
+		for x in frappe.get_list(dt, filters={"name": ("in", names)}, fields=fields):
 			live[(dt, x.name)] = x
-	trashed = {(d.deleted_doctype, d.deleted_name) for d in frappe.get_all("Deleted Document", filters={
+	trashed = {(d.deleted_doctype, d.deleted_name) for d in frappe.get_all("Deleted Document", filters={  # system: Frappe's trash is not a space record
 		"deleted_name": ("in", [r.record for r in rows] or ["-"]), "restored": 0, "creation": (">=", add_days(now_datetime(), -30))},
 		fields=["deleted_doctype", "deleted_name"])}
-	closed = set(frappe.get_all("Life Cycle", filters={"name": ("in", [x.cycle for x in live.values() if x.get("cycle")] or ["-"]), "status": "Closed"},
+	closed = set(frappe.get_list("Life Cycle", filters={"name": ("in", [x.cycle for x in live.values() if x.get("cycle")] or ["-"]), "status": "Closed"},
 		pluck="name"))
 	for r in rows:
 		x = live.get((r.doctype, r.record))

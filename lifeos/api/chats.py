@@ -30,7 +30,7 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 	names = [r.ref_name for r in index]
 	details, items = {}, {}
 	if names:
-		for r in frappe.get_all("Life Chat Log", filters={"name": ("in", names)}, fields=["name", "url", "assistant", "summary_md"]):
+		for r in frappe.get_list("Life Chat Log", filters={"name": ("in", names)}, fields=["name", "url", "assistant", "summary_md"]):
 			details[r.name] = r
 		for r in frappe.db.sql(
 			"select parent, name, text, status, task from `tabLife Chat Open Item` where parenttype='Life Chat Log' and parent in %s order by parent, idx",

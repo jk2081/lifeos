@@ -34,7 +34,7 @@ def _decide(prop, decision, payload=None):
 		prop.created_doctype, prop.created_name = doctype, name
 	prop.decided_by = frappe.session.user
 	prop.decided_on = now_datetime()
-	prop.save(ignore_permissions=True)
+	prop.save(ignore_permissions=True)  # system: the decision was checked above; agents are refused before this
 	try:
 		lessons.record(prop, item)  # a decision that is not the skill's best guess is kept against the skill, for its lessons
 	except Exception:  # a lesson must never stop a decision
@@ -66,7 +66,7 @@ def decide_all(item: str, decision: str):
 		frappe.throw(_("decision must be accept or reject."))
 	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
 	done, errors = [], []
-	for name in frappe.get_all("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name", order_by="sort_order asc, creation asc"):
+	for name in frappe.get_list("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name", order_by="sort_order asc, creation asc"):
 		prop = frappe.get_doc("Life Proposal", name)
 		frappe.db.savepoint("lifeos_decide")
 		try:

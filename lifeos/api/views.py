@@ -24,7 +24,7 @@ def get_all():
 	user = _person()
 	spaces = permissions.user_spaces(user)
 	out = {}
-	for row in frappe.get_all("Life View State", filters={"user": user}, fields=["screen", "space", "state"], limit=500, ignore_permissions=True):
+	for row in frappe.get_list("Life View State", filters={"user": user}, fields=["screen", "space", "state"], limit=500, ignore_permissions=True):  # system: a person's own screen state, keyed by their user
 		if row.space and row.space not in spaces and user != "Administrator":
 			continue  # a space the user has since left
 		state = parse(row.state, {})
@@ -53,5 +53,5 @@ def save(screen: str, space: str | None = None, state: str | dict | None = None)
 	if name:
 		frappe.db.set_value("Life View State", name, "state", text)
 	else:
-		frappe.get_doc({"doctype": "Life View State", "user": user, "screen": screen, "space": space or None, "state": text}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "Life View State", "user": user, "screen": screen, "space": space or None, "state": text}).insert(ignore_permissions=True)  # system: a person's own screen state, keyed by their user
 	return {"screen": screen, "space": space or "", "saved": True}

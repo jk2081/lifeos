@@ -54,7 +54,7 @@ def _mentions(space, person, limit=MENTION_CAP):
 			found[("Event", ev.name)] = {"doctype": "Event", "name": ev.name, "kind": "Meeting", "title": ev.subject or "Meeting", "date": str(ev.starts_on)[:10],
 				"at": str(ev.starts_on), "how": None, "ref": "event:" + ev.name}
 	for field, how in (("waiting_on_person", "Waiting on them"), ("delegated_to", "Delegated to them")):
-		for t in frappe.get_all("Life Task", filters={"space": space, field: person["name"], "is_archived": 0}, fields=["name", "title", "creation", "modified"], limit=limit):
+		for t in frappe.get_list("Life Task", filters={"space": space, field: person["name"], "is_archived": 0}, fields=["name", "title", "creation", "modified"], limit=limit):
 			key = ("Life Task", t.name)
 			row = found.setdefault(key, {"doctype": "Life Task", "name": t.name, "kind": "Task", "title": t.title, "date": str(t.creation.date()), "at": str(t.modified),
 				"how": None, "ref": "task:" + t.name})
@@ -88,22 +88,23 @@ def list(space: str | None = None, kind: str | None = None, q: str | None = None
 	or_filters = None
 	q = (q or "").strip()[:200]
 	if q:
-		orgs = frappe.get_all("Life Person", filters={"space": space, "kind": "Organisation", "full_name": ("like", _like(q))}, pluck="name")
+		orgs = frappe.get_list("Life Person", filters={"space": space, "kind": "Organisation", "full_name": ("like", _like(q))}, pluck="name")
 		or_filters = [["full_name", "like", _like(q)], ["aliases", "like", _like(q)], ["role", "like", _like(q)], ["relation", "like", _like(q)]]
 		if orgs:
 			or_filters.append(["organisation", "in", orgs])
 	fields = ["name", "full_name", "kind", "relation", "role", "organisation", "area", "wiki_page"]
-	rows = frappe.get_all("Life Person", filters=filters, or_filters=or_filters, fields=fields, order_by="full_name asc", limit_start=start, limit_page_length=page_length)
-	total = len(frappe.get_all("Life Person", filters=filters, or_filters=or_filters, pluck="name", limit=100000))
+	rows = frappe.get_list("Life Person", filters=filters, or_filters=or_filters, fields=fields, order_by="full_name asc", limit_start=start, limit_page_length=page_length)
+	total = len(frappe.get_list("Life Person", filters=filters, or_filters=or_filters, pluck="name", limit=100000))
 	counts = {k: frappe.db.count("Life Person", {"space": space, "kind": k}) for k in KINDS}
 	org_names = names_map("Life Person", [r.organisation for r in rows], "full_name")
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
 	summaries = names_map("Life Note", [r.wiki_page for r in rows], "summary")
 	members = dict(frappe.db.sql("select organisation, count(*) from `tabLife Person` where space = %s and organisation in %s group by organisation",
 		(space, [r.name for r in rows] or [""])))
+	aliases = names_map("Life Person", [r.name for r in rows], "aliases")
 	out = []
 	for r in rows:
-		got, n = _mentions(space, {**r, "aliases": frappe.db.get_value("Life Person", r.name, "aliases")}, limit=1)
+		got, n = _mentions(space, {**r, "aliases": aliases.get(r.name)}, limit=1)
 		last = {k: got[0][k] for k in ("ref", "kind", "title", "date")} if got else None
 		out.append(_person_row(r, last, members, org_names, areas, summaries))
 	return {"space": space, "rows": out, "total": total, "start": start, "page_length": page_length, "counts": counts}
@@ -127,7 +128,7 @@ def get(name: str):
 	who = _text(p)
 	mentioned, total = _mentions(doc.space, p)
 	org = frappe.db.get_value("Life Person", doc.organisation, ["name", "full_name"], as_dict=True) if doc.organisation else None
-	members = frappe.get_all("Life Person", filters={"space": doc.space, "organisation": doc.name}, fields=["name", "full_name", "role", "relation"], order_by="full_name asc", limit=500)
+	members = frappe.get_list("Life Person", filters={"space": doc.space, "organisation": doc.name}, fields=["name", "full_name", "role", "relation"], order_by="full_name asc", limit=500)
 	return {"name": doc.name, "space": doc.space, "kind": doc.kind or "Person", "title": doc.full_name, "role": doc.role or doc.relation,
 		"aliases": split_aliases(doc.aliases), "area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 		"organisation": org, "people": [{"name": m.name, "title": m.full_name, "role": m.role or m.relation} for m in members],
@@ -142,6 +143,6 @@ def options(space: str | None = None, q: str | None = None, kind: str | None = N
 	if kind in KINDS:
 		filters["kind"] = kind
 	q = (q or "").strip()[:200]
-	rows = frappe.get_all("Life Person", filters=filters, or_filters=[["full_name", "like", _like(q)], ["aliases", "like", _like(q)]] if q else None,
+	rows = frappe.get_list("Life Person", filters=filters, or_filters=[["full_name", "like", _like(q)], ["aliases", "like", _like(q)]] if q else None,
 		fields=["name", "full_name", "kind"], order_by="full_name asc", limit=50)
 	return [{"value": r.name, "label": r.full_name, "kind": r.kind or "Person"} for r in rows]

@@ -30,24 +30,24 @@ def key_results(space: str | None = None, area: str | None = None):
 	_person()
 	space = permissions.resolve_space(space)
 	area = lens_area(area)
-	goals = frappe.get_all("Life Goal", filters={"space": space, "outcome": "In Progress", "is_someday": 0, "is_archived": 0},
+	goals = frappe.get_list("Life Goal", filters={"space": space, "outcome": "In Progress", "is_someday": 0, "is_archived": 0},
 		fields=["name", "title", "horizon", "area", "done_when", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value",
 			"current_on", "notes_md", "cycle"], limit=500)
 	goals = _in_lens(space, area, goals)
 	by_name = {g.name: g for g in goals}
-	suggested = frappe.get_all("Life Goal Reading", filters={"space": space, "status": "Suggested", "goal": ("in", list(by_name) or ["-"])},
+	suggested = frappe.get_list("Life Goal Reading", filters={"space": space, "status": "Suggested", "goal": ("in", list(by_name) or ["-"])},
 		fields=["name", "goal", "date", "value", "status", "excerpt", "source_doctype", "source_name", "suggested_by", "confirmed_on"],
 		order_by="date desc, creation desc", limit=200)
 	titles = {}
 	for dt in {r.source_doctype for r in suggested if r.source_doctype in SOURCES}:
 		names = [r.source_name for r in suggested if r.source_doctype == dt and r.source_name]
-		titles.update({(dt, n): t for n, t in frappe.get_all(dt, filters={"name": ("in", names)}, fields=["name", "title"], as_list=True)})
+		titles.update({(dt, n): t for n, t in frappe.get_list(dt, filters={"name": ("in", names)}, fields=["name", "title"], as_list=True)})
 	to_confirm = []
 	for r in suggested:
 		g = by_name[r.goal]
 		to_confirm.append({**readings.reading_dict(r), "goal_title": g.title, "unit": g.unit, "measure": g.measure,
 			"source_title": titles.get((r.source_doctype, r.source_name))})
-	cycles = frappe.get_all("Life Cycle", filters={"space": space, "status": "Active"}, pluck="name")
+	cycles = frappe.get_list("Life Cycle", filters={"space": space, "status": "Active"}, pluck="name")
 	no_line = [{"name": g.name, "title": g.title, "horizon": g.horizon, "area": g.area, "notes_md": g.notes_md} for g in goals
 		if not readings.has_finish_line(g) and (g.horizon != "12 weeks" or g.cycle in cycles)]
 	stale = [{"name": g["name"], "title": g["title"], "measure": g["measure"], "unit": g["unit"], "last_reading_on": g.get("last_reading_on"),

@@ -61,8 +61,8 @@ def _people(users):
 	if not users:
 		return {}
 	out = {r.name: {"full_name": r.full_name or r.name, "image": r.user_image, "roles": set()}
-		for r in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "full_name", "user_image"])}
-	for r in frappe.get_all("Has Role", filters={"parent": ("in", users), "parenttype": "User",
+		for r in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "full_name", "user_image"])}  # system: user and role lookups and the admin's space list are not space records
+	for r in frappe.get_all("Has Role", filters={"parent": ("in", users), "parenttype": "User",  # system: user and role lookups and the admin's space list are not space records
 			"role": ("in", list(LIFE_ROLES))}, fields=["parent", "role"]):
 		if r.parent in out:
 			out[r.parent]["roles"].add(r.role)
@@ -92,7 +92,7 @@ def _last_filed(users):
 		return {}
 	out = {}
 	for doctype in ("Life Proposal", "Life Chat Log"):
-		for user, when in frappe.get_all(doctype, filters={"owner": ("in", users)}, fields=["owner", {"MAX": "creation"}],
+		for user, when in frappe.get_all(doctype, filters={"owner": ("in", users)}, fields=["owner", {"MAX": "creation"}],  # system: user and role lookups and the admin's space list are not space records
 				group_by="owner", as_list=True):
 			if when and (user not in out or when > out[user]):
 				out[user] = when
@@ -108,7 +108,7 @@ def _agents(spaces):
 		for m in s["members"]:
 			if m["is_agent"]:
 				reach.setdefault(m["user"], []).append({"space": s["name"], "access": m["access"], "agents_can_read_vault": s["agents_can_read_vault"]})
-	users = set(reach) | set(frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent", distinct=True))
+	users = set(reach) | set(frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent", distinct=True))  # system: user and role lookups and the admin's space list are not space records
 	people = _people([u for u in users if _visible_user(u)])
 	last = _last_filed(list(people))
 	out = []
@@ -123,10 +123,10 @@ def _agents(spaces):
 
 def _spaces(names):
 	"""The spaces with their members, in three queries whatever their number."""
-	rows = frappe.get_all("Life Space", filters={"name": ("in", names or ["-"])},
+	rows = frappe.get_all("Life Space", filters={"name": ("in", names or ["-"])},  # system: user and role lookups and the admin's space list are not space records
 		fields=["name", "owner_user", "agents_can_read_vault", "ask_enabled", "ask_can_read_vault"], order_by="name asc")
 	members = {}
-	for m in frappe.get_all("Life Space Member", filters={"parent": ("in", names or ["-"]), "parenttype": "Life Space"},
+	for m in frappe.get_all("Life Space Member", filters={"parent": ("in", names or ["-"]), "parenttype": "Life Space"},  # system: user and role lookups and the admin's space list are not space records
 			fields=["parent", "user", "access"], order_by="idx asc"):
 		members.setdefault(m.parent, []).append(m)
 	for r in rows:
@@ -158,7 +158,7 @@ def get(space: str | None = None):
 			"sort_order, area_name"),
 		"habit": ("Life Habit", "title", "habits", [], "title"),
 	}.items():
-		rows = frappe.get_all(doctype, filters={"space": space}, fields=["name", field, "is_archived", "archived_on", *extra], order_by=order, limit=1000)
+		rows = frappe.get_list(doctype, filters={"space": space}, fields=["name", field, "is_archived", "archived_on", *extra], order_by=order, limit=1000)
 		counts = _counts(kind, space, [r.name for r in rows])
 		for r in rows:
 			r["count"] = counts.get(r.name, 0)
@@ -176,10 +176,10 @@ def get(space: str | None = None):
 		"settings": {f: (str(s.get(f)) if f in TIME_FIELDS and s.get(f) else s.get(f)) for f in SETTING_FIELDS},
 		**lists,
 		"cycle": _cycle_info(space), "rules_note": frappe.db.get_value("Life Note", {"space": space, "collection": "Wiki", "is_rules": 1}),
-		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], order_by="full_name", limit=500),
+		"people": frappe.get_list("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], order_by="full_name", limit=500),
 		"spaces": [], "agents": [],
 	}
-	names = frappe.get_all("Life Space", pluck="name") if permissions.is_admin() else list(permissions.user_spaces())
+	names = frappe.get_all("Life Space", pluck="name") if permissions.is_admin() else list(permissions.user_spaces())  # system: user and role lookups and the admin's space list are not space records
 	docs = _spaces(names)
 	people = _people([m.user for d in docs for m in d.members] + [d.owner_user for d in docs])
 	access = permissions.user_spaces()
@@ -243,7 +243,7 @@ def ai_settings():
 	by_purpose = frappe.db.sql("select purpose, sum(cost), sum(input_tokens), sum(output_tokens) from `tabLife AI Usage` where month=%s group by purpose", month)
 	by_user = frappe.db.sql("select user, sum(cost) from `tabLife AI Usage` where month=%s group by user", month)
 	by_day = frappe.db.sql("select date(creation), sum(cost), count(*) from `tabLife AI Usage` where month=%s group by date(creation) order by date(creation) desc", month)
-	calls = frappe.get_all("Life AI Usage", fields=["creation", "purpose", "model", "input_tokens", "output_tokens", "cached_tokens", "cost", "user",
+	calls = frappe.get_list("Life AI Usage", fields=["creation", "purpose", "model", "input_tokens", "output_tokens", "cached_tokens", "cost", "user",
 		"reference_doctype", "reference_name"], order_by="creation desc, name desc", limit=50)
 	caps = client.feature_caps()
 	features = sorted({p for p, *_r in by_purpose} | set(caps))
@@ -432,7 +432,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 				_move_open_work(doc, move_to)
 			doc.is_archived, doc.archived_on = 1, frappe.utils.today()
 			if kind == "area":
-				for child in frappe.get_all("Life Area", filters={"parent_area": doc.name, "is_archived": 0}, pluck="name"):
+				for child in frappe.get_list("Life Area", filters={"parent_area": doc.name, "is_archived": 0}, pluck="name"):
 					frappe.db.set_value("Life Area", child, {"is_archived": 1, "archived_on": doc.archived_on})
 					archived.append(child)
 		else:
@@ -447,7 +447,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 					f = {"parent_area": doc.name, "is_archived": 1}
 					if when:
 						f["archived_on"] = when
-					for child in frappe.get_all("Life Area", filters=f, pluck="name"):
+					for child in frappe.get_list("Life Area", filters=f, pluck="name"):
 						frappe.db.set_value("Life Area", child, {"is_archived": 0, "archived_on": None})
 						restored.append(child)
 	doc.save() if name else doc.insert()
@@ -565,7 +565,7 @@ def _give_role(user, grant_role):
 	if not grant_role:
 		frappe.throw(_("{0} has no Life OS role yet. Choose whether they are a person or an agent.").format(user))
 	u = frappe.get_doc("User", user)
-	u.flags.ignore_permissions = True  # Life Admin only (checked by the caller); _check_grant allowed only Life User or Life Agent
+	u.flags.ignore_permissions = True  # system: Life Admin only (checked by the caller); _check_grant allowed only Life User or Life Agent
 	u.add_roles(grant_role)
 	permissions.clear_cache()
 
@@ -586,10 +586,10 @@ def find_users(txt: str | None = "", space: str | None = None):
 	its kind (Person, Agent, or None for no Life OS role yet) and, with `space`, whether it is already a member. Admin only."""
 	_admin_only()
 	like = f"%{txt or ''}%"
-	rows = frappe.get_all("User", filters={"enabled": 1, "name": ("not in", ["Administrator", "Guest"])},
+	rows = frappe.get_all("User", filters={"enabled": 1, "name": ("not in", ["Administrator", "Guest"])},  # system: user and role lookups and the admin's space list are not space records
 		or_filters={"name": ("like", like), "full_name": ("like", like)}, fields=["name", "full_name"], order_by="full_name asc", limit=20)
 	people = _people([r.name for r in rows])
-	members = set(frappe.get_all("Life Space Member", filters={"parent": space, "parenttype": "Life Space"}, pluck="user")) if space else set()
+	members = set(frappe.get_all("Life Space Member", filters={"parent": space, "parenttype": "Life Space"}, pluck="user")) if space else set()  # system: user and role lookups and the admin's space list are not space records
 	return [{"name": r.name, "full_name": r.full_name or r.name, "kind": people.get(r.name, {}).get("kind"),
 		"is_member": r.name in members} for r in rows]
 

@@ -72,7 +72,7 @@ def ensure_rules(space):
 	frappe.flags.lifeos_app_write = True  # made by the app, whoever asked first (an agent reading the rules, too)
 	try:
 		doc = frappe.get_doc({"doctype": "Life Note", "space": space, "title": RULES_TITLE, "collection": "Wiki", "is_rules": 1,
-			"summary": RULES_SUMMARY, "content_md": RULES_TEXT}).insert(ignore_permissions=True)
+			"summary": RULES_SUMMARY, "content_md": RULES_TEXT}).insert(ignore_permissions=True)  # system: the page's space was checked above; changes are written by the system
 	finally:
 		frappe.flags.lifeos_app_write = False
 	log_change(doc, "Created", "", doc.content_md, change_note="The starter rules page.", by="Administrator")
@@ -90,7 +90,7 @@ def log_change(doc, change_type, before_md, after_md, change_note=None, source=N
 		"changed_by": by or frappe.session.user, "changed_on": now_datetime(), "change_note": (change_note or "")[:1000] or None,
 		"source_doctype": src[0] if src else None, "source_name": src[1] if src else None,
 		"before_md": before_md or "", "after_md": after_md or "", "reverts": reverts})
-	ch.insert(ignore_permissions=True)
+	ch.insert(ignore_permissions=True)  # system: the page's space was checked above; changes are written by the system
 	return ch
 
 
@@ -98,7 +98,7 @@ def person_edited(doc, before_md):
 	"""A person saved a wiki page (library.save): one Edited change, merged with their own edits of the last minutes."""
 	if (before_md or "") == (doc.content_md or ""):
 		return None
-	last = frappe.get_all("Life Wiki Change", filters={"note": doc.name}, fields=["name", "change_type", "changed_by", "changed_on", "reverted"],
+	last = frappe.get_list("Life Wiki Change", filters={"note": doc.name}, fields=["name", "change_type", "changed_by", "changed_on", "reverted"],
 		order_by="changed_on desc, creation desc", limit=1)
 	if last and last[0].change_type == "Edited" and last[0].changed_by == frappe.session.user and not last[0].reverted \
 			and last[0].changed_on > add_to_date(now_datetime(), minutes=-COALESCE_MINUTES):
@@ -256,7 +256,7 @@ def search(space: str | None = None, query: str | None = None, collection: str |
 		# nosemgrep: frappe-sql-format-injection -- WHERE and LIKE placeholders are fixed fragments; each word is a %(wN)s parameter
 		rows = frappe.db.sql(f"""select ref_doctype, ref_name, title, collection, search_text from `tabLife Index`
 			where {' and '.join(where)} and {likes} order by record_date desc limit %(limit)s""", values, as_dict=True)
-	summaries = dict(frappe.get_all("Life Note", filters={"name": ["in", [r.ref_name for r in rows if r.ref_doctype == "Life Note"] or [""]]},
+	summaries = dict(frappe.get_list("Life Note", filters={"name": ["in", [r.ref_name for r in rows if r.ref_doctype == "Life Note"] or [""]]},
 		fields=["name", "summary"], as_list=True))
 	return {"results": [{"doctype": r.ref_doctype, "name": r.ref_name, "title": r.title, "collection": r.collection or None,
 		"summary": summaries.get(r.ref_name), "snippet": _snippet(r.search_text, words)} for r in rows]}
@@ -400,7 +400,7 @@ CHANGE_FIELDS = ["name", "note", "change_type", "changed_by", "changed_on", "cha
 def _decorate_changes(rows):
 	from lifeos.api.utils import user_names
 
-	notes = {r.name: r for r in frappe.get_all("Life Note", filters={"name": ["in", [x.note for x in rows] or [""]]}, fields=["name", "title", "collection"])}
+	notes = {r.name: r for r in frappe.get_list("Life Note", filters={"name": ["in", [x.note for x in rows] or [""]]}, fields=["name", "title", "collection"])}
 	users = user_names([r.changed_by for r in rows])
 	for r in rows:
 		n = notes.get(r.note)
@@ -548,7 +548,7 @@ def health(space: str | None = None, refresh: bool | int | None = 0):
 		data = compute_health(space)
 		frappe.cache.set_value(_health_key(space), data, expires_in_sec=26 * 3600)
 	if permissions.vault_hidden(space):  # the cache is everyone's: leave the sensitive pages out of an agent's copy
-		closed = set(frappe.get_all("Life Note", filters={"space": space, "is_sensitive": 1}, pluck="name"))
+		closed = set(frappe.get_list("Life Note", filters={"space": space, "is_sensitive": 1}, pluck="name"))
 		if closed:
 			data = {k: _without(v, closed) for k, v in data.items()}
 	return data
@@ -571,7 +571,7 @@ def _without(value, closed):
 
 def refresh_all_health():
 	"""The nightly job: health of every space's wiki."""
-	for space in frappe.get_all("Life Space", pluck="name"):
+	for space in frappe.get_all("Life Space", pluck="name"):  # system: the daily job covers every space
 		frappe.cache.set_value(_health_key(space), compute_health(space), expires_in_sec=26 * 3600)
 
 

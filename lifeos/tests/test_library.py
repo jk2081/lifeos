@@ -518,7 +518,6 @@ class TestFilesList(LifeTestCase):
 def set_switch(space, field, on):
 	frappe.set_user("Administrator")
 	frappe.db.set_value("Life Space", space, field, 1 if on else 0)
-	frappe.local.lifeos_vault_open = None
 	permissions.clear_cache()
 
 

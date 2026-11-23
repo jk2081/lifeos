@@ -83,7 +83,7 @@ def list(space: str | None = None, tab: str | None = "all", area: str | None = N
 		{**values, "start": start, "len": page_length}, as_dict=True)
 	total = tabs[tab]
 	areas = names_map("Life Area", [r.area for r in rows], "area_name")
-	parents = {r.area: frappe.db.get_value("Life Area", r.area, "parent_area") for r in rows if r.area}
+	parents = names_map("Life Area", [r.area for r in rows], "parent_area")
 	parent_names = names_map("Life Area", [p for p in parents.values() if p], "area_name")
 	now = getdate(today())
 	for r in rows:
@@ -110,7 +110,7 @@ def _check(doctype):
 
 def _goal_tasks(goal):
 	"""The open tasks an open-ended goal takes with it to Someday."""
-	return frappe.get_all("Life Task", filters={"goal": goal, "status": ["in", ["Open", "Doing", "Waiting"]], "is_archived": 0}, pluck="name")
+	return frappe.get_list("Life Task", filters={"goal": goal, "status": ["in", ["Open", "Doing", "Waiting"]], "is_archived": 0}, pluck="name")
 
 
 def park_doc(doc, note=None):
@@ -156,7 +156,7 @@ def _snapshot(doc):
 	out = {"doctype": doc.doctype, "name": doc.name, "status": doc.get("status"), "is_someday": doc.get("is_someday"),
 		"due_date": doc.get("due_date"), "on_hold": doc.get("on_hold"), "outcome": doc.get("outcome")}
 	if doc.doctype == "Life Goal" and doc.horizon == "Long term":
-		out["tasks"] = frappe.get_all("Life Task", filters={"name": ["in", _goal_tasks(doc.name) or ["-"]]}, fields=["name", "status"])
+		out["tasks"] = frappe.get_list("Life Task", filters={"name": ["in", _goal_tasks(doc.name) or ["-"]]}, fields=["name", "status"])
 	return out
 
 
@@ -183,7 +183,7 @@ def bring_back(doctype: str, name: str, due_date: str | date | None = None, stat
 		if doc.horizon == "Long term":
 			doc.on_hold = 1 if status == "On Hold" else 0
 		doc.save()
-		for t in frappe.get_all("Life Task", filters={"someday_with": doc.name, "status": "Someday"}, pluck="name"):
+		for t in frappe.get_list("Life Task", filters={"someday_with": doc.name, "status": "Someday"}, pluck="name"):
 			td = frappe.get_doc("Life Task", t)
 			td.status = "Open"
 			td.save()
@@ -214,7 +214,7 @@ def purge(doctype: str, name: str):
 
 	doc = permissions.get_doc_checked(doctype, name, "write")
 	if doctype == "Life Goal":
-		for t in frappe.get_all("Life Task", filters={"someday_with": name, "status": "Someday"}, pluck="name"):
+		for t in frappe.get_list("Life Task", filters={"someday_with": name, "status": "Someday"}, pluck="name"):
 			trash.delete("Life Task", t)
 	return trash.delete(doctype, name)
 

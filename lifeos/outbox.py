@@ -93,7 +93,7 @@ def record(doc, pile, on=None, note=None, kind=None):
 	e = frappe.get_doc({"doctype": "Life Exit", "space": doc.space, "area": area, "record_doctype": doc.doctype,
 		"record_name": doc.name, "title": _title(doc), "kind": kind or KIND[doc.doctype], "pile": pile, "exited_on": on or now_datetime(),
 		"exited_by": frappe.session.user if frappe.session.user not in ("Guest",) else None, "note": note,
-		"auto_rule": doc.flags.get("auto_rule") or getattr(frappe.local, "lifeos_auto_rule", None)})
+		"auto_rule": doc.flags.get("auto_rule") or frappe.flags.get("lifeos_auto_rule")})
 	e.insert(ignore_permissions=True)
 	return e.name
 
@@ -134,7 +134,7 @@ def after_insert(doc, method=None):
 
 def on_trash(doc, method=None):
 	"""Deleted (to the trash, or purged from Someday): Discarded."""
-	if doc.doctype not in KIND or doc.flags.get("no_exit") or getattr(frappe.local, "lifeos_no_exit", False):
+	if doc.doctype not in KIND or doc.flags.get("no_exit") or frappe.flags.get("lifeos_no_exit"):
 		return
 	if active(doc.doctype, doc.name):  # it had already left the plate (a done task deleted later): that exit stands
 		return

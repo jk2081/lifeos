@@ -22,13 +22,13 @@ def tree(space: str | None = None, include_archived: bool | int | None = 0, coll
 		filters["is_archived"] = 0
 	if permissions.vault_hidden(space):
 		filters["is_sensitive"] = 0
-	notes = frappe.get_all("Life Note", filters=filters, fields=["name", "title", "parent_note", "area", "goal", "modified", "is_archived"],
+	notes = frappe.get_list("Life Note", filters=filters, fields=["name", "title", "parent_note", "area", "goal", "modified", "is_archived"],
 		order_by="title asc", limit=2000)
 	area = lens_area(area)
 	if area:
 		keep = in_area(space, area, "Life Note", [n.name for n in notes])
 		notes = [n for n in notes if n.name in keep]
-	areas = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "area_name", "parent_area"], order_by="sort_order, area_name", limit=1000)
+	areas = frappe.get_list("Life Area", filters={"space": space}, fields=["name", "area_name", "parent_area"], order_by="sort_order, area_name", limit=1000)
 	goals = names_map("Life Goal", [n.goal for n in notes], "title")
 	for n in notes:
 		n["goal_title"] = goals.get(n.goal)
@@ -117,7 +117,7 @@ def get(note: str):
 		"sources": [{"doctype": r.source_doctype, "name": r.source_name, "title": links.title_of(r.source_doctype, r.source_name),
 			"added_on": str(r.added_on) if r.get("added_on") else None} for r in doc.sources],
 		"links": links.outgoing(doc),
-		"children": frappe.get_all("Life Note", filters={"parent_note": doc.name, "is_archived": 0,
+		"children": frappe.get_list("Life Note", filters={"parent_note": doc.name, "is_archived": 0,
 			**({"is_sensitive": 0} if permissions.vault_hidden(doc.space) else {})}, fields=["name", "title"], order_by="title", limit=100),
 		"versions": frappe.db.count("Version", {"ref_doctype": "Life Note", "docname": doc.name}),
 	}
@@ -175,7 +175,7 @@ def save(note: str | None = None, space: str | None = None, title: str | None = 
 def versions(note: str):
 	"""Saved versions of a note, from Frappe's document versioning."""
 	doc = permissions.get_doc_checked("Life Note", note)
-	rows = frappe.get_all("Version", filters={"ref_doctype": "Life Note", "docname": doc.name}, fields=["name", "owner", "creation", "data"],
+	rows = frappe.get_all("Version", filters={"ref_doctype": "Life Note", "docname": doc.name}, fields=["name", "owner", "creation", "data"],  # system: the note's own permission is checked above
 		order_by="creation desc", limit=30)
 	out = []
 	for r in rows:

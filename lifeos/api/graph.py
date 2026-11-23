@@ -34,22 +34,22 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 	note_filters = {"space": space, "is_archived": 0, **({"is_sensitive": 0} if permissions.vault_hidden(space) else {})}
 	if collection in ("Wiki", "My notes"):
 		note_filters["collection"] = collection
-	notes = frappe.get_all("Life Note", filters=note_filters, fields=["name", "title", "parent_note"], order_by="modified desc", limit=300)
+	notes = frappe.get_list("Life Note", filters=note_filters, fields=["name", "title", "parent_note"], order_by="modified desc", limit=300)
 	area = lens_area(area)
 	if area:  # the lens: the graph starts from the area's notes and goals; linked records still join it
 		keep = in_area(space, area, "Life Note", [n.name for n in notes])
 		notes = [n for n in notes if n.name in keep]
 	for n in notes:
 		add("Life Note", n.name, n.title)
-	for p in ([] if collection or area else frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name"], limit=100)):
+	for p in ([] if collection or area else frappe.get_list("Life Person", filters={"space": space}, fields=["name", "full_name"], limit=100)):
 		add("Life Person", p.name, p.full_name)
-	goals = [] if collection else frappe.get_all("Life Goal", filters={"space": space}, fields=["name", "title", "carried_from", "serves"], order_by="creation desc", limit=100)
+	goals = [] if collection else frappe.get_list("Life Goal", filters={"space": space}, fields=["name", "title", "carried_from", "serves"], order_by="creation desc", limit=100)
 	if area:
 		keep = in_area(space, area, "Life Goal", [g.name for g in goals])
 		goals = [g for g in goals if g.name in keep]
 	for g in goals:
 		add("Life Goal", g.name, g.title)
-	docs = [] if permissions.vault_hidden(space) or collection or area else frappe.get_all("Life Vault Document", filters={"space": space, "is_archived": 0}, fields=["name", "title", "holder"], limit=100)
+	docs = [] if permissions.vault_hidden(space) or collection or area else frappe.get_list("Life Vault Document", filters={"space": space, "is_archived": 0}, fields=["name", "title", "holder"], limit=100)
 	for d in docs:
 		add("Life Vault Document", d.name, d.title)
 
@@ -62,7 +62,7 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 	if hidden:  # sensitive items join an agent's graph only when the space's switch allows it (set 6)
 		for dt in permissions.SENSITIVE_DOCTYPES:
 			names = [n for d, n in found if d == dt]
-			for n in frappe.get_all(dt, filters={"name": ("in", names or ["-"]), "is_sensitive": 1}, pluck="name"):
+			for n in frappe.get_list(dt, filters={"name": ("in", names or ["-"]), "is_sensitive": 1}, pluck="name"):
 				found.pop((dt, n), None)
 	for r in link_rows:  # a task or chat joins the graph when a link touches it
 		for dt, name in ((r.from_doctype, r.from_name), (r.to_doctype, r.to_name)):
@@ -119,6 +119,6 @@ def titles(refs):
 	for dt, names in by_type.items():
 		field = rules.LINKABLE.get(dt) or "title"
 		field = field if frappe.get_meta(dt).has_field(field) else "name"
-		for name, title in frappe.get_all(dt, filters={"name": ("in", sorted(names))}, fields=["name", field], as_list=True):
+		for name, title in frappe.get_list(dt, filters={"name": ("in", sorted(names))}, fields=["name", field], as_list=True):
 			out[(dt, name)] = title
 	return out

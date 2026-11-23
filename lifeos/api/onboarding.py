@@ -82,7 +82,7 @@ def save_you(full_name: str, time_zone: str):
 	first, _sep, last = full_name.partition(" ")
 	user = frappe.get_doc("User", frappe.session.user)
 	user.first_name, user.last_name = first, last
-	user.flags.ignore_permissions = True
+	user.flags.ignore_permissions = True  # system: a person saves their own name and time zone
 	user.save()
 	if frappe.db.get_single_value("System Settings", "time_zone") != time_zone:
 		# set directly: a site made by bench new-site may lack other required System Settings fields, which a save would refuse

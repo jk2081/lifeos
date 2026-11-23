@@ -70,7 +70,7 @@ def made_counts(rows):
 
 
 def agent_users():
-	return frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent") or ["-"]
+	return frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent") or ["-"]  # system: role lookup, not a space record
 
 
 def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, status=None, intent=None, system=None, assistant=None,
@@ -199,7 +199,7 @@ def _vault_fields(names):
 		return {}
 	from lifeos.api.vault import badge
 
-	rows = frappe.get_all("Life Vault Document", filters={"name": ("in", names)},
+	rows = frappe.get_list("Life Vault Document", filters={"name": ("in", names)},
 		fields=["name", "doc_type", "holder", "number_last4", "issue_date", "expiry_date", "remind_days_before"])
 	holders = names_map("Life Person", [r.holder for r in rows], "full_name")
 	out = {}
@@ -218,7 +218,7 @@ def made_from(doctype: str, name: str):
 	doc = permissions.get_doc_checked(doctype, name)
 	out = []
 	if doctype == "Life Inbox Item":
-		for p in frappe.get_all("Life Proposal", filters={"inbox_item": doc.name, "status": "Accepted", "created_name": ["is", "set"]},
+		for p in frappe.get_list("Life Proposal", filters={"inbox_item": doc.name, "status": "Accepted", "created_name": ["is", "set"]},
 				fields=["kind", "preview", "created_doctype", "created_name"], order_by="sort_order asc, creation asc"):
 			if not frappe.db.exists(p.created_doctype, p.created_name):
 				continue

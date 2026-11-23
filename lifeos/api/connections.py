@@ -89,7 +89,7 @@ def touch(space, system, what=None):
 	if name:
 		frappe.db.set_value("Life Connection", name, values, update_modified=False)
 	else:
-		frappe.get_doc({"doctype": "Life Connection", "space": space, "system": system, "active": 1, **values}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "Life Connection", "space": space, "system": system, "active": 1, **values}).insert(ignore_permissions=True)  # system: admin-only screen; the space write check is above
 
 
 def _out(c):
@@ -159,7 +159,7 @@ def sources(space: str | None = None):
 	with `always_on`; those already connected are left out, except Gmail, which can be connected again for another mailbox.
 	`coming`: sources not built yet; they cannot be switched on."""
 	space = permissions.resolve_space(space)
-	rows = frappe.get_all("Life Connection", filters={"space": space}, fields=FIELDS + GMAIL_FIELDS, order_by="creation asc")
+	rows = frappe.get_list("Life Connection", filters={"space": space}, fields=FIELDS + GMAIL_FIELDS, order_by="creation asc")
 	have = {r.system for r in rows}
 	available = [{"system": "upload", "label": UPLOAD["label"], "hint": UPLOAD["hint"], "always_on": 1, "this_week": _week_counts(space, "upload")[0],
 		"processed_by": processed_by("upload"), "lands": LANDS["upload"]}]
@@ -185,7 +185,7 @@ def defaults(space: str | None = None, system: str | None = None):
 def list(space: str | None = None):
 	"""Every connection of a space, with its defaults, when something last arrived and whether it has been quiet too long."""
 	space = permissions.resolve_space(space)
-	rows = frappe.get_all("Life Connection", filters={"space": space},
+	rows = frappe.get_list("Life Connection", filters={"space": space},
 		fields=["name", "system", "label", "default_area", "default_goal", "default_intent", "active", "last_received_on", "last_received_what"],
 		order_by="label asc, system asc")
 	return {"space": space, "connections": [_out(r) for r in rows]}
@@ -284,7 +284,7 @@ def gmail_finish(name: str):
 		gmail.finish(conn)
 	except gmail.GmailError as e:
 		if not conn.mailbox:
-			frappe.delete_doc("Life Connection", conn.name, ignore_permissions=True, force=True)
+			frappe.delete_doc("Life Connection", conn.name, ignore_permissions=True, force=True)  # system: admin-only screen; the space write check is above
 		frappe.throw(str(e))
 	return gmail_card(conn.name)
 
@@ -302,9 +302,9 @@ def gmail_remove(name: str):
 	if conn.system != "gmail":
 		frappe.throw(_("This is not a Gmail connection."))
 	app = conn.connected_app
-	for cache in frappe.get_all("Token Cache", filters={"connected_app": app}, pluck="name") if app else []:
-		frappe.delete_doc("Token Cache", cache, ignore_permissions=True, force=True)
-	frappe.delete_doc("Life Connection", conn.name, ignore_permissions=True, force=True)
+	for cache in frappe.get_all("Token Cache", filters={"connected_app": app}, pluck="name") if app else []:  # system: Frappe's token cache, not a space record
+		frappe.delete_doc("Token Cache", cache, ignore_permissions=True, force=True)  # system: admin-only screen; the space write check is above
+	frappe.delete_doc("Life Connection", conn.name, ignore_permissions=True, force=True)  # system: admin-only screen; the space write check is above
 	return {"removed": name}
 
 

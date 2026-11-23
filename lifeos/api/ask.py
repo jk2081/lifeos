@@ -93,7 +93,7 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 		sc = _scope(scope, space)
 		t = frappe.get_doc({"doctype": "Life Ask Thread", "space": space, "user": frappe.session.user, "title": question[:140],
 			"scope_kind": sc.get("kind"), "scope_label": sc.get("label"), "scope_doctype": sc.get("doctype"), "scope_name": sc.get("name")})
-		t.insert(ignore_permissions=True)
+		t.insert(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
 	if sc.get("items"):
 		frappe.cache.hset("lifeos_ask_items", t.name, json.dumps(sc["items"]))
 	if not frappe.db.get_value("Life Space", space, "ask_enabled"):
@@ -105,10 +105,10 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 	except client.CapReached as e:
 		return _refuse(t, question, "cap", str(e))
 	history = engine.history_messages(t.name)
-	frappe.get_doc({"doctype": "Life Ask Message", "thread": t.name, "role": "user", "text": question, "status": "Done"}).insert(ignore_permissions=True)
-	msg = frappe.get_doc({"doctype": "Life Ask Message", "thread": t.name, "role": "assistant", "text": "", "status": "Working"}).insert(ignore_permissions=True)
+	frappe.get_doc({"doctype": "Life Ask Message", "thread": t.name, "role": "user", "text": question, "status": "Done"}).insert(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
+	msg = frappe.get_doc({"doctype": "Life Ask Message", "thread": t.name, "role": "assistant", "text": "", "status": "Working"}).insert(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
 	t.last_message_on = now_datetime()
-	t.save(ignore_permissions=True)
+	t.save(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
 	# The screen polls `progress` with its own id while the answer is written. The text so far goes to the cache, not the
 	# database, so the request commits once, at its end, and a failure leaves no half-written message behind.
 	key = f"lifeos_ask_req:{frappe.session.user}:{client_id}" if client_id else None
@@ -135,7 +135,7 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 		text = str(e) if isinstance(e, client.AIError) else _("Something went wrong while answering. It has been logged.")
 		msg.reload()
 		msg.status, msg.error, msg.text = "Error", text, ""
-		msg.save(ignore_permissions=True)
+		msg.save(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
 		buf.clear()
 		show_progress("Error")
 		return {"thread": t.name, "message": _message_out(msg), "error": "ai", "error_text": text}
@@ -143,7 +143,7 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 	msg.update({"text": res["text"], "cited": json.dumps(res["cited"]), "actions": json.dumps(res["actions"]),
 		"records_read": json.dumps(res["read"]), "input_tokens": res["input_tokens"], "output_tokens": res["output_tokens"],
 		"cost": res["cost"], "status": "Done"})
-	msg.save(ignore_permissions=True)
+	msg.save(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
 	buf[:] = [msg.text or ""]
 	show_progress("Done")
 	frappe.publish_realtime("lifeos_ask", {"thread": t.name, "message": msg.name, "done": 1}, user=frappe.session.user)
@@ -177,7 +177,7 @@ def message(name: str):
 def thread(name: str):
 	_person()
 	t = _thread(name)
-	msgs = frappe.get_all("Life Ask Message", filters={"thread": t.name}, fields=["*"], order_by="creation asc")
+	msgs = frappe.get_list("Life Ask Message", filters={"thread": t.name}, fields=["*"], order_by="creation asc")
 	return {"name": t.name, "title": t.title, "space": t.space, "scope": {"kind": t.scope_kind or "space", "label": t.scope_label,
 		"doctype": t.scope_doctype, "name": t.scope_name}, "messages": [_message_out(frappe._dict(m)) for m in msgs]}
 
@@ -210,7 +210,7 @@ def delete_thread(name: str):
 	_person()
 	t = _thread(name)
 	frappe.db.delete("Life Ask Message", {"thread": t.name})
-	frappe.delete_doc("Life Ask Thread", t.name, ignore_permissions=True, delete_permanently=True)
+	frappe.delete_doc("Life Ask Thread", t.name, ignore_permissions=True, delete_permanently=True)  # system: the thread and messages belong to the asker and the background answer writes them
 	return {"deleted": name}
 
 

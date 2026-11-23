@@ -32,7 +32,7 @@ def names_map(doctype, names, field):
 	names = [n for n in set(names) if n]
 	if not names:
 		return {}
-	return dict(frappe.get_all(doctype, filters={"name": ("in", names)}, fields=["name", field], as_list=True))
+	return dict(frappe.get_list(doctype, filters={"name": ("in", names)}, fields=["name", field], as_list=True))
 
 
 def user_names(users):
@@ -40,14 +40,14 @@ def user_names(users):
 	if not users:
 		return {}
 	out = {}
-	for name, first, full in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "first_name", "full_name"], as_list=True):
+	for name, first, full in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "first_name", "full_name"], as_list=True):  # system: user names, not a space record
 		out[name] = first or full or name
 	return out
 
 
 def descendants(space, area):
 	"""The area and every area below it."""
-	rows = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "parent_area"], limit=2000)
+	rows = frappe.get_list("Life Area", filters={"space": space}, fields=["name", "parent_area"], limit=2000)
 	children = {}
 	for r in rows:
 		children.setdefault(r.parent_area, []).append(r.name)

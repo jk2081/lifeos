@@ -108,7 +108,7 @@ def overview():
 	"""Brain > Skills: one card for each skill, with runs and cost this month; the fixed lists a new skill picks from; what the Brain may file on its own."""
 	_people_only()
 	month = _month_rows()
-	cards = [_card(frappe.get_doc("Life Skill", n), month) for n in frappe.get_all("Life Skill", pluck="name", order_by="source asc, title asc")
+	cards = [_card(frappe.get_doc("Life Skill", n), month) for n in frappe.get_list("Life Skill", pluck="name", order_by="source asc, title asc")
 		if _visible(n)]
 	return {"skills": cards, "lists": lists(), "auto_file": filing.settings(), "can_edit": permissions.is_admin(),
 		"proposal_kinds": sorted(SCHEMA)}
@@ -132,13 +132,13 @@ def detail(name: str):
 	_people_only()
 	doc = _skill(name)
 	card = _card(doc, _month_rows())
-	versions = frappe.get_all("Life Skill Version", filters={"skill": name}, fields=["version", "instructions", "changed_by", "changed_on", "note", "config"],
+	versions = frappe.get_list("Life Skill Version", filters={"skill": name}, fields=["version", "instructions", "changed_by", "changed_on", "note", "config"],
 		order_by="version desc")
-	names = {u.name: u.full_name for u in frappe.get_all("User", filters={"name": ("in", [v.changed_by for v in versions if v.changed_by])}, fields=["name", "full_name"])}
+	names = {u.name: u.full_name for u in frappe.get_all("User", filters={"name": ("in", [v.changed_by for v in versions if v.changed_by])}, fields=["name", "full_name"])}  # system: user names, not a space record
 	for v in versions:
 		v["changed_by_name"] = names.get(v.changed_by) or v.changed_by
 		v["changed_on"] = str(v.changed_on)[:19]
-	runs = frappe.get_all("Life Skill Run", filters={"skill": name}, fields=["name", "skill_version", "trigger", "input_doctype", "input_name", "status", "cost",
+	runs = frappe.get_list("Life Skill Run", filters={"skill": name}, fields=["name", "skill_version", "trigger", "input_doctype", "input_name", "status", "cost",
 		"duration", "error", "creation", "sensitive"], order_by="creation desc", limit=20)
 	for r in runs:
 		r["creation"] = str(r.creation)[:19]
@@ -146,7 +146,7 @@ def detail(name: str):
 		"config": {k: doc.get(k) for k in store.CONFIG}, "tools": store.tool_list(doc),
 		"examples": [{"name": e.name, "title": e.title, "input": e.input, "checks": e.expected, "last_result": e.last_result, "source": e.source,
 			"recorded": bool(e.fixture and e.fixture_hash == store.digest(doc.as_dict()))}
-			for e in frappe.get_all("Life Skill Example", filters={"skill": name}, fields=["name", "title", "input", "expected", "last_result", "source", "fixture", "fixture_hash"],
+			for e in frappe.get_list("Life Skill Example", filters={"skill": name}, fields=["name", "title", "input", "expected", "last_result", "source", "fixture", "fixture_hash"],
 				order_by="creation asc")],
 		"versions": versions, "runs": runs, "lessons": [x for x in lessons.for_skill(name) if not x["space"] or x["space"] in permissions.user_spaces() or permissions.is_admin()], "can_edit": permissions.is_admin(), "lists": lists()}
 
@@ -242,6 +242,6 @@ def save_auto_file(threshold: float, kinds: str | builtins.list):
 		frappe.throw(_("The confidence must be between 0.5 and 1."))
 	settings = frappe.get_doc("Life Settings")
 	settings.brain_auto_threshold, settings.brain_auto_kinds = float(threshold), json.dumps(chosen)
-	settings.flags.ignore_permissions = True
+	settings.flags.ignore_permissions = True  # system: the skill settings are saved by the Life Admin checked above
 	settings.save()
 	return filing.settings()

@@ -148,7 +148,7 @@ def _next_actions(space, names):
 	if not names:
 		return {}
 	hidden = set(areas_off(space))
-	rows = frappe.get_all("Life Task", filters={"goal": ("in", names), "status": ("in", ("Open", "Doing")), "is_archived": 0},
+	rows = frappe.get_list("Life Task", filters={"goal": ("in", names), "status": ("in", ("Open", "Doing")), "is_archived": 0},
 		fields=["name", "title", "goal", "scheduled_at", "due_date", "area"], limit=5000)
 	rows = [r for r in rows if not r.area or r.area not in hidden]
 	rows.sort(key=lambda r: (r.scheduled_at is None, r.scheduled_at or 0, r.due_date is None, r.due_date or 0))
@@ -209,7 +209,7 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 		rows.sort(key=lambda r: -(r.score if r.score is not None else (r.progress.get("percent") or 0)))
 	for r in rows:  # "To sort" (issue 57): an Open goal is kept, and the owner chooses what it becomes
 		r["to_sort"] = int(r.horizon == "Long term" and r.outcome == "In Progress")
-	tree = frappe.get_all("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "is_life_area", "is_on", "colour",
+	tree = frappe.get_list("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "is_life_area", "is_on", "colour",
 		"sort_order", "is_focus", "standard"], order_by="sort_order asc, area_name asc", limit=5000)
 	top = [a for a in tree if not a.parent_area]
 	hidden = set(areas_off(space))
@@ -281,8 +281,8 @@ def _scores(rows):
 	"""The 12 Week Year percentage of each goal, as the grid shows it (the final score once the cycle is closed)."""
 	out = {}
 	for cycle in {r.cycle for r in rows}:
+		status = frappe.db.get_value("Life Cycle", cycle, "status")
 		for g in rules.grid(cycle)["goals"]:
-			status = frappe.db.get_value("Life Cycle", cycle, "status")
 			out[g["name"]] = g["final_score"] if status == "Closed" and g.get("final_score") is not None else g["percent"]
 	return out
 
@@ -426,7 +426,7 @@ def picker(space: str | None = None):
 def cycles(space: str | None = None):
 	"""The current and planned 12 Week Years of a space: where a new 12 Week Year goal can go, or an open goal can move."""
 	space = permissions.resolve_space(space)
-	return frappe.get_all("Life Cycle", filters={"space": space, "status": ("in", ["Active", "Planned"])}, fields=["name", "title", "status"], order_by="start_date")
+	return frappe.get_list("Life Cycle", filters={"space": space, "status": ("in", ["Active", "Planned"])}, fields=["name", "title", "status"], order_by="start_date")
 
 
 # ---- open-ended goals: what a project page did before set 6 ----
@@ -461,7 +461,7 @@ def get(goal: str):
 	g["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
 	g["serves_title"] = frappe.db.get_value("Life Goal", doc.serves, "title") if doc.serves else None
 	g["cycle_title"] = frappe.db.get_value("Life Cycle", doc.cycle, "title") if doc.cycle else None
-	served_by = frappe.get_all("Life Goal", filters={"serves": doc.name, "space": space}, fields=["name", "title", "horizon", "outcome", "is_someday", "on_hold",
+	served_by = frappe.get_list("Life Goal", filters={"serves": doc.name, "space": space}, fields=["name", "title", "horizon", "outcome", "is_someday", "on_hold",
 		"cycle", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"], order_by="creation asc", limit=100)
 	served_by.sort(key=lambda r: TYPES.index(r.horizon) if r.horizon in TYPES else 9)
 	cycles = names_map("Life Cycle", [r.cycle for r in served_by], "title")
@@ -643,7 +643,7 @@ def suggest_measure(title: str, notes: str | None = None, space: str | None = No
 		space, horizon = doc.space, horizon or doc.horizon
 		area = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
 		actions = [a.title for a in doc.actions if a.status != "Dropped"][:20]
-		tasks = frappe.get_all("Life Task", filters={"goal": doc.name, "status": ("in", ["Open", "Doing", "Waiting"])}, pluck="title", limit=20)
+		tasks = frappe.get_list("Life Task", filters={"goal": doc.name, "status": ("in", ["Open", "Doing", "Waiting"])}, pluck="title", limit=20)
 	return readings.suggest_measure((title or "").strip()[:300], notes, space, area=area, actions=actions, tasks=tasks, horizon=horizon)
 
 
@@ -738,7 +738,7 @@ def grid(cycle: str | None = None, space: str | None = None, area: str | None = 
 		keep = in_area(doc.space, area, "Life Goal", [g.name for g in out["goals"]])
 		out["goals"] = [g for g in out["goals"] if g.name in keep]
 		out["area"] = area
-	out["cycles"] = frappe.get_all("Life Cycle", filters={"space": doc.space}, fields=["name", "title", "status", "start_date"], order_by="start_date desc", limit=40)
+	out["cycles"] = frappe.get_list("Life Cycle", filters={"space": doc.space}, fields=["name", "title", "status", "start_date"], order_by="start_date desc", limit=40)
 	for c in out["cycles"]:
 		c["start_date"] = str(c.start_date)
 	out["next"] = _next_cycle_dates(doc)
@@ -835,9 +835,9 @@ def _goal_links(goals):
 	names = [g["name"] for g in goals]
 	carried_from = [g["carried_from"] for g in goals if g["carried_from"]]
 	into = {}
-	for r in frappe.get_all("Life Goal", filters={"carried_from": ("in", names or ["-"])}, fields=["carried_from", "cycle"], order_by="creation asc"):
+	for r in frappe.get_list("Life Goal", filters={"carried_from": ("in", names or ["-"])}, fields=["carried_from", "cycle"], order_by="creation asc"):
 		into.setdefault(r.carried_from, r.cycle)
-	from_cycle = dict(frappe.get_all("Life Goal", filters={"name": ("in", carried_from or ["-"])}, fields=["name", "cycle"], as_list=True))
+	from_cycle = dict(frappe.get_list("Life Goal", filters={"name": ("in", carried_from or ["-"])}, fields=["name", "cycle"], as_list=True))
 	cycles = names_map("Life Cycle", [*into.values(), *from_cycle.values()], "title")
 	serves = names_map("Life Goal", [g["serves"] for g in goals], "title")
 	return {"into_cycle": into, "from_cycle": from_cycle, "cycles": cycles, "serves": serves}
@@ -847,7 +847,7 @@ def _goal_links(goals):
 def across_cycles(space: str | None = None, area: str | None = None):
 	"""Every goal across every cycle, grouped by cycle: planned, active, then closed, newest first."""
 	space = permissions.resolve_space(space)
-	cycles = frappe.get_all("Life Cycle", filters={"space": space}, fields=["name", "title", "status", "start_date", "end_date", "final_score"],
+	cycles = frappe.get_list("Life Cycle", filters={"space": space}, fields=["name", "title", "status", "start_date", "end_date", "final_score"],
 		order_by="start_date desc", limit=60)
 	order = {"Planned": 0, "Active": 1, "Closed": 2}
 	cycles.sort(key=lambda c: order.get(c.status, 3))
@@ -874,7 +874,7 @@ def across_cycles(space: str | None = None, area: str | None = None):
 			})
 		out.append({"name": c.name, "title": c.title, "status": c.status, "start_date": str(c.start_date), "end_date": str(c.end_date),
 			"current_week": g["current_week"], "average": g["average"], "past_end": g["past_end"], "goals": rows})
-	areas = frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set"), "is_archived": 0}, fields=["name", "area_name"], order_by="sort_order")
+	areas = frappe.get_list("Life Area", filters={"space": space, "parent_area": ("is", "not set"), "is_archived": 0}, fields=["name", "area_name"], order_by="sort_order")
 	used = {r[0] for r in frappe.db.sql("select distinct area from `tabLife Goal` where space=%s", space)}
 	with_tasks([r for c in out for r in c["goals"]])
 	return {"cycles": out, "target": target, "areas": [a for a in areas if a.name in used]}
@@ -889,7 +889,7 @@ def detail(goal: str):
 	tf = {"goal": doc.name}
 	if frappe.session.user != "Administrator":  # a member sees only the tasks of their own spaces
 		tf["space"] = ("in", [*permissions.user_spaces()] or [""])
-	tasks = sorted(frappe.get_all("Life Task", filters=tf,
+	tasks = sorted(frappe.get_list("Life Task", filters=tf,
 		fields=["name", "title", "status", "due_date", "is_archived"], limit=200),
 		key=lambda t: (order.index(t.status) if t.status in order else 9, t.due_date is None, str(t.due_date or "")))
 	common = {"space": doc.space, "horizon": doc.horizon or "12 weeks", "target_date": str(doc.target_date) if doc.target_date else None,
@@ -898,7 +898,7 @@ def detail(goal: str):
 	if not doc.cycle:
 		g = {"name": doc.name, "title": doc.title, "area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 			"serves": doc.serves, "actions": [], "percent": None, "outcome": doc.outcome, "result_note": doc.result_note, "carried_from": None}
-		cycles = frappe.get_all("Life Cycle", filters={"space": doc.space, "status": ("in", ["Active", "Planned"])}, fields=["name", "title", "status"], order_by="start_date")
+		cycles = frappe.get_list("Life Cycle", filters={"space": doc.space, "status": ("in", ["Active", "Planned"])}, fields=["name", "title", "status"], order_by="start_date")
 		return {"goal": g, "cycle": None, "cycles": cycles, "history": [], **common}
 	g = next((x for x in rules.grid(doc.cycle)["goals"] if x["name"] == doc.name), None)
 	cycle = frappe.db.get_value("Life Cycle", doc.cycle, ["title", "status", "start_date", "end_date"], as_dict=True)
@@ -978,7 +978,7 @@ def toggle_habit(habit: str, date: str | None = None, done: bool | int | None = 
 def habit_library(space: str | None = None):
 	"""Every habit ever tracked in a space."""
 	space = permissions.resolve_space(space)
-	return frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title", "area"], order_by="title", limit=200)
+	return frappe.get_list("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title", "area"], order_by="title", limit=200)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -1023,7 +1023,7 @@ def this_month(space: str | None = None, year: int | None = None, month: int | N
 	if area:
 		ids = set(descendants(space, area))
 		out["goals"] = [g for g in out["goals"] if not g["area"] or g["area"] in ids]
-		habit_areas = dict(frappe.get_all("Life Habit", filters={"name": ("in", [h["habit"] for h in out["habits"]["habits"]] or ["-"])},
+		habit_areas = dict(frappe.get_list("Life Habit", filters={"name": ("in", [h["habit"] for h in out["habits"]["habits"]] or ["-"])},
 			fields=["name", "area"], as_list=True))
 		out["habits"]["habits"] = [h for h in out["habits"]["habits"] if not habit_areas.get(h["habit"]) or habit_areas[h["habit"]] in ids]
 		out["area"] = area

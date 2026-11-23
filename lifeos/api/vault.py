@@ -121,7 +121,7 @@ def list(space: str | None = None, include_archived: bool | int = 0, start: int 
 	groups = {}
 	for r in rows:
 		groups.setdefault(r["holder_name"] or "No holder", []).append(r)
-	people = frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], order_by="full_name", limit=500)
+	people = frappe.get_list("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], order_by="full_name", limit=500)
 	counts = expiry_counts(space)
 	return {"space": space, "documents": rows,
 		"groups": [{"holder": k, "documents": v} for k, v in sorted(groups.items(), key=lambda kv: (kv[0] == "No holder", kv[0]))],

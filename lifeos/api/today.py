@@ -40,7 +40,7 @@ def goals_without_plan(space, now, area=None, cycle=None):
 	"""How many active goals of the current cycle have no task planned this week."""
 	if not cycle:
 		return 0
-	goals = frappe.get_all("Life Goal", filters={"space": space, "cycle": cycle, "outcome": "In Progress", "is_archived": 0, "on_hold": 0, "is_someday": 0},
+	goals = frappe.get_list("Life Goal", filters={"space": space, "cycle": cycle, "outcome": "In Progress", "is_archived": 0, "on_hold": 0, "is_someday": 0},
 		pluck="name")
 	if area and goals:
 		keep = in_area(space, area, "Life Goal", goals)
@@ -82,7 +82,7 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		review_filter["name"] = ("in", [r.name for r in inbox_lens["items"]] or ["-"])
 	if permissions.vault_hidden(space):  # an agent: no sensitive item, and no source of a Vault document
 		review_filter.update({"is_sensitive": 0, "vault_document": ("is", "not set")})
-	review_items = frappe.get_all("Life Inbox Item", filters=review_filter,
+	review_items = frappe.get_list("Life Inbox Item", filters=review_filter,
 		fields=["name", "title", "source_type", "received_on", "owner", "claimed_by", "transcript_md", "summary_md"], order_by="received_on desc", limit=5)
 	pending = {}
 	if review_items:
@@ -301,8 +301,12 @@ def week_summary(space: str | None = None, week_start: str | None = None):
 			if h["habit"] in seen:
 				continue
 			seen.add(h["habit"])
-			done = frappe.db.count("Life Habit Log", {"habit": h["habit"], "date": ("between", [start, end]), "done": 1})
-			habit_rows.append({"habit": h["habit"], "title": h["title"], "done": done, "target": h["days_per_week"]})
+			habit_rows.append({"habit": h["habit"], "title": h["title"], "done": 0, "target": h["days_per_week"]})
+	if habit_rows:  # one query for every habit's ticks
+		ticks = dict(frappe.db.sql("select habit, count(*) from `tabLife Habit Log` where habit in %s and date between %s and %s and done = 1 group by habit",
+			([h["habit"] for h in habit_rows], start, end)))
+		for h in habit_rows:
+			h["done"] = ticks.get(h["habit"], 0)
 
 	done_tasks = task_api.query(space, "and t.status = 'Done' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
 	carried = task_api.query(space, "and t.status = 'Carried' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
