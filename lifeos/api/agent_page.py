@@ -78,3 +78,13 @@ def decide(request: str, decision: str, space: str | None = None):
 		frappe.throw(_("An agent cannot approve its own request."), frappe.PermissionError, title=_("Only people decide"))
 	space = permissions.resolve_space(space, write=True)
 	return pages.decide(space, request, decision, frappe.session.user)
+
+
+@frappe.whitelist(methods=["POST"])
+def undo(request: str, space: str | None = None):
+	"""Take back something the agent did in Google (a draft, an archive, a label, an event it made) where Google allows it."""
+	permissions.require_login()
+	if permissions.is_agent():
+		frappe.throw(_("An agent cannot undo its own acts."), frappe.PermissionError, title=_("Only people undo"))
+	space = permissions.resolve_space(space, write=True)
+	return pages.undo(space, request)

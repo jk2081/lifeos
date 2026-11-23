@@ -113,6 +113,8 @@ class SiteFake:
 				refs.append((res["ref"], res.get("title") or ""))
 		suggested = any(b.get("type") == "tool_use" and b.get("name") == "suggest_actions" for m in msgs if m["role"] == "assistant"
 			for b in (m["content"] if isinstance(m["content"], list) else []))
+		if any(t["name"] == "mail_search" for t in params.get("tools") or []) and re.match(r"find\b", q, re.I):
+			return self._mail(params, on_text, q, results, called)
 		if not params.get("tools") or suggested:
 			return self._done(params, on_text, "" if suggested else "I could not check more than this.")
 		if called == 0:
@@ -127,6 +129,17 @@ class SiteFake:
 		act = tool_use("suggest_actions", {"actions": [{"kind": "make_task", "label": f"Make task: follow up {first[1][:40]}",
 			"title": f"Follow up: {first[1][:100]}", "area_ref": first[0]}]})
 		return self._out(params, on_text, text, [act], "tool_use")
+
+	def _mail(self, params, on_text, q, results, called):
+		"""Ask with an inbox connected (issue 86): one live search with the question's words, then the threads it found, named plainly."""
+		if not called:
+			words = re.sub(r"^find\s+(the\s+)?", "", q, flags=re.I).strip(" ?.")
+			return self._out(params, on_text, "", [tool_use("mail_search", {"text": words})], "tool_use")
+		rows = next((r.get("results") for r in results if r.get("results") is not None and "searched" in r), [])
+		if not rows:
+			return self._done(params, on_text, "I could not find that in your email.")
+		lines = [f"- **{r['subject']}**, from {r['from']}, {r['date']} ({r['inbox']})" for r in rows[:3]]
+		return self._done(params, on_text, "Here is what I found in your email.\n\n" + "\n".join(lines) + "\n")
 
 	def _capture(self, params):
 		"""process-capture (issue 28): one task named after the capture's title in Career, then a summary."""

@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, flt, getdate, now_datetime, nowdate
 
-from lifeos.agents import connector, limits
+from lifeos.agents import acts, connector, limits
 
 DECISIONS = {"approve": "Approved", "no": "Declined"}
 
@@ -68,8 +68,10 @@ def sections(space: str, key: str) -> dict:
 	areas = [{"name": a.name, "title": a.area_name, "on": int(a.name not in off)} for a in frappe.get_all("Life Area", filters={"space": space, "is_on": 1, "is_archived": 0, "is_life_area": 1},
 		fields=["name", "area_name"], order_by="sort_order asc, creation asc", limit=50)]  # system: the owner's own areas
 	rows = frappe.get_all("Life Agent Action", filters={"space": space, "agent": key, "status": ("in", list(connector.DONE_STATES)), "happened_on": (">=", _week_start())},
-		fields=["name", "action", "title", "status", "cost", "happened_on"], order_by="happened_on desc, creation desc", limit=200)  # system: as above
-	did = [{"name": r.name, "action": r.action, "title": r.title, "status": r.status, "cost": flt(r.cost), "when": str(r.happened_on)[:16]} for r in rows]
+		fields=["name", "action", "title", "status", "cost", "happened_on", "asked_by", "request", "undo", "undone", "error"],
+		order_by="happened_on desc, creation desc", limit=200)  # system: as above
+	did = [{"name": r.name, "action": r.action, "title": r.title, "status": r.status, "cost": flt(r.cost), "when": str(r.happened_on)[:16], "asked_by": r.asked_by or "",
+		"request": r.request or "", "can_undo": int(bool(r.undo) and not r.undone and r.status == "Done"), "undone": int(r.undone or 0), "error": r.error or ""} for r in rows]
 	return {"name": limits.display_name(cfg), "has_name": int(bool(cfg and cfg.display_name)), "reported": str(cfg.last_report)[:16] if cfg and cfg.last_report else None,
 		"waiting": requests(space, key), "facts": facts, "can": can, "areas": areas, "vault": "off", "jobs": jobs, "did": did,
 		"cost_week": round(sum(d["cost"] for d in did), 4), "skills": json.loads(cfg.skills) if cfg and cfg.skills else [],
@@ -129,14 +131,23 @@ def rename(space: str, key: str, name: str) -> dict:
 def decide(space: str, name: str, decision: str, user: str) -> dict:
 	"""Approve or say no to something an agent waits to do. The agent picks the decision up on its next pull."""
 	status = DECISIONS.get(decision)
-	row = frappe.db.get_value("Life Agent Action", {"name": name, "space": space}, ["name", "agent", "status"], as_dict=True)
+	row = frappe.db.get_value("Life Agent Action", {"name": name, "space": space}, ["name", "agent", "status", "params"], as_dict=True)
 	if not status or not row:
 		frappe.throw(_("Choose approve or no, for a request in this space."), frappe.DoesNotExistError, title=_("Request not found"))
 	if row.status != "Waiting":
 		frappe.throw(_("That was already decided."), title=_("Already decided"))
+	if row.params:  # something Life OS does itself in Google (issue 86): approving runs it now
+		return acts.decide(row.name, decision == "approve", user)
 	frappe.db.set_value("Life Agent Action", row.name, {"status": status, "decided_by": user, "decided_on": now_datetime(), "delivered": 0,
 		**({"happened_on": now_datetime()} if status == "Approved" else {})})
 	return {"name": row.name, "agent": row.agent, "status": status}
+
+
+def undo(space: str, name: str) -> dict:
+	"""Take back something an agent did in Google where Google allows it."""
+	if not frappe.db.exists("Life Agent Action", {"name": name, "space": space}):
+		frappe.throw(_("That is not in this space."), frappe.DoesNotExistError, title=_("Action not found"))
+	return acts.undo(name)
 
 
 def flag_stale(space: str, key: str, name: str, reason: str | None) -> None:

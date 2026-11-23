@@ -8,7 +8,7 @@ import frappe
 from frappe.utils import now_datetime, today
 
 from lifeos.ai import client
-from lifeos.ai.tools import TOOLS, Context, run_tool
+from lifeos.ai.tools import Context, file_actions, run_tool, tools_for
 
 MAX_TOOL_CALLS = 8
 TOKEN_BUDGET = 80000  # input and output tokens for one question, across its turns
@@ -57,8 +57,8 @@ def answer(space, question, scope, history=None, on_text=None):
 	parts, tin, tout, cost, limited = [], 0, 0, 0.0, False
 	for _turn in range(MAX_TURNS):
 		allow = ctx.calls < MAX_TOOL_CALLS and tin + tout < TOKEN_BUDGET
-		out = client.call("Ask", system_text(), messages, tools=TOOLS, on_text=on_text, space=space)
-		tin, tout, cost = tin + out["usage"]["input_tokens"], tout + out["usage"]["output_tokens"], cost + out["cost"]
+		out = client.call("Ask", system_text(), messages, tools=tools_for(ctx), on_text=on_text, space=space)
+		tin, tout, cost, ctx.turn_cost = tin + out["usage"]["input_tokens"], tout + out["usage"]["output_tokens"], cost + out["cost"], out["cost"]  # a mail search is logged with its turn's cost
 		content = out["content"]
 		text = client.text_of(content)
 		if text:
@@ -84,7 +84,7 @@ def answer(space, question, scope, history=None, on_text=None):
 		messages.append({"role": "user", "content": results})
 		if limited and not allow:
 			# one last turn to write the answer; if it still calls tools, stop here
-			out = client.call("Ask", system_text(), messages, tools=TOOLS, on_text=on_text, space=space)
+			out = client.call("Ask", system_text(), messages, tools=tools_for(ctx), on_text=on_text, space=space)
 			tin, tout, cost = tin + out["usage"]["input_tokens"], tout + out["usage"]["output_tokens"], cost + out["cost"]
 			text = client.text_of(out["content"])
 			if text:
@@ -94,7 +94,7 @@ def answer(space, question, scope, history=None, on_text=None):
 	if limited and "not check" not in text.lower():
 		text += "\n\n_I stopped at the limit for one question, so some records were not checked._"
 	read = [{"ref": r, **{k: ctx.refs[r][k] for k in ("doctype", "name", "title", "kind", "pane")}} for r in ctx.read]
-	return {"text": text or "I could not find that.", "cited": cited, "actions": ctx.actions, "read": read, "input_tokens": tin,
+	return {"text": text or "I could not find that.", "cited": cited, "actions": [*ctx.actions, *file_actions(ctx)], "read": read, "input_tokens": tin,
 		"output_tokens": tout, "cost": round(cost, 6), "limited": limited}
 
 

@@ -15,7 +15,7 @@ from lifeos.agents import limits
 
 FACT_EDIT, FACT_DELETE, JOB_PAUSE, JOB_RESUME, SETTING = "Fact edit", "Fact delete", "Job pause", "Job resume", "Setting"
 FACT_KINDS, JOB_KINDS = (FACT_EDIT, FACT_DELETE), (JOB_PAUSE, JOB_RESUME)
-DONE_STATES = ("Done", "Approved")
+DONE_STATES = ("Done", "Approved", "Failed")
 MAX_ROWS = 2000  # facts or jobs one report may carry
 
 
