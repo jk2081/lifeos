@@ -3,7 +3,7 @@
 </template>
 <script setup>
 // A wiki change in the pane, from the Wiki's Changes tab and a page's History.
-import ChangeView from '../ChangeView.vue'
+import ChangeView from '@/components/ChangeView.vue'
 defineProps({ name: String, type: String, tab: String })
 defineEmits(['meta', 'missing', 'changed', 'close'])
 </script>

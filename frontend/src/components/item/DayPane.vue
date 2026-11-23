@@ -16,9 +16,9 @@
 // One day of the calendar in the pane. Each entry opens its own record.
 import { onMounted, ref } from 'vue'
 import { Button } from 'frappe-ui'
-import Card from '../ui/Card.vue'
-import Row from '../ui/Row.vue'
-import Empty from '../Empty.vue'
+import Card from '@/components/ui/Card.vue'
+import Row from '@/components/ui/Row.vue'
+import Empty from '@/components/Empty.vue'
 import { api, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { long, short, time, weekday } from '@/lib/dates'

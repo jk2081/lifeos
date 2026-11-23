@@ -15,9 +15,9 @@
 // with `view=` in the URL. Reset is a section of Settings > Data, reached from the Week's button and from All tasks.
 import { useRoute } from 'vue-router'
 import { Button } from 'frappe-ui'
-import PlanRhythm from '@/components/plan/PlanRhythm.vue'
-import WeekScore from '@/components/plan/WeekScore.vue'
-import ReviewPage from '@/components/weekly/ReviewPage.vue'
+import PlanRhythm from '@/components/goals/PlanRhythm.vue'
+import WeekScore from '@/components/goals/WeekScore.vue'
+import ReviewPage from '@/components/review/ReviewPage.vue'
 import Habits from '@/components/goals/Habits.vue'
 import JournalGoals from '@/components/goals/Goals.vue'
 import { navDot } from '@/lib/newMenu'

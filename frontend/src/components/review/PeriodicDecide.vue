@@ -50,7 +50,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge, Button, FormControl, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
-import ReviewFooter from '@/components/weekly/ReviewFooter.vue'
+import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 
 const emit = defineEmits(['go'])

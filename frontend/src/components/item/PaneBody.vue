@@ -40,20 +40,20 @@
 // The inside of the record pane, the same on desktop and phone: a header with the record's type, title, filing and
 // buttons, then the pane content for that type of record.
 import { computed, defineAsyncComponent } from 'vue'
-import TabBar from '../TabBar.vue'
+import TabBar from '@/components/TabBar.vue'
 import { useUrlTab } from '@/lib/tabs'
 import { Alert, Button } from 'frappe-ui'
-import Card from '../ui/Card.vue'
-import Empty from '../Empty.vue'
-import TaskPane from './TaskPane.vue'
-import VaultPane from './VaultPane.vue'
-import GoalPane from './GoalPane.vue'
-import ChatPane from './ChatPane.vue'
-import EntryPane from './EntryPane.vue'
-import DayPane from './DayPane.vue'
-import NotePane from './NotePane.vue'
-import SourcePane from './SourcePane.vue'
-import ChangePane from './ChangePane.vue'
+import Card from '@/components/ui/Card.vue'
+import Empty from '@/components/Empty.vue'
+import TaskPane from '@/components/item/TaskPane.vue'
+import VaultPane from '@/components/item/VaultPane.vue'
+import GoalPane from '@/components/item/GoalPane.vue'
+import ChatPane from '@/components/item/ChatPane.vue'
+import EntryPane from '@/components/item/EntryPane.vue'
+import DayPane from '@/components/item/DayPane.vue'
+import NotePane from '@/components/item/NotePane.vue'
+import SourcePane from '@/components/item/SourcePane.vue'
+import ChangePane from '@/components/item/ChangePane.vue'
 import { closePane, openRef } from '@/lib/pane'
 import { park } from '@/lib/someday'
 import { askAbout } from '@/lib/ask'
@@ -77,5 +77,5 @@ async function toggleSensitive() {
 async function toSomeday() {
   if (await park(props.meta.someday.doctype, props.meta.someday.name, props.meta.title)) emit('reload')
 }
-const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('../ReviewBody.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane }
+const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('@/components/review/InboxReview.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane }
 </script>

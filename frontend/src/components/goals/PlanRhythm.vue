@@ -23,7 +23,7 @@ import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { TabButtons } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
-import Calendar from './Calendar.vue'
+import Calendar from '@/components/goals/Calendar.vue'
 
 const props = defineProps({ title: String, views: Array, initial: String })
 const route = useRoute()

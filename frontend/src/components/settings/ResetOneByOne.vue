@@ -32,8 +32,8 @@
 // from the toast for a minute.
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { Button, DatePicker, Dialog, KeyboardShortcut, TextInput, toast } from 'frappe-ui'
-import Card from '../ui/Card.vue'
-import Empty from '../Empty.vue'
+import Card from '@/components/ui/Card.vue'
+import Empty from '@/components/Empty.vue'
 import { api, errorText } from '@/lib/api'
 import { store } from '@/lib/store'
 import { addDays, short } from '@/lib/dates'

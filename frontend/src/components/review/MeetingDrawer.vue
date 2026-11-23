@@ -50,7 +50,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge, Button, Dropdown, Select, Skeleton, Switch, TextInput } from 'frappe-ui'
 import Drawer from '@/components/ui/Drawer.vue'
-import FindingRow from './FindingRow.vue'
+import FindingRow from '@/components/review/FindingRow.vue'
 import { openRef } from '@/lib/pane'
 import { store } from '@/lib/store'
 import { short, time, weekday } from '@/lib/dates'

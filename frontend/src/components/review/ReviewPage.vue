@@ -13,12 +13,12 @@
 import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Skeleton, toast } from 'frappe-ui'
-import ReviewHeader from './ReviewHeader.vue'
-import ReviewDone from './ReviewDone.vue'
-import TabLibrary from './TabLibrary.vue'
-import TabTasks from './TabTasks.vue'
-import TabGoals from './TabGoals.vue'
-import TabReflect from './TabReflect.vue'
+import ReviewHeader from '@/components/review/ReviewHeader.vue'
+import ReviewDone from '@/components/review/ReviewDone.vue'
+import TabLibrary from '@/components/review/WeeklyLibrary.vue'
+import TabTasks from '@/components/review/WeeklyTasks.vue'
+import TabGoals from '@/components/review/WeeklyGoals.vue'
+import TabReflect from '@/components/review/WeeklyReflect.vue'
 import { provideReview, TABS } from '@/lib/review'
 
 const COMPS = { library: TabLibrary, tasks: TabTasks, goals: TabGoals, reflect: TabReflect }
