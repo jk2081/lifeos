@@ -662,7 +662,8 @@ class TestScreenFolders(LifeTestCase):
 		self.assertEqual(bad, [], "these call api( directly; use data/item.js, brain.js or library.js")
 
 	def test_the_pane_has_one_item_view(self):
-		self.assertFalse(os.path.isdir(os.path.join(self.SRC, "components", "pane")))
-		self.assertFalse(os.path.exists(os.path.join(self.SRC, "components", "item", "RecordPane.vue")))
-		self.assertFalse(os.path.exists(os.path.join(self.SRC, "components", "item", "PaneBody.vue")))
-		self.assertTrue(os.path.exists(os.path.join(self.SRC, "components", "item", "ItemView.vue")))
+		self.assertNotIn("pane", os.listdir(os.path.join(self.SRC, "components")))
+		item = os.listdir(os.path.join(self.SRC, "components", "item"))
+		self.assertNotIn("RecordPane.vue", item)
+		self.assertNotIn("PaneBody.vue", item)
+		self.assertIn("ItemView.vue", item)
