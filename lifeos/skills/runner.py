@@ -81,7 +81,8 @@ def run(skill, input, trigger="Button", run_name=None):
 	if not log:
 		return None
 	# one worker only: the row is locked, and only a Queued one is taken
-	if not frappe.db.sql("select name from `tabLife Skill Run` where name=%s and status='Queued' for update skip locked", log.name):
+	run = frappe.qb.DocType("Life Skill Run")
+	if not frappe.qb.from_(run).select(run.name).where((run.name == log.name) & (run.status == "Queued")).for_update(skip_locked=True).run():
 		return None
 	frappe.db.set_value("Life Skill Run", log.name, "status", "Running")
 	ensure_brain_user()
@@ -167,7 +168,8 @@ def _item_of(input):
 
 def _claim(item):
 	"""Only a New capture, and only once: this is the lock per input, so two workers never process the same capture."""
-	if not frappe.db.sql("select name from `tabLife Inbox Item` where name=%s and status='New' for update skip locked", item.name):
+	i = frappe.qb.DocType("Life Inbox Item")
+	if not frappe.qb.from_(i).select(i.name).where((i.name == item.name) & (i.status == "New")).for_update(skip_locked=True).run():
 		raise SkillError(_("an agent or another run already has it"), skipped=True)
 	frappe.db.set_value("Life Inbox Item", item.name, {"status": "Processing", "claimed_by": frappe.session.user, "claimed_on": now_datetime(), "error": None})
 	item.reload()

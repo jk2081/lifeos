@@ -19,9 +19,8 @@ def _spaces_of(user) -> dict:
 	if user == BRAIN_USER:  # the built-in Brain works in every space, as an agent
 		out = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}  # system: the Brain user sees every space
 	elif user and user != "Guest":
-		for row in frappe.db.sql(
-			"select parent, access from `tabLife Space Member` where user=%s and parenttype='Life Space'", user
-		):
+		member = frappe.qb.DocType("Life Space Member")
+		for row in frappe.qb.from_(member).select(member.parent, member.access).where((member.user == user) & (member.parenttype == "Life Space")).run():  # system: the permission layer itself
 			if row[1] == "Write" or row[0] not in out:
 				out[row[0]] = row[1]
 		for name in frappe.get_all("Life Space", filters={"owner_user": user}, pluck="name"):  # system: the permission layer itself

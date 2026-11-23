@@ -1,6 +1,7 @@
 """Reset's suggested batches: open tasks that no rule batch has taken are given to the tidy-backlog skill, and the ones it parks or
 drops that it grouped together become batches (at most three), each with its reason. Tasks it names that were not given are ignored."""
 import frappe
+from frappe.query_builder import functions as fn
 from frappe.utils import date_diff, today
 
 MAX_CANDIDATES = 150
@@ -13,10 +14,10 @@ def suggest(space, rule_batches):
 	from lifeos.skills import call
 
 	taken = {i["name"] for b in rule_batches for i in b["items"]}
-	rows = frappe.db.sql("""select t.name, t.title, a.area_name, p.title as goal, ifnull(t.last_touched_on, date(t.creation)) as touched
-		from `tabLife Task` t left join `tabLife Area` a on a.name = t.area left join `tabLife Goal` p on p.name = t.goal
-		where t.space=%s and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived=0 order by touched asc limit %s""",
-		(space, MAX_CANDIDATES + len(taken)), as_dict=True)
+	t, a, p = frappe.qb.DocType("Life Task"), frappe.qb.DocType("Life Area"), frappe.qb.DocType("Life Goal")
+	touched = fn.IfNull(t.last_touched_on, fn.Date(t.creation))
+	rows = (frappe.qb.from_(t).left_join(a).on(a.name == t.area).left_join(p).on(p.name == t.goal).select(t.name, t.title, a.area_name, p.title.as_("goal"), touched.as_("touched"))
+		.where((t.space == space) & t.status.isin(["Open", "Doing", "Waiting"]) & (t.is_archived == 0)).orderby(touched).limit(MAX_CANDIDATES + len(taken)).run(as_dict=True))  # system: Reset reads the owner's own space
 	cands = [r for r in rows if r.name not in taken][:MAX_CANDIDATES]
 	if len(cands) < 3:
 		return []

@@ -164,11 +164,10 @@ def claim_next(space: str | None = None):
 		return None
 	# a source a Vault document was made from is hidden from an agent while that Vault is closed to it
 	closed = [sp for sp in spaces if permissions.vault_hidden(sp)] or [""]
-	# raw SQL: the queue's claim needs `for update skip locked`, which the query builder cannot write
-	rows = frappe.db.sql(
-		"select name from `tabLife Inbox Item` where status='New' and is_archived=0 and space in %s "
-		"and not ((ifnull(vault_document, '') != '' or is_sensitive = 1) and space in %s) "
-		"order by received_on asc, creation asc limit 1 for update skip locked", (spaces, closed))
+	i = frappe.qb.DocType("Life Inbox Item")
+	hidden = fn.IfNull(i.vault_document, "") != ""
+	rows = (frappe.qb.from_(i).select(i.name).where((i.status == "New") & (i.is_archived == 0) & i.space.isin(spaces) & ~((hidden | (i.is_sensitive == 1)) & i.space.isin(closed)))
+		.orderby(i.received_on).orderby(i.creation).limit(1).for_update(skip_locked=True).run())  # system: the queue is claimed by whoever asks, the spaces were chosen above
 	if not rows:
 		return None
 	item = frappe.get_doc("Life Inbox Item", rows[0][0])

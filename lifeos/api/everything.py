@@ -167,6 +167,7 @@ def list(space: str | None = None, tab: str | None = "all", q: str | None = None
 			"line": " · ".join(x for x in ("Person", p.relation) if x), "area": None, "area_name": None, "goal": None, "goal_title": None,
 			"date": str(p.creation.date()), "_at": str(p.creation), "sensitive": 0, "by_brain": 1 if p.owner in set(agent_users()) else 0, "expiry": None})
 	rows.sort(key=lambda r: (r["date"] or "", r.pop("_at")), reverse=True)
-	systems = frappe.db.sql("select distinct source_system from `tabLife Index` where space = %s and source_system != '' order by source_system limit 30", space, pluck=True)
+	x = frappe.qb.DocType("Life Index")
+	systems = list_query("Life Index", ["source_system"], [x.space == space, x.source_system != ""]).distinct().orderby(x.source_system).limit(30).run(pluck=True)
 	return {"space": space, "tab": tab, "rows": rows[start:start + page_length], "total": idx_total + people_total, "start": start,
 		"page_length": page_length, "sources": systems}

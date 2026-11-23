@@ -6,6 +6,7 @@ import calendar
 from datetime import date, timedelta
 
 import frappe
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, get_datetime, getdate
 
 from lifeos import permissions
@@ -111,8 +112,7 @@ def expiring_documents(space, on):
 	if permissions.vault_hidden(space):
 		return []
 	on = getdate(on)
-	rows = frappe.db.sql(
-		"""select name, title, expiry_date, remind_days_before, doc_type from `tabLife Vault Document`
-		where space=%s and is_archived=0 and expiry_date is not null
-		and datediff(expiry_date, %s) <= ifnull(remind_days_before, 60) order by expiry_date asc limit 20""", (space, on), as_dict=True)
+	d = frappe.qb.DocType("Life Vault Document")
+	rows = (frappe.qb.from_(d).select(d.name, d.title, d.expiry_date, d.remind_days_before, d.doc_type).where((d.space == space) & (d.is_archived == 0) & d.expiry_date.isnotnull()
+		& (fn.Function("datediff", d.expiry_date, on) <= fn.IfNull(d.remind_days_before, 60))).orderby(d.expiry_date).limit(20).run(as_dict=True))  # system: the calendar reads the owner's own space
 	return [{"name": r.name, "title": r.title, "expiry_date": str(r.expiry_date), "days": (getdate(r.expiry_date) - on).days, "doc_type": r.doc_type} for r in rows]

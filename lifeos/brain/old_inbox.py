@@ -5,8 +5,7 @@ items, are never acted on. Parking and discarding record their Outbox exits with
 (for seven days) read."""
 import frappe
 from frappe import _
-from frappe.query_builder import Order
-from frappe.query_builder import functions as fn
+from frappe.query_builder import Order, functions as fn
 from frappe.utils import add_days, cint, getdate, now_datetime, today
 
 from lifeos import permissions
