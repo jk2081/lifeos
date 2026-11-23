@@ -50,7 +50,7 @@ Findings:
   - **Fix:** group the unknown endpoints by DocType, then one `get_all(dt, filters={"name": ("in", names)}, fields=["name", title_field])` per DocType.
 - **R3.4 REAL (low). Agent "last filed" scans unindexed `owner` columns** (`lifeos/api/settings.py:70-71`). `select max(creation) from tabLife Proposal / tabLife Chat Log where owner=%s` runs once per agent on every Settings load. `owner` has no index on either table, and chat logs reach tens of thousands after an export import.
   - **Fix:** an index on (`owner`, `creation`) in `index.ensure_indexes`, or `order by creation desc limit 1` over an indexed column.
-- **R3.5 REAL (low). Today's "goals with no tasks" checks `exists` per goal, with `Life Task.goal` unindexed** (`lifeos/counts.py:127`).
+- **R3.5 REAL (low). Today's "goals with no tasks" checks `exists` per goal, with `Life Task.goal` unindexed** (`lifeos/review/counts.py:127`).
   - **Fix:** one `select distinct goal from tabLife Task where space=%s and goal in %s`, and `search_index` on `Life Task.goal`. This sits beside the Today fix and is small.
 - **R3.6 STYLE.** `Life Proposal.created_doctype/created_name` and `Life Ask Thread.scope_doctype/scope_name` are unindexed Dynamic Links. Frappe scans them on every delete of a linkable record, even though they are now in `ignore_links_on_delete`, because the check filters after the query. Deletes are rare, so this is not worth a schema change now.
 
@@ -73,7 +73,7 @@ Findings:
   - `lifeos/api/wiki.py` (~560 lines)
   - `lifeos/api/journal.py` (~520)
   - `lifeos/journal.py` (~480)
-  - `lifeos/proposals.py` (~430)
+  - `lifeos/brain/proposals.py` (~430)
   - `lifeos/ai/tools.py` (~410)
 
   Each is one responsibility, so splitting would be churn without a defect.

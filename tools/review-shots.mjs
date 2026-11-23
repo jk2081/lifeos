@@ -22,7 +22,7 @@ for (const width of opt('widths', '1440,390').split(',').map(Number)) {
   for (const scheme of opt('schemes', 'light,dark').split(',')) {
     const phone = width < 800
     const stamp = `shot ${width} ${scheme}`
-    JSON.parse(bench(`import json\nfrom lifeos import devtools_review\nprint(json.dumps(devtools_review.setup("${stamp}"), default=str))`).split('\n').pop())
+    JSON.parse(bench(`import json\nfrom lifeos.tools import devtools_review\nprint(json.dumps(devtools_review.setup("${stamp}"), default=str))`).split('\n').pop())
     const ctx = await browser.newContext({ viewport: { width, height: phone ? 844 : 900 }, colorScheme: scheme, timezoneId: 'Asia/Kolkata', isMobile: phone, hasTouch: phone })
     const pg = await ctx.newPage()
     const errors = []
@@ -62,7 +62,7 @@ for (const width of opt('widths', '1440,390').split(',').map(Number)) {
     await shot('done')
     await pg.goto(base + '/life?area=', { waitUntil: 'networkidle' }); await shot('today')
     await ctx.close()
-    bench(`from lifeos import devtools_review\ndevtools_review.cleanup("${stamp}")`)
+    bench(`from lifeos.tools import devtools_review\ndevtools_review.cleanup("${stamp}")`)
   }
 }
 await browser.close()

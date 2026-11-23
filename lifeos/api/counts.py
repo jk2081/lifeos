@@ -1,7 +1,7 @@
-"""The counts of a screen, each with the list it opens (UX fixes, set 5). The rules are in lifeos/counts.py."""
+"""The counts of a screen, each with the list it opens (UX fixes, set 5). The rules are in lifeos/review/counts.py."""
 import frappe
 
-from lifeos import counts
+from lifeos.review import counts
 
 
 @frappe.whitelist(methods=["GET"])

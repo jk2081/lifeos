@@ -6,13 +6,14 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
 
-from lifeos import cycles as rules
-from lifeos import habits as habit_rules
-from lifeos import permissions, readings
+from lifeos.goals import cycles as rules
+from lifeos.goals import habits as habit_rules
+from lifeos import permissions
+from lifeos.goals import readings
 from lifeos.life.doctype.life_goal.life_goal import HORIZONS, derive_horizon, planning_in_quarters
-from lifeos.areas import off as areas_off
-from lifeos.areas import use_focuses
-from lifeos.areas import off_clause
+from lifeos.goals.areas import off as areas_off
+from lifeos.goals.areas import use_focuses
+from lifeos.goals.areas import off_clause
 from lifeos.api.utils import area_filter, descendants, in_area, lens_area, names_map, parse, page, std_clause, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
@@ -449,7 +450,7 @@ def get(goal: str):
 	"""A goal page: the goal with what it serves and what serves it, its open and finished tasks, the counts of what is
 	filed under it (notes, captures, chats), the number of records that would move to the Archive when it is completed,
 	and the count on each tab. Reads only what the user may read."""
-	from lifeos import archive
+	from lifeos.library import archive
 
 	doc = permissions.get_doc_checked("Life Goal", goal)
 	space = doc.space
@@ -516,7 +517,7 @@ def tab_counts_of(space, goal, include_archived=0):
 def set_status(goal: str, status: str):
 	"""Change an open-ended goal's state as a project's was changed: Active, On Hold, Done or Dropped. Done or Dropped
 	archives it at once with every record filed under it; Active or On Hold brings an archived one back."""
-	from lifeos import archive
+	from lifeos.library import archive
 
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")

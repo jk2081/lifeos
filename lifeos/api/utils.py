@@ -72,7 +72,7 @@ def area_filter(space, area, column, values, also_in=None):
 	sql = f"{column} in %(area_ids)s"
 	alias = column.rsplit(".", 1)[0] + "." if "." in column else ""
 	if also_in == "index":
-		from lifeos.index import also_in_sql
+		from lifeos.library.index import also_in_sql
 
 		sql = f"({sql} or {also_in_sql('area_ids', alias)})"
 	elif also_in:

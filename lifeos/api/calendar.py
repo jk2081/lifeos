@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, get_datetime, getdate, today
 
-from lifeos import calendar_data as data
+from lifeos.calendar import calendar_data as data
 from lifeos import permissions
 from lifeos.api.utils import flag, in_area, lens_area
 
@@ -105,7 +105,7 @@ def year(space: str | None = None, year: int | None = None):
 def year_plan(space: str | None = None, year: int | None = None, area: str | None = None):
 	"""Today > Year: the 12 Week Years with their scores, a lane for each area that is on with its goals as bars, key dates, one tick
 	for each weekly review, and the cards underneath. `area` is the lens."""
-	from lifeos import year_plan as plan
+	from lifeos.goals import year_plan as plan
 
 	space = permissions.resolve_space(space)
 	return plan.year_plan(space, int(year or getdate(today()).year), lens_area(area))
@@ -114,7 +114,7 @@ def year_plan(space: str | None = None, year: int | None = None, area: str | Non
 @frappe.whitelist(methods=["GET"])
 def week_plan(space: str | None = None, week_start: str | None = None, area: str | None = None):
 	"""Today > Week: the week's score in the 12 Week Year, the top three and the goal work planned, by goal."""
-	from lifeos import year_plan as plan
+	from lifeos.goals import year_plan as plan
 
 	space = permissions.resolve_space(space)
 	return plan.week_plan(space, week_start or today(), lens_area(area))

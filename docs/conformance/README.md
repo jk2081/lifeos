@@ -35,7 +35,7 @@ Also, 83 of 171 whitelisted methods had no `methods=[...]`; now none lack it. Th
 
 ## What was fixed, in short
 
-- **Whitelisted methods.** Every method answers either GET or POST. The front end, the acceptance script and the fake agent send reads as GET (`frontend/src/lib/getMethods.json`, written by `scripts/http-methods.py`). On the acceptance site, GETs run in a read-only transaction (`lifeos/strict_get.py`), so a read that writes fails the run.
+- **Whitelisted methods.** Every method answers either GET or POST. The front end, the acceptance script and the fake agent send reads as GET (`frontend/src/lib/getMethods.json`, written by `scripts/http-methods.py`). On the acceptance site, GETs run in a read-only transaction (`lifeos/web/strict_get.py`), so a read that writes fails the run.
 - **Commits.** Ask keeps its streamed text in the cache and commits once. Chat import and the nightly insights use savepoints, which fixed a chat import that could silently lose up to 24 conversations.
 - **User switching.** The nightly insights and the chat import never switch the session's user. Records are checked for the user the work is for.
 - **Files.** Originals are read only from inside the site's files folders. A `../` path or a symbolic link out of the folder is refused.
@@ -50,7 +50,7 @@ python3 tools/scan_exceptions.py       # rewrite exceptions.md from the inline n
 python3 scripts/http-methods.py        # rewrite the front end's list of GET methods after changing a decorator (--check to compare)
 docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost run-tests --app lifeos'
 node tools/acceptance.mjs              # ends with the scan (END.3); GETs are read-only on its site
-docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost execute lifeos.loadtest.run_sources'
+docker exec lifeos-bench bash -lc 'cd ~/frappe-bench && bench --site lifeos.localhost execute lifeos.tools.loadtest.run_sources'
 scripts/get-frappe-skills.sh           # the skills, pinned; then work through deep-app-audit and frappe-code-review as in audit.md and review.md
 ```
 

@@ -5,7 +5,7 @@ import unittest
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from lifeos import loadtest
+from lifeos.tools import loadtest
 
 
 class TestLoad(IntegrationTestCase):
@@ -46,7 +46,7 @@ class TestLoad(IntegrationTestCase):
 
 	def test_a_user_outside_the_big_space_finds_nothing_in_it(self):
 		from lifeos.api import search
-		from lifeos.devtools import FAMILY
+		from lifeos.tools.devtools import FAMILY
 
 		frappe.set_user(FAMILY)
 		self.assertEqual(search.query(loadtest.RARE_WORD)["results"], [])

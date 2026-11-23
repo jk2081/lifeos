@@ -18,8 +18,9 @@ import frappe
 from frappe import _
 from frappe.utils import get_url, now_datetime
 
-from lifeos import files, links, permissions
-from lifeos import proposals as rules
+from lifeos.library import files, links
+from lifeos import permissions
+from lifeos.brain import proposals as rules
 from lifeos.api.utils import parse
 from lifeos.constants import SPACE_DOCTYPES
 

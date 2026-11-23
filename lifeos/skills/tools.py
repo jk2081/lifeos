@@ -7,7 +7,8 @@ code behind a name never does those things.
 import frappe
 from frappe import _
 
-from lifeos import permissions, proposals
+from lifeos import permissions
+from lifeos.brain import proposals
 from lifeos.ai import tools as ask_tools
 
 READ = ["search", "context.get", "get_record", "list_goals", "list_areas"]

@@ -28,15 +28,15 @@ else
   $B "bench drop-site $SITE --force --no-backup --db-root-password $DBROOT >/dev/null 2>&1 || true
       bench new-site $SITE --db-root-password $DBROOT --admin-password \"\$(head -c 24 /dev/urandom | base64)\" --install-app lifeos >/tmp/acc-site.log 2>&1
       bench --site $SITE set-config allow_tests true >/dev/null
-      bench --site $SITE execute lifeos.devtools.prepare_site >>/tmp/acc-site.log 2>&1
-      bench --site $SITE execute lifeos.devtools.setup_users --kwargs \"{'password': '\$LIFEOS_PW'}\" >>/tmp/acc-site.log 2>&1
-      bench --site $SITE execute lifeos.demo.load >>/tmp/acc-site.log 2>&1
+      bench --site $SITE execute lifeos.tools.devtools.prepare_site >>/tmp/acc-site.log 2>&1
+      bench --site $SITE execute lifeos.tools.devtools.setup_users --kwargs \"{'password': '\$LIFEOS_PW'}\" >>/tmp/acc-site.log 2>&1
+      bench --site $SITE execute lifeos.tools.demo.load >>/tmp/acc-site.log 2>&1
       rm -rf $SNAPDIR && mkdir -p $SNAPDIR && bench --site $SITE backup --backup-path $SNAPDIR >>/tmp/acc-site.log 2>&1
       mv \$(ls $SNAPDIR/*-database.sql.gz | head -1) $SNAP && rm -f $SNAPDIR/*.json"
 fi
 # issue 58: process-capture ships on; this site starts like one with an agent working the Inbox
-$B "bench --site $SITE execute lifeos.devtools.brain_off >/dev/null 2>&1"
-# GETs to Life OS methods run read-only here, so a read that writes fails the run (lifeos/strict_get.py)
+$B "bench --site $SITE execute lifeos.tools.devtools.brain_off >/dev/null 2>&1"
+# GETs to Life OS methods run read-only here, so a read that writes fails the run (lifeos/web/strict_get.py)
 $B "bench --site $SITE set-config -p lifeos_strict_get 1 >/dev/null"
 # issue 57: checks that predate the retirement of the Open goal still make one through the API; the site itself refuses it otherwise
 $B "bench --site $SITE set-config -p lifeos_allow_open_goals 1 >/dev/null"

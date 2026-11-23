@@ -6,7 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 
-from lifeos import outbox, permissions
+from lifeos.brain import outbox
+from lifeos import permissions
 from lifeos.api.utils import area_filter, lens_area, names_map, page, std_clause
 
 TABS = ("Done", "Delegated", "Parked", "Discarded", "all", "in")
@@ -154,7 +155,7 @@ def bring_back(exit: str):
 		frappe.throw(_("This has already been brought back."), title=_("Already brought back"))
 	dt, name = e.record_doctype, e.record_name
 	if not frappe.db.exists(dt, name):
-		from lifeos import trash
+		from lifeos.library import trash
 
 		dd = frappe.db.get_value("Deleted Document", {"deleted_doctype": dt, "deleted_name": name, "restored": 0}, "name", order_by="creation desc")
 		if not dd:
@@ -224,7 +225,7 @@ def total(space, pile, period="week", area=None, from_date=None, to_date=None):
 
 
 def week_line(space, area=None):
-	"""Today's line: this week's in and out, each a count with the list it opens (lifeos/counts.py)."""
-	from lifeos import counts
+	"""Today's line: this week's in and out, each a count with the list it opens (lifeos/review/counts.py)."""
+	from lifeos.review import counts
 
 	return {"in": counts.outbox(space, area, "in", "came in"), "out": counts.outbox(space, area, "all", "out")}

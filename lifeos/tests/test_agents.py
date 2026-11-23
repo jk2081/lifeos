@@ -6,7 +6,9 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import add_days, today
 
-from lifeos import context, files, permissions, wiki_check
+from lifeos.agents import context
+from lifeos.library import files, wiki_check
+from lifeos import permissions
 from lifeos.ai import fake
 from lifeos.api import context as context_api, inbox, jobs, review, wiki
 from lifeos.skills import call as call_skills

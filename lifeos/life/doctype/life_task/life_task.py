@@ -3,7 +3,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import today
 
-from lifeos import area_guess
+from lifeos.brain import area_guess
 
 CLOSED = ("Done", "Dropped", "Carried")
 

@@ -50,7 +50,7 @@ def _marks(names):
 
 def came_in(space, start, end):
 	"""Counts for the period by source, each a door to the list that shows exactly those rows."""
-	from lifeos import counts
+	from lifeos.review import counts
 	from lifeos.api import library, sources
 
 	a, b = str(start), str(end)
@@ -88,7 +88,7 @@ def meeting(review, event):
 	if ev.life_space != space or not frappe.has_permission("Event", "read", doc=ev):
 		frappe.throw(frappe._("That meeting is not in this review."), frappe.PermissionError, title=frappe._("Meeting not in review"))
 	links = meetings.linked(event)
-	from lifeos.pane_refs import ref_of
+	from lifeos.web.pane_refs import ref_of
 
 	recs = [{"link": l.name, "how": l.how, "doctype": l.record_doctype, "name": l.record_name, "title": l.title,
 		"kind": meetings.label_of(l.record_doctype, l.record_name), "ref": ref_of(l.record_doctype, l.record_name),
@@ -129,7 +129,7 @@ def candidates(space, ev, recs):
 	have = {(r["doctype"], r["name"]) for r in recs}
 	a = get_datetime(ev.starts_on).replace(hour=0, minute=0, second=0)
 	b = a + timedelta(days=2)
-	from lifeos.pane_refs import ref_of
+	from lifeos.web.pane_refs import ref_of
 
 	out = []
 	for dt, when in (("Life Inbox Item", "ifnull(received_on, creation)"), ("Life Chat Log", "creation"), ("Life Note", "creation")):

@@ -9,7 +9,7 @@ class LifeInboxItem(Document):
 			self.received_on = now_datetime()
 
 	def validate(self):
-		from lifeos import sources
+		from lifeos.brain import sources
 
 		self.intent = self.intent or "Process"
 		sources.set_media_kind(self)

@@ -2,7 +2,8 @@
 import frappe
 from frappe.utils import add_days, getdate, now_datetime, today
 
-from lifeos import calendar_data, cycles as rules, rhythms, year_plan as plan
+from lifeos.calendar import calendar_data
+from lifeos.goals import cycles as rules, rhythms, year_plan as plan
 from lifeos.api import calendar as cal, goals, tasks, today as today_api
 from lifeos.tests.base import AGENT, LifeTestCase, OWNER, PRIVATE
 from lifeos.tests.helpers import task

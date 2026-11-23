@@ -5,7 +5,8 @@ from datetime import timedelta
 import frappe
 from frappe.utils import cint, get_datetime, getdate
 
-from lifeos import cycles, readings, weekplan
+from lifeos.goals import cycles, readings
+from lifeos.tasks import weekplan
 
 DAY = "%a"
 
@@ -118,7 +119,7 @@ def glance(gp, now=None):
 		if day:
 			day["blocks"].append({"start": str(start)[:16], "minutes": int(minutes), "title": title, "kind": kind, "goal": goal})
 
-	from lifeos import calendar_data
+	from lifeos.calendar import calendar_data
 
 	for e in calendar_data.events_between(gp.space, a.date(), b.date()):
 		if not e.get("all_day"):

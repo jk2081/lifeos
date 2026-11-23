@@ -4,7 +4,11 @@ import datetime
 import frappe
 from frappe.utils import add_days, add_to_date, getdate, now_datetime, today
 
-from lifeos import archive as archive_rules, counts, datewords, outbox, permissions, trash
+from lifeos.library import archive as archive_rules, trash
+from lifeos.review import counts
+from lifeos.tasks import datewords
+from lifeos.brain import outbox
+from lifeos import permissions
 from lifeos.api import archive, area as area_api, calendar as calendar_api, chats, goals, goals as goal_api, inbox, library, outbox as outbox_api, review, someday, tasks, timeline, today as today_api, vault, views
 from lifeos.api.utils import std_filters, std_order
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED

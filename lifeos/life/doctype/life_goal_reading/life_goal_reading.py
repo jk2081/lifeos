@@ -29,12 +29,12 @@ class LifeGoalReading(Document):
 			self.confirmed_by = self.confirmed_on = None
 
 	def on_update(self):
-		from lifeos import readings
+		from lifeos.goals import readings
 
 		readings.refresh_current(self.goal)
 
 	def after_delete(self):
-		from lifeos import readings
+		from lifeos.goals import readings
 
 		if frappe.db.exists("Life Goal", self.goal):
 			readings.refresh_current(self.goal)

@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, get_datetime, getdate, now_datetime, today
 
-from lifeos import weekplan
+from lifeos.tasks import weekplan
 from lifeos.review import findings, goals, stale
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]

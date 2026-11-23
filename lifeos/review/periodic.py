@@ -14,8 +14,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, now_datetime, today
 
-from lifeos import cycles, readings
-from lifeos import habits as habit_rules
+from lifeos.goals import cycles, readings
+from lifeos.goals import habits as habit_rules
 from lifeos.review.record import MONTHS, Review, span_text
 
 MONTHLY, CYCLE, WEEKLY = "Monthly", "12 Weeks", "Weekly"
@@ -280,7 +280,7 @@ class Periodic(Review):
 	def _result(self, goal):
 		cyc = self.cycle()
 		actions, ticks = cycles._actions(cyc.name), cycles._ticks(cyc.name)
-		from lifeos import readings
+		from lifeos.goals import readings
 
 		g = frappe.db.get_value("Life Goal", goal, ["name", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"], as_dict=True)
 		pct = cycles.goal_percent(cyc, [a for a in actions if a.goal == goal], ticks, cycles.WEEKS)

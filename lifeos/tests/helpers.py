@@ -9,7 +9,8 @@ import frappe
 from frappe.utils import add_days, get_datetime, now_datetime, today
 from werkzeug.test import EnvironBuilder
 
-from lifeos import files, permissions
+from lifeos.library import files
+from lifeos import permissions
 from lifeos.ai import fake
 from lifeos.api import inbox, settings, weekly
 from lifeos.review import gcal

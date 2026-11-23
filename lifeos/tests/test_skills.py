@@ -8,8 +8,11 @@ from unittest import mock
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos import area_guess, cycles, insights, old_inbox, permissions, readings
-from lifeos import habits as habit_rules
+from lifeos.brain import area_guess, old_inbox
+from lifeos.goals import cycles, readings
+from lifeos.review import insights
+from lifeos import permissions
+from lifeos.goals import habits as habit_rules
 from lifeos.ai import batches, client, fake
 from lifeos.api import ask, brain, goals as goals_api, inbox, insights as api, lessons as lessons_api, old_items, reset, review, skills as skills_api, weekly
 from lifeos.review import goals as goals_mod
@@ -653,7 +656,7 @@ class TestPlanWeek(GoalsCase):
 
 		from frappe.utils import get_datetime
 
-		from lifeos import weekplan
+		from lifeos.tasks import weekplan
 
 		def plan(data):
 			if data["request"] == "stars":
@@ -987,7 +990,7 @@ class TestLiveSmoke(AskCase):
 
 class TestAIInsightsAndBatches(AskCase):
 	def test_ai_insight_candidates_keep_only_visible_evidence(self):
-		from lifeos import insights
+		from lifeos.review import insights
 
 		frappe.db.delete("Life Insight", {"space": PRIVATE})
 		chat = self.make("Life Chat Log", title="ux5ai Mithun blend sheets", date=today(), summary_md="I will send six questions to Mithun.",
@@ -1013,7 +1016,7 @@ class TestAIInsightsAndBatches(AskCase):
 		self.assertEqual(frappe.db.get_value("Life Insight", rows[0].name, "source_line"), "Suggested by notice v1")
 
 	def test_no_key_skips_ai_and_rules_still_run(self):
-		from lifeos import insights
+		from lifeos.review import insights
 
 		set_key_ask("")
 		frappe.set_user(OWNER)

@@ -3,7 +3,7 @@ import builtins
 
 import frappe
 
-from lifeos import archive as rules
+from lifeos.library import archive as rules
 from lifeos import permissions
 from lifeos.api.timeline import index_rows
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_filters, std_order, summarise, tab_counts

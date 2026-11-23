@@ -55,7 +55,7 @@ to the site.
 ### [HIGH] Records that a proposal, an insight, an Ask thread or an idea points to can never be deleted
 
 - **Id:** `Q-B26`
-- **File:** `lifeos/trash.py:27-31` (refusal), caused by the Dynamic Link fields `Life Proposal.created_name`, `Life Insight Evidence.ref_name`, `Life Ask Thread.scope_name`, `Life Idea.brought_to_name` / `source_name`, `Life Wiki Change.source_name`
+- **File:** `lifeos/library/trash.py:27-31` (refusal), caused by the Dynamic Link fields `Life Proposal.created_name`, `Life Insight Evidence.ref_name`, `Life Ask Thread.scope_name`, `Life Idea.brought_to_name` / `source_name`, `Life Wiki Change.source_name`
 - **Trigger:** the owner deletes (record pane, the trash, Reset's Delete batch or one-by-one D) a task, note or source that was accepted from an inbox proposal, cited by any insight (Dismissed ones included), used as the scope of an Ask question, or brought back from Someday.
 - **Failure:** Frappe's delete check finds the bookkeeping Dynamic Link and refuses: "X is still used by other records, so it cannot be deleted. Archive it instead." A Reset Delete batch stops at the first such item and nothing in the batch is deleted.
 - **Impact:** every record made through inbox review, which is the main way records are made, and every stuck task the nightly Stuck insight cites, which are exactly Reset's candidates. The person cannot see or remove these pointers, so the record can never be deleted.

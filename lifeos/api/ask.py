@@ -253,6 +253,6 @@ def run_action(message: str, index: int | str):
 def undo_made_task(task: str):
 	"""Undo of a suggested Make task: the task goes to the trash."""
 	_person()
-	from lifeos import trash
+	from lifeos.library import trash
 
 	return trash.delete("Life Task", task)

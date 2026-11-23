@@ -5,7 +5,7 @@
   </RouterLink>
 </template>
 <script setup>
-// A number from the count helper (lifeos/counts.py): { n, to: { path, query }, label }. It opens the list that shows
+// A number from the count helper (lifeos/review/counts.py): { n, to: { path, query }, label }. It opens the list that shows
 // exactly n rows, so the number and the list cannot disagree. The acceptance script clicks every [data-count-door].
 defineProps({ count: { type: Object, required: true }, tone: String, ariaLabel: String, countKey: String })
 </script>

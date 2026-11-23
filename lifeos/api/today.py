@@ -5,8 +5,11 @@ from datetime import timedelta
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, today
 
-from lifeos import calendar_data, cycles, old_inbox, permissions, rhythms
-from lifeos import habits as habit_rules
+from lifeos.calendar import calendar_data
+from lifeos.goals import cycles, rhythms
+from lifeos.brain import old_inbox
+from lifeos import permissions
+from lifeos.goals import habits as habit_rules
 from lifeos.api import tasks as task_api
 from lifeos.api import vault as vault_api
 from lifeos.api.utils import area_filter, descendants, in_area, lens_area, user_names
@@ -54,7 +57,7 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 	"""Tasks due or overdue, today's events, habits with today's state, items to review, the current week of the active cycle,
 	the open loops count and expiring documents. `area` is the lens (UX fixes, set 6): the band, Next and the rail keep to
 	the area and its sub-areas. Events and important dates have no area, so they always show. `banner` is the one rhythm
-	that is due (lifeos/rhythms.py); `at` moves its clock on a test site only."""
+	that is due (lifeos/goals/rhythms.py); `at` moves its clock on a test site only."""
 	space = permissions.resolve_space(space)
 	area = lens_area(area)
 	now = getdate(today())
@@ -159,7 +162,7 @@ GROUP_MAX = 30
 def next_list(space, now, cycle, events, area=None):
 	"""Tasks only, in a fixed order: the top three, Overdue, Today (events at their times and tasks due today), and tasks planned this
 	week under a goal of the cycle. No goal and no lead action is a row. Someday items never appear."""
-	from lifeos import counts
+	from lifeos.review import counts
 
 	lens, lens_values = task_lens(space, area)
 	# set 8: the week's top three come first, starred, until the next review is locked
@@ -278,7 +281,7 @@ def scheduled_today(space, now, area=None):
 def week_summary(space: str | None = None, week_start: str | None = None):
 	"""Everything an agent needs to run the weekly review in chat, for one week (Monday to Sunday): the cycle's score, habits,
 	tasks done and carried, open loops, stale tasks to decide, and what the archive job archived."""
-	from lifeos import archive
+	from lifeos.library import archive
 
 	space = permissions.resolve_space(space)
 	now = getdate(today())

@@ -20,7 +20,7 @@ class LifeArea(Document):
 				frappe.throw(_("Areas cannot form a loop."), title=_("Areas form a loop"))
 			seen.add(parent)
 			parent = frappe.db.get_value("Life Area", parent, "parent_area")
-		from lifeos import areas
+		from lifeos.goals import areas
 
 		areas.validate_area(self)
 		if not self.colour:
@@ -28,7 +28,7 @@ class LifeArea(Document):
 
 	def default_colour(self):
 		"""A sub-area takes its parent's colour; a top-level area the next colour its space has used least."""
-		from lifeos.areas import COLOURS
+		from lifeos.goals.areas import COLOURS
 
 		if self.parent_area:
 			return frappe.db.get_value("Life Area", self.parent_area, "colour") or "gray"

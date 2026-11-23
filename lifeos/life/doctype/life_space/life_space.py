@@ -20,7 +20,7 @@ class LifeSpace(Document):
 			self.append("members", {"user": self.owner_user, "access": "Write"})
 
 	def after_insert(self):
-		from lifeos import areas
+		from lifeos.goals import areas
 
 		areas.ensure(self.name)  # every space has the seven areas of life, Career and Health on (issue 11)
 

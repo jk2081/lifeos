@@ -1,7 +1,7 @@
 """The link graph: notes, people, goals and vault documents, joined by links, parent notes and record fields."""
 import frappe
 
-from lifeos import links as rules
+from lifeos.library import links as rules
 from lifeos import permissions
 from lifeos.api.utils import in_area, lens_area
 

@@ -83,7 +83,7 @@ class LifeGoal(Document):
 	def check_measure(self):
 		"""Key results (set 7): a milestone goal needs its finish line, a number goal its measure, start and target. The
 		current value is the latest confirmed reading and is never typed."""
-		from lifeos import readings
+		from lifeos.goals import readings
 
 		if self.measure_kind != "Number":
 			self.measure = self.unit = None
@@ -111,7 +111,7 @@ class LifeGoal(Document):
 
 	def on_update(self):
 		# an open-ended goal that is finished archives itself and what is filed under it, as a project did
-		from lifeos import archive
+		from lifeos.library import archive
 
 		before = self.get_doc_before_save()
 		closed = (self.outcome or "In Progress") not in ("In Progress", "Carried")

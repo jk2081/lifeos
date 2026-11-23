@@ -26,8 +26,8 @@ Install creates the roles `Life Admin`, `Life User` and `Life Agent`, the spaces
 bench --site SITE execute lifeos.install.set_owner --kwargs "{'user': 'you@example.com'}"
 
 # fictional example records for screenshots and the acceptance site (never on a real site)
-bench --site SITE execute lifeos.demo.load
-bench --site SITE execute lifeos.demo.remove            # takes exactly those records out again
+bench --site SITE execute lifeos.tools.demo.load
+bench --site SITE execute lifeos.tools.demo.remove            # takes exactly those records out again
 
 # set the site time zone to Asia/Kolkata in System Settings
 ```
@@ -48,10 +48,10 @@ Open `https://SITE/life`. On a phone, use Add to Home Screen to install it as an
 
 | Command | Does |
 | --- | --- |
-| `bench --site SITE execute lifeos.index.rebuild` | Rebuilds `Life Index` from the records |
-| `bench --site SITE execute lifeos.archive.run_daily` | Runs the archive job now |
-| `bench --site SITE execute lifeos.demo.load` / `lifeos.demo.remove` | Example records for a test site: ticks, tasks, chats, notes. Not the owner's data |
-| `bench --site SITE execute lifeos.loadtest.run` | Test sites only. Seeds 100,000 index rows in 50 spaces for 20 users, times the main reads, removes the rows |
+| `bench --site SITE execute lifeos.library.index.rebuild` | Rebuilds `Life Index` from the records |
+| `bench --site SITE execute lifeos.library.archive.run_daily` | Runs the archive job now |
+| `bench --site SITE execute lifeos.tools.demo.load` / `lifeos.tools.demo.remove` | Example records for a test site: ticks, tasks, chats, notes. Not the owner's data |
+| `bench --site SITE execute lifeos.tools.loadtest.run` | Test sites only. Seeds 100,000 index rows in 50 spaces for 20 users, times the main reads, removes the rows |
 | `bench --site SITE run-tests --app lifeos` | The test suite. Needs `allow_tests` on the site |
 | `bench --site SITE execute lifeos.tools.tidy.run` | Reports duplicate files, old jobs and intent-refused items; changes nothing. See below |
 
@@ -118,7 +118,7 @@ node tools/shot.mjs today=/life --widths 1440,390 # screenshots into screenshots
 node tools/acceptance.mjs                         # walks every place; --only=TODAY runs one place, --only=TODAY.3 one check
 ```
 
-`tools/` needs `npm install` once and Google Chrome. Test users come from `lifeos.devtools.setup_users`; their password is in the git-ignored `.env`.
+`tools/` needs `npm install` once and Google Chrome. Test users come from `lifeos.tools.devtools.setup_users`; their password is in the git-ignored `.env`.
 
 | Path | What it is |
 | --- | --- |

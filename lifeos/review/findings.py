@@ -11,7 +11,7 @@ import json
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos import insights
+from lifeos.review import insights
 
 REVELATIONS = ["Promise", "Goal reading", "Blocker", "Date", "Waiting on you", "Keeps coming up", "Theme", "Not captured"]
 RANK = {k: i for i, k in enumerate(REVELATIONS)}
