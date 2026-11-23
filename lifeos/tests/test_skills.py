@@ -582,8 +582,8 @@ NEW_SKILLS = ("tidy-backlog", "plan-week", "notice", "define-goal", "reflect", "
 
 
 # the Python lines of the modules that held the prompts, before this issue (also in DECISIONS.md, "Issue 59")
-LINES_BEFORE = {"old_inbox.py": 283, "ai/batches.py": 54, "weekplan.py": 260, "review/goals.py": 276, "ai/insights.py": 90,
-	"review/followups.py": 140, "readings.py": 328, "goal_suggest.py": 58, "review/lock.py": 161, "area_guess.py": 257, "ai/ask.py": 128}
+LINES_BEFORE = {"brain/old_inbox.py": 283, "ai/batches.py": 54, "tasks/weekplan.py": 260, "review/goals.py": 276, "review/insights.py": 90,
+	"review/followups.py": 140, "goals/readings.py": 328, "goals/goal_suggest.py": 58, "review/lock.py": 161, "brain/area_guess.py": 257, "ai/ask.py": 128}
 
 
 def text_skills_for_judgment(**out):

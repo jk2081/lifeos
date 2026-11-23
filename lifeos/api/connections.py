@@ -165,7 +165,7 @@ def sources(space: str | None = None):
 		"processed_by": processed_by("upload"), "lands": LANDS["upload"]}]
 	available += [{"system": k, "label": v["label"], "hint": "Connect Gmail" if k == "gmail" else v["hint"], "always_on": 0,
 		"processed_by": processed_by(k, v["label"])} for k, v in CATALOG.items() if k not in have or k == "gmail"]
-	from lifeos import email_in
+	from lifeos.brain import email_in
 
 	return {"space": space, "connected": [_card(space, r) for r in rows], "available": available, "email_in": email_in.info(),
 		"coming": [{"system": k, "label": v[0], "hint": v[1]} for k, v in COMING.items()]}

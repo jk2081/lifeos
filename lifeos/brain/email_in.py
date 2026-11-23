@@ -104,9 +104,10 @@ def file_email(comm) -> str | None:
 
 def keep_files(comm, item: str):
 	"""The email's attachments, as private files of the capture."""
-	from lifeos import files
+	from lifeos.library import files
 
-	for f in frappe.get_all("File",  # system: the mail was read by Frappe's job, not a signed-in person filters={"attached_to_doctype": "Communication", "attached_to_name": comm.name, "is_folder": 0},
+	# system read: the mail was read by Frappe's job, not a signed-in person
+	for f in frappe.get_all("File", filters={"attached_to_doctype": "Communication", "attached_to_name": comm.name, "is_folder": 0},
 			fields=["name", "file_name"]):
 		content = files.read(frappe.get_doc("File", f.name))
 		if content:
