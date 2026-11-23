@@ -30,8 +30,7 @@ def candidates(space, days, limit=MAX_PER_RUN):
 	cutoff = add_days(getdate(today()), -int(days))
 	i = frappe.qb.DocType("Life Inbox Item")
 	when = fn.IfNull(i.received_on, i.creation)
-	fields = [i.name, i.title, i.status, i.area, i.summary_md, i.raw_text, i.suggested_decision, i.suggested_reason, i.suggested_by, i.suggested_on, i.received_on]
-	return (frappe.qb.from_(i).select(*fields).where((i.space == space) & (i.is_archived == 0) & (fn.Date(when) < cutoff)
+	return (frappe.qb.from_(i).select(i.name, i.title, i.status, i.area, i.summary_md, i.raw_text, i.suggested_decision, i.suggested_reason, i.suggested_by, i.suggested_on, i.received_on).where((i.space == space) & (i.is_archived == 0) & (fn.Date(when) < cutoff)
 		& ((i.status == "To Review") | ((i.status == "New") & (fn.IfNull(i.claimed_by, "") == "")))).orderby(when).limit(limit).run(as_dict=True))  # system: the rule works on the owner's own space
 
 
@@ -223,9 +222,7 @@ def recent_auto(space, area=None):
 	from lifeos.api.utils import area_criterion
 
 	e = frappe.qb.DocType("Life Exit")
-	where = (e.space == space) & (e.auto_rule == RULE) & (e.reversed == 0) & (e.exited_on >= add_days(now_datetime(), -UNDO_DAYS))
-	if area:
-		where = where & area_criterion(space, area, e)
+	where = (e.space == space) & (e.auto_rule == RULE) & (e.reversed == 0) & (e.exited_on >= add_days(now_datetime(), -UNDO_DAYS)) & (area_criterion(space, area, e) if area else e.name.isnotnull())
 	rows = frappe.qb.from_(e).select(e.record_name, e.pile, e.exited_on).where(where).orderby(e.exited_on, order=Order.desc).run(as_dict=True)  # system: Today's line reads the owner's own exits
 	if not rows:
 		return None
