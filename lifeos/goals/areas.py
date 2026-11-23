@@ -87,16 +87,6 @@ def off_criterion(space, field):
 	return None if not names else frappe.query_builder.functions.IfNull(field, "").notin(names)
 
 
-def off_clause(space, column, values, key="off_areas"):
-	"""LEGACY (SQL text; the new API is off_criterion). SQL that leaves out records filed under an area that is off: "" when every area is on, otherwise a condition that
-	starts with " and ". `column` is fixed SQL from the caller; the names go in `values`."""
-	names = off(space)
-	if not names:
-		return ""
-	values[key] = names
-	return f" and ifnull({column}, '') not in %({key})s"
-
-
 def validate_area(doc):
 	"""The rules of `Life Area`: the seven are fixed and sit at the top; any other area is a part of one of the seven in the
 	same space, one level deep. Only a person switches an area on or off: the Brain files only into areas that are on."""

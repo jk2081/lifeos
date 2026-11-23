@@ -64,30 +64,8 @@ def descendants(space, area):
 	return out
 
 
-def area_filter(space, area, column, values, also_in=None):
-	"""LEGACY (SQL text; the new API is area_criterion). SQL for an Area filter, the same on every list and under the lens (UX fixes, set 6): the area with its sub-areas,
-	or "none" for records with no area. A record listing the area (or a sub-area) in "also in" counts as in it.
-	`also_in` is the parenttype of a record that can also be filed under other areas, or "index" for Life Index rows,
-	whose record is named by ref_doctype and ref_name."""
-	if area == "none":
-		return f"ifnull({column}, '') = ''"
-	values["area_ids"] = descendants(space, area)
-	sql = f"{column} in %(area_ids)s"
-	alias = column.rsplit(".", 1)[0] + "." if "." in column else ""
-	if also_in == "index":
-		from lifeos.library.index import also_in_sql
-
-		sql = f"({sql} or {also_in_sql('area_ids', alias)})"
-	elif also_in:
-		if also_in not in ALSO_IN:
-			frappe.throw(frappe._("Unknown filed DocType {0}.").format(also_in), title=frappe._("Unknown filed DocType"))
-		sql = (f"({sql} or exists (select 1 from `tabLife Also In` ai where ai.parent = {alias}name "
-			f"and ai.parenttype = '{also_in}' and ai.area in %(area_ids)s))")
-	return sql
-
-
 def area_criterion(space, area, table, also_in=None):
-	"""The Area filter as a pypika criterion over `table` (new API; area_filter is the SQL-text legacy of it). The area with its
+	"""The Area filter as a pypika criterion over `table`. The area with its
 	sub-areas, or "none" for records with no area. A record listing the area (or a sub-area) in "also in" counts as in it.
 	`also_in` is the parenttype of a record that can also be filed under other areas, or "index" for Life Index rows,
 	whose record is named by ref_doctype and ref_name."""
@@ -122,14 +100,6 @@ def lens_area(area):
 	return None if area in ("", "all") else area
 
 
-def order_by(sort, direction, allowed, default):
-	"""LEGACY (SQL text; the new API is sort_terms). An ORDER BY for a list. `allowed` maps the sort keys a caller may name to SQL, so nothing else reaches the query."""
-	if not sort or sort not in allowed:
-		return default
-	way = "desc" if str(direction or "").lower() == "desc" else "asc"
-	return ", ".join(f"{part.strip()} {way}" for part in allowed[sort].split(","))
-
-
 # ---- standard Frappe filters and order_by on the list methods ----
 # The list screens send what the library's Filter and SortBy controls produce: a list of [fieldname, operator, value]
 # and an order_by string. Every field name is checked against the DocType's meta before it reaches SQL, and every
@@ -142,14 +112,14 @@ NO_COLUMN = ("Section Break", "Column Break", "Tab Break", "HTML", "Table", "Tab
 MAX_FILTERS = 25
 
 
-def column(doctype, fieldname, alias=""):
-	"""The SQL for one column of a DocType, or an error if the DocType has no such column."""
+def column(doctype, fieldname):
+	"""The name of one column of a DocType, or an error if the DocType has no such column."""
 	fieldname = str(fieldname or "").strip()
 	meta = frappe.get_meta(doctype)
 	field = meta.get_field(fieldname)
 	if fieldname not in STANDARD_COLUMNS and (not field or field.fieldtype in NO_COLUMN):
 		frappe.throw(frappe._("{0} has no field {1}.").format(doctype, frappe.bold(fieldname)), frappe.ValidationError, title=frappe._("Field does not exist"))
-	return f"{alias}.`{fieldname}`" if alias else f"`{fieldname}`"
+	return fieldname
 
 
 def _fieldtype(doctype, fieldname):
@@ -215,33 +185,6 @@ def _parsed_filters(doctype, filters):
 PLAIN_TYPES = ("Date", "Datetime", "Int", "Float", "Currency", "Check")  # columns that are never the empty string
 
 
-def std_filters(doctype, filters, alias="", values=None, prefix="sf"):
-	"""LEGACY (SQL text; the new API is filter_criteria). SQL conditions for a standard Frappe filter list.
-	Returns (list of SQL strings, values)."""
-	values = values if values is not None else {}
-	out = []
-	for i, fieldname, op, value, ftype in _parsed_filters(doctype, filters):
-		col = column(doctype, fieldname, alias)
-		key = f"{prefix}{i}"
-		if op == "is":
-			unset = f"({col} is null or {col} = '')" if ftype not in PLAIN_TYPES else f"{col} is null"
-			out.append(unset if str(value).strip().lower() == "not set" else f"not {unset}")
-		elif op in ("in", "not in"):
-			values[key] = value
-			out.append(f"ifnull({col}, '') {op} %({key})s")
-		elif op in ("between", "timespan"):
-			values[key + "a"], values[key + "b"] = value
-			target = f"date({col})" if ftype == "Datetime" else col
-			out.append(f"{target} between %({key}a)s and %({key}b)s")
-		else:
-			values[key] = value
-			if op in ("=", "!=", "like", "not like") and ftype not in PLAIN_TYPES:
-				out.append(f"ifnull({col}, '') {op} %({key})s")
-			else:
-				out.append(f"{col} {op} %({key})s")
-	return out, values
-
-
 def filter_criteria(doctype, filters, table):
 	"""The standard filter list of a list screen as a list of pypika criteria over `table` (the DocType's own table,
 	`frappe.qb.DocType(doctype)`, or a join of it). Same checks as ever: field names against the DocType's meta, values as parameters."""
@@ -261,27 +204,6 @@ def filter_criteria(doctype, filters, table):
 			out.append({"=": left == value, "!=": left != value, "<": left < value, ">": left > value, "<=": left <= value,
 				">=": left >= value, "like": left.like(value), "not like": left.not_like(value)}[op])
 	return out
-
-
-def std_order(doctype, order_by, alias="", smart=None):
-	"""LEGACY (SQL text; the new API is order_terms). An ORDER BY from a standard Frappe order_by string such as "due_date desc, title asc", or None.
-	`smart` maps a field name to hand-written SQL (comma separated parts), used in place of the plain column."""
-	if not order_by:
-		return None
-	parts = []
-	for raw in str(order_by).split(",")[:5]:
-		bits = raw.replace("`", "").strip().split()
-		if not bits:
-			continue
-		fieldname = bits[0].split(".")[-1]
-		way = "desc" if len(bits) > 1 and bits[1].lower() == "desc" else "asc"
-		if len(bits) > 2 or (len(bits) == 2 and bits[1].lower() not in ("asc", "desc")):
-			frappe.throw(frappe._("order_by must look like: fieldname asc, fieldname desc."), frappe.ValidationError, title=frappe._("Order by is malformed"))
-		if smart and fieldname in smart:
-			parts += [f"{p.strip()} {way}" for p in smart[fieldname].split(",")]
-		else:
-			parts.append(f"{column(doctype, fieldname, alias)} {way}")
-	return ", ".join(parts) or None
 
 
 def order_terms(doctype, order_by, table, smart=None):
@@ -345,88 +267,7 @@ def extra_fields(doctype, fields, table, have=()):
 	return out[:30]
 
 
-def std_clause(doctype, filters, alias="", values=None):
-	"""LEGACY (SQL text; the new API is filter_criteria). The standard filters as one string that starts with " and ", or "" when there are none."""
-	conds, values = std_filters(doctype, filters, alias, values)
-	return ((" and " + " and ".join(conds)) if conds else ""), values
-
-
-def extra_columns(doctype, fields, alias="", have=()):
-	"""LEGACY (SQL text; the new API is extra_fields). Columns the table view asks for on top of a list's own, as SQL select parts. Unknown names are refused."""
-	out = []
-	for name in parse(fields, []) or []:
-		name = str(name)
-		if name in have or name in [p.split("`")[-2] for p in out]:
-			continue
-		out.append(column(doctype, name, alias))
-	return out[:30]
-
-
-def tab_counts(base, values, tabs):
-	"""LEGACY (SQL text; the new API is count_tabs). The count on each state tab of a list, in one query. `base` is the SQL from "from" to the end of the WHERE the list
-	uses, without the condition on the tab's own field, so every count respects the other filters. `tabs` maps a tab to
-	its SQL condition; None counts every row."""
-	cols = ", ".join(("count(*)" if cond is None else f"ifnull(sum({cond}), 0)") + f" as `c{i}`" for i, cond in enumerate(tabs.values()))
-	# nosemgrep: frappe-sql-format-injection -- `base` and the tab conditions are fixed SQL from the list methods; values are parameters
-	row = frappe.db.sql(f"select {cols} {base}", values)[0]
-	return {key: int(n or 0) for key, n in zip(tabs, row)}
-
-
 AGGREGATES = ("count", "sum", "avg", "min", "max")
-
-
-def summarise(doctype, base, values, alias, summary, start=0, page_length=20):
-	"""LEGACY (SQL text; the new API is group_summary). One row per group for the library's Group By control, inside the same WHERE as the list it belongs to.
-	`base` is the SQL from "from" to the end of the WHERE. `summary` is {fields, aggregates, order_by, totals}:
-	fields are DocType fields, aggregates are {function, fieldname}, and an aggregate comes back as `_aggregate_<n>`."""
-	summary = parse(summary, {}) or {}
-	fields = [str(f) for f in (summary.get("fields") or [])][:3]
-	if not fields:
-		frappe.throw(frappe._("A summary needs at least one field to group by."), frappe.ValidationError, title=frappe._("Summary needs a group"))
-	cols = [column(doctype, f, alias) for f in fields]
-	aggs = []
-	for i, a in enumerate((summary.get("aggregates") or [])[:6]):
-		fn = str((a or {}).get("function") or "").lower()
-		if fn not in AGGREGATES:
-			frappe.throw(frappe._("Unknown aggregate {0}.").format(frappe.bold(fn)), frappe.ValidationError, title=frappe._("Unknown aggregate"))
-		expr = "count(*)" if fn == "count" else f"{fn}({column(doctype, a.get('fieldname'), alias)})"
-		aggs.append(f"{expr} as `_aggregate_{i}`")
-	order = []
-	for raw in str(summary.get("order_by") or "").split(","):
-		bits = raw.replace("`", "").strip().split()
-		if not bits:
-			continue
-		way = "desc" if len(bits) > 1 and bits[1].lower() == "desc" else "asc"
-		name = bits[0].split(".")[-1]
-		if name.startswith("_aggregate_") and name[11:].isdigit() and int(name[11:]) < len(aggs):
-			order.append(f"`{name}` {way}")
-		elif name in fields:
-			order.append(f"{cols[fields.index(name)]} {way}")
-	order = order or ([f"`_aggregate_0` desc"] if aggs else []) + [f"{c} asc" for c in cols]
-	select = ", ".join([f"{c} as `{f}`" for c, f in zip(cols, fields)] + aggs)
-	group = ", ".join(cols)
-	start, page_length = page(start, page_length)
-	# nosemgrep: frappe-sql-format-injection -- columns pass column() (DocType meta), aggregates an allowlist, `base` is fixed SQL; values are parameters
-	rows = frappe.db.sql(f"select {select} {base} group by {group} order by {', '.join(order)} limit %(g_start)s, %(g_len)s",
-		{**values, "g_start": start, "g_len": page_length}, as_dict=True)
-	total = frappe.db.sql(f"select count(*) from (select 1 as one {base} group by {group}) g", values)[0][0]  # nosemgrep: frappe-sql-format-injection -- as above
-	meta = frappe.get_meta(doctype)
-	for f in fields:  # a Link shows the title of the record it points to
-		field = meta.get_field(f)
-		target = field.options if field and field.fieldtype == "Link" else {"area": "Life Area", "goal": "Life Goal"}.get(f) if doctype == "Life Index" else None
-		title = target and frappe.get_meta(target).title_field
-		if title:
-			names = names_map(target, [r[f] for r in rows], title)
-			for r in rows:
-				r[f + "__label"] = names.get(r[f])
-	for r in rows:
-		for k, v in r.items():
-			if hasattr(v, "isoformat"):
-				r[k] = str(v)
-	totals = None
-	if aggs and flag(summary.get("totals")):
-		totals = frappe.db.sql(f"select {', '.join(aggs)} {base}", values, as_dict=True)[0]  # nosemgrep: frappe-sql-format-injection -- allowlisted aggregates over meta-checked columns
-	return {"rows": rows, "total": total, "totals": totals}
 
 
 class FullText(Term):

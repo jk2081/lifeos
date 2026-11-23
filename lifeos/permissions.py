@@ -140,12 +140,6 @@ def vault_locked(doc) -> bool:
 	return False
 
 
-def sensitive_guard(space, alias="", user=None) -> str:
-	"""LEGACY (SQL text; the new API is sensitive_criterion). SQL for a query on a capture or note table of one space: leaves sensitive rows out when the space's switch keeps
-	sensitive items from the user (an agent)."""
-	return f" and {alias}is_sensitive = 0" if vault_hidden(space, user) else ""
-
-
 def sensitive_criterion(space, table, user=None):
 	"""A criterion that leaves sensitive rows of a capture or note table out when the space's switch keeps them from the user
 	(an agent); None when they are open."""
@@ -158,12 +152,6 @@ def vault_criterion(space, table, user=None):
 	if not vault_hidden(space, user):
 		return None
 	return (table.vault_locked == 0) & (table.ref_doctype != "Life Vault Document")
-
-
-def vault_guard(space, alias="", user=None) -> str:
-	"""LEGACY (SQL text; the new API is vault_criterion). SQL for a query on Life Index rows of one space: leaves Vault rows, and sources of Vault documents, out when the
-	Vault is closed to the user."""
-	return f" and {alias}vault_locked = 0 and {alias}ref_doctype != 'Life Vault Document'" if vault_hidden(space, user) else ""
 
 
 def has_permission(doc, ptype=None, user=None, debug=False):

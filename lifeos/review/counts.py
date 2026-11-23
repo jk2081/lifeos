@@ -11,7 +11,7 @@ import frappe
 from frappe.query_builder import functions as fn
 from frappe.utils import add_days, add_months, cint, getdate, today
 
-from lifeos.api.utils import area_filter, lens_area
+from lifeos.api.utils import lens_area
 
 OPEN = ["Open", "Doing", "Waiting"]
 

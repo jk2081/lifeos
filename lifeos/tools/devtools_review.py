@@ -25,7 +25,7 @@ def setup(tag):
 	s.save(ignore_permissions=True)
 	_unskip_banner()
 	# earlier checks' findings out of the way, so the five revelations are this run's
-	frappe.db.sql("update `tabLife Insight` set status='Dismissed' where space=%s and status='New'", SPACE)
+	frappe.db.set_value("Life Insight", {"space": SPACE, "status": "New"}, "status", "Dismissed", update_modified=False)
 	area = frappe.db.get_value("Life Area", {"space": SPACE, "area_name": "Tea & Coffee"})
 	cycle = frappe.db.get_value("Life Cycle", {"space": SPACE, "status": "Active"})
 	cycle_goal = frappe.db.get_value("Life Goal", {"cycle": cycle, "outcome": "In Progress"}, "name", order_by="sort_order asc")
@@ -65,10 +65,11 @@ def setup(tag):
 def cleanup(stamp, was=None):
 	"""Remove what the run made that its titles do not mark, and put the settings back."""
 	frappe.db.delete("Life Review", {"space": SPACE, "user": OWNER})
-	frappe.db.sql("update `tabLife Task` set is_top_three = 0 where space = %s and is_top_three = 1", SPACE)
+	frappe.db.set_value("Life Task", {"space": SPACE, "is_top_three": 1}, "is_top_three", 0, update_modified=False)
 	for name in frappe.get_all("Life Task", filters={"space": SPACE, "title": ("like", f"Chase %{stamp}%")}, pluck="name"):
 		frappe.delete_doc("Life Task", name, ignore_permissions=True, force=True, delete_permanently=True)
-	frappe.db.sql("delete from `tabLife Insight` where space = %s and (title like %s or body like %s)", (SPACE, f"%{stamp}%", f"%{stamp}%"))
+	i = frappe.qb.DocType("Life Insight")
+	frappe.qb.from_(i).delete().where((i.space == SPACE) & (i.title.like(f"%{stamp}%") | i.body.like(f"%{stamp}%"))).run()
 	for link in frappe.get_all("Life Meeting Link", filters={"space": SPACE}, fields=["name", "record_doctype", "record_name"]):
 		if not frappe.db.exists(link.record_doctype, link.record_name):
 			frappe.db.delete("Life Meeting Link", link.name)

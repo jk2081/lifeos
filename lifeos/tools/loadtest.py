@@ -139,7 +139,7 @@ def measure(user=None, space=None):
 	permissions.clear_cache()
 	try:
 		area = frappe.db.get_value("Life Area", {"space": space}, "name", order_by="sort_order asc, creation asc")
-		word = frappe.db.sql("select title from `tabLife Index` where space=%s limit 1 offset 500", space)[0][0].split()[0].lower()
+		word = frappe.get_all("Life Index", filters={"space": space}, pluck="title", order_by="name asc", limit_start=500, limit=1)[0].split()[0].lower()  # system: a load test
 		out = {
 			"index_rows": frappe.db.count("Life Index"),
 			"rows_in_space": frappe.db.count("Life Index", {"space": space}),
@@ -275,7 +275,7 @@ def measure_sources(user=None, space=None):
 	frappe.set_user(user or devtools.OWNER)  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs
 	permissions.clear_cache()
 	try:
-		word = frappe.db.sql("select title from `tabLife Index` where space=%s and kind='Inbox' limit 1 offset 700", space)[0][0].split()[0].lower()
+		word = frappe.get_all("Life Index", filters={"space": space, "kind": "Inbox"}, pluck="title", order_by="name asc", limit_start=700, limit=1)[0].split()[0].lower()  # system: a load test
 		out = {
 			"sources": frappe.db.count("Life Index", {"space": space, "kind": ("in", ["Inbox", "Chat"])}),
 			"wiki_pages": frappe.db.count("Life Note", {"space": space, "collection": "Wiki"}),

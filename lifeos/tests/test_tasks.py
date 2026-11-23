@@ -10,7 +10,7 @@ from lifeos.tasks import datewords
 from lifeos.brain import outbox
 from lifeos import permissions
 from lifeos.api import archive, area as area_api, calendar as calendar_api, chats, goals, goals as goal_api, inbox, library, outbox as outbox_api, review, someday, tasks, timeline, today as today_api, vault, views
-from lifeos.api.utils import std_filters, std_order
+from lifeos.api.utils import filter_criteria, order_terms
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import item, set_key, task, text
 
@@ -862,7 +862,7 @@ class TestStandardFilters(LifeTestCase):
 	def test_field_names_are_checked_against_the_doctype(self):
 		for bad in ("no_such_field", "title; drop table tabUser", "t.title", "`title`", "space or 1=1", "", "also_in", "organisation_section"):
 			self.assertRaises(frappe.ValidationError, tasks.list, space=PRIVATE, filters=[[bad, "=", "x"]])
-			self.assertRaises(frappe.ValidationError, std_filters, "Life Task", [[bad, "=", "x"]])
+			self.assertRaises(frappe.ValidationError, filter_criteria, "Life Task", [[bad, "=", "x"]], frappe.qb.DocType("Life Task"))
 		for bad in ("no_such_field desc", "title desc; drop table tabUser", "title sideways", "title desc nulls"):
 			self.assertRaises(frappe.ValidationError, tasks.list, space=PRIVATE, order_by=bad)
 		self.assertRaises(frappe.ValidationError, tasks.list, space=PRIVATE, filters=[["title", "regexp", "x"]])
@@ -876,13 +876,14 @@ class TestStandardFilters(LifeTestCase):
 		self.assertRaises(frappe.ValidationError, tasks.list, space=PRIVATE,
 			summary={"fields": ["status"], "aggregates": [{"function": "max", "fieldname": "1); drop table x; --"}]})
 		# a value is always a parameter, never part of the SQL
-		conds, values = std_filters("Life Task", [["title", "=", "x' or '1'='1"]], "t")
-		self.assertEqual(conds, ["ifnull(t.`title`, '') = %(sf0)s"])
-		self.assertEqual(values, {"sf0": "x' or '1'='1"})
-		self.assertEqual(std_order("Life Task", "due_date desc, title asc", "t"), "t.`due_date` desc, t.`title` asc")
-		self.assertEqual(std_order("Life Task", "priority desc", "t", {"priority": "case t.priority when 'I' then 1 else 5 end"}),
-			"case t.priority when 'I' then 1 else 5 end desc")
-		self.assertIsNone(std_order("Life Task", "", "t"))
+		t = frappe.qb.DocType("Life Task")
+		crit = filter_criteria("Life Task", [["title", "=", "x' or '1'='1"]], t)
+		self.assertEqual(len(crit), 1)
+		self.assertIn("'x'' or ''1''=''1'", crit[0].get_sql(quote_char="`"))  # the quotes are doubled: the value stays one string
+		sql = lambda terms: [(term.get_sql(quote_char="`"), way.name) for term, way in terms]
+		self.assertEqual(sql(order_terms("Life Task", "due_date desc, title asc", t)), [("`due_date`", "desc"), ("`title`", "asc")])
+		self.assertEqual(sql(order_terms("Life Task", "priority desc", t, {"priority": lambda t: [t.creation]})), [("`creation`", "desc")])
+		self.assertEqual(order_terms("Life Task", "", t), [])
 
 	def test_task_filters_operators_and_sort(self):
 		now = getdate(today())
