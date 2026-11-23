@@ -114,7 +114,7 @@ import FileView from '@/components/item/FileView.vue'
 import ItemSection from '@/components/item/ItemSection.vue'
 import ProposalCards from '@/components/item/ProposalCards.vue'
 import RecordRow from '@/components/item/RecordRow.vue'
-import { api, tryCall } from '@/lib/api'
+import { api, db, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { decideAll as decideAllOf } from '@/lib/items'
@@ -173,7 +173,7 @@ const decideAll = (decision) => decideAllOf(item.value, decision, load)
 async function retry() {
   if (await tryCall(() => api('inbox.retry', { item: item.value.name }), 'Sent back to the agent.')) await load()
 }
-const saveTranscript = (text) => api('inbox.update_transcript', { item: item.value.name, transcript_md: text })
+const saveTranscript = (text) => db.set('Life Inbox Item', item.value.name, { transcript_md: text })
 const openLink = () => window.open(safeLink.value, '_blank', 'noopener,noreferrer')
 
 onMounted(load)

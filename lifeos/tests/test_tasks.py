@@ -1175,3 +1175,16 @@ class TestRulesOnTheDocType(LifeTestCase):
 		doc.waiting_on = "The plumber"
 		doc.insert()
 		self.assertEqual(frappe.db.get_value("Life Task", doc.name, "status"), "Waiting")
+
+	def test_someday_through_get_doc_gets_its_dates_and_only_an_open_task_goes(self):
+		doc = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "77 park", "status": "Open", "area": self.areas["Tea"]}).insert()
+		doc.status = "Someday"
+		doc.save()
+		self.assertEqual(str(doc.someday_on), today())
+		self.assertTrue(doc.someday_review_on)
+		doc.status = "Done"
+		doc.save()
+		self.assertIsNone(doc.someday_on)
+		doc.status = "Someday"
+		with self.assertRaises(frappe.ValidationError):
+			doc.save()

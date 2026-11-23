@@ -98,8 +98,6 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 		"source_system": system, "external_id": (external_id or "").strip() or None,
 		"area": area or (conn.default_area if conn else None),
 		"goal": goal or (conn.default_goal if conn else None)})
-	if item.goal and not item.area:
-		item.area = frappe.db.get_value("Life Goal", item.goal, "area")
 	item.insert()
 	if system:
 		connections.touch(space, system, item.title)
@@ -120,8 +118,6 @@ def _refile(name, system, source_type, values):
 		if value is not None and (item.get(field) or "") != value:
 			item.set(field, value)
 			changed_fields.append(field)
-	if "goal" in changed_fields and not item.area:
-		item.area = frappe.db.get_value("Life Goal", item.goal, "area")
 	content_changed = any(f in CONTENT_FIELDS for f in changed_fields)
 	intent_changed = "intent" in changed_fields
 	if (content_changed and item.status == "Done") or (intent_changed and item.status in ("Done", "Failed")):
@@ -479,10 +475,3 @@ def item_page(item: str):
 	return out
 
 
-@frappe.whitelist(methods=["POST"])
-def update_transcript(item: str, transcript_md: str | None):
-	"""Correct the transcript of an item, for example words marked [?]."""
-	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
-	doc.transcript_md = transcript_md
-	doc.save()
-	return {"item": doc.name}

@@ -80,6 +80,20 @@ def load_cycle(space):
 
 
 def load(space="Private"):
+	"""The demo's goals are made as plain records, many of them with no Done when: the setting that asks for one is off while
+	they are made, and left as it was."""
+	was = frappe.db.get_value("Singles", {"doctype": "Life Settings", "field": "require_done_when"}, "value", order_by=None)
+	frappe.db.set_single_value("Life Settings", "require_done_when", 0)
+	try:
+		return _load(space)
+	finally:
+		frappe.db.delete("Singles", {"doctype": "Life Settings", "field": "require_done_when"})
+		if was is not None:
+			frappe.db.set_single_value("Life Settings", "require_done_when", was)
+		frappe.clear_cache(doctype="Life Settings")
+
+
+def _load(space="Private"):
 	if frappe.parse_json(frappe.db.get_default(seed.DEMO_KEY) or "[]"):
 		return "Demo data is already loaded. Run lifeos.tools.demo.remove first."
 	if not frappe.db.exists("Life Cycle", {"space": space, "title": CYCLE_TITLE}):

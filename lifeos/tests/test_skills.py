@@ -1098,7 +1098,7 @@ class TestRuleInsights(LifeTestCase):
 
 		insights.run(PRIVATE, ai=False)
 		first = money_insight("New")[0]
-		api.dismiss(first.name, "Not relevant")
+		frappe.get_doc("Life Insight", first.name).update({"status": "Dismissed", "dismiss_reason": "Not relevant"}).save()
 		insights.run(PRIVATE, ai=False)
 		self.assertEqual(money_insight("New"), [])
 		self.assertEqual(frappe.db.get_value("Life Insight", first.name, "status"), "Dismissed")
@@ -1108,7 +1108,7 @@ class TestRuleInsights(LifeTestCase):
 		new = money_insight("New")
 		self.assertEqual(len(new), 1)
 		self.assertNotEqual(new[0].fingerprint, first.fingerprint)
-		api.snooze(new[0].name, add_days(today(), 3))
+		frappe.get_doc("Life Insight", new[0].name).update({"status": "Snoozed", "snooze_until": add_days(today(), 3)}).save()
 		insights.run(PRIVATE, ai=False)
 		self.assertEqual(frappe.db.get_value("Life Insight", new[0].name, "status"), "Snoozed")
 		frappe.db.set_value("Life Insight", new[0].name, "snooze_until", add_days(today(), -1))
@@ -1150,3 +1150,17 @@ class TestRulesOnTheDocType(LifeTestCase):
 			frappe.get_doc({**values, "trigger_kind": "Whenever"}).insert()
 		with self.assertRaises(frappe.ValidationError):
 			frappe.get_doc({**values, "tools": '["delete_everything"]'}).insert()
+
+
+
+class TestInsightRulesOnTheDocType(LifeTestCase):
+	def test_snoozing_and_restoring_through_get_doc(self):
+		"""The screens change an insight's status with the standard document API; the DocType keeps the dates tidy."""
+		doc = frappe.get_doc({"doctype": "Life Insight", "space": PRIVATE, "kind": "Stuck", "title": "77 stuck"}).insert()
+		doc.status = "Snoozed"
+		doc.save()
+		self.assertEqual(str(doc.snooze_until), add_days(today(), 7))
+		doc.update({"status": "Dismissed", "dismiss_reason": "Wrong"}).save()
+		doc.status = "New"
+		doc.save()
+		self.assertEqual((doc.snooze_until, doc.dismiss_reason), (None, ""))

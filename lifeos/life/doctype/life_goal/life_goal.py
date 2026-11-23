@@ -29,6 +29,16 @@ def derive_horizon(target_date=None, cycle=None, space=None, on=None):
 	return "Year" if day <= getdate(add_days(now, 366)) else "Long term"
 
 
+OPEN_RETIRED = "Open goals are retired. Make it a 12 Week Year goal or an Annual goal with a target date, or, for ongoing work, a focus."
+
+
+def refuse_open(horizon):
+	"""The Open goal (horizon Long term) is retired (issue 57): a new goal is a 12 Week Year, Annual or Month goal. Tests and the
+	acceptance site that predate this switch it back on with `lifeos_allow_open_goals`; records already Open are kept."""
+	if horizon == "Long term" and not (frappe.flags.get("lifeos_allow_open_goals") or frappe.conf.get("lifeos_allow_open_goals")):
+		frappe.throw(_(OPEN_RETIRED), frappe.ValidationError, title=_("Open goals are retired"))
+
+
 def check_cycle_open(cycle, flags=None):
 	if flags and flags.allow_closed:
 		return
@@ -45,6 +55,9 @@ class LifeGoal(Document):
 		if not self.is_someday:
 			self.someday_on = self.someday_review_on = None
 		self.check_horizon()
+		if self.is_new() and not self.flags.from_restore:
+			refuse_open(self.horizon)
+			self.check_finish_line()
 		# closed_on: the day the outcome left In Progress
 		if (self.outcome or "In Progress") == "In Progress":
 			self.closed_on = None
@@ -79,6 +92,14 @@ class LifeGoal(Document):
 			frappe.throw(_("A {0} goal needs a target date.").format(_(self.horizon).lower()), title=_("Goal needs a target date"))
 		if self.horizon != "12 weeks" and self.actions:
 			frappe.throw(_("Weekly actions belong to 12-week goals."), title=_("Actions need a 12-week goal"))
+
+	def check_finish_line(self):
+		"""A new goal has its Done when (or a number with its target) while the setting is on. A goal carried from an earlier one
+		(`carried_from`, or `flags.carried`) keeps what it had, even when that was nothing."""
+		from lifeos.goals import readings
+
+		if not (self.carried_from or self.flags.carried):
+			readings.require_finish_line(self)
 
 	def check_measure(self):
 		"""Key results (set 7): a milestone goal needs its finish line, a number goal its measure, start and target. The

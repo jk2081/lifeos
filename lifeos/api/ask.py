@@ -242,9 +242,9 @@ def run_action(message: str, index: int | str):
 	if kind == "open_list":
 		return {"kind": kind, "to": a.get("to")}
 	if kind in ("snooze_insight", "dismiss_insight"):
-		from lifeos.api import insights
-
-		(insights.snooze if kind == "snooze_insight" else insights.dismiss)(a["insight"])
+		insight = permissions.get_doc_checked("Life Insight", a["insight"], "write")
+		insight.status = "Snoozed" if kind == "snooze_insight" else "Dismissed"
+		insight.save()
 		return {"kind": kind, "insight": a["insight"]}
 	frappe.throw(_("Unknown action."), title=_("Unknown action"))
 

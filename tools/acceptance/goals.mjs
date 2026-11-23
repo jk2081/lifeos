@@ -1583,7 +1583,7 @@ part = part[0] if part else frappe.get_doc({"doctype": "Life Area", "space": spa
 cycle = frappe.get_doc({"doctype": "Life Cycle", "space": space, "title": "I56 cycle ${width}", "start_date": add_days(today(), -3), "status": "Active"}).insert(ignore_permissions=True)
 g = frappe.get_doc({"doctype": "Life Goal", "space": space, "cycle": cycle.name, "title": "I56 RMT ${width}", "area": areas[0].name, "done_when": "The systems run on their own",
   "actions": [{"title": "I56 audit ${width}", "per_week": 2}, {"title": "I56 newsletter ${width}", "per_week": 1}]}).insert(ignore_permissions=True)
-old = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": "I56 old ${width}", "horizon": "Long term", "area": career.name}).insert(ignore_permissions=True)
+old = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": "I56 old ${width}", "horizon": "Long term", "area": career.name, "done_when": "Done"}).insert(ignore_permissions=True)
 t = frappe.get_doc({"doctype": "Life Task", "space": space, "title": "I56 task ${width}", "goal": g.name, "area": areas[0].name}).insert(ignore_permissions=True)
 n = frappe.get_doc({"doctype": "Life Note", "space": space, "title": "I56 note ${width}", "goal": g.name, "area": areas[0].name, "content_md": "x"}).insert(ignore_permissions=True)
 print(json.dumps({"cycle": cycle.name, "goal": g.name, "old": old.name, "career": career.name, "part": part.name, "actions": [a.name for a in g.actions], "task": t.name, "note": n.name}))`).split('\n').pop())

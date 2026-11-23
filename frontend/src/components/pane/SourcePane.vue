@@ -53,7 +53,7 @@ import MdField from '../MdField.vue'
 import DigestView from '../DigestView.vue'
 import FileVersions from '../FileVersions.vue'
 import Empty from '../Empty.vue'
-import { api } from '@/lib/api'
+import { api, db } from '@/lib/api'
 import { store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { fileKind, fileSize } from '@/lib/upload'
@@ -77,7 +77,7 @@ const details = computed(() => [
   ...(s.value.instruction ? [['Instruction', s.value.instruction]] : []),
 ])
 function openLink() { window.open(safeLink.value, '_blank', 'noopener,noreferrer') }
-async function saveText(text) { await api('inbox.update_transcript', { item: s.value.name, transcript_md: text }) }
+async function saveText(text) { await db.set('Life Inbox Item', s.value.name, { transcript_md: text }) }
 onMounted(async () => {
   try {
     const [item, m] = await Promise.all([api('inbox.get', { item: props.name }), api('sources.made_from', { doctype: 'Life Inbox Item', name: props.name })])

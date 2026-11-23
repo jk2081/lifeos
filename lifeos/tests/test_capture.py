@@ -880,3 +880,14 @@ class TestRulesOnTheDocType(LifeTestCase):
 		doc.status = "Done"
 		doc.save()
 		self.assertTrue(doc.finished_on)
+
+	def test_capture_sent_to_a_goal_through_get_doc_is_filed_in_its_area(self):
+		goal = self.make("Life Goal", title="77 goal", horizon="12 weeks", cycle=self.make("Life Cycle", title="77 cycle", start_date=today()).name, area=self.areas["Tea"])
+		doc = frappe.get_doc({"doctype": "Life Inbox Item", "space": PRIVATE, "title": "77 to goal", "source_type": "Message", "raw_text": "x", "goal": goal.name}).insert()
+		self.assertEqual(doc.area, self.areas["Tea"])
+
+	def test_same_original_through_get_doc_is_refused(self):
+		fields = {"doctype": "Life Inbox Item", "space": PRIVATE, "title": "77 twice", "source_type": "Message", "raw_text": "x", "source_system": "gmail", "external_id": "77-same"}
+		frappe.get_doc(fields).insert()
+		with self.assertRaises(frappe.DuplicateEntryError):
+			frappe.get_doc(fields).insert()

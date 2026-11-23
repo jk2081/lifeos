@@ -1,11 +1,12 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import today
+from frappe.utils import add_months, getdate, today
 
 from lifeos.brain import area_guess
 
 CLOSED = ("Done", "Dropped", "Carried")
+OPEN = ("Open", "Doing", "Waiting")
 
 
 class LifeTask(Document):
@@ -26,10 +27,22 @@ class LifeTask(Document):
 			frappe.throw(_("Say who or what this task is waiting on."), frappe.MandatoryError, title=_("Waiting needs a reason"))
 		if not self.flags.keep_touched:
 			self.last_touched_on = today()
+		self.check_someday()
+		area_guess.track_change(self)  # issue 13: every task has an area
+
+	def check_someday(self):
+		"""Only an open task goes on the Someday list, and a parked task has the day it went and the day it is looked at again."""
 		if self.status != "Someday":
 			self.someday_on = self.someday_review_on = None
 			self.someday_with = None
-		area_guess.track_change(self)  # issue 13: every task has an area
+			return
+		before = self.get_doc_before_save()
+		if before and before.status not in OPEN + ("Someday",):
+			frappe.throw(_("Only an open task can go on the Someday list."), title=_("Task is not open"))
+		from lifeos.review.counts import rules
+
+		self.someday_on = self.someday_on or today()
+		self.someday_review_on = self.someday_review_on or add_months(getdate(self.someday_on), rules()["someday_review_months"])
 
 	def on_update(self):
 		area_guess.after_save(self)

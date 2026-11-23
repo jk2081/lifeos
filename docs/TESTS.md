@@ -6,11 +6,11 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 
 | File | What it covers |
 | --- | --- |
-| `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address |
+| `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc` |
 | `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources, old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
-| `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the one gateway for model calls (cost and caps), Ask, insights |
-| `test_goals.py` | Goals: cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday |
-| `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts |
+| `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
+| `test_goals.py` | Goals: cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the rules of a goal saved through `frappe.get_doc` |
+| `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
 | `test_review.py` | The weekly, monthly and 12-week reviews |
 | `test_library.py` | Library: notes, the vault, search, the graph, Everything, files, the sensitive mark |

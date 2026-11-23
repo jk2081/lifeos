@@ -103,7 +103,7 @@ import Backlinks from './Backlinks.vue'
 import TabBar from './TabBar.vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useUrlTab } from '@/lib/tabs'
-import { api, tryCall } from '@/lib/api'
+import { api, db, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { decideAll as decideAllOf } from '@/lib/items'
 import { dateTime } from '@/lib/dates'
@@ -181,7 +181,7 @@ async function retry() {
   }
 }
 async function saveTranscript(text) {
-  await api('inbox.update_transcript', { item: item.value.name, transcript_md: text })
+  await db.set('Life Inbox Item', item.value.name, { transcript_md: text })
 }
 
 onMounted(async () => {

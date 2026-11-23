@@ -118,9 +118,7 @@ def park_doc(doc, note=None):
 	day = today()
 	rev = review_date(day)
 	if doc.doctype == "Life Task":
-		if doc.status not in ("Open", "Doing", "Waiting", "Someday"):
-			frappe.throw(_("Only an open task can go on the Someday list."), title=_("Task is not open"))
-		doc.status = "Someday"
+		doc.status = "Someday"  # the task's own rule refuses one that is not open
 	elif doc.doctype == "Life Goal":
 		if (doc.outcome or "In Progress") != "In Progress":
 			frappe.throw(_("Only a goal in progress can go on the Someday list."), title=_("Goal is not in progress"))

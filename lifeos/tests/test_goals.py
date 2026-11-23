@@ -747,7 +747,8 @@ class TestGoalEdit(LifeTestCase):
 			goals.create(title="i56 never saved", horizon="Long term", space=PRIVATE)
 
 	def test_existing_goals_without_done_when_are_not_blocked(self):
-		g = self.make("Life Goal", title="i56 old", horizon="Long term").name
+		g = self.make("Life Goal", title="i56 old", horizon="Long term", done_when="x").name
+		frappe.db.set_value("Life Goal", g, "done_when", None)  # as the goals from before the setting were
 		out = goals.update(g, {"title": "i56 old renamed"})
 		self.assertEqual(out["goal"]["title"], "i56 old renamed")
 		self.assertFalse(out["goal"]["has_finish_line"])
@@ -799,7 +800,7 @@ class TestGoalEdit(LifeTestCase):
 		from lifeos.tests.helpers import set_key
 
 		cycle = self.make("Life Cycle", title="i56 s cycle", start_date="2026-11-02", end_date="2027-01-24", status="Active").name
-		g = self.make("Life Goal", title="i56 systems", horizon="12 weeks", cycle=cycle, area=self.life["Career"],
+		g = self.make("Life Goal", title="i56 systems", horizon="12 weeks", cycle=cycle, area=self.life["Career"], done_when="Started",
 			actions=[{"title": "Start the internal audit", "per_week": 2, "status": "Open"}]).name
 		self.make("Life Task", title="i56 draft the audit plan", goal=g)
 		set_key("sk-test-not-real")
@@ -1384,3 +1385,23 @@ class TestRulesOnTheDocType(LifeTestCase):
 		doc.target_date = add_days(today(), 30)
 		doc.insert()
 		self.assertTrue(doc.name)
+
+	def test_new_goal_through_get_doc_needs_its_done_when(self):
+		frappe.db.set_single_value("Life Settings", "require_done_when", 1)
+		doc = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "77 no finish line", "horizon": "Year", "target_date": add_days(today(), 30)})
+		with self.assertRaises(frappe.ValidationError):
+			doc.insert()
+		doc.done_when = "It is filed"
+		doc.insert()
+		doc.done_when = None  # a goal that exists is never checked again
+		doc.save()
+		# a goal carried on keeps what it had
+		carried = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "77 carried", "horizon": "Year", "target_date": add_days(today(), 30),
+			"carried_from": doc.name})
+		carried.insert()
+		self.assertTrue(carried.name)
+
+	def test_open_goal_through_get_doc_is_retired(self):
+		frappe.flags.lifeos_allow_open_goals = False
+		with self.assertRaises(frappe.ValidationError):
+			frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "77 open", "done_when": "x"}).insert()

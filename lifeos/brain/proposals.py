@@ -380,7 +380,6 @@ def apply(kind, payload, item) -> tuple:
 		if kind == "Month Goal":
 			first, last = cycles.month_bounds(p["year"], p["month"])
 			p = {**p, "horizon": "Month", "target_date": str(last)}
-		readings.require_finish_line({"done_when": p.get("done_when")})  # the setting: accepted into Needs you, but not filed until it has one
 		if not p.get("horizon") and not p.get("target_date"):  # no horizon and no date would be an Open goal, which is retired (issue 57)
 			raise PayloadError(_("Give the goal a horizon (Year, 12 weeks or Month) or a target date."))
 		doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": p["title"], "horizon": p.get("horizon"), "area": p.get("area"),

@@ -114,34 +114,6 @@ def _doc(name):
 
 
 @frappe.whitelist(methods=["POST"])
-def dismiss(insight: str, reason: str | None = None):
-	"""Dismiss, with an optional reason (not relevant, already done, wrong). The AI reads the last 30 with their reasons."""
-	doc = _doc(insight)
-	if reason and reason not in ("Not relevant", "Already done", "Wrong"):
-		frappe.throw(_("reason must be Not relevant, Already done or Wrong."), title=_("Unknown dismiss reason"))
-	doc.status, doc.dismiss_reason = "Dismissed", reason or ""
-	doc.save()
-	return {"status": doc.status}
-
-
-@frappe.whitelist(methods=["POST"])
-def snooze(insight: str, until: str | date | None = None):
-	doc = _doc(insight)
-	doc.status, doc.snooze_until = "Snoozed", until or add_days(today(), 7)
-	doc.save()
-	return {"status": doc.status, "snooze_until": str(doc.snooze_until)}
-
-
-@frappe.whitelist(methods=["POST"])
-def restore(insight: str):
-	"""Undo a dismiss, a snooze or an act: back to New."""
-	doc = _doc(insight)
-	doc.status, doc.snooze_until, doc.dismiss_reason = "New", None, ""
-	doc.save()
-	return {"status": doc.status}
-
-
-@frappe.whitelist(methods=["POST"])
 def act(insight: str, index: int | str = 0):
 	"""Run one of an insight's suggested actions, with the person's own permissions. Navigation actions are done by the
 	screen; this records them. Returns what the screen needs (a route, a created record, Undo)."""

@@ -563,8 +563,10 @@ def lock_cycle(rv):
 			goal.sort_order = i + 1
 			goal.save()
 		else:
-			frappe.get_doc({"doctype": "Life Goal", "space": rv.doc.space, "cycle": nxt["cycle"], "horizon": "12 weeks", "title": g["title"], "area": g["area"],
-				"serves": g.get("serves") or None, "done_when": g["done_when"], "sort_order": i + 1, "actions": actions}).insert()
+			new_goal = frappe.get_doc({"doctype": "Life Goal", "space": rv.doc.space, "cycle": nxt["cycle"], "horizon": "12 weeks", "title": g["title"], "area": g["area"],
+				"serves": g.get("serves") or None, "done_when": g["done_when"], "sort_order": i + 1, "actions": actions})
+			new_goal.flags.carried = bool(g["carried_from"])  # a goal carried on keeps what it had, even with no Done when
+			new_goal.insert()
 	piles = {p: sum(1 for d in decided.values() if d["pile"] == p) for p in PILES[CYCLE]}
 	return {"numbers": {"score": closed["final_score"], "score_target": cint(frappe.db.get_single_value("Life Settings", "score_target")) or 85,
 		"goals_planned": len(plan["goals"]), "goals_skipped": piles["drop"]},

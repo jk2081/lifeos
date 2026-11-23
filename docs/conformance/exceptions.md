@@ -36,7 +36,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/settings.py` | 229 | the site's own backup folder, names only |
+| `lifeos/api/settings.py` | 231 | the site's own backup folder, names only |
 | `lifeos/brain/sources.py` | 104 | a fixed name in a temporary folder made here |
 | `lifeos/brain/sources.py` | 114 | pdftoppm's own output in a temporary folder made here |
 | `lifeos/library/files.py` | 90 | local_path keeps the path inside the site's files folders |
@@ -49,12 +49,12 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | --- | --- | --- |
 | `lifeos/skills/runner.py` | 89 | the run is the Life Brain's, a Life Agent; the session user is put back below |
 | `lifeos/skills/runner.py` | 103 | back to the user whose request or job it was |
-| `lifeos/tools/demo.py` | 88 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/tools/demo.py` | 245 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/tools/demo.py` | 249 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/tools/demo.py` | 317 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/tools/demo.py` | 102 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/tools/demo.py` | 259 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/tools/demo.py` | 263 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/tools/demo.py` | 331 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/tools/demo.py` | 347 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/tools/demo.py` | 345 | demo data: records are made through the API as the owner and the agent would make them |
+| `lifeos/tools/demo.py` | 361 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/tools/devtools_review.py` | 20 | development tool on the acceptance site: the owner-shaped data is made as the owner |
 | `lifeos/tools/loadtest.py` | 46 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/tools/loadtest.py` | 138 | load test: reads are timed as a member of the space, the way a request runs |
@@ -91,10 +91,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/goals.py` | 103 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters |
 | `lifeos/api/goals.py` | 112 | WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order |
 | `lifeos/api/goals.py` | 184 | SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters |
-| `lifeos/api/goals.py` | 417 | `off` is off_clause's fixed SQL; values are parameters |
-| `lifeos/api/inbox.py` | 410 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
-| `lifeos/api/inbox.py` | 415 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
-| `lifeos/api/inbox.py` | 417 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/goals.py` | 406 | `off` is off_clause's fixed SQL; values are parameters |
+| `lifeos/api/inbox.py` | 406 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters); order from std_order or the SORTS allowlist |
+| `lifeos/api/inbox.py` | 411 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
+| `lifeos/api/inbox.py` | 413 | clause from fixed fragments and std_filters (columns checked against meta, values as parameters |
 | `lifeos/api/insights.py` | 79 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 87 | WHERE is joined from fixed fragments; every value is a parameter |
 | `lifeos/api/insights.py` | 90 | WHERE is joined from fixed fragments; every value is a parameter |
@@ -107,7 +107,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/api/people.py` | 47 | the only formatted part is vault_guard's fixed SQL; every value is a parameter |
 | `lifeos/api/search.py` | 58 | FIELDS and WHERE are fixed fragments; the search text is the %(q)s parameter |
 | `lifeos/api/search.py` | 70 | FIELDS, WHERE and the LIKE placeholders are fixed fragments; each word is a %(wN)s parameter |
-| `lifeos/api/settings.py` | 39 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |
+| `lifeos/api/settings.py` | 41 | also_in_sql and vault_guard return fixed fragments; space and area are parameters |
 | `lifeos/api/someday.py` | 67 | each branch is _sub's fixed SQL over a PARKABLE table, with std_filters columns checked against meta |
 | `lifeos/api/someday.py` | 81 | the union as above; `order` and `way` come from fixed allowlists; values are parameters |
 | `lifeos/api/sources.py` | 156 | WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters (TABS and STATUSES are fixed maps |

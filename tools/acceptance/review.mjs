@@ -319,16 +319,19 @@ frappe.set_user("owner@lifeos.test")
 area = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"})
 cycle = frappe.db.get_value("Life Cycle", {"space": "${SPACE}", "status": "Active"})
 def goal(title, **kw):
+    if "measure_kind" not in kw: kw.setdefault("done_when", "BF1 set-up")  # a new goal has its Done when
     g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": title, "area": area, **kw})
     g.flags.ignore_permissions = True
     return g.insert().name
 # an open-ended goal with no finish line and no measure, as the migrated projects were
 migrated = goal("BF1 migrated ${W}", horizon="Long term")
+frappe.db.set_value("Life Goal", migrated, "done_when", None)  # as the migrated projects were: no finish line
 number = goal("BF1 number ${W}", horizon="Long term", measure_kind="Number", measure="BF1 weight", unit="kg", start_value=84, target_value=78)
 readings.suggest(number, 81, excerpt="Weighed 81 kg this morning.", by="Agent")
 milestone = goal("BF1 milestone ${W}", horizon="12 weeks", cycle=cycle, measure_kind="Milestone", done_when="Signed")
 frappe.db.set_value("Life Goal", milestone, "done_when", None)
 nocycle = goal("BF1 no cycle ${W}", horizon="12 weeks", cycle=cycle)
+frappe.db.set_value("Life Goal", nocycle, "done_when", None)
 frappe.db.set_value("Life Goal", nocycle, "cycle", None)
 t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "BF1 delegated ${W}", "goal": migrated, "area": area, "status": "Waiting",
     "waiting_on": "Ravi", "scheduled_at": str(add_days(now_datetime(), 1).replace(hour=11, minute=0, second=0, microsecond=0)), "duration_min": 30})

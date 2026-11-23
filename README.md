@@ -188,7 +188,6 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `skills.overview`, `detail`, `run_log`, `save`, `create`, `set_active`, `rollback`, `accept_update`, `test`, `save_auto_file` | | Brain > Skills (people; changes are the owner's). |
 | `inbox.list` | `space=None, status=None, include_archived=0, start=0, page_length=30` | Inbox items of a space, newest first, with proposal counts. `tabs` in the answer counts the items on each state tab (To Review, Waiting, Failed, Done, all) under the same filters. |
 | `inbox.get` | `item` | One inbox item with its files, proposals and the choices for the filing chips. A job's item also has `inputs`, `job_chat` and `wiki_pages`. |
-| `inbox.update_transcript` | `item, transcript_md` | Correct the transcript of an item, for example words marked [?]. |
 
 **`lifeos.api.jobs`**
 
