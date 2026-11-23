@@ -57,8 +57,8 @@ def _job_parts(item):
 	for crit in where:
 		pages = pages.where(crit)
 	pages = pages.orderby(n.title).limit(50).run(as_dict=True)
-	for page in pages:
-		page["route"] = links.route_of("Life Note", page.name)
+	for wiki_page in pages:
+		wiki_page["route"] = links.route_of("Life Note", wiki_page.name)
 	return {"inputs": inputs, "job_chat": chat, "wiki_pages": pages}
 
 

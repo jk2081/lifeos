@@ -5,7 +5,6 @@ from datetime import date as Date
 
 import frappe
 from frappe import _
-from frappe.query_builder import Order
 from frappe.query_builder import functions as fn
 from frappe.utils import add_days, cint, date_diff, getdate, today
 

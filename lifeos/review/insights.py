@@ -266,8 +266,8 @@ def run(space, ai=True, user=None):
 		frappe.db.set_value("Life Insight", name, {"status": "New", "snooze_until": None})
 		stats["returned"] += 1
 	cands = []
-	for fn in RULES:
-		cands += fn(space)
+	for rule in RULES:
+		cands += rule(space)
 	if ai:
 		got, note = noticed(space, user)
 		cands += got

@@ -317,7 +317,6 @@ def count_tabs(doctype, where, tabs):
 	"""The count on each state tab of a list, in one query. `where` is the list's criteria without the one on the tab's own
 	field, so every count respects the other filters. `tabs` maps a tab to its criterion (a function of nothing: build it
 	over `frappe.qb.DocType(doctype)`); None counts every row."""
-	table = frappe.qb.DocType(doctype)
 	cols = [fn.Count("*") if crit is None else fn.IfNull(fn.Sum(Case().when(crit, 1).else_(0)), 0) for crit in tabs.values()]
 	query = frappe.qb.get_query(doctype, fields=cols, ignore_permissions=False)
 	for crit in where:

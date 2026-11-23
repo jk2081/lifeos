@@ -8,7 +8,6 @@ Reset, Someday and the sidebar take every number from here; Ask's `counts` tool 
 import json
 
 import frappe
-from frappe.query_builder import functions as fn
 from frappe.utils import add_days, add_months, cint, getdate, today
 
 from lifeos.api.utils import lens_area

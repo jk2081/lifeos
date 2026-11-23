@@ -16,7 +16,7 @@ from lifeos.life.doctype.life_goal.life_goal import HORIZONS, derive_horizon, pl
 from lifeos.goals.areas import off as areas_off
 from lifeos.goals.areas import use_focuses
 from lifeos.goals.areas import off_criterion
-from lifeos.api.utils import (apply_order, area_criterion, count_tabs, descendants, filter_criteria, group_summary, in_area, in_order_of, lens_area, list_query,
+from lifeos.api.utils import (area_criterion, count_tabs, descendants, filter_criteria, group_summary, in_area, in_order_of, lens_area, list_query,
 	names_map, null_last, order_terms, parse, page, sort_terms)
 
 TYPES = ("12 weeks", "Month", "Year", "Long term")  # the order lists show them in

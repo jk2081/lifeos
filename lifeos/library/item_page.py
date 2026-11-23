@@ -1,7 +1,6 @@
 """Issue 10: the item page. What came of one inbox item (the records made from it, with their state) and what is related
 to it (wiki pages and chat logs that cite it, the meetings it is linked to). Every record is checked for read access."""
 import frappe
-from frappe.query_builder import functions as fn
 
 from lifeos.library import links
 from lifeos import permissions
