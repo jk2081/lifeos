@@ -362,3 +362,10 @@ After Lock, the week's three starred goal tasks (`is_top_three`) are the first g
 
 Library > Outbox also takes a review's period as `from=` and `to=` (shown as a fourth choice, "Review period"), so the review's counts open lists with exactly those rows.
 
+
+## Folder map after issue 74 (partly done)
+
+- `components/review/`: the weekly review (`Review*`, `Weekly*`), the monthly and 12-week review (`Periodic*`) and the inbox item review (`InboxReview.vue`).
+- `components/item/`: the record side pane (`RecordPane`, `PaneBody`, `*Pane`) and the item page parts.
+- `components/goals/`: the goal screens plus the calendar and rhythm tabs that were in `plan/`.
+- `components/settings/Reset*.vue`: the Reset section parts.
