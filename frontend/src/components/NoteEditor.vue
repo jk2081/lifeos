@@ -57,12 +57,13 @@
 // One note or wiki page, ready to write in: the title (on the full page), the filing as one line, and the editor.
 // It saves by itself a moment after typing stops, with a quiet "Saved". Each save sends the version it started from;
 // when the page changed meanwhile nothing is overwritten and a dialog offers View changes, Keep mine and Reload.
+import { libraryData } from '@/data/library'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Button, Dialog, Popover, TextInput } from 'frappe-ui'
 import LiveEditor from './LiveEditor.vue'
 import DiffView from './DiffView.vue'
 import Pick from './Pick.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaName, areaOptions, loadLookups, lookups } from '@/lib/lookups'
@@ -91,7 +92,7 @@ const parentOptions = computed(() => allNotes.value.filter((n) => n.name !== not
 
 async function loadNotes() {
   loadLookups()
-  if (!allNotes.value.length) allNotes.value = (await tryCall(() => api('library.tree', { space: note.space })))?.notes || []
+  if (!allNotes.value.length) allNotes.value = (await tryCall(() => libraryData.library.tree({ space: note.space })))?.notes || []
 }
 
 function queue() {
@@ -108,7 +109,7 @@ async function flush(force = false) {
   dirty = false
   saveState.value = 'Saving…'
   const body = { note: note.name, title: note.title, content_md: note.content_md, base_version: force ? undefined : note.version }
-  saving = tryCall(() => api('library.save', body))
+  saving = tryCall(() => libraryData.library.save(body))
   const res = await saving
   saving = null
   if (!res) { saveState.value = 'Not saved'; dirty = true; return }
@@ -138,7 +139,7 @@ function reloadTheirs() {
 }
 async function saveMeta(values) {
   await flush()
-  const res = await tryCall(() => api('library.save', { note: note.name, ...values }))
+  const res = await tryCall(() => libraryData.library.save({ note: note.name, ...values }))
   if (res) {
     Object.assign(note, res)
     emit('saved', res)

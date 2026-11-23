@@ -23,6 +23,7 @@
   </div>
 </template>
 <script setup>
+import { libraryData } from '@/data/library'
 import { tokenColor } from '@/lib/tokens'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -32,7 +33,7 @@ import { NOTES_VIEWS } from '@/lib/nav'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 
 const LEGEND = [{ type: 'Note', label: 'Note', color: '--ink-blue-7' }, { type: 'Person', label: 'Person', color: '--ink-amber-7' },
@@ -83,7 +84,7 @@ function draw() {
   cy.on('dbltap', 'node', (evt) => router.push(evt.target.data('route')))
 }
 async function load() {
-  const res = await tryCall(() => api('graph.get', { space: store.space, center: center.value || undefined, collection: route.query.collection || undefined, area: store.lensArea || undefined }))
+  const res = await tryCall(() => libraryData.graph.get({ space: store.space, center: center.value || undefined, collection: route.query.collection || undefined, area: store.lensArea || undefined }))
   if (!res) return
   d.value = res
   picked.value = null

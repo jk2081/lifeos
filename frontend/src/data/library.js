@@ -7,4 +7,12 @@ export const libraryData = {
   counts: group('counts', ['get']),
   files: group('files', ['list']),
   people: group('people', ['get', 'list']),
+  wiki: group('wiki', ['change', 'changes', 'create_page', 'health', 'move', 'overview', 'pages', 'undo']),
+  links: group('links', ['suggest']),
+  library: group('library', ['get', 'list', 'save', 'tree', 'versions']),
+  search: group('search', ['query']),
+  graph: group('graph', ['get']),
+  someday: group('someday', ['create']),
+  archive: group('archive', ['set']),
+  trash: group('trash', ['delete']),
 }

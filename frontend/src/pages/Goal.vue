@@ -104,6 +104,7 @@
 // A goal's page (UX fixes, set 6): what a project page and a goal page each did. Every goal shows what it serves and what
 // serves it; an open-ended goal (a project before set 6) is put on hold, completed or dropped here, and completing it
 // archives it with what is filed under it. The tabs are the main screens' lists with this goal fixed.
+import { goalsData } from '@/data/goals'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, DatePicker, Dialog, FormControl, Progress, TextInput, toast } from 'frappe-ui'
@@ -124,7 +125,7 @@ import Backlinks from '@/components/Backlinks.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import GoalMeasure from '@/components/goals/GoalMeasure.vue'
 import GoalEditDialog from '@/components/goals/GoalEditDialog.vue'
-import { api, db, optimistic, tryCall } from '@/lib/api'
+import { db, optimistic, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { askScope } from '@/lib/ask'
@@ -173,7 +174,7 @@ function embed(t) {
 }
 async function load() {
   try {
-    ;[d.value, j.value] = await Promise.all([api('goals.get', { goal: props.id }), api('goals.detail', { goal: props.id })])
+    ;[d.value, j.value] = await Promise.all([goalsData.goals.get({ goal: props.id }), goalsData.goals.detail({ goal: props.id })])
     stamp.value++
   } catch (e) {
     missing.value = true
@@ -184,7 +185,7 @@ function askComplete(status) {
   confirmOpen.value = true
 }
 async function setStatus(status) {
-  const res = await tryCall(() => api('goals.set_status', { goal: g.value.name, status }))
+  const res = await tryCall(() => goalsData.goals.set_status({ goal: g.value.name, status }))
   confirmOpen.value = false
   if (!res) return
   if (res.is_archived) toast.success(`Archived with ${res.archived_records} record${res.archived_records === 1 ? '' : 's'}. Restore it from the Archive.`)
@@ -193,23 +194,23 @@ async function setStatus(status) {
   load()
 }
 async function saveField(field) {
-  await tryCall(() => api('goals.update', { goal: g.value.name, values: { [field]: g.value[field] || null } }))
+  await tryCall(() => goalsData.goals.update({ goal: g.value.name, values: { [field]: g.value[field] || null } }))
 }
 async function saveServes(v) {
-  if (await tryCall(() => api('goals.update', { goal: g.value.name, values: { serves: v || null } }), v ? 'Linked to the goal it serves' : 'No longer serves a goal')) load()
+  if (await tryCall(() => goalsData.goals.update({ goal: g.value.name, values: { serves: v || null } }), v ? 'Linked to the goal it serves' : 'No longer serves a goal')) load()
 }
 async function saveNotes(v) {
-  await tryCall(() => api('goals.update', { goal: g.value.name, values: { notes_md: v } }))
+  await tryCall(() => goalsData.goals.update({ goal: g.value.name, values: { notes_md: v } }))
 }
 function toggle(t) {
   const next = t.status === 'Done' ? 'Open' : 'Done'
-  optimistic(() => {}, () => {}, () => api('tasks.set_status', { task: t.name, status: next })).then(load).catch(() => {})
+  optimistic(() => {}, () => {}, () => goalsData.tasks.set_status({ task: t.name, status: next })).then(load).catch(() => {})
 }
 async function addTask() {
   const text = quick.value.trim()
   if (!text) return
   quick.value = ''
-  if (await tryCall(() => api('tasks.quick_add', { text, space: d.value.space, area: g.value.area || undefined, goal: g.value.name }))) load()
+  if (await tryCall(() => goalsData.tasks.quick_add({ text, space: d.value.space, area: g.value.area || undefined, goal: g.value.name }))) load()
   else quick.value = text
 }
 async function createNote(v) {

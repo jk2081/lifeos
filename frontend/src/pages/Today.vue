@@ -147,6 +147,7 @@
 // Today (issue 55): tasks only. The Needs you line, the list (the top three, today, overdue folded, tasks planned this week under a
 // goal of the cycle; never a goal or a lead action), the habits row, then the rail (events, this week, insights). A goal with nothing
 // planned is one quiet line. The old Open band lives where each number counts. Someday items never appear.
+import { todayData } from '@/data/today'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
@@ -157,7 +158,7 @@ import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import Row from '@/components/ui/Row.vue'
 import AreaGuess from '@/components/AreaGuess.vue'
-import { api, optimistic, tryCall } from '@/lib/api'
+import { optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onboarding } from '@/lib/onboarding'
 import { addDays, long, short, startOfWeek, weekday } from '@/lib/dates'
@@ -222,16 +223,16 @@ const autoText = computed(() => {
   return `Inbox items older than ${a.days} days: ${parts.join(' and ')}. Undo until ${short(a.undo_until)}.`
 })
 async function undoAuto() {
-  if (await tryCall(() => api('old_items.undo_auto', { space: store.space }), 'Back in the Inbox')) load()
+  if (await tryCall(() => todayData.old_items.undo_auto({ space: store.space }), 'Back in the Inbox')) load()
 }
 async function skipBanner() {
   const occ = d.value.banner.occurrence
   d.value.banner = null
-  await tryCall(() => api('today.skip_banner', { occurrence: occ }), 'Skipped until next time.')
+  await tryCall(() => todayData.today.skip_banner({ occurrence: occ }), 'Skipped until next time.')
   load()
 }
 async function load() {
-  const res = await tryCall(() => api('today.get', { space: store.space, area: store.lensArea || undefined, at: route.query.at || undefined }))
+  const res = await tryCall(() => todayData.today.get({ space: store.space, area: store.lensArea || undefined, at: route.query.at || undefined }))
   if (!res) return
   d.value = res
   paneNav.rows = res.next.groups.flatMap((g) => g.rows.map((r) => (r.type === 'event' ? 'event:' + r.name : !r.type || r.type === 'task' ? 'task:' + r.name : null)).filter(Boolean))
@@ -239,24 +240,24 @@ async function load() {
 onRecordChanged(() => load())
 async function done(t) {
   await optimistic(() => { t.status = 'Done'; t._done = true }, () => { t.status = 'Open'; t._done = false },
-    () => api('tasks.set_status', { task: t.name, status: 'Done' })).catch(() => {})
+    () => todayData.tasks.set_status({ task: t.name, status: 'Done' })).catch(() => {})
   setTimeout(load, 700)
 }
 function triage(t) {
   const leave = (request, message) => async () => { if (await tryCall(request, message)) load() }
-  const move = (label, date) => ({ label, onClick: leave(() => api('tasks.update', { task: t.name, values: { due_date: date } }), `Moved to ${long(date)}`) })
+  const move = (label, date) => ({ label, onClick: leave(() => todayData.tasks.update({ task: t.name, values: { due_date: date } }), `Moved to ${long(date)}`) })
   return [move('Today', d.value.date), move('Tomorrow', addDays(d.value.date, 1)), move('Next week', addDays(startOfWeek(d.value.date), 7)),
-    { label: 'Drop', onClick: leave(() => api('tasks.set_status', { task: t.name, status: 'Dropped' }), 'Dropped') }]
+    { label: 'Drop', onClick: leave(() => todayData.tasks.set_status({ task: t.name, status: 'Dropped' }), 'Dropped') }]
 }
 async function moveAll({ close }) {
-  const out = await tryCall(() => api('tasks.reschedule_overdue', { space: store.space, to_date: d.value.date }))
+  const out = await tryCall(() => todayData.tasks.reschedule_overdue({ space: store.space, to_date: d.value.date }))
   close()
   if (out) { toast.success(`${out.moved} task${out.moved === 1 ? '' : 's'} moved to today`); load() }
 }
 // ticking a 12 Week Year action records the week's tick; the week score follows
 function toggleHabit(x) {
   optimistic(() => (x.done = !x.done), () => (x.done = !x.done),
-    () => api('goals.toggle_habit', { habit: x.habit, date: d.value.date, done: x.done ? 1 : 0 })).catch(() => {})
+    () => todayData.goals.toggle_habit({ habit: x.habit, date: d.value.date, done: x.done ? 1 : 0 })).catch(() => {})
 }
 let clock = null
 onMounted(() => { load(); clock = setInterval(() => (nowTime.value = new Date().toTimeString().slice(0, 5)), 60000) })

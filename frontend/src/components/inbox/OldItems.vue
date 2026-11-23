@@ -31,11 +31,12 @@
 <script setup>
 // Inbox items left too long (set 7): the banner on the Inbox and the batch screen of suggested decisions. Confirm applies
 // exactly the ticked items and toasts an Undo. ?decisions=1 (Reset's batch) opens it.
+import { brainData } from '@/data/brain'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Alert, Button, Checkbox, Dialog, Select, toast } from 'frappe-ui'
 import Empty from '../Empty.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 
@@ -51,7 +52,7 @@ const open = ref(false)
 const busy = ref(false)
 async function load() {
   if (store.isAgent) return
-  const res = await tryCall(() => api('old_items.suggested', { space: store.space, area: store.lensArea || undefined, page_length: 500 }))
+  const res = await tryCall(() => brainData.old_items.suggested({ space: store.space, area: store.lensArea || undefined, page_length: 500 }))
   if (!res) return
   total.value = res.total
   days.value = res.days
@@ -67,7 +68,7 @@ async function confirmSelected() {
   busy.value = true
   try {
     const items = rows.value.filter((r) => chosen.has(r.name)).map((r) => ({ item: r.name, decision: r.decision }))
-    const res = await api('old_items.apply', { items })
+    const res = await brainData.old_items.apply({ items })
     open.value = false
     toast.success(`${res.done} item${res.done === 1 ? '' : 's'} dealt with.`, { action: { label: 'Undo', onClick: () => undo(res.undo) }, duration: 60000 })
     await load()
@@ -79,7 +80,7 @@ async function confirmSelected() {
   }
 }
 async function undo(log) {
-  if (await tryCall(() => api('old_items.undo', { log }), 'Undone')) { await load(); emit('changed') }
+  if (await tryCall(() => brainData.old_items.undo({ log }), 'Undone')) { await load(); emit('changed') }
 }
 onMounted(async () => {
   await load()

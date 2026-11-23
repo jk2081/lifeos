@@ -92,6 +92,7 @@
 <script setup>
 // A focus's own page (issue 57): its standard, numbered principles (edit, reorder), goals by horizon (annual, 12 Week Year, others, then
 // finished ones greyed) and how it is going. Principles and the standard are saved through settings.save_item (the owner only).
+import { todayData } from '@/data/today'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Dialog, ErrorMessage, FormControl, toast } from 'frappe-ui'
@@ -99,7 +100,7 @@ import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { loadLookups } from '@/lib/lookups'
@@ -129,7 +130,7 @@ const rows = computed(() => [
 async function load() {
   missing.value = false
   try {
-    d.value = await api('focus.get', { area: props.id })
+    d.value = await todayData.focus.get({ area: props.id })
     Object.assign(form, { title: d.value.title, standard: d.value.standard || '' })
   } catch (e) {
     d.value = null
@@ -148,7 +149,7 @@ function move(i, by) {
 async function savePrinciples() {
   busy.value = true
   try {
-    await api('settings.save_item', { kind: 'area', name: props.id, principles: draft.value.map((p) => p.line).filter((l) => l.trim()) })
+    await todayData.settings.save_item({ kind: 'area', name: props.id, principles: draft.value.map((p) => p.line).filter((l) => l.trim()) })
     toast.success('Saved')
     editing.value = false
     await load()
@@ -161,7 +162,7 @@ async function savePrinciples() {
 async function saveFocus({ close }) {
   formError.value = ''
   try {
-    await api('settings.save_item', { kind: 'area', name: props.id, title: form.title, standard: form.standard })
+    await todayData.settings.save_item({ kind: 'area', name: props.id, title: form.title, standard: form.standard })
     toast.success('Saved')
     close()
     await load()

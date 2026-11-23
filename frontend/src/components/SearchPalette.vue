@@ -43,12 +43,12 @@
 <script setup>
 // Search over everything the person can see. frappe-ui's experimental CommandPalette draws it; the results come from
 // our own search method, which applies the space rules. A result opens in the pane over the screen you are on.
+import { libraryData } from '@/data/library'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, KeyboardShortcut } from 'frappe-ui'
 import { CommandPalette, CommandPaletteEmpty, CommandPaletteFooter, CommandPaletteInput, CommandPaletteItem, CommandPaletteList } from '@/experimental'
 import Empty from './Empty.vue'
-import { api } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { openRef, refOf } from '@/lib/pane'
@@ -78,7 +78,7 @@ async function run() {
   }
   const mine = ++seq
   try {
-    const res = await api('search.query', { text: q, limit: 20, include_archived: archived.value ? 1 : 0, ...(store.lensArea ? { space: store.space, area: store.lensArea } : {}) })
+    const res = await libraryData.search.query({ text: q, limit: 20, include_archived: archived.value ? 1 : 0, ...(store.lensArea ? { space: store.space, area: store.lensArea } : {}) })
     if (mine !== seq) return
     results.value = res.results
     searched.value = q

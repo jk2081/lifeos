@@ -99,6 +99,7 @@
 <script setup>
 // A skill page (issue 28): its instructions (editable, with a preview), its examples with Test (pass or fail before saving), its versions with
 // a diff and Roll back, and its recent runs, each opening its log.
+import { settingsData } from '@/data/settings'
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Dialog, FormControl, Switch } from 'frappe-ui'
@@ -108,7 +109,7 @@ import Empty from '@/components/Empty.vue'
 import LessonCard from '@/components/brain/LessonCard.vue'
 import Md from '@/components/Md.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { dateTime } from '@/lib/dates'
 
 const props = defineProps({ name: String })
@@ -133,7 +134,7 @@ function checkText(c) {
 }
 
 async function load() {
-  const res = await tryCall(() => api('skills.detail', { name: props.name }))
+  const res = await tryCall(() => settingsData.skills.detail({ name: props.name }))
   if (!res) { missing.value = true; return }
   d.value = res
   text.value = res.instructions || ''
@@ -141,30 +142,30 @@ async function load() {
 watch(() => props.name, () => { results.value = {}; load() }, { immediate: true })
 
 async function toggle(on) {
-  const res = await tryCall(() => api('skills.set_active', { name: d.value.name, active: on ? 1 : 0 }))
+  const res = await tryCall(() => settingsData.skills.set_active({ name: d.value.name, active: on ? 1 : 0 }))
   if (res) d.value.active = res.active
 }
 async function save() {
-  const res = await tryCall(() => api('skills.save', { name: d.value.name, values: JSON.stringify({ instructions: text.value }) }), 'Saved as a new version.')
+  const res = await tryCall(() => settingsData.skills.save({ name: d.value.name, values: JSON.stringify({ instructions: text.value }) }), 'Saved as a new version.')
   if (res) { results.value = {}; await load() }
 }
 async function runTest() {
   testing.value = true
   try {
-    const res = await tryCall(() => api('skills.test', { name: d.value.name, instructions: text.value }))
+    const res = await tryCall(() => settingsData.skills.test({ name: d.value.name, instructions: text.value }))
     if (res) results.value = Object.fromEntries(res.results.map((r) => [r.title, r]))
   } finally { testing.value = false }
 }
 async function rollback(v) {
-  const res = await tryCall(() => api('skills.rollback', { name: d.value.name, version: v.version }), `Rolled back to version ${v.version}.`)
+  const res = await tryCall(() => settingsData.skills.rollback({ name: d.value.name, version: v.version }), `Rolled back to version ${v.version}.`)
   if (res) await load()
 }
 async function takeUpdate() {
-  const res = await tryCall(() => api('skills.accept_update', { name: d.value.name }), 'Updated. Your earlier text is in the versions.')
+  const res = await tryCall(() => settingsData.skills.accept_update({ name: d.value.name }), 'Updated. Your earlier text is in the versions.')
   if (res) await load()
 }
 async function openRun(r) {
-  log.value = await tryCall(() => api('skills.run_log', { run: r.name }))
+  log.value = await tryCall(() => settingsData.skills.run_log({ run: r.name }))
   logOpen.value = !!log.value
 }
 </script>

@@ -96,10 +96,11 @@
 </template>
 
 <script setup>
+import { settingsData } from '@/data/settings'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, ErrorMessage, Select, Switch, TextInput } from 'frappe-ui'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
 import { loadLookups } from '@/lib/lookups'
 import { finishOnboarding, onboarding } from '@/lib/onboarding'
 import { refreshCounts, store } from '@/lib/store'
@@ -131,14 +132,14 @@ const onAreas = computed(() => lifeAreas.value.filter((a) => a.is_on).map((a) =>
 const part = reactive({ area: '', title: '' })
 const parts = ref([])
 async function loadAreas() {
-  areaRows.value = (await api('area.tree', { space: store.space, include_off: 1 })).areas
+  areaRows.value = (await settingsData.area.tree({ space: store.space, include_off: 1 })).areas
   if (!onAreas.value.some((o) => o.value === part.area)) part.area = onAreas.value[0]?.value || ''
 }
 async function switchArea(a, on) {
   busy.value = a.name
   error.value = ''
   try {
-    await api('settings.save_item', { kind: 'area', space: store.space, name: a.name, is_on: on ? 1 : 0 })
+    await settingsData.settings.save_item({ kind: 'area', space: store.space, name: a.name, is_on: on ? 1 : 0 })
     touched.value = true
     await loadAreas()
   } catch (e) { error.value = errorText(e) } finally { busy.value = '' }
@@ -148,7 +149,7 @@ async function addPart() {
   busy.value = 'part'
   error.value = ''
   try {
-    const made = await api('settings.save_item', { kind: 'area', space: store.space, title: part.title.trim(), parent_area: part.area })
+    const made = await settingsData.settings.save_item({ kind: 'area', space: store.space, title: part.title.trim(), parent_area: part.area })
     parts.value.push({ name: made.name, label: `${part.title.trim()} · ${onAreas.value.find((o) => o.value === part.area)?.label}` })
     part.title = ''
     touched.value = true
@@ -170,7 +171,7 @@ async function next() {
   if (key === 'you' && you.name.trim()) {
     busy.value = 'next'
     try {
-      const out = await api('onboarding.save_you', { full_name: you.name, time_zone: you.zone })
+      const out = await settingsData.onboarding.save_you({ full_name: you.name, time_zone: you.zone })
       store.fullName = out.full_name
       touched.value = true
     } catch (e) { error.value = errorText(e); return } finally { busy.value = '' }
@@ -178,7 +179,7 @@ async function next() {
   if (key === 'things' && !made.value.length && things.value.some((t) => t.trim())) {
     busy.value = 'next'
     try {
-      made.value = await api('onboarding.add_first_things', { things: things.value.filter((t) => t.trim()), space: store.space })
+      made.value = await settingsData.onboarding.add_first_things({ things: things.value.filter((t) => t.trim()), space: store.space })
       touched.value = true
       return // show what was made; Continue goes on
     } catch (e) { error.value = errorText(e); return } finally { busy.value = '' }

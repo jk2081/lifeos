@@ -10,10 +10,11 @@
 </template>
 <script setup>
 // Quick add from anywhere (the n key, or the + button on a phone): one text box, Enter adds, the dialog stays open for the next one.
+import { todayData } from '@/data/today'
 import { nextTick, ref, watch } from 'vue'
 import { Dialog, Select, TextInput } from 'frappe-ui'
 import { goalOptions, loadLookups, lookups } from '@/lib/lookups'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 
 const open = defineModel('open', { type: Boolean, default: false })
@@ -25,7 +26,7 @@ async function add() {
   const value = text.value.trim()
   if (!value) return
   text.value = ''
-  const t = await tryCall(() => api('tasks.quick_add', { text: value, space: store.space, goal: goal.value || undefined }))
+  const t = await tryCall(() => todayData.tasks.quick_add({ text: value, space: store.space, goal: goal.value || undefined }))
   if (t) {
     last.value = t.title + (t.due_date ? `, due ${t.due_date}` : '')
     window.dispatchEvent(new CustomEvent('lifeos-task-added', { detail: t }))

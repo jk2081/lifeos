@@ -33,13 +33,13 @@
     :initial="bringBack.initial" :save="doBringBack" @saved="list?.reload()" />
 </template>
 <script setup>
+import { todayData } from '@/data/today'
 import { manySpaces } from '@/lib/lens'
 import { computed, h, onMounted, ref } from 'vue'
 import { Badge, Button, Dropdown } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import Card from '@/components/ui/Card.vue'
-import { api } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { onRecordChanged } from '@/lib/pane'
@@ -80,7 +80,7 @@ const RowActions = (p) => {
 RowActions.props = ['row']
 
 async function fetch({ params: p, tab: t, filters, order_by, start, page_length }) {
-  const res = await api('someday.list', { space: store.space, tab: t, area: p.area, filters, order_by, start, page_length })
+  const res = await todayData.someday.list({ space: store.space, tab: t, area: p.area, filters, order_by, start, page_length })
   months.value = res.review_months || 3
   return { rows: res.rows, total: res.total, tabs: res.tabs }
 }

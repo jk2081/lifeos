@@ -71,6 +71,7 @@
 </template>
 
 <script setup>
+import { todayData } from '@/data/today'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Alert, Badge, Button, FrappeUIProvider, KeyboardShortcut, KeyboardShortcutsDialog, LoadingIndicator, MobileNav, MobileNavItem,
@@ -81,7 +82,7 @@ import NewGoalDialog from './components/goals/NewGoalDialog.vue'
 import { GO, PLACES } from './lib/nav'
 import { activePlace } from './lib/sidebar'
 import { navCount } from './lib/newMenu'
-import { api, db } from './lib/api'
+import { db } from './lib/api'
 import { recordChanged } from './lib/pane'
 import { areaOptions, loadLookups } from './lib/lookups'
 import SearchPalette from './components/SearchPalette.vue'
@@ -126,7 +127,7 @@ const somedayFields = computed(() => [{ name: 'title', label: 'What to park', re
   { name: 'as_note', label: 'It is', options: [{ label: 'A task', value: 0 }, { label: 'A thought with no action (a note)', value: 1 }] }, { name: 'area', label: 'Area', options: areaOptions() },
   { name: 'body_md', label: 'More detail', type: 'textarea' }, { name: 'note', label: 'Why it can wait (optional)' }])
 async function createSomeday(v) {
-  await api('someday.create', { space: store.space, ...v })
+  await todayData.someday.create({ space: store.space, ...v })
   store.newKind = ''
   recordChanged('task:new')
   toast.success('Parked on the Someday list.')

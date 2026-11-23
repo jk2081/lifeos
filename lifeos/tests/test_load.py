@@ -90,3 +90,37 @@ class TestRawSql(IntegrationTestCase):
 	def test_at_most_10_sql_injection_findings_are_silenced(self):
 		silenced = [f"{path.name}:{i + 1}" for path, lines in self.sources() for i, line in enumerate(lines) if "nosemgrep: frappe-sql-format-injection" in line]
 		self.assertLessEqual(len(silenced), 10, silenced)
+
+
+class TestFrontEndFiles(IntegrationTestCase):
+	"""The front end's own rules (issue 82): screens reach the server through `frontend/src/data/`, and no file is dead."""
+
+	SRC = __import__("pathlib").Path(__file__).resolve().parents[2] / "frontend" / "src"
+
+	def test_no_component_or_page_calls_api_directly(self):
+		import re
+
+		bad = []
+		for folder in ("components", "pages"):
+			for path in sorted((self.SRC / folder).rglob("*")):
+				if path.suffix in (".vue", ".js") and re.search(r"\bapi\(", path.read_text(encoding="utf-8")):
+					bad.append(str(path.relative_to(self.SRC)))
+		app = (self.SRC / "App.vue").read_text(encoding="utf-8")
+		if re.search(r"\bapi\(", app):
+			bad.append("App.vue")
+		self.assertEqual(bad, [], "these call api( directly; use a module of data/")
+
+	def test_every_vue_file_is_imported_or_routed(self):
+		import re
+
+		everything = "\n".join(p.read_text(encoding="utf-8") for p in self.SRC.rglob("*") if p.suffix in (".vue", ".js"))
+		# pages are routed by name: page('Name') in router.js
+		routed = set(re.findall(r"page\('([A-Za-z]+)'\)", (self.SRC / "router.js").read_text(encoding="utf-8")))
+		dead = []
+		for path in sorted(self.SRC.rglob("*.vue")):
+			rel = path.relative_to(self.SRC)
+			if rel.parts[0] == "pages" and len(rel.parts) == 2 and path.stem in routed:
+				continue
+			if not re.search(r"[/'\"]" + re.escape(path.name) + r"['\"]", everything):
+				dead.append(str(rel))
+		self.assertEqual(dead, [], "these .vue files are neither imported nor routed; delete them")

@@ -19,6 +19,7 @@
 // "Show Markdown" (the `raw` prop) shows the plain text. Typing [[ opens a picker over the records a link can point to;
 // / at the start of a line opens a menu of blocks. Pasted or dropped images upload as private files attached to the record.
 // One typeface for writing and reading (the reading typeface), in a column of at most about 720 px.
+import { libraryData } from '@/data/library'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Button, FileUploader, toast } from 'frappe-ui'
 import { EditorState } from '@codemirror/state'
@@ -27,7 +28,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { indentUnit } from '@codemirror/language'
 import { autocompletion, completionKeymap } from '@codemirror/autocomplete'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
 import { openRoute } from '@/lib/pane'
 import { uploadFile } from '@/lib/upload'
 import { livePreview, setLinks, setRaw } from '@/lib/editor/livePreview'
@@ -51,7 +52,7 @@ async function wikiSource(context) {
   const text = before.text.slice(2)
   let rows = []
   try {
-    rows = await api('links.suggest', { space: props.space, text })
+    rows = await libraryData.links.suggest({ space: props.space, text })
   } catch (e) {
     return null
   }

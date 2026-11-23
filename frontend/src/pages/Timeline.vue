@@ -22,12 +22,12 @@
   </ListView>
 </template>
 <script setup>
+import { todayData } from '@/data/today'
 import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Avatar, Badge } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import NumLink from '@/components/ui/NumLink.vue'
-import { api } from '@/lib/api'
 import { store } from '@/lib/store'
 import { long, weekday } from '@/lib/dates'
 import { loadLookups } from '@/lib/lookups'
@@ -48,7 +48,7 @@ const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'is_archived', 'record
 const props = defineProps({ embed: { type: Object, default: null } })
 const route = useRoute()
 async function fetch({ params: p, filters, summary, start, page_length }) {
-  const res = await api('timeline.get', { space: props.embed?.space || store.space, area: p.area, doctype: p.doctype, from_date: p.from, to_date: p.to, include_archived: p.archived ? 1 : 0,
+  const res = await todayData.timeline.get({ space: props.embed?.space || store.space, area: p.area, doctype: p.doctype, from_date: p.from, to_date: p.to, include_archived: p.archived ? 1 : 0,
     filters, summary, start, page_length })
   return summary ? res : { rows: res.days.flatMap((d) => d.entries), total: res.total }
 }

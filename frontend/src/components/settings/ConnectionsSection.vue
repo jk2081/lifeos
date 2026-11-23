@@ -20,11 +20,12 @@
   </div>
 </template>
 <script setup>
+import { settingsData } from '@/data/settings'
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { Button, FileUploader, Progress, toast } from 'frappe-ui'
 import Card from '../ui/Card.vue'
 import SectionHead from '../ui/SectionHead.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
 import { dateTime } from '@/lib/dates'
 
 // Settings > Advanced > Import and export: the chat import (the connections are Brain > Sources, issue 19)
@@ -43,18 +44,18 @@ function describe(s) {
   return s.status === 'Queued' ? 'Waiting to start…' : 'Reading the export…'
 }
 async function load() {
-  for (const k of KINDS) status.value[k.system] = await tryCall(() => api('connections.import_status', { space: props.space, system: k.system }))
+  for (const k of KINDS) status.value[k.system] = await tryCall(() => settingsData.connections.import_status({ space: props.space, system: k.system }))
   poll()
 }
 async function start(system, file) {
-  const res = await tryCall(() => api('connections.start_import', { space: props.space, system, file_url: file.file_url }), 'Import started.')
+  const res = await tryCall(() => settingsData.connections.start_import({ space: props.space, system, file_url: file.file_url }), 'Import started.')
   if (res) { status.value[system] = res; poll() }
 }
 function poll() {
   clearTimeout(timer)
   if (!KINDS.some((k) => busy(k.system))) return
   timer = setTimeout(async () => {
-    for (const k of KINDS) if (busy(k.system)) status.value[k.system] = await tryCall(() => api('connections.import_status', { space: props.space, system: k.system }))
+    for (const k of KINDS) if (busy(k.system)) status.value[k.system] = await tryCall(() => settingsData.connections.import_status({ space: props.space, system: k.system }))
     if (!KINDS.some((k) => busy(k.system))) load()
     else poll()
   }, 2000)

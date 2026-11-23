@@ -56,6 +56,7 @@
 <script setup>
 // Today > Week (issue 16): seven days with what is on each (meetings, goal work, due tasks, important dates), the week's focus
 // and score, and the goal work planned by goal. A day opens in Day; an item opens in the record pane. The cursor is `date=`.
+import { todayData } from '@/data/today'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Button, Progress } from 'frappe-ui'
@@ -63,7 +64,7 @@ import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import ViewLinks from './ViewLinks.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { chipClass, itemLabel, itemRef, openDay, useCalendarRange } from '@/lib/calRange'
 import { onRecordChanged, openRef } from '@/lib/pane'
@@ -78,7 +79,7 @@ const days = computed(() => Array.from({ length: 7 }, (_, i) => addDays(first.va
 const { itemsOn } = useCalendarRange(computed(() => [first.value, addDays(first.value, 6)]))
 const plan = ref(null)
 async function loadPlan() {
-  const res = await tryCall(() => api('calendar.week_plan', { space: store.space, week_start: first.value, area: store.lensArea || undefined }))
+  const res = await tryCall(() => todayData.calendar.week_plan({ space: store.space, week_start: first.value, area: store.lensArea || undefined }))
   if (res) plan.value = res
 }
 watch(first, loadPlan, { immediate: true })

@@ -47,11 +47,12 @@
 </template>
 <script setup>
 // Settings > Me > Calendar (set 8, issue 31): Google Calendar through Frappe's own OAuth flow; read, and written to only when a calendar is chosen.
+import { settingsData } from '@/data/settings'
 import { onMounted, ref } from 'vue'
 import { Alert, Badge, Button, Checkbox, Skeleton, Textarea, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import SettingRow from './SettingRow.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 
@@ -62,40 +63,40 @@ const write = ref('')
 const domains = ref('')
 const busy = ref(false)
 async function load() {
-  s.value = await api('gcal.state')
+  s.value = await settingsData.gcal.state()
   domains.value = (s.value.domains || []).join('\n')
   read.value = s.value.read || []
   write.value = s.value.write || ''
   if (s.value.connected) {
-    const got = await tryCall(() => api('gcal.calendars'))
+    const got = await tryCall(() => settingsData.gcal.calendars())
     cals.value = got?.calendars || []
     write.value = got?.write || ''
   }
 }
 async function connect() {
-  const out = await tryCall(() => api('gcal.connect'))
+  const out = await tryCall(() => settingsData.gcal.connect())
   if (out?.url) window.location.href = out.url
 }
 async function disconnect() {
-  if (await tryCall(() => api('gcal.disconnect'), 'Disconnected. Events already read stay.')) load()
+  if (await tryCall(() => settingsData.gcal.disconnect(), 'Disconnected. Events already read stay.')) load()
 }
 async function sync() {
   busy.value = true
-  const out = await tryCall(() => api('gcal.sync'))
+  const out = await tryCall(() => settingsData.gcal.sync())
   busy.value = false
   if (out) { s.value = { ...s.value, ...out }; toast.success(`${out.read} events read.`) }
 }
 async function toggle(c, on) {
   const ids = on ? [...new Set([...read.value, c.id])] : read.value.filter((x) => x !== c.id && !(c.primary && x === 'primary'))
-  const out = await tryCall(() => api('gcal.set_read', { ids }))
+  const out = await tryCall(() => settingsData.gcal.set_read({ ids }))
   if (out) read.value = out.read
 }
 async function saveWrite() {
-  const out = await tryCall(() => api('gcal.set_write', { calendar: write.value }), write.value ? 'Writing to that calendar.' : 'Writing is off.')
+  const out = await tryCall(() => settingsData.gcal.set_write({ calendar: write.value }), write.value ? 'Writing to that calendar.' : 'Writing is off.')
   if (out) write.value = out.write || ''
 }
 async function saveDomains() {
-  await tryCall(() => api('settings.save', { values: { own_domains: domains.value } }), 'Saved.')
+  await tryCall(() => settingsData.settings.save({ values: { own_domains: domains.value } }), 'Saved.')
 }
 onMounted(load)
 </script>

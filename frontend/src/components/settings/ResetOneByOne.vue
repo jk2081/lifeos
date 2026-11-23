@@ -30,11 +30,12 @@
 // Reset's one by one: the oldest untouched open task or open-ended goal, where it came from, and five decisions with keys on a
 // desktop (D, W, S, A, X) and large buttons on a phone. After each decision the next item shows; each can be undone
 // from the toast for a minute.
+import { settingsData } from '@/data/settings'
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { Button, DatePicker, Dialog, KeyboardShortcut, TextInput, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
 import { store } from '@/lib/store'
 import { addDays, short } from '@/lib/dates'
 import { openRef, recordChanged } from '@/lib/pane'
@@ -51,7 +52,7 @@ const skip = ref([])
 const ask = reactive({ open: false, kind: '', date: '', who: '' })
 
 async function load() {
-  const res = await api('reset.next_item', { space: props.space || store.space, skip: JSON.stringify(skip.value), only: props.only ? JSON.stringify(props.only) : undefined })
+  const res = await settingsData.reset.next_item({ space: props.space || store.space, skip: JSON.stringify(skip.value), only: props.only ? JSON.stringify(props.only) : undefined })
   item.value = res.item
   left.value = res.left
   loaded.value = true
@@ -70,7 +71,7 @@ async function confirmAsk({ close } = {}) {
 async function decide(kind, extra = {}) {
   const it = item.value
   try {
-    const res = await api('reset.decide', { doctype: it.doctype, name: it.name, decision: kind, ...extra })
+    const res = await settingsData.reset.decide({ doctype: it.doctype, name: it.name, decision: kind, ...extra })
     skip.value.push(it.name)
     decided.value++
     recordChanged(it.ref)
@@ -84,7 +85,7 @@ async function decide(kind, extra = {}) {
 }
 async function undo(log, it) {
   try {
-    await api('reset.undo', { log: JSON.stringify(log) })
+    await settingsData.reset.undo({ log: JSON.stringify(log) })
     skip.value = skip.value.filter((n) => n !== it.name)
     decided.value = Math.max(decided.value - 1, 0)
     recordChanged(it.ref)

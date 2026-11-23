@@ -20,7 +20,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it |
 | `test_gmail.py` | Life OS reading Gmail: connect, fetch, triage, one capture per thread |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check |
-| `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings |
+| `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings; no component, page or `App.vue` calls `api(`; every `.vue` file is imported or routed |
 
 ## Skills
 

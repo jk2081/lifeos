@@ -76,6 +76,7 @@
   </Dialog>
 </template>
 <script setup>
+import { brainData } from '@/data/brain'
 import { inSpace } from '@/lib/lens'
 // Sources: the library of every capture, finished or not (UX fixes, set 4). Inbox items and chat logs, read from Life Index.
 // Tabs by kind; List by default, a Grid of thumbnails on Photos (and as a view on All), and By day on Chats (the old chats report).
@@ -87,7 +88,7 @@ import ListView from '@/components/ListView.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import NumLink from '@/components/ui/NumLink.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { long, short, weekday } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
@@ -161,7 +162,7 @@ function select(row, on) {
 }
 let shown = []
 async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
-  const res = await api('sources.list', { space: props.embed?.space || store.space, scope: props.place === 'all' && !props.embed ? 'all' : 'captures',
+  const res = await brainData.sources.list({ space: props.embed?.space || store.space, scope: props.place === 'all' && !props.embed ? 'all' : 'captures',
     sensitive: p.sensitive ? 1 : 0, by: props.embed ? undefined : route.query.by || undefined, tab: tab || 'all', area: p.area, goal: p.goal, from_date: p.from, to_date: p.to,
     status: p.status, intent: p.intent, system: p.system, assistant: p.assistant, open_items: p.open_items ? 1 : 0, include_archived: p.archived ? 1 : 0, filters, order_by, summary, start, page_length })
   if (summary) return res
@@ -171,7 +172,7 @@ async function fetch({ params: p, tab, filters, order_by, summary, start, page_l
 }
 async function refile() {
   const sources = shown.filter((r) => selected.value.includes(r.ref)).map((r) => ({ doctype: r.doctype, name: r.name }))
-  const res = await tryCall(() => api('sources.refile', { sources, area: refileArea.value }), 'Area set.')
+  const res = await tryCall(() => brainData.sources.refile({ sources, area: refileArea.value }), 'Area set.')
   if (res) {
     refileOpen.value = false
     selected.value = []

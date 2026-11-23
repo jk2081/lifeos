@@ -41,13 +41,14 @@
 </template>
 
 <script setup>
+import { brainData } from '@/data/brain'
 import { manySpaces } from '@/lib/lens'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Avatar, Badge, Button } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
 import NumLink from '@/components/ui/NumLink.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
 import { canWrite, refreshCounts, store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
 import { loadLookups } from '@/lib/lookups'
@@ -86,14 +87,14 @@ function describe(it) {
 }
 
 async function fetch({ params: p, tab, filters, order_by, summary, start, page_length }) {
-  const res = await api('inbox.list', { space: store.space, status: STATUS[tab] ? JSON.stringify(STATUS[tab]) : undefined,
+  const res = await brainData.inbox.list({ space: store.space, status: STATUS[tab] ? JSON.stringify(STATUS[tab]) : undefined,
     source_type: p.source_type, area: p.area, from_date: p.from, to_date: p.to, filters, order_by, summary, start, page_length })
   if (summary) return res
   refreshCounts()
   return { rows: res.items, total: res.total, pending_total: res.pending_total, tabs: res.tabs }
 }
 async function retry(it) {
-  if (await tryCall(() => api('inbox.retry', { item: it.name }), 'Sent back to the agent.')) list.value.reload()
+  if (await tryCall(() => brainData.inbox.retry({ item: it.name }), 'Sent back to the agent.')) list.value.reload()
 }
 onMounted(loadLookups)
 </script>
