@@ -128,10 +128,11 @@ def active_goals(space, area=None):
 	from lifeos.api.utils import in_area
 
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"})
-	rows = frappe.db.sql("""select g.name, g.title, g.horizon, g.cycle, g.area, g.done_when, g.measure_kind, g.measure, g.unit, g.target_value,
-		g.target_date, g.sort_order, g.last_activity_on, c.title as cycle_title from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
-		where g.space = %(space)s and g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0 and g.on_hold = 0
-		and (g.horizon != '12 weeks' or g.cycle = %(cycle)s)""", {"space": space, "cycle": cycle or ""}, as_dict=True)
+	g, c = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Cycle")
+	rows = (frappe.qb.from_(g).left_join(c).on(c.name == g.cycle).select(g.name, g.title, g.horizon, g.cycle, g.area, g.done_when, g.measure_kind, g.measure,
+		g.unit, g.target_value, g.target_date, g.sort_order, g.last_activity_on, c.title.as_("cycle_title"))
+		.where((g.space == space) & (g.outcome == "In Progress") & (g.is_someday == 0) & (g.is_archived == 0) & (g.on_hold == 0)
+			& ((g.horizon != "12 weeks") | (g.cycle == (cycle or "")))).run(as_dict=True))  # system: the weekly plan reads its own space
 	if area:
 		keep = in_area(space, area, "Life Goal", [r.name for r in rows])
 		rows = [r for r in rows if r.name in keep]

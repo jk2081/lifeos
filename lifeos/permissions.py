@@ -147,8 +147,16 @@ def sensitive_guard(space, alias="", user=None) -> str:
 	return f" and {alias}is_sensitive = 0" if vault_hidden(space, user) else ""
 
 
+def vault_criterion(space, table, user=None):
+	"""A criterion over a table of Life Index rows (`frappe.qb.DocType("Life Index")`) that leaves Vault rows, and sources of Vault
+	documents, out when the Vault is closed to the user; None when it is open. Use it with a space on the same query."""
+	if not vault_hidden(space, user):
+		return None
+	return (table.vault_locked == 0) & (table.ref_doctype != "Life Vault Document")
+
+
 def vault_guard(space, alias="", user=None) -> str:
-	"""SQL for a query on Life Index rows of one space: leaves Vault rows, and sources of Vault documents, out when the
+	"""LEGACY (SQL text; the new API is vault_criterion). SQL for a query on Life Index rows of one space: leaves Vault rows, and sources of Vault documents, out when the
 	Vault is closed to the user."""
 	return f" and {alias}vault_locked = 0 and {alias}ref_doctype != 'Life Vault Document'" if vault_hidden(space, user) else ""
 

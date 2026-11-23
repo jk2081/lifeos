@@ -1,16 +1,19 @@
 """The Timeline: every record by day, newest first. Reads only Life Index."""
 import frappe
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, getdate, today
 
 from lifeos.library import links
 from lifeos import permissions
-from lifeos.api.utils import area_filter, flag, names_map, page, std_filters, summarise, user_names
+from frappe.query_builder import Order
+
+from lifeos.api.utils import area_criterion, count_where, filter_criteria, flag, group_summary, list_query, names_map, page, user_names
 
 KIND_DOCTYPES = {
 	"Life Inbox Item": ["Inbox"], "Life Task": ["Task", "Task Done"], "Life Note": ["Note"], "Life Vault Document": ["Document"],
 	"Life Chat Log": ["Chat"]
 }
-ROW_FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, goal, is_archived, status, record_owner, also_in_csv"
+ROW_FIELDS = ["ref_doctype", "ref_name", "kind", "title", "record_date", "area", "goal", "is_archived", "status", "record_owner", "also_in_csv"]
 
 
 def decorate(rows):
@@ -20,8 +23,9 @@ def decorate(rows):
 	inbox = [r.ref_name for r in rows if r.ref_doctype == "Life Inbox Item"]
 	proposals = {}
 	if inbox:
-		for item, st, n in frappe.db.sql(
-			"select inbox_item, status, count(*) from `tabLife Proposal` where inbox_item in %s group by inbox_item, status", (inbox,)):
+		p = frappe.qb.DocType("Life Proposal")
+		for item, st, n in frappe.qb.get_query("Life Proposal", fields=[p.inbox_item, p.status, fn.Count("*")], ignore_permissions=False).where(
+				p.inbox_item.isin(inbox)).groupby(p.inbox_item, p.status).run():
 			proposals.setdefault(item, {})[st] = n
 	for r in rows:
 		if r.ref_doctype == "Life Inbox Item":
@@ -35,12 +39,21 @@ def decorate(rows):
 	return rows
 
 
-def index_rows(space, where="", values=None, order="record_date desc, modified desc", start=0, page_length=50):
-	# nosemgrep: frappe-sql-format-injection -- ROW_FIELDS and vault_guard are constants; callers pass fixed WHERE and ORDER fragments; values are parameters
-	rows = frappe.db.sql(
-		f"select {ROW_FIELDS} from `tabLife Index` where space=%(space)s {where}{permissions.vault_guard(space)} order by {order} limit %(start)s, %(len)s",
-		{"space": space, "start": start, "len": page_length, **(values or {})}, as_dict=True)
-	return decorate(rows)
+def index_where(space, where=()):
+	"""The criteria of a read of one space's Life Index rows: the space, `where`, and the Vault guard."""
+	x = frappe.qb.DocType("Life Index")
+	guard = permissions.vault_criterion(space, x)
+	return [x.space == space, *where, *([guard] if guard is not None else [])]
+
+
+DEFAULT_ORDER = (("record_date", Order.desc), ("modified", Order.desc))
+
+
+def index_rows(space, where=(), order=None, start=0, page_length=50):
+	"""Index rows of a space, decorated. `where` is a list of criteria over `frappe.qb.DocType("Life Index")`, `order` a list of (term, Order)."""
+	x = frappe.qb.DocType("Life Index")
+	order = order or [(x[f], way) for f, way in DEFAULT_ORDER]
+	return decorate(list_query("Life Index", ROW_FIELDS, index_where(space, where), order).limit(page_length).offset(start).run(as_dict=True))
 
 
 @frappe.whitelist(methods=["GET"])
@@ -49,28 +62,23 @@ def get(space: str | None = None, from_date: str | None = None, to_date: str | N
 	"""Every record by day, newest first: inbox items, tasks created and completed, notes, documents, chats."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = [], {}
+	x = frappe.qb.DocType("Life Index")
+	where = []
 	if from_date:
-		where.append("record_date >= %(from_date)s")
-		values["from_date"] = getdate(from_date)
+		where.append(x.record_date >= getdate(from_date))
 	if to_date:
-		where.append("record_date <= %(to_date)s")
-		values["to_date"] = getdate(to_date)
+		where.append(x.record_date <= getdate(to_date))
 	if area:
-		where.append(area_filter(space, area, "area", values, also_in="index"))  # with its sub-areas, as under the lens
+		where.append(area_criterion(space, area, x, also_in="index"))  # with its sub-areas, as under the lens
 	if doctype:
-		where.append("ref_doctype = %(doctype)s")
-		values["doctype"] = doctype
+		where.append(x.ref_doctype == doctype)
 	if not flag(include_archived):
-		where.append("is_archived = 0")
-	conds, values = std_filters("Life Index", filters, "", values)
-	where += conds
-	clause = ((" and " + " and ".join(where)) if where else "") + permissions.vault_guard(space)
+		where.append(x.is_archived == 0)
+	where += filter_criteria("Life Index", filters, x)
 	if summary:
-		return {"summary": summarise("Life Index", f"from `tabLife Index` where space=%(space)s {clause}", {"space": space, **values}, "", summary, start, page_length)}
-	rows = index_rows(space, clause, values, start=start, page_length=page_length)
-	# nosemgrep: frappe-sql-format-injection -- fixed fragments, std_filters columns checked against meta; values are parameters
-	total = frappe.db.sql(f"select count(*) from `tabLife Index` where space=%(space)s {clause}", {"space": space, **values})[0][0]
+		return {"summary": group_summary("Life Index", index_where(space, where), summary, start, page_length)}
+	rows = index_rows(space, where, start=start, page_length=page_length)
+	total = count_where("Life Index", index_where(space, where))
 	days = []
 	for r in rows:
 		if not days or days[-1]["date"] != r["record_date"]:

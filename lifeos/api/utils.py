@@ -439,6 +439,14 @@ def list_query(doctype, fields, where=(), terms=()):
 	return apply_order(query, terms)
 
 
+def count_where(doctype, where=()):
+	"""How many of the DocType's rows the user may read meet the criteria."""
+	query = frappe.qb.get_query(doctype, fields=[fn.Count("*")], ignore_permissions=False)
+	for crit in where:
+		query = query.where(crit)
+	return query.run()[0][0]
+
+
 def count_by(doctype, field, where=()):
 	"""{value of `field`: rows} over the DocType's rows the user may read that meet the criteria."""
 	table = frappe.qb.DocType(doctype)

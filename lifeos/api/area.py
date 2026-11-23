@@ -4,15 +4,14 @@ import frappe
 from lifeos.goals import areas as life_areas
 from lifeos import permissions
 from lifeos.api import tasks as task_api
-from lifeos.api.utils import flag
+from lifeos.api.utils import count_by, flag
 
 
 def chat_open_counts(names):
 	if not names:
 		return {}
-	return dict(frappe.db.sql(
-		"select parent, count(*) from `tabLife Chat Open Item` where parenttype='Life Chat Log' and status='Open' and parent in %s group by parent",
-		(names,)))
+	o = frappe.qb.DocType("Life Chat Open Item")
+	return count_by("Life Chat Open Item", "parent", [o.parenttype == "Life Chat Log", o.status == "Open", o.parent.isin(names)])
 
 
 @frappe.whitelist(methods=["GET"])
@@ -32,9 +31,9 @@ def tree(space: str | None = None, include_archived: bool | int = 0, include_off
 			out.extend(below(k))
 		return out
 
-	direct_goals = dict(frappe.db.sql(
-		"select area, count(*) from `tabLife Goal` where space=%s and outcome='In Progress' and is_someday=0 and is_archived=0 group by area", space))
-	direct_notes = dict(frappe.db.sql("select area, count(*) from `tabLife Index` where space=%s and kind='Note' and is_archived=0 group by area", space))
+	g, x = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Index")
+	direct_goals = count_by("Life Goal", "area", [g.space == space, g.outcome == "In Progress", g.is_someday == 0, g.is_archived == 0])
+	direct_notes = count_by("Life Index", "area", [x.space == space, x.kind == "Note", x.is_archived == 0])
 	for a in areas:
 		ids = below(a.name)
 		a["open_tasks"] = task_api.count(space, area=a.name)
