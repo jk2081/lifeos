@@ -439,6 +439,15 @@ def list_query(doctype, fields, where=(), terms=()):
 	return apply_order(query, terms)
 
 
+def count_by(doctype, field, where=()):
+	"""{value of `field`: rows} over the DocType's rows the user may read that meet the criteria."""
+	table = frappe.qb.DocType(doctype)
+	query = frappe.qb.get_query(doctype, fields=[table[field], fn.Count("*")], ignore_permissions=False)
+	for crit in where:
+		query = query.where(crit)
+	return dict(query.groupby(table[field]).run())
+
+
 def count_tabs(doctype, where, tabs):
 	"""The count on each state tab of a list, in one query. `where` is the list's criteria without the one on the tab's own
 	field, so every count respects the other filters. `tabs` maps a tab to its criterion (a function of nothing: build it
