@@ -1271,3 +1271,8 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **Plurals.** `plural()` moved to `lib/plural.js` (still exported from `lib/tasks.js`) so a node test can import it; "ticks so far" on the goal page and the goal pane use it. Other counts on those pages already used it or have a fixed unit ("1 of 3").
 - **Cycles.** The goal names were already links; the weekly score bars lost their 520 px minimum and sideways scroll and use small 10 px labels on a phone (the current week's "so far" is cut short there).
 - **Checks.** GOALS.57 and 58 changed; GOALS.72 to 75 added, placed after GOALS.64 in the file because they share that block's set-up.
+
+## Issue 83: where am I
+
+- **One header.** `PageHead` takes `path` (ancestors, place first) instead of `crumb`; it draws the back button and the path (frappe-ui `Breadcrumbs`), and sets `document.title` (`lib/trail.js`). The back button is a link to the parent in the path, so it works after a direct link. The same row serves the phone; the path is no longer hidden below `md`.
+- **Checks.** TOOLING.5 to 8 added; REVIEW checks read the title from `[data-page-title]`.
