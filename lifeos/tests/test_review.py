@@ -1,4 +1,5 @@
 """Tests for review."""
+import os
 from datetime import datetime, timedelta
 
 import frappe
@@ -659,3 +660,27 @@ class TestScheduledOnTodayAndCalendar(WeekCase):
 		cal = calendar.get(space=PRIVATE, from_date=today(), to_date=add_days(today(), 6))
 		item = next(i for i in cal["items"] if i["name"] == t.name)
 		self.assertEqual((item["all_day"], item["start"][11:16], item["end"][11:16]), (0, "15:30", "16:15"))
+
+
+class TestReviewFolder(LifeTestCase):
+	"""The review screens live in one folder and reach the server through frontend/src/data/review.js."""
+
+	COMPONENTS = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend", "src", "components")
+
+	def test_no_review_file_calls_api_directly(self):
+		import re
+
+		folder = os.path.join(self.COMPONENTS, "review")
+		bad = []
+		for name in sorted(os.listdir(folder)):
+			if not name.endswith((".vue", ".js")):
+				continue
+			source = open(os.path.join(folder, name), encoding="utf-8").read()
+			if re.search(r"\bapi\(", source) or re.search(r"import\s*\{[^}]*\bapi\b[^}]*\}\s*from\s*'@/lib/api'", source):
+				bad.append(name)
+		self.assertEqual(bad, [], "these review components call api( directly; use data/review.js")
+
+	def test_weekly_and_periodic_folders_are_gone(self):
+		for folder in ("weekly", "periodic"):
+			self.assertFalse(os.path.isdir(os.path.join(self.COMPONENTS, folder)), f"components/{folder} still exists")
+

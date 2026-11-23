@@ -1,8 +1,9 @@
-// The weekly review's shared state (set 8): the header (period, tabs done and openable), and one way to change anything
-// that saves at once and says "Saved". Created by components/review/ReviewPage.vue and injected by its tabs.
+// The review's shared state, for the weekly, monthly and 12-week reviews: the header (period, tabs done and openable), and one
+// way to change anything that saves at once and says "Saved". Created by components/review/ReviewPage.vue and injected by its tabs.
 import { inject, provide, reactive } from 'vue'
 import { toast } from 'frappe-ui'
-import { api, errorText } from './api'
+import { errorText } from './api'
+import { reviewData } from '@/data/review'
 import { canWrite, store } from './store'
 
 export const TABS = [
@@ -13,13 +14,17 @@ export const TABS = [
 ]
 const KEY = Symbol('review')
 
-export function provideReview() {
-  const r = reactive({ head: null, saving: '', readOnly: false, version: 0 })
+// kind: 'weekly' (`weekly.*`), 'monthly' or '12-weeks' (`periodic.*`, which also take the kind)
+export function provideReview(kind = 'weekly') {
+  const weekly = kind === 'weekly'
+  const send = (method, args) => (weekly ? reviewData.weekly(method, { space: store.space, ...args }) : reviewData.periodic(method, { space: store.space, kind, ...args }))
+  const r = reactive({ head: null, saving: '', readOnly: false, notDue: false, version: 0, kind })
   r.load = async () => {
-    let head = await api('weekly.get', { space: store.space })
+    let head
+    try { head = await send('get') } catch (e) { if (weekly) throw e; r.notDue = true; return null }
     if (canWrite() && !store.isAgent) {
       // resume or start (a site that refuses writes keeps the unsaved review, which reads the same)
-      try { head = await api('weekly.start', { space: store.space }) } catch (e) { r.readOnly = true }
+      try { head = await send('start') } catch (e) { r.readOnly = true }
     } else r.readOnly = true
     r.head = head
     return head
@@ -28,7 +33,7 @@ export function provideReview() {
   r.act = async (method, args = {}, okMessage) => {
     r.saving = 'Saving…'
     try {
-      const out = await api(`weekly.${method}`, { space: store.space, ...args })
+      const out = await send(method, args)
       if (out?.header) r.head = out.header
       r.saving = 'Saved'
       r.version += 1
@@ -40,11 +45,9 @@ export function provideReview() {
       throw e
     }
   }
-  r.read = (method, args = {}) => api(`weekly.${method}`, { space: store.space, ...args })
+  r.read = (method, args = {}) => send(method, args)
   provide(KEY, r)
   return r
 }
 
 export const useReview = () => inject(KEY)
-// the monthly and 12-week reviews (issue 47) provide their own state of the same shape, so the shell's header and footer are shared
-export const provideShell = (r) => provide(KEY, r)

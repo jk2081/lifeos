@@ -1224,3 +1224,11 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **Counts, Goals, before and after:** components 26 to 19 files (the goals, plan, journal and periodic folders of main became one); lines 2,712 to 2,158 in the components, plus 35 in `data/goals.js`. Fewer files and lines come from #72's removals and #74's merges, not from this issue.
 - **Tests:** `TestGoalsFolder` in `test_goals.py` (no direct `api(`; no goal components in the old folders). It stands in for the issue's "Unit (tooling)" tests, since there is no tooling unit module.
 - **Docker mount:** after the merge the bench's mount served `src/pages/Plan.vue` at a stale size and the build failed with "Element is missing end tag"; recreating the file from inside the container fixed it.
+
+## Issue 79 (screens 2 of 4: one review screen, review data module)
+
+- **Already done by #74:** `components/weekly/`, `components/periodic/` and `ReviewBody.vue` were merged into `components/review/` (same look). Review meetings, their calendar write-back and the one-list stale tasks are untouched.
+- **One review screen.** `ReviewPage.vue` now takes a `kind` (`weekly`, `monthly`, `12-weeks`) and holds the shell that `ReviewPage.vue` and `PeriodicReviewPage.vue` each had: the steps, which step is open, Pause, and the done screen. `PeriodicReviewPage.vue` and `lib/periodic.js` are deleted; `lib/review.js` `provideReview(kind)` serves all three kinds (`weekly.*` or `periodic.*`). The step components and the weekly and periodic done cards stay as they are, since their content differs.
+- **Data module.** `frontend/src/data/review.js` (`reviewData`) wraps the server calls of the review folder, `pages/WeeklyReview.vue` and `lib/review.js` in frappe-ui `createResource`, with the same "counts are stale" rule as `lib/api.js`. No file under `components/review/` imports or calls `api(`.
+- **Counts, Review, before and after:** components 21 to 20 files; lines (components, `lib/review.js`, `lib/periodic.js`) 1,790 to 1,712, plus 30 in `data/review.js`.
+- **Tests:** `TestReviewFolder` in `test_review.py` (no direct `api(`; no `weekly/` or `periodic/` folders). It stands in for the issue's "Unit (tooling)" tests. Not run: the acceptance walk (GitHub runs it).

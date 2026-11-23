@@ -71,7 +71,8 @@ import { Alert, Button, Checkbox, DateTimePicker, Dropdown, FormControl, Skeleto
 import Drawer from '@/components/ui/Drawer.vue'
 import DoneWhen from '@/components/goals/DoneWhen.vue'
 import SuggestedReadings from '@/components/goals/SuggestedReadings.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { reviewData } from '@/data/review'
 import { emptyMeasure, measureArgs, measureProblem } from '@/lib/goals'
 import { store } from '@/lib/store'
 import { time, weekday } from '@/lib/dates'
@@ -106,7 +107,7 @@ const sameSlot = (s) => (v.slot || '').slice(0, 16) === s
 // gave the drawer new data, which read the readings again: a loop that refreshed the open drawer and wiped what was typed.
 async function loadReadings() {
   if (!props.d) return
-  readings.value = (await tryCall(() => api('goals.goal_readings', { goal: props.d.goal })))?.suggested || []
+  readings.value = (await tryCall(() => reviewData.goals.goal_readings({ goal: props.d.goal })))?.suggested || []
 }
 // after a reading is confirmed or dismissed: the goal's progress changed, so the row and the drawer read it again
 async function reloadReadings() {
@@ -114,7 +115,7 @@ async function reloadReadings() {
   emit('changed')
 }
 async function saveMeasure() {
-  if (await tryCall(() => api('goals.update', { goal: props.d.goal, values: measureArgs(measure) }), 'Finish line saved.')) emit('changed')
+  if (await tryCall(() => reviewData.goals.update({ goal: props.d.goal, values: measureArgs(measure) }), 'Finish line saved.')) emit('changed')
 }
 function save() {
   // with a task the next action renames it at Lock; without one a task is made
