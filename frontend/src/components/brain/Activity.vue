@@ -76,7 +76,8 @@ import { Badge, Button } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { brainData } from '@/data/brain'
 import { canWrite, store } from '@/lib/store'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { dotClass } from '@/lib/lens'
@@ -124,18 +125,18 @@ function setQuery(patch) {
 }
 const args = () => ({ space: store.space, outcome: outcome.value || undefined, source: source.value || undefined, area: area.value || undefined })
 async function load() {
-  const res = await tryCall(() => api('brain.activity', args()))
+  const res = await tryCall(() => brainData.brain.activity(args()))
   if (res) { data.value = res; rows.value = res.rows }
   loaded.value = true
 }
 async function loadMore() {
   more.value = true
-  const res = await tryCall(() => api('brain.activity', { ...args(), start: rows.value.length }))
+  const res = await tryCall(() => brainData.brain.activity({ ...args(), start: rows.value.length }))
   if (res) rows.value = [...rows.value, ...res.rows]
   more.value = false
 }
 async function retry(r) {
-  if (await tryCall(() => api('inbox.retry', { item: r.item }), 'Sent back to the agent.')) await load()
+  if (await tryCall(() => brainData.inbox.retry({ item: r.item }), 'Sent back to the agent.')) await load()
 }
 onMounted(async () => { await loadLookups(); await load() })
 watch(() => [store.space, route.query.outcome, route.query.source, route.query.area, store.lensArea], load)

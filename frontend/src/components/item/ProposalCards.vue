@@ -80,7 +80,8 @@ import { Badge, Button, Checkbox, DatePicker, DateTimePicker, Dialog, FormContro
 import Card from '../ui/Card.vue'
 import Pick from '../Pick.vue'
 import Empty from '../Empty.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { refreshCounts } from '@/lib/store'
 import { openRoute } from '@/lib/pane'
 import { areaOptionsOf, goalOptions } from '@/lib/lookups'
@@ -140,7 +141,7 @@ async function setField(p, field, value) {
   p.payload = next
   p.error = ''
   try {
-    const res = await api('review.update_payload', { proposal: p.name, payload: next })
+    const res = await itemData.review.update_payload({ proposal: p.name, payload: next })
     p.payload = res.payload
     p.preview = res.preview
   } catch (e) {
@@ -153,7 +154,7 @@ async function decide(p, decision, payload) {
   const before = p.status
   p.status = decision === 'accept' ? 'Accepted' : 'Rejected'
   try {
-    const res = await api('review.decide', { proposal: p.name, decision, payload })
+    const res = await itemData.review.decide({ proposal: p.name, decision, payload })
     Object.assign(p, { created_doctype: res.created_doctype, created_name: res.created_name, route: res.route, exists: true })
     props.item.status = res.item_status
     if (res.item_status === 'Done') toast.success('All decided. This item is done.')
@@ -205,7 +206,7 @@ async function saveEdit(accept) {
     }
     return
   }
-  const res = await tryCall(() => api('review.update_payload', { proposal: p.name, payload: next }), 'Saved.')
+  const res = await tryCall(() => itemData.review.update_payload({ proposal: p.name, payload: next }), 'Saved.')
   if (res) {
     p.payload = res.payload
     p.preview = res.preview
@@ -215,6 +216,6 @@ async function saveEdit(accept) {
 }
 
 onMounted(async () => {
-  schema.value = (await tryCall(() => api('meta.proposal_schema'))) || {}
+  schema.value = (await tryCall(() => itemData.meta.proposal_schema())) || {}
 })
 </script>

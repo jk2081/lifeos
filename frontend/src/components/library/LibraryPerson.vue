@@ -60,7 +60,7 @@ import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api } from '@/lib/api'
+import { libraryData } from '@/data/library'
 import { short } from '@/lib/dates'
 import { onRecordChanged, openRef } from '@/lib/pane'
 
@@ -73,7 +73,7 @@ const go = (name) => router.push({ path: `/library/people/${name}`, query: { spa
 
 async function load() {
   try {
-    person.value = await api('people.get', { name: props.person })
+    person.value = await libraryData.people.get({ name: props.person })
     missing.value = false
   } catch (e) {
     person.value = null

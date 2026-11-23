@@ -127,7 +127,8 @@ import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import Pick from '@/components/Pick.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { brainData } from '@/data/brain'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { dateTime } from '@/lib/dates'
 import { canWrite, store } from '@/lib/store'
@@ -160,21 +161,21 @@ function lastReceived(c) {
 }
 async function load() {
   loadLookups()
-  const res = await tryCall(() => api('connections.sources', { space: store.space }))
+  const res = await tryCall(() => brainData.connections.sources({ space: store.space }))
   if (res) {
     connected.value = res.connected; available.value = res.available; coming.value = res.coming
     emailIn.value = res.email_in || {}
     sendersText.value = (res.email_in?.senders || []).join('\n')
-    if (store.isAdmin) accountName.value = (await tryCall(() => api('settings.get', { space: store.space })))?.settings?.email_in_account || ''
+    if (store.isAdmin) accountName.value = (await tryCall(() => brainData.settings.get({ space: store.space })))?.settings?.email_in_account || ''
   }
   loaded.value = true
 }
 async function saveEmailIn() {
   const values = { email_in_senders: sendersText.value, email_in_account: accountName.value.trim() || null }
-  if (await tryCall(() => api('settings.save', { values }), 'Saved.')) load()
+  if (await tryCall(() => brainData.settings.save({ values }), 'Saved.')) load()
 }
 async function toggle(c, on) {
-  const res = await tryCall(() => api('connections.save', { name: c.name, active: on ? 1 : 0 }), on ? `${c.label} is on.` : `${c.label} is off. Nothing it brought in was deleted.`)
+  const res = await tryCall(() => brainData.connections.save({ name: c.name, active: on ? 1 : 0 }), on ? `${c.label} is on.` : `${c.label} is off. Nothing it brought in was deleted.`)
   if (res) Object.assign(c, { active: res.active, quiet: res.quiet })
 }
 function openSettings(c) {
@@ -187,14 +188,14 @@ async function save() {
   const d = draft.value
   const extra = current.value.system === 'gmail' && current.value.mailbox
     ? { label_name: d.label_name || '', always_include: d.always_include || '', always_skip: d.always_skip || '', always_sensitive: d.always_sensitive || '', attach_files: d.attach_files ? 1 : 0 } : {}
-  const res = await tryCall(() => api('connections.save', { name: current.value.name, active: d.active ? 1 : 0, default_intent: d.default_intent, default_area: d.default_area || '', default_goal: d.default_goal || '', ...extra }), 'Saved.')
+  const res = await tryCall(() => brainData.connections.save({ name: current.value.name, active: d.active ? 1 : 0, default_intent: d.default_intent, default_area: d.default_area || '', default_goal: d.default_goal || '', ...extra }), 'Saved.')
   if (!res) return
   settingsOpen.value = false
   await load()
 }
 async function add(t) {
   if (t.system === 'gmail') return openGmail()
-  const res = await tryCall(() => api('connections.save', { space: store.space, system: t.system, active: 1 }), `${t.label} is on.`)
+  const res = await tryCall(() => brainData.connections.save({ space: store.space, system: t.system, active: 1 }), `${t.label} is on.`)
   if (!res) return
   await load()
   const c = connected.value.find((x) => x.system === t.system)
@@ -203,21 +204,21 @@ async function add(t) {
 async function openGmail() {
   gmailSetup.value = null
   gmailOpen.value = true
-  gmailSetup.value = await tryCall(() => api('connections.gmail_setup'))
+  gmailSetup.value = await tryCall(() => brainData.connections.gmail_setup())
 }
 async function connectGmail() {
-  const res = await tryCall(() => api('connections.gmail_connect', { space: store.space, success_uri: '/life/brain/sources' }))
+  const res = await tryCall(() => brainData.connections.gmail_connect({ space: store.space, success_uri: '/life/brain/sources' }))
   if (res?.url) window.location.assign(res.url) // Google's own sign-in; Frappe brings the browser back here with ?gmail=<card>
 }
 async function finishGmail(name) {
   await router.replace({ path: route.path, query: { ...route.query, gmail: undefined } })
-  const res = await tryCall(() => api('connections.gmail_finish', { name }), 'Gmail is connected. Life OS reads new mail every 15 minutes.')
+  const res = await tryCall(() => brainData.connections.gmail_finish({ name }), 'Gmail is connected. Life OS reads new mail every 15 minutes.')
   await load()
   const c = res && connected.value.find((x) => x.name === res.name)
   if (c) openSettings(c)
 }
 async function removeGmail() {
-  const res = await tryCall(() => api('connections.gmail_remove', { name: current.value.name }), 'Mailbox removed. What it brought in stays.')
+  const res = await tryCall(() => brainData.connections.gmail_remove({ name: current.value.name }), 'Mailbox removed. What it brought in stays.')
   if (!res) return
   settingsOpen.value = false
   await load()
@@ -225,7 +226,7 @@ async function removeGmail() {
 async function addOther() {
   const system = otherName.value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
   if (!system) return
-  const res = await tryCall(() => api('connections.save', { space: store.space, system, label: otherName.value.trim(), active: 1 }), `${otherName.value.trim()} is on.`)
+  const res = await tryCall(() => brainData.connections.save({ space: store.space, system, label: otherName.value.trim(), active: 1 }), `${otherName.value.trim()} is on.`)
   if (!res) return
   otherOpen.value = false
   otherName.value = ''

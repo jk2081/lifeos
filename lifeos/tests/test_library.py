@@ -1,4 +1,6 @@
 """Tests for library."""
+import os
+import re
 import base64
 
 import frappe
@@ -637,3 +639,30 @@ class TestSensitiveEverywhere(LifeTestCase):
 		doc = frappe.get_doc("Life Note", note.name)
 		doc.is_sensitive = 1
 		self.assertRaises(frappe.PermissionError, doc.save)
+
+
+class TestScreenFolders(LifeTestCase):
+	"""The item, Brain and Library screens reach the server through frontend/src/data/{item,brain,library}.js (#80)."""
+
+	SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "frontend", "src")
+
+	def test_no_screen_file_calls_api_directly(self):
+		bad = []
+		for folder in ("components/item", "components/brain", "components/library"):
+			path = os.path.join(self.SRC, folder)
+			for name in sorted(os.listdir(path)):
+				if not name.endswith((".vue", ".js")):
+					continue
+				source = open(os.path.join(path, name), encoding="utf-8").read()
+				if re.search(r"\bapi\(", source) or re.search(r"import\s*\{[^}]*\bapi\b[^}]*\}\s*from\s*'@/lib/api'", source):
+					bad.append(f"{folder}/{name}")
+		page = open(os.path.join(self.SRC, "pages", "Item.vue"), encoding="utf-8").read()
+		if re.search(r"\bapi\(", page):
+			bad.append("pages/Item.vue")
+		self.assertEqual(bad, [], "these call api( directly; use data/item.js, brain.js or library.js")
+
+	def test_the_pane_has_one_item_view(self):
+		self.assertFalse(os.path.isdir(os.path.join(self.SRC, "components", "pane")))
+		self.assertFalse(os.path.exists(os.path.join(self.SRC, "components", "item", "RecordPane.vue")))
+		self.assertFalse(os.path.exists(os.path.join(self.SRC, "components", "item", "PaneBody.vue")))
+		self.assertTrue(os.path.exists(os.path.join(self.SRC, "components", "item", "ItemView.vue")))

@@ -63,7 +63,8 @@ import { Badge, Button, Select, TextInput } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { libraryData } from '@/data/library'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { fileSize } from '@/lib/upload'
@@ -100,7 +101,7 @@ let timer
 watch(q, () => { clearTimeout(timer); timer = setTimeout(applyQuery, 300) })
 function clear() { q.value = ''; router.replace({ query: { space: route.query.space, open: route.query.open } }) }
 
-const fetchRows = (start) => tryCall(() => api('files.list', { space: store.space, q: route.query.q || undefined, type: type.value || undefined,
+const fetchRows = (start) => tryCall(() => libraryData.files.list({ space: store.space, q: route.query.q || undefined, type: type.value || undefined,
   area: area.value || store.lensArea || undefined, source: source.value || undefined, start, page_length: PAGE }))
 async function load() {
   const res = await fetchRows(0)

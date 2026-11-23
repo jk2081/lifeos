@@ -50,7 +50,8 @@ import { Badge, Button, TextInput } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { libraryData } from '@/data/library'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
@@ -77,7 +78,7 @@ let timer
 watch(q, () => { clearTimeout(timer); timer = setTimeout(applyQuery, 300) })
 function clear() { q.value = ''; router.replace({ query: { space: route.query.space } }) }
 
-const fetchRows = (start) => tryCall(() => api('people.list', { space: store.space, kind: kind.value || undefined, q: route.query.q || undefined,
+const fetchRows = (start) => tryCall(() => libraryData.people.list({ space: store.space, kind: kind.value || undefined, q: route.query.q || undefined,
   area: area.value || store.lensArea || undefined, start, page_length: PAGE }))
 async function load() {
   const res = await fetchRows(0)

@@ -36,7 +36,8 @@ import Row from '@/components/ui/Row.vue'
 import Md from '@/components/Md.vue'
 import Empty from '@/components/Empty.vue'
 import Backlinks from '@/components/Backlinks.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { loadBacklinks } from '@/lib/links'
 import { store } from '@/lib/store'
 import { long } from '@/lib/dates'
@@ -53,8 +54,8 @@ const canRestore = computed(() => store.spaces.find((s) => s.name === c.value?.s
 const writable = computed(() => canRestore.value && !c.value?.is_archived)
 async function load() {
   try {
-    ;[c.value, links.value, made.value] = await Promise.all([api('chats.get', { chat: props.name }), loadBacklinks('Life Chat Log', props.name),
-      api('sources.made_from', { doctype: 'Life Chat Log', name: props.name })])
+    ;[c.value, links.value, made.value] = await Promise.all([itemData.chats.get({ chat: props.name }), loadBacklinks('Life Chat Log', props.name),
+      itemData.sources.made_from({ doctype: 'Life Chat Log', name: props.name })])
     const open = c.value.open_items.filter((i) => i.status === 'Open').length
     emit('meta', { title: c.value.title, area: c.value.area, area_name: c.value.area_name, goal: c.value.goal, goal_title: c.value.goal_title,
       archived: !!c.value.is_archived, canRestore: canRestore.value, sensitive: { doctype: 'Life Chat Log', name: c.value.name, on: !!c.value.is_sensitive },
@@ -66,16 +67,16 @@ async function load() {
   }
 }
 async function makeTask(i) {
-  if (await tryCall(() => api('chats.make_task', { chat: c.value.name, row: i.row }), 'Task created.')) { await load(); emit('changed') }
+  if (await tryCall(() => itemData.chats.make_task({ chat: c.value.name, row: i.row }), 'Task created.')) { await load(); emit('changed') }
 }
 // an open item that should not weigh on the lists is parked on the Someday list, and the item is closed
 async function toSomeday(i) {
-  if (await tryCall(() => api('someday.create', { space: c.value.space, title: i.text, area: c.value.area, body_md: 'From the chat ' + (c.value.title || c.value.name) }), 'Parked on the Someday list.')) {
+  if (await tryCall(() => itemData.someday.create({ space: c.value.space, title: i.text, area: c.value.area, body_md: 'From the chat ' + (c.value.title || c.value.name) }), 'Parked on the Someday list.')) {
     await closeItem(i)
   }
 }
 async function closeItem(i) {
-  if (await tryCall(() => api('chats.close_item', { chat: c.value.name, row: i.row }))) { await load(); emit('changed') }
+  if (await tryCall(() => itemData.chats.close_item({ chat: c.value.name, row: i.row }))) { await load(); emit('changed') }
 }
 onMounted(load)
 </script>

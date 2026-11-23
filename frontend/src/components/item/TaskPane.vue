@@ -54,7 +54,8 @@ import LiveEditor from '@/components/LiveEditor.vue'
 import { safeUrl } from '@/lib/editor/livePreview'
 import { loadBacklinks } from '@/lib/links'
 import { openRef } from '@/lib/pane'
-import { api, db, errorText, tryCall } from '@/lib/api'
+import { db, errorText, tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import AreaGuess from '@/components/AreaGuess.vue'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
@@ -92,7 +93,7 @@ function tell() {
 // the people and organisations of the task's space, to pick for "waiting on" and "delegated to" (issue 25)
 const peopleOptions = ref([{ label: '—', value: '' }])
 async function loadPeople() {
-  const rows = await api('people.options', { space: task.value.space })
+  const rows = await itemData.people.options({ space: task.value.space })
   peopleOptions.value = [{ label: '—', value: '' }, ...rows.map((r) => ({ label: r.label, value: r.value }))]
 }
 function pickWaiting(v) {
@@ -102,7 +103,7 @@ function pickWaiting(v) {
 
 async function load() {
   try {
-    ;[task.value, links.value] = await Promise.all([api('tasks.get', { task: props.name }), loadBacklinks('Life Task', props.name)])
+    ;[task.value, links.value] = await Promise.all([itemData.tasks.get({ task: props.name }), loadBacklinks('Life Task', props.name)])
     tell()
     loadPeople().catch(() => {})
   } catch (e) {
@@ -131,7 +132,7 @@ async function saveNotes() {
   notesState.value = 'Saving…'
   const text = task.value.notes_md
   try {
-    const res = await api('tasks.update', { task: props.name, values: { notes_md: text } })
+    const res = await itemData.tasks.update({ task: props.name, values: { notes_md: text } })
     task.value = { ...res, notes_md: task.value.notes_md }
     notesState.value = 'Saved'
     emit('changed', task.value)
@@ -145,7 +146,7 @@ onBeforeUnmount(saveNotes)
 
 async function save(values) {
   try {
-    task.value = await api('tasks.update', { task: props.name, values })
+    task.value = await itemData.tasks.update({ task: props.name, values })
     tell()
     emit('changed', task.value)
   } catch (e) {
@@ -162,7 +163,7 @@ async function setStatus(status) {
     return
   }
   try {
-    task.value = await api('tasks.set_status', { task: props.name, status, waiting_on: task.value.waiting_on })
+    task.value = await itemData.tasks.set_status({ task: props.name, status, waiting_on: task.value.waiting_on })
     askWaiting.value = false
     tell()
     emit('changed', task.value)
@@ -172,7 +173,7 @@ async function setStatus(status) {
   }
 }
 async function carry() {
-  const res = await tryCall(() => api('tasks.carry_forward', { task: props.name }))
+  const res = await tryCall(() => itemData.tasks.carry_forward({ task: props.name }))
   if (res) {
     toast.success(`Carried into ${res.month}/${res.year}.`)
     emit('changed', null)
@@ -180,7 +181,7 @@ async function carry() {
   }
 }
 async function archive() {
-  const res = await tryCall(() => api('archive.set', { doctype: 'Life Task', name: props.name, archived: task.value.is_archived ? 0 : 1 }),
+  const res = await tryCall(() => itemData.archive.set({ doctype: 'Life Task', name: props.name, archived: task.value.is_archived ? 0 : 1 }),
     task.value.is_archived ? 'Restored.' : 'Archived.')
   if (res) {
     emit('changed', null)
@@ -191,7 +192,7 @@ function remove() {
   dialog.danger({ title: 'Delete task', message: 'Move this task to the trash? It can be restored from Archive, Trash, for 30 days.', onConfirm: doRemove })
 }
 async function doRemove() {
-  if ((await tryCall(() => api('trash.delete', { doctype: 'Life Task', name: props.name }), 'Moved to the trash. Restore it from Archive, Trash, within 30 days.')) !== undefined) {
+  if ((await tryCall(() => itemData.trash.delete({ doctype: 'Life Task', name: props.name }), 'Moved to the trash. Restore it from Archive, Trash, within 30 days.')) !== undefined) {
     emit('changed', null)
     emit('close')
   }

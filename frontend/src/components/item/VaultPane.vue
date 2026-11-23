@@ -31,7 +31,8 @@ import { Alert, Button, FormControl, dialog, toast } from 'frappe-ui'
 import LifeFormLayout from '@/framework/LifeFormLayout.vue'
 import FileAttach from '@/components/FileAttach.vue'
 import Backlinks from '@/components/Backlinks.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
+import { itemData } from '@/data/item'
 import { store } from '@/lib/store'
 import { fileKind, fileSize } from '@/lib/upload'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
@@ -70,7 +71,7 @@ function fill(d) {
 async function save() {
   try {
     const isNew = !doc.value.name
-    const d = await api('vault.save', { document: doc.value.name, space: store.space, values: { ...form } })
+    const d = await itemData.vault.save({ document: doc.value.name, space: store.space, values: { ...form } })
     toast.success('Saved.')
     emit('changed')
     if (isNew) openRef('vault:' + d.name)
@@ -82,7 +83,7 @@ async function save() {
 // the file is already on the server, private and attached to this document: point the document's field at it
 async function attached(f) {
   try {
-    fill(await api('vault.set_file', { document: doc.value.name, file_url: f.file_url }))
+    fill(await itemData.vault.set_file({ document: doc.value.name, file_url: f.file_url }))
     toast.success('File attached.')
     emit('changed')
   } catch (err) {
@@ -95,7 +96,7 @@ function addPerson() {
     fields: [{ name: 'full_name', label: 'Name of the person', required: true, validate: (v) => (String(v || '').trim() ? null : 'A name is needed.') }],
     // an error from the server shows in the dialog, which stays open
     onConfirm: async ({ values }) => {
-      const p = await api('vault.add_person', { space: store.space, full_name: values.full_name.trim() })
+      const p = await itemData.vault.add_person({ space: store.space, full_name: values.full_name.trim() })
       people.value.push(p)
       form.holder = p.name
       loadLookups(true)
@@ -103,7 +104,7 @@ function addPerson() {
   })
 }
 async function archive() {
-  if (await tryCall(() => api('archive.set', { doctype: 'Life Vault Document', name: doc.value.name, archived: 1 }), 'Archived.')) {
+  if (await tryCall(() => itemData.archive.set({ doctype: 'Life Vault Document', name: doc.value.name, archived: 1 }), 'Archived.')) {
     emit('changed')
     emit('close')
   }
@@ -113,7 +114,7 @@ onMounted(async () => {
   people.value = [...(lookups.people || [])]
   if (props.name === 'new') return fill({ doc_type: 'Other', remind_days_before: 60 })
   try {
-    fill(await api('vault.get', { document: props.name }))
+    fill(await itemData.vault.get({ document: props.name }))
   } catch (e) {
     emit('missing')
   }

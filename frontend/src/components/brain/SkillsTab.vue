@@ -69,7 +69,8 @@ import { Badge, Button, Checkbox, Dialog, FormControl, Switch } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { brainData } from '@/data/brain'
 import { store } from '@/lib/store'
 
 const router = useRouter()
@@ -87,7 +88,7 @@ const draft = ref(blank())
 const allTools = computed(() => [...lists.value.tools.read, ...lists.value.tools.write])
 
 async function load() {
-  const res = await tryCall(() => api('skills.overview'))
+  const res = await tryCall(() => brainData.skills.overview())
   if (res) {
     skills.value = res.skills
     lists.value = res.lists
@@ -102,12 +103,12 @@ async function load() {
 watch(() => store.space, load, { immediate: true })
 
 async function toggle(s, on) {
-  const res = await tryCall(() => api('skills.set_active', { name: s.name, active: on ? 1 : 0 }), on ? `${s.title} is on.` : `${s.title} is off.`)
+  const res = await tryCall(() => brainData.skills.set_active({ name: s.name, active: on ? 1 : 0 }), on ? `${s.title} is on.` : `${s.title} is off.`)
   if (res) s.active = res.active
 }
 const tick = (k, v) => { chosen.value = v ? [...new Set([...chosen.value, k])] : chosen.value.filter((x) => x !== k) }
 async function saveAuto() {
-  const res = await tryCall(() => api('skills.save_auto_file', { threshold: Number(threshold.value), kinds: JSON.stringify(chosen.value) }), 'Saved.')
+  const res = await tryCall(() => brainData.skills.save_auto_file({ threshold: Number(threshold.value), kinds: JSON.stringify(chosen.value) }), 'Saved.')
   if (res) { chosen.value = [...res.kinds]; threshold.value = res.threshold }
 }
 function openNew() { draft.value = blank(); newOpen.value = true }
@@ -115,7 +116,7 @@ const pickTool = (t, v) => { draft.value.tools = v ? [...draft.value.tools, t] :
 async function create() {
   const d = draft.value
   if (!d.title.trim()) return
-  const res = await tryCall(() => api('skills.create', { slug: d.title, values: JSON.stringify({ ...d, tools: d.tools }) }), 'Skill created. It is switched off until you turn it on.')
+  const res = await tryCall(() => brainData.skills.create({ slug: d.title, values: JSON.stringify({ ...d, tools: d.tools }) }), 'Skill created. It is switched off until you turn it on.')
   if (res) { newOpen.value = false; router.push(`/brain/skills/${res.name}`) }
 }
 </script>

@@ -141,7 +141,8 @@ import Stat from '@/components/ui/Stat.vue'
 import OldItems from '@/components/inbox/OldItems.vue'
 import LessonCard from '@/components/brain/LessonCard.vue'
 import ContradictionCard from '@/components/brain/ContradictionCard.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
+import { brainData } from '@/data/brain'
 import { canWrite, store } from '@/lib/store'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { dotClass } from '@/lib/lens'
@@ -163,7 +164,7 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 const dot = (area) => dotClass((lookups.areas || []).find((a) => a.name === area))
 
 async function load() {
-  const res = await tryCall(() => api('brain.needs_you', { space: store.space }))
+  const res = await tryCall(() => brainData.brain.needs_you({ space: store.space }))
   if (res) data.value = res
   loaded.value = true
 }
@@ -173,7 +174,7 @@ async function decide(r, decision, area) {
   busy.add(r.proposal)
   try {
     const payload = area ? { ...r.payload, area } : undefined
-    await api('review.decide', { proposal: r.proposal, decision, payload })
+    await brainData.review.decide({ proposal: r.proposal, decision, payload })
     toast.success(decision === 'reject' ? `Dropped “${r.title}”.` : `Filed “${r.title}”${area ? ` under ${areaLabel(area)}` : ''}.`)
   } catch (e) {
     toast.error(errorText(e))
@@ -198,12 +199,12 @@ async function fileAll() {
       const everyOne = list.length === list[0].item_pending
       try {
         if (everyOne) {
-          const res = await api('review.decide_all', { item, decision: 'accept' })
+          const res = await brainData.review.decide_all({ item, decision: 'accept' })
           done += res.decided.length
           failed += res.errors.length
         } else {
           for (const r of list) {
-            try { await api('review.decide', { proposal: r.proposal, decision: 'accept' }); done++ } catch { failed++ }
+            try { await brainData.review.decide({ proposal: r.proposal, decision: 'accept' }); done++ } catch { failed++ }
           }
         }
       } catch {
@@ -220,10 +221,10 @@ async function fileAll() {
 // a capture the Brain could not process ("Not processed: no AI key", "Sensitive, not read by the Brain"): Retry sends it back, File it myself takes it
 const notProcessed = (u) => /^(Not processed|Sensitive, not read)/.test(u.reason || '')
 async function retry(u) {
-  if (await tryCall(() => api('inbox.retry', { item: u.item }), 'Sent back to be processed.')) await load()
+  if (await tryCall(() => brainData.inbox.retry({ item: u.item }), 'Sent back to be processed.')) await load()
 }
 async function fileMyself(u) {
-  if (await tryCall(() => api('inbox.file_myself', { item: u.item }))) router.push(`/item/${u.item}`)
+  if (await tryCall(() => brainData.inbox.file_myself({ item: u.item }))) router.push(`/item/${u.item}`)
 }
 onMounted(async () => { await loadLookups(); await load() })
 watch(() => [store.space], load)

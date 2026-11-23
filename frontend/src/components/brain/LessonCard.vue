@@ -41,7 +41,8 @@
 import { computed, ref } from 'vue'
 import { Badge, Button, FormControl, toast } from 'frappe-ui'
 import DiffView from '@/components/DiffView.vue'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
+import { brainData } from '@/data/brain'
 
 const props = defineProps({ lesson: { type: Object, required: true }, canEdit: Boolean })
 const emit = defineEmits(['changed'])
@@ -61,7 +62,7 @@ async function act(name, method, args, done) {
   busy.value = name
   error.value = ''
   try {
-    await api(method, { lesson: props.lesson.name, ...args })
+    await brainData.lessons[method]({ lesson: props.lesson.name, ...args })
     toast.success(done)
     editing.value = false
     emit('changed')
@@ -71,7 +72,7 @@ async function act(name, method, args, done) {
     busy.value = ''
   }
 }
-const accept = () => act('accept', 'lessons.accept', editing.value ? { text: draft.value } : {}, 'Added to the skill as a new version.')
-const reject = () => act('reject', 'lessons.reject', {}, 'Rejected.')
-const remove = () => act('remove', 'lessons.remove', {}, 'Removed. The skill has a new version without it.')
+const accept = () => act('accept', 'accept', editing.value ? { text: draft.value } : {}, 'Added to the skill as a new version.')
+const reject = () => act('reject', 'reject', {}, 'Rejected.')
+const remove = () => act('remove', 'remove', {}, 'Removed. The skill has a new version without it.')
 </script>
