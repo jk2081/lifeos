@@ -3,6 +3,7 @@ import frappe
 from frappe import _
 from frappe.utils.caching import request_cache
 
+from lifeos.agents import limits
 from lifeos.constants import NO_AGENT_DOCTYPES
 
 BRAIN_USER = "brain@lifeos.local"  # the "Life Brain" user skills run as (lifeos/skills/runner.py)
@@ -72,6 +73,8 @@ def query_conditions(user=None, doctype=None):
 		if closed:  # the before and after text of a sensitive page (set 6)
 			cond += (f" and not (`tabLife Wiki Change`.`space` in ({_in_list(closed)}) and exists (select 1 from `tabLife Note` sn"
 				" where sn.name = `tabLife Wiki Change`.`note` and sn.is_sensitive = 1))")
+	if is_agent(user) and (doctype == "Life Area" or doctype in limits.AREA_DOCTYPES):  # an area the owner switched off for the agent (issue 85)
+		cond += limits.area_condition(doctype, limits.blocked(user=user))
 	if doctype in ("Life Index", *SENSITIVE_DOCTYPES) and is_agent(user):
 		closed = [s for s in spaces if s not in vault_open_spaces()]
 		if closed and doctype == "Life Index":
@@ -154,6 +157,14 @@ def vault_criterion(space, table, user=None):
 	return (table.vault_locked == 0) & (table.ref_doctype != "Life Vault Document")
 
 
+def _area_off(doc, user) -> bool:
+	"""A record under an area the owner switched off for this agent (issue 85)."""
+	if doc.doctype != "Life Area" and doc.doctype not in limits.AREA_DOCTYPES:
+		return False
+	area = doc.get("name") if doc.doctype == "Life Area" else doc.get("area")
+	return bool(area) and area in limits.blocked(doc.get("space"), user)
+
+
 def has_permission(doc, ptype=None, user=None, debug=False):
 	user = user or frappe.session.user
 	if user == "Administrator":
@@ -172,6 +183,8 @@ def has_permission(doc, ptype=None, user=None, debug=False):
 	space = doc.get("space")
 	if not space:
 		return True  # a new record with no space yet; validate requires one
+	if is_agent(user) and ptype in (None, "read") and _area_off(doc, user):
+		return False
 	access = user_spaces(user).get(space)
 	if not access:
 		return False

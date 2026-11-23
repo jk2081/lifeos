@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "agent",
+  "external_id",
+  "action",
+  "title",
+  "draft",
+  "status",
+  "cost",
+  "happened_on",
+  "decided_by",
+  "decided_on",
+  "delivered"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "agent",
+   "fieldtype": "Data",
+   "label": "Agent",
+   "reqd": 1,
+   "length": 60,
+   "search_index": 1,
+   "in_list_view": 1,
+   "description": "The agent's connection key (its source_system), for example hermes"
+  },
+  {
+   "fieldname": "external_id",
+   "fieldtype": "Data",
+   "label": "External Id",
+   "length": 140
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Data",
+   "label": "Action",
+   "length": 60,
+   "reqd": 1,
+   "description": "read email, send email, change the calendar, chase people, use websites or pay"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "length": 200,
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "draft",
+   "fieldtype": "Text",
+   "label": "Draft",
+   "description": "What it wants to send or do, for the owner to read"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Waiting\nApproved\nDeclined\nDone",
+   "default": "Waiting",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "cost",
+   "fieldtype": "Currency",
+   "label": "Cost",
+   "precision": "4"
+  },
+  {
+   "fieldname": "happened_on",
+   "fieldtype": "Datetime",
+   "label": "Happened On"
+  },
+  {
+   "fieldname": "decided_by",
+   "fieldtype": "Link",
+   "label": "Decided By",
+   "options": "User"
+  },
+  {
+   "fieldname": "decided_on",
+   "fieldtype": "Datetime",
+   "label": "Decided On"
+  },
+  {
+   "fieldname": "delivered",
+   "fieldtype": "Check",
+   "label": "Delivered",
+   "description": "The agent has picked up the decision"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Agent Action",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

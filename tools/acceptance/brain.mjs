@@ -1199,3 +1199,106 @@ for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I84 %${st
     await s.ctx.close()
   }
 }
+
+// Brain > Sources > an agent (issue 85): what it waits for, knows, can do, may read, has scheduled and did, carried by the connector in agent/connector/.
+// Each agent here is a fixture with the key i85-<width> and a folder of files the real connector script reads and changes.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const system = `i85-${width}`
+  const home = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'i85-agent-'))
+  const put = (name, data) => fs.writeFileSync(path.join(home, name), JSON.stringify(data))
+  const read = (name) => JSON.parse(fs.readFileSync(path.join(home, name), 'utf8'))
+  const connector = () => JSON.parse(execFileSync('python3', [path.join(root, 'agent/connector/connector.py'), '--home', home, '--system', system, '--space', SPACE],
+    { env: { ...process.env, LIFEOS_URL: base, LIFEOS_API_KEY: agentKey, LIFEOS_API_SECRET: agentSecret }, encoding: 'utf8' }).trim().split('\n').pop())
+  const open = async () => { await s.open(`/life/brain/sources/${system}`); await pg.locator('[data-agent-panel] [data-agent-section="connector"]').waitFor({ timeout: 10000 }) }
+  try {
+    await check('BRAIN.49', `${width} px: an agent's page shows Waiting, Knows, Can, May read, Scheduled and Did from the connector's report; approving a waiting item moves it to Did`, async () => {
+      put('memory.json', [{ id: 'f1', text: `I85 prefers mornings ${width}`, origin: 'WhatsApp chat', learned_on: '2026-11-01' }, { id: 'f2', text: `I85 daughter is in class 5 ${width}` }])
+      put('jobs.json', [{ id: 'j1', name: `I85 morning digest ${width}`, schedule: 'Every day 7:00', paused: false }])
+      put('settings.json', { abilities: { send_email: 'ask' } })
+      put('actions.json', [{ id: 'a1', action: 'send_email', title: `I85 chase Mehi Motors ${width}`, draft: 'Hello, a gentle reminder about the invoice.', status: 'Waiting' },
+        { id: 'a2', action: 'read_email', title: `I85 read the morning mail ${width}`, status: 'Done', cost: 0.0123 }])
+      fs.mkdirSync(path.join(home, 'skills/chase'), { recursive: true })
+      fs.writeFileSync(path.join(home, 'skills/chase/SKILL.md'), '# Chase\nChases overdue invoices.\n')
+      must(connector().report.facts === 2, 'the first report did not carry the facts')
+      must(connector().report.facts === 0, 'a repeated report changed something')
+      await open()
+      must((await pg.locator('[data-page-title]').innerText()) === 'Your assistant', 'the agent is not shown as Your assistant: ' + await pg.locator('[data-page-title]').innerText())
+      for (const k of ['waiting', 'knows', 'can', 'read', 'scheduled', 'did', 'connector']) must(await pg.locator(`[data-agent-section="${k}"]`).isVisible(), `no ${k} section`)
+      must((await pg.locator('[data-fact]').count()) === 2 && (await pg.locator('[data-fact-origin]').first().innerText()).includes('WhatsApp'), 'the facts or where they came from are missing')
+      must((await pg.locator('[data-ability]').count()) === 6 && (await pg.locator('[data-ability-key="pay"] [data-ability-fixed]').innerText()) === 'Always off', 'the six actions, with pay always off, are missing')
+      must((await pg.locator('[data-area]').count()) >= 1 && await pg.locator('[data-area-vault]').isVisible(), 'the areas and the Vault are missing')
+      must((await pg.locator('[data-job]').count()) === 1, 'the job is missing')
+      must((await pg.locator('[data-agent-skills]').innerText()).includes('chase'), 'the skill it reported is missing')
+      const waiting = pg.locator('[data-agent-section="waiting"] [data-agent-request]')
+      must((await waiting.count()) === 1 && (await waiting.locator('[data-request-draft]').innerText()).includes('gentle reminder'), 'the waiting request and its draft are missing')
+      must((await pg.locator('[data-did]').count()) === 1, 'Did should list the one thing it did')
+      const needs = await owner.api('brain.needs_you', { space: SPACE })
+      must(needs.agent_requests.some((r) => r.title.includes(`I85 chase Mehi Motors ${width}`)), 'Needs you does not list the request')
+      await noSideways()
+      await waiting.locator('[data-request-approve]').click()
+      await pg.locator('[data-agent-section="waiting"] [data-agent-empty="waiting"]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-did]').count()) === 2, 'the approved request did not move to Did')
+      const again = connector()
+      must(again.decisions.length === 1 && again.decisions[0].decision === 'approved', 'the connector was not told the answer')
+      must(connector().decisions.length === 0, 'the answer was handed over twice')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.50', `${width} px: editing a fact and pausing a job show waiting until the connector confirms; a switch is changed the same way`, async () => {
+      await open()
+      const fact = pg.locator(`[data-fact][data-fact-id="f1"]`)
+      await fact.locator('[data-fact-edit]').click()
+      await fact.locator('[data-fact-input] input, input[data-fact-input]').first().fill(`I85 prefers afternoons ${width}`)
+      await fact.locator('[data-fact-save]').click()
+      await fact.locator('[data-change="waiting"]').waitFor({ timeout: 10000 })
+      must((await fact.locator('[data-fact-text]').innerText()).includes('afternoons'), 'the page does not show the new text while it waits')
+      await pg.locator('[data-job] [data-job-toggle]').click()
+      await pg.locator('[data-job] [data-change="waiting"]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-ability-key="send_email"] [data-ability-select]').click()
+      await pg.getByRole('option', { name: 'Off' }).first().click()
+      await pg.locator('[data-ability-key="send_email"] [data-change="waiting"]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-fact-delete]').last().click()
+      await pg.locator('[data-fact][data-fact-id="f2"] [data-change="waiting"]').waitFor({ timeout: 10000 })
+      must(read('memory.json').some((f) => f.text.includes('mornings')), 'the connector files changed before it ran')
+      await noSideways()
+      const ran = connector()
+      must(ran.applied === 4 && ran.failed === 0, `the connector applied ${ran.applied} and failed ${ran.failed}`)
+      must(read('memory.json').length === 1 && read('memory.json')[0].text.includes('afternoons'), 'the connector did not apply the fact changes')
+      must(read('jobs.json')[0].paused === true && read('settings.json').abilities.send_email === 'off', 'the connector did not apply the job and the switch')
+      await open()
+      must((await pg.locator('[data-fact]').count()) === 1 && (await pg.locator('[data-fact-text]').innerText()).includes('afternoons'), 'the page does not show the applied fact')
+      must((await pg.locator('[data-change="waiting"]').count()) === 0, 'something still waits after the connector confirmed')
+      must((await pg.locator('[data-job]').getAttribute('data-paused')) === '1' && (await pg.locator('[data-ability-key="send_email"]').getAttribute('data-mode')) === 'off', 'the job or the switch is not as confirmed')
+      // a change the agent cannot apply is failed, with its reason
+      put('jobs.json', [])
+      await pg.locator('[data-job] [data-job-toggle]').click()
+      await pg.locator('[data-job] [data-change="waiting"]').waitFor({ timeout: 10000 })
+      must(connector().failed === 1, 'the connector did not fail a change it could not apply')
+      await open()
+      must((await pg.locator('[data-job]').count()) === 0, 'the job is still listed after the agent dropped it')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.51', `${width} px: an agent that has reported nothing says what will appear in each section`, async () => {
+      const empty = `i85-empty-${width}`
+      bench(`frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "${empty}", "active": 1}).insert(ignore_permissions=True)`)
+      await s.open(`/life/brain/sources/${empty}`)
+      await pg.locator('[data-agent-panel] [data-agent-section="connector"]').waitFor({ timeout: 10000 })
+      for (const k of ['waiting', 'knows', 'scheduled', 'did']) must(await pg.locator(`[data-agent-empty="${k}"]`).isVisible(), `no empty state for ${k}`)
+      must((await pg.locator('[data-agent-empty="knows"]').innerText()).includes('Nothing yet') && await pg.locator('[data-connector-how]').isVisible(), 'the empty page does not say what fills it')
+      must((await pg.locator('[data-page-title]').innerText()) === 'Your assistant', 'the empty agent is not shown as Your assistant')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for dt in ("Life Agent Fact", "Life Agent Job", "Life Agent Change", "Life Agent Action", "Life Agent Config", "Life Connection"):
+    filters = {"system": ["like", "i85-%"]} if dt == "Life Connection" else {"agent": ["like", "i85-%"]}
+    for n in frappe.get_all(dt, filters=filters, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)`)
+    fs.rmSync(home, { recursive: true, force: true })
+    await s.ctx.close()
+  }
+}

@@ -1,4 +1,6 @@
 [
+ "lifeos.api.agent_connector.pull",
+ "lifeos.api.agent_page.get",
  "lifeos.api.archive.list",
  "lifeos.api.area.tree",
  "lifeos.api.ask.status",

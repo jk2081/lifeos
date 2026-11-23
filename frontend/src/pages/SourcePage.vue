@@ -11,6 +11,8 @@
     </Card>
     <TabBar :tabs="TABS" :model-value="tab" label="This source" data-source-tabs @update:model-value="setTab" />
 
+    <AgentPanel v-if="tab === 'agent'" :key-name="d.key" :writable="writable" data-tab-panel="agent" @changed="load" />
+
     <!-- Overview -->
     <section v-if="tab === 'overview'" class="flex flex-col gap-3" data-tab-panel="overview">
       <Card class="flex flex-col gap-2">
@@ -157,6 +159,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, Dialog, FormControl, Switch, TextInput, Textarea } from 'frappe-ui'
+import AgentPanel from '@/components/brain/AgentPanel.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
@@ -167,7 +170,7 @@ import { brainData } from '@/data/brain'
 import { canWrite, store } from '@/lib/store'
 import { uploadFile } from '@/lib/upload'
 
-const TABS = [{ value: 'overview', label: 'Overview' }, { value: 'rules', label: 'Rules' }, { value: 'examples', label: 'Examples & lessons' },
+const BASE_TABS = [{ value: 'overview', label: 'Overview' }, { value: 'rules', label: 'Rules' }, { value: 'examples', label: 'Examples & lessons' },
   { value: 'activity', label: 'Activity' }, { value: 'try', label: 'Try it' }]
 const route = useRoute()
 const router = useRouter()
@@ -190,8 +193,10 @@ const filing = ref(false)
 const teachOpen = ref(false)
 const lesson = ref('')
 const writable = computed(() => canWrite() && !store.isAgent && !!d.value?.can_edit)
-const tab = computed(() => (TABS.some((t) => t.value === route.query.tab) ? route.query.tab : 'overview'))
-const setTab = (v) => router.replace({ query: { ...route.query, tab: v === 'overview' ? undefined : v } })
+// an agent has one more tab (issue 85): what it knows, can do, did and waits for, and it opens on it
+const TABS = computed(() => (d.value?.is_agent ? [{ value: 'agent', label: 'Your agent' }, ...BASE_TABS] : BASE_TABS))
+const tab = computed(() => (TABS.value.some((t) => t.value === route.query.tab) ? route.query.tab : d.value?.is_agent ? 'agent' : 'overview'))
+const setTab = (v) => router.replace({ query: { ...route.query, tab: v === TABS.value[0].value ? undefined : v } })
 
 const strip = computed(() => {
   const s = d.value.strip

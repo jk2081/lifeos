@@ -6,13 +6,13 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import add_days, today
 
-from lifeos.agents import context
+from lifeos.agents import connector, context, limits
 from lifeos.library import files, wiki_check
 from lifeos import permissions
 from lifeos.ai import fake
-from lifeos.api import context as context_api, inbox, jobs, review, wiki
+from lifeos.api import agent_connector, agent_page, brain, context as context_api, inbox, jobs, review, search, wiki
 from lifeos.skills import call as call_skills
-from lifeos.tests.base import AGENT, LifeTestCase, OWNER, PRIVATE, SHARED
+from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import Keyed, set_key, task, text
 
 
@@ -420,6 +420,145 @@ class TestWeeklyCheck(Keyed):
 		out = wiki_check.run(PRIVATE)
 		self.assertIn("skipped", out)
 		self.assertEqual(call_skills.ask("check-wiki", {}, PRIVATE).reason, "no AI key")
+
+
+class TestConnector(LifeTestCase):
+	"""Your agent in the open (issue 85): the connector's report, pull and confirm, the owner's changes, and the areas an agent may read."""
+	KEY = "i85agent"
+
+	def setUp(self):
+		super().setUp()
+		for dt in ("Life Agent Fact", "Life Agent Job", "Life Agent Change", "Life Agent Action", "Life Agent Config"):
+			frappe.db.delete(dt, {"space": PRIVATE})
+		permissions.clear_cache()
+
+	def report(self, **kw):
+		self.as_user(AGENT)
+		args = {"source_system": self.KEY, "space": PRIVATE, "facts": [{"id": "f1", "text": "Prefers mornings for calls", "origin": "WhatsApp chat", "learned_on": "2026-11-01"},
+			{"id": "f2", "text": "Daughter's school is Mehi Public"}], "jobs": [{"id": "j1", "name": "Morning digest", "schedule": "Every day 7:00"}],
+			"skills": [{"name": "chase-invoices", "description": "Chases overdue invoices"}], **kw}
+		out = agent_connector.report(**args)
+		self.as_user(OWNER)
+		return out
+
+	def state(self):
+		return {dt: frappe.get_all(dt, filters={"space": PRIVATE, "agent": self.KEY}, fields=["name", "modified"], order_by="name") for dt in ("Life Agent Fact", "Life Agent Job")}
+
+	# 1
+	def test_1_a_report_creates_facts_jobs_and_settings_and_a_repeat_changes_nothing(self):
+		first = self.report()
+		self.assertEqual(first["changed"]["facts"], 2)
+		page = agent_page.get(self.KEY, space=PRIVATE)
+		self.assertEqual([f["text"] for f in page["facts"]].count("Prefers mornings for calls"), 1)
+		self.assertEqual([j["title"] for j in page["jobs"]], ["Morning digest"])
+		self.assertEqual(page["name"], "Your assistant")
+		self.assertEqual(page["skills"][0]["name"], "chase-invoices")
+		before = self.state()
+		again = self.report()
+		self.assertEqual(again["changed"], {"facts": 0, "jobs": 0, "actions": 0})
+		self.assertEqual(self.state(), before)
+		self.report(facts=[{"id": "f1", "text": "Prefers afternoons for calls"}])  # a new report is the whole memory: f2 is gone, f1 changed
+		self.assertEqual([f["text"] for f in agent_page.get(self.KEY, space=PRIVATE)["facts"]], ["Prefers afternoons for calls"])
+
+	# 2
+	def test_2_deleting_a_fact_or_pausing_a_job_queues_a_change_the_connector_confirms_or_fails(self):
+		self.report()
+		page = agent_page.get(self.KEY, space=PRIVATE)
+		fact = next(f for f in page["facts"] if f["id"] == "f1")
+		other = next(f for f in page["facts"] if f["id"] == "f2")
+		job = page["jobs"][0]
+		agent_page.delete_fact(self.KEY, fact["name"], space=PRIVATE)
+		agent_page.edit_fact(self.KEY, other["name"], "Daughter is at Mehi Public, class 5", space=PRIVATE)
+		page = agent_page.pause_job(self.KEY, job["name"], 1, space=PRIVATE)
+		self.assertEqual(sorted(c["change"]["status"] for c in (page["facts"] + page["jobs"]) if c["change"]), ["waiting"] * 3)
+		self.assertEqual(next(j for j in page["jobs"])["paused"], 1)  # shows the state asked for, as waiting
+		self.report()  # a report while the changes wait does not undo them
+		self.assertEqual(len(frappe.get_all("Life Agent Fact", filters={"space": PRIVATE, "agent": self.KEY})), 2)
+		self.assertEqual(frappe.db.get_value("Life Agent Fact", other["name"], "fact"), "Daughter's school is Mehi Public")
+		self.as_user(AGENT)
+		got = agent_connector.pull(self.KEY, space=PRIVATE)
+		self.assertEqual(sorted(c["kind"] for c in got["changes"]), ["Fact delete", "Fact edit", "Job pause"])
+		by_kind = {c["kind"]: c["id"] for c in got["changes"]}
+		agent_connector.confirm(self.KEY, changes=[{"id": by_kind["Fact delete"], "status": "applied"}, {"id": by_kind["Fact edit"], "status": "applied"},
+			{"id": by_kind["Job pause"], "status": "failed", "reason": "No such job on the server"}], space=PRIVATE)
+		self.as_user(OWNER)
+		page = agent_page.get(self.KEY, space=PRIVATE)
+		self.assertEqual([f["text"] for f in page["facts"]], ["Daughter is at Mehi Public, class 5"])
+		self.assertEqual(page["jobs"][0]["change"]["status"], "failed")
+		self.assertEqual(page["jobs"][0]["change"]["reason"], "No such job on the server")
+		self.assertEqual(page["jobs"][0]["paused"], 0)
+		self.as_user(AGENT)
+		self.assertEqual(agent_connector.confirm(self.KEY, changes=[{"id": by_kind["Fact delete"], "status": "failed", "reason": "x"}], space=PRIVATE), {"applied": 0, "failed": 0})  # settled once
+
+	# 3
+	def test_3_an_area_switched_off_is_left_out_of_context_search_and_records(self):
+		note = self.make("Life Note", title="i85 Tea sourcing", collection="Wiki", summary="Where the tea comes from", content_md="Assam estates", area=self.areas["Tea"])
+		task = self.make("Life Task", title="i85 Call the Assam estate", area=self.areas["Tea"])
+		self.make("Life Note", title="i85 Family trip", collection="Wiki", summary="Goa in December", content_md="Booked", area=self.life["Health"])
+		self.report()
+		frappe.db.commit()  # the full-text index drops deleted rows only at commit
+		self.as_user(AGENT)
+		self.assertIn("i85 Tea sourcing", [x["title"] for x in context_api.get(space=PRIVATE)["index"]])
+		self.assertTrue(search.query("i85", space=PRIVATE)["results"])
+		self.as_user(OWNER)
+		agent_page.set_area(self.KEY, self.areas["Tea"], 0, space=PRIVATE)
+		self.as_user(AGENT)
+		got = context_api.get(space=PRIVATE)
+		titles = [x["title"] for x in got["index"]]
+		self.assertNotIn("i85 Tea sourcing", titles)
+		self.assertIn("i85 Family trip", titles)
+		self.assertNotIn("i85 Call the Assam estate", [r["title"] for r in search.query("i85", space=PRIVATE)["results"]])
+		self.assertIn("i85 Family trip", [r["title"] for r in search.query("i85", space=PRIVATE)["results"]])
+		self.assertEqual(frappe.get_list("Life Task", filters={"name": task.name}), [])
+		self.assertFalse(frappe.has_permission("Life Note", "read", note.name))
+		self.assertTrue(frappe.has_permission("Life Note", "read", frappe.get_all("Life Note", filters={"title": "i85 Family trip", "space": PRIVATE}, pluck="name")[0]))
+		self.as_user(OWNER)
+		self.assertIn("i85 Tea sourcing", [r["title"] for r in search.query("i85", space=PRIVATE)["results"]])  # the owner still sees it
+		agent_page.set_area(self.KEY, self.areas["Tea"], 1, space=PRIVATE)
+		self.as_user(AGENT)
+		self.assertIn("i85 Tea sourcing", [x["title"] for x in context_api.get(space=PRIVATE)["index"]])
+
+	# 4
+	def test_4_pay_cannot_be_set_to_anything_but_off(self):
+		self.report()
+		self.assertEqual(next(c for c in agent_page.get(self.KEY, space=PRIVATE)["can"] if c["key"] == "pay")["mode"], "off")
+		for mode in ("ask", "auto"):
+			with self.assertRaises(frappe.ValidationError):
+				agent_page.set_ability(self.KEY, "pay", mode, space=PRIVATE)
+		page = agent_page.set_ability(self.KEY, "send_email", "auto", space=PRIVATE)
+		self.assertEqual(next(c for c in page["can"] if c["key"] == "send_email")["mode"], "auto")
+		self.assertEqual(next(c for c in page["can"] if c["key"] == "send_email")["change"]["status"], "waiting")
+		with self.assertRaises(frappe.ValidationError):
+			agent_page.set_ability(self.KEY, "send_email", "maybe", space=PRIVATE)
+
+	def test_5_a_request_waits_in_needs_you_and_approving_moves_it_to_what_it_did(self):
+		self.report(actions=[{"id": "a1", "action": "send_email", "title": "Chase Mehi Motors for the invoice", "draft": "Hello, a gentle reminder.", "status": "Waiting"},
+			{"id": "a2", "action": "read_email", "title": "Read the morning mail", "cost": 0.0123, "status": "Done"}])
+		self.assertEqual([r["title"] for r in brain.needs_you(space=PRIVATE)["agent_requests"]], ["Chase Mehi Motors for the invoice"])
+		page = agent_page.get(self.KEY, space=PRIVATE)
+		self.assertEqual([d["title"] for d in page["did"]], ["Read the morning mail"])
+		agent_page.decide(page["waiting"][0]["name"], "approve", space=PRIVATE)
+		page = agent_page.get(self.KEY, space=PRIVATE)
+		self.assertEqual((page["waiting"], sorted(d["title"] for d in page["did"])), ([], ["Chase Mehi Motors for the invoice", "Read the morning mail"]))
+		self.as_user(AGENT)
+		self.assertEqual(agent_connector.pull(self.KEY, space=PRIVATE)["decisions"], [{"id": "a1", "decision": "approved"}])
+		agent_connector.confirm(self.KEY, delivered=["a1"], space=PRIVATE)
+		self.assertEqual(agent_connector.pull(self.KEY, space=PRIVATE)["decisions"], [])
+		with self.assertRaises(frappe.PermissionError):
+			agent_page.decide(page["did"][0]["name"], "approve", space=PRIVATE)  # an agent never approves
+		self.report()  # a repeated report does not bring it back to waiting
+		self.assertEqual(brain.needs_you(space=PRIVATE)["agent_requests"], [])
+
+	def test_6_the_agent_is_shown_under_the_name_the_owner_gives_it_and_only_the_owner_changes_it(self):
+		self.report()
+		self.assertEqual(agent_page.rename(self.KEY, "Ravi", space=PRIVATE)["name"], "Ravi")
+		self.assertEqual(agent_page.rename(self.KEY, "", space=PRIVATE)["name"], "Your assistant")
+		self.as_user(FAMILY)
+		with self.assertRaises(frappe.PermissionError):
+			agent_page.edit_fact(self.KEY, "x", "y", space=SHARED)
+		self.as_user(AGENT)
+		with self.assertRaises(frappe.PermissionError):
+			agent_page.get(self.KEY, space=PRIVATE)
 
 
 class TestAgentMethodsExist(LifeTestCase):

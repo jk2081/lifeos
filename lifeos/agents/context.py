@@ -11,6 +11,7 @@ from frappe import _
 from frappe.utils import getdate, today
 
 from lifeos import permissions
+from lifeos.agents import limits
 
 CARD_WORDS = 1500  # the card stays under this many words
 SUMMARY_WORDS = 15  # an index line's summary
@@ -55,7 +56,8 @@ def _cached(key, build):
 def card(space, hidden=None) -> str:
 	"""The summary of the owner that agents read first, in Markdown. `hidden`: leave out what is sensitive (default: as for the caller)."""
 	hidden = permissions.vault_hidden(space) if hidden is None else hidden
-	return _cached(f"{space}|card|{int(bool(hidden))}|{today()}", lambda: _build_card(space, hidden))
+	off = limits.blocked(space)  # areas the owner switched off for this agent (issue 85)
+	return _cached(f"{space}|card|{int(bool(hidden))}|{today()}|{','.join(off)}", lambda: _build_card(space, hidden, off))
 
 
 def _owner(space):
@@ -66,9 +68,10 @@ def _owner(space):
 	return name, role, zone
 
 
-def _areas_lines(space):
+def _areas_lines(space, off=()):
 	rows = frappe.get_all("Life Area", filters={"space": space, "is_on": 1, "is_archived": 0, "is_focus": 0}, fields=["name", "area_name", "parent_area", "description"],
 		order_by="sort_order asc, creation asc", limit=200)
+	rows = [r for r in rows if r.name not in off]
 	parts = {}
 	for r in rows:
 		if r.parent_area:
@@ -82,7 +85,7 @@ def _areas_lines(space):
 	return lines
 
 
-def _focus_lines(space):
+def _focus_lines(space, off=()):
 	"""Each active focus with its standard and principles (issue 57), so agents work within them; none while "Use focuses" is off."""
 	from lifeos.goals import areas
 
@@ -92,7 +95,7 @@ def _focus_lines(space):
 	lines = []
 	for f in frappe.get_all("Life Area", filters={"space": space, "is_on": 1, "is_archived": 0, "is_focus": 1}, fields=["name", "area_name", "parent_area", "standard"],
 			order_by="sort_order asc, creation asc", limit=100):
-		if f.name in hidden:
+		if f.name in hidden or f.name in off:
 			continue
 		part = frappe.db.get_value("Life Area", f.parent_area, "area_name")
 		bits = [f"- **{f.area_name}** ({part})"]
@@ -105,10 +108,10 @@ def _focus_lines(space):
 	return lines
 
 
-def _goal_lines(space):
+def _goal_lines(space, off=()):
 	from lifeos.api import goals
 
-	rows = goals.list(space=space, state="in_progress", page_length=100)["goals"]
+	rows = [g for g in goals.list(space=space, state="in_progress", page_length=100)["goals"] if g.get("area") not in off]
 	lines = []
 	for g in rows:
 		bits = [f"- **{g.title}** ({g.horizon}{', ' + g.area_name if g.area_name else ''})"]
@@ -155,12 +158,12 @@ def _rules_text(space, hidden):
 	return clip(re.sub(r"\n{2,}", "\n", text).strip(), RULES_WORDS)
 
 
-def _build_card(space, hidden):
+def _build_card(space, hidden, off=()):
 	name, role, zone = _owner(space)
 	out = [f"# {name or _('The owner')}", ""]
 	out.append(" · ".join(b for b in [role, f"Time zone {zone}" if zone else None, f"Today is {today()}"] if b))
-	out += ["", "## Areas that are on", *(_areas_lines(space) or [_("- None yet.")]), "", "## Active goals", *(_goal_lines(space) or [_("- None yet.")])]
-	focuses = _focus_lines(space)
+	out += ["", "## Areas that are on", *(_areas_lines(space, off) or [_("- None yet.")]), "", "## Active goals", *(_goal_lines(space, off) or [_("- None yet.")])]
+	focuses = _focus_lines(space, off)
 	if focuses:
 		out += ["", "## Focuses (ongoing work: work within these)", *focuses]
 	cycle = _cycle_line(space)
@@ -187,10 +190,11 @@ def index_lines(space, hidden=None) -> list:
 	"""One line for every person, organisation and wiki page of the space (people and organisations once, from Life Person, never also as
 	the wiki page that describes them): {name, doctype, title, kind, area, summary (15 words at most), updated}. Newest change first."""
 	hidden = permissions.vault_hidden(space) if hidden is None else hidden
-	return _cached(f"{space}|index|{int(bool(hidden))}", lambda: _build_index(space, hidden))
+	off = limits.blocked(space)
+	return _cached(f"{space}|index|{int(bool(hidden))}|{','.join(off)}", lambda: _build_index(space, hidden, off))
 
 
-def _build_index(space, hidden):
+def _build_index(space, hidden, off=()):
 	areas = {r.name: r.area_name for r in frappe.get_all("Life Area", filters={"space": space}, fields=["name", "area_name"], limit=1000)}
 	notes = frappe.get_all("Life Note", filters={"space": space, "collection": "Wiki", "is_rules": 0, "is_archived": 0},
 		fields=["name", "title", "summary", "area", "modified", "person", "is_sensitive"], order_by="modified desc", limit=5000)
@@ -198,13 +202,13 @@ def _build_index(space, hidden):
 	lines = []
 	for p in frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "kind", "role", "relation", "area", "wiki_page", "modified"], limit=5000):
 		page = by_name.get(p.wiki_page)
-		if hidden and page and page.is_sensitive:
+		if (hidden and page and page.is_sensitive) or (p.area or (page.area if page else None)) in off:
 			continue
 		summary = (page.summary if page else None) or p.role or p.relation or p.kind
 		lines.append({"name": p.name, "doctype": "Life Person", "title": p.full_name, "kind": (p.kind or "Person").lower(), "area": areas.get(p.area or (page.area if page else None)),
 			"summary": clip(summary, SUMMARY_WORDS), "updated": str(max(p.modified, page.modified) if page else p.modified)[:10]})
 	for n in notes:
-		if n.person or (hidden and n.is_sensitive):
+		if n.person or (hidden and n.is_sensitive) or n.area in off:
 			continue
 		lines.append({"name": n.name, "doctype": "Life Note", "title": n.title, "kind": "wiki", "area": areas.get(n.area), "summary": clip(n.summary, SUMMARY_WORDS),
 			"updated": str(n.modified)[:10]})

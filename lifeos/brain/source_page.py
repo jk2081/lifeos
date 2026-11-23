@@ -50,6 +50,12 @@ def title_of(space: str, key: str) -> str:
 	for system, label, *_rest in CHANNELS:
 		if system == key:
 			return label
+	from lifeos.agents import limits
+
+	from lifeos.brain import agent_page
+
+	if agent_page.is_agent_key(space, key):  # an agent is shown under the name the owner gave it, else "Your assistant" (issue 85)
+		return limits.display_name(limits.config(space, key))
 	return frappe.db.get_value("Life Connection", {"space": space, "system": key}, "label") or key.title()
 
 
@@ -157,7 +163,9 @@ def page(space: str, key: str) -> dict:
 	active = 1 if kind or key in ALWAYS_ON else int(bool(conn and conn.active))
 	channel_line = next((c[3] for c in CHANNELS if c[0] == key), "Agent")
 	sets = setting(space, key)
-	return {"key": key, "group": "kind" if kind else "channel", "title": title_of(space, key), "skill": slug, "version": skill.version,
+	from lifeos.brain import agent_page
+
+	return {"key": key, "group": "kind" if kind else "channel", "is_agent": int(agent_page.is_agent_key(space, key)), "title": title_of(space, key), "skill": slug, "version": skill.version,
 		"skill_active": int(bool(skill.active)), "connection": dict(conn) if conn else None,
 		"strip": {"active": active, "always_on": int(kind or key in ALWAYS_ON), "arrives_from": KIND_LINES[key[len(KIND_PREFIX):]] if kind else channel_line,
 			"this_week": nums["count"], "filed_without_you": nums["filed_without_you"], "cost_week": nums["cost"], "skill_label": store.label(slug, skill.version)},

@@ -15,12 +15,20 @@
       </Stat>
     </div>
 
-    <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length && !contradictions.length" class="py-2" data-needs-empty>
+    <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length && !contradictions.length && !agentRequests.length" class="py-2" data-needs-empty>
       <Empty title="Nothing needs you.">
         <p class="mt-1">Things you capture or connect will show up here.</p>
         <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-needs-capture @click="store.captureOpen = true" />
       </Empty>
     </Card>
+
+    <section v-if="agentRequests.length" class="flex flex-col gap-2" data-needs-agent>
+      <div>
+        <h2 class="text-base-medium text-ink-gray-9">Waiting for your OK</h2>
+        <p class="text-sm text-ink-gray-6">Your agent will not do these until you say so.</p>
+      </div>
+      <AgentRequests :rows="agentRequests" @changed="load" />
+    </section>
 
     <Card v-if="asked.length" flush data-needs-rows>
       <div v-for="r in asked" :key="r.proposal" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-b border-outline-gray-1 py-3 last:border-b-0"
@@ -140,6 +148,7 @@ import Card from '@/components/ui/Card.vue'
 import Stat from '@/components/ui/Stat.vue'
 import OldItems from '@/components/inbox/OldItems.vue'
 import LessonCard from '@/components/brain/LessonCard.vue'
+import AgentRequests from '@/components/brain/AgentRequests.vue'
 import ContradictionCard from '@/components/brain/ContradictionCard.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { brainData } from '@/data/brain'
@@ -155,6 +164,7 @@ const allBusy = ref(false)
 const writable = computed(() => canWrite() && !store.isAgent)
 const rows = computed(() => data.value?.rows || [])
 const lessons = computed(() => data.value?.lessons || [])
+const agentRequests = computed(() => data.value?.agent_requests || [])
 const contradictions = computed(() => data.value?.contradictions || [])
 // a proposal that takes an area and has none cannot be kept as it is: it sits under Unfiled until you choose one
 const unfiled = computed(() => rows.value.filter((r) => r.unfiled))
