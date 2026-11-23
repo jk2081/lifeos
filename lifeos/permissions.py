@@ -1,6 +1,7 @@
 """Space permissions. A user sees a record only if they are a member of its space."""
 import frappe
 from frappe import _
+from frappe.utils.caching import request_cache
 
 from lifeos.constants import NO_AGENT_DOCTYPES
 
@@ -8,30 +9,30 @@ BRAIN_USER = "brain@lifeos.local"  # the "Life Brain" user skills run as (lifeos
 
 
 def user_spaces(user=None) -> dict:
-	"""Return {space: access} for the user. access is 'Read' or 'Write'."""
-	user = user or frappe.session.user
-	cache = getattr(frappe.local, "lifeos_spaces", None)
-	if cache is None:
-		cache = frappe.local.lifeos_spaces = {}
-	if user not in cache:
-		out = {}
-		if user == BRAIN_USER:  # the built-in Brain works in every space, as an agent
-			out = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}
-		elif user and user != "Guest":
-			for row in frappe.db.sql(
-				"select parent, access from `tabLife Space Member` where user=%s and parenttype='Life Space'", user
-			):
-				if row[1] == "Write" or row[0] not in out:
-					out[row[0]] = row[1]
-			for (name,) in frappe.db.sql("select name from `tabLife Space` where owner_user=%s", user):
-				out[name] = "Write"
-		cache[user] = out
-	return cache[user]
+	"""Return {space: access} for the user. access is 'Read' or 'Write'. Kept for the request (Frappe's request cache)."""
+	return _spaces_of(user or frappe.session.user)
+
+
+@request_cache
+def _spaces_of(user) -> dict:
+	out = {}
+	if user == BRAIN_USER:  # the built-in Brain works in every space, as an agent
+		out = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}  # system: the Brain user sees every space
+	elif user and user != "Guest":
+		for row in frappe.db.sql(
+			"select parent, access from `tabLife Space Member` where user=%s and parenttype='Life Space'", user
+		):
+			if row[1] == "Write" or row[0] not in out:
+				out[row[0]] = row[1]
+		for (name,) in frappe.db.sql("select name from `tabLife Space` where owner_user=%s", user):
+			out[name] = "Write"
+	return out
 
 
 def clear_cache():
-	frappe.local.lifeos_spaces = {}
-	frappe.local.lifeos_vault_open = None
+	"""Forget the cached spaces and Vault switches, after a membership or a switch changes in the same request."""
+	for fn in (_spaces_of, _vault_open):
+		getattr(frappe.local, "request_cache", {}).pop(fn.__wrapped__, None)
 
 
 def is_agent(user=None) -> bool:
@@ -108,11 +109,13 @@ VAULT = "Life Vault Document"
 
 
 def vault_open_spaces() -> set:
-	"""Spaces whose switch lets agents open Vault documents (agents_can_read_vault)."""
-	cache = getattr(frappe.local, "lifeos_vault_open", None)
-	if cache is None:
-		cache = frappe.local.lifeos_vault_open = set(frappe.get_all("Life Space", filters={"agents_can_read_vault": 1}, pluck="name"))
-	return cache
+	"""Spaces whose switch lets agents open Vault documents (agents_can_read_vault). Kept for the request."""
+	return _vault_open()
+
+
+@request_cache
+def _vault_open() -> set:
+	return set(frappe.get_all("Life Space", filters={"agents_can_read_vault": 1}, pluck="name"))  # system: the switch is read for every space
 
 
 def vault_hidden(space, user=None) -> bool:
@@ -121,7 +124,7 @@ def vault_hidden(space, user=None) -> bool:
 
 
 # Captures and notes a person can mark sensitive (UX fixes, set 6); Vault documents always are
-SENSITIVE_DOCTYPES = ("Life Note", "Life Inbox Item", "Life Chat Log", "Life Journal Page")
+SENSITIVE_DOCTYPES = ("Life Note", "Life Inbox Item", "Life Chat Log")
 
 
 def vault_locked(doc) -> bool:
@@ -265,19 +268,19 @@ def ask_has_permission(doc, ptype=None, user=None, debug=False):
 
 def require_login():
 	if frappe.session.user == "Guest":
-		frappe.throw(_("Please log in."), frappe.PermissionError)
+		frappe.throw(_("Please log in."), frappe.PermissionError, title=_("Login required"))
 
 
 def require_space(space, write=False):
 	"""Stop unless the session user is a member of the space (with Write access when asked)."""
 	require_login()
 	if not space or not frappe.db.exists("Life Space", space):
-		frappe.throw(_("Space not found."), frappe.PermissionError)
+		frappe.throw(_("Space not found."), frappe.PermissionError, title=_("Space not found"))
 	if frappe.session.user == "Administrator":
 		return space
 	access = user_spaces().get(space)
 	if not access or (write and access != "Write"):
-		frappe.throw(_("You do not have access to this space."), frappe.PermissionError)
+		frappe.throw(_("You do not have access to this space."), frappe.PermissionError, title=_("No access to this space"))
 	return space
 
 
@@ -300,7 +303,7 @@ def resolve_space(space=None, write=False):
 	"""Return the given space, or the user's default one, after checking membership."""
 	space = space or default_space()
 	if not space:
-		frappe.throw(_("You are not a member of any space."), frappe.PermissionError)
+		frappe.throw(_("You are not a member of any space."), frappe.PermissionError, title=_("Not in any space"))
 	return require_space(space, write=write)
 
 
@@ -342,4 +345,4 @@ def validate_user_roles(doc, method=None):
 	roles = {r.role for r in doc.get("roles") or []}
 	if "Life Agent" in roles and roles & {"Life User", "Life Admin"}:
 		frappe.throw(_("A user cannot have Life Agent together with Life User or Life Admin. Agents and people are separate accounts: "
-			"remove Life Agent, or remove the other Life role."), frappe.ValidationError)
+			"remove Life Agent, or remove the other Life role."), frappe.ValidationError, title=_("Agent role conflict"))

@@ -8,6 +8,11 @@
   "space",
   "title",
   "area",
+  "tracking_section",
+  "days_per_week",
+  "sort_order",
+  "tracked_from",
+  "tracked_until",
   "is_archived",
   "archived_on"
  ],
@@ -33,6 +38,32 @@
    "fieldtype": "Link",
    "label": "Area",
    "options": "Life Area"
+  },
+  {
+   "fieldname": "tracking_section",
+   "fieldtype": "Section Break",
+   "label": "Tracking"
+  },
+  {
+   "fieldname": "days_per_week",
+   "fieldtype": "Int",
+   "label": "Days Per Week",
+   "default": "7"
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Sort Order"
+  },
+  {
+   "fieldname": "tracked_from",
+   "fieldtype": "Date",
+   "label": "Tracked From"
+  },
+  {
+   "fieldname": "tracked_until",
+   "fieldtype": "Date",
+   "label": "Tracked Until"
   },
   {
    "fieldname": "is_archived",

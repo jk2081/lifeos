@@ -119,7 +119,7 @@ const headline = computed(() => {
 })
 async function load() {
   try {
-    ;[d.value, links.value, info.value] = await Promise.all([api('journal.goal', { goal: props.name }), loadBacklinks('Life Goal', props.name),
+    ;[d.value, links.value, info.value] = await Promise.all([api('goals.detail', { goal: props.name }), loadBacklinks('Life Goal', props.name),
       api('goals.get', { goal: props.name })])
     loadLookups()
     const x = d.value

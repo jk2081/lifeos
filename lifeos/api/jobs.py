@@ -44,7 +44,7 @@ def file_job(job_id: str, space: str | None = None, title: str | None = None, ar
 	or merge. chat: {title, summary_md?, open_items?, source_system?, assistant?, date?, transcript_md?}.
 	Answers {item, url, created, changed_fields, inputs, outputs, proposals, wiki, chat}."""
 	if not permissions.has_app_permission():
-		frappe.throw(_("Only Life OS users and agents can file work."), frappe.PermissionError)
+		frappe.throw(_("Only Life OS users and agents can file work."), frappe.PermissionError, title=_("Not a Life OS user"))
 	space = permissions.resolve_space(space, write=True)
 	from lifeos.api import connections
 
@@ -77,7 +77,7 @@ def _at(field):
 		log = getattr(frappe.local, "message_log", None) or []
 		if log and message in str(log[-1]):  # frappe.throw logged it once already; the named error replaces it
 			frappe.clear_last_message()
-		frappe.throw(f"{field}: {message}", type(e))
+		frappe.throw(f"{field}: {message}", type(e), title=_("Job field rejected"))
 
 
 def _list(value, field):
@@ -85,9 +85,9 @@ def _list(value, field):
 	if rows is None:
 		return []
 	if not isinstance(rows, builtins.list) or not all(isinstance(r, builtins.dict) for r in rows):
-		frappe.throw(_("{0} must be a list of objects.").format(field))
+		frappe.throw(_("{0} must be a list of objects.").format(field), title=_("List expected"))
 	if len(rows) > MAX_ITEMS:
-		frappe.throw(_("{0}: at most {1} in one call.").format(field, MAX_ITEMS))
+		frappe.throw(_("{0}: at most {1} in one call.").format(field, MAX_ITEMS), title=_("Too many items"))
 	return rows
 
 
@@ -95,22 +95,22 @@ def _text(row, key, field, required=True, limit=140):
 	value = row.get(key)
 	value = str(value).strip() if value is not None else ""
 	if required and not value:
-		frappe.throw(_("{0}.{1} is required.").format(field, key))
+		frappe.throw(_("{0}.{1} is required.").format(field, key), title=_("Field is required"))
 	if len(value) > limit:
-		frappe.throw(_("{0}.{1} can hold at most {2} characters.").format(field, key, limit))
+		frappe.throw(_("{0}.{1} can hold at most {2} characters.").format(field, key, limit), title=_("Text is too long"))
 	return value or None
 
 
 def _check(space, job_id, title, area, goal, inputs, outputs, proposals, wiki, chat):
 	job_id = (job_id or "").strip()
 	if not job_id:
-		frappe.throw(_("job_id is required: a stable id for the work, for example mehi-motors-pitch-2026-11-19."))
+		frappe.throw(_("job_id is required: a stable id for the work, for example mehi-motors-pitch-2026-11-19."), title=_("Job id is required"))
 	if len(job_id) > 140:
-		frappe.throw(_("job_id can hold at most 140 characters."))
+		frappe.throw(_("job_id can hold at most 140 characters."), title=_("Job id is too long"))
 	plan = {"job_id": job_id, "title": (title or "").strip()[:140] or None}
 	plan["existing"] = _find_job(space, job_id)
 	if not plan["title"] and not plan["existing"]:
-		frappe.throw(_("title is required for a new job."))
+		frappe.throw(_("title is required for a new job."), title=_("Job needs a title"))
 	with _at("area"):
 		plan["area"] = rules.resolve_link("Life Area", area, space) if area else None
 	with _at("goal"):
@@ -122,7 +122,7 @@ def _check(space, job_id, title, area, goal, inputs, outputs, proposals, wiki, c
 	for field, rows in (("inputs", plan["inputs"]), ("outputs", plan["outputs"])):
 		names = [r["name"] for r in rows]
 		if len(names) != len(set(names)):
-			frappe.throw(_("{0}: two files have the same name.").format(field))
+			frappe.throw(_("{0}: two files have the same name.").format(field), title=_("Duplicate file name"))
 	plan["proposals"] = _check_proposals(space, proposals)
 	plan["chat"] = _check_chat(chat)
 	plan["wiki"] = _check_wiki(space, wiki)
@@ -139,7 +139,7 @@ def _find_job(space, job_id):
 def _check_file_row(space, row, field):
 	out = {"name": _text(row, "name", field, limit=140)}
 	if "/" in out["name"] or "\\" in out["name"]:
-		frappe.throw(_("{0}.name is a file name, not a path.").format(field))
+		frappe.throw(_("{0}.name is a file name, not a path.").format(field), title=_("File name has a path"))
 	with _at(f"{field}.file"):
 		out.update(_source(space, row.get("file")))
 	return out
@@ -148,7 +148,7 @@ def _check_file_row(space, row, field):
 def _source(space, value):
 	"""What a `file` value names: {"content": bytes} for base64, {"from": File row} for a file already in the space."""
 	if not isinstance(value, str) or not value.strip():
-		frappe.throw(_("is required: base64 content or the URL of a file in this space."))
+		frappe.throw(_("is required: base64 content or the URL of a file in this space."), title=_("File content is missing"))
 	value = value.strip()
 	if value.startswith(("/private/files/", "/files/")):
 		return {"from": _file_in_space(space, value)}
@@ -157,20 +157,20 @@ def _source(space, value):
 	try:
 		content = base64.b64decode("".join(value.split()), validate=True)
 	except (binascii.Error, ValueError):
-		frappe.throw(_("is neither base64 nor the URL of a file (/private/files/...)."))
+		frappe.throw(_("is neither base64 nor the URL of a file (/private/files/...)."), title=_("File not recognised"))
 	if not content:
-		frappe.throw(_("is empty."))
+		frappe.throw(_("is empty."), title=_("File is empty"))
 	return {"content": content}
 
 
 def _file_in_space(space, file_url):
 	"""A File row with this URL on a record of this space that the caller can read."""
-	for row in frappe.get_all("File", filters={"file_url": file_url, "attached_to_doctype": ["in", SPACE_DOCTYPES]},
+	for row in frappe.get_all("File", filters={"file_url": file_url, "attached_to_doctype": ["in", SPACE_DOCTYPES]},  # system: background job, runs as the system
 			fields=["name", "attached_to_doctype", "attached_to_name", "life_sha256"], order_by="creation asc"):
 		if files.record_space(row.attached_to_doctype, row.attached_to_name) == space \
 				and frappe.get_doc("File", row.name).has_permission("read"):
 			return row
-	frappe.throw(_("no file at {0} in this space that you can read.").format(file_url), frappe.DoesNotExistError)
+	frappe.throw(_("no file at {0} in this space that you can read.").format(file_url), frappe.DoesNotExistError, title=_("File not found"))
 
 
 def _check_input(space, row, field):
@@ -180,7 +180,7 @@ def _check_input(space, row, field):
 		with _at(f"{field}.reusable_as"):
 			asset = _find_asset(space, reusable_as)
 			if not asset:
-				frappe.throw(_("nothing is kept as {0} yet; send its file.").format(reusable_as), frappe.DoesNotExistError)
+				frappe.throw(_("nothing is kept as {0} yet; send its file.").format(reusable_as), frappe.DoesNotExistError, title=_("Kept file not found"))
 		out = {"name": name}
 	else:
 		out = _check_file_row(space, row, field)
@@ -200,15 +200,15 @@ def _check_proposals(space, value):
 		field = f"proposals[{i}]"
 		kind = row.get("kind")
 		if kind in rules.DIRECT:
-			frappe.throw(_("{0}: a {1} is not filed with a piece of work.").format(field, kind))
+			frappe.throw(_("{0}: a {1} is not filed with a piece of work.").format(field, kind), title=_("Not filed with a job"))
 		try:
 			payload = rules.validate(kind, row.get("payload") or {}, space, ctx)
 			confidence = 0.5 if row.get("confidence") is None else float(row.get("confidence"))
 			extra = rules.extras(row, payload, space)
 		except (rules.PayloadError, ValueError, TypeError) as e:
-			frappe.throw(f"{field}: {e}", rules.PayloadError)
+			frappe.throw(f"{field}: {e}", rules.PayloadError, title=_("Proposal rejected"))
 		if not 0 <= confidence <= 1:
-			frappe.throw(_("{0}: confidence must be between 0 and 1.").format(field), rules.PayloadError)
+			frappe.throw(_("{0}: confidence must be between 0 and 1.").format(field), rules.PayloadError, title=_("Confidence out of range"))
 		preview = (str(row.get("preview") or "").strip() or payload.get("title") or payload.get("subject") or kind)[:500]
 		out.append({"kind": kind, "payload": payload, "confidence": confidence, "preview": preview, "key": _key(kind, payload), **extra})
 	return out
@@ -223,11 +223,11 @@ def _check_chat(value):
 		return None
 	chat = parse(value, None) if isinstance(value, str) else value
 	if not isinstance(chat, builtins.dict):
-		frappe.throw(_("chat must be an object."))
+		frappe.throw(_("chat must be an object."), title=_("Chat must be an object"))
 	_text(chat, "title", "chat")
 	items = chat.get("open_items")
 	if items is not None and not isinstance(items, builtins.list):
-		frappe.throw(_("chat.open_items must be a list of text."))
+		frappe.throw(_("chat.open_items must be a list of text."), title=_("Open items must be a list"))
 	return chat
 
 
@@ -241,7 +241,7 @@ def _check_wiki(space, value):
 			"content_md": row.get("content_md") if isinstance(row.get("content_md"), str) else None,
 			"base_version": _text(row, "base_version", field, required=False)}
 		if page["content_md"] is None:
-			frappe.throw(_("{0}.content_md is required.").format(field))
+			frappe.throw(_("{0}.content_md is required.").format(field), title=_("Wiki page needs content"))
 		with _at(f"{field}.content_md"):
 			wiki_api._check_text(page["content_md"])
 		page["existing"] = _wiki_page(space, page["title"])
@@ -249,10 +249,10 @@ def _check_wiki(space, value):
 			with _at(field):
 				doc = permissions.get_doc_checked("Life Note", page["existing"], "write")
 				if page["base_version"] != wiki_api.version_of(doc):
-					frappe.throw(_("base_version: the page changed since you read it. Read it again with wiki.get_page and merge."))
+					frappe.throw(_("base_version: the page changed since you read it. Read it again with wiki.get_page and merge."), title=_("Wiki page changed"))
 		out.append(page)
 	if len({p["title"].lower() for p in out}) != len(out):
-		frappe.throw(_("wiki: two pages have the same title."))
+		frappe.throw(_("wiki: two pages have the same title."), title=_("Duplicate wiki titles"))
 	return out
 
 
@@ -330,7 +330,7 @@ def _attach(doctype, name, file_name, source, written):
 		doc["file_url"] = frappe.db.get_value("File", source["from"].name, "file_url")
 	stored_before = bool(digest) and frappe.db.exists("File", {"life_sha256": digest})
 	# the caller's write access to the record was checked; Frappe's own File permission would ask for the File role
-	f = frappe.get_doc(doc).insert(ignore_permissions=True)
+	f = frappe.get_doc(doc).insert(ignore_permissions=True)  # system: background job, runs as the system
 	if not stored_before and not frappe.db.exists("File", {"file_url": f.file_url, "name": ["!=", f.name]}):
 		written.append(f.file_url)
 	return f, True
@@ -390,7 +390,7 @@ def _asset(space, plan, row):
 def _proposals(item, wanted):
 	"""The proposals of this call wait for the owner. One already there (by kind and payload) is kept, whatever its status;
 	a pending one this call no longer sends is removed. Nothing is ever decided here."""
-	have = frappe.get_all("Life Proposal", filters={"inbox_item": item.name},
+	have = frappe.get_all("Life Proposal", filters={"inbox_item": item.name},  # system: background job, runs as the system
 		fields=["name", "kind", "payload", "status", "preview", "confidence", "reason", "alt_area"], order_by="sort_order asc, creation asc")
 	by_key = {}
 	for p in have:
@@ -413,8 +413,8 @@ def _proposals(item, wanted):
 		made.append(doc.name)
 	removed = [p.name for p in have if p.status == "Pending" and p.name not in used]
 	for name in removed:
-		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)
-	waiting = frappe.get_all("Life Proposal", filters={"inbox_item": item.name, "status": "Pending"},
+		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)  # system: background job, runs as the system
+	waiting = frappe.get_all("Life Proposal", filters={"inbox_item": item.name, "status": "Pending"},  # system: background job, runs as the system
 		fields=["name", "kind", "preview"], order_by="sort_order asc, creation asc")
 	return {"created": made, "kept": kept, "removed": removed, "waiting": waiting}
 
@@ -465,7 +465,7 @@ def _wiki(space, item, chat, page):
 
 
 def _last_written_by(note, item):
-	last = frappe.get_all("Life Wiki Change", filters={"note": note}, fields=["source_doctype", "source_name"],
+	last = frappe.get_all("Life Wiki Change", filters={"note": note}, fields=["source_doctype", "source_name"],  # system: background job, runs as the system
 		order_by="changed_on desc, creation desc", limit=1)
 	return bool(last) and last[0].source_doctype == JOB and last[0].source_name == item
 

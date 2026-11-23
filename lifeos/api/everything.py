@@ -10,7 +10,7 @@ import frappe
 from frappe import _
 
 from lifeos import counts, permissions
-from lifeos.api.utils import area_filter, flag, page
+from lifeos.api.utils import area_filter, flag, names_map, page
 from lifeos.api.sources import agent_users
 
 TABS = ("all", "notes", "documents", "people", "chats")
@@ -68,12 +68,12 @@ def _person_rows(space, tab, q, area, goal, source, include_archived, limit):
 	or_filters = None
 	if q:
 		or_filters = [["full_name", "like", _like(q)], ["relation", "like", _like(q)], ["notes_md", "like", _like(q)]]
-	rows = frappe.get_all("Life Person", filters=filters, or_filters=or_filters, fields=["name", "full_name", "relation", "creation", "owner"],
+	rows = frappe.get_list("Life Person", filters=filters, or_filters=or_filters, fields=["name", "full_name", "relation", "creation", "owner"],
 		order_by="creation desc", limit=limit)
 	agents = set(agent_users())
 	if source in ("me", "brain"):
 		rows = [r for r in rows if (r.owner in agents) == (source == "brain")]
-	total = len(rows) if len(rows) < limit else len(frappe.get_all("Life Person", filters=filters, or_filters=or_filters, pluck="name"))
+	total = len(rows) if len(rows) < limit else len(frappe.get_list("Life Person", filters=filters, or_filters=or_filters, pluck="name"))
 	return rows, total
 
 
@@ -81,7 +81,7 @@ def _decorate(rows):
 	from lifeos.api.sources import decorate
 
 	notes = [r.ref_name for r in rows if r.ref_doctype == "Life Note"]
-	details = {n.name: n for n in frappe.get_all("Life Note", filters={"name": ("in", notes)}, fields=["name", "summary", "collection", "inbox_item"])} if notes else {}
+	details = {n.name: n for n in frappe.get_list("Life Note", filters={"name": ("in", notes)}, fields=["name", "summary", "collection", "inbox_item"])} if notes else {}
 	files = dict(frappe.db.sql("select attached_to_name, count(*) from `tabFile` where attached_to_doctype = 'Life Note' and attached_to_name in %s group by attached_to_name", (notes,))) if notes else {}
 	sources = {}
 	if notes:
@@ -90,10 +90,14 @@ def _decorate(rows):
 	for n, d in details.items():
 		if d.inbox_item and n not in sources:
 			sources[n] = ("Life Inbox Item", d.inbox_item)
-	made_from = {}
+	made_from, by_doctype = {}, {}
 	for n, (dt, name) in sources.items():
 		if dt in ("Life Inbox Item", "Life Chat Log", "Life Note", "Life Vault Document"):
-			made_from[n] = frappe.db.get_value(dt, name, "title")
+			by_doctype.setdefault(dt, []).append(name)
+	titles = {dt: names_map(dt, names, "title") for dt, names in by_doctype.items()}
+	for n, (dt, name) in sources.items():
+		if dt in titles:
+			made_from[n] = titles[dt].get(name)
 	base = {(d["doctype"], d["name"]): d for d in decorate(rows)}
 	out = []
 	for r in rows:
@@ -143,7 +147,7 @@ def list(space: str | None = None, tab: str | None = "all", q: str | None = None
 	start, page_length = page(start, page_length)
 	tab = tab or "all"
 	if tab not in TABS:
-		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)))
+		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)), title=_("Unknown tab"))
 	q = (q or "").strip()[:200]
 	limit = start + page_length
 	idx, idx_total = _index_rows(space, tab, q, area, goal, source, include_archived, limit, flag(unopened))

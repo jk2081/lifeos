@@ -21,7 +21,7 @@ def after_insert(doc, method=None):
 	if not (doc.attached_to_doctype or "").startswith("Life ") or doc.is_folder:
 		return
 	if not doc.is_private:
-		frappe.throw(frappe._("Files attached to Life OS records must be private."))
+		frappe.throw(frappe._("Files attached to Life OS records must be private."), title=frappe._("File must be private"))
 	if doc.attached_to_doctype != "Life Inbox Item" or frappe.flags.lifeos_making_preview:
 		return
 	if not doc.attached_to_field and keep_earlier_versions(doc):
@@ -82,7 +82,7 @@ def local_path(file_doc) -> str:
 		root = os.path.realpath(folder)
 		if os.path.commonpath([path, root]) == root and path != root:
 			return path
-	frappe.throw(_("{0} is not a file of this site.").format(file_doc.file_url or file_doc.name), frappe.PermissionError)
+	frappe.throw(_("{0} is not a file of this site.").format(file_doc.file_url or file_doc.name), frappe.PermissionError, title=frappe._("Not a file of this site"))
 
 
 def read(file_doc) -> bytes:

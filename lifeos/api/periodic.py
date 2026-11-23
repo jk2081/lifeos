@@ -15,7 +15,7 @@ from lifeos.review.periodic import Periodic
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Reviews are for people."), frappe.PermissionError)
+		frappe.throw(_("Reviews are for people."), frappe.PermissionError, title=_("Reviews are for people"))
 
 
 def _clock(at):
@@ -29,7 +29,7 @@ def _current(space, kind, at=None):
 	space = permissions.resolve_space(space)
 	rv = Periodic.current(space, frappe.session.user, periodic.kind_of(kind), _clock(at))
 	if rv is None:
-		frappe.throw(_("This review is not due."))
+		frappe.throw(_("This review is not due."), title=_("Review is not due"))
 	return rv
 
 
@@ -38,7 +38,7 @@ def _open(space, kind, at=None):
 	space = permissions.resolve_space(space, write=True)
 	rv = Periodic.begin(space, frappe.session.user, periodic.kind_of(kind), _clock(at))
 	if rv.doc.status == "Locked":
-		frappe.throw(_("This review is locked."))
+		frappe.throw(_("This review is locked."), title=_("Review is locked"))
 	return rv
 
 
@@ -141,5 +141,5 @@ def lock(space: str | None = None, kind: str = "monthly", went_well: str | None 
 def done(space: str | None = None, kind: str = "monthly", at: str | None = None):
 	rv = _current(space, kind, at)
 	if rv.doc.status != "Locked":
-		frappe.throw(_("This review is not locked yet."))
+		frappe.throw(_("This review is not locked yet."), title=_("Review not locked yet"))
 	return periodic.summary(rv)

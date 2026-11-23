@@ -10,11 +10,11 @@ class LifeSpace(Document):
 		if not self.owner_user:
 			self.owner_user = frappe.session.user
 		if self.owner_user != "Administrator" and permissions.is_agent(self.owner_user):
-			frappe.throw(_("An agent cannot own a space. Choose a person."))
+			frappe.throw(_("An agent cannot own a space. Choose a person."), title=_("Agent cannot own space"))
 		seen = set()
 		for m in self.members:
 			if m.user in seen:
-				frappe.throw(_("{0} is listed twice.").format(m.user))
+				frappe.throw(_("{0} is listed twice.").format(m.user), title=_("Member listed twice"))
 			seen.add(m.user)
 		if self.owner_user not in seen:
 			self.append("members", {"user": self.owner_user, "access": "Write"})
@@ -30,6 +30,6 @@ class LifeSpace(Document):
 
 	def on_trash(self):
 		if frappe.db.exists("Life Index", {"space": self.name}) or frappe.db.exists("Life Area", {"space": self.name}):
-			frappe.throw(_("This space still holds records. Move or delete them first."))
+			frappe.throw(_("This space still holds records. Move or delete them first."), title=_("Space still holds records"))
 		from lifeos import permissions
 		permissions.clear_cache()

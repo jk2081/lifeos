@@ -8,14 +8,14 @@ import frappe
 from frappe import _
 
 from lifeos import permissions
-from lifeos.review import piles
+from lifeos.review import stale
 from lifeos.review.record import TABS, Review
 
 
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("The weekly review is for people."), frappe.PermissionError)
+		frappe.throw(_("The weekly review is for people."), frappe.PermissionError, title=_("Weekly review is for people"))
 
 
 def _current(space):
@@ -30,7 +30,7 @@ def _open(space):
 	space = permissions.resolve_space(space, write=True)
 	rv = Review.start(space, frappe.session.user)
 	if rv.doc.status == "Locked":
-		frappe.throw(_("This review is locked."))
+		frappe.throw(_("This review is locked."), title=_("Review is locked"))
 	return rv
 
 
@@ -49,15 +49,13 @@ def get(space: str | None = None):
 
 @frappe.whitelist(methods=["POST"])
 def start(space: str | None = None, fresh: bool | int = 0):
-	"""Resume the Open review or start one (a review locked in the last days is returned as it is, unless `fresh`). Sorting
-	the piles may call the assistant, within the cap."""
+	"""Resume the Open review or start one (a review locked in the last days is returned as it is, unless `fresh`). Preparing
+	the goals may call the assistant, within the cap."""
 	_person()
 	space = permissions.resolve_space(space, write=True)
 	rv = Review.start(space, frappe.session.user, fresh=bool(int(fresh or 0)))
 	if rv.doc.status == "Open":
 		_refresh(rv)
-		for key in piles.KEYS:
-			piles.PileSet(rv, key).load(ai=_ai(space))
 		from lifeos.review import goals as goals_mod
 
 		gp = goals_mod.GoalPlan(rv)
@@ -93,67 +91,18 @@ def _refresh(rv):
 def visit(space: str | None = None, tab: str | None = None):
 	"""Mark a tab as visited (Library is done once visited)."""
 	if tab not in TABS:
-		frappe.throw(_("Unknown tab."))
+		frappe.throw(_("Unknown tab."), title=_("Unknown review tab"))
 	rv = _open(space)
 	rv.visit(tab)
 	rv.save()
 	return rv.header()
 
 
-# ---- piles ----
-
-@frappe.whitelist(methods=["GET"])
-def pile_summary(space: str | None = None, key: str = "tasks"):
-	rv = _current(space)
-	return piles.PileSet(rv, key).summary()
-
-
-@frappe.whitelist(methods=["GET"])
-def pile_drawer(space: str | None = None, key: str = "tasks", pile: str = "keep"):
-	rv = _current(space)
-	return piles.PileSet(rv, key).drawer(pile)
-
-
-@frappe.whitelist(methods=["POST"])
-def pile_settle(space: str | None = None, key: str = "tasks", ref: str = "", decision: str = "keep", chase: bool | int | None = None):
-	"""Settle one item now: Keep, Park or Let go (Keep with `chase` for a waiting item)."""
-	rv = _open(space)
-	ps = piles.PileSet(rv, key)
-	ps.settle(ref, decision, None if chase is None else bool(int(chase)))
-	rv.save()
-	return {"summary": ps.summary(), "header": rv.header()}
-
-
-@frappe.whitelist(methods=["POST"])
-def pile_accept(space: str | None = None, key: str = "tasks", pile: str = "keep"):
-	"""Apply a pile's decision to every item still in it."""
-	rv = _open(space)
-	ps = piles.PileSet(rv, key)
-	n = ps.accept(pile)
-	rv.save()
-	return {"done": n, "summary": ps.summary(), "header": rv.header()}
-
-
-@frappe.whitelist(methods=["POST"])
-def pile_undo(space: str | None = None, key: str = "tasks", ref: str | None = None, pile: str | None = None):
-	"""Undo one item (`ref`) or a whole pile (`pile`), reversing every exit it recorded."""
-	rv = _open(space)
-	ps = piles.PileSet(rv, key)
-	if ref:
-		ps.undo(ref)
-	elif pile:
-		ps.undo_pile(pile)
-	else:
-		frappe.throw(_("Say what to undo."))
-	rv.save()
-	return {"summary": ps.summary(), "header": rv.header()}
-
-
 # ---- tab 1: Library ----
 
 @frappe.whitelist(methods=["GET"])
 def library(space: str | None = None):
-	"""The calendar strip, what came in, the Inbox piles' split and the revelations."""
+	"""The calendar strip, what came in and the revelations."""
 	from lifeos.review import library as lib
 
 	rv = _current(space)
@@ -202,11 +151,11 @@ def meeting_link(space: str | None = None, event: str = "", doctype: str = "", n
 	_check_event(rv, event)
 	if unlink:
 		if frappe.db.get_value("Life Meeting Link", unlink, "event") != event:
-			frappe.throw(_("That link is not on this meeting."))
+			frappe.throw(_("That link is not on this meeting."), title=_("Link not on this meeting"))
 		meetings.unlink(unlink)
 	else:
 		if doctype not in ("Life Inbox Item", "Life Chat Log", "Life Note", "Life Task"):
-			frappe.throw(_("Only captures, chats, notes and tasks link to a meeting."))
+			frappe.throw(_("Only captures, chats, notes and tasks link to a meeting."), title=_("Cannot link to a meeting"))
 		meetings.link(event, doctype, name)
 	return {"ok": True}
 
@@ -235,7 +184,7 @@ def meeting_done(space: str | None = None, event: str = ""):
 
 def _check_event(rv, event):
 	if not isinstance(event, str) or frappe.db.get_value("Event", event, "life_space") != rv.doc.space:
-		frappe.throw(_("That meeting is not in this review."))
+		frappe.throw(_("That meeting is not in this review."), title=_("Meeting not in this review"))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -247,7 +196,7 @@ def finding_act(space: str | None = None, insight: str = "", index: int = 0, tit
 
 	rv = _open(space)
 	if frappe.db.get_value("Life Insight", insight, "space") != rv.doc.space:
-		frappe.throw(_("That finding is not in this space."))
+		frappe.throw(_("That finding is not in this space."), title=_("Finding is in another space"))
 	out = findings.act(insight, index, {"title": title, "goal": goal, "value": value, "reason": reason})
 	if out.get("task"):
 		lib.note_created(rv, out["task"], goal or frappe.db.get_value("Life Task", out["task"], "goal"), "library")
@@ -256,6 +205,21 @@ def finding_act(space: str | None = None, insight: str = "", index: int = 0, tit
 
 
 # ---- tab 2: Tasks ----
+
+@frappe.whitelist(methods=["GET"])
+def stale_tasks(space: str | None = None):
+	"""The stale tasks to decide in the Tasks tab, and how many this review has decided."""
+	return stale.tab(_current(space))
+
+
+@frappe.whitelist(methods=["POST"])
+def settle_stale(task: str, decision: str, space: str | None = None):
+	"""Keep, Someday or Drop one stale task."""
+	rv = _open(space)
+	stale.settle(rv, task, decision)
+	rv.save()
+	return {"stale": stale.tab(rv), "header": rv.header()}
+
 
 @frappe.whitelist(methods=["GET"])
 def plate(space: str | None = None):
@@ -296,7 +260,7 @@ def goal_save(space: str | None = None, goal: str = "", values: str | dict | Non
 	rv = _open(space)
 	vals = parse(values, {}) or {}
 	if not isinstance(vals, dict):
-		frappe.throw(_("values must be an object."))
+		frappe.throw(_("values must be an object."), title=_("Values must be an object"))
 	goals_mod.GoalPlan(rv).save(goal, {k: vals[k] for k in ("next_action", "task", "slot", "minutes", "who", "note") if k in vals})
 	rv.save()
 	return {"header": rv.header()}
@@ -310,7 +274,7 @@ def goal_skip(space: str | None = None, goal: str = "", reason: str | None = Non
 	rv = _open(space)
 	gp = goals_mod.GoalPlan(rv)
 	if goal not in [g.name for g in gp.goals()]:
-		frappe.throw(_("That goal is not in this review."))
+		frappe.throw(_("That goal is not in this review."), title=_("Goal not in this review"))
 	gp.unskip(goal) if int(undo or 0) else gp.skip(goal, reason)
 	rv.save()
 	return {"header": rv.header()}
@@ -323,7 +287,7 @@ def goal_star(space: str | None = None, goal: str = "", on: bool | int = 1):
 	rv = _open(space)
 	gp = goals_mod.GoalPlan(rv)
 	if goal not in [g.name for g in gp.goals()]:
-		frappe.throw(_("That goal is not in this review."))
+		frappe.throw(_("That goal is not in this review."), title=_("Goal not in this review"))
 	gp.set_star(goal, bool(int(on)))
 	rv.save()
 	return {"header": rv.header()}
@@ -381,5 +345,5 @@ def done(space: str | None = None):
 
 	rv = _current(space)
 	if rv.doc.status != "Locked":
-		frappe.throw(_("This review is not locked yet."))
+		frappe.throw(_("This review is not locked yet."), title=_("Review is not locked"))
 	return lock_mod.summary(rv)

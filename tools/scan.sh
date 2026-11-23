@@ -30,6 +30,12 @@ fi
 
 if [ "$#" -eq 0 ]; then set -- lifeos; fi
 
+# The permissions guard (tools/scan_guard.py): under lifeos/api/, `frappe.get_all(` and `ignore_permissions=True` need a
+# `# system: <reason>` comment on the same line. It looks at the given files, or at all of lifeos/api for a whole scan.
+GUARD=0
+API=$(printf '%s\n' "$@" | grep -E '^(lifeos/api/|lifeos/?$|lifeos/api$)' | sed -E 's#^lifeos/?$#lifeos/api#' || true)
+if [ -n "$API" ]; then python3 tools/scan_guard.py $API >&2 || GUARD=1; fi
+
 # Semgrep reads .gitignore and .semgrepignore, so the built front end and node_modules are skipped.
 if [ "${LIFEOS_BENCH_CMD:-docker}" = local ]; then
   OUT=$(semgrep scan --metrics=off --quiet --json --config "$RULES/rules" "$@" || true)
@@ -39,9 +45,11 @@ else
     "cd apps/lifeos && semgrep scan --metrics=off --quiet --json --config $RULES/rules $(printf '%q ' "$@")" || true)
 fi
 
+RC=0
 if [ "$JSON" = 1 ]; then
   printf '%s\n' "$OUT"
-  printf '%s' "$OUT" | python3 tools/scan_summary.py --quiet
+  printf '%s' "$OUT" | python3 tools/scan_summary.py --quiet || RC=1
 else
-  printf '%s' "$OUT" | python3 tools/scan_summary.py
+  printf '%s' "$OUT" | python3 tools/scan_summary.py || RC=1
 fi
+[ "$GUARD" = 0 ] && [ "$RC" = 0 ]

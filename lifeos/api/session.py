@@ -11,7 +11,7 @@ def boot():
 	permissions.require_login()
 	spaces = permissions.user_spaces()
 	if frappe.session.user == "Administrator" and not spaces:
-		spaces = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}
+		spaces = {name: "Write" for name in frappe.get_all("Life Space", pluck="name")}  # system: the Brain user sees every space
 	s = frappe.get_cached_doc("Life Settings")
 	order = {"Private": 0, "Shared": 1}
 	return {
@@ -27,7 +27,6 @@ def boot():
 			"stale_task_days": s.stale_task_days or 90,
 			# Settings > Rhythms (set 6)
 			"start_of_day": str(s.start_of_day or "06:00:00"), "week_starts_on": s.week_starts_on or "Monday",
-			"month_plan_enabled": int(s.month_plan_enabled if s.month_plan_enabled is not None else 1),
 			"require_done_when": int(readings.done_when_required()),
 			"use_focuses": int(areas.use_focuses()),
 		},

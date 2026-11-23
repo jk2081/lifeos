@@ -147,11 +147,11 @@ def discard(doc, auto=False):
 
 	doc.flags.auto_rule = RULE if auto else None
 	permissions.get_doc_checked("Life Inbox Item", doc.name, "delete")
-	frappe.local.lifeos_auto_rule = doc.flags.auto_rule
+	frappe.flags.lifeos_auto_rule = doc.flags.auto_rule
 	try:
 		trash.delete("Life Inbox Item", doc.name)
 	finally:
-		frappe.local.lifeos_auto_rule = None
+		frappe.flags.lifeos_auto_rule = None
 	return {"op": "restore", "item": doc.name}
 
 
@@ -188,11 +188,11 @@ def undo(log):
 			note = op.get("note")
 			if isinstance(note, str) and frappe.db.exists("Life Note", note):
 				permissions.get_doc_checked("Life Note", note, "delete")
-				frappe.local.lifeos_no_exit = True  # the note was only the item's parking place: no Discarded exit for it
+				frappe.flags.lifeos_no_exit = True  # the note was only the item's parking place: no Discarded exit for it
 				try:
 					frappe.delete_doc("Life Note", note, ignore_permissions=True, delete_permanently=True)
 				finally:
-					frappe.local.lifeos_no_exit = False
+					frappe.flags.lifeos_no_exit = False
 			doc = _reopen(item, op.get("status") or "To Review")
 			# only the item's own rejected proposals go back to Pending (the item's write access is checked in _reopen)
 			for p in op.get("proposals") or []:

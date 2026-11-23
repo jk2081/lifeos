@@ -1,9 +1,9 @@
 // Review: the weekly, monthly and 12-week reviews and the screens they share.
 // Checks are numbered REVIEW.<n> in the order they appear here; `node tools/acceptance.mjs --only=REVIEW` runs this file's checks.
-import { ensureJournalPage, SPACE, WIDTHS, addDays, areaId, bench, check, must, owner, session, stamp, today, walkScreens } from './context.mjs'
+import { SPACE, WIDTHS, addDays, areaId, bench, check, must, owner, session, stamp, today, walkScreens } from './context.mjs'
 import { ux, uxKit } from './ux.mjs'
 
-await check('REVIEW.1', "Archive job archives done tasks; a stale open task waits in the weekly review's piles", async () => {
+await check('REVIEW.1', "Archive job archives done tasks; a stale open task waits in the weekly review's list of stale tasks", async () => {
   const done = await owner.api('tasks.quick_add', { text: `Old done task ${stamp}`, space: SPACE, area: areaId('Personal') })
   const stale = await owner.api('tasks.quick_add', { text: `Stale open task ${stamp}`, space: SPACE, area: areaId('Personal') })
   await owner.api('tasks.set_status', { task: done.name, status: 'Done' })
@@ -17,27 +17,16 @@ archive.run_daily()`)
   const arch = await owner.api('archive.list', { space: SPACE, page_length: 100, filters: [['title', 'like', `%${stamp}%`]] }) // earlier runs fill the Archive
   must(JSON.stringify(arch.groups).includes(done.name), 'the done task was not archived')
   must(!JSON.stringify(arch.groups).includes(stale.name), 'the stale open task was archived')
-  // set 8, as issue 59 left it: the age rules are gone, so with no skill answer the stale task waits in a pile of the weekly review's Tasks tab
-  // (Needs you, or Keep when Needs you is full); it is never archived for you
-  let pile = null
-  for (const p of ['needs', 'keep', 'park', 'letgo']) {
-    const d = await owner.api('weekly.pile_drawer', { space: SPACE, key: 'tasks', pile: p })
-    if (d.rows.some((r) => r.name === stale.name)) { pile = p; break }
-  }
-  must(pile, 'the stale task is in no pile of the weekly review')
+  // the age rules are gone: a stale open task is never archived for you; it waits in the weekly review's Tasks tab (issue 72)
+  must((await owner.api('weekly.stale_tasks', { space: SPACE })).tasks.some((r) => r.name === stale.name), "the stale task is not in the weekly review's list")
   await owner.open('/life/today/week?view=review&tab=tasks')
-  if (pile === 'needs') must((await owner.page.locator('[data-main]').innerText()).includes(`Stale open task ${stamp}`), 'Needs you does not show it') // its rows are on the board, not in a drawer
-  else {
-    await owner.page.locator(`[data-pile-card][data-pile="${pile}"] [data-pile-open]`).first().click()
-    await owner.page.waitForTimeout(800)
-    must((await owner.page.locator('[data-drawer-name="pile"]').innerText()).includes(`Stale open task ${stamp}`), `the ${pile} pile does not show it`)
-  }
+  await owner.page.locator(`[data-stale-task][data-task="${stale.name}"]`).waitFor({ timeout: 15000 })
   await owner.page.keyboard.press('Escape')
 })
 
 for (const width of WIDTHS) {
   const { count, overflow, pane, pg, phone, s, settle, tag } = await uxKit(width)
-  await check('REVIEW.2', `${width} px: the review screen and the journal page show tabs on a phone only`, async () => {
+  await check('REVIEW.2', `${width} px: the review screen shows tabs on a phone only`, async () => {
     await s.open('/life/brain/queue?open=inbox:' + ux.inbox)
     const review = pg.locator('[data-review-tabs]')
     if (!phone) must(!(await review.count()), 'the review screen shows tabs at 1440 px')
@@ -52,17 +41,6 @@ for (const width of WIDTHS) {
       must((await pg.locator('[data-review-tabs]').getAttribute('data-tab-current')) === 'transcript', 'the full review page does not open on tab=transcript')
       if (pendingNow) must(await pg.getByRole('button', { name: /Accept all/ }).isVisible(), 'Accept all is hidden on the Original tab')
     }
-    // set 6: a journal page is a capture; its old link opens it in the pane over Library > Everything, Journal pages, on its tabs (issue 14)
-    const jp = ensureJournalPage()
-    await s.open(`/life/library/notes?view=list&open=page:${jp}`)
-    must(new URL(pg.url()).pathname === '/life/library/notes' && new URL(pg.url()).searchParams.get('view') === 'list' && await pane.isVisible(),
-      `a journal page went to ${new URL(pg.url()).pathname}${new URL(pg.url()).search}`)
-    const jt = pg.locator('[data-pane-tabs]')
-    await jt.locator('[data-tab="transcript"]').click()
-    await settle()
-    await pg.reload({ waitUntil: 'networkidle' })
-    await settle()
-    must((await jt.getAttribute('data-tab-current')) === 'transcript', 'the journal page tab did not survive a reload')
     must((await overflow()) <= 0, 'the page scrolls sideways')
   })
   await s.ctx.close()
@@ -148,69 +126,57 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     return r.progress.label
   })
 
-  await check('REVIEW.6', `${width} px: the Park pile: one moved to Keep, the rest parked; the card's done state; the Outbox counts match; Undo restores both`, async () => {
+  await check('REVIEW.6', `${width} px: the Tasks tab lists each stale task once with Keep, Someday and Drop; each button does what it says; the Outbox counts match`, async () => {
     await goTab('tasks')
     must(tabNow() === 'tasks', 'Tasks did not open')
-    const before = (await s.api('weekly.plate', { space: SPACE })).piles.find((x) => x.pile === 'Parked').n
-    await pg.locator('[data-pile-card][data-pile="park"] [data-pile-open]').first().click()
-    const d = drawer('pile')
-    await d.locator('[data-pile-row]').first().waitFor({ timeout: 10000 })
-    const moved = d.locator('[data-pile-row]', { hasText: `S8 park 0 ${W}` })
-    await moved.locator('[data-pile-choice="keep"]').click()
-    await pg.waitForLoadState('networkidle')
-    await settle()
-    must((await d.locator('[data-pile-row]', { hasText: `S8 park 0 ${W}` }).innerText()).includes('Moved to Keep'), 'the row does not say Moved to Keep')
-    const left = (await s.api('weekly.pile_summary', { space: SPACE, key: 'tasks' })).piles.park.left
-    await d.locator('[data-pile-accept]').click()
-    await pg.waitForLoadState('networkidle')
-    await settle()
-    must(!(await d.count()) || !(await d.isVisible()), 'the drawer stayed open')
-    const card = pg.locator('[data-pile-card][data-pile="park"]')
-    must((await card.getAttribute('data-pile-done')) === '1', 'the card is not done')
-    must((await card.innerText()).includes('1 moved to Keep'), 'the card does not say what moved')
+    const row = (name) => pg.locator(`[data-stale-task][data-task="${name}"]`)
+    for (const name of [data.keep, data.park[0], data.letgo]) {
+      await row(name).waitFor({ timeout: 10000 })
+      must(await pg.locator(`[data-stale-task][data-task="${name}"]`).count() === 1, 'a stale task is listed twice')
+      must(JSON.stringify(await row(name).locator('[data-stale-decision]').allInnerTexts()) === JSON.stringify(['Keep', 'Someday', 'Drop']), 'the buttons are not Keep, Someday and Drop')
+    }
+    const plateN = async (p) => (await s.api('weekly.plate', { space: SPACE })).piles.find((x) => x.pile === p).n
+    const before = { Parked: await plateN('Parked'), Discarded: await plateN('Discarded') }
     const status = async (n) => (await s.api('frappe.client.get_value', { doctype: 'Life Task', filters: { name: n }, fieldname: 'status' })).status
-    must(await status(data.park[0]) === 'Open' && await status(data.park[1]) === 'Someday' && await status(data.park[2]) === 'Someday', 'the tasks did not move')
-    const plate = (await s.api('weekly.plate', { space: SPACE })).piles.find((x) => x.pile === 'Parked')
-    const listed = await s.api('outbox.list', { space: SPACE, pile: 'Parked', from_date: plate.to.query.from, to_date: plate.to.query.to, page_length: 500 })
-    must(plate.n === listed.total && plate.n === listed.rows.length, `Parked says ${plate.n}, the Outbox lists ${listed.rows.length}`)
-    must(plate.n === before + left, `Parked went from ${before} to ${plate.n}, not by ${left}`)
-    await card.locator('[data-pile-undo]').click()
-    await pg.waitForLoadState('networkidle')
-    await settle()
-    must(await status(data.park[0]) === 'Open' && await status(data.park[1]) === 'Open' && await status(data.park[2]) === 'Open', 'Undo did not restore both')
-    must((await pg.locator('[data-pile-card][data-pile="park"]').getAttribute('data-pile-done')) === '0', 'the card stayed done after Undo')
-    const after = (await s.api('weekly.plate', { space: SPACE })).piles.find((x) => x.pile === 'Parked').n
-    must(after === before, `after Undo Parked is ${after}, was ${before}`)
-    return `${left} parked, 1 moved to Keep, Outbox ${plate.n}, undone`
+    const press = async (name, decision) => {
+      await row(name).locator(`[data-stale-decision="${decision}"]`).click()
+      await row(name).waitFor({ state: 'detached', timeout: 10000 })
+      await settle()
+    }
+    await press(data.keep, 'keep')
+    must(await status(data.keep) === 'Open', 'Keep changed the task')
+    must(bench(`print(str(frappe.db.get_value("Life Task", "${data.keep}", "last_touched_on")))`).split('\n').pop() === today, 'Keep did not touch the task, so it would be stale again next week')
+    await press(data.park[0], 'someday')
+    must(await status(data.park[0]) === 'Someday', 'Someday did not park the task')
+    await press(data.letgo, 'drop')
+    must(await status(data.letgo) === 'Dropped', 'Drop did not drop the task')
+    must(await plateN('Parked') === before.Parked + 1 && await plateN('Discarded') === before.Discarded + 1, 'the Outbox counts did not follow')
+    for (const p of ['Parked', 'Discarded']) {
+      const plate = (await s.api('weekly.plate', { space: SPACE })).piles.find((x) => x.pile === p)
+      const listed = await s.api('outbox.list', { space: SPACE, pile: p, from_date: plate.to.query.from, to_date: plate.to.query.to, page_length: 500 })
+      must(plate.n === listed.total && plate.n === listed.rows.length, `${p} says ${plate.n}, the Outbox lists ${listed.rows.length}`)
+    }
+    must(Number(await pg.locator('[data-left-to-clear]').getAttribute('data-n')) === (await s.api('weekly.stale_tasks', { space: SPACE })).left, 'the count left to decide is not the list')
+    return 'Keep, Someday and Drop'
   })
 
-  await check('REVIEW.7', `${width} px: Needs you settled and every pile accepted; Next: Goals opens`, async () => {
-    for (let i = 0; i < 8; i++) {
-      const row = pg.locator('[data-needs-row][data-settled="0"]').first()
+  await check('REVIEW.7', `${width} px: every stale task decided; Next: Goals opens`, async () => {
+    for (let i = 0; i < 12; i++) {
+      const row = pg.locator('[data-stale-task]').first()
       if (!(await row.count())) break
-      await row.locator('[data-needs-choice]').first().click()
+      await row.locator('[data-stale-decision="keep"]').click()
       await pg.waitForLoadState('networkidle')
       await settle()
     }
-    must(!(await pg.locator('[data-needs-you]').count()), 'Needs you did not fold away')
-    for (const p of ['keep', 'park', 'letgo']) {
-      const card = pg.locator(`[data-pile-card][data-pile="${p}"]`)
-      if ((await card.getAttribute('data-pile-done')) === '1' || (await card.getAttribute('data-pile-count')) === '0') continue
-      await card.locator('[data-pile-open]').click()
-      await drawer('pile').locator('[data-pile-accept]').waitFor({ timeout: 10000 })
-      await drawer('pile').locator('[data-pile-accept]').click()
-      await pg.waitForLoadState('networkidle')
-      await settle()
-    }
-    const chase = (await s.api('tasks.list', { space: SPACE, status: 'all', filters: [['title', 'like', `Chase Ravi: S8 drainage photos ${W}%`]] })).tasks
-    must(chase.length === 1, 'the waiting item kept as Chase made no chase task')
+    must(!(await pg.locator('[data-stale-task]').count()), 'stale tasks are left')
+    must((await pg.locator('[data-stale-tasks]').innerText()).includes('No stale tasks.'), 'the empty list does not say what will appear here')
     const next = pg.locator('[data-review-next]')
     must(await next.isEnabled(), 'Next: Goals is still closed: ' + (await pg.locator('[data-review-footer-line]').innerText()))
     await next.dispatchEvent('click') // a toast may sit over the footer for a moment
     await pg.waitForLoadState('networkidle')
     await settle()
     must(tabNow() === 'goals', 'Goals did not open')
-    return 'Needs you, Keep, Park, Let go'
+    return 'every stale task decided'
   })
 
   await check('REVIEW.8', `${width} px: every cycle goal gets a next action or a skip with a reason; exactly three stars; more than the free time shows the warning`, async () => {
@@ -280,7 +246,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
       seen.push(t)
     }
     await goTab('tasks')
-    must(await pg.locator('[data-pile-card][data-pile-done="1"]').count() >= 1, 'the piles were not kept')
+    must(!(await pg.locator('[data-stale-task]').count()) && (await pg.locator('[data-left-to-clear]').getAttribute('data-n')) === '0', 'the decided stale tasks came back')
     await goTab('goals')
     must(await pg.locator('[data-goal-row][data-star="1"]').count() === 3 && await pg.locator('[data-goal-row][data-skipped="1"]').count() === 1, 'stars or skip lost')
     // the drawers too
@@ -468,7 +434,7 @@ for (const width of WIDTHS) {
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
   const sb = (code) => bench(`import json
 from frappe.utils import add_days, getdate, today
-from lifeos import journal
+from lifeos import cycles, habits
 SP = "${S}"
 OWNER = "owner@lifeos.test"
 now = getdate(today())
@@ -488,27 +454,22 @@ for g in frappe.get_all("Life Goal", filters={"space": SP, "title": ["like", "I4
 for c in frappe.get_all("Life Cycle", filters={"space": SP}, pluck="name"):
     frappe.db.delete("Life Action Log", {"cycle": c})
     frappe.db.delete("Life Cycle", {"name": c})
-frappe.db.sql("delete from \`tabLife Month Plan Habit\` where parent like %s", SP + "-%")
-frappe.db.delete("Life Month Plan", {"space": SP})
 frappe.db.delete("Life Habit", {"space": SP, "title": ["like", "I47 %"]})
 print("{}")`)
   const area = () => sb('print(json.dumps(frappe.db.get_value("Life Area", {"space": SP, "is_on": 1}, "name") or frappe.db.get_value("Life Area", {"space": SP}, "name")))').replace(/"/g, '')
   // last month's plan: one goal done, three open, a habit; and a closed cycle that covers it, with ticks, so its weeks have scores
   const seedMonth = () => JSON.parse(sb(`frappe.set_user(OWNER)
 a = frappe.db.get_value("Life Area", {"space": SP, "is_on": 1}, "name") or frappe.db.get_value("Life Area", {"space": SP}, "name")
-journal.get_month_plan(SP, last.year, last.month, create=True)
 goals = {}
 for key in ("done", "carry", "drop", "finish"):
-    goals[key] = journal.add_month_goal(SP, last.year, last.month, "I47 goal " + key + " ${width} ${stamp}", a).name
+    goals[key] = cycles.add_month_goal(SP, last.year, last.month, "I47 goal " + key + " ${width} ${stamp}", a).name
 frappe.db.set_value("Life Goal", goals["done"], "outcome", "Achieved")
 habit = frappe.get_doc({"doctype": "Life Habit", "space": SP, "title": "I47 habit ${width} ${stamp}"}).insert().name
-plan = journal.get_month_plan(SP, last.year, last.month)
-plan.append("habits", {"habit": habit, "days_per_week": 5, "sort_order": 1})
-plan.save()
+habits.set_month_habits(SP, last.year, last.month, [{"habit": habit, "days_per_week": 5}])
 start = add_days(last.replace(day=1), -last.replace(day=1).weekday())
 cyc = frappe.get_doc({"doctype": "Life Cycle", "space": SP, "title": "I47 look ${width} ${stamp}", "start_date": start, "status": "Planned"}).insert()
 g = frappe.get_doc({"doctype": "Life Goal", "space": SP, "cycle": cyc.name, "horizon": "12 weeks", "title": "I47 look goal ${width} ${stamp}", "done_when": "x", "actions": [{"title": "I47 look act", "per_week": 3, "status": "Open"}]}).insert()
-for w in (1, 2, 3, 4): journal.set_tick(g.actions[0].name, w, 2)
+for w in (1, 2, 3, 4): cycles.set_tick(g.actions[0].name, w, 2)
 frappe.db.set_value("Life Cycle", cyc.name, "status", "Closed")
 print(json.dumps({"month": last.month, "year": last.year, "goals": goals, "habit": habit}))`))
   // an ended 12 Week Year: it ended today, with two goals, ticks, and lead actions
@@ -521,9 +482,9 @@ for key, per in (("done", 3), ("carry", 2), ("drop", 1)):
     g = frappe.get_doc({"doctype": "Life Goal", "space": SP, "cycle": cyc.name, "horizon": "12 weeks", "title": "I47 cg " + key + " ${width} ${stamp}", "area": a, "done_when": "Finished " + key,
         "sort_order": 10 + per, "actions": [{"title": "I47 act " + key, "per_week": per, "status": "Open"}]}).insert()
     out[key] = g.name
-    for w in (1, 2, 3, 5): journal.set_tick(g.actions[0].name, w, per)
-actions, ticks = journal._actions(cyc.name), journal._ticks(cyc.name)
-print(json.dumps({"cycle": cyc.name, "goals": out, "expected": journal.cycle_average(cyc, actions, ticks, journal.WEEKS)}))`))
+    for w in (1, 2, 3, 5): cycles.set_tick(g.actions[0].name, w, per)
+actions, ticks = cycles._actions(cyc.name), cycles._ticks(cyc.name)
+print(json.dumps({"cycle": cyc.name, "goals": out, "expected": cycles.cycle_average(cyc, actions, ticks, cycles.WEEKS)}))`))
   const next = async () => { await pg.locator('[data-review-next]').click(); await pg.waitForTimeout(700) }
   const tabNow = () => pg.locator('[data-review]').first().getAttribute('data-review-tab')
   const choose = (goal, pile) => pg.locator(`[data-decide-goal][data-goal="${goal}"] [data-choose="${pile}"]`).click()
@@ -586,7 +547,7 @@ print(json.dumps({"cycle": cyc.name, "goals": out, "expected": journal.cycle_ave
       await pg.locator('[data-review-next]').click()
       await pg.locator('[data-review-done]').waitFor({ timeout: 20000 })
       const out = JSON.parse(sb(`print(json.dumps({"carry": frappe.db.get_value("Life Goal", "${g.carry}", "outcome"), "drop": frappe.db.get_value("Life Goal", "${g.drop}", ["outcome", "result_note"]),
-  "finish": str(frappe.db.get_value("Life Goal", "${g.finish}", "target_date")), "next": [x["title"] for x in journal.month_goals(SP, now.year, now.month)]}))`))
+  "finish": str(frappe.db.get_value("Life Goal", "${g.finish}", "target_date")), "next": [x["title"] for x in cycles.month_goals(SP, now.year, now.month)]}))`))
       must(out.carry === 'Carried', `the carried goal is ${out.carry}`)
       must(out.drop[0] === 'Dropped' && out.drop[1] === 'Not worth the time', `the dropped goal is ${JSON.stringify(out.drop)}`)
       must(out.finish === addDays(5), `the finish date is ${out.finish}`)
@@ -594,7 +555,7 @@ print(json.dumps({"cycle": cyc.name, "goals": out, "expected": journal.cycle_ave
     })
 
     await check('REVIEW.16', `${width} px: the goals made in Plan are in the order given, and Goals > Cycles shows them`, async () => {
-      const order = JSON.parse(sb(`print(json.dumps([x["title"] for x in journal.month_goals(SP, now.year, now.month) if x["title"].startswith("I47 ") and x["title"].endswith("${width} ${stamp}") and " finish " not in x["title"]]))`))
+      const order = JSON.parse(sb(`print(json.dumps([x["title"] for x in cycles.month_goals(SP, now.year, now.month) if x["title"].startswith("I47 ") and x["title"].endswith("${width} ${stamp}") and " finish " not in x["title"]]))`))
       must(order.length === 3 && order[0].includes('goal carry') && order[1].endsWith(`plan one ${width} ${stamp}`) && order[2].endsWith(`plan two ${width} ${stamp}`), `this month's goals are ${order}`)
       await open('/goals/cycles')
       await pg.locator('[data-cycles][data-loaded="1"]').waitFor({ timeout: 15000 })
@@ -618,7 +579,7 @@ print(json.dumps({"cycle": cyc.name, "goals": out, "expected": journal.cycle_ave
       await open('/review?kind=12-weeks')
       await pg.locator('[data-review-score]').waitFor({ timeout: 20000 })
       await pg.waitForTimeout(800)
-      const grid = await s.api('journal.grid', { space: S, cycle: c.cycle })
+      const grid = await s.api('goals.grid', { space: S, cycle: c.cycle })
       must(await pg.locator('[data-score-week]').count() === 12, 'Score does not show twelve weeks')
       const got = await pg.locator('[data-score-week]').evaluateAll((els) => els.map((e) => Number(e.getAttribute('data-score'))))
       must(JSON.stringify(got) === JSON.stringify(grid.weeks.map((w) => Math.round(w.percent))), `the weeks read ${got}, the grid ${grid.weeks.map((w) => Math.round(w.percent))}`)
@@ -694,7 +655,7 @@ Review.start(SP, OWNER)`)
       must(Number(sb(`print(frappe.db.count("Life Review", {"space": SP, "user": OWNER, "kind": "Monthly", "status": "Open"}))`)) === 1, 'there is more than one open monthly review')
     })
 
-    await check('REVIEW.23', `${width} px: deciding each goal and locking closes the cycle with journal.close_cycle's score and makes the next cycle with the carried goals and their lead actions`, async () => {
+    await check('REVIEW.23', `${width} px: deciding each goal and locking closes the cycle with cycles.close_cycle's score and makes the next cycle with the carried goals and their lead actions`, async () => {
       cleanup()
       const c = seedCycle()
       await open('/review?kind=12-weeks')
@@ -725,12 +686,12 @@ Review.start(SP, OWNER)`)
       await pg.locator('[data-review-next]').click()
       await pg.locator('[data-review-done]').waitFor({ timeout: 30000 })
       const out = JSON.parse(sb(`cyc = frappe.get_doc("Life Cycle", "${c.cycle}")
-nxt = frappe.db.get_value("Life Cycle", {"space": SP, "start_date": journal.next_monday(cyc.end_date)}, ["name", "status"], as_dict=True)
+nxt = frappe.db.get_value("Life Cycle", {"space": SP, "start_date": cycles.next_monday(cyc.end_date)}, ["name", "status"], as_dict=True)
 goals = frappe.get_all("Life Goal", filters={"cycle": nxt.name}, fields=["name", "title", "done_when", "carried_from"], order_by="sort_order asc")
 acts = {g.name: [(a.title, a.per_week) for a in frappe.get_doc("Life Goal", g.name).actions] for g in goals}
 print(json.dumps({"status": cyc.status, "score": cyc.final_score, "next": nxt.status, "goals": goals, "acts": acts,
   "outcomes": {k: frappe.db.get_value("Life Goal", v, "outcome") for k, v in ${JSON.stringify(c.goals)}.items()}}))`))
-      must(out.status === 'Closed' && out.score === c.expected, `the cycle is ${out.status} with score ${out.score}, journal.close_cycle gives ${c.expected}`)
+      must(out.status === 'Closed' && out.score === c.expected, `the cycle is ${out.status} with score ${out.score}, cycles.close_cycle gives ${c.expected}`)
       must(out.outcomes.done === 'Achieved' && out.outcomes.carry === 'Carried' && out.outcomes.drop === 'Dropped', `the outcomes are ${JSON.stringify(out.outcomes)}`)
       must(out.next === 'Planned' && out.goals.length === 2, `the next cycle is ${out.next} with ${out.goals.length} goals`)
       const kept = out.goals.find((g) => g.carried_from === c.goals.carry)

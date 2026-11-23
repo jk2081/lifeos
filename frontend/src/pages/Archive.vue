@@ -48,8 +48,8 @@ import { loadLookups } from '@/lib/lookups'
 import { refOf } from '@/lib/pane'
 
 const REASON = { Auto: 'by the daily job', Manual: 'by hand', Project: 'with its goal' }
-const KIND = { Inbox: 'Inbox item', 'Journal Page': 'Journal page', Document: 'Vault document', Chat: 'AI chat' }
-const TYPES = ['Life Task', 'Life Note', 'Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Journal Page']
+const KIND = { Inbox: 'Inbox item', Document: 'Vault document', Chat: 'AI chat' }
+const TYPES = ['Life Task', 'Life Note', 'Life Inbox Item', 'Life Chat Log', 'Life Vault Document']
 // the archive is a cross-type list: its filters are columns of Life Index, plus two the server reads from the records themselves
 // the Archive is the one screen whose area filter offers archived areas, marked "(archived)"
 useLinkScope({ archived: true })
@@ -64,7 +64,7 @@ const VIRTUAL = [
 ]
 // the state tabs: one per record type, on type=. All is the default
 const TABS = { key: 'type', field: 'ref_doctype', label: 'Record type', items: [{ value: 'all', label: 'All' }, { value: 'Life Task', label: 'Tasks' }, { value: 'Life Note', label: 'Notes' },
-  { value: 'Life Chat Log', label: 'Chats' }, { value: 'Life Vault Document', label: 'Documents' }, { value: 'Life Inbox Item', label: 'Inbox items' }, { value: 'Life Journal Page', label: 'Journal pages' },
+  { value: 'Life Chat Log', label: 'Chats' }, { value: 'Life Vault Document', label: 'Documents' }, { value: 'Life Inbox Item', label: 'Inbox items' },
   // Trash (UX fixes, set 5): records deleted in the last 30 days, with Restore; a daily job removes older ones for good
   { value: 'trash', label: 'Trash' }] }
 const HIDDEN = ['ref_name', 'search_text', 'also_in_csv', 'is_archived', 'record_owner', 'status']

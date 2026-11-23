@@ -56,12 +56,13 @@ def check_external_id(doc):
 	doc.external_id = doc.external_id.strip()[:255]
 	doc.source_system = (doc.source_system or "").strip().lower()[:40] or None
 	if not doc.source_system:
-		frappe.throw(_("An external_id needs a source_system, for example gmail or claude."))
+		frappe.throw(_("An external_id needs a source_system, for example gmail or claude."), title=_("Source system missing"))
 	other = frappe.db.get_value(doc.doctype, {"space": doc.space, "source_system": doc.source_system, "external_id": doc.external_id,
 		"name": ["!=", doc.name or ""]})
 	if other:
 		frappe.throw(_("{0} already has {1} {2} from {3}.").format(doc.space, doc.doctype, doc.external_id, doc.source_system),
-			frappe.DuplicateEntryError)
+			frappe.DuplicateEntryError,
+			title=_("Source already filed"))
 
 
 # ---------- thumbnails ----------

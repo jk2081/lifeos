@@ -126,18 +126,18 @@ def add_event(space: str | None = None, subject: str | None = None, starts_on: s
 	(writing to Google comes with set 9)."""
 	space = permissions.resolve_space(space, write=True)
 	if not (subject or "").strip() or not starts_on:
-		frappe.throw(_("An event needs a title and a start."))
+		frappe.throw(_("An event needs a title and a start."), title=_("Event needs title and start"))
 	starts = get_datetime(starts_on)
 	ends = get_datetime(ends_on) if ends_on else None
 	if flag(all_day):
 		starts = starts.replace(hour=0, minute=0, second=0)
 		ends = (ends or starts).replace(hour=23, minute=59, second=59)
 	if ends and ends < starts:
-		frappe.throw(_("The end is before the start."))
+		frappe.throw(_("The end is before the start."), title=_("Event ends before start"))
 	doc = frappe.get_doc({"doctype": "Event", "subject": subject.strip(), "starts_on": starts, "ends_on": ends, "all_day": 1 if flag(all_day) else 0,
 		"description": description, "event_type": "Public", "life_space": space})
 	# the space check above is the rule; core Event asks for the Desk User role, which Life User and Life Agent do not have
-	doc.insert(ignore_permissions=True)
+	doc.insert(ignore_permissions=True)  # system: the event is made for the person after the space check above
 	return {"name": doc.name, "synced_to_google": False}
 
 
@@ -148,22 +148,20 @@ def delete_event(event: str):
 	# event filed by an agent can be removed by the owner. The checks below replace the core one.
 	doc = permissions.get_doc_checked("Event", event, "read")
 	if not doc.get("life_space"):
-		frappe.throw(_("This event does not belong to a Life OS space."), frappe.PermissionError)
+		frappe.throw(_("This event does not belong to a Life OS space."), frappe.PermissionError, title=_("Event is not in a space"))
 	permissions.require_space(doc.life_space, write=True)
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot delete records."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot delete records."), frappe.PermissionError, title=_("Agents cannot delete"))
 	# an accepted proposal still names the event it made; that is a record of what happened, not a reason to keep the event
-	frappe.delete_doc("Event", doc.name, force=True, ignore_permissions=True)
+	frappe.delete_doc("Event", doc.name, force=True, ignore_permissions=True)  # system: the event is made for the person after the space check above
 	return {"deleted": event}
 
 
 @frappe.whitelist(methods=["POST"])
-def add_important_date(space: str | None = None, title: str | None = None, day: int | None = None, month: int | None = None, year: int | str | None = None, kind: str | None = "Birthday",
-		person: str | None = None):
-	"""Add a birthday, anniversary or other date that repeats every year."""
+def add_important_date(space: str | None = None, title: str | None = None, day: int | None = None, month: int | None = None, year: int | str | None = None, kind: str | None = "Birthday"):
+	"""Add a birthday, anniversary or other date that repeats every year: an all-day Event that repeats yearly."""
 	space = permissions.resolve_space(space, write=True)
-	doc = frappe.get_doc({"doctype": "Life Important Date", "space": space, "title": title, "day": day, "month": month,
-		"year": year or None, "kind": kind or "Birthday", "person": person}).insert()
+	doc = data.add_yearly_date(space, title, day, month, year, kind or "Birthday")
 	return {"name": doc.name}
 
 
@@ -177,8 +175,9 @@ def entry(kind: str, name: str):
 			"description": frappe.utils.strip_html(doc.description or ""), "repeats": bool(doc.repeat_this_event),
 			"synced_to_google": bool(doc.get("pulled_from_google_calendar"))}
 	if kind == "date":
-		doc = permissions.get_doc_checked("Life Important Date", name)
-		return {"kind": "date", "name": doc.name, "title": doc.title, "space": doc.space, "day": doc.day, "month": doc.month, "year": doc.year,
-			"date_kind": doc.kind, "person": doc.person,
-			"person_name": frappe.db.get_value("Life Person", doc.person, "full_name") if doc.person else None}
-	frappe.throw(_("kind must be event or date."))
+		doc = permissions.get_doc_checked("Event", name, "read")
+		first = getdate(doc.starts_on)
+		note = frappe.utils.strip_html(doc.description or "").strip()
+		return {"kind": "date", "name": doc.name, "title": doc.subject, "space": doc.get("life_space"), "day": first.day, "month": first.month,
+			"year": None, "date_kind": note if note in data.DATE_KINDS else "Other"}
+	frappe.throw(_("kind must be event or date."), title=_("Kind is not valid"))

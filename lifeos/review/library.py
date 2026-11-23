@@ -1,5 +1,5 @@
-"""Tab 1, Library (set 8): last week's calendar strip, what came in by source (each count opens its list), the Inbox piles'
-suggested split, and the revelations. A meeting opened shows what is linked to it, its follow-ups, and a line to plan from it."""
+"""Tab 1, Library (set 8): last week's calendar strip, what came in by source (each count opens its list), and the
+revelations. A meeting opened shows what is linked to it, its follow-ups, and a line to plan from it."""
 from collections import Counter
 from datetime import timedelta
 
@@ -14,12 +14,11 @@ DAY = "%a %-d"
 def data(review, user):
 	space, start, end = review.doc.space, getdate(review.doc.period_start), getdate(review.doc.period_end)
 	from lifeos.ai import client
-	from lifeos.review.piles import PileSet
 
 	ai = client.is_set_up() and bool(frappe.db.get_value("Life Space", space, "ask_enabled"))
 	shown = findings.revelations(review)
 	rows = findings.rows(shown)
-	return {"strip": strip(space, start, end, user), "came_in": came_in(space, start, end), "inbox": PileSet(review, "inbox").split(),
+	return {"strip": strip(space, start, end, user), "came_in": came_in(space, start, end),
 		"revelations": [_revelation(r) for r in rows if r.status == "New"], "revelations_shown": len(rows), "ai": ai}
 
 
@@ -87,7 +86,7 @@ def meeting(review, event):
 	space, start, end = review.doc.space, review.doc.period_start, review.doc.period_end
 	ev = frappe.get_doc("Event", event)
 	if ev.life_space != space or not frappe.has_permission("Event", "read", doc=ev):
-		frappe.throw(frappe._("That meeting is not in this review."), frappe.PermissionError)
+		frappe.throw(frappe._("That meeting is not in this review."), frappe.PermissionError, title=frappe._("Meeting not in review"))
 	links = meetings.linked(event)
 	from lifeos.pane_refs import ref_of
 
@@ -146,10 +145,10 @@ def plan_task(review, event, title, goal=None):
 	"""A line in the meeting drawer becomes a task linked to the meeting, under the goal chosen."""
 	ev = frappe.get_doc("Event", event)
 	if ev.life_space != review.doc.space:
-		frappe.throw(frappe._("That meeting is not in this review."))
+		frappe.throw(frappe._("That meeting is not in this review."), title=frappe._("Meeting not in review"))
 	title = " ".join((title or "").split())[:140]
 	if not title:
-		frappe.throw(frappe._("Type the task."))
+		frappe.throw(frappe._("Type the task."), title=frappe._("Task is empty"))
 	area = frappe.db.get_value("Life Goal", goal, "area") if goal else None
 	t = frappe.get_doc({"doctype": "Life Task", "space": review.doc.space, "title": title, "status": "Open", "goal": goal or None, "area": area}).insert()
 	meetings.link(event, "Life Task", t.name)

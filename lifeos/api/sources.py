@@ -12,13 +12,12 @@ from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, s
 from lifeos.api.utils import order_by as sort_order
 
 SOURCE_DOCTYPES = ("Life Inbox Item", "Life Chat Log")
-# Library > Captures (UX fixes, set 6): every source, with Vault documents (kind Document, always sensitive) and journal
-# pages; Library > All adds the notes
-CAPTURE_DOCTYPES = ("Life Inbox Item", "Life Chat Log", "Life Vault Document", "Life Journal Page")
-BASE = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Journal Page') "
-	"and x.kind in ('Inbox', 'Chat', 'Document', 'Journal Page')")
-BASE_ALL = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Journal Page', 'Life Note') "
-	"and x.kind in ('Inbox', 'Chat', 'Document', 'Journal Page', 'Note')")
+# Library > Captures (UX fixes, set 6): every source, with Vault documents (kind Document, always sensitive); Library > All adds the notes
+CAPTURE_DOCTYPES = ("Life Inbox Item", "Life Chat Log", "Life Vault Document")
+BASE = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document') "
+	"and x.kind in ('Inbox', 'Chat', 'Document')")
+BASE_ALL = ("x.ref_doctype in ('Life Inbox Item', 'Life Chat Log', 'Life Vault Document', 'Life Note') "
+	"and x.kind in ('Inbox', 'Chat', 'Document', 'Note')")
 # the kind tabs of Captures and All, each a condition on the index row
 TABS = {
 	"all": None,
@@ -26,7 +25,6 @@ TABS = {
 	"chats": "x.ref_doctype = 'Life Chat Log'",
 	"voice": "x.media_kind = 'Voice'",
 	"documents": "(x.media_kind = 'Document' or x.ref_doctype = 'Life Vault Document')",
-	"pages": "x.ref_doctype = 'Life Journal Page'",
 	"photos": "x.media_kind = 'Photo'",
 	"articles": "x.media_kind = 'Article'",
 	"email": "x.media_kind in ('Email', 'Email Digest')",
@@ -72,7 +70,7 @@ def made_counts(rows):
 
 
 def agent_users():
-	return frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent") or ["-"]
+	return frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent") or ["-"]  # system: role lookup, not a space record
 
 
 def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, status=None, intent=None, system=None, assistant=None,
@@ -104,7 +102,7 @@ def _where(space, tab=None, area=None, goal=None, from_date=None, to_date=None, 
 	if status:
 		status = str(status).strip().lower().replace("in inbox", "inbox")
 		if status not in STATUSES:
-			frappe.throw(_("status must be one of: {0}.").format(", ".join(STATUSES)))
+			frappe.throw(_("status must be one of: {0}.").format(", ".join(STATUSES)), title=_("Unknown source status"))
 		where.append(f"({STATUSES[status]})")
 	if intent:
 		where.append("x.intent = %(intent)s")
@@ -123,9 +121,9 @@ def list(space: str | None = None, tab: str | None = None, area: str | None = No
 		system: str | None = None, assistant: str | None = None, include_archived: bool | int | None = 0, open_items: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
 		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None,
 		scope: str | None = "captures", sensitive: bool | int | None = 0, by: str | None = None):
-	"""Every capture of a space, newest first: inbox items, chat logs, Vault documents (kind Document, always sensitive)
-	and journal pages (Library > Captures). scope="all" adds the notes (Library > All).
-	tab: all (default), notes (scope all), chats, voice, documents (with Vault documents), pages (journal pages), photos,
+	"""Every capture of a space, newest first: inbox items, chat logs and Vault documents (kind Document, always sensitive)
+	(Library > Captures). scope="all" adds the notes (Library > All).
+	tab: all (default), notes (scope all), chats, voice, documents (with Vault documents), photos,
 	articles, email (emails and email digests), text. sensitive=1 keeps the sensitive items; by=me or assistant keeps
 	what a person or an agent wrote (the assistant's notes count as the assistant's).
 	Filters: area (with its sub-areas, or "none"), goal, from_date and to_date (received), status (inbox, done, failed),
@@ -138,9 +136,9 @@ def list(space: str | None = None, tab: str | None = None, area: str | None = No
 	tab = tab or "all"
 	scope = "all" if scope == "all" else "captures"
 	if tab not in TABS:
-		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)))
+		frappe.throw(_("tab must be one of: {0}.").format(", ".join(TABS)), title=_("Unknown source tab"))
 	if by not in (None, "", "me", "assistant"):
-		frappe.throw(_("by must be me or assistant."))
+		frappe.throw(_("by must be me or assistant."), title=_("Unknown actor filter"))
 	where, values = _where(space, tab, area, goal, from_date, to_date, status, intent, system, assistant, include_archived, open_items, scope,
 		sensitive, by)
 	where.append("1=1" + permissions.vault_guard(space, "x."))
@@ -191,8 +189,8 @@ def decorate(rows):
 	return out
 
 
-KIND_OF = {"Life Chat Log": "Chat", "Life Vault Document": "Document", "Life Journal Page": "Journal page", "Life Note": "Note"}
-REF_OF = {"Life Chat Log": "chat:", "Life Vault Document": "vault:", "Life Journal Page": "page:", "Life Note": "note:", "Life Inbox Item": "source:"}
+KIND_OF = {"Life Chat Log": "Chat", "Life Vault Document": "Document", "Life Note": "Note"}
+REF_OF = {"Life Chat Log": "chat:", "Life Vault Document": "vault:", "Life Note": "note:", "Life Inbox Item": "source:"}
 
 
 def _vault_fields(names):
@@ -201,7 +199,7 @@ def _vault_fields(names):
 		return {}
 	from lifeos.api.vault import badge
 
-	rows = frappe.get_all("Life Vault Document", filters={"name": ("in", names)},
+	rows = frappe.get_list("Life Vault Document", filters={"name": ("in", names)},
 		fields=["name", "doc_type", "holder", "number_last4", "issue_date", "expiry_date", "remind_days_before"])
 	holders = names_map("Life Person", [r.holder for r in rows], "full_name")
 	out = {}
@@ -216,11 +214,11 @@ def _vault_fields(names):
 def made_from(doctype: str, name: str):
 	"""What was made from one source: records created from it, and the wiki pages citing it."""
 	if doctype not in SOURCE_DOCTYPES:
-		frappe.throw(_("Not a source."))
+		frappe.throw(_("Not a source."), title=_("Not a source"))
 	doc = permissions.get_doc_checked(doctype, name)
 	out = []
 	if doctype == "Life Inbox Item":
-		for p in frappe.get_all("Life Proposal", filters={"inbox_item": doc.name, "status": "Accepted", "created_name": ["is", "set"]},
+		for p in frappe.get_list("Life Proposal", filters={"inbox_item": doc.name, "status": "Accepted", "created_name": ["is", "set"]},
 				fields=["kind", "preview", "created_doctype", "created_name"], order_by="sort_order asc, creation asc"):
 			if not frappe.db.exists(p.created_doctype, p.created_name):
 				continue
@@ -250,10 +248,10 @@ def refile(sources: str | builtins.list, area: str | None = None, goal: str | No
 	"""Set the area (and goal) of many sources at once, from the Sources list. `sources` is a list of
 	{doctype, name}. People only."""
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can re-file sources in bulk."), frappe.PermissionError)
+		frappe.throw(_("Only a person can re-file sources in bulk."), frappe.PermissionError, title=_("Only a person can re-file"))
 	rows = parse(sources, []) or []
 	if len(rows) > 500:
-		frappe.throw(_("At most 500 sources at a time."))
+		frappe.throw(_("At most 500 sources at a time."), title=_("Too many sources at once"))
 	done = 0
 	for r in rows:
 		if r.get("doctype") not in SOURCE_DOCTYPES:

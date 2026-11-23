@@ -4,7 +4,7 @@
     :flag-labels="{ archived: 'Include archived' }" :quick="['ref_doctype', 'area', 'title']" :virtual="VIRTUAL" :hidden="HIDDEN" :fetch="fetch" :page-size="60"
     :row-ref="(r) => refOf(r.ref_doctype, r.ref_name)" :row-key="(r) => r.ref_doctype + r.ref_name + r.kind" :row-label="(r) => r.title || 'Untitled'"
     :group-by="(r) => `${weekday(r.record_date)}, ${long(r.record_date, true)}`" empty-title="Nothing on the timeline yet."
-    empty-hint="Every inbox item, task, note, document, chat, journal page and check-in shows here on the day it was captured.">
+    empty-hint="Every inbox item, task, note, document and chat shows here on the day it was captured.">
     <template #row="{ row: e }">
       <div class="flex items-start gap-2.5">
         <div class="min-w-0 flex-1">
@@ -33,10 +33,10 @@ import { long, weekday } from '@/lib/dates'
 import { loadLookups } from '@/lib/lookups'
 import { refOf } from '@/lib/pane'
 
-const TYPES = ['Life Inbox Item', 'Life Task', 'Life Note', 'Life Vault Document', 'Life Chat Log', 'Life Journal Page', 'Life Check-in', 'Life Month Plan']
+const TYPES = ['Life Inbox Item', 'Life Task', 'Life Note', 'Life Vault Document', 'Life Chat Log']
 const KIND = { Inbox: 'Added to the Inbox', Task: 'Task created', 'Task Done': 'Task completed', Note: 'Note', Document: 'Vault document',
-  Chat: 'AI chat', 'Journal Page': 'Journal page', 'Check-in': 'Check-in', 'Month Plan': 'Month plan' }
-const SHORT = { 'Task Done': 'Done', 'Journal Page': 'Page', 'Month Plan': 'Month', Document: 'Doc' }
+  Chat: 'AI chat' }
+const SHORT = { 'Task Done': 'Done', Document: 'Doc' }
 const THEME = { Task: 'blue', 'Task Done': 'green', Inbox: 'amber' }
 // a cross-type list: the filters are columns of Life Index. The area filter is this one area (sub-areas have their own pages).
 const SPEC = [{ key: 'area', field: 'area', kind: 'link' }, { key: 'doctype', field: 'ref_doctype', kind: 'value' },

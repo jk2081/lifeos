@@ -18,8 +18,10 @@ def titles(items, source=None):
 
 class TestCalendar(LifeTestCase):
 	def test_important_dates_repeat_every_year(self):
-		calendar.add_important_date(space=PRIVATE, title="Ruchi m6", day=14, month=1, kind="Birthday")
-		for year in (2026, 2027, 2031):
+		made = calendar.add_important_date(space=PRIVATE, title="Ruchi m6", day=14, month=1, kind="Birthday")["name"]
+		event = frappe.get_doc("Event", made)  # an important date is an all-day Event that repeats yearly (issue 72)
+		self.assertEqual((event.all_day, event.repeat_on, event.life_space), (1, "Yearly", PRIVATE))
+		for year in (2010, 2026, 2027, 2031):
 			items = calendar.get(space=PRIVATE, from_date=f"{year}-01-10", to_date=f"{year}-01-20")["items"]
 			hits = [i for i in items if i["source"] == "important" and i["title"] == "Ruchi m6"]
 			self.assertEqual([h["date"] for h in hits], [f"{year}-01-14"])
@@ -35,7 +37,7 @@ class TestCalendar(LifeTestCase):
 	def test_year_of_first_occurrence(self):
 		calendar.add_important_date(space=PRIVATE, title="Wedding m6", day=23, month=11, year=2010, kind="Anniversary")
 		items = calendar.get(space=PRIVATE, from_date="2026-11-20", to_date="2026-11-25")["items"]
-		self.assertEqual([i["label"] for i in items if i["title"] == "Wedding m6"], ["Wedding m6 (16)"])
+		self.assertEqual([i["label"] for i in items if i["title"] == "Wedding m6"], ["Wedding m6"])
 		self.assertEqual([i for i in calendar.get(space=PRIVATE, from_date="2009-11-20", to_date="2009-11-25")["items"] if i["title"] == "Wedding m6"], [])
 
 	def test_calendar_merges_four_sources(self):

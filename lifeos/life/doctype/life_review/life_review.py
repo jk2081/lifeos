@@ -9,7 +9,7 @@ class LifeReview(Document):
 
 	def validate(self):
 		if getdate(self.period_end) < getdate(self.period_start):
-			frappe.throw(_("A review's period cannot end before it starts."))
+			frappe.throw(_("A review's period cannot end before it starts."), title=_("Review dates out of order"))
 		if self.status == "Open" and frappe.db.exists("Life Review", {"space": self.space, "user": self.user, "kind": self.kind,
 				"status": "Open", "name": ("!=", self.name or "")}):
-			frappe.throw(_("There is already an open review for this space."))
+			frappe.throw(_("There is already an open review for this space."), title=_("Review already open"))

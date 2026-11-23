@@ -1,7 +1,6 @@
 <template>
-  <PageHead title="Reset" :sub="sub" :crumb="{ to: '/today/week', label: 'Today', here: 'Week' }">
-  </PageHead>
-  <div class="page-body" data-reset>
+  <div class="flex flex-col gap-3" data-reset>
+    <p class="text-sm text-ink-gray-6">{{ sub }}</p>
     <template v-if="d">
       <!-- the goal bar: open tasks against the goal, and what was decided in this session -->
       <Card class="flex flex-wrap items-center gap-x-8 gap-y-2" data-reset-goal>
@@ -44,13 +43,12 @@
   </div>
 </template>
 <script setup>
-// Reset (UX fixes, set 5): clear the backlog. The goal bar, suggested batches (rules, and up to three from the AI on
-// request), the Inventory of counts and one-by-one decisions. On a phone, Batches, One by one and Inventory are tabs.
+// Reset (UX fixes, set 5), now Settings > Data (issue 72): clear the backlog. The goal bar, suggested batches (rules, and up to three
+// from the AI on request), the Inventory of counts and one-by-one decisions. On a phone, Batches, One by one and Inventory are tabs.
 import { computed, onMounted, ref } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useRouter } from 'vue-router'
 import { Button, Skeleton, dialog, toast } from 'frappe-ui'
-import PageHead from '@/components/PageHead.vue'
 import TabBar from '@/components/TabBar.vue'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
@@ -63,7 +61,6 @@ import { api, errorText } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged } from '@/lib/pane'
 import { useUrlTab } from '@/lib/tabs'
-import { askScope } from '@/lib/ask'
 
 const router = useRouter()
 const phone = useMediaQuery('(max-width: 767px)')
@@ -80,12 +77,10 @@ const aiReady = ref(false)
 const writable = computed(() => canWrite() && !store.isAgent)
 const scale = computed(() => Math.max(d.value?.open.n || 0, d.value?.goal || 0, 1))
 const shown = computed(() => (d.value?.batches || []).filter((b) => !skipped.value.includes(b.key)))
-const sub = computed(() => `${store.space} · clear the backlog in batches or one by one · also the first step of your weekly review`)
+const sub = computed(() => `${store.space} · clear the backlog in batches or one by one`)
 const phoneTabs = computed(() => [{ value: 'batches', label: 'Batches', count: shown.value.length }, { value: 'one', label: 'One by one', count: d.value?.next?.left ?? undefined },
   { value: 'inventory', label: 'Inventory' }])
-const tab = useUrlTab('tab', phoneTabs)
-// Ask from here starts with the items on screen as its scope
-askScope({ kind: 'items', label: 'Items on Reset', doctype: null, name: null, items: () => shown.value.flatMap((b) => b.items.slice(0, 40)) })
+const tab = useUrlTab('rtab', phoneTabs)
 
 async function load(ai = aiAsked.value) {
   d.value = await api('reset.get', { space: store.space, ai: ai ? 1 : 0 })

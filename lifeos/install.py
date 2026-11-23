@@ -105,7 +105,7 @@ def set_owner(user):
 	Run: bench --site SITE execute lifeos.install.set_owner --kwargs "{'user': 'you@example.com'}"
 	"""
 	if not frappe.db.exists("User", user):
-		frappe.throw(f"User {user} does not exist.")
+		frappe.throw(f"User {user} does not exist.", title=frappe._("User does not exist"))
 	frappe.get_doc("User", user).add_roles("Life Admin", "Life User")
 	for name in frappe.get_all("Life Space", pluck="name"):
 		space = frappe.get_doc("Life Space", name)
@@ -128,7 +128,7 @@ def new_owner(email, full_name, send_welcome_email=1, space="Private", use_focus
 	email = (email or "").strip().lower()
 	full_name = " ".join((full_name or "").split())
 	if not email or "@" not in email or not full_name:
-		frappe.throw(frappe._("An email address and a full name are needed."))
+		frappe.throw(frappe._("An email address and a full name are needed."), title=frappe._("Email and name needed"))
 	if not frappe.db.exists("Life Space", space):
 		setup()
 	first, _sep, last = full_name.partition(" ")
@@ -175,5 +175,4 @@ def make_personal_space(user, space_name=None):
 	space_name = space_name or f"{frappe.db.get_value('User', user, 'first_name') or user}'s space"
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name, "owner_user": user,
 		"members": [{"user": user, "access": "Write"}]}).insert(ignore_permissions=True)
-	seed.make_dimensions(doc.name)
 	return doc.name

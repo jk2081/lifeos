@@ -53,10 +53,10 @@ export const STATE_TABS = [
   ['Inbox', '/life/brain/queue', 'status', ['To Review', 'Waiting', 'Failed'], 'source_type=Message'],
   ['Tasks', '/life/goals/tasks', 'status', ['open', 'loops', 'Waiting', 'Done', 'Someday', 'all'], `area=${uxArea}`],
   ['Goals', '/life/goals', 'status', ['in_progress', 'achieved', 'closed', 'someday', 'all'], `area=${uxArea}`],
-  ['Archive', '/life/library/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'Life Journal Page', 'trash'], `area=${uxArea}`],
+  ['Archive', '/life/library/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'trash'], `area=${uxArea}`],
   ['Someday', '/life/goals/someday', 'tab', ['all', 'due', 'tasks', 'goals', 'notes'], `area=${uxArea}`],
-  ['Captures', '/life/brain/captures', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
-  ['All', '/life/library', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'pages', 'articles', 'email', 'text'], `area=${uxArea}`],
+  ['Captures', '/life/brain/captures', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'articles', 'email', 'text'], `area=${uxArea}`],
+  ['All', '/life/library', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'articles', 'email', 'text'], `area=${uxArea}`],
 ]
 
 

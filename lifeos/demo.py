@@ -6,7 +6,8 @@ Remove:  bench --site SITE execute lifeos.demo.remove
 import frappe
 from frappe.utils import add_days, add_to_date, getdate, now_datetime, today
 
-from lifeos import devtools, journal, permissions, seed
+from lifeos import calendar_data, cycles, devtools, permissions, seed
+from lifeos import habits as habit_rules
 
 DEMO_AREAS = ["Business That Works", "Family", "Learning", "Money & Legal", "Personal", "Tea & Coffee", "Unstoppable & Content"]
 CYCLE_TITLE = "Oct to Dec 2026"
@@ -29,7 +30,6 @@ OCTOBER = [
 	("Renew the driving licence", "Carried", "Personal"), ("File the tax return", "Open", "Money & Legal"),
 	("Book the passport photo", "Done", "Family"), ("Finish the course", "Carried", "Learning"), ("Agree the new blend", "Open", "Tea & Coffee"),
 ]
-MINDSWEEP = ["Training for the team", "Cash visibility", "A second supplier", "New products"]
 
 # ticks per action for the weeks so far: x done, - missed
 TICKS = {
@@ -47,17 +47,20 @@ def _user(email):
 
 
 def load_cycle(space):
-	"""The active cycle with its goals and actions, the habits, October's goals and the October and November month plans."""
+	"""The active cycle with its goals and actions, the habits and October's goals."""
 	from frappe.utils import add_days as _add
 
 	seed.ensure_structure()
 	frappe.db.set_single_value("Life Settings", "use_focuses", 1)  # the demo site uses focuses (issue 57); a new site does not
 	areas = seed.make_areas(space, DEMO_AREAS)
 	t = seed.Tracker(seed.DEMO_KEY)
-	habits = []
-	for title in HABITS:
+	for i, title in enumerate(HABITS):
+		tracking = {"days_per_week": 7, "sort_order": i + 1, "tracked_from": "2026-10-01"}
 		name = frappe.db.get_value("Life Habit", {"space": space, "title": title})
-		habits.append(name or t.insert({"doctype": "Life Habit", "space": space, "title": title}).name)
+		if name:
+			frappe.db.set_value("Life Habit", name, tracking)
+		else:
+			t.insert({"doctype": "Life Habit", "space": space, "title": title, **tracking})
 	cycle = t.insert({"doctype": "Life Cycle", "space": space, "title": CYCLE_TITLE, "start_date": CYCLE_START, "status": "Active"})
 	for i, (title, area, actions) in enumerate(GOALS):
 		rows = []
@@ -67,15 +70,9 @@ def load_cycle(space):
 				"done_on": _add(CYCLE_START, 14) if done else None})
 		t.insert({"doctype": "Life Goal", "space": space, "cycle": cycle.name, "title": title, "area": areas.get(area),
 			"sort_order": i + 1, "actions": rows})
-	habit_rows = [{"habit": h, "days_per_week": 7, "sort_order": i + 1} for i, h in enumerate(habits)]
 	for order, (title, status, area_name) in enumerate(OCTOBER, 1):
 		t.insert({"doctype": "Life Goal", "space": space, "title": title, "horizon": "Month", "target_date": "2026-10-31", "sort_order": order,
 			"area": areas.get(area_name), "outcome": {"Done": "Achieved", "Carried": "Carried"}.get(status, "In Progress")})
-	t.insert({"doctype": "Life Month Plan", "space": space, "year": 2026, "month": 10,
-		"habits": [dict(r, tracked_from="2026-10-01") for r in habit_rows],
-		"mindsweep_md": "\n\n".join(f"## {topic}" for topic in MINDSWEEP) + "\n"})
-	t.insert({"doctype": "Life Month Plan", "space": space, "year": 2026, "month": 11,
-		"habits": [dict(r, tracked_from="2026-11-01") for r in habit_rows]})
 	t.save()
 
 
@@ -180,9 +177,8 @@ def load(space="Private"):
 	chat("Ruchi ITR, Merrill statements", 1, "Money & Legal", ["Download Merrill statements"], summary="What the accountant needs for the ITR.")
 	chat("Owner outreach funnel copy", 3, "Business That Works", [], funnel, "ChatGPT", "Drafted the first outreach email.")
 
-	t.insert({"doctype": "Life Important Date", "space": space, "title": "Anniversary", "day": 23, "month": 11, "kind": "Anniversary"})
-	for name, day, month in (("Ruchi", 14, 1), ("Jai", 20, 1), ("Anya", 14, 9)):
-		t.insert({"doctype": "Life Important Date", "space": space, "title": name, "day": day, "month": month, "kind": "Birthday", "person": people[name]})
+	for title, day, month, kind in (("Anniversary", 23, 11, "Anniversary"), ("Ruchi", 14, 1, "Birthday"), ("Jai", 20, 1, "Birthday"), ("Anya", 14, 9, "Birthday")):
+		t.track(calendar_data.add_yearly_date(space, title, day, month, kind=kind))
 
 	def event(subject, starts, ends=None, all_day=0):
 		return t.insert({"doctype": "Event", "subject": subject, "starts_on": starts, "ends_on": ends, "all_day": all_day,
@@ -197,15 +193,15 @@ def load(space="Private"):
 
 	# ticks on the 12 Week Year grid
 	cycle = frappe.get_doc("Life Cycle", {"space": space, "status": "Active"})
-	cur = journal.current_week(cycle)
-	for a in journal._actions(cycle.name):
+	cur = cycles.current_week(cycle)
+	for a in cycles._actions(cycle.name):
 		pattern = TICKS.get(a.title, "")
 		for week, mark in enumerate(pattern, start=1):
 			if mark == "x" and week <= cur and not frappe.db.exists("Life Action Log", {"action_id": a.name, "week": week}):
-				start, end = journal.week_dates(cycle, week)
+				start, end = cycles.week_dates(cycle, week)
 				t.insert({"doctype": "Life Action Log", "space": space, "goal": a.goal, "action_id": a.name, "cycle": cycle.name,
 					"week": week, "date": min(end, now) if week == cur else start, "count": 1})
-		journal._update_tick_summary(a.name)
+		cycles._update_tick_summary(a.name)
 
 	# a closed earlier cycle, so the Goals tab shows history
 	old = t.insert({"doctype": "Life Cycle", "space": space, "title": "Jul to Sep 2026", "start_date": "2026-07-06", "status": "Planned"})
@@ -217,23 +213,16 @@ def load(space="Private"):
 	old.save()
 
 	# habits this month
-	plan = journal.get_month_plan(space, now.year, now.month, create=True)
 	for title, a in (("Ghillidary drainage plan agreed", "Tea & Coffee"), ("File the ITR", "Money & Legal")):  # this month's goals, in priority order
-		journal.add_month_goal(space, now.year, now.month, title, area[a])
-	for row in plan.habits:
-		title = frappe.db.get_value("Life Habit", row.habit, "title")
+		cycles.add_month_goal(space, now.year, now.month, title, area[a])
+	for row in habit_rules.habits_month(space, now.year, now.month)["habits"]:
+		title = row["title"]
 		for day in range(1, now.day + 1):
 			if day in HABIT_MISSES.get(title, set()) or (day == now.day and title in ("Journal", "Workout")):
 				continue
 			d = now.replace(day=day)
-			if not frappe.db.exists("Life Habit Log", {"habit": row.habit, "date": d}):
-				t.insert({"doctype": "Life Habit Log", "space": space, "habit": row.habit, "date": d, "done": 1})
-
-	dims = frappe.get_all("Life Dimension", filters={"space": space}, fields=["name"], order_by="sort_order")
-	for back, base in ((35, 4), (21, 5), (7, 6)):
-		t.insert({"doctype": "Life Check-in", "space": space, "date": add_days(now, -back), "reflection_md": "Example check-in.",
-			"scores": [{"dimension": d.name, "habits_low": min(10, base + i % 3), "habits_high": min(10, base + 1 + i % 3),
-				"situation_low": min(10, base + (i + 1) % 4), "situation_high": min(10, base + (i + 1) % 4)} for i, d in enumerate(dims)]})
+			if not frappe.db.exists("Life Habit Log", {"habit": row["habit"], "date": d}):
+				t.insert({"doctype": "Life Habit Log", "space": space, "habit": row["habit"], "date": d, "done": 1})
 
 	# inbox items, processed by the fake agent as the agent user
 	from lifeos.api import inbox
@@ -284,7 +273,7 @@ def load_set7(space="Private"):
 def remove():
 	items = [n for dt, n in frappe.parse_json(frappe.db.get_default(seed.DEMO_KEY) or "[]") if dt == "Life Inbox Item"]
 	for item in items:
-		for dt in ("Life Task", "Life Note", "Life Journal Page", "Life Vault Document", "Life Check-in", "Life Important Date"):
+		for dt in ("Life Task", "Life Note", "Life Vault Document"):
 			for name in frappe.get_all(dt, filters={"inbox_item": item}, pluck="name"):
 				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)
 	n = seed._remove(seed.DEMO_KEY)

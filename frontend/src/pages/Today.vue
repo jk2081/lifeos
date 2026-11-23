@@ -256,7 +256,7 @@ async function moveAll({ close }) {
 // ticking a 12 Week Year action records the week's tick; the week score follows
 function toggleHabit(x) {
   optimistic(() => (x.done = !x.done), () => (x.done = !x.done),
-    () => api('journal.toggle_habit', { habit: x.habit, date: d.value.date, done: x.done ? 1 : 0 })).catch(() => {})
+    () => api('goals.toggle_habit', { habit: x.habit, date: d.value.date, done: x.done ? 1 : 0 })).catch(() => {})
 }
 let clock = null
 onMounted(() => { load(); clock = setInterval(() => (nowTime.value = new Date().toTimeString().slice(0, 5)), 60000) })

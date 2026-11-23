@@ -1,7 +1,7 @@
 <template>
   <!-- the notes as a list, on the cross-type index: /library/notes?view=list, and the Notes tab of the goal page -->
   <ListView ref="list" :title="embed ? null : 'Notes'" noun="notes" :screen="embed ? embed.screen + (collection === 'Wiki' ? '-wiki' : '-notes') : 'library'" :fixed="embed?.fixed" :active="embed ? embed.active : true" doctype="Life Index" :spec="SPEC" :flag-labels="embed?.fixed?.goal ? { archived: 'Include archived' } : { archived: 'Include archived', reference: 'Reference only' }" :quiet="['archived']"
-    :virtual="VIRTUAL" :hidden="HIDDEN" :quick="['title', 'area', 'goal']" :fetch="fetchList" :row-ref="(r) => (r.kind === 'Journal page' ? 'page:' : 'note:') + r.name" :watch-keys="embed ? [] : ['by']"
+    :virtual="VIRTUAL" :hidden="HIDDEN" :quick="['title', 'area', 'goal']" :fetch="fetchList" :row-ref="(r) => 'note:' + r.name" :watch-keys="embed ? [] : ['by']"
     :empty-title="collection === 'Wiki' ? 'No wiki pages here yet.' : 'No notes yet.'"
     :empty-hint="collection === 'Wiki' ? 'The agent writes wiki pages from the sources you add with Add to wiki.' : 'Notes hold reference material and notes on your goals, in Markdown. Add one with New note.'">
     <template #sub>{{ by === 'assistant' ? 'Notes the assistant keeps from your sources' : by === 'me' ? 'Notes you wrote' : 'Every note' }}{{ inSpace }}</template>
@@ -14,15 +14,13 @@
     </template>
     <template #cell-title="{ row }"><span class="flex min-w-0 flex-wrap items-center gap-2"><span v-if="row.vault_locked" class="lucide-lock size-3.5 text-ink-gray-6" role="img" aria-label="Sensitive" data-sensitive-lock />
       <span class="break-words font-medium text-ink-gray-9">{{ row.title }}</span>
-      <Badge v-if="row.collection === 'Wiki'" size="sm" theme="blue" label="Kept by the assistant" data-assistant-badge />
-      <Badge v-if="row.kind === 'Journal page'" size="sm" label="Journal page" data-journal-page-badge /></span></template>
+      <Badge v-if="row.collection === 'Wiki'" size="sm" theme="blue" label="Kept by the assistant" data-assistant-badge /></span></template>
     <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="{ query: { ...$route.query, area: row.area, open: undefined } }">{{ row.area_name }}</RouterLink></template>
     <template #cell-goal="{ row }"><span class="truncate">{{ row.goal_title }}</span></template>
     <template #cell-record_date="{ row }"><span class="whitespace-nowrap">{{ short(row.record_date || row.modified, true) }}</span></template>
     <template #cell-kind="{ row }"><span class="truncate">{{ row.kind || 'Note' }}</span></template>
     <template #stack="{ row }"><div class="flex flex-wrap items-center gap-2"><span v-if="row.vault_locked" class="lucide-lock size-3.5 text-ink-gray-6" role="img" aria-label="Sensitive" />
-      <span class="break-words text-base-medium text-ink-gray-9">{{ row.title }}</span><Badge v-if="row.collection === 'Wiki'" size="sm" theme="blue" label="Kept by the assistant" />
-      <Badge v-if="row.kind === 'Journal page'" size="sm" label="Journal page" data-journal-page-badge /></div>
+      <span class="break-words text-base-medium text-ink-gray-9">{{ row.title }}</span><Badge v-if="row.collection === 'Wiki'" size="sm" theme="blue" label="Kept by the assistant" /></div>
       <div class="text-sm text-ink-gray-6">{{ [row.area_name, row.goal_title, 'edited ' + short(row.modified, true)].filter(Boolean).join(' · ') }}</div></template>
   </ListView>
 </template>

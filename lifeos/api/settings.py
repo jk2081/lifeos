@@ -1,4 +1,4 @@
-"""The Settings screen: spaces and members, areas, dimensions, habits, review time, archive days."""
+"""The Settings screen: spaces and members, areas, habits, review time, archive days."""
 import frappe
 from frappe import _
 
@@ -9,13 +9,13 @@ SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "s
 	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
 	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
 	# UX fixes, set 6: Rhythms
-	"start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week", "planning_period", "require_done_when", "use_focuses",
+	"start_of_day", "week_starts_on", "cycle_break_week", "planning_period", "require_done_when", "use_focuses",
 	# set 7: working hours, for the weekly review's goal work
 	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days", "own_domains")
 TIME_FIELDS = ("weekly_review_time", "start_of_day", "work_start", "work_end")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 LISTS = {
-	"area": ("Life Area", "area_name"), "dimension": ("Life Dimension", "dimension_name"),
+	"area": ("Life Area", "area_name"),
 	"habit": ("Life Habit", "title"), "person": ("Life Person", "full_name"),
 }
 
@@ -23,12 +23,11 @@ LISTS = {
 def _admin_only():
 	permissions.require_login()
 	if not permissions.is_admin():
-		frappe.throw(_("Only the owner can change this."), frappe.PermissionError)
+		frappe.throw(_("Only the owner can change this."), frappe.PermissionError, title=_("Only the owner can change this"))
 
 
 def _counts(kind, space, names):
-	"""The quiet count beside each row: areas, active records filed there; habits, months that
-	track it; dimensions, check-ins that scored it."""
+	"""The quiet count beside each row: areas, active records filed there; habits, days ticked."""
 	if not names:
 		return {}
 	if kind == "area":
@@ -41,11 +40,8 @@ def _counts(kind, space, names):
 				and (area=%(area)s or {also_in_sql('area')}){permissions.vault_guard(space)}""", {"space": space, "area": n})[0][0]
 		return out
 	if kind == "habit":
-		return dict(frappe.db.sql("""select habit, count(distinct parent) from `tabLife Month Plan Habit`
-			where habit in %s group by habit""", (names,)))
-	if kind == "dimension":
-		return dict(frappe.db.sql("""select dimension, count(distinct parent) from `tabLife Check-in Score`
-			where dimension in %s group by dimension""", (names,)))
+		return dict(frappe.db.sql("""select habit, count(*) from `tabLife Habit Log`
+			where habit in %s and done = 1 group by habit""", (names,)))
 	return {}
 
 
@@ -65,8 +61,8 @@ def _people(users):
 	if not users:
 		return {}
 	out = {r.name: {"full_name": r.full_name or r.name, "image": r.user_image, "roles": set()}
-		for r in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "full_name", "user_image"])}
-	for r in frappe.get_all("Has Role", filters={"parent": ("in", users), "parenttype": "User",
+		for r in frappe.get_all("User", filters={"name": ("in", users)}, fields=["name", "full_name", "user_image"])}  # system: user and role lookups and the admin's space list are not space records
+	for r in frappe.get_all("Has Role", filters={"parent": ("in", users), "parenttype": "User",  # system: user and role lookups and the admin's space list are not space records
 			"role": ("in", list(LIFE_ROLES))}, fields=["parent", "role"]):
 		if r.parent in out:
 			out[r.parent]["roles"].add(r.role)
@@ -96,7 +92,7 @@ def _last_filed(users):
 		return {}
 	out = {}
 	for doctype in ("Life Proposal", "Life Chat Log"):
-		for user, when in frappe.get_all(doctype, filters={"owner": ("in", users)}, fields=["owner", {"MAX": "creation"}],
+		for user, when in frappe.get_all(doctype, filters={"owner": ("in", users)}, fields=["owner", {"MAX": "creation"}],  # system: user and role lookups and the admin's space list are not space records
 				group_by="owner", as_list=True):
 			if when and (user not in out or when > out[user]):
 				out[user] = when
@@ -112,7 +108,7 @@ def _agents(spaces):
 		for m in s["members"]:
 			if m["is_agent"]:
 				reach.setdefault(m["user"], []).append({"space": s["name"], "access": m["access"], "agents_can_read_vault": s["agents_can_read_vault"]})
-	users = set(reach) | set(frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent", distinct=True))
+	users = set(reach) | set(frappe.get_all("Has Role", filters={"role": "Life Agent", "parenttype": "User"}, pluck="parent", distinct=True))  # system: user and role lookups and the admin's space list are not space records
 	people = _people([u for u in users if _visible_user(u)])
 	last = _last_filed(list(people))
 	out = []
@@ -127,10 +123,10 @@ def _agents(spaces):
 
 def _spaces(names):
 	"""The spaces with their members, in three queries whatever their number."""
-	rows = frappe.get_all("Life Space", filters={"name": ("in", names or ["-"])},
+	rows = frappe.get_all("Life Space", filters={"name": ("in", names or ["-"])},  # system: user and role lookups and the admin's space list are not space records
 		fields=["name", "owner_user", "agents_can_read_vault", "ask_enabled", "ask_can_read_vault"], order_by="name asc")
 	members = {}
-	for m in frappe.get_all("Life Space Member", filters={"parent": ("in", names or ["-"]), "parenttype": "Life Space"},
+	for m in frappe.get_all("Life Space Member", filters={"parent": ("in", names or ["-"]), "parenttype": "Life Space"},  # system: user and role lookups and the admin's space list are not space records
 			fields=["parent", "user", "access"], order_by="idx asc"):
 		members.setdefault(m.parent, []).append(m)
 	for r in rows:
@@ -161,9 +157,8 @@ def get(space: str | None = None):
 			"is_focus", "standard", "part_kind"],
 			"sort_order, area_name"),
 		"habit": ("Life Habit", "title", "habits", [], "title"),
-		"dimension": ("Life Dimension", "dimension_name", "dimensions", ["sort_order"], "sort_order, dimension_name"),
 	}.items():
-		rows = frappe.get_all(doctype, filters={"space": space}, fields=["name", field, "is_archived", "archived_on", *extra], order_by=order, limit=1000)
+		rows = frappe.get_list(doctype, filters={"space": space}, fields=["name", field, "is_archived", "archived_on", *extra], order_by=order, limit=1000)
 		counts = _counts(kind, space, [r.name for r in rows])
 		for r in rows:
 			r["count"] = counts.get(r.name, 0)
@@ -181,10 +176,10 @@ def get(space: str | None = None):
 		"settings": {f: (str(s.get(f)) if f in TIME_FIELDS and s.get(f) else s.get(f)) for f in SETTING_FIELDS},
 		**lists,
 		"cycle": _cycle_info(space), "rules_note": frappe.db.get_value("Life Note", {"space": space, "collection": "Wiki", "is_rules": 1}),
-		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], order_by="full_name", limit=500),
+		"people": frappe.get_list("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], order_by="full_name", limit=500),
 		"spaces": [], "agents": [],
 	}
-	names = frappe.get_all("Life Space", pluck="name") if permissions.is_admin() else list(permissions.user_spaces())
+	names = frappe.get_all("Life Space", pluck="name") if permissions.is_admin() else list(permissions.user_spaces())  # system: user and role lookups and the admin's space list are not space records
 	docs = _spaces(names)
 	people = _people([m.user for d in docs for m in d.members] + [d.owner_user for d in docs])
 	access = permissions.user_spaces()
@@ -206,12 +201,12 @@ def get(space: str | None = None):
 
 def _cycle_info(space):
 	"""The current 12 Week cycle for Settings > Rhythms: its dates and this week's number (read-only there)."""
-	from lifeos import journal
+	from lifeos import cycles
 
 	c = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date", "end_date"], as_dict=True)
 	if not c:
 		return None
-	return {"name": c.name, "title": c.title, "start_date": str(c.start_date), "end_date": str(c.end_date), "week": journal.week_of(c)}
+	return {"name": c.name, "title": c.title, "start_date": str(c.start_date), "end_date": str(c.end_date), "week": cycles.week_of(c)}
 
 
 BACKUP_KEYS = ("backup_frequency", "backup_with_files", "backup_path", "encrypt_backup", "keep_backups_for_hours", "backup_limit")
@@ -248,7 +243,7 @@ def ai_settings():
 	by_purpose = frappe.db.sql("select purpose, sum(cost), sum(input_tokens), sum(output_tokens) from `tabLife AI Usage` where month=%s group by purpose", month)
 	by_user = frappe.db.sql("select user, sum(cost) from `tabLife AI Usage` where month=%s group by user", month)
 	by_day = frappe.db.sql("select date(creation), sum(cost), count(*) from `tabLife AI Usage` where month=%s group by date(creation) order by date(creation) desc", month)
-	calls = frappe.get_all("Life AI Usage", fields=["creation", "purpose", "model", "input_tokens", "output_tokens", "cached_tokens", "cost", "user",
+	calls = frappe.get_list("Life AI Usage", fields=["creation", "purpose", "model", "input_tokens", "output_tokens", "cached_tokens", "cost", "user",
 		"reference_doctype", "reference_name"], order_by="creation desc, name desc", limit=50)
 	caps = client.feature_caps()
 	features = sorted({p for p, *_r in by_purpose} | set(caps))
@@ -283,7 +278,7 @@ def set_feature_cap(feature: str, cap: float = 0):
 	import json
 
 	if float(cap) < 0:
-		frappe.throw(_("A cap cannot be negative."))
+		frappe.throw(_("A cap cannot be negative."), title=_("Cap cannot be negative"))
 	doc = frappe.get_doc("Life Settings")
 	caps = json.loads(doc.feature_caps or "{}")
 	if float(cap):
@@ -304,7 +299,7 @@ def set_ai_price(model: str, input_per_mtok: float, output_per_mtok: float, cach
 	if cached_per_mtok is not None:
 		row.cached_per_mtok = float(cached_per_mtok)
 	if row.input_per_mtok < 0 or row.output_per_mtok < 0:
-		frappe.throw(_("Prices cannot be negative."))
+		frappe.throw(_("Prices cannot be negative."), title=_("Prices cannot be negative"))
 	doc.save()
 	return {"saved": True}
 
@@ -330,34 +325,34 @@ def save(values: str | dict):
 	doc = frappe.get_doc("Life Settings")
 	for k, v in values.items():
 		if k not in SETTING_FIELDS:
-			frappe.throw(_("Unknown setting {0}.").format(k))
+			frappe.throw(_("Unknown setting {0}.").format(k), title=_("Unknown setting"))
 		doc.set(k, v)
 	for f in ("score_target", "archive_after_days", "stale_task_days", "stuck_after_days", "someday_review_months"):
 		if int(doc.get(f) or 0) <= 0:
-			frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label(f)))
+			frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label(f)), title=_("Number must be positive"))
 	for f in ("stuck_limit", "open_task_goal"):
 		if int(doc.get(f) or 0) < 0:
-			frappe.throw(_("{0} cannot be negative.").format(doc.meta.get_label(f)))
+			frappe.throw(_("{0} cannot be negative.").format(doc.meta.get_label(f)), title=_("Number cannot be negative"))
 	if float(doc.get("monthly_cap_usd") or 0) < 0:
-		frappe.throw(_("The monthly cap cannot be negative."))
+		frappe.throw(_("The monthly cap cannot be negative."), title=_("Monthly cap cannot be negative"))
 	if doc.get("old_inbox_mode") not in (None, "", "Suggest", "Park", "Discard"):
-		frappe.throw(_("Choose Suggest, Park or Discard."))
+		frappe.throw(_("Choose Suggest, Park or Discard."), title=_("Unknown old inbox action"))
 	if "old_inbox_days" in values and int(doc.get("old_inbox_days") or 0) <= 0:
-		frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label("old_inbox_days")))
+		frappe.throw(_("{0} must be a positive number.").format(doc.meta.get_label("old_inbox_days")), title=_("Number must be positive"))
 	if "work_days" in values:
 		days = [d.strip() for d in str(doc.work_days or "").split(",") if d.strip()]
 		if not days or any(d not in WEEKDAYS for d in days):
-			frappe.throw(_("Choose at least one working day."))
+			frappe.throw(_("Choose at least one working day."), title=_("Working day needed"))
 		doc.work_days = ",".join(d for d in WEEKDAYS if d in days)
 	if doc.work_start and doc.work_end and str(doc.work_end).zfill(8) <= str(doc.work_start).zfill(8):
-		frappe.throw(_("The working day must end after it starts."))
+		frappe.throw(_("The working day must end after it starts."), title=_("Working day ends too early"))
 	if int(doc.score_target) > 100:
-		frappe.throw(_("The score target is a percentage."))
+		frappe.throw(_("The score target is a percentage."), title=_("Score target is a percentage"))
 	doc.save()
 	return {"saved": True}
 
 
-ARCHIVABLE = ("area", "habit", "dimension")
+ARCHIVABLE = ("area", "habit")
 
 
 @frappe.whitelist(methods=["POST"])
@@ -366,7 +361,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 		with_children: bool | int = 1, colour: str | None = None, is_pinned: bool | int | None = None, is_on: bool | int | None = None,
 		description: str | None = None, move_to: str | None = None, part_kind: str | None = None, is_focus: bool | int | None = None,
 		standard: str | None = None, principles: str | list | None = None, focuses: str | list | None = None):
-	"""Add, rename, reorder, nest, archive or restore one area, dimension or habit of a space, or a person.
+	"""Add, rename, reorder, nest, archive or restore one area or habit of a space, or a person.
 	Archiving sets archived_on to today; records filed under the heading are not changed. Archiving an area archives its
 	parts with it. Restoring an area puts it back under its old area of life, and with_children=1 restores the parts
 	archived on the same day with it.
@@ -380,7 +375,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	"Use focuses" on, the focuses its kind offers are created under it, or only those named in `focuses`.
 	delete=1 removes the row for good; the Settings screen does not offer it, agents and tests may use it."""
 	if kind not in LISTS:
-		frappe.throw(_("Unknown list."))
+		frappe.throw(_("Unknown list."), title=_("Unknown list"))
 	if kind == "area":
 		_areas_admin_only(is_on)
 	doctype, field = LISTS[kind]
@@ -392,14 +387,15 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 				doc.delete()
 			except frappe.LinkExistsError:
 				frappe.throw(_("{0} is still used by other records. Remove it from them first{1}.").format(
-					doc.get(field), _(", or archive it") if kind in ARCHIVABLE else ""))
+					doc.get(field), _(", or archive it") if kind in ARCHIVABLE else ""),
+					title=_("Still used by other records"))
 			return {"deleted": name}
 	else:
 		space = permissions.resolve_space(space, write=True)
 		doc = frappe.get_doc({"doctype": doctype, "space": space})
 	if title is not None:
 		if not title.strip():
-			frappe.throw(_("A name is needed."))
+			frappe.throw(_("A name is needed."), title=_("Name needed"))
 		doc.set(field, title.strip())
 	if kind == "area" and parent_area is not None:
 		doc.parent_area = parent_area or None
@@ -432,12 +428,12 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	if is_archived is not None and kind in ARCHIVABLE and int(is_archived) != int(doc.get("is_archived") or 0):
 		if int(is_archived):
 			if kind == "area" and doc.is_life_area:
-				frappe.throw(_("{0} is one of the seven areas of life. Switch it off instead of archiving it.").format(doc.area_name))
+				frappe.throw(_("{0} is one of the seven areas of life. Switch it off instead of archiving it.").format(doc.area_name), title=_("Core area cannot be archived"))
 			if kind == "area":
 				_move_open_work(doc, move_to)
 			doc.is_archived, doc.archived_on = 1, frappe.utils.today()
 			if kind == "area":
-				for child in frappe.get_all("Life Area", filters={"parent_area": doc.name, "is_archived": 0}, pluck="name"):
+				for child in frappe.get_list("Life Area", filters={"parent_area": doc.name, "is_archived": 0}, pluck="name"):
 					frappe.db.set_value("Life Area", child, {"is_archived": 1, "archived_on": doc.archived_on})
 					archived.append(child)
 		else:
@@ -452,7 +448,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 					f = {"parent_area": doc.name, "is_archived": 1}
 					if when:
 						f["archived_on"] = when
-					for child in frappe.get_all("Life Area", filters=f, pluck="name"):
+					for child in frappe.get_list("Life Area", filters=f, pluck="name"):
 						frappe.db.set_value("Life Area", child, {"is_archived": 0, "archived_on": None})
 						restored.append(child)
 	doc.save() if name else doc.insert()
@@ -471,8 +467,8 @@ def _areas_admin_only(is_on=None):
 	if permissions.is_admin():
 		return
 	if is_on is not None and permissions.is_agent():
-		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError)
-	frappe.throw(_("Only the owner can change areas."), frappe.PermissionError)
+		frappe.throw(_("Only a person can switch an area on or off."), frappe.PermissionError, title=_("Only a person can switch areas"))
+	frappe.throw(_("Only the owner can change areas."), frappe.PermissionError, title=_("Only the owner can change areas"))
 
 
 def _move_open_work(doc, move_to):
@@ -485,7 +481,8 @@ def _move_open_work(doc, move_to):
 	if not move_to:
 		goals, tasks = len(work["goals"]), len(work["tasks"])
 		frappe.throw(_("{0} has {1} and {2}. Choose where to move them before archiving it.").format(doc.area_name,
-			_("1 open goal") if goals == 1 else _("{0} open goals").format(goals), _("1 open task") if tasks == 1 else _("{0} open tasks").format(tasks)))
+			_("1 open goal") if goals == 1 else _("{0} open goals").format(goals), _("1 open task") if tasks == 1 else _("{0} open tasks").format(tasks)),
+			title=_("Area still has open records"))
 	areas.move_work(doc.name, move_to)
 
 
@@ -502,19 +499,16 @@ def area_open_work(area: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def create_space(space_name: str, owner_user: str | None = None, starter_areas: bool | int = 1):
+def create_space(space_name: str, owner_user: str | None = None):
 	"""Create a space, for example a private space for a family member. Owner only. Every new space gets the seven areas of
-	life with Career and Health on (issue 11); `starter_areas` (kept for older callers) adds the check-in dimensions."""
+	life with Career and Health on (issue 11)."""
 	_admin_only()
-	from lifeos import seed
 
 	owner_user = owner_user or frappe.session.user
 	if not frappe.db.exists("User", owner_user):
-		frappe.throw(_("User {0} does not exist.").format(owner_user))
+		frappe.throw(_("User {0} does not exist.").format(owner_user), title=_("User does not exist"))
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name.strip(), "owner_user": owner_user,
 		"members": [{"user": owner_user, "access": "Write"}]}).insert()
-	if int(starter_areas or 0):
-		seed.make_dimensions(doc.name)
 	return {"name": doc.name}
 
 
@@ -528,22 +522,22 @@ def set_member(space: str, user: str, access: str | None = None, remove: bool | 
 	_admin_only()
 	doc = frappe.get_doc("Life Space", space)
 	if user in ("Administrator", "Guest"):
-		frappe.throw(_("This account cannot be a member."))
+		frappe.throw(_("This account cannot be a member."), title=_("Account cannot be a member"))
 	if not frappe.db.exists("User", user):
-		frappe.throw(_("User {0} does not exist. Create the user in Frappe first.").format(user))
+		frappe.throw(_("User {0} does not exist. Create the user in Frappe first.").format(user), title=_("User does not exist"))
 	if access not in (None, "", "Read", "Write"):
-		frappe.throw(_("Access is Read or Write."))
+		frappe.throw(_("Access is Read or Write."), title=_("Access level not recognised"))
 	row = next((m for m in doc.members if m.user == user), None)
 	if grant_role:
 		_check_grant(user, grant_role)
 	if int(remove or 0):
 		if user == doc.owner_user:
-			frappe.throw(_("The owner of a space cannot be removed from it."))
+			frappe.throw(_("The owner of a space cannot be removed from it."), title=_("Space owner cannot be removed"))
 		if row:
 			doc.remove(row)
 	elif row:
 		if user == doc.owner_user and access == "Read":
-			frappe.throw(_("The owner of a space always has Can edit."))
+			frappe.throw(_("The owner of a space always has Can edit."), title=_("Space owner must edit"))
 		row.access = access or row.access
 	else:
 		_give_role(user, grant_role)
@@ -561,9 +555,9 @@ def _check_grant(user, grant_role):
 	"""Add member's role rule (issue 1): only Life User or Life Agent, and only to a user with no Life role yet. So an agent
 	is never given Life User or Life Admin here."""
 	if grant_role not in GRANTABLE.values():
-		frappe.throw(_("Add member gives only the person or the agent role."), frappe.PermissionError)
+		frappe.throw(_("Add member gives only the person or the agent role."), frappe.PermissionError, title=_("Role not allowed for member"))
 	if _life_roles(user) - {grant_role}:
-		frappe.throw(_("{0} already has a Life OS role. Change roles in Frappe.").format(user), frappe.PermissionError)
+		frappe.throw(_("{0} already has a Life OS role. Change roles in Frappe.").format(user), frappe.PermissionError, title=_("User already has a role"))
 
 
 def _give_role(user, grant_role):
@@ -571,9 +565,9 @@ def _give_role(user, grant_role):
 	if _life_roles(user):
 		return
 	if not grant_role:
-		frappe.throw(_("{0} has no Life OS role yet. Choose whether they are a person or an agent.").format(user))
+		frappe.throw(_("{0} has no Life OS role yet. Choose whether they are a person or an agent.").format(user), title=_("Member needs a role"))
 	u = frappe.get_doc("User", user)
-	u.flags.ignore_permissions = True  # Life Admin only (checked by the caller); _check_grant allowed only Life User or Life Agent
+	u.flags.ignore_permissions = True  # system: Life Admin only (checked by the caller); _check_grant allowed only Life User or Life Agent
 	u.add_roles(grant_role)
 	permissions.clear_cache()
 
@@ -594,29 +588,28 @@ def find_users(txt: str | None = "", space: str | None = None):
 	its kind (Person, Agent, or None for no Life OS role yet) and, with `space`, whether it is already a member. Admin only."""
 	_admin_only()
 	like = f"%{txt or ''}%"
-	rows = frappe.get_all("User", filters={"enabled": 1, "name": ("not in", ["Administrator", "Guest"])},
+	rows = frappe.get_all("User", filters={"enabled": 1, "name": ("not in", ["Administrator", "Guest"])},  # system: user and role lookups and the admin's space list are not space records
 		or_filters={"name": ("like", like), "full_name": ("like", like)}, fields=["name", "full_name"], order_by="full_name asc", limit=20)
 	people = _people([r.name for r in rows])
-	members = set(frappe.get_all("Life Space Member", filters={"parent": space, "parenttype": "Life Space"}, pluck="user")) if space else set()
+	members = set(frappe.get_all("Life Space Member", filters={"parent": space, "parenttype": "Life Space"}, pluck="user")) if space else set()  # system: user and role lookups and the admin's space list are not space records
 	return [{"name": r.name, "full_name": r.full_name or r.name, "kind": people.get(r.name, {}).get("kind"),
 		"is_member": r.name in members} for r in rows]
 
 
 @frappe.whitelist(methods=["POST"])
 def reorder(kind: str, names: str | list, parent_area: str | None = None):
-	"""Put the rows of one ordered list (areas, dimensions) in this order, in one call. For areas, `names` are siblings
+	"""Put the rows of one ordered list (areas) in this order, in one call. For areas, `names` are siblings
 	and `parent_area` is their parent ("" for the top level): moving an area into this list nests it there."""
 	from lifeos.api.utils import parse
 
-	if kind not in ("area", "dimension"):
-		frappe.throw(_("Only areas and check-in dimensions have an order."))
-	if kind == "area":
-		_areas_admin_only()
+	if kind != "area":
+		frappe.throw(_("Only areas have an order."), title=_("Only areas have an order"))
+	_areas_admin_only()
 	doctype = LISTS[kind][0]
 	names = parse(names, []) or []
 	for i, name in enumerate(names):
 		doc = permissions.get_doc_checked(doctype, name, "write")
-		if kind == "area" and parent_area is not None and (doc.parent_area or "") != (parent_area or ""):
+		if parent_area is not None and (doc.parent_area or "") != (parent_area or ""):
 			save_item("area", name=name, parent_area=parent_area or "")
 			doc.reload()
 		if doc.sort_order != i + 1:

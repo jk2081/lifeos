@@ -1,8 +1,8 @@
 {
- "title": "The weekly review: a waiting item is chased, a goal task is left for the owner",
+ "title": "Stuck and waiting tasks: a waiting item is chased, a goal task is left for the owner",
  "input": {
   "data": {
-   "request": "the weekly review's piles",
+   "request": "stuck and waiting tasks",
    "items": [
     {
      "item": "I1",
@@ -51,5 +51,5 @@
    "stop_reason": "end_turn"
   }
  ],
- "skill_hash": "d868ea15079fe7d7"
+ "skill_hash": "6c078722accdaaf6"
 }

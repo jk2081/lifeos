@@ -18,7 +18,7 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	if group_by not in ("day", "area", "goal"):
-		frappe.throw(_("group_by must be day, area or goal."))
+		frappe.throw(_("group_by must be day, area or goal."), title=_("Unknown grouping"))
 	end = getdate(to_date or today())
 	begin = getdate(from_date) if from_date else add_days(end, -6)
 	guard = permissions.vault_guard(space)
@@ -30,7 +30,7 @@ def report(space: str | None = None, from_date: str | None = None, to_date: str 
 	names = [r.ref_name for r in index]
 	details, items = {}, {}
 	if names:
-		for r in frappe.get_all("Life Chat Log", filters={"name": ("in", names)}, fields=["name", "url", "assistant", "summary_md"]):
+		for r in frappe.get_list("Life Chat Log", filters={"name": ("in", names)}, fields=["name", "url", "assistant", "summary_md"]):
 			details[r.name] = r
 		for r in frappe.db.sql(
 			"select parent, name, text, status, task from `tabLife Chat Open Item` where parenttype='Life Chat Log' and parent in %s order by parent, idx",
@@ -128,7 +128,7 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	if group_by not in GROUP_ORDER:
-		frappe.throw(_("group_by must be day, area or goal."))
+		frappe.throw(_("group_by must be day, area or goal."), title=_("Unknown grouping"))
 	clause, values = where_clause(space, area, goal, open_items, from_date, to_date, include_archived)
 	extra, values = std_clause("Life Chat Log", filters, "c", values)
 	clause += extra
@@ -191,7 +191,7 @@ def log(space: str | None = None, title: str | None = None, date: str | datetime
 
 	space = permissions.resolve_space(space, write=True)
 	if not (title or "").strip():
-		frappe.throw(_("A chat log needs a title."))
+		frappe.throw(_("A chat log needs a title."), title=_("Chat log needs a title"))
 	if assistant not in ASSISTANTS:
 		assistant = "Other"
 	system = (source_system or "").strip().lower() or None
@@ -242,7 +242,7 @@ def log(space: str | None = None, title: str | None = None, date: str | datetime
 		for a in parse(also_in, []) or []:
 			doc.append("also_in", {"area": proposals.resolve_link("Life Area", a, space)})
 	except proposals.PayloadError as e:
-		frappe.throw(str(e))
+		frappe.throw(str(e), title=_("Chat import failed"))
 	doc.insert()
 	if system:
 		connections.touch(space, system, doc.title)
@@ -293,7 +293,7 @@ def _row(chat, row):
 	doc = permissions.get_doc_checked("Life Chat Log", chat, "write")
 	item = next((i for i in doc.open_items if i.name == row), None)
 	if not item:
-		frappe.throw(_("Open item not found."), frappe.DoesNotExistError)
+		frappe.throw(_("Open item not found."), frappe.DoesNotExistError, title=_("Open item not found"))
 	return doc, item
 
 
@@ -301,7 +301,7 @@ def _row(chat, row):
 def make_task(chat: str, row: str):
 	"""Turn an open item into a task. People only: an open item becomes a task only when the owner asks."""
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can turn an open item into a task."), frappe.PermissionError)
+		frappe.throw(_("Only a person can turn an open item into a task."), frappe.PermissionError, title=_("Only a person can do this"))
 	doc, item = _row(chat, row)
 	if item.status == "Task Created" and item.task:
 		return {"task": item.task}

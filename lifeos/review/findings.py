@@ -135,7 +135,7 @@ def act(name, index, extra=None):
 	try:
 		a = actions[int(index)]
 	except (IndexError, ValueError, TypeError):
-		frappe.throw(frappe._("No such action."))
+		frappe.throw(frappe._("No such action."), title=frappe._("Action not found"))
 	extra = extra or {}
 	kind = a.get("kind")
 	out = {"kind": kind}

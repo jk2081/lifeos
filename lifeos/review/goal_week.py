@@ -5,7 +5,7 @@ from datetime import timedelta
 import frappe
 from frappe.utils import cint, get_datetime, getdate
 
-from lifeos import journal, readings, weekplan
+from lifeos import cycles, readings, weekplan
 
 DAY = "%a"
 
@@ -19,7 +19,7 @@ def percent(gp, g):
 def _cycle_data(gp):
 	if not hasattr(gp, "_cyc"):
 		cyc = gp.cycle()
-		gp._cyc = (frappe.get_doc("Life Cycle", cyc.name), journal._actions(cyc.name), journal._ticks(cyc.name)) if cyc else (None, [], {})
+		gp._cyc = (frappe.get_doc("Life Cycle", cyc.name), cycles._actions(cyc.name), cycles._ticks(cyc.name)) if cyc else (None, [], {})
 	return gp._cyc
 
 
@@ -29,17 +29,17 @@ def mark_of(gp, g):
 	target = cint(frappe.db.get_single_value("Life Settings", "score_target")) or 85
 	mine = [a for a in actions if a.goal == g.name]
 	if cycle and mine and g.cycle == cycle.name:
-		week = journal.current_week(cycle)
-		planned = sum(journal.planned_in_week(cycle, a, week) for a in mine)
-		done = sum(min(ticks.get(a.name, {}).get(week, 0), journal.planned_in_week(cycle, a, week)) for a in mine)
-		pct = journal.goal_percent(cycle, mine, ticks)
+		week = cycles.current_week(cycle)
+		planned = sum(cycles.planned_in_week(cycle, a, week) for a in mine)
+		done = sum(min(ticks.get(a.name, {}).get(week, 0), cycles.planned_in_week(cycle, a, week)) for a in mine)
+		pct = cycles.goal_percent(cycle, mine, ticks)
 		if planned and not done:
 			return {"mark": "No ticks", "percent": pct}
 		return {"mark": "On track" if pct >= target else "Slipping", "percent": pct}
 	prog = progress_of(g)
 	if prog["percent"] is None:
 		return {"mark": "No ticks" if cycle and g.cycle == cycle.name else None, "percent": None}
-	elapsed = 100.0 * max(journal.current_week(cycle), 1) / journal.WEEKS if cycle and g.cycle == cycle.name else 50.0
+	elapsed = 100.0 * max(cycles.current_week(cycle), 1) / cycles.WEEKS if cycle and g.cycle == cycle.name else 50.0
 	return {"mark": "On track" if prog["percent"] >= elapsed - 10 else "Slipping", "percent": prog["percent"]}
 
 

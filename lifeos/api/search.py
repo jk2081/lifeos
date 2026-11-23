@@ -36,7 +36,7 @@ def query(text: str, limit: int | None = 20, space: str | None = None, include_a
 	else:
 		spaces = list(permissions.user_spaces())
 		if frappe.session.user == "Administrator" and not spaces:
-			spaces = frappe.get_all("Life Space", pluck="name")
+			spaces = frappe.get_all("Life Space", pluck="name")  # system: the admin's space list
 	words = [w.lower() for w in WORD.findall(text or "")][:8]
 	if not words or not spaces:
 		return {"text": text, "results": []}

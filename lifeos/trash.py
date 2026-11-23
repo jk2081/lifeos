@@ -9,26 +9,26 @@ from frappe.utils import add_days, now_datetime
 from lifeos import permissions
 
 DAYS = 30
-# what the trash lists and restores; areas, habits and dimensions stay archive-only (set 3)
+# what the trash lists and restores; areas and habits stay archive-only (set 3)
 TRASHABLE = ("Life Task", "Life Goal", "Life Note", "Life Inbox Item", "Life Chat Log",
-	"Life Journal Page", "Life Vault Document", "Life Important Date", "Life Person")
+	"Life Vault Document", "Life Person")
 LABELS = {"Life Task": "Task", "Life Goal": "Goal", "Life Note": "Note",
-	"Life Inbox Item": "Source", "Life Chat Log": "Chat", "Life Journal Page": "Journal page", "Life Vault Document": "Vault document",
-	"Life Important Date": "Important date", "Life Person": "Person"}
+	"Life Inbox Item": "Source", "Life Chat Log": "Chat", "Life Vault Document": "Vault document",
+	"Life Person": "Person"}
 
 
 def delete(doctype, name):
 	"""Move one record to the trash, with the caller's own delete permission. Records that other records still point
 	to are refused with a plain message."""
 	if doctype not in TRASHABLE:
-		frappe.throw(_("{0} cannot be deleted here.").format(doctype))
+		frappe.throw(_("{0} cannot be deleted here.").format(doctype), title=_("Record cannot be deleted"))
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot delete records."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot delete records."), frappe.PermissionError, title=_("Agents cannot delete"))
 	doc = permissions.get_doc_checked(doctype, name, "delete")
 	try:
 		frappe.delete_doc(doctype, name)
 	except frappe.LinkExistsError:
-		frappe.throw(_("{0} is still used by other records, so it cannot be deleted. Archive it instead.").format(frappe.bold(_title(doc))))
+		frappe.throw(_("{0} is still used by other records, so it cannot be deleted. Archive it instead.").format(frappe.bold(_title(doc))), title=_("Record is still in use"))
 	return {"deleted": name, "doctype": doctype}
 
 
@@ -85,12 +85,12 @@ def list(space=None, start=0, page_length=50, kind=None):
 def restore(name):
 	"""Put a deleted record back as it was, with its original name and creation date. Needs Write access to its space."""
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot restore records."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot restore records."), frappe.PermissionError, title=_("Agents cannot restore"))
 	deleted = frappe.db.get_value("Deleted Document", name, ["deleted_doctype", "deleted_name", "data", "restored"], as_dict=True)
 	if not deleted or deleted.deleted_doctype not in TRASHABLE:
-		frappe.throw(_("Not found in the trash."), frappe.DoesNotExistError)
+		frappe.throw(_("Not found in the trash."), frappe.DoesNotExistError, title=_("Not found in trash"))
 	if deleted.restored:
-		frappe.throw(_("This record was already restored."))
+		frappe.throw(_("This record was already restored."), title=_("Already restored"))
 	data = json.loads(deleted.data)
 	permissions.require_space(data.get("space"), write=True)
 	doc = frappe.get_doc(data)

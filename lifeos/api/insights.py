@@ -16,7 +16,7 @@ STATUSES = ("New", "Snoozed", "Acted", "Dismissed")
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Insights are for people."), frappe.PermissionError)
+		frappe.throw(_("Insights are for people."), frappe.PermissionError, title=_("Insights are for people"))
 
 
 def _out(rows):
@@ -41,7 +41,7 @@ def _out(rows):
 
 
 LABEL = {"Life Task": ("task", "tasks"), "Life Goal": ("goal", "goals"), "Life Chat Log": ("chat", "chats"),
-	"Life Inbox Item": ("source", "sources"), "Life Note": ("note", "notes"), "Life Check-in": ("check-in", "check-ins"),
+	"Life Inbox Item": ("source", "sources"), "Life Note": ("note", "notes"),
 	"Life Habit": ("habit log", "habit logs"), "Life Cycle": ("12 Week Year", "12 Week Years")}
 
 
@@ -118,7 +118,7 @@ def dismiss(insight: str, reason: str | None = None):
 	"""Dismiss, with an optional reason (not relevant, already done, wrong). The AI reads the last 30 with their reasons."""
 	doc = _doc(insight)
 	if reason and reason not in ("Not relevant", "Already done", "Wrong"):
-		frappe.throw(_("reason must be Not relevant, Already done or Wrong."))
+		frappe.throw(_("reason must be Not relevant, Already done or Wrong."), title=_("Unknown dismiss reason"))
 	doc.status, doc.dismiss_reason = "Dismissed", reason or ""
 	doc.save()
 	return {"status": doc.status}
@@ -150,7 +150,7 @@ def act(insight: str, index: int | str = 0):
 	try:
 		a = actions[int(index)]
 	except (IndexError, ValueError, TypeError):
-		frappe.throw(_("No such action."))
+		frappe.throw(_("No such action."), title=_("Unknown insight action"))
 	out = {"kind": a.get("kind")}
 	if a.get("kind") == "make_task":
 		from lifeos.api import chats, tasks
@@ -175,7 +175,7 @@ def act(insight: str, index: int | str = 0):
 		if a.get("kind") != "open_reset":
 			return out  # looking is not acting: the insight stays New
 	else:
-		frappe.throw(_("Unknown action."))
+		frappe.throw(_("Unknown action."), title=_("Unknown insight action"))
 	doc.status = "Acted"
 	doc.save()
 	return out

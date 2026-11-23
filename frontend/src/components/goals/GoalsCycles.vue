@@ -1,5 +1,5 @@
 <template>
-  <PageHead title="Goals" sub="Cycles: the 12 Week Year and this month's plan, in one place.">
+  <PageHead title="Goals" sub="Cycles: the 12 Week Year and this month's goals, in one place.">
     <Button v-if="writable" variant="solid" icon-left="lucide-plus" label="Goal" data-new-goal @click="newOpen = true" />
   </PageHead>
   <div class="page-body" data-cycles :data-loaded="loaded ? 1 : 0">
@@ -69,50 +69,36 @@
         <Button v-if="writable" class="mt-3" variant="solid" label="Start a cycle next Monday" data-create-cycle @click="createCycle" /></Empty>
     </Card>
 
-    <!-- right: this month's plan; hidden when the month plan is off in Rhythms -->
-    <Card v-if="mp && mp.enabled" class="flex min-w-0 flex-col gap-4 !p-4 md:!p-5" data-month-card>
+    <!-- right: this month's goals (goals with the Month horizon) and its habits -->
+    <Card v-if="mp" class="flex min-w-0 flex-col gap-4 !p-4 md:!p-5" data-month-card>
       <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 class="text-lg-semibold text-ink-gray-9" data-month-title>{{ MONTHS[mp.month - 1] }} plan</h2>
-        <span v-if="mp.plan" class="text-sm text-ink-gray-6">{{ goals.length }} month goal{{ goals.length === 1 ? '' : 's' }} · {{ closedCount }} done or closed</span>
-        <Button v-if="writable" class="ml-auto !text-ink-blue-8" size="sm" variant="ghost" label="Edit" data-month-edit @click="editOpen = true" />
+        <h2 class="text-lg-semibold text-ink-gray-9" data-month-title>{{ MONTHS[mp.month - 1] }} goals</h2>
+        <span v-if="goals.length" class="text-sm text-ink-gray-6">{{ goals.length }} month goal{{ goals.length === 1 ? '' : 's' }} · {{ closedCount }} done or closed</span>
       </div>
-      <template v-if="mp.plan">
-        <ol v-if="goals.length" class="flex flex-col">
-          <li v-for="(m, i) in goals" :key="m.row" class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-outline-gray-1 py-2.5 last:border-b-0" data-month-goal :data-goal="m.row">
-            <span class="w-5 flex-none text-center text-sm tabular-nums text-ink-gray-6" aria-hidden="true">{{ i + 1 }}</span>
-            <span class="min-w-0 flex-1 break-words" :class="m.status === 'Done' || m.status === 'Dropped' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ m.title }}</span>
-            <Badge v-if="m.area_name" :label="m.area_name" />
-            <Badge :theme="statusOf(m).theme" :label="statusOf(m).label" data-month-status />
-          </li>
-        </ol>
-        <Empty v-else title="No goals this month." hint="Add what you want done this month. The order is your priority."><Button v-if="writable" class="mt-3" variant="solid" label="Edit" @click="editOpen = true" /></Empty>
+      <ol v-if="goals.length" class="flex flex-col">
+        <li v-for="(m, i) in goals" :key="m.row" class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-outline-gray-1 py-2.5 last:border-b-0" data-month-goal :data-goal="m.row">
+          <span class="w-5 flex-none text-center text-sm tabular-nums text-ink-gray-6" aria-hidden="true">{{ i + 1 }}</span>
+          <RouterLink class="min-w-0 flex-1 break-words hover:underline focus-visible:focus-ring" :class="m.status === 'Done' || m.status === 'Dropped' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'" :to="`/goals/${m.row}`">{{ m.title }}</RouterLink>
+          <Badge v-if="m.area_name" :label="m.area_name" />
+          <Badge :theme="statusOf(m).theme" :label="statusOf(m).label" data-month-status />
+        </li>
+      </ol>
+      <Empty v-else title="No goals this month." hint="A month goal is a goal with the Month horizon. Add one with + Goal.">
+        <Button v-if="writable" class="mt-3" variant="solid" label="Goal" @click="newOpen = true" /></Empty>
 
-        <div v-if="mp.habits.habits.length" data-month-habits>
-          <h3 class="mb-2 text-sm text-ink-gray-6">Habits this month</h3>
-          <div v-for="h in mp.habits.habits" :key="h.habit" class="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] items-center gap-3 py-1.5 max-md:grid-cols-[minmax(0,1fr)_auto]" data-month-habit>
-            <span class="min-w-0 truncate text-ink-gray-9">{{ h.title }} <span class="text-ink-gray-6">{{ h.days_per_week >= 7 ? 'daily' : `${h.days_per_week} a week` }}</span></span>
-            <div class="max-md:col-span-2 max-md:order-3"><Progress size="sm" :value="h.percent" /></div>
-            <span class="text-sm tabular-nums text-ink-gray-6">{{ h.done }} of {{ h.target }}</span>
-          </div>
+      <div v-if="mp.habits.habits.length" data-month-habits>
+        <h3 class="mb-2 text-sm text-ink-gray-6">Habits this month</h3>
+        <div v-for="h in mp.habits.habits" :key="h.habit" class="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] items-center gap-3 py-1.5 max-md:grid-cols-[minmax(0,1fr)_auto]" data-month-habit>
+          <span class="min-w-0 truncate text-ink-gray-9">{{ h.title }} <span class="text-ink-gray-6">{{ h.days_per_week >= 7 ? 'daily' : `${h.days_per_week} a week` }}</span></span>
+          <div class="max-md:col-span-2 max-md:order-3"><Progress size="sm" :value="h.percent" /></div>
+          <span class="text-sm tabular-nums text-ink-gray-6">{{ h.done }} of {{ h.target }}</span>
         </div>
-
-        <details v-if="mp.plan.mindsweep_md || mp.plan.projects_md" class="text-sm text-ink-gray-7" data-month-sweep>
-          <summary class="cursor-pointer select-none focus-visible:focus-ring">Mind sweep and projects list</summary>
-          <div v-if="mp.plan.mindsweep_md" class="mt-2"><div class="text-ink-gray-6">Mind sweep</div><Md :text="mp.plan.mindsweep_md" read /></div>
-          <div v-if="mp.plan.projects_md" class="mt-2"><div class="text-ink-gray-6">Projects</div><Md :text="mp.plan.projects_md" read /></div>
-        </details>
-      </template>
-      <Empty v-else :title="`No plan for ${MONTHS[mp.month - 1]} yet.`" hint="A new plan starts with last month's habits. Goals and the mind sweep start empty.">
-        <Button v-if="writable" class="mt-3" variant="solid" label="Start this month's plan" data-month-start @click="startPlan" /></Empty>
-      <p class="rounded-5 bg-surface-gray-1 px-4 py-3 text-sm text-ink-gray-7" data-month-next>{{ nextMonthLine }}</p>
+      </div>
     </Card>
    </div>
   </div>
 
   <CycleGoalsDialog v-if="g" v-model="goalsOpen" :grid="g" :writable="canEdit" @changed="load" />
-  <Dialog v-model:open="editOpen" title="Month plan" size="5xl" @update:open="(o) => !o && loadMonth()">
-    <div data-month-edit-body><MonthPlan embedded /></div>
-  </Dialog>
   <NewGoalDialog v-model="newOpen" @saved="load" @habit="loadMonth" />
 </template>
 <script setup>
@@ -120,14 +106,13 @@
 // month's plan on the right. It moves the Plan section's screens; the records, the API and the scores are the same.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dialog, Dropdown, Progress, toast } from 'frappe-ui'
+import { Badge, Button, Dropdown, Progress, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
 import CycleGoalsDialog from '@/components/goals/CycleGoalsDialog.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'
-import MonthPlan from '@/components/journal/Month.vue'
 import { api, errorText, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged } from '@/lib/pane'
@@ -140,7 +125,6 @@ const g = ref(null)
 const mp = ref(null)
 const loaded = ref(false)
 const goalsOpen = ref(false)
-const editOpen = ref(false)
 const newOpen = ref(false)
 const reviewsDue = ref([])
 const pct = (n) => Math.round(n || 0) + '%'
@@ -179,7 +163,7 @@ async function tap(a, i) {
   const next = i === before ? i - 1 : i
   a.ticks[String(w)] = next
   try {
-    const score = await api('journal.tick', { action: a.name, week: w, count: next })
+    const score = await api('goals.tick', { action: a.name, week: w, count: next })
     Object.assign(g.value.weeks[w - 1], score)
     const scores = g.value.weeks.slice(0, w).map((x) => x.percent)
     g.value.average = scores.reduce((x, y) => x + y, 0) / scores.length
@@ -189,8 +173,8 @@ async function tap(a, i) {
   }
 }
 
-// the month plan
-const goals = computed(() => (mp.value?.plan?.goals || []).map((m) => ({ ...m, area_name: m.area_name || areaName(m.area) })))
+// this month's goals
+const goals = computed(() => (mp.value?.goals || []).map((m) => ({ ...m, area_name: m.area_name || areaName(m.area) })))
 const closedCount = computed(() => goals.value.filter((m) => m.status !== 'Open').length)
 function statusOf(m) {
   if (m.status === 'Done') return { label: 'Done', theme: 'green' }
@@ -200,25 +184,16 @@ function statusOf(m) {
   if (m.tasks_counted) return { label: `${m.tasks_done} of ${m.tasks_counted}`, theme: 'green' }
   return { label: 'In progress', theme: 'green' }
 }
-// Today reminds you to plan a month on its first day: the next plan opens on the 1st
-const nextMonthLine = computed(() => {
-  const next = new Date(mp.value.year, mp.value.month, 1)
-  return `${MONTHS[next.getMonth()]}'s plan opens on 1 ${MONTHS[next.getMonth()].slice(0, 3)}. Unfinished goals can carry over.`
-})
-async function startPlan() {
-  const res = await tryCall(() => api('journal.month', { space: store.space, create: 1 }))
-  if (res) mp.value = res
-}
 async function createCycle() {
-  if (await tryCall(() => api('journal.create_cycle', { space: store.space }), 'Cycle created.')) load()
+  if (await tryCall(() => api('goals.create_cycle', { space: store.space }), 'Cycle created.')) load()
 }
 
 async function loadGrid() {
-  const res = await tryCall(() => api('journal.grid', { space: store.space, cycle: route.query.cycle || undefined, area: store.lensArea || undefined }))
+  const res = await tryCall(() => api('goals.grid', { space: store.space, cycle: route.query.cycle || undefined, area: store.lensArea || undefined }))
   g.value = res || null
 }
 async function loadMonth() {
-  const res = await tryCall(() => api('journal.month', { space: store.space, area: store.lensArea || undefined }))
+  const res = await tryCall(() => api('goals.this_month', { space: store.space, area: store.lensArea || undefined }))
   if (res) mp.value = res
 }
 // the monthly and the 12-week review, when one is due (issue 47)

@@ -121,13 +121,13 @@ def _goal_lines(space):
 
 
 def _cycle_line(space):
-	from lifeos import journal
+	from lifeos import cycles
 
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["title", "start_date", "end_date"], as_dict=True, order_by="start_date desc")
 	if not cycle:
 		return None
-	week = journal.week_of(cycle)
-	where = f"week {min(max(week, 1), journal.WEEKS)} of {journal.WEEKS}" if week <= journal.WEEKS else "past its last week"
+	week = cycles.week_of(cycle)
+	where = f"week {min(max(week, 1), cycles.WEEKS)} of {cycles.WEEKS}" if week <= cycles.WEEKS else "past its last week"
 	return f"{cycle.title}: {where} ({getdate(cycle.start_date):%-d %b} to {getdate(cycle.end_date):%-d %b %Y})."
 
 

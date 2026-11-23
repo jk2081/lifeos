@@ -166,7 +166,7 @@ async function refresh() {
 }
 async function act(r, i) {
   const a = r.actions[i]
-  if (a.kind === 'open_reset') return router.push('/today/reset')
+  if (a.kind === 'open_reset') return router.push('/settings?tab=data')
   if (a.kind === 'open_list') return router.push(a.to)
   if (a.kind === 'open_record') return openRef(a.ref)
   try {

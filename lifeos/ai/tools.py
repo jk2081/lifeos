@@ -19,12 +19,11 @@ show so than that the their them then there these they this to up was we were wh
 still open here stuck tell give list find about any all""".split())
 
 KIND_DOCTYPE = {"task": "Life Task", "note": "Life Note", "source": "Life Inbox Item", "chat": "Life Chat Log", "document": "Life Vault Document",
-	"journal page": "Life Journal Page", "goal": "Life Goal", "insight": "Life Insight"}
-INDEX_KIND = {"task": "Task", "note": "Note", "source": "Inbox", "chat": "Chat", "document": "Document", "journal page": "Journal Page",
-	"check-in": "Check-in", "month plan": "Month Plan"}
+	"goal": "Life Goal", "insight": "Life Insight"}
+INDEX_KIND = {"task": "Task", "note": "Note", "source": "Inbox", "chat": "Chat", "document": "Document"}
 
 TOOLS = [
-	{"name": "search", "description": "Search the owner's records (notes, wiki pages, tasks, sources and their transcripts, chats, journal pages, check-ins) by words. Returns matching records with a snippet and a reference such as R3 to cite.",
+	{"name": "search", "description": "Search the owner's records (notes, wiki pages, tasks, sources and their transcripts, chats) by words. Returns matching records with a snippet and a reference such as R3 to cite.",
 		"input_schema": {"type": "object", "properties": {
 			"query": {"type": "string", "description": "A few key words, not a sentence."},
 			"kinds": {"type": "array", "items": {"type": "string", "enum": sorted(INDEX_KIND)}, "description": "Only these kinds."},
@@ -40,7 +39,7 @@ TOOLS = [
 			"required": ["kind"]}},
 	{"name": "counts", "description": "A count with the list it opens: open_tasks, stuck_tasks, overdue_tasks, due_today_tasks, open_goals, idle_goals, goals_in_progress, inbox_to_review, inbox_old, someday, someday_due.",
 		"input_schema": {"type": "object", "properties": {"kind": {"type": "string"}}, "required": ["kind"]}},
-	{"name": "journal_state", "description": "The active 12 Week Year: week, scores, goals with their actions and this week's ticks, and this month's habits.",
+	{"name": "cycle_state", "description": "The active 12 Week Year: week, scores, goals with their actions and this week's ticks, and this month's habits.",
 		"input_schema": {"type": "object", "properties": {}}},
 	{"name": "timeline", "description": "What happened in a period: records by day (created, completed, captured).",
 		"input_schema": {"type": "object", "properties": {"date_from": {"type": "string"}, "date_to": {"type": "string"}}, "required": ["date_from"]}},
@@ -134,7 +133,7 @@ def run_tool(ctx, name, args):
 	args = args or {}
 	try:
 		fn = {"search": t_search, "get_record": t_get_record, "list_records": t_list, "counts": t_counts,
-			"journal_state": t_journal, "timeline": t_timeline, "suggest_actions": t_suggest}[name]
+			"cycle_state": t_cycle, "timeline": t_timeline, "suggest_actions": t_suggest}[name]
 	except KeyError:
 		return {"error": f"Unknown tool {name}."}
 	try:
@@ -192,13 +191,13 @@ def _area(area):
 
 
 TEXT_FIELDS = {"Life Note": ["summary", "content_md"], "Life Task": ["notes_md", "waiting_on"], "Life Inbox Item": ["instruction", "summary_md", "transcript_md", "raw_text"],
-	"Life Chat Log": ["summary_md", "transcript_md"], "Life Journal Page": ["transcript_md"],
+	"Life Chat Log": ["summary_md", "transcript_md"],
 	"Life Goal": ["done_when", "notes_md", "result_note"], "Life Vault Document": ["notes_md"], "Life Insight": ["body"]}
 FIELDS = {"Life Task": ["status", "due_date", "priority", "goal", "completed_on", "last_touched_on", "someday_review_on"],
 	"Life Goal": ["horizon", "outcome", "on_hold", "target_date", "cycle", "serves", "is_someday", "last_activity_on"],
 	"Life Inbox Item": ["status", "received_on", "source_type", "intent"], "Life Chat Log": ["date", "assistant", "url"],
-	"Life Note": ["collection", "last_opened_on"], "Life Vault Document": ["doc_type", "expiry_date", "number_last4"],
-	"Life Journal Page": ["page_date", "page_number"], "Life Insight": ["kind", "status"]}
+	"Life Note": ["collection", "last_opened_on", "page_date"], "Life Vault Document": ["doc_type", "expiry_date", "number_last4"],
+	"Life Insight": ["kind", "status"]}
 
 
 def t_get_record(ctx, ref=None, doctype=None, name=None):
@@ -339,7 +338,7 @@ def t_counts(ctx, kind):
 	return {"kind": kind, "n": c["n"], "label": c["label"], "list": c["to"]}
 
 
-def t_journal(ctx):
+def t_cycle(ctx):
 	from lifeos.api import today as today_api
 
 	t = today_api.get(space=ctx.space)
@@ -348,22 +347,22 @@ def t_journal(ctx):
 		"this_week_actions": [{"title": a["title"], "goal": a["goal_title"], "ticks": a["count"], "per_week": a["per_week"]} for a in cycle.get("actions") or []],
 		"habits_today": [{"habit": h["title"], "done": h["done"]} for h in t.get("habits") or []]}
 	if cycle.get("name"):
-		from lifeos import journal
+		from lifeos import cycles
 
-		g = journal.grid(cycle["name"])
+		g = cycles.grid(cycle["name"])
 		out["goals"] = [{"ref": ctx.ref("Life Goal", x["name"], x["title"], "Goal"), "title": x["title"], "percent": x.get("percent"),
 			"actions": [a.get("title") for a in x.get("actions") or []]} for x in g.get("goals", [])]
 		out["week_scores"] = [w.get("percent") for w in g.get("weeks", [])] if isinstance(g.get("weeks"), list) else None
 	now = getdate(today())
-	month = journal_month(ctx.space, now)
+	month = habits_this_month(ctx.space, now)
 	out["habits_this_month"] = month
 	return out
 
 
-def journal_month(space, now):
-	from lifeos import journal
+def habits_this_month(space, now):
+	from lifeos import habits
 
-	m = journal.habits_month(space, now.year, now.month)
+	m = habits.habits_month(space, now.year, now.month)
 	return [{"habit": h["title"], "done": h["done"], "target": h["target"], "percent": h["percent"]} for h in m["habits"]]
 
 

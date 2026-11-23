@@ -209,18 +209,18 @@ def add(goal, title=None, task=None, scheduled_at=None, duration_min=None, who=N
 	if task:
 		doc = permissions.get_doc_checked("Life Task", task, "write")
 		if doc.goal != g.name:
-			frappe.throw(frappe._("That task is not under this goal."))
+			frappe.throw(frappe._("That task is not under this goal."), title=frappe._("Task is not in this goal"))
 		if title and title.strip():
 			doc.title = title.strip()[:140]
 	else:
 		title = (title or "").strip()
 		if not title:
-			frappe.throw(frappe._("Write the next action."))
+			frappe.throw(frappe._("Write the next action."), title=frappe._("Next action is empty"))
 		doc = frappe.get_doc({"doctype": "Life Task", "space": g.space, "title": title[:140], "goal": g.name, "area": g.area or None, "status": "Open"})
 	doc.scheduled_at = get_datetime(scheduled_at) if scheduled_at else None
 	minutes = cint(duration_min) or DEFAULT_MINUTES
 	if minutes < 5 or minutes > 600:
-		frappe.throw(frappe._("The length must be between 5 minutes and 10 hours."))
+		frappe.throw(frappe._("The length must be between 5 minutes and 10 hours."), title=frappe._("Length out of range"))
 	doc.duration_min = minutes
 	note = (note or "").strip()
 	if note:

@@ -4,9 +4,10 @@ from datetime import datetime, timedelta
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 
-from lifeos import journal as rules, readings, weekplan
+from lifeos import cycles as rules, readings, weekplan
+from lifeos import habits as habit_rules
 from lifeos.api import calendar, goals, library as library_api, outbox as outbox_api, periodic, settings, settings as settings_api, sources, today as today_api, week, weekly
-from lifeos.review import findings, periodic as rv_rules, piles
+from lifeos.review import findings, periodic as rv_rules
 from lifeos.review.record import period_text, Review
 from lifeos.tests.base import AGENT, AGENT as AGENT_USER, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import CalCase, gevent, GoalsCase, item, ME, ReviewCase, set_key, task, tidy
@@ -19,9 +20,8 @@ NOV_1, OCT_31 = "2026-11-01", "2026-10-31"
 class TestReviews(LifeTestCase):
 	def setUp(self):
 		super().setUp()
-		for dt in ("Life Review", "Life Goal", "Life Cycle", "Life Month Plan", "Life Habit"):
+		for dt in ("Life Review", "Life Goal", "Life Cycle", "Life Habit"):
 			frappe.db.delete(dt, {"space": PRIVATE})
-		frappe.db.sql("delete from `tabLife Month Plan Habit` where parenttype = 'Life Month Plan' and parent not in (select name from `tabLife Month Plan`)")
 		frappe.db.set_single_value("Life Settings", "weekly_review_day", "Sunday")
 		frappe.db.set_single_value("Life Settings", "cycle_break_week", 1)
 		frappe.clear_cache(doctype="Life Settings")
@@ -32,7 +32,6 @@ class TestReviews(LifeTestCase):
 		super().tearDown()
 
 	def october(self):
-		rules.get_month_plan(PRIVATE, 2026, 10, create=True)
 		return [rules.add_month_goal(PRIVATE, 2026, 10, f"i47 goal {i}", self.area()) for i in range(3)]
 
 	def area(self):
@@ -70,9 +69,7 @@ class TestReviews(LifeTestCase):
 	def test_locking_the_monthly_review_writes_next_months_plan(self):
 		goals = self.october()
 		habit = self.make("Life Habit", title="i47 walk").name
-		plan = rules.get_month_plan(PRIVATE, 2026, 10)
-		plan.append("habits", {"habit": habit, "days_per_week": 5, "sort_order": 1})
-		plan.save()
+		habit_rules.set_month_habits(PRIVATE, 2026, 10, [{"habit": habit, "days_per_week": 5}])
 		at = f"{NOV_1} 10:00"
 		task = self.make("Life Task", title="i47 task", goal=goals[0].name, status="Open").name
 		look = periodic.look(space=PRIVATE, kind="monthly", at=at)
@@ -96,7 +93,7 @@ class TestReviews(LifeTestCase):
 		self.assertEqual(frappe.db.get_value("Life Goal", goals[1].name, "result_note"), "Not worth it")
 		self.assertEqual(str(frappe.db.get_value("Life Goal", goals[2].name, "target_date")), "2026-11-10")
 		self.assertNotEqual(frappe.db.get_value("Life Task", task, "goal"), goals[0].name)  # the task went with the carried goal
-		self.assertEqual([h["habit"] for h in rules.habits_month(PRIVATE, 2026, 11)["habits"]], [habit])
+		self.assertEqual([h["habit"] for h in habit_rules.habits_month(PRIVATE, 2026, 11)["habits"]], [habit])
 		doc = frappe.get_doc("Life Review", res["header"]["name"])
 		self.assertEqual((doc.kind, doc.went_well, doc.do_differently), ("Monthly", "Good", "Start earlier"))
 
@@ -222,133 +219,53 @@ class TestResumeAndGates(ReviewCase):
 		self.assertFalse(head["openable"]["goals"])
 		self.assertFalse(head["done"]["library"])
 		weekly.visit(space=PRIVATE, tab="library")
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(stuck), decision="park")
+		weekly.settle_stale(task=stuck, decision="someday", space=PRIVATE)
 		# pause: leave and come back; everything is where it was
 		frappe.local.response = frappe._dict()
 		head = weekly.start(space=PRIVATE)
 		self.assertTrue(head["done"]["library"])
 		self.assertTrue(head["done"]["tasks"])
 		self.assertEqual(head["first"], "goals")
-		got = weekly.pile_summary(space=PRIVATE, key="tasks")
-		self.assertEqual(got["left"], 0)
+		self.assertEqual(weekly.stale_tasks(space=PRIVATE)["left"], 0)
 		self.assertEqual(frappe.db.get_value("Life Task", stuck, "status"), "Someday")
 
 
-class TestPiles(ReviewCase):
-	def test_without_a_key_everything_waits_except_waiting_items(self):
-		"""Issue 59: no rule parks or lets go of anything; Needs you holds it, and a waiting item is kept (chased after a week)."""
-		set_key("")
+class TestStaleTasks(ReviewCase):
+	"""The Tasks tab lists the stale tasks once, each with Keep, Someday and Drop (issue 72; it replaced the piles board)."""
+
+	def test_the_list_holds_the_stale_tasks_and_not_the_new_ones(self):
 		frappe.set_user(OWNER)
-		goal = self.cycle_goal("s8 goal")
-		names = {"goal": self.task("s8 serves", age=40, goal=goal.name), "old": self.task("s8 old", age=70), "ancient": self.task("s8 ancient", age=130),
-			"chase": self.task("s8 asked", age=10, status="Waiting", waiting_on="Ruchi"),
-			"wait": self.task("s8 just asked", age=3, status="Waiting", waiting_on="Ruchi"),
-			"new": self.task("s8 came this week", age=40, created_days=1)}
+		old, waiting, ancient = self.task("s8 old", age=70), self.task("s8 asked", age=40, status="Waiting", waiting_on="Ruchi"), self.task("s8 ancient", age=130)
+		fresh, new = self.task("s8 recent", age=5), self.task("s8 came this week", age=40, created_days=1)
 		weekly.start(space=PRIVATE)
-		items = {i["name"]: i for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").items()}
-		for key in ("goal", "old", "ancient"):
-			self.assertEqual(items[names[key]]["pile"], "needs")
-		self.assertEqual((items[names["chase"]]["pile"], items[names["chase"]]["chase"]), ("keep", True))
-		self.assertEqual((items[names["wait"]]["pile"], items[names["wait"]]["chase"]), ("keep", False))
-		self.assertNotIn(names["new"], items)  # came in during the period: handled in Library
-		self.assertTrue(all(i["reason"] for i in items.values()))
-		self.assertIsNone(piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").summary()["by"])
-		task = self.old_item("s8 inbox task", ["Task"], age=2)
-		got = {i["name"]: i["pile"] for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "inbox").items()}
-		self.assertEqual(got[task], "needs")
+		got = weekly.stale_tasks(space=PRIVATE)
+		names = [r["name"] for r in got["tasks"]]
+		self.assertEqual(names[:3], [ancient, old, waiting])  # the oldest first
+		self.assertNotIn(fresh, names)
+		self.assertNotIn(new, names)  # came in during the period
+		self.assertEqual((got["left"], got["decided"]), (len(names), 0))
+		self.assertEqual(got["tasks"][1]["age"], 70)
 
-	def test_the_skill_sorts_tasks_and_inbox_items_into_the_piles(self):
-		"""One skill, tidy-backlog, sorts the review's piles; what it leaves out waits under Needs you."""
-		frappe.set_user(OWNER)
-		goal = self.cycle_goal("s8 goal")
-		names = {"goal": self.task("s8 serves", age=40, goal=goal.name), "keep": self.task("s8 recent", age=40),
-			"park": self.task("s8 old", age=70), "letgo": self.task("s8 ancient", age=130)}
-		task = self.old_item("s8 inbox task", ["Task"], age=2)
-		note = self.old_item("s8 inbox note", ["Note"], age=2)
-		empty = self.old_item("s8 inbox empty", age=3, status="New")
-		table = {"s8 recent": "keep", "s8 old": "park", "s8 ancient": "drop", "s8 inbox task": "keep", "s8 inbox note": "park", "s8 inbox empty": "drop"}
-		with tidy(lambda i: table.get(i["title"])):
-			weekly.start(space=PRIVATE)
-			items = {i["name"]: i for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").items()}
-			got = {i["name"]: i["pile"] for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "inbox").items()}
-		self.assertEqual(items[names["goal"]]["pile"], "needs")  # left out by the skill
-		self.assertEqual([items[names[k]]["pile"] for k in ("keep", "park", "letgo")], ["keep", "park", "letgo"])
-		self.assertEqual(items[names["park"]]["by"], "tidy-backlog v1")
-		self.assertEqual((got[task], got[note], got[empty]), ("keep", "park", "letgo"))
-		self.assertEqual(piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").summary()["by"], "tidy-backlog v1")
-
-	def test_needs_you_is_at_most_five(self):
-		goal = self.cycle_goal("s8 goal 2")
-		for i in range(7):
-			self.task(f"s8 needs {i}", age=40 + i, goal=goal.name)
+	def test_each_button_does_what_it_says(self):
+		keep, someday, drop = self.task("s8 k", age=40), self.task("s8 p", age=70), self.task("s8 l", age=130)
 		weekly.start(space=PRIVATE)
-		s = weekly.pile_summary(space=PRIVATE, key="tasks")
-		self.assertEqual(s["needs_left"], 5)
-		self.assertEqual(sum(1 for i in piles.PileSet(Review.find_open(PRIVATE, OWNER), "tasks").items() if i["reason"] == "Not sure; kept for now."), 2)
-
-	def test_each_decision_its_exit_and_undo(self):
-		keep, park, letgo = self.task("s8 k", age=40), self.task("s8 p", age=70), self.task("s8 l", age=130)
-		weekly.start(space=PRIVATE)
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(keep), decision="keep")
+		weekly.settle_stale(task=keep, decision="keep", space=PRIVATE)
 		self.assertEqual(frappe.db.get_value("Life Task", keep, "status"), "Open")
 		self.assertEqual(str(frappe.db.get_value("Life Task", keep, "last_touched_on")), today())
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(park), decision="park")
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(letgo), decision="letgo")
-		self.assertEqual(self.exits(park), ["Parked"])
-		self.assertEqual(self.exits(letgo), ["Discarded"])
-		for name in (keep, park, letgo):
-			weekly.pile_undo(space=PRIVATE, key="tasks", ref=self.ref(name))
-		self.assertEqual([frappe.db.get_value("Life Task", n, "status") for n in (keep, park, letgo)], ["Open"] * 3)
-		self.assertEqual(self.exits(park) + self.exits(letgo), [])
-		self.assertEqual(str(frappe.db.get_value("Life Task", keep, "last_touched_on")), str(add_days(today(), -40)))
-		# inbox items: accept, park as an idea, discard to the trash; each undone
-		a, p, d = self.old_item("s8 a", ["Task"], age=2), self.old_item("s8 n", ["Note"], age=2), self.old_item("s8 e", age=3, status="New")
-		for name, dec in ((a, "keep"), (p, "park"), (d, "letgo")):
-			weekly.pile_settle(space=PRIVATE, key="inbox", ref=self.ref(name, "Life Inbox Item"), decision=dec)
-		self.assertEqual(self.exits(a), ["Done"])
-		self.assertEqual(self.exits(p), ["Parked"])
-		self.assertEqual(self.exits(d), ["Discarded"])
-		for name in (a, p, d):
-			weekly.pile_undo(space=PRIVATE, key="inbox", ref=self.ref(name, "Life Inbox Item"))
-		self.assertEqual([frappe.db.get_value("Life Inbox Item", n, "status") for n in (a, p, d)], ["To Review", "To Review", "New"])
-		self.assertEqual(self.exits(a) + self.exits(p) + self.exits(d), [])
-
-	def test_accept_a_pile_move_one_and_undo_both(self):
-		one, two, three = (self.task(f"s8 park {i}", age=70 + i) for i in range(3))
-		with tidy(lambda i: "park"):
-			weekly.start(space=PRIVATE)
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(one), decision="keep")  # moved to Keep
-		res = weekly.pile_accept(space=PRIVATE, key="tasks", pile="park")
-		self.assertEqual(res["done"], 2)
-		park = res["summary"]["piles"]["park"]
-		self.assertTrue(park["done"])
-		self.assertEqual(park["moved"], {"keep": 1})
-		self.assertEqual(res["summary"]["piles"]["keep"]["count"], 1)
-		self.assertEqual([frappe.db.get_value("Life Task", n, "status") for n in (one, two, three)], ["Open", "Someday", "Someday"])
-		res = weekly.pile_undo(space=PRIVATE, key="tasks", pile="park")
-		self.assertEqual(res["summary"]["piles"]["park"]["count"], 3)
-		self.assertEqual(res["summary"]["left"], 3)
-		self.assertEqual([frappe.db.get_value("Life Task", n, "status") for n in (one, two, three)], ["Open"] * 3)
-		self.assertEqual(sum(len(self.exits(n)) for n in (one, two, three)), 0)
-
-	def test_chase_creates_a_task_and_got_it_marks_answered(self):
-		asked = self.task("s8 drainage photos", age=10, status="Waiting", waiting_on="Mr. Rao")
-		answered = self.task("s8 blend query", age=10, status="Waiting", waiting_on="Mithun")
-		weekly.start(space=PRIVATE)
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(asked), decision="keep", chase=1)
-		chase = frappe.db.get_value("Life Task", {"space": PRIVATE, "title": "Chase Mr. Rao: s8 drainage photos"}, ["name", "due_date", "status"], as_dict=True)
-		self.assertEqual((str(chase.due_date), chase.status), (today(), "Open"))
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(answered), decision="letgo")
-		self.assertEqual(frappe.db.get_value("Life Task", answered, "status"), "Done")
-		weekly.pile_undo(space=PRIVATE, key="tasks", ref=self.ref(asked))
-		self.assertFalse(frappe.db.exists("Life Task", chase.name))
-		self.assertFalse(frappe.db.exists("Life Exit", {"record_name": chase.name}))
+		weekly.settle_stale(task=someday, decision="someday", space=PRIVATE)
+		out = weekly.settle_stale(task=drop, decision="drop", space=PRIVATE)
+		self.assertEqual([frappe.db.get_value("Life Task", n, "status") for n in (keep, someday, drop)], ["Open", "Someday", "Dropped"])
+		self.assertEqual(self.exits(someday), ["Parked"])
+		self.assertEqual(self.exits(drop), ["Discarded"])
+		self.assertEqual((out["stale"]["decided"], out["stale"]["tasks"]), (3, []))
+		self.assertTrue(out["header"]["done"]["tasks"])  # nothing left to decide
+		self.assertRaises(frappe.ValidationError, weekly.settle_stale, task=keep, decision="later", space=PRIVATE)
 
 	def test_agents_are_refused(self):
 		from lifeos.tests.base import AGENT
 
 		self.as_user(AGENT)
-		for fn, kw in ((weekly.get, {}), (weekly.start, {}), (weekly.pile_accept, {"pile": "park"})):
+		for fn, kw in ((weekly.get, {}), (weekly.start, {}), (weekly.stale_tasks, {}), (weekly.settle_stale, {"task": "x", "decision": "keep"})):
 			with self.assertRaises(frappe.PermissionError):
 				fn(space=PRIVATE, **kw)
 
@@ -431,7 +348,7 @@ class TestTasksTab(ReviewCase):
 		done.save()
 		parked = self.task("s8 plate park", age=70)
 		weekly.start(space=PRIVATE)
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(parked), decision="park")
+		weekly.settle_stale(task=parked, decision="someday", space=PRIVATE)
 		got = weekly.plate(space=PRIVATE)
 		by = {x["pile"]: x for x in got["piles"]}
 		self.assertGreaterEqual(by["Done"]["n"], 1)
@@ -443,16 +360,15 @@ class TestTasksTab(ReviewCase):
 			self.assertEqual(x["n"], len(listed["rows"]))
 		self.assertEqual(got["out"]["n"], sum(x["n"] for x in got["piles"]))
 
-	def test_next_goals_opens_when_the_piles_are_cleared(self):
+	def test_next_goals_opens_when_every_stale_task_is_decided(self):
 		goal = self.cycle_goal("s8 tasks goal")
 		needs = self.task("s8 tasks needs", age=40, goal=goal.name)
 		old = self.task("s8 tasks old", age=70)
-		with tidy(lambda i: "park" if i["title"] == "s8 tasks old" else None):  # the skill parks the old one and leaves the goal's task out
-			head = weekly.start(space=PRIVATE)
+		head = weekly.start(space=PRIVATE)
 		self.assertFalse(head["done"]["tasks"])
-		weekly.pile_settle(space=PRIVATE, key="tasks", ref=self.ref(needs), decision="keep")
+		weekly.settle_stale(task=needs, decision="keep", space=PRIVATE)
 		self.assertFalse(weekly.get(space=PRIVATE)["done"]["tasks"])
-		head = weekly.pile_accept(space=PRIVATE, key="tasks", pile="park")["header"]
+		head = weekly.settle_stale(task=old, decision="someday", space=PRIVATE)["header"]
 		self.assertTrue(head["done"]["tasks"])
 		self.assertEqual(frappe.db.get_value("Life Task", old, "status"), "Someday")
 
@@ -681,23 +597,22 @@ class TestAddGoalWork(WeekCase):
 	def test_add_creates_a_scheduled_task_under_the_goal(self):
 		g = goals.create("ux7 add goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		at = monday_at(10)
-		out = week.add_goal_work(g, title="ux7 draft the plan", scheduled_at=str(at), duration_min=90, note="the soil report")
-		t = frappe.get_doc("Life Task", out["task"])
+		t = weekplan.add(g, title="ux7 draft the plan", scheduled_at=str(at), duration_min=90, note="the soil report")
 		self.assertEqual((t.goal, t.area, get_datetime(t.scheduled_at), t.duration_min, t.status), (g, self.areas["Tea"], at, 90, "Open"))
 		self.assertIn("the soil report", t.notes_md)
 		# Add again updates the same task
-		week.add_goal_work(g, task=t.name, title="ux7 draft the plan", scheduled_at="", duration_min=30)
+		weekplan.add(g, task=t.name, title="ux7 draft the plan", scheduled_at="", duration_min=30)
 		t.reload()
 		self.assertIsNone(t.scheduled_at)
 		self.assertEqual(t.notes_md.count("the soil report"), 1)
 
 	def test_someone_else_makes_it_waiting_and_delegated(self):
 		g = goals.create("ux7 delegate goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
-		out = week.add_goal_work(g, title="ux7 get the quotes", scheduled_at=str(monday_at(11)), duration_min=60, who="Mithun")
-		self.assertEqual((out["status"], out["waiting_on"]), ("Waiting", "Mithun"))
-		self.assertEqual(frappe.get_all("Life Exit", filters={"record_name": out["task"], "reversed": 0}, pluck="pile"), ["Delegated"])
-		mine = week.add_goal_work(g, title="ux7 mine", who="Me")
-		self.assertEqual(mine["status"], "Open")
+		out = weekplan.add(g, title="ux7 get the quotes", scheduled_at=str(monday_at(11)), duration_min=60, who="Mithun")
+		self.assertEqual((out.status, out.waiting_on), ("Waiting", "Mithun"))
+		self.assertEqual(frappe.get_all("Life Exit", filters={"record_name": out.name, "reversed": 0}, pluck="pile"), ["Delegated"])
+		mine = weekplan.add(g, title="ux7 mine", who="Me")
+		self.assertEqual(mine.status, "Open")
 
 	def test_cards_prefill_the_oldest_open_task(self):
 		g = goals.create("ux7 oldest goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
@@ -710,8 +625,6 @@ class TestAddGoalWork(WeekCase):
 	def test_people_only(self):
 		g = goals.create("ux7 agent goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		self.as_user(AGENT)
-		self.assertRaises(frappe.PermissionError, week.add_goal_work, g, title="x")
-		self.assertRaises(frappe.PermissionError, week.goal_plan, space=PRIVATE)
 		self.assertRaises(frappe.PermissionError, week.key_results, space=PRIVATE)
 
 

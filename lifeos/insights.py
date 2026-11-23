@@ -1,6 +1,6 @@
 """Insights (UX fixes, set 5): findings that push stuck things to a decision.
 
-Rule detectors run first (Stuck, Waiting on you, 12 Week Year, Habit, Check-in, Someday); the notice skill
+Rule detectors run first (Stuck, Waiting on you, 12 Week Year, Habit, Someday); the notice skill
 adds Waiting on you, Promise and Theme candidates when a key is set. Every insight carries its
 evidence; its fingerprint is the kind plus the sorted evidence, so a dismissed one is not shown again unless the
 evidence changes. Snoozed ones come back after their date. At most 12 new insights a day per space, ranked by kind.
@@ -11,15 +11,15 @@ import json
 import frappe
 from frappe.utils import add_days, add_months, cint, getdate, now_datetime, today
 
-from lifeos import counts, journal
+from lifeos import counts, cycles
+from lifeos import habits as habit_rules
 
-KINDS = ["Stuck", "Waiting on you", "Promise", "12 Week Year", "Habit", "Check-in", "Theme", "Someday"]
+KINDS = ["Stuck", "Waiting on you", "Promise", "12 Week Year", "Habit", "Theme", "Someday"]
 RANK = {k: i for i, k in enumerate(KINDS)}
 ACTIONABLE = ("Stuck", "Waiting on you", "Promise", "Someday")
 MAX_NEW_PER_DAY = 12
 STUCK_GROUP_MIN = 3  # a group of stuck tasks smaller than this is not worth an insight of its own
 HABIT_MARGIN = 20  # percentage points a habit's rate must fall, this month against last
-LOW_SCORE = 5  # a check-in dimension at or below this, three times in a row, is low
 WAITING_DAYS = 3  # a chat open item still open after this many days is someone waiting
 
 
@@ -103,14 +103,14 @@ def detect_cycle(space):
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date", "end_date"], as_dict=True)
 	if not cycle:
 		return []
-	week = journal.week_of(cycle, getdate(today()))
-	if not 1 <= week <= journal.WEEKS:
+	week = cycles.week_of(cycle, getdate(today()))
+	if not 1 <= week <= cycles.WEEKS:
 		return []
 	out = []
 	target = cint(frappe.db.get_single_value("Life Settings", "score_target")) or 85
 	goals = frappe.get_all("Life Goal", filters={"cycle": cycle.name, "outcome": "In Progress", "is_someday": 0}, fields=["name", "title", "area"])
 	if week >= 2:
-		prev = journal.week_score(cycle.name, week - 1)
+		prev = cycles.week_score(cycle.name, week - 1)
 		if prev["planned"] and prev["percent"] < target:
 			out.append(candidate("12 Week Year", f"Week {week - 1} ended at {round(prev['percent'])}% against your {target}% target",
 				[ev("Life Cycle", cycle.name, cycle.title)], body=f"{prev['done']} of {prev['planned']} planned ticks were done.",
@@ -133,9 +133,9 @@ def detect_habits(space):
 	now = getdate(today())
 	if now.day < 7:
 		return []
-	this = journal.habits_month(space, now.year, now.month)
+	this = habit_rules.habits_month(space, now.year, now.month)
 	prev_d = add_months(now, -1)
-	last = {h["habit"]: h for h in journal.habits_month(space, prev_d.year, prev_d.month)["habits"]}
+	last = {h["habit"]: h for h in habit_rules.habits_month(space, prev_d.year, prev_d.month)["habits"]}
 	out = []
 	for h in this["habits"]:
 		before = last.get(h["habit"])
@@ -146,31 +146,6 @@ def detect_habits(space):
 			out.append(candidate("Habit", f"{h['title']} slipped from {rate(before):g} days a week last month to {rate(h):g} so far this month",
 				[ev("Life Habit", h["habit"], h["title"])], body=f"{before['percent']}% last month, {h['percent']}% this month.",
 				actions=[{"kind": "open_list", "label": "Open habits", "to": {"path": "/today/month", "query": {"view": "habits"}}}]))
-	return out
-
-
-def detect_checkins(space):
-	rows = frappe.db.sql("""select c.name, c.date, s.dimension, s.habits_low, s.habits_high, s.situation_low, s.situation_high
-		from `tabLife Check-in` c join `tabLife Check-in Score` s on s.parent = c.name where c.space=%s order by c.date desc limit 400""", space, as_dict=True)
-	by_dim = {}
-	for r in rows:
-		vals = [v for v in (r.habits_low, r.habits_high, r.situation_low, r.situation_high) if v is not None]
-		if vals:
-			by_dim.setdefault(r.dimension, []).append((r.name, r.date, sum(vals) / len(vals)))
-	names = dict(frappe.get_all("Life Dimension", filters={"space": space}, fields=["name", "dimension_name"], as_list=True))
-	out = []
-	for dim, pts in by_dim.items():
-		last3 = pts[:3]
-		if len(last3) < 3:
-			continue
-		label = names.get(dim, dim)
-		evidence = [ev("Life Check-in", n, str(d)) for n, d, _ in last3]
-		if all(v <= LOW_SCORE for _, _, v in last3):
-			out.append(candidate("Check-in", f"{label} has scored {LOW_SCORE} or lower in three check-ins in a row", evidence,
-				actions=[{"kind": "open_list", "label": "Open check-ins", "to": {"path": "/today/month", "query": {"view": "checkins"}}}]))
-		elif last3[0][2] < last3[1][2] < last3[2][2]:
-			out.append(candidate("Check-in", f"{label} is trending down: {last3[2][2]:g}, {last3[1][2]:g}, {last3[0][2]:g}", evidence,
-				actions=[{"kind": "open_list", "label": "Open check-ins", "to": {"path": "/today/month", "query": {"view": "checkins"}}}]))
 	return out
 
 
@@ -185,7 +160,7 @@ def detect_someday(space):
 		actions=[{"kind": "open_list", "label": "Review them", "to": counts.someday_due(space)["to"]}])]
 
 
-RULES = [detect_stuck, detect_waiting, detect_cycle, detect_habits, detect_checkins, detect_someday]
+RULES = [detect_stuck, detect_waiting, detect_cycle, detect_habits, detect_someday]
 
 
 # ---- the notice skill ----

@@ -6,10 +6,9 @@ from frappe.utils import getdate, now
 
 from lifeos.constants import INDEXED_DOCTYPES
 
-MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 KINDS = {
 	"Life Inbox Item": "Inbox", "Life Task": "Task", "Life Note": "Note", "Life Vault Document": "Document",
-	"Life Chat Log": "Chat", "Life Journal Page": "Journal Page", "Life Check-in": "Check-in", "Life Month Plan": "Month Plan",
+	"Life Chat Log": "Chat",
 }
 COLUMNS = ["name", "creation", "modified", "modified_by", "owner", "docstatus", "idx", "ref_doctype", "ref_name", "space",
 	"area", "also_in_csv", "goal", "record_date", "title", "search_text", "is_archived", "kind", "status", "record_owner",
@@ -59,6 +58,8 @@ def build_rows(doc) -> list[dict]:
 		base["search_text"] = _text(doc.summary, doc.content_md)
 		base["collection"] = doc.collection or "My notes"
 		base["last_opened_on"] = doc.get("last_opened_on") or getdate(doc.creation)
+		if doc.page_date:  # a photographed journal page is dated the day it was written
+			base["record_date"] = getdate(doc.page_date)
 	elif dt == "Life Vault Document":
 		base["search_text"] = _text(doc.doc_type, doc.notes_md)
 	elif dt == "Life Chat Log":
@@ -66,18 +67,6 @@ def build_rows(doc) -> list[dict]:
 		base["search_text"] = _text(doc.summary_md, *[r.text for r in doc.open_items or []], doc.transcript_md)
 		base.update({"media_kind": "Chat", "source_system": doc.source_system or "", "assistant": doc.assistant or ""})
 		base["status"] = "Open" if any(r.status == "Open" for r in doc.open_items or []) else ""
-	elif dt == "Life Journal Page":
-		base["record_date"] = getdate(doc.page_date)
-		base["title"] = f"Journal page {doc.page_number}" if doc.page_number else "Journal page"
-		base["search_text"] = _text(doc.transcript_md)
-	elif dt == "Life Check-in":
-		base["record_date"] = getdate(doc.date)
-		base["title"] = "Check-in"
-		base["search_text"] = _text(doc.reflection_md, *[r.note for r in doc.scores or []])
-	elif dt == "Life Month Plan":
-		base["record_date"] = getdate(f"{doc.year}-{int(doc.month):02d}-01")
-		base["title"] = f"Month plan, {MONTHS[int(doc.month) - 1]} {doc.year}"
-		base["search_text"] = _text(doc.mindsweep_md, doc.projects_md)
 	return rows
 
 

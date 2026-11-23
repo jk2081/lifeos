@@ -24,7 +24,7 @@ def restore(doctype: str, name: str):
 	return rules.set_archived(doctype, name, False)
 
 
-TYPES = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document", "Life Journal Page")
+TYPES = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document")
 SORTS = {"title": "title", "kind": "kind", "record_date": "record_date", "area": "area"}
 
 
@@ -77,13 +77,13 @@ def list(space: str | None = None, area: str | None = None, start: int = 0, page
 	for dt in {r.ref_doctype for r in rows}:
 		names = [r.ref_name for r in rows if r.ref_doctype == dt]
 		if frappe.get_meta(dt).has_field("archive_reason"):
-			for n, why, on in frappe.get_all(dt, filters={"name": ("in", names)}, fields=["name", "archive_reason", "archived_on"], as_list=True):
+			for n, why, on in frappe.get_list(dt, filters={"name": ("in", names)}, fields=["name", "archive_reason", "archived_on"], as_list=True):
 				reasons[(dt, n)] = (why, str(on) if on else None)
 	groups = {}
 	for r in rows:
 		r["archive_reason"], r["archived_on"] = reasons.get((r.ref_doctype, r.ref_name), ("", None))
 		groups.setdefault((r.area or "", r.area_name or "Unfiled"), []).append(r)
-	goals = frappe.get_all("Life Goal", filters={"space": space, "is_archived": 1},
+	goals = frappe.get_list("Life Goal", filters={"space": space, "is_archived": 1},
 		fields=["name", "title", "area", "horizon", "outcome", "on_hold", "is_someday", "archived_on"], order_by="archived_on desc", limit=100)
 	areas = names_map("Life Area", [g.area for g in goals], "area_name")
 	from lifeos.api.goals import status_of

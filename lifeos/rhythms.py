@@ -13,11 +13,10 @@ import json
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, now_datetime
 
-from lifeos import journal
+from lifeos import cycles
 
 SCREEN = "rhythm-banners"
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 KEEP = 60  # occurrences remembered
 
 
@@ -85,19 +84,10 @@ def banner(space, at=None):
 			return {"key": "review", "occurrence": occ, "text": "Your weekly review is ready", "action": "Start the review",
 				"to": {"path": "/today/week", "query": {"view": "review"}}}
 
-	# 2. the month plan
-	enabled = s.month_plan_enabled if s.month_plan_enabled is not None else 1
-	if int(enabled) and day.day <= 3:
-		occ = f"month:{day.year}-{day.month:02d}"
-		has_plan = frappe.db.exists("Life Month Plan", {"space": space, "year": day.year, "month": day.month})
-		if occ not in gone and not has_plan:
-			return {"key": "month", "occurrence": occ, "text": f"Plan {MONTHS[day.month - 1]}", "action": "Open the plan",
-				"to": {"path": "/goals/cycles", "query": {}}}
-
-	# 3 and 4. the 12 Week cycle
+	# 2 and 3. the 12 Week cycle
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "start_date", "end_date"], as_dict=True)
 	if cycle:
-		week = journal.week_of(cycle, day)
+		week = cycles.week_of(cycle, day)
 		if week == 11:
 			occ = f"plan-next:{cycle.name}"
 			planned = frappe.db.exists("Life Cycle", {"space": space, "status": "Planned", "start_date": (">", cycle.start_date)})

@@ -1,4 +1,4 @@
-// The one place that narrows link searches for the filing DocTypes: areas, habits, dimensions and goals.
+// The one place that narrows link searches for the filing DocTypes: areas, habits and goals.
 // Every picker, Filter and QuickFilter of @framework/ui searches with frappe.desk.search.search_link, and the library's
 // Filter and QuickFilter send no filters of their own. So this helper adds them to that one request: the current space,
 // and (on the server, lifeos/queries.py) only active records: not archived; goals in progress.
@@ -7,7 +7,7 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { store } from '@/lib/store'
 
-export const SCOPED_DOCTYPES = ['Life Area', 'Life Habit', 'Life Dimension', 'Life Goal']
+export const SCOPED_DOCTYPES = ['Life Area', 'Life Habit', 'Life Goal']
 const overrides = [] // a stack: the innermost screen wins
 
 /** The filters a link search for `doctype` gets: { space, include_archived?, goal_outcome? } */

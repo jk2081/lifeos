@@ -19,23 +19,23 @@ LIST = list  # this module defines its own `list` method below
 def _people_only():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Skills are edited by people."), frappe.PermissionError)
+		frappe.throw(_("Skills are edited by people."), frappe.PermissionError, title=_("Only people edit skills"))
 
 
 def _admin_only():
 	_people_only()
 	if not permissions.is_admin():
-		frappe.throw(_("Only the owner can change skills."), frappe.PermissionError)
+		frappe.throw(_("Only the owner can change skills."), frappe.PermissionError, title=_("Only the owner edits skills"))
 
 
 def _skill(name):
 	"""A skill the caller may see: for all spaces, or for a space they belong to."""
 	permissions.require_login()
 	if not frappe.db.exists("Life Skill", name):
-		frappe.throw(_("There is no skill called {0}.").format(name), frappe.DoesNotExistError)
+		frappe.throw(_("There is no skill called {0}.").format(name), frappe.DoesNotExistError, title=_("Skill not found"))
 	doc = frappe.get_doc("Life Skill", name)
 	if doc.space and doc.space not in permissions.user_spaces() and not permissions.is_admin():
-		frappe.throw(_("There is no skill called {0}.").format(name), frappe.DoesNotExistError)
+		frappe.throw(_("There is no skill called {0}.").format(name), frappe.DoesNotExistError, title=_("Skill not found"))
 	return doc
 
 
@@ -56,9 +56,9 @@ def get(name: str, space: str | None = None):
 	"""One skill: its text and version. A skill for one space is served only to members of that space."""
 	doc = _skill(name)
 	if not doc.active:
-		frappe.throw(_("The skill {0} is switched off.").format(name), frappe.DoesNotExistError)
+		frappe.throw(_("The skill {0} is switched off.").format(name), frappe.DoesNotExistError, title=_("Skill is switched off"))
 	if space and doc.space and doc.space != space:
-		frappe.throw(_("There is no skill called {0} for that space.").format(name), frappe.DoesNotExistError)
+		frappe.throw(_("There is no skill called {0} for that space.").format(name), frappe.DoesNotExistError, title=_("Skill not found in space"))
 	return {"name": doc.name, "title": doc.title, "when_to_use": doc.when_to_use, "version": doc.version, "space": doc.space,
 		"source": doc.source, "instructions": doc.instructions}
 
@@ -71,10 +71,10 @@ def run(skill: str, input: str | dict | None = None):
 	_people_only()
 	doc = _skill(skill)
 	if not doc.active or doc.trigger_kind != "Button":
-		frappe.throw(_("{0} is not a skill a button runs, or it is switched off.").format(skill))
+		frappe.throw(_("{0} is not a skill a button runs, or it is switched off.").format(skill), title=_("Skill cannot run here"))
 	data = parse(input) or {}
 	if not isinstance(data, dict) or not data.get("doctype") or not data.get("name"):
-		frappe.throw(_("input must be {doctype, name}."))
+		frappe.throw(_("input must be {doctype, name}."), title=_("Input is malformed"))
 	record = permissions.get_doc_checked(data["doctype"], data["name"])
 	name = triggers.queue(doc, {"doctype": record.doctype, "name": record.name, "space": record.get("space")}, "Button")
 	return {"run": name, "queued": bool(name)}
@@ -108,7 +108,7 @@ def overview():
 	"""Brain > Skills: one card for each skill, with runs and cost this month; the fixed lists a new skill picks from; what the Brain may file on its own."""
 	_people_only()
 	month = _month_rows()
-	cards = [_card(frappe.get_doc("Life Skill", n), month) for n in frappe.get_all("Life Skill", pluck="name", order_by="source asc, title asc")
+	cards = [_card(frappe.get_doc("Life Skill", n), month) for n in frappe.get_list("Life Skill", pluck="name", order_by="source asc, title asc")
 		if _visible(n)]
 	return {"skills": cards, "lists": lists(), "auto_file": filing.settings(), "can_edit": permissions.is_admin(),
 		"proposal_kinds": sorted(SCHEMA)}
@@ -132,13 +132,13 @@ def detail(name: str):
 	_people_only()
 	doc = _skill(name)
 	card = _card(doc, _month_rows())
-	versions = frappe.get_all("Life Skill Version", filters={"skill": name}, fields=["version", "instructions", "changed_by", "changed_on", "note", "config"],
+	versions = frappe.get_list("Life Skill Version", filters={"skill": name}, fields=["version", "instructions", "changed_by", "changed_on", "note", "config"],
 		order_by="version desc")
-	names = {u.name: u.full_name for u in frappe.get_all("User", filters={"name": ("in", [v.changed_by for v in versions if v.changed_by])}, fields=["name", "full_name"])}
+	names = {u.name: u.full_name for u in frappe.get_all("User", filters={"name": ("in", [v.changed_by for v in versions if v.changed_by])}, fields=["name", "full_name"])}  # system: user names, not a space record
 	for v in versions:
 		v["changed_by_name"] = names.get(v.changed_by) or v.changed_by
 		v["changed_on"] = str(v.changed_on)[:19]
-	runs = frappe.get_all("Life Skill Run", filters={"skill": name}, fields=["name", "skill_version", "trigger", "input_doctype", "input_name", "status", "cost",
+	runs = frappe.get_list("Life Skill Run", filters={"skill": name}, fields=["name", "skill_version", "trigger", "input_doctype", "input_name", "status", "cost",
 		"duration", "error", "creation", "sensitive"], order_by="creation desc", limit=20)
 	for r in runs:
 		r["creation"] = str(r.creation)[:19]
@@ -146,7 +146,7 @@ def detail(name: str):
 		"config": {k: doc.get(k) for k in store.CONFIG}, "tools": store.tool_list(doc),
 		"examples": [{"name": e.name, "title": e.title, "input": e.input, "checks": e.expected, "last_result": e.last_result, "source": e.source,
 			"recorded": bool(e.fixture and e.fixture_hash == store.digest(doc.as_dict()))}
-			for e in frappe.get_all("Life Skill Example", filters={"skill": name}, fields=["name", "title", "input", "expected", "last_result", "source", "fixture", "fixture_hash"],
+			for e in frappe.get_list("Life Skill Example", filters={"skill": name}, fields=["name", "title", "input", "expected", "last_result", "source", "fixture", "fixture_hash"],
 				order_by="creation asc")],
 		"versions": versions, "runs": runs, "lessons": [x for x in lessons.for_skill(name) if not x["space"] or x["space"] in permissions.user_spaces() or permissions.is_admin()], "can_edit": permissions.is_admin(), "lists": lists()}
 
@@ -157,7 +157,7 @@ def run_log(run: str):
 	_people_only()
 	doc = frappe.get_doc("Life Skill Run", run)
 	if not permissions.is_admin() and (not doc.space or doc.space not in permissions.user_spaces()):
-		frappe.throw(_("There is no such run."), frappe.DoesNotExistError)
+		frappe.throw(_("There is no such run."), frappe.DoesNotExistError, title=_("Run not found"))
 	return {"name": doc.name, "skill": doc.skill, "version": doc.skill_version, "trigger": doc.trigger, "status": doc.status,
 		"input": f"{doc.input_doctype} {doc.input_name}" if doc.input_name else None, "tool_calls": json.loads(doc.tool_calls or "[]"), "output": doc.output,
 		"input_tokens": doc.input_tokens, "output_tokens": doc.output_tokens, "cost": doc.cost, "duration": doc.duration, "error": doc.error,
@@ -167,7 +167,7 @@ def run_log(run: str):
 def _values(values):
 	data = parse(values) or {}
 	if not isinstance(data, dict):
-		frappe.throw(_("values must be an object."))
+		frappe.throw(_("values must be an object."), title=_("Values must be an object"))
 	if isinstance(data.get("tools"), (builtins.list, tuple)):
 		data["tools"] = json.dumps(data["tools"])
 	allowed = {*store.CONFIG, "instructions", "active", "space"}
@@ -189,7 +189,7 @@ def create(slug: str, values: str | dict):
 	_admin_only()
 	slug = frappe.scrub(slug or "").replace("_", "-")
 	if not slug or frappe.db.exists("Life Skill", slug):
-		frappe.throw(_("Pick a name that no skill has yet."))
+		frappe.throw(_("Pick a name that no skill has yet."), title=_("Skill name is taken"))
 	doc = store.create({"slug": slug, **_values(values)})
 	return {"name": doc.name, "version": doc.version}
 
@@ -239,9 +239,9 @@ def save_auto_file(threshold: float, kinds: str | builtins.list):
 	_admin_only()
 	chosen = [k for k in (parse(kinds) or []) if k in SCHEMA]
 	if not 0.5 <= float(threshold) <= 1:
-		frappe.throw(_("The confidence must be between 0.5 and 1."))
+		frappe.throw(_("The confidence must be between 0.5 and 1."), title=_("Confidence is out of range"))
 	settings = frappe.get_doc("Life Settings")
 	settings.brain_auto_threshold, settings.brain_auto_kinds = float(threshold), json.dumps(chosen)
-	settings.flags.ignore_permissions = True
+	settings.flags.ignore_permissions = True  # system: the skill settings are saved by the Life Admin checked above
 	settings.save()
 	return filing.settings()

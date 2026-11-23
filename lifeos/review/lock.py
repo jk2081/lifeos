@@ -8,7 +8,7 @@ from frappe import _
 from frappe.utils import add_days, cint, get_datetime, getdate, now_datetime, today
 
 from lifeos import weekplan
-from lifeos.review import findings, goals, piles
+from lifeos.review import findings, goals, stale
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -26,7 +26,7 @@ def numbers(review):
 	f = findings.counts(space, a, b)
 	return {"score": score["percent"] if score else None, "target": cint(frappe.db.get_single_value("Life Settings", "score_target")) or 85,
 		"came_in": int(outbox_api.total(space, "in", from_date=a, to_date=b)), "went_out": int(outbox_api.total(space, "all", from_date=a, to_date=b)),
-		"findings_acted": f["acted"], "findings_dismissed": f["dismissed"], "items_cleared": piles.cleared_count(review),
+		"findings_acted": f["acted"], "findings_dismissed": f["dismissed"], "items_cleared": stale.decided_count(review),
 		"goals_planned": sum(1 for p in plans if not p.get("skip") and (p.get("next_action") or "").strip()),
 		"goals_skipped": sum(1 for p in plans if p.get("skip"))}
 
@@ -75,12 +75,12 @@ def save_words(review, went_well=None, do_differently=None):
 def lock(review):
 	"""Lock the week. Needs Tasks and Goals done and a line on what went well."""
 	if review.doc.status == "Locked":
-		frappe.throw(_("This review is already locked."))
+		frappe.throw(_("This review is already locked."), title=_("Review already locked"))
 	if not (review.doc.went_well or "").strip():
-		frappe.throw(_("Write what went well first."))
+		frappe.throw(_("Write what went well first."), title=_("Went well is empty"))
 	done = review.done()
 	if not done["tasks"] or not done["goals"]:
-		frappe.throw(_("Finish Tasks and Goals first."))
+		frappe.throw(_("Finish Tasks and Goals first."), title=_("Tasks and Goals unfinished"))
 	gp = goals.GoalPlan(review)
 	stars = gp.stars()
 	made = []

@@ -1,6 +1,6 @@
 // Settings: Profile, Areas, Rhythms, Members, Sources, Rules, Skills, Cost, the ladder and the calendar connection.
 // Checks are numbered SETTINGS.<n> in the order they appear here; `node tools/acceptance.mjs --only=SETTINGS` runs this file's checks.
-import { SPACE, WIDTHS, areaId, areas, base, bench, check, must, owner, path, results, session, stamp, today } from './context.mjs'
+import { SPACE, WIDTHS, areaId, areas, base, bench, check, must, owner, pathOf, results, session, stamp, today } from './context.mjs'
 import { uxKit } from './ux.mjs'
 
 for (const width of WIDTHS) {
@@ -10,7 +10,7 @@ for (const width of WIDTHS) {
     const problems = []
     try {
     // issue 44: eight pages and Advanced (Sources is the Brain's screen)
-    const SECTIONS = ['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules', 'members', 'advanced']
+    const SECTIONS = ['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'sources', 'rules', 'members', 'advanced']
     const PAGES = SECTIONS.filter((x) => x !== 'sources')
     const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
     const menuItems = async () => { await s.open('/life/settings'); return pg.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section'))) }
@@ -30,10 +30,12 @@ for (const width of WIDTHS) {
       must((await cur()) === sec && (phone ? !(await pg.locator('[data-settings-menu]').count()) : true), `the menu did not open ${sec}`)
       must((await overflow()) <= 0, `${sec}: the page scrolls sideways`)
       const text = await pg.locator('[data-main]').innerText()
-      must(!/Life (Agent|User|Admin)|Administrator/.test(text), `${sec}: a role name or Administrator shows`)
+      // a recorded AI call names the user who made it (the Brain's own runs are Administrator's), so that name is data, not a role label
+      const shown = text.replace(/ · Administrator$/gm, '')
+      must(!/Life (Agent|User|Admin)|Administrator/.test(shown), `${sec}: a role name or Administrator shows`)
     }
     // areas (issue 12): Settings > Areas lists the seven with their parts; a part is renamed in its Edit dialog and archived
-    // there, its open tasks moving to the place chosen. Rename in place stays for habits and dimensions.
+    // there, its open tasks moving to the place chosen. Rename in place stays for habits.
     const got = async () => (await s.api('settings.get', { space: SPACE }))
     step = 'areas: rename a part in its Edit dialog'
     const A = `UX3 area A ${width} ${stamp}`
@@ -48,8 +50,8 @@ for (const width of WIDTHS) {
     await pg.waitForTimeout(900)
     must((await got()).areas.find((x) => x.name === a).area_name === A + ' renamed', 'renaming a part did not save')
     must(await pg.locator(`[data-parts-of="Career"] [data-part="${a}"]`).innerText().then((t) => t.includes(A + ' renamed')), 'the renamed part does not show under Career')
-    // no Delete or Remove for areas, habits or dimensions
-    step = 'no Delete or Remove for areas, habits or dimensions'
+    // no Delete or Remove for areas or habits
+    step = 'no Delete or Remove for areas or habits'
     const itemsOf = async (n) => { await pg.locator(`[data-row-name="${n}"] [data-row-menu]`).click(); await pg.waitForTimeout(250); const t = await pg.getByRole('menuitem').allInnerTexts(); await pg.keyboard.press('Escape'); await pg.waitForTimeout(200); return t.map((x) => x.trim()) }
     must(!(await pg.locator('[data-areas-section]').getByRole('button', { name: /^(Delete|Remove)$/ }).count()), 'areas: a Delete or Remove button')
     for (const sec of ['habits', 'rhythms']) {
@@ -99,20 +101,14 @@ for (const width of WIDTHS) {
       await box.fill(String(next))
       await box.press('Tab')
       await pg.getByText('Saved', { exact: true }).first().waitFor({ timeout: 5000 })
-      // the month plan switch (TabButtons): Off then On, whichever it is not
-      const plan = pg.locator('[data-setting="month_plan_enabled"]')
-      const want = was.month_plan_enabled ? 'Off' : 'On'
-      await plan.getByText(want, { exact: true }).click()
       await pg.waitForTimeout(1200)
       await pg.reload({ waitUntil: 'networkidle' })
       await settle()
       must(Number(await pg.locator('[data-setting="score_target"] input, input[data-setting="score_target"]').first().inputValue()) === next, 'the score target did not survive a reload')
-      const checked = (await plan.locator('[aria-checked="true"], [data-state="checked"], [data-state="on"]').first().innerText()).trim()
-      must(checked === want, `the month plan shows ${checked} after a reload, not ${want}`)
       const saved = (await s.api('settings.get', { space: SPACE })).settings
-      must(saved.score_target === next && Number(saved.month_plan_enabled) === (want === 'On' ? 1 : 0), 'the Rhythms settings were not saved')
+      must(saved.score_target === next, 'the Rhythms settings were not saved')
     } finally {
-      await s.api('settings.save', { values: { score_target: was.score_target, month_plan_enabled: was.month_plan_enabled ? 1 : 0 } })
+      await s.api('settings.save', { values: { score_target: was.score_target } })
     }
     // add and remove a member through the dialogs
     step = 'add and remove a member through the dialogs'
@@ -839,10 +835,10 @@ for (const width of WIDTHS) {
   const was = (await s.api('settings.get', { space: SPACE })).settings
   const save = (values) => s.api('settings.save', { values })
   try {
-    await check('SETTINGS.22', `${width} px: the owner's menu is Profile, Calendar, Areas, Rhythms, Habits, Sources, Rules, Members in four groups, and Advanced at the bottom`, async () => {
+    await check('SETTINGS.22', `${width} px: the owner's menu is Profile, Calendar, Areas, Rhythms, Habits, Data, Sources, Rules, Members in four groups, and Advanced at the bottom`, async () => {
       await s.open('/life/settings')
       await pg.locator('[data-settings-menu] [data-section]').first().waitFor()
-      must(JSON.stringify(await items()) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules', 'members', 'advanced']), `the menu lists ${await items()}`)
+      must(JSON.stringify(await items()) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'sources', 'rules', 'members', 'advanced']), `the menu lists ${await items()}`)
       const groups = await pg.locator('[data-settings-menu] [data-settings-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-settings-group')))
       must(JSON.stringify(groups) === JSON.stringify(['me', 'space', 'brain', 'people']), `the groups are ${groups}`)
       must(!(await pg.locator('[data-settings-later]').count()), 'a Life Admin is told more settings come later')
@@ -856,13 +852,13 @@ for (const width of WIDTHS) {
       must(new URL(pg.url()).pathname === '/life/brain/sources', `Sources opened ${pg.url()}`)
     })
 
-    await check('SETTINGS.23', `${width} px: Rhythms holds the weekly review, check-in dimensions, old items, working hours, the month and the 12 Week Year, and each saves the same setting`, async () => {
+    await check('SETTINGS.23', `${width} px: Rhythms holds the weekly review, old items, working hours and the 12 Week Year, and each saves the same setting`, async () => {
       await s.open('/life/settings?tab=rhythms')
       await pg.locator('[data-settings-rhythms]').waitFor()
       const text = await pg.locator('[data-settings-section]').innerText()
-      for (const want of ['Weekly review', 'Week starts on', 'Check-in dimensions', 'Inbox items not dealt with', 'Working days', 'Month plan', 'Current cycle', 'Score target', 'Break week'])
+      for (const want of ['Weekly review', 'Week starts on', 'Inbox items not dealt with', 'Working days', 'Current cycle', 'Score target', 'Break week'])
         must(text.includes(want), `Rhythms does not show "${want}"`)
-      must(await pg.locator('[data-settings-list]').count(), 'no check-in dimensions list')
+      must(!text.includes('Check-in dimensions') && !text.includes('Month plan'), 'Rhythms still shows the check-in dimensions or the month plan')
       const pick = async (sel, label) => { await pg.locator(sel).first().click(); await pg.getByRole('option', { name: label, exact: true }).first().click(); await settle() }
       const day = was.weekly_review_day === 'Tuesday' ? 'Wednesday' : 'Tuesday'
       await pick('[data-setting="weekly_review_day"]', day)
@@ -878,10 +874,6 @@ for (const width of WIDTHS) {
       const had = String(was.work_days || 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday').includes('Sunday')
       await wd.click(); await settle()
       must(String((await s.api('settings.get', { space: SPACE })).settings.work_days).includes('Sunday') === !had, 'the working days were not saved')
-      const plan = pg.locator('[data-setting="month_plan_enabled"]')
-      const want = was.month_plan_enabled ? 'Off' : 'On'
-      await plan.getByText(want, { exact: true }).click(); await settle()
-      must(Number((await s.api('settings.get', { space: SPACE })).settings.month_plan_enabled) === (want === 'On' ? 1 : 0), 'the month plan was not saved')
       const target = was.score_target === 77 ? 78 : 77
       const tb = pg.locator('input[data-setting="score_target"], [data-setting="score_target"] input').first()
       await tb.fill(String(target)); await tb.press('Tab'); await settle()
@@ -911,7 +903,7 @@ for (const width of WIDTHS) {
 
     await check('SETTINGS.25', `${width} px: every old ?tab= value lands on its new place`, async () => {
       const MAP = [['default', 'profile'], ['appearance', 'profile'], ['notifications', 'profile'], ['shortcuts', 'profile'], ['calendar', 'calendar'], ['areas', 'areas'],
-        ['rhythms', 'rhythms'], ['review', 'rhythms'], ['dimensions', 'rhythms'], ['reset', 'rhythms'], ['habits', 'habits'], ['sensitive', 'rules'], ['note-rules', 'rules'],
+        ['rhythms', 'rhythms'], ['review', 'rhythms'], ['reset', 'data'], ['data', 'data'], ['habits', 'habits'], ['sensitive', 'rules'], ['note-rules', 'rules'],
         ['spaces', 'members', 'spaces'], ['members', 'members'], ['agents', 'members', 'agents'], ['ai', 'advanced', null, 'ai'], ['cost', 'advanced', null, 'ai'],
         ['import', 'advanced', null, 'import'], ['backups', 'advanced', null, 'backups'], ['places', 'profile']]
       for (const [old, now, view, part] of MAP) {
@@ -971,9 +963,9 @@ for (const width of WIDTHS) {
         const one = await levelAt(1)
         must(JSON.stringify(one) === JSON.stringify(['profile', 'areas', 'sources']), `level 1 shows ${one}`)
         const line = await fam.page.locator('[data-settings-later]').innerText()
-        must(/More settings appear as you go up the ladder/.test(line) && /Rhythms at level 4/.test(line), `the footer says "${line}"`)
+        must(/More settings appear as you go up the ladder/.test(line) && /Rhythms and Data at level 4/.test(line), `the footer says "${line}"`)
         const four = await levelAt(4)
-        must(JSON.stringify(four) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'sources', 'rules']), `level 4 shows ${four}`)
+        must(JSON.stringify(four) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'sources', 'rules']), `level 4 shows ${four}`)
         // a page that is not in the menu yet is still reached by its link
         await fam.open('/life/settings?tab=habits')
         await fam.page.locator('[data-settings-section]').waitFor()
@@ -1013,7 +1005,7 @@ for (const width of WIDTHS) {
     })
   } finally {
     await save({ weekly_review_day: was.weekly_review_day, week_starts_on: was.week_starts_on || 'Monday', old_inbox_days: was.old_inbox_days || 7, work_days: was.work_days || 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
-      month_plan_enabled: was.month_plan_enabled ? 1 : 0, score_target: was.score_target, cycle_break_week: was.cycle_break_week ? 1 : 0 })
+      score_target: was.score_target, cycle_break_week: was.cycle_break_week ? 1 : 0 })
     await s.ctx.close()
   }
 }
@@ -1249,3 +1241,34 @@ print(json.dumps({"text": a.content_md, "sources": [s.source_name for s in a.sou
   } finally { await s.ctx.close() }
 }
 
+
+
+// Issue 72: Reset is a section of Settings > Data, and its old route lands on Today, which says the page moved.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  try {
+    await check('SETTINGS.39', `${width} px: Settings > Data holds the Reset section; /today/reset lands on Today and says that page moved`, async () => {
+      await s.open('/life/settings?tab=data')
+      await pg.locator('[data-reset]').first().waitFor({ timeout: 15000 })
+      must(await pg.locator('[data-reset-goal]').count() === 1, "Settings > Data has no Reset goal bar")
+      must((await pg.locator('[data-settings-section]').innerText()).includes('Suggested batches') || phone, 'the Reset section shows no batches')
+      must((await pg.locator('[data-section-title]').innerText()).includes('Data'), 'the page is not titled Data')
+      // the menu lists Data, and the old Reset section link lands on it
+      await s.open('/life/settings?tab=reset')
+      await pg.locator('[data-reset]').first().waitFor({ timeout: 15000 })
+      must(new URL(pg.url()).searchParams.get('tab') === 'data', `?tab=reset opened ${pg.url()}`)
+      // the Rhythms page no longer carries Reset
+      await s.open('/life/settings?tab=rhythms')
+      await pg.locator('[data-settings-rhythms]').waitFor()
+      must(!(await pg.locator('[data-reset]').count()), 'Rhythms still holds Reset')
+      // the old route
+      await s.open('/life/today/reset')
+      must(pathOf(pg) === '/life/today', `/today/reset opened ${pathOf(pg)}`)
+      must(await pg.locator('[data-moved-note]').isVisible(), 'no "That page moved" note')
+      must((await pg.locator('[data-moved-note]').innerText()).includes('That page moved'), 'the note does not say that page moved')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    })
+  } finally { await s.ctx.close() }
+}

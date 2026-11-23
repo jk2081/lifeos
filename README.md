@@ -1,6 +1,6 @@
 # Life OS
 
-A personal operating system on Frappe v16: inbox and review, tasks, calendar, a journal that mirrors a paper journal, areas and goals, a library, a vault, and a chat log. Agents capture and propose; the owner approves.
+A personal operating system on Frappe v16: inbox and review, tasks, calendar, a 12 Week Year and habits that mirror a paper journal, areas and goals, a library, a vault, and a chat log. Agents capture and propose; the owner approves.
 
 - The app is `lifeos`, served at `/life`. It needs Frappe Framework v16 and nothing else (no ERPNext). It installs beside Folio and touches none of its DocTypes.
 - `docs/DIRECTION.md` is the target design; work comes from GitHub issues (`docs/BUILDING.md`). The original build spec is `docs/history/SPEC.md`. `DECISIONS.md` lists every default and every difference from it. `STATUS.md` says what works, what is stubbed and what is untested.
@@ -156,7 +156,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `calendar.year` | `space=None, year=None` | The year view: important dates, all-day and multi-day events, vault expiry dates and the start and end of each 12 Week Year. |
 | `calendar.add_event` | `space=None, subject=None, starts_on=None, ends_on=None, all_day=0, description=None` | Create a core Event in a space. It stays in Life OS; only accepted proposals and goal blocks are written to Google, when the person has chosen a calendar. |
 | `calendar.delete_event` | `event` | Delete an event of a space the user can write to. |
-| `calendar.add_important_date` | `space=None, title=None, day=None, month=None, year=None, kind='Birthday', person=None` | Add a birthday, anniversary or other date that repeats every year. |
+| `calendar.add_important_date` | `space=None, title=None, day=None, month=None, year=None, kind='Birthday'` | Add a birthday, anniversary or other date that repeats every year: an all-day Event that repeats yearly. |
 
 **`lifeos.api.chats`**
 
@@ -199,17 +199,17 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `context.decide` | `finding, choice` | People only: keep one fact of a wiki contradiction. |
 | `jobs.file_job` | `job_id, space=None, title=None, area=None, goal=None, instruction=None, raw_text=None, inputs=None, outputs=None, transcript_md=None, summary_md=None, proposals=None, wiki=None, chat=None, source_system=None` | File a finished piece of work as one inbox item in one call (issue 8, the `lifeos-file-work` skill): outputs on the item, reusable inputs kept once each and linked as inputs, proposals waiting for the owner, wiki pages and a chat log citing the item. The same `job_id` again updates the job. All or nothing: an invalid part refuses the call and names the field. |
 
-**`lifeos.api.journal`**
+**`lifeos.api.goals`: the 12 Week Year, weekly actions and habits** (more methods of the same module)
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `journal.grid` | `cycle=None, space=None` | The 12 Week Year grid of a cycle: goals, actions, ticks per week, week scores and the average. |
-| `journal.tick` | `action, week, count` | Set the ticks of a goal action in a week. Returns that week's score. |
-| `journal.week_score` | `cycle=None, week=None, space=None` | Done over planned for a week of a cycle. Defaults: the active cycle and its current week. |
-| `journal.set_action_status` | `action, status` | Mark an action Done once and for all, Dropped, or Open again. |
-| `journal.save_goal` | `goal=None, cycle=None, title=None, area=None, actions=None` | Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}. |
-| `journal.delete_goal` | `goal` |  |
-| `journal.goals` | `space=None, area=None` | Every goal across every cycle, grouped by cycle: planned, active, then closed, newest first. |
+| `goals.grid` | `cycle=None, space=None` | The 12 Week Year grid of a cycle: goals, actions, ticks per week, week scores and the average. |
+| `goals.tick` | `action, week, count` | Set the ticks of a goal action in a week. Returns that week's score. |
+| `goals.week_score` | `cycle=None, week=None, space=None` | Done over planned for a week of a cycle. Defaults: the active cycle and its current week. |
+| `goals.set_action_status` | `action, status` | Mark an action Done once and for all, Dropped, or Open again. |
+| `goals.save_goal` | `goal=None, cycle=None, title=None, area=None, actions=None` | Create or change a goal and its actions. `actions` is a list of {name?, title, per_week}. |
+| `goals.delete_goal` | `goal` |  |
+| `goals.across_cycles` | `space=None, area=None` | Every goal across every cycle, grouped by cycle: planned, active, then closed, newest first. |
 | `goals.list` | `space=None, state='in_progress', horizon=None, area=None, cycle=None, target_from=None, target_to=None, start=0, page_length=50, filters=None, order_by=None, summary=None` | Goals of every type with `tasks_done`, `tasks_counted` and `score` (12 Week Year only), the state `tabs` and a `summary_line`. |
 | `goals.create` | `title, horizon=None, space=None, area=None, target_date=None, cycle=None` | Create a goal. The horizon (Long term, Year, 12 weeks, Month) follows the target date and cycle when not given; Year and Month need a target date. Not for agents. |
 | `goals.suggest_horizon` | `space=None, target_date=None, cycle=None` | The horizon the goal form sets from the date, and whether 12-week goals follow the quarter. |
@@ -217,28 +217,18 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `goals.add_to_cycle` | `goal, cycle` | Move a goal into the active or a planned 12 Week Year, with its tasks. Not for agents. |
 | `goals.picker` | `space=None` | Every goal in progress, ordered by type, for the goal picker on a task. |
 | `goals.cycles` | `space=None` | The active and planned 12 Week Years of a space. |
-| `journal.goal` | `goal` | A goal page: the goal, its actions, and its history across cycles through the carried_from chain. |
-| `journal.close_cycle` | `cycle, outcomes=None` | Close an active cycle after its end date. `outcomes` is a list of {goal, outcome, result_note}. |
-| `journal.plan_next_cycle` | `cycle, goals=None, title=None` | Create the next cycle, starting the Monday after this one ends, and carry the chosen goals with their open actions. |
-| `journal.start_cycle` | `cycle` | Make a planned cycle the active one. |
-| `journal.create_cycle` | `space=None, start_date=None, title=None` | Create the first cycle of a space. It starts on the given date, or next Monday. |
-| `journal.month` | `space=None, year=None, month=None, create=0` | The plan of one month: goals, mindsweep, habits with their month so far, and the latest check-in. |
-| `journal.save_month_goal` | `plan, row=None, title=None, status=None, area=None, delete=0, move=None` | Add, change, move (the priority order) or remove one Month goal of a month plan. |
-| `journal.save_month_text` | `plan, mindsweep_md=None, projects_md=None` |  |
-| `journal.carry_month_goal` | `plan, row` | Carry an open Month goal into next month. The old one is marked Carried. |
-| `journal.make_task_from_goal` | `plan, row` | Create a Life Task filed under a Month goal. |
-| `journal.habits` | `space=None, year=None, month=None` | The habit grid of one month: each tracked habit with its done days, count, target and percentage. |
-| `journal.toggle_habit` | `habit, date=None, done=None` | Tick or untick a habit on a day. |
-| `journal.habit_library` | `space=None` | Every habit ever tracked in a space. |
-| `journal.set_month_habits` | `space=None, year=None, month=None, habits=None` | Set the habits tracked in one month. `habits` is an ordered list of {habit or title, days_per_week}. Other months are untouched. |
-| `journal.habits_year` | `space=None, year=None` | Each habit's monthly percentage for the months of a year in which it was tracked. |
-| `journal.checkins` | `space=None, start=0, page_length=30` | Check-ins of a space, newest first, with the dimensions and a series per dimension for the charts (midpoint of each range). |
-| `journal.save_checkin` | `space=None, date=None, scores=None, reflection_md=None, name=None` | Create or change a check-in. Each score is {dimension, habits, situation, note}; a score is a number or a range such as 2-3. |
-| `journal.pages` | `space=None, start=0, page_length=24` | Photographed journal pages by date, newest first. |
-| `journal.page_detail` | `page` | One journal page: image, transcript, and the records created from the same inbox item. |
-| `journal.save_page_transcript` | `page, transcript_md` |  |
-| `journal.weekly_review` | `space=None, week_start=None` | Everything the weekly review gathers for one week (Monday to Sunday). |
-| `journal.save_review_note` | `space=None, week_start=None, content_md=''` | Save the owner's notes for a week as a Life Note under the Reviews parent note. |
+| `goals.detail` | `goal` | A goal page: the goal, its actions, and its history across cycles through the carried_from chain. |
+| `goals.close_cycle` | `cycle, outcomes=None` | Close an active cycle after its end date. `outcomes` is a list of {goal, outcome, result_note}. |
+| `goals.plan_next_cycle` | `cycle, goals=None, title=None` | Create the next cycle, starting the Monday after this one ends, and carry the chosen goals with their open actions. |
+| `goals.start_cycle` | `cycle` | Make a planned cycle the active one. |
+| `goals.create_cycle` | `space=None, start_date=None, title=None` | Create the first cycle of a space. It starts on the given date, or next Monday. |
+| `goals.month_habits` | `space=None, year=None, month=None` | The habit grid of one month: each tracked habit with its done days, count, target and percentage. |
+| `goals.toggle_habit` | `habit, date=None, done=None` | Tick or untick a habit on a day. |
+| `goals.habit_library` | `space=None` | Every habit ever tracked in a space. |
+| `goals.set_month_habits` | `space=None, year=None, month=None, habits=None` | Set the habits tracked in one month. `habits` is an ordered list of {habit or title, days_per_week}. Other months are untouched. |
+| `goals.habits_year` | `space=None, year=None` | Each habit's monthly percentage for the months of a year in which it was tracked. |
+| `goals.this_month` | `space=None, year=None, month=None, area=None` | The goals of one month (goals with the Month horizon, in priority order, with how far their tasks are) and the habits tracked in it with their month so far. |
+| `today.week_summary` | `space=None, week_start=None` | Everything the weekly review gathers for one week (Monday to Sunday). |
 
 **`lifeos.api.library`**
 
@@ -262,7 +252,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | Method | Arguments | Does |
 | --- | --- | --- |
 | `meta.proposal_schema` |  | For each proposal kind: the allowed payload fields and an example. Call once before the first submission. |
-| `meta.space_context` | `space=None` | Areas, people, habits, dimensions and active goals of a space, for filing proposals. `areas` holds the areas of life that are on, each followed by its parts; `areas_off` names those that are off. |
+| `meta.space_context` | `space=None` | Areas, people, habits and active goals of a space, for filing proposals. `areas` holds the areas of life that are on, each followed by its parts; `areas_off` names those that are off. |
 
 **`lifeos.api.review`**
 
@@ -276,7 +266,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `search.query` | `text, limit=20, space=None, include_archived=0` | Search notes, tasks, inbox items (including transcripts), chat logs, journal pages and vault titles. Only records in spaces the user belongs to are returned. Archived records are left out unless asked for. |
+| `search.query` | `text, limit=20, space=None, include_archived=0` | Search notes, tasks, inbox items (including transcripts), chat logs and vault titles. Only records in spaces the user belongs to are returned. Archived records are left out unless asked for. |
 
 **`lifeos.api.session`**
 
@@ -292,9 +282,9 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `settings.get` | `space=None` | Everything the Settings screen shows for one space (each area with `goals`, its goals in progress; an area of life counts its parts' too); each space's `members` holds people and agents together, with `is_agent` and `kind` on each row, and `agents` lists every agent across spaces. |
 | `settings.save` | `values` | Change Life Settings. Owner only. |
 | `settings.save_item` | `kind, space=None, name=None, title=None, parent_area=None, relation=None, sort_order=None, is_archived=None, delete=0, with_children=1, colour=None, is_pinned=None, is_on=None, description=None, move_to=None, part_kind=None, is_focus=None, standard=None, principles=None, focuses=None` | Add, rename, reorder, nest, archive or restore one area, tag, dimension or habit of a space, or a person. Archiving sets `archived_on`. A new area is a part of `parent_area` (one of the seven areas of life) or of Career. The seven cannot be renamed or archived; `is_on` switches an area on or off. Only Life Admin changes areas. Archiving a part that holds open goals or tasks needs `move_to` (its area of life or another of its parts), where they are moved first. `delete=1` is not offered on the screen. Issue 57: `is_focus=1` makes the new area a focus under `parent_area` (a part or an area of life) with its `standard` and `principles`; `part_kind` (Company, Estate, Household, Other) offers that kind's focuses (`settings.focus_offers`), created when Use focuses is on. |
-| `settings.create_space` | `space_name, owner_user=None, starter_areas=1` | Create a space, for example a private space for a family member. It gets the seven areas of life with Career and Health on; `starter_areas` adds the check-in dimensions. Owner only. |
+| `settings.create_space` | `space_name, owner_user=None` | Create a space, for example a private space for a family member. It gets the seven areas of life with Career and Health on. Owner only. |
 | `settings.set_member` | `space, user, access=None, remove=0, grant_role=None` | Add a person or an agent to a space, change their access, or remove them; the one method for space access. Owner only. The user must already exist. Access defaults to `Write` for a person and `Read` for an agent. A user with no Life OS role is refused unless `grant_role` is `Life User` or `Life Agent`; a user who has a Life role keeps it, and `Life Admin` is never given. The space owner cannot be removed and keeps `Write`. |
-| `settings.reorder` | `kind, names, parent_area=None` | Put the areas or check-in dimensions in this order in one call; for areas, moving one into `parent_area`'s list nests it there. Areas: Life Admin only. |
+| `settings.reorder` | `kind, names, parent_area=None` | Put the areas in this order in one call; moving one into `parent_area`'s list nests it there. Areas: Life Admin only. |
 | `settings.area_open_work` | `area` | How many open goals and tasks a part holds, and where they can move when it is archived (its area of life, then its other parts). Life Admin only. |
 | `settings.set_agent_vault` | `space, allowed` | Let agents open the documents of one space's Vault, or not. Off by default. Life Admin only. |
 | `settings.find_users` | `txt='', space=None` | Users who can be added to a space, people and agents alike, each with its `kind` (`Person`, `Agent`, or none yet) and, with `space`, `is_member`. Life Admin only. |
@@ -303,15 +293,14 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 
 | Method | Arguments | Does |
 | --- | --- | --- |
-| `tasks.list` | `space=None, status='open', area=None, priority=None, goal=None, month_plan=None, include_archived=0, start=0, page_length=50` | Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first. `status=open_doing` leaves Waiting tasks out. `tabs` in the answer counts the tasks on each state tab (open = Open and Doing, loops, Waiting, Done, all) under the same filters. |
+| `tasks.list` | `space=None, status='open', area=None, priority=None, goal=None, include_archived=0, start=0, page_length=50` | Tasks of a space. status: open, done, all, or one status. Sorted by due date, then priority I first. `status=open_doing` leaves Waiting tasks out. `tabs` in the answer counts the tasks on each state tab (open = Open and Doing, loops, Waiting, Done, all) under the same filters. |
 | `tasks.get` | `task` |  |
-| `tasks.quick_add` | `text, space=None, area=None, goal=None, due_date=None, priority=None, month_plan=None` | Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date. |
+| `tasks.quick_add` | `text, space=None, area=None, goal=None, due_date=None, priority=None` | Create a task from one line of text. A date word such as "tomorrow" or "fri" at the start or end sets the due date. |
 | `tasks.set_status` | `task, status, waiting_on=None` | Change a task's status. Done fills completed_on. Waiting needs waiting_on. |
 | `tasks.update` | `task, values` | Change fields of a task. Only task fields a person edits are accepted. |
 | `tasks.confirm_area` | `task, area=None` | Confirm the area the Brain guessed for a task (a task saved without an area gets one, marked `area_guessed` with `area_confidence`), or move it to `area`. Either clears the mark; a move is kept as an area correction in `Life Action Log`. |
 | `tasks.carry_forward` | `task` | Copy an open task into next month's plan, mark the old one Carried and set carried_from. |
 | `tasks.open_loops` | `space=None, start=0, page_length=50` | Open tasks older than 14 days with no due date. |
-| `tasks.decide_stale` | `task, decision` | The three buttons under Decide in the weekly review: do (due this week), carry, drop. |
 
 **`lifeos.api.timeline`**
 

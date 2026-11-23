@@ -22,31 +22,18 @@ def tree(space: str | None = None, include_archived: bool | int | None = 0, coll
 		filters["is_archived"] = 0
 	if permissions.vault_hidden(space):
 		filters["is_sensitive"] = 0
-	notes = frappe.get_all("Life Note", filters=filters, fields=["name", "title", "parent_note", "area", "goal", "modified", "is_archived"],
+	notes = frappe.get_list("Life Note", filters=filters, fields=["name", "title", "parent_note", "area", "goal", "modified", "is_archived"],
 		order_by="title asc", limit=2000)
 	area = lens_area(area)
 	if area:
 		keep = in_area(space, area, "Life Note", [n.name for n in notes])
 		notes = [n for n in notes if n.name in keep]
-	areas = frappe.get_all("Life Area", filters={"space": space}, fields=["name", "area_name", "parent_area"], order_by="sort_order, area_name", limit=1000)
+	areas = frappe.get_list("Life Area", filters={"space": space}, fields=["name", "area_name", "parent_area"], order_by="sort_order, area_name", limit=1000)
 	goals = names_map("Life Goal", [n.goal for n in notes], "title")
 	for n in notes:
 		n["goal_title"] = goals.get(n.goal)
 		n["modified"] = str(n.modified)[:10]
-	return {"space": space, "notes": notes, "areas": areas, "journal_pages": _journal_page_count(space, collection, include_archived, area)}
-
-
-def _journal_page_count(space, collection, include_archived, area):
-	"""The journal pages the Notes list adds to the notes (the same filters as `list`), so the number over the tree is the list's total."""
-	if collection != "all":
-		return 0
-	where, values = ["x.space = %(space)s", "x.kind = 'Journal Page'" + permissions.vault_guard(space, "x.")], {"space": space}
-	if not flag(include_archived):
-		where.append("x.is_archived = 0")
-	if area:
-		where.append(area_filter(space, area, "x.area", values, also_in="index"))
-	# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments and area_filter; values are parameters
-	return frappe.db.sql(f"select count(*) from `tabLife Index` x where {' and '.join(where)}", values)[0][0]
+	return {"space": space, "notes": notes, "areas": areas}
 
 
 SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modified"}
@@ -55,15 +42,13 @@ SORTS = {"title": "x.title", "record_date": "x.record_date", "modified": "x.modi
 @frappe.whitelist(methods=["GET"])
 def list(space: str | None = None, area: str | None = None, goal: str | None = None, include_archived: bool | int | None = 0, sort: str | None = None, dir: str | None = None, start: int | None = 0,
 		page_length: int | None = 50, filters: str | builtins.list | dict | None = None, order_by: str | None = None, summary: str | dict | None = None, collection: str | None = "My notes"):
-	"""Notes of a space as a flat list, newest first. Reads Life Index. With collection "all" the list also holds journal pages (`kind` "Journal page").
+	"""Notes of a space as a flat list, newest first. Reads Life Index. A photographed journal page is a note too.
 	Filters: area (with its sub-areas, or "none"), goal (a goal, or "none" for reference notes),
 	collection (My notes, the default; Wiki; or "all").
 	`total` is the number of notes the filters match."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	# the whole Library list ("all") also holds the journal pages, a kind of note (issue 45)
-	kinds = "x.kind in ('Note', 'Journal Page')" if collection == "all" else "x.kind = 'Note'"
-	where, values = ["x.space = %(space)s", kinds + permissions.vault_guard(space, "x.")], {"space": space}
+	where, values = ["x.space = %(space)s", "x.kind = 'Note'" + permissions.vault_guard(space, "x.")], {"space": space}
 	if collection and collection != "all":
 		where.append("x.collection = %(collection)s")
 		values["collection"] = collection
@@ -82,7 +67,7 @@ def list(space: str | None = None, area: str | None = None, goal: str | None = N
 	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
 	rows = frappe.db.sql(
 		f"""select x.ref_name as name, x.title, x.area, x.goal, x.record_date, x.modified, x.is_archived, x.collection, x.vault_locked,
-		if(x.kind = 'Journal Page', 'Journal page', 'Note') as kind from `tabLife Index` x
+		'Note' as kind from `tabLife Index` x
 		where {clause} order by {order}, x.ref_name limit %(start)s, %(len)s""",
 		{**values, "start": start, "len": page_length}, as_dict=True)
 	# nosemgrep: frappe-sql-format-injection -- WHERE/ORDER from fixed fragments, area_filter and std_filters/std_order (fields checked against meta); values are parameters
@@ -122,7 +107,7 @@ def get(note: str):
 	mark_opened(doc)
 	return {
 		"name": doc.name, "space": doc.space, "title": doc.title, "content_md": doc.content_md or "", "parent_note": doc.parent_note,
-		"is_sensitive": doc.is_sensitive,
+		"is_sensitive": doc.is_sensitive, "image": doc.image, "page_date": str(doc.page_date) if doc.page_date else None,
 		"parent_title": _visible_title(doc.parent_note, doc.space) if doc.parent_note else None,
 		"area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 		"goal": doc.goal, "goal_title": frappe.db.get_value("Life Goal", doc.goal, "title") if doc.goal else None,
@@ -132,7 +117,7 @@ def get(note: str):
 		"sources": [{"doctype": r.source_doctype, "name": r.source_name, "title": links.title_of(r.source_doctype, r.source_name),
 			"added_on": str(r.added_on) if r.get("added_on") else None} for r in doc.sources],
 		"links": links.outgoing(doc),
-		"children": frappe.get_all("Life Note", filters={"parent_note": doc.name, "is_archived": 0,
+		"children": frappe.get_list("Life Note", filters={"parent_note": doc.name, "is_archived": 0,
 			**({"is_sensitive": 0} if permissions.vault_hidden(doc.space) else {})}, fields=["name", "title"], order_by="title", limit=100),
 		"versions": frappe.db.count("Version", {"ref_doctype": "Life Note", "docname": doc.name}),
 	}
@@ -158,7 +143,7 @@ def save(note: str | None = None, space: str | None = None, title: str | None = 
 		doc = frappe.get_doc({"doctype": "Life Note", "space": space})
 	if title is not None:
 		if not title.strip():
-			frappe.throw(_("A note needs a title."))
+			frappe.throw(_("A note needs a title."), title=_("Note needs a title"))
 		doc.title = title.strip()
 	before_md = doc.content_md or ""
 	if content_md is not None:
@@ -173,7 +158,7 @@ def save(note: str | None = None, space: str | None = None, title: str | None = 
 	if also_in is not None:
 		doc.set("also_in", [{"area": a} for a in parse(also_in, [])])
 	if doc.parent_note and doc.parent_note == doc.name:
-		frappe.throw(_("A note cannot be its own parent."))
+		frappe.throw(_("A note cannot be its own parent."), title=_("Note cannot be its own parent"))
 	doc.save() if note else doc.insert()
 	if doc.collection == "Wiki":
 		# every change to a wiki page, by anyone, is logged with the text before and after (UX fixes, set 4)
@@ -190,7 +175,7 @@ def save(note: str | None = None, space: str | None = None, title: str | None = 
 def versions(note: str):
 	"""Saved versions of a note, from Frappe's document versioning."""
 	doc = permissions.get_doc_checked("Life Note", note)
-	rows = frappe.get_all("Version", filters={"ref_doctype": "Life Note", "docname": doc.name}, fields=["name", "owner", "creation", "data"],
+	rows = frappe.get_all("Version", filters={"ref_doctype": "Life Note", "docname": doc.name}, fields=["name", "owner", "creation", "data"],  # system: the note's own permission is checked above
 		order_by="creation desc", limit=30)
 	out = []
 	for r in rows:
@@ -206,9 +191,9 @@ def set_sensitive(doctype: str, name: str, sensitive: bool | int = 1):
 	"""Mark a capture or note sensitive, or unmark it (UX fixes, set 6). Anyone who may edit it may mark it; only the space's
 	owner may unmark it. A sensitive item follows the Vault rules. People only: an agent cannot change who sees what."""
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot mark or unmark sensitive items."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot mark or unmark sensitive items."), frappe.PermissionError, title=_("Agents cannot mark sensitive"))
 	if doctype not in permissions.SENSITIVE_DOCTYPES:
-		frappe.throw(_("Only captures and notes can be marked sensitive."))
+		frappe.throw(_("Only captures and notes can be marked sensitive."), title=_("Cannot be marked sensitive"))
 	doc = permissions.get_doc_checked(doctype, name, "write")
 	doc.is_sensitive = 1 if flag(sensitive) else 0
 	doc.flags.keep_touched = True

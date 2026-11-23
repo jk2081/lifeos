@@ -10,7 +10,7 @@ from frappe.utils import add_days, getdate, today
 
 from lifeos import areas, permissions
 from lifeos import calendar_data as data
-from lifeos import journal as rules
+from lifeos import cycles as rules
 from lifeos.api.utils import descendants
 
 FINISHED = ("Achieved", "Partly Achieved")

@@ -68,7 +68,7 @@ def resolve(value: str | None):
 	try:
 		return json.loads(value)
 	except ValueError:
-		frappe.throw(_("The output shape must be the name of a shape or valid JSON."))
+		frappe.throw(_("The output shape must be the name of a shape or valid JSON."), title=_("Output shape not valid"))
 
 
 TYPES = {"object": dict, "array": list, "string": str, "number": (int, float), "integer": int, "boolean": bool}

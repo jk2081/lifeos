@@ -146,22 +146,22 @@ def validate(doc):
 	from lifeos.skills import tools as fixed
 
 	if doc.trigger_kind not in TRIGGERS:
-		frappe.throw(_("The trigger must be one of: {0}.").format(", ".join(TRIGGERS)))
+		frappe.throw(_("The trigger must be one of: {0}.").format(", ".join(TRIGGERS)), title=_("Unknown skill trigger"))
 	if doc.trigger_kind == "Event" and doc.trigger_event not in EVENTS:
-		frappe.throw(_("Pick an event: {0}.").format(", ".join(EVENTS)))
+		frappe.throw(_("Pick an event: {0}.").format(", ".join(EVENTS)), title=_("Skill needs an event"))
 	if doc.trigger_kind == "Schedule":
 		from croniter import croniter
 
 		if not doc.schedule_cron or not croniter.is_valid(doc.schedule_cron):
-			frappe.throw(_("A schedule needs a valid cron expression, such as 0 7 * * *."))
+			frappe.throw(_("A schedule needs a valid cron expression, such as 0 7 * * *."), title=_("Schedule needs a cron"))
 	if doc.output_kind not in OUTPUTS:
-		frappe.throw(_("The output must be one of: {0}.").format(", ".join(OUTPUTS)))
+		frappe.throw(_("The output must be one of: {0}.").format(", ".join(OUTPUTS)), title=_("Unknown skill output"))
 	if doc.model_tier not in TIERS:
-		frappe.throw(_("The model tier is Fast or Smart."))
+		frappe.throw(_("The model tier is Fast or Smart."), title=_("Unknown model tier"))
 	chosen = tool_list(doc)
 	bad = [t for t in chosen if t not in fixed.NAMES]
 	if bad:
-		frappe.throw(_("{0} is not one of the tools Life OS offers. The tools are: {1}.").format(", ".join(bad), ", ".join(fixed.NAMES)))
+		frappe.throw(_("{0} is not one of the tools Life OS offers. The tools are: {1}.").format(", ".join(bad), ", ".join(fixed.NAMES)), title=_("Unknown skill tool"))
 	if doc.output_kind == "JSON" and doc.output_schema:
 		from lifeos.skills import schemas
 
@@ -180,7 +180,7 @@ def rollback(slug: str, version: int):
 	"""Restore an earlier version's text and settings as a new version."""
 	row = frappe.db.get_value("Life Skill Version", {"skill": slug, "version": int(version)}, ["instructions", "config"], as_dict=True)
 	if not row:
-		frappe.throw(_("There is no version {0} of this skill.").format(version))
+		frappe.throw(_("There is no version {0} of this skill.").format(version), title=_("Skill version not found"))
 	config = json.loads(row.config or "{}")
 	return save(slug, {"instructions": row.instructions, **{k: v for k, v in config.items() if k in CONFIG}}, _("Rolled back to version {0}").format(version))
 
@@ -190,7 +190,7 @@ def accept_update(slug: str):
 	doc = frappe.get_doc("Life Skill", slug)
 	shipped = builtin(slug)
 	if not shipped:
-		frappe.throw(_("This skill is not built in."))
+		frappe.throw(_("This skill is not built in."), title=_("Skill is not built in"))
 	_apply(doc, shipped)
 	doc.version += 1
 	doc.update_available, doc.update_text, doc.update_version = 0, None, None

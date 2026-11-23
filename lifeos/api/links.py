@@ -9,29 +9,20 @@ from lifeos.constants import LINKABLE
 FIELD_TIES = {
 	"Life Inbox Item": [
 		("Life Task", "inbox_item", "created from this item"), ("Life Note", "inbox_item", "created from this item"),
-		("Life Vault Document", "inbox_item", "created from this item"), ("Life Journal Page", "inbox_item", "created from this item"),
-		("Life Check-in", "inbox_item", "created from this item"), ("Life Important Date", "inbox_item", "created from this item"),
-		("Life Chat Log", "inbox_item", "created from this item"),
+		("Life Vault Document", "inbox_item", "created from this item"), ("Life Chat Log", "inbox_item", "created from this item"),
 	],
 	"Life Goal": [("Life Task", "goal", "task for this goal"), ("Life Goal", "carried_from", "carried into the next cycle"),
 		("Life Note", "goal", "filed under this goal"), ("Life Vault Document", "goal", "filed under this goal"),
 		("Life Chat Log", "goal", "filed under this goal"), ("Life Goal", "serves", "serves this goal")],
 	"Life Note": [("Life Note", "parent_note", "sub-note")],
 	"Life Task": [("Life Task", "carried_from", "carried forward from this task")],
-	"Life Person": [("Life Vault Document", "holder", "document held"), ("Life Important Date", "person", "important date")],
-	"Life Month Plan": [("Life Task", "month_plan", "task in this month")],
+	"Life Person": [("Life Vault Document", "holder", "document held")],
 }
-KIND = {"Life Task": "Task", "Life Note": "Note", "Life Vault Document": "Document", "Life Journal Page": "Journal page",
-	"Life Check-in": "Check-in", "Life Important Date": "Important date", "Life Chat Log": "Chat", "Life Goal": "Goal",
+KIND = {"Life Task": "Task", "Life Note": "Note", "Life Vault Document": "Document", "Life Chat Log": "Chat", "Life Goal": "Goal",
 	"Life Person": "Person", "Life Inbox Item": "Inbox item"}
 
 
 def _title(doctype, name):
-	if doctype == "Life Journal Page":
-		d = frappe.db.get_value(doctype, name, ["page_number", "page_date"], as_dict=True)
-		return f"Journal page {d.page_number or ''} · {frappe.utils.formatdate(d.page_date, 'd MMM yyyy')}".replace("  ", " ")
-	if doctype == "Life Check-in":
-		return f"Check-in, {frappe.utils.formatdate(frappe.db.get_value(doctype, name, 'date'), 'd MMM yyyy')}"
 	return rules.title_of(doctype, name)
 
 
@@ -58,7 +49,7 @@ def backlinks(doctype: str, name: str):
 			(doctype, name, doc.space), as_dict=True):
 		add(r.from_doctype, r.from_name, "links here")
 	for dt, field, why in FIELD_TIES.get(doctype, []):
-		for n in frappe.get_all(dt, filters={field: name, "space": doc.space}, pluck="name", limit=50, order_by="creation desc"):
+		for n in frappe.get_list(dt, filters={field: name, "space": doc.space}, pluck="name", limit=50, order_by="creation desc"):
 			add(dt, n, why)
 	for field, why in (("inbox_item", "source"), ("goal", "goal"), ("carried_from", "carried from"), ("parent_note", "parent note")):
 		if doc.meta.has_field(field) and doc.get(field):
@@ -81,7 +72,7 @@ def suggest(space: str | None = None, text: str | None = "", limit: int | None =
 			filters["is_sensitive"] = 0  # sensitive items are closed to the agent while the space's switch is off
 		if text:
 			filters[field] = ("like", f"%{text}%")
-		for r in frappe.get_all(dt, filters=filters, fields=["name", f"{field} as title"], order_by="modified desc", limit=limit):
+		for r in frappe.get_list(dt, filters=filters, fields=["name", f"{field} as title"], order_by="modified desc", limit=limit):
 			out.append({"doctype": dt, "name": r.name, "title": r.title, "kind": KIND[dt]})
 	out.sort(key=lambda r: (not r["title"].lower().startswith(text.lower()), len(r["title"])))
 	out = out[:limit]

@@ -34,8 +34,7 @@ function remove() {
   dialog.danger({ title: 'Remove', message: `Remove “${e.value.title}”?`, confirmLabel: 'Remove', onConfirm: doRemove })
 }
 async function doRemove() {
-  const ok = e.value.kind === 'event' ? await tryCall(() => api('calendar.delete_event', { event: e.value.name }), 'Removed.')
-    : await tryCall(() => db.delete('Life Important Date', e.value.name), 'Removed.')
+  const ok = await tryCall(() => api('calendar.delete_event', { event: e.value.name }), 'Removed.')  // an important date is a yearly Event
   if (ok !== undefined) {
     emit('changed')
     emit('close')

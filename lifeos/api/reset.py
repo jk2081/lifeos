@@ -20,7 +20,7 @@ OLD_DAYS = 180
 def _person():
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(_("Agents cannot use Reset."), frappe.PermissionError)
+		frappe.throw(_("Agents cannot use Reset."), frappe.PermissionError, title=_("Agents cannot use Reset"))
 
 
 def norm(title):
@@ -51,7 +51,7 @@ def rule_batches(space):
 		out.append(_batch("duplicates", "Duplicate open tasks", "Each has the same title, area and goal as an older open task, which is kept.",
 			dupes, "delete", "Delete {n}"))
 	# 2. open tasks whose open-ended goal (a project before set 6) is achieved or dropped
-	closed = set(frappe.get_all("Life Goal", filters={"space": space, "horizon": "Long term", "outcome": ["not in", ["In Progress", "Carried"]]}, pluck="name"))
+	closed = set(frappe.get_list("Life Goal", filters={"space": space, "horizon": "Long term", "outcome": ["not in", ["In Progress", "Carried"]]}, pluck="name"))
 	orphans = [_item("Life Task", t.name, t.title) for t in tasks if t.goal in closed]
 	if orphans:
 		out.append(_batch("closed_project", "Open tasks of finished goals", "Their open-ended goal is achieved or dropped, but they are still open.",
@@ -198,14 +198,14 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 	"""One decision on one item: Do (with a date), Waiting (for whom), Someday, Archive or Delete. Returns what Undo needs."""
 	_person()
 	if decision not in DECISIONS:
-		frappe.throw(_("decision must be one of: {0}.").format(", ".join(DECISIONS)))
+		frappe.throw(_("decision must be one of: {0}.").format(", ".join(DECISIONS)), title=_("Decision is not valid"))
 	if doctype not in ("Life Task", "Life Goal"):
-		frappe.throw(_("Reset decides on tasks and goals."))
+		frappe.throw(_("Reset decides on tasks and goals."), title=_("Record type not supported"))
 	doc = permissions.get_doc_checked(doctype, name, "delete" if decision == "delete" else "write")
 	undo = [_snap(doc)]
 	if decision == "do":
 		if not date:
-			frappe.throw(_("Choose a date."))
+			frappe.throw(_("Choose a date."), title=_("Date is missing"))
 		if doctype == "Life Task":
 			doc.status = "Open" if doc.status == "Waiting" else doc.status
 			doc.due_date = date
@@ -214,7 +214,7 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 		doc.save()
 	elif decision == "waiting":
 		if not (waiting_on or "").strip():
-			frappe.throw(_("Say who or what it is waiting on."))
+			frappe.throw(_("Say who or what it is waiting on."), title=_("Waiting reason is missing"))
 		if doctype == "Life Task":
 			doc.status, doc.waiting_on = "Waiting", waiting_on.strip()
 		else:
@@ -250,7 +250,7 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 	space = permissions.resolve_space(space, write=True)
 	items = parse(items, []) or []
 	if len(items) > MAX_ITEMS:
-		frappe.throw(_("At most {0} items at a time.").format(MAX_ITEMS))
+		frappe.throw(_("At most {0} items at a time.").format(MAX_ITEMS), title=_("Too many items"))
 	undo, done = [], 0
 	for it in items:
 		doctype, name = it.get("doctype"), it.get("name")
@@ -290,7 +290,7 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 		elif action == "keep":
 			someday.keep(doctype, name)
 		else:
-			frappe.throw(_("Unknown batch action."))
+			frappe.throw(_("Unknown batch action."), title=_("Batch action is not known"))
 		done += 1
 	return {"done": done, "undo": undo}
 
@@ -299,7 +299,7 @@ def _accept_notes(item):
 	from lifeos.api import review
 
 	out = []
-	for p in frappe.get_all("Life Proposal", filters={"inbox_item": item, "status": "Pending", "kind": "Note"}, pluck="name"):
+	for p in frappe.get_list("Life Proposal", filters={"inbox_item": item, "status": "Pending", "kind": "Note"}, pluck="name"):
 		res = review.decide(p, "accept")
 		out.append({"op": "unaccept", "proposal": p, "doctype": res.get("created_doctype"), "name": res.get("created_name"), "item": item})
 	return out
@@ -365,16 +365,16 @@ def _unaccept(proposal):
 	from lifeos import index
 
 	if not isinstance(proposal, str) or not proposal:
-		frappe.throw(_("Nothing to undo."))
+		frappe.throw(_("Nothing to undo."), title=_("Nothing to undo"))
 	prop = permissions.get_doc_checked("Life Proposal", proposal, "write")
 	if prop.status != "Accepted":
 		return
 	item = permissions.get_doc_checked("Life Inbox Item", prop.inbox_item, "write")
 	if prop.created_doctype and prop.created_name and frappe.db.exists(prop.created_doctype, prop.created_name):
 		permissions.get_doc_checked(prop.created_doctype, prop.created_name, "delete")
-		frappe.delete_doc(prop.created_doctype, prop.created_name, ignore_permissions=True, delete_permanently=True)
+		frappe.delete_doc(prop.created_doctype, prop.created_name, ignore_permissions=True, delete_permanently=True)  # system: the decision was checked above; the undo restores the owner's own records
 	frappe.db.set_value("Life Proposal", prop.name, {"status": "Pending", "created_doctype": None, "created_name": None,
 		"decided_by": None, "decided_on": None})
 	item.reload()
 	item.status, item.finished_on = "To Review", None
-	item.save(ignore_permissions=True)  # saved, so the Outbox reverses the item's exit (set 7)
+	item.save(ignore_permissions=True)  # saved, so the Outbox reverses the item's exit (set 7)  # system: the decision was checked above; the undo restores the owner's own records

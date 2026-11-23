@@ -10,7 +10,7 @@ from lifeos.api import goals as goal_api
 def _focus(area):
 	doc = permissions.get_doc_checked("Life Area", area)
 	if not doc.is_focus:
-		frappe.throw(_("{0} is not a focus.").format(doc.area_name))
+		frappe.throw(_("{0} is not a focus.").format(doc.area_name), title=_("Area is not a focus"))
 	return doc
 
 
@@ -25,7 +25,7 @@ def get(area: str):
 	doc = _focus(area)
 	parent = frappe.db.get_value("Life Area", doc.parent_area, ["name", "area_name", "is_life_area", "parent_area"], as_dict=True)
 	life = parent if parent.is_life_area else frappe.db.get_value("Life Area", parent.parent_area, ["name", "area_name"], as_dict=True)
-	rows = frappe.get_all("Life Goal", filters={"area": area, "is_archived": 0}, fields=GOAL_FIELDS, order_by="sort_order asc, creation asc", limit=500)
+	rows = frappe.get_list("Life Goal", filters={"area": area, "is_archived": 0}, fields=GOAL_FIELDS, order_by="sort_order asc, creation asc", limit=500)
 	counts = goal_api.task_counts([r.name for r in rows])
 	for r in rows:
 		r["tasks_done"], r["tasks_counted"] = counts.get(r.name, (0, 0))
@@ -36,10 +36,10 @@ def get(area: str):
 	live = [r for r in rows if r.outcome == "In Progress" and not r.is_someday]
 	finished = [r for r in rows if r.outcome != "In Progress"]
 	annual = [r for r in live if r.horizon == "Year"]
-	cycles = frappe.get_all("Life Cycle", filters={"space": doc.space, "status": ("in", ("Active", "Closed"))}, fields=["name", "title"],
+	cycles = frappe.get_list("Life Cycle", filters={"space": doc.space, "status": ("in", ("Active", "Closed"))}, fields=["name", "title"],
 		order_by="start_date desc", limit=3)
 	with_goal = {r.cycle for r in rows if r.horizon == "12 weeks" and r.cycle}
-	last = frappe.get_all("Life Task", filters={"area": area, "is_archived": 0}, fields=["title", "status", "due_date", "scheduled_at", "modified"],
+	last = frappe.get_list("Life Task", filters={"area": area, "is_archived": 0}, fields=["title", "status", "due_date", "scheduled_at", "modified"],
 		order_by="modified desc", limit=1)
 	return {
 		"name": doc.name, "title": doc.area_name, "space": doc.space, "standard": doc.standard, "is_on": doc.is_on,
@@ -73,7 +73,7 @@ def focuses_without_goal(space, covered):
 	if not areas.use_focuses():
 		return []
 	hidden = set(areas.off(space))
-	return [f for f in frappe.get_all("Life Area", filters={"space": space, "is_focus": 1, "is_on": 1, "is_archived": 0}, fields=["name", "area_name", "standard"],
+	return [f for f in frappe.get_list("Life Area", filters={"space": space, "is_focus": 1, "is_on": 1, "is_archived": 0}, fields=["name", "area_name", "standard"],
 		order_by="sort_order asc, area_name asc", limit=500) if f.name not in covered and f.name not in hidden]
 
 
@@ -88,21 +88,21 @@ def sort_open(goal: str, action: str, title: str | None = None, target_date: str
 	permissions.require_login()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	if doc.horizon != "Long term" or doc.outcome != "In Progress":
-		frappe.throw(_("Only an Open goal in progress is sorted this way."))
+		frappe.throw(_("Only an Open goal in progress is sorted this way."), title=_("Goal cannot be sorted"))
 	if action == "drop":
 		return goal_api.close(goal, "Dropped")
 	if action == "annual":
 		if not target_date:
-			frappe.throw(_("An Annual goal needs a target date."))
+			frappe.throw(_("An Annual goal needs a target date."), title=_("Annual goal needs a date"))
 		doc.horizon, doc.target_date = "Year", target_date
 		doc.save()
 		return {"name": doc.name, "horizon": doc.horizon}
 	if action != "focus":
-		frappe.throw(_("Choose focus, annual or drop."))
+		frappe.throw(_("Choose focus, annual or drop."), title=_("Unknown sorting choice"))
 	if not areas.use_focuses():
-		frappe.throw(_("Switch on Use focuses in Settings → Areas to make a focus."))
+		frappe.throw(_("Switch on Use focuses in Settings → Areas to make a focus."), title=_("Focuses are switched off"))
 	if not permissions.is_admin():
-		frappe.throw(_("Only the owner can make a focus."), frappe.PermissionError)
+		frappe.throw(_("Only the owner can make a focus."), frappe.PermissionError, title=_("Only the owner makes focuses"))
 	parent = doc.area
 	if parent and frappe.db.get_value("Life Area", parent, "is_focus"):
 		parent = frappe.db.get_value("Life Area", parent, "parent_area")
@@ -114,7 +114,7 @@ def sort_open(goal: str, action: str, title: str | None = None, target_date: str
 	focus.insert()
 	annual = goal_api.create(title=(title or "").strip() or name, horizon="Year", space=doc.space, area=focus.name,
 		target_date=target_date or goal_api.year_end(), done_when=done_when or doc.done_when)
-	for t in frappe.get_all("Life Task", filters={"goal": doc.name}, pluck="name", limit=0):
+	for t in frappe.get_list("Life Task", filters={"goal": doc.name}, pluck="name", limit=0):
 		frappe.db.set_value("Life Task", t, {"goal": annual["name"], "area": focus.name})
 	doc.flags.no_archive = True
 	doc.outcome, doc.result_note = "Dropped", _("Made into the focus {0}.").format(focus.area_name)

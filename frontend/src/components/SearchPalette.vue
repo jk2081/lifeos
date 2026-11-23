@@ -55,7 +55,7 @@ import { openRef, refOf } from '@/lib/pane'
 import { isQuestion, scopeFromRoute, startAsk } from '@/lib/ask'
 
 const open = defineModel('open', { type: Boolean, default: false })
-const KIND = { Inbox: 'Inbox item', 'Journal Page': 'Journal page', 'Month Plan': 'Month plan' }
+const KIND = { Inbox: 'Inbox item' }
 const router = useRouter()
 const text = ref('')
 const field = ref(null)

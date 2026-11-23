@@ -17,7 +17,6 @@
   "is_top_three",
   "top_three_week",
   "goal",
-  "month_plan",
   "inbox_item",
   "source_url",
   "notes_md",
@@ -127,12 +126,6 @@
    "fieldtype": "Link",
    "label": "Goal",
    "options": "Life Goal"
-  },
-  {
-   "fieldname": "month_plan",
-   "fieldtype": "Link",
-   "label": "Month Plan",
-   "options": "Life Month Plan"
   },
   {
    "fieldname": "inbox_item",

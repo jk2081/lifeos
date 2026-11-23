@@ -5,7 +5,8 @@ from datetime import timedelta
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, today
 
-from lifeos import calendar_data, journal, old_inbox, permissions, rhythms
+from lifeos import calendar_data, cycles, old_inbox, permissions, rhythms
+from lifeos import habits as habit_rules
 from lifeos.api import tasks as task_api
 from lifeos.api import vault as vault_api
 from lifeos.api.utils import area_filter, descendants, in_area, lens_area, user_names
@@ -39,7 +40,7 @@ def goals_without_plan(space, now, area=None, cycle=None):
 	"""How many active goals of the current cycle have no task planned this week."""
 	if not cycle:
 		return 0
-	goals = frappe.get_all("Life Goal", filters={"space": space, "cycle": cycle, "outcome": "In Progress", "is_archived": 0, "on_hold": 0, "is_someday": 0},
+	goals = frappe.get_list("Life Goal", filters={"space": space, "cycle": cycle, "outcome": "In Progress", "is_archived": 0, "on_hold": 0, "is_someday": 0},
 		pluck="name")
 	if area and goals:
 		keep = in_area(space, area, "Life Goal", goals)
@@ -81,7 +82,7 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		review_filter["name"] = ("in", [r.name for r in inbox_lens["items"]] or ["-"])
 	if permissions.vault_hidden(space):  # an agent: no sensitive item, and no source of a Vault document
 		review_filter.update({"is_sensitive": 0, "vault_document": ("is", "not set")})
-	review_items = frappe.get_all("Life Inbox Item", filters=review_filter,
+	review_items = frappe.get_list("Life Inbox Item", filters=review_filter,
 		fields=["name", "title", "source_type", "received_on", "owner", "claimed_by", "transcript_md", "summary_md"], order_by="received_on desc", limit=5)
 	pending = {}
 	if review_items:
@@ -108,19 +109,19 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 	events = [e for e in calendar_data.events_between(space, now, add_days(now, 1))]
 	events.sort(key=lambda e: e["start"])
 
-	month = journal.habits_month(space, now.year, now.month)
+	month = habit_rules.habits_month(space, now.year, now.month)
 	habits = [{"habit": h["habit"], "title": h["title"], "done": now.day in h["done_days"]} for h in month["habits"] if not h["removed"]]
 
 	cycle_out = None
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date", "end_date"], as_dict=True)
 	if cycle:
-		week = journal.week_of(cycle, now)
-		if 1 <= week <= journal.WEEKS:
-			score = journal.week_score(cycle.name, week)
-			cycle_out = {"name": cycle.name, "title": cycle.title, "week": week, "weeks": journal.WEEKS, "score": score["percent"],
+		week = cycles.week_of(cycle, now)
+		if 1 <= week <= cycles.WEEKS:
+			score = cycles.week_score(cycle.name, week)
+			cycle_out = {"name": cycle.name, "title": cycle.title, "week": week, "weeks": cycles.WEEKS, "score": score["percent"],
 				"done": score["done"], "planned": score["planned"]}
 		else:
-			cycle_out = {"name": cycle.name, "title": cycle.title, "week": None, "weeks": journal.WEEKS, "ended": week > journal.WEEKS,
+			cycle_out = {"name": cycle.name, "title": cycle.title, "week": None, "weeks": cycles.WEEKS, "ended": week > cycles.WEEKS,
 				"start_date": str(cycle.start_date)}
 
 	coming = []
@@ -252,7 +253,7 @@ def unique_insights(rows, limit=3):
 	return {"rows": out[:limit], "total": len(out)}
 
 
-OCCURRENCE = re.compile(r"^(review:\d{4}-\d{2}-\d{2}|month:\d{4}-\d{2}|(plan-next|close):[\w-]{1,40})$")
+OCCURRENCE = re.compile(r"^(review:\d{4}-\d{2}-\d{2}|(plan-next|close):[\w-]{1,40})$")
 
 
 @frappe.whitelist(methods=["POST"])
@@ -260,9 +261,9 @@ def skip_banner(occurrence: str, how: str = "skipped"):
 	"""Hide Today's rhythm banner until its next occurrence: `how` is skipped, or done (the weekly review's Finish)."""
 	permissions.require_login()
 	if permissions.is_agent():
-		frappe.throw(frappe._("Agents have no Today."), frappe.PermissionError)
+		frappe.throw(frappe._("Agents have no Today."), frappe.PermissionError, title=frappe._("Agents have no Today"))
 	if how not in ("skipped", "done") or not OCCURRENCE.match(str(occurrence or "")):
-		frappe.throw(frappe._("Unknown banner."))
+		frappe.throw(frappe._("Unknown banner."), title=frappe._("Unknown banner"))
 	return rhythms.dismiss(occurrence, how)
 
 
@@ -271,3 +272,57 @@ def scheduled_today(space, now, area=None):
 	lens, lens_values = task_lens(space, area)
 	return task_api.query(space, lens + "and t.status in ('Open', 'Doing', 'Waiting') and t.is_archived = 0 and t.scheduled_at >= %(a)s and t.scheduled_at < %(b)s",
 		{"a": str(now), "b": str(add_days(now, 1)), **lens_values}, "t.scheduled_at asc", 0, 50)
+
+
+@frappe.whitelist(methods=["GET"])
+def week_summary(space: str | None = None, week_start: str | None = None):
+	"""Everything an agent needs to run the weekly review in chat, for one week (Monday to Sunday): the cycle's score, habits,
+	tasks done and carried, open loops, stale tasks to decide, and what the archive job archived."""
+	from lifeos import archive
+
+	space = permissions.resolve_space(space)
+	now = getdate(today())
+	start = getdate(week_start) if week_start else add_days(now, -now.weekday())
+	start = add_days(start, -start.weekday())
+	end = add_days(start, 6)
+
+	cycle_out = None
+	cycle = frappe.db.sql(
+		"select name, title, status from `tabLife Cycle` where space=%s and start_date <= %s and end_date >= %s order by start_date desc limit 1",
+		(space, end, start), as_dict=True)
+	if cycle:
+		c = frappe.get_doc("Life Cycle", cycle[0].name)
+		week = min(max(cycles.week_of(c, min(end, getdate(c.end_date))), 1), cycles.WEEKS)
+		cycle_out = {"name": c.name, "title": c.title, "week": week, **cycles.week_score(c.name, week)}
+
+	habit_rows, seen = [], set()
+	for y, m in sorted({(start.year, start.month), (end.year, end.month)}):
+		for h in habit_rules.habits_month(space, y, m)["habits"]:
+			if h["habit"] in seen:
+				continue
+			seen.add(h["habit"])
+			habit_rows.append({"habit": h["habit"], "title": h["title"], "done": 0, "target": h["days_per_week"]})
+	if habit_rows:  # one query for every habit's ticks
+		ticks = dict(frappe.db.sql("select habit, count(*) from `tabLife Habit Log` where habit in %s and date between %s and %s and done = 1 group by habit",
+			([h["habit"] for h in habit_rows], start, end)))
+		for h in habit_rows:
+			h["done"] = ticks.get(h["habit"], 0)
+
+	done_tasks = task_api.query(space, "and t.status = 'Done' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
+	carried = task_api.query(space, "and t.status = 'Carried' and t.completed_on between %(a)s and %(b)s", {"a": start, "b": end}, "t.completed_on desc", 0, 100)
+	loops = task_api.open_loops(space=space, page_length=20)
+	return {
+		"space": space, "week_start": str(start), "week_end": str(end), "cycle": cycle_out, "habits": habit_rows,
+		"done_total": _count_tasks(space, "Done", start, end), "carried_total": _count_tasks(space, "Carried", start, end),
+		"done": done_tasks, "carried": carried, "open_loops": loops["tasks"], "open_loops_total": loops["total"],
+		"decide": task_api.stale_tasks(space, 30),
+		"archived": archive.archived_in_week(space, start, end),
+		"stale_days": frappe.db.get_single_value("Life Settings", "stale_task_days") or 90,
+		"target": frappe.db.get_single_value("Life Settings", "score_target") or 85,
+	}
+
+
+def _count_tasks(space, status, start, end):
+	"""How many tasks closed with this status in the week, for the numbers that lead to the Tasks screen (the lists show 100)."""
+	return frappe.db.sql("select count(*) from `tabLife Task` t where t.space=%s and t.status=%s and t.completed_on between %s and %s",
+		(space, status, start, end))[0][0]

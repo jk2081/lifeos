@@ -48,7 +48,7 @@ async function save() {
   const problem = measureProblem(m, (!props.goal && doneWhenRequired()) || !!props.goal?.measure_kind)
   if (problem) return toast.error(problem)
   const measure = m.measure_kind ? measureArgs(m) : {}
-  const res = await tryCall(() => api('journal.save_goal', { goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area || '', actions: form.actions,
+  const res = await tryCall(() => api('goals.save_goal', { goal: props.goal?.name, cycle: props.cycle, title: form.title, area: form.area || '', actions: form.actions,
     ...measure, measure_kind: m.measure_kind || undefined }), 'Goal saved.')
   if (res) {
     open.value = false
@@ -64,7 +64,7 @@ function remove() {
     message: 'Delete this goal and its ticks?',
     confirmLabel: 'Delete goal',
     onConfirm: async () => {
-      if (await tryCall(() => api('journal.delete_goal', { goal: props.goal.name }), 'Goal deleted.')) {
+      if (await tryCall(() => api('goals.delete_goal', { goal: props.goal.name }), 'Goal deleted.')) {
         open.value = false
         emit('saved')
       }

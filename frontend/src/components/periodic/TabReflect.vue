@@ -6,7 +6,7 @@
         <p class="text-sm text-ink-gray-6">In your own words. A line or two is enough.</p>
       </div>
       <Skeleton v-if="!d" class="h-80 w-full" />
-      <div v-else class="grid items-start gap-4 md:grid-cols-[minmax(0,1.45fr)_minmax(300px,1fr)]">
+      <div v-else class="grid grid-cols-[minmax(0,1fr)] items-start gap-4 md:grid-cols-[minmax(0,1.45fr)_minmax(300px,1fr)]">
         <div class="flex min-w-0 flex-col gap-4">
           <FormControl v-model="wentWell" type="textarea" :rows="3" label="What went well?" placeholder="One line or more" data-went-well @update:model-value="queue" />
           <FormControl v-if="monthly" v-model="notWell" type="textarea" :rows="3" label="What did not go well?" data-not-well @update:model-value="queue" />

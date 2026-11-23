@@ -137,7 +137,7 @@ const route = useRoute()
 const router = useRouter()
 const stamp = ref(0)
 const d = ref(null) // goals.get
-const j = ref(null) // journal.goal: tasks, actions and history across cycles
+const j = ref(null) // goals.detail: tasks, actions and history across cycles
 const missing = ref(false)
 const quick = ref('')
 const confirmOpen = ref(false)
@@ -145,7 +145,7 @@ const confirmStatus = ref('Done')
 const noteOpen = ref(false)
 const editOpen = ref(false)
 const g = computed(() => d.value.goal)
-// the goal's cycle: goals.get names it, journal.goal carries its grid row
+// the goal's cycle: goals.get names it, goals.detail carries its grid row
 const cyc = computed(() => d.value.cycle || j.value?.cycle || null)
 const writable = computed(() => store.spaces.find((s) => s.name === d.value?.space)?.access === 'Write' && !store.isAgent)
 const arch = computed(() => (g.value.is_archived ? { archived: '1' } : {}))
@@ -173,7 +173,7 @@ function embed(t) {
 }
 async function load() {
   try {
-    ;[d.value, j.value] = await Promise.all([api('goals.get', { goal: props.id }), api('journal.goal', { goal: props.id })])
+    ;[d.value, j.value] = await Promise.all([api('goals.get', { goal: props.id }), api('goals.detail', { goal: props.id })])
     stamp.value++
   } catch (e) {
     missing.value = true

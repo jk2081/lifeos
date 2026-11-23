@@ -7,7 +7,7 @@ from lifeos.api.utils import area_filter, flag, names_map, page, std_filters, su
 
 KIND_DOCTYPES = {
 	"Life Inbox Item": ["Inbox"], "Life Task": ["Task", "Task Done"], "Life Note": ["Note"], "Life Vault Document": ["Document"],
-	"Life Chat Log": ["Chat"], "Life Journal Page": ["Journal Page"], "Life Check-in": ["Check-in"], "Life Month Plan": ["Month Plan"],
+	"Life Chat Log": ["Chat"]
 }
 ROW_FIELDS = "ref_doctype, ref_name, kind, title, record_date, area, goal, is_archived, status, record_owner, also_in_csv"
 
@@ -45,7 +45,7 @@ def index_rows(space, where="", values=None, order="record_date desc, modified d
 @frappe.whitelist(methods=["GET"])
 def get(space: str | None = None, from_date: str | None = None, to_date: str | None = None, area: str | None = None, doctype: str | None = None, include_archived: bool | int = 0, start: int = 0,
 		page_length: int = 50, filters: str | list | None = None, summary: str | dict | None = None):
-	"""Every record by day, newest first: inbox items, tasks created and completed, notes, documents, chats, journal pages, check-ins."""
+	"""Every record by day, newest first: inbox items, tasks created and completed, notes, documents, chats."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
 	where, values = [], {}

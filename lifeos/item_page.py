@@ -7,11 +7,10 @@ from lifeos import links, permissions
 ITEM = "Life Inbox Item"
 LIMIT = 100
 # records that keep the item they came from in their own `inbox_item` field, besides those named by accepted proposals
-BACKREF = ("Life Task", "Life Note", "Life Important Date", "Life Journal Page", "Life Vault Document")
-KIND_OF = {"Life Task": "Task", "Life Note": "Note", "Life Important Date": "Date", "Life Journal Page": "Journal page",
+BACKREF = ("Life Task", "Life Note", "Life Vault Document")
+KIND_OF = {"Life Task": "Task", "Life Note": "Note",
 	"Life Vault Document": "Document", "Event": "Event", "Life Goal": "Goal", "Life Habit Log": "Habit",
-	"Life Check-in": "Check-in", "Life Action Log": "Week tick", "Life Month Plan": "Month goal"}
-MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")
+	"Life Action Log": "Week tick"}
 
 
 def _readable(doctype, name, space):
@@ -32,17 +31,11 @@ def _state(doctype, name):
 	if doctype == "Life Note":
 		d = frappe.db.get_value(doctype, name, ["collection", "is_archived"], as_dict=True)
 		return ("Archived" if d.is_archived else "Wiki page" if d.collection == "Wiki" else "In My notes"), ""
-	if doctype == "Life Important Date":
-		d = frappe.db.get_value(doctype, name, ["day", "month", "kind"], as_dict=True)
-		when = f"{d.day} {MONTHS[d.month - 1]}" if d.day and d.month and 1 <= d.month <= 12 else ""
-		return " · ".join(x for x in (d.kind or "Date", when) if x), ""
 	if doctype == "Event":
 		return "Event", str(frappe.db.get_value(doctype, name, "starts_on") or "")[:16]
 	if doctype == "Life Goal":
 		d = frappe.db.get_value(doctype, name, ["outcome", "is_archived"], as_dict=True)
 		return ("Archived" if d.is_archived else d.outcome or "In Progress"), ""
-	if doctype == "Life Journal Page":
-		return "Journal page", str(frappe.db.get_value(doctype, name, "page_date") or "")
 	if doctype == permissions.VAULT:
 		return "In the Vault", str(frappe.db.get_value(doctype, name, "expiry_date") or "")
 	return "Made", ""

@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const page = (name) => () => import(`./pages/${name}.vue`)
 
 // The places (issue 14): Today, Brain, Goals and Library, each tab its own path, with Review, Settings and the Ask page
-// beside them. Housekeeping pages live inside the place they belong to and are not tabs: Reset under Today, the Outbox
+// beside them. Housekeeping pages live inside the place they belong to and are not tabs: the Outbox
 // under Brain, Someday under Goals, the Timeline and the trash and archive under Library.
 const TODAY = ['week', 'month', 'year']
 const BRAIN = ['activity', 'captures', 'sources', 'skills', 'outbox', 'queue']
@@ -13,7 +13,6 @@ const LIBRARY = ['notes', 'documents', 'people', 'chats', 'files', 'timeline', '
 const routes = [
   { path: '/', redirect: '/today' },
   { path: `/today/:tab(${TODAY.join('|')})?`, name: 'Today', component: page('TodayPlace'), props: true },
-  { path: '/today/reset', name: 'Reset', component: page('Reset') },
   { path: `/brain/:tab(${BRAIN.join('|')})?`, name: 'Brain', component: page('BrainPlace'), props: true },
   { path: '/brain/skills/:name', name: 'Skill', component: page('Skill'), props: true },
   { path: '/brain/review/:id', name: 'ItemReview', component: page('Review'), props: true },

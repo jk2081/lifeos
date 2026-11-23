@@ -78,9 +78,9 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 
 	space = permissions.resolve_space(space, write=True)
 	if source_type not in SOURCE_TYPES:
-		frappe.throw(_("source_type must be one of: {0}.").format(", ".join(SOURCE_TYPES)))
+		frappe.throw(_("source_type must be one of: {0}.").format(", ".join(SOURCE_TYPES)), title=_("Unknown source type"))
 	if intent and intent not in INTENTS:
-		frappe.throw(_("intent must be one of: {0}.").format(", ".join(INTENTS)))
+		frappe.throw(_("intent must be one of: {0}.").format(", ".join(INTENTS)), title=_("Unknown intent"))
 	system = (source_system or "").strip().lower() or None
 	connections.require_on(space, system)
 	existing = frappe.db.get_value("Life Inbox Item", {"space": space, "source_system": system, "external_id": external_id.strip()}) \
@@ -124,8 +124,8 @@ def _refile(name, system, source_type, values):
 	intent_changed = "intent" in changed_fields
 	if (content_changed and item.status == "Done") or (intent_changed and item.status in ("Done", "Failed")):
 		if item.status == "Failed":  # as retry does: the old attempt's pending proposals go
-			for proposal in frappe.get_all("Life Proposal", filters={"inbox_item": item.name, "status": "Pending"}, pluck="name"):
-				frappe.delete_doc("Life Proposal", proposal, ignore_permissions=True, force=True)
+			for proposal in frappe.get_list("Life Proposal", filters={"inbox_item": item.name, "status": "Pending"}, pluck="name"):
+				frappe.delete_doc("Life Proposal", proposal, ignore_permissions=True, force=True)  # system: inbox processing is the Brain's and agents' own work; the space check is above
 		item.status, item.error = "New", None
 		item.add_comment("Info", _("Updated from {0} ({1}), so it went back to the agent.").format(system, ", ".join(changed_fields)))
 	elif changed_fields:
@@ -142,7 +142,7 @@ def _refile(name, system, source_type, values):
 def release_stale_claims():
 	"""A claim older than 30 minutes goes back to New. Runs every five minutes and before each claim."""
 	cutoff = add_to_date(now_datetime(), minutes=-CLAIM_MINUTES)
-	stale = frappe.get_all("Life Inbox Item", filters={"status": "Processing", "claimed_on": ("<", cutoff)}, pluck="name")
+	stale = frappe.get_all("Life Inbox Item", filters={"status": "Processing", "claimed_on": ("<", cutoff)}, pluck="name")  # system: the stale-claim sweep covers every user's items
 	for name in stale:
 		frappe.db.set_value("Life Inbox Item", name, {"status": "New", "claimed_by": None, "claimed_on": None})
 	return len(stale)
@@ -189,15 +189,21 @@ def claim_next(space: str | None = None):
 
 
 def space_context(space):
-	"""What an agent needs to file proposals: the space's areas, people, habits, dimensions and goals in progress.
+	"""What an agent needs to file proposals: the space's areas, people, habits and goals in progress.
 	`areas` (issue 11) holds the areas of life that are on, each followed by its parts: file only into these. `areas_off`
 	names the areas of life that are switched off; nothing may be filed there, and their goals are left out."""
 	from lifeos import areas as life
 
 	areas = life.ordered(space, fields=["name", "area_name", "parent_area", "is_life_area", "description", "colour", "is_pinned", "is_focus", "standard"])
+	principles = {}
+	focus_names = [a.name for a in areas if a.is_focus]
+	if focus_names:
+		for row in frappe.get_list("Life Area Principle", filters={"parent": ("in", focus_names), "parenttype": "Life Area"}, fields=["parent", "line"],
+				order_by="idx", parent_doctype="Life Area", limit=0):
+			principles.setdefault(row.parent, []).append(row.line)
 	for a in areas:  # focuses (issue 57) only when the owner uses them: the standard and principles agents work within
 		if a.is_focus:
-			a["principles"] = frappe.get_all("Life Area Principle", filters={"parent": a.name, "parenttype": "Life Area"}, pluck="line", order_by="idx")
+			a["principles"] = principles.get(a.name, [])
 		else:
 			a.pop("is_focus", None), a.pop("standard", None)
 	off = set(life.off(space))
@@ -205,13 +211,20 @@ def space_context(space):
 	cycle = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date"], as_dict=True)
 	# every goal in progress, of every type, for filing a task under it; 12 Week Year goals of the active cycle carry their actions
 	goals = []
-	for g in frappe.db.sql("""select g.name, g.title, g.area, g.horizon, g.cycle, g.measure_kind, g.measure, g.unit, g.start_value,
+	rows = frappe.db.sql("""select g.name, g.title, g.area, g.horizon, g.cycle, g.measure_kind, g.measure, g.unit, g.start_value,
 			g.target_value, g.current_value, g.current_on from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle
 			where g.space=%s and g.outcome='In Progress' and (ifnull(g.cycle, '') = '' or c.status in ('Active', 'Planned'))
-			order by field(g.horizon, '12 weeks', 'Month', 'Year', 'Long term'), g.sort_order, g.title""", space, as_dict=True):
+			order by field(g.horizon, '12 weeks', 'Month', 'Year', 'Long term'), g.sort_order, g.title""", space, as_dict=True)
+	cycle_goals = [g.name for g in rows if g.cycle and g.area not in off]
+	actions = {}
+	if cycle_goals:
+		for row in frappe.get_list("Life Goal Action", filters={"parent": ("in", cycle_goals)}, fields=["parent", "name", "title", "status", "per_week"],
+				order_by="idx", parent_doctype="Life Goal", limit=0):
+			actions.setdefault(row.pop("parent"), []).append(row)
+	for g in rows:
 		if g.area in off:  # the goals of an area that is off are hidden
 			continue
-		g["actions"] = frappe.get_all("Life Goal Action", filters={"parent": g.name}, fields=["name", "title", "status", "per_week"], order_by="idx") if g.cycle else []
+		g["actions"] = actions.get(g.name, []) if g.cycle else []
 		if g.measure_kind == "Number":  # a number goal: what a Reading proposal reports (set 7)
 			g["measure"] = {"measure": g.measure, "unit": g.unit, "start": g.start_value, "target": g.target_value, "current": g.current_value if g.current_on else None}
 		g.pop("unit", None), g.pop("start_value", None), g.pop("target_value", None), g.pop("current_value", None), g.pop("current_on", None)
@@ -220,9 +233,8 @@ def space_context(space):
 		"space": space,
 		"areas": areas,
 		"areas_off": areas_off,
-		"people": frappe.get_all("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], limit=500),
-		"habits": frappe.get_all("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title"], limit=200),
-		"dimensions": frappe.get_all("Life Dimension", filters={"space": space, "is_archived": 0}, fields=["name", "dimension_name"], order_by="sort_order", limit=50),
+		"people": frappe.get_list("Life Person", filters={"space": space}, fields=["name", "full_name", "relation"], limit=500),
+		"habits": frappe.get_list("Life Habit", filters={"space": space, "is_archived": 0}, fields=["name", "title"], limit=200),
 		"cycle": ({"name": cycle.name, "title": cycle.title, "start_date": str(cycle.start_date)} if cycle else None),
 		"goals": goals,
 	}
@@ -231,9 +243,9 @@ def space_context(space):
 def _claimed_item(item_name):
 	item = permissions.get_doc_checked("Life Inbox Item", item_name, "write")
 	if item.status != "Processing":
-		frappe.throw(_("This item is not being processed. Claim it first."))
+		frappe.throw(_("This item is not being processed. Claim it first."), title=_("Item not claimed"))
 	if item.claimed_by != frappe.session.user and not permissions.is_admin():
-		frappe.throw(_("This item is claimed by someone else."), frappe.PermissionError)
+		frappe.throw(_("This item is claimed by someone else."), frappe.PermissionError, title=_("Item claimed by someone else"))
 	return item
 
 
@@ -248,11 +260,11 @@ def submit_result(item: str, transcript_md: str | None = None, summary_md: str |
 	doc = _claimed_item(item)
 	rows = parse(proposals, []) or []
 	if not isinstance(rows, LIST):
-		frappe.throw(_("proposals must be a list."))
+		frappe.throw(_("proposals must be a list."), title=_("Proposals must be a list"))
 	if rows and doc.intent == "Just keep":
-		frappe.throw(_("This item is to be kept only (intent Just keep). Send its text with no proposals."))
+		frappe.throw(_("This item is to be kept only (intent Just keep). Send its text with no proposals."), title=_("Item is kept only"))
 	if doc.intent == "Add to wiki" and any(isinstance(r, dict) and r.get("kind") == "Note" for r in rows):
-		frappe.throw(_("This item is for the wiki (intent Add to wiki). Write wiki pages with lifeos.api.wiki instead of proposing notes."))
+		frappe.throw(_("This item is for the wiki (intent Add to wiki). Write wiki pages with lifeos.api.wiki instead of proposing notes."), title=_("Item is for the wiki"))
 	created, errors, ctx, readings_made = [], [], {}, []
 	for i, row in enumerate(rows):
 		try:
@@ -295,7 +307,7 @@ def _finish_if_decided(doc):
 		# saved, not set: the Outbox hooks record the item leaving the Inbox (set 7)
 		doc.reload()
 		doc.status, doc.finished_on = "Done", frappe.utils.today()
-		doc.save(ignore_permissions=True)
+		doc.save(ignore_permissions=True)  # system: inbox processing is the Brain's and agents' own work; the space check is above
 	return doc.status
 
 
@@ -314,11 +326,11 @@ def retry(item: str):
 	"""Send a Failed item back to New so an agent picks it up again. Pending proposals of the old attempt are removed."""
 	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can retry an item."), frappe.PermissionError)
+		frappe.throw(_("Only a person can retry an item."), frappe.PermissionError, title=_("Only a person can retry"))
 	if doc.status not in ("Failed", "To Review", "Processing"):
-		frappe.throw(_("Only a failed item can be retried."))
-	for name in frappe.get_all("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name"):
-		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)
+		frappe.throw(_("Only a failed item can be retried."), title=_("Item has not failed"))
+	for name in frappe.get_list("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name"):
+		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)  # system: inbox processing is the Brain's and agents' own work; the space check is above
 	doc.status = "New"
 	doc.error = None
 	doc.save()
@@ -333,12 +345,12 @@ def file_myself(item: str):
 	"""The owner takes a capture the Brain could not process (Needs you, Unfiled): it leaves the queue as Done, and they file it by hand
 	from its page. Its pending proposals, if any, are removed. People only."""
 	if permissions.is_agent():
-		frappe.throw(_("Only a person can file a capture by hand."), frappe.PermissionError)
+		frappe.throw(_("Only a person can file a capture by hand."), frappe.PermissionError, title=_("Only a person can file"))
 	doc = permissions.get_doc_checked("Life Inbox Item", item, "write")
 	if doc.status not in ("Failed", "New"):
-		frappe.throw(_("Only a capture that was not processed can be filed by hand."))
-	for name in frappe.get_all("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name"):
-		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)
+		frappe.throw(_("Only a capture that was not processed can be filed by hand."), title=_("Capture was processed"))
+	for name in frappe.get_list("Life Proposal", filters={"inbox_item": doc.name, "status": "Pending"}, pluck="name"):
+		frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)  # system: inbox processing is the Brain's and agents' own work; the space check is above
 	doc.status, doc.error = "Done", None
 	doc.add_comment("Info", _("Filed by hand: the Brain did not process it."))
 	doc.save()
@@ -433,7 +445,7 @@ def get(item: str):
 	out["filed_by"], out["processed_by"] = users.get(doc.owner), users.get(doc.claimed_by)
 	out["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
 	out["goal_title"] = frappe.db.get_value("Life Goal", doc.goal, "title") if doc.goal else None
-	props = frappe.get_all("Life Proposal", filters={"inbox_item": doc.name},
+	props = frappe.get_list("Life Proposal", filters={"inbox_item": doc.name},
 		fields=["name", "kind", "preview", "payload", "confidence", "reason", "alt_area", "status", "created_doctype", "created_name", "decided_on"],
 		order_by="sort_order asc, creation asc", limit=100)
 	for p in props:

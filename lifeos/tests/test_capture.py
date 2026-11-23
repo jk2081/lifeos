@@ -8,7 +8,7 @@ import frappe
 from frappe.core.doctype.file.utils import find_file_by_url, get_content_hash
 from frappe.utils import add_to_date, now_datetime, today
 
-from lifeos import files, journal, links, permissions, proposals, trash
+from lifeos import calendar_data, cycles, files, links, permissions, proposals, trash
 from lifeos.api import chats, connections, inbox, meta, review, wiki
 from lifeos.devtools import attach, load_fake_agent, LocalClient, pdf_bytes
 from lifeos.pwa import SW_PATH
@@ -242,12 +242,11 @@ class TestReview(InboxCase):
 		out = inbox.submit_result(claimed["name"], transcript_md="Goal Oct to Dec", summary_md="s", proposals=[
 			{"kind": "Task", "payload": {"title": "Visit leased gardens", "area": "Tea", "goal": "Close open loops", "priority": "I"}},
 			{"kind": "Event", "payload": {"subject": "Golf round", "starts_on": "2026-11-14 07:00:00"}},
-			{"kind": "Important Date", "payload": {"title": "Ruchi", "day": 14, "month": 1, "kind": "Birthday", "person": "Ruchi"}},
+			{"kind": "Important Date", "payload": {"title": "Ruchi", "day": 14, "month": 1, "kind": "Birthday"}},
 			{"kind": "Note", "payload": {"title": "New crops by estate", "content_md": "pepper", "area": "Tea", "also_in": ["Money"]}},
 			{"kind": "Vault Document", "payload": {"title": "Driving licence", "doc_type": "ID", "expiry_date": "2026-12-12", "number_last4": "4821", "area": "Personal", "holder": "Ruchi"}},
 			{"kind": "Month Goal", "payload": {"title": "GHL visit", "year": 2033, "month": 2, "area": "Tea"}},
 			{"kind": "Habit Log", "payload": {"habit": "Japa", "date": "2026-11-13"}},
-			{"kind": "Check-in", "payload": {"date": "2026-11-14", "scores": [{"dimension": "Money", "habits": "2-3", "situation": 7, "note": "PMS"}], "reflection_md": "ok"}},
 			{"kind": "Week Tick", "payload": {"goal": "Close open loops", "action": "Anya passport", "mark_done": True}},
 			{"kind": "Journal Page", "payload": {"page_date": "2026-11-14", "page_number": "187-188"}},
 		])
@@ -262,24 +261,24 @@ class TestReview(InboxCase):
 		self.assertEqual((task.goal, task.priority, task.inbox_item), (goal.name, "I", claimed["name"]))
 		event = frappe.get_doc("Event", made["Event"].created_name)
 		self.assertEqual((event.subject, event.life_space, event.event_type), ("Golf round", PRIVATE, "Public"))
-		date = frappe.get_doc("Life Important Date", made["Important Date"].created_name)
-		self.assertEqual((date.day, date.month, date.person), (14, 1, person.name))
+		date = frappe.get_doc("Event", made["Important Date"].created_name)
+		self.assertEqual((date.subject, date.all_day, date.repeat_on, str(date.starts_on)[5:10]), ("Ruchi", 1, "Yearly", "01-14"))
+		self.assertEqual([d["title"] for d in calendar_data.important_dates_between(PRIVATE, "2035-01-14", "2035-01-14")], ["Ruchi"])
 		note = frappe.get_doc("Life Note", made["Note"].created_name)
 		self.assertEqual([r.area for r in note.also_in], [self.areas["Money"]])
 		vault = frappe.get_doc("Life Vault Document", made["Vault Document"].created_name)
 		self.assertEqual((vault.number_last4, str(vault.expiry_date), vault.holder), ("4821", "2026-12-12", person.name))
 		self.assertTrue(vault.file)
 		self.assertEqual(made["Month Goal"].created_doctype, "Life Goal")
-		self.assertEqual([(g["title"], g["status"]) for g in journal.month_goals(PRIVATE, 2033, 2)], [("GHL visit", "Open")])
+		self.assertEqual([(g["title"], g["status"]) for g in cycles.month_goals(PRIVATE, 2033, 2)], [("GHL visit", "Open")])
 		self.assertTrue(frappe.db.exists("Life Habit Log", {"habit": habit.name, "date": "2026-11-13", "done": 1}))
-		checkin = frappe.get_doc("Life Check-in", made["Check-in"].created_name)
-		self.assertEqual((checkin.scores[0].habits_low, checkin.scores[0].habits_high, checkin.scores[0].situation_low), (2, 3, 7))
 		goal.reload()
 		action = goal.actions[0]
 		self.assertEqual(action.status, "Done")
 		self.assertTrue(frappe.db.exists("Life Action Log", {"action_id": action.name, "week": 1}))
-		page = frappe.get_doc("Life Journal Page", made["Journal Page"].created_name)
-		self.assertEqual((page.page_number, page.transcript_md, page.inbox_item), ("187-188", "Goal Oct to Dec", claimed["name"]))
+		page = frappe.get_doc("Life Note", made["Journal Page"].created_name)  # a journal page is a note in My notes
+		self.assertEqual((page.collection, str(page.page_date), page.content_md, page.inbox_item), ("My notes", "2026-11-14", "Goal Oct to Dec", claimed["name"]))
+		self.assertEqual(page.title, "Journal page 187-188, 2026-11-14")
 		self.assertTrue(page.image)
 		# the original stays on the inbox item
 		self.assertEqual(len(inbox.get(claimed["name"])["files"]), 1)
@@ -311,7 +310,7 @@ class TestFakeAgent(InboxCase):
 		self.assertEqual(out["item_status"], "Done")
 		tasks = frappe.get_all("Life Task", filters={"inbox_item": item["name"]}, pluck="title")
 		self.assertEqual(sorted(tasks), ["Genetic promotion", "Meet Arjun Singh for PMS"])
-		self.assertTrue(frappe.db.exists("Life Journal Page", {"inbox_item": item["name"]}))
+		self.assertTrue(frappe.db.exists("Life Note", {"inbox_item": item["name"], "page_date": today()}))
 
 	def test_pdf_gives_tasks_and_failure_is_reported(self):
 		fake = load_fake_agent()

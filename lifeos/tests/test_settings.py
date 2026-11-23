@@ -5,7 +5,7 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import add_days, today
 
-from lifeos import areas, demo, devtools, index, install, journal as rules, ladder, permissions, queries, seed
+from lifeos import areas, cycles as rules, demo, devtools, index, install, ladder, permissions, queries, seed
 from lifeos.api import area as area_api, goals, inbox, meta, onboarding, session, settings, tasks
 from lifeos.constants import SPACE_DOCTYPES
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
@@ -99,11 +99,6 @@ class TestModel(LifeTestCase):
 		doc.notes_md = "Account 123456789012"
 		self.assertRaises(frappe.ValidationError, doc.save)
 
-	def test_important_date_validation(self):
-		self.make("Life Important Date", title="Leap birthday", day=29, month=2)
-		bad = frappe.get_doc({"doctype": "Life Important Date", "space": PRIVATE, "title": "Bad", "day": 31, "month": 4})
-		self.assertRaises(frappe.ValidationError, bad.insert)
-
 	def test_habit_log_is_unique_per_day(self):
 		habit = self.make("Life Habit", title="Japa test")
 		self.make("Life Habit Log", habit=habit.name, date="2026-11-01")
@@ -111,30 +106,10 @@ class TestModel(LifeTestCase):
 		self.assertRaises(frappe.DuplicateEntryError, dup.insert)
 		self.make("Life Habit Log", habit=habit.name, date="2026-11-02")
 
-	def test_check_in_ranges(self):
-		from lifeos.life.doctype.life_check_in.life_check_in import parse_range
-
-		self.assertEqual(parse_range("2-3"), (2.0, 3.0))
-		self.assertEqual(parse_range("7"), (7.0, 7.0))
-		self.assertEqual(parse_range(6.5), (6.5, 6.5))
-		self.assertEqual(parse_range(""), (None, None))
-		dim = frappe.db.get_value("Life Dimension", {"space": PRIVATE, "dimension_name": "Money"})
-		doc = self.make("Life Check-in", date=today(), scores=[
-			{"dimension": dim, "habits_low": 2, "habits_high": 3, "situation_low": 7, "situation_high": 7}])
-		self.assertEqual((doc.scores[0].habits_low, doc.scores[0].habits_high), (2, 3))
-		bad = frappe.get_doc({"doctype": "Life Check-in", "space": PRIVATE, "date": today(),
-			"scores": [{"dimension": dim, "habits_low": 4, "habits_high": 11}]})
-		self.assertRaises(frappe.ValidationError, bad.insert)
-
 	def test_cycle_end_date(self):
 		cycle = self.make("Life Cycle", title="Test cycle", start_date="2026-10-05")
 		self.assertEqual(str(cycle.end_date), "2026-12-27")
 
-	def test_month_plan_name(self):
-		plan = self.make("Life Month Plan", year=2031, month=3)
-		self.assertEqual(plan.name, f"{PRIVATE}-2031-03")
-		dup = frappe.get_doc({"doctype": "Life Month Plan", "space": PRIVATE, "year": 2031, "month": 3})
-		self.assertRaises(frappe.DuplicateEntryError, dup.insert)
 
 
 class TestAreasAndGoals(LifeTestCase):
@@ -183,16 +158,14 @@ class TestIndex(LifeTestCase):
 			self.make("Life Note", title="Indexed note"),
 			self.make("Life Vault Document", title="Passport"),
 			self.make("Life Chat Log", title="Mandir planning", date=today(), open_items=[{"text": "Decide the deity"}]),
-			self.make("Life Journal Page", page_date=today(), page_number="187", transcript_md="Goal Oct to Dec"),
-			self.make("Life Check-in", date=today(), reflection_md="steady week"),
-			self.make("Life Month Plan", year=2032, month=5, mindsweep_md="## Land"),
+			self.make("Life Note", title="Journal page 187", page_date="2026-11-14", content_md="Goal Oct to Dec"),
 		]
 		for doc in made:
 			rows = index_rows(doc.doctype, doc.name)
 			self.assertEqual(len(rows), 1, doc.doctype)
 			self.assertEqual(rows[0].space, PRIVATE)
 		self.assertEqual(index_rows("Life Chat Log", made[4].name)[0].status, "Open")
-		self.assertEqual(str(index_rows("Life Month Plan", made[7].name)[0].record_date), "2032-05-01")
+		self.assertEqual(str(index_rows("Life Note", made[5].name)[0].record_date), "2026-11-14")  # a journal page is dated the day it was written
 
 	def test_done_task_gets_a_second_dated_row(self):
 		task = self.make("Life Task", title="Finish me")
@@ -239,7 +212,6 @@ class TestSeed(LifeTestCase):
 		for space in frappe.get_all("Life Space", filters={"name": ("in", ("Private", "Shared"))}, pluck="name"):
 			top = frappe.get_all("Life Area", filters={"space": space, "parent_area": ("is", "not set")}, pluck="area_name", order_by="sort_order")
 			self.assertEqual(top, ["Career", "Health", "Relationships", "Money", "Emotions", "Mind", "Environment"])
-		self.assertEqual(frappe.db.count("Life Dimension", {"space": "Private"}), 8)
 
 	def test_the_demo_cycle_loads_and_removes(self):
 		from unittest.mock import patch
@@ -257,11 +229,9 @@ class TestSeed(LifeTestCase):
 			self.assertEqual([g.title for g in goals], [g[0] for g in demo.GOALS])
 			self.assertEqual([a.status for a in frappe.get_doc("Life Goal", goals[1].name).actions if a.title == "Book the passport photo"], ["Done"])
 			self.assertEqual(len(rules.month_goals(PRIVATE, 2026, 10)), len(demo.OCTOBER))
-			november = frappe.get_doc("Life Month Plan", f"{PRIVATE}-2026-11")
-			self.assertEqual([frappe.db.get_value("Life Habit", h.habit, "title") for h in november.habits], demo.HABITS)
+			self.assertEqual(frappe.get_all("Life Habit", filters={"space": PRIVATE, "tracked_from": ("is", "set")}, pluck="title", order_by="sort_order"), demo.HABITS)
 			seed._remove(key)
 			self.assertFalse(frappe.db.exists("Life Cycle", cycle.name))
-			self.assertFalse(frappe.db.exists("Life Month Plan", f"{PRIVATE}-2026-10"))
 			self.assertEqual(frappe.db.count("Life Habit", {"space": PRIVATE, "title": ("in", demo.HABITS)}), 0)
 
 
@@ -473,12 +443,12 @@ class TestSettings(LifeTestCase):
 	def test_rhythms_save_and_read_back(self):
 		before = settings.get(space=PRIVATE)["settings"]
 		try:
-			settings.save({"start_of_day": "05:30:00", "week_starts_on": "Sunday", "month_plan_enabled": 0, "cycle_break_week": 0, "weekly_review_day": "Saturday"})
+			settings.save({"start_of_day": "05:30:00", "week_starts_on": "Sunday", "cycle_break_week": 0, "weekly_review_day": "Saturday"})
 			s = settings.get(space=PRIVATE)["settings"]
-			self.assertEqual((s["start_of_day"][:5], s["week_starts_on"], s["month_plan_enabled"], s["cycle_break_week"], s["weekly_review_day"]),
-				("05:30", "Sunday", 0, 0, "Saturday"))
+			self.assertEqual((s["start_of_day"][:5], s["week_starts_on"], s["cycle_break_week"], s["weekly_review_day"]),
+				("05:30", "Sunday", 0, "Saturday"))
 		finally:
-			settings.save({k: before[k] for k in ("start_of_day", "week_starts_on", "month_plan_enabled", "cycle_break_week", "weekly_review_day") if before[k] is not None})
+			settings.save({k: before[k] for k in ("start_of_day", "week_starts_on", "cycle_break_week", "weekly_review_day") if before[k] is not None})
 
 	def test_area_pin_and_colour(self):
 		a = self.areas["Tea"]

@@ -34,11 +34,12 @@ await check('BRAIN.1', 'Journal photo: agent submits 5 proposals; accept 3, edit
   const made = got.proposals.filter((p) => p.status === 'Accepted')
   must(made.length === 4 && made.every((p) => p.created_name), 'accepted proposals did not store their records')
   const links = await owner.api('links.backlinks', { doctype: 'Life Inbox Item', name: item.name })
-  must(links.some((l) => l.doctype === 'Life Task') && links.some((l) => l.doctype === 'Life Journal Page'), 'records do not link back to the photo')
+  must(links.some((l) => l.doctype === 'Life Task') && links.some((l) => l.doctype === 'Life Note'), 'records do not link back to the photo')
   const tasks = await owner.api('tasks.list', { space: SPACE, page_length: 100, filters: [['title', 'like', stamp]] }) // this run's tasks: the site holds more than one page
   must(tasks.tasks.some((t) => t.title === `Promotion plan ${stamp}` && t.inbox_item === item.name), 'the edited task is not in Tasks')
-  const pages = await owner.api('journal.pages', { space: SPACE })
-  must(JSON.stringify(pages).includes(item.name), 'the journal page is not in Journal, Pages')
+  const page = links.find((l) => l.doctype === 'Life Note')
+  const notes = await owner.api('library.list', { space: SPACE, page_length: 100, filters: [['title', 'like', 'Journal page%']] })
+  must(notes.notes.some((n) => n.name === page.name), 'the journal page is not a note in Library > Notes')
   return `${made.length} accepted (1 edited), 1 rejected`
 })
 
@@ -84,8 +85,8 @@ await check('BRAIN.4', 'A second user who is only in Shared sees nothing from Pr
   must(!JSON.stringify(boot.spaces).includes('Private'), 'Private is offered in the space switcher')
   const reads = { 'today.get': {}, 'tasks.list': {}, 'timeline.get': {}, 'inbox.list': {}, 'library.tree': {}, 'vault.list': {}, 'chats.report': {},
     'graph.get': {}, 'archive.list': {}, 'calendar.get': { from_date: '2026-11-01', to_date: '2026-12-31' }, 'calendar.year': { year: 2026 },
-    'goals.list': {}, 'sources.list': {}, 'someday.list': {}, 'counts.get': {}, 'session.counts': {}, 'area.tree': {}, 'journal.grid': {}, 'journal.goals': {}, 'journal.month': {}, 'journal.habits': {}, 'journal.checkins': {},
-    'journal.pages': {}, 'journal.weekly_review': {}, 'settings.get': {}, 'weekly.get': {}, 'weekly.library': {}, 'weekly.goals': {}, 'weekly.plate': {} }
+    'goals.list': {}, 'sources.list': {}, 'someday.list': {}, 'counts.get': {}, 'session.counts': {}, 'area.tree': {}, 'goals.grid': {}, 'goals.across_cycles': {}, 'goals.this_month': {}, 'goals.month_habits': {},
+    'today.week_summary': {}, 'settings.get': {}, 'weekly.get': {}, 'weekly.library': {}, 'weekly.goals': {}, 'weekly.plate': {}, 'weekly.stale_tasks': {} }
   for (const [m, args] of Object.entries(reads)) {
     const r = await fam.api(m, { ...args, space: SPACE }, { raw: true })
     must(r.status() === 403, `${m} with space=Private answered ${r.status()}`)
@@ -106,8 +107,8 @@ await check('BRAIN.4', 'A second user who is only in Shared sees nothing from Pr
   let screens = 0
   // every place, tab and view (set 6), and a Private goal's page and Private area in the URL
   for (const p of ['', '/brain', '/brain/queue', '/today/week?view=review', '/today/week?view=calendar', '/today/week?view=agenda', '/goals/cycles', '/today/month?view=habits',
-    '/today/month?view=checkins', '/today/month?view=calendar', '/today/year?view=calendar', '/today/year?view=goals', '/goals', '/goals/tasks',
-    '/goals/someday', '/today/reset', '/library', '/library/notes', '/library/notes?view=tree', '/library/notes?view=graph', '/library/notes?by=assistant',
+    '/today/month?view=calendar', '/today/year?view=calendar', '/today/year?view=goals', '/goals', '/goals/tasks',
+    '/goals/someday', '/settings?tab=data', '/library', '/library/notes', '/library/notes?view=tree', '/library/notes?view=graph', '/library/notes?by=assistant',
     '/library/documents?sensitive=1', '/library/chats', '/library/notes?view=list', '/library/timeline',
     '/library/archive', '/ask', '/settings', `/goals/${privateGoal}`, `/?area=${areaId('Tea & Coffee')}`]) {
     await fam.open('/life' + p)
@@ -136,7 +137,7 @@ await check('BRAIN.5', 'At review, change the area with one tap and add a second
 await check('TODAY.4', 'Timeline shows everything captured on one day', async () => {
   const t = await owner.api('timeline.get', { space: SPACE, from_date: today, to_date: today, page_length: 100 })
   const kinds = new Set(t.days.flatMap((d) => d.entries.map((e) => e.kind)))
-  for (const k of ['Inbox', 'Task', 'Note', 'Document', 'Journal Page']) must(kinds.has(k), `no ${k} on today's timeline`)
+  for (const k of ['Inbox', 'Task', 'Note', 'Document']) must(kinds.has(k), `no ${k} on today's timeline`)
   must(t.days.length === 1, 'more than one day returned')
   await owner.open('/life/library/timeline?all=1') // a bare URL restores the remembered view, which a UX check may have filtered
   must((await owner.page.locator('[data-main]').innerText()).includes(`Target note ${stamp}`), 'the screen does not show today')
@@ -189,11 +190,11 @@ await check('BRAIN.7', 'Security: the PWA manifest and icons are served; an agen
 
 for (const width of WIDTHS) {
   const { S5, askOn, count, pane, paneTitle, pg, phone, s, settle, tag, tasksLike } = await uxKit(width)
-  await check('BRAIN.8', `${width} px: Ask: from Today, Today under an area, a goal page, Reset and a record pane, with the scope of the screen; citations open their records; Make task only when clicked; the panel closes and the screen is as it was`, async () => {
+  await check('BRAIN.8', `${width} px: Ask: from Today, Today under an area, a goal page and a record pane, with the scope of the screen; citations open their records; Make task only when clicked; the panel closes and the screen is as it was`, async () => {
     const done = []
     // set 6: the area page became the lens (Ask's scope is the lens), the project page the goal's page
     for (const [path, scope] of [['/life', 'Everything in this space'], ['/life?area=' + uxArea, areas.find((x) => x.name === uxArea).area_name],
-      ['/life/goals/' + ux.goal, ux.goalTitle], ['/life/today/reset', 'Items on Reset']]) {
+      ['/life/goals/' + ux.goal, ux.goalTitle]]) {
       await askOn(path, scope)
       const here = new URL(pg.url()).pathname
       const cites = pg.locator('[data-ask-cite]:visible')

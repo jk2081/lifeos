@@ -13,7 +13,7 @@ DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 def setup(tag):
 	"""Owner-shaped data around a fresh review; returns the names the checks use, and the settings to restore."""
 	if frappe.conf.get("lifeos_fake_calendar") != 1 or not frappe.conf.get("lifeos_strict_get"):
-		frappe.throw("Only on the acceptance site.")  # nosemgrep: frappe-missing-translate-function-python -- development tool, never shown in the app
+		frappe.throw("Only on the acceptance site.", title="Acceptance site only")  # nosemgrep: frappe-missing-translate-function-python -- development tool, never shown in the app
 	from lifeos import readings
 	from lifeos.review import gcal
 
