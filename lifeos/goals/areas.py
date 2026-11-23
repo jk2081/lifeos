@@ -80,8 +80,15 @@ def is_off(space, area):
 	return bool(area) and area in off(space)
 
 
+def off_criterion(space, field):
+	"""A pypika criterion that leaves out records filed under an area that is off (`field` is the record's area column), or None
+	when every area is on."""
+	names = off(space)
+	return None if not names else frappe.query_builder.functions.IfNull(field, "").notin(names)
+
+
 def off_clause(space, column, values, key="off_areas"):
-	"""SQL that leaves out records filed under an area that is off: "" when every area is on, otherwise a condition that
+	"""LEGACY (SQL text; the new API is off_criterion). SQL that leaves out records filed under an area that is off: "" when every area is on, otherwise a condition that
 	starts with " and ". `column` is fixed SQL from the caller; the names go in `values`."""
 	names = off(space)
 	if not names:

@@ -41,9 +41,8 @@ def habits_month(space, year, month) -> dict:
 	ids = [r.name for r in rows]
 	logs = {}
 	if ids:
-		for h, d in frappe.db.sql(
-			"select habit, date from `tabLife Habit Log` where habit in %s and date between %s and %s and done=1", (ids, first, last)
-		):
+		for h, d in frappe.get_list("Life Habit Log", filters={"habit": ("in", ids), "date": ("between", [first, last]), "done": 1},
+				fields=["habit", "date"], as_list=True, limit=100000):
 			logs.setdefault(h, set()).add(getdate(d))
 	for r in rows:
 		done_dates = logs.get(r.name, set())

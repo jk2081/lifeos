@@ -4,6 +4,8 @@ import builtins
 
 import frappe
 from frappe import _
+from frappe.query_builder import Case, Order
+from frappe.query_builder import functions as fn
 from frappe.utils import add_days, getdate, today
 
 from lifeos.goals import cycles as rules
@@ -13,20 +15,33 @@ from lifeos.goals import readings
 from lifeos.life.doctype.life_goal.life_goal import HORIZONS, derive_horizon, planning_in_quarters, refuse_open
 from lifeos.goals.areas import off as areas_off
 from lifeos.goals.areas import use_focuses
-from lifeos.goals.areas import off_clause
-from lifeos.api.utils import area_filter, descendants, in_area, lens_area, names_map, parse, page, std_clause, std_order, summarise, tab_counts
-from lifeos.api.utils import order_by as sort_order
+from lifeos.goals.areas import off_criterion
+from lifeos.api.utils import (apply_order, area_criterion, count_tabs, descendants, filter_criteria, group_summary, in_area, in_order_of, lens_area, list_query,
+	names_map, null_last, order_terms, parse, page, sort_terms)
 
 TYPES = ("12 weeks", "Month", "Year", "Long term")  # the order lists show them in
 CLOSED = ("Partly Achieved", "Not Achieved", "Carried", "Dropped")
 OUTCOMES = ("In Progress", "Achieved", *CLOSED)
 # the state tabs of the Goals screen
 # Someday goals (UX fixes, set 5) leave In progress and have their own tab; their outcome is not changed
-TABS = {"in_progress": "g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0", "achieved": "g.outcome = 'Achieved'",
-	"closed": "g.outcome in ('Partly Achieved', 'Not Achieved', 'Carried', 'Dropped')", "someday": "g.is_someday = 1", "all": "g.is_someday = 0"}
+def tab_criteria(g):
+	"""The state tabs of the Goals screen as criteria over the goal table `g`: None counts every goal."""
+	return {"in_progress": (g.outcome == "In Progress") & (g.is_someday == 0) & (g.is_archived == 0), "achieved": g.outcome == "Achieved",
+		"closed": g.outcome.isin(CLOSED), "someday": g.is_someday == 1, "all": g.is_someday == 0}
+
+
 COUNTED = ("Open", "Doing", "Waiting", "Done")
-SORTS = {"title": "g.title", "target_date": "g.target_date is null, g.target_date", "completion": "_completion",
-	"creation": "g.creation", "serves": "s.title is null, s.title, g.serves, g.horizon, g.title"}
+HORIZON_ORDER = ("12 weeks", "Month", "Year", "Long term")
+LIST_FIELDS = ("name", "title", "horizon", "area", "serves", "cycle", "target_date", "outcome", "closed_on", "result_note", "final_score",
+	"on_hold", "done_when", "last_activity_on", "is_archived", "is_someday", "measure_kind", "measure", "unit", "start_value", "target_value",
+	"current_value", "current_on")
+
+
+def with_joins(query, g):
+	"""The list's query with the area, cycle and serving goal joined on: area_name, cycle_title, cycle_status, serves_title."""
+	a, c, s = frappe.qb.DocType("Life Area").as_("a"), frappe.qb.DocType("Life Cycle").as_("c"), frappe.qb.DocType("Life Goal").as_("s")
+	query = query.left_join(a).on(a.name == g.area).left_join(c).on(c.name == g.cycle).left_join(s).on(s.name == g.serves)
+	return query.select(a.area_name, c.title.as_("cycle_title"), c.status.as_("cycle_status"), s.title.as_("serves_title"))
 
 
 def task_counts(goals):
@@ -34,14 +49,11 @@ def task_counts(goals):
 	Open, Doing, Waiting or Done; archived ones count, so the figure does not fall when done tasks are archived. Tasks
 	that serve it through another goal count only under that goal. Only tasks in the user's spaces are counted."""
 	goals = [g for g in goals if g]
-	spaces = [*permissions.user_spaces()] if frappe.session.user != "Administrator" else None
-	if not goals or spaces == []:
+	if not goals:
 		return {}
-	sp = "and t.space in %(spaces)s" if spaces is not None else ""
-	# nosemgrep: frappe-sql-format-injection -- `sp` is one of two constant fragments; values are parameters
-	rows = frappe.db.sql(f"""select t.goal, sum(t.status = 'Done'), count(*) from `tabLife Task` t
-		where t.goal in %(goals)s and t.status in %(counted)s {sp} group by t.goal""",
-		{"goals": goals, "counted": COUNTED, "spaces": spaces or [""]})
+	t = frappe.qb.DocType("Life Task")
+	rows = frappe.qb.get_query("Life Task", fields=[t.goal, fn.Sum(Case().when(t.status == "Done", 1).else_(0)), fn.Count("*")], ignore_permissions=False)  # the user's spaces only
+	rows = rows.where(t.goal.isin(goals) & t.status.isin(COUNTED)).groupby(t.goal).run()
 	return {g: (int(done or 0), int(n or 0)) for g, done, n in rows}
 
 
@@ -53,33 +65,29 @@ def with_tasks(rows, key="name"):
 	return rows
 
 
-def where_clause(space, state=None, horizon=None, area=None, cycle=None, target_from=None, target_to=None, serves=None):
-	where, values = [], {}
+def where_criteria(space, state=None, horizon=None, area=None, cycle=None, target_from=None, target_to=None, serves=None):
+	g = frappe.qb.DocType("Life Goal")
+	where = [g.space == space]
 	if state:
-		if state not in TABS:
+		if state not in tab_criteria(g):
 			frappe.throw(_("Unknown state."), title=_("Unknown goal state"))
-		where.append(TABS[state])
+		where.append(tab_criteria(g)[state])
 	if horizon:
-		where.append("g.horizon = %(horizon)s")
-		values["horizon"] = horizon
+		where.append(g.horizon == horizon)
 	if area:
-		where.append(area_filter(space, area, "g.area", values))
-	off = off_clause(space, "g.area", values)  # goals of an area that is off are hidden (issue 11)
-	if off:
-		where.append(off[len(" and "):])
+		where.append(area_criterion(space, area, g))
+	off = off_criterion(space, g.area)  # goals of an area that is off are hidden (issue 11)
+	if off is not None:
+		where.append(off)
 	if serves:
-		where.append("g.serves = %(serves)s")
-		values["serves"] = serves
+		where.append(g.serves == serves)
 	if cycle:
-		where.append("g.cycle = %(cycle)s")
-		values["cycle"] = cycle
+		where.append(g.cycle == cycle)
 	if target_from:
-		where.append("g.target_date >= %(target_from)s")
-		values["target_from"] = target_from
+		where.append(g.target_date >= target_from)
 	if target_to:
-		where.append("g.target_date <= %(target_to)s")
-		values["target_to"] = target_to
-	return "".join(" and " + w for w in where), values
+		where.append(g.target_date <= target_to)
+	return where
 
 
 @frappe.whitelist(methods=["GET"])
@@ -92,32 +100,28 @@ def list(space: str | None = None, state: str | None = "in_progress", horizon: s
 	done out of counted across the goals the filters match. `serves` keeps the goals that serve one goal. Each row also has on_hold, done_when, serves and its title, and last_activity_on."""
 	space = permissions.resolve_space(space)
 	start, page_length = page(start, page_length)
-	where, values = where_clause(space, state, horizon, area, cycle, target_from, target_to, serves)
-	extra, values = std_clause("Life Goal", filters, "g", values)
-	where += extra
-	t_where, t_values = where_clause(space, None, horizon, area, cycle, target_from, target_to, serves)
-	base = {"space": space}
-	tabs = tab_counts(f"from `tabLife Goal` g where g.space=%(space)s {t_where}{extra}", {**t_values, **values, **base}, TABS)
+	g = frappe.qb.DocType("Life Goal")
+	extra = filter_criteria("Life Goal", filters, g)
+	where = where_criteria(space, state, horizon, area, cycle, target_from, target_to, serves) + extra
+	tabs = count_tabs("Life Goal", where_criteria(space, None, horizon, area, cycle, target_from, target_to, serves) + extra, tab_criteria(g))
 	if summary:
-		return {"summary": summarise("Life Goal", f"from `tabLife Goal` g where g.space=%(space)s {where}", {**base, **values}, "g", summary, start, page_length), "tabs": tabs}
-	# nosemgrep: frappe-sql-format-injection -- WHERE from where_clause (TABS map) and std_clause (meta-checked columns); values are parameters
-	names = frappe.db.sql(f"select g.name from `tabLife Goal` g where g.space=%(space)s {where}", {**base, **values}, pluck=True)
+		return {"summary": group_summary("Life Goal", where, summary, start, page_length), "tabs": tabs}
+	names = list_query("Life Goal", ["name"], where).run(pluck=True)
 	counts = task_counts(names)
 	total_done = sum(counts.get(n, (0, 0))[0] for n in names)
 	total_counted = sum(counts.get(n, (0, 0))[1] for n in names)
 	completion = (order_by or "").startswith("completion") or sort == "completion"
-	order = None if completion else std_order("Life Goal", order_by, "g")
-	if not order and not completion:
-		order = sort_order(sort, dir, {k: v for k, v in SORTS.items() if k != "completion"}, "field(g.horizon, '12 weeks', 'Month', 'Year', 'Long term'), g.target_date is null, g.target_date, g.creation")
-	# nosemgrep: frappe-sql-format-injection -- WHERE from where_clause (TABS map) and std_clause (meta-checked columns); ORDER from SORTS or std_order
-	rows = frappe.db.sql(f"""select g.name, g.title, g.horizon, g.area, g.serves, g.cycle, g.target_date, g.outcome, g.closed_on,
-		g.result_note, g.final_score, g.on_hold, g.done_when, g.last_activity_on, g.is_archived, g.is_someday,
-		g.measure_kind, g.measure, g.unit, g.start_value, g.target_value, g.current_value, g.current_on,
-		a.area_name, c.title as cycle_title, c.status as cycle_status, s.title as serves_title
-		from `tabLife Goal` g left join `tabLife Area` a on a.name = g.area left join `tabLife Cycle` c on c.name = g.cycle
-		left join `tabLife Goal` s on s.name = g.serves
-		where g.space=%(space)s {where} order by {order or 'g.creation'}""" + ("" if completion else " limit %(start)s, %(len)s"),
-		{**base, **values, "start": start, "len": page_length}, as_dict=True)
+	terms = [] if completion else order_terms("Life Goal", order_by, g)
+	if not terms and not completion:
+		sv = frappe.qb.DocType("Life Goal").as_("s")
+		sorts = {"title": lambda t: [t.title], "target_date": lambda t: null_last(t.target_date), "creation": lambda t: [t.creation],
+			"serves": lambda t: [sv.title.isnull(), sv.title, t.serves, t.horizon, t.title]}
+		terms = sort_terms(sort, dir, sorts, g, [(in_order_of(g.horizon, HORIZON_ORDER), Order.asc), (g.target_date.isnull(), Order.asc),
+			(g.target_date, Order.asc), (g.creation, Order.asc)])
+	query = with_joins(list_query("Life Goal", LIST_FIELDS, where, terms or [(g.creation, Order.asc)]), g)
+	if not completion:
+		query = query.limit(page_length).offset(start)
+	rows = query.run(as_dict=True)
 	with_tasks(rows)
 	if completion:
 		desc = "desc" in (order_by or dir or "").lower()
@@ -136,11 +140,10 @@ def list(space: str | None = None, state: str | None = "in_progress", horizon: s
 		"summary_line": {"in_progress": tabs["in_progress"], "tasks_done": total_done, "tasks_counted": total_counted}}
 
 
-SHOWS = {
-	"cycle": "g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0 and c.status = 'Active'",
-	"open": TABS["in_progress"],
-	"finished": "g.outcome != 'In Progress' and g.is_someday = 0",
-}
+def show_criteria(g, c):
+	"""The `show` choices of Goals -> By area as criteria over the goal table `g` and the joined cycle `c`."""
+	return {"cycle": (g.outcome == "In Progress") & (g.is_someday == 0) & (g.is_archived == 0) & (c.status == "Active"),
+		"open": tab_criteria(g)["in_progress"], "finished": (g.outcome != "In Progress") & (g.is_someday == 0)}
 
 
 def _next_actions(space, names):
@@ -175,18 +178,20 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 	goal has its Done when, progress, the cycle's current week and score, the next action, the open task count and what it
 	serves. Areas that are off have no section and are listed in `off` for the chips."""
 	space = permissions.resolve_space(space)
-	if show not in SHOWS:
+	if show not in ("cycle", "open", "finished"):
 		frappe.throw(_("Unknown filter."), title=_("Unknown goal filter"))
 	if sort not in ("order", "score"):
 		frappe.throw(_("Unknown sort."), title=_("Unknown sort order"))
-	values = {"space": space}
-	off = off_clause(space, "g.area", values)
-	# nosemgrep: frappe-sql-format-injection -- SHOWS is a constant map, off is off_clause's fixed SQL; values are parameters
-	rows = frappe.db.sql(f"""select g.name, g.title, g.horizon, g.area, g.serves, g.cycle, g.target_date, g.outcome, g.on_hold, g.done_when,
-		g.measure_kind, g.measure, g.unit, g.start_value, g.target_value, g.current_value, g.current_on, g.sort_order,
-		c.title as cycle_title, c.start_date as cycle_start, s.title as serves_title
-		from `tabLife Goal` g left join `tabLife Cycle` c on c.name = g.cycle left join `tabLife Goal` s on s.name = g.serves
-		where g.space = %(space)s and {SHOWS[show]} {off} order by g.sort_order, g.creation""", values, as_dict=True)
+	g, c, sv = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Cycle").as_("c"), frappe.qb.DocType("Life Goal").as_("s")
+	where = [g.space == space, show_criteria(g, c)[show]]
+	off = off_criterion(space, g.area)
+	if off is not None:
+		where.append(off)
+	fields = ["name", "title", "horizon", "area", "serves", "cycle", "target_date", "outcome", "on_hold", "done_when", "measure_kind", "measure",
+		"unit", "start_value", "target_value", "current_value", "current_on", "sort_order"]
+	rows = list_query("Life Goal", fields, where, [(g.sort_order, Order.asc), (g.creation, Order.asc)])
+	rows = rows.left_join(c).on(c.name == g.cycle).left_join(sv).on(sv.name == g.serves)
+	rows = rows.select(c.title.as_("cycle_title"), c.start_date.as_("cycle_start"), sv.title.as_("serves_title")).run(as_dict=True)
 	names = [r.name for r in rows]
 	counts = task_counts(names)
 	nxt = _next_actions(space, names)
@@ -255,8 +260,9 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 
 def annual_focuses(space):
 	"""Names of the focuses of a space that have at least one active Annual goal (horizon Year, in progress, not parked or archived)."""
-	return set(frappe.db.sql_list("""select distinct g.area from `tabLife Goal` g join `tabLife Area` a on a.name = g.area and a.is_focus = 1
-		where g.space = %s and g.horizon = 'Year' and g.outcome = 'In Progress' and g.is_someday = 0 and g.is_archived = 0""", space))
+	g, a = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Area").as_("a")
+	where = [g.space == space, g.horizon == "Year", g.outcome == "In Progress", g.is_someday == 0, g.is_archived == 0]
+	return set(list_query("Life Goal", ["area"], where).distinct().join(a).on((a.name == g.area) & (a.is_focus == 1)).run(pluck=True))
 
 
 @frappe.whitelist(methods=["POST"])
@@ -401,14 +407,14 @@ def add_to_cycle(goal: str, cycle: str):
 def picker(space: str | None = None):
 	"""Every goal in progress, grouped by type, for the goal picker on a task."""
 	space = permissions.resolve_space(space)
-	values = {"space": space}
-	off = off_clause(space, "g.area", values)  # not goals of an area that is off (issue 11)
-	# nosemgrep: frappe-sql-format-injection -- `off` is off_clause's fixed SQL; values are parameters
-	rows = frappe.db.sql(f"""select g.name, g.title, g.horizon, g.area, c.title as cycle_title from `tabLife Goal` g
-		left join `tabLife Cycle` c on c.name = g.cycle where g.space=%(space)s and g.outcome = 'In Progress'
-		and (g.horizon != '12 weeks' or c.status in ('Active', 'Planned')){off}
-		order by field(g.horizon, '12 weeks', 'Month', 'Year', 'Long term'), g.sort_order, g.title""", values, as_dict=True)
-	return rows
+	g, c = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Cycle").as_("c")
+	where = [g.space == space, g.outcome == "In Progress", (g.horizon != "12 weeks") | c.status.isin(["Active", "Planned"])]
+	off = off_criterion(space, g.area)  # not goals of an area that is off (issue 11)
+	if off is not None:
+		where.append(off)
+	rows = list_query("Life Goal", ["name", "title", "horizon", "area"], where,
+		[(in_order_of(g.horizon, HORIZON_ORDER), Order.asc), (g.sort_order, Order.asc), (g.title, Order.asc)])
+	return rows.left_join(c).on(c.name == g.cycle).select(c.title.as_("cycle_title")).run(as_dict=True)
 
 
 @frappe.whitelist(methods=["GET"])

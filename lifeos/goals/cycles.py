@@ -33,20 +33,19 @@ def week_dates(cycle, week):
 
 
 def _actions(cycle_name):
-	return frappe.db.sql(
-		"""select a.name, a.parent as goal, a.title, a.per_week, a.status, a.done_on, a.idx
-		from `tabLife Goal Action` a join `tabLife Goal` g on g.name = a.parent
-		where g.cycle = %s and a.parenttype = 'Life Goal' order by g.sort_order, g.creation, a.idx""",
-		cycle_name, as_dict=True,
-	)
+	a, g = frappe.qb.DocType("Life Goal Action"), frappe.qb.DocType("Life Goal")
+	return (frappe.qb.from_(a).join(g).on(g.name == a.parent)
+		.select(a.name, a.parent.as_("goal"), a.title, a.per_week, a.status, a.done_on, a.idx)
+		.where((g.cycle == cycle_name) & (a.parenttype == "Life Goal"))
+		.orderby(g.sort_order).orderby(g.creation).orderby(a.idx).run(as_dict=True))  # system: the actions of one cycle the caller already read
 
 
 def _ticks(cycle_name) -> dict:
 	out = {}
-	for r in frappe.db.sql(
-		"select action_id, week, sum(`count`) as n from `tabLife Action Log` where cycle=%s group by action_id, week", cycle_name
-	):
-		out.setdefault(r[0], {})[int(r[1])] = int(r[2])
+	log = frappe.qb.DocType("Life Action Log")
+	for action, week, n in (frappe.qb.from_(log).select(log.action_id, log.week, Sum(log["count"]))
+			.where(log.cycle == cycle_name).groupby(log.action_id, log.week).run()):  # system: the ticks of one cycle the caller already read
+		out.setdefault(action, {})[int(week)] = int(n)
 	return out
 
 
@@ -337,8 +336,8 @@ def month_goals(space, year, month) -> list[dict]:
 		fields=["name", "title", "area", "outcome", "carried_from", "sort_order"], order_by="sort_order asc, creation asc")
 	tasks = {}
 	if rows:
-		for goal, task in frappe.db.sql("""select goal, name from `tabLife Task` where goal in %s and status in ('Open', 'Doing', 'Waiting')
-			order by creation desc""", [[r.name for r in rows]]):
+		for goal, task in frappe.get_list("Life Task", filters={"goal": ("in", [r.name for r in rows]), "status": ("in", ("Open", "Doing", "Waiting"))},
+				fields=["goal", "name"], order_by="creation desc", as_list=True, limit=5000):
 			tasks[goal] = task
 	from lifeos.api.goals import task_counts
 
