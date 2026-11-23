@@ -82,6 +82,7 @@ def _write(rows):
 	updates = ", ".join(f"`{c}`=values(`{c}`)" for c in COLUMNS if c not in ("name", "creation", "owner"))
 	placeholders = ", ".join(["(" + ", ".join(["%s"] * len(COLUMNS)) + ")"] * len(values))
 	flat = [v for row in values for v in row]
+	# raw SQL: a bulk upsert (`on duplicate key update`) on every save; the query builder writes one parameter per value, far slower
 	# nosemgrep: frappe-sql-format-injection -- column names come from the fixed COLUMNS list; every value is a %s parameter
 	frappe.db.sql(f"insert into `tabLife Index` ({cols}) values {placeholders} on duplicate key update {updates}", flat)
 
@@ -89,9 +90,7 @@ def _write(rows):
 def update(doc):
 	rows = build_rows(doc)
 	keep = [row_name(r["ref_doctype"], r["ref_name"], r["kind"]) for r in rows]
-	frappe.db.sql(
-		"delete from `tabLife Index` where ref_doctype=%s and ref_name=%s and name not in %s", (doc.doctype, doc.name, keep)
-	)
+	frappe.db.delete("Life Index", {"ref_doctype": doc.doctype, "ref_name": doc.name, "name": ("not in", keep)})
 	_write(rows)
 
 
@@ -170,5 +169,5 @@ def ensure_indexes():
 	frappe.db.add_index("Life Task", ["goal", "status"], "life_task_goal_status")
 	frappe.db.add_index("Life Proposal", ["owner", "creation"], "life_proposal_owner_creation")
 	frappe.db.add_index("Life Chat Log", ["owner", "creation"], "life_chat_owner_creation")
-	if not frappe.db.sql("show index from `tabLife Index` where Key_name='life_index_fulltext'"):
+	if not frappe.db.has_index("tabLife Index", "life_index_fulltext"):
 		frappe.db.sql_ddl("alter table `tabLife Index` add fulltext index `life_index_fulltext` (`title`, `search_text`)")
