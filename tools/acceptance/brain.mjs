@@ -1027,7 +1027,7 @@ print(json.dumps({"aside": aside}))`).split('\n').pop())
   const openSources = async () => { await s.open('/life/brain/sources'); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
   try {
-    await check('BRAIN.44', `${width} px: Sources offers Connect Gmail, a connected mailbox shows its week's counts and "Processed by: the Brain", every card has a Processed by line`, async () => {
+    await check('BRAIN.44', `${width} px: Sources offers Connect Gmail, a connected mailbox says it is a daily digest searched live and "Processed by: the Brain", every card has a Processed by line`, async () => {
       await openSources()
       must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state on an empty space')
       must((await pg.locator('[data-source-tile][data-system="upload"] [data-processed-by]').innerText()).includes('Processed by: the Brain'), 'the Upload tile has no Processed by line')
@@ -1036,17 +1036,14 @@ print(json.dumps({"aside": aside}))`).split('\n').pop())
       await tile.locator('[data-tile-add]').click()
       await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
       const t = await pg.locator('[data-gmail-connect]').innerText()
-      must(t.includes('read-only') && /never marks, labels, moves, deletes or sends/.test(t), 'the dialog does not say it is read only: ' + t)
+      must(/copies none of your mail and never deletes any/.test(t) && /send, draft, archive or label/.test(t), 'the dialog does not say what it may do: ' + t)
       await pg.keyboard.press('Escape')
-      bench(`from frappe.utils import add_days, getdate
-d = getdate()
-frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "gmail", "mailbox": "i58-${width}@example.com", "label": "i58-${width}@example.com", "active": 1,
-  "week_start": add_days(d, -d.weekday()), "seen_week": 218, "kept_week": 31}).insert(ignore_permissions=True)
+      bench(`frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "gmail", "mailbox": "i58-${width}@example.com", "label": "i58-${width}@example.com", "active": 1}).insert(ignore_permissions=True)
 for system in ("hermes", "claude", "google-calendar"):
     frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": system, "active": 1}).insert(ignore_permissions=True)`)
       await openSources()
       const mail = pg.locator('[data-source-card][data-system="gmail"]')
-      must((await mail.locator('[data-source-line]').innerText()).includes('218 this week · 31 kept'), 'the mailbox line says: ' + await mail.locator('[data-source-line]').innerText())
+      must((await mail.locator('[data-source-line]').innerText()).includes('Daily digest, and searched live'), 'the mailbox line says: ' + await mail.locator('[data-source-line]').innerText())
       must((await mail.locator('[data-processed-by]').innerText()) === 'Processed by: the Brain', 'the mailbox does not say the Brain processes it')
       const lines = await pg.locator('[data-source-card] [data-processed-by]').allInnerTexts()
       must(lines.length === 4 && lines.every((x) => /^(Processed by|Not processed)/.test(x)), 'every card needs a Processed by line: ' + lines.join(' | '))
@@ -1054,6 +1051,7 @@ for system in ("hermes", "claude", "google-calendar"):
       await mail.locator('[data-source-open]').click()
       await pg.locator('[data-source-settings][data-system="gmail"]').waitFor({ timeout: 5000 })
       must(await pg.locator('[data-gmail-include]').isVisible() && await pg.locator('[data-gmail-skip]').isVisible(), 'the always include and always skip lists are missing')
+      must(!(await pg.locator('[data-gmail-attach]').count()), 'the old attachments switch is still there')
       await pg.keyboard.press('Escape')
       await noSideways()
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
@@ -1299,6 +1297,96 @@ for dt in ("Life Agent Fact", "Life Agent Job", "Life Agent Change", "Life Agent
     filters = {"system": ["like", "i85-%"]} if dt == "Life Connection" else {"agent": ["like", "i85-%"]}
     for n in frappe.get_all(dt, filters=filters, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)`)
     fs.rmSync(home, { recursive: true, force: true })
+    await s.ctx.close()
+  }
+}
+
+// Google through Life OS (issue 86): an agent's own idea waits for the owner's OK, Ask searches Gmail live. The fake Google and fake Gmail are the site's own
+// (site config lifeos_fake_gmail); the fake agent here is a Life Connection with the key i86-<width>.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const phone = width < 768
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const system = `i86-${width}`
+  bench(`frappe.set_user("Administrator")
+from lifeos.mail import fake
+fake.clear()
+if not frappe.db.get_value("Life Space", "${SPACE}", "owner_user"): frappe.db.set_value("Life Space", "${SPACE}", "owner_user", "owner@lifeos.test")
+for n in frappe.get_all("Life Mail Account", filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc("Life Mail Account", n, force=1, ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Mail Account", "space": "${SPACE}", "user": "owner@lifeos.test", "provider": "gmail", "address": "owner@example.com", "label": "Personal", "is_default": 1}).insert(ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "${system}", "active": 1}).insert(ignore_permissions=True)`)
+  try {
+    await check('BRAIN.52', `${width} px: an agent's suggested reply waits in Needs you and on its page; approving sends it (fake Google) and moves it to Did, with who asked`, async () => {
+      bench(`from lifeos.agents import acts
+frappe.set_user("Administrator")
+acts.request("${SPACE}", "${system}", "email.send", {"to": "meera@example.com", "subject": "I86 quote ${width}", "body": "Hello Meera, the quote is attached."}, "agent")
+acts.request("${SPACE}", "${system}", "calendar.create", {"title": "I86 lunch ${width}", "start": "2026-11-25T13:00:00", "end": "2026-11-25T14:00:00"}, "owner", "Put lunch with Meera on Wednesday")`)
+      const needs = await owner.api('brain.needs_you', { space: SPACE })
+      must(needs.agent_requests.some((r) => r.title.includes(`I86 quote ${width}`)), 'Needs you does not list the reply')
+      await s.open(`/life/brain/sources/${system}`)
+      await pg.locator('[data-agent-panel] [data-agent-section="connector"]').waitFor({ timeout: 10000 })
+      const waiting = pg.locator('[data-agent-section="waiting"] [data-agent-request]')
+      must((await waiting.count()) === 1 && (await waiting.locator('[data-request-draft]').innerText()).includes('the quote is attached'), 'the reply and its draft are not on the agent page')
+      const did = pg.locator('[data-did]')
+      must((await did.count()) === 1 && (await did.first().locator('[data-did-asked]').innerText()).includes('Put lunch with Meera on Wednesday'), 'the owner request is not in Did with the owner words')
+      must(!bench('from lifeos.mail import fake\nprint([c["call"] for c in fake.calls()])').includes('send'), 'the reply was sent before the owner said so')
+      await noSideways()
+      await waiting.locator('[data-request-approve]').click()
+      await pg.locator('[data-agent-section="waiting"] [data-agent-empty="waiting"]').waitFor({ timeout: 10000 })
+      must((await did.count()) === 2, 'the approved reply did not move to Did')
+      must((await pg.locator('[data-did-asked]').allInnerTexts()).some((t) => t.includes('Its own idea, with your OK')), 'Did does not say it was the agent own idea')
+      must(bench('from lifeos.mail import fake\nprint([c["call"] for c in fake.calls()])').includes('send'), 'approving did not send it (fake Google): ' + bench(`print(frappe.get_all("Life Agent Action", filters={"agent": "${system}"}, fields=["status", "error", "title"]))`).split('\\n').pop())
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.53', `${width} px: Ask "find the 2014 tax return" (fake AI, fake Gmail) shows the threads it found and a File it button; filing makes a Brain item linked to Gmail`, async () => {
+      bench(`frappe.set_user("Administrator")
+for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+      await s.open('/life/today')
+      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill('find the 2014 tax return'); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type('find the 2014 tax return'); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
+      const answer = pg.locator('[data-ask-answer]:visible').last()
+      await answer.waitFor({ timeout: 15000 })
+      for (let i = 0; i < 40 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
+      must((await answer.innerText()).includes('2014 tax return'), 'the answer does not name the thread: ' + await answer.innerText())
+      const file = pg.locator('[data-ask-action="file_mail"]:visible')
+      must((await file.count()) === 1 && (await file.innerText()).includes('File it'), 'there is not one File it button')
+      must(bench(`print(frappe.db.exists("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}))`).split('\n').pop() === 'None', 'it was filed before the owner clicked')
+      await noSideways()
+      await file.click()
+      let made = 'None'
+      for (let i = 0; i < 20 && made === 'None'; i++) { await pg.waitForTimeout(300); made = bench(`print(frappe.db.get_value("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, "source_url"))`).split('\n').pop() }
+      must(made.includes('mail.google.com'), 'filing did not make a Brain item linked to Gmail: ' + made)
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.54', `${width} px: the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item`, async () => {
+      const digest = bench(`from lifeos.mail import digest
+frappe.set_user("Administrator")
+print(digest.make("owner@lifeos.test", "${SPACE}", 1))`).split('\n').pop()
+      must(digest && digest !== 'None', 'the digest was not made: ' + digest)
+      await s.open(`/life/brain/captures?tab=email&open=source:${digest}`)
+      await pg.locator('[data-digest]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-digest-section]').first().getAttribute('data-digest-section')) === 'Personal', 'the digest is not grouped by inbox')
+      const lines = pg.locator('[data-digest-item]')
+      must((await lines.count()) === 2 && (await lines.first().locator('[data-open-gmail]').count()) === 1, 'the lines or their Open in Gmail buttons are missing')
+      await noSideways()
+      await lines.filter({ hasText: '2014 tax return' }).locator('[data-file-mail]').click()
+      let made = 'None'
+      for (let i = 0; i < 20 && made === 'None'; i++) { await pg.waitForTimeout(300); made = bench(`print(frappe.db.get_value("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, "name"))`).split('\n').pop() }
+      must(made !== 'None', 'File it did not make the thread\'s item')
+      must((await lines.filter({ hasText: '2014 tax return' }).locator('[data-file-mail]').innerText()).includes('Filed'), 'the line does not say it is filed')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for dt in ("Life Agent Action", "Life Agent Config"):
+    for n in frappe.get_all(dt, filters={"agent": "${system}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Connection", filters={"system": "${system}"}, pluck="name"): frappe.delete_doc("Life Connection", n, force=1, ignore_permissions=True)
+for dt in ("Life Mail Account", "Life Mail Search"):
+    for n in frappe.get_all(dt, filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "source_system": "gmail"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

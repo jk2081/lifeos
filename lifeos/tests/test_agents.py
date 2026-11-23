@@ -6,13 +6,17 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import add_days, today
 
-from lifeos.agents import connector, context, limits
+from lifeos.agents import acts, connector, context, limits
 from lifeos.library import files, wiki_check
 from lifeos import permissions
 from lifeos.ai import fake
-from lifeos.api import agent_connector, agent_page, brain, context as context_api, inbox, jobs, review, search, wiki
+from lifeos.api import agent_connector, agent_page, brain, context as context_api, google, inbox, jobs, review, search, wiki
+from lifeos.api import mail as mail_api
 from lifeos.skills import call as call_skills
+from lifeos.brain import agent_page as pages
+from lifeos.mail import gmail
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
+from lifeos.tests.test_gmail import FakeGmail, message
 from lifeos.tests.helpers import Keyed, set_key, task, text
 
 
@@ -559,6 +563,223 @@ class TestConnector(LifeTestCase):
 		self.as_user(AGENT)
 		with self.assertRaises(frappe.PermissionError):
 			agent_page.get(self.KEY, space=PRIVATE)
+
+
+class RecordingGoogle:
+	"""Stands in for Google: records what would have been sent."""
+
+	def __init__(self):
+		self.calls = []
+
+	def _note(self, what, **kw):
+		self.calls.append((what, kw))
+		return {"id": f"{what}-{len(self.calls)}", "thread_id": kw.get("thread_id") or "th-new", "event_id": f"ev-{len(self.calls)}", "title": kw.get("title", ""), "start": kw.get("start"), "end": None}
+
+	def send(self, to, subject, body, thread_id=None, cc=None):
+		return self._note("send", to=to, subject=subject, body=body, thread_id=thread_id)
+
+	def draft(self, to, subject, body, thread_id=None, cc=None):
+		return self._note("draft", to=to, subject=subject, thread_id=thread_id)
+
+	def delete_draft(self, draft_id):
+		self._note("delete_draft", id=draft_id)
+
+	def archive(self, thread_id):
+		self._note("archive", thread_id=thread_id)
+
+	def unarchive(self, thread_id):
+		self._note("unarchive", thread_id=thread_id)
+
+	def label(self, thread_id, name):
+		self._note("label", thread_id=thread_id, name=name)
+		return "Label_9"
+
+	def unlabel(self, thread_id, label_id):
+		self._note("unlabel", thread_id=thread_id)
+
+	def list_events(self, time_min, time_max, limit=50):
+		return [{"event_id": "e1", "title": "Call with Meera", "start": time_min}]
+
+	def create_event(self, title, start, end, attendees=None, description=None, location=None):
+		return self._note("create_event", title=title, start=start)
+
+	def move_event(self, event_id, start, end):
+		return self._note("move_event", event_id=event_id, start=start)
+
+	def respond(self, event_id, response, address):
+		return self._note("respond", event_id=event_id, response=response)
+
+	def delete_event(self, event_id):
+		self._note("delete_event", event_id=event_id)
+
+
+class TestGoogleActs(LifeTestCase):
+	"""Google through Life OS (issue 86): the owner's request runs, the agent's own idea waits for the owner's OK, a switch off refuses, nothing is deleted."""
+	KEY = "i86agent"
+	ADDRESS = "owner86@example.com"
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		for dt in ("Life Agent Action", "Life Agent Config", "Life Mail Account", "Life Mail Search"):
+			frappe.db.delete(dt, {"space": PRIVATE})
+		frappe.db.delete("Life Inbox Item", {"space": PRIVATE, "source_system": "gmail"})
+		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": self.ADDRESS, "label": "Personal", "is_default": 1}).insert()
+		self.google = RecordingGoogle()
+		frappe.flags.lifeos_google = {self.ADDRESS: self.google}
+		frappe.flags.lifeos_gmail = {}
+		self.addCleanup(lambda: (setattr(frappe.flags, "lifeos_google", {}), setattr(frappe.flags, "lifeos_gmail", {})))
+		permissions.clear_cache()
+		self.as_user(OWNER)
+
+	def mode(self, action, mode):
+		frappe.set_user("Administrator")
+		cfg = limits.config(PRIVATE, self.KEY, create=True)
+		limits.set_ability(cfg, action, mode)
+		self.as_user(OWNER)
+
+	def act(self, tool, params, asked_by, message=None):
+		return acts.request(PRIVATE, self.KEY, tool, params, asked_by, message)
+
+	EMAIL = {"to": "meera@example.com", "subject": "Quote", "body": "Hello Meera, the quote is attached."}
+	EVENT = {"title": "Lunch with Meera", "start": "2026-11-25T13:00:00", "end": "2026-11-25T14:00:00"}
+
+	# 1
+	def test_1_the_owners_request_runs_at_once_and_is_logged_with_no_approval(self):
+		self.mode("change_calendar", "off")  # even a switch that is off: the owner asked
+		out = self.act("calendar.create", self.EVENT, "owner", "Put lunch with Meera on Wednesday at 1")
+		self.assertEqual(out["status"], "done")
+		self.assertEqual([c[0] for c in self.google.calls], ["create_event"])
+		row = frappe.get_doc("Life Agent Action", out["action"])
+		self.assertEqual((row.status, row.asked_by, row.request), ("Done", "owner", "Put lunch with Meera on Wednesday at 1"))
+		self.assertEqual(pages.requests(PRIVATE), [])  # nothing waits
+		with self.assertRaises(frappe.ValidationError):  # an owner's request carries the owner's words
+			self.act("calendar.create", self.EVENT, "owner")
+		with self.assertRaises(frappe.ValidationError):
+			self.act("calendar.create", self.EVENT, "someone")
+
+	# 2
+	def test_2_an_agents_own_idea_waits_for_the_owners_ok_and_no_discards_it(self):
+		out = self.act("email.send", self.EMAIL, "agent")  # the default is "asks you"
+		self.assertEqual(out["status"], "waiting")
+		self.assertEqual(self.google.calls, [])
+		wait = pages.requests(PRIVATE, self.KEY)
+		self.assertEqual([(w["action_label"], w["title"]) for w in wait], [("Send email", "Send “Quote” to meera@example.com")])
+		self.assertIn("the quote is attached", wait[0]["draft"])
+		self.assertEqual(brain.needs_you(space=PRIVATE)["agent_requests"][0]["name"], out["action"])
+		pages.decide(PRIVATE, out["action"], "approve", OWNER)
+		self.assertEqual([c[0] for c in self.google.calls], ["send"])
+		row = frappe.get_doc("Life Agent Action", out["action"])
+		self.assertEqual((row.status, row.decided_by, row.asked_by), ("Done", OWNER, "agent"))
+		self.assertEqual(pages.requests(PRIVATE), [])
+		self.assertEqual([d["name"] for d in pages.sections(PRIVATE, self.KEY)["did"]], [out["action"]])
+		with self.assertRaises(frappe.ValidationError):  # decided once
+			pages.decide(PRIVATE, out["action"], "approve", OWNER)
+		no = self.act("email.send", self.EMAIL, "agent")
+		pages.decide(PRIVATE, no["action"], "no", OWNER)
+		self.assertEqual(len(self.google.calls), 1)  # nothing more was sent
+		gone = frappe.get_doc("Life Agent Action", no["action"])
+		self.assertEqual((gone.status, gone.params, gone.draft), ("Declined", None, None))
+		self.assertEqual(pages.requests(PRIVATE), [])
+
+	def test_a_switch_on_its_own_runs_the_agents_idea_at_once(self):
+		self.mode("send_email", "auto")
+		self.assertEqual(self.act("email.send", self.EMAIL, "agent")["status"], "done")
+		self.assertEqual(frappe.db.get_value("Life Agent Action", {"agent": self.KEY}, "asked_by"), "agent")
+
+	# 3
+	def test_3_with_the_switch_off_the_agents_idea_is_refused_with_the_reason(self):
+		self.mode("send_email", "off")
+		with self.assertRaises(frappe.PermissionError) as e:
+			self.act("email.send", self.EMAIL, "agent")
+		self.assertIn("Send email", str(e.exception))
+		self.assertIn("off", str(e.exception))
+		self.assertEqual((self.google.calls, frappe.db.count("Life Agent Action", {"space": PRIVATE})), ([], 0))
+		self.assertEqual(self.act("email.send", self.EMAIL, "owner", "Send Meera the quote")["status"], "done")  # the owner may still ask
+
+	# 4
+	def test_4_read_tools_return_only_what_the_agent_may_read(self):
+		tea = self.areas["Tea"]
+		threads = [{"id": "t-open", "messages": [message("m1", "A <a@a.example>", "Open thread", "hello")]}, {"id": "t-tea", "messages": [message("m2", "B <b@b.example>", "Tea thread", "tea")]}]
+		frappe.flags.lifeos_gmail = {self.ADDRESS: FakeGmail(threads, address=self.ADDRESS)}
+		frappe.set_user("Administrator")
+		inbox.create_item(title="Tea thread", source_type="Email", source_system="gmail", external_id="t-tea", space=PRIVATE, area=tea)
+		cfg = limits.config(PRIVATE, self.KEY, create=True)
+		self.as_user(OWNER)
+		got = acts.read(PRIVATE, self.KEY, "mail.search", {"fields": {"text": "thread"}})
+		self.assertEqual(sorted(h["thread_id"] for h in got["hits"]), ["t-open", "t-tea"])
+		limits.set_area(cfg, tea, False)
+		got = acts.read(PRIVATE, self.KEY, "mail.search", {"fields": {"text": "thread"}})
+		self.assertEqual([h["thread_id"] for h in got["hits"]], ["t-open"])
+		self.assertEqual(acts.read(PRIVATE, self.KEY, "mail.get_thread", {"thread_id": "t-open"})["subject"], "Open thread")
+		with self.assertRaises(frappe.PermissionError):
+			acts.read(PRIVATE, self.KEY, "mail.get_thread", {"thread_id": "t-tea"})
+		self.assertEqual(acts.read(PRIVATE, self.KEY, "calendar.list", {})["events"][0]["title"], "Call with Meera")
+		self.mode("read_email", "off")
+		with self.assertRaises(frappe.PermissionError):
+			acts.read(PRIVATE, self.KEY, "mail.search", {"fields": {"text": "thread"}})
+		self.assertEqual(frappe.db.count("Life Mail Search", {"agent": self.KEY}), 2)  # the two searches that ran are logged with the agent's name
+
+	def test_an_agent_reaches_the_inbox_of_the_person_it_acts_for_only(self):
+		frappe.set_user("Administrator")
+		frappe.get_doc({"doctype": "Life Mail Account", "space": SHARED, "user": FAMILY, "provider": "gmail", "address": "fam86@example.com", "label": "Family"}).insert()
+		frappe.flags.lifeos_gmail = {self.ADDRESS: FakeGmail([{"id": "t1", "messages": [message("m1", "A <a@a.example>", "Mine", "x")]}], address=self.ADDRESS),
+			"fam86@example.com": FakeGmail([{"id": "tf", "messages": [message("m2", "B <b@b.example>", "Not yours", "x")]}], address="fam86@example.com")}
+		self.as_user(AGENT)
+		got = mail_api.search({"text": "x"}, space=PRIVATE, source_system=self.KEY)
+		self.assertEqual([h["thread_id"] for h in got["hits"]], ["t1"])
+		with self.assertRaises(frappe.PermissionError):
+			mail_api.search({"text": "x"}, account="fam86@example.com", space=PRIVATE, source_system=self.KEY)
+		frappe.db.delete("Life Mail Account", {"address": "fam86@example.com"})
+
+	# 5
+	def test_5_there_is_no_delete_tool(self):
+		names = [t["name"] for t in google.tools()]
+		self.assertEqual(sorted(names), sorted(acts.TOOLS))
+		for word in ("delete", "trash", "remove", "purge", "spam"):
+			self.assertEqual([n for n in names if word in n], [])
+		self.assertEqual(sorted(n for n in names if n.startswith("email.")), ["email.archive", "email.draft", "email.label", "email.send"])
+		self.assertEqual(sorted(n for n in names if n.startswith("calendar.")), ["calendar.create", "calendar.list", "calendar.move", "calendar.respond"])
+		with self.assertRaises(frappe.ValidationError):
+			self.act("email.delete", {"thread_id": "t"}, "owner", "delete it")
+		whitelisted = {f.__name__ for f in frappe.whitelisted if f.__module__ in ("lifeos.api.google", "lifeos.api.mail")}
+		self.assertEqual([n for n in whitelisted if "delete" in n or "trash" in n], [])
+
+	def test_the_api_takes_the_agents_name_checks_the_owners_words_and_lists_the_tools(self):
+		self.as_user(AGENT)
+		out = google.act(self.KEY, "email.draft", {**self.EMAIL}, "agent", space=PRIVATE)
+		self.assertEqual(out["status"], "waiting")
+		with self.assertRaises(frappe.ValidationError):
+			google.act(self.KEY, "email.draft", {"to": "x@example.com"}, "owner", "Draft it", space=PRIVATE)  # a subject and a body are missing
+		self.assertEqual(google.act(self.KEY, "calendar.respond", {"event_id": "e1", "response": "accepted"}, "owner", "Say yes to the 3 pm", space=PRIVATE)["status"], "done")
+		with self.assertRaises(frappe.ValidationError):
+			google.act(self.KEY, "calendar.respond", {"event_id": "e1", "response": "maybe"}, "owner", "Say maybe", space=PRIVATE)
+		self.assertEqual(google.calendar_list(source_system=self.KEY, space=PRIVATE)["events"][0]["title"], "Call with Meera")
+
+	def test_a_draft_a_label_and_an_archive_can_be_undone_and_a_sent_email_cannot(self):
+		self.mode("send_email", "auto")
+		draft = self.act("email.draft", self.EMAIL, "agent")
+		archived = self.act("email.archive", {"thread_id": "t9", "subject": "Old"}, "owner", "Archive the old thread")
+		labelled = self.act("email.label", {"thread_id": "t9", "label": "Done"}, "owner", "Label it Done")
+		sent = self.act("email.send", self.EMAIL, "owner", "Send the quote")
+		did = {d["name"]: d for d in pages.sections(PRIVATE, self.KEY)["did"]}
+		self.assertEqual([did[n]["can_undo"] for n in (draft["action"], archived["action"], labelled["action"], sent["action"])], [1, 1, 1, 0])
+		for n in (draft["action"], archived["action"], labelled["action"]):
+			pages.undo(PRIVATE, n)
+		self.assertEqual([c[0] for c in self.google.calls if c[0] in ("delete_draft", "unarchive", "unlabel")], ["delete_draft", "unarchive", "unlabel"])
+		with self.assertRaises(frappe.ValidationError):
+			pages.undo(PRIVATE, sent["action"])
+		with self.assertRaises(frappe.ValidationError):
+			pages.undo(PRIVATE, draft["action"])  # once
+
+	def test_a_google_failure_is_logged_as_failed_without_a_token(self):
+		self.google.send = lambda *a, **k: (_ for _ in ()).throw(gmail.GmailError("Google refused. Bearer ya29.SECRETSECRETSECRET"))
+		out = self.act("email.send", self.EMAIL, "owner", "Send it")
+		self.assertEqual(out["status"], "failed")
+		row = frappe.get_doc("Life Agent Action", out["action"])
+		self.assertEqual(row.status, "Failed")
+		self.assertNotIn("SECRETSECRET", row.error)
+		self.assertEqual(pages.sections(PRIVATE, self.KEY)["did"][0]["status"], "Failed")
 
 
 class TestAgentMethodsExist(LifeTestCase):

@@ -18,7 +18,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder, one space |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read refusing another space's records, the scan guard, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it |
-| `test_gmail.py` | Life OS reading Gmail: connect, fetch, triage, one capture per thread |
+| `test_gmail.py` | Gmail through Life OS: connect, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check, the connector (report, pull, confirm), the owner's changes, an agent's switches and the areas it may read |
 | `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings; no component, page or `App.vue` calls `api(`; every `.vue` file is imported or routed |
 
@@ -37,8 +37,9 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `reflect` | `test_review` (Reflect), `test_skills.TestNewSkillsExamples` | `SETTINGS.38` |
 | `ask` | `test_skills.TestAnswer` | `SETTINGS.38` |
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
-| `ingest-email` (was `triage-email`) | `test_gmail.TestGmail`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
+| `ingest-email` (was `triage-email`) | `test_gmail.TestDigest`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
 | the agent connector (`agent/connector/`) | `test_agents.TestConnector` | `BRAIN.49` to `BRAIN.51` |
+| Google through Life OS: acts, switches, the log and undo | `test_agents.TestGoogleActs`, `test_gmail.TestMailSearch`, `test_gmail.TestAskSearchesMail` | `BRAIN.52` to `BRAIN.54` |
 | `ingest-document`, `ingest-photo`, `ingest-video`, `ingest-link`, `ingest-voice` | `test_skills.TestSourceSkills`, `test_brain.TestSourcePages` | `BRAIN.46` to `BRAIN.48` |
 | `channel-upload`, `channel-phone`, `channel-gmail`, `channel-calendar`, `channel-email-in`, `channel-agent` | `test_skills.TestSourceSkills` | `BRAIN.46` to `BRAIN.48` |
 | `improve-skill` | `test_skills.TestCorrections` | `SETTINGS.38` |
@@ -83,7 +84,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.28` the order is Needs you, the list, habits, then the rail
 - `TODAY.29` each moved number is in its new place with the count the old card had (All tasks, Goals, Library, Brain Activity)
 
-### Brain (`tools/acceptance/brain.mjs`, 50 checks)
+### Brain (`tools/acceptance/brain.mjs`, 53 checks)
 
 Capture and the Brain's filing, Needs you, Activity, Sources, the item page, jobs from agents, Ask, and the checks that need the records of the first photo capture.
 
@@ -134,7 +135,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.41` a Coming tile cannot be switched on
 - `BRAIN.42` opening a source shows its default intent, area and goal, and saving changes what create_item uses
 - `BRAIN.43` the cards sit in a grid and nothing scrolls sideways
-- `BRAIN.44` Sources offers Connect Gmail, a connected mailbox shows its week's counts and "Processed by: the Brain", every card has a Processed by line
+- `BRAIN.44` Sources offers Connect Gmail (it says what it reads and may do, and that nothing is copied or deleted), a connected mailbox says it is a daily digest searched live and "Processed by: the Brain", every card has a Processed by line
 - `BRAIN.45` a capture the Brain could not process is in Needs you with Retry and File it myself; File it myself takes it out
 - `BRAIN.46` Sources shows channels and kinds with counts and switches; each row opens its page with the path Brain / Sources / <name>, the strip and the five tabs
 - `BRAIN.47` Rules: add a Skip chip and save to see version n+1, go back restores it; Try it on a sample PDF (fake AI) shows the result and files nothing until File it for real
@@ -142,6 +143,9 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.49` an agent's page shows Waiting, Knows, Can, May read, Scheduled and Did from the connector's report; approving a waiting item moves it to Did
 - `BRAIN.50` editing a fact, pausing a job and changing a switch show waiting until the connector confirms, then applied; a change it cannot apply is failed
 - `BRAIN.51` an agent that has reported nothing says what will appear in each section
+- `BRAIN.52` an agent's suggested reply waits in Needs you and on its page; approving sends it (fake Google) and moves it to Did, with who asked; the owner's own request is in Did with his words
+- `BRAIN.53` Ask "find the 2014 tax return" (fake AI, fake Gmail) shows the threads it found and a File it button; filing makes a Brain item linked to Gmail
+- `BRAIN.54` the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item
 
 ### Goals (`tools/acceptance/goals.mjs`, 71 checks)
 

@@ -104,12 +104,11 @@
           <span data-settings-goal><Pick v-model="draft.default_goal" :options="goalOptions" placeholder="No default goal" :disabled="!writable" /></span></div>
         <p class="text-sm text-ink-gray-6" data-settings-processed>{{ current.processed_by }}. {{ current.lands }}</p>
         <template v-if="current.system === 'gmail' && current.mailbox">
-          <div data-gmail-label><FormControl v-model="draft.label_name" label="Only mail with this Gmail label" placeholder="Empty reads the Inbox, for example Life OS" :disabled="!writable" /></div>
+          <div data-gmail-label><FormControl v-model="draft.label_name" label="The daily digest reads only mail with this Gmail label" placeholder="Empty reads the Inbox, for example Life OS" :disabled="!writable" /></div>
           <div data-gmail-include><FormControl v-model="draft.always_include" type="textarea" :rows="2" label="Always include" placeholder="Senders or domains, one per line" :disabled="!writable" /></div>
           <div data-gmail-skip><FormControl v-model="draft.always_skip" type="textarea" :rows="2" label="Always skip" placeholder="Senders or domains, one per line" :disabled="!writable" /></div>
           <div data-gmail-sensitive><FormControl v-model="draft.always_sensitive" type="textarea" :rows="2" label="Always sensitive" placeholder="Their mail is marked sensitive" :disabled="!writable" /></div>
-          <Switch v-model="draft.attach_files" :disabled="!writable" label="Keep attachments (up to 10 MB each)" data-gmail-attach />
-          <p class="text-sm text-ink-gray-6">Life OS only reads this mailbox. It never marks, labels, moves or deletes mail. By default it skips Promotions, Social, Updates and Forums, mailing lists and no-reply senders.</p>
+          <p class="text-sm text-ink-gray-6">Mail is not copied into Life OS. Each morning a digest lists the mail from real people (it skips Promotions, Social, Updates and Forums, mailing lists and no-reply senders), and Ask and your agent search this mailbox live when you ask. Nothing is sent, archived or labelled except at your request, or with your OK to what your agent suggests. Nothing is deleted.</p>
           <Button v-if="writable" variant="subtle" theme="red" label="Remove this mailbox" data-gmail-remove @click="removeGmail" />
         </template>
         <p v-else class="text-sm text-ink-gray-6">What this source sends without an area, goal or intent of its own is filed with these. No passwords or keys are kept here.</p>
@@ -120,7 +119,7 @@
   <Dialog v-model:open="gmailOpen" title="Connect Gmail" :actions="gmailSetup?.ready && writable ? [{ label: 'Continue to Google', variant: 'solid', onClick: connectGmail }] : []">
     <template #default>
       <div class="flex flex-col gap-2" data-gmail-connect>
-        <p class="text-sm text-ink-gray-8">You sign in with Google in this browser. Life OS asks for <strong>read-only</strong> access to this mailbox and nothing else: it never marks, labels, moves, deletes or sends mail. Several mailboxes can be connected, one card each.</p>
+        <p class="text-sm text-ink-gray-8">You sign in with Google in this browser. Life OS asks to <strong>read</strong> this mailbox when you or your agent search it, and to send, draft, archive or label mail and change your calendar when you ask your agent to or approve what it suggests. It copies none of your mail and never deletes any. Several mailboxes can be connected, one card each.</p>
         <p v-if="gmailSetup && !gmailSetup.ready" class="text-sm text-ink-amber-9" data-gmail-not-ready>Google sign-in is not set up yet. In Frappe, open Google Settings and enter the OAuth client (client ID and secret), then come back here.</p>
         <p v-else-if="gmailSetup" class="text-sm text-ink-gray-6">If Google says the redirect address does not match, add this one to the OAuth client in Google Cloud: <span class="break-all font-mono text-xs" data-gmail-redirect>{{ gmailSetup.redirect_uri }}</span></p>
       </div>
@@ -208,13 +207,13 @@ async function toggle(c, on) {
 function openSettings(c) {
   current.value = c
   draft.value = { active: !!c.active, default_intent: c.default_intent || 'Process', default_area: c.default_area || null, default_goal: c.default_goal || null,
-    label_name: c.label_name || '', always_include: c.always_include || '', always_skip: c.always_skip || '', always_sensitive: c.always_sensitive || '', attach_files: !!c.attach_files }
+    label_name: c.label_name || '', always_include: c.always_include || '', always_skip: c.always_skip || '', always_sensitive: c.always_sensitive || '' }
   settingsOpen.value = true
 }
 async function save() {
   const d = draft.value
   const extra = current.value.system === 'gmail' && current.value.mailbox
-    ? { label_name: d.label_name || '', always_include: d.always_include || '', always_skip: d.always_skip || '', always_sensitive: d.always_sensitive || '', attach_files: d.attach_files ? 1 : 0 } : {}
+    ? { label_name: d.label_name || '', always_include: d.always_include || '', always_skip: d.always_skip || '', always_sensitive: d.always_sensitive || '' } : {}
   const res = await tryCall(() => brainData.connections.save({ name: current.value.name, active: d.active ? 1 : 0, default_intent: d.default_intent, default_area: d.default_area || '', default_goal: d.default_goal || '', ...extra }), 'Saved.')
   if (!res) return
   settingsOpen.value = false

@@ -82,8 +82,11 @@
         <Card v-if="a.did.length" flush>
           <div v-for="d in a.did" :key="d.name" class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-outline-gray-1 py-3 last:border-b-0" data-did :data-status="d.status">
             <div class="min-w-0"><span class="break-words text-base text-ink-gray-9" data-did-title>{{ d.title }}</span>
-              <span class="ml-2 text-sm text-ink-gray-6">{{ d.status === 'Approved' ? 'Approved by you · ' : '' }}{{ d.when }}</span></div>
-            <span class="text-sm text-ink-gray-6">{{ money(d.cost) }}</span>
+              <span class="ml-2 text-sm text-ink-gray-6">{{ d.status === 'Approved' ? 'Approved by you · ' : '' }}{{ d.when }}</span>
+              <div v-if="d.asked_by" class="text-sm text-ink-gray-6" data-did-asked>{{ d.asked_by === 'owner' ? `Asked by you: “${d.request}”` : 'Its own idea, with your OK' }}{{ d.undone ? ' · undone' : '' }}</div>
+              <div v-if="d.error" class="text-sm text-ink-red-8" data-did-error>Failed: {{ d.error }}</div></div>
+            <div class="flex items-center gap-2"><Button v-if="d.can_undo && writable" size="sm" label="Undo" data-did-undo @click="undoDid(d)" />
+              <span class="text-sm text-ink-gray-6">{{ money(d.cost) }}</span></div>
           </div>
         </Card>
         <Card v-else class="text-sm text-ink-gray-6" data-agent-empty="did">Nothing this week.</Card>
@@ -124,6 +127,9 @@ const editing = ref(null)
 const draft = ref('')
 const nameDraft = ref('')
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
+async function undoDid(d) {
+  if (await tryCall(() => brainData.agentPage.undo({ request: d.name, space: store.space }), 'Undone')) await load()
+}
 const money = (n) => `$${(n || 0).toFixed(2)}`
 
 const ChangeBadge = (p) => (p.change ? h(Badge, { theme: p.change.status === 'failed' ? 'red' : p.change.status === 'waiting' ? 'orange' : 'green', 'data-change': p.change.status,

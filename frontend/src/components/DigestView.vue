@@ -7,6 +7,7 @@
         <li v-for="(it, j) in s.items" :key="j" class="flex flex-wrap items-start gap-2 px-3 py-2" data-digest-item>
           <Md class="min-w-0 flex-1 basis-[240px]" :text="it.text" />
           <Button v-for="(u, k) in it.gmail" :key="k" size="sm" icon-left="lucide-mail" label="Open in Gmail" data-open-gmail @click="open(u)" />
+          <Button v-if="it.file" size="sm" variant="subtle" :label="filed[it.file] ? 'Filed · Open' : 'File it'" :loading="busy === it.file" data-file-mail @click="fileIt(it.file)" />
         </li>
       </ul>
     </section>
@@ -15,17 +16,23 @@
 <script setup>
 // An email digest as headed lists: each section (Needs your attention, Waiting on others, Dates and deadlines, FYI from
 // people, Company information, Left out) is a heading with its items, and each item's Gmail link is an "Open in Gmail" button.
-import { computed } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { toast } from 'frappe-ui'
+import { brainData } from '@/data/brain'
+import { errorText } from '@/lib/api'
 import { Button } from 'frappe-ui'
 import Md from './Md.vue'
 
 const props = defineProps({ text: { type: String, default: '' } })
 const GMAIL = /\[([^\]]*)\]\((https:\/\/mail\.google\.com\/[^)\s]+)\)|(https:\/\/mail\.google\.com\/[^\s)]+)/g
+const FILE = /\[File it\]\(lifeos-file:([^)\s]+)\)/
 function item(raw) {
   const gmail = []
-  const text = raw.replace(GMAIL, (m, label, url, bare) => { gmail.push(url || bare); return label && !/^(open|gmail|link|open in gmail)$/i.test(label.trim()) ? label : '' })
+  const file = (FILE.exec(raw) || [])[1] || ''
+  const text = raw.replace(FILE, '').replace(GMAIL, (m, label, url, bare) => { gmail.push(url || bare); return label && !/^(open|gmail|link|open in gmail)$/i.test(label.trim()) ? label : '' })
     .replace(/\s*[·|–-]\s*$/, '').trim()
-  return { text, gmail }
+  return { text, gmail, file }
 }
 const sections = computed(() => {
   const out = []
@@ -47,5 +54,19 @@ const sections = computed(() => {
   if (cur.title || cur.intro.trim() || cur.items.length) out.push(cur)
   return out.map((s) => ({ ...s, items: s.items.map(item) }))
 })
+// "File it": the owner says keep this thread. It becomes a Brain item (the same one when filed again) with a link back to Gmail.
+const router = useRouter()
+const filed = reactive({})
+const busy = ref('')
+async function fileIt(key) {
+  if (filed[key]) return router.push('/item/' + filed[key])
+  const [account, ...rest] = key.split(':')
+  busy.value = key
+  try {
+    const out = await brainData.mail.file({ thread_id: rest.join(':'), account })
+    filed[key] = out.item
+    toast.success(`Filed: ${out.title}`, { action: { label: 'Open', onClick: () => router.push('/item/' + out.item) } })
+  } catch (e) { toast.error(errorText(e)) } finally { busy.value = '' }
+}
 function open(u) { window.open(u, '_blank', 'noopener,noreferrer') }
 </script>

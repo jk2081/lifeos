@@ -140,6 +140,7 @@ bench(`from lifeos.tools import devtools\nfrappe.set_user("Administrator")\ndevt
 // starts with "fake-", which the client never sends anywhere. Insights start empty.
 bench(`from frappe.installer import update_site_config
 update_site_config("lifeos_fake_ai", 1)
+update_site_config("lifeos_fake_gmail", 1)
 s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()
 frappe.db.delete("Life Insight"); frappe.db.delete("Life AI Usage")
 # issue 56: new goals need a "Done when" by default; the older checks make goals without one, so it is off for them and I56 switches it on
