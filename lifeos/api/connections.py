@@ -13,7 +13,7 @@ from lifeos.api.utils import flag
 
 INTENTS = ("Process", "Add to wiki", "Just keep")
 # how long without anything new before a connection shows a warning, by system (hours)
-QUIET_HOURS = {"gmail": 48, "claude": 48, "chatgpt": 48, "email": 48}
+QUIET_HOURS = {"gmail": 48, "microsoft": 48, "claude": 48, "chatgpt": 48, "email": 48}
 DEFAULT_QUIET_HOURS = 24 * 7
 
 
@@ -21,6 +21,7 @@ DEFAULT_QUIET_HOURS = 24 * 7
 # kind is the second line of its card; note is said after this week's count. Upload is always on and has no connection row.
 CATALOG = {
 	"gmail": {"label": "Gmail", "kind": "Email · Read only", "hint": "Email from real people", "note": "only people, not newsletters", "icon": "M"},
+	"microsoft": {"label": "Microsoft", "kind": "Email · Outlook and Microsoft 365", "hint": "Email from real people", "note": "only people, not newsletters", "icon": "O"},
 	"google-calendar": {"label": "Google Calendar", "kind": "Read only", "hint": "Meetings and events", "icon": "31"},
 	"hermes": {"label": "Hermes", "kind": "Agent · Telegram", "hint": "Captures and finished work", "icon": "H"},
 	"claude": {"label": "Claude chats", "kind": "Chat export · Nightly", "hint": "Chats summarised", "icon": "C"},
@@ -34,11 +35,13 @@ COMING = {"github": ("GitHub", "PRs and issues"), "whatsapp": ("WhatsApp", "Star
 ALWAYS_ON = ("upload", "phone")
 
 # Where each source goes (issue 58): who processes what it brings, and where it lands. Everything not listed here is an agent's.
-BRAIN_SOURCES = ("upload", "phone", "gmail", "email")
+MAIL = ("gmail", "microsoft")  # the providers of a person's inboxes (one card for each inbox)
+BRAIN_SOURCES = ("upload", "phone", *MAIL, "email")
 KEPT_AS_IS = ("claude", "chatgpt", "google-calendar")
 LANDS = {
 	"upload": "Needs you, or filed on its own; then tasks, notes and dates. The capture stays on its page and in Activity.",
 	"gmail": "Needs you, or filed on its own; then tasks, notes and dates. The capture stays on its page and in Activity.",
+	"microsoft": "Needs you, or filed on its own; then tasks, notes and dates. The capture stays on its page and in Activity.",
 	"claude": "Library, Chats. Open items become tasks only with Make task.",
 	"chatgpt": "Library, Chats. Open items become tasks only with Make task.",
 	"google-calendar": "Today and the calendar views, and meetings in the review (not captures).",
@@ -130,7 +133,7 @@ def _card(space, row):
 	"""One connected source for the Sources screen: its look, whether it is on, what came in this week, and who processes it."""
 	meta = CATALOG.get(row.system) or ({"label": "Email", "kind": "Email · Forwarded", "icon": "@"} if row.system == "email" else {})
 	out = _out(row)
-	if row.system == "gmail" and (row.connected_app or row.mailbox):  # one Life OS reads itself; a bare gmail row is only the defaults for what agents file
+	if row.system in MAIL and (row.connected_app or row.mailbox):  # one Life OS reads itself; a bare gmail row is only the defaults for what agents file
 		return _gmail_card(row, out, meta)
 	n, jobs = _week_counts(space, row.system)
 	counts = [f"{n} this week" if not jobs else f"{n - jobs} captures · {jobs} piece{'s' if jobs != 1 else ''} of work filed"]
@@ -143,11 +146,11 @@ def _card(space, row):
 def _gmail_card(row, out, meta):
 	"""A mailbox: when it was last read for the digest, its lists and settings, and an error when Google refused."""
 	pending = not row.mailbox
-	line = _("Waiting for you to finish signing in with Google.") if pending else _("Daily digest, and searched live by Ask and your agent")
+	line = _("Waiting for you to finish signing in with {0}.").format("Microsoft" if row.system == "microsoft" else "Google") if pending else _("Daily digest, and searched live by Ask and your agent")
 	return {**out, "kind": meta["kind"], "icon": meta["icon"], "this_week": 0, "line": line, "pending": int(pending), "mailbox": row.mailbox,
 		"label_name": row.label_name or "", "always_include": row.always_include or "", "always_skip": row.always_skip or "",
 		"always_sensitive": row.always_sensitive or "", "error": row.last_error,
-		"processed_by": processed_by("gmail"), "lands": LANDS["gmail"]}
+		"processed_by": processed_by(row.system), "lands": LANDS[row.system]}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -161,8 +164,8 @@ def sources(space: str | None = None):
 	have = {r.system for r in rows}
 	available = [{"system": "upload", "label": UPLOAD["label"], "hint": UPLOAD["hint"], "always_on": 1, "this_week": _week_counts(space, "upload")[0],
 		"processed_by": processed_by("upload"), "lands": LANDS["upload"]}]
-	available += [{"system": k, "label": v["label"], "hint": "Connect Gmail" if k == "gmail" else v["hint"], "always_on": 0,
-		"processed_by": processed_by(k, v["label"])} for k, v in CATALOG.items() if k not in have or k == "gmail"]
+	available += [{"system": k, "label": v["label"], "hint": f"Connect {v['label']}" if k in MAIL else v["hint"], "always_on": 0,
+		"processed_by": processed_by(k, v["label"])} for k, v in CATALOG.items() if k not in have or k in MAIL]
 	from lifeos.brain import email_in
 
 	return {"space": space, "connected": [_card(space, r) for r in rows], "available": available, "email_in": email_in.info(),
@@ -221,18 +224,18 @@ def save(space: str | None = None, system: str | None = None, name: str | None =
 		if default_intent not in INTENTS:
 			frappe.throw(_("default_intent must be one of: {0}.").format(", ".join(INTENTS)), title=_("Intent is not valid"))
 		doc.default_intent = default_intent
-	if doc.system == "gmail":
+	if doc.system in MAIL:
 		for field, value in (("label_name", label_name), ("always_include", always_include), ("always_skip", always_skip), ("always_sensitive", always_sensitive)):
 			if value is not None:
 				doc.set(field, value.strip()[:2000])
 	if active is not None:
 		doc.active = 1 if flag(active) else 0
 	doc.save() if name else doc.insert()
-	if doc.system == "gmail" and doc.mailbox:  # the mailbox's mail account follows its switch and its name
+	if doc.system in MAIL and doc.mailbox:  # the mailbox's mail account follows its switch and its name
 		from lifeos import mail
 
 		mail.account_for_connection(doc)
-	return _out(connection(doc.space, doc.system)) if doc.system != "gmail" else _out(frappe.get_doc("Life Connection", doc.name))
+	return _out(connection(doc.space, doc.system)) if doc.system not in MAIL else _out(frappe.get_doc("Life Connection", doc.name))
 
 
 # ---------- Gmail (issue 58): Life OS reads it itself, read only ----------
@@ -294,16 +297,65 @@ def gmail_finish(name: str):
 
 def gmail_card(name):
 	conn = frappe.get_doc("Life Connection", name)
-	return _gmail_card(conn, _out(conn), CATALOG["gmail"])
+	return _gmail_card(conn, _out(conn), CATALOG[conn.system])
+
+
+# ---------- Microsoft (issue 88): Outlook and Microsoft 365, one card for each inbox ----------
+
+@frappe.whitelist(methods=["GET"])
+def microsoft_setup():
+	"""What Connect Microsoft shows before it sends you to Microsoft: whether the Azure app registration is in the site config, the permissions asked for,
+	and the redirect address to register in Azure for the next inbox."""
+	from lifeos.mail import gmail, microsoft
+
+	permissions.require_login()
+	return {"ready": int(microsoft.configured()), "scopes": [*microsoft.SCOPES], "redirect_uri": gmail.redirect_uri(microsoft.free_app_name()),
+		"nothing_changes": _("Life OS reads your mail only when you or your agent search it, and copies none of it. It sends or drafts mail, and archives or labels it, only when you ask your agent to, or approve what it suggests. It never deletes.")}
+
+
+@frappe.whitelist(methods=["POST"])
+def microsoft_connect(space: str | None = None, success_uri: str | None = None):
+	"""Start Connect Microsoft: a card for the inbox, a Connected App for it from the site config's Azure client, and Microsoft's sign-in address for the
+	signed-in person. The browser goes there; Frappe stores the token and returns to `success_uri` (a path in this site). Finish with microsoft_finish."""
+	from lifeos.mail import microsoft
+
+	_people_only()
+	space = permissions.resolve_space(space, write=True)
+	if not microsoft.configured():
+		frappe.throw(_("Microsoft sign-in is not set up yet. Put the Azure app's client ID and secret in the site config (docs/MICROSOFT.md), then try again."), title=_("Microsoft sign-in not set up"))
+	app = microsoft.make_app(microsoft.free_app_name())
+	conn = frappe.get_doc({"doctype": "Life Connection", "space": space, "system": "microsoft", "label": "Microsoft", "active": 0,
+		"connected_app": app.name, "connected_by": frappe.session.user}).insert()
+	success = success_uri if (success_uri or "").startswith("/") and not (success_uri or "").startswith("//") else "/life/brain/sources"
+	url = app.initiate_web_application_flow(frappe.session.user, f"{success}{'&' if '?' in success else '?'}microsoft={conn.name}")
+	return {"connection": conn.name, "url": url}
+
+
+@frappe.whitelist(methods=["POST"])
+def microsoft_finish(name: str):
+	"""After Microsoft sends the person back: read the inbox's address and switch it on. A card whose sign-in was abandoned is removed."""
+	from lifeos.mail import microsoft
+
+	_people_only()
+	conn = permissions.get_doc_checked("Life Connection", name, "write")
+	if conn.system != "microsoft":
+		frappe.throw(_("This is not a Microsoft connection."), title=_("Not a Microsoft connection"))
+	try:
+		microsoft.finish(conn)
+	except microsoft.MicrosoftError as e:
+		if not conn.mailbox:
+			frappe.delete_doc("Life Connection", conn.name, ignore_permissions=True, force=True)  # system: admin-only screen; the space write check is above
+		frappe.throw(str(e), title=_("Microsoft sign-in failed"))
+	return gmail_card(conn.name)
 
 
 @frappe.whitelist(methods=["POST"])
 def gmail_remove(name: str):
-	"""Stop reading a mailbox and forget its sign-in. What it already brought in stays."""
+	"""(Gmail or Microsoft.) Stop reading a mailbox and forget its sign-in. What it already brought in stays."""
 	_people_only()
 	conn = permissions.get_doc_checked("Life Connection", name, "write")
-	if conn.system != "gmail":
-		frappe.throw(_("This is not a Gmail connection."), title=_("Not a Gmail connection"))
+	if conn.system not in MAIL:
+		frappe.throw(_("This is not a mailbox connection."), title=_("Not a mailbox connection"))
 	app = conn.connected_app
 	for account in frappe.get_all("Life Mail Account", filters={"connection": conn.name}, pluck="name"):  # system: the account goes with its sign-in; the space write check is above
 		frappe.delete_doc("Life Mail Account", account, ignore_permissions=True, force=True)  # system: as above

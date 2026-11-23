@@ -45,7 +45,7 @@ def make(user: str, space: str, days: int = 1, weekly: bool = False, today=None)
 	"""The digest of one person's inboxes for the last `days` days; the item's name, or None when nothing from a person came in. Run again for the same day it updates the same item."""
 	today = getdate(today or nowdate())
 	since = str(add_days(today, -days))
-	sections, lines, sensitive = [], 0, False
+	sections, lines, sensitive, systems = [], 0, False, set()
 	for row in mail.accounts_for(user, space):
 		doc = frappe._dict(row)
 		conn = frappe.db.get_value("Life Connection", doc.connection, ["label_name", "always_include", "always_skip", "always_sensitive"], as_dict=True) if doc.connection else None
@@ -63,8 +63,9 @@ def make(user: str, space: str, days: int = 1, weekly: bool = False, today=None)
 			if conn.always_sensitive and _listed(h["sender"], conn.always_sensitive):
 				sensitive = True
 			subject = h["subject"].replace("[", "(").replace("]", ")")
-			items.append(f"- **{h['from']}**: {subject}. {line} [Open in Gmail]({h['link']}) [File it](lifeos-file:{doc.name}:{h['thread_id']})")
+			items.append(f"- **{h['from']}**: {subject}. {line} [Open in {mail.PROVIDER_NAMES.get(doc.provider, 'mail')}]({h['link']}) [File it](lifeos-file:{doc.name}:{h['thread_id']})")
 		if items:
+			systems.add(doc.provider)
 			sections.append(f"## {mail.label_of(doc)}\n\n" + "\n".join(items))
 			lines += len(items)
 	if not lines:
@@ -73,7 +74,7 @@ def make(user: str, space: str, days: int = 1, weekly: bool = False, today=None)
 
 	title = _("Email this week, to {0}").format(today.strftime("%-d %b")) if weekly else _("Email, {0}").format(today.strftime("%-d %b"))
 	text = "\n\n".join(sections)
-	done = inbox.create_item(space=space, source_type="Email Digest", source_system="gmail", external_id=f"digest:{user}:{'week' if weekly else 'day'}:{today}",
+	done = inbox.create_item(space=space, source_type="Email Digest", source_system="gmail" if "gmail" in systems or not systems else sorted(systems)[0], external_id=f"digest:{user}:{'week' if weekly else 'day'}:{today}",
 		title=title, raw_text=text, intent="Just keep")  # made by the scheduled job; the item belongs to the person's space
 	if sensitive:
 		frappe.db.set_value("Life Inbox Item", done["name"], "is_sensitive", 1, update_modified=False)

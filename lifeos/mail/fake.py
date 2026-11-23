@@ -94,8 +94,42 @@ class FakeGoogle:
 		self._note("delete_event", event_id=event_id)
 
 
+MS_ADDRESS = "owner@outlook.example"
+MS_MESSAGES = {
+	"fake-ms-conv-1": [{"id": "fake-ms-1", "conversationId": "fake-ms-conv-1", "subject": "Your 2016 tax return", "from": {"emailAddress": {"name": "Rekha Iyer", "address": "rekha@ca-firm.example"}},
+		"toRecipients": [{"emailAddress": {"address": MS_ADDRESS}}], "receivedDateTime": "2016-07-20T09:00:00Z", "bodyPreview": "Your 2016 return is attached.",
+		"body": {"contentType": "text", "content": "Your 2016 return is attached. Please keep it."}, "webLink": "https://outlook.office.com/mail/fake-ms-1", "categories": [],
+		"attachments": []}],
+}
+
+
+class FakeGraph:
+	"""Microsoft Graph on the acceptance site (site config lifeos_fake_microsoft = 1): one canned conversation, found by any word in it."""
+
+	def profile(self):
+		return {"mail": MS_ADDRESS}
+
+	def search_messages(self, search, top=10):
+		plain = re.sub(r"\b[a-z]+[:<>=]+\S+", " ", search.lower())
+		words = [w for w in re.findall(r"[a-z0-9]{3,}", plain) if w not in ("find", "the")]
+		return {"value": [m for ms in MS_MESSAGES.values() for m in ms if all(w in json.dumps(m).lower() for w in words)][:top]}
+
+	def conversation(self, conversation_id):
+		return {"value": MS_MESSAGES.get(conversation_id, [])}
+
+	def inbox_since(self, since, category="", top=100):
+		return {"value": []}
+
+	def get_attachment(self, message_id, attachment_id):
+		return b"fake attachment"
+
+
 def gmail():
 	return FakeGmail()
+
+
+def graph():
+	return FakeGraph()
 
 
 def google():

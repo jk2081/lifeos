@@ -22,7 +22,7 @@ ROWS = ("Where it goes", "What to propose", "Check every")
 KINDS = {"document": ("ingest-document", "Documents (PDF)", "Document"), "photo": ("ingest-photo", "Photos", "Photo"),
 	"video": ("ingest-video", "Videos", "Video"), "link": ("ingest-link", "Links and articles", "Article"),
 	"voice": ("ingest-voice", "Voice notes", "Voice"), "email": ("ingest-email", "Email", "Email")}
-CHANNEL_SKILLS = {"upload": "channel-upload", "phone": "channel-phone", "gmail": "channel-gmail", "google-calendar": "channel-calendar",
+CHANNEL_SKILLS = {"upload": "channel-upload", "phone": "channel-phone", "gmail": "channel-gmail", "microsoft": "channel-microsoft", "google-calendar": "channel-calendar",
 	"email": "channel-email-in"}
 AGENT_SKILL = "channel-agent"
 MEDIA_TO_KIND = {"Document": "document", "Photo": "photo", "Video": "video", "Article": "link", "Voice": "voice", "Email": "email", "Email Digest": "email"}
