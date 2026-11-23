@@ -8,23 +8,33 @@ import builtins
 
 import frappe
 from frappe import _
+from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 
 from lifeos.review import counts
 from lifeos import permissions
-from lifeos.api.utils import area_filter, flag, names_map, page
+from lifeos.api.timeline import index_where
+from lifeos.api.utils import area_criterion, count_where, flag, list_query, names_map, page
 from lifeos.api.sources import agent_users
 
 TABS = ("all", "notes", "documents", "people", "chats")
 # the index rows each tab holds (a kept file is an inbox item whose media kind is Document)
-PEOPLE_NOTE = ("(x.ref_doctype = 'Life Note' and x.collection = 'Wiki' and exists (select 1 from `tabLife Note` n where n.name = x.ref_name "
-	"and (n.summary like 'Person%%' or n.summary like 'Organi%%' or n.summary like 'People%%')))")
-DOCUMENT = "(x.ref_doctype = 'Life Vault Document' or (x.ref_doctype = 'Life Inbox Item' and x.media_kind = 'Document'))"
-CHAT = "x.ref_doctype = 'Life Chat Log'"
-NOTE = f"(x.ref_doctype = 'Life Note' and not {PEOPLE_NOTE})"
-TAB_SQL = {"all": f"({NOTE} or {DOCUMENT} or {CHAT} or {PEOPLE_NOTE})", "notes": NOTE, "documents": DOCUMENT, "chats": CHAT, "people": PEOPLE_NOTE}
+
+
+def tab_criteria(x):
+	"""The index rows each tab holds (a kept file is an inbox item whose media kind is Document), as criteria over the index table."""
+	n = frappe.qb.DocType("Life Note")
+	about_people = n.summary.like("Person%") | n.summary.like("Organi%") | n.summary.like("People%")
+	people = (x.ref_doctype == "Life Note") & (x.collection == "Wiki") & x.ref_name.isin(frappe.qb.from_(n).select(n.name).where(about_people))
+	document = (x.ref_doctype == "Life Vault Document") | ((x.ref_doctype == "Life Inbox Item") & (x.media_kind == "Document"))
+	chat = x.ref_doctype == "Life Chat Log"
+	note = (x.ref_doctype == "Life Note") & ~people
+	return {"all": note | document | chat | people, "notes": note, "documents": document, "chats": chat, "people": people}
+
+
 LETTER = {"note": "N", "person": "P", "document": "D", "chat": "C"}
 REF = {"Life Note": "note:", "Life Vault Document": "vault:", "Life Chat Log": "chat:", "Life Inbox Item": "source:", "Life Person": "person:"}
-FIELDS = "x.ref_doctype, x.ref_name, x.title, x.record_date, x.area, x.goal, x.status, x.media_kind, x.source_system, x.assistant, x.intent, x.vault_locked, x.collection, x.record_owner, x.modified"
+FIELDS = ["ref_doctype", "ref_name", "title", "record_date", "area", "goal", "status", "media_kind", "source_system", "assistant", "intent", "vault_locked", "collection", "record_owner", "modified"]
 
 
 def _like(text: str) -> str:
@@ -32,32 +42,27 @@ def _like(text: str) -> str:
 
 
 def _index_rows(space, tab, q, area, goal, source, include_archived, limit, unopened=False):
-	where, values = ["x.space = %(space)s", TAB_SQL[tab]], {"space": space}
-	where.append("1=1" + permissions.vault_guard(space, "x."))
+	x = frappe.qb.DocType("Life Index")
+	where = [tab_criteria(x)[tab]]
 	if not flag(include_archived):
-		where.append("x.is_archived = 0")
+		where.append(x.is_archived == 0)
 	if q:
-		where.append("(x.title like %(q)s or x.search_text like %(q)s)")
-		values["q"] = _like(q)
+		where.append(x.title.like(_like(q)) | x.search_text.like(_like(q)))
 	if area:
-		where.append(area_filter(space, area, "x.area", values, also_in="index"))
+		where.append(area_criterion(space, area, x, also_in="index"))
 	if goal:
-		where.append("x.goal = %(goal)s")
-		values["goal"] = "" if goal == "none" else goal
+		where.append(x.goal == ("" if goal == "none" else goal))
 	if unopened:  # notes not opened in 90 days (the Library's "Not opened in 90 days" filter)
-		where.append("(x.ref_doctype = 'Life Note' and exists (select 1 from `tabLife Note` un where un.name = x.ref_name and un.last_opened_on <= %(unopened_cut)s))")
-		values["unopened_cut"] = counts.ago(90)
+		un = frappe.qb.DocType("Life Note")
+		where.append((x.ref_doctype == "Life Note") & x.ref_name.isin(frappe.qb.from_(un).select(un.name).where(un.last_opened_on <= counts.ago(90))))
 	if source in ("me", "brain"):
-		where.append(("" if source == "brain" else "not ") + "(x.record_owner in %(agents)s or x.collection = 'Wiki')")
-		values["agents"] = agent_users()
+		by_brain = x.record_owner.isin(agent_users()) | (x.collection == "Wiki")
+		where.append(by_brain if source == "brain" else ~by_brain)
 	elif source:
-		where.append("x.source_system = %(source)s")
-		values["source"] = source.lower()
-	clause = " and ".join(where)
-	# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments (TAB_SQL) and area_filter; every value is a parameter
-	rows = frappe.db.sql(f"select {FIELDS} from `tabLife Index` x where {clause} order by x.record_date desc, x.modified desc limit %(n)s", {**values, "n": limit}, as_dict=True)
-	# nosemgrep: frappe-sql-format-injection -- WHERE from fixed fragments (TAB_SQL) and area_filter; every value is a parameter
-	total = frappe.db.sql(f"select count(*) from `tabLife Index` x where {clause}", values)[0][0]
+		where.append(x.source_system == source.lower())
+	where = index_where(space, where)
+	rows = list_query("Life Index", FIELDS, where, [(x.record_date, Order.desc), (x.modified, Order.desc)]).limit(limit).run(as_dict=True)
+	total = count_where("Life Index", where)
 	return rows, total
 
 
@@ -83,10 +88,11 @@ def _decorate(rows):
 
 	notes = [r.ref_name for r in rows if r.ref_doctype == "Life Note"]
 	details = {n.name: n for n in frappe.get_list("Life Note", filters={"name": ("in", notes)}, fields=["name", "summary", "collection", "inbox_item"])} if notes else {}
-	files = dict(frappe.db.sql("select attached_to_name, count(*) from `tabFile` where attached_to_doctype = 'Life Note' and attached_to_name in %s group by attached_to_name", (notes,))) if notes else {}
+	f, ns = frappe.qb.DocType("File"), frappe.qb.DocType("Life Note Source")
+	files = dict(frappe.qb.from_(f).select(f.attached_to_name, fn.Count("*")).where((f.attached_to_doctype == "Life Note") & f.attached_to_name.isin(notes)).groupby(f.attached_to_name).run()) if notes else {}  # system: the notes were read above
 	sources = {}
 	if notes:
-		for parent, dt, name in frappe.db.sql("select parent, source_doctype, source_name from `tabLife Note Source` where parenttype = 'Life Note' and parent in %s order by idx", (notes,)):
+		for parent, dt, name in frappe.qb.from_(ns).select(ns.parent, ns.source_doctype, ns.source_name).where((ns.parenttype == "Life Note") & ns.parent.isin(notes)).orderby(ns.idx).run():  # system: the notes were read above
 			sources.setdefault(parent, (dt, name))
 	for n, d in details.items():
 		if d.inbox_item and n not in sources:
