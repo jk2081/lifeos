@@ -2,7 +2,8 @@
 import frappe
 from frappe import _
 
-from lifeos import permissions, readings
+from lifeos import permissions
+from lifeos.goals import readings
 from lifeos.api.utils import parse
 
 SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "score_target", "archive_after_days", "stale_task_days",
@@ -34,7 +35,7 @@ def _counts(kind, space, names):
 		return {}
 	if kind == "area":
 		out = {}
-		from lifeos.index import also_in_sql
+		from lifeos.library.index import also_in_sql
 
 		for n in names:  # as the Timeline counts an area: filed there or also filed there
 			# nosemgrep: frappe-sql-format-injection -- also_in_sql and vault_guard return fixed fragments; space and area are parameters
@@ -140,7 +141,7 @@ def _spaces(names):
 def focus_offers(kind: str):
 	"""The focuses offered for a kind of part (Company, Estate, Household, Other), each with its suggested standard: [{name, standard}]."""
 	permissions.require_login()
-	from lifeos import focus_defaults
+	from lifeos.goals import focus_defaults
 
 	return [{"name": n, "standard": st} for n, st in focus_defaults.offered(kind)]
 
@@ -166,7 +167,7 @@ def get(space: str | None = None):
 			r["count"] = counts.get(r.name, 0)
 			r["archived_on"] = str(r.archived_on) if r.archived_on else None
 		lists[key] = rows
-	from lifeos import areas
+	from lifeos.goals import areas
 
 	hidden = set(areas.hidden_focuses(space))  # existing focuses are hidden, not deleted, while "Use focuses" is off
 	lists["areas"] = [r for r in lists["areas"] if r.name not in hidden]
@@ -203,7 +204,7 @@ def get(space: str | None = None):
 
 def _cycle_info(space):
 	"""The current 12 Week cycle for Settings > Rhythms: its dates and this week's number (read-only there)."""
-	from lifeos import cycles
+	from lifeos.goals import cycles
 
 	c = frappe.db.get_value("Life Cycle", {"space": space, "status": "Active"}, ["name", "title", "start_date", "end_date"], as_dict=True)
 	if not c:
@@ -402,7 +403,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	if kind == "area" and parent_area is not None:
 		doc.parent_area = parent_area or None
 	if kind == "area" and not name and not doc.parent_area:  # a new area is a part; Career when no area of life is named
-		from lifeos import areas
+		from lifeos.goals import areas
 
 		doc.parent_area = areas.ensure(doc.space)[areas.DEFAULT_PARENT]
 	if kind == "area" and is_on is not None:
@@ -443,7 +444,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 			doc.is_archived, doc.archived_on = 0, None
 			if kind == "area":
 				if doc.parent_area and frappe.db.get_value("Life Area", doc.parent_area, "is_archived"):
-					from lifeos import areas  # its old parent is archived: back under Career
+					from lifeos.goals import areas# its old parent is archived: back under Career
 
 					doc.parent_area = areas.ensure(doc.space)[areas.DEFAULT_PARENT]
 				if int(with_children or 0):
@@ -456,7 +457,7 @@ def save_item(kind: str, space: str | None = None, name: str | None = None, titl
 	doc.save() if name else doc.insert()
 	made = []
 	if kind == "area" and doc.part_kind and not doc.is_focus and (part_kind is not None or not name):
-		from lifeos import areas
+		from lifeos.goals import areas
 
 		wanted = parse(focuses, None)
 		made = areas.add_offered_focuses(doc.name, wanted if isinstance(wanted, list) else None)
@@ -475,7 +476,7 @@ def _areas_admin_only(is_on=None):
 
 def _move_open_work(doc, move_to):
 	"""Before a part is archived, its open goals and tasks go to `move_to`; without it, a part that holds any is refused."""
-	from lifeos import areas
+	from lifeos.goals import areas
 
 	work = areas.open_work(doc.name)
 	if not (work["goals"] or work["tasks"]):
@@ -493,7 +494,7 @@ def area_open_work(area: str):
 	"""What archiving a part would leave behind: how many open goals and tasks it holds, and the areas they can move to
 	(its own area of life, then its other parts). Life Admin only."""
 	_admin_only()
-	from lifeos import areas
+	from lifeos.goals import areas
 
 	permissions.get_doc_checked("Life Area", area, "read")
 	work = areas.open_work(area)

@@ -5,7 +5,8 @@ import builtins
 import frappe
 from frappe import _
 
-from lifeos import old_inbox, permissions
+from lifeos.brain import old_inbox
+from lifeos import permissions
 from lifeos.api.utils import lens_area, page, parse
 
 

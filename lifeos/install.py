@@ -53,7 +53,7 @@ def setup():
 		"Google Calendar": GOOGLE_FIELDS,
 		"File": FILE_FIELDS,
 	}, ignore_validate=True)
-	from lifeos import index
+	from lifeos.library import index
 	index.ensure_indexes()
 	make_spaces()
 	from lifeos.skills import runner, store
@@ -78,7 +78,7 @@ def make_roles():
 
 
 # issue 46: a new site has one space. Spaces stay in the data model; a second one is made by hand (the acceptance site's
-# `lifeos.devtools.setup_users` makes Shared).
+# `lifeos.tools.devtools.setup_users` makes Shared).
 STARTING_SPACES = ("Private",)
 
 
@@ -95,7 +95,7 @@ def make_spaces():
 		settings.default_space = "Private"
 		settings.flags.ignore_permissions = True
 		settings.save()
-	from lifeos import seed
+	from lifeos.tools import seed
 	seed.ensure_structure()
 
 
@@ -171,7 +171,7 @@ def add_member(space, user, access="Write", role="Life User"):
 
 def make_personal_space(user, space_name=None):
 	"""Create a private space for a family member. Like every new space it gets the seven areas of life (issue 11)."""
-	from lifeos import seed
+	from lifeos.tools import seed
 	space_name = space_name or f"{frappe.db.get_value('User', user, 'first_name') or user}'s space"
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name, "owner_user": user,
 		"members": [{"user": user, "access": "Write"}]}).insert(ignore_permissions=True)

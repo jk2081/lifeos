@@ -6,7 +6,7 @@ from unittest import mock
 
 import frappe
 
-from lifeos import gmail
+from lifeos.brain import gmail
 from lifeos.api import connections, inbox, settings
 from lifeos.tests.base import AGENT, OWNER, PRIVATE
 from lifeos.tests.helpers import item, set_key, SKILL, SkillCase, text
@@ -262,7 +262,7 @@ class TestConnectGmail(GmailCase):
 					frappe.delete_doc("Connected App", name, ignore_permissions=True, force=True)
 
 	def test_without_google_settings_connect_says_what_to_set_up(self):
-		with mock.patch("lifeos.gmail.configured", return_value=False):
+		with mock.patch("lifeos.brain.gmail.configured", return_value=False):
 			self.as_user(OWNER)
 			with self.assertRaises(frappe.ValidationError) as e:
 				connections.gmail_connect(space=PRIVATE)

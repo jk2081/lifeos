@@ -7,7 +7,9 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, date_diff, getdate, today
 
-from lifeos import counts, permissions, trash
+from lifeos.review import counts
+from lifeos import permissions
+from lifeos.library import trash
 from lifeos.api import someday
 from lifeos.api.utils import names_map, parse
 
@@ -85,7 +87,7 @@ def rule_batches(space):
 		out.append(_batch("wiki_twins", "Notes that repeat wiki pages", "A wiki page has the same title. Merging adds the note's text to the page, keeps both texts in the page's history, and archives the note.",
 			twins, "merge", "Merge {n}"))
 	# set 7: Inbox items left too long, each with its suggested decision, confirmed on the Inbox's batch screen
-	from lifeos import old_inbox
+	from lifeos.brain import old_inbox
 
 	rule = old_inbox.rule()
 	waiting = [i for i in old_inbox.candidates(space, rule["days"], limit=1000) if i.suggested_decision]
@@ -225,7 +227,7 @@ def decide(doctype: str, name: str, decision: str, date: str | Date | None = Non
 		undo = [someday._snapshot(doc)]
 		someday.park_doc(doc)
 	elif decision == "archive":
-		from lifeos import archive
+		from lifeos.library import archive
 
 		archive.set_archived(doctype, name, True, "Manual")
 	elif decision == "delete":
@@ -278,7 +280,7 @@ def apply_batch(action: str, items: str | list, space: str | None = None):
 			undo.append(someday._snapshot(doc))
 			someday.park_doc(doc)
 		elif action == "archive":
-			from lifeos import archive
+			from lifeos.library import archive
 
 			doc = permissions.get_doc_checked(doctype, name, "write")
 			undo.append(_snap(doc))
@@ -307,7 +309,7 @@ def _accept_notes(item):
 
 def _merge(note):
 	"""Add a My notes page's text to the wiki page with the same title, logged as a wiki change, and archive the note."""
-	from lifeos import archive
+	from lifeos.library import archive
 	from lifeos.api import wiki
 
 	doc = permissions.get_doc_checked("Life Note", note, "write")
@@ -339,7 +341,7 @@ def undo(log: str | list):
 		elif kind == "unaccept":
 			_unaccept(op.get("proposal"))
 		elif kind == "unmerge":
-			from lifeos import archive
+			from lifeos.library import archive
 			from lifeos.api import wiki
 
 			if op.get("change"):
@@ -362,7 +364,7 @@ def undo(log: str | list):
 def _unaccept(proposal):
 	"""Undo an accepted note proposal. The undo log comes from the browser, so only the proposal's name is taken from it:
 	the item and the record made are read from the proposal, and each is checked for this user."""
-	from lifeos import index
+	from lifeos.library import index
 
 	if not isinstance(proposal, str) or not proposal:
 		frappe.throw(_("Nothing to undo."), title=_("Nothing to undo"))

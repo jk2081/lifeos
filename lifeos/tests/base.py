@@ -2,7 +2,9 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from lifeos import areas, devtools, permissions, seed
+from lifeos.goals import areas
+from lifeos.tools import devtools, seed
+from lifeos import permissions
 
 OWNER, FAMILY, AGENT = devtools.OWNER, devtools.FAMILY, devtools.AGENT
 PRIVATE, SHARED = "Test Private", "Test Shared"

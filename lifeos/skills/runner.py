@@ -201,7 +201,7 @@ def blocks_of_sample(sample):
 
 def _blocks_of(item, with_files=True):
 	"""What the model is given of a capture: its words and its images and PDFs. Wrapped, and marked as data."""
-	from lifeos import files
+	from lifeos.library import files
 
 	parts = [f'<capture source="{item.source_type or ""}" received="{item.received_on or ""}" intent="{item.intent or "Process"}" id="{item.name}">',
 		f"<title>{_data(item.title)}</title>"]

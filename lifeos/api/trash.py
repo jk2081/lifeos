@@ -1,7 +1,7 @@
-"""The trash, for the Archive's Trash tab and the Delete buttons (UX fixes, set 5). The rules are in lifeos/trash.py."""
+"""The trash, for the Archive's Trash tab and the Delete buttons (UX fixes, set 5). The rules are in lifeos/library/trash.py."""
 import frappe
 
-from lifeos import trash
+from lifeos.library import trash
 
 
 @frappe.whitelist(methods=["GET"])

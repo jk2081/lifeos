@@ -4,7 +4,8 @@ import builtins
 import frappe
 from frappe import _
 
-from lifeos import links, permissions
+from lifeos.library import links
+from lifeos import permissions
 from lifeos.api.utils import area_filter, extra_columns, flag, in_area, lens_area, names_map, page, parse, std_clause, std_filters, std_order, summarise
 from lifeos.api.utils import order_by as sort_order
 
@@ -89,7 +90,7 @@ def mark_opened(doc):
 	if doc.get("last_opened_on") and frappe.utils.getdate(doc.last_opened_on) == day:
 		return
 	frappe.db.set_value("Life Note", doc.name, "last_opened_on", day, update_modified=False)
-	frappe.db.sql("update `tabLife Index` set last_opened_on=%s where ref_doctype='Life Note' and ref_name=%s", (day, doc.name))
+	frappe.db.set_value("Life Index", {"ref_doctype": "Life Note", "ref_name": doc.name}, "last_opened_on", day, update_modified=False)
 
 
 def _visible_title(note, space):

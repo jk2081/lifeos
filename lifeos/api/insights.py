@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
 
-from lifeos import insights as rules
+from lifeos.review import insights as rules
 from lifeos import permissions
 from lifeos.api.utils import names_map, page, parse
 
@@ -26,7 +26,7 @@ def _out(rows):
 		for p, dt, n, label in frappe.db.sql("""select parent, ref_doctype, ref_name, label from `tabLife Insight Evidence`
 			where parent in %s order by idx""", ([r.name for r in rows],)):
 			ev.setdefault(p, []).append({"doctype": dt, "name": n, "label": label})
-	from lifeos.pane_refs import ref_of
+	from lifeos.web.pane_refs import ref_of
 
 	for r in rows:
 		r["area_name"] = areas.get(r.area)

@@ -8,10 +8,14 @@ import frappe
 from frappe.core.doctype.file.utils import find_file_by_url, get_content_hash
 from frappe.utils import add_to_date, now_datetime, today
 
-from lifeos import calendar_data, cycles, email_in, files, links, permissions, proposals, trash
+from lifeos.calendar import calendar_data
+from lifeos.goals import cycles
+from lifeos.library import files, links, trash
+from lifeos import permissions
+from lifeos.brain import email_in, proposals
 from lifeos.api import chats, connections, inbox, meta, review, wiki
-from lifeos.devtools import attach, load_fake_agent, LocalClient, pdf_bytes
-from lifeos.pwa import SW_PATH
+from lifeos.tools.devtools import attach, load_fake_agent, LocalClient, pdf_bytes
+from lifeos.web.pwa import SW_PATH
 from lifeos.review import meetings
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import item, task, upload
@@ -866,3 +870,13 @@ class EmailInCase(LifeTestCase):
 		self.receive(message_id="<five@mail.example.com>", content="<div>Remember the milk</div>", subject="Milk")
 		(cap,) = self.captures("<five@mail.example.com>")
 		self.assertEqual((cap.instruction, cap.raw_text.strip()), (None, "Remember the milk"))
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a capture straight through frappe.get_doc applies the same rule as the API."""
+
+	def test_done_capture_through_get_doc_gets_its_finish_date(self):
+		doc = frappe.get_doc({"doctype": "Life Inbox Item", "space": PRIVATE, "title": "75 direct", "source_type": "Message", "raw_text": "x"}).insert()
+		self.assertEqual(doc.intent, "Process")
+		doc.status = "Done"
+		doc.save()
+		self.assertTrue(doc.finished_on)

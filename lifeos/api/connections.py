@@ -1,6 +1,6 @@
 """Connections (UX fixes, set 4): one row per space and outside system (gmail, claude, chatgpt, google-calendar) with the
 defaults agents use when filing what arrives from it, and when something last arrived. No credentials are stored here: an
-agent holds its own access, and Life OS's own read of Gmail (issue 58, `lifeos/gmail.py`) keeps its token in Frappe's Token Cache,
+agent holds its own access, and Life OS's own read of Gmail (issue 58, `lifeos/brain/gmail.py`) keeps its token in Frappe's Token Cache,
 one mailbox for each Gmail card."""
 import frappe
 from frappe import _
@@ -247,7 +247,7 @@ def _people_only():
 def gmail_setup():
 	"""What Connect Gmail shows before it sends you to Google: whether Google sign-in is set up (Google Settings, the OAuth client), the one
 	permission asked for, and the redirect address to allow in Google Cloud for the next mailbox."""
-	from lifeos import gmail
+	from lifeos.brain import gmail
 
 	permissions.require_login()
 	return {"ready": int(gmail.configured()), "scope": gmail.SCOPE, "redirect_uri": gmail.redirect_uri(gmail.free_app_name()),
@@ -259,7 +259,7 @@ def gmail_connect(space: str | None = None, success_uri: str | None = None):
 	"""Start Connect Gmail: a card for the mailbox, a Connected App for it from Google Settings, and Google's sign-in address for the
 	signed-in person (read only: gmail.readonly). The browser goes there; Frappe stores the token and returns to `success_uri`
 	(a path in this site). Finish with gmail_finish. Nothing secret is typed or shown."""
-	from lifeos import gmail
+	from lifeos.brain import gmail
 
 	_people_only()
 	space = permissions.resolve_space(space, write=True)
@@ -276,7 +276,7 @@ def gmail_connect(space: str | None = None, success_uri: str | None = None):
 @frappe.whitelist(methods=["POST"])
 def gmail_finish(name: str):
 	"""After Google sends the person back: read the mailbox's address and switch it on. A card whose sign-in was abandoned is removed."""
-	from lifeos import gmail
+	from lifeos.brain import gmail
 
 	_people_only()
 	conn = permissions.get_doc_checked("Life Connection", name, "write")
@@ -316,7 +316,7 @@ def gmail_remove(name: str):
 def start_import(space: str | None = None, system: str | None = None, file_url: str | None = None):
 	"""Import a Claude (system=claude) or ChatGPT (system=chatgpt) data export: the .zip uploaded as a private file.
 	It runs in a background job; import_status shows its progress. People with Write access only."""
-	from lifeos import chat_import
+	from lifeos.brain import chat_import
 
 	if permissions.is_agent():
 		frappe.throw(_("Only a person can import a chat export."), frappe.PermissionError, title=_("Only people import chats"))
@@ -336,7 +336,7 @@ def start_import(space: str | None = None, system: str | None = None, file_url: 
 			frappe.utils.get_datetime(cur["started_on"]) > add_to_date(now_datetime(), hours=-2):
 		frappe.throw(_("An import of this kind is already running in this space."), title=_("Import already running"))
 	chat_import._set(space, system, status="Queued", file_name=f.file_name, error=None, user=frappe.session.user, started_on=str(now_datetime())[:19])
-	frappe.enqueue("lifeos.chat_import.run", queue="long", timeout=4 * 3600, space=space, system=system, file_url=file_url,
+	frappe.enqueue("lifeos.brain.chat_import.run", queue="long", timeout=4 * 3600, space=space, system=system, file_url=file_url,
 		user=frappe.session.user, now=bool(frappe.flags.in_test or frappe.flags.lifeos_import_now))
 	return chat_import.progress(space, system)
 
@@ -345,7 +345,7 @@ def start_import(space: str | None = None, system: str | None = None, file_url: 
 def import_status(space: str | None = None, system: str | None = None):
 	"""The progress of the last chat import of this kind in this space: status (Queued, Reading, Importing, Done, Failed),
 	done and total, and the counts created, updated, unchanged and skipped (could not be read)."""
-	from lifeos import chat_import
+	from lifeos.brain import chat_import
 
 	space = permissions.resolve_space(space)
 	return chat_import.progress(space, (system or "").lower()) or {"status": None}

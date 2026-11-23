@@ -3,7 +3,8 @@ part with a standard, principles and an annual goal. It is made and edited throu
 import frappe
 from frappe import _
 
-from lifeos import areas, permissions, readings
+from lifeos.goals import areas, readings
+from lifeos import permissions
 from lifeos.api import goals as goal_api
 
 

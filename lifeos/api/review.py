@@ -3,7 +3,9 @@ import frappe
 from frappe import _
 from frappe.utils import now_datetime
 
-from lifeos import links, permissions, proposals
+from lifeos.library import links
+from lifeos import permissions
+from lifeos.brain import proposals
 from lifeos.api.inbox import _finish_if_decided
 from lifeos.api.utils import parse
 from lifeos.skills import lessons

@@ -6,7 +6,8 @@ import builtins
 import frappe
 from frappe import _
 
-from lifeos import links, permissions
+from lifeos.library import links
+from lifeos import permissions
 from lifeos.api.utils import flag
 from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order

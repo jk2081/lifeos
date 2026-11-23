@@ -242,7 +242,7 @@ The list screens take `embed`: `{ screen: 'goal', space, fixed: { goal }, active
 
 ### Count doors
 
-Every number on Today, Reset, Someday, the sidebar and the weekly review's Reset step comes from the count helper (`lifeos/counts.py`): `{ n, to: { path, query }, label }`, where `n` is worked out by calling the same list method, with the same arguments, that the screen at `to` calls. Show it with `components/ui/CountLink.vue` (`:count`, optional `count-key` and `tone`), never by formatting a number and building a link by hand. It carries `data-count-door`, `data-count-n` and `data-count-label`, which the acceptance check U.31 clicks and compares with the rows shown. A count with no condition of its own carries `all=1`, so a remembered view cannot change what the list shows. Ask's `counts` tool returns the same objects.
+Every number on Today, Reset, Someday, the sidebar and the weekly review's Reset step comes from the count helper (`lifeos/review/counts.py`): `{ n, to: { path, query }, label }`, where `n` is worked out by calling the same list method, with the same arguments, that the screen at `to` calls. Show it with `components/ui/CountLink.vue` (`:count`, optional `count-key` and `tone`), never by formatting a number and building a link by hand. It carries `data-count-door`, `data-count-n` and `data-count-label`, which the acceptance check U.31 clicks and compares with the rows shown. A count with no condition of its own carries `all=1`, so a remembered view cannot change what the list shows. Ask's `counts` tool returns the same objects.
 
 ### The Search or ask box
 

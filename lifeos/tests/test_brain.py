@@ -7,10 +7,14 @@ from unittest import mock
 import frappe
 from frappe.utils import add_days, add_months, add_to_date, getdate, now_datetime, today
 
-from lifeos import area_guess, chat_import, counts, index, old_inbox, permissions, queries, sources as sources_lifeos, trash
+from lifeos.brain import area_guess, chat_import, old_inbox, sources as sources_lifeos
+from lifeos.review import counts
+from lifeos.library import index, trash
+from lifeos import permissions
+from lifeos.web import queries
 from lifeos.ai import fake
 from lifeos.api import brain, chats, connections, goals, inbox, jobs, library, meta, old_items, outbox, reset, review, settings, someday, sources, tasks, today as today_api, wiki
-from lifeos.devtools import attach, load_fake_agent, LocalClient, pdf_bytes
+from lifeos.tools.devtools import attach, load_fake_agent, LocalClient, pdf_bytes
 from lifeos.skills import runner, triggers
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import answer, item, NoModel, OldCase, set_key, SKILL, SkillCase, task, text

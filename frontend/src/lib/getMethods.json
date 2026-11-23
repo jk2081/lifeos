@@ -124,5 +124,5 @@
  "lifeos.api.wiki.changes",
  "lifeos.api.wiki.change",
  "lifeos.api.wiki.health",
- "lifeos.queries.link_query"
+ "lifeos.web.queries.link_query"
 ]

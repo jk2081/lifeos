@@ -8,7 +8,7 @@ from frappe import _
 from frappe.utils import get_first_day, now_datetime
 
 from lifeos import permissions
-from lifeos.proposals import SCHEMA
+from lifeos.brain.proposals import SCHEMA
 from lifeos.api.utils import parse
 from lifeos.skills import examples, filing, lessons, store, triggers
 from lifeos.skills import tools as fixed

@@ -8,7 +8,10 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
-from lifeos import permissions, proposals, readings, wiki_check
+from lifeos import permissions
+from lifeos.brain import proposals
+from lifeos.goals import readings
+from lifeos.library import wiki_check
 from lifeos.api.utils import area_filter, lens_area, names_map, page
 from lifeos.skills import lessons
 
@@ -166,7 +169,7 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 
 def _made(space, items):
 	"""The records made from each capture: those of its accepted proposals, at most MADE_EACH, each readable by the caller."""
-	from lifeos import item_page
+	from lifeos.library import item_page
 
 	if not items:
 		return {}
@@ -182,7 +185,7 @@ def _made(space, items):
 
 def plate(space, area=None):
 	"""This week's Outbox piles (Done, Delegated, Parked, Discarded) with what came in, as the Outbox counts them. People only."""
-	from lifeos import outbox
+	from lifeos.brain import outbox
 	from lifeos.api import outbox as outbox_api
 
 	if permissions.is_agent():

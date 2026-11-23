@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 
-from lifeos import cycles as rules, readings, weekplan
-from lifeos import habits as habit_rules
+from lifeos.goals import cycles as rules, readings
+from lifeos.tasks import weekplan
+from lifeos.goals import habits as habit_rules
 from lifeos.api import calendar, goals, library as library_api, outbox as outbox_api, periodic, settings, settings as settings_api, sources, today as today_api, week, weekly
 from lifeos.review import findings, periodic as rv_rules
 from lifeos.review.record import period_text, Review

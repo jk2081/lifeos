@@ -1,7 +1,7 @@
 """The area tree (Settings > Areas and pickers). Area pages went in set 6: the lens shows an area on every place."""
 import frappe
 
-from lifeos import areas as life_areas
+from lifeos.goals import areas as life_areas
 from lifeos import permissions
 from lifeos.api import tasks as task_api
 from lifeos.api.utils import flag

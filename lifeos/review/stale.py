@@ -8,7 +8,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
 
-from lifeos import counts, permissions
+from lifeos.review import counts
+from lifeos import permissions
 from lifeos.api import someday
 from lifeos.api.utils import names_map
 

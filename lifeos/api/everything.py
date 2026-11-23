@@ -9,7 +9,8 @@ import builtins
 import frappe
 from frappe import _
 
-from lifeos import counts, permissions
+from lifeos.review import counts
+from lifeos import permissions
 from lifeos.api.utils import area_filter, flag, names_map, page
 from lifeos.api.sources import agent_users
 

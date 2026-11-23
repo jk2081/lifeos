@@ -9,7 +9,8 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-from lifeos import readings, weekplan
+from lifeos.goals import readings
+from lifeos.tasks import weekplan
 from lifeos.review import goal_week
 
 STARS = 3
@@ -197,7 +198,7 @@ def tab(review, now=None):
 
 
 def journal_score(cycle):
-	from lifeos import cycles
+	from lifeos.goals import cycles
 
 	week = cycles.current_week(cycle)
 	s = cycles.week_score(cycle.name, week)

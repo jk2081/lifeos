@@ -118,7 +118,7 @@ export async function failShots(n, dir = FAIL_SHOTS) {
 export const pathOf = (pg) => new URL(pg.url()).pathname.replace(/\/$/, '') || '/'
 
 // the agent's key is made for this run and passed in the environment; it is never printed or stored
-export const [agentKey, agentSecret] = bench('from lifeos import devtools\nprint(devtools.agent_api_key())').split('\n').pop().split(':')
+export const [agentKey, agentSecret] = bench('from lifeos.tools import devtools\nprint(devtools.agent_api_key())').split('\n').pop().split(':')
 // the agent over HTTP with its key: GET for the methods that declare GET (frontend/src/lib/getMethods.json), POST for the rest,
 // so a refusal is the permission rule and not the wrong HTTP method
 export function agentFetch(m, args = {}) {
@@ -132,10 +132,10 @@ export function runAgent() {
     { env: { ...process.env, LIFEOS_API_KEY: agentKey, LIFEOS_API_SECRET: agentSecret }, encoding: 'utf8' })
 }
 // a real one-page PDF, made by the test helpers on the bench
-export const PDF = Buffer.from(bench('import base64\nfrom lifeos import devtools\nprint(base64.b64encode(devtools.pdf_bytes()).decode())').split('\n').pop(), 'base64')
+export const PDF = Buffer.from(bench('import base64\nfrom lifeos.tools import devtools\nprint(base64.b64encode(devtools.pdf_bytes()).decode())').split('\n').pop(), 'base64')
 
 // the Settings check adds and removes this person as a member; they exist on the acceptance site with no space
-bench(`from lifeos import devtools\nfrappe.set_user("Administrator")\ndevtools.make_user("stranger@lifeos.test", "Stranger", ["Life User"])`)
+bench(`from lifeos.tools import devtools\nfrappe.set_user("Administrator")\ndevtools.make_user("stranger@lifeos.test", "Stranger", ["Life User"])`)
 // UX fixes, set 5: Ask and the AI insights use the fake model here, never the real API: the site config flag, and a key that
 // starts with "fake-", which the client never sends anywhere. Insights start empty.
 bench(`from frappe.installer import update_site_config
@@ -147,7 +147,7 @@ frappe.db.set_single_value("Life Settings", "require_done_when", 0)
 for sp in frappe.get_all("Life Space", pluck="name"): frappe.db.set_value("Life Space", sp, {"ask_enabled": 1, "ask_can_read_vault": 0})`)
 // Earlier runs leave their records on the test site. Today lists only the 20 documents that expire soonest, so the vault
 // documents of earlier runs are archived first; otherwise this run's document would not be among them.
-bench(`from lifeos import archive
+bench(`from lifeos.library import archive
 frappe.set_user("owner@lifeos.test")
 for name in frappe.get_all("Life Vault Document", filters={"space": "${SPACE}", "is_archived": 0}, or_filters=[["title", "like", "UX permit %"], ["title", "like", "Passport m%"]], pluck="name"):
     archive.set_archived("Life Vault Document", name, True, "Manual")`)

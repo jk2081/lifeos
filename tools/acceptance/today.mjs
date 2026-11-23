@@ -183,7 +183,7 @@ for (const width of WIDTHS) {
   if (!phone) await check('TODAY.7', 'Insights: rules make Stuck, 12 Week Year and Habit insights from seeded data; a dismissed one does not return; a snoozed one returns after its date; at most 12 new a day', async () => {
     bench('frappe.db.delete("Life Insight", {"space": "Private"})')
     // a habit done every day last month and never this month
-    bench(`from lifeos import cycles, habits
+    bench(`from lifeos.goals import cycles, habits
 frappe.set_user("owner@lifeos.test")
 h = frappe.get_doc({"doctype": "Life Habit", "space": "Private", "title": "${S5('habit')}"}).insert()
 now = frappe.utils.getdate(frappe.utils.today()); prev = frappe.utils.add_months(now, -1)
@@ -515,13 +515,13 @@ for (const width of WIDTHS) {
 frappe.db.set_single_value("System Settings", "time_zone", "${zoneWas}")
 for dt in ("Life Task",):
     for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
-from lifeos import devtools
+from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
   let one = null
   try {
-    bench(`from lifeos import devtools
+    bench(`from lifeos.tools import devtools
 devtools.make_user("${user}", "Newcomer", ["Life Admin", "Life User"])
 frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
 frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
@@ -664,13 +664,13 @@ for (const width of WIDTHS) {
   const restore = () => bench(`frappe.set_user("Administrator")
 for dt in ("Life Task", "Life Goal", "Life Cycle", "Life Habit Log", "Life Habit", "Life Action Log"):
     for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
-from lifeos import devtools
+from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
   let one = null
   try {
-    bench(`from lifeos import devtools
+    bench(`from lifeos.tools import devtools
 devtools.make_user("${user}", "Newcomer55", ["Life Admin", "Life User"])
 frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
 frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")

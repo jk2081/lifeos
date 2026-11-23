@@ -47,7 +47,7 @@ await check('GOALS.3', 'Carry an open October goal into November: the month card
   // a month goal is a goal with the Month horizon; carrying is what the monthly review does, so this calls the rule it calls
   const old = (await owner.api('goals.create', { space: SPACE, title: `October goal ${stamp}`, horizon: 'Month', target_date: '2026-10-31', done_when: 'Done' })).name
   const out = JSON.parse(bench(`import json
-from lifeos import cycles
+from lifeos.goals import cycles
 frappe.set_user("owner@lifeos.test")
 print(json.dumps(cycles.carry_month_goal("${old}")))`).split('\n').pop())
   const oct = await owner.api('goals.this_month', { space: SPACE, year: 2026, month: 10 })
@@ -655,9 +655,9 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     const b = (await s.api('goals.create', { space: SPACE, title: `S7 handoff goal ${W}`, horizon: 'Long term', area: areaId('Personal'), done_when: 'Handed over' })).name
     const now = iso(new Date()) // the run may cross midnight
     const at = `${now} 23:${phone ? '30' : '00'}:00`
-    // the weekly review's Goals tab makes this work; the call it makes is lifeos.weekplan.add
+    // the weekly review's Goals tab makes this work; the call it makes is lifeos.tasks.weekplan.add
     const addWork = (args) => JSON.parse(bench(`import json
-from lifeos import weekplan
+from lifeos.tasks import weekplan
 frappe.set_user("owner@lifeos.test")
 args = json.loads(${JSON.stringify(JSON.stringify(args))})
 d = weekplan.add(args.pop("goal"), **args)
@@ -681,7 +681,7 @@ print(json.dumps({"task": d.name, "status": d.status, "waiting_on": d.waiting_on
 
   await check('GOALS.18', `${width} px: Inbox items left too long: on Suggest an old item gets a suggested decision and the batch confirms it; on Park and Discard the job acts and Today's Undo restores`, async () => {
     const age = (name, days) => bench(`frappe.db.set_value("Life Inbox Item", "${name}", "received_on", frappe.utils.add_days(frappe.utils.now_datetime(), -${days}), update_modified=False)`)
-    const run = () => JSON.parse(bench(`import json\nfrom lifeos import old_inbox\nfrappe.clear_document_cache("Life Settings", "Life Settings")\nprint(json.dumps(old_inbox.run_for_space("${SPACE}")))`).split('\n').pop())
+    const run = () => JSON.parse(bench(`import json\nfrom lifeos.brain import old_inbox\nfrappe.clear_document_cache("Life Settings", "Life Settings")\nprint(json.dumps(old_inbox.run_for_space("${SPACE}")))`).split('\n').pop())
     const setRule = (mode, days) => owner.api('settings.save', { values: { old_inbox_mode: mode, old_inbox_days: days } })
     try {
       // Suggest
@@ -1401,7 +1401,7 @@ print(json.dumps({"cycle": cycle, "goal": g.name}))`).split('\n').pop())
       const [py, pm] = m === 1 ? [y - 1, 12] : [y, m - 1]
       const lastDay = (yy, mm) => `${yy}-${String(mm).padStart(2, '0')}-${new Date(Date.UTC(yy, mm, 0)).getUTCDate()}`
       const old = (await s.api('goals.create', { space: SPACE, title: T('carried'), horizon: 'Month', target_date: lastDay(py, pm), done_when: 'Done' })).name
-      bench(`from lifeos import cycles
+      bench(`from lifeos.goals import cycles
 frappe.set_user("owner@lifeos.test")
 cycles.carry_month_goal("${old}")`)
       const made = {}
@@ -1553,13 +1553,13 @@ frappe.db.set_single_value("Life Settings", "require_done_when", 0)
 s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()
 for dt in ("Life Note", "Life Task", "Life Goal", "Life Cycle", "Life Action Log"):
     for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
-from lifeos import devtools
+from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
   let one = null
   try {
-    bench(`from lifeos import devtools
+    bench(`from lifeos.tools import devtools
 devtools.make_user("${user}", "Newcomer56", ["Life Admin", "Life User"])
 frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
 frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
@@ -1605,7 +1605,7 @@ print(json.dumps({"cycle": cycle.name, "goal": g.name, "old": old.name, "career"
     })
 
     await check('GOALS.58', `${width} px: progress on a 12 Week Year goal shows this week's ticks and the tasks done`, async () => {
-      bench(`from lifeos import cycles
+      bench(`from lifeos.goals import cycles
 cycles.set_tick("${made.actions[0]}", cycles.current_week(frappe.get_doc("Life Cycle", "${made.cycle}")), 1)`)
       await goalPage(made.goal)
       const line = await pg.locator('[data-goal-week-ticks]').innerText()
@@ -1752,13 +1752,13 @@ for (const width of WIDTHS) {
 frappe.db.set_single_value("Life Settings", "use_focuses", 1)
 for dt in ("Life Note", "Life Task", "Life Goal", "Life Cycle", "Life Action Log"):
     for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
-from lifeos import devtools
+from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
   let one = null
   try {
-    bench(`from lifeos import devtools
+    bench(`from lifeos.tools import devtools
 devtools.make_user("${user}", "Newcomer57", ["Life Admin", "Life User"])
 frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
 frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")

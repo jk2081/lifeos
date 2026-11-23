@@ -16,7 +16,7 @@ from datetime import timedelta
 import frappe
 from frappe.utils import add_days, cint, get_datetime, get_system_timezone, get_url
 
-from lifeos.pane_refs import ref_of
+from lifeos.web.pane_refs import ref_of
 from lifeos.review import gcal
 
 KEY = "life_write_calendar"

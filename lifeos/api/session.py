@@ -2,7 +2,8 @@
 import frappe
 from frappe.utils import today
 
-from lifeos import areas, permissions, readings
+from lifeos.goals import areas, readings
+from lifeos import permissions
 
 
 @frappe.whitelist(methods=["GET"])
@@ -43,7 +44,7 @@ def counts(space: str | None = None, area: str | None = None):
 
 	from lifeos.api import tasks as task_api
 
-	from lifeos import counts as count_rules
+	from lifeos.review import counts as count_rules
 
 	# every number comes with the list it opens (UX fixes, set 5): Inbox items to review, Tasks due today or overdue
 	# (Open, Doing and Waiting), the Someday list, and the stuck count behind Reset's amber dot

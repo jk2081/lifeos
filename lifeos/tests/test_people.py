@@ -1,7 +1,7 @@
 """Tests for people."""
 import frappe
 
-from lifeos import people
+from lifeos.library import people
 from lifeos.api import people as people_api, tasks, wiki
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, PRIVATE
 from lifeos.tests.helpers import task

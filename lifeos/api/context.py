@@ -1,9 +1,11 @@
 """Context for agents (issue 54): `get` is the one call an agent makes first; `card` is what Settings → Rules shows the owner;
-`decide` settles a wiki contradiction that waits in Brain → Needs you. The rules are in lifeos/context.py and lifeos/wiki_check.py."""
+`decide` settles a wiki contradiction that waits in Brain → Needs you. The rules are in lifeos/agents/context.py and lifeos/library/wiki_check.py."""
 import frappe
 from frappe import _
 
-from lifeos import context, permissions, wiki_check
+from lifeos.agents import context
+from lifeos import permissions
+from lifeos.library import wiki_check
 
 
 @frappe.whitelist(methods=["GET"])

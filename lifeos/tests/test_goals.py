@@ -6,8 +6,9 @@ import types
 import frappe
 from frappe.utils import add_days, add_months, getdate, today
 
-from lifeos import areas, cycles as rules, focus_defaults, old_inbox, readings
-from lifeos import habits as habit_rules
+from lifeos.goals import areas, cycles as rules, focus_defaults, readings
+from lifeos.brain import old_inbox
+from lifeos.goals import habits as habit_rules
 from lifeos.ai import fake
 from lifeos.api import area, focus, goals, inbox, library, links, reset, review, search, settings, someday, tasks, timeline, today as today_api, vault, weekly
 from lifeos.life.doctype.life_goal.life_goal import derive_horizon
@@ -453,7 +454,7 @@ class TestReadings(LifeTestCase):
 		self.assertIsNone(frappe.db.get_value("Life Goal", g, "current_on"))
 
 	def test_fake_agent_reports_a_reading(self):
-		from lifeos.devtools import load_fake_agent
+		from lifeos.tools.devtools import load_fake_agent
 
 		fa = load_fake_agent()
 		g = number_goal("ux7 weight goal")
@@ -1023,7 +1024,7 @@ class TestFocuses(LifeTestCase):
 		self.assertEqual(item.area, f.name)
 
 	def test_the_core_card_carries_each_focus_with_its_standard_and_principles(self):
-		from lifeos import context
+		from lifeos.agents import context
 
 		self.focus("Yield", standard="Above 1,700 kg/ha")
 		settings.save_item("area", name=frappe.db.get_value("Life Area", {"space": PRIVATE, "area_name": "Yield"}), principles=["One system"])
@@ -1371,3 +1372,15 @@ class TestGoals(LifeTestCase):
 		self.assertRaises(frappe.PermissionError, goals.list, space=PRIVATE)
 		self.assertEqual(goals.task_counts([g]), {})
 		self.assertNotIn(g, [x.name for x in goals.list(space=SHARED, state="all")["goals"]])
+
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a goal straight through frappe.get_doc applies the same rule as the API."""
+
+	def test_year_goal_through_get_doc_needs_a_target_date(self):
+		doc = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "75 no date", "horizon": "Year"})
+		with self.assertRaises(frappe.ValidationError):
+			doc.insert()
+		doc.target_date = add_days(today(), 30)
+		doc.insert()
+		self.assertTrue(doc.name)

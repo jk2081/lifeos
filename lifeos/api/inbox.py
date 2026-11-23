@@ -5,7 +5,9 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
-from lifeos import files, links, permissions, proposals
+from lifeos.library import files, links
+from lifeos import permissions
+from lifeos.brain import proposals
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, parse, std_clause, std_filters, std_order, summarise, tab_counts, user_names
 from lifeos.api.utils import order_by as sort_order
 
@@ -192,7 +194,7 @@ def space_context(space):
 	"""What an agent needs to file proposals: the space's areas, people, habits and goals in progress.
 	`areas` (issue 11) holds the areas of life that are on, each followed by its parts: file only into these. `areas_off`
 	names the areas of life that are switched off; nothing may be filed there, and their goals are left out."""
-	from lifeos import areas as life
+	from lifeos.goals import areas as life
 
 	areas = life.ordered(space, fields=["name", "area_name", "parent_area", "is_life_area", "description", "colour", "is_pinned", "is_focus", "standard"])
 	principles = {}
@@ -255,7 +257,7 @@ def submit_result(item: str, transcript_md: str | None = None, summary_md: str |
 
 	Each proposal is {kind, preview, payload, confidence, reason, alt_area}; the last two are optional (see meta.proposal_schema). An invalid proposal is refused with a clear error; the rest are kept.
 	"""
-	from lifeos import proposals as rules
+	from lifeos.brain import proposals as rules
 
 	doc = _claimed_item(item)
 	rows = parse(proposals, []) or []
@@ -464,7 +466,7 @@ def item_page(item: str):
 	"""Issue 10: one item's page. Everything `get` returns, plus `came_of_it` (the records made from it, each with its state),
 	`related` (wiki pages and chat logs that cite it, the meetings it is linked to) and the space's name. An item the user may
 	not read is answered as not found, so its page says nothing about it."""
-	from lifeos import item_page
+	from lifeos.library import item_page
 
 	if not frappe.db.exists("Life Inbox Item", item) or not frappe.has_permission("Life Inbox Item", "read", doc=item):
 		raise frappe.DoesNotExistError(_("Not found"))

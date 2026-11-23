@@ -11,7 +11,7 @@ await check('REVIEW.1', "Archive job archives done tasks; a stale open task wait
   bench(`from frappe.utils import add_days, today
 frappe.db.set_value("Life Task", "${done.name}", "completed_on", add_days(today(), -100), update_modified=False)
 frappe.db.set_value("Life Task", "${stale.name}", {"last_touched_on": add_days(today(), -100), "creation": add_days(today(), -100)}, update_modified=False)
-from lifeos import archive, index
+from lifeos.library import archive, index
 index.update(frappe.get_doc("Life Task", "${done.name}"))
 archive.run_daily()`)
   const arch = await owner.api('archive.list', { space: SPACE, page_length: 100, filters: [['title', 'like', `%${stamp}%`]] }) // earlier runs fill the Archive
@@ -45,7 +45,7 @@ for (const width of WIDTHS) {
   })
   await s.ctx.close()
 }
-// On data shaped like the owner's (lifeos/devtools_review.py: a number goal with a Suggested reading, a milestone goal without its
+// On data shaped like the owner's (lifeos/tools/devtools_review.py: a number goal with a Suggested reading, a milestone goal without its
 // finish line, stuck, waiting and delegated tasks, Inbox items of every kind) plus the fixture calendar. Records carry
 // "S8 … <width> <stamp>" and are removed by S4.1; devtools_review.cleanup removes the rest and puts the settings back.
 for (const width of WIDTHS) {
@@ -58,7 +58,7 @@ for (const width of WIDTHS) {
   const W = `${width} ${stamp}`
   const settle = () => pg.waitForTimeout(600)
   const data = JSON.parse(bench(`import json
-from lifeos import devtools_review
+from lifeos.tools import devtools_review
 print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop())
   const tabNow = () => new URL(pg.url()).searchParams.get('tab')
   const goTab = async (t) => {
@@ -291,7 +291,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     return `${made.length} tasks, ${scheduled.length} scheduled, top three on Today`
   })
 
-  bench(`from lifeos import devtools_review
+  bench(`from lifeos.tools import devtools_review
 devtools_review.cleanup("${stamp}", ${JSON.stringify(JSON.stringify(data.was))})`)
   await s.ctx.close()
 }
@@ -314,7 +314,7 @@ for (const width of WIDTHS) {
   await check('REVIEW.11', `${width} px: the weekly review renders on data like the owner's (a goal migrated from a project, a number goal with a Suggested reading, a milestone goal without "done when", a goal with no cycle, a delegated task), reached by clicking and by URL`, async () => {
     const made = JSON.parse(bench(`import json
 from frappe.utils import add_days, now_datetime, today
-from lifeos import readings
+from lifeos.goals import readings
 frappe.set_user("owner@lifeos.test")
 area = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Tea & Coffee"})
 cycle = frappe.db.get_value("Life Cycle", {"space": "${SPACE}", "status": "Active"})
@@ -434,7 +434,7 @@ for (const width of WIDTHS) {
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
   const sb = (code) => bench(`import json
 from frappe.utils import add_days, getdate, today
-from lifeos import cycles, habits
+from lifeos.goals import cycles, habits
 SP = "${S}"
 OWNER = "owner@lifeos.test"
 now = getdate(today())

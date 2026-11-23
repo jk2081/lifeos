@@ -51,7 +51,7 @@ const examples = ref([])
 const habitDismissed = ref(false)
 const suggestedHabit = ref(null)
 
-// a frequency in the title or the finish line, read in the browser as the server does (lifeos/readings.py FREQUENCY)
+// a frequency in the title or the finish line, read in the browser as the server does (lifeos/goals/readings.py FREQUENCY)
 const FREQ = /\b(daily|every\s?day|each\s?day|every\s+(morning|evening|night|week|weekday|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|weekly|nightly|(\d+|once|twice|two|three|four|five|six)\s*(x|times?)?\s*(a|per|each|every)\s+(day|week)|(once|twice)\s+(a|per)\s+(day|week))\b/i
 const WORDS = { once: 1, twice: 2, two: 2, three: 3, four: 4, five: 5, six: 6 }
 function habitOf(text) {
