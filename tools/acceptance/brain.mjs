@@ -1033,6 +1033,7 @@ print(json.dumps({"aside": aside}))`).split('\n').pop())
       must((await pg.locator('[data-source-tile][data-system="upload"] [data-processed-by]').innerText()).includes('Processed by: the Brain'), 'the Upload tile has no Processed by line')
       const tile = pg.locator('[data-source-tile][data-system="gmail"]')
       must((await tile.innerText()).includes('Connect Gmail'), 'the Gmail tile does not say Connect Gmail: ' + await tile.innerText())
+      await tile.locator('[data-tile-add]').waitFor({ timeout: 15000 }) // the button shows once permissions have loaded
       await tile.locator('[data-tile-add]').click()
       await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
       const t = await pg.locator('[data-gmail-connect]').innerText()
