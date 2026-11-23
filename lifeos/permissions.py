@@ -142,9 +142,15 @@ def vault_locked(doc) -> bool:
 
 
 def sensitive_guard(space, alias="", user=None) -> str:
-	"""SQL for a query on a capture or note table of one space: leaves sensitive rows out when the space's switch keeps
+	"""LEGACY (SQL text; the new API is sensitive_criterion). SQL for a query on a capture or note table of one space: leaves sensitive rows out when the space's switch keeps
 	sensitive items from the user (an agent)."""
 	return f" and {alias}is_sensitive = 0" if vault_hidden(space, user) else ""
+
+
+def sensitive_criterion(space, table, user=None):
+	"""A criterion that leaves sensitive rows of a capture or note table out when the space's switch keeps them from the user
+	(an agent); None when they are open."""
+	return (table.is_sensitive == 0) if vault_hidden(space, user) else None
 
 
 def vault_criterion(space, table, user=None):

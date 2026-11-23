@@ -3,7 +3,7 @@ import frappe
 from frappe.query_builder import Case, Order
 from frappe.query_builder import functions as fn
 from frappe.utils import cint
-from pypika.terms import Tuple
+from pypika.terms import Term, Tuple
 
 MAX_PAGE = 100
 
@@ -427,6 +427,18 @@ def summarise(doctype, base, values, alias, summary, start=0, page_length=20):
 	if aggs and flag(summary.get("totals")):
 		totals = frappe.db.sql(f"select {', '.join(aggs)} {base}", values, as_dict=True)[0]  # nosemgrep: frappe-sql-format-injection -- allowlisted aggregates over meta-checked columns
 	return {"rows": rows, "total": total, "totals": totals}
+
+
+class FullText(Term):
+	"""MATCH(columns) AGAINST (text IN BOOLEAN MODE), the one thing the query builder has no term for with several columns. `text` is escaped by the database layer."""
+
+	def __init__(self, columns, text, alias=None):
+		super().__init__(alias=alias)
+		self.columns, self.text = columns, text
+
+	def get_sql(self, **kwargs):
+		cols = ", ".join(c.get_sql(**kwargs) for c in self.columns)
+		return f"MATCH({cols}) AGAINST ({frappe.db.escape(self.text)} IN BOOLEAN MODE)"
 
 
 def list_query(doctype, fields, where=(), terms=()):
