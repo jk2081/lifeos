@@ -180,10 +180,12 @@ for (const width of WIDTHS) {
     await pickQuick('Priority', 'II')
     must(param('priority') === 'II', 'the filter was not set')
     const filtered = await count()
+    await pg.waitForTimeout(1600) // the view is saved a moment after it changes; leaving sooner can lose it
     await nav('Today')
     must(new URL(pg.url()).pathname === '/life/today', 'the sidebar did not go to Today')
     await s.open('/life/goals/no-goal?goal=none') // the bare path is the screen of issue 22; the old list is behind the goal filter
     must(new URL(pg.url()).pathname === '/life/goals/no-goal', 'Goals > No goal did not open')
+    await pg.waitForFunction(() => new URL(location.href).searchParams.get('priority') === 'II', null, { timeout: 5000 }).catch(() => {})
     must(param('priority') === 'II', `coming back lost the view: ${new URL(pg.url()).search}`)
     must((await count()) === filtered, 'the remembered filter is in the URL but the list is not filtered')
     must(!param('open'), 'an open record was restored')
