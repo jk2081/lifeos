@@ -6,7 +6,7 @@ import os
 
 import frappe
 
-from lifeos import files
+from lifeos.library import files
 from lifeos.constants import SPACE_DOCTYPES
 
 CHUNK = 1 << 20

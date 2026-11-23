@@ -109,7 +109,7 @@ import AskComposer from '@/components/ask/AskComposer.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import Empty from '@/components/Empty.vue'
-import { api, errorText } from '@/lib/api'
+import { api, db, errorText } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
@@ -172,22 +172,22 @@ async function act(r, i) {
   try {
     const out = await api('insights.act', { insight: r.name, index: i })
     toast.success(out.kind === 'make_task' ? 'Task made.' : `${a.label}: done.`, out.undo ? { duration: 60000, action: { label: 'Undo', onClick: async () => {
-      await api('reset.undo', { log: JSON.stringify(out.undo) }); await api('insights.restore', { insight: r.name }); loadInsights() } } } : undefined)
+      await api('reset.undo', { log: JSON.stringify(out.undo) }); await db.set('Life Insight', r.name, { status: 'New' }); loadInsights() } } } : undefined)
     loadInsights()
   } catch (e) { toast.error(errorText(e)) }
 }
 async function snooze(r, days) {
   const until = new Date(Date.now() + days * 86400e3 + 5.5 * 3600e3).toISOString().slice(0, 10)
-  await api('insights.snooze', { insight: r.name, until })
+  await db.set('Life Insight', r.name, { status: 'Snoozed', snooze_until: until })
   toast.success(`Snoozed until ${short(until)}.`)
   loadInsights()
 }
 async function dismiss(r, reason) {
-  await api('insights.dismiss', { insight: r.name, reason })
-  toast.success('Dismissed.', { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('insights.restore', { insight: r.name }); loadInsights() } } })
+  await db.set('Life Insight', r.name, { status: 'Dismissed', dismiss_reason: reason || '' })
+  toast.success('Dismissed.', { duration: 60000, action: { label: 'Undo', onClick: async () => { await db.set('Life Insight', r.name, { status: 'New' }); loadInsights() } } })
   loadInsights()
 }
-async function restore(r) { await api('insights.restore', { insight: r.name }); loadInsights() }
+async function restore(r) { await db.set('Life Insight', r.name, { status: 'New' }); loadInsights() }
 async function loadHistory() {
   try { Object.assign(hist, await api('ask.threads', { space: store.space, q: hq.value || undefined })) } catch (e) { /* shown as empty */ }
 }

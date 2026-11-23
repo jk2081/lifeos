@@ -183,7 +183,7 @@ for (const width of WIDTHS) {
   if (!phone) await check('TODAY.7', 'Insights: rules make Stuck, 12 Week Year and Habit insights from seeded data; a dismissed one does not return; a snoozed one returns after its date; at most 12 new a day', async () => {
     bench('frappe.db.delete("Life Insight", {"space": "Private"})')
     // a habit done every day last month and never this month
-    bench(`from lifeos import cycles, habits
+    bench(`from lifeos.goals import cycles, habits
 frappe.set_user("owner@lifeos.test")
 h = frappe.get_doc({"doctype": "Life Habit", "space": "Private", "title": "${S5('habit')}"}).insert()
 now = frappe.utils.getdate(frappe.utils.today()); prev = frappe.utils.add_months(now, -1)
@@ -201,12 +201,12 @@ while d <= last:
     must(all.filter((r) => r.found_on === today).length <= 12, 'more than 12 new insights today')
     const stuck = all.find((r) => r.kind === 'Stuck' && r.evidence.some((e) => ids.includes(e.name)))
     must(stuck, 'the seeded stuck tasks have no insight')
-    await s.api('insights.dismiss', { insight: stuck.name, reason: 'Not relevant' })
+    await s.api('frappe.client.set_value', { doctype: 'Life Insight', name: stuck.name, fieldname: { status: 'Dismissed', dismiss_reason: 'Not relevant' } })
     await s.api('insights.refresh', { space: SPACE })
     const again = (await s.api('insights.list', { space: SPACE, status: 'New', page_length: 100 })).rows.filter((r) => r.kind === 'Stuck' && r.evidence.some((e) => ids.includes(e.name)))
     must(!again.length, 'a dismissed insight came back')
     const other = (await s.api('insights.list', { space: SPACE, status: 'New', page_length: 100 })).rows[0]
-    await s.api('insights.snooze', { insight: other.name, until: addDays(5) })
+    await s.api('frappe.client.set_value', { doctype: 'Life Insight', name: other.name, fieldname: { status: 'Snoozed', snooze_until: addDays(5) } })
     await s.api('insights.refresh', { space: SPACE })
     must((await s.api('insights.list', { space: SPACE, status: 'Snoozed' })).rows.some((r) => r.name === other.name), 'the snoozed insight is not snoozed')
     bench(`frappe.db.set_value("Life Insight", "${other.name}", "snooze_until", frappe.utils.add_days(frappe.utils.today(), -1))`)
@@ -371,8 +371,8 @@ ev = frappe.get_doc({"doctype": "Event", "subject": "${meeting}", "starts_on": "
   "event_type": "Public", "life_space": "${SPACE}", "google_calendar_event_id": "fixture-i16-${stamp}-${width}"}).insert(ignore_permissions=True)
 tasks = [frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": t, "status": "Open", "area": tea, "due_date": d}).insert(ignore_permissions=True).name
   for t, d in (("${due}", "${dueDay}"), ("${later}", "${nextMonth}"))]
-goal = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${goalTitle}", "area": tea, "horizon": "Year", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
-off = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${offTitle}", "area": mind, "horizon": "Year", "target_date": "${year}-12-31"}).insert(ignore_permissions=True).name
+goal = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${goalTitle}", "area": tea, "horizon": "Year", "target_date": "${year}-12-31", "done_when": "Done"}).insert(ignore_permissions=True).name
+off = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "${offTitle}", "area": mind, "horizon": "Year", "target_date": "${year}-12-31", "done_when": "Done"}).insert(ignore_permissions=True).name
 print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event": ev.name, "tasks": tasks, "goal": goal, "off": off}))`).split('\n').pop())
   let reviewName = null
   try {
@@ -515,13 +515,13 @@ for (const width of WIDTHS) {
 frappe.db.set_single_value("System Settings", "time_zone", "${zoneWas}")
 for dt in ("Life Task",):
     for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
-from lifeos import devtools
+from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
   let one = null
   try {
-    bench(`from lifeos import devtools
+    bench(`from lifeos.tools import devtools
 devtools.make_user("${user}", "Newcomer", ["Life Admin", "Life User"])
 frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
 frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
@@ -664,13 +664,13 @@ for (const width of WIDTHS) {
   const restore = () => bench(`frappe.set_user("Administrator")
 for dt in ("Life Task", "Life Goal", "Life Cycle", "Life Habit Log", "Life Habit", "Life Action Log"):
     for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
-from lifeos import devtools
+from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
   let one = null
   try {
-    bench(`from lifeos import devtools
+    bench(`from lifeos.tools import devtools
 devtools.make_user("${user}", "Newcomer55", ["Life Admin", "Life User"])
 frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
 frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
@@ -698,7 +698,7 @@ from frappe.utils import add_days, today
 space = "${space}"
 area = frappe.get_all("Life Area", filters={"space": space, "is_life_area": 1, "is_on": 1}, pluck="name", limit=1)[0]
 cycle = frappe.get_doc({"doctype": "Life Cycle", "space": space, "title": "I55 cycle ${width}", "start_date": add_days(today(), -14), "status": "Active"}).insert(ignore_permissions=True)
-goals = [frappe.get_doc({"doctype": "Life Goal", "space": space, "cycle": cycle.name, "title": f"I55 goal {i} ${width}", "area": area, "sort_order": i,
+goals = [frappe.get_doc({"doctype": "Life Goal", "space": space, "cycle": cycle.name, "title": f"I55 goal {i} ${width}", "area": area, "sort_order": i, "done_when": "Done",
   "actions": [{"title": f"I55 lead {i} ${width}", "per_week": 1}]}).insert(ignore_permissions=True) for i in range(3)]
 print(json.dumps({"cycle": cycle.name, "goals": [g.name for g in goals], "actions": [g.actions[0].name for g in goals]}))`).split('\n').pop())
 

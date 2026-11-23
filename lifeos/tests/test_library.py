@@ -4,7 +4,8 @@ import base64
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos import archive, permissions
+from lifeos.library import archive
+from lifeos import permissions
 from lifeos.ai.tools import Context, t_get_record
 from lifeos.api import archive as archive_api, chats, everything, files as files_api, goals as goal_api, graph, inbox, jobs, library, links, search, sources, timeline, today as today_api, vault, wiki
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
@@ -122,7 +123,7 @@ class TestLibraryAndVault(LifeTestCase):
 		self.assertIn(soon["name"], [c["name"] for c in today_api.get(space=PRIVATE)["coming_up"] if c["kind"] == "vault"])
 
 	def test_vault_file_is_private_to_the_space(self):
-		from lifeos.devtools import attach
+		from lifeos.tools.devtools import attach
 		doc = vault.save(space=PRIVATE, values={"title": "PAN card m7"})
 		f = attach("Life Vault Document", doc["name"], "pan-m7.txt", b"scan", "file")
 		out = vault.set_file(doc["name"], f.file_url)

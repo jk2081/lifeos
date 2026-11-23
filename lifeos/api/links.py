@@ -1,7 +1,7 @@
 """Links between records: backlinks, the [[ picker, and link resolution for rendering."""
 import frappe
 
-from lifeos import links as rules
+from lifeos.library import links as rules
 from lifeos import permissions
 from lifeos.constants import LINKABLE
 

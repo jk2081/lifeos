@@ -1,7 +1,8 @@
 """Schema help for agents and for the review screen."""
 import frappe
 
-from lifeos import permissions, proposals
+from lifeos import permissions
+from lifeos.brain import proposals
 
 
 @frappe.whitelist(methods=["GET"])
@@ -23,7 +24,7 @@ def space_context(space: str | None = None):
 def setup_level():
 	"""The person's level on the ladder (1 to 6), what is done, and the next step's text and link. Cached for a few minutes."""
 	permissions.require_login()
-	from lifeos import ladder
+	from lifeos.review import ladder
 
 	return ladder.get(frappe.session.user)
 
@@ -32,7 +33,7 @@ def setup_level():
 def dismiss_setup(undo: int = 0):
 	"""Hide the "Your setup" card for this person (or show it again with undo=1)."""
 	permissions.require_login()
-	from lifeos import ladder
+	from lifeos.review import ladder
 
 	user = frappe.session.user
 	if int(undo):

@@ -6,8 +6,9 @@ import types
 import frappe
 from frappe.utils import add_days, add_months, getdate, today
 
-from lifeos import areas, cycles as rules, focus_defaults, old_inbox, readings
-from lifeos import habits as habit_rules
+from lifeos.goals import areas, cycles as rules, focus_defaults, readings
+from lifeos.brain import old_inbox
+from lifeos.goals import habits as habit_rules
 from lifeos.ai import fake
 from lifeos.api import area, focus, goals, inbox, library, links, reset, review, search, settings, someday, tasks, timeline, today as today_api, vault, weekly
 from lifeos.life.doctype.life_goal.life_goal import derive_horizon
@@ -453,7 +454,7 @@ class TestReadings(LifeTestCase):
 		self.assertIsNone(frappe.db.get_value("Life Goal", g, "current_on"))
 
 	def test_fake_agent_reports_a_reading(self):
-		from lifeos.devtools import load_fake_agent
+		from lifeos.tools.devtools import load_fake_agent
 
 		fa = load_fake_agent()
 		g = number_goal("ux7 weight goal")
@@ -746,7 +747,8 @@ class TestGoalEdit(LifeTestCase):
 			goals.create(title="i56 never saved", horizon="Long term", space=PRIVATE)
 
 	def test_existing_goals_without_done_when_are_not_blocked(self):
-		g = self.make("Life Goal", title="i56 old", horizon="Long term").name
+		g = self.make("Life Goal", title="i56 old", horizon="Long term", done_when="x").name
+		frappe.db.set_value("Life Goal", g, "done_when", None)  # as the goals from before the setting were
 		out = goals.update(g, {"title": "i56 old renamed"})
 		self.assertEqual(out["goal"]["title"], "i56 old renamed")
 		self.assertFalse(out["goal"]["has_finish_line"])
@@ -798,7 +800,7 @@ class TestGoalEdit(LifeTestCase):
 		from lifeos.tests.helpers import set_key
 
 		cycle = self.make("Life Cycle", title="i56 s cycle", start_date="2026-11-02", end_date="2027-01-24", status="Active").name
-		g = self.make("Life Goal", title="i56 systems", horizon="12 weeks", cycle=cycle, area=self.life["Career"],
+		g = self.make("Life Goal", title="i56 systems", horizon="12 weeks", cycle=cycle, area=self.life["Career"], done_when="Started",
 			actions=[{"title": "Start the internal audit", "per_week": 2, "status": "Open"}]).name
 		self.make("Life Task", title="i56 draft the audit plan", goal=g)
 		set_key("sk-test-not-real")
@@ -1023,7 +1025,7 @@ class TestFocuses(LifeTestCase):
 		self.assertEqual(item.area, f.name)
 
 	def test_the_core_card_carries_each_focus_with_its_standard_and_principles(self):
-		from lifeos import context
+		from lifeos.agents import context
 
 		self.focus("Yield", standard="Above 1,700 kg/ha")
 		settings.save_item("area", name=frappe.db.get_value("Life Area", {"space": PRIVATE, "area_name": "Yield"}), principles=["One system"])
@@ -1371,3 +1373,62 @@ class TestGoals(LifeTestCase):
 		self.assertRaises(frappe.PermissionError, goals.list, space=PRIVATE)
 		self.assertEqual(goals.task_counts([g]), {})
 		self.assertNotIn(g, [x.name for x in goals.list(space=SHARED, state="all")["goals"]])
+
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a goal straight through frappe.get_doc applies the same rule as the API."""
+
+	def test_year_goal_through_get_doc_needs_a_target_date(self):
+		doc = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "75 no date", "horizon": "Year"})
+		with self.assertRaises(frappe.ValidationError):
+			doc.insert()
+		doc.target_date = add_days(today(), 30)
+		doc.insert()
+		self.assertTrue(doc.name)
+
+	def test_new_goal_through_get_doc_needs_its_done_when(self):
+		frappe.db.set_single_value("Life Settings", "require_done_when", 1)
+		doc = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "77 no finish line", "horizon": "Year", "target_date": add_days(today(), 30)})
+		with self.assertRaises(frappe.ValidationError):
+			doc.insert()
+		doc.done_when = "It is filed"
+		doc.insert()
+		doc.done_when = None  # a goal that exists is never checked again
+		doc.save()
+		# a goal carried on keeps what it had
+		carried = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "77 carried", "horizon": "Year", "target_date": add_days(today(), 30),
+			"carried_from": doc.name})
+		carried.insert()
+		self.assertTrue(carried.name)
+
+	def test_open_goal_through_get_doc_is_retired(self):
+		frappe.flags.lifeos_allow_open_goals = False
+		with self.assertRaises(frappe.ValidationError):
+			frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "77 open", "done_when": "x"}).insert()
+
+
+class TestGoalsFolder(LifeTestCase):
+	"""The goals screens live in one folder and reach the server through frontend/src/data/goals.js."""
+
+	GOALS = os.path.join(REPO, "frontend", "src", "components", "goals")
+	COMPONENTS = os.path.join(REPO, "frontend", "src", "components")
+
+	def test_no_goals_file_calls_api_directly(self):
+		import re
+
+		bad = []
+		for name in sorted(os.listdir(self.GOALS)):
+			if not name.endswith((".vue", ".js")):
+				continue
+			source = open(os.path.join(self.GOALS, name), encoding="utf-8").read()
+			if re.search(r"\bapi\(", source) or re.search(r"import\s*\{[^}]*\bapi\b[^}]*\}\s*from\s*'@/lib/api'", source):
+				bad.append(name)
+		self.assertEqual(bad, [], "these goals components call api( directly; use data/goals.js")
+
+	def test_old_folders_hold_no_goal_components(self):
+		for folder in ("journal", "plan", "periodic"):
+			path = os.path.join(self.COMPONENTS, folder)
+			if not os.path.isdir(path):
+				continue
+			goalish = [f for f in os.listdir(path) if "goal" in f.lower() or f.startswith(("Habit", "Cycle"))]
+			self.assertEqual(goalish, [], f"components/{folder} holds goal components")

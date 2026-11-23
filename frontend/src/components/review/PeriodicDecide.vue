@@ -1,0 +1,91 @@
+<template>
+  <div class="flex min-h-0 flex-1 flex-col" data-review-decide>
+    <div class="page-body !gap-4">
+      <div>
+        <h2 class="text-xl-semibold text-ink-gray-9">{{ monthly ? 'What happens to each goal that is not done?' : 'What happens to each goal?' }}</h2>
+        <p class="text-sm text-ink-gray-6">{{ monthly ? 'Finish it with a date, carry it to next month, or drop it and say why.' : 'Done, carry it into the next cycle (with a new target if you want one), or drop it and say why.' }} Each choice is saved as you make it.</p>
+      </div>
+      <Skeleton v-if="!d" class="h-80 w-full" />
+      <template v-else>
+        <div class="grid grid-cols-3 gap-2 md:gap-4" data-piles>
+          <Card v-for="p in PILES" :key="p.key" tint class="flex flex-col gap-0.5 !p-3" data-pile :data-pile-key="p.key">
+            <span class="flex items-center gap-2 text-sm-medium text-ink-gray-8"><span class="size-2 rounded-full" :class="p.dot" aria-hidden="true" />{{ p.label }}</span>
+            <span class="text-xl-semibold tabular-nums text-ink-gray-9" data-pile-count>{{ d.piles[p.key] }}</span>
+          </Card>
+        </div>
+        <Card class="flex min-w-0 flex-col" flush data-decide-goals>
+          <div v-for="g in d.goals" :key="g.name" class="flex flex-col gap-2 border-b border-outline-gray-1 px-4 py-3 last:border-b-0" data-decide-goal :data-goal="g.name"
+            :data-pile="g.decision?.pile || ''">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span class="min-w-0 flex-1 break-words text-base-medium text-ink-gray-9">{{ g.title }}</span>
+              <Badge v-if="g.area_name" :label="g.area_name" />
+              <span v-if="g.result" class="text-sm text-ink-gray-7">{{ g.result.label }}</span>
+              <span v-else-if="g.tasks_counted" class="text-sm text-ink-gray-7">{{ g.tasks_done }} of {{ g.tasks_counted }} tasks</span>
+            </div>
+            <div class="flex flex-wrap items-center gap-2" role="group" :aria-label="`What happens to ${g.title}`">
+              <Button v-for="p in PILES" :key="p.key" size="sm" :variant="g.decision?.pile === p.key ? 'solid' : 'subtle'" :label="p.verb" :disabled="r.readOnly"
+                :aria-pressed="g.decision?.pile === p.key" :data-choose="p.key" @click="choose(g, p.key)" />
+            </div>
+            <div v-if="g.decision?.pile === 'finish'" class="max-w-xs"><FormControl type="date" label="Finished by" :model-value="g.decision.date || ''" data-decide-date
+              @update:model-value="(v) => save(g, { pile: 'finish', date: v })" /></div>
+            <div v-if="g.decision?.pile === 'drop'" class="max-w-xl"><FormControl type="text" label="Why are you dropping it?" :model-value="g.decision.reason || ''" data-decide-reason
+              @update:model-value="(v) => queue(g, { pile: 'drop', reason: v })" /></div>
+            <div v-if="!monthly && g.decision?.pile === 'carry' && g.measure_kind === 'Number'" class="max-w-xs"><FormControl type="number" :label="`New target${g.unit ? ' (' + g.unit + ')' : ''}`"
+              :model-value="g.decision.target ?? g.target_value" data-decide-target @update:model-value="(v) => queue(g, { pile: 'carry', target: v })" /></div>
+          </div>
+          <div v-if="!d.goals.length" class="p-4" data-decide-empty>
+            <Empty :title="monthly ? 'No goals are left open this month.' : 'No goals are left open in this cycle.'" hint="Everything is already done or closed. Go on to the plan." />
+          </div>
+        </Card>
+      </template>
+    </div>
+    <ReviewFooter back :label="monthly ? 'Next: Plan' : 'Next: Plan the next cycle'" :disabled="!!d?.problems.length" :line="line" @back="emit('go', first)" @next="emit('go', 'plan')" />
+  </div>
+</template>
+<script setup>
+// Monthly review tab 2 (Decide) and 12-week review tab 2 (Each goal): each goal that is not done goes into a pile. Finish needs a
+// date, Drop a reason; Carry (with a new target on a number goal) needs nothing. Saved as each choice is made; nothing reaches the
+// goals until Lock.
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Badge, Button, FormControl, Skeleton } from 'frappe-ui'
+import Card from '@/components/ui/Card.vue'
+import Empty from '@/components/Empty.vue'
+import ReviewFooter from '@/components/review/ReviewFooter.vue'
+import { useReview } from '@/lib/review'
+
+const emit = defineEmits(['go'])
+const r = useReview()
+const d = ref(null)
+const monthly = computed(() => r.head?.slug === 'monthly')
+const first = computed(() => r.head?.tabs[0].value)
+const PILES = computed(() => (monthly.value
+  ? [{ key: 'finish', label: 'Finish', verb: 'Finish', dot: 'bg-surface-green-7' }, { key: 'carry', label: 'Carry to next month', verb: 'Carry', dot: 'bg-surface-amber-7' }, { key: 'drop', label: 'Drop', verb: 'Drop', dot: 'bg-surface-gray-7' }]
+  : [{ key: 'done', label: 'Done', verb: 'Done', dot: 'bg-surface-green-7' }, { key: 'carry', label: 'Carry into the next cycle', verb: 'Carry', dot: 'bg-surface-amber-7' }, { key: 'drop', label: 'Drop', verb: 'Drop', dot: 'bg-surface-gray-7' }]))
+const line = computed(() => {
+  const p = d.value?.problems || []
+  return p.length ? p[0] + (p.length > 1 ? ` · ${p.length - 1} more` : '') : 'Everything is decided'
+})
+const timers = {}
+async function load() { d.value = await r.read('decisions') }
+// one change at a time: two at once would each save the review from the state they read
+let chain = Promise.resolve()
+function save(g, values) {
+  chain = chain.catch(() => {}).then(async () => {
+    const out = await r.act('decide', { goal: g.name, ...values })
+    if (out) d.value = out
+  })
+  return chain
+}
+// choosing a pile keeps what was typed for that pile
+function choose(g, pile) {
+  if (g.decision?.pile === pile) return save(g, { undo: 1 })
+  return save(g, { pile, date: g.decision?.date, reason: g.decision?.reason })
+}
+function queue(g, values) {
+  clearTimeout(timers[g.name])
+  timers[g.name] = setTimeout(() => save(g, values), 800)
+}
+watch(() => r.head?.slug, load)
+onMounted(load)
+onBeforeUnmount(() => Object.values(timers).forEach(clearTimeout))
+</script>

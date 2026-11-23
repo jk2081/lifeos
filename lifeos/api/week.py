@@ -3,7 +3,8 @@ reading). People only."""
 import frappe
 from frappe import _
 
-from lifeos import permissions, readings
+from lifeos import permissions
+from lifeos.goals import readings
 from lifeos.api.utils import in_area, lens_area
 
 

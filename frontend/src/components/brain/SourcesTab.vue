@@ -50,6 +50,25 @@
         </div>
       </div>
     </section>
+    <section class="flex flex-col gap-3" data-email-in :data-configured="emailIn.configured ? 1 : 0">
+      <h2 class="text-base-medium text-ink-gray-9">Email-in address <span class="text-sm font-normal text-ink-gray-6">Optional. Forward an email to capture it.</span></h2>
+      <Card class="flex flex-col gap-2">
+        <p class="text-sm text-ink-gray-8" data-email-in-address>
+          <template v-if="emailIn.address">Forward to <span class="text-base-medium">{{ emailIn.address }}</span></template>
+          <template v-else>Not set up. Create a mailbox, add it as an incoming Email Account on the server, then choose it here.</template>
+        </p>
+        <p class="text-sm text-ink-gray-6">{{ emailIn.how_to }}</p>
+        <div class="flex flex-col gap-1">
+          <label class="text-sm text-ink-gray-7" for="email-in-senders">Allowed senders (your own addresses, one per line)</label>
+          <Textarea id="email-in-senders" v-model="sendersText" class="w-full" :rows="3" placeholder="you@example.com" :disabled="!store.isAdmin" data-email-in-senders />
+        </div>
+        <div v-if="store.isAdmin" class="flex flex-col gap-1">
+          <label class="text-sm text-ink-gray-7" for="email-in-account">Email Account (its name on the server)</label>
+          <TextInput id="email-in-account" v-model="accountName" class="w-full" placeholder="Life OS" data-email-in-account />
+        </div>
+        <div v-if="store.isAdmin"><Button variant="solid" label="Save" data-email-in-save @click="saveEmailIn" /></div>
+      </Card>
+    </section>
   </div>
 
   <Dialog v-model:open="settingsOpen" :title="current?.label || 'Source'" :actions="writable ? [{ label: 'Save', variant: 'solid', onClick: save }] : []">
@@ -103,7 +122,7 @@
 // makes the server refuse its captures; nothing it brought in is deleted.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dialog, FormControl, Switch } from 'frappe-ui'
+import { Badge, Button, Dialog, FormControl, Switch, TextInput, Textarea } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import Pick from '@/components/Pick.vue'
@@ -127,6 +146,9 @@ const otherOpen = ref(false)
 const otherName = ref('')
 const gmailOpen = ref(false)
 const gmailSetup = ref(null)
+const emailIn = ref({})
+const sendersText = ref('')
+const accountName = ref('')
 const route = useRoute()
 const router = useRouter()
 
@@ -139,8 +161,17 @@ function lastReceived(c) {
 async function load() {
   loadLookups()
   const res = await tryCall(() => api('connections.sources', { space: store.space }))
-  if (res) { connected.value = res.connected; available.value = res.available; coming.value = res.coming }
+  if (res) {
+    connected.value = res.connected; available.value = res.available; coming.value = res.coming
+    emailIn.value = res.email_in || {}
+    sendersText.value = (res.email_in?.senders || []).join('\n')
+    if (store.isAdmin) accountName.value = (await tryCall(() => api('settings.get', { space: store.space })))?.settings?.email_in_account || ''
+  }
   loaded.value = true
+}
+async function saveEmailIn() {
+  const values = { email_in_senders: sendersText.value, email_in_account: accountName.value.trim() || null }
+  if (await tryCall(() => api('settings.save', { values }), 'Saved.')) load()
 }
 async function toggle(c, on) {
   const res = await tryCall(() => api('connections.save', { name: c.name, active: on ? 1 : 0 }), on ? `${c.label} is on.` : `${c.label} is off. Nothing it brought in was deleted.`)

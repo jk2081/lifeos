@@ -6,13 +6,14 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
 
-from lifeos import cycles as rules
-from lifeos import habits as habit_rules
-from lifeos import permissions, readings
-from lifeos.life.doctype.life_goal.life_goal import HORIZONS, derive_horizon, planning_in_quarters
-from lifeos.areas import off as areas_off
-from lifeos.areas import use_focuses
-from lifeos.areas import off_clause
+from lifeos.goals import cycles as rules
+from lifeos.goals import habits as habit_rules
+from lifeos import permissions
+from lifeos.goals import readings
+from lifeos.life.doctype.life_goal.life_goal import HORIZONS, derive_horizon, planning_in_quarters, refuse_open
+from lifeos.goals.areas import off as areas_off
+from lifeos.goals.areas import use_focuses
+from lifeos.goals.areas import off_clause
 from lifeos.api.utils import area_filter, descendants, in_area, lens_area, names_map, parse, page, std_clause, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
@@ -333,16 +334,6 @@ def year_end():
 	return str(end if (end - d).days > 30 else getdate(f"{d.year + 1}-12-31"))
 
 
-OPEN_RETIRED = "Open goals are retired. Make it a 12 Week Year goal or an Annual goal with a target date, or, for ongoing work, a focus."
-
-
-def refuse_open(horizon):
-	"""The Open goal (horizon Long term) is retired (issue 57): a new goal is a 12 Week Year, Annual or Month goal. Tests and the
-	acceptance site that predate this switch it back on with `lifeos_allow_open_goals`; records already Open are kept."""
-	if horizon == "Long term" and not (frappe.flags.get("lifeos_allow_open_goals") or frappe.conf.get("lifeos_allow_open_goals")):
-		frappe.throw(_(OPEN_RETIRED), frappe.ValidationError, title=_("Open goals are retired"))
-
-
 @frappe.whitelist(methods=["POST"])
 def create(title: str, horizon: str | None = None, space: str | None = None, area: str | None = None, target_date: str | None = None,
 		cycle: str | None = None, serves: str | None = None, done_when: str | None = None, notes_md: str | None = None,
@@ -361,10 +352,8 @@ def create(title: str, horizon: str | None = None, space: str | None = None, are
 	horizon = horizon or derive_horizon(target_date, cycle, space)
 	if horizon not in HORIZONS:
 		frappe.throw(_("Unknown horizon."), title=_("Unknown goal horizon"))
-	refuse_open(horizon)
 	measure_fields = measure_values(measure_kind, done_when, measure, unit, start_value, target_value)
-	readings.require_finish_line({"done_when": done_when, **measure_fields})
-	last = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where space=%s", space)[0][0]
+	last = rules.last_sort_order(space=space)
 	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": (title or "").strip(), "horizon": horizon, "area": area or None,
 		"serves": serves or None, "done_when": done_when or None, "notes_md": notes_md or None,
 		"target_date": target_date or None, "cycle": cycle if horizon == "12 weeks" else None, "sort_order": last + 1,
@@ -403,7 +392,7 @@ def add_to_cycle(goal: str, cycle: str):
 	if c.status not in ("Active", "Planned"):
 		frappe.throw(_("Choose the current or a planned cycle."), title=_("Cycle cannot take goals"))
 	doc.horizon, doc.cycle, doc.target_date = "12 weeks", c.name, doc.target_date
-	doc.sort_order = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where cycle=%s", c.name)[0][0] + 1
+	doc.sort_order = rules.last_sort_order(cycle=c.name) + 1
 	doc.save()
 	return {"name": doc.name, "cycle": c.name}
 
@@ -449,7 +438,7 @@ def get(goal: str):
 	"""A goal page: the goal with what it serves and what serves it, its open and finished tasks, the counts of what is
 	filed under it (notes, captures, chats), the number of records that would move to the Archive when it is completed,
 	and the count on each tab. Reads only what the user may read."""
-	from lifeos import archive
+	from lifeos.library import archive
 
 	doc = permissions.get_doc_checked("Life Goal", goal)
 	space = doc.space
@@ -516,7 +505,7 @@ def tab_counts_of(space, goal, include_archived=0):
 def set_status(goal: str, status: str):
 	"""Change an open-ended goal's state as a project's was changed: Active, On Hold, Done or Dropped. Done or Dropped
 	archives it at once with every record filed under it; Active or On Hold brings an archived one back."""
-	from lifeos import archive
+	from lifeos.library import archive
 
 	_person_only()
 	doc = permissions.get_doc_checked("Life Goal", goal, "write")
@@ -789,8 +778,7 @@ def save_goal(goal: str | None = None, cycle: str | None = None, title: str | No
 		doc = permissions.get_doc_checked("Life Goal", goal, "write")
 	else:
 		c = permissions.get_doc_checked("Life Cycle", cycle, "write")
-		readings.require_finish_line({"done_when": done_when, **measure_values(measure_kind or None, done_when, measure, unit, start_value, target_value)})
-		last = frappe.db.sql("select ifnull(max(sort_order), 0) from `tabLife Goal` where cycle=%s", c.name)[0][0]
+		last = rules.last_sort_order(cycle=c.name)
 		doc = frappe.get_doc({"doctype": "Life Goal", "space": c.space, "cycle": c.name, "sort_order": last + 1})
 	if title is not None:
 		doc.title = title
@@ -875,7 +863,7 @@ def across_cycles(space: str | None = None, area: str | None = None):
 		out.append({"name": c.name, "title": c.title, "status": c.status, "start_date": str(c.start_date), "end_date": str(c.end_date),
 			"current_week": g["current_week"], "average": g["average"], "past_end": g["past_end"], "goals": rows})
 	areas = frappe.get_list("Life Area", filters={"space": space, "parent_area": ("is", "not set"), "is_archived": 0}, fields=["name", "area_name"], order_by="sort_order")
-	used = {r[0] for r in frappe.db.sql("select distinct area from `tabLife Goal` where space=%s", space)}
+	used = set(frappe.get_list("Life Goal", filters={"space": space}, pluck="area", distinct=True, order_by="area"))
 	with_tasks([r for c in out for r in c["goals"]])
 	return {"cycles": out, "target": target, "areas": [a for a in areas if a.name in used]}
 

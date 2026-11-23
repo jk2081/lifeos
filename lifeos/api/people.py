@@ -8,7 +8,7 @@ import re
 import frappe
 from frappe import _
 
-from lifeos import people as rules
+from lifeos.library import people as rules
 from lifeos import permissions
 from lifeos.api.utils import descendants, names_map, page
 from lifeos.life.doctype.life_person.life_person import split_aliases

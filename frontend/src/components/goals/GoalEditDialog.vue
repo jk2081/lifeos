@@ -35,7 +35,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { DatePicker, Dialog, FormControl, TextInput, Button, toast } from 'frappe-ui'
 import DoneWhen from './DoneWhen.vue'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { store } from '@/lib/store'
 import { areaOptions, loadLookups, parentOptions } from '@/lib/lookups'
 import { emptyMeasure, measureArgs, measureProblem } from '@/lib/goals'
@@ -70,8 +71,8 @@ watch(() => props.modelValue, async (o) => {
   Object.assign(m, emptyMeasure(g), g.measure_kind || !g.done_when ? {} : { measure_kind: 'Milestone' })
   actions.value = props.weeklyActions.map((a) => ({ key: keys++, name: a.name, title: a.title, per_week: a.per_week, retired: a.status === 'Dropped', status: a.status }))
   loadLookups()
-  cycles.value = (await api('goals.cycles', { space: props.space || store.space })) || []
-  quarters.value = (await api('goals.suggest_horizon', { space: props.space || store.space })).quarters
+  cycles.value = (await goalsData.goals.cycles({ space: props.space || store.space })) || []
+  quarters.value = (await goalsData.goals.suggest_horizon({ space: props.space || store.space })).quarters
 }, { immediate: true })
 watch(open, (o) => emit('update:modelValue', o))
 
@@ -100,7 +101,7 @@ async function save() {
   }
   busy.value = true
   try {
-    const out = await api('goals.edit', { goal: props.goal.name, values, actions: v.horizon === '12 weeks' ? actions.value.map((a) => ({ name: a.name, title: a.title, per_week: a.per_week, retired: a.retired })) : undefined })
+    const out = await goalsData.goals.edit({ goal: props.goal.name, values, actions: v.horizon === '12 weeks' ? actions.value.map((a) => ({ name: a.name, title: a.title, per_week: a.per_week, retired: a.retired })) : undefined })
     open.value = false
     toast.success('Goal saved.')
     await loadLookups(true)

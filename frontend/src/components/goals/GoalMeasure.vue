@@ -43,7 +43,8 @@ import DoneWhen from './DoneWhen.vue'
 import ResultBar from './ResultBar.vue'
 import ReadingChart from './ReadingChart.vue'
 import SuggestedReadings from './SuggestedReadings.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { store } from '@/lib/store'
 import { emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
 
@@ -63,20 +64,20 @@ async function save() {
   const a = measureArgs(m)
   const values = { measure_kind: a.measure_kind, done_when: a.done_when ?? props.g.done_when ?? null }
   if (a.measure_kind === 'Number') Object.assign(values, { measure: a.measure, unit: a.unit, start_value: a.start_value, target_value: a.target_value })
-  if (await tryCall(() => api('goals.update', { goal: props.g.name, values }), 'Saved')) {
+  if (await tryCall(() => goalsData.goals.update({ goal: props.g.name, values }), 'Saved')) {
     editing.value = false
     emit('changed')
   }
 }
 async function addReading() {
   if (add.value === '' || add.value === null) return toast.error('Type the value.')
-  if (await tryCall(() => api('goals.add_reading', { goal: props.g.name, value: add.value, date: add.date || undefined }), 'Reading added')) {
+  if (await tryCall(() => goalsData.goals.add_reading({ goal: props.g.name, value: add.value, date: add.date || undefined }), 'Reading added')) {
     add.value = ''
     emit('changed')
   }
 }
 async function markAchieved() {
-  if (await tryCall(() => api('goals.close', { goal: props.g.name, outcome: 'Achieved', result_note: props.g.progress.label }), 'Marked achieved')) emit('changed')
+  if (await tryCall(() => goalsData.goals.close({ goal: props.g.name, outcome: 'Achieved', result_note: props.g.progress.label }), 'Marked achieved')) emit('changed')
 }
 async function toHabit(h) {
   if (await tryCall(() => makeHabit(h, { area: props.g.area, space: props.space }))) editing.value = false

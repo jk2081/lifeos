@@ -1,5 +1,5 @@
 // The weekly review's shared state (set 8): the header (period, tabs done and openable), and one way to change anything
-// that saves at once and says "Saved". Created by components/weekly/ReviewPage.vue and injected by its tabs.
+// that saves at once and says "Saved". Created by components/review/ReviewPage.vue and injected by its tabs.
 import { inject, provide, reactive } from 'vue'
 import { toast } from 'frappe-ui'
 import { api, errorText } from './api'

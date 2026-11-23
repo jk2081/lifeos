@@ -5,7 +5,7 @@ import unittest
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from lifeos import loadtest
+from lifeos.tools import loadtest
 
 
 class TestLoad(IntegrationTestCase):
@@ -46,8 +46,20 @@ class TestLoad(IntegrationTestCase):
 
 	def test_a_user_outside_the_big_space_finds_nothing_in_it(self):
 		from lifeos.api import search
-		from lifeos.devtools import FAMILY
+		from lifeos.tools.devtools import FAMILY
 
 		frappe.set_user(FAMILY)
 		self.assertEqual(search.query(loadtest.RARE_WORD)["results"], [])
 		frappe.set_user("Administrator")
+
+
+class TestCodeShape(IntegrationTestCase):
+	"""The shape of the code: modules grouped by place."""
+
+	TOP = {"__init__", "constants", "hooks", "install", "permissions"}
+
+	def test_no_loose_module_at_the_top(self):
+		from pathlib import Path
+
+		top = {p.stem for p in Path(frappe.get_app_path("lifeos")).glob("*.py")}
+		self.assertEqual(top - self.TOP, set())

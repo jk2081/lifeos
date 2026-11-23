@@ -8,8 +8,11 @@ from unittest import mock
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos import area_guess, cycles, insights, old_inbox, permissions, readings
-from lifeos import habits as habit_rules
+from lifeos.brain import area_guess, old_inbox
+from lifeos.goals import cycles, readings
+from lifeos.review import insights
+from lifeos import permissions
+from lifeos.goals import habits as habit_rules
 from lifeos.ai import batches, client, fake
 from lifeos.api import ask, brain, goals as goals_api, inbox, insights as api, lessons as lessons_api, old_items, reset, review, skills as skills_api, weekly
 from lifeos.review import goals as goals_mod
@@ -579,8 +582,8 @@ NEW_SKILLS = ("tidy-backlog", "plan-week", "notice", "define-goal", "reflect", "
 
 
 # the Python lines of the modules that held the prompts, before this issue (also in DECISIONS.md, "Issue 59")
-LINES_BEFORE = {"old_inbox.py": 283, "ai/batches.py": 54, "weekplan.py": 260, "review/goals.py": 276, "ai/insights.py": 90,
-	"review/followups.py": 140, "readings.py": 328, "goal_suggest.py": 58, "review/lock.py": 161, "area_guess.py": 257, "ai/ask.py": 128}
+LINES_BEFORE = {"brain/old_inbox.py": 283, "ai/batches.py": 54, "tasks/weekplan.py": 260, "review/goals.py": 276, "review/insights.py": 90,
+	"review/followups.py": 140, "goals/readings.py": 328, "goals/goal_suggest.py": 58, "review/lock.py": 161, "brain/area_guess.py": 257, "ai/ask.py": 128}
 
 
 def text_skills_for_judgment(**out):
@@ -653,7 +656,7 @@ class TestPlanWeek(GoalsCase):
 
 		from frappe.utils import get_datetime
 
-		from lifeos import weekplan
+		from lifeos.tasks import weekplan
 
 		def plan(data):
 			if data["request"] == "stars":
@@ -987,7 +990,7 @@ class TestLiveSmoke(AskCase):
 
 class TestAIInsightsAndBatches(AskCase):
 	def test_ai_insight_candidates_keep_only_visible_evidence(self):
-		from lifeos import insights
+		from lifeos.review import insights
 
 		frappe.db.delete("Life Insight", {"space": PRIVATE})
 		chat = self.make("Life Chat Log", title="ux5ai Mithun blend sheets", date=today(), summary_md="I will send six questions to Mithun.",
@@ -1013,7 +1016,7 @@ class TestAIInsightsAndBatches(AskCase):
 		self.assertEqual(frappe.db.get_value("Life Insight", rows[0].name, "source_line"), "Suggested by notice v1")
 
 	def test_no_key_skips_ai_and_rules_still_run(self):
-		from lifeos import insights
+		from lifeos.review import insights
 
 		set_key_ask("")
 		frappe.set_user(OWNER)
@@ -1095,7 +1098,7 @@ class TestRuleInsights(LifeTestCase):
 
 		insights.run(PRIVATE, ai=False)
 		first = money_insight("New")[0]
-		api.dismiss(first.name, "Not relevant")
+		frappe.get_doc("Life Insight", first.name).update({"status": "Dismissed", "dismiss_reason": "Not relevant"}).save()
 		insights.run(PRIVATE, ai=False)
 		self.assertEqual(money_insight("New"), [])
 		self.assertEqual(frappe.db.get_value("Life Insight", first.name, "status"), "Dismissed")
@@ -1105,7 +1108,7 @@ class TestRuleInsights(LifeTestCase):
 		new = money_insight("New")
 		self.assertEqual(len(new), 1)
 		self.assertNotEqual(new[0].fingerprint, first.fingerprint)
-		api.snooze(new[0].name, add_days(today(), 3))
+		frappe.get_doc("Life Insight", new[0].name).update({"status": "Snoozed", "snooze_until": add_days(today(), 3)}).save()
 		insights.run(PRIVATE, ai=False)
 		self.assertEqual(frappe.db.get_value("Life Insight", new[0].name, "status"), "Snoozed")
 		frappe.db.set_value("Life Insight", new[0].name, "snooze_until", add_days(today(), -1))
@@ -1135,3 +1138,29 @@ class TestRuleInsights(LifeTestCase):
 			api.list(space=PRIVATE)
 		with self.assertRaises(frappe.PermissionError):
 			frappe.get_list("Life Insight", filters={"space": PRIVATE})
+
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a skill straight through frappe.get_doc applies the same rules as the API."""
+
+	def test_skill_through_get_doc_refuses_an_unknown_trigger_and_tool(self):
+		values = {"doctype": "Life Skill", "slug": "t75-direct", "title": "t75", "source": "Owner", "version": 1, "trigger_kind": "Button",
+			"output_kind": "Answer", "model_tier": "Fast", "tools": "[]", "instructions": "x"}
+		with self.assertRaises(frappe.ValidationError):
+			frappe.get_doc({**values, "trigger_kind": "Whenever"}).insert()
+		with self.assertRaises(frappe.ValidationError):
+			frappe.get_doc({**values, "tools": '["delete_everything"]'}).insert()
+
+
+
+class TestInsightRulesOnTheDocType(LifeTestCase):
+	def test_snoozing_and_restoring_through_get_doc(self):
+		"""The screens change an insight's status with the standard document API; the DocType keeps the dates tidy."""
+		doc = frappe.get_doc({"doctype": "Life Insight", "space": PRIVATE, "kind": "Stuck", "title": "77 stuck"}).insert()
+		doc.status = "Snoozed"
+		doc.save()
+		self.assertEqual(str(doc.snooze_until), add_days(today(), 7))
+		doc.update({"status": "Dismissed", "dismiss_reason": "Wrong"}).save()
+		doc.status = "New"
+		doc.save()
+		self.assertEqual((doc.snooze_until, doc.dismiss_reason), (None, ""))

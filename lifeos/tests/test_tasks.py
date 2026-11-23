@@ -4,7 +4,11 @@ import datetime
 import frappe
 from frappe.utils import add_days, add_to_date, getdate, now_datetime, today
 
-from lifeos import archive as archive_rules, counts, datewords, outbox, permissions, trash
+from lifeos.library import archive as archive_rules, trash
+from lifeos.review import counts
+from lifeos.tasks import datewords
+from lifeos.brain import outbox
+from lifeos import permissions
 from lifeos.api import archive, area as area_api, calendar as calendar_api, chats, goals, goals as goal_api, inbox, library, outbox as outbox_api, review, someday, tasks, timeline, today as today_api, vault, views
 from lifeos.api.utils import std_filters, std_order
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
@@ -1159,3 +1163,28 @@ class TestRecordPageTabs(LifeTestCase):
 		p = self.make("Life Goal", title="ux3 hidden goal", horizon="Long term", area=tea)
 		self.as_user(FAMILY)
 		self.assertRaises(frappe.PermissionError, goals.get, p.name)
+
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a task straight through frappe.get_doc applies the same rule as the API."""
+
+	def test_waiting_task_through_get_doc_needs_a_reason(self):
+		doc = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "75 waiting", "status": "Waiting"})
+		with self.assertRaises(frappe.MandatoryError):
+			doc.insert()
+		doc.waiting_on = "The plumber"
+		doc.insert()
+		self.assertEqual(frappe.db.get_value("Life Task", doc.name, "status"), "Waiting")
+
+	def test_someday_through_get_doc_gets_its_dates_and_only_an_open_task_goes(self):
+		doc = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "77 park", "status": "Open", "area": self.areas["Tea"]}).insert()
+		doc.status = "Someday"
+		doc.save()
+		self.assertEqual(str(doc.someday_on), today())
+		self.assertTrue(doc.someday_review_on)
+		doc.status = "Done"
+		doc.save()
+		self.assertIsNone(doc.someday_on)
+		doc.status = "Someday"
+		with self.assertRaises(frappe.ValidationError):
+			doc.save()

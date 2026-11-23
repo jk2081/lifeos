@@ -227,7 +227,7 @@ class TestWriteGoalBlocks(WriteCase):
 	def block(self, **kw):
 		g = goals.create("issue31 goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
 		at = get_datetime(f"{add_days(today(), 7)} 10:00:00")
-		return g, at, __import__("lifeos.weekplan", fromlist=["add"]).add(g, title="issue31 draft", scheduled_at=at, duration_min=90, **kw)
+		return g, at, __import__("lifeos.tasks.weekplan", fromlist=["add"]).add(g, title="issue31 draft", scheduled_at=at, duration_min=90, **kw)
 
 	def test_4_a_goal_block_is_written_to_google(self):
 		self.turn_on()
@@ -245,7 +245,7 @@ class TestWriteGoalBlocks(WriteCase):
 		self.assertEqual(self.rec.calls, [])
 		self.turn_on()
 		task = frappe.get_doc("Life Task", task.name)
-		from lifeos import weekplan
+		from lifeos.tasks import weekplan
 		weekplan.add(g, task=task.name, scheduled_at=at + timedelta(hours=2), duration_min=60)
 		self.assertEqual([c[0] for c in self.rec.calls], ["insert"])
 		weekplan.add(g, task=task.name, scheduled_at=at + timedelta(hours=4), duration_min=60)

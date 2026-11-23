@@ -14,6 +14,8 @@
   "work_start",
   "work_end",
   "own_domains",
+  "email_in_account",
+  "email_in_senders",
   "planning_period",
   "require_done_when",
   "use_focuses",
@@ -97,6 +99,19 @@
    "fieldtype": "Time",
    "label": "Working Day Ends",
    "default": "19:00:00"
+  },
+  {
+   "fieldname": "email_in_account",
+   "fieldtype": "Link",
+   "options": "Email Account",
+   "label": "Email-in Account",
+   "description": "The incoming Email Account Life OS reads. Anything forwarded to it from an allowed sender becomes a capture."
+  },
+  {
+   "fieldname": "email_in_senders",
+   "fieldtype": "Small Text",
+   "label": "Email-in Allowed Senders",
+   "description": "Your own email addresses (one per line). Email from anyone else is ignored."
   },
   {
    "fieldname": "own_domains",

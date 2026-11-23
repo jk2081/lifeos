@@ -6,8 +6,11 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
 
-from lifeos import cycles, datewords, gone_names, permissions
-from lifeos.areas import off_clause
+from lifeos.goals import cycles
+from lifeos.tasks import datewords
+from lifeos.web import gone_names
+from lifeos import permissions
+from lifeos.goals.areas import off_clause
 from lifeos.api.utils import area_filter, extra_columns, flag, names_map, page, std_clause, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 
@@ -134,7 +137,7 @@ def list_clause(space, status="open", area=None, priority=None, goal=None, inclu
 
 def total(space, status="open", due=None, filters=None, area=None):
 	"""The `total` that `list` answers for these arguments, without its rows or tab counts: the counts on Today, Reset and
-	the sidebar (lifeos/counts.py) use it, and the same WHERE keeps the number and the list in step."""
+	the sidebar (lifeos/review/counts.py) use it, and the same WHERE keeps the number and the list in step."""
 	space = permissions.resolve_space(space)
 	clause, values, _extra = list_clause(space, status, area=area, due=due, filters=filters)
 	# nosemgrep: frappe-sql-format-injection -- where_clause and std_clause give fixed fragments and meta-checked columns; values are parameters
@@ -210,7 +213,7 @@ def all_tasks(space: str | None = None, group: str = "area", show: str = "open",
 	if group not in ("area", "goal", "due"):
 		frappe.throw(_("Unknown grouping."), title=_("Grouping is not known"))
 	now = getdate(today())
-	from lifeos import counts
+	from lifeos.review import counts
 
 	stuck_days = counts.rules()["stuck_after_days"]
 	values = {"today": now, "week_end": add_days(now, 6 - now.weekday()), "stuck_cut": add_days(now, -stuck_days)}
@@ -239,7 +242,7 @@ def all_tasks(space: str | None = None, group: str = "area", show: str = "open",
 
 
 def _by_area(space, rows, show, now, week_end):
-	from lifeos.areas import off as areas_off
+	from lifeos.goals.areas import off as areas_off
 
 	tree = frappe.get_list("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "colour", "is_focus"],
 		order_by="sort_order asc, area_name asc", limit=5000)
@@ -307,8 +310,8 @@ def no_goal(space: str | None = None):
 	area that is off still shows, marked, until the owner decides). Each group has `suggestion` when three or more of its tasks
 	share a word ({word, title, tasks}): a goal they may belong to, made only by `make_goal`. `goals` are the goals in progress
 	for the picker, the group's own first."""
-	from lifeos import goal_suggest
-	from lifeos.areas import off as areas_off
+	from lifeos.goals import goal_suggest
+	from lifeos.goals.areas import off as areas_off
 
 	space = permissions.resolve_space(space)
 	rows = query(space, NO_GOAL, {}, None, 0, ALL_CAP + 1, ["standalone"], hide_off=False)
@@ -354,7 +357,7 @@ def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | 
 		target_value: float | str | None = None):
 	"""Make it a goal: one Open goal in `area` (named `title`, else by the assistant when a key is set, else from the task
 	titles) and every one of `tasks` put under it. With the setting "Require Done when on new goals" on, it needs `done_when` or a number. Only open tasks with no goal in this space are taken."""
-	from lifeos import goal_suggest
+	from lifeos.goals import goal_suggest
 	from lifeos.api import goals
 
 	space = permissions.resolve_space(space, write=True)
@@ -384,7 +387,7 @@ def get(task: str):
 	row = decorate([frappe._dict({f: doc.get(f) for f in FIELDS})])[0]
 	row["also_in"] = [r.area for r in doc.also_in]
 	row["space"] = doc.space
-	from lifeos import links
+	from lifeos.library import links
 
 	row["links"] = links.outgoing(doc)  # the [[links]] in its notes, for the editor's chips
 	return row
@@ -468,7 +471,7 @@ def update(task: str, values: str | dict):
 def confirm_area(task: str, area: str | None = None):
 	"""Confirm the area the Brain guessed for a task, or move the task to `area`. Either clears the guess mark; a move is
 	kept as a correction (issue 13)."""
-	from lifeos import area_guess
+	from lifeos.brain import area_guess
 
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	area_guess.confirm(doc, area or None)

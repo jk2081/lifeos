@@ -6,7 +6,9 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import add_days, today
 
-from lifeos import context, files, permissions, wiki_check
+from lifeos.agents import context
+from lifeos.library import files, wiki_check
+from lifeos import permissions
 from lifeos.ai import fake
 from lifeos.api import context as context_api, inbox, jobs, review, wiki
 from lifeos.skills import call as call_skills
@@ -418,3 +420,28 @@ class TestWeeklyCheck(Keyed):
 		out = wiki_check.run(PRIVATE)
 		self.assertIn("skipped", out)
 		self.assertEqual(call_skills.ask("check-wiki", {}, PRIVATE).reason, "no AI key")
+
+
+class TestAgentMethodsExist(LifeTestCase):
+	"""Every `lifeos.api.<module>.<method>` that an agent's instructions name is a real whitelisted method."""
+
+	def test_methods_named_in_skills_exist(self):
+		import importlib
+		import re
+		from pathlib import Path
+
+		root = Path(frappe.get_app_path("lifeos"))
+		files = [*(root / "skills").glob("*.md"), *(root.parent.parent / "agent").glob("*.md")]
+		named = set()
+		for f in files:
+			named |= set(re.findall(r"lifeos\.api\.([a-z_]+)\.([a-z_]+)", f.read_text()))
+		self.assertTrue(named)
+		missing = []
+		for module, method in sorted(named):
+			try:
+				fn = getattr(importlib.import_module(f"lifeos.api.{module}"), method, None)
+			except ImportError:
+				fn = None
+			if fn is None or fn not in frappe.whitelisted:
+				missing.append(f"lifeos.api.{module}.{method}")
+		self.assertEqual(missing, [])

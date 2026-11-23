@@ -8,7 +8,8 @@ from zoneinfo import available_timezones
 import frappe
 from frappe import _
 
-from lifeos import ladder, permissions
+from lifeos.review import ladder
+from lifeos import permissions
 
 KEY = "lifeos_onboarding"
 STATUSES = ("done", "skipped")

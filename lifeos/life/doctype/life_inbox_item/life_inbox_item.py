@@ -8,8 +8,13 @@ class LifeInboxItem(Document):
 		if not self.received_on:
 			self.received_on = now_datetime()
 
+	def before_validate(self):
+		# filing: a capture sent to a goal is in the goal's area
+		if self.goal and not self.area:
+			self.area = frappe.db.get_value("Life Goal", self.goal, "area")
+
 	def validate(self):
-		from lifeos import sources
+		from lifeos.brain import sources
 
 		self.intent = self.intent or "Process"
 		sources.set_media_kind(self)

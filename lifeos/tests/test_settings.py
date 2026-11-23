@@ -5,7 +5,12 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import add_days, today
 
-from lifeos import areas, cycles as rules, demo, devtools, index, install, ladder, permissions, queries, seed
+from lifeos.goals import areas, cycles as rules
+from lifeos.tools import demo, devtools, seed
+from lifeos.library import index
+from lifeos import install, permissions
+from lifeos.review import ladder
+from lifeos.web import queries
 from lifeos.api import area as area_api, goals, inbox, meta, onboarding, session, settings, tasks
 from lifeos.constants import SPACE_DOCTYPES
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
@@ -216,7 +221,7 @@ class TestSeed(LifeTestCase):
 	def test_the_demo_cycle_loads_and_removes(self):
 		from unittest.mock import patch
 
-		from lifeos import demo
+		from lifeos.tools import demo
 
 		frappe.set_user("Administrator")
 		key = "lifeos_seed_test"
@@ -473,7 +478,7 @@ FRESH = "I49 fresh"
 
 def _drop():
 	frappe.set_user("Administrator")
-	from lifeos import devtools
+	from lifeos.tools import devtools
 
 	devtools.purge_space(FRESH, drop=True)
 	frappe.db.delete("DefaultValue", {"parent": NEW})

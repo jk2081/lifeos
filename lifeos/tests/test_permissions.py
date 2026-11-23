@@ -15,7 +15,11 @@ from frappe.modules.patch_handler import get_patches_from_app
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_days, now_datetime, today
 
-from lifeos import counts, devtools, gone_names, install, permissions, proposals
+from lifeos.review import counts
+from lifeos.tools import devtools
+from lifeos.web import gone_names
+from lifeos import install, permissions
+from lifeos.brain import proposals
 from lifeos.ai import fake
 from lifeos.api import archive, ask, chats, client_errors, connections, goals, graph, inbox, library, search, session, settings, someday, sources, tasks, timeline, today as today_api, vault
 from lifeos.api.utils import in_area
@@ -91,7 +95,7 @@ class TestSpacePermissions(LifeTestCase):
 		self.assertRaises(frappe.ValidationError, self.private_note.save)
 
 	def test_user_without_spaces_sees_nothing(self):
-		from lifeos import devtools
+		from lifeos.tools import devtools
 
 		devtools.make_user("stranger@lifeos.test", "Stranger", ["Life User"])
 		self.as_user("stranger@lifeos.test")
@@ -157,7 +161,7 @@ class TestWhitelistConventions(IntegrationTestCase):
 		import lifeos.api  # noqa: F401
 		for path in sorted((APP / "lifeos/api").glob("*.py")):
 			importlib.import_module(f"lifeos.api.{path.stem}")
-		importlib.import_module("lifeos.queries")
+		importlib.import_module("lifeos.web.queries")
 
 	def test_every_method_declares_http_methods_and_hints(self):
 		methods = lifeos_whitelisted()
@@ -255,7 +259,7 @@ class TestNoUserSwitching(AskCase):
 		return answer
 
 	def test_an_insight_for_a_user_never_holds_a_record_they_cannot_read(self):
-		from lifeos import insights
+		from lifeos.review import insights
 
 		self._chat()
 		frappe.db.delete("Life Insight", {"space": PRIVATE})
@@ -269,7 +273,7 @@ class TestNoUserSwitching(AskCase):
 		self.assertEqual(frappe.session.user, "Administrator")
 
 	def test_the_nightly_job_runs_for_the_owner_without_switching(self):
-		from lifeos import insights
+		from lifeos.review import insights
 
 		self._chat()
 		frappe.db.delete("Life Insight", {"space": PRIVATE})
@@ -293,14 +297,14 @@ class TestChatImportUser(LifeTestCase):
 			return save_file("claude_export.zip", fh.read(), None, None, is_private=1).file_url
 
 	def test_the_job_runs_only_as_the_person_who_started_it(self):
-		from lifeos import chat_import
+		from lifeos.brain import chat_import
 
 		url = self._file()
 		frappe.set_user(OWNER)
 		self.assertRaises(frappe.PermissionError, chat_import.run, PRIVATE, "claude", url, FAMILY)
 
 	def test_an_import_never_writes_where_its_user_cannot(self):
-		from lifeos import chat_import
+		from lifeos.brain import chat_import
 
 		url = self._file()
 		frappe.set_user(FAMILY)
@@ -315,13 +319,14 @@ class TestFilePaths(LifeTestCase):
 		return frappe.get_doc({"doctype": "File", "file_url": url, "file_name": name, "is_private": 1})
 
 	def test_a_dot_dot_path_reads_nothing(self):
-		from lifeos import files
+		from lifeos.library import files
 
 		for url in ("/private/files/../../site_config.json", "/files/../../../common_site_config.json"):
 			self.assertRaises((frappe.PermissionError, frappe.ValidationError), files.read, self._file(url, "site_config.json"))
 
 	def test_a_link_out_of_the_files_folder_reads_nothing(self):
-		from lifeos import files, sources
+		from lifeos.library import files
+		from lifeos.brain import sources
 
 		link = frappe.get_site_path("private", "files", "pre6-link.png")
 		if os.path.lexists(link):
@@ -337,7 +342,7 @@ class TestFilePaths(LifeTestCase):
 	def test_a_real_file_is_read(self):
 		from frappe.utils.file_manager import save_file
 
-		from lifeos import files
+		from lifeos.library import files
 
 		f = save_file("pre6.txt", b"hello", None, None, is_private=1)
 		self.assertEqual(files.read(f), b"hello")
@@ -617,7 +622,7 @@ class TestCleanup(IntegrationTestCase):
 
 	def test_seed_has_no_personal_names_goals_or_amounts(self):
 
-		text = (APP_cleanup / "seed.py").read_text()
+		text = (APP_cleanup / "tools" / "seed.py").read_text()
 		for word in PERSONAL:
 			self.assertNotIn(word.lower(), text.lower(), word)
 		self.assertNotRegex(text, r"\d[\d,]{3,}\s*(?:rs|inr|usd|\$)|(?:rs|inr|usd|\$)\s*\d{3,}")

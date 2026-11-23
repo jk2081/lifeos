@@ -1,6 +1,6 @@
 // Checks front-end source without building it. Run inside the bench container, from apps/lifeos/frontend:
 //   node scripts/check-sfc.mjs                 every file under src/
-//   node scripts/check-sfc.mjs src/pages/Today.vue src/components/pane/TaskPane.vue
+//   node scripts/check-sfc.mjs src/pages/Today.vue src/components/item/TaskPane.vue
 // It compiles each .vue file (template and script), checks that every lucide-* icon name exists, that imports of local
 // files resolve, and that none of the patterns UX fixes set 2 removed has come back.
 import fs from 'node:fs'

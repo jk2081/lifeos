@@ -19,7 +19,7 @@ def _person():
 
 
 def _clock(at):
-	from lifeos import rhythms
+	from lifeos.goals import rhythms
 
 	return rhythms.clock(at).date() if at else None
 

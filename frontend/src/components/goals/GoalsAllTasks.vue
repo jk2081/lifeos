@@ -87,7 +87,8 @@ import AreaGuess from '@/components/AreaGuess.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { dotClass } from '@/lib/lens'
 import { short } from '@/lib/dates'
@@ -142,14 +143,14 @@ const addArgs = (g) => (group.value === 'goal' ? { goal: g.goal || undefined, ar
   ? { due_date: g.key === 'today' ? data.value.today : undefined } : { area: g.area || undefined })
 async function add(args, text, clear) {
   if (!text || !text.trim()) return
-  const res = await tryCall(() => api('tasks.quick_add', { text: text.trim(), space: store.space, ...args }))
+  const res = await tryCall(() => goalsData.tasks.quick_add({ text: text.trim(), space: store.space, ...args }))
   if (!res) return
   clear()
   await load()
 }
 async function toggle(t) {
   try {
-    await api('tasks.set_status', { task: t.name, status: t.status === 'Done' ? 'Open' : 'Done' })
+    await goalsData.tasks.set_status({ task: t.name, status: t.status === 'Done' ? 'Open' : 'Done' })
     await load()
   } catch (e) {
     toast.error(errorText(e))
@@ -162,7 +163,7 @@ async function openTopAdd() {
 }
 const go = (q) => router.push({ query: { ...route.query, ...q } })
 async function load() {
-  const res = await tryCall(() => api('tasks.all_tasks', { space: store.space, group: group.value, show: show.value, area: area.value || undefined, q: search.value || undefined }))
+  const res = await tryCall(() => goalsData.tasks.all_tasks({ space: store.space, group: group.value, show: show.value, area: area.value || undefined, q: search.value || undefined }))
   if (res) data.value = res
   loaded.value = true
 }

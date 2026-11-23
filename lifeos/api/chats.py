@@ -186,7 +186,7 @@ def log(space: str | None = None, title: str | None = None, date: str | datetime
 	logged twice: title, updated_on, url, summary and transcript change when given, and open items are merged by their text
 	(new ones are added, closed ones stay closed). The connection of that system gives the default area and goal.
 	The answer is {name, created}."""
-	from lifeos import proposals
+	from lifeos.brain import proposals
 	from lifeos.api import connections
 
 	space = permissions.resolve_space(space, write=True)

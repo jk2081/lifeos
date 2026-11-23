@@ -21,7 +21,8 @@
 // What becomes of an Open goal (issue 57): a focus (with an annual goal that holds its tasks), an annual goal, or dropped.
 import { computed, reactive, ref, watch } from 'vue'
 import { DatePicker, Dialog, ErrorMessage, FormControl, toast } from 'frappe-ui'
-import { api, errorText } from '@/lib/api'
+import { errorText } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 
 const props = defineProps({ modelValue: Boolean, goal: { type: Object, default: null }, mode: { type: String, default: 'annual' } })
 const emit = defineEmits(['update:modelValue', 'done'])
@@ -42,7 +43,7 @@ async function submit() {
   try {
     const args = { goal: props.goal.name, action: props.mode, ...(props.mode !== 'drop' && v.target_date ? { target_date: v.target_date } : {}) }
     if (props.mode === 'focus') Object.assign(args, { title: v.title, done_when: v.done_when })
-    const res = await api('focus.sort_open', args)
+    const res = await goalsData.focus.sort_open(args)
     toast.success({ focus: 'Focus made', annual: 'Now an annual goal', drop: 'Dropped' }[props.mode])
     open.value = false
     emit('done', res)

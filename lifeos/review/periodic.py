@@ -14,8 +14,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, flt, getdate, now_datetime, today
 
-from lifeos import cycles, readings
-from lifeos import habits as habit_rules
+from lifeos.goals import cycles, readings
+from lifeos.goals import habits as habit_rules
 from lifeos.review.record import MONTHS, Review, span_text
 
 MONTHLY, CYCLE, WEEKLY = "Monthly", "12 Weeks", "Weekly"
@@ -280,7 +280,7 @@ class Periodic(Review):
 	def _result(self, goal):
 		cyc = self.cycle()
 		actions, ticks = cycles._actions(cyc.name), cycles._ticks(cyc.name)
-		from lifeos import readings
+		from lifeos.goals import readings
 
 		g = frappe.db.get_value("Life Goal", goal, ["name", "measure_kind", "measure", "unit", "start_value", "target_value", "current_value", "current_on"], as_dict=True)
 		pct = cycles.goal_percent(cyc, [a for a in actions if a.goal == goal], ticks, cycles.WEEKS)
@@ -525,7 +525,7 @@ def lock_month(rv):
 			new = cycles.add_month_goal(space, ny, nm, old.title, g.get("area") or old.area, carried_from=old.name, serves=g.get("serves") or old.serves)
 			old.outcome = "Carried"
 			old.save()
-			frappe.db.sql("update `tabLife Task` set goal=%s where goal=%s and status in ('Open', 'Doing', 'Waiting')", (new.name, old.name))
+			cycles.move_open_tasks(old.name, new.name)
 		else:
 			new = cycles.add_month_goal(space, ny, nm, g["title"], g["area"], serves=g.get("serves"), done_when=g.get("done_when"))
 		made.append({"goal": new.name, "title": new.title, "carried": bool(g["carried_from"])})
@@ -563,8 +563,10 @@ def lock_cycle(rv):
 			goal.sort_order = i + 1
 			goal.save()
 		else:
-			frappe.get_doc({"doctype": "Life Goal", "space": rv.doc.space, "cycle": nxt["cycle"], "horizon": "12 weeks", "title": g["title"], "area": g["area"],
-				"serves": g.get("serves") or None, "done_when": g["done_when"], "sort_order": i + 1, "actions": actions}).insert()
+			new_goal = frappe.get_doc({"doctype": "Life Goal", "space": rv.doc.space, "cycle": nxt["cycle"], "horizon": "12 weeks", "title": g["title"], "area": g["area"],
+				"serves": g.get("serves") or None, "done_when": g["done_when"], "sort_order": i + 1, "actions": actions})
+			new_goal.flags.carried = bool(g["carried_from"])  # a goal carried on keeps what it had, even with no Done when
+			new_goal.insert()
 	piles = {p: sum(1 for d in decided.values() if d["pile"] == p) for p in PILES[CYCLE]}
 	return {"numbers": {"score": closed["final_score"], "score_target": cint(frappe.db.get_single_value("Life Settings", "score_target")) or 85,
 		"goals_planned": len(plan["goals"]), "goals_skipped": piles["drop"]},

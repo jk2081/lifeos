@@ -57,7 +57,10 @@ export async function tryCall(fn, okMessage) {
 
 export const db = {
   insert: (doc) => call('frappe.client.insert', { doc }),
-  set: (doctype, name, values) => call('frappe.client.set_value', { doctype, name, fieldname: values }),
+  set: (doctype, name, values) => call('frappe.client.set_value', { doctype, name, fieldname: values }).then((out) => {
+    if (doctype === 'Life Insight') window.dispatchEvent(new CustomEvent('lifeos-counts-stale')) // the sidebar's count of findings
+    return out
+  }),
   delete: (doctype, name) => call('frappe.client.delete', { doctype, name }),
   get: (doctype, name) => call('frappe.client.get', { doctype, name }),
 }

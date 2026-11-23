@@ -10,7 +10,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
-from lifeos import links, permissions
+from lifeos.library import links
+from lifeos import permissions
 from lifeos.api.utils import area_filter, names_map, page, parse, std_filters, std_order, summarise, tab_counts
 from lifeos.api.utils import order_by as sort_order
 from lifeos.life.doctype.life_note.life_note import MAX_MD, SOURCE_DOCTYPES
@@ -266,7 +267,7 @@ def search(space: str | None = None, query: str | None = None, collection: str |
 
 def _about(doc, about):
 	"""`about` names what a page describes (Person or Organisation); anything else is refused so a typo is not lost."""
-	from lifeos import people
+	from lifeos.library import people
 
 	if about in (None, ""):
 		return

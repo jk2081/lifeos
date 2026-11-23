@@ -8,7 +8,8 @@ import re
 import frappe
 from frappe.utils import now_datetime
 
-from lifeos import files, permissions
+from lifeos.library import files
+from lifeos import permissions
 
 ITEM = "Life Inbox Item"
 AGENT_SYSTEMS = ("hermes", "claude", "agent", "chatgpt")

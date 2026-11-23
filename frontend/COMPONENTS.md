@@ -91,7 +91,7 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | Component | Why neither library has it | Built from |
 | --- | --- | --- |
 | `ListView.vue` | The wrapper every list screen uses. It owns the view switch, the URL form of the filters (`lib/filterUrl.js`), the open row and the remembered state (`lib/views.js`). The libraries give the parts, not this composition | `frappe-ui/list` (`List`, `ListHeader`, `ListHeaderCellSort`, `ListGroup`, `ListRow`, `ListCell`), `TabButtons`, `Checkbox`, `Badge`, `Button`, `BottomSheet`, `Skeleton`, and the `Life*` wrappers |
-| `RecordPane.vue`, `pane/PaneBody.vue` | A slide-over that keeps the list usable beside it. frappe-ui has `Dialog` (modal) and `BottomSheet` (phones) | Desktop: an `aside` with `bg-surface-base`, `border-outline-gray-2`, `shadow-2xl`. Phone: `BottomSheet`. Header: `Button`. Notice: `Alert` |
+| `item/RecordPane.vue`, `item/PaneBody.vue` | A slide-over that keeps the list usable beside it. frappe-ui has `Dialog` (modal) and `BottomSheet` (phones) | Desktop: an `aside` with `bg-surface-base`, `border-outline-gray-2`, `shadow-2xl`. Phone: `BottomSheet`. Header: `Button`. Notice: `Alert` |
 | `PageHead.vue` | A thin composition, so every screen has the same header | `PageHeader`, `PageHeaderTitle`, `Breadcrumbs`, `Badge` |
 | `SetupCard.vue` (issue 26) | "Your setup · level n of 6": the next step, Go, How it works and a dismiss button, from `lib/ladder.js`. In the sidebar and the phone's focus sheet; do not build another | `RouterLink` |
 | `ui/Card.vue` | frappe-ui has no card | `rounded-5 border border-outline-gray-2 bg-surface-base` |
@@ -242,7 +242,7 @@ The list screens take `embed`: `{ screen: 'goal', space, fixed: { goal }, active
 
 ### Count doors
 
-Every number on Today, Reset, Someday, the sidebar and the weekly review's Reset step comes from the count helper (`lifeos/counts.py`): `{ n, to: { path, query }, label }`, where `n` is worked out by calling the same list method, with the same arguments, that the screen at `to` calls. Show it with `components/ui/CountLink.vue` (`:count`, optional `count-key` and `tone`), never by formatting a number and building a link by hand. It carries `data-count-door`, `data-count-n` and `data-count-label`, which the acceptance check U.31 clicks and compares with the rows shown. A count with no condition of its own carries `all=1`, so a remembered view cannot change what the list shows. Ask's `counts` tool returns the same objects.
+Every number on Today, Reset, Someday, the sidebar and the weekly review's Reset step comes from the count helper (`lifeos/review/counts.py`): `{ n, to: { path, query }, label }`, where `n` is worked out by calling the same list method, with the same arguments, that the screen at `to` calls. Show it with `components/ui/CountLink.vue` (`:count`, optional `count-key` and `tone`), never by formatting a number and building a link by hand. It carries `data-count-door`, `data-count-n` and `data-count-label`, which the acceptance check U.31 clicks and compares with the rows shown. A count with no condition of its own carries `all=1`, so a remembered view cannot change what the list shows. Ask's `counts` tool returns the same objects.
 
 ### The Search or ask box
 
@@ -258,7 +258,7 @@ Both live in `pages/Today.vue` and read `today.get`. The band (`data-open-band`)
 
 ### Reset decisions
 
-`pages/Reset.vue` with `components/reset/BatchCard.vue`, `Inventory.vue` and `OneByOne.vue`. On a phone, Batches, One by one and Inventory are `TabBar` tabs (`tab=`); on desktop they are one page. A batch action asks for confirmation (`dialog.confirm`) with the exact count, applies to exactly the listed names, and toasts Undo for one minute. One by one shows the oldest untouched item with Do (D, asks for a date), Waiting (W, asks for whom), Someday (S), Archive (A) and Delete (X): keys on desktop (ignored while typing in a field), large buttons on a phone (`data-obo`). Delete moves the record to the trash (Frappe's Deleted Document), restorable from the Archive's Trash tab for 30 days.
+`pages/Reset.vue` with `components/settings/ResetBatchCard.vue`, `ResetInventory.vue` and `ResetOneByOne.vue`. On a phone, Batches, One by one and Inventory are `TabBar` tabs (`tab=`); on desktop they are one page. A batch action asks for confirmation (`dialog.confirm`) with the exact count, applies to exactly the listed names, and toasts Undo for one minute. One by one shows the oldest untouched item with Do (D, asks for a date), Waiting (W, asks for whom), Someday (S), Archive (A) and Delete (X): keys on desktop (ignored while typing in a field), large buttons on a phone (`data-obo`). Delete moves the record to the trash (Frappe's Deleted Document), restorable from the Archive's Trash tab for 30 days.
 
 ## UX fixes, set 6: the lens, the four places, Plan and Library
 
@@ -278,7 +278,7 @@ A place's tabs are paths (`/goals/tasks`, `/library/notes`). The place pages (`p
 
 ### Today's rhythms and Goals
 
-- **Rhythm tabs** (Week, Month, 12 Weeks, Year) are `components/plan/PlanRhythm.vue`: a view switch (`view=`, `TabButtons`) between the journal's screens (`components/journal/*`, which teleport their buttons into `#jr-actions` in the header) and the calendar (`components/plan/Calendar.vue`, with `place` and `switch-options`). Week: Review, Calendar, Agenda, with `WeekScore` above the calendar and the Reset button. Month: Plan, Habits, Check-ins, Calendar. 12 Weeks: the cycle grid. Year: Calendar, Goals across cycles.
+- **Rhythm tabs** (Week, Month, 12 Weeks, Year) are `components/goals/PlanRhythm.vue`: a view switch (`view=`, `TabButtons`) between the journal's screens (`components/journal/*`, which teleport their buttons into `#jr-actions` in the header) and the calendar (`components/goals/Calendar.vue`, with `place` and `switch-options`). Week: Review, Calendar, Agenda, with `WeekScore` above the calendar and the Reset button. Month: Plan, Habits, Check-ins, Calendar. 12 Weeks: the cycle grid. Year: Calendar, Goals across cycles.
 - **List tabs** are the Goals, All tasks and Someday screens (`pages/Goals.vue`, `Tasks.vue`, `Someday.vue`, inside `GoalsPlace.vue`).
 - **A goal's page** is `/goals/<id>` (`pages/Goal.vue`): what a project page and a goal page each had, with "Serves" and "Served by". Reset is `/today/reset`.
 
@@ -308,7 +308,7 @@ At most one line above the Open band (`data-rhythm-banner`), from `today.get`'s 
 
 ### The weekly review
 
-Replaced in set 8 by `components/weekly/` (see "Set 8: the weekly review" below). The goal cards and key-results step of set 7 are gone; readings to confirm are Goal reading revelations in Library and links on the goal rows in Goals.
+Replaced in set 8 by `components/review/` (see "Set 8: the weekly review" below). The goal cards and key-results step of set 7 are gone; readings to confirm are Goal reading revelations in Library and links on the goal rows in Goals.
 
 ### Scheduled tasks
 
@@ -329,7 +329,7 @@ The Inbox's `#above` slot starts with `inbox/OldItems.vue`: an amber `Alert` (`d
 - **The assistant decides first.** Each item carries the assistant's suggestion and a one-line reason. Only items it cannot decide are shown one by one, under **Needs you** (at most 5; any beyond 5 go into Keep with the reason "not sure").
 - **One primary button in a footer** (`weekly/ReviewFooter.vue`), with one line saying what is left before it opens. The footer is sticky at the bottom of the screen (above the tab bar on a phone).
 
-### The review's components (`components/weekly/`)
+### The review's components (`components/review/`)
 
 | Component | What it is | Built from |
 | --- | --- | --- |
@@ -362,3 +362,17 @@ After Lock, the week's three starred goal tasks (`is_top_three`) are the first g
 
 Library > Outbox also takes a review's period as `from=` and `to=` (shown as a fourth choice, "Review period"), so the review's counts open lists with exactly those rows.
 
+
+## Folder map after issue 74 (partly done)
+
+- `components/review/`: the weekly review (`Review*`, `Weekly*`), the monthly and 12-week review (`Periodic*`) and the inbox item review (`InboxReview.vue`).
+- `components/item/`: the record side pane (`RecordPane`, `PaneBody`, `*Pane`) and the item page parts.
+- `components/goals/`: the goal screens plus the calendar and rhythm tabs that were in `plan/`.
+- `components/settings/Reset*.vue`: the Reset section parts.
+
+## Folder map after issue 74 (partly done)
+
+- `components/review/`: the weekly review (`Review*`, `Weekly*`), the monthly and 12-week review (`Periodic*`) and the inbox item review (`InboxReview.vue`).
+- `components/item/`: the record side pane (`RecordPane`, `PaneBody`, `*Pane`) and the item page parts.
+- `components/goals/`: the goal screens plus the calendar and rhythm tabs that were in `plan/`.
+- `components/settings/Reset*.vue`: the Reset section parts.

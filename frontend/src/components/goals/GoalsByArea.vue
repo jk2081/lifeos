@@ -134,7 +134,8 @@ import Empty from '@/components/Empty.vue'
 import PageHead from '@/components/PageHead.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'
 import SortOpenDialog from '@/components/goals/SortOpenDialog.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { dotClass } from '@/lib/lens'
 import { short, time, weekday } from '@/lib/dates'
@@ -184,9 +185,9 @@ function nextWhen(n) {
 const go = (q) => router.push({ query: { ...route.query, ...q } })
 const numbers = ref(null)
 async function load() {
-  const res = await tryCall(() => api('goals.by_area', { space: store.space, show: show.value, sort: sort.value }))
+  const res = await tryCall(() => goalsData.goals.by_area({ space: store.space, show: show.value, sort: sort.value }))
   if (res) data.value = res
-  numbers.value = (await tryCall(() => api('counts.get', { space: store.space, which: 'goals', area: store.lensArea || undefined }))) || numbers.value
+  numbers.value = (await tryCall(() => goalsData.counts.get({ space: store.space, which: 'goals', area: store.lensArea || undefined }))) || numbers.value
   loaded.value = true
 }
 function addGoal(area, horizon = '') {
@@ -206,7 +207,7 @@ async function created(g) {
 }
 // the owner's order: move one step, or drag over another card of the same group; saved when dropped
 async function save(list) {
-  await tryCall(() => api('goals.reorder', { goals: list.map((x) => x.name) }))
+  await tryCall(() => goalsData.goals.reorder({ goals: list.map((x) => x.name) }))
 }
 function move(list, i, by) {
   const j = i + by

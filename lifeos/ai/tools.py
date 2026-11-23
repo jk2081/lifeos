@@ -9,7 +9,7 @@ from frappe.utils import add_days, cint, getdate, today
 
 from lifeos import permissions
 from lifeos.api.utils import descendants
-from lifeos.pane_refs import ref_of
+from lifeos.web.pane_refs import ref_of
 
 TEXT_CAP = 6000  # characters of a record's text sent to the model
 MAX_ROWS = 50
@@ -89,7 +89,7 @@ class Context:
 		k = s.get("kind")
 		if k == "area" and s.get("name"):
 			values["scope_ids"] = descendants(self.space, s["name"])
-			from lifeos.index import also_in_sql
+			from lifeos.library.index import also_in_sql
 
 			return f" and ({alias}area in %(scope_ids)s or {also_in_sql('scope_ids', alias)})", values
 		if k in ("goal",) and s.get("name"):  # a goal: what is filed under it, and what links to it
@@ -249,7 +249,7 @@ def _rows_out(ctx, doctype, rows, title="title", extra=()):
 
 
 def t_list(ctx, kind, filters=None, order=None, limit=20):
-	from lifeos import counts
+	from lifeos.review import counts
 	from lifeos.api import goals, someday, tasks
 
 	filters = filters if isinstance(filters, dict) else (json.loads(filters) if isinstance(filters, str) and filters else {})
@@ -328,7 +328,7 @@ COUNT_KINDS = {"open_tasks", "stuck_tasks", "overdue_tasks", "due_today_tasks", 
 
 
 def t_counts(ctx, kind):
-	from lifeos import counts
+	from lifeos.review import counts
 
 	if kind not in COUNT_KINDS:
 		return {"error": f"kind must be one of {', '.join(sorted(COUNT_KINDS))}."}
@@ -347,7 +347,7 @@ def t_cycle(ctx):
 		"this_week_actions": [{"title": a["title"], "goal": a["goal_title"], "ticks": a["count"], "per_week": a["per_week"]} for a in cycle.get("actions") or []],
 		"habits_today": [{"habit": h["title"], "done": h["done"]} for h in t.get("habits") or []]}
 	if cycle.get("name"):
-		from lifeos import cycles
+		from lifeos.goals import cycles
 
 		g = cycles.grid(cycle["name"])
 		out["goals"] = [{"ref": ctx.ref("Life Goal", x["name"], x["title"], "Goal"), "title": x["title"], "percent": x.get("percent"),
@@ -360,7 +360,7 @@ def t_cycle(ctx):
 
 
 def habits_this_month(space, now):
-	from lifeos import habits
+	from lifeos.goals import habits
 
 	m = habits.habits_month(space, now.year, now.month)
 	return [{"habit": h["title"], "done": h["done"], "target": h["target"], "percent": h["percent"]} for h in m["habits"]]
@@ -382,7 +382,7 @@ def t_timeline(ctx, date_from, date_to=None):
 
 def t_suggest(ctx, actions):
 	"""Record the buttons to show. Records are named by the references the answer cited."""
-	from lifeos import counts
+	from lifeos.review import counts
 
 	kept = []
 	for a in (actions or [])[:4]:

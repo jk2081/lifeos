@@ -1,4 +1,4 @@
-// Life OS service worker (issue 50), served at /life/sw.js (lifeos/pwa.py).
+// Life OS service worker (issue 50), served at /life/sw.js (lifeos/web/pwa.py).
 // 1. It caches only the app's own static files (/assets/lifeos/…). It never caches an API response, a page or a record.
 // 2. It takes what other apps share to Life OS (a POST to /life/share) and keeps it in IndexedDB on this phone, then sends the
 //    person to the share screen. Nothing is sent to the server from here.

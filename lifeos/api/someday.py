@@ -10,7 +10,7 @@ from frappe.utils import add_months, cint, getdate, today
 
 from lifeos import permissions
 from lifeos.api.utils import names_map, page, parse, std_filters
-from lifeos.counts import rules
+from lifeos.review.counts import rules
 
 PARKABLE = ("Life Task", "Life Goal", "Life Note")
 TYPE_OF = {"Life Task": "Task", "Life Goal": "Goal", "Life Note": "Note"}
@@ -118,9 +118,7 @@ def park_doc(doc, note=None):
 	day = today()
 	rev = review_date(day)
 	if doc.doctype == "Life Task":
-		if doc.status not in ("Open", "Doing", "Waiting", "Someday"):
-			frappe.throw(_("Only an open task can go on the Someday list."), title=_("Task is not open"))
-		doc.status = "Someday"
+		doc.status = "Someday"  # the task's own rule refuses one that is not open
 	elif doc.doctype == "Life Goal":
 		if (doc.outcome or "In Progress") != "In Progress":
 			frappe.throw(_("Only a goal in progress can go on the Someday list."), title=_("Goal is not in progress"))
@@ -210,7 +208,7 @@ def purge(doctype: str, name: str):
 	"""Move a parked item to the trash. An open-ended goal takes the tasks it was parked with."""
 	_person()
 	_check(doctype)
-	from lifeos import trash
+	from lifeos.library import trash
 
 	doc = permissions.get_doc_checked(doctype, name, "write")
 	if doctype == "Life Goal":
@@ -251,7 +249,7 @@ def restore_snapshot(snap):
 		frappe.throw(frappe._("Nothing to undo."), title=_("Nothing to undo"))
 	doc = permissions.get_doc_checked(snap["doctype"], snap["name"], "write")
 	if doc.get("is_archived") and not cint(snap.get("is_archived")) and snap.get("is_archived") is not None:
-		from lifeos import archive
+		from lifeos.library import archive
 
 		archive.set_archived(doc.doctype, doc.name, False)
 		doc.reload()
@@ -268,7 +266,7 @@ def restore_snapshot(snap):
 		doc.due_date = snap.get("due_date") or None
 	doc.save()
 	if snap.get("is_archived") is not None and doc.meta.has_field("is_archived") and cint(doc.is_archived) != cint(snap["is_archived"]):
-		from lifeos import archive
+		from lifeos.library import archive
 
 		archive.set_archived(doc.doctype, doc.name, bool(cint(snap["is_archived"])))
 	for t in snap.get("tasks") or []:

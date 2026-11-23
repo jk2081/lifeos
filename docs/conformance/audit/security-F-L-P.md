@@ -40,7 +40,7 @@ Pre-step 6, step 3. The checklists of Frappe's `deep-app-audit` skill were appli
 ### [MODERATE] The trash lists deleted Vault documents to an agent while the Vault switch is off
 
 - **Id:** S-I01 (also S-H05)
-- **Entry point:** `lifeos.api.trash.list` (GET), `lifeos/api/trash.py:8` → `lifeos/trash.py:66` `list` → `lifeos/trash.py:40` `_rows`.
+- **Entry point:** `lifeos.api.trash.list` (GET), `lifeos/api/trash.py:8` → `lifeos/library/trash.py:66` `list` → `lifeos/library/trash.py:40` `_rows`.
 - **Actor:** an agent (`Life Agent`) that is a member of the space, in a space whose "agents can read the Vault" switch is off.
 - **Input:** `space` (any space the agent belongs to).
 - **Impact:** for every Vault document deleted in the last 30 days, the agent gets its title, area, record name, who deleted it and when. `_rows` filters by space membership only (`trash.py:54`); it never applies `permissions.vault_hidden`, unlike every other list (`vault_guard`). The same holds for a deleted inbox item a Vault document was made from (`vault_document` set).
@@ -50,7 +50,7 @@ Pre-step 6, step 3. The checklists of Frappe's `deep-app-audit` skill were appli
 ### [LOW] Quick add's date pattern takes quadratic time on a run of commas
 
 - **Id:** S-K01
-- **Entry point:** `lifeos.api.tasks.quick_add` (POST), `lifeos/api/tasks.py:194` → `lifeos/datewords.py:76` `parse` → `TAIL` at `lifeos/datewords.py:15`.
+- **Entry point:** `lifeos.api.tasks.quick_add` (POST), `lifeos/api/tasks.py:194` → `lifeos/tasks/datewords.py:76` `parse` → `TAIL` at `lifeos/tasks/datewords.py:15`.
 - **Actor:** any person or agent with Write access to a space.
 - **Input:** `text`, for example `"a" + "," * 30000 + "x"` (30 KB). `parse` collapses whitespace but not commas, and `^(?P<title>.+?)[\s,]+…$` backtracks over the run.
 - **Impact:** one request holds a web worker for minutes (measured on the bench: 2,000 commas 0.7 s, 8,000 commas 11 s, so 30,000 about 2.5 minutes), until the worker timeout. A few requests at once make the site unresponsive.
@@ -59,7 +59,7 @@ Pre-step 6, step 3. The checklists of Frappe's `deep-app-audit` skill were appli
 ### [LOW] The chat import reads conversations.json without a limit on its uncompressed size
 
 - **Id:** S-K01
-- **Entry point:** `lifeos.api.connections.start_import` (POST) → job `lifeos.chat_import.run` → `conversations_from_zip`, `lifeos/chat_import.py:146` (`json.load` of the zip member).
+- **Entry point:** `lifeos.api.connections.start_import` (POST) → job `lifeos.brain.chat_import.run` → `conversations_from_zip`, `lifeos/brain/chat_import.py:146` (`json.load` of the zip member).
 - **Actor:** a person with Write access to a space.
 - **Input:** an uploaded private `.zip` whose `conversations.json` is small compressed and very large uncompressed. Only the compressed size is checked (1 GB, `MAX_ZIP`).
 - **Impact:** the long-queue worker reads the whole member into memory and is killed (the bench container has 2.5 GB), stopping other background jobs until it restarts. Bounded by the site's upload limit.

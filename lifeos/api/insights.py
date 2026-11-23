@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, today
 
-from lifeos import insights as rules
+from lifeos.review import insights as rules
 from lifeos import permissions
 from lifeos.api.utils import names_map, page, parse
 
@@ -26,7 +26,7 @@ def _out(rows):
 		for p, dt, n, label in frappe.db.sql("""select parent, ref_doctype, ref_name, label from `tabLife Insight Evidence`
 			where parent in %s order by idx""", ([r.name for r in rows],)):
 			ev.setdefault(p, []).append({"doctype": dt, "name": n, "label": label})
-	from lifeos.pane_refs import ref_of
+	from lifeos.web.pane_refs import ref_of
 
 	for r in rows:
 		r["area_name"] = areas.get(r.area)
@@ -111,34 +111,6 @@ def refresh(space: str | None = None):
 def _doc(name):
 	_person()
 	return permissions.get_doc_checked("Life Insight", name, "write")
-
-
-@frappe.whitelist(methods=["POST"])
-def dismiss(insight: str, reason: str | None = None):
-	"""Dismiss, with an optional reason (not relevant, already done, wrong). The AI reads the last 30 with their reasons."""
-	doc = _doc(insight)
-	if reason and reason not in ("Not relevant", "Already done", "Wrong"):
-		frappe.throw(_("reason must be Not relevant, Already done or Wrong."), title=_("Unknown dismiss reason"))
-	doc.status, doc.dismiss_reason = "Dismissed", reason or ""
-	doc.save()
-	return {"status": doc.status}
-
-
-@frappe.whitelist(methods=["POST"])
-def snooze(insight: str, until: str | date | None = None):
-	doc = _doc(insight)
-	doc.status, doc.snooze_until = "Snoozed", until or add_days(today(), 7)
-	doc.save()
-	return {"status": doc.status, "snooze_until": str(doc.snooze_until)}
-
-
-@frappe.whitelist(methods=["POST"])
-def restore(insight: str):
-	"""Undo a dismiss, a snooze or an act: back to New."""
-	doc = _doc(insight)
-	doc.status, doc.snooze_until, doc.dismiss_reason = "New", None, ""
-	doc.save()
-	return {"status": doc.status}
 
 
 @frappe.whitelist(methods=["POST"])

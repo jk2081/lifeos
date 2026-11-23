@@ -149,7 +149,7 @@ for (const width of WIDTHS) {
   if (!phone) await check('SETTINGS.2', 'access: the family user sees no Private sources, pages or changes; the agent cannot see a source behind a Vault document while the switch is off', async () => {
     const item = await s.api('inbox.create_item', { title: `S4 passport scan ${stamp}`, source_type: 'Upload', space: SPACE })
     const vault = await s.api('vault.save', { space: SPACE, values: { title: `S4 passport ${stamp}`, doc_type: 'ID', area: areaId('Money & Legal') } })
-    bench(`from lifeos import index\nfrappe.db.set_value("Life Inbox Item", "${item.name}", "vault_document", "${vault.name}")\nindex.update(frappe.get_doc("Life Inbox Item", "${item.name}"))\nfrappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", 0)`)
+    bench(`from lifeos.library import index\nfrappe.db.set_value("Life Inbox Item", "${item.name}", "vault_document", "${vault.name}")\nindex.update(frappe.get_doc("Life Inbox Item", "${item.name}"))\nfrappe.db.set_value("Life Space", "${SPACE}", "agents_can_read_vault", 0)`)
     const seen = await asAgent(`rows = sources.list(space="${SPACE}", page_length=500)["sources"]
 try:
 	inbox.get("${item.name}"); got = "allowed"
@@ -188,7 +188,7 @@ for (const width of WIDTHS) {
   const settle = () => pg.waitForTimeout(500)
   const cur = () => pg.locator('[data-settings-section]').getAttribute('data-current')
   // an agent in no space, and a user with no Life OS role in no space
-  const reset = () => bench(`from lifeos import devtools
+  const reset = () => bench(`from lifeos.tools import devtools
 frappe.set_user("Administrator")
 devtools.make_user("${I1_AGENT}", "Issue One Agent", ["Life Agent"])
 devtools.make_user("${I1_NEW}", "Issue One Newcomer", [])
@@ -552,13 +552,13 @@ for (const width of WIDTHS) {
   const restore = () => bench(`frappe.set_user("Administrator")
 for dt in ("Life Task",):
     for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
-from lifeos import devtools
+from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
   let s
   try {
-    bench(`from lifeos import devtools
+    bench(`from lifeos.tools import devtools
 devtools.make_user("${user}", "Ladder", ["Life User"])
 frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
 frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
@@ -1021,14 +1021,14 @@ for (const width of WIDTHS) {
   const restore = () => bench(`frappe.set_user("Administrator")
 for dt in ("Life Task",):
     for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
-from lifeos import devtools
+from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
   let one = null
   const owner = await session('owner@lifeos.test', width)
   try {
-    bench(`from lifeos import devtools
+    bench(`from lifeos.tools import devtools
 devtools.make_user("${user}", "One", ["Life Admin", "Life User"])
 frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
 frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
@@ -1271,4 +1271,37 @@ for (const width of WIDTHS) {
       must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
     })
   } finally { await s.ctx.close() }
+}
+
+// Issue 32: the email-in address is shown in Settings > Sources, with the allowed senders, and never in the onboarding guide.
+const EMAIL_IN = 'Acceptance Email-in'
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  try {
+    await check('SETTINGS.40', `${width} px: Settings > Sources shows the email-in address and the allowed senders, and the onboarding guide says nothing about forwarding`, async () => {
+      bench(`from frappe.utils import now
+if not frappe.db.exists("Email Account", "${EMAIL_IN}"):
+    d = frappe.get_doc({"doctype": "Email Account", "email_account_name": "${EMAIL_IN}", "email_id": "life-in-acceptance@example.com", "enable_incoming": 1,
+        "enable_outgoing": 0, "password": "not-a-real-password", "imap_folder": [{"folder_name": "INBOX", "append_to": "Communication"}]})
+    d.flags.ignore_validate = True
+    d.insert(ignore_permissions=True)
+frappe.db.set_single_value("Life Settings", "email_in_account", "${EMAIL_IN}")
+frappe.db.set_single_value("Life Settings", "email_in_senders", "me-acceptance@example.com")
+frappe.clear_cache(doctype="Life Settings")`)
+      await s.open('/life/brain/sources')
+      await pg.locator('[data-email-in]').waitFor({ timeout: 15000 })
+      await pg.locator('[data-email-in-address]:has-text("life-in-acceptance@example.com")').waitFor({ timeout: 15000 })
+      must(await pg.locator('[data-email-in-senders]').inputValue() === 'me-acceptance@example.com', 'the allowed sender is not shown')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      // the guide: no word about an address or forwarding
+      const guide = (await import('node:fs')).readFileSync(new URL('../../frontend/src/components/OnboardingGuide.vue', import.meta.url), 'utf8')
+      must(!/forward|email-in|email in/i.test(guide), 'the onboarding guide mentions email forwarding')
+    })
+  } finally {
+    bench(`frappe.db.set_single_value("Life Settings", "email_in_account", None)
+frappe.db.set_single_value("Life Settings", "email_in_senders", None)
+frappe.clear_cache(doctype="Life Settings")`)
+    await s.ctx.close()
+  }
 }

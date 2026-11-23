@@ -2,7 +2,8 @@
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos import links, permissions
+from lifeos.library import links
+from lifeos import permissions
 from lifeos.api.utils import area_filter, flag, names_map, page, std_filters, summarise, user_names
 
 KIND_DOCTYPES = {

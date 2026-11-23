@@ -20,7 +20,7 @@ print(json.dumps(frappe.db.sql("select name from \`tabLife Goal\` where space='$
   await owner.api('tasks.carry_forward', { task: carried })
   const old = (await owner.api('tasks.quick_add', { text: `UX archived by the job ${stamp}`, space: SPACE, area: uxArea })).name
   await owner.api('tasks.set_status', { task: old, status: 'Done' })
-  bench(`from lifeos import archive\nfrappe.set_user("owner@lifeos.test")\narchive.set_archived("Life Task", "${old}", True, "Auto")`)
+  bench(`from lifeos.library import archive\nfrappe.set_user("owner@lifeos.test")\narchive.set_archived("Life Task", "${old}", True, "Auto")`)
   ux.note = (await owner.api('library.save', { space: SPACE, title: `UX note ${stamp}`, area: uxArea, content_md: 'A reference note for the UX checks.' })).name
   ux.vault = (await owner.api('vault.save', { space: SPACE, values: { title: `UX permit ${stamp}`, doc_type: 'Other', expiry_date: addDays(20), area: uxArea } })).name
   ux.chat = (await owner.api('chats.log', { space: SPACE, title: `UX chat ${stamp}`, area: uxArea, goal: ux.goal, summary_md: 'Talked about the UX checks.',

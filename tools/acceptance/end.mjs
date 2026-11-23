@@ -2,7 +2,7 @@
 import { bench, check, execFileSync, must, path, root } from './context.mjs'
 
 await check('END.1', "This run's records are removed from the acceptance site", async () => {
-  const code = 'from lifeos import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))'
+  const code = 'from lifeos.tools import devtools\nimport json\ndevtools.purge_test_debris(dry_run=0)\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))'
   let out
   try { out = bench(code) } catch (e) { out = bench(code) } // the purge is safe to repeat: a lock wait on a busy runner should not fail the run
   out = out.split('\n').pop()
@@ -10,7 +10,7 @@ await check('END.1', "This run's records are removed from the acceptance site", 
 })
 
 await check('END.2', 'No test debris on lifeos.localhost after the run', async () => {
-  const out = bench('from lifeos import devtools\nimport json\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))', 'lifeos.localhost').split('\n').pop()
+  const out = bench('from lifeos.tools import devtools\nimport json\nd, st = devtools.find_test_debris()\nprint(json.dumps({k: len(v) for k, v in d.items()}))', 'lifeos.localhost').split('\n').pop()
   const d = JSON.parse(out)
   must(!Object.keys(d).length, 'debris on lifeos.localhost: ' + out)
 })

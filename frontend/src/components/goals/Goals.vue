@@ -56,7 +56,8 @@ import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import GoalDialog from './GoalDialog.vue'
-import { api, tryCall } from '@/lib/api'
+import { tryCall } from '@/lib/api'
+import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { long } from '@/lib/dates'
 
@@ -84,7 +85,7 @@ function goalNote(g, c) {
   return c.status === 'Closed' ? g.result_note : ''
 }
 async function load() {
-  const res = await tryCall(() => api('goals.across_cycles', { space: store.space, area: area.value || store.lensArea || undefined }))
+  const res = await tryCall(() => goalsData.goals.across_cycles({ space: store.space, area: area.value || store.lensArea || undefined }))
   if (res) {
     d.value = res
     if (!area.value) all.value = res
@@ -102,7 +103,7 @@ function setCarry(name, on) {
   carry.value = on ? [...carry.value.filter((x) => x !== name), name] : carry.value.filter((x) => x !== name)
 }
 async function plan() {
-  const res = await tryCall(() => api('goals.plan_next_cycle', { cycle: active.value.name, goals: carry.value }))
+  const res = await tryCall(() => goalsData.goals.plan_next_cycle({ cycle: active.value.name, goals: carry.value }))
   if (res) {
     toast.success(`${res.title} is planned, starting ${long(res.start_date, true)}.`)
     planOpen.value = false

@@ -8,10 +8,14 @@ import frappe
 from frappe.core.doctype.file.utils import find_file_by_url, get_content_hash
 from frappe.utils import add_to_date, now_datetime, today
 
-from lifeos import calendar_data, cycles, files, links, permissions, proposals, trash
+from lifeos.calendar import calendar_data
+from lifeos.goals import cycles
+from lifeos.library import files, links, trash
+from lifeos import permissions
+from lifeos.brain import email_in, proposals
 from lifeos.api import chats, connections, inbox, meta, review, wiki
-from lifeos.devtools import attach, load_fake_agent, LocalClient, pdf_bytes
-from lifeos.pwa import SW_PATH
+from lifeos.tools.devtools import attach, load_fake_agent, LocalClient, pdf_bytes
+from lifeos.web.pwa import SW_PATH
 from lifeos.review import meetings
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import item, task, upload
@@ -778,3 +782,112 @@ class TestPhone(LifeTestCase):
 		inbox.create_item(title="I50 from the phone", source_type="Phone", space=PRIVATE, source_system="phone")
 		self.assertFalse(frappe.db.exists("Life Connection", {"space": PRIVATE, "system": "phone"}))
 		connections.require_on(PRIVATE, "phone")  # does not raise
+
+
+ACCOUNT = "Life OS Email-in Test"
+MAILBOX = "life-in-test@example.com"
+ME = "owner-in@example.com"
+FORWARDED = "<div>Pay the bill by Friday</div><div>---------- Forwarded message ---------</div><div>From: Shop &lt;shop@example.com&gt;</div><div>The invoice is due.</div>"
+
+
+class EmailInCase(LifeTestCase):
+	"""Email-in (issue 32): a forwarded email from an allowed sender becomes a capture."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		if not frappe.db.exists("Email Account", ACCOUNT):
+			doc = frappe.get_doc({"doctype": "Email Account", "email_account_name": ACCOUNT, "email_id": MAILBOX, "enable_incoming": 1,
+				"enable_outgoing": 0, "password": "not-a-real-password", "imap_folder": [{"folder_name": "INBOX", "append_to": "Communication"}]})
+			doc.flags.ignore_validate = True
+			doc.insert(ignore_permissions=True)
+		for k, v in {"email_in_account": ACCOUNT, "email_in_senders": f"{ME}\nalso-me@example.com", "default_space": PRIVATE}.items():
+			frappe.db.set_single_value("Life Settings", k, v)
+		frappe.clear_cache(doctype="Life Settings")
+		self.made = []
+
+	def tearDown(self):
+		frappe.set_user("Administrator")
+		for n in self.made:
+			frappe.delete_doc("Communication", n, force=1, ignore_permissions=True)
+		for k in ("email_in_account", "email_in_senders"):
+			frappe.db.set_single_value("Life Settings", k, None)
+		frappe.clear_cache(doctype="Life Settings")
+		super().tearDown()
+
+	def receive(self, sender=ME, message_id="<one@mail.example.com>", content=FORWARDED, subject="Fwd: The bill", files=()):
+		"""Saves a Communication the way Frappe's mail reading does: insert, keep the files, then save with the content."""
+		comm = frappe.get_doc({"doctype": "Communication", "communication_medium": "Email", "sent_or_received": "Received", "sender": sender,
+			"recipients": MAILBOX, "subject": subject, "content": "", "message_id": message_id, "email_account": ACCOUNT})
+		comm.flags.in_receive = True
+		comm.insert(ignore_permissions=True)
+		self.made.append(comm.name)
+		comm.reload()
+		kept = []
+		for name, data in files:
+			kept.append(frappe.get_doc({"doctype": "File", "file_name": name, "attached_to_doctype": "Communication", "attached_to_name": comm.name,
+				"is_private": 1, "content": data}).insert(ignore_permissions=True))
+		comm._attachments = kept
+		comm.content = content
+		comm.save()
+		return comm
+
+	def captures(self, message_id):
+		message_id = message_id.strip("<>")
+		return frappe.get_all("Life Inbox Item", filters={"source_system": "email", "external_id": message_id},
+			fields=["name", "title", "instruction", "raw_text", "source_type", "space"])
+
+	def test_allowed_sender_makes_a_capture_with_instruction_and_files(self):
+		self.receive(files=[("bill.pdf", pdf_bytes())])
+		(cap,) = self.captures("<one@mail.example.com>")
+		self.assertEqual((cap.source_type, cap.title, cap.instruction, cap.space), ("Email", "The bill", "Pay the bill by Friday", PRIVATE))
+		self.assertIn("The invoice is due.", cap.raw_text)
+		self.assertNotIn("Pay the bill by Friday", cap.raw_text)
+		self.assertEqual(frappe.get_all("File", filters={"attached_to_doctype": "Life Inbox Item", "attached_to_name": cap.name, "attached_to_field": ["is", "not set"],
+			"file_name": "bill.pdf"}, pluck="name").__len__(), 1)
+
+	def test_anyone_else_creates_nothing(self):
+		self.receive(sender="stranger@example.com", message_id="<two@mail.example.com>")
+		self.assertEqual(self.captures("<two@mail.example.com>"), [])
+
+	def test_the_same_email_twice_is_one_capture(self):
+		self.receive(message_id="<three@mail.example.com>")
+		again = self.receive(message_id="<three@mail.example.com>")
+		again.save()
+		self.assertEqual(len(self.captures("<three@mail.example.com>")), 1)
+
+	def test_another_mailbox_is_not_filed(self):
+		frappe.db.set_single_value("Life Settings", "email_in_account", None)
+		frappe.clear_cache(doctype="Life Settings")
+		self.receive(message_id="<four@mail.example.com>")
+		self.assertEqual(self.captures("<four@mail.example.com>"), [])
+
+	def test_info_gives_the_address_and_senders(self):
+		info = email_in.info()
+		self.assertEqual((info["address"], info["senders"][0]), (MAILBOX, ME))
+
+	def test_a_plain_email_without_a_forward_keeps_its_text(self):
+		self.receive(message_id="<five@mail.example.com>", content="<div>Remember the milk</div>", subject="Milk")
+		(cap,) = self.captures("<five@mail.example.com>")
+		self.assertEqual((cap.instruction, cap.raw_text.strip()), (None, "Remember the milk"))
+
+class TestRulesOnTheDocType(LifeTestCase):
+	"""Saving a capture straight through frappe.get_doc applies the same rule as the API."""
+
+	def test_done_capture_through_get_doc_gets_its_finish_date(self):
+		doc = frappe.get_doc({"doctype": "Life Inbox Item", "space": PRIVATE, "title": "75 direct", "source_type": "Message", "raw_text": "x"}).insert()
+		self.assertEqual(doc.intent, "Process")
+		doc.status = "Done"
+		doc.save()
+		self.assertTrue(doc.finished_on)
+
+	def test_capture_sent_to_a_goal_through_get_doc_is_filed_in_its_area(self):
+		goal = self.make("Life Goal", title="77 goal", horizon="12 weeks", cycle=self.make("Life Cycle", title="77 cycle", start_date=today()).name, area=self.areas["Tea"])
+		doc = frappe.get_doc({"doctype": "Life Inbox Item", "space": PRIVATE, "title": "77 to goal", "source_type": "Message", "raw_text": "x", "goal": goal.name}).insert()
+		self.assertEqual(doc.area, self.areas["Tea"])
+
+	def test_same_original_through_get_doc_is_refused(self):
+		fields = {"doctype": "Life Inbox Item", "space": PRIVATE, "title": "77 twice", "source_type": "Message", "raw_text": "x", "source_system": "gmail", "external_id": "77-same"}
+		frappe.get_doc(fields).insert()
+		with self.assertRaises(frappe.DuplicateEntryError):
+			frappe.get_doc(fields).insert()
