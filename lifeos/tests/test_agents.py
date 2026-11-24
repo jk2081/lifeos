@@ -17,7 +17,7 @@ from lifeos.brain import agent_page as pages
 from lifeos.mail import gmail
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.test_gmail import FakeGmail, message
-from lifeos.tests.helpers import Keyed, set_key, task, text
+from lifeos.tests.helpers import Keyed, find, set_key, task, text
 
 
 DECK = b"issue 8 standard deck"
@@ -503,7 +503,7 @@ class TestConnector(LifeTestCase):
 		frappe.db.commit()  # the full-text index drops deleted rows only at commit
 		self.as_user(AGENT)
 		self.assertIn("i85 Tea sourcing", [x["title"] for x in context_api.get(space=PRIVATE)["index"]])
-		self.assertTrue(search.query("i85", space=PRIVATE)["results"])
+		self.assertTrue(find("i85", space=PRIVATE)["results"])
 		self.as_user(OWNER)
 		agent_page.set_area(self.KEY, self.areas["Tea"], 0, space=PRIVATE)
 		self.as_user(AGENT)
@@ -511,13 +511,13 @@ class TestConnector(LifeTestCase):
 		titles = [x["title"] for x in got["index"]]
 		self.assertNotIn("i85 Tea sourcing", titles)
 		self.assertIn("i85 Family trip", titles)
-		self.assertNotIn("i85 Call the Assam estate", [r["title"] for r in search.query("i85", space=PRIVATE)["results"]])
-		self.assertIn("i85 Family trip", [r["title"] for r in search.query("i85", space=PRIVATE)["results"]])
+		self.assertNotIn("i85 Call the Assam estate", [r["title"] for r in find("i85", space=PRIVATE)["results"]])
+		self.assertIn("i85 Family trip", [r["title"] for r in find("i85", space=PRIVATE)["results"]])
 		self.assertEqual(frappe.get_list("Life Task", filters={"name": task.name}), [])
 		self.assertFalse(frappe.has_permission("Life Note", "read", note.name))
 		self.assertTrue(frappe.has_permission("Life Note", "read", frappe.get_all("Life Note", filters={"title": "i85 Family trip", "space": PRIVATE}, pluck="name")[0]))
 		self.as_user(OWNER)
-		self.assertIn("i85 Tea sourcing", [r["title"] for r in search.query("i85", space=PRIVATE)["results"]])  # the owner still sees it
+		self.assertIn("i85 Tea sourcing", [r["title"] for r in find("i85", space=PRIVATE)["results"]])  # the owner still sees it
 		agent_page.set_area(self.KEY, self.areas["Tea"], 1, space=PRIVATE)
 		self.as_user(AGENT)
 		self.assertIn("i85 Tea sourcing", [x["title"] for x in context_api.get(space=PRIVATE)["index"]])

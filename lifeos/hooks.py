@@ -5,7 +5,7 @@ app_description = "A personal operating system on Frappe"
 app_email = "hello@example.com"
 app_license = "mit"
 
-from lifeos.constants import INDEXED_DOCTYPES, SPACE_DOCTYPES
+from lifeos.constants import INDEXED_DOCTYPES, SEARCHED_DOCTYPES, SPACE_DOCTYPES
 
 add_to_apps_screen = [
 	{"name": "lifeos", "logo": "/assets/lifeos/icons/icon-192.png", "title": "Life OS", "route": "/life",
@@ -70,6 +70,10 @@ for _dt in ("Life Note", "Life Person", "Life Goal", "Life Area", "Life Cycle", 
 	for _event in ("on_update", "after_insert", "on_trash"):
 		_have = doc_events.setdefault(_dt, {}).get(_event)
 		doc_events[_dt][_event] = [*([_have] if isinstance(_have, str) else _have or []), "lifeos.agents.context.changed"]
+# issue 98: Frappe queues a saved record for Global Search and its scheduler writes the queue every 15 minutes; a job writes it at once
+for _dt in SEARCHED_DOCTYPES:
+	_have = doc_events.setdefault(_dt, {}).get("on_update")
+	doc_events[_dt]["on_update"] = [*([_have] if isinstance(_have, str) else _have or []), "lifeos.library.globalsearch.index_soon"]
 doc_events["File"] = {"after_insert": "lifeos.library.files.after_insert"}
 # issue 32: an email read from the email-in mailbox becomes a capture
 doc_events["Communication"] = {"on_update": "lifeos.brain.email_in.communication_received"}

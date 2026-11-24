@@ -8,14 +8,24 @@
           <span class="truncate text-base-medium text-ink-gray-9">Ask: {{ text.trim() }}</span></div>
         <template #suffix><Badge theme="blue" :label="askScopeLabel" /></template>
       </CommandPaletteItem>
-      <CommandPaletteItem v-for="r in results" :key="r.ref_name + r.kind" :value="r" :label="r.title || 'Untitled'" data-search-hit>
-        <div class="flex min-w-0 flex-col gap-0.5 py-0.5">
-          <span class="truncate text-base-medium text-ink-gray-9">{{ r.title || 'Untitled' }}</span>
-          <span class="truncate text-sm text-ink-gray-6">{{ [multi && r.space, r.area_name, short(r.record_date, true), r.is_archived ? 'archived' : ''].filter(Boolean).join(' · ') }}</span>
-          <span v-if="r.snippet" class="truncate text-sm text-ink-gray-6">{{ r.snippet }}</span>
-        </div>
-        <template #suffix><Badge :label="KIND[r.kind] || r.kind" /></template>
-      </CommandPaletteItem>
+      <!-- screens and settings by name -->
+      <CommandPaletteGroup v-if="screens.length" label="Go to" data-search-group="Go to">
+        <CommandPaletteItem v-for="s in screens" :key="s.to" :value="{ screen: s.to, ref_name: s.to, kind: 'screen' }" :label="s.label" data-search-screen>
+          <span class="truncate py-0.5 text-base-medium text-ink-gray-9">{{ s.label }}</span>
+          <template #suffix><Badge label="Screen" /></template>
+        </CommandPaletteItem>
+      </CommandPaletteGroup>
+      <!-- records, grouped by kind, the kind with the best match first -->
+      <CommandPaletteGroup v-for="g in groups" :key="g.name" :label="g.name" :data-search-group="g.name">
+        <CommandPaletteItem v-for="r in g.rows" :key="r.ref_doctype + r.ref_name" :value="r" :label="r.title || 'Untitled'" data-search-hit>
+          <div class="flex min-w-0 flex-col gap-0.5 py-0.5">
+            <span class="truncate text-base-medium text-ink-gray-9">{{ r.title || 'Untitled' }}</span>
+            <span class="truncate text-sm text-ink-gray-6">{{ [multi && r.space, r.area_name, short(r.record_date, true), r.is_archived ? 'archived' : ''].filter(Boolean).join(' · ') }}</span>
+            <span v-if="r.snippet" class="truncate text-sm text-ink-gray-6">{{ r.snippet }}</span>
+          </div>
+          <template #suffix><Badge :label="r.kind" /></template>
+        </CommandPaletteItem>
+      </CommandPaletteGroup>
       <CommandPaletteItem v-if="text.trim() && !askFirst" :value="ASK" :label="'Ask: ' + text" data-search-ask>
         <div class="flex min-w-0 items-center gap-2 py-0.5"><span class="lucide-sparkles size-4 text-ink-gray-7" aria-hidden="true" />
           <span class="truncate text-base-medium text-ink-gray-9">Ask: {{ text.trim() }}</span></div>
@@ -42,26 +52,31 @@
 </template>
 <script setup>
 // Search over everything the person can see. frappe-ui's experimental CommandPalette draws it; the results come from
-// our own search method, which applies the space rules. A result opens in the pane over the screen you are on.
+// our own search method (Frappe's Global Search, then the space rules). A result opens in the pane over the screen you are on.
 import { libraryData } from '@/data/library'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, KeyboardShortcut } from 'frappe-ui'
-import { CommandPalette, CommandPaletteEmpty, CommandPaletteFooter, CommandPaletteInput, CommandPaletteItem, CommandPaletteList } from '@/experimental'
+import { CommandPalette, CommandPaletteEmpty, CommandPaletteFooter, CommandPaletteGroup, CommandPaletteInput, CommandPaletteItem, CommandPaletteList } from '@/experimental'
 import Empty from './Empty.vue'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
-import { openRef, refOf } from '@/lib/pane'
+import { openHit, screenHits } from '@/lib/search'
 import { isQuestion, scopeFromRoute, startAsk } from '@/lib/ask'
 
 const open = defineModel('open', { type: Boolean, default: false })
-const KIND = { Inbox: 'Inbox item' }
 const router = useRouter()
 const text = ref('')
 const field = ref(null)
 const results = ref([])
 const searched = ref('')
 const archived = ref(false)
+const screens = computed(() => screenHits(text.value))
+const groups = computed(() => {
+  const by = new Map()
+  for (const r of results.value) by.set(r.group, [...(by.get(r.group) || []), r])
+  return [...by].map(([name, rows]) => ({ name, rows }))
+})
 const multi = computed(() => store.spaces.length > 1)
 const ASK = { ask: true, ref_name: '__ask', kind: 'ask' }
 const askFirst = computed(() => isQuestion(text.value) && !store.isAgent)
@@ -110,9 +125,6 @@ function go(r) {
     text.value = ''
     return startAsk(q)
   }
-  if (r.space && r.space !== store.space) Object.assign(store, { space: r.space, lensArea: '' }) // a result in another space: its whole space
-  if (r.ref_doctype === 'Life Inbox Item') return router.push(r.route) // a capture opens its item page (issue 10)
-  const ref = refOf(r.ref_doctype, r.ref_name)
-  ref ? openRef(ref) : router.push(r.route)
+  openHit(r)
 }
 </script>

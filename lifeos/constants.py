@@ -27,6 +27,12 @@ ORG_DOCTYPES = [
 # DocTypes written to Life Index: the organisation DocTypes.
 INDEXED_DOCTYPES = [*ORG_DOCTYPES]
 
+# DocTypes search covers (issue 98), with the fields: lifeos/library/globalsearch.py. Their saves ask for the search index to be written.
+SEARCHED_DOCTYPES = [
+	"Life Task", "Life Inbox Item", "Life Note", "Life Chat Log", "Event", "Life Goal", "Life Cycle", "Life Area", "Life Person", "Life Habit",
+	"Life Review", "Life Insight", "Life Ask Thread", "Life Vault Document", "Life Proposal", "Life Skill", "Life Source Setting", "Comment",
+]
+
 # Records a [[Title]] link can point to, with their title field. Order is the match priority.
 LINKABLE = {
 	"Life Note": "title", "Life Task": "title", "Life Person": "full_name",

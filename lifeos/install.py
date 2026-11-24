@@ -61,6 +61,8 @@ def setup():
 	from lifeos.library import index
 	index.ensure_indexes()
 	make_spaces()
+	from lifeos.library import globalsearch
+	globalsearch.install()  # issue 98: search covers the whole app, through Frappe's Global Search
 	from lifeos.skills import runner, store
 
 	runner.ensure_brain_user()  # issue 28: the user skills run as

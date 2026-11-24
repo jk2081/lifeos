@@ -13,7 +13,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
-| `test_library.py` | Library: notes, the vault, search, the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
+| `test_library.py` | Library: notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions |
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection), Updates (who may ask, the check against a temporary repository, the runner's steps and rollback, a target not on the remote, one runner at a time, Update now) |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
@@ -299,6 +299,9 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.36` the facts sit beside the text and mentions
 - `LIBRARY.37` with no people the screen says what will appear and offers + Capture
 - `LIBRARY.38` a photo of a journal page captured from the phone becomes a note with the photo, the transcript and its date; search finds it and its goal shows it
+- `LIBRARY.39` search finds a calendar event by the start of a word, under Events, and Enter opens its drawer
+- `LIBRARY.40` "ai key" offers Settings › AI and Enter opens it
+- `LIBRARY.41` with no AI key, Ask says it needs one, links to Settings › AI and shows what search finds for the same words
 
 ### Review (`tools/acceptance/review.mjs`, 23 checks)
 

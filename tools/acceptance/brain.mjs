@@ -241,7 +241,7 @@ for (const width of WIDTHS) {
       await s.open('/life')
       await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type('What is open this week?'); await pg.waitForTimeout(500); await pg.keyboard.press('Enter')
       await pg.waitForTimeout(1500)
-      must(await pg.locator('[data-refusal="not_set_up"]').count() && (await pg.locator('[data-ask-refusal]').innerText()).includes('Ask is not set up yet'), 'no "not set up" message')
+      must(await pg.locator('[data-refusal="not_set_up"]').count() && (await pg.locator('[data-ask-refusal]').innerText()).includes('Ask needs an AI key'), 'no "not set up" message')
       await pg.locator('[data-ask-close]').click()
     } finally {
       bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()')

@@ -862,7 +862,7 @@ class TestClient(AskCase):
 		self.script(text("x"))
 		res = ask.ask("What is open?", space=PRIVATE)
 		self.assertEqual(res["error"], "not_set_up")
-		self.assertEqual(res["error_text"], "Ask is not set up yet.")
+		self.assertEqual(res["error_text"], "Ask needs an AI key. Add one in Settings › AI.")
 		self.assertFalse(ask.status(space=PRIVATE)["ready"])
 
 	def test_cap_refuses_with_the_spend(self):
