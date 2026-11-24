@@ -638,7 +638,7 @@ print(json.dumps({"item": first("Life Inbox Item"), "goal": first("Life Goal"), 
       // router path -> an address that opens it
       const ROUTES = {
         '/': '/life', '/today/:tab(week|month|year)?': '/life/today/month', '/brain/:tab(...)?': '/life/brain/activity',
-        '/brain/skills/:name': `/life/brain/skills/${ids.skill}`, '/brain/review/:id': `/life/brain/review/${ids.item}`, '/share': '/life/share',
+        '/brain/skills/:name': `/life/brain/skills/${ids.skill}`, '/brain/sources/:key': '/life/brain/sources/gmail', '/brain/review/:id': `/life/brain/review/${ids.item}`, '/share': '/life/share',
         '/item/:id': `/life/item/${ids.item}`, '/goals/:tab(...)?': '/life/goals/cycles', '/goals/:id': `/life/goals/${ids.goal}`,
         '/focus/:id': `/life/focus/${ids.area}`, '/library/:tab(...)?': '/life/library/notes', '/library/people/:person': `/life/library/people/${ids.person}`,
         '/library/:id': `/life/library/${ids.note}`, '/review': '/life/review', '/how-it-works': '/life/how-it-works', '/ask': '/life/ask', '/settings': '/life/settings',
