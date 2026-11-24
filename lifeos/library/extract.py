@@ -296,7 +296,7 @@ def run(doctype: str, name: str, force: bool = False):
 def after_read(doc):
 	"""The text is searchable: the capture's search text and Global Search. A Vault document is searched by Global Search only, which
 	asks `has_permission` of each hit; its text is not written to Life Index, which Ask reads."""
-	from frappe.utils.global_search import update_global_search
+	from frappe.utils.global_search import sync_global_search, update_global_search
 
 	from lifeos.library import globalsearch, index
 
@@ -304,6 +304,9 @@ def after_read(doc):
 		index.update(doc)
 	update_global_search(doc)  # the values were written without a save, so Frappe's own hook did not queue the record
 	globalsearch.index_soon(doc)
+	if frappe.flags.in_test or getattr(frappe.local, "request", None):
+		return
+	sync_global_search()  # in the background job: write the queue now, so the text is found as soon as it is read, not after a second job
 
 
 def ensure(doctype, name):
