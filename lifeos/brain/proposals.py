@@ -332,7 +332,7 @@ def _attach_copy(file_url, doctype, name, fieldname):
 	if not src:
 		return None
 	frappe.get_doc({"doctype": "File", "file_url": file_url, "file_name": src.file_name, "is_private": 1,
-		"attached_to_doctype": doctype, "attached_to_name": name, "attached_to_field": fieldname}).insert(ignore_permissions=True)
+		"attached_to_doctype": doctype, "attached_to_name": name, "attached_to_field": fieldname}).insert()
 	return file_url
 
 

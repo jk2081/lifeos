@@ -42,7 +42,7 @@ def ensure(space, on=ON_BY_DEFAULT):
 		if not existing:
 			doc = frappe.get_doc({"doctype": "Life Area", "space": space, "area_name": name, "is_life_area": 1, "description": description,
 				"colour": colour, "sort_order": i + 1, "is_on": 1 if name in on else 0, "is_pinned": 1 if name in on else 0})
-			existing = doc.insert(ignore_permissions=True).name
+			existing = doc.insert(ignore_permissions=True).name  # system: areas are made for a new space by install and by the Brain, whoever the caller is
 		out[name] = existing
 	return out
 

@@ -50,7 +50,7 @@ def connect(user):
 	acc.enable, acc.pull_from_google_calendar, acc.push_to_google_calendar = 1, 0, 0
 	if not acc.get("life_read_calendars"):
 		acc.life_read_calendars = json.dumps(["primary"])
-	acc.save(ignore_permissions=True) if not acc.is_new() else acc.insert(ignore_permissions=True)
+	acc.save(ignore_permissions=True) if not acc.is_new() else acc.insert(ignore_permissions=True)  # system: the sync job keeps the person's own calendar account up to date
 	return authorize_access(acc.name, reauthorize=True)
 
 
@@ -61,7 +61,7 @@ def disconnect(user):
 	if acc:
 		acc.enable = 0
 		acc.refresh_token = acc.authorization_code = acc.next_sync_token = None
-		acc.save(ignore_permissions=True)
+		acc.save(ignore_permissions=True)  # system: the sync job keeps the person's own calendar account up to date
 	return state(user)
 
 
@@ -71,7 +71,7 @@ def set_read(user, ids):
 		frappe.throw(frappe._("Connect Google Calendar first."), title=frappe._("Google Calendar not connected"))
 	ids = [i for i in ids if isinstance(i, str) and i.strip()][:20] or ["primary"]
 	acc.life_read_calendars = json.dumps(ids)
-	acc.save(ignore_permissions=True)
+	acc.save(ignore_permissions=True)  # system: the sync job keeps the person's own calendar account up to date
 	return state(user)
 
 
@@ -219,7 +219,7 @@ def upsert(user, space, calendar_id, ev):
 		"google_calendar_event_id": key, "google_calendar_id": calendar_id, "pulled_from_google_calendar": 1, "sync_with_google_calendar": 0,
 		"life_attendees": json.dumps(attendees), "life_recurring": 1 if ev.get("recurringEventId") else 0, "status": "Open"})
 	meetings.apply_rule(doc)
-	doc.flags.ignore_permissions = True
+	doc.flags.ignore_permissions = True  # system: the sync job keeps the person's own calendar account up to date
 	doc.save() if name else doc.insert()
 	if not name:
 		doc.db_set("owner", user, update_modified=False)

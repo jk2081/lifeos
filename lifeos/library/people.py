@@ -52,7 +52,7 @@ def link_page(note, kind=None) -> str | None:
 	else:
 		doc = frappe.get_doc({"doctype": "Life Person", "space": note.space, "full_name": note.title, "kind": kind, "area": note.get("area") or None,
 			"wiki_page": note.name})
-		doc.insert(ignore_permissions=True)  # the caller has already checked write access to the space
+		doc.insert()
 		name = doc.name
 	if note.get("person") != name:
 		frappe.db.set_value("Life Note", note.name, "person", name, update_modified=False)

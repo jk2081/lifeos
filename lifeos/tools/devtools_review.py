@@ -22,7 +22,7 @@ def setup(tag):
 	s = frappe.get_single("Life Settings")
 	was = {"weekly_review_day": s.weekly_review_day, "weekly_review_time": str(s.weekly_review_time or "18:00:00")}
 	s.weekly_review_day, s.weekly_review_time = DAYS[getdate(today()).weekday()], "00:00:00"
-	s.save(ignore_permissions=True)
+	s.save(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	_unskip_banner()
 	# earlier checks' findings out of the way, so the five revelations are this run's
 	frappe.db.set_value("Life Insight", {"space": SPACE, "status": "New"}, "status", "Dismissed", update_modified=False)
@@ -67,7 +67,7 @@ def cleanup(stamp, was=None):
 	frappe.db.delete("Life Review", {"space": SPACE, "user": OWNER})
 	frappe.db.set_value("Life Task", {"space": SPACE, "is_top_three": 1}, "is_top_three", 0, update_modified=False)
 	for name in frappe.get_all("Life Task", filters={"space": SPACE, "title": ("like", f"Chase %{stamp}%")}, pluck="name"):
-		frappe.delete_doc("Life Task", name, ignore_permissions=True, force=True, delete_permanently=True)
+		frappe.delete_doc("Life Task", name, ignore_permissions=True, force=True, delete_permanently=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	i = frappe.qb.DocType("Life Insight")
 	frappe.qb.from_(i).delete().where((i.space == SPACE) & (i.title.like(f"%{stamp}%") | i.body.like(f"%{stamp}%"))).run()
 	for link in frappe.get_all("Life Meeting Link", filters={"space": SPACE}, fields=["name", "record_doctype", "record_name"]):
@@ -77,12 +77,12 @@ def cleanup(stamp, was=None):
 		was = json.loads(was) if isinstance(was, str) else was
 		s = frappe.get_single("Life Settings")
 		s.weekly_review_day, s.weekly_review_time = was["weekly_review_day"], was["weekly_review_time"]
-		s.save(ignore_permissions=True)
+		s.save(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 
 
 def _doc(doctype, **values):
 	d = frappe.get_doc({"doctype": doctype, "space": SPACE, **values})
-	d.flags.ignore_permissions = True
+	d.flags.ignore_permissions = True  # system: developer, seed and maintenance tool; never reached by a person's request
 	return d.insert().name
 
 
@@ -92,7 +92,7 @@ def _item(title, kind, status, text, proposal=False, at=None):
 		frappe.db.set_value("Life Inbox Item", name, "received_on", at, update_modified=False)
 	if proposal:
 		frappe.get_doc({"doctype": "Life Proposal", "space": SPACE, "inbox_item": name, "kind": "Task", "status": "Pending",
-			"preview": f"Task: {title}", "payload": json.dumps({"title": title})}).insert(ignore_permissions=True)
+			"preview": f"Task: {title}", "payload": json.dumps({"title": title})}).insert(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	return name
 
 

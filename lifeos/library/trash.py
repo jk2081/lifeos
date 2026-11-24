@@ -96,7 +96,7 @@ def restore(name):
 	doc.flags.from_restore = True
 	doc.flags.name_set = True  # back under its own name, so links written before the delete still find it
 	keep = {k: data.get(k) for k in ("owner", "creation", "modified", "modified_by")}
-	doc.insert(ignore_permissions=True)  # the space check above is the permission
+	doc.insert()
 	frappe.db.set_value(doc.doctype, doc.name, keep, update_modified=False)
 	frappe.db.set_value("Deleted Document", name, {"restored": 1, "new_name": doc.name}, update_modified=False)
 	doc.reload()

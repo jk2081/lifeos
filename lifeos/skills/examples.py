@@ -28,7 +28,7 @@ def install(slug):
 		doc = frappe.get_doc("Life Skill Example", row) if row else frappe.get_doc({"doctype": "Life Skill Example", "skill": slug, "source": "Built-in"})
 		doc.update({"title": data["title"], "input": json.dumps(data["input"], ensure_ascii=False), "expected": json.dumps(data["checks"]),
 			"fixture": json.dumps(data.get("fixture") or []), "fixture_hash": data.get("skill_hash")})
-		doc.save(ignore_permissions=True) if row else doc.insert(ignore_permissions=True)
+		doc.save(ignore_permissions=True) if row else doc.insert(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 
 
 def at(output, path):

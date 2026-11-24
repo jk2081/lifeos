@@ -294,7 +294,7 @@ def remove():
 	for item in items:
 		for dt in ("Life Task", "Life Note", "Life Vault Document"):
 			for name in frappe.get_all(dt, filters={"inbox_item": item}, pluck="name"):
-				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)
+				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	n = seed._remove(seed.DEMO_KEY)
 	return f"Demo data removed: {n} records."
 
@@ -373,7 +373,7 @@ def remove_v4():
 	for item in items:
 		for dt in ("Life Task", "Life Note"):
 			for name in frappe.get_all(dt, filters={"inbox_item": item}, pluck="name"):
-				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)
+				frappe.delete_doc(dt, name, ignore_permissions=True, force=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	notes = [n for dt, n in frappe.parse_json(frappe.db.get_default(DEMO4_KEY) or "[]") if dt == "Life Note"]
 	frappe.db.delete("Life Wiki Change", {"note": ("in", notes or [""])})
 	n = seed._remove(DEMO4_KEY)

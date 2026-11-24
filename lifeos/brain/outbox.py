@@ -94,7 +94,7 @@ def record(doc, pile, on=None, note=None, kind=None):
 		"record_name": doc.name, "title": _title(doc), "kind": kind or KIND[doc.doctype], "pile": pile, "exited_on": on or now_datetime(),
 		"exited_by": frappe.session.user if frappe.session.user not in ("Guest",) else None, "note": note,
 		"auto_rule": doc.flags.get("auto_rule") or frappe.flags.get("lifeos_auto_rule")})
-	e.insert(ignore_permissions=True)
+	e.insert(ignore_permissions=True)  # system: the outbox entry is written for the Brain after the person's own check
 	return e.name
 
 

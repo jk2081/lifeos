@@ -63,9 +63,9 @@ def toggle_habit(habit, on, done=None) -> dict:
 	if done and on > getdate(today()):
 		frappe.throw(_("A habit cannot be ticked for a day that has not come yet."), title=_("Habit day not reached yet"))
 	if existing and not done:
-		frappe.delete_doc("Life Habit Log", existing.name, ignore_permissions=True, force=True)
+		frappe.delete_doc("Life Habit Log", existing.name, force=True)
 	elif not existing and done:
-		frappe.get_doc({"doctype": "Life Habit Log", "space": h.space, "habit": habit, "date": on, "done": 1}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "Life Habit Log", "space": h.space, "habit": habit, "date": on, "done": 1}).insert()
 	return {"habit": habit, "date": str(on), "done": done}
 
 
@@ -90,7 +90,7 @@ def set_month_habits(space, year, month, habits) -> dict:
 		if doc.tracked_until or not doc.tracked_from:  # new, or added back
 			doc.tracked_from = now if in_month else first
 			doc.tracked_until = None
-		doc.save(ignore_permissions=True)
+		doc.save()
 	for r in tracked_habits(space, first, last):
 		if r.name in wanted or r.tracked_until:
 			continue
@@ -101,7 +101,7 @@ def set_month_habits(space, year, month, habits) -> dict:
 		else:
 			doc.tracked_until = cutoff
 			doc.sort_order = 100 + (doc.sort_order or 0)
-		doc.save(ignore_permissions=True)
+		doc.save()
 	return habits_month(space, year, month)
 
 

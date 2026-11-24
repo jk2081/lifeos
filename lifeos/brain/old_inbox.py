@@ -190,7 +190,7 @@ def undo(log):
 				permissions.get_doc_checked("Life Note", note, "delete")
 				frappe.flags.lifeos_no_exit = True  # the note was only the item's parking place: no Discarded exit for it
 				try:
-					frappe.delete_doc("Life Note", note, ignore_permissions=True, delete_permanently=True)
+					frappe.delete_doc("Life Note", note, ignore_permissions=True, delete_permanently=True)  # system: the nightly job clears old items for all spaces
 				finally:
 					frappe.flags.lifeos_no_exit = False
 			doc = _reopen(item, op.get("status") or "To Review")

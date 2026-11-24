@@ -66,14 +66,14 @@ def setup():
 def make_roles():
 	for role in ROLES:
 		if not frappe.db.exists("Role", role):
-			frappe.get_doc({"doctype": "Role", "role_name": role, "desk_access": 1 if role == "Life Admin" else 0}).insert(ignore_permissions=True)
+			frappe.get_doc({"doctype": "Role", "role_name": role, "desk_access": 1 if role == "Life Admin" else 0}).insert(ignore_permissions=True)  # system: install runs before any person has roles
 	# Frappe creates a role named in a DocType's permissions before after_install runs, with desk access on. Life User
 	# and Life Agent never open the back office: turn it off, which also makes their users Website Users again.
 	for role in ("Life User", "Life Agent"):
 		doc = frappe.get_doc("Role", role)
 		if doc.desk_access:
 			doc.desk_access = 0
-			doc.save(ignore_permissions=True)
+			doc.save(ignore_permissions=True)  # system: install runs before any person has roles
 			doc.update_user_type_on_change()  # on_update skips this while installing
 
 
@@ -89,11 +89,11 @@ def make_spaces():
 			frappe.get_doc({
 				"doctype": "Life Space", "space_name": name, "owner_user": owner,
 				"members": [{"user": owner, "access": "Write"}],
-			}).insert(ignore_permissions=True)
+			}).insert(ignore_permissions=True)  # system: install runs before any person has roles
 	settings = frappe.get_single("Life Settings")
 	if not settings.default_space:
 		settings.default_space = "Private"
-		settings.flags.ignore_permissions = True
+		settings.flags.ignore_permissions = True  # system: install runs before any person has roles
 		settings.save()
 	from lifeos.tools import seed
 	seed.ensure_structure()
@@ -112,7 +112,7 @@ def set_owner(user):
 		space.owner_user = user
 		if user not in [m.user for m in space.members]:
 			space.append("members", {"user": user, "access": "Write"})
-		space.save(ignore_permissions=True)
+		space.save(ignore_permissions=True)  # system: install runs before any person has roles
 
 
 def new_owner(email, full_name, send_welcome_email=1, space="Private", use_focuses=0):
@@ -134,7 +134,7 @@ def new_owner(email, full_name, send_welcome_email=1, space="Private", use_focus
 	first, _sep, last = full_name.partition(" ")
 	if not frappe.db.exists("User", email):
 		frappe.get_doc({"doctype": "User", "email": email, "first_name": first, "last_name": last, "user_type": "System User",
-			"send_welcome_email": 0}).insert(ignore_permissions=True)
+			"send_welcome_email": 0}).insert(ignore_permissions=True)  # system: install runs before any person has roles
 		if int(send_welcome_email or 0):
 			try:
 				frappe.get_doc("User", email).send_welcome_mail_to_user()
@@ -146,7 +146,7 @@ def new_owner(email, full_name, send_welcome_email=1, space="Private", use_focus
 	doc.owner_user = email
 	if email not in [m.user for m in doc.members]:
 		doc.append("members", {"user": email, "access": "Write"})
-	doc.save(ignore_permissions=True)
+	doc.save(ignore_permissions=True)  # system: install runs before any person has roles
 	if int(use_focuses or 0):
 		frappe.db.set_single_value("Life Settings", "use_focuses", 1)
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- a bench execute command: the user and the space are kept when it ends
@@ -166,7 +166,7 @@ def add_member(space, user, access="Write", role="Life User"):
 			break
 	else:
 		doc.append("members", {"user": user, "access": access})
-	doc.save(ignore_permissions=True)
+	doc.save(ignore_permissions=True)  # system: install runs before any person has roles
 
 
 def make_personal_space(user, space_name=None):
@@ -174,5 +174,5 @@ def make_personal_space(user, space_name=None):
 	from lifeos.tools import seed
 	space_name = space_name or f"{frappe.db.get_value('User', user, 'first_name') or user}'s space"
 	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name, "owner_user": user,
-		"members": [{"user": user, "access": "Write"}]}).insert(ignore_permissions=True)
+		"members": [{"user": user, "access": "Write"}]}).insert(ignore_permissions=True)  # system: install runs before any person has roles
 	return doc.name

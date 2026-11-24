@@ -32,14 +32,14 @@
                 </template>
                 <template v-else>
                   <div class="min-w-0 flex-1"><Progress size="sm" :value="j.tasks_counted ? Math.round((100 * j.tasks_done) / j.tasks_counted) : 0" /></div>
-                  <NumLink class="text-sm" :to="{ path: '/goals/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</NumLink>
+                  <CountLink class="text-sm" :to="{ path: '/goals/tasks', query: { goal: g.name, status: 'all', view: 'list', ...arch } }" data-door="goal-tasks">{{ j.tasks_done }} of {{ j.tasks_counted }} tasks done</CountLink>
                 </template></div></div>
             </div>
             <!-- what this goal serves, and what serves it (a goal can point to the longer goal it serves) -->
             <div class="flex flex-wrap items-center gap-2" data-goal-serves>
               <span class="text-sm text-ink-gray-6">Serves</span>
               <Pick :model-value="g.serves || null" :options="servesOptions" placeholder="Choose a longer goal" :disabled="!writable" @update:model-value="(v) => saveServes(v)" />
-              <NumLink v-if="g.serves" :to="{ path: `/goals/${g.serves}` }" class="text-sm">Open {{ g.serves_title }}</NumLink>
+              <CountLink v-if="g.serves" :to="{ path: `/goals/${g.serves}` }" class="text-sm">Open {{ g.serves_title }}</CountLink>
             </div>
             <div v-if="d.serves" class="flex items-center gap-2" data-goal-serves-progress>
               <div class="w-24 shrink-0"><Progress size="sm" :value="Math.round(d.serves.progress.percent || 0)" /></div>
@@ -111,7 +111,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, DatePicker, Dialog, FormControl, Progress, TextInput, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
-import NumLink from '@/components/ui/NumLink.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'

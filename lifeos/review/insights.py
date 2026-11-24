@@ -296,14 +296,14 @@ def run(space, ai=True, user=None):
 			continue
 		frappe.get_doc({"doctype": "Life Insight", "space": space, "kind": c["kind"], "title": c["title"], "body": c.get("body"),
 			"evidence": c["evidence"], "actions": json.dumps(c.get("actions") or []), "status": "New", "fingerprint": fp,
-			"source": c.get("source") or "Rule", "source_line": c.get("source_line"), "area": c.get("area") or None, "found_on": day, "rank": RANK.get(c["kind"], 99)}).insert(ignore_permissions=True)
+			"source": c.get("source") or "Rule", "source_line": c.get("source_line"), "area": c.get("area") or None, "found_on": day, "rank": RANK.get(c["kind"], 99)}).insert(ignore_permissions=True)  # system: the nightly job writes insights for each person
 		room -= 1
 		stats["created"] += 1
 	# rule insights still New whose finding is no longer true are removed (their evidence changed or went away)
 	# (the weekly review's own rule findings, set 8, are kept current by lifeos/review/findings.py, not here)
 	for name, fp in frappe.get_all("Life Insight", filters={"space": space, "status": "New", "source": "Rule", "kind": ("in", KINDS)}, fields=["name", "fingerprint"], as_list=True):  # system: the nightly job
 		if fp not in seen:
-			frappe.delete_doc("Life Insight", name, ignore_permissions=True, delete_permanently=True)
+			frappe.delete_doc("Life Insight", name, ignore_permissions=True, delete_permanently=True)  # system: the nightly job writes insights for each person
 	frappe.db.set_single_value("Life Settings", "insights_run_on", now_datetime())
 	return stats
 

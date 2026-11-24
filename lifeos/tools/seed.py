@@ -30,7 +30,7 @@ def make_areas(space, names, under=None):
 		existing = frappe.db.get_value("Life Area", {"space": space, "area_name": name, "parent_area": life[target]})
 		if not existing:
 			existing = frappe.get_doc({"doctype": "Life Area", "space": space, "area_name": name, "parent_area": life[target],
-				"sort_order": i + 1}).insert(ignore_permissions=True).name
+				"sort_order": i + 1}).insert(ignore_permissions=True).name  # system: developer, seed and maintenance tool; never reached by a person's request
 		out[name] = existing
 	return out
 
@@ -54,7 +54,7 @@ class Tracker:
 		doc = frappe.get_doc(data)
 		for k, v in flags.items():
 			doc.flags[k] = v
-		doc.insert(ignore_permissions=True)
+		doc.insert(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 		self.records.append([doc.doctype, doc.name])
 		return doc
 
@@ -77,7 +77,7 @@ def _remove(key):
 			doc = frappe.get_doc(doctype, name)
 			doc.flags.allow_closed = True
 			try:
-				doc.delete(ignore_permissions=True, force=True)
+				doc.delete(ignore_permissions=True, force=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 				removed += 1
 			except frappe.LinkExistsError:
 				frappe.clear_messages()

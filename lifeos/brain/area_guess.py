@@ -139,7 +139,7 @@ def refine(task, area):
 	doc.area, doc.area_confidence = found["area"], found["confidence"]
 	doc.flags.area_guess = True  # still a guess: keep the mark, log no correction
 	doc.flags.keep_touched = True
-	doc.save(ignore_permissions=True)  # the job runs as the user who saved the task; only the guess changes
+	doc.save()
 	return found
 
 
@@ -193,7 +193,7 @@ def after_save(doc):
 	if not change:
 		return
 	frappe.get_doc({"doctype": "Life Action Log", "kind": "Area correction", "space": doc.space, "task": doc.name,
-		"old_area": change[0], "new_area": change[1], "date": frappe.utils.today()}).insert(ignore_permissions=True)
+		"old_area": change[0], "new_area": change[1], "date": frappe.utils.today()}).insert()
 
 
 def confirm(doc, area=None):

@@ -69,7 +69,7 @@ def _sync_facts(space, agent, facts) -> int:
 		wrote += _upsert("Life Agent Fact", space, agent, ext, {"fact": _text(r.get("text"), 500), "origin": _text(r.get("origin"), 140), "learned_on": learned})
 	for name in frappe.get_all("Life Agent Fact", filters={"space": space, "agent": agent, "external_id": ("not in", list(keep) or [""])}, pluck="name"):  # system: the agent forgot it
 		if frappe.db.get_value("Life Agent Fact", name, "external_id") not in held:
-			frappe.delete_doc("Life Agent Fact", name, ignore_permissions=True, force=True)
+			frappe.delete_doc("Life Agent Fact", name, ignore_permissions=True, force=True)  # system: the connector acts for the agent's own checks, which ran above
 			wrote += 1
 	return wrote
 
@@ -85,7 +85,7 @@ def _sync_jobs(space, agent, jobs) -> int:
 			values["paused"] = cint(bool(r.get("paused")))
 		wrote += _upsert("Life Agent Job", space, agent, ext, values)
 	for name in frappe.get_all("Life Agent Job", filters={"space": space, "agent": agent, "external_id": ("not in", list(keep) or [""])}, pluck="name"):  # system: the agent dropped it
-		frappe.delete_doc("Life Agent Job", name, ignore_permissions=True, force=True)
+		frappe.delete_doc("Life Agent Job", name, ignore_permissions=True, force=True)  # system: the connector acts for the agent's own checks, which ran above
 		wrote += 1
 	return wrote
 
@@ -151,7 +151,7 @@ def report(space: str, system: str, user: str, facts=None, jobs=None, skills=Non
 		changed["agent_user"] = 1
 	_settle_settings(space, system, settings)
 	cfg.last_report = now_datetime()  # the agent was heard from; not a change of what it holds
-	cfg.flags.ignore_permissions = True
+	cfg.flags.ignore_permissions = True  # system: the connector acts for the agent's own checks, which ran above
 	cfg.save()
 	return {"changed": changed, "waiting": waiting_count(space, system)}
 
@@ -203,7 +203,7 @@ def _apply(space, agent, ch):
 	if ch.kind == FACT_EDIT and fact:
 		frappe.db.set_value("Life Agent Fact", fact, {"fact": json.loads(ch.payload or "{}").get("text", ""), "is_stale": 0, "stale_reason": None})
 	elif ch.kind == FACT_DELETE and fact:
-		frappe.delete_doc("Life Agent Fact", fact, ignore_permissions=True, force=True)
+		frappe.delete_doc("Life Agent Fact", fact, ignore_permissions=True, force=True)  # system: the connector acts for the agent's own checks, which ran above
 	elif ch.kind in JOB_KINDS and job:
 		frappe.db.set_value("Life Agent Job", job, "paused", int(ch.kind == JOB_PAUSE))
 
@@ -212,7 +212,7 @@ def _apply(space, agent, ch):
 def queue(space: str, agent: str, kind: str, target: str, payload: dict | None = None) -> str:
 	"""Ask the agent to change something. A newer change to the same thing replaces one still waiting."""
 	for old in frappe.get_all("Life Agent Change", filters={"space": space, "agent": agent, "status": "Waiting", "target": target, "kind": ("in", FACT_KINDS if kind in FACT_KINDS else JOB_KINDS if kind in JOB_KINDS else (kind,))}, pluck="name"):  # system: the connector's queue
-		frappe.delete_doc("Life Agent Change", old, ignore_permissions=True, force=True)
+		frappe.delete_doc("Life Agent Change", old, ignore_permissions=True, force=True)  # system: the connector acts for the agent's own checks, which ran above
 	doc = frappe.get_doc({"doctype": "Life Agent Change", "space": space, "agent": agent, "kind": kind, "target": target, "payload": json.dumps(payload or {}), "status": "Waiting"})
 	doc.insert(ignore_permissions=True)  # system: only the owner reaches this, in the API
 	return doc.name

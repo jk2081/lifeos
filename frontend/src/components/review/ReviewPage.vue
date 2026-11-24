@@ -5,7 +5,7 @@
       <Empty :title="`No ${kind === 'monthly' ? 'monthly' : '12-week'} review is due.`" :hint="kind === 'monthly' ? 'It opens on your review day after a month ends, and stays until you lock it.' : 'It opens on the last day of a 12 Week Year, and stays until you lock it.'" />
     </div>
     <div v-else-if="!r.head" class="page-body"><Skeleton class="h-8 w-80" /><Skeleton class="h-64 w-full" /></div>
-    <component :is="weekly ? ReviewDone : PeriodicDone" v-else-if="r.head.status === 'Locked'" />
+    <ReviewDone v-else-if="r.head.status === 'Locked'" :weekly="weekly" />
     <component :is="COMPS[kind][tab]" v-else :key="tab" @go="go" />
   </div>
 </template>
@@ -19,7 +19,6 @@ import { Skeleton, toast } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
 import ReviewHeader from '@/components/review/ReviewHeader.vue'
 import ReviewDone from '@/components/review/ReviewDone.vue'
-import PeriodicDone from '@/components/review/PeriodicDone.vue'
 import TabLibrary from '@/components/review/WeeklyLibrary.vue'
 import TabTasks from '@/components/review/WeeklyTasks.vue'
 import TabGoals from '@/components/review/WeeklyGoals.vue'

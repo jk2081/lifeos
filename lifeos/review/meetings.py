@@ -177,7 +177,7 @@ def _names_in(text, names):
 
 def _add(space, event, doctype, name, title, how):
 	return frappe.get_doc({"doctype": "Life Meeting Link", "space": space, "event": event, "record_doctype": doctype, "record_name": name,
-		"title": (title or name)[:140], "how": how}).insert(ignore_permissions=True)
+		"title": (title or name)[:140], "how": how}).insert()
 
 
 def link(event, doctype, name):

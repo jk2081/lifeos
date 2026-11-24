@@ -61,7 +61,7 @@ def make_preview(file_doc):
 			"doctype": "File", "file_name": os.path.splitext(stored_name(file_doc))[0] + "-preview.jpg",
 			"attached_to_doctype": file_doc.attached_to_doctype, "attached_to_name": file_doc.attached_to_name,
 			"attached_to_field": "preview_image", "is_private": 1, "content": buf.getvalue(),
-		}).insert(ignore_permissions=True)
+		}).insert()
 	finally:
 		frappe.flags.lifeos_making_preview = False
 	return preview.file_url
@@ -246,7 +246,7 @@ def _drop_derived(item):
 	for row in frappe.get_all("File", filters={"attached_to_doctype": "Life Inbox Item", "attached_to_name": item,
 			"attached_to_field": ["in", ("preview_image", "thumbnail")]}, fields=["name", "file_url"]):
 		if row.file_url not in originals:
-			frappe.delete_doc("File", row.name, ignore_permissions=True, force=True)
+			frappe.delete_doc("File", row.name, force=True)
 	frappe.db.set_value("Life Inbox Item", item, {"preview_image": None, "thumbnail": None}, update_modified=False)
 
 

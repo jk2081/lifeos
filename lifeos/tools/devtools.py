@@ -7,12 +7,12 @@ OWNER, FAMILY, AGENT = "owner@lifeos.test", "family@lifeos.test", "hermes@lifeos
 def make_user(email, first_name, roles, password=None):
 	if not frappe.db.exists("User", email):
 		user = frappe.get_doc({"doctype": "User", "email": email, "first_name": first_name, "send_welcome_email": 0,
-			"user_type": "System User"}).insert(ignore_permissions=True)
+			"user_type": "System User"}).insert(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	else:
 		user = frappe.get_doc("User", email)
 	missing = [r for r in roles if r not in [x.role for x in user.roles]]
 	if missing:
-		user.flags.ignore_permissions = True
+		user.flags.ignore_permissions = True  # system: developer, seed and maintenance tool; never reached by a person's request
 		user.add_roles(*missing)
 	if password:
 		from frappe.utils.password import update_password
@@ -23,7 +23,7 @@ def make_user(email, first_name, roles, password=None):
 def make_shared_space():
 	"""A new site has one space (issue 46); the test sites keep a second, Shared, to test what two spaces show and do."""
 	if not frappe.db.exists("Life Space", "Shared"):
-		frappe.get_doc({"doctype": "Life Space", "space_name": "Shared", "owner_user": "Administrator"}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "Life Space", "space_name": "Shared", "owner_user": "Administrator"}).insert(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	from lifeos.tools import seed
 	seed.ensure_structure()
 
@@ -54,7 +54,7 @@ def agent_api_key(user=AGENT):
 	if not doc.api_key:
 		doc.api_key = frappe.generate_hash(length=15)
 	doc.api_secret = secret
-	doc.save(ignore_permissions=True)
+	doc.save(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	return f"{doc.api_key}:{secret}"
 
 

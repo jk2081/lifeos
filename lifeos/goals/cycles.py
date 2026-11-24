@@ -163,14 +163,14 @@ def set_tick(action_id, week, count, inbox_item=None) -> dict:
 	count = max(0, min(int(count or 0), int(row.per_week or 1)))
 	start, end = week_dates(cycle, week)
 	for name in frappe.get_all("Life Action Log", filters={"action_id": action_id, "week": week}, pluck="name"):
-		frappe.delete_doc("Life Action Log", name, ignore_permissions=True, force=True)
+		frappe.delete_doc("Life Action Log", name, force=True)
 	if count:
 		now = getdate(today())
 		on = now if start <= now <= end else (end if now > end else start)
 		frappe.get_doc({
 			"doctype": "Life Action Log", "space": goal.space, "goal": goal.name, "action_id": action_id,
 			"cycle": cycle.name, "week": week, "date": on, "count": count, "inbox_item": inbox_item,
-		}).insert(ignore_permissions=True)
+		}).insert()
 	_update_tick_summary(action_id)
 	return week_score(cycle, week)
 
@@ -191,7 +191,7 @@ def set_action_status(action_id, status) -> dict:
 		if a.name == action_id:
 			a.status = status
 			a.done_on = today() if status == "Done" else None
-	goal.save(ignore_permissions=True)
+	goal.save()
 	cycle = frappe.get_doc("Life Cycle", goal.cycle)
 	if status == "Done" and 1 <= week_of(cycle) <= WEEKS:
 		wk = week_of(cycle)
@@ -225,11 +225,11 @@ def close_cycle(cycle_name, outcomes=None) -> dict:
 		goal.outcome = outcome
 		goal.result_note = o.get("result_note") or goal.result_note
 		goal.final_score = goal_percent(cycle, by_goal.get(name, []), ticks, WEEKS)
-		goal.save(ignore_permissions=True)
+		goal.save()
 	cycle.final_score = cycle_average(cycle, actions, ticks, WEEKS)
 	cycle.status = "Closed"
 	cycle.closed_on = today()
-	cycle.save(ignore_permissions=True)
+	cycle.save()
 	return {"cycle": cycle.name, "final_score": cycle.final_score}
 
 
@@ -257,7 +257,7 @@ def plan_next_cycle(cycle_name, goals=None, title=None) -> dict:
 			frappe.throw(_("The next cycle is already closed."), title=_("Next cycle already closed"))
 	else:
 		new = frappe.get_doc({"doctype": "Life Cycle", "space": cycle.space, "title": title or cycle_title(start),
-			"start_date": start, "status": "Planned"}).insert(ignore_permissions=True)
+			"start_date": start, "status": "Planned"}).insert()
 	carried = []
 	for name in goals or []:
 		old = frappe.get_doc("Life Goal", name)
@@ -271,15 +271,15 @@ def plan_next_cycle(cycle_name, goals=None, title=None) -> dict:
 			"done_when": old.done_when, "measure_kind": old.measure_kind, "measure": old.measure, "unit": old.unit,
 			"start_value": old.start_value, "target_value": old.target_value,
 			"actions": [{"title": a.title, "per_week": a.per_week, "status": "Open"} for a in old.actions if a.status == "Open"],
-		}).insert(ignore_permissions=True)
+		}).insert()
 		if old.measure_kind == "Number" and old.current_on:
 			# the carried goal starts from where the old one got to
 			frappe.get_doc({"doctype": "Life Goal Reading", "space": copy.space, "goal": copy.name, "date": old.current_on or today(),
 				"value": old.current_value, "status": "Confirmed", "suggested_by": "Owner",
-				"excerpt": "Carried from the previous cycle"}).insert(ignore_permissions=True)
+				"excerpt": "Carried from the previous cycle"}).insert()
 		old.outcome = "Carried"
 		old.flags.allow_closed = True
-		old.save(ignore_permissions=True)
+		old.save()
 		carried.append(copy.name)
 	return {"cycle": new.name, "title": new.title, "start_date": str(new.start_date), "carried": carried}
 
@@ -365,13 +365,13 @@ def move_open_tasks(old, new):
 	frappe.db.set_value("Life Task", {"goal": old, "status": ("in", OPEN_TASK_STATUSES)}, "goal", new)
 
 
-def add_month_goal(space, year, month, title, area=None, carried_from=None, serves=None, ignore_permissions=False, done_when=None):
+def add_month_goal(space, year, month, title, area=None, carried_from=None, serves=None, done_when=None):
 	"""Add a Month goal dated the last day of the month, at the end of the month's order."""
 	first, last = month_bounds(year, month)
 	top = last_sort_order(space=space, horizon="Month", target_date=("between", (first, last)))
 	doc = frappe.get_doc({"doctype": "Life Goal", "space": space, "title": title, "horizon": "Month", "target_date": last, "area": area or None,
 		"sort_order": top + 1, "carried_from": carried_from, "serves": serves or None, "done_when": (done_when or "").strip() or None})
-	doc.insert(ignore_permissions=ignore_permissions)
+	doc.insert()
 	return doc
 
 
@@ -398,7 +398,7 @@ def carry_task(task_name) -> dict:
 	new = frappe.copy_doc(old)
 	new.update({"status": "Open", "carried_from": old.name, "completed_on": None,
 		"due_date": None, "is_archived": 0, "archived_on": None, "archive_reason": ""})
-	new.insert(ignore_permissions=True)
+	new.insert()
 	old.status = "Carried"
-	old.save(ignore_permissions=True)
+	old.save()
 	return {"task": new.name}

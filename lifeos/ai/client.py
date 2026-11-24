@@ -139,7 +139,7 @@ def record(model, usage, purpose, space=None, user=None, reference=None):
 	frappe.get_doc({"doctype": "Life AI Usage", "user": user or frappe.session.user, "month": month(), "model": model,
 		"input_tokens": int(usage.get("input_tokens") or 0), "output_tokens": int(usage.get("output_tokens") or 0),
 		"cached_tokens": int(usage.get("cached_tokens") or 0), "cache_write_tokens": int(usage.get("cache_write_tokens") or 0),
-		"cost": cost, "purpose": purpose, "space": space, "reference_doctype": ref[0], "reference_name": ref[1]}).insert(ignore_permissions=True)
+		"cost": cost, "purpose": purpose, "space": space, "reference_doctype": ref[0], "reference_name": ref[1]}).insert(ignore_permissions=True)  # system: the cost log is written for whoever made the call, who may not write Life AI Cost
 	return cost
 
 

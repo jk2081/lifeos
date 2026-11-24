@@ -16,7 +16,7 @@
           @click="startRename(r)" />
         <span v-else class="break-words px-1 text-base text-ink-gray-9" data-row-title>{{ r.title }}</span>
       </div>
-      <NumLink v-if="countLink(r)" class="relative shrink-0 text-sm" :to="countLink(r)" :data-row-count="r.name">{{ countText(r) }}</NumLink>
+      <CountLink v-if="countLink(r)" class="relative shrink-0 text-sm" :to="countLink(r)" :data-row-count="r.name">{{ countText(r) }}</CountLink>
       <span v-else class="shrink-0 text-sm tabular-nums text-ink-gray-6" :data-row-count="r.name">{{ countText(r) }}</span>
       <Dropdown v-if="writable" :options="menu(r)" placement="right">
         <Button variant="ghost" icon="lucide-ellipsis" :label="`More for ${r.title}`" data-row-menu />
@@ -34,7 +34,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { Button, Dialog, Dropdown, Select, TextInput } from 'frappe-ui'
 import Card from '../ui/Card.vue'
-import NumLink from '../ui/NumLink.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 import Empty from '../Empty.vue'
 
 const props = defineProps({

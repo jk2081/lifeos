@@ -112,4 +112,4 @@ def keep_files(comm, item: str):
 		content = files.read(frappe.get_doc("File", f.name))
 		if content:
 			frappe.get_doc({"doctype": "File", "file_name": f.file_name, "attached_to_doctype": "Life Inbox Item", "attached_to_name": item,
-				"is_private": 1, "content": content}).insert(ignore_permissions=True)
+				"is_private": 1, "content": content}).insert(ignore_permissions=True)  # system: mail arrives with no signed-in person; the Brain files it

@@ -16,7 +16,7 @@
     <template #cell-area="{ row }"><span class="truncate text-ink-gray-6">{{ row.area_name || '' }}</span></template>
     <template #cell-received_on="{ row }"><span class="whitespace-nowrap text-ink-gray-6">{{ dateTime(row.received_on) }}</span></template>
     <template #cell-_proposals="{ row }">
-      <NumLink v-if="row.pending" class="relative" :to="{ query: { ...route.query, open: 'inbox:' + row.name, focus: 'pending' } }" data-door="inbox-row">{{ row.pending }} of {{ row.proposals }} proposals pending</NumLink>
+      <CountLink v-if="row.pending" class="relative" :to="{ query: { ...route.query, open: 'inbox:' + row.name, focus: 'pending' } }" data-door="inbox-row">{{ row.pending }} of {{ row.proposals }} proposals pending</CountLink>
       <span v-else-if="row.proposals" class="text-sm text-ink-gray-6">{{ row.proposals }} proposal{{ row.proposals === 1 ? '' : 's' }}, all decided</span>
     </template>
     <template #cell-status="{ row }">
@@ -31,7 +31,7 @@
           <div class="break-words text-base-medium text-ink-gray-9">{{ row.title }}</div>
           <div class="text-sm text-ink-gray-6">{{ describe(row) }}</div>
           <div v-if="row.status === 'Failed' && row.error" class="text-sm text-ink-red-8">{{ row.error }}</div>
-          <NumLink v-if="row.pending" class="relative text-sm" :to="{ query: { ...route.query, open: 'inbox:' + row.name, focus: 'pending' } }">{{ row.pending }} of {{ row.proposals }} proposals pending</NumLink>
+          <CountLink v-if="row.pending" class="relative text-sm" :to="{ query: { ...route.query, open: 'inbox:' + row.name, focus: 'pending' } }">{{ row.pending }} of {{ row.proposals }} proposals pending</CountLink>
         </div>
         <Badge :theme="THEME[row.status]" :label="row.status === 'To Review' ? 'To review' : row.status" />
       </div>
@@ -47,7 +47,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Avatar, Badge, Button } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
-import NumLink from '@/components/ui/NumLink.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 import { tryCall } from '@/lib/api'
 import { canWrite, refreshCounts, store } from '@/lib/store'
 import { dateTime } from '@/lib/dates'
