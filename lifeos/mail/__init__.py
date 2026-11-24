@@ -264,4 +264,10 @@ def file_thread(user: str, space: str, thread_id: str, area: str | None = None, 
 	doc, thread = _find(user, space, thread_id, account)
 	done = inbox.create_item(space=space, source_type="Email", source_system=doc.provider, external_id=thread_id, title=sanitize_html(thread["subject"])[:140],
 		raw_text=sanitize_html(thread_text(thread)), source_url=thread["link"], area=area or None)
+	try:  # issue 111: the filed email is linked to the subjects it is about
+		from lifeos.library import subjects
+
+		subjects.see_email(space, subjects.mail_of_thread(thread, thread_id, doc.address), done["name"])
+	except Exception:  # noqa: BLE001 - filing the email is what was asked; the link can come later
+		frappe.log_error(title="Life OS: could not link an email to its pages")
 	return {"item": done["name"], "created": bool(done.get("created", True)), "title": thread["subject"], "link": thread["link"]}

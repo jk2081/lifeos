@@ -1,0 +1,118 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-24 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "address",
+  "sender_name",
+  "thread_id",
+  "subject",
+  "seen_on",
+  "replied",
+  "item",
+  "proposal",
+  "snippet",
+  "url"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Data",
+   "label": "Address",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "sender_name",
+   "fieldtype": "Data",
+   "label": "Name"
+  },
+  {
+   "fieldname": "thread_id",
+   "fieldtype": "Data",
+   "label": "Thread",
+   "reqd": 1
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject"
+  },
+  {
+   "fieldname": "seen_on",
+   "fieldtype": "Date",
+   "label": "Seen on"
+  },
+  {
+   "fieldname": "replied",
+   "fieldtype": "Check",
+   "label": "The owner replied"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Data",
+   "label": "Item",
+   "description": "A name, kept as text so the email's item or proposal can be deleted"
+  },
+  {
+   "fieldname": "proposal",
+   "fieldtype": "Data",
+   "label": "Proposal",
+   "description": "A name, kept as text so the email's item or proposal can be deleted"
+  },
+  {
+   "fieldname": "snippet",
+   "fieldtype": "Small Text",
+   "label": "Text"
+  },
+  {
+   "fieldname": "url",
+   "fieldtype": "Data",
+   "label": "Link"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-24 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Sender Sighting",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "address"
+}

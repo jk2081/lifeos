@@ -31,6 +31,8 @@ TOOLS = [
 			"kinds": {"type": "array", "items": {"type": "string", "enum": sorted(INDEX_KIND)}, "description": "Only these kinds."},
 			"date_from": {"type": "string", "description": "YYYY-MM-DD"}, "date_to": {"type": "string", "description": "YYYY-MM-DD"}},
 			"required": ["query"]}},
+	{"name": "read_page", "description": "A person's, company's or part's page: the Brain's brief with its sources, and the newest things linked to it. For any question about a person, a company or a part, read its page FIRST, answer from it, cite the page, and search the raw records only for what it does not say.",
+		"input_schema": {"type": "object", "properties": {"name": {"type": "string", "description": "The person's, company's or part's name, or another name they go by."}}, "required": ["name"]}},
 	{"name": "get_record", "description": "One record's fields and text (truncated), by its reference (R3) or doctype and name.",
 		"input_schema": {"type": "object", "properties": {"ref": {"type": "string"}, "doctype": {"type": "string"}, "name": {"type": "string"}}}},
 	{"name": "list_records", "description": "Rows of one kind, at most 50: tasks, goals, notes, sources, chats, someday (parked tasks, goals and notes), insights.",
@@ -200,7 +202,7 @@ def run_tool(ctx, name, args):
 	try:
 		fn = {"search": t_search, "get_record": t_get_record, "list_records": t_list, "counts": t_counts,
 			"cycle_state": t_cycle, "timeline": t_timeline, "suggest_actions": t_suggest, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
-			"mail_list_threads": t_mail_list_threads, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
+			"mail_list_threads": t_mail_list_threads, "read_page": t_read_page, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
 			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "add_event": t_add_event,
 			"ask_one_question": t_ask_one_question}[name]
 	except KeyError:
@@ -267,6 +269,37 @@ FIELDS = {"Life Task": ["status", "due_date", "priority", "goal", "completed_on"
 	"Life Inbox Item": ["status", "received_on", "source_type", "intent"], "Life Chat Log": ["date", "assistant", "url"],
 	"Life Note": ["collection", "last_opened_on", "page_date"], "Life Vault Document": ["doc_type", "expiry_date", "number_last4"],
 	"Life Insight": ["kind", "status"]}
+
+
+def t_read_page(ctx, name):
+	"""The brief and the newest links of the page called `name` (issue 111). Each source is a reference the answer may cite; the page is one too."""
+	from lifeos.library import briefs, subjects
+
+	text = " ".join((name or "").split())
+	found = subjects.find_by_name(ctx.space, text)
+	doctype, docname = ("Life Person", found.name) if found else (None, None)
+	if not found:
+		area = frappe.db.get_value("Life Area", {"space": ctx.space, "area_name": text, "is_archived": 0, "is_focus": 0}, "name")
+		doctype, docname = ("Life Area", area) if area else (None, None)
+	if not docname:
+		return {"error": f"There is no page called {text}. Use search."}
+	doc = permissions.get_doc_checked(doctype, docname, user=ctx.user)
+	title = subjects.title_of(doctype, docname)
+	page = ctx.ref(doctype, docname, title, "Page", None)
+	ctx.refs[page]["route"] = f"/library/pages/{doctype}/{docname}"
+	ctx.mark_read(page)
+	brief = briefs.read(doctype, docname)
+	line, total = subjects.timeline(doctype, docname, limit=15)
+	out = {"page": page, "title": title, "kind": subjects.kind_of_subject(doctype, docname), "status": doc.get("status"), "brief": None, "timeline": [], "timeline_total": total}
+	if brief:
+		out["brief"] = {"text": brief["md"], "as_of": brief["on"], "stale": brief["stale"], "sources": [{"n": b["n"], "title": b["title"], "date": b["date"], "kind": b["kind"]} for b in brief["sources"]]}
+	for e in line:
+		if e["sensitive"] and not ctx.vault_ok:
+			out["timeline"].append({"kind": e["kind"], "date": e["date"], "title": "(a sensitive item)"})
+			continue
+		rid = ctx.ref(e["doctype"], e["name"], e["title"], e["kind"], e["date"]) if e["doctype"] != "Life Sender Sighting" else None
+		out["timeline"].append({"ref": rid, "kind": e["kind"], "date": e["date"], "title": e["title"], "text": (e["text"] or "")[:300]})
+	return out
 
 
 def t_get_record(ctx, ref=None, doctype=None, name=None):

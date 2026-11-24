@@ -7,6 +7,7 @@ export const libraryData = {
   counts: group('counts', ['get']),
   files: group('files', ['list']),
   people: group('people', ['get', 'list']),
+  pages: group('pages', ['get', 'index', 'pinned', 'pin', 'unpin', 'reorder', 'visit', 'rewrite', 'set_status', 'rename', 'merge', 'archive', 'remove_link', 'add_note', 'delete_note']),
   wiki: group('wiki', ['change', 'changes', 'create_page', 'health', 'move', 'overview', 'pages', 'undo']),
   links: group('links', ['suggest']),
   library: group('library', ['get', 'list', 'save', 'tree', 'versions']),

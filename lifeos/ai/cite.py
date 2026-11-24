@@ -22,6 +22,6 @@ def cite(text, ctx):
 	cited = []
 	for i, r in enumerate(order, 1):
 		x = ctx.refs[r]
-		cited.append({"n": i, "doctype": x["doctype"], "name": x["name"], "title": x["title"], "kind": x["kind"], "date": x["date"], "pane": x["pane"]})
+		cited.append({"n": i, "doctype": x["doctype"], "name": x["name"], "title": x["title"], "kind": x["kind"], "date": x["date"], "pane": x["pane"], "route": x.get("route")})
 	return text, cited
 

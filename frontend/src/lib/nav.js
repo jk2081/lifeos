@@ -14,13 +14,14 @@ export const SETTINGS = { label: 'Settings', to: '/settings', base: '/settings',
 export const TODAY_TABS = [{ value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }, { value: 'year', label: 'Year' }]
 export const BRAIN_TABS = [{ value: 'needs-you', label: 'Needs you' }, { value: 'activity', label: 'Activity' }, { value: 'sources', label: 'Sources' }, { value: 'skills', label: 'Skills' }]
 export const GOALS_TABS = [{ value: 'by-area', label: 'By area' }, { value: 'tasks', label: 'All tasks' }, { value: 'no-goal', label: 'No goal' }, { value: 'cycles', label: 'Cycles' }]
-export const LIBRARY_TABS = [{ value: 'all', label: 'Everything' }, { value: 'notes', label: 'Notes' }, { value: 'documents', label: 'Documents' },
+export const LIBRARY_TABS = [{ value: 'pages', label: 'Pages' }, { value: 'all', label: 'Everything' }, { value: 'notes', label: 'Notes' }, { value: 'documents', label: 'Documents' },
   { value: 'people', label: 'People' }, { value: 'chats', label: 'Chats' }, { value: 'files', label: 'Files' }]
 const tabPath = (base, tabs) => (tab) => (tab === tabs[0].value ? base : `${base}/${tab}`)
 export const todayPath = tabPath('/today', TODAY_TABS)
 export const brainPath = tabPath('/brain', BRAIN_TABS)
 export const goalsPath = tabPath('/goals', GOALS_TABS)
-export const libraryPath = tabPath('/library', LIBRARY_TABS)
+// Pages is the first section, but /library is still Everything: the address of a tab is its name, and Everything's is the place's own
+export const libraryPath = (tab) => (tab === 'all' ? '/library' : `/library/${tab}`)
 
 // G then a letter: the places, then the pages inside them. The letters from before issue 14 open their new homes
 // (I, once the Inbox, opens the Brain; P, once Plan, opens Today's Week; U, once Captures, opens Brain > Activity).

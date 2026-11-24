@@ -43,7 +43,7 @@
    "fieldname": "correction_type",
    "fieldtype": "Select",
    "label": "Correction",
-   "options": "Area\nKind\nDrop\nKey date",
+   "options": "Area\nKind\nDrop\nKey date\nLink",
    "reqd": 1,
    "in_list_view": 1
   },

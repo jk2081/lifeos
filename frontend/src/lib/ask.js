@@ -163,6 +163,7 @@ export function openPane(pane) {
 export function openCite(message, n) {
   const c = (message.cited || []).find((x) => x.n === n)
   if (c && c.pane) openPane(c.pane)
+  else if (c && c.route) router.push(c.route)
   else if (c) toast.info(`${c.kind}: ${c.title}`)
 }
 

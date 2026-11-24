@@ -13,7 +13,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
-| `test_library.py` | Library: notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
+| `test_library.py` | Library (`TestPages`: pages that build themselves, issue 111: an email linked to a known person and their organisation, a page made on a reply thread with Undo, a proposal after three emails, no page for a promotion, "same company" merging and adding the alias, the daily briefs with sources and no Vault text, AI usage and the cap, per-user pins capped at seven, a wrong link taken off, Your notes kept): notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions |
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection), Updates (who may ask, the check against a temporary repository, the runner's steps and rollback, a target not on the remote, one runner at a time, Update now) |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
@@ -47,6 +47,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `improve-skill` | `test_skills.TestCorrections` | `SETTINGS.38` |
 | `lifeos` | `test_skills.TestServing` | `SETTINGS.38` |
 | `lifeos-file-work` | `test_skills.TestServing` | `SETTINGS.38` |
+| `link-subjects`, `write-brief` (pages that build themselves) | `test_library.TestPages`, `test_skills.TestExamples` | `SETTINGS.38`, `LIBRARY.42` to `LIBRARY.47` |
 
 ## Acceptance checks by place
 
@@ -269,7 +270,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.74` in Cycles a goal's name opens its goal page
 - `GOALS.75` Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone
 
-### Library (`tools/acceptance/library.mjs`, 38 checks)
+### Library (`tools/acceptance/library.mjs`, 47 checks)
 
 Everything, Notes, Documents, People, Chats, files, search and the graph, and the list screens' panes, filters and remembered views.
 
@@ -316,6 +317,12 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.39` search finds a calendar event by the start of a word, under Events, and Enter opens its drawer
 - `LIBRARY.40` "ai key" offers Settings › AI and Enter opens it
 - `LIBRARY.41` with no AI key, Ask says it needs one, links to Settings › AI and shows what search finds for the same words
+- `LIBRARY.42` a company page shows its header with the status and part, the brief with source numbers, Open, People, Files, Timeline and Your notes; a source number opens its email
+- `LIBRARY.43` Pin puts the page in the sidebar with the company icon; a new link shows "· 1" until the page is opened; dragging reorders the pins
+- `LIBRARY.44` Library > Pages is the first section, filters by kind and by status, and lists the seeded pages
+- `LIBRARY.45` Your notes takes text, and a brief rewrite afterwards leaves it unchanged
+- `LIBRARY.46` the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library
+- `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
 
 ### Review (`tools/acceptance/review.mjs`, 23 checks)
 

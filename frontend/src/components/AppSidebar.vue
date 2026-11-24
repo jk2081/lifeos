@@ -12,10 +12,12 @@
     </div>
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2" data-nav-groups>
       <nav class="flex flex-col gap-0.5" aria-label="Places" data-nav-places>
-        <SidebarItem v-for="n in places" :key="n.to" :label="n.label" :icon="n.icon" :route="n.to" :active="activePlace === n.base" :data-nav-item="n.label"
+        <template v-for="n in places" :key="n.to"><SidebarItem :label="n.label" :icon="n.icon" :route="n.to" :active="activePlace === n.base" :data-nav-item="n.label"
           :aria-current="activePlace === n.base ? 'page' : undefined">
           <template v-if="countOf(n.label)" #suffix><CountBadge :c="countOf(n.label)" :name="n.label" /></template>
         </SidebarItem>
+        <!-- issue 111: the pages the person pinned, under Library -->
+        <PinnedPages v-if="n.label === 'Library' && !nav.rail" /></template>
       </nav>
       <SetupCard v-if="!nav.rail && !store.isAgent" />
     </div>
@@ -44,6 +46,7 @@ import { activePlace, nav, reviewShown, setRail } from '@/lib/sidebar'
 import { manySpaces, setSpace } from '@/lib/lens'
 import { store } from '@/lib/store'
 import SetupCard from './SetupCard.vue'
+import PinnedPages from './PinnedPages.vue'
 import { navCount } from '@/lib/newMenu'
 
 const emit = defineEmits(['logout', 'shortcuts'])

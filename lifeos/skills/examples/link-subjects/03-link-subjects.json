@@ -1,0 +1,35 @@
+{
+ "title": "A longer spelling of a company already there",
+ "input": {
+  "data": {
+   "from": "Priya <priya@ambaji-foods.example>",
+   "subject": "Order",
+   "text": "Please send the order for next week.",
+   "signature": "Priya, Shri Ambaji Food Products Pvt Ltd",
+   "owner_replied": true,
+   "existing_subjects": [
+    "Shri Ambaji Food Products"
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "same_as",
+    "equals": "Shri Ambaji Food Products"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"context\": \"business\", \"person\": \"Priya\", \"role\": \"\", \"organisation\": \"Shri Ambaji Food Products Pvt Ltd\", \"same_as\": \"Shri Ambaji Food Products\", \"unsure_of\": \"\", \"reason\": \"Same company, Pvt Ltd added\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "e2b3682316682acd"
+}

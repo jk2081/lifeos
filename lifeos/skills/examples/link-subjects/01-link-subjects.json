@@ -1,0 +1,41 @@
+{
+ "title": "A reply thread with a signature naming a company",
+ "input": {
+  "data": {
+   "from": "Anirudh Poddar <anirudh@sap-partner.example>",
+   "subject": "SAP B1 Blueprint for Ambaji Food Products",
+   "text": "Hello, the SAP B1 Blueprint for Ambaji Food Products is attached. Please confirm the scope.",
+   "signature": "Regards, Anirudh Poddar, Solutions Lead, SAP Partner Pvt Ltd",
+   "owner_replied": true,
+   "existing_subjects": [
+    "Meera Shah"
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "context",
+    "equals": "business"
+   }
+  },
+  {
+   "answer": {
+    "path": "organisation",
+    "contains": "SAP Partner"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"context\": \"business\", \"person\": \"Anirudh Poddar\", \"role\": \"Solutions Lead\", \"organisation\": \"SAP Partner Pvt Ltd\", \"same_as\": \"\", \"unsure_of\": \"\", \"reason\": \"A partner writing about a project\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "e2b3682316682acd"
+}

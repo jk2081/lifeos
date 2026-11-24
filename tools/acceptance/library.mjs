@@ -1111,3 +1111,183 @@ print(ev.name)`).split('\n').pop()
   }
 }
 
+
+// ---- pages that build themselves (issue 111): a page for every person, company and part, with a brief, a timeline and pins ----
+{
+  const T = `Ambaji ${stamp}`
+  const seeded = JSON.parse(bench(`import json
+from lifeos.library import subjects
+sp = "${SPACE}"
+career = frappe.db.get_value("Life Area", {"space": sp, "area_name": "Career", "parent_area": ("is", "not set")})
+part = frappe.get_doc({"doctype": "Life Area", "space": sp, "area_name": "BTW ${stamp}", "parent_area": career, "is_on": 1}).insert(ignore_permissions=True).name
+org = frappe.get_doc({"doctype": "Life Person", "space": sp, "full_name": "${T} Food Products", "kind": "Organisation", "status": "Prospect", "area": part}).insert(ignore_permissions=True).name
+people = [frappe.get_doc({"doctype": "Life Person", "space": sp, "full_name": f"${T} Contact {i}", "kind": "Person", "organisation": org, "email": f"c{i}-${stamp}@ambaji.example", "role": "Buyer"}).insert(ignore_permissions=True).name for i in (1, 2)]
+emails = []
+for i in range(1, 5):
+    it = frappe.get_doc({"doctype": "Life Inbox Item", "space": sp, "title": f"${T} email {i}", "source_type": "Email", "status": "Done", "raw_text": f"Email {i} about the blueprint, quote 4.2 lakh.", "received_on": frappe.utils.add_days(frappe.utils.now_datetime(), -i)}).insert(ignore_permissions=True).name
+    emails.append(it)
+    subjects.link(sp, "Life Inbox Item", it, "Life Person", org)
+for i in range(1, 4):
+    frappe.get_doc({"doctype": "File", "file_name": f"${T}-file-{i}.txt", "content": f"file {i}", "attached_to_doctype": "Life Inbox Item", "attached_to_name": emails[0], "is_private": 1}).insert(ignore_permissions=True)
+brief = " ".join(f"The ${T} thread {i} is about the blueprint. [{i}]" for i in (1, 2, 3))
+frappe.db.set_value("Life Person", org, {"brief_md": brief, "brief_on": frappe.utils.now_datetime(), "brief_sources": json.dumps([{"n": i, "doctype": "Life Inbox Item", "name": emails[i - 1], "kind": "Email", "title": f"${T} email {i}", "date": str(frappe.utils.today()), "url": None, "ref": "source:" + emails[i - 1]} for i in (1, 2, 3)])})
+frappe.get_doc({"doctype": "Life Task", "space": sp, "title": "${T} send the quote", "status": "Open", "inbox_item": emails[0]}).insert(ignore_permissions=True)
+print(json.dumps({"org": org, "people": people, "emails": emails, "part": part}))`).split('\n').pop())
+  const PAGE = `/life/library/pages/Life%20Person/${seeded.org}`
+  const pinsOf = async () => (await owner.api('pages.pinned')).pins
+  try {
+    for (const width of WIDTHS) {
+      const u = await session('owner@lifeos.test', width)
+      const pg = u.page
+      const phone = width < 800
+      const problems = []
+      pg.on('pageerror', (e) => problems.push(String(e).slice(0, 160)))
+      const sideways = () => pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+      await owner.api('pages.unpin', { doctype: 'Life Person', name: seeded.org }).catch(() => {})
+      for (const p of await pinsOf()) await owner.api('pages.unpin', { doctype: p.doctype, name: p.name })
+
+      await check('LIBRARY.42', `${width} px: a company page shows its header with the status and part, the brief with source numbers, Open, People, Files, Timeline and Your notes; a source number opens its email`, async () => {
+        await u.open(PAGE)
+        await pg.locator('[data-library-page][data-loaded="1"]').waitFor({ timeout: 15000 })
+        const head = await pg.locator('[data-page-header]').innerText()
+        must(head.includes(`${T} Food Products`) && head.includes('Prospect') && head.includes(`Career › BTW ${stamp}`), 'the header says: ' + head.replace(/\s*\n\s*/g, ' | '))
+        must(await pg.locator('[data-page-icon]').isVisible(), 'no kind icon')
+        must((await pg.locator('[data-brief-source]').count()) === 3, 'the brief has no three source numbers')
+        must(/by the Brain · as of .* · 3 sources/.test(await pg.locator('[data-brief-by]').innerText()), 'the brief does not say who wrote it')
+        must(await pg.locator('[data-brief-rewrite]').isVisible(), 'no Rewrite button')
+        must((await pg.locator('[data-page-open] [data-open-task]').innerText()).includes('send the quote'), 'Open does not list the linked task')
+        must((await pg.locator('[data-page-people] [data-page-person]').count()) === 2, 'People does not list the two people')
+        must((await pg.locator('[data-page-files] [data-page-file]').count()) === 3, 'Files does not list the three files')
+        must((await pg.locator('[data-page-timeline] [data-timeline-row]').count()) === 4, 'the Timeline does not list the four emails')
+        must(await pg.locator('[data-page-timeline] [data-timeline-row][data-kind="Email"] .lucide-mail').first().isVisible(), 'a timeline line has no kind icon')
+        must(await pg.locator('[data-page-notes] [data-notes-input]').isVisible(), 'no Your notes')
+        await pg.locator('[data-brief-source][data-n="2"]').click()
+        await pg.waitForFunction((n) => new URL(location.href).searchParams.get('open') === `source:${n}`, seeded.emails[1], { timeout: 8000 })
+        must(await sideways() <= 1, 'the page scrolls sideways')
+      })
+
+      await check('LIBRARY.43', `${width} px: Pin puts the page in the sidebar with the company icon, a new link shows "· 1" until the page is opened, and dragging reorders the pins`, async () => {
+        await u.open(PAGE)
+        await pg.locator('[data-page-pin]').click()
+        await pg.waitForFunction(() => document.querySelector('[data-page-pin]')?.innerText.includes('Pinned'), null, { timeout: 8000 })
+        must((await pinsOf()).some((p) => p.name === seeded.org), 'the pin was not saved')
+        const second = seeded.people[0]
+        await owner.api('pages.pin', { doctype: 'Life Person', name: second })
+        // a new item is linked: the count shows on the pin until the page is opened
+        bench(`from lifeos.library import subjects
+it = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "${T} email new", "source_type": "Email", "status": "Done", "raw_text": "new"}).insert(ignore_permissions=True).name
+subjects.link("${SPACE}", "Life Inbox Item", it, "Life Person", "${seeded.org}")`)
+        await u.open('/life/today')
+        if (phone) {
+          await u.open('/life/library/pages')
+          const pin = pg.locator(`[data-pinned-pages="phone"] [data-pin][data-pin-name="${seeded.org}"]`)
+          await pin.waitFor({ timeout: 10000 })
+          must((await pin.getAttribute('data-pin-kind')) === 'company', 'the pin has no company kind')
+          must((await pin.locator('[data-pin-count]').innerText()).includes('· 1'), 'the pin does not show "· 1"')
+          return
+        }
+        const pin = pg.locator(`[data-sidebar] [data-pin][data-pin-name="${seeded.org}"]`)
+        await pin.waitFor({ timeout: 10000 })
+        must((await pin.getAttribute('data-pin-kind')) === 'company' && (await pin.locator('.lucide-building-2').count()) === 1, 'the pin has no company icon')
+        must(!(await pg.locator('[data-sidebar] [data-pin-group]').count()), 'the pins have group headings')
+        must((await pin.locator('[data-pin-count]').innerText()).includes('· 1'), 'the pin does not show "· 1": ' + (await pin.innerText()))
+        await pin.click()
+        await pg.locator('[data-library-page][data-loaded="1"]').waitFor({ timeout: 15000 })
+        await pg.waitForTimeout(800)
+        await u.open('/life/today')
+        await pg.locator(`[data-sidebar] [data-pin][data-pin-name="${seeded.org}"]`).waitFor({ timeout: 10000 })
+        must(!(await pg.locator(`[data-sidebar] [data-pin][data-pin-name="${seeded.org}"] [data-pin-count]`).count()), 'opening the page did not clear the count')
+        const names = () => pg.locator('[data-sidebar] [data-pin]').evaluateAll((els) => els.map((e) => e.getAttribute('data-pin-name')))
+        must(JSON.stringify(await names()) === JSON.stringify([seeded.org, second]), 'the pins are in another order: ' + JSON.stringify(await names()))
+        await pg.locator(`[data-sidebar] [data-pin][data-pin-name="${second}"]`).dragTo(pg.locator(`[data-sidebar] [data-pin][data-pin-name="${seeded.org}"]`))
+        await pg.waitForTimeout(800)
+        must(JSON.stringify((await pinsOf()).map((p) => p.name)) === JSON.stringify([second, seeded.org]), 'dragging did not reorder the pins: ' + JSON.stringify((await pinsOf()).map((p) => p.name)))
+      })
+
+      await check('LIBRARY.44', `${width} px: Library > Pages is the first section, filters by kind and by status, and lists the seeded pages`, async () => {
+        await u.open('/life/library/pages')
+        await pg.locator('[data-library-pages][data-loaded="1"]').waitFor({ timeout: 15000 })
+        const tabs = await pg.locator('[data-place-tabs] [role="tab"], [data-place-tabs] button').allInnerTexts()
+        must(tabs[0]?.trim().startsWith('Pages'), 'Pages is not the first section: ' + tabs.join(' | '))
+        const rows = () => pg.locator('[data-pages-row]').evaluateAll((els) => els.map((e) => ({ name: e.dataset.name, kind: e.dataset.kind, status: e.dataset.status })))
+        const has = async (n) => (await rows()).some((r) => r.name === n)
+        must((await has(seeded.org)) && (await has(seeded.people[0])) && (await has(seeded.part)), 'the seeded company, person and part are not listed')
+        await pg.locator('[data-pages-kind="company"]').click()
+        await pg.waitForFunction(() => { const r = [...document.querySelectorAll('[data-pages-row]')]; return r.length > 0 && r.every((e) => e.dataset.kind === 'company') }, null, { timeout: 8000 })
+        must((await has(seeded.org)) && !(await has(seeded.people[0])), 'the Companies filter is wrong')
+        await u.open('/life/library/pages?status=Prospect')
+        await pg.locator('[data-library-pages][data-loaded="1"]').waitFor()
+        must((await has(seeded.org)) && (await rows()).every((r) => r.status === 'Prospect'), 'the Prospect filter is wrong')
+        await u.open('/life/library/pages?status=Client')
+        await pg.locator('[data-library-pages][data-loaded="1"]').waitFor()
+        must(!(await has(seeded.org)), 'the Client filter lists a Prospect')
+        must(await sideways() <= 1, 'the list scrolls sideways')
+      })
+
+      await check('LIBRARY.45', `${width} px: Your notes takes text, and a brief rewrite afterwards leaves it unchanged`, async () => {
+        await u.open(PAGE)
+        await pg.locator('textarea[data-notes-input], [data-notes-input] textarea').first().fill(`My own note ${stamp} ${width}`)
+        await pg.locator('[data-notes-save]').click()
+        await pg.locator('[data-note-text]', { hasText: `My own note ${stamp} ${width}` }).waitFor({ timeout: 8000 })
+        const was = await pg.locator('[data-note-text]').allInnerTexts()
+        await owner.api('pages.rewrite', { doctype: 'Life Person', name: seeded.org }).catch(() => null)
+        await u.open(PAGE)
+        await pg.locator('[data-note-text]').first().waitFor({ timeout: 8000 })
+        const after = await pg.locator('[data-note-text]').allInnerTexts()
+        must(JSON.stringify(after) === JSON.stringify(was), `a brief rewrite changed Your notes: ${JSON.stringify(was)} became ${JSON.stringify(after)}`)
+        const byAgents = Number(bench(`print(frappe.db.count("Comment", {"reference_doctype": "Life Person", "reference_name": "${seeded.org}", "comment_type": "Comment", "comment_email": ["!=", "owner@lifeos.test"]}))`).replace(/\D/g, '') || 0)
+        must(byAgents === 0, 'someone other than the owner wrote a note')
+      })
+
+      await check('LIBRARY.46', `${width} px: the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library`, async () => {
+        await owner.api('pages.pin', { doctype: 'Life Person', name: seeded.org })
+        for (const scheme of ['light', 'dark']) {
+          await pg.emulateMedia({ colorScheme: scheme })
+          for (const p of [PAGE, '/life/library/pages']) {
+            await u.open(p)
+            await pg.waitForTimeout(500)
+            must(await sideways() <= 1, `${scheme}: ${p} scrolls sideways`)
+          }
+        }
+        await pg.emulateMedia({ colorScheme: 'light' })
+        if (phone) {
+          await u.open('/life/library/pages')
+          const strip = pg.locator('[data-pinned-pages="phone"]')
+          await strip.waitFor({ timeout: 8000 })
+          const top = await strip.evaluate((e) => e.getBoundingClientRect().top)
+          const list = await pg.locator('[data-library-pages]').evaluate((e) => e.getBoundingClientRect().top)
+          must(top < list, 'the pins are not at the top of Library')
+        }
+        must(!problems.length, 'script errors: ' + problems.join(' | '))
+      })
+
+      await check('LIBRARY.47', `${width} px: on an empty space Pages says what will appear and offers + Capture`, async () => {
+        bench(`if not frappe.db.exists("Life Space", "zz-pages-empty"):
+    frappe.get_doc({"doctype": "Life Space", "space_name": "zz-pages-empty", "owner_user": "owner@lifeos.test", "members": [{"user": "owner@lifeos.test", "access": "Write"}]}).insert(ignore_permissions=True)`)
+        try {
+          await pg.evaluate(() => localStorage.setItem('lifeos-space', 'zz-pages-empty'))
+          await u.open('/life/library/pages')
+          await pg.locator('[data-pages-empty]').waitFor({ timeout: 15000 })
+          const text = await pg.locator('[data-pages-empty]').innerText()
+          must(text.includes('No pages yet.') && text.includes('Capture'), 'the empty state says: ' + text)
+          must(await pg.locator('[data-pages-capture]').isVisible(), 'no Capture button')
+        } finally {
+          await pg.evaluate(() => localStorage.setItem('lifeos-space', 'Private'))
+        }
+      })
+      await u.ctx.close()
+    }
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for dt, f in (("Life Person", "full_name"), ("Life Inbox Item", "title"), ("Life Task", "title")):
+    for n in frappe.get_all(dt, filters={f: ["like", "${T}%"]}, pluck="name"):
+        frappe.db.delete("Life Link", {"from_doctype": dt, "from_name": n})
+        frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Area", filters={"area_name": "BTW ${stamp}"}, pluck="name"):
+    frappe.delete_doc("Life Area", n, force=1, ignore_permissions=True)
+frappe.db.delete("Life Pin")
+frappe.db.delete("Life Page Visit")
+from lifeos.tools import devtools
+devtools.purge_space("zz-pages-empty", drop=True)`)
+  }
+}

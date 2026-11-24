@@ -43,7 +43,10 @@
   "ai_prices",
   "insights_run_on",
   "updater_heartbeat",
-  "update_state"
+  "update_state",
+  "pages_section",
+  "subject_seen_count",
+  "subject_seen_days"
  ],
  "fields": [
   {
@@ -298,6 +301,23 @@
    "label": "Update state",
    "read_only": 1,
    "hidden": 1
+  },
+  {
+   "fieldname": "pages_section",
+   "fieldtype": "Section Break",
+   "label": "Pages"
+  },
+  {
+   "fieldname": "subject_seen_count",
+   "fieldtype": "Int",
+   "label": "A new sender seen this many times is proposed as a page",
+   "default": "3"
+  },
+  {
+   "fieldname": "subject_seen_days",
+   "fieldtype": "Int",
+   "label": "\u2026within this many days",
+   "default": "30"
   }
  ],
  "issingle": 1,

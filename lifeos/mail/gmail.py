@@ -364,7 +364,9 @@ class GmailAdapter:
 				last = messages[-1]
 				theirs = [m for m in messages if sender_of(m) != self.account.address.lower() and "SENT" not in (m.get("labelIds") or [])] or [last]
 				head = headers_of(theirs[-1])
-				out.append({"thread_id": thread["id"], "subject": subject_of(thread), "from": who(head), "sender": sender_of(theirs[-1]), "at": int(last.get("internalDate") or 0) // 1000,
+				mine = [m for m in messages if m not in theirs]
+				body = text_of(theirs[-1])
+				out.append({"replied": bool(mine), "text": body[:1500], "signature": body[-500:], "list_mail": "list-unsubscribe" in head, "thread_id": thread["id"], "subject": subject_of(thread), "from": who(head), "sender": sender_of(theirs[-1]), "at": int(last.get("internalDate") or 0) // 1000,
 					"snippet": " ".join(text_of(theirs[-1]).split())[:SNIPPET_CHARS], "person": keep, "why": why, "messages": len(messages),
 					"link": link_of(thread["id"], self.account.address), "to": headers_of(theirs[-1]).get("to", ""), "date": head.get("date", "")})
 			page = listing.get("nextPageToken")

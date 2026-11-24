@@ -1,5 +1,8 @@
 <template>
-  <LibraryFiles v-if="current === 'files'" />
+  <!-- issue 111: on a phone the pinned pages sit at the top of the Library tab -->
+  <PinnedPages class="md:hidden" variant="phone" />
+  <LibraryPages v-if="current === 'pages'" />
+  <LibraryFiles v-else-if="current === 'files'" />
   <LibraryPerson v-else-if="current === 'people' && person" :key="person" :person="person" />
   <LibraryPeople v-else-if="current === 'people'" />
   <LibraryEverything v-else-if="own" :key="current" :tab="current" />
@@ -22,6 +25,8 @@ import { useRoute, useRouter } from 'vue-router'
 import LibraryEverything from '@/components/library/LibraryEverything.vue'
 import LibraryPeople from '@/components/library/LibraryPeople.vue'
 import LibraryPerson from '@/components/library/LibraryPerson.vue'
+import LibraryPages from '@/components/library/LibraryPages.vue'
+import PinnedPages from '@/components/PinnedPages.vue'
 import LibraryFiles from '@/components/library/LibraryFiles.vue'
 import Sources from '@/pages/Sources.vue'
 import Library from '@/pages/Library.vue'
