@@ -914,7 +914,7 @@ class TestUpdates(LifeTestCase):
 			frappe.delete_doc("Life Update", name, force=True, ignore_permissions=True)  # system: the test's own requests
 		frappe.db.set_single_value("Life Settings", "updater_heartbeat", None)
 		frappe.db.set_single_value("Life Settings", "update_state", None)
-		frappe.db.commit()
+		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- the runner under test commits, so the test cleans up with a commit
 
 	def git(self, repo, *args):
 		import subprocess
