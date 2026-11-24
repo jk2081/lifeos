@@ -1,0 +1,106 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "user",
+  "agent",
+  "account",
+  "account_label",
+  "query",
+  "results",
+  "cost",
+  "searched_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "Person",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "agent",
+   "fieldtype": "Data",
+   "label": "Agent",
+   "length": 60,
+   "search_index": 1,
+   "description": "The agent's source_system, or empty for Ask"
+  },
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "label": "Inbox",
+   "options": "Life Mail Account"
+  },
+  {
+   "fieldname": "account_label",
+   "fieldtype": "Data",
+   "label": "Inbox Label",
+   "length": 140
+  },
+  {
+   "fieldname": "query",
+   "fieldtype": "Small Text",
+   "label": "Query"
+  },
+  {
+   "fieldname": "results",
+   "fieldtype": "Int",
+   "label": "Results"
+  },
+  {
+   "fieldname": "cost",
+   "fieldtype": "Currency",
+   "label": "AI Cost",
+   "precision": "4"
+  },
+  {
+   "fieldname": "searched_on",
+   "fieldtype": "Datetime",
+   "label": "Searched On",
+   "search_index": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Mail Search",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "query"
+}

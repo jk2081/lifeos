@@ -1,0 +1,108 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "agent",
+  "agent_user",
+  "display_name",
+  "abilities",
+  "areas_off",
+  "skills",
+  "last_report"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "agent",
+   "fieldtype": "Data",
+   "label": "Agent",
+   "reqd": 1,
+   "length": 60,
+   "search_index": 1,
+   "in_list_view": 1,
+   "description": "The agent's connection key (its source_system), for example hermes"
+  },
+  {
+   "fieldname": "agent_user",
+   "fieldtype": "Link",
+   "label": "Agent user",
+   "options": "User",
+   "description": "The user the agent's connector signs in as"
+  },
+  {
+   "fieldname": "display_name",
+   "fieldtype": "Data",
+   "label": "Name shown",
+   "length": 80,
+   "description": "The name the owner gives the agent"
+  },
+  {
+   "fieldname": "abilities",
+   "fieldtype": "Small Text",
+   "label": "Abilities",
+   "description": "JSON: action to on its own, asks you or off"
+  },
+  {
+   "fieldname": "areas_off",
+   "fieldtype": "Small Text",
+   "label": "Areas Off",
+   "description": "JSON list of areas the agent may not read"
+  },
+  {
+   "fieldname": "skills",
+   "fieldtype": "Small Text",
+   "label": "Skills",
+   "description": "JSON list of the skills the agent reported"
+  },
+  {
+   "fieldname": "last_report",
+   "fieldtype": "Datetime",
+   "label": "Last Report"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Agent Config",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "agent"
+}

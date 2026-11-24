@@ -1027,26 +1027,25 @@ print(json.dumps({"aside": aside}))`).split('\n').pop())
   const openSources = async () => { await s.open('/life/brain/sources'); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
   try {
-    await check('BRAIN.44', `${width} px: Sources offers Connect Gmail, a connected mailbox shows its week's counts and "Processed by: the Brain", every card has a Processed by line`, async () => {
+    await check('BRAIN.44', `${width} px: Sources offers Connect Gmail, a connected mailbox says it is a daily digest searched live and "Processed by: the Brain", every card has a Processed by line`, async () => {
       await openSources()
       must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state on an empty space')
       must((await pg.locator('[data-source-tile][data-system="upload"] [data-processed-by]').innerText()).includes('Processed by: the Brain'), 'the Upload tile has no Processed by line')
       const tile = pg.locator('[data-source-tile][data-system="gmail"]')
       must((await tile.innerText()).includes('Connect Gmail'), 'the Gmail tile does not say Connect Gmail: ' + await tile.innerText())
-      await tile.locator('[data-tile-add]').click()
+      await tile.locator('[data-tile-add]').waitFor({ timeout: 15000 }) // the button shows once permissions have loaded
+      // the tile's Rules link (issue 84) sits above the full-tile button, so click its top-left corner, away from the link
+      await tile.locator('[data-tile-add]').click({ position: { x: 6, y: 6 } })
       await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
       const t = await pg.locator('[data-gmail-connect]').innerText()
-      must(t.includes('read-only') && /never marks, labels, moves, deletes or sends/.test(t), 'the dialog does not say it is read only: ' + t)
+      must(/copies none of your mail and never deletes any/.test(t) && /send, draft, archive or label/.test(t), 'the dialog does not say what it may do: ' + t)
       await pg.keyboard.press('Escape')
-      bench(`from frappe.utils import add_days, getdate
-d = getdate()
-frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "gmail", "mailbox": "i58-${width}@example.com", "label": "i58-${width}@example.com", "active": 1,
-  "week_start": add_days(d, -d.weekday()), "seen_week": 218, "kept_week": 31}).insert(ignore_permissions=True)
+      bench(`frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "gmail", "mailbox": "i58-${width}@example.com", "label": "i58-${width}@example.com", "active": 1}).insert(ignore_permissions=True)
 for system in ("hermes", "claude", "google-calendar"):
     frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": system, "active": 1}).insert(ignore_permissions=True)`)
       await openSources()
       const mail = pg.locator('[data-source-card][data-system="gmail"]')
-      must((await mail.locator('[data-source-line]').innerText()).includes('218 this week · 31 kept'), 'the mailbox line says: ' + await mail.locator('[data-source-line]').innerText())
+      must((await mail.locator('[data-source-line]').innerText()).includes('Daily digest, and searched live'), 'the mailbox line says: ' + await mail.locator('[data-source-line]').innerText())
       must((await mail.locator('[data-processed-by]').innerText()) === 'Processed by: the Brain', 'the mailbox does not say the Brain processes it')
       const lines = await pg.locator('[data-source-card] [data-processed-by]').allInnerTexts()
       must(lines.length === 4 && lines.every((x) => /^(Processed by|Not processed)/.test(x)), 'every card needs a Processed by line: ' + lines.join(' | '))
@@ -1054,6 +1053,7 @@ for system in ("hermes", "claude", "google-calendar"):
       await mail.locator('[data-source-open]').click()
       await pg.locator('[data-source-settings][data-system="gmail"]').waitFor({ timeout: 5000 })
       must(await pg.locator('[data-gmail-include]').isVisible() && await pg.locator('[data-gmail-skip]').isVisible(), 'the always include and always skip lists are missing')
+      must(!(await pg.locator('[data-gmail-attach]').count()), 'the old attachments switch is still there')
       await pg.keyboard.press('Escape')
       await noSideways()
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
@@ -1083,6 +1083,312 @@ for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I58 %${wi
 for c in frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc("Life Connection", c, force=1, ignore_permissions=True)
 for n in ${JSON.stringify(made.aside)}: frappe.db.set_value("Life Connection", n, "space", "${SPACE}", update_modified=False)
 frappe.db.set_value("Life Skill", "process-capture", "active", 0)`)
+    await s.ctx.close()
+  }
+}
+
+
+// Brain > Sources in two groups and one page for each source: its strip, Rules (saved as a version of the skill), Try it. Titles start "I84 ".
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const pathOf = async () => (await pg.locator('[data-page-path]').innerText()).replace(/\s+/g, ' ').trim()
+  const version = () => Number(bench('print(frappe.db.get_value("Life Skill", "ingest-document", "version"))').split('\n').pop())
+  const openSources = async (query = '') => { await s.open('/life/brain/sources' + query); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const pdfName = `I84 sample ${width} ${stamp}.pdf`
+  try {
+    await check('BRAIN.46', `${width} px: Sources shows channels and kinds with counts and switches; each row opens its page with the path Brain / Sources / <name>`, async () => {
+      await openSources()
+      const channels = Number(await pg.locator('[data-group-count="channels"]').innerText())
+      must(channels >= 5 && (await pg.locator('[data-group-count="kinds"]').innerText()) === '6', `the counts are ${channels} and ${await pg.locator('[data-group-count="kinds"]').innerText()}`)
+      must((await pg.locator('[data-group][aria-selected="true"]').getAttribute('data-group')) === 'channels', 'Channels is not the first group')
+      await pg.locator('[data-group="kinds"]').click()
+      await pg.locator('[data-kinds]').waitFor({ timeout: 5000 })
+      must((await pg.locator('[data-kind-card]').count()) === 6, 'expected six kinds')
+      must(!(await pg.locator('[data-connected]').count()), 'the channels still show with Kinds open')
+      await pg.locator('[data-kind-card][data-kind="kind-document"] [data-kind-open]').click()
+      await pg.locator('[data-source-page][data-source="kind-document"]').waitFor({ timeout: 10000 })
+      must(/^Brain \/ Sources/.test(await pathOf()) && (await pg.locator('[data-page-title]').innerText()) === 'Documents (PDF)', 'the path says: ' + await pathOf())
+      const strip = await pg.locator('[data-source-strip]').innerText()
+      for (const word of ['Arrives from', 'This week', 'Filed without you', 'AI cost this week', 'Skill']) must(strip.includes(word), `the strip lacks ${word}: ${strip}`)
+      must(strip.includes('ingest-document v'), 'the strip does not name the skill and its version')
+      for (const t of ['Overview', 'Rules', 'Examples & lessons', 'Activity', 'Try it']) must(await pg.locator(`[data-tab-bar] >> text="${t}"`).first().isVisible(), `no ${t} tab`)
+      await pg.locator('[data-page-back]').click()
+      await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 })
+      await openSources()
+      await pg.locator('[data-source-tile][data-system="upload"] [data-tile-rules]').click()
+      await pg.locator('[data-source-page][data-source="upload"]').waitFor({ timeout: 10000 })
+      must((await pathOf()).startsWith('Brain / Sources') && (await pg.locator('[data-page-title]').innerText()) === 'Upload', 'the Upload path says: ' + await pathOf())
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.47', `${width} px: Rules: add a Skip chip and save to see version n+1, go back restores it; Try it on a sample PDF (fake AI) files nothing until File it for real`, async () => {
+      await s.open('/life/brain/sources/kind-document?tab=rules')
+      await pg.locator('[data-rule-section][data-section="Skip"]').waitFor({ timeout: 10000 })
+      const before = version()
+      const chip = `Fax cover sheets ${width}`
+      await pg.locator('[data-section="Skip"] [data-chip-input]').fill(chip)
+      await pg.locator('[data-section="Skip"] [data-chip-add]').click()
+      must(await pg.locator(`[data-section="Skip"] [data-chip]:has-text("${chip}")`).count() === 1, 'the chip was not added')
+      await pg.locator('[data-rules-anything]').fill('Ask before filing anything over Rs 1,00,000.')
+      await pg.locator('[data-rules-save]').click()
+      await pg.locator(`[data-rules-version]:has-text("Version ${before + 1}")`).waitFor({ timeout: 10000 })
+      must(version() === before + 1, `the skill is at version ${version()}, expected ${before + 1}`)
+      must(bench('print(frappe.db.get_value("Life Skill", "ingest-document", "instructions"))').includes(`- ${chip}`), 'the chip is not in the skill text')
+      await pg.reload()
+      await pg.locator(`[data-section="Skip"] [data-chip]:has-text("${chip}")`).waitFor({ timeout: 10000 })
+      await pg.locator(`[data-version-row][data-version="${before}"] [data-version-back]`).click()
+      await pg.locator(`[data-rules-version]:has-text("Version ${before + 2}")`).waitFor({ timeout: 10000 })
+      must(!bench('print(frappe.db.get_value("Life Skill", "ingest-document", "instructions"))').includes(chip), 'going back did not restore the old text')
+      // Try it
+      const count = () => Number(bench(`print(frappe.db.count("Life Inbox Item", {"space": "${SPACE}", "title": ["like", "I84 sample%${stamp}%"]}))`).split('\n').pop())
+      await s.open('/life/brain/sources/kind-document?tab=try')
+      await pg.locator('[data-try-file]').setInputFiles({ name: pdfName, mimeType: 'application/pdf', buffer: PDF })
+      await pg.locator('[data-try-drop]:has-text("I84 sample")').waitFor({ timeout: 10000 })
+      await pg.locator('[data-try-run]').click()
+      await pg.locator('[data-try-result], [data-sonner-toast][data-type="error"]').first().waitFor({ timeout: 30000 })
+      if (!(await pg.locator('[data-try-result]').count())) must(false, 'Try it said: ' + await pg.locator('[data-sonner-toast]').first().innerText())
+      must((await pg.locator('[data-try-summary]').innerText()).includes('stand-in model'), 'the summary says: ' + await pg.locator('[data-try-summary]').innerText())
+      must((await pg.locator('[data-try-proposal]').count()) >= 1, 'no proposal shown')
+      must((await pg.locator('[data-try-result]').innerText()).includes('ingest-document v'), 'the result does not name the skills used')
+      must(count() === 0, 'Try it filed something')
+      await pg.locator('[data-try-file-it]').click()
+      await pg.locator('[data-try-result]').waitFor({ state: 'detached', timeout: 10000 })
+      must(count() === 1, `File it for real made ${count()} captures`)
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.48', `${width} px: on a new site the sources say Nothing yet and how to connect each`, async () => {
+      const aside = `zz-i84-aside-${width}`
+      const moved = JSON.parse(bench(`import json
+from frappe.utils import add_days, getdate
+d = getdate()
+names = frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "creation": [">=", add_days(d, -d.weekday())]}, pluck="name")
+for n in names: frappe.db.set_value("Life Inbox Item", n, "space", "${aside}", update_modified=False)
+conns = frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name")
+for n in conns: frappe.db.set_value("Life Connection", n, "space", "${aside}", update_modified=False)
+print(json.dumps({"names": names, "conns": conns}))`).split('\n').pop())
+      try {
+        await openSources('?group=kinds')
+        for (const k of ['kind-document', 'kind-photo', 'kind-video', 'kind-link', 'kind-voice', 'kind-email'])
+          must((await pg.locator(`[data-kind-card][data-kind="${k}"] [data-kind-line]`).innerText()) === 'Nothing yet', `${k} does not say Nothing yet`)
+        await openSources()
+        must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state')
+        must(await pg.locator('[data-email-in]').isVisible(), 'the email-in address does not say how to set it up')
+        for (const sys of ['gmail', 'google-calendar']) must((await pg.locator(`[data-source-tile][data-system="${sys}"]`).innerText()).length > 10, `${sys} has no hint`)
+        await s.open('/life/brain/sources/gmail')
+        await pg.locator('[data-source-page][data-source="gmail"]').waitFor({ timeout: 10000 })
+        const t = await pg.locator('[data-source-connect]').innerText()
+        must(t.includes('Nothing yet') && t.includes('Connect Gmail'), 'Gmail does not say how to connect: ' + t)
+        must((await pg.locator('[data-strip="week"]').innerText()) === 'Nothing yet', 'the week does not say Nothing yet')
+        await pg.locator('[data-tab="activity"]').click()
+        await pg.locator('[data-activity-empty]').waitFor({ timeout: 5000 })
+        await noSideways()
+      } finally {
+        bench(`for n in ${JSON.stringify(moved.names)}: frappe.db.set_value("Life Inbox Item", n, "space", "${SPACE}", update_modified=False)
+for n in ${JSON.stringify(moved.conns)}: frappe.db.set_value("Life Connection", n, "space", "${SPACE}", update_modified=False)`)
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for i in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I84 %${stamp}%"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", i, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Brain > Sources > an agent (issue 85): what it waits for, knows, can do, may read, has scheduled and did, carried by the connector in agent/connector/.
+// Each agent here is a fixture with the key i85-<width> and a folder of files the real connector script reads and changes.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const system = `i85-${width}`
+  const home = fs.mkdtempSync(path.join(process.env.TMPDIR || '/tmp', 'i85-agent-'))
+  const put = (name, data) => fs.writeFileSync(path.join(home, name), JSON.stringify(data))
+  const read = (name) => JSON.parse(fs.readFileSync(path.join(home, name), 'utf8'))
+  const connector = () => JSON.parse(execFileSync('python3', [path.join(root, 'agent/connector/connector.py'), '--home', home, '--system', system, '--space', SPACE],
+    { env: { ...process.env, LIFEOS_URL: base, LIFEOS_API_KEY: agentKey, LIFEOS_API_SECRET: agentSecret }, encoding: 'utf8' }).trim().split('\n').pop())
+  const open = async () => { await s.open(`/life/brain/sources/${system}`); await pg.locator('[data-agent-panel] [data-agent-section="connector"]').waitFor({ timeout: 10000 }) }
+  try {
+    await check('BRAIN.49', `${width} px: an agent's page shows Waiting, Knows, Can, May read, Scheduled and Did from the connector's report; approving a waiting item moves it to Did`, async () => {
+      put('memory.json', [{ id: 'f1', text: `I85 prefers mornings ${width}`, origin: 'WhatsApp chat', learned_on: '2026-11-01' }, { id: 'f2', text: `I85 daughter is in class 5 ${width}` }])
+      put('jobs.json', [{ id: 'j1', name: `I85 morning digest ${width}`, schedule: 'Every day 7:00', paused: false }])
+      put('settings.json', { abilities: { send_email: 'ask' } })
+      put('actions.json', [{ id: 'a1', action: 'send_email', title: `I85 chase Mehi Motors ${width}`, draft: 'Hello, a gentle reminder about the invoice.', status: 'Waiting' },
+        { id: 'a2', action: 'read_email', title: `I85 read the morning mail ${width}`, status: 'Done', cost: 0.0123 }])
+      fs.mkdirSync(path.join(home, 'skills/chase'), { recursive: true })
+      fs.writeFileSync(path.join(home, 'skills/chase/SKILL.md'), '# Chase\nChases overdue invoices.\n')
+      must(connector().report.facts === 2, 'the first report did not carry the facts')
+      must(connector().report.facts === 0, 'a repeated report changed something')
+      await open()
+      must((await pg.locator('[data-page-title]').innerText()) === 'Your assistant', 'the agent is not shown as Your assistant: ' + await pg.locator('[data-page-title]').innerText())
+      for (const k of ['waiting', 'knows', 'can', 'read', 'scheduled', 'did', 'connector']) must(await pg.locator(`[data-agent-section="${k}"]`).isVisible(), `no ${k} section`)
+      must((await pg.locator('[data-fact]').count()) === 2 && (await pg.locator('[data-fact-origin]').first().innerText()).includes('WhatsApp'), 'the facts or where they came from are missing')
+      must((await pg.locator('[data-ability]').count()) === 6 && (await pg.locator('[data-ability-key="pay"] [data-ability-fixed]').innerText()) === 'Always off', 'the six actions, with pay always off, are missing')
+      must((await pg.locator('[data-area]').count()) >= 1 && await pg.locator('[data-area-vault]').isVisible(), 'the areas and the Vault are missing')
+      must((await pg.locator('[data-job]').count()) === 1, 'the job is missing')
+      must((await pg.locator('[data-agent-skills]').innerText()).includes('chase'), 'the skill it reported is missing')
+      const waiting = pg.locator('[data-agent-section="waiting"] [data-agent-request]')
+      must((await waiting.count()) === 1 && (await waiting.locator('[data-request-draft]').innerText()).includes('gentle reminder'), 'the waiting request and its draft are missing')
+      must((await pg.locator('[data-did]').count()) === 1, 'Did should list the one thing it did')
+      const needs = await owner.api('brain.needs_you', { space: SPACE })
+      must(needs.agent_requests.some((r) => r.title.includes(`I85 chase Mehi Motors ${width}`)), 'Needs you does not list the request')
+      await noSideways()
+      await waiting.locator('[data-request-approve]').click()
+      await pg.locator('[data-agent-section="waiting"] [data-agent-empty="waiting"]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-did]').count()) === 2, 'the approved request did not move to Did')
+      const again = connector()
+      must(again.decisions.length === 1 && again.decisions[0].decision === 'approved', 'the connector was not told the answer')
+      must(connector().decisions.length === 0, 'the answer was handed over twice')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.50', `${width} px: editing a fact and pausing a job show waiting until the connector confirms; a switch is changed the same way`, async () => {
+      await open()
+      const fact = pg.locator(`[data-fact][data-fact-id="f1"]`)
+      await fact.locator('[data-fact-edit]').click()
+      await fact.locator('[data-fact-input] input, input[data-fact-input]').first().fill(`I85 prefers afternoons ${width}`)
+      await fact.locator('[data-fact-save]').click()
+      await fact.locator('[data-change="waiting"]').waitFor({ timeout: 10000 })
+      must((await fact.locator('[data-fact-text]').innerText()).includes('afternoons'), 'the page does not show the new text while it waits')
+      await pg.locator('[data-job] [data-job-toggle]').click()
+      await pg.locator('[data-job] [data-change="waiting"]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-ability-key="send_email"] [data-ability-select]').click()
+      await pg.getByRole('option', { name: 'Off' }).first().click()
+      await pg.locator('[data-ability-key="send_email"] [data-change="waiting"]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-fact-delete]').last().click()
+      await pg.locator('[data-fact][data-fact-id="f2"] [data-change="waiting"]').waitFor({ timeout: 10000 })
+      must(read('memory.json').some((f) => f.text.includes('mornings')), 'the connector files changed before it ran')
+      await noSideways()
+      const ran = connector()
+      must(ran.applied === 4 && ran.failed === 0, `the connector applied ${ran.applied} and failed ${ran.failed}`)
+      must(read('memory.json').length === 1 && read('memory.json')[0].text.includes('afternoons'), 'the connector did not apply the fact changes')
+      must(read('jobs.json')[0].paused === true && read('settings.json').abilities.send_email === 'off', 'the connector did not apply the job and the switch')
+      await open()
+      must((await pg.locator('[data-fact]').count()) === 1 && (await pg.locator('[data-fact-text]').innerText()).includes('afternoons'), 'the page does not show the applied fact')
+      must((await pg.locator('[data-change="waiting"]').count()) === 0, 'something still waits after the connector confirmed')
+      must((await pg.locator('[data-job]').getAttribute('data-paused')) === '1' && (await pg.locator('[data-ability-key="send_email"]').getAttribute('data-mode')) === 'off', 'the job or the switch is not as confirmed')
+      // a change the agent cannot apply is failed, with its reason
+      put('jobs.json', [])
+      await pg.locator('[data-job] [data-job-toggle]').click()
+      await pg.locator('[data-job] [data-change="waiting"]').waitFor({ timeout: 10000 })
+      must(connector().failed === 1, 'the connector did not fail a change it could not apply')
+      await open()
+      must((await pg.locator('[data-job]').count()) === 0, 'the job is still listed after the agent dropped it')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.51', `${width} px: an agent that has reported nothing says what will appear in each section`, async () => {
+      const empty = `i85-empty-${width}`
+      bench(`frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "${empty}", "active": 1}).insert(ignore_permissions=True)`)
+      await s.open(`/life/brain/sources/${empty}`)
+      await pg.locator('[data-agent-panel] [data-agent-section="connector"]').waitFor({ timeout: 10000 })
+      for (const k of ['waiting', 'knows', 'scheduled', 'did']) must(await pg.locator(`[data-agent-empty="${k}"]`).isVisible(), `no empty state for ${k}`)
+      must((await pg.locator('[data-agent-empty="knows"]').innerText()).includes('Nothing yet') && await pg.locator('[data-connector-how]').isVisible(), 'the empty page does not say what fills it')
+      must((await pg.locator('[data-page-title]').innerText()) === 'Your assistant', 'the empty agent is not shown as Your assistant')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for dt in ("Life Agent Fact", "Life Agent Job", "Life Agent Change", "Life Agent Action", "Life Agent Config", "Life Connection"):
+    filters = {"system": ["like", "i85-%"]} if dt == "Life Connection" else {"agent": ["like", "i85-%"]}
+    for n in frappe.get_all(dt, filters=filters, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)`)
+    fs.rmSync(home, { recursive: true, force: true })
+    await s.ctx.close()
+  }
+}
+
+// Google through Life OS (issue 86): an agent's own idea waits for the owner's OK, Ask searches Gmail live. The fake Google and fake Gmail are the site's own
+// (site config lifeos_fake_gmail); the fake agent here is a Life Connection with the key i86-<width>.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const phone = width < 768
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const system = `i86-${width}`
+  bench(`frappe.set_user("Administrator")
+from lifeos.mail import fake
+fake.clear()
+if not frappe.db.get_value("Life Space", "${SPACE}", "owner_user"): frappe.db.set_value("Life Space", "${SPACE}", "owner_user", "owner@lifeos.test")
+for n in frappe.get_all("Life Mail Account", filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc("Life Mail Account", n, force=1, ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Mail Account", "space": "${SPACE}", "user": "owner@lifeos.test", "provider": "gmail", "address": "owner@example.com", "label": "Personal", "is_default": 1}).insert(ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "${system}", "active": 1}).insert(ignore_permissions=True)`)
+  try {
+    await check('BRAIN.52', `${width} px: an agent's suggested reply waits in Needs you and on its page; approving sends it (fake Google) and moves it to Did, with who asked`, async () => {
+      bench(`from lifeos.agents import acts
+frappe.set_user("Administrator")
+acts.request("${SPACE}", "${system}", "email.send", {"to": "meera@example.com", "subject": "I86 quote ${width}", "body": "Hello Meera, the quote is attached."}, "agent")
+acts.request("${SPACE}", "${system}", "calendar.create", {"title": "I86 lunch ${width}", "start": "2026-11-25T13:00:00", "end": "2026-11-25T14:00:00"}, "owner", "Put lunch with Meera on Wednesday")`)
+      const needs = await owner.api('brain.needs_you', { space: SPACE })
+      must(needs.agent_requests.some((r) => r.title.includes(`I86 quote ${width}`)), 'Needs you does not list the reply')
+      await s.open(`/life/brain/sources/${system}`)
+      await pg.locator('[data-agent-panel] [data-agent-section="connector"]').waitFor({ timeout: 10000 })
+      const waiting = pg.locator('[data-agent-section="waiting"] [data-agent-request]')
+      must((await waiting.count()) === 1 && (await waiting.locator('[data-request-draft]').innerText()).includes('the quote is attached'), 'the reply and its draft are not on the agent page')
+      const did = pg.locator('[data-did]')
+      must((await did.count()) === 1 && (await did.first().locator('[data-did-asked]').innerText()).includes('Put lunch with Meera on Wednesday'), 'the owner request is not in Did with the owner words')
+      must(!bench('from lifeos.mail import fake\nprint([c["call"] for c in fake.calls()])').includes('send'), 'the reply was sent before the owner said so')
+      await noSideways()
+      await waiting.locator('[data-request-approve]').click()
+      await pg.locator('[data-agent-section="waiting"] [data-agent-empty="waiting"]').waitFor({ timeout: 10000 })
+      must((await did.count()) === 2, 'the approved reply did not move to Did')
+      must((await pg.locator('[data-did-asked]').allInnerTexts()).some((t) => t.includes('Its own idea, with your OK')), 'Did does not say it was the agent own idea')
+      must(bench('from lifeos.mail import fake\nprint([c["call"] for c in fake.calls()])').includes('send'), 'approving did not send it (fake Google): ' + bench(`print(frappe.get_all("Life Agent Action", filters={"agent": "${system}"}, fields=["status", "error", "title"]))`).split('\\n').pop())
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.53', `${width} px: Ask "find the 2014 tax return" (fake AI, fake Gmail) shows the threads it found and a File it button; filing makes a Brain item linked to Gmail`, async () => {
+      bench(`frappe.set_user("Administrator")
+for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+      await s.open('/life/today')
+      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill('find the 2014 tax return'); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type('find the 2014 tax return'); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
+      const answer = pg.locator('[data-ask-answer]:visible').last()
+      await answer.waitFor({ timeout: 15000 })
+      for (let i = 0; i < 40 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
+      must((await answer.innerText()).includes('2014 tax return'), 'the answer does not name the thread: ' + await answer.innerText())
+      const file = pg.locator('[data-ask-action="file_mail"]:visible')
+      must((await file.count()) === 1 && (await file.innerText()).includes('File it'), 'there is not one File it button')
+      must(bench(`print(frappe.db.exists("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}))`).split('\n').pop() === 'None', 'it was filed before the owner clicked')
+      await noSideways()
+      await file.click()
+      let made = 'None'
+      for (let i = 0; i < 20 && made === 'None'; i++) { await pg.waitForTimeout(300); made = bench(`print(frappe.db.get_value("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, "source_url"))`).split('\n').pop() }
+      must(made.includes('mail.google.com'), 'filing did not make a Brain item linked to Gmail: ' + made)
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.54', `${width} px: the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item`, async () => {
+      const digest = bench(`from lifeos.mail import digest
+frappe.set_user("Administrator")
+print(digest.make("owner@lifeos.test", "${SPACE}", 1))`).split('\n').pop()
+      must(digest && digest !== 'None', 'the digest was not made: ' + digest)
+      await s.open(`/life/brain/captures?tab=email&open=source:${digest}`)
+      await pg.locator('[data-digest]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-digest-section]').first().getAttribute('data-digest-section')) === 'Personal', 'the digest is not grouped by inbox')
+      const lines = pg.locator('[data-digest-item]')
+      must((await lines.count()) === 2 && (await lines.first().locator('[data-open-gmail]').count()) === 1, 'the lines or their Open in Gmail buttons are missing')
+      await noSideways()
+      await lines.filter({ hasText: '2014 tax return' }).locator('[data-file-mail]').click()
+      let made = 'None'
+      for (let i = 0; i < 20 && made === 'None'; i++) { await pg.waitForTimeout(300); made = bench(`print(frappe.db.get_value("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, "name"))`).split('\n').pop() }
+      must(made !== 'None', 'File it did not make the thread\'s item')
+      must((await lines.filter({ hasText: '2014 tax return' }).locator('[data-file-mail]').innerText()).includes('Filed'), 'the line does not say it is filed')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for dt in ("Life Agent Action", "Life Agent Config"):
+    for n in frappe.get_all(dt, filters={"agent": "${system}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Connection", filters={"system": "${system}"}, pluck="name"): frappe.delete_doc("Life Connection", n, force=1, ignore_permissions=True)
+for dt in ("Life Mail Account", "Life Mail Search"):
+    for n in frappe.get_all(dt, filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "source_system": "gmail"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

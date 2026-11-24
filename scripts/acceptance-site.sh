@@ -42,6 +42,8 @@ $B "bench --site $SITE set-config -p lifeos_strict_get 1 >/dev/null"
 $B "bench --site $SITE set-config -p lifeos_allow_open_goals 1 >/dev/null"
 # set 8: a fixture calendar stands in for Google here
 $B "bench --site $SITE set-config -p lifeos_fake_calendar 1 >/dev/null"
+# issue 86: a fake Gmail and a fake Google stand in for the real ones (lifeos/mail/fake.py)
+$B "bench --site $SITE set-config -p lifeos_fake_gmail 1 >/dev/null"
 # the rhythm banners' clock may be moved here (today.get's `at`), and only here (UX fixes, set 6)
 $B "bench --site $SITE set-config -p lifeos_test_clock 1 >/dev/null"
 # Its own web server (host port 19000, which nothing else uses), since `bench serve` on 8000 serves the default site

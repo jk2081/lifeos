@@ -1,0 +1,187 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "agent",
+  "external_id",
+  "action",
+  "title",
+  "draft",
+  "status",
+  "cost",
+  "happened_on",
+  "decided_by",
+  "decided_on",
+  "delivered",
+  "asked_by",
+  "request",
+  "params",
+  "result",
+  "undo",
+  "undone",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "agent",
+   "fieldtype": "Data",
+   "label": "Agent",
+   "reqd": 1,
+   "length": 60,
+   "search_index": 1,
+   "in_list_view": 1,
+   "description": "The agent's connection key (its source_system), for example hermes"
+  },
+  {
+   "fieldname": "external_id",
+   "fieldtype": "Data",
+   "label": "External Id",
+   "length": 140
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Data",
+   "label": "Action",
+   "length": 60,
+   "reqd": 1,
+   "description": "read email, send email, change the calendar, chase people, use websites or pay"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "label": "Title",
+   "length": 200,
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "draft",
+   "fieldtype": "Text",
+   "label": "Draft",
+   "description": "What it wants to send or do, for the owner to read"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Waiting\nApproved\nDeclined\nDone\nFailed",
+   "default": "Waiting",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "cost",
+   "fieldtype": "Currency",
+   "label": "Cost",
+   "precision": "4"
+  },
+  {
+   "fieldname": "happened_on",
+   "fieldtype": "Datetime",
+   "label": "Happened On"
+  },
+  {
+   "fieldname": "decided_by",
+   "fieldtype": "Link",
+   "label": "Decided By",
+   "options": "User"
+  },
+  {
+   "fieldname": "decided_on",
+   "fieldtype": "Datetime",
+   "label": "Decided On"
+  },
+  {
+   "fieldname": "delivered",
+   "fieldtype": "Check",
+   "label": "Delivered",
+   "description": "The agent has picked up the decision"
+  },
+  {
+   "fieldname": "asked_by",
+   "fieldtype": "Select",
+   "label": "Asked By",
+   "options": "\nowner\nagent",
+   "description": "owner: the owner told the agent to do it; agent: its own idea"
+  },
+  {
+   "fieldname": "request",
+   "fieldtype": "Small Text",
+   "label": "Owner's Message",
+   "description": "What the owner said, for a request the owner made"
+  },
+  {
+   "fieldname": "params",
+   "fieldtype": "Long Text",
+   "label": "Parameters",
+   "description": "What is sent to Google (JSON); cleared when the request is declined"
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Small Text",
+   "label": "Result",
+   "description": "What Google answered, in a line"
+  },
+  {
+   "fieldname": "undo",
+   "fieldtype": "Small Text",
+   "label": "Undo",
+   "description": "How to take it back where Google allows it (JSON)"
+  },
+  {
+   "fieldname": "undone",
+   "fieldtype": "Check",
+   "label": "Undone"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Agent Action",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title"
+}

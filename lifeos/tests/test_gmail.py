@@ -6,10 +6,13 @@ from unittest import mock
 
 import frappe
 
-from lifeos.brain import gmail
+from lifeos import mail, permissions
+from lifeos.mail import digest, gmail
 from lifeos.api import connections, inbox, settings
-from lifeos.tests.base import AGENT, OWNER, PRIVATE
-from lifeos.tests.helpers import item, set_key, SKILL, SkillCase, text
+from lifeos.api import ask as ask_api
+from lifeos.api import mail as mail_api
+from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED
+from lifeos.tests.helpers import AskCase, item, set_key, SKILL, SkillCase, text, use
 
 
 MAILBOX = "owner@example.com"
@@ -28,21 +31,22 @@ def message(id, sender, subject, text, labels=("INBOX",), headers=None, at=1_900
 
 
 class FakeGmail:
-	"""Stands in for the Gmail client and records every call it gets."""
+	"""Stands in for the Gmail client: the threads it holds, and a record of every call it gets."""
 
-	def __init__(self, threads, files=None):
-		self.threads, self.files, self.calls = {t["id"]: t for t in threads}, files or {}, []
+	def __init__(self, threads, files=None, address=MAILBOX):
+		self.threads, self.files, self.calls, self.address = {t["id"]: t for t in threads}, files or {}, [], address
+		self.query = None
 
 	def profile(self):
 		self.calls.append("profile")
-		return {"emailAddress": MAILBOX}
+		return {"emailAddress": self.address}
 
-	def list_threads(self, query, page_token=None):
+	def list_threads(self, query, page_token=None, max_results=100):
 		self.calls.append("list_threads")
 		self.query = query
-		return {"threads": [{"id": i} for i in self.threads]}
+		return {"threads": [{"id": i, "snippet": " ".join(gmail.text_of(t["messages"][-1]).split())[:80]} for i, t in list(self.threads.items())[:max_results]]}
 
-	def get_thread(self, thread_id):
+	def get_thread(self, thread_id, fmt="full"):
 		self.calls.append("get_thread")
 		return self.threads[thread_id]
 
@@ -58,175 +62,36 @@ def thread(id, *messages):
 class GmailCase(SkillCase):
 	def setUp(self):
 		super().setUp()
-		set_key("")  # no key unless a test sets one: the triage skill then has no answer, and mail from a person is kept
+		set_key("")  # no key unless a test sets one
 		frappe.db.delete("Life Connection", {"space": PRIVATE})
+		frappe.db.delete("Life Mail Account", {"space": PRIVATE})
+		frappe.db.delete("Life Mail Search", {"space": PRIVATE})
 		frappe.db.delete("Life Inbox Item", {"space": PRIVATE})
 		frappe.db.delete("Life Skill Run")
 		frappe.set_user("Administrator")
-		self.conn = frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "label": MAILBOX, "mailbox": MAILBOX, "active": 1}).insert()
+		self.conn = frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "label": MAILBOX, "mailbox": MAILBOX, "active": 1,
+			"connected_by": OWNER}).insert()
+		frappe.flags.lifeos_gmail, frappe.flags.lifeos_google = {}, {}
+		self.addCleanup(lambda: setattr(frappe.flags, "lifeos_gmail", {}))
+		self.addCleanup(lambda: setattr(frappe.flags, "lifeos_google", {}))
 
-	def fetch(self, *threads, files=None, **settings):
-		for k, v in settings.items():
-			self.conn.set(k, v)
-		self.conn.save()
-		client = FakeGmail(threads, files)
-		with mock.patch("frappe.enqueue"):
-			stats = gmail.fetch(self.conn.name, client)
-		self.conn.reload()
-		return stats, client
+	def inbox(self, user, address, label, *threads, files=None, default=0, space=PRIVATE):
+		"""An inbox of a person, with the threads a fake Gmail holds for it."""
+		before = frappe.session.user
+		frappe.set_user("Administrator")
+		acc = frappe.get_doc({"doctype": "Life Mail Account", "space": space, "user": user, "provider": "gmail", "address": address, "label": label, "is_default": default,
+			"active": 1}).insert()
+		frappe.set_user(before)
+		fake = FakeGmail(threads, files, address)
+		frappe.flags.lifeos_gmail[address] = fake
+		return acc, fake
 
 	def items(self):
-		return frappe.get_all("Life Inbox Item", filters={"space": PRIVATE, "source_system": "gmail"}, fields=["name", "external_id", "title", "status", "raw_text", "source_type"])
-
-
-class TestGmail(GmailCase):
-	def test_a_run_files_one_capture_per_kept_thread_and_skips_what_is_not_a_person(self):
-		"""Gmail client faked."""
-		person = thread("t-person", message("m1", "Meera Shah <meera@shahandsons.example>", "Quote for the estate blend", "Could you send a quote by Friday?"))
-		promo = thread("t-promo", message("m2", "Shop <hello@shop.example>", "50% off", "Sale!", labels=("INBOX", "CATEGORY_PROMOTIONS")))
-		updates = thread("t-upd", message("m3", "Bank <alerts@bank.example>", "Statement", "Your statement", labels=("INBOX", "CATEGORY_UPDATES")))
-		listed = thread("t-list", message("m4", "News <news@paper.example>", "Weekly", "Read on", headers={"List-Unsubscribe": "<mailto:u@paper.example>"}))
-		bulk = thread("t-bulk", message("m5", "Club <club@club.example>", "Notice", "Dear member", headers={"Precedence": "bulk"}))
-		noreply = thread("t-noreply", message("m6", "Service <no-reply@service.example>", "Your code", "123456"))
-		noreply2 = thread("t-noreply2", message("m7", "Service <donotreply@service.example>", "Receipt", "Thanks"))
-		vip = thread("t-vip", message("m8", "Anil <anil@vendor.example>", "Offer", "Special", labels=("INBOX", "CATEGORY_PROMOTIONS")))
-		skipped = thread("t-skip", message("m9", "Pest <sales@pest.example>", "Hello", "Hi there"))
-		mine = thread("t-mine", message("m10", f"Me <{MAILBOX}>", "Note to self", "Remember", labels=("SENT",)))
-		stats, client = self.fetch(person, promo, updates, listed, bulk, noreply, noreply2, vip, skipped, mine,
-			always_include="vendor.example", always_skip="pest.example")
-		got = {i.external_id: i for i in self.items()}
-		self.assertEqual(sorted(got), ["t-person", "t-vip"])
-		self.assertEqual((got["t-person"].title, got["t-person"].source_type), ("Quote for the estate blend", "Email"))
-		self.assertIn("Could you send a quote", got["t-person"].raw_text)
-		self.assertEqual(stats["kept"], 2)
-		self.assertEqual((self.conn.seen_week, self.conn.kept_week), (10, 2))
-		self.assertIn("10 this week · 2 kept", connections.sources(space=PRIVATE)["connected"][0]["line"])
-		self.assertEqual(frappe.db.count("Life Skill Run", {"skill": SKILL}), 2)  # the Brain is started for each kept capture
-		self.assertIn("in:inbox", client.query)
-
-	def test_a_label_can_be_read_instead_of_the_inbox(self):
-		_, client = self.fetch(thread("t1", message("m1", "A <a@a.example>", "S", "x")), label_name="Life OS")
-		self.assertIn("label:Life-OS", client.query)
-		self.assertNotIn("in:inbox", client.query)
-
-	def test_the_triage_skill_decides_what_is_kept_and_a_missing_answer_keeps_it(self):
-		set_key("sk-test-not-real")
-		self.script({"content": [{"type": "text", "text": json.dumps({"keep": False, "reason": "Cold sales outreach"})}], "stop_reason": "end_turn"},
-			{"content": [{"type": "text", "text": json.dumps({"keep": True, "reason": "A client"})}], "stop_reason": "end_turn"})
-		stats, _ = self.fetch(thread("t-cold", message("m1", "Rohan <rohan@leads.example>", "10x your leads", "Hop on a call?")),
-			thread("t-client", message("m2", "Meera <meera@client.example>", "Quote", "Please quote")))
-		self.assertEqual(sorted(i.external_id for i in self.items()), ["t-client"])
-		self.assertEqual(stats["skipped"], {"Cold sales outreach": 1})
-		set_key("")  # no key: the answer is missing, so the mail is kept
-		stats, _ = self.fetch(thread("t-nokey", message("m3", "Pat <pat@friend.example>", "Lunch?", "Are you free?")))
-		self.assertIn("t-nokey", [i.external_id for i in self.items()])
-
-	def test_a_reply_updates_the_same_capture_and_a_done_capture_goes_back_to_the_brain(self):
-		first = message("m1", "Meera <meera@client.example>", "Quote", "Please send a quote.", at=1_900_000_000_000)
-		self.fetch(thread("t1", first))
-		item = self.items()[0]
-		frappe.db.set_value("Life Inbox Item", item.name, "status", "Done")
-		frappe.db.delete("Life Skill Run")
-		reply = message("m2", "Meera <meera@client.example>", "Re: Quote", "Also, by Friday please.", at=1_900_000_100_000)
-		self.fetch(thread("t1", first, reply))
-		items = self.items()
-		self.assertEqual(len(items), 1)  # the same capture, the same external_id
-		self.assertEqual((items[0].name, items[0].external_id, items[0].status), (item.name, "t1", "New"))
-		self.assertIn("Also, by Friday please.", items[0].raw_text)
-		self.assertIn("Earlier in this thread", items[0].raw_text)
-		self.assertIn("Please send a quote.", items[0].raw_text)
-		self.assertEqual(len(frappe.get_all("Life Skill Run", filters={"input_name": item.name, "skill": SKILL, "status": "Queued"})), 1)
-		# the same mail read again changes nothing and starts nothing
-		frappe.db.delete("Life Skill Run")
-		stats, _ = self.fetch(thread("t1", first, reply))
-		self.assertEqual(stats["updated"], 0)
-		self.assertEqual(frappe.db.count("Life Skill Run"), 0)
-
-	def test_attachments_are_kept_up_to_10_mb_and_once(self):
-		pdf = ("offer.txt", b"The offer: 200 kg at Rs 900.")
-		t = thread("t1", message("m1", "A <a@a.example>", "With a file", "see attached", attachments=[pdf]))
-		_, client = self.fetch(t, files={"att-offer.txt": pdf[1]})
-		names = [f.file_name for f in frappe.get_all("File", filters={"attached_to_doctype": "Life Inbox Item", "attached_to_name": self.items()[0].name}, fields=["file_name"])]
-		self.assertIn("offer.txt", names)
-		self.assertEqual(client.calls.count("get_attachment"), 1)
-		_, client = self.fetch(t, files={"att-offer.txt": pdf[1]})
-		self.assertEqual(client.calls.count("get_attachment"), 0)
-		big = ("big.pdf", b"x")
-		t2 = thread("t2", message("m3", "B <b@b.example>", "Too big", "x", attachments=[big]))
-		t2["messages"][0]["payload"]["parts"][1]["body"]["size"] = gmail.ATTACHMENT_CAP + 1
-		_, client = self.fetch(t2, files={"att-big.pdf": b"x"})
-		self.assertEqual(client.calls.count("get_attachment"), 0)
-
-	def test_sensitive_senders_mark_the_capture_sensitive(self):
-		self.fetch(thread("t1", message("m1", "Dr Rao <rao@clinic.example>", "Your report", "Attached")), always_sensitive="clinic.example")
-		self.assertEqual(frappe.db.get_value("Life Inbox Item", self.items()[0].name, "is_sensitive"), 1)
-
-	def test_the_fetch_never_calls_a_gmail_method_that_changes_mail(self):
-		"""Only list and get are used, and the client has nothing else."""
-		_, client = self.fetch(thread("t1", message("m1", "A <a@a.example>", "S", "x")))
-		self.assertTrue(set(client.calls) <= {"profile", "list_threads", "get_thread", "get_attachment"}, client.calls)
-		self.assertEqual(sorted(n for n in dir(gmail.GmailClient) if not n.startswith("_")),
-			["get_attachment", "get_thread", "list_threads", "profile"])
-		sent = []
-
-		def reply(url, **kwargs):
-			sent.append(url)
-			return mock.Mock(status_code=200, json=lambda: {"threads": []} if url.endswith("/threads") else {"emailAddress": MAILBOX})
-
-		real = gmail.GmailClient(lambda: {"Authorization": "Bearer x"})
-		with mock.patch("requests.get", side_effect=reply), mock.patch("requests.post") as post, mock.patch("requests.put") as put, \
-				mock.patch("requests.delete") as delete, mock.patch("requests.patch") as patch, mock.patch("requests.request") as request:
-			gmail.fetch(self.conn.name, real)
-		for call in (post, put, delete, patch, request):
-			call.assert_not_called()
-		self.assertTrue(sent and all(u.startswith(gmail.API) for u in sent), sent)
-		self.assertFalse([u for u in sent if any(w in u for w in ("modify", "trash", "delete", "send", "labels", "batch", "import", "insert"))], sent)
-
-	def test_hermes_filing_an_email_with_the_thread_id_updates_the_capture(self):
-		"""No second capture."""
-		self.fetch(thread("t-9", message("m1", "Meera <meera@client.example>", "Quote", "Please send a quote.")))
-		made = self.items()[0]
-		self.as_user(AGENT)
-		with mock.patch("frappe.enqueue"):
-			done = inbox.create_item(title="Quote", source_type="Email", source_system="gmail", external_id="t-9", space=PRIVATE,
-				instruction="Reply today", raw_text=made.raw_text)
-		self.assertEqual((done["created"], done["updated"], done["name"]), (False, True, made.name))
-		frappe.set_user("Administrator")
-		self.assertEqual(len(self.items()), 1)
-		self.assertEqual(frappe.db.get_value("Life Inbox Item", made.name, "instruction"), "Reply today")
-
-	def test_no_token_or_secret_is_written_to_logs_captures_or_errors(self):
-		token = "ya29.A0SECRETTOKENVALUE123456"
-		refresh = "1//0gREFRESHSECRETVALUE9876"
-		self.assertNotIn("SECRET", gmail.scrub(f"Authorization: Bearer {token} and {refresh}"))
-		import requests
-
-		real = gmail.GmailClient(lambda: {"Authorization": f"Bearer {token}"})
-		with mock.patch("requests.get", side_effect=requests.ConnectionError(f"failed with Bearer {token} {refresh}")):
-			stats = gmail.fetch(self.conn.name, real)
-		self.conn.reload()
-		self.assertTrue(stats["error"])
-		self.assertNotIn("SECRET", self.conn.last_error)
-
-		class Breaks(FakeGmail):
-			def get_thread(self, thread_id):
-				raise ValueError(f"boom Bearer {token} {refresh} secret=abcdefgh12345")
-
-		with mock.patch("frappe.enqueue"):
-			gmail.fetch(self.conn.name, Breaks([thread("t-x", message("m1", "A <a@a.example>", "S", "x"))]))
-		marks = ("A0SECRETTOKENVALUE123456", "0gREFRESHSECRETVALUE9876", "abcdefgh12345")
-		logs = frappe.get_all("Error Log", filters={"method": ("like", "Life OS Gmail%")}, fields=["method", "error"])
-		self.assertTrue(logs)  # the failure was logged, without the token
-		for dt, fields in (("Error Log", ["error", "method"]), ("Life Inbox Item", ["raw_text", "title", "error"]), ("Life Connection", ["last_error"]),
-				("Life Skill Run", ["error", "output"])):
-			for row in frappe.get_all(dt, fields=fields, order_by="creation desc", limit=100):
-				for v in row.values():
-					for mark in marks:
-						self.assertNotIn(mark, str(v or ""), dt)
+		return frappe.get_all("Life Inbox Item", filters={"space": PRIVATE, "source_system": "gmail"}, fields=["name", "external_id", "title", "status", "raw_text", "source_type", "source_url"])
 
 
 class TestConnectGmail(GmailCase):
-	def test_connect_asks_google_for_read_only_access_and_nothing_secret_is_returned(self):
+	def test_connect_asks_google_for_read_and_act_access_and_nothing_secret_is_returned(self):
 		settings = frappe.get_doc("Google Settings")
 		before = (settings.enable, settings.client_id, settings.get_password("client_secret", raise_exception=False))
 		settings.enable, settings.client_id, settings.client_secret = 1, "client-id-123.apps.example", "client-secret-xyz-789"
@@ -238,12 +103,14 @@ class TestConnectGmail(GmailCase):
 				out = connections.gmail_connect(space=PRIVATE)
 			self.assertTrue(out["url"].startswith(gmail.AUTHORIZATION_URI))
 			self.assertIn("gmail.readonly", out["url"])
+			self.assertIn("gmail.send", out["url"])
+			self.assertIn("calendar.events", out["url"])
 			self.assertIn("access_type=offline", out["url"])
 			self.assertNotIn("client-secret-xyz-789", json.dumps(out))
 			conn = frappe.get_doc("Life Connection", out["connection"])
 			self.assertEqual((conn.system, conn.active, conn.connected_by), ("gmail", 0, OWNER))
 			app = frappe.get_doc("Connected App", conn.connected_app)
-			self.assertEqual([r.scope for r in app.scopes], [gmail.SCOPE])
+			self.assertEqual([r.scope for r in app.scopes], list(gmail.SCOPES))
 			self.assertTrue(app.name.startswith(gmail.APP_PREFIX))
 			card = next(c for c in connections.sources(space=PRIVATE)["connected"] if c["name"] == conn.name)
 			self.assertEqual((card["pending"], card["processed_by"]), (1, "Processed by: the Brain"))
@@ -262,11 +129,23 @@ class TestConnectGmail(GmailCase):
 					frappe.delete_doc("Connected App", name, ignore_permissions=True, force=True)
 
 	def test_without_google_settings_connect_says_what_to_set_up(self):
-		with mock.patch("lifeos.brain.gmail.configured", return_value=False):
+		with mock.patch("lifeos.mail.gmail.configured", return_value=False):
 			self.as_user(OWNER)
 			with self.assertRaises(frappe.ValidationError) as e:
 				connections.gmail_connect(space=PRIVATE)
 		self.assertIn("Google Settings", str(e.exception))
+
+	def test_a_mail_account_follows_its_connection_and_goes_with_it(self):
+		acc = mail.account_for_connection(self.conn)
+		self.assertEqual((acc.user, acc.address, acc.label, acc.active, acc.is_default, acc.connection), (OWNER, MAILBOX, MAILBOX, 1, 1, self.conn.name))
+		self.assertEqual(mail.account_for_connection(self.conn).name, acc.name)  # the same account again
+		self.as_user(OWNER)
+		connections.save(name=self.conn.name, label="Rungamattee", active=0)
+		acc.reload()
+		self.assertEqual((acc.label, acc.active), ("Rungamattee", 0))
+		self.assertEqual(mail.accounts_for(OWNER, PRIVATE), [])  # off: not searched
+		connections.gmail_remove(self.conn.name)
+		self.assertFalse(frappe.db.exists("Life Mail Account", acc.name))
 
 	def test_two_mailboxes_are_two_cards(self):
 		frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "mailbox": "second@example.com", "label": "second@example.com", "active": 1}).insert()
@@ -294,3 +173,242 @@ class TestSourceCards(GmailCase):
 
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
+
+
+def person(id, sender, subject, text, at=1_900_000_000_000, **kw):
+	return thread(id, message(f"m-{id}", sender, subject, text, at=at, **kw))
+
+
+class TestMailSearch(GmailCase):
+	"""Live Gmail search (issue 86): one inbox or many, one query shape, the person's own inboxes only, every search logged."""
+
+	def test_7_search_returns_subject_sender_date_snippet_and_thread_id_and_refuses_another_persons_inbox(self):
+		acc, fake = self.inbox(OWNER, MAILBOX, "Personal", person("t1", "Anil <anil@ca.example>", "2014 tax return", "Your 2014 return is attached."))
+		out = mail.search(OWNER, PRIVATE, {"text": "tax return"})
+		hit = out["hits"][0]
+		self.assertEqual((hit["thread_id"], hit["subject"], hit["inbox"]), ("t1", "2014 tax return", "Personal"))
+		self.assertIn("anil@ca.example", hit["from"])
+		self.assertIn("Your 2014 return", hit["snippet"])
+		self.assertTrue(hit["date"])
+		self.assertIn("tax return", fake.query)
+		with self.assertRaises(frappe.PermissionError):  # the family member names the owner's inbox
+			mail.search(FAMILY, PRIVATE, {"text": "tax"}, account=acc.name)
+		with self.assertRaises(frappe.PermissionError):
+			mail.search(FAMILY, PRIVATE, {"text": "tax"}, account=MAILBOX)
+		with self.assertRaises(frappe.ValidationError):  # and with none of their own, there is nothing to search
+			mail.search(FAMILY, PRIVATE, {"text": "tax"})
+		self.assertEqual(fake.calls.count("list_threads"), 1)
+		with self.assertRaises(frappe.ValidationError):
+			mail.search(OWNER, PRIVATE, {})
+
+	def test_the_tools_are_whitelisted_methods_with_the_persons_own_session(self):
+		self.inbox(OWNER, MAILBOX, "Personal", person("t1", "A <a@a.example>", "Hello", "Hi"))
+		self.as_user(OWNER)
+		self.assertEqual(mail_api.search({"text": "hello"}, space=PRIVATE)["hits"][0]["thread_id"], "t1")
+		self.assertEqual(mail_api.get_thread("t1", space=PRIVATE)["messages"][0]["text"], "Hi")
+		self.assertEqual([a.label for a in mail.accounts_for(OWNER, PRIVATE)], ["Personal"])
+		self.as_user(FAMILY)
+		self.assertEqual(mail.accounts_for(FAMILY, SHARED), [])
+
+	def test_8_an_attachment_is_stored_once_and_linked_to_the_asking_item(self):
+		pdf = ("return.txt", b"The 2014 return: refund Rs 4,200.")
+		self.inbox(OWNER, MAILBOX, "Personal", person("t1", "A <a@a.example>", "Return", "see attached", attachments=[pdf]), files={"att-return.txt": pdf[1]})
+		self.as_user(OWNER)
+		asking = item("Where is my 2014 return", space=PRIVATE)
+		first = mail_api.get_attachment("m-t1", "att-return.txt", asking, filename="return.txt", space=PRIVATE)
+		again = mail_api.get_attachment("m-t1", "att-return.txt", asking, filename="return.txt", space=PRIVATE)
+		self.assertEqual(first["file"], again["file"])
+		self.assertEqual(frappe.db.count("File", {"attached_to_doctype": "Life Inbox Item", "attached_to_name": asking, "file_name": "return.txt"}), 1)
+		other = item("Another question", space=PRIVATE)
+		linked = mail_api.get_attachment("m-t1", "att-return.txt", other, filename="return.txt", space=PRIVATE)
+		self.assertEqual(frappe.db.get_value("File", linked["file"], "file_url"), frappe.db.get_value("File", first["file"], "file_url"))  # one copy on disk
+		self.as_user(FAMILY)
+		with self.assertRaises(frappe.PermissionError):
+			mail_api.get_attachment("m-t1", "att-return.txt", asking, space=SHARED)
+
+	def test_9_every_search_writes_a_log_with_the_query_the_count_and_the_cost(self):
+		self.inbox(OWNER, MAILBOX, "Personal", person("t1", "A <a@a.example>", "Tax", "x"), person("t2", "B <b@b.example>", "Tax again", "y"))
+		mail.search(OWNER, PRIVATE, {"text": "tax", "from": "a@a.example"}, cost=0.0123)
+		mail.search(OWNER, PRIVATE, {"text": "tax"}, max_results=1, agent="hermes")
+		rows = frappe.get_all("Life Mail Search", filters={"space": PRIVATE}, fields=["user", "agent", "account_label", "query", "results", "cost"], order_by="creation asc")
+		self.assertEqual(len(rows), 2)
+		self.assertEqual((rows[0].user, rows[0].results, round(rows[0].cost, 4), rows[0].account_label), (OWNER, 2, 0.0123, "Personal"))
+		self.assertIn("from:a@a.example", rows[0].query)
+		self.assertEqual((rows[1].agent, rows[1].results), ("hermes", 1))
+
+	def test_12_two_inboxes_are_one_merged_labelled_list_and_one_inbox_when_named(self):
+		_, rung = self.inbox(OWNER, "rung@example.com", "Rungamattee", person("r1", "A <a@a.example>", "Tea order", "tea", at=1_900_000_000_000), default=1)
+		_, home = self.inbox(OWNER, "home@example.com", "Personal", person("h1", "B <b@b.example>", "Tea party", "party", at=1_900_000_500_000))
+		_, theirs = self.inbox(FAMILY, "family@example.com", "Family", person("f1", "C <c@c.example>", "Tea secrets", "x", at=1_900_000_900_000))
+		both = mail.search(OWNER, PRIVATE, {"text": "tea"})
+		self.assertEqual([(h["thread_id"], h["inbox"]) for h in both["hits"]], [("h1", "Personal"), ("r1", "Rungamattee")])  # newest first
+		self.assertEqual(theirs.calls, [])  # another person's inbox is never touched
+		one = mail.search(OWNER, PRIVATE, {"text": "tea"}, account="Rungamattee")
+		self.assertEqual([h["thread_id"] for h in one["hits"]], ["r1"])
+		self.assertEqual(home.calls.count("list_threads"), 1)  # only the first search reached it
+		self.assertEqual(theirs.calls, [])
+		self.assertEqual(mail.get_thread(OWNER, PRIVATE, "h1")["inbox"], "Personal")  # the thread is found in the inbox that has it
+		self.assertEqual([r.label for r in mail.accounts_for(OWNER, PRIVATE)], ["Rungamattee", "Personal"])  # the default first
+
+	def test_13_the_gmail_adapter_turns_each_plain_field_into_gmail_syntax(self):
+		q = gmail.build_query
+		self.assertEqual(q({"text": "tax return"}), "tax return")
+		self.assertEqual(q({"from": "anil@ca.example"}), "from:anil@ca.example")
+		self.assertEqual(q({"from": "Anil Shah"}), 'from:"Anil Shah"')
+		self.assertEqual(q({"to": "me@example.com"}), "to:me@example.com")
+		self.assertEqual(q({"subject": "tax return 2014"}), 'subject:"tax return 2014"')
+		self.assertEqual(q({"has_attachment": True}), "has:attachment")
+		self.assertEqual(q({"has_attachment": False}), "")
+		self.assertEqual(q({"filename": "return.pdf"}), "filename:return.pdf")
+		self.assertEqual(q({"after": "2014-04-05"}), "after:2014/04/05")
+		self.assertEqual(q({"before": "2015-1-9"}), "before:2015/01/09")
+		self.assertEqual(q({"raw": "is:starred larger:5M"}), "is:starred larger:5M")
+		self.assertEqual(q({"text": "tax", "from": "anil", "has_attachment": 1, "after": "2014-04-01", "before": "2015-03-31", "raw": "in:anywhere"}),
+			"tax from:anil has:attachment after:2014/04/01 before:2015/03/31 in:anywhere")
+		with self.assertRaises(frappe.ValidationError):
+			q({"after": "last spring"})
+
+	def test_the_provider_interface_is_one_adapter_and_microsoft_is_not_built_yet(self):
+		acc, _ = self.inbox(OWNER, MAILBOX, "Personal")
+		ad = mail.adapter(acc)
+		for name in ("search", "get_thread", "get_attachment", "send", "draft"):
+			self.assertTrue(callable(getattr(ad, name)), name)
+		frappe.db.set_value("Life Mail Account", acc.name, "provider", "microsoft")
+		out = mail.search(OWNER, PRIVATE, {"text": "x"})  # the inbox that cannot be searched is named; it does not hide the others
+		self.assertEqual((out["hits"], out["errors"][0]["inbox"]), ([], "Personal"))
+		self.assertIn("not supported", out["errors"][0]["error"])
+
+	def test_no_mail_is_copied_into_life_os_by_a_search(self):
+		self.inbox(OWNER, MAILBOX, "Personal", person("t1", "A <a@a.example>", "Hello", "Hi"))
+		before = (frappe.db.count("Life Inbox Item", {"space": PRIVATE}), frappe.db.count("Communication"))
+		mail.search(OWNER, PRIVATE, {"text": "hello"})
+		mail.get_thread(OWNER, PRIVATE, "t1")
+		self.assertEqual((frappe.db.count("Life Inbox Item", {"space": PRIVATE}), frappe.db.count("Communication")), before)
+		self.assertNotIn("lifeos.mail.gmail.fetch_all", json.dumps(frappe.get_hooks("scheduler_events")))
+
+	def test_filing_a_thread_makes_a_brain_item_linked_to_gmail_and_filing_again_is_the_same_item(self):
+		self.inbox(OWNER, MAILBOX, "Personal", person("t1", "Anil <anil@ca.example>", "2014 tax return", "Your 2014 return is attached."))
+		self.as_user(OWNER)
+		with mock.patch("frappe.enqueue"):
+			one = mail_api.file("t1", area=self.areas["Tea"], space=PRIVATE)
+			two = mail_api.file("t1", space=PRIVATE)
+		self.assertEqual(one["item"], two["item"])
+		doc = frappe.get_doc("Life Inbox Item", one["item"])
+		self.assertEqual((doc.source_type, doc.source_system, doc.external_id, doc.area), ("Email", "gmail", "t1", self.areas["Tea"]))
+		self.assertIn("mail.google.com", doc.source_url)
+		self.assertIn("Your 2014 return", doc.raw_text)
+		self.as_user(AGENT)
+		with self.assertRaises(frappe.PermissionError):
+			mail_api.file("t1", space=PRIVATE)
+
+
+class TestDigest(GmailCase):
+	"""How email enters Life OS (issue 86): a daily digest of mail from real people, not a capture for each email."""
+
+	def make(self, *threads, **kw):
+		self.inbox(OWNER, MAILBOX, "Personal", *threads)
+		return digest.make(OWNER, PRIVATE, **kw)
+
+	def test_11_one_digest_item_lists_the_real_people_and_filing_a_line_makes_the_brain_item(self):
+		name = self.make(person("t-meera", "Meera Shah <meera@shahandsons.example>", "Quote for the estate blend", "Could you send a quote by Friday?"),
+			person("t-promo", "Shop <hello@shop.example>", "50% off", "Sale!", labels=("INBOX", "CATEGORY_PROMOTIONS")),
+			person("t-list", "News <news@paper.example>", "Weekly", "Read on", headers={"List-Unsubscribe": "<mailto:u@paper.example>"}),
+			person("t-noreply", "Service <no-reply@service.example>", "Your code", "123456"),
+			person("t-mine", f"Me <{MAILBOX}>", "Note to self", "Remember", labels=("SENT",)))
+		doc = frappe.get_doc("Life Inbox Item", name)
+		self.assertEqual((doc.source_type, doc.source_system, doc.intent), ("Email Digest", "gmail", "Just keep"))
+		self.assertIn("Quote for the estate blend", doc.raw_text)
+		self.assertIn("Could you send a quote", doc.raw_text)
+		self.assertIn("## Personal", doc.raw_text)
+		for left_out in ("50% off", "Weekly", "Your code", "Note to self"):
+			self.assertNotIn(left_out, doc.raw_text)
+		self.assertIn("[File it](lifeos-file:", doc.raw_text)
+		self.assertEqual([i.name for i in self.items()], [name])  # one item for the day, no capture for each email
+		self.assertEqual(digest.make(OWNER, PRIVATE), name)  # the same day again is the same item
+		self.assertEqual(len(self.items()), 1)
+		self.as_user(OWNER)
+		with mock.patch("frappe.enqueue"):
+			filed = mail_api.file("t-meera", space=PRIVATE)
+		self.assertEqual(len(self.items()), 2)
+		self.assertEqual(frappe.db.get_value("Life Inbox Item", filed["item"], "external_id"), "t-meera")
+
+	def test_a_digest_groups_by_inbox_and_names_an_inbox_that_failed(self):
+		self.inbox(OWNER, "rung@example.com", "Rungamattee", person("r1", "A <a@a.example>", "Estate order", "tea"))
+		self.inbox(OWNER, MAILBOX, "Personal", person("h1", "B <b@b.example>", "Dinner", "tonight"))
+		broken = self.inbox(OWNER, "broken@example.com", "Old", person("x", "C <c@c.example>", "x", "x"))[1]
+		broken.list_threads = mock.Mock(side_effect=gmail.GmailError("Google refused access."))
+		text = frappe.db.get_value("Life Inbox Item", digest.make(OWNER, PRIVATE), "raw_text")
+		self.assertLess(text.index("## Rungamattee"), text.index("## Personal"))
+		self.assertIn("Estate order", text)
+		self.assertIn("Dinner", text)
+		self.assertIn("## Old", text)
+		self.assertIn("could not be read", text)
+
+	def test_nothing_from_people_makes_no_item_and_the_weekly_one_is_its_own_item(self):
+		self.assertIsNone(self.make(person("t1", "Service <no-reply@service.example>", "Code", "1")))
+		self.assertEqual(self.items(), [])
+		self.inbox(OWNER, "second@example.com", "Second", person("t2", "A <a@a.example>", "Hi", "hello"))
+		day, week = digest.make(OWNER, PRIVATE, 1), digest.make(OWNER, PRIVATE, 7, weekly=True)
+		self.assertNotEqual(day, week)
+		self.assertIn("this week", frappe.db.get_value("Life Inbox Item", week, "title"))
+
+	def test_a_person_with_no_inbox_has_no_digest_and_the_old_import_is_gone(self):
+		self.assertIsNone(digest.make(FAMILY, PRIVATE))
+		self.assertFalse(hasattr(gmail, "fetch_all"))
+		self.assertIn("lifeos.mail.digest.run_daily", json.dumps(frappe.get_hooks("scheduler_events")))
+		self.assertEqual(sorted(n for n in dir(gmail.GmailClient) if not n.startswith("_")), ["get_attachment", "get_thread", "list_threads", "profile"])
+
+
+
+class TestAskSearchesMail(AskCase):
+	"""Ask with an inbox connected (issue 86): it searches live, offers File it for what it read, and files only on the owner's click."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		frappe.db.delete("Life Mail Account", {"space": PRIVATE})
+		frappe.db.delete("Life Mail Search", {"space": PRIVATE})
+		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": MAILBOX, "label": "Personal", "is_default": 1}).insert()
+		self.gmail = FakeGmail([person("t-tax", "Anil <anil@ca.example>", "2014 tax return", "Your 2014 return is attached.")])
+		frappe.flags.lifeos_gmail = {MAILBOX: self.gmail}
+		self.addCleanup(lambda: setattr(frappe.flags, "lifeos_gmail", {}))
+		frappe.set_user(OWNER)
+
+	def test_10_ask_finds_the_thread_and_offers_file_it_and_filing_makes_a_brain_item_linked_to_gmail(self):
+		backend = self.script(use("mail_search", {"text": "tax return", "after": "2014-04-01", "before": "2015-03-31"}),
+			use("mail_thread", {"thread_id": "t-tax"}, id="t2"),
+			{"content": [text("Anil Shah sent your 2014 tax return on 23 Nov.")], "stop_reason": "end_turn"})
+		res = ask_api.ask("find the 2014 tax return", space=PRIVATE)
+		offered = [t["name"] for t in backend.received[0]["tools"]]
+		self.assertIn("mail_search", offered)
+		self.assertIn("after:2014/04/01", self.gmail.query)
+		msg = res["message"]
+		self.assertEqual([(a["kind"], a["thread_id"]) for a in msg["actions"]], [("file_mail", "t-tax")])
+		self.assertEqual(msg["actions"][0]["label"], "File it: 2014 tax return")
+		self.assertEqual(frappe.db.count("Life Inbox Item", {"space": PRIVATE, "source_system": "gmail"}), 0)  # nothing is filed until the owner clicks
+		log = frappe.get_all("Life Mail Search", filters={"space": PRIVATE}, fields=["user", "results", "query", "cost"])
+		self.assertEqual((log[0].user, log[0].results), (OWNER, 1))
+		self.assertGreater(log[0].cost, 0)  # the AI cost of the turn that searched
+		with mock.patch("frappe.enqueue"):
+			done = ask_api.run_action(msg["name"], 0)
+		item = frappe.get_doc("Life Inbox Item", done["item"])
+		self.assertEqual((item.source_system, item.external_id, item.title), ("gmail", "t-tax", "2014 tax return"))
+		self.assertIn("mail.google.com", item.source_url)
+
+	def test_without_an_inbox_ask_is_not_offered_the_mail_tools(self):
+		frappe.set_user("Administrator")
+		frappe.db.delete("Life Mail Account", {"space": PRIVATE})
+		frappe.set_user(OWNER)
+		backend = self.script({"content": [text("Nothing here.")], "stop_reason": "end_turn"})
+		ask_api.ask("find the 2014 tax return", space=PRIVATE)
+		self.assertNotIn("mail_search", [t["name"] for t in backend.received[0]["tools"]])
+
+	def test_a_family_member_asking_never_reaches_the_owners_inbox(self):
+		self.as_user = lambda u: (permissions.clear_cache(), frappe.set_user(u))
+		frappe.set_user("Administrator")
+		frappe.db.set_value("Life Space", SHARED, "ask_enabled", 1)
+		frappe.set_user(FAMILY)
+		backend = self.script({"content": [text("Nothing here.")], "stop_reason": "end_turn"})
+		ask_api.ask("find the 2014 tax return", space=SHARED)
+		self.assertNotIn("mail_search", [t["name"] for t in backend.received[0]["tools"]])
+		self.assertEqual(self.gmail.calls, [])

@@ -5,7 +5,7 @@ when_to_use: An agent works the Life OS inbox: claims captures, transcribes, sum
 trigger: Served
 output: Answer
 model: Smart
-version: 3
+version: 4
 ---
 
 # Life OS agent instructions
@@ -57,9 +57,10 @@ There is one kind of goal, with a **horizon**: Year (an annual goal), 12 weeks o
 ## Who processes a capture, and email (issue 58)
 
 - **You process what you file yourself.** A capture you create and claim, or a finished job you file with `jobs.file_job`, is yours. **Everything else is the built-in Brain's**: what the owner adds with + Capture or from the phone, the email Life OS reads itself, and a capture you made but did not claim within 30 minutes. Do not go looking for the owner's own captures to process; claim only what you made, or what `claim_next` hands you while the Brain is switched off for the space.
-- **Life OS reads and files the owner's Gmail itself** (read only, every 15 minutes, real people only, one capture per thread with `source_system` `gmail` and `external_id` the Gmail thread ID). **Do not file emails into Life OS on your own, and do not file an email digest of the same mail.** Your own Gmail access stays for what the owner asks of you: read mail on the move, reply, send.
-- When the owner asks you to **"file this email"**, file it with `inbox.create_item`, `source_system="gmail"` and `external_id` the Gmail **thread ID**, so it updates the capture Life OS already made instead of making a second one. Send the same title and text; add an `instruction` only if the owner gave one.
-- To see what Life OS made of an email, use `search.query` (the subject or the sender) or `context.get` with the subject as `task`, then `inbox.get` on the capture. Read the filed email from Life OS rather than from Gmail when you summarise the owner's mail.
+- **Gmail and the calendar go through Life OS** (issue 86): one Google connection for each person, held by Life OS. Email is **not copied** into Life OS; the owner gets one digest a day of mail from real people. Do not file emails on your own and do not file a digest of the same mail. To find mail, use `lifeos.api.mail.search` (plain fields `text`, `from`, `to`, `subject`, `has_attachment`, `filename`, `after`, `before`, optional `account`, and `raw` for Gmail's own syntax), then `lifeos.api.mail.get_thread` and `lifeos.api.mail.get_attachment` (saved once on the item you name in `for_item`). Pass your name as `source_system`. Read what you need, say what you found and what you could not find, and let the owner file what he wants kept (`lifeos.api.mail.file` is his).
+- To **send, draft, archive or label mail, or change the calendar**, call `lifeos.api.google.act` with `tool` (`email.draft`, `email.send`, `email.archive`, `email.label`, `calendar.create`, `calendar.move`, `calendar.respond`), `params`, and `asked_by`: `owner` when the owner told you to (pass his own words as `owner_message`; it runs at once and is logged), or `agent` when it is your own idea (it follows his switch for you: on its own, waits for his OK in Needs you, or is refused). There is no delete. `lifeos.api.google.calendar_list` reads events. Use `lifeos.api.google.tools` to list the tools.
+- When the owner asks you to **"file this email"**, file it with `lifeos.api.mail.file` (or `inbox.create_item` with `source_system="gmail"` and `external_id` the Gmail **thread ID**), so it is one item and not two.
+- To see what Life OS made of an email already filed, use `search.query` (the subject or the sender) or `context.get` with the subject as `task`, then `inbox.get`. An area the owner switched off for you is left out of what you read.
 - When a capture the Brain could not process is in Needs you as "Not processed", it waits for the owner (Retry or File it myself); do not claim it.
 
 ## Polling

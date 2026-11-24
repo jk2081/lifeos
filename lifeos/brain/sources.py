@@ -14,6 +14,7 @@ from lifeos.library.files import stored_name
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".heic")
 AUDIO_EXT = (".mp3", ".m4a", ".wav", ".ogg", ".opus", ".aac", ".flac", ".webm", ".amr")
 DOC_EXT = (".pdf", ".doc", ".docx", ".odt", ".rtf", ".xls", ".xlsx", ".csv", ".ppt", ".pptx", ".txt", ".md", ".epub")
+VIDEO_EXT = (".mp4", ".mov", ".m4v", ".mkv", ".avi", ".mpeg", ".mpg", ".3gp")
 ARTICLE_EXT = (".html", ".htm", ".mhtml", ".webarchive")
 BY_SOURCE_TYPE = {"Voice Note": "Voice", "Journal Photo": "Photo", "Email": "Email", "Email Digest": "Email Digest", "Web": "Article"}
 THUMB_WIDTH = 480
@@ -25,11 +26,13 @@ def original_files(item_name):
 
 
 def media_kind(source_type, file_names=(), source_url=None):
-	"""Voice, Document, Photo, Article, Email, Email Digest or Text: from the source type, else from the first file."""
+	"""Voice, Document, Photo, Video, Article, Email, Email Digest or Text: from the source type, else from the first file."""
 	if source_type in BY_SOURCE_TYPE:
 		return BY_SOURCE_TYPE[source_type]
 	for name in file_names:
 		low = (name or "").lower()
+		if low.endswith(VIDEO_EXT):
+			return "Video"
 		if low.endswith(AUDIO_EXT):
 			return "Voice"
 		if low.endswith(IMAGE_EXT):

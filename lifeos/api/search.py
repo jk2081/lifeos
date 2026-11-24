@@ -3,9 +3,11 @@ import re
 
 import frappe
 from frappe.query_builder import Order
+from frappe.query_builder import functions as fn
 from pypika.terms import Criterion, ValueWrapper
 
 from lifeos import permissions
+from lifeos.agents import limits
 from lifeos.api.timeline import decorate
 from lifeos.api.utils import FullText, area_criterion, flag, lens_area
 
@@ -56,6 +58,9 @@ def query(text: str, limit: int | None = 20, space: str | None = None, include_a
 	closed = [s for s in spaces if permissions.vault_hidden(s)]  # an agent's spaces whose Vault is closed to it
 	if closed:
 		where.append(~(((x.vault_locked == 1) | (x.ref_doctype == "Life Vault Document")) & x.space.isin(closed)))
+	off = limits.blocked()  # areas the owner switched off for this agent (issue 85)
+	if off:
+		where.append(fn.IfNull(x.area, "").notin(off))
 	if not flag(include_archived):
 		where.append(x.is_archived == 0)
 	area = lens_area(area)

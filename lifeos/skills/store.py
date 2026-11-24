@@ -77,8 +77,19 @@ def _apply(doc, values: dict):
 			doc.set(k, values[k])
 
 
+RENAMED = {"triage-email": "ingest-email"}  # a built-in skill that changed its name keeps its versions, runs and edits
+
+
+def _rename_old():
+	for old, new in RENAMED.items():
+		if frappe.db.exists("Life Skill", old) and not frappe.db.exists("Life Skill", new):
+			frappe.rename_doc("Life Skill", old, new, force=True)
+			frappe.db.set_value("Life Skill", new, "slug", new, update_modified=False)
+
+
 def install():
 	"""Install or update every built-in skill and its examples. Runs on migrate. An edit by the owner is kept."""
+	_rename_old()
 	for path in builtin_files():
 		shipped = parse_file(path)
 		slug = shipped["slug"]

@@ -1,0 +1,107 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-23 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "user",
+  "provider",
+  "address",
+  "label",
+  "connection",
+  "is_default",
+  "active"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "Person",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1,
+   "description": "Whose inbox this is. Only this person's Ask and agent search it."
+  },
+  {
+   "fieldname": "provider",
+   "fieldtype": "Select",
+   "label": "Provider",
+   "options": "gmail\nmicrosoft",
+   "default": "gmail",
+   "reqd": 1
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Data",
+   "label": "Address",
+   "reqd": 1,
+   "length": 140,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "label": "Label",
+   "length": 60,
+   "in_list_view": 1,
+   "description": "What the person calls it: Rungamattee, Personal"
+  },
+  {
+   "fieldname": "connection",
+   "fieldtype": "Link",
+   "label": "Connection",
+   "options": "Life Connection",
+   "description": "The sign-in (the token stays in Frappe's Token Cache, encrypted)"
+  },
+  {
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "label": "Default inbox",
+   "description": "Where a new email or draft is sent from when none is named"
+  },
+  {
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "label": "On",
+   "default": "1"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-23 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Mail Account",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "address"
+}

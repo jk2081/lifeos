@@ -120,6 +120,8 @@ export async function runAction(message, index) {
     if (out.kind === 'make_task') {
       recordChanged('task:' + out.task)
       toast.success(`Task made: ${out.title}`, { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('ask.undo_made_task', { task: out.task }); a.done = false; recordChanged('task:' + out.task) } } })
+    } else if (out.kind === 'file_mail') {
+      toast.success(`Filed: ${out.title}`, { duration: 60000, action: { label: 'Open', onClick: () => { ask.open = false; router.push('/item/' + out.item) } } })
     } else if (out.undo) {
       toast.success(`${a.label}: done.`, { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('reset.undo', { log: JSON.stringify(out.undo) }); a.done = false; recordChanged('') } } })
     } else toast.success('Done.')

@@ -38,6 +38,11 @@ for _dt in ("Life Ask Thread", "Life Ask Message"):
 	permission_query_conditions[_dt] = "lifeos.permissions.ask_query_conditions"
 	has_permission[_dt] = "lifeos.permissions.ask_has_permission"
 
+# issue 86: a person's mail accounts and the searches made in them are theirs alone
+for _dt in ("Life Mail Account", "Life Mail Search"):
+	permission_query_conditions[_dt] = "lifeos.permissions.mail_query_conditions"
+	has_permission[_dt] = "lifeos.permissions.mail_has_permission"
+
 doc_events = {
 	dt: {"validate": "lifeos.life.org.validate_common", "on_update": "lifeos.life.org.on_update", "on_trash": "lifeos.life.org.on_trash"}
 	for dt in SPACE_DOCTYPES
@@ -78,8 +83,8 @@ scheduler_events = {
 	"daily": ["lifeos.library.archive.run_daily", "lifeos.api.wiki.refresh_all_health", "lifeos.library.trash.purge_old", "lifeos.library.wiki_check.run_weekly"],
 	"cron": {"*/5 * * * *": ["lifeos.api.inbox.release_stale_claims", "lifeos.skills.triggers.run_due",
 		"lifeos.skills.triggers.route_unclaimed"],
-		# issue 58: Life OS reads the connected mailboxes (read only)
-		"*/15 * * * *": ["lifeos.brain.gmail.fetch_all"],
+		# issue 86: the daily email digest (and the Sunday roll-up) is made at 07:00 site time; Gmail is searched live, never copied
+		"0 7 * * *": ["lifeos.mail.digest.run_daily"],
 		# insights: nightly at 06:00 site time (the owner's time zone is the site's, Asia/Kolkata)
 		"0 6 * * *": ["lifeos.review.insights.run_nightly"],
 		# set 7: Inbox items left too long, before the morning

@@ -87,7 +87,7 @@
    "fieldname": "media_kind",
    "fieldtype": "Select",
    "label": "Media Kind",
-   "options": "\nVoice\nDocument\nPhoto\nArticle\nEmail\nEmail Digest\nText",
+   "options": "\nVoice\nDocument\nPhoto\nVideo\nArticle\nEmail\nEmail Digest\nText",
    "search_index": 1,
    "read_only": 1,
    "description": "Set on save from the file or the source type"

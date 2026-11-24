@@ -232,6 +232,11 @@ def run_action(message: str, index: int | str):
 
 		task = tasks.quick_add(a.get("title") or a.get("label"), space=t.space, area=a.get("area"), due_date=a.get("due_date"))
 		return {"kind": kind, "task": task["name"], "title": task["title"]}
+	if kind == "file_mail":
+		from lifeos import mail
+
+		done = mail.file_thread(frappe.session.user, t.space, a.get("thread_id") or "", account=a.get("account"))
+		return {"kind": kind, "item": done["item"], "title": done["title"]}
 	if kind == "move_someday":
 		from lifeos.api import reset
 

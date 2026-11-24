@@ -54,6 +54,17 @@ TOOLS = [
 			"required": ["kind", "label"]}}}, "required": ["actions"]}},
 ]
 TOOL_NAMES = [t["name"] for t in TOOLS]
+# issue 86: offered only to a person who has connected an inbox; the search is live, nothing is copied into Life OS
+MAIL_TOOLS = [
+	{"name": "mail_search", "description": "Search the person's own inbox live, with plain fields (not Gmail's syntax). Returns up to 10 threads, newest first: subject, sender, date, a snippet, the thread_id and which inbox. Try two or three different searches before giving up.",
+		"input_schema": {"type": "object", "properties": {
+			"text": {"type": "string", "description": "Words to find, a few key words."}, "from": {"type": "string"}, "to": {"type": "string"}, "subject": {"type": "string"},
+			"has_attachment": {"type": "boolean"}, "filename": {"type": "string", "description": "Part of an attachment's file name."},
+			"after": {"type": "string", "description": "YYYY-MM-DD"}, "before": {"type": "string", "description": "YYYY-MM-DD"},
+			"account": {"type": "string", "description": "One inbox, by its label or address. Leave out to search every inbox."}, "raw": {"type": "string", "description": "The provider's own query, only if the plain fields cannot say it."}}}},
+	{"name": "mail_thread", "description": "Read one thread found by mail_search: each message's text and its attachments.",
+		"input_schema": {"type": "object", "properties": {"thread_id": {"type": "string"}, "account": {"type": "string", "description": "The inbox the search said."}}, "required": ["thread_id"]}},
+]
 
 
 class Context:
@@ -70,6 +81,17 @@ class Context:
 		self.actions = []
 		self.calls = 0
 		self._scope_names = None
+		self.mails = []  # threads a search found: {thread_id, account, subject, from, date, link}
+		self.mails_read = []  # of those, the ones read in full
+		self.turn_cost = 0.0  # the AI cost of the model turn that is calling a tool; a search is logged with it
+		self._has_mail = None
+
+	def has_mail(self):
+		if self._has_mail is None:
+			from lifeos import mail
+
+			self._has_mail = bool(mail.accounts_for(self.user, self.space))
+		return self._has_mail
 
 	def ref(self, doctype, name, title="", kind="", date=None, area=None):
 		key = (doctype, name)
@@ -138,7 +160,7 @@ def run_tool(ctx, name, args):
 	args = args or {}
 	try:
 		fn = {"search": t_search, "get_record": t_get_record, "list_records": t_list, "counts": t_counts,
-			"cycle_state": t_cycle, "timeline": t_timeline, "suggest_actions": t_suggest}[name]
+			"cycle_state": t_cycle, "timeline": t_timeline, "suggest_actions": t_suggest, "mail_search": t_mail_search, "mail_thread": t_mail_thread}[name]
 	except KeyError:
 		return {"error": f"Unknown tool {name}."}
 	try:
@@ -405,3 +427,52 @@ def t_suggest(ctx, actions):
 		kept.append(item)
 	ctx.actions = kept
 	return {"ok": True, "shown": len(kept)}
+
+
+def tools_for(ctx):
+	return [*TOOLS, *MAIL_TOOLS] if ctx.has_mail() else TOOLS
+
+
+def t_mail_search(ctx, text=None, has_attachment=None, account=None, **fields):
+	"""A live search of the asking person's inboxes. One log record; the AI cost of this turn goes on it."""
+	from lifeos import mail
+	from lifeos.mail.gmail import GmailError, scrub
+
+	cost, ctx.turn_cost = ctx.turn_cost, 0.0
+	try:
+		found = mail.search(ctx.user, ctx.space, {"text": text, "has_attachment": has_attachment, **{k: v for k, v in fields.items() if k in mail.FIELDS}}, account, 10, cost=cost)
+	except GmailError as e:
+		return {"error": scrub(e)}
+	except frappe.ValidationError as e:
+		return {"error": str(e)}
+	rows = []
+	for h in found["hits"]:
+		if h["thread_id"] not in {m["thread_id"] for m in ctx.mails}:
+			ctx.mails.append({"thread_id": h["thread_id"], "account": h["account"], "subject": h["subject"], "from": h["from"], "date": h["date"], "link": h["link"]})
+		rows.append({k: h[k] for k in ("thread_id", "subject", "from", "date", "snippet", "inbox")})
+	return {"results": rows, "searched": found["searched"], "errors": found["errors"], "note": "These are not records in Life OS: say who, when and what, not a reference."}
+
+
+def t_mail_thread(ctx, thread_id, account=None):
+	from lifeos import mail
+	from lifeos.mail.gmail import GmailError, scrub
+
+	try:
+		got = mail.get_thread(ctx.user, ctx.space, thread_id, account)
+	except GmailError as e:
+		return {"error": scrub(e)}
+	known = next((m for m in ctx.mails if m["thread_id"] == thread_id), None)
+	if known and known not in ctx.mails_read:
+		ctx.mails_read.append(known)
+	elif not known:
+		known = {"thread_id": thread_id, "account": got["account"], "subject": got["subject"], "from": got["messages"][0]["from"] if got["messages"] else "", "date": "", "link": got["link"]}
+		ctx.mails.append(known)
+		ctx.mails_read.append(known)
+	return {"subject": got["subject"], "inbox": got["inbox"], "messages": [{"from": m["from"], "date": m["date"], "text": m["text"][:TEXT_CAP], "attachments": m["attachments"]}
+		for m in got["messages"][:6]]}
+
+
+def file_actions(ctx):
+	"""A File it button for each thread the answer read (or, if none was read, the best three found). The owner's click files it; nothing is filed before."""
+	chosen = (ctx.mails_read or ctx.mails)[:3]
+	return [{"kind": "file_mail", "label": f"File it: {m['subject'][:60]}", "thread_id": m["thread_id"], "account": m["account"], "title": m["subject"], "link": m["link"]} for m in chosen]

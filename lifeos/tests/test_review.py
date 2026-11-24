@@ -521,7 +521,7 @@ class TestLock(GoalsCase):
 		frappe.set_user(OWNER)
 		frappe.db.set_value("Life Space", PRIVATE, "ask_enabled", 1)
 		try:
-			tuesday = next(add_days(today(), -n) for n in range(1, 7) if frappe.utils.getdate(add_days(today(), -n)).weekday() == 1)
+			tuesday = next(add_days(today(), -n) for n in range(1, 8) if frappe.utils.getdate(add_days(today(), -n)).weekday() == 1)
 			frappe.get_doc({"doctype": "Event", "subject": "s8 call with Vivek", "starts_on": f"{tuesday} 11:00:00", "ends_on": f"{tuesday} 11:30:00",
 				"life_space": PRIVATE, "event_type": "Public"}).insert(ignore_permissions=True)
 			weekly.start(space=PRIVATE)

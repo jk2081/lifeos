@@ -23,13 +23,17 @@ def file_confident(item, proposals, label):
 	from lifeos.api import review
 	from lifeos.api.inbox import _finish_if_decided
 
+	from lifeos.brain import source_page
+
 	rule = settings()
 	if not rule["kinds"]:
 		return []
+	own = source_page.threshold_for(frappe.get_doc("Life Inbox Item", item))  # a source's own confidence (issue 84) beats the setting
+	threshold = rule["threshold"] if own is None else own
 	filed = []
 	for name in proposals:
 		prop = frappe.get_doc("Life Proposal", name)
-		if prop.status != "Pending" or prop.kind not in rule["kinds"] or flt(prop.confidence) < rule["threshold"]:
+		if prop.status != "Pending" or prop.kind not in rule["kinds"] or flt(prop.confidence) < threshold:
 			continue
 		frappe.db.savepoint("lifeos_autofile")
 		try:
