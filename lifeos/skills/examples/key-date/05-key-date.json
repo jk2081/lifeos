@@ -1,0 +1,34 @@
+{
+ "title": "A board meeting is a key date",
+ "input": {
+  "data": {
+   "title": "Board meeting",
+   "notes": "Quarterly numbers",
+   "all_day": false,
+   "starts": "2026-12-11 10:00",
+   "ends": "2026-12-11 13:00",
+   "repeats": "",
+   "attendees": 9
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "key",
+    "equals": true
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"key\": true, \"reason\": \"A board meeting shapes the plan.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "33b0ef2c1f5feb40"
+}

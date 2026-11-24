@@ -1,0 +1,34 @@
+{
+ "title": "A birthday is a key date",
+ "input": {
+  "data": {
+   "title": "Anya's birthday",
+   "notes": "",
+   "all_day": true,
+   "starts": "2026-12-03 00:00",
+   "ends": "2026-12-03 00:00",
+   "repeats": "Yearly",
+   "attendees": 0
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "key",
+    "equals": true
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"key\": true, \"reason\": \"A birthday.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "33b0ef2c1f5feb40"
+}

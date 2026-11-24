@@ -1,0 +1,34 @@
+{
+ "title": "An exam is a key date",
+ "input": {
+  "data": {
+   "title": "Aarav: maths exam",
+   "notes": "Class 8 half-yearly",
+   "all_day": false,
+   "starts": "2026-12-09 09:00",
+   "ends": "2026-12-09 12:00",
+   "repeats": "",
+   "attendees": 0
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "key",
+    "equals": true
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"key\": true, \"reason\": \"A school exam.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "33b0ef2c1f5feb40"
+}

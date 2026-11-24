@@ -1,0 +1,34 @@
+{
+ "title": "A day blocked out is not a key date",
+ "input": {
+  "data": {
+   "title": "Focus: write the report",
+   "notes": "",
+   "all_day": true,
+   "starts": "2026-11-30 00:00",
+   "ends": "2026-11-30 00:00",
+   "repeats": "",
+   "attendees": 0
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "key",
+    "equals": false
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"key\": false, \"reason\": \"A day blocked for work, not a date that marks something.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "33b0ef2c1f5feb40"
+}

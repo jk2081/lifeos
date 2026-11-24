@@ -1,0 +1,34 @@
+{
+ "title": "A deadline is a key date",
+ "input": {
+  "data": {
+   "title": "GST return due",
+   "notes": "File before midnight",
+   "all_day": true,
+   "starts": "2026-12-20 00:00",
+   "ends": "2026-12-20 00:00",
+   "repeats": "",
+   "attendees": 0
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "key",
+    "equals": true
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"key\": true, \"reason\": \"A filing deadline.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "33b0ef2c1f5feb40"
+}

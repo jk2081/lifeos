@@ -1,0 +1,34 @@
+{
+ "title": "A dentist visit is not a key date",
+ "input": {
+  "data": {
+   "title": "Dentist",
+   "notes": "",
+   "all_day": false,
+   "starts": "2026-11-27 11:00",
+   "ends": "2026-11-27 12:00",
+   "repeats": "",
+   "attendees": 0
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "key",
+    "equals": false
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"key\": false, \"reason\": \"A routine appointment.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "33b0ef2c1f5feb40"
+}

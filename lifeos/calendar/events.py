@@ -2,6 +2,7 @@
 import frappe
 
 from lifeos import permissions
+from lifeos.calendar import key_dates
 
 
 def validate_event(doc, method=None):
@@ -17,3 +18,4 @@ def validate_event(doc, method=None):
 				frappe.throw(frappe._("You do not have access to this space."), frappe.PermissionError, title=frappe._("No access to space"))
 		# core Event shows a record to others only when it is Public; the space hook then narrows it to members
 		doc.event_type = "Public"
+	key_dates.track_change(doc)

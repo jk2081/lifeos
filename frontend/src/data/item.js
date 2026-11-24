@@ -15,7 +15,7 @@ export const itemData = {
   goals: group('goals', ['add_to_cycle', 'close', 'detail', 'get', 'set_status', 'update']),
   chats: group('chats', ['close_item', 'get', 'make_task']),
   someday: group('someday', ['create']),
-  calendar: group('calendar', ['add_note', 'delete_event', 'delete_note', 'entry', 'get', 'hide_event', 'note_to_task', 'update_note']),
+  calendar: group('calendar', ['add_note', 'delete_event', 'delete_note', 'entry', 'get', 'hide_event', 'note_to_task', 'set_key_date', 'update_note']),
   people: group('people', ['options']),
   vault: group('vault', ['add_person', 'get', 'save', 'set_file']),
 }

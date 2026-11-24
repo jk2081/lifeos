@@ -49,6 +49,7 @@ SCHEMAS.update({
 		"unit": _S, "target_value": _N, "start_value": _N, "title": _S}),
 	"email-triage": _obj(["keep", "reason"], {"keep": {"type": "boolean"}, "reason": _S}),
 	"reflect-result": _obj(["sentence"], {"sentence": _S}),
+	"key-date": _obj(["key", "reason"], {"key": {"type": "boolean"}, "reason": _S}),
 	"area-guess": _obj(["area", "confidence"], {"area": _S, "confidence": {"type": "integer"}}),
 	"wiki-check": _obj(["orphans", "missing", "stale", "contradictions"], {
 		"orphans": _list(_obj(["page", "action"], {"page": _S, "action": {"type": "string", "enum": ["link", "archive"]}, "link_to": _S, "reason": _S})),

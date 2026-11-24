@@ -7,7 +7,7 @@ from frappe import _
 from frappe.utils import add_days, get_datetime, getdate, today
 
 from lifeos.calendar import calendar_data as data
-from lifeos.calendar import notes
+from lifeos.calendar import key_dates, notes
 from lifeos import permissions
 from lifeos.api.utils import flag, in_area, lens_area
 
@@ -104,13 +104,14 @@ def year(space: str | None = None, year: int | None = None):
 
 
 @frappe.whitelist(methods=["GET"])
-def year_plan(space: str | None = None, year: int | None = None, area: str | None = None):
-	"""Today > Year: the 12 Week Years with their scores, a lane for each area that is on with its goals as bars, key dates, one tick
-	for each weekly review, and the cards underneath. `area` is the lens."""
+def year_plan(space: str | None = None, shift: int | None = 0, area: str | None = None):
+	"""Today > Year: four columns of cycles around today (the last, this, the next and the one after; four quarters when no 12 Week Year is
+	running), each with its score, a row for each area that is on with its goals as bars, key dates by week, and the weekly reviews since
+	setup. `shift` moves the columns by whole cycles; `area` is the lens."""
 	from lifeos.goals import year_plan as plan
 
 	space = permissions.resolve_space(space)
-	return plan.year_plan(space, int(year or getdate(today()).year), lens_area(area))
+	return plan.year_plan(space, int(shift or 0), lens_area(area))
 
 
 @frappe.whitelist(methods=["GET"])
@@ -202,6 +203,14 @@ def note_to_task(note: str):
 
 
 @frappe.whitelist(methods=["POST"])
+def set_key_date(event: str, key: bool | int = 1):
+	"""The star in an event's drawer: make the event a key date, or not. The owner's word is final, and it is kept as a correction of the
+	`key-date` skill (issue 100)."""
+	doc = _event_to_change(event.partition("@")[0])
+	return {"name": doc.name, "key_date": key_dates.set_by_owner(doc, bool(flag(key)))}
+
+
+@frappe.whitelist(methods=["POST"])
 def add_important_date(space: str | None = None, title: str | None = None, day: int | None = None, month: int | None = None, year: int | str | None = None, kind: str | None = "Birthday"):
 	"""Add a birthday, anniversary or other date that repeats every year: an all-day Event that repeats yearly."""
 	space = permissions.resolve_space(space, write=True)
@@ -224,7 +233,7 @@ def entry(kind: str, name: str):
 		return {"kind": "event", "name": doc.name, "title": doc.subject, "space": doc.get("life_space"), "all_day": bool(doc.all_day),
 			"starts_on": str(starts)[:16], "ends_on": str(ends)[:16], "occurrence": str(starts.date()) if doc.repeat_this_event else None,
 			"description": frappe.utils.strip_html(doc.description or ""), "repeats": bool(doc.repeat_this_event),
-			"from_google": google, "hidden": bool(doc.get("life_hidden")),
+			"from_google": google, "hidden": bool(doc.get("life_hidden")), "key_date": bool(doc.get("life_key_date")),
 			"notes": notes.listing(doc.name, str(starts.date()) if doc.repeat_this_event else None)}
 	if kind == "date":
 		doc = permissions.get_doc_checked("Event", name, "read")
