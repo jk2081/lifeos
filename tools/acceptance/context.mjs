@@ -32,7 +32,17 @@ export const plusDays = (d, n) => new Date(Date.parse(d + 'T12:00:00Z') + n * 86
 export function bench(code, site = SITE) {
   // run Python on the acceptance site, for the steps that need the clock moved (the archive job)
   const script = `import frappe; frappe.init("${site}"); frappe.connect()\n${code}\nfrappe.db.commit()\n`
-  return benchPython(script).trim()
+  // a background job of the site (the Brain filing a capture made by a check) can hold the same rows; the database then refuses
+  // with a deadlock and rolls the script back whole (it commits only at the end), so running it again is safe
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return benchPython(script).trim()
+    } catch (e) {
+      const deadlock = /QueryDeadlockError|Deadlock found|Record has changed since last read/.test(String(e.stderr || e.message))
+      if (!deadlock || attempt >= 4) throw e
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000 * attempt)
+    }
+  }
 }
 
 export const browser = await chromium.launch({ executablePath: SETUP.chrome, headless: true })
