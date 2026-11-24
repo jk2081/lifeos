@@ -37,6 +37,8 @@ All are in the `--home` folder. A missing file is an empty list.
 | `settings.json` | `{"abilities": {"send_email": "ask", "read_email": "auto", "pay": "off"}}`; each is `auto` (on its own), `ask` (asks you) or `off`. Pay is always off |
 | `actions.json` | `[{"id": "a1", "action": "send_email", "title": "Chase Mehi Motors", "draft": "...", "status": "Waiting", "cost": 0.01, "when": "2026-11-23 10:00"}]`. `Waiting` is something it will not do until you approve; `Done` is something it did |
 
+**Hermes** is read as it keeps its files, with nothing to set up: memory from `memories/MEMORY.md` and `memories/USER.md` (entries separated by a line holding only `§`), skills from `skills/<group>/<name>/SKILL.md`, jobs from `cron/jobs.json`. Edits to memory are written back while holding Hermes's own `.lock` file. Hermes has no switches for what it may do, so Life OS's are kept in `lifeos-settings.json` beside its files. Run it as the Hermes user with `--home ~/.hermes --system hermes`.
+
 If the agent keeps its files another way, change `snapshot` and `apply_change` in `connector.py`: they are the only two places that know the layout.
 
 ## What Life OS does with it
