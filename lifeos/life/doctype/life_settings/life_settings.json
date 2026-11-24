@@ -41,7 +41,9 @@
   "brain_auto_threshold",
   "brain_auto_kinds",
   "ai_prices",
-  "insights_run_on"
+  "insights_run_on",
+  "updater_heartbeat",
+  "update_state"
  ],
  "fields": [
   {
@@ -281,6 +283,21 @@
    "options": "JSON",
    "label": "Kinds the Brain may file on its own",
    "description": "A JSON list of proposal kinds. Empty: it files nothing on its own."
+  },
+  {
+   "fieldname": "updater_heartbeat",
+   "fieldtype": "Datetime",
+   "label": "Updater last seen",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "update_state",
+   "fieldtype": "Code",
+   "options": "JSON",
+   "label": "Update state",
+   "read_only": 1,
+   "hidden": 1
   }
  ],
  "issingle": 1,

@@ -91,7 +91,7 @@ scheduler_events = {
 		# set 7: Inbox items left too long, before the morning
 		"30 5 * * *": ["lifeos.brain.old_inbox.run_nightly"]},
 	# set 8: Google Calendar, read only, hourly
-	"hourly": ["lifeos.review.gcal.sync_all", "lifeos.api.connections.clean_abandoned"],
+	"hourly": ["lifeos.review.gcal.sync_all", "lifeos.api.connections.clean_abandoned", "lifeos.updater.status.check_hourly"],
 }
 
 # the Outbox (set 7) is a record of what happened: an exit naming an area or a record never stops that area from being deleted

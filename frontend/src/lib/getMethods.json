@@ -112,6 +112,7 @@
  "lifeos.api.today.get",
  "lifeos.api.today.week_summary",
  "lifeos.api.trash.list",
+ "lifeos.api.updates.get",
  "lifeos.api.vault.list",
  "lifeos.api.vault.get",
  "lifeos.api.views.get_all",

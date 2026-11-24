@@ -1376,6 +1376,38 @@ update_site_config("lifeos_fake_ai_error", {})
 frappe.defaults.clear_default("lifeos_ai_off", parent="__default")`)
       }
     })
+    await check('SETTINGS.44', `${width} px: Settings > Advanced > Updates shows the installed commit; with no heartbeat it shows the set-up command and no Update now; with a fresh heartbeat Update now queues a request`, async () => {
+      const reset = `frappe.db.set_single_value("Life Settings", "updater_heartbeat", None)
+frappe.db.delete("Life Update")`
+      bench(`from lifeos.updater import git, status
+${reset}
+status.save_state({"installed": git.describe(status.repo_path(), "HEAD"), "available": None, "checked_at": str(frappe.utils.now_datetime()), "branch": "main", "error": None})`)
+      try {
+        const installed = bench(`from lifeos.updater import status
+print(status.state()["installed"]["short"])`)
+        await s.open('/life/settings?tab=advanced&part=updates')
+        await pg.locator('[data-updates-installed]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-updates-installed]').innerText()).includes(installed.split('\n').pop()), 'the installed commit does not show')
+        must(await pg.locator('[data-updates-command]').innerText().then((t) => /lifeos-setup-updater/.test(t)), 'no set-up command without a heartbeat')
+        must((await pg.locator('[data-updates-now]').count()) === 0, 'Update now shows without a runner')
+        must(await pg.locator('[data-updates-empty]').isVisible(), 'no empty state in the history')
+        must((await pg.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width)) <= 0, 'the page scrolls sideways')
+        bench(`from lifeos.updater import status
+status.heartbeat()
+st = status.state()
+st["available"] = {"commit": "e" * 40, "short": "eeeeeee", "date": "2026-11-24T10:00:00+05:30", "migrations": True, "changes": [{"commit": "e" * 40, "short": "eeeeeee", "title": "Acceptance change", "date": "2026-11-24T10:00:00+05:30"}]}
+status.save_state(st)`)
+        await s.open('/life/settings?tab=advanced&part=updates')
+        await pg.locator('[data-updates-now]').click()
+        await pg.locator('[data-update] [data-update-status]').first().waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-update] [data-update-status]').first().innerText()).trim() === 'Queued', 'the request is not shown as Queued')
+        must((await pg.locator('[data-updates-command]').count()) === 0, 'the set-up command shows with a runner')
+      } finally {
+        bench(`from lifeos.updater import status
+${reset}
+frappe.db.set_single_value("Life Settings", "update_state", None)`)
+      }
+    })
   } finally {
     bench(`frappe.db.set_single_value("Life Settings", "email_in_account", None)
 frappe.db.set_single_value("Life Settings", "email_in_senders", None)

@@ -410,6 +410,7 @@
               <span class="text-sm tabular-nums text-ink-gray-6">{{ (f.size / 1024).toFixed(0) }} KB</span></Row></Card></section>
           <p class="text-sm text-ink-gray-6">Backups hold the database (every record, including Life OS) and, when files are included, the uploaded files.</p>
           </template>
+          <UpdatesSection v-if="advPart === 'updates'" />
           <template v-if="advPart === 'guide'">
           <Card flush data-guide-settings>
             <SettingRow label="Welcome guide" :help="`The short guide a new person sees on first opening Life OS. It is ${onboarding.status ? (onboarding.status === 'done' ? 'done' : 'skipped') : 'not yet done'} for you now. Showing it again opens it only while the site has no tasks, goals or captures.`">
@@ -493,6 +494,7 @@ import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
+import UpdatesSection from '@/components/settings/UpdatesSection.vue'
 import CalendarSection from '@/components/settings/CalendarSection.vue'
 import AreasSection from '@/components/settings/AreasSection.vue'
 import ResetSection from '@/components/settings/ResetSection.vue'
@@ -561,7 +563,7 @@ const MENU = [
   { key: 'people', label: 'People and agents', items: [{ value: 'members', label: 'Members', level: 7, admin: true }] },
   { key: 'advanced', label: '', items: [{ value: 'advanced', label: 'Advanced', level: 1, admin: true }] },
 ]
-const ADVANCED = [{ label: 'AI key and cost', value: 'ai' }, { label: 'Import and export', value: 'import' }, { label: 'Backups', value: 'backups' },
+const ADVANCED = [{ label: 'AI key and cost', value: 'ai' }, { label: 'Import and export', value: 'import' }, { label: 'Backups', value: 'backups' }, { label: 'Updates', value: 'updates' },
   { label: 'Archive', value: 'archive' }, { label: 'First-run guide', value: 'guide' }]
 async function resetGuide() {
   await tryCall(() => settingsData.onboarding.reset(), 'The guide will show again.')
@@ -587,7 +589,7 @@ const MOVED = {
   review: { tab: 'rhythms' }, reset: { tab: 'data' },
   sensitive: { tab: 'rules' }, 'note-rules': { tab: 'rules' },
   spaces: { tab: 'members', view: 'spaces' }, agents: { tab: 'members', view: 'agents' }, assistants: { tab: 'members', view: 'agents' }, people: { tab: 'members', view: 'people' },
-  ai: { tab: 'advanced', part: 'ai' }, cost: { tab: 'advanced', part: 'ai' }, import: { tab: 'advanced', part: 'import' }, backups: { tab: 'advanced', part: 'backups' },
+  ai: { tab: 'advanced', part: 'ai' }, cost: { tab: 'advanced', part: 'ai' }, import: { tab: 'advanced', part: 'import' }, backups: { tab: 'advanced', part: 'backups' }, updates: { tab: 'advanced', part: 'updates' },
   places: { tab: 'profile' },
   archived: { path: '/library/archive' }, archive: { path: '/library/archive' },
   connections: { path: '/brain/sources' }, sources: { path: '/brain/sources' },
