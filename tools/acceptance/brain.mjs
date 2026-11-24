@@ -1034,7 +1034,8 @@ print(json.dumps({"aside": aside}))`).split('\n').pop())
       const tile = pg.locator('[data-source-tile][data-system="gmail"]')
       must((await tile.innerText()).includes('Connect Gmail'), 'the Gmail tile does not say Connect Gmail: ' + await tile.innerText())
       await tile.locator('[data-tile-add]').waitFor({ timeout: 15000 }) // the button shows once permissions have loaded
-      await tile.locator('[data-tile-add]').click()
+      // the tile's Rules link (issue 84) sits above the full-tile button, so click its top-left corner, away from the link
+      await tile.locator('[data-tile-add]').click({ position: { x: 6, y: 6 } })
       await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
       const t = await pg.locator('[data-gmail-connect]').innerText()
       must(/copies none of your mail and never deletes any/.test(t) && /send, draft, archive or label/.test(t), 'the dialog does not say what it may do: ' + t)
