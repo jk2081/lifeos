@@ -75,4 +75,4 @@ def ask(slug: str, data, space: str | None = None, reference: tuple | None = Non
 def _log(slug, version, space, log, seconds):
 	frappe.get_doc({"doctype": "Life Skill Run", "skill": slug, "skill_version": version, "trigger": "Button", "space": space,
 		"run_key": f"call|{slug}|{frappe.generate_hash(length=10)}", "status": "Failed" if log["error"] else "Done",
-		"duration": round(seconds, 2), **log}).insert(ignore_permissions=True)
+		"duration": round(seconds, 2), **log}).insert(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them

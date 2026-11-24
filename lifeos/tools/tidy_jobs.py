@@ -50,7 +50,7 @@ class MixedJobs:
 			self.log(ITEM, item.name, f"Input {label} moved to the reusable asset {asset.name} ({asset.external_id}).")
 		if not item.job_id:
 			item.job_id = _job_id(item)
-		item.save(ignore_permissions=True)
+		item.save(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 
 	# ---------- finding ----------
 
@@ -80,7 +80,7 @@ class MixedJobs:
 			for name in frappe.get_all("File", filters={"life_version_of": f["file"]}, pluck="name"):
 				frappe.db.set_value("File", name, {"attached_to_name": asset_file.attached_to_name,
 					"life_version_of": asset_file.name}, update_modified=False)
-			frappe.delete_doc("File", f["file"], ignore_permissions=True, force=True)
+			frappe.delete_doc("File", f["file"], ignore_permissions=True, force=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 			return frappe.get_doc(ITEM, asset_file.attached_to_name)
 		asset = _new_asset(item, f)
 		for name in [f["file"]] + frappe.get_all("File", filters={"life_version_of": f["file"]}, pluck="name"):
@@ -102,7 +102,7 @@ class FailedIntents:
 		"""Back to New, so an agent claims it again. Its proposals stay: tidying never deletes one."""
 		item = frappe.get_doc(ITEM, row["name"])
 		item.status, item.error, item.claimed_by, item.claimed_on = "New", None, None, None
-		item.save(ignore_permissions=True)
+		item.save(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 		self.log(ITEM, item.name, f"Failed by the intent refusal ({(row['error'] or '')[:120]}); put back to New.")
 
 
@@ -140,7 +140,7 @@ def _new_asset(item, f):
 		"source_type": "Upload", "intent": "Just keep", "status": "Done", "source_system": item.source_system or "agent",
 		"external_id": reusable_as, "area": item.area, "claimed_by": "Administrator", "claimed_on": now_datetime(),
 		"summary_md": f"Kept as a reusable input ({reusable_as}), by the tidy command from {item.title}."})
-	asset.insert(ignore_permissions=True)
+	asset.insert(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	return asset
 
 

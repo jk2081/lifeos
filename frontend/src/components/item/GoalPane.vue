@@ -43,7 +43,7 @@
         <template v-if="d.tasks_counted"><div class="min-w-0 flex-1"><Progress size="sm" :value="Math.round((100 * d.tasks_done) / d.tasks_counted)" /></div>
           <span class="text-sm tabular-nums text-ink-gray-8">{{ d.tasks_done }} of {{ d.tasks_counted }} tasks</span></template>
         <span v-else class="text-sm text-ink-gray-6">No tasks yet</span>
-        <NumLink class="ml-auto text-sm" :to="{ path: '/goals/tasks', query: { goal: d.goal.name, status: 'all', view: 'list' } }" data-door="goal-tasks">Open in Tasks</NumLink>
+        <CountLink class="ml-auto text-sm" :to="{ path: '/goals/tasks', query: { goal: d.goal.name, status: 'all', view: 'list' } }" data-door="goal-tasks">Open in Tasks</CountLink>
       </div>
       <Card flush>
         <Row v-for="t in d.tasks" :key="t.name" :pane="'task:' + t.name" :label="t.title"><div class="min-w-0 flex-1">
@@ -81,7 +81,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Dialog, Progress, Select, TextInput, Textarea, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
-import NumLink from '@/components/ui/NumLink.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
 import Backlinks from '@/components/Backlinks.vue'

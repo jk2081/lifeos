@@ -1298,10 +1298,42 @@ frappe.clear_cache(doctype="Life Settings")`)
       const guide = (await import('node:fs')).readFileSync(new URL('../../frontend/src/components/OnboardingGuide.vue', import.meta.url), 'utf8')
       must(!/forward|email-in|email in/i.test(guide), 'the onboarding guide mentions email forwarding')
     })
+    await check('SETTINGS.41', `${width} px: Sources offers Connect Gmail and Connect Microsoft; a connected (fake) Microsoft inbox shows with its label and an on/off switch; Connect Microsoft says what it reads and sends`, async () => {
+      bench(`frappe.set_user("Administrator")
+for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system": "microsoft"}, pluck="name"): frappe.delete_doc("Life Connection", n, force=1, ignore_permissions=True)`)
+      await s.open('/life/brain/sources')
+      await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 15000 })
+      must((await pg.locator('[data-source-tile][data-system="gmail"] [data-tile-add]').getAttribute('aria-label')) === 'Connect Gmail', 'there is no Connect Gmail')
+      const tile = pg.locator('[data-source-tile][data-system="microsoft"]')
+      must((await tile.locator('[data-tile-add]').getAttribute('aria-label')) === 'Connect Microsoft', 'there is no Connect Microsoft')
+      // the tile can still be settling after load (CI timed out here once at 1440 px): scroll to it and try again
+      for (let i = 0; i < 3 && !(await pg.locator('[data-gmail-connect]').isVisible()); i++) {
+        await tile.locator('[data-tile-add]').scrollIntoViewIfNeeded()
+        await pg.keyboard.press('Escape') // a dialog left open by the step before would cover the tile
+        await tile.locator('[data-tile-add]').click({ timeout: 4000 }).catch(() => tile.locator('[data-tile-add]').evaluate((el) => el.click()))
+        await pg.locator('[data-gmail-connect]').waitFor({ timeout: 2500 }).catch(() => {})
+      }
+      await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
+      const said = await pg.locator('[data-gmail-connect]').innerText()
+      must(/Microsoft \(Outlook or Microsoft 365\)/.test(said) && /never deletes any/.test(said) && !/calendar/.test(said), 'the dialog does not say what it may do: ' + said)
+      await pg.keyboard.press('Escape')
+      bench(`frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "microsoft", "mailbox": "work-${width}@outlook.example", "label": "Work ${width}", "active": 1, "connected_by": "owner@lifeos.test"}).insert(ignore_permissions=True)`)
+      await s.open('/life/brain/sources')
+      await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 15000 })
+      const card = pg.locator('[data-source-card][data-system="microsoft"]')
+      await card.waitFor({ timeout: 10000 })
+      must((await card.innerText()).includes(`Work ${width}`), 'the inbox card does not show its label')
+      must((await card.getAttribute('data-active')) === '1', 'the inbox is not on')
+      await card.locator('[data-source-switch]').click()
+      for (let i = 0; i < 20 && (await card.getAttribute('data-active')) !== '0'; i++) await pg.waitForTimeout(200)
+      must((await card.getAttribute('data-active')) === '0', 'the switch did not turn the inbox off')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    })
   } finally {
     bench(`frappe.db.set_single_value("Life Settings", "email_in_account", None)
 frappe.db.set_single_value("Life Settings", "email_in_senders", None)
-frappe.clear_cache(doctype="Life Settings")`)
+frappe.clear_cache(doctype="Life Settings")
+for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system": "microsoft"}, pluck="name"): frappe.delete_doc("Life Connection", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

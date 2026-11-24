@@ -82,13 +82,19 @@ def read(space: str, agent: str, tool: str, params: dict) -> dict:
 
 def _filed_area(space: str, thread_id: str | None):
 	"""The area a thread is filed under in Life OS, if it has been filed."""
-	return frappe.db.get_value("Life Inbox Item", {"space": space, "source_system": "gmail", "external_id": thread_id or ""}, "area") if thread_id else None
+	return frappe.db.get_value("Life Inbox Item", {"space": space, "source_system": ["in", ["gmail", "microsoft"]], "external_id": thread_id or ""}, "area") if thread_id else None
+
+
+def _google_only(rows: list) -> list:
+	"""The calendar is Google's (Microsoft's is not built): its tools use a Google inbox, and say so when the person has none."""
+	rows = [r for r in rows if r.provider == "gmail"]
+	if not rows:
+		frappe.throw(_("No Google account is connected. Calendar tools work for Google inboxes only."), title=_("No account connected"))
+	return rows
 
 
 def calendar_list(space: str, person: str, params: dict) -> list:
-	rows = mail.accounts_for(person, space, params.get("account"))
-	if not rows:
-		frappe.throw(_("No Google account is connected."), title=_("No account connected"))
+	rows = _google_only(mail.accounts_for(person, space, params.get("account")))
 	client = mail.google_for(frappe._dict(rows[0]))
 	return client.list_events(str(params.get("time_min") or frappe.utils.today()), str(params.get("time_max") or frappe.utils.add_days(frappe.utils.today(), 14)),
 		min(cint(params.get("max") or 50), 100))
@@ -147,11 +153,13 @@ def request(space: str, agent: str, tool: str, params: dict, asked_by: str, owne
 	return {**execute(row.name), "action": row.name, "title": title}
 
 
-def _inbox(person: str, space: str, p: dict):
+def _inbox(person: str, space: str, p: dict, tool: str = ""):
 	"""The inbox an act is made in: the one named, the one the thread is in, or the person's default."""
 	rows = mail.accounts_for(person, space, p.get("account"))
 	if not rows:
 		frappe.throw(_("No inbox is connected. Connect one in Brain > Sources."), title=_("No inbox connected"))
+	if tool.startswith("calendar."):
+		rows = _google_only(rows)
 	if len(rows) > 1 and p.get("thread_id") and not p.get("account"):
 		for row in rows:
 			try:
@@ -173,7 +181,7 @@ def execute(name: str) -> dict:
 	tool = p.pop("tool")
 	person = person_of(row.space)
 	try:
-		account = _inbox(person, row.space, p)
+		account = _inbox(person, row.space, p, tool)
 		result, undo = _run(tool, account, p)
 	except frappe.PermissionError:
 		raise

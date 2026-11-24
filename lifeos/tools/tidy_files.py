@@ -107,7 +107,7 @@ class DuplicateFiles:
 			frappe.db.set_value("File", name, "life_version_of", kept, update_modified=False)
 		for name in frappe.get_all("Life Job Input", filters={"file": extra}, pluck="name"):
 			frappe.db.set_value("Life Job Input", name, "file", kept, update_modified=False)
-		frappe.delete_doc("File", extra, ignore_permissions=True, force=True)
+		frappe.delete_doc("File", extra, ignore_permissions=True, force=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 		self.log(twin["doctype"], twin["name"], f"File {extra} was the same file as {kept} on this record; removed the second.")
 
 

@@ -5,13 +5,13 @@
     <span class="tabular-nums">{{ Math.round(s.percent) }}%</span>
     <div class="w-32"><Progress size="sm" :value="Math.round(s.percent)" /></div>
     <span class="text-sm text-ink-gray-6">{{ s.done }} of {{ s.planned }} ticks · target {{ store.settings.score_target }}%</span>
-    <NumLink class="text-sm" :to="'/goals/cycles'">Open the cycle</NumLink>
+    <CountLink class="text-sm" :to="'/goals/cycles'">Open the cycle</CountLink>
   </div>
 </template>
 <script setup>
 import { onMounted, ref } from 'vue'
 import { Progress } from 'frappe-ui'
-import NumLink from '@/components/ui/NumLink.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 import { goalsData } from '@/data/goals'
 import { store } from '@/lib/store'
 

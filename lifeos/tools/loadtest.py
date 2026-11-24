@@ -56,7 +56,7 @@ def seed(rows=100000, users=20, spaces=50, big_share=0.5):
 		# every user is in the big space and in a few of the others
 		members = emails if i == 0 else sorted({emails[0], emails[i % len(emails)], emails[(i * 7) % len(emails)]})
 		frappe.get_doc({"doctype": "Life Space", "space_name": name, "owner_user": emails[0],
-			"members": [{"user": u, "access": "Write"} for u in members]}).insert(ignore_permissions=True)
+			"members": [{"user": u, "access": "Write"} for u in members]}).insert(ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 		areas[name] = list(seed_data.make_areas(name, AREAS).values())
 	permissions.clear_cache()
 
@@ -314,7 +314,7 @@ def remove():
 	for name in frappe.get_all("Life Space", filters={"name": ("like", PREFIX + "%")}, pluck="name"):
 		devtools.purge_space(name, drop=True)
 	for email in frappe.get_all("User", filters={"name": ("like", "load%@lifeos.test")}, pluck="name"):
-		frappe.delete_doc("User", email, force=True, ignore_permissions=True)
+		frappe.delete_doc("User", email, force=True, ignore_permissions=True)  # system: developer, seed and maintenance tool; never reached by a person's request
 	permissions.clear_cache()
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- load test: its removal must stick even when run inside a test
 	return "Load data removed."

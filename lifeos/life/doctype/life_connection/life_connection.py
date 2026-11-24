@@ -11,7 +11,7 @@ class LifeConnection(Document):
 		self.label = (self.label or "").strip() or self.system.title()
 		self.default_intent = self.default_intent or "Process"
 		other = {"space": self.space, "system": self.system, "name": ["!=", self.name or ""]}
-		if self.system == "gmail":  # several mailboxes, one card each (issue 58)
+		if self.system in ("gmail", "microsoft"):  # several mailboxes, one card each (issues 58 and 88)
 			if self.mailbox:
 				other["mailbox"] = self.mailbox
 			elif self.connected_app:  # a sign-in under way

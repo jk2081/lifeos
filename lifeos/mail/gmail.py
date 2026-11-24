@@ -128,14 +128,14 @@ def make_app(name: str):
 		app.update(values)
 		app.set("scopes", [{"scope": x} for x in SCOPES])
 		app.set("query_parameters", [{"key": "access_type", "value": "offline"}, {"key": "prompt", "value": "consent"}])
-		app.save(ignore_permissions=True)
+		app.save(ignore_permissions=True)  # system: the connection record is kept for the person who just authorised it; the caller checked the user
 		return app
 	app = frappe.get_doc({"doctype": "Connected App", **values, "scopes": [{"scope": x} for x in SCOPES],
 		"query_parameters": [{"key": "access_type", "value": "offline"}, {"key": "prompt", "value": "consent"}]})
 	frappe.flags.in_import = True  # the name is chosen here, not a random hash
 	try:
 		app.name = name
-		app.insert(ignore_permissions=True)
+		app.insert(ignore_permissions=True)  # system: the connection record is kept for the person who just authorised it; the caller checked the user
 	finally:
 		frappe.flags.in_import = False
 	return app
@@ -151,7 +151,7 @@ def finish(conn, client=None):
 	if other:
 		raise GmailError(_("{0} is already connected.").format(email))
 	conn.mailbox, conn.label, conn.active, conn.last_error = email, email, 1, None
-	conn.save(ignore_permissions=True)
+	conn.save(ignore_permissions=True)  # system: the connection record is kept for the person who just authorised it; the caller checked the user
 	from lifeos import mail
 
 	mail.account_for_connection(conn)

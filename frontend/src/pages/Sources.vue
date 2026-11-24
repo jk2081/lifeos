@@ -5,7 +5,7 @@
     :quiet="['open_items', 'archived']" :flag-labels="{ sensitive: 'Sensitive only', open_items: 'With open items', archived: 'Include archived' }" :group-by="groupBy" :empty-title="EMPTY[list?.tab] || 'No sources yet.'" :watch-keys="['view', 'by']" @loaded="(res) => (extra = res)"
     empty-hint="Everything captured lands here: files, voice notes, photos, pasted text, links, emails and AI chats. Add some from the Inbox.">
     <template #sub>{{ place === 'all' ? 'Every note and capture' : 'Everything captured' }}{{ inSpace }}, finished or not. The Inbox holds what is still to do.<template v-if="extra.with_open_items !== undefined"> ·
-      <NumLink :to="{ query: { ...route.query, open_items: '1', open: undefined } }" data-door="chats-open">{{ extra.with_open_items }} with open items</NumLink></template></template>
+      <CountLink :to="{ query: { ...route.query, open_items: '1', open: undefined } }" data-door="chats-open">{{ extra.with_open_items }} with open items</CountLink></template></template>
     <template #actions>
       <Select v-if="!embed" class="w-48" :model-value="route.query.by || ''" :options="WRITTEN_BY" aria-label="Written by" data-captures-by
         @update:model-value="(v) => router.push({ query: { ...route.query, by: v || undefined } })" />
@@ -29,7 +29,7 @@
     <template #cell-goal="{ row }"><span class="truncate text-ink-gray-7">{{ row.goal_title || '' }}</span></template>
     <template #cell-_status="{ row }"><Badge :theme="STATUS_THEME[row.status]" :label="row.status" data-source-status /></template>
     <template #cell-_made="{ row }">
-      <NumLink v-if="row.open_count" class="relative text-sm" :to="{ query: { ...route.query, open: row.ref, ptab: 'items' } }" data-door="chat-items">{{ row.open_count }} open item{{ row.open_count === 1 ? '' : 's' }}</NumLink>
+      <CountLink v-if="row.open_count" class="relative text-sm" :to="{ query: { ...route.query, open: row.ref, ptab: 'items' } }" data-door="chat-items">{{ row.open_count }} open item{{ row.open_count === 1 ? '' : 's' }}</CountLink>
       <span v-else class="text-sm" :class="row.made ? 'text-ink-gray-8' : 'text-ink-gray-6'" data-made>{{ row.made ? `${row.made} made` : '—' }}</span></template>
     <template #stack="{ row }">
       <div class="flex items-start gap-2.5">
@@ -87,7 +87,7 @@ import { WRITTEN_BY } from '@/lib/nav'
 import ListView from '@/components/ListView.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
-import NumLink from '@/components/ui/NumLink.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { long, short, weekday } from '@/lib/dates'

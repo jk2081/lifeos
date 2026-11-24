@@ -994,8 +994,8 @@ class TestReadsThroughFrappePermissions(LifeTestCase):
 		self.args = {"space": PRIVATE, "area": self.area, "goal": self.goal, "task": self.task.name, "note": self.note.name, "item": self.item,
 			"name": self.person.name, "document": "-", "chat": "-", "run": "-", "skill": "-", "client_id": "-", "kind": "Task", "text": MARKER}
 
-	def reads(self):
-		"""Every whitelisted GET method of lifeos/api/, as (dotted name, function, the keyword arguments to call it with)."""
+	def reads(self, http_method="GET"):
+		"""Every whitelisted GET (or POST) method of lifeos/api/, as (dotted name, function, the keyword arguments to call it with)."""
 		import importlib
 		import pkgutil
 
@@ -1006,7 +1006,7 @@ class TestReadsThroughFrappePermissions(LifeTestCase):
 			for name, fn in vars(module).items():
 				if not callable(fn) or getattr(fn, "__module__", None) != module.__name__ or fn not in frappe.whitelisted:
 					continue
-				if "GET" not in (frappe.allowed_http_methods_for_whitelisted_func.get(fn) or []):
+				if http_method not in (frappe.allowed_http_methods_for_whitelisted_func.get(fn) or []):
 					continue
 				params = inspect.signature(fn).parameters
 				required = [p for p in params.values() if p.default is inspect.Parameter.empty]
@@ -1038,6 +1038,34 @@ class TestReadsThroughFrappePermissions(LifeTestCase):
 			called += 1
 			self.assertNotIn(MARKER, json.dumps(result, default=str), dotted)
 		self.assertGreater(called, 50)
+
+	def snapshot(self):
+		"""Everything the first person's space holds in the doctypes the test made records in, with each row's last change."""
+		return {dt: sorted(frappe.get_all(dt, filters={"space": PRIVATE}, fields=["name", "modified"], limit=0, as_list=True))  # system: the test looks at every row
+			for dt in ("Life Note", "Life Task", "Life Person", "Life Goal", "Life Inbox Item", "Life Proposal") if frappe.get_meta(dt).has_field("space")}
+
+	def test_1b_a_person_in_another_space_changes_nothing_of_this_one_with_any_write(self):
+		"""Issue 93: the same call as the read test, for every whitelisted POST method, with this space's record names."""
+		before = {dt: frappe.db.get_value(dt, name, "modified") for dt, name in (("Life Note", self.note.name), ("Life Task", self.task.name),
+			("Life Person", self.person.name), ("Life Goal", self.goal), ("Life Inbox Item", self.item))}
+		rows_before = self.snapshot()
+		self.as_user(FAMILY)
+		called = 0
+		for dotted, fn, kwargs in self.reads("POST"):
+			if dotted.split(".")[0] in ("settings", "jobs", "connections", "agents"):
+				continue  # whole-site or admin-only: refused by role, and a refused call is not what this test is about
+			frappe.db.savepoint("write_probe")
+			try:
+				fn(**kwargs)
+			except Exception:  # a refusal, or a missing argument: either way nothing may have changed
+				frappe.db.rollback(save_point="write_probe")
+			called += 1
+		self.as_user("Administrator")
+		self.assertGreater(called, 20)
+		self.assertEqual(self.snapshot(), rows_before)
+		self.assertEqual({dt: frappe.db.get_value(dt, name, "modified") for dt, name in (("Life Note", self.note.name), ("Life Task", self.task.name),
+			("Life Person", self.person.name), ("Life Goal", self.goal), ("Life Inbox Item", self.item))}, before)
+		self.assertEqual(frappe.db.get_value("Life Note", self.note.name, "title"), f"{MARKER} note")
 
 	def test_2_the_brain_and_an_agent_read_only_what_they_are_allowed_to(self):
 		frappe.db.set_value("Life Space", PRIVATE, "agents_can_read_vault", 0)
@@ -1072,6 +1100,44 @@ class TestReadsThroughFrappePermissions(LifeTestCase):
 		self.assertEqual(refused.returncode, 1, refused.stdout)
 		self.assertEqual(refused.stdout.count("bad.py"), 2)
 		self.assertEqual(passed.returncode, 0, passed.stdout)
+
+	def test_3c_the_scan_refuses_ignore_permissions_anywhere_under_lifeos_unless_it_says_why(self):
+		import subprocess
+		import tempfile
+
+		guard = Path(__file__).resolve().parents[2] / "tools" / "scan_guard.py"
+		with tempfile.TemporaryDirectory() as tmp:
+			folder = Path(tmp) / "lifeos" / "goals"
+			folder.mkdir(parents=True)
+			bad, good, flag = folder / "bad.py", folder / "good.py", folder / "flag.py"
+			bad.write_text("doc.save(ignore_permissions=True)\n")
+			good.write_text("doc.save(ignore_permissions=True)  # system: a background job\ndoc.flags.ignore_permissions = True  # system: install\n")
+			flag.write_text("doc.flags.ignore_permissions = True\n")
+			refused = subprocess.run(["python3", str(guard), str(bad), str(flag)], capture_output=True, text=True)
+			passed = subprocess.run(["python3", str(guard), str(good)], capture_output=True, text=True)
+		self.assertEqual(refused.returncode, 1, refused.stdout)
+		self.assertEqual(refused.stdout.count(".py"), 2)
+		self.assertEqual(passed.returncode, 0, passed.stdout)
+
+	def test_3d_every_ignore_permissions_outside_tests_says_why(self):
+		import sys
+
+		sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+		try:
+			import scan_guard
+		finally:
+			sys.path.pop(0)
+		self.assertEqual(scan_guard.findings([Path(__file__).resolve().parents[1]]), [])
+
+	def test_3e_no_library_or_experimental_folder_is_kept_without_an_import(self):
+		front = Path(__file__).resolve().parents[2] / "frontend"
+		package = json.loads((front / "package.json").read_text())
+		sources = "\n".join(p.read_text() for p in (front / "src").rglob("*") if p.suffix in (".vue", ".js"))
+		for library in ("cytoscape", "reka-ui"):
+			imported = re.search(rf"from ['\"]{library}['\"]", sources) is not None
+			self.assertEqual(library in package["dependencies"], imported, library)
+		if (front / "src" / "experimental").exists():  # kept only while something imports it
+			self.assertRegex(sources, r"from ['\"]@/experimental['\"]")
 
 	def test_3b_the_api_has_no_unexplained_get_all(self):
 		import sys

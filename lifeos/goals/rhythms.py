@@ -44,7 +44,7 @@ def _save(state, user=None):
 	if name:
 		frappe.db.set_value("Life View State", name, "state", text)
 	else:
-		frappe.get_doc({"doctype": "Life View State", "user": user, "screen": SCREEN, "state": text}).insert(ignore_permissions=True)
+		frappe.get_doc({"doctype": "Life View State", "user": user, "screen": SCREEN, "state": text}).insert()
 
 
 def dismiss(occurrence, how="skipped"):

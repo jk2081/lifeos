@@ -31,7 +31,7 @@ def add(space, kind, title, evidence, actions, meeting=None, reading=None, sourc
 	return frappe.get_doc({"doctype": "Life Insight", "space": space, "kind": kind, "title": title[:255], "body": body, "evidence": evidence,
 		"actions": json.dumps(actions), "status": "New", "fingerprint": fp, "source": source, "area": area, "found_on": today(),
 		"rank": RANK.get(kind, 99), "meeting": meeting, "reading": reading, "source_line": (source_line or "")[:140] or None,
-		"found_for": found_for}).insert(ignore_permissions=True).name
+		"found_for": found_for}).insert().name
 
 
 # ---- rule findings ----
@@ -64,7 +64,7 @@ def detect_not_captured(space, start, end):
 		return got.name
 	if not empty:
 		if got:
-			frappe.delete_doc("Life Insight", got.name, ignore_permissions=True, delete_permanently=True)
+			frappe.delete_doc("Life Insight", got.name, delete_permanently=True)
 		return None
 	names = ", ".join(m.subject for m in empty[:4]) + (f" and {len(empty) - 4} more" if len(empty) > 4 else "")
 	n = len(empty)
@@ -75,7 +75,7 @@ def detect_not_captured(space, start, end):
 		doc = frappe.get_doc("Life Insight", got.name)
 		doc.title, doc.actions = title, json.dumps(actions)
 		doc.set("evidence", evidence)
-		doc.save(ignore_permissions=True)
+		doc.save()
 		return doc.name
 	return add(space, "Not captured", title, evidence, actions, source_line="Calendar", found_for=getdate(start))
 

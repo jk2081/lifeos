@@ -68,7 +68,7 @@ def config_of(doc) -> dict:
 def snapshot(doc, note: str, user: str | None = None):
 	frappe.get_doc({"doctype": "Life Skill Version", "skill": doc.name, "version": doc.version, "instructions": doc.instructions,
 		"config": json.dumps(config_of(doc), default=str), "changed_by": user or frappe.session.user, "changed_on": now_datetime(),
-		"note": note[:140]}).insert(ignore_permissions=True)
+		"note": note[:140]}).insert(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 
 
 def _apply(doc, values: dict):
@@ -98,7 +98,7 @@ def install():
 			values = {"doctype": "Life Skill", "source": "Built-in", "version": shipped["version"], "built_in_version": shipped["version"],
 				"built_in_hash": digest(shipped), "active": 0 if shipped.get("trigger_kind") == "Event" and slug != "process-capture" else 1,
 				**{k: v for k, v in shipped.items() if k not in ("version",)}}
-			doc = frappe.get_doc(values).insert(ignore_permissions=True)
+			doc = frappe.get_doc(values).insert(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 			snapshot(doc, "Installed with the app", "Administrator")
 		else:
 			_update_builtin(frappe.get_doc("Life Skill", slug), shipped)
@@ -117,12 +117,12 @@ def _update_builtin(doc, shipped: dict):
 		doc.update_available = 0
 		doc.update_text = doc.update_version = None
 		doc.built_in_version, doc.built_in_hash = shipped["version"], new_hash
-		doc.save(ignore_permissions=True)
+		doc.save(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 		snapshot(doc, f"Built-in update (shipped v{shipped['version']})", "Administrator")
 	else:  # an edited skill keeps the edit and shows the update
 		doc.update_available = 1
 		doc.update_text, doc.update_version = shipped["instructions"], shipped["version"]
-		doc.save(ignore_permissions=True)
+		doc.save(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 
 
 def save(slug: str, values: dict, note: str | None = None):
@@ -135,17 +135,17 @@ def save(slug: str, values: dict, note: str | None = None):
 			doc.set(k, values[k])
 	if digest(doc.as_dict()) != before:
 		doc.version += 1
-		doc.save(ignore_permissions=True)
+		doc.save(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 		snapshot(doc, note or _("Edited"))
 	else:
-		doc.save(ignore_permissions=True)
+		doc.save(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 	return doc
 
 
 def create(values: dict):
 	doc = frappe.get_doc({"doctype": "Life Skill", "source": "Owner", "version": 1, "active": 0, "trigger_kind": "Button", "output_kind": "Answer",
 		"model_tier": "Fast", "cost_limit": 0.25, "tools": "[]", **values})
-	doc.insert(ignore_permissions=True)
+	doc.insert(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 	snapshot(doc, _("Created"))
 	return doc
 
@@ -204,7 +204,7 @@ def accept_update(slug: str):
 	doc.version += 1
 	doc.update_available, doc.update_text, doc.update_version = 0, None, None
 	doc.built_in_version, doc.built_in_hash = shipped["version"], digest(shipped)
-	doc.save(ignore_permissions=True)
+	doc.save(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 	snapshot(doc, _("Built-in update (shipped v{0})").format(shipped["version"]))
 	return doc
 

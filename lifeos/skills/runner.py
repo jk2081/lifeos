@@ -51,7 +51,7 @@ def ensure_brain_user():
 		return BRAIN_USER
 	user = frappe.get_doc({"doctype": "User", "email": BRAIN_USER, "first_name": "Life Brain", "enabled": 1, "user_type": "System User",
 		"send_welcome_email": 0})
-	user.flags.ignore_permissions = True
+	user.flags.ignore_permissions = True  # system: skills are shared system records; only the Brain and admin screens change them
 	user.insert()
 	user.add_roles("Life Agent")
 	return BRAIN_USER
@@ -71,7 +71,7 @@ def new_run(skill, input, trigger):
 	return frappe.get_doc({"doctype": "Life Skill Run", "skill": skill.name, "skill_version": skill.version, "trigger": trigger,
 		"input_doctype": input.get("doctype"), "input_name": input.get("name"), "run_key": key, "status": "Queued",
 		"space": input.get("space") or (frappe.db.get_value(input["doctype"], input["name"], "space") if input.get("doctype") and input.get("name") else None)}
-	).insert(ignore_permissions=True)
+	).insert(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 
 
 def run(skill, input, trigger="Button", run_name=None):

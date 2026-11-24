@@ -95,7 +95,7 @@ def make_thumbnail(file_doc):
 			"doctype": "File", "file_name": os.path.splitext(stored_name(file_doc))[0] + "-thumb.jpg",
 			"attached_to_doctype": file_doc.attached_to_doctype, "attached_to_name": file_doc.attached_to_name,
 			"attached_to_field": "thumbnail", "is_private": 1, "content": buf.getvalue(),
-		}).insert(ignore_permissions=True)
+		}).insert()
 	finally:
 		frappe.flags.lifeos_making_preview = False
 	return thumb.file_url

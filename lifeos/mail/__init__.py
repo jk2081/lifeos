@@ -9,23 +9,25 @@ import frappe
 from frappe import _
 from frappe.utils import now_datetime
 
-PROVIDERS = {"gmail": "lifeos.mail.gmail.GmailAdapter"}
+PROVIDERS = {"gmail": "lifeos.mail.gmail.GmailAdapter", "microsoft": "lifeos.mail.microsoft.MicrosoftAdapter"}
+PROVIDER_NAMES = {"gmail": "Gmail", "microsoft": "Outlook"}  # what "Open in ..." says
 FIELDS = ("text", "from", "to", "subject", "has_attachment", "filename", "after", "before", "raw")
 MAX_HITS = 25
 TEXT_CHARS = 20000
 
 
 def account_for_connection(conn):
-	"""The mail account of a connected Gmail mailbox: made when the sign-in finishes, the same one when it is called again."""
+	"""The mail account of a connected mailbox (Gmail or Microsoft): made when the sign-in finishes, the same one when it is called again."""
 	user = conn.connected_by or frappe.session.user
-	name = frappe.db.get_value("Life Mail Account", {"user": user, "provider": "gmail", "address": conn.mailbox})
+	provider = "microsoft" if conn.system == "microsoft" else "gmail"
+	name = frappe.db.get_value("Life Mail Account", {"user": user, "provider": provider, "address": conn.mailbox})
 	if name:
 		doc = frappe.get_doc("Life Mail Account", name)
 		doc.update({"connection": conn.name, "label": conn.label or conn.mailbox, "active": conn.active, "space": conn.space})
 		doc.save(ignore_permissions=True)  # system: kept in step with the connection the person just signed in
 		return doc
 	first = not frappe.db.exists("Life Mail Account", {"user": user})
-	return frappe.get_doc({"doctype": "Life Mail Account", "space": conn.space, "user": user, "provider": "gmail", "address": conn.mailbox,
+	return frappe.get_doc({"doctype": "Life Mail Account", "space": conn.space, "user": user, "provider": provider, "address": conn.mailbox,
 		"label": conn.label or conn.mailbox, "connection": conn.name, "is_default": int(first), "active": conn.active}).insert(ignore_permissions=True)  # system: as above
 
 
@@ -50,28 +52,39 @@ def google_for(account):
 	fake = (getattr(frappe.flags, "lifeos_google", None) or {}).get(account.address)
 	if fake:
 		return fake
-	if frappe.conf.get("lifeos_fake_gmail"):
+	if frappe.conf.get("lifeos_fake_gmail") or (account.provider == "microsoft" and frappe.conf.get("lifeos_fake_microsoft")):
 		from lifeos.mail import fake as site
 
 		return site.google()
+	if account.provider == "microsoft":
+		from lifeos.mail import microsoft
+
+		return microsoft.GraphActs(microsoft.headers_for(frappe.get_doc("Life Connection", account.connection)))
 	from lifeos.mail import gmail, google
 
 	return google.GoogleClient(gmail.headers_for(frappe.get_doc("Life Connection", account.connection)))
 
 
 def client_for(account):
-	fake = (getattr(frappe.flags, "lifeos_gmail", None) or {}).get(account.address)
+	"""The read client of an inbox. Tests put their own in `frappe.flags.lifeos_gmail` or `lifeos_microsoft` (by address); the acceptance site has fakes."""
+	microsoft = account.provider == "microsoft"
+	fake = (getattr(frappe.flags, "lifeos_microsoft" if microsoft else "lifeos_gmail", None) or {}).get(account.address)
 	if fake:
 		return fake
-	if frappe.conf.get("lifeos_fake_gmail"):
+	if frappe.conf.get("lifeos_fake_microsoft" if microsoft else "lifeos_fake_gmail"):
 		from lifeos.mail import fake as site
 
-		return site.gmail()
-	from lifeos.mail import gmail
-
+		return site.graph() if microsoft else site.gmail()
 	if not account.connection:
 		frappe.throw(_("This inbox is not connected."), title=_("Inbox not connected"))
-	return gmail.client_for(frappe.get_doc("Life Connection", account.connection))
+	conn = frappe.get_doc("Life Connection", account.connection)
+	if microsoft:
+		from lifeos.mail import microsoft as ms
+
+		return ms.client_for(conn)
+	from lifeos.mail import gmail
+
+	return gmail.client_for(conn)
 
 
 def adapter(account):

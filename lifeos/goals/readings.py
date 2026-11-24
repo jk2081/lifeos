@@ -209,7 +209,7 @@ def suggest(goal, value, on=None, excerpt=None, source_doctype=None, source_name
 	return frappe.get_doc({"doctype": "Life Goal Reading", "space": frappe.db.get_value("Life Goal", goal, "space"), "goal": goal,
 		"date": on, "value": flt(value), "status": "Suggested", "excerpt": (excerpt or "")[:1000] or None,
 		"source_doctype": source_doctype if source_name else None, "source_name": source_name or None, "suggested_by": by,
-	}).insert(ignore_permissions=True)
+	}).insert(ignore_permissions=True)  # system: an agent's Reading proposal is stored for the Brain; agents may not create goals or readings themselves
 
 
 # ---- the nightly job: readings found in the last week's captures and chat logs ----

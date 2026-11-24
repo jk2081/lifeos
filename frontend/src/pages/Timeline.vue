@@ -13,7 +13,7 @@
             {{ [KIND[e.kind] || e.kind, e.area_name, e.goal_title].filter(Boolean).join(' · ') }}
             <template v-if="e.filed_by"> · <Avatar size="xs" :label="e.filed_by" /> by {{ e.filed_by }}</template>
             <template v-if="e.is_archived"> · archived</template>
-            <template v-if="e.pending"> · <NumLink class="relative" :to="{ query: { ...route.query, open: refOf(e.ref_doctype, e.ref_name), focus: 'pending' } }">{{ e.pending }} of {{ e.proposals }} proposals pending</NumLink></template>
+            <template v-if="e.pending"> · <CountLink class="relative" :to="{ query: { ...route.query, open: refOf(e.ref_doctype, e.ref_name), focus: 'pending' } }">{{ e.pending }} of {{ e.proposals }} proposals pending</CountLink></template>
           </div>
         </div>
         <Badge :theme="THEME[e.kind] || 'gray'" :label="SHORT[e.kind] || e.kind" />
@@ -27,7 +27,7 @@ import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Avatar, Badge } from 'frappe-ui'
 import ListView from '@/components/ListView.vue'
-import NumLink from '@/components/ui/NumLink.vue'
+import CountLink from '@/components/ui/CountLink.vue'
 import { store } from '@/lib/store'
 import { long, weekday } from '@/lib/dates'
 import { loadLookups } from '@/lib/lookups'

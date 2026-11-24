@@ -1172,7 +1172,7 @@ class TestSourceSkills(SkillCase):
 		"""A schema test: kinds and channels each carry the template's sections; a run is given the base's rules, then its channel's, then its kind's."""
 		from lifeos.skills import template
 
-		self.assertEqual(len(template.source_skills()), 12)
+		self.assertEqual(len(template.source_skills()), 13)
 		for slug in template.source_skills():
 			text = store.instructions_of(slug)
 			self.assertEqual(template.missing(slug, text), [], f"{slug} lacks sections of the template")

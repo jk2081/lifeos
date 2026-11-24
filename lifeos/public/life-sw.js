@@ -5,9 +5,28 @@
 const STATIC_CACHE = 'lifeos-static-v1'
 const STATIC_PREFIX = '/assets/lifeos/'
 const HASHED = '/assets/lifeos/frontend/assets/' // built files carry a hash in their name, so they never change
-const OFFLINE_PAGE = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Life OS</title>'
-  + '<body style="font:16px system-ui;padding:2rem;max-width:30rem;margin:auto"><h1 style="font-size:1.25rem">Life OS needs a connection</h1>'
-  + '<p>Only capture works without one. Open Life OS again when you are back online. What you captured is kept on this phone and sent then.</p></body>'
+// Issue 90: a page that fails to load shows one of two pages, in the app's colours (light and dark follow the system, as the app does).
+// No connection (the device is offline): the capture note. The server does not answer (the device is online): it retries every 5 seconds
+// and loads the page by itself; after 2 minutes it adds Try again.
+const PAGE_HEAD = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>Life OS</title>'
+  + '<style>body{margin:0;font:16px/1.5 system-ui,sans-serif;padding:2rem;background:#fff;color:#171717}main{max-width:30rem;margin:12vh auto 0}'
+  + 'h1{font-size:1.25rem;margin:0 0 .75rem}p{margin:.5rem 0;color:#525252}button{margin-top:1rem;font:inherit;padding:.5rem 1rem;border-radius:.5rem;border:1px solid #d4d4d4;background:#171717;color:#fff;cursor:pointer}'
+  + '@media(prefers-color-scheme:dark){body{background:#161616;color:#ededed}p{color:#a3a3a3}button{background:#ededed;color:#171717;border-color:#404040}}</style>'
+const OFFLINE_PAGE = PAGE_HEAD + '<body><main data-offline-page="no-connection"><h1>Life OS needs a connection</h1>'
+  + '<p>Only capture works without one. Open Life OS again when you are back online. What you captured is kept on this device and sent then.</p></main></body>'
+const NOT_RESPONDING_PAGE = PAGE_HEAD + '<body><main data-offline-page="not-responding"><h1>Life OS is not responding right now. Trying again…</h1>'
+  + '<p data-keeps-happening hidden>If this keeps happening, the server may be down.</p><button data-try-again hidden onclick="location.reload()">Try again</button></main>'
+  + '<script>(function(){var t0=Date.now();function ok(r){return r.status<502||r.status>504}'
+  + 'function go(){fetch(location.href,{cache:"no-store",headers:{"X-Life-Retry":"1"}}).then(function(r){if(ok(r))location.reload()}).catch(function(){})}'
+  + 'setInterval(function(){go();if(Date.now()-t0>=120000){document.querySelector("[data-try-again]").hidden=false;document.querySelector("[data-keeps-happening]").hidden=false}},5000)})()</script></body>'
+const html = (body) => new Response(body, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } })
+async function page(req) {
+  try {
+    const res = await fetch(req)
+    if (res.status < 502 || res.status > 504) return res
+  } catch (err) { /* handled below */ }
+  return html(self.navigator.onLine ? NOT_RESPONDING_PAGE : OFFLINE_PAGE)
+}
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(STATIC_CACHE).then((c) => c.addAll(['/assets/lifeos/icons/icon-192.png', '/assets/lifeos/icons/icon-512.png'])).then(() => self.skipWaiting()))
@@ -23,7 +42,7 @@ self.addEventListener('fetch', (e) => {
   if (req.method === 'POST' && url.pathname === '/life/share') return e.respondWith(takeShare(req))
   if (req.method !== 'GET') return
   if (url.pathname.startsWith(STATIC_PREFIX)) return e.respondWith(staticFile(req, url))
-  if (req.mode === 'navigate' && url.pathname.startsWith('/life')) return e.respondWith(fetch(req).catch(() => new Response(OFFLINE_PAGE, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } })))
+  if (req.mode === 'navigate' && url.pathname.startsWith('/life')) return e.respondWith(page(req))
 })
 
 async function staticFile(req, url) {

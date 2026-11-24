@@ -102,7 +102,7 @@ def _save(doc, before, note):
 
 	frappe.flags.lifeos_wiki_api = True
 	try:
-		doc.save(ignore_permissions=True)
+		doc.save()
 	finally:
 		frappe.flags.lifeos_wiki_api = False
 	wiki.log_change(doc, "Edited", before, doc.content_md, note, by=permissions.BRAIN_USER)
@@ -146,7 +146,7 @@ def _missing(space, captures, known, m, out):
 	try:
 		doc = frappe.get_doc({"doctype": "Life Note", "space": space, "title": name[:140], "collection": "Wiki", "summary": summary[:500], "content_md": body,
 			"sources": [{"source_doctype": s["doctype"], "source_name": s["name"]} for s in sources]})
-		doc.insert(ignore_permissions=True)
+		doc.insert()
 	finally:
 		frappe.flags.lifeos_wiki_api = False
 	wiki.log_change(doc, "Created", "", doc.content_md, _("Weekly wiki check: {0} came up in {1} captures and had no page.").format(name, len(found)), by=permissions.BRAIN_USER)
@@ -184,7 +184,7 @@ def _contradiction(space, by_id, c, out):
 			return
 	question = " ".join((c.get("question") or "").split()) or _("The pages disagree about {0}: keep which?").format(topic)
 	doc = frappe.get_doc({"doctype": "Life Wiki Finding", "space": space, "topic": topic, "question": question[:500], "options": json.dumps(options), "status": "Open"})
-	doc.insert(ignore_permissions=True)
+	doc.insert()
 	out["findings"].append(doc.name)
 
 

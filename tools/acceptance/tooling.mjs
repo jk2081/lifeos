@@ -154,3 +154,41 @@ await check('TOOLING.8', 'The sidebar highlights the right place on every route'
     return `${all.length} routes`
   } finally { await s.ctx.close() }
 })
+
+// Issue 90: the page shown when a page fails to load tells "no connection" from "the server does not answer".
+const withWorker = async (fn) => {
+  const s = await session('owner@lifeos.test')
+  try {
+    await s.page.goto(base + '/life/today', { waitUntil: 'networkidle' })
+    await s.page.evaluate(() => navigator.serviceWorker.ready)
+    await s.page.reload({ waitUntil: 'networkidle' }) // now the worker controls the page
+    return await fn(s)
+  } finally { await s.ctx.close() }
+}
+const darkBackground = async (pg) => pg.evaluate(() => getComputedStyle(document.body).backgroundColor)
+await check('TOOLING.9', 'With the browser offline, /life/today shows the offline page saying "this device", in dark mode too', async () => withWorker(async ({ ctx, page }) => {
+  await ctx.setOffline(true)
+  await page.waitForFunction(() => !navigator.onLine)
+  await page.goto(base + '/life/today').catch(() => {})
+  const text = await page.locator('[data-offline-page="no-connection"]').innerText({ timeout: 10000 })
+  must(text.includes('this device') && !text.includes('this phone'), 'the page does not say "this device": ' + text)
+  await page.emulateMedia({ colorScheme: 'light' })
+  const light = await darkBackground(page)
+  await page.emulateMedia({ colorScheme: 'dark' })
+  const dark = await darkBackground(page)
+  must(light === 'rgb(255, 255, 255)' && dark === 'rgb(22, 22, 22)', `light is ${light}, dark is ${dark}`)
+  await ctx.setOffline(false)
+}))
+await check('TOOLING.10', 'Online but the server gives no answer: the page says "not responding" and loads Today by itself within 10 seconds of the server answering; it is dark in dark mode', async () => withWorker(async ({ ctx, page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  const block = (r) => r.abort('connectionrefused')
+  await ctx.route('**/life/today*', block)
+  await page.goto(base + '/life/today').catch(() => {})
+  const text = await page.locator('[data-offline-page="not-responding"]').innerText({ timeout: 10000 })
+  must(text.includes('not responding') && text.includes('Trying again'), 'the page does not say "not responding": ' + text)
+  must(await page.locator('[data-try-again]').isHidden(), 'Try again shows at once; it should wait 2 minutes')
+  must((await darkBackground(page)) === 'rgb(22, 22, 22)', 'the page is not dark: ' + await darkBackground(page))
+  await ctx.unroute('**/life/today*', block)
+  await page.locator('[data-sidebar], [data-tab-capture]').first().waitFor({ timeout: 10000 })
+  must(new URL(page.url()).pathname === '/life/today', 'Today did not load by itself: ' + page.url())
+}))

@@ -43,7 +43,7 @@ def record(prop, item):
 	ctype, key, detail = found
 	doc = frappe.get_doc({"doctype": "Life Skill Correction", "skill": made[0], "skill_version": made[1], "space": item.space, "correction_type": ctype,
 		"key": key[:140], "detail": detail, "capture_title": (item.title or "")[:140], "capture_excerpt": (item.raw_text or "")[:EXCERPT],
-		"proposal": prop.name, "inbox_item": item.name}).insert(ignore_permissions=True)
+		"proposal": prop.name, "inbox_item": item.name}).insert(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 	ask_for_lesson(made[0], item.space, key)
 	return doc
 
@@ -72,7 +72,7 @@ def ask_for_lesson(skill, space, key):
 	if len(open_) < AFTER or not frappe.db.exists("Life Skill", "improve-skill") or not frappe.db.get_value("Life Skill", "improve-skill", "active"):
 		return None
 	lesson = frappe.get_doc({"doctype": "Life Skill Lesson", "skill": skill, "space": space, "status": "Drafting",
-		"base_version": frappe.db.get_value("Life Skill", skill, "version")}).insert(ignore_permissions=True)
+		"base_version": frappe.db.get_value("Life Skill", skill, "version")}).insert(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 	for name in open_:
 		frappe.db.set_value("Life Skill Correction", name, "lesson", lesson.name)
 	from lifeos.skills import triggers
@@ -117,7 +117,7 @@ def discard(name):
 	"""The draft could not be made (no key, over the cap, a wrong answer): the corrections wait for the next one."""
 	if frappe.db.get_value("Life Skill Lesson", name, "status") == "Drafting":
 		frappe.db.set_value("Life Skill Correction", {"lesson": name}, "lesson", None)
-		frappe.delete_doc("Life Skill Lesson", name, force=True, ignore_permissions=True)
+		frappe.delete_doc("Life Skill Lesson", name, force=True, ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 
 
 # ---- the text ----
@@ -157,7 +157,7 @@ def edit(name, text):
 		frappe.throw(_("A lesson needs some words."), title=_("Lesson needs words"))
 	if text != lesson.text:
 		lesson.text, lesson.edited = text, 1
-		lesson.save(ignore_permissions=True)
+		lesson.save(ignore_permissions=True)  # system: skills are shared system records; only the Brain and admin screens change them
 	return lesson
 
 

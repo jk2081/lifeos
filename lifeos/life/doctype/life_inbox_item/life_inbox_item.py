@@ -29,4 +29,4 @@ class LifeInboxItem(Document):
 
 	def on_trash(self):
 		for name in frappe.get_all("Life Proposal", filters={"inbox_item": self.name}, pluck="name"):
-			frappe.delete_doc("Life Proposal", name, ignore_permissions=True, force=True)
+			frappe.delete_doc("Life Proposal", name, force=True)

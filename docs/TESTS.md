@@ -16,9 +16,9 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_library.py` | Library: notes, the vault, search, the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions |
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder, one space |
-| `test_permissions.py` | Spaces and members, what each kind of user sees, every read refusing another space's records, the scan guard, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
+| `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it |
-| `test_gmail.py` | Gmail through Life OS: connect, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools |
+| `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check, the connector (report, pull, confirm), the owner's changes, an agent's switches and the areas it may read |
 | `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings; no component, page or `App.vue` calls `api(`; every `.vue` file is imported or routed |
 
@@ -40,8 +40,9 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `ingest-email` (was `triage-email`) | `test_gmail.TestDigest`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
 | the agent connector (`agent/connector/`) | `test_agents.TestConnector` | `BRAIN.49` to `BRAIN.51` |
 | Google through Life OS: acts, switches, the log and undo | `test_agents.TestGoogleActs`, `test_gmail.TestMailSearch`, `test_gmail.TestAskSearchesMail` | `BRAIN.52` to `BRAIN.54` |
+| Microsoft inboxes: Graph adapter, merged search, attachments, replies, the digest, connect | `test_gmail.TestMicrosoftInbox`, `test_gmail.TestConnectMicrosoft` | `SETTINGS.41` |
 | `ingest-document`, `ingest-photo`, `ingest-video`, `ingest-link`, `ingest-voice` | `test_skills.TestSourceSkills`, `test_brain.TestSourcePages` | `BRAIN.46` to `BRAIN.48` |
-| `channel-upload`, `channel-phone`, `channel-gmail`, `channel-calendar`, `channel-email-in`, `channel-agent` | `test_skills.TestSourceSkills` | `BRAIN.46` to `BRAIN.48` |
+| `channel-upload`, `channel-phone`, `channel-gmail`, `channel-microsoft`, `channel-calendar`, `channel-email-in`, `channel-agent` | `test_skills.TestSourceSkills` | `BRAIN.46` to `BRAIN.48` |
 | `improve-skill` | `test_skills.TestCorrections` | `SETTINGS.38` |
 | `lifeos` | `test_skills.TestServing` | `SETTINGS.38` |
 | `lifeos-file-work` | `test_skills.TestServing` | `SETTINGS.38` |
@@ -350,6 +351,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.38` Skills: every built-in skill has its card, and Test passes the examples of each
 - `SETTINGS.39` Settings > Data holds the Reset section; /today/reset lands on Today and says that page moved
 - `SETTINGS.40` Settings > Sources shows the email-in address and the allowed senders, and the onboarding guide says nothing about forwarding
+- `SETTINGS.41` Sources offers Connect Gmail and Connect Microsoft; a connected (fake) Microsoft inbox shows with its label and an on/off switch; Connect Microsoft says what it reads and sends
 
 ### Phone (`tools/acceptance/phone.mjs`, 24 checks)
 
@@ -392,6 +394,8 @@ Unit tests: none: these check the tools, not the app
 - `TOOLING.2` CI has an acceptance job that builds the front end, makes acceptance.localhost, serves it and runs every check
 - `TOOLING.3` A failed check saves screenshots, and CI uploads them with the logs as an artifact
 - `TOOLING.4` No password or key in the workflow file or in the logs a failed run uploads
+- `TOOLING.9` With the browser offline, /life/today shows the offline page saying "this device", in dark mode too
+- `TOOLING.10` Online but the server gives no answer: "not responding", Today loads by itself once it answers; dark in dark mode
 
 ### End of every run (`tools/acceptance/end.mjs`)
 

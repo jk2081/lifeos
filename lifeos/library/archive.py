@@ -58,7 +58,7 @@ def set_archived(doctype, name, archived=True, reason="Manual"):
 	doc.archived_on = today() if archived else None
 	doc.archive_reason = reason if archived else ""
 	doc.flags.keep_touched = True
-	doc.save(ignore_permissions=True)
+	doc.save()
 	return {"doctype": doctype, "name": name, "is_archived": doc.is_archived}
 
 
@@ -97,7 +97,7 @@ def restore_goal(goal) -> dict:
 		doc = frappe.get_doc("Life Goal", goal.name)
 		doc.is_archived, doc.archived_on, doc.outcome = 0, None, "In Progress"
 		doc.flags.keep_touched = True
-		doc.save(ignore_permissions=True)
+		doc.save()
 	else:
 		frappe.db.set_value("Life Goal", goal.name, {"is_archived": 0, "archived_on": None}, update_modified=False)
 	return {"doctype": "Life Goal", "name": goal.name, "is_archived": 0, "records": count}

@@ -9,7 +9,7 @@ export const brainData = {
   review: group('review', ['decide', 'decide_all']),
   context: group('context', ['decide']),
   lessons: group('lessons', ['accept', 'reject', 'remove']),
-  connections: group('connections', ['gmail_connect', 'gmail_finish', 'gmail_remove', 'gmail_setup', 'save', 'sources']),
+  connections: group('connections', ['gmail_connect', 'gmail_finish', 'gmail_remove', 'gmail_setup', 'microsoft_connect', 'microsoft_finish', 'microsoft_setup', 'save', 'sources']),
   settings: group('settings', ['get', 'save']),
   skills: group('skills', ['create', 'overview', 'save_auto_file', 'set_active']),
   old_items: group('old_items', ['apply', 'suggested', 'undo']),
