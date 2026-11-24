@@ -5,6 +5,7 @@ import json
 import re
 
 import frappe
+from frappe import _
 from frappe.query_builder import Case, Order
 from frappe.utils import add_days, cint, getdate, today
 
@@ -46,12 +47,36 @@ TOOLS = [
 		"input_schema": {"type": "object", "properties": {"date_from": {"type": "string"}, "date_to": {"type": "string"}}, "required": ["date_from"]}},
 	{"name": "suggest_actions", "description": "Offer the owner buttons under the answer. Nothing changes until the owner clicks one. Use only records you cited.",
 		"input_schema": {"type": "object", "properties": {"actions": {"type": "array", "items": {"type": "object", "properties": {
-			"kind": {"type": "string", "enum": ["make_task", "move_someday", "open_reset", "open_list", "snooze_insight", "dismiss_insight"]},
+			"kind": {"type": "string", "enum": ["make_task", "move_someday", "open_reset", "open_list", "snooze_insight", "dismiss_insight", "file_mail"]},
 			"label": {"type": "string", "description": "Button text, short: 'Make task: reply to Kunal', 'Move 11 to Someday'."},
 			"title": {"type": "string", "description": "make_task: the task title"}, "area_ref": {"type": "string", "description": "make_task: a cited record whose area the task takes"},
 			"due_date": {"type": "string"}, "refs": {"type": "array", "items": {"type": "string"}, "description": "move_someday, open_reset: the cited records"},
-			"list": {"type": "string", "description": "open_list: one of the counts kinds"}, "insight_ref": {"type": "string"}},
+			"list": {"type": "string", "description": "open_list: one of the counts kinds"}, "insight_ref": {"type": "string"},
+			"thread_id": {"type": "string", "description": "file_mail: a thread you read with mail_thread. The label names the email by who sent it and what it is: 'File Ashmeet's leave email'."}},
 			"required": ["kind", "label"]}}}, "required": ["actions"]}},
+]
+# issue 107: what Ask does when the owner asks. Each runs the plain function in lifeos/tools, as the asking person, and the answer lists what it did, each with Undo.
+WRITE_TOOLS = [
+	{"name": "create_page", "description": "Create a wiki page under an area (and a part of it), by their names, when the owner asks for one. kind: Prospect, Client, Project, Person or Note. The body is Markdown and may link people and pages as [[Name]]. Refuses a title the wiki already has: use update_page on that page.",
+		"input_schema": {"type": "object", "properties": {
+			"title": {"type": "string"}, "area": {"type": "string", "description": "An area's name, e.g. Career."}, "part": {"type": "string", "description": "A part of the area, e.g. BTW."},
+			"kind": {"type": "string", "enum": ["Prospect", "Client", "Project", "Person", "Note"]}, "body": {"type": "string"}, "summary": {"type": "string", "description": "One line on what the page is about."},
+			"sources": {"type": "array", "items": {"type": "string"}, "description": "Emails or captures it is written from, as 'Life Inbox Item:<name>' (an email saved with save_attachment says its item)."}},
+			"required": ["title", "area"]}},
+	{"name": "update_page", "description": "Change a wiki page found with search or made with create_page: replace its text (send the whole new text), and/or add links to other pages or people.",
+		"input_schema": {"type": "object", "properties": {"page": {"type": "string", "description": "The page's name, or the reference R3 of a record you found."}, "body": {"type": "string"},
+			"add_links": {"type": "array", "items": {"type": "string"}, "description": "Titles of pages or people to link under Links."}}, "required": ["page"]}},
+	{"name": "add_person", "description": "Add a person (with their email and company) when the owner asks; a person already there is reused. link_to is a page's name: the page lists them under People.",
+		"input_schema": {"type": "object", "properties": {"name": {"type": "string"}, "email": {"type": "string"}, "company": {"type": "string"}, "link_to": {"type": "string"}}, "required": ["name"]}},
+	{"name": "save_note", "description": "Save text you wrote, such as a summary the owner asked you to file, as a note under an area (and a part), by their names.",
+		"input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "body": {"type": "string"}, "area": {"type": "string"}, "part": {"type": "string"}}, "required": ["title", "body", "area"]}},
+	{"name": "make_task", "description": "Make a task now, only when the owner asked for it. For a task you think of yourself, offer a button with suggest_actions instead.",
+		"input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "area": {"type": "string"}, "part": {"type": "string"}, "due_date": {"type": "string", "description": "YYYY-MM-DD"}}, "required": ["title"]}},
+	{"name": "add_event", "description": "Put an event on the calendar now, only when the owner asked for it.",
+		"input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "start": {"type": "string", "description": "YYYY-MM-DD or YYYY-MM-DD HH:MM"}, "end": {"type": "string"},
+			"all_day": {"type": "boolean"}, "description": {"type": "string"}}, "required": ["title", "start"]}},
+	{"name": "ask_one_question", "description": "When two records could be the one meant (for example two similar company names), ask the owner one question with each as a choice, then stop. The owner's choice comes back as their next message, and then you do the work. Do not hand the work back.",
+		"input_schema": {"type": "object", "properties": {"question": {"type": "string"}, "choices": {"type": "array", "items": {"type": "string"}, "description": "Two to four short choices."}}, "required": ["question", "choices"]}},
 ]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # issue 86: offered only to a person who has connected an inbox; the search is live, nothing is copied into Life OS
@@ -64,6 +89,14 @@ MAIL_TOOLS = [
 			"account": {"type": "string", "description": "One inbox, by its label or address. Leave out to search every inbox."}, "raw": {"type": "string", "description": "The provider's own query, only if the plain fields cannot say it."}}}},
 	{"name": "mail_thread", "description": "Read one thread found by mail_search: each message's text and its attachments.",
 		"input_schema": {"type": "object", "properties": {"thread_id": {"type": "string"}, "account": {"type": "string", "description": "The inbox the search said."}}, "required": ["thread_id"]}},
+	{"name": "mail_list_threads", "description": "Every email thread of a period, 25 a page, newest first: use it for any question about a period, never mail_search (which stops at 10). When the answer has next_page_token, call again with it until it is empty. `pages` says how many pages the period holds.",
+		"input_schema": {"type": "object", "properties": {"after": {"type": "string", "description": "YYYY-MM-DD, the first day"}, "before": {"type": "string", "description": "YYYY-MM-DD, the last day, included"},
+			"query": {"type": "string"}, "page_token": {"type": "string"}, "account": {"type": "string"}}, "required": ["after", "before"]}},
+	{"name": "digests_read", "description": "The daily email digests Life OS already wrote for a period, and the days that have none. For a summary of a period, read these first and search the inbox only for the missing days.",
+		"input_schema": {"type": "object", "properties": {"start": {"type": "string", "description": "YYYY-MM-DD"}, "end": {"type": "string", "description": "YYYY-MM-DD"}}, "required": ["start", "end"]}},
+	{"name": "save_attachment", "description": "Save one attachment of an email (from mail_thread) in Life OS when the owner asks: under an area or part, attached to a page when one is given. The email it came from is kept with it. vault_type (ID, Travel, Insurance, Property, Tax, Medical, Other) only for an ID card, a statement or another private document: it goes to the Vault.",
+		"input_schema": {"type": "object", "properties": {"thread_id": {"type": "string"}, "attachment_id": {"type": "string"}, "area": {"type": "string"}, "part": {"type": "string"}, "page": {"type": "string", "description": "A page's name from create_page."},
+			"vault_type": {"type": "string"}, "account": {"type": "string"}}, "required": ["thread_id", "attachment_id"]}},
 ]
 
 
@@ -86,6 +119,11 @@ class Context:
 		self.no_tools = False  # the service takes no tools (issue 102): Ask answers from one search of the question
 		self.turn_cost = 0.0  # the AI cost of the model turn that is calling a tool; a search is logged with it
 		self._has_mail = None
+		self.done = []  # what the answer did (issue 107): {text, undo, kind, doctype, name}; each with Undo
+		self.choice = None  # a question with choices the owner answers by tapping one
+		self.background = False  # a long read of mail runs as a background job
+		self.progress = None  # called with what is being read, for the screen
+		self.mail_pages = {}  # (after, before, query) -> pages read
 
 	def has_mail(self):
 		if self._has_mail is None:
@@ -161,15 +199,21 @@ def run_tool(ctx, name, args):
 	args = args or {}
 	try:
 		fn = {"search": t_search, "get_record": t_get_record, "list_records": t_list, "counts": t_counts,
-			"cycle_state": t_cycle, "timeline": t_timeline, "suggest_actions": t_suggest, "mail_search": t_mail_search, "mail_thread": t_mail_thread}[name]
+			"cycle_state": t_cycle, "timeline": t_timeline, "suggest_actions": t_suggest, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
+			"mail_list_threads": t_mail_list_threads, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
+			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "add_event": t_add_event,
+			"ask_one_question": t_ask_one_question}[name]
 	except KeyError:
 		return {"error": f"Unknown tool {name}."}
 	try:
 		return fn(ctx, **{k: v for k, v in args.items() if v not in (None, "")})
 	except frappe.PermissionError:
-		return {"error": "Not allowed: this record is outside what you may read."}
+		return {"error": "Not allowed: this record is outside what you may read or change."}
 	except frappe.DoesNotExistError:
 		return {"error": "Not found."}
+	except (frappe.DuplicateEntryError, frappe.ValidationError) as e:
+		frappe.clear_messages()  # the model is told; the owner is not given a second pop-up
+		return {"error": frappe.utils.strip_html(str(e))[:300]}
 	except TypeError as e:
 		return {"error": f"Bad arguments: {e}"}
 
@@ -418,6 +462,11 @@ def t_suggest(ctx, actions):
 			if k not in COUNT_KINDS:
 				continue
 			item["to"] = getattr(counts, k)(ctx.space)["to"]
+		elif kind == "file_mail":
+			m = next((m for m in [*ctx.mails_read, *ctx.mails] if m["thread_id"] == a.get("thread_id")), None)
+			if not m:
+				continue
+			item.update({"thread_id": m["thread_id"], "account": m["account"], "title": m["subject"], "link": m["link"]})
 		elif kind in ("snooze_insight", "dismiss_insight"):
 			r = ctx.refs.get(a.get("insight_ref") or "")
 			if not r or r["doctype"] != "Life Insight":
@@ -431,7 +480,7 @@ def t_suggest(ctx, actions):
 
 
 def tools_for(ctx):
-	return None if ctx.no_tools else [*TOOLS, *MAIL_TOOLS] if ctx.has_mail() else TOOLS
+	return None if ctx.no_tools else [*TOOLS, *WRITE_TOOLS, *(MAIL_TOOLS if ctx.has_mail() else [])]
 
 
 def ask_call(ctx, system, question, messages, on_text, space):
@@ -486,7 +535,125 @@ def t_mail_thread(ctx, thread_id, account=None):
 		for m in got["messages"][:6]]}
 
 
+# ---- issue 107: reading a period of mail, and what Ask does when the owner asks (each write lists itself under "Done" with Undo) ----
+
+class NeedsBackground(Exception):
+	"""A question that needs more than 3 pages of mail: it is run again as a background job, which reports each page."""
+
+
+BACKGROUND_PAGES = 3
+
+
+def _label_period(after, before):
+	a, b = getdate(after), getdate(before)
+	return f"{a.day}–{b.day} {b.strftime('%b')}" if (a.year, a.month) == (b.year, b.month) else f"{a.day} {a.strftime('%b')}–{b.day} {b.strftime('%b')}"
+
+
+def t_mail_list_threads(ctx, after, before, query=None, page_token=None, account=None):
+	from lifeos.tools import mail as mail_tools
+
+	got = mail_tools.list_threads(after, before, query, page_token, ctx.space, account)
+	key = (after, before, query or "")
+	ctx.mail_pages[key] = n = ctx.mail_pages.get(key, 0) + 1
+	if got["pages"] > BACKGROUND_PAGES and not ctx.background:
+		raise NeedsBackground
+	if ctx.progress:
+		ctx.progress(f"Reading {_label_period(after, before)}… (page {n} of {max(got['pages'], n)})")
+	rows = [{k: t[k] for k in ("thread_id", "subject", "from", "date", "snippet", "inbox")} for t in got["threads"]]
+	return {"threads": rows, "next_page_token": got["next_page_token"], "page": n, "pages": got["pages"], "note": "These are not records in Life OS: say who, when and what, not a reference."}
+
+
+def t_digests_read(ctx, start, end):
+	from lifeos.tools import digests
+
+	return digests.read(start, end, ctx.space)
+
+
+def _did(ctx, out, kind, doctype=None, name=None):
+	"""Remember a write for the "Done" list under the answer; the model gets the same line back."""
+	ctx.done.append({"text": out["done"], "undo": out.get("undo"), "kind": kind, "doctype": doctype, "name": name, "pane": ref_of(doctype, name) if doctype and name else None})
+	return {"done": out["done"], **{k: v for k, v in out.items() if k in ("page", "person", "note", "task", "event", "item", "file", "file_name", "title", "organisation", "vault_document")}}
+
+
+def _page_arg(ctx, page):
+	r = ctx.refs.get(str(page).strip()) if page else None
+	if r:
+		if r["doctype"] != "Life Note":
+			frappe.throw(_("That record is not a page."), title=_("Not a page"))
+		return r["name"]
+	return page
+
+
+def t_create_page(ctx, title, area, part=None, kind=None, body=None, summary=None, sources=None):
+	from lifeos.tools import pages
+
+	out = pages.create(title, area, part, kind, body, sources, summary, space=ctx.space)
+	return _did(ctx, out, "page", "Life Note", out["page"])
+
+
+def t_update_page(ctx, page, body=None, add_links=None):
+	from lifeos.tools import pages
+
+	out = pages.update(_page_arg(ctx, page), body, add_links, space=ctx.space)
+	return _did(ctx, out, "page", "Life Note", out["page"])
+
+
+def t_add_person(ctx, name, email=None, company=None, link_to=None):
+	from lifeos.tools import people
+
+	out = people.add(name, email, company, _page_arg(ctx, link_to), space=ctx.space)
+	return _did(ctx, out, "person", "Life Person", out["person"])
+
+
+def t_save_note(ctx, title, body, area, part=None):
+	from lifeos.tools import notes
+
+	out = notes.save(title, body, area, part, space=ctx.space)
+	return _did(ctx, out, "note", "Life Note", out["note"])
+
+
+def t_save_attachment(ctx, thread_id, attachment_id, area=None, part=None, page=None, vault_type=None, account=None):
+	from lifeos.tools import mail as mail_tools
+
+	out = mail_tools.save_attachment(thread_id, attachment_id, area, part, _page_arg(ctx, page), vault_type, account, ctx.space)
+	return _did(ctx, out, "file", "Life Note" if out.get("page") else "Life Inbox Item", out.get("page") or out["item"])
+
+
+def t_make_task(ctx, title, area=None, part=None, due_date=None):
+	from lifeos.tools import work
+
+	out = work.add_task(title, area, part, due_date, ctx.space)
+	return _did(ctx, out, "task", "Life Task", out["task"])
+
+
+def t_add_event(ctx, title, start, end=None, all_day=False, description=None):
+	from lifeos.tools import work
+
+	out = work.add_event(title, start, end, bool(all_day), description, ctx.space)
+	return _did(ctx, out, "event")
+
+
+def t_ask_one_question(ctx, question, choices):
+	"""The question is the end of the turn: the owner taps a choice, which comes back as the next message."""
+	picks = [str(c)[:80] for c in (choices or [])[:4] if str(c).strip()]
+	if len(picks) < 2:
+		return {"error": "Give two to four choices."}
+	ctx.choice = {"question": str(question)[:300], "choices": picks}
+	return {"ok": True, "note": "Write the question as your answer and stop. Do not call more tools."}
+
+
 def file_actions(ctx):
-	"""A File it button for each thread the answer read (or, if none was read, the best three found). The owner's click files it; nothing is filed before."""
-	chosen = (ctx.mails_read or ctx.mails)[:3]
-	return [{"kind": "file_mail", "label": f"File it: {m['subject'][:60]}", "thread_id": m["thread_id"], "account": m["account"], "title": m["subject"], "link": m["link"]} for m in chosen]
+	"""A button to file each thread the answer read (or, if none was read, the best three found), named for what it files: "File the email “LEAVE” from
+	Ashmeet". The owner's click files it; nothing is filed before. A thread the model already named in suggest_actions, or one already filed, gets none."""
+	if ctx.choice:  # a question with choices: the choices are the buttons, and nothing is offered to file
+		return [{"kind": "choose", "label": c, "question": ctx.choice["question"]} for c in ctx.choice["choices"]]
+	named = {a.get("thread_id") for a in ctx.actions if a.get("kind") == "file_mail"}
+	chosen = [m for m in (ctx.mails_read or ctx.mails)[:3] if m["thread_id"] not in named
+		and not frappe.db.exists("Life Inbox Item", {"space": ctx.space, "source_system": ["in", ["gmail", "microsoft"]], "external_id": m["thread_id"]})]
+	return [{"kind": "file_mail", "label": file_label(m), "thread_id": m["thread_id"], "account": m["account"], "title": m["subject"], "link": m["link"]} for m in chosen]
+
+
+def file_label(m):
+	""""File the email “Leave request” from Ashmeet Singh": the whole subject (the button wraps), and who sent it."""
+	who = re.sub(r"\s*[(<].*$", "", m.get("from") or "").strip().strip('"')
+	return f"File the email “{m['subject'][:100]}”" + (f" from {who}" if who else "")

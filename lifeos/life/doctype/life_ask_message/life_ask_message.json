@@ -10,6 +10,7 @@
   "text",
   "cited",
   "actions",
+  "done",
   "records_read",
   "status",
   "error",
@@ -80,6 +81,11 @@
    "fieldname": "cost",
    "fieldtype": "Float",
    "label": "Cost"
+  },
+  {
+   "fieldname": "done",
+   "fieldtype": "JSON",
+   "label": "Done"
   }
  ],
  "links": [],

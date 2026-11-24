@@ -9,7 +9,9 @@ import frappe
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import mail, permissions
-from lifeos.agents import acts
+from lifeos.agents import acts, limits
+from lifeos.brain import agent_page as pages_agent
+from lifeos.ai import fake
 from lifeos.mail import digest, gmail, microsoft
 from lifeos.api import connections, inbox, settings
 from lifeos.api import ask as ask_api
@@ -499,7 +501,7 @@ class TestAskSearchesMail(AskCase):
 		self.assertIn("after:2014/04/01", self.gmail.query)
 		msg = res["message"]
 		self.assertEqual([(a["kind"], a["thread_id"]) for a in msg["actions"]], [("file_mail", "t-tax")])
-		self.assertEqual(msg["actions"][0]["label"], "File it: 2014 tax return")
+		self.assertEqual(msg["actions"][0]["label"], "File the email “2014 tax return” from Anil")
 		self.assertEqual(frappe.db.count("Life Inbox Item", {"space": PRIVATE, "source_system": "gmail"}), 0)  # nothing is filed until the owner clicks
 		log = frappe.get_all("Life Mail Search", filters={"space": PRIVATE}, fields=["user", "results", "query", "cost"])
 		self.assertEqual((log[0].user, log[0].results), (OWNER, 1))
@@ -527,6 +529,299 @@ class TestAskSearchesMail(AskCase):
 		ask_api.ask("find the 2014 tax return", space=SHARED)
 		self.assertNotIn("mail_search", [t["name"] for t in backend.received[0]["tools"]])
 		self.assertEqual(self.gmail.calls, [])
+
+
+# ---------------------------------------------------------------- Ask's tools (issue 107)
+
+DAY_MS = 86_400_000
+NOV1 = 1_793_491_200_000  # 2026-11-01 00:00 UTC
+
+
+class PagedGmail(FakeGmail):
+	"""A fake inbox that answers like Gmail: only the threads inside `after:` and `before:`, newest first, a page at a time with a token."""
+
+	def list_threads(self, query, page_token=None, max_results=100):
+		import re
+		from datetime import datetime, timezone
+
+		self.calls.append("list_threads")
+		self.query = query
+		day = lambda t: int(datetime(*[int(x) for x in t.split("/")], tzinfo=timezone.utc).timestamp() * 1000)  # noqa: E731
+		lo, hi = (day(re.search(f"{k}:(\\S+)", query).group(1)) for k in ("after", "before"))
+		found = sorted((t for t in self.threads.values() if lo <= int(t["messages"][-1]["internalDate"]) < hi), key=lambda t: -int(t["messages"][-1]["internalDate"]))
+		start = int(page_token or 0)
+		return {"threads": [{"id": t["id"], "snippet": "x"} for t in found[start:start + max_results]], "resultSizeEstimate": len(found),
+			**({"nextPageToken": str(start + max_results)} if start + max_results < len(found) else {})}
+
+
+class TestAskTools(GmailCase):
+	"""Ask's tools (issue 107): read a period, read the digests, save an attachment, make pages and people, save notes; each write is logged with an Undo."""
+	KEY = "i107agent"
+	PDF = ("blueprint.txt", b"The SAP B1 blueprint.")
+
+	def setUp(self):
+		super().setUp()
+		set_key("sk-test-not-real")
+		frappe.db.set_value("Life Space", PRIVATE, {"ask_enabled": 1, "ask_can_read_vault": 0})
+		self.addCleanup(lambda: setattr(frappe.flags, "lifeos_ai_backend", None))
+		for dt in ("Life Agent Action", "Life Agent Config"):
+			frappe.db.delete(dt, {"space": PRIVATE})
+		frappe.db.delete("Life Note", {"space": PRIVATE})
+		frappe.db.delete("Life Person", {"space": PRIVATE})
+		frappe.db.delete("File", {"file_name": "blueprint.txt"})
+		self.career = frappe.db.get_value("Life Area", {"space": PRIVATE, "area_name": "Career"})
+		self.tea = self.areas["Tea"]
+		self.as_user(OWNER)
+
+	def script(self, *responses):
+		frappe.flags.lifeos_ai_backend = fake.ScriptedFake(responses)
+		return frappe.flags.lifeos_ai_backend
+
+	def steps(self, *steps):
+		"""A model that answers each turn from the result of the tool it called the turn before."""
+		def turn(step):
+			def respond(params):
+				last = params["messages"][-1]["content"]
+				prev = json.loads(last[0]["content"]) if isinstance(last, list) and last and last[0].get("type") == "tool_result" else {}
+				return step(prev)
+			return respond
+		return self.script(*[turn(s) for s in steps])
+
+	def busy_inbox(self, per_day=4):
+		"""60 threads over 1 to 15 November 2026 (four a day), and two outside that range."""
+		threads = [person(f"d{d:02d}-{k}", f"P{k} <p{k}@x.example>", f"Day {d} mail {k}", "text", at=NOV1 + (d - 1) * DAY_MS + (3 + k) * 3_600_000) for d in range(1, 16) for k in range(per_day)]
+		threads += [person("before", "A <a@x.example>", "Before", "x", at=NOV1 - 3_600_000), person("after", "A <a@x.example>", "After", "x", at=NOV1 + 15 * DAY_MS + 3_600_000)]
+		fake = PagedGmail(threads, {"att-blueprint.txt": self.PDF[1]})
+		frappe.flags.lifeos_gmail[MAILBOX] = fake
+		frappe.set_user("Administrator")
+		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": MAILBOX, "label": "Personal", "is_default": 1, "active": 1}).insert()
+		self.as_user(OWNER)
+		return fake
+
+	def blueprint(self):
+		t = person("t-bp", "Anirudh Poddar <anirudh@sap.example>", "SAP B1 Blueprint", "The blueprint is attached.", attachments=[self.PDF])
+		fake = FakeGmail([t], {"att-blueprint.txt": self.PDF[1]})
+		frappe.flags.lifeos_gmail[MAILBOX] = fake
+		frappe.set_user("Administrator")
+		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": MAILBOX, "label": "Personal", "is_default": 1, "active": 1}).insert()
+		self.as_user(OWNER)
+
+	def test_1_list_threads_returns_every_thread_of_a_period_over_three_pages_and_none_outside_it(self):
+		from lifeos.tools import mail as mail_tools
+
+		self.busy_inbox()
+		got, token, pages_read = [], None, 0
+		while True:
+			page = mail_tools.list_threads("2026-11-01", "2026-11-15", page_token=token, space=PRIVATE)
+			pages_read += 1
+			got += page["threads"]
+			token = page["next_page_token"]
+			if pages_read == 1:
+				self.assertEqual((page["pages"], len(page["threads"])), (3, 25))
+			if not token:
+				break
+		self.assertEqual((pages_read, len(got)), (3, 60))
+		self.assertEqual(len({t["thread_id"] for t in got}), 60)
+		self.assertFalse({"before", "after"} & {t["thread_id"] for t in got})
+
+	def test_2_digests_read_returns_the_stored_digests_of_a_range_and_the_days_with_none(self):
+		from lifeos.tools import digests
+
+		frappe.set_user("Administrator")
+		for day in ("2026-11-10", "2026-11-12"):
+			frappe.get_doc({"doctype": "Life Inbox Item", "space": PRIVATE, "title": f"Email, {day}", "source_type": "Email Digest", "source_system": "gmail",
+				"external_id": f"digest:{OWNER}:day:{day}", "raw_text": f"Digest of {day}", "status": "New"}).insert()
+		self.as_user(OWNER)
+		got = digests.read("2026-11-10", "2026-11-13", space=PRIVATE)
+		self.assertEqual([d["date"] for d in got["digests"]], ["2026-11-10", "2026-11-12"])
+		self.assertEqual(got["missing_days"], ["2026-11-11", "2026-11-13"])
+		self.assertIn("Digest of 2026-11-12", got["digests"][1]["text"])
+
+	def test_3_save_attachment_saves_a_file_under_an_area_linked_to_its_email_and_undo_removes_it(self):
+		from lifeos.tools import actions, mail as mail_tools
+
+		self.blueprint()
+		out = mail_tools.save_attachment("t-bp", "att-blueprint.txt", area="Career", part="Tea", space=PRIVATE)
+		self.assertIn("Saved blueprint.txt", out["done"])
+		f = frappe.get_doc("File", out["file"])
+		self.assertEqual((f.attached_to_doctype, f.attached_to_name, f.is_private), ("Life Inbox Item", out["item"], 1))
+		item = frappe.get_doc("Life Inbox Item", out["item"])
+		self.assertEqual((item.area, item.external_id, item.source_system), (self.tea, "t-bp", "gmail"))  # the email it came from
+		log = frappe.get_doc("Life Agent Action", out["action"])
+		self.assertEqual((log.status, log.asked_by, log.agent), ("Done", "owner", "ask"))
+		again = mail_tools.save_attachment("t-bp", "att-blueprint.txt", area="Career", part="Tea", space=PRIVATE)
+		self.assertEqual(again["file"], out["file"])  # the same attachment is one file
+		self.assertIsNone(again["undo"])  # the second call made nothing, so there is nothing to undo
+		with self.assertRaises(frappe.ValidationError):
+			actions.undo(again["action"])
+		actions.undo(out["action"])
+		self.assertFalse(frappe.db.exists("File", out["file"]))
+		self.assertFalse(frappe.db.exists("Life Inbox Item", out["item"]))
+		self.assertTrue(frappe.db.get_value("Life Agent Action", out["action"], "undone"))
+		with self.assertRaises(frappe.ValidationError):
+			actions.undo(out["action"])
+
+	def test_3b_a_page_gets_the_file_and_cites_the_email_and_a_vault_type_goes_to_the_vault(self):
+		from lifeos.tools import mail as mail_tools, pages
+
+		self.blueprint()
+		page = pages.create("Ambaji Food Products", "Career", part="Tea", kind="Prospect", body="Prospective client.", space=PRIVATE)
+		out = mail_tools.save_attachment("t-bp", "att-blueprint.txt", page=page["page"], space=PRIVATE)
+		self.assertEqual(frappe.db.get_value("File", out["file"], "attached_to_name"), page["page"])
+		self.assertIn(("Life Inbox Item", out["item"]), [(s.source_doctype, s.source_name) for s in frappe.get_doc("Life Note", page["page"]).sources])
+		vault = mail_tools.save_attachment("t-bp", "att-blueprint.txt", area="Career", vault_type="ID", space=PRIVATE)
+		doc = frappe.get_doc("Life Vault Document", vault["vault_document"])
+		self.assertEqual((doc.doc_type, doc.area), ("ID", self.career))
+		self.assertEqual(frappe.db.get_value("File", vault["file"], "attached_to_doctype"), "Life Vault Document")
+
+	def test_4_a_prospect_page_and_a_person_linked_to_it_exist_are_linked_and_are_the_owners_alone(self):
+		from lifeos.tools import actions, pages, people
+
+		page = pages.create("Ambaji Food Products", "Career", part="Tea", kind="Prospect", body="Prospective client of BTW.", space=PRIVATE)
+		doc = frappe.get_doc("Life Note", page["page"])
+		self.assertEqual((doc.kind, doc.collection, doc.area), ("Prospect", "Wiki", self.tea))
+		self.assertIn("Prospect, Career › Tea", page["done"])
+		org = frappe.get_doc("Life Person", doc.person)
+		self.assertEqual((org.kind, org.wiki_page), ("Organisation", doc.name))
+		made = people.add("Anirudh Poddar", email="anirudh@sap.example", company="SAP Partner Pvt Ltd", link_to=doc.name, space=PRIVATE)
+		person = frappe.get_doc("Life Person", made["person"])
+		self.assertEqual((person.email, frappe.db.get_value("Life Person", person.organisation, "full_name")), ("anirudh@sap.example", "SAP Partner Pvt Ltd"))
+		self.assertIn("[[Anirudh Poddar]]", frappe.db.get_value("Life Note", doc.name, "content_md"))
+		self.assertTrue(frappe.db.exists("Life Link", {"from_name": doc.name, "to_doctype": "Life Person", "to_name": person.name}))
+		again = people.add("anirudh poddar", space=PRIVATE)  # the same person is not added twice
+		self.assertEqual(again["person"], person.name)
+		self.as_user(FAMILY)  # a family member who is not in the owner's space sees none of it
+		self.assertFalse(frappe.has_permission("Life Note", "read", doc=doc))
+		self.assertFalse(frappe.has_permission("Life Person", "read", doc=person))
+		self.as_user(OWNER)
+		actions.undo(made["action"])
+		self.assertFalse(frappe.db.exists("Life Person", person.name))
+		actions.undo(page["action"])
+		self.assertFalse(frappe.db.exists("Life Note", doc.name))
+		self.assertFalse(frappe.db.exists("Life Person", org.name))
+
+	def test_pages_update_adds_links_and_undo_puts_the_text_back_and_notes_save_a_note(self):
+		from lifeos.tools import actions, notes, pages
+
+		page = pages.create("Ambaji Food Products", "Career", kind="Client", body="# Ambaji\n", space=PRIVATE)
+		upd = pages.update(page["page"], add_links=["SAP B1 Blueprint"], space=PRIVATE)
+		self.assertIn("[[SAP B1 Blueprint]]", frappe.db.get_value("Life Note", page["page"], "content_md"))
+		actions.undo(upd["action"])
+		self.assertEqual(frappe.db.get_value("Life Note", page["page"], "content_md"), "# Ambaji\n")
+		note = notes.save("Email, 1 to 15 Nov", "A summary.", "Career", part="Tea", space=PRIVATE)
+		self.assertEqual(frappe.db.get_value("Life Note", note["note"], ["collection", "area"]), ("My notes", self.tea))
+		actions.undo(note["action"])
+		self.assertFalse(frappe.db.exists("Life Note", note["note"]))
+		with self.assertRaises(frappe.DoesNotExistError):
+			pages.create("X", "No such area", space=PRIVATE)
+
+	def test_5_an_agent_that_asks_first_makes_a_needs_you_item_not_a_file_and_the_owners_ok_makes_it(self):
+		from lifeos.tools import actions, mail as mail_tools
+
+		self.blueprint()
+		frappe.set_user("Administrator")
+		cfg = limits.config(PRIVATE, self.KEY, create=True)
+		self.as_user(AGENT)
+		out = mail_tools.save_attachment("t-bp", "att-blueprint.txt", area="Career", space=PRIVATE, source_system=self.KEY)
+		self.assertIn("waiting", out)
+		self.assertFalse(frappe.db.exists("File", {"file_name": "blueprint.txt"}))
+		self.assertEqual(frappe.db.get_value("Life Agent Action", out["waiting"], ["status", "asked_by"]), ("Waiting", "agent"))
+		self.as_user(OWNER)
+		self.assertIn(out["waiting"], [r["name"] for r in pages_agent.requests(PRIVATE)])  # in Needs you
+		done = pages_agent.decide(PRIVATE, out["waiting"], "approve", OWNER)
+		self.assertEqual(done["status"], "Done")
+		self.assertTrue(frappe.db.exists("File", {"file_name": "blueprint.txt"}))
+		frappe.set_user("Administrator")
+		limits.set_ability(cfg, "save_files", "off")
+		self.as_user(AGENT)
+		with self.assertRaises(frappe.PermissionError):
+			mail_tools.save_attachment("t-bp", "att-blueprint.txt", area="Career", space=PRIVATE, source_system=self.KEY)
+
+	def test_7_ask_writes_when_the_owner_asks_lists_each_line_under_done_with_undo_and_undo_takes_it_back(self):
+		self.blueprint()
+		self.steps(lambda p: use("create_page", {"title": "Ambaji Food Products", "area": "Career", "part": "Tea", "kind": "Prospect", "body": "Prospective client."}, id="a"),
+			lambda p: use("save_attachment", {"thread_id": "t-bp", "attachment_id": "att-blueprint.txt", "page": p["page"], "area": "Career", "part": "Tea"}, id="b"),
+			lambda p: use("add_person", {"name": "Anirudh Poddar", "email": "anirudh@sap.example", "company": "SAP Partner", "link_to": p["page"]}, id="c"),
+			lambda p: {"content": [text("Done: the page, the blueprint and Anirudh.")], "stop_reason": "end_turn"})
+		res = ask_api.ask("Create a page on Ambaji Food Products as Prospect in Tea and save the blueprint there", space=PRIVATE)
+		msg = res["message"]
+		self.assertEqual(len(msg["done"]), 3)
+		self.assertTrue(all(d["undo"] for d in msg["done"]))
+		self.assertIn("Created page Ambaji Food Products (Prospect, Career › Tea)", msg["done"][0]["text"])
+		self.assertTrue(frappe.db.exists("Life Note", {"title": "Ambaji Food Products", "kind": "Prospect"}))
+		self.assertEqual(frappe.get_all("Life Agent Action", filters={"space": PRIVATE, "asked_by": "owner"}, pluck="agent"), ["ask"] * 3)
+		for i in (2, 1, 0):
+			ask_api.undo_done(msg["name"], i)
+		self.assertFalse(frappe.db.exists("Life Note", {"title": "Ambaji Food Products"}))
+		self.assertFalse(frappe.db.exists("File", {"file_name": "blueprint.txt"}))
+		self.assertFalse(frappe.db.exists("Life Person", {"space": PRIVATE, "full_name": "Anirudh Poddar"}))
+		self.assertTrue(all(d.get("undone") for d in ask_api.message(msg["name"])["done"]))
+		with self.assertRaises(frappe.ValidationError):
+			ask_api.undo_done(msg["name"], 0)
+
+	def test_8_a_question_needing_more_than_three_pages_runs_in_the_background_and_says_which_page(self):
+		self.busy_inbox(per_day=7)  # 105 threads: 5 pages
+		reads = lambda token: use("mail_list_threads", {"after": "2026-11-01", "before": "2026-11-15", **({"page_token": token} if token else {})}, id=f"p{token}")  # noqa: E731
+		self.steps(lambda p: reads(None))
+		with mock.patch("frappe.enqueue") as enq:
+			res = ask_api.ask("Summarize my emails from 1 to 15 Nov", space=PRIVATE, client_id="c1")
+		self.assertEqual(res.get("background"), 1)
+		self.assertEqual(res["message"]["status"], "Working")
+		self.assertEqual(enq.call_args.args[0], "lifeos.ai.ask_job.run_background")
+		seen = []
+
+		def next_page(p):  # each turn reads the next page with the token the last one gave
+			seen.append(frappe.cache.get_value(f"lifeos_ask_req:{OWNER}:c1")["reading"])
+			return reads(p["next_page_token"]) if p.get("next_page_token") else {"content": [text("A summary of 105 threads.")], "stop_reason": "end_turn"}
+		self.steps(lambda p: reads(None), *[next_page] * 6)
+		from lifeos.ai import ask_job
+
+		ask_job.run_background(**{k: v for k, v in enq.call_args.kwargs.items() if k not in ("queue", "timeout", "enqueue_after_commit")})
+		done = ask_api.message(res["message"]["name"])
+		self.assertEqual((done["status"], done["text"]), ("Done", "A summary of 105 threads."))
+		self.assertEqual(seen, [f"Reading 1–15 Nov… (page {n} of 5)" for n in range(1, 6)])
+
+	def test_9_ask_asks_one_question_with_choices_and_the_choice_is_the_next_message(self):
+		self.script(use("ask_one_question", {"question": "Which one?", "choices": ["Shakambhari Foods", "Shri Ambaji Food Products"]}),
+			{"content": [text("Which one did you mean?")], "stop_reason": "end_turn"})
+		msg = ask_api.ask("Create a page on Ambaji Foods", space=PRIVATE)["message"]
+		self.assertEqual([(a["kind"], a["label"]) for a in msg["actions"]], [("choose", "Shakambhari Foods"), ("choose", "Shri Ambaji Food Products")])
+		self.assertEqual(ask_api.run_action(msg["name"], 1)["answer"], "Shri Ambaji Food Products")
+
+	def test_10_file_it_buttons_are_named_for_what_they_file_and_a_filed_email_gets_none(self):
+		from lifeos.ai.tools import Context, file_actions
+
+		ctx = Context(PRIVATE)
+		ctx.mails_read = [{"thread_id": "t1", "account": "a", "subject": "LEAVE", "from": "Ashmeet Singh (ashmeet@x.example)", "date": "", "link": "l"}]
+		self.assertEqual(file_actions(ctx)[0]["label"], "File the email “LEAVE” from Ashmeet Singh")
+
+	def test_the_tools_are_whitelisted_methods_that_do_what_the_functions_do(self):
+		from lifeos.api import tools
+
+		self.busy_inbox()
+		self.assertEqual(len(tools.mail_list_threads("2026-11-01", "2026-11-02", space=PRIVATE)["threads"]), 8)
+		self.assertEqual(tools.digests_read("2026-11-01", "2026-11-02", space=PRIVATE)["missing_days"], ["2026-11-01", "2026-11-02"])
+		page = tools.pages_create("Ambaji Food Products", "Career", kind="Client", body="# Ambaji", space=PRIVATE)
+		tools.pages_update(page["page"], add_links='["Anirudh Poddar"]', space=PRIVATE)
+		frappe.flags.lifeos_gmail[MAILBOX] = FakeGmail([person("t-bp", "Anirudh Poddar <a@sap.example>", "Blueprint", "Attached.", attachments=[self.PDF])], {"att-blueprint.txt": self.PDF[1]})
+		saved = tools.mail_save_attachment("t-bp", "att-blueprint.txt", page=page["page"], space=PRIVATE)
+		self.assertEqual(frappe.db.get_value("File", saved["file"], "attached_to_name"), page["page"])
+		who = tools.people_add("Anirudh Poddar", email="a@sap.example", link_to=page["page"], space=PRIVATE)
+		note = tools.notes_save("Summary", "Text.", "Career", space=PRIVATE)
+		self.assertTrue(all(frappe.db.exists(dt, n) for dt, n in (("Life Note", page["page"]), ("Life Person", who["person"]), ("Life Note", note["note"]))))
+		tools.undo(note["action"])
+		self.assertFalse(frappe.db.exists("Life Note", note["note"]))
+
+	def test_6_every_write_tool_refuses_a_person_without_the_space(self):
+		from lifeos.tools import mail as mail_tools, notes, pages, people
+
+		self.blueprint()
+		self.as_user(FAMILY)
+		for call in (lambda: mail_tools.save_attachment("t-bp", "att-blueprint.txt", area="Career", space=PRIVATE), lambda: pages.create("X", "Career", space=PRIVATE),
+				lambda: pages.update("nothing", body="x", space=PRIVATE), lambda: people.add("X", space=PRIVATE), lambda: notes.save("X", "y", "Career", space=PRIVATE),
+				lambda: mail_tools.list_threads("2026-11-01", "2026-11-02", space=PRIVATE)):
+			with self.assertRaises(frappe.PermissionError):
+				call()
 
 
 # ---------------------------------------------------------------- Microsoft (issue 88)

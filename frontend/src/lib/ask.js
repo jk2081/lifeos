@@ -68,7 +68,7 @@ export async function send(question) {
   ask.busy = true
   const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36)
   ask.messages.push({ role: 'user', text: q })
-  const answer = reactive({ role: 'assistant', text: '', status: 'Working', cited: [], actions: [], read: [] })
+  const answer = reactive({ role: 'assistant', text: '', status: 'Working', cited: [], actions: [], done: [], read: [], reading: '' })
   ask.messages.push(answer)
   // the answer streams: realtime is not always there, so the text so far is polled
   let polling = true
@@ -79,6 +79,7 @@ export async function send(question) {
       try {
         const p = await api('ask.progress', { client_id: clientId })
         if (polling && p.text) answer.text = p.text
+        if (polling) answer.reading = p.reading || ''
       } catch (e) { /* the final answer will come */ }
     }
   }
@@ -92,7 +93,15 @@ export async function send(question) {
     if (res.error) {
       ask.messages.pop()
       ask.refusal = res
-    } else Object.assign(answer, res.message)
+    } else {
+      Object.assign(answer, res.message)
+      // more than 3 pages of mail: the answer is written by a background job; "Reading 9–24 Nov… (page 2 of 6)" shows meanwhile (polled above)
+      while (res.background && answer.status === 'Working') {
+        await new Promise((r) => setTimeout(r, 1000))
+        Object.assign(answer, await api('ask.message', { name: res.message.name }), { reading: answer.reading })
+      }
+      answer.reading = ''
+    }
   } catch (e) {
     Object.assign(answer, { status: 'Error', error: errorText(e) })
   } finally {
@@ -114,6 +123,7 @@ export async function runAction(message, index) {
   const a = message.actions[index]
   try {
     const out = await api('ask.run_action', { message: message.name, index })
+    if (out.kind === 'choose') { a.done = true; return send(out.answer) } // the pick is the owner's next message
     if (out.to) { ask.open = false; return router.push(out.to) }
     a.done = true
     window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))
@@ -128,17 +138,32 @@ export async function runAction(message, index) {
   } catch (e) { toast.error(errorText(e)) }
 }
 
+/** One line of an answer's Done list taken back: what Ask made is removed, and the line says so. */
+export async function undoDone(message, index) {
+  const line = message.done[index]
+  try {
+    await api('ask.undo_done', { message: message.name, index })
+    line.undone = 1
+    window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))
+    recordChanged('')
+    toast.success('Undone.')
+  } catch (e) { toast.error(errorText(e)) }
+}
+
+/** Open a record from the Ask panel. On a phone both are bottom sheets and the record's would open under the Ask sheet: hand over to the record, and
+ *  bring the Ask sheet back, with its thread, when the record is closed on the same screen (AskPanel watches this). */
+export function openPane(pane) {
+  if (window.matchMedia('(max-width: 767px)').matches && ask.open) {
+    ask.returnTo = router.currentRoute.value.path
+    ask.open = false
+  }
+  openRef(pane)
+}
+
 export function openCite(message, n) {
   const c = (message.cited || []).find((x) => x.n === n)
-  if (c && c.pane) {
-    // On a phone both are bottom sheets and the record's would open under the Ask sheet: hand over to the record, and
-    // bring the Ask sheet back, with its thread, when the record is closed on the same screen (AskPanel watches this).
-    if (window.matchMedia('(max-width: 767px)').matches && ask.open) {
-      ask.returnTo = router.currentRoute.value.path
-      ask.open = false
-    }
-    openRef(c.pane)
-  } else if (c) toast.info(`${c.kind}: ${c.title}`)
+  if (c && c.pane) openPane(c.pane)
+  else if (c) toast.info(`${c.kind}: ${c.title}`)
 }
 
 /** The record pane's "Ask about this": the record and the records linked to it. */

@@ -57,8 +57,10 @@ class GraphClient:
 	def profile(self) -> dict:
 		return self._call("GET", "/me", {"$select": "mail,userPrincipalName"})
 
-	def search_messages(self, search: str, top: int = 10) -> dict:
+	def search_messages(self, search: str, top: int = 10, next_link: str | None = None) -> dict:
 		"""Messages that match a Graph search string (KQL). Graph does not combine `$search` with `$filter` or `$orderby`, so every plain field is in the string."""
+		if next_link:
+			return self.next_page(next_link)
 		return self._call("GET", "/me/messages", {"$search": f'"{search}"', "$top": top, "$select": LIST_FIELDS})
 
 	def conversation(self, conversation_id: str) -> dict:
@@ -333,6 +335,19 @@ class MicrosoftAdapter:
 			hits.append({"thread_id": conv, "subject": _subject(m), "from": who(m.get("from")), "date": m.get("receivedDateTime", ""), "at": _epoch(m.get("receivedDateTime")),
 				"snippet": _snippet(m), "messages": 1, "started_by": who(m.get("from")), "link": m.get("webLink") or ""})
 		return hits[:top]
+
+	def list_page(self, fields: dict, page_token: str | None = None, size: int = 25) -> dict:
+		"""One page of the conversations the fields match (issue 107); the token is Graph's own next link. Graph gives no estimate of the whole."""
+		listing = self.client.search_messages(self.query(fields), max(1, min(int(size or 25), 100)), page_token or None)
+		seen, hits = set(), []
+		for m in sorted(listing.get("value") or [], key=lambda m: m.get("receivedDateTime") or "", reverse=True):
+			conv = m.get("conversationId") or m["id"]
+			if conv in seen:
+				continue
+			seen.add(conv)
+			hits.append({"thread_id": conv, "subject": _subject(m), "from": who(m.get("from")), "date": m.get("receivedDateTime", ""), "at": _epoch(m.get("receivedDateTime")),
+				"snippet": _snippet(m), "messages": 1, "started_by": who(m.get("from")), "link": m.get("webLink") or ""})
+		return {"hits": hits, "next": listing.get("@odata.nextLink") or None, "estimate": None}
 
 	def get_thread(self, thread_id: str) -> dict:
 		got = sorted(self.client.conversation(thread_id).get("value") or [], key=lambda m: m.get("receivedDateTime") or "")

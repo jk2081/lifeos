@@ -120,6 +120,8 @@ class SiteFake:
 			for b in (m["content"] if isinstance(m["content"], list) else []))
 		if any(t["name"] == "mail_search" for t in params.get("tools") or []) and re.match(r"find\b", q, re.I):
 			return self._mail(params, on_text, q, results, called)
+		if any(t["name"] == "mail_list_threads" for t in params.get("tools") or []) and re.match(r"(read my mail|file the blueprint)\b", q, re.I):
+			return self._mail_work(params, on_text, q, results, called)
 		if not params.get("tools") or suggested:
 			return self._done(params, on_text, "" if suggested else "I could not check more than this.")
 		if called == 0:
@@ -145,6 +147,26 @@ class SiteFake:
 			return self._done(params, on_text, "I could not find that in your email.")
 		lines = [f"- **{r['subject']}**, from {r['from']}, {r['date']} ({r['inbox']})" for r in rows[:3]]
 		return self._done(params, on_text, "Here is what I found in your email.\n\n" + "\n".join(lines) + "\n")
+
+	def _mail_work(self, params, on_text, q, results, called):
+		"""Ask's tools for mail and writing (issue 107). "read my mail": every page of 1 to 14 November, then one line. "file the blueprint": find the email, read it,
+		make a Prospect page under Career, save the attachment to it and add the sender."""
+		last = results[0] if results else {}
+		if q.lower().startswith("read my mail"):
+			if called == 0 or last.get("next_page_token"):
+				args = {"after": "2026-11-01", "before": "2026-11-14", **({"page_token": last["next_page_token"]} if last.get("next_page_token") else {})}
+				return self._out(params, on_text, "", [tool_use("mail_list_threads", args)], "tool_use")
+			return self._done(params, on_text, f"I read your mail from 1 to 14 November: {last.get('pages', 1)} pages in all.")
+		page = next((r["page"] for r in results if r.get("page")), None)
+		steps = [("mail_search", {"text": "blueprint"}), ("mail_thread", {"thread_id": "fake-blueprint"}),
+			("create_page", {"title": "Ambaji Food Products", "area": "Career", "kind": "Prospect", "summary": "A prospective client.",
+				"body": "A prospective client. The SAP B1 Blueprint came from [[Anirudh Poddar]]."}),
+			("save_attachment", {"thread_id": "fake-blueprint", "attachment_id": "att-SAP B1 Blueprint.pdf", "area": "Career", "page": page}),
+			("add_person", {"name": "Anirudh Poddar", "email": "anirudh@sap-partner.example", "company": "SAP Partner", "link_to": page})]
+		if called < len(steps):
+			name, args = steps[called]
+			return self._out(params, on_text, "", [tool_use(name, {k: v for k, v in args.items() if v is not None})], "tool_use")
+		return self._done(params, on_text, "I made the page for Ambaji Food Products, saved the blueprint on it and added Anirudh Poddar.")
 
 	def _capture(self, params):
 		"""process-capture (issue 28): one task named after the capture's title in Career, then a summary."""

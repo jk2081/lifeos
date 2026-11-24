@@ -65,7 +65,7 @@ def _scope(scope, space):
 
 def _message_out(m):
 	out = {"name": m.name, "thread": m.thread, "role": m.role, "text": m.text or "", "status": m.status, "error": m.error,
-		"cited": parse(m.cited, []) or [], "actions": parse(m.actions, []) or [], "read": parse(m.records_read, []) or [],
+		"cited": parse(m.cited, []) or [], "actions": parse(m.actions, []) or [], "done": parse(m.done, []) or [], "read": parse(m.records_read, []) or [],
 		"cost": m.cost, "created": str(m.creation)[:19]}
 	return out
 
@@ -76,6 +76,7 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 	answer. While it is written, `message` returns the text so far (and realtime events go to the asking user)."""
 	from lifeos.ai import ask as engine
 	from lifeos.ai import client
+	from lifeos.ai.tools import NeedsBackground
 
 	_person()
 	question = " ".join((question or "").split())
@@ -130,26 +131,45 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 	show_progress()
 	try:
 		res = engine.answer(space, question, sc, history, on_text)
+	except NeedsBackground:
+		# more than 3 pages of mail: the question runs again as a background job, which shows "Reading 9–24 Nov… (page 2 of 6)" and writes the answer
+		buf.clear()
+		frappe.enqueue("lifeos.ai.ask_job.run_background", queue="long", timeout=1800, enqueue_after_commit=True, thread=t.name, message=msg.name, question=question, scope=sc,
+			history=history, client_id=client_id)
+		if key:
+			frappe.cache.set_value(key, {"status": "Working", "text": "", "thread": t.name, "message": msg.name, "reading": _("Reading…"), "background": 1}, expires_in_sec=3600)
+		return {"thread": t.name, "message": _message_out(msg), "scope": sc, "background": 1}
 	except Exception as e:
 		# an unexpected failure is logged and answered like a model error, so the usage already recorded is kept
 		if not isinstance(e, client.AIError):
 			frappe.log_error(title="Life OS Ask failed")
 		text = str(e) if isinstance(e, client.AIError) else _("Something went wrong while answering. It has been logged.")
-		msg.reload()
-		msg.status, msg.error, msg.text = "Error", text, ""
-		msg.save(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
+		msg = fail(msg.name, text)
 		buf.clear()
 		show_progress("Error")
 		return {"thread": t.name, "message": _message_out(msg), "error": "ai", "error_text": text}
-	msg.reload()
-	msg.update({"text": res["text"], "cited": json.dumps(res["cited"]), "actions": json.dumps(res["actions"]),
-		"records_read": json.dumps(res["read"]), "input_tokens": res["input_tokens"], "output_tokens": res["output_tokens"],
-		"cost": res["cost"], "status": "Done"})
-	msg.save(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
+	msg = complete(msg.name, res)
 	buf[:] = [msg.text or ""]
 	show_progress("Done")
 	frappe.publish_realtime("lifeos_ask", {"thread": t.name, "message": msg.name, "done": 1}, user=frappe.session.user)
 	return {"thread": t.name, "message": _message_out(msg), "scope": sc}
+
+
+def fail(message_name, text):
+	msg = frappe.get_doc("Life Ask Message", message_name)
+	msg.status, msg.error, msg.text = "Error", text, ""
+	msg.save(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
+	return msg
+
+
+def complete(message_name, res):
+	"""Write an answer into its message."""
+	msg = frappe.get_doc("Life Ask Message", message_name)
+	msg.update({"text": res["text"], "cited": json.dumps(res["cited"]), "actions": json.dumps(res["actions"]), "done": json.dumps(res.get("done") or []),
+		"records_read": json.dumps(res["read"]), "input_tokens": res["input_tokens"], "output_tokens": res["output_tokens"],
+		"cost": res["cost"], "status": "Done"})
+	msg.save(ignore_permissions=True)  # system: the thread and messages belong to the asker and the background answer writes them
+	return msg
 
 
 def _refuse(t, question, code, text):
@@ -215,6 +235,29 @@ def delete_thread(name: str):
 
 
 @frappe.whitelist(methods=["POST"])
+def undo_done(message: str, index: int | str):
+	"""Undo one line of an answer's "Done" list (issue 107): what Ask made is taken away again, and the line says so."""
+	from lifeos.tools import actions
+
+	_person()
+	m = frappe.get_doc("Life Ask Message", message)
+	t = _thread(m.thread)
+	rows = parse(m.done, []) or []
+	try:
+		row = rows[int(index)]
+	except (IndexError, ValueError, TypeError):
+		frappe.throw(_("No such line."), title=_("Line not found"))
+	if not row.get("undo") or row.get("undone"):
+		frappe.throw(_("That cannot be undone."), title=_("Nothing to undo"))
+	permissions.require_space(t.space, write=True)
+	out = actions.undo(row["undo"])
+	row["undone"] = 1
+	m.done = json.dumps(rows)
+	m.save(ignore_permissions=True)  # system: the thread and messages belong to the asker
+	return {"undone": out["undone"], "index": int(index)}
+
+
+@frappe.whitelist(methods=["POST"])
 def run_action(message: str, index: int | str):
 	"""Run one suggested action of an answer, with the person's own permissions, through the normal methods.
 	Returns what the screen needs: a route, the record made, or the Undo log."""
@@ -232,6 +275,8 @@ def run_action(message: str, index: int | str):
 
 		task = tasks.quick_add(a.get("title") or a.get("label"), space=t.space, area=a.get("area"), due_date=a.get("due_date"))
 		return {"kind": kind, "task": task["name"], "title": task["title"]}
+	if kind == "choose":  # the owner's pick of a question Ask asked; the screen sends it as the next message
+		return {"kind": kind, "answer": a.get("label")}
 	if kind == "file_mail":
 		from lifeos import mail
 

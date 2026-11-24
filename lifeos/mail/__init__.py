@@ -5,6 +5,9 @@ what the owner decides to keep (`file_thread`). Each person connects their own i
 and by the agent that acts for them (`accounts_for` is the one gate). One adapter for each provider (`lifeos.mail.<provider>`) turns the plain
 search fields into the provider's own syntax; nothing outside an adapter knows which provider an inbox is.
 """
+import base64
+import json
+
 import frappe
 from frappe import _
 from frappe.utils import now_datetime
@@ -141,6 +144,64 @@ def search(user: str, space: str, fields: dict, account: str | None = None, max_
 		"account_label": label_of(frappe._dict(accounts[0])) if len(accounts) == 1 else _("All {0} inboxes").format(len(accounts)),
 		"query": "\n".join(queries)[:600], "results": len(hits), "cost": cost, "searched_on": now_datetime()}).insert(ignore_permissions=True)  # system: the person's own log
 	return {"hits": hits, "errors": errors, "searched": [label_of(frappe._dict(a)) for a in accounts]}
+
+
+PAGE_SIZE = 25
+
+
+def _token(state: dict | None) -> str | None:
+	return base64.urlsafe_b64encode(json.dumps(state).encode()).decode() if state else None
+
+
+def _state(token: str | None, accounts: list) -> dict:
+	"""Where each inbox has got to: its own page token, "" at the start, None once it has no more. Asking for another person's place is refused."""
+	if not token:
+		return {a.name: "" for a in accounts}
+	try:
+		state = json.loads(base64.urlsafe_b64decode(token.encode()))
+	except ValueError:
+		frappe.throw(_("That page token is not one this search gave."), title=_("Page token not understood"))
+	if not isinstance(state, dict) or set(state) - {a.name for a in accounts}:
+		frappe.throw(_("That page token is not one this search gave."), title=_("Page token not understood"))
+	return {a.name: state.get(a.name) for a in accounts}
+
+
+def list_page(user: str, space: str, fields: dict, page_token: str | None = None, account: str | None = None) -> dict:
+	"""One page of every thread the fields match (issue 107), 25 a page across the inboxes asked, newest first, with the token of the next page.
+	An inbox that fails is named in `errors`; the others still answer."""
+	accounts = [frappe._dict(r) for r in accounts_for(user, space, account)]
+	if not accounts:
+		no_inbox(user)
+	state, hits, errors, estimate = _state(page_token, accounts), [], [], 0
+	size = max(1, -(-PAGE_SIZE // len(accounts)))
+	for doc in accounts:
+		if state[doc.name] is None:
+			continue
+		try:
+			got = adapter(doc).list_page(fields, state[doc.name] or None, size)
+		except Exception as e:
+			if isinstance(e, frappe.PermissionError):
+				raise
+			from lifeos.mail.gmail import scrub
+
+			errors.append({"inbox": label_of(doc), "error": scrub(e)[:140]})
+			state[doc.name] = None
+			continue
+		hits += [{**h, "account": doc.name, "inbox": label_of(doc)} for h in got["hits"]]
+		state[doc.name] = got["next"]
+		estimate += got.get("estimate") or len(got["hits"])
+	hits.sort(key=lambda h: h.get("at") or 0, reverse=True)
+	more = {k: v for k, v in state.items() if v is not None}
+	return {"threads": hits, "next_page_token": _token(state) if more else None, "estimate": estimate, "errors": errors}
+
+
+def attachment_of(thread: dict, attachment_id: str) -> tuple[str, dict]:
+	"""(the message id, the attachment) with this id in a thread read with `get_thread`."""
+	for m in thread.get("messages") or []:
+		for a in m.get("attachments") or []:
+			if a["attachment_id"] == attachment_id:
+				return m["message_id"], a
+	frappe.throw(_("That attachment is not in this email."), frappe.DoesNotExistError, title=_("Attachment not found"))
 
 
 def _find(user: str, space: str, thread_id: str, account: str | None):

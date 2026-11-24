@@ -1338,7 +1338,7 @@ for (const width of WIDTHS) {
       must((await pg.locator('[data-page-title]').innerText()) === 'Your assistant', 'the agent is not shown as Your assistant: ' + await pg.locator('[data-page-title]').innerText())
       for (const k of ['waiting', 'knows', 'can', 'read', 'scheduled', 'did', 'connector']) must(await pg.locator(`[data-agent-section="${k}"]`).isVisible(), `no ${k} section`)
       must((await pg.locator('[data-fact]').count()) === 2 && (await pg.locator('[data-fact-origin]').first().innerText()).includes('WhatsApp'), 'the facts or where they came from are missing')
-      must((await pg.locator('[data-ability]').count()) === 6 && (await pg.locator('[data-ability-key="pay"] [data-ability-fixed]').innerText()) === 'Always off', 'the six actions, with pay always off, are missing')
+      must((await pg.locator('[data-ability]').count()) === 8 && (await pg.locator('[data-ability-key="pay"] [data-ability-fixed]').innerText()) === 'Always off', 'the eight actions, with pay always off, are missing')
       must((await pg.locator('[data-area]').count()) >= 1 && await pg.locator('[data-area-vault]').isVisible(), 'the areas and the Vault are missing')
       must((await pg.locator('[data-job]').count()) === 1, 'the job is missing')
       must((await pg.locator('[data-agent-skills]').innerText()).includes('chase'), 'the skill it reported is missing')
@@ -1462,7 +1462,7 @@ for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "source
       for (let i = 0; i < 40 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
       must((await answer.innerText()).includes('2014 tax return'), 'the answer does not name the thread: ' + await answer.innerText())
       const file = pg.locator('[data-ask-action="file_mail"]:visible')
-      must((await file.count()) === 1 && (await file.innerText()).includes('File it'), 'there is not one File it button')
+      must((await file.count()) === 1 && (await file.innerText()).includes('File the email') && (await file.innerText()).includes('2014 tax return'), 'there is not one File button named for the email: ' + await file.allInnerTexts())
       must(bench(`print(frappe.db.exists("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}))`).split('\n').pop() === 'None', 'it was filed before the owner clicked')
       await noSideways()
       await file.click()
@@ -1487,6 +1487,59 @@ print(digest.make("owner@lifeos.test", "${SPACE}", 1))`).split('\n').pop()
       for (let i = 0; i < 20 && made === 'None'; i++) { await pg.waitForTimeout(300); made = bench(`print(frappe.db.get_value("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, "name"))`).split('\n').pop() }
       must(made !== 'None', 'File it did not make the thread\'s item')
       must((await lines.filter({ hasText: '2014 tax return' }).locator('[data-file-mail]').innerText()).includes('Filed'), 'the line does not say it is filed')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    const askUi = async (question) => {
+      await s.open('/life/today')
+      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill(question); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type(question); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
+      await pg.locator('[data-ask-answer]:visible').last().waitFor({ timeout: 15000 })
+    }
+    await check('BRAIN.60', `${width} px: Ask "file the blueprint" (fake AI, fake Gmail) makes the Ambaji Prospect page, saves the blueprint on it and adds Anirudh; the answer lists the three under Done with Undo; the page and its file are in Library; Undo takes one back`, async () => {
+      bench(`frappe.set_user("Administrator")
+for dt, f in (("Life Note", "title"), ("Life Person", "full_name"), ("Life Inbox Item", "external_id")):
+    for n in frappe.get_all(dt, filters={"space": "${SPACE}", f: ["in", ["Ambaji Food Products", "Anirudh Poddar", "SAP Partner", "fake-blueprint"]]}, pluck="name"):
+        if dt == "Life Note": frappe.db.delete("Life Wiki Change", {"note": n})
+        frappe.db.set_value("Life Person", {"wiki_page": n}, "wiki_page", None) if dt == "Life Note" else None
+        frappe.db.set_value("Life Note", {"person": n}, "person", None) if dt == "Life Person" else None
+        frappe.delete_doc(dt, n, force=1, ignore_permissions=True)`)
+      await askUi('file the blueprint from Anirudh Poddar into Career as a prospect')
+      for (let i = 0; i < 60 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
+      const lines = pg.locator('[data-ask-done]:visible [data-ask-done-line]')
+      must((await lines.count()) === 3, `the Done list has ${await lines.count()} lines, not 3: ${await pg.locator('[data-ask-answer]:visible').last().innerText()}`)
+      const text = (await lines.allInnerTexts()).join(' | ')
+      must(text.includes('Created page Ambaji Food Products (Prospect, Career)') && text.includes('Saved SAP B1 Blueprint.pdf') && text.includes('Added Anirudh Poddar'), 'the Done lines are wrong: ' + text)
+      must((await pg.locator('[data-ask-done]:visible [data-ask-undo]').count()) === 3, 'every Done line needs an Undo')
+      const page = bench(`print(frappe.db.get_value("Life Note", {"space": "${SPACE}", "title": "Ambaji Food Products"}, ["name", "kind"]))`).split('\n').pop()
+      must(page.includes('Prospect'), 'the page is not a Prospect: ' + page)
+      const name = page.match(/'([^']+)'/)[1]
+      must(bench(`print(frappe.db.exists("File", {"attached_to_doctype": "Life Note", "attached_to_name": "${name}", "file_name": "SAP B1 Blueprint.pdf"}) is not None)`).split('\n').pop() === 'True', 'the blueprint is not attached to the page')
+      must(bench(`print(frappe.db.exists("Life Agent Action", {"space": "${SPACE}", "asked_by": "owner", "agent": "ask", "action": "write_pages"}) is not None)`).split('\n').pop() === 'True', 'the writes are not in the log with asked_by owner')
+      await noSideways()
+      await s.open('/life/library/files')
+      await pg.locator('[data-library-files][data-loaded="1"]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-file-row]', { hasText: 'SAP B1 Blueprint' }).count()) >= 1, 'the file is not in Library > Files')
+      await s.open('/life/library/notes?open=note:' + name)
+      await pg.getByText('Ambaji Food Products').first().waitFor({ timeout: 10000 }).catch(() => {})
+      must((await pg.locator('body').innerText()).includes('Ambaji Food Products'), 'the page does not open in Library')
+      // Undo: the page goes, and the line says so
+      await askUi('file the blueprint from Anirudh Poddar into Career as a prospect')
+      for (let i = 0; i < 60 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
+      await pg.locator('[data-ask-done]:visible [data-ask-undo]').last().click()
+      await pg.locator('[data-ask-done]:visible [data-ask-done-line][data-undone="1"]').first().waitFor({ timeout: 8000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.61', `${width} px: Ask "read my mail" over a period of 4 pages shows "Reading 1–14 Nov… (page n of 4)" and then the answer`, async () => {
+      await askUi('read my mail from 1 to 14 November')
+      const seen = new Set()
+      for (let i = 0; i < 120 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) {
+        for (const t of await pg.locator('[data-ask-reading]:visible').allInnerTexts()) seen.add(t.trim())
+        await pg.waitForTimeout(150)
+      }
+      const answer = await pg.locator('[data-ask-answer]:visible').last().innerText()
+      must(answer.includes('4 pages in all'), 'the answer is not the finished one: ' + answer)
+      must([...seen].some((t) => /^Reading 1–14 Nov… \(page \d of 4\)$/.test(t)), 'the reading line was never shown: ' + [...seen].join(' | '))
+      await noSideways()
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
   } finally {

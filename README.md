@@ -173,6 +173,19 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | --- | --- | --- |
 | `graph.get` | `space=None, center=None` | Nodes and edges for the graph view. `center` is "DocType/name": the graph is then limited to two steps around that record. |
 
+**`lifeos.api.tools`** (the Ask tools, issue 107; also what Ask calls). A person's call runs at once and returns what it did with an `undo` token; an agent names itself with `source_system` and follows its "Save files" and "Make pages and people" switches (a write it may not do on its own waits in Needs you).
+
+| Method | Arguments | Does |
+| --- | --- | --- |
+| `tools.mail_list_threads` | `after, before, query=None, page_token=None, account=None, space=None, source_system=None` | Every email thread from `after` to `before` (both days included), 25 a page, newest first, with `next_page_token` and `pages`. |
+| `tools.digests_read` | `start, end, space=None, source_system=None` | The daily email digests of those days, and the days that have none. |
+| `tools.mail_save_attachment` | `thread_id, attachment_id, area=None, part=None, page=None, vault_type=None, account=None, space=None, source_system=None` | Save an attachment under an area or part (attached to `page`, or in the Vault for `vault_type`), with its email. |
+| `tools.pages_create` | `title, area, part=None, kind=None, body=None, sources=None, summary=None, space=None, source_system=None` | A wiki page; `kind` is Prospect, Client, Project, Person or Note. |
+| `tools.pages_update` | `page, body=None, add_links=None, space=None, source_system=None` | Change a page's text, or add `[[links]]`. |
+| `tools.people_add` | `name, email=None, company=None, link_to=None, space=None, source_system=None` | A person with their company, listed on a page. |
+| `tools.notes_save` | `title, body, area, part=None, space=None, source_system=None` | Save text as a note. |
+| `tools.undo` | `action` | Take back what a call above did (people only). |
+
 **`lifeos.api.inbox`**
 
 | Method | Arguments | Does |

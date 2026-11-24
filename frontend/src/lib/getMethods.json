@@ -111,6 +111,8 @@
  "lifeos.api.timeline.get",
  "lifeos.api.today.get",
  "lifeos.api.today.week_summary",
+ "lifeos.api.tools.mail_list_threads",
+ "lifeos.api.tools.digests_read",
  "lifeos.api.trash.list",
  "lifeos.api.updates.get",
  "lifeos.api.vault.list",

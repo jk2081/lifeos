@@ -14,6 +14,7 @@
   "page_date",
   "image",
   "summary",
+  "kind",
   "sources",
   "is_rules",
   "last_opened_on",
@@ -201,6 +202,13 @@
    "fieldname": "someday_note",
    "fieldtype": "Small Text",
    "label": "Why It Was Parked"
+  },
+  {
+   "fieldname": "kind",
+   "fieldtype": "Select",
+   "label": "Kind",
+   "options": "\nProspect\nClient\nProject\nPerson\nNote",
+   "description": "What the page is about, when someone said (Ask's pages.create)"
   }
  ],
  "links": [],

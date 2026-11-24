@@ -11,6 +11,7 @@
   "kind",
   "organisation",
   "role",
+  "email",
   "aliases",
   "area",
   "wiki_page",
@@ -88,6 +89,12 @@
    "fieldtype": "Link",
    "label": "Wiki page",
    "options": "Life Note"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
   }
  ],
  "links": [],
