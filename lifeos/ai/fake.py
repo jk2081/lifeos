@@ -82,6 +82,11 @@ class SiteFake:
 
 	def run(self, params, on_text=None):
 		_record(params)
+		failing = frappe.get_site_config().get("lifeos_fake_ai_error")  # {"status": 400, "message": "…"}: the acceptance site's provider failing
+		if failing:
+			from lifeos.ai import client
+
+			raise client.error_from(failing.get("status"), failing.get("message"))
 		if any(t["name"] == "propose" for t in params.get("tools") or []):
 			return self._capture(params)
 		if (params.get("output_config") or {}).get("format"):

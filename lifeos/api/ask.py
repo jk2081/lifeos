@@ -30,7 +30,7 @@ def status(space: str | None = None):
 	space = permissions.resolve_space(space)
 	on = bool(frappe.db.get_value("Life Space", space, "ask_enabled"))
 	st = client.spend_status()
-	return {"ready": on and st["set_up"] and not st["reached"] and not permissions.is_agent(), "enabled": on, **st,
+	return {"ready": on and st["set_up"] and not st["reached"] and not permissions.is_agent(), "enabled": on, **st, "brain_off": client.brain_off(),
 		"vault": bool(frappe.db.get_value("Life Space", space, "ask_can_read_vault")), "suggested": SUGGESTED,
 		"is_admin": permissions.is_admin()}
 

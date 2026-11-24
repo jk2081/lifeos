@@ -7,6 +7,7 @@ from frappe.query_builder import Order
 from frappe.query_builder import functions as fn
 from frappe.utils import add_days, get_datetime, getdate, today
 
+from lifeos.ai import client as ai_client
 from lifeos.calendar import calendar_data
 from lifeos.goals import cycles, rhythms
 from lifeos.brain import old_inbox
@@ -148,6 +149,7 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		"events": events, "habits": habits,
 		"open_loops": task_api.open_loops_count(space), "area": area,
 		"banner": None if permissions.is_agent() else rhythms.banner(space, at),
+		"brain_off": None if permissions.is_agent() else ai_client.brain_off(),  # issue 102: why the AI service is not answering, until a call works again
 		"auto_inbox": None if permissions.is_agent() else old_inbox.recent_auto(space, area),
 		"coming_up": coming,
 		"vault_soon": vault_api.expiry_counts(space)["soon"],

@@ -5,6 +5,7 @@ from frappe.model.document import Document
 from lifeos.life.doctype.life_goal.life_goal import check_cycle_open
 
 AREA_CORRECTION = "Area correction"
+AI_UNAVAILABLE = "AI unavailable"
 
 
 class LifeActionLog(Document):
@@ -13,6 +14,8 @@ class LifeActionLog(Document):
 	def autoname(self):
 		if self.kind == AREA_CORRECTION:
 			self.name = f"area-{self.task}-{frappe.generate_hash(length=8)}"
+		elif self.kind == AI_UNAVAILABLE:
+			self.name = f"ai-off-{frappe.generate_hash(length=10)}"
 		else:
 			self.name = f"{self.action_id}-{self.date}"
 
@@ -23,6 +26,8 @@ class LifeActionLog(Document):
 			self.space = frappe.db.get_value("Life Task", self.task, "space")
 
 	def validate(self):
+		if self.kind == AI_UNAVAILABLE:  # issue 102: why the AI service stopped answering, one row an hour at most
+			return
 		if self.kind == AREA_CORRECTION:
 			if not (self.task and self.new_area):
 				frappe.throw(_("An area correction names the task and the area it moved to."), frappe.MandatoryError, title=_("Correction is incomplete"))
@@ -33,5 +38,5 @@ class LifeActionLog(Document):
 		check_cycle_open(self.cycle, self.flags)
 
 	def on_trash(self):
-		if self.kind != AREA_CORRECTION:
+		if self.kind not in (AREA_CORRECTION, AI_UNAVAILABLE):
 			check_cycle_open(self.cycle, self.flags)

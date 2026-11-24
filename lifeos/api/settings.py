@@ -16,7 +16,9 @@ SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "s
 	# set 7: working hours, for the weekly review's goal work
 	"work_days", "work_start", "work_end", "old_inbox_mode", "old_inbox_days", "own_domains",
 	# issue 32: the mailbox people forward to, and who may
-	"email_in_account", "email_in_senders")
+	"email_in_account", "email_in_senders",
+	# issue 102: the AI provider (the key has its own method and is never sent back)
+	"ai_provider", "ai_base_url")
 TIME_FIELDS = ("weekly_review_time", "start_of_day", "work_start", "work_end")
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 LISTS = {
@@ -263,7 +265,8 @@ def ai_settings():
 		"reference_doctype", "reference_name"], order_by="creation desc, name desc", limit=50)
 	caps = client.feature_caps()
 	features = sorted({p for p, *_r in by_purpose} | set(caps))
-	return {"key_set": client.is_set_up(), "ask_model": s.get("ask_model") or client.DEFAULT_ASK_MODEL, "short_model": s.get("short_model") or client.DEFAULT_SHORT_MODEL,
+	return {"key_set": bool(client.api_key()), "provider": client.OTHER if client.is_other() else client.ANTHROPIC, "brain_off": client.brain_off(),
+		"unpriced": client.unpriced(), "ask_model": s.get("ask_model") or client.DEFAULT_ASK_MODEL, "short_model": s.get("short_model") or client.DEFAULT_SHORT_MODEL,
 		"monthly_cap_usd": client.cap(), "spend": client.spend_status(),
 		"prices": [{"model": m, "input_per_mtok": p[0], "output_per_mtok": p[1], "cached_per_mtok": p[2]} for m, p in client.price_table().items()],
 		"by_day": [{"day": str(d), "cost": round(c or 0, 2), "calls": int(n)} for d, c, n in by_day],
@@ -276,15 +279,24 @@ def ai_settings():
 
 
 @frappe.whitelist(methods=["POST"])
-def set_ai_key(key: str | None = None):
-	"""Store or clear the Anthropic API key (a Password field, encrypted by Frappe). The key is never returned."""
+def set_ai_key(key: str | None = None, other: int = 0):
+	"""Store or clear the API key (a Password field, encrypted by Frappe): the Anthropic one, or with `other` the other service's. The key is never returned."""
 	_admin_only()
 	doc = frappe.get_doc("Life Settings")
-	doc.anthropic_api_key = (key or "").strip() or None
+	doc.set("ai_other_key" if int(other) else "anthropic_api_key", (key or "").strip() or None)
 	doc.save()
 	from lifeos.ai import client
 
-	return {"key_set": client.is_set_up()}
+	return {"key_set": bool(client.api_key())}
+
+
+@frappe.whitelist(methods=["POST"])
+def test_ai_connection():
+	"""Settings, Advanced, AI: one tiny call with the current setting. {ok, text}: "Working: <model> answered", or the provider's reason."""
+	_admin_only()
+	from lifeos.ai import client
+
+	return client.test_connection()
 
 
 @frappe.whitelist(methods=["POST"])

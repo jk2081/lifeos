@@ -310,17 +310,34 @@
           <TabButtons v-model="advPart" class="self-start" :options="ADVANCED" aria-label="Advanced" data-advanced-parts />
           <template v-if="advPart === 'ai' && d.ai">
           <Card flush data-ai-settings>
-            <SettingRow label="Anthropic API key" :help="d.ai.key_set ? 'A key is set. It is stored encrypted and never shown again.' : 'No key yet: Ask says it is not set up, and only rule insights run. Or set it with bench set-config anthropic_api_key.'">
+            <SettingRow label="Provider" help="Anthropic, or any service that speaks Anthropic's API, such as DeepSeek.">
+              <Select class="w-72" :model-value="provider" :options="PROVIDERS" aria-label="AI provider" data-setting="ai_provider"
+                @update:model-value="(v) => setProvider(v)" />
+            </SettingRow>
+            <template v-if="isOther">
+              <p class="px-4 py-2 text-sm text-ink-gray-7" data-ai-other-note>Life OS sends this service what it works on: task titles, notes, email snippets and area names. Check where it stores and uses your data.</p>
+              <SettingRow label="Address" help="The service's base URL, for example https://api.deepseek.com/anthropic" :error="errors.ai_base_url">
+                <TextInput class="w-72" :model-value="d.settings.ai_base_url" placeholder="https://api.deepseek.com/anthropic" aria-label="Address of the service" data-setting="ai_base_url"
+                  @change="(e) => setOne('ai_base_url', e.target.value.trim())" /></SettingRow>
+            </template>
+            <SettingRow :label="isOther ? 'Key' : 'Anthropic API key'" :help="d.ai.key_set ? 'A key is set. It is stored encrypted and never shown again.' : isOther ? 'No key yet: the Brain and Ask are off.' : 'No key yet: Ask says it is not set up, and only rule insights run. Or set it with bench set-config anthropic_api_key.'">
               <div class="flex items-center gap-2">
-                <TextInput v-model="aiKey" class="w-56" type="password" :placeholder="d.ai.key_set ? 'Replace the key' : 'sk-ant-…'" aria-label="Anthropic API key" autocomplete="off" data-ai-key />
+                <TextInput v-model="aiKey" class="w-56" type="password" :placeholder="d.ai.key_set ? 'Replace the key' : isOther ? 'Key of the service' : 'sk-ant-…'" :aria-label="isOther ? 'Key of the service' : 'Anthropic API key'" autocomplete="off" data-ai-key />
                 <Button label="Save" :disabled="!aiKey" data-ai-key-save @click="saveKey" />
                 <Button v-if="d.ai.key_set" variant="ghost" theme="red" label="Remove" @click="saveKey(true)" />
               </div>
             </SettingRow>
-            <SettingRow label="Ask model" help="Writes Ask's answers and the AI insights.">
+            <SettingRow :label="isOther ? 'Model for Ask' : 'Ask model'" help="Writes Ask's answers and the AI insights.">
               <TextInput class="w-56" :model-value="d.settings.ask_model" data-setting="ask_model" @change="(e) => setOne('ask_model', e.target.value.trim())" /></SettingRow>
-            <SettingRow label="Short-task model" help="For short wording jobs.">
+            <SettingRow :label="isOther ? 'Model for quick jobs' : 'Short-task model'" help="For short wording jobs.">
               <TextInput class="w-56" :model-value="d.settings.short_model" data-setting="short_model" @change="(e) => setOne('short_model', e.target.value.trim())" /></SettingRow>
+            <p v-for="m in d.ai.unpriced" :key="m" class="px-4 py-2 text-sm text-ink-amber-8" data-ai-unpriced :data-model="m">Add a price for {{ m }} so the cap counts it correctly.</p>
+            <SettingRow label="Test connection" help="One tiny call with these settings.">
+              <div class="flex items-center gap-2">
+                <Button label="Test connection" :loading="testing" data-ai-test @click="testConnection" />
+                <span v-if="tested" class="max-w-80 text-sm" :class="tested.ok ? 'text-ink-green-8' : 'text-ink-red-8'" role="status" data-ai-test-result :data-ok="tested.ok ? 1 : 0">{{ tested.text }}</span>
+              </div>
+            </SettingRow>
             <SettingRow label="Monthly cap" help="Ask and the AI insights stop for the month when the spend reaches this." :error="errors.monthly_cap_usd">
               <TextInput class="w-28" type="number" min="0" :model-value="d.settings.monthly_cap_usd" data-setting="monthly_cap_usd"
                 @change="(e) => setOne('monthly_cap_usd', Number(e.target.value))"><template #prefix><span class="text-sm text-ink-gray-6">$</span></template></TextInput></SettingRow>
@@ -675,8 +692,27 @@ async function changed() {
 
 // ---- plain settings: each saves on its own; an error shows under the field and the old value comes back ----
 const aiKey = ref('')
+const PROVIDERS = [{ label: 'Anthropic', value: 'Anthropic' }, { label: 'Another service (Anthropic-compatible)', value: 'Another service (Anthropic-compatible)' }]
+const provider = computed(() => d.value.settings.ai_provider || 'Anthropic')
+const isOther = computed(() => provider.value !== 'Anthropic')
+async function setProvider(v) {
+  await setOne('ai_provider', v)
+  tested.value = null
+  await load()
+}
+const testing = ref(false)
+const tested = ref(null)
+async function testConnection() {
+  testing.value = true
+  tested.value = null
+  try {
+    tested.value = await settingsData.settings.test_ai_connection()
+  } catch (e) {
+    tested.value = { ok: false, text: errorText(e) }
+  } finally { testing.value = false }
+}
 async function saveKey(clear = false) {
-  const res = await tryCall(() => settingsData.settings.set_ai_key({ key: clear === true ? '' : aiKey.value }), clear === true ? 'Key removed' : 'Key saved')
+  const res = await tryCall(() => settingsData.settings.set_ai_key({ key: clear === true ? '' : aiKey.value, other: isOther.value ? 1 : 0 }), clear === true ? 'Key removed' : 'Key saved')
   aiKey.value = ''
   if (res) await load()
 }

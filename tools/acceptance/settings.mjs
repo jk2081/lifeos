@@ -1329,6 +1329,44 @@ for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system
       must((await card.getAttribute('data-active')) === '0', 'the switch did not turn the inbox off')
       must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
     })
+    // issue 102: the AI provider
+    await check('SETTINGS.42', `${width} px: Settings > Advanced > AI offers the provider; Another service shows the address, the key, the models and the data line; Anthropic hides them`, async () => {
+      bench(`frappe.db.set_single_value("Life Settings", "ai_provider", "Anthropic")\nfrappe.db.set_single_value("Life Settings", "ai_base_url", None)\nfrappe.clear_cache(doctype="Life Settings")`)
+      await s.open('/life/settings?tab=advanced')
+      await pg.locator('[data-ai-settings]').waitFor({ timeout: 15000 })
+      const pickProvider = async (label) => { await pg.locator('[data-setting="ai_provider"]').first().click(); await pg.getByRole('option', { name: label, exact: true }).first().click(); await pg.waitForTimeout(1200) }
+      must((await pg.locator('[data-setting="ai_base_url"]').count()) === 0 && (await pg.locator('[data-ai-other-note]').count()) === 0, 'the address shows with Anthropic')
+      await pickProvider('Another service (Anthropic-compatible)')
+      await pg.locator('[data-ai-other-note]').waitFor({ timeout: 10000 })
+      must(/Check where it stores and uses your data/.test(await pg.locator('[data-ai-other-note]').innerText()), 'the data line is missing')
+      must(await pg.locator('[data-setting="ai_base_url"]').count() === 1 && await pg.locator('[data-ai-key]').count() === 1 && await pg.locator('[data-setting="ask_model"]').count() === 1 && await pg.locator('[data-setting="short_model"]').count() === 1, 'the address, key or models are missing')
+      await pg.locator('[data-setting="ai_base_url"]').fill('https://api.deepseek.com/anthropic')
+      await pg.locator('[data-setting="ai_base_url"]').blur()
+      await pg.waitForTimeout(1200)
+      must((await s.api('settings.get', { space: SPACE })).settings.ai_base_url === 'https://api.deepseek.com/anthropic', 'the address was not saved')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      await pickProvider('Anthropic')
+      must((await pg.locator('[data-setting="ai_base_url"]').count()) === 0 && (await pg.locator('[data-ai-other-note]').count()) === 0, 'the address stays with Anthropic')
+    })
+    await check('SETTINGS.43', `${width} px: Test connection says Working with the fake AI, and the provider's own reason when the fake fails on credit`, async () => {
+      await s.open('/life/settings?tab=advanced')
+      await pg.locator('[data-ai-test]').waitFor({ timeout: 15000 })
+      await pg.locator('[data-ai-test]').click()
+      await pg.locator('[data-ai-test-result][data-ok="1"]').waitFor({ timeout: 15000 })
+      must(/^Working: .+ answered/.test((await pg.locator('[data-ai-test-result]').innerText()).trim()), 'the result does not say Working')
+      bench(`from frappe.installer import update_site_config
+update_site_config("lifeos_fake_ai_error", {"status": 400, "message": "Your credit balance is too low to access the Anthropic API."})`)
+      try {
+        await pg.locator('[data-ai-test]').click()
+        await pg.locator('[data-ai-test-result][data-ok="0"]').waitFor({ timeout: 15000 })
+        const said = await pg.locator('[data-ai-test-result]').innerText()
+        must(/credit/i.test(said) && !/\(400\)/.test(said), 'the reason is not shown: ' + said)
+      } finally {
+        bench(`from frappe.installer import update_site_config
+update_site_config("lifeos_fake_ai_error", {})
+frappe.defaults.clear_default("lifeos_ai_off", parent="__default")`)
+      }
+    })
   } finally {
     bench(`frappe.db.set_single_value("Life Settings", "email_in_account", None)
 frappe.db.set_single_value("Life Settings", "email_in_senders", None)

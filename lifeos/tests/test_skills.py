@@ -884,6 +884,31 @@ class TestClient(AskCase):
 		self.assertAlmostEqual(u[0].cost, 2.0 + 1.0)
 		self.assertEqual(client.spend_status()["text"], "This month: $3.00 of $30")
 
+	def test_a_provider_that_takes_no_tools_gets_search_results_and_the_answer_says_so(self):
+		# issue 102
+		self.make("Life Task", title="i102 drainage review", area=self.areas["Tea"])
+
+		def refuse(params):
+			raise client.error_from(400, "tools are not supported")
+
+		fk = self.script(refuse, {"content": [text("The review is open [R1].")], "stop_reason": "end_turn"})
+		res = ask.ask("i102 drainage?", space=PRIVATE)
+		self.assertEqual(res["message"]["status"], "Done")
+		self.assertIn("search results only", res["message"]["text"])
+		self.assertNotIn("tools", fk.received[1])
+		self.assertIn("i102 drainage review", fk.received[1]["messages"][-1]["content"])
+
+	def test_a_failed_call_shows_the_providers_reason_in_ask(self):
+		def credit(params):
+			raise client.error_from(400, "Your credit balance is too low to access the Anthropic API.")
+
+		self.script(credit)
+		res = ask.ask("Anything?", space=PRIVATE)
+		self.assertEqual(res["error"], "ai")
+		self.assertIn("credit", res["error_text"])
+		self.assertNotIn("(400)", res["error_text"])
+		frappe.defaults.clear_default(client.OFF_KEY, parent="__default")
+
 	def test_agents_cannot_ask(self):
 		self.as_user(AGENT)
 		with self.assertRaises(frappe.PermissionError):

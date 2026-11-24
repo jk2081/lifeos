@@ -26,7 +26,9 @@ def setup_level():
 	permissions.require_login()
 	from lifeos.review import ladder
 
-	return ladder.get(frappe.session.user)
+	from lifeos.ai import client
+
+	return {**ladder.get(frappe.session.user), "brain_off": client.brain_off()}  # not cached with the ladder: it clears the moment a call works
 
 
 @frappe.whitelist(methods=["POST"])

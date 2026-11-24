@@ -15,7 +15,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
 | `test_library.py` | Library: notes, the vault, search, the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions |
-| `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder, one space |
+| `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder, one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection) |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it |
 | `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools |
@@ -49,7 +49,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 
 ## Acceptance checks by place
 
-### Today (`tools/acceptance/today.mjs`, 29 checks)
+### Today (`tools/acceptance/today.mjs`, 30 checks)
 
 Day, Week, Month and Year, the numbers that open lists, Reset, rhythm banners, the first-run guide, Today's tasks.
 
@@ -84,6 +84,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.27` no link on Today goes to an old route, and each opens where it says
 - `TODAY.28` the order is Needs you, the list, habits, then the rail
 - `TODAY.29` each moved number is in its new place with the count the old card had (All tasks, Goals, Library, Brain Activity)
+- `TODAY.30` with the fake AI failing on credit, Ask shows the credit message and Today shows "The Brain is off" with a link to Settings > AI, until a call works
 
 ### Brain (`tools/acceptance/brain.mjs`, 53 checks)
 
@@ -305,7 +306,7 @@ Unit tests: `test_review.py`
 - `REVIEW.22` a review left after step 2 resumes at step 2 with its decisions kept
 - `REVIEW.23` deciding each goal and locking closes the cycle with cycles.close_cycle's score and makes the next cycle with the carried goals and their lead actions
 
-### Settings (`tools/acceptance/settings.mjs`, 40 checks)
+### Settings (`tools/acceptance/settings.mjs`, 42 checks)
 
 Profile, Areas, Rhythms, Members, Sources, Rules, Skills, Cost, the setup ladder, the calendar connection and the one-space site.
 
@@ -352,6 +353,8 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.39` Settings > Data holds the Reset section; /today/reset lands on Today and says that page moved
 - `SETTINGS.40` Settings > Sources shows the email-in address and the allowed senders, and the onboarding guide says nothing about forwarding
 - `SETTINGS.41` Sources offers Connect Gmail and Connect Microsoft; a connected (fake) Microsoft inbox shows with its label and an on/off switch; Connect Microsoft says what it reads and sends
+- `SETTINGS.42` Settings > Advanced > AI offers the provider; Another service shows the address, key, models and the data line
+- `SETTINGS.43` Test connection says Working with the fake AI, and the provider's own reason when it fails on credit
 
 ### Phone (`tools/acceptance/phone.mjs`, 24 checks)
 
