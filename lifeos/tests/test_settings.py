@@ -677,8 +677,9 @@ class TestLadder(LifeTestCase):
 			frappe.db.delete(dt, {"space": HER} if dt != "Life Review" else {"user": ANYA})
 		frappe.db.delete("Life Space Member", {"parent": HER, "user": ("!=", ANYA)})
 		frappe.db.set_value("Life Area", {"space": HER}, "is_on", 0)
-		frappe.defaults.clear_default(ladder.DISMISSED_KEY, parent=ANYA)
-		ladder.forget(ANYA)
+		for user in (ANYA, "family@lifeos.test"):  # test_4 checks the card is dismissed for one person only: start with neither dismissed
+			frappe.defaults.clear_default(ladder.DISMISSED_KEY, parent=user)
+			ladder.forget(user)
 		key = patch("lifeos.ai.client.is_set_up", return_value=True)  # a site with a key; the tests of the key itself say otherwise
 		key.start()
 		self.addCleanup(key.stop)

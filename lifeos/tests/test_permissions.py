@@ -615,7 +615,7 @@ class TestCleanup(IntegrationTestCase):
 		# issue 98: the one patch indexes the records that exist for Global Search; the schema still comes from the DocTypes
 		lines = [x.strip() for x in (APP_cleanup / "patches.txt").read_text().splitlines()]
 		self.assertEqual([x for x in lines if x and not x.startswith(("#", "["))], ["lifeos.patches.index_global_search"])
-		self.assertEqual([p.name for p in (APP_cleanup / "patches").glob("*.py")], ["__init__.py", "index_global_search.py"])
+		self.assertEqual(sorted(p.name for p in (APP_cleanup / "patches").glob("*.py")), ["__init__.py", "index_global_search.py"])  # glob order is the file system's
 		self.assertEqual(get_patches_from_app("lifeos"), ["lifeos.patches.index_global_search"])
 		install.after_migrate()
 		install.after_migrate()  # again: the schema comes from the DocTypes and setup is repeatable
