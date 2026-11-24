@@ -635,13 +635,13 @@ print(json.dumps({"name": doc.full_name, "zone": frappe.db.get_single_value("Sys
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.21', `${width} px: after the guide the ladder card shows level 1 and connect a source`, async () => {
+    await check('TODAY.21', `${width} px: after the guide the ladder card shows level 2 and connect a source`, async () => {
       await one.open('/life/today')
       if (phone) await pg.locator('[data-more-title]').click()
       const card = pg.locator('[data-setup-card]:visible')
       await card.waitFor({ timeout: 10000 })
       const t = await card.innerText()
-      must(t.includes('level 1 of 6'), 'the card says: ' + t)
+      must(t.includes('level 2 of 7'), 'the card says: ' + t.replace(/\n/g, ' | '))
       must(/connect a source/i.test(t), 'the next step is not to connect a source: ' + t)
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
@@ -823,6 +823,36 @@ for (const width of WIDTHS) {
       must(await num('[data-flow-in]') === week.in.n && await num('[data-flow-out]') === week.out.n, `Activity says ${await num('[data-flow-in]')} in, ${await num('[data-flow-out]')} out; the old line ${week.in.n}, ${week.out.n}`)
       await one.open('/life/goals/cycles')
       await pg.locator('[data-main]').waitFor({ timeout: 10000 })
+    })
+    // issue 102: the AI service has no credit
+    await check('TODAY.30', `${width} px: with the fake AI failing on credit, Ask shows the credit message and Today shows "The Brain is off" with a link to Settings > AI, until a call works`, async () => {
+      const task = await one.api('tasks.quick_add', { text: `Brain off ${stamp} ${width}`, space: SPACE })
+      bench(`from frappe.installer import update_site_config
+update_site_config("lifeos_fake_ai_error", {"status": 400, "message": "Your credit balance is too low to access the Anthropic API."})
+frappe.defaults.clear_default("lifeos_ai_off", parent="__default")`)
+      try {
+        await one.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%Brain off ${stamp} ${width}%`]]))}`)
+        await pg.locator(`[data-ref="task:${task.name}"]`).first().click()
+        await pg.locator('[data-pane-ask]').click()
+        await pg.locator('[data-ask-panel] textarea').fill('What is open?')
+        await pg.locator('[data-ask-send]:visible').click()
+        await pg.locator('[data-ask-error], [data-ask-refusal]').first().waitFor({ timeout: 20000 })
+        const said = await pg.locator('[data-ask-error], [data-ask-refusal]').first().innerText()
+        must(/credit/i.test(said) && !/\(400\)/.test(said), 'Ask does not show the credit message: ' + said)
+        await one.open('/life')
+        await pg.locator('[data-brain-off]').waitFor({ timeout: 15000 })
+        must(/The Brain is off: .*credit/i.test(await pg.locator('[data-brain-off]').innerText()), 'Today does not say the Brain is off')
+        await pg.locator('[data-brain-off-open]').click()
+        await pg.waitForURL(/\/life\/settings/, { timeout: 10000 })
+      } finally {
+        bench(`from frappe.installer import update_site_config
+update_site_config("lifeos_fake_ai_error", {})`)
+      }
+      // a call that works clears it
+      await one.api('settings.test_ai_connection')
+      await one.open('/life')
+      await pg.locator('[data-today-sub]').waitFor({ timeout: 15000 })
+      must((await pg.locator('[data-brain-off]').count()) === 0, 'the Brain stays off after a call worked')
     })
   } finally {
     if (one) await one.ctx.close()

@@ -579,7 +579,7 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task 
       const card = await openCard()
       await card.waitFor({ timeout: 10000 })
       const t = await card.innerText()
-      must(t.includes('Your setup · level 1 of 6'), 'the card says: ' + t)
+      must(t.includes('Your setup · level 2 of 7'), 'the card says: ' + t)
       must(t.includes('Next: Connect a source'), 'the next step is not Connect a source: ' + t)
       await card.locator('[data-setup-how]').click()
       await pg.waitForFunction(() => location.pathname.endsWith('/how-it-works'), null, { timeout: 8000 })
@@ -589,11 +589,11 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I26 task 
     await check('SETTINGS.13', `${width} px: How it works marks the current level as next, and shows the flow`, async () => {
       await s.open('/life/how-it-works')
       await pg.locator('[data-ladder]').waitFor({ timeout: 10000 })
-      await pg.waitForFunction(() => document.querySelectorAll('[data-ladder-level]').length === 6, null, { timeout: 8000 })
+      await pg.waitForFunction(() => document.querySelectorAll('[data-ladder-level]').length === 7, null, { timeout: 8000 })
       const marks = await pg.locator('[data-ladder-level]').evaluateAll((els) => els.map((e) => e.dataset.ladderMark).join())
-      must(marks === 'done,next,later,later,later,later', 'the levels are marked ' + marks)
+      must(marks === 'done,done,next,later,later,later,later', 'the levels are marked ' + marks)
       const next = await pg.locator('[data-ladder-mark="next"]').innerText()
-      must(next.includes('Level 2 · next') && next.includes('Connect a source'), 'next says: ' + next)
+      must(next.includes('Level 3 · next') && next.includes('Connect a source'), 'next says: ' + next)
       must((await pg.locator('[data-how-flow] [data-how-step]').count()) === 4, 'the flow is not four boxes')
       await noSideways()
     })
@@ -952,28 +952,28 @@ for (const width of WIDTHS) {
     const fam = await session('family@lifeos.test', width)
     try {
       const levelAt = async (n) => {
-        await fam.page.route('**/lifeos.api.meta.setup_level*', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: { level: n, of: 6, complete: false, dismissed: true, next: null, levels: [], done: [], how: [] } }) }))
+        await fam.page.route('**/lifeos.api.meta.setup_level*', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ message: { level: n, of: 7, complete: false, dismissed: true, next: null, levels: [], done: [], how: [] } }) }))
         await fam.open('/life/settings')
-        await fam.page.waitForFunction((lv) => document.querySelector('[data-settings-menu]') && (lv === 6 || document.querySelector('[data-settings-later]')), n, { timeout: 8000 }).catch(() => {})
+        await fam.page.waitForFunction((lv) => document.querySelector('[data-settings-menu]') && (lv === 7 || document.querySelector('[data-settings-later]')), n, { timeout: 8000 }).catch(() => {})
         await fam.page.waitForTimeout(600)
         await fam.page.unroute('**/lifeos.api.meta.setup_level*')
         return fam.page.locator('[data-settings-menu] [data-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-section')))
       }
-      await check('SETTINGS.28', `${width} px: a person who is not a Life Admin at level 1 sees Profile, Areas and Sources and the footer line; Rhythms appears at level 4`, async () => {
+      await check('SETTINGS.28', `${width} px: a person who is not a Life Admin at level 1 sees Profile, Areas and Sources and the footer line; Rhythms appears at level 5`, async () => {
         const one = await levelAt(1)
         must(JSON.stringify(one) === JSON.stringify(['profile', 'areas', 'sources']), `level 1 shows ${one}`)
         const line = await fam.page.locator('[data-settings-later]').innerText()
-        must(/More settings appear as you go up the ladder/.test(line) && /Rhythms and Data at level 4/.test(line), `the footer says "${line}"`)
-        const four = await levelAt(4)
-        must(JSON.stringify(four) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'sources', 'rules']), `level 4 shows ${four}`)
+        must(/More settings appear as you go up the ladder/.test(line) && /Rhythms and Data at level 5/.test(line), `the footer says "${line}"`)
+        const five = await levelAt(5)
+        must(JSON.stringify(five) === JSON.stringify(['profile', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'sources', 'rules']), `level 5 shows ${five}`)
         // a page that is not in the menu yet is still reached by its link
         await fam.open('/life/settings?tab=habits')
         await fam.page.locator('[data-settings-section]').waitFor()
         must((await fam.page.locator('[data-settings-section]').getAttribute('data-current')) === 'habits', 'a link to a page not in the menu yet did not open it')
       })
       await check('SETTINGS.29', `${width} px: a person who is not a Life Admin does not see Advanced; the owner's Advanced opens AI key and cost, Import and export and Backups`, async () => {
-        const all = await levelAt(6)
-        must(!all.includes('advanced') && !all.includes('members'), `a non-admin at level 6 sees ${all}`)
+        const all = await levelAt(7)
+        must(!all.includes('advanced') && !all.includes('members'), `a non-admin at level 7 sees ${all}`)
         await fam.open('/life/settings?tab=advanced')
         await fam.page.waitForTimeout(800)
         must((await fam.page.locator('[data-settings-section]').getAttribute('data-current').catch(() => null)) !== 'advanced', 'a non-admin opened Advanced')
@@ -1298,36 +1298,115 @@ frappe.clear_cache(doctype="Life Settings")`)
       const guide = (await import('node:fs')).readFileSync(new URL('../../frontend/src/components/OnboardingGuide.vue', import.meta.url), 'utf8')
       must(!/forward|email-in|email in/i.test(guide), 'the onboarding guide mentions email forwarding')
     })
-    await check('SETTINGS.41', `${width} px: Sources offers Connect Gmail and Connect Microsoft; a connected (fake) Microsoft inbox shows with its label and an on/off switch; Connect Microsoft says what it reads and sends`, async () => {
+    await check('SETTINGS.41', `${width} px: Sources offers Connect Gmail; with more sources on, Connect Microsoft too; a connected (fake) Microsoft inbox shows with its label and an on/off switch; Connect Microsoft says what it reads and sends`, async () => {
       bench(`frappe.set_user("Administrator")
-for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system": "microsoft"}, pluck="name"): frappe.delete_doc("Life Connection", n, force=1, ignore_permissions=True)`)
-      await s.open('/life/brain/sources')
-      await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 15000 })
-      must((await pg.locator('[data-source-tile][data-system="gmail"] [data-tile-add]').getAttribute('aria-label')) === 'Connect Gmail', 'there is no Connect Gmail')
-      const tile = pg.locator('[data-source-tile][data-system="microsoft"]')
-      must((await tile.locator('[data-tile-add]').getAttribute('aria-label')) === 'Connect Microsoft', 'there is no Connect Microsoft')
-      // the tile can still be settling after load (CI timed out here once at 1440 px): scroll to it and try again
-      for (let i = 0; i < 3 && !(await pg.locator('[data-gmail-connect]').isVisible()); i++) {
-        await tile.locator('[data-tile-add]').scrollIntoViewIfNeeded()
-        await pg.keyboard.press('Escape') // a dialog left open by the step before would cover the tile
-        await tile.locator('[data-tile-add]').click({ timeout: 4000 }).catch(() => tile.locator('[data-tile-add]').evaluate((el) => el.click()))
-        await pg.locator('[data-gmail-connect]').waitFor({ timeout: 2500 }).catch(() => {})
+for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system": "microsoft"}, pluck="name"): frappe.delete_doc("Life Connection", n, force=1, ignore_permissions=True)
+from frappe.installer import update_site_config
+update_site_config("lifeos_more_sources", 1)`)
+      try {
+        await s.open('/life/brain/sources')
+        await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-source-card][data-system="gmail"] [data-source-connect]').innerText()) === 'Connect', 'there is no Connect Gmail')
+        const row = pg.locator('[data-source-card][data-system="microsoft"]')
+        const more = (await s.api('connections.sources', { space: SPACE })).more
+        must(more === 1, 'the site setting lifeos_more_sources is not seen by the server: ' + more)
+        await row.locator('[data-source-connect]').waitFor({ timeout: 10000 })
+        // the button can still be settling after load (CI timed out here once at 1440 px): scroll to it and try again
+        for (let i = 0; i < 3 && !(await pg.locator('[data-gmail-connect]').isVisible()); i++) {
+          await row.locator('[data-source-connect]').scrollIntoViewIfNeeded()
+          await pg.keyboard.press('Escape') // a dialog left open by the step before would cover it
+          await row.locator('[data-source-connect]').click({ timeout: 4000 }).catch(() => row.locator('[data-source-connect]').evaluate((el) => el.click()))
+          await pg.locator('[data-gmail-connect]').waitFor({ timeout: 2500 }).catch(() => {})
+        }
+        await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
+        const said = await pg.locator('[data-gmail-connect]').innerText()
+        must(/Microsoft \(Outlook or Microsoft 365\)/.test(said) && /never deletes any/.test(said) && !/calendar/.test(said), 'the dialog does not say what it may do: ' + said)
+        await pg.keyboard.press('Escape')
+        bench(`frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "microsoft", "mailbox": "work-${width}@outlook.example", "label": "Work ${width}", "active": 1, "connected_by": "owner@lifeos.test"}).insert(ignore_permissions=True)`)
+        await s.open('/life/brain/sources')
+        await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 15000 })
+        const card = pg.locator('[data-source-card][data-system="microsoft"]')
+        await card.waitFor({ timeout: 10000 })
+        must((await card.innerText()).includes(`Work ${width}`), 'the inbox card does not show its label')
+        must((await card.getAttribute('data-active')) === '1', 'the inbox is not on')
+        await card.locator('[data-source-switch]').click()
+        for (let i = 0; i < 20 && (await card.getAttribute('data-active')) !== '0'; i++) await pg.waitForTimeout(200)
+        must((await card.getAttribute('data-active')) === '0', 'the switch did not turn the inbox off')
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      } finally {
+        bench(`from frappe.installer import update_site_config
+update_site_config("lifeos_more_sources", None)`)
       }
-      await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
-      const said = await pg.locator('[data-gmail-connect]').innerText()
-      must(/Microsoft \(Outlook or Microsoft 365\)/.test(said) && /never deletes any/.test(said) && !/calendar/.test(said), 'the dialog does not say what it may do: ' + said)
-      await pg.keyboard.press('Escape')
-      bench(`frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "microsoft", "mailbox": "work-${width}@outlook.example", "label": "Work ${width}", "active": 1, "connected_by": "owner@lifeos.test"}).insert(ignore_permissions=True)`)
-      await s.open('/life/brain/sources')
-      await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 15000 })
-      const card = pg.locator('[data-source-card][data-system="microsoft"]')
-      await card.waitFor({ timeout: 10000 })
-      must((await card.innerText()).includes(`Work ${width}`), 'the inbox card does not show its label')
-      must((await card.getAttribute('data-active')) === '1', 'the inbox is not on')
-      await card.locator('[data-source-switch]').click()
-      for (let i = 0; i < 20 && (await card.getAttribute('data-active')) !== '0'; i++) await pg.waitForTimeout(200)
-      must((await card.getAttribute('data-active')) === '0', 'the switch did not turn the inbox off')
+    })
+    // issue 102: the AI provider
+    await check('SETTINGS.42', `${width} px: Settings > Advanced > AI offers the provider; Another service shows the address, the key, the models and the data line; Anthropic hides them`, async () => {
+      bench(`frappe.db.set_single_value("Life Settings", "ai_provider", "Anthropic")\nfrappe.db.set_single_value("Life Settings", "ai_base_url", None)\nfrappe.clear_cache(doctype="Life Settings")`)
+      await s.open('/life/settings?tab=advanced')
+      await pg.locator('[data-ai-settings]').waitFor({ timeout: 15000 })
+      const pickProvider = async (label) => { await pg.locator('[data-setting="ai_provider"]').first().click(); await pg.getByRole('option', { name: label, exact: true }).first().click(); await pg.waitForTimeout(1200) }
+      must((await pg.locator('[data-setting="ai_base_url"]').count()) === 0 && (await pg.locator('[data-ai-other-note]').count()) === 0, 'the address shows with Anthropic')
+      await pickProvider('Another service (Anthropic-compatible)')
+      await pg.locator('[data-ai-other-note]').waitFor({ timeout: 10000 })
+      must(/Check where it stores and uses your data/.test(await pg.locator('[data-ai-other-note]').innerText()), 'the data line is missing')
+      must(await pg.locator('[data-setting="ai_base_url"]').count() === 1 && await pg.locator('[data-ai-key]').count() === 1 && await pg.locator('[data-setting="ask_model"]').count() === 1 && await pg.locator('[data-setting="short_model"]').count() === 1, 'the address, key or models are missing')
+      await pg.locator('[data-setting="ai_base_url"]').fill('https://api.deepseek.com/anthropic')
+      await pg.locator('[data-setting="ai_base_url"]').blur()
+      await pg.waitForTimeout(1200)
+      must((await s.api('settings.get', { space: SPACE })).settings.ai_base_url === 'https://api.deepseek.com/anthropic', 'the address was not saved')
       must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      await pickProvider('Anthropic')
+      must((await pg.locator('[data-setting="ai_base_url"]').count()) === 0 && (await pg.locator('[data-ai-other-note]').count()) === 0, 'the address stays with Anthropic')
+    })
+    await check('SETTINGS.43', `${width} px: Test connection says Working with the fake AI, and the provider's own reason when the fake fails on credit`, async () => {
+      await s.open('/life/settings?tab=advanced')
+      await pg.locator('[data-ai-test]').waitFor({ timeout: 15000 })
+      await pg.locator('[data-ai-test]').click()
+      await pg.locator('[data-ai-test-result][data-ok="1"]').waitFor({ timeout: 15000 })
+      must(/^Working: .+ answered/.test((await pg.locator('[data-ai-test-result]').innerText()).trim()), 'the result does not say Working')
+      bench(`from frappe.installer import update_site_config
+update_site_config("lifeos_fake_ai_error", {"status": 400, "message": "Your credit balance is too low to access the Anthropic API."})`)
+      try {
+        await pg.locator('[data-ai-test]').click()
+        await pg.locator('[data-ai-test-result][data-ok="0"]').waitFor({ timeout: 15000 })
+        const said = await pg.locator('[data-ai-test-result]').innerText()
+        must(/credit/i.test(said) && !/\(400\)/.test(said), 'the reason is not shown: ' + said)
+      } finally {
+        bench(`from frappe.installer import update_site_config
+update_site_config("lifeos_fake_ai_error", {})
+frappe.defaults.clear_default("lifeos_ai_off", parent="__default")`)
+      }
+    })
+    await check('SETTINGS.44', `${width} px: Settings > Advanced > Updates shows the installed commit; with no heartbeat it shows the set-up command and no Update now; with a fresh heartbeat Update now queues a request`, async () => {
+      const reset = `frappe.db.set_single_value("Life Settings", "updater_heartbeat", None)
+frappe.db.delete("Life Update")`
+      bench(`from lifeos.updater import git, status
+${reset}
+status.save_state({"installed": git.describe(status.repo_path(), "HEAD"), "available": None, "checked_at": str(frappe.utils.now_datetime()), "branch": "main", "error": None})`)
+      try {
+        const installed = bench(`from lifeos.updater import status
+print(status.state()["installed"]["short"])`)
+        await s.open('/life/settings?tab=advanced&part=updates')
+        await pg.locator('[data-updates-installed]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-updates-installed]').innerText()).includes(installed.split('\n').pop()), 'the installed commit does not show')
+        must(await pg.locator('[data-updates-command]').innerText().then((t) => /lifeos-setup-updater/.test(t)), 'no set-up command without a heartbeat')
+        must((await pg.locator('[data-updates-now]').count()) === 0, 'Update now shows without a runner')
+        must(await pg.locator('[data-updates-empty]').isVisible(), 'no empty state in the history')
+        must((await pg.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width)) <= 0, 'the page scrolls sideways')
+        bench(`from lifeos.updater import status
+status.heartbeat()
+st = status.state()
+st["available"] = {"commit": "e" * 40, "short": "eeeeeee", "date": "2026-11-24T10:00:00+05:30", "migrations": True, "changes": [{"commit": "e" * 40, "short": "eeeeeee", "title": "Acceptance change", "date": "2026-11-24T10:00:00+05:30"}]}
+status.save_state(st)`)
+        await s.open('/life/settings?tab=advanced&part=updates')
+        await pg.locator('[data-updates-now]').click()
+        await pg.locator('[data-update] [data-update-status]').first().waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-update] [data-update-status]').first().innerText()).trim() === 'Queued', 'the request is not shown as Queued')
+        must((await pg.locator('[data-updates-command]').count()) === 0, 'the set-up command shows with a runner')
+      } finally {
+        bench(`from lifeos.updater import status
+${reset}
+frappe.db.set_single_value("Life Settings", "update_state", None)`)
+      }
     })
   } finally {
     bench(`frappe.db.set_single_value("Life Settings", "email_in_account", None)

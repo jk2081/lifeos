@@ -17,6 +17,12 @@
         <Button size="sm" variant="solid" :label="d.banner.action" :route="d.banner.to" />
         <Button size="sm" variant="ghost" label="Skip" data-banner-skip @click="skipBanner" />
       </div>
+      <!-- issue 102: the AI service is not answering (credit, the key or the provider), until a call works again -->
+      <div v-if="d.brain_off" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-amber-1 bg-surface-amber-1 px-4 py-2.5" role="status" data-brain-off>
+        <span class="lucide-triangle-alert size-4 text-ink-amber-8" aria-hidden="true" />
+        <span class="min-w-0 flex-1 text-base text-ink-gray-9">The Brain is off: {{ d.brain_off }}</span>
+        <Button size="sm" label="Settings › AI" :route="{ path: '/settings', query: { tab: 'advanced' } }" data-brain-off-open />
+      </div>
       <!-- set 7: what the rule for Inbox items left too long parked or discarded on its own, with Undo for seven days -->
       <div v-if="d.auto_inbox" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-4 py-2.5" role="status" data-auto-inbox>
         <span class="lucide-inbox size-4 text-ink-gray-7" aria-hidden="true" />

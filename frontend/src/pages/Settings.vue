@@ -310,17 +310,34 @@
           <TabButtons v-model="advPart" class="self-start" :options="ADVANCED" aria-label="Advanced" data-advanced-parts />
           <template v-if="advPart === 'ai' && d.ai">
           <Card flush data-ai-settings>
-            <SettingRow label="Anthropic API key" :help="d.ai.key_set ? 'A key is set. It is stored encrypted and never shown again.' : 'No key yet: Ask says it is not set up, and only rule insights run. Or set it with bench set-config anthropic_api_key.'">
+            <SettingRow label="Provider" help="Anthropic, or any service that speaks Anthropic's API, such as DeepSeek.">
+              <Select class="w-72" :model-value="provider" :options="PROVIDERS" aria-label="AI provider" data-setting="ai_provider"
+                @update:model-value="(v) => setProvider(v)" />
+            </SettingRow>
+            <template v-if="isOther">
+              <p class="px-4 py-2 text-sm text-ink-gray-7" data-ai-other-note>Life OS sends this service what it works on: task titles, notes, email snippets and area names. Check where it stores and uses your data.</p>
+              <SettingRow label="Address" help="The service's base URL, for example https://api.deepseek.com/anthropic" :error="errors.ai_base_url">
+                <TextInput class="w-72" :model-value="d.settings.ai_base_url" placeholder="https://api.deepseek.com/anthropic" aria-label="Address of the service" data-setting="ai_base_url"
+                  @change="(e) => setOne('ai_base_url', e.target.value.trim())" /></SettingRow>
+            </template>
+            <SettingRow :label="isOther ? 'Key' : 'Anthropic API key'" :help="d.ai.key_set ? 'A key is set. It is stored encrypted and never shown again.' : isOther ? 'No key yet: the Brain and Ask are off.' : 'No key yet: Ask says it is not set up, and only rule insights run. Or set it with bench set-config anthropic_api_key.'">
               <div class="flex items-center gap-2">
-                <TextInput v-model="aiKey" class="w-56" type="password" :placeholder="d.ai.key_set ? 'Replace the key' : 'sk-ant-…'" aria-label="Anthropic API key" autocomplete="off" data-ai-key />
+                <TextInput v-model="aiKey" class="w-56" type="password" :placeholder="d.ai.key_set ? 'Replace the key' : isOther ? 'Key of the service' : 'sk-ant-…'" :aria-label="isOther ? 'Key of the service' : 'Anthropic API key'" autocomplete="off" data-ai-key />
                 <Button label="Save" :disabled="!aiKey" data-ai-key-save @click="saveKey" />
                 <Button v-if="d.ai.key_set" variant="ghost" theme="red" label="Remove" @click="saveKey(true)" />
               </div>
             </SettingRow>
-            <SettingRow label="Ask model" help="Writes Ask's answers and the AI insights.">
+            <SettingRow :label="isOther ? 'Model for Ask' : 'Ask model'" help="Writes Ask's answers and the AI insights.">
               <TextInput class="w-56" :model-value="d.settings.ask_model" data-setting="ask_model" @change="(e) => setOne('ask_model', e.target.value.trim())" /></SettingRow>
-            <SettingRow label="Short-task model" help="For short wording jobs.">
+            <SettingRow :label="isOther ? 'Model for quick jobs' : 'Short-task model'" help="For short wording jobs.">
               <TextInput class="w-56" :model-value="d.settings.short_model" data-setting="short_model" @change="(e) => setOne('short_model', e.target.value.trim())" /></SettingRow>
+            <p v-for="m in d.ai.unpriced" :key="m" class="px-4 py-2 text-sm text-ink-amber-8" data-ai-unpriced :data-model="m">Add a price for {{ m }} so the cap counts it correctly.</p>
+            <SettingRow label="Test connection" help="One tiny call with these settings.">
+              <div class="flex items-center gap-2">
+                <Button label="Test connection" :loading="testing" data-ai-test @click="testConnection" />
+                <span v-if="tested" class="max-w-80 text-sm" :class="tested.ok ? 'text-ink-green-8' : 'text-ink-red-8'" role="status" data-ai-test-result :data-ok="tested.ok ? 1 : 0">{{ tested.text }}</span>
+              </div>
+            </SettingRow>
             <SettingRow label="Monthly cap" help="Ask and the AI insights stop for the month when the spend reaches this." :error="errors.monthly_cap_usd">
               <TextInput class="w-28" type="number" min="0" :model-value="d.settings.monthly_cap_usd" data-setting="monthly_cap_usd"
                 @change="(e) => setOne('monthly_cap_usd', Number(e.target.value))"><template #prefix><span class="text-sm text-ink-gray-6">$</span></template></TextInput></SettingRow>
@@ -393,6 +410,7 @@
               <span class="text-sm tabular-nums text-ink-gray-6">{{ (f.size / 1024).toFixed(0) }} KB</span></Row></Card></section>
           <p class="text-sm text-ink-gray-6">Backups hold the database (every record, including Life OS) and, when files are included, the uploaded files.</p>
           </template>
+          <UpdatesSection v-if="advPart === 'updates'" />
           <template v-if="advPart === 'guide'">
           <Card flush data-guide-settings>
             <SettingRow label="Welcome guide" :help="`The short guide a new person sees on first opening Life OS. It is ${onboarding.status ? (onboarding.status === 'done' ? 'done' : 'skipped') : 'not yet done'} for you now. Showing it again opens it only while the site has no tasks, goals or captures.`">
@@ -476,6 +494,7 @@ import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
+import UpdatesSection from '@/components/settings/UpdatesSection.vue'
 import CalendarSection from '@/components/settings/CalendarSection.vue'
 import AreasSection from '@/components/settings/AreasSection.vue'
 import ResetSection from '@/components/settings/ResetSection.vue'
@@ -538,13 +557,13 @@ const memberSpace = ref('')
 // The menu (issue 44): eight items in four groups and Advanced at the foot. `level` is the first level of the ladder at which a person
 // who is not a Life Admin sees the item; a Life Admin sees all. A page left out of the menu is still reached by its link.
 const MENU = [
-  { key: 'me', label: 'Me', items: [{ value: 'profile', label: 'Profile', level: 1 }, { value: 'calendar', label: 'Calendar', level: 2 }] },
-  { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas', level: 1 }, { value: 'rhythms', label: 'Rhythms', level: 4 }, { value: 'habits', label: 'Habits', level: 3 }, { value: 'data', label: 'Data', level: 4 }] },
-  { key: 'brain', label: 'Brain', items: [{ value: 'sources', label: 'Sources', level: 1 }, { value: 'rules', label: 'Rules', level: 3 }] },
-  { key: 'people', label: 'People and agents', items: [{ value: 'members', label: 'Members', level: 6, admin: true }] },
+  { key: 'me', label: 'Me', items: [{ value: 'profile', label: 'Profile', level: 1 }, { value: 'calendar', label: 'Calendar', level: 3 }] },
+  { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas', level: 1 }, { value: 'rhythms', label: 'Rhythms', level: 5 }, { value: 'habits', label: 'Habits', level: 4 }, { value: 'data', label: 'Data', level: 5 }] },
+  { key: 'brain', label: 'Brain', items: [{ value: 'sources', label: 'Sources', level: 1 }, { value: 'rules', label: 'Rules', level: 4 }] },
+  { key: 'people', label: 'People and agents', items: [{ value: 'members', label: 'Members', level: 7, admin: true }] },
   { key: 'advanced', label: '', items: [{ value: 'advanced', label: 'Advanced', level: 1, admin: true }] },
 ]
-const ADVANCED = [{ label: 'AI key and cost', value: 'ai' }, { label: 'Import and export', value: 'import' }, { label: 'Backups', value: 'backups' },
+const ADVANCED = [{ label: 'AI key and cost', value: 'ai' }, { label: 'Import and export', value: 'import' }, { label: 'Backups', value: 'backups' }, { label: 'Updates', value: 'updates' },
   { label: 'Archive', value: 'archive' }, { label: 'First-run guide', value: 'guide' }]
 async function resetGuide() {
   await tryCall(() => settingsData.onboarding.reset(), 'The guide will show again.')
@@ -555,7 +574,7 @@ const isAdmin = computed(() => !!d.value?.is_admin)
 // items that need a Life Admin (Members, Advanced) are never shown to anyone else; the rest by the person's level
 const seen = (it) => (it.admin ? isAdmin.value : true) && (isAdmin.value || ladder.level >= it.level)
 const groups = computed(() => MENU.map((g) => ({ ...g, items: g.items.filter(seen) })).filter((g) => g.items.length))
-// "Rhythms at level 4, Members at level 6": what is still to come, for a person who is not a Life Admin
+// "Rhythms at level 5, Members at level 7": what is still to come, for a person who is not a Life Admin
 const later = computed(() => {
   if (isAdmin.value) return ''
   const hidden = MENU.flatMap((g) => g.items).filter((it) => !it.admin && !seen(it) && it.value !== 'sources').sort((x, y) => x.level - y.level)
@@ -570,7 +589,7 @@ const MOVED = {
   review: { tab: 'rhythms' }, reset: { tab: 'data' },
   sensitive: { tab: 'rules' }, 'note-rules': { tab: 'rules' },
   spaces: { tab: 'members', view: 'spaces' }, agents: { tab: 'members', view: 'agents' }, assistants: { tab: 'members', view: 'agents' }, people: { tab: 'members', view: 'people' },
-  ai: { tab: 'advanced', part: 'ai' }, cost: { tab: 'advanced', part: 'ai' }, import: { tab: 'advanced', part: 'import' }, backups: { tab: 'advanced', part: 'backups' },
+  ai: { tab: 'advanced', part: 'ai' }, cost: { tab: 'advanced', part: 'ai' }, import: { tab: 'advanced', part: 'import' }, backups: { tab: 'advanced', part: 'backups' }, updates: { tab: 'advanced', part: 'updates' },
   places: { tab: 'profile' },
   archived: { path: '/library/archive' }, archive: { path: '/library/archive' },
   connections: { path: '/brain/sources' }, sources: { path: '/brain/sources' },
@@ -675,8 +694,27 @@ async function changed() {
 
 // ---- plain settings: each saves on its own; an error shows under the field and the old value comes back ----
 const aiKey = ref('')
+const PROVIDERS = [{ label: 'Anthropic', value: 'Anthropic' }, { label: 'Another service (Anthropic-compatible)', value: 'Another service (Anthropic-compatible)' }]
+const provider = computed(() => d.value.settings.ai_provider || 'Anthropic')
+const isOther = computed(() => provider.value !== 'Anthropic')
+async function setProvider(v) {
+  await setOne('ai_provider', v)
+  tested.value = null
+  await load()
+}
+const testing = ref(false)
+const tested = ref(null)
+async function testConnection() {
+  testing.value = true
+  tested.value = null
+  try {
+    tested.value = await settingsData.settings.test_ai_connection()
+  } catch (e) {
+    tested.value = { ok: false, text: errorText(e) }
+  } finally { testing.value = false }
+}
 async function saveKey(clear = false) {
-  const res = await tryCall(() => settingsData.settings.set_ai_key({ key: clear === true ? '' : aiKey.value }), clear === true ? 'Key removed' : 'Key saved')
+  const res = await tryCall(() => settingsData.settings.set_ai_key({ key: clear === true ? '' : aiKey.value, other: isOther.value ? 1 : 0 }), clear === true ? 'Key removed' : 'Key saved')
   aiKey.value = ''
   if (res) await load()
 }

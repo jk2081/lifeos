@@ -3,7 +3,7 @@
     <template v-for="(m, i) in ask.messages" :key="i">
       <div v-if="m.role === 'user'" class="max-w-[85%] self-end rounded-5 bg-surface-gray-2 px-3.5 py-2 text-base text-ink-gray-9" data-ask-question>{{ m.text }}</div>
       <div v-else class="flex flex-col gap-3" data-ask-answer :data-status="m.status">
-        <div v-if="m.status === 'Error'"><Alert theme="red" :title="m.error || 'The answer could not be written.'" /></div>
+        <div v-if="m.status === 'Error'"><Alert theme="red" :title="m.error || 'The answer could not be written.'" data-ask-error /></div>
         <template v-else>
           <Md v-if="m.text" :text="m.text" :cites="m.cited || []" @cite="(n) => openCite(m, n)" />
           <div v-if="m.status === 'Working'" class="flex items-center gap-2 text-sm text-ink-gray-6" aria-live="polite" data-ask-working>

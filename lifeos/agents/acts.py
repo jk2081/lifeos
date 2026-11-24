@@ -157,7 +157,7 @@ def _inbox(person: str, space: str, p: dict, tool: str = ""):
 	"""The inbox an act is made in: the one named, the one the thread is in, or the person's default."""
 	rows = mail.accounts_for(person, space, p.get("account"))
 	if not rows:
-		frappe.throw(_("No inbox is connected. Connect one in Brain > Sources."), title=_("No inbox connected"))
+		mail.no_inbox(person)
 	if tool.startswith("calendar."):
 		rows = _google_only(rows)
 	if len(rows) > 1 and p.get("thread_id") and not p.get("account"):

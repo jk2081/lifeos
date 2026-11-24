@@ -1,5 +1,10 @@
 <template>
-  <!-- "Your setup · level n of 6" (issue 26): the next step and a link to How it works; gone after level 6 or when dismissed -->
+  <!-- issue 102: why the Brain is off, until a call works again -->
+  <div v-if="ladder.brain_off" class="mt-3 rounded-5 border border-outline-amber-1 bg-surface-amber-1 p-3 text-sm text-ink-gray-9" data-setup-brain-off>
+    The Brain is off: {{ ladder.brain_off }}
+    <RouterLink class="text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="{ path: '/settings', query: { tab: 'advanced' } }" @click="emit('go')">Settings › AI</RouterLink>
+  </div>
+  <!-- "Your setup · level n of 7" (issue 26): the next step and a link to How it works; gone after level 7 or when dismissed -->
   <div v-if="ladder.loaded && !ladder.complete && !ladder.dismissed" class="mt-3 rounded-5 border border-outline-gray-2 bg-surface-gray-1 p-3" data-setup-card>
     <div class="flex items-start justify-between gap-1">
       <div class="text-sm-medium text-ink-gray-9" data-setup-level>Your setup · level {{ ladder.level }} of {{ ladder.of }}</div>

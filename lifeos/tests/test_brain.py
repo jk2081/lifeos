@@ -372,7 +372,7 @@ class TestSources(LifeTestCase):
 		frappe.db.delete("Life Connection", {"space": PRIVATE})
 
 	def card(self, system):
-		return next(c for c in connections.sources(space=PRIVATE)["connected"] if c["system"] == system)
+		return next(c for c in connections.sources(space=PRIVATE)["sources"] if c["system"] == system)
 
 	def test_cards_count_this_weeks_captures_from_the_database(self):
 		for i in range(3):
@@ -380,14 +380,13 @@ class TestSources(LifeTestCase):
 		inbox.create_item(title="i19 mail", source_system="gmail", space=PRIVATE)
 		frappe.db.set_value("Life Inbox Item", {"title": "i19 hermes 0"}, "creation", "2020-01-01 10:00:00")  # an old one does not count
 		got = connections.sources(space=PRIVATE)
-		by = {c["system"]: c for c in got["connected"]}
+		by = {c["system"]: c for c in got["sources"]}
 		mine = frappe.db.count("Life Inbox Item", {"space": PRIVATE, "source_system": "hermes", "creation": (">=", connections._week_start())})
 		self.assertEqual((by["hermes"]["this_week"], mine), (2, 2))
 		self.assertIn("2 this week", by["hermes"]["line"])
-		self.assertIn("only people, not newsletters", by["gmail"]["line"])
-		self.assertEqual(by["hermes"]["kind"], "Agent · Telegram")
-		self.assertNotIn("hermes", [t["system"] for t in got["available"]])
-		self.assertEqual(got["available"][0]["system"], "upload")
+		self.assertEqual(by["gmail"]["state"], "Not connected")  # what an agent filed under gmail is not a connected inbox
+		self.assertEqual((by["hermes"]["kind"], by["hermes"]["label"], by["hermes"]["state"]), ("Agent", "Your assistant", "On"))
+		self.assertEqual(got["capture"]["label"], "Capture")
 
 	def test_switching_hermes_off_refuses_its_captures_and_on_again_works(self):
 		inbox.create_item(title="i19 first", source_system="hermes", space=PRIVATE)
@@ -404,8 +403,63 @@ class TestSources(LifeTestCase):
 		self.assertEqual(inbox.create_item(title="i19 on", source_system="hermes", space=PRIVATE)["title"], "i19 on")
 		self.assertEqual(frappe.db.count("Life Inbox Item", {"space": PRIVATE, "title": "i19 first"}), 1)  # nothing was deleted
 
-	def test_a_coming_tile_cannot_be_switched_on(self):
+	def test_sources_lists_only_what_is_in_use_and_more_sources_brings_the_rest_back(self):
+		"""Issue 101: Capture, Google Calendar, Gmail, Your assistant and Claude; the rest only with the site setting."""
 		got = connections.sources(space=PRIVATE)
+		self.assertEqual([c["system"] for c in got["sources"]], ["google-calendar", "gmail", "hermes", "claude"])
+		self.assertEqual((got["capture"]["label"], got["more"], got["coming"]), ("Capture", 0, []))
+		self.assertEqual({c["state"] for c in got["sources"]}, {"Not connected"})
+		frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "openclaw", "active": 1, "label": "OpenClaw"}).insert()
+		frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "atlas", "active": 1, "label": "Atlas"}).insert()
+		self.assertNotIn("openclaw", [c["system"] for c in connections.sources(space=PRIVATE)["sources"]])
+		with mock.patch.dict(frappe.conf, {"lifeos_more_sources": 1}):
+			more = connections.sources(space=PRIVATE)
+		by = {c["system"]: c for c in more["sources"]}
+		self.assertEqual(more["more"], 1)
+		self.assertTrue({"microsoft", "chatgpt", "openclaw", "atlas"} <= set(by))
+		self.assertEqual(by["openclaw"]["label"], "Another agent")  # the product never names the agent
+		self.assertEqual(len(more["coming"]), 6)
+		text = json.dumps(connections.sources(space=PRIVATE)) + json.dumps(more)
+		self.assertNotIn("Hermes", text)
+		self.assertNotIn("OpenClaw", text)
+
+	def test_a_calendar_counts_the_events_it_synced_and_warns_only_when_stale_or_failed(self):
+		"""Issue 101: the count is what the calendar brought in the last 7 days, not captures."""
+		frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "google-calendar", "active": 1}).insert()
+		event = frappe.get_doc({"doctype": "Event", "subject": "i101 board meeting", "starts_on": now_datetime(), "event_type": "Private", "life_space": PRIVATE,
+			"pulled_from_google_calendar": 1}).insert(ignore_permissions=True)
+		self.addCleanup(lambda: frappe.delete_doc("Event", event.name, force=True, ignore_permissions=True))
+		with mock.patch("lifeos.review.gcal.last_sync", return_value=(now_datetime(), None)):
+			card = self.card("google-calendar")
+		self.assertGreater(card["this_week"], 0)
+		self.assertFalse(card["quiet"])
+		self.assertIn("synced in the last 7 days", card["line"])
+		with mock.patch("lifeos.review.gcal.last_sync", return_value=(add_days(now_datetime(), -3), None)):
+			self.assertTrue(self.card("google-calendar")["quiet"])
+		with mock.patch("lifeos.review.gcal.last_sync", return_value=(now_datetime(), "Google said no")):
+			failed = self.card("google-calendar")
+		self.assertTrue(failed["quiet"])
+		self.assertEqual(failed["error"], "Google said no")
+		frappe.db.set_value("Event", event.name, "modified", add_days(now_datetime(), -8), update_modified=False)  # not synced this week
+		with mock.patch("lifeos.review.gcal.last_sync", return_value=(now_datetime(), None)):
+			self.assertEqual(self.card("google-calendar")["this_week"], 0)
+
+	def test_a_sync_that_changes_nothing_leaves_the_event_as_it_was(self):
+		from lifeos.review import gcal
+
+		ev = {"id": "i101-ev", "summary": "i101 sync", "start": {"dateTime": "2026-12-01T10:00:00"}, "end": {"dateTime": "2026-12-01T11:00:00"}}
+		name = gcal.upsert("Administrator", PRIVATE, "primary", ev)
+		self.addCleanup(lambda: frappe.delete_doc("Event", name, force=True, ignore_permissions=True))
+		old = add_days(now_datetime(), -5)
+		frappe.db.set_value("Event", name, "modified", old, update_modified=False)
+		gcal.upsert("Administrator", PRIVATE, "primary", ev)
+		self.assertEqual(str(frappe.db.get_value("Event", name, "modified"))[:10], str(old)[:10])
+		gcal.upsert("Administrator", PRIVATE, "primary", {**ev, "summary": "i101 sync, moved"})
+		self.assertGreater(frappe.db.get_value("Event", name, "modified"), old + frappe.utils.datetime.timedelta(days=4))
+
+	def test_a_coming_tile_cannot_be_switched_on(self):
+		with mock.patch.dict(frappe.conf, {"lifeos_more_sources": 1}):
+			got = connections.sources(space=PRIVATE)
 		self.assertEqual(sorted(t["system"] for t in got["coming"]), ["drive", "erpnext", "github", "tally", "wearable", "whatsapp"])
 		with self.assertRaises(frappe.ValidationError):
 			connections.save(space=PRIVATE, system="github", active=1)
@@ -496,7 +550,7 @@ class TestRouting(SkillCase):
 			item = inbox.create_item(title="For the agent", raw_text="x", space=PRIVATE)["name"]
 		enqueue.assert_not_called()
 		self.assertEqual(frappe.db.get_value("Life Inbox Item", item, "status"), "New")
-		sources = {c["system"]: c for c in connections.sources(space=PRIVATE)["connected"]}
+		sources = {c["system"]: c for c in connections.sources(space=PRIVATE)["sources"]}
 		self.assertIn("the Brain is switched off", connections.processed_by("gmail"))
 		self.assertEqual(connections.processed_by("claude"), "Not processed: kept as is")
 		self.assertTrue(all("Processed by" in c["processed_by"] or "Not processed" in c["processed_by"] for c in sources.values()))

@@ -38,7 +38,7 @@ import { store } from '@/lib/store'
 import { ladder, loadLadder, dismissLadder } from '@/lib/ladder'
 
 const FLOW = [
-  { kicker: '1 · Sources (in Brain)', title: 'Where information comes from', text: 'Email · Calendar · ERP · GitHub · Hermes · OpenClaw · Wispr Flow · Wearable · WhatsApp · Claude chats · Photos' },
+  { kicker: '1 · Sources (in Brain)', title: 'Where information comes from', text: 'Email · Calendar · Your assistant · Claude · Photos, files and voice you capture' },
   { kicker: '2 · Brain', title: 'Reads and sorts', brain: true, text: 'Pulls out people, dates and promises · picks area and goal · proposes tasks and notes · links related things · says how sure it is' },
   { kicker: '3 · Plan', title: 'Your areas and goals', text: 'The shelves everything is filed on. Clearer goals, better sorting.' },
   { kicker: 'What you see', title: 'Today, Brain, Goals, Library', see: true, text: 'Today: what to do. Brain: what came in and what needs you. Goals: where life is going. Library: what you know.' },

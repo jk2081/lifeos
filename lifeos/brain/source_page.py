@@ -24,7 +24,7 @@ CHANNELS = (("upload", "Upload", "Files, photos, voice and text you add yourself
 	("email", "Email-in address", "Mail you forward to Life OS", "Forwarded"))
 ALWAYS_ON = ("upload", "phone")
 HOW_TO_CONNECT = {"upload": "Drop a file or + Capture anywhere in Life OS.", "phone": "Capture from your phone with + Capture or the share sheet.",
-	"gmail": "Connect Gmail under Add more below. Life OS only reads.", "google-calendar": "Connect Google Calendar under Add more below.",
+	"gmail": "Connect Gmail in Brain › Sources. Life OS only reads.", "google-calendar": "Connect Google Calendar in Brain › Sources.",
 	"email": "Set the email-in address below, then forward an email to it."}
 KIND_LINES = {"document": "PDFs, scans and office files", "photo": "Photos, receipts and whiteboards", "video": "Recordings and clips, up to 500 MB",
 	"link": "Links and saved articles", "voice": "Voice notes", "email": "Email threads"}

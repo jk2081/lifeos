@@ -16,7 +16,8 @@
   "inbox_item",
   "task",
   "old_area",
-  "new_area"
+  "new_area",
+  "reason"
  ],
  "fields": [
   {
@@ -32,7 +33,7 @@
    "fieldname": "kind",
    "fieldtype": "Select",
    "label": "Kind",
-   "options": "Week tick\nArea correction",
+   "options": "Week tick\nArea correction\nAI unavailable",
    "default": "Week tick",
    "in_list_view": 1
   },
@@ -101,6 +102,12 @@
    "label": "Corrected Area",
    "options": "Life Area",
    "depends_on": "eval:doc.kind=='Area correction'"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "depends_on": "eval:doc.kind=='AI unavailable'"
   }
  ],
  "links": [],

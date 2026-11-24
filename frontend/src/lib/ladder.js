@@ -2,7 +2,7 @@
 import { reactive } from 'vue'
 import { api } from './api'
 
-export const ladder = reactive({ loaded: false, level: 1, of: 6, complete: false, dismissed: false, next: null, levels: [], done: [] })
+export const ladder = reactive({ loaded: false, level: 1, of: 7, complete: false, dismissed: false, brain_off: null, next: null, levels: [], done: [] })
 
 export async function loadLadder() {
   try {

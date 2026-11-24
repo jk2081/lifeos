@@ -905,26 +905,24 @@ for n in aside: frappe.db.set_value("Life Connection", n, "space", "${ASIDE}", u
 print(json.dumps({"tea": tea, "was": was, "aside": aside}))`).split('\n').pop())
   const card = (sys) => pg.locator(`[data-source-card][data-system="${sys}"]`)
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
-  const openSources = async () => { await s.open('/life/brain/sources'); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
+  const openSources = async (query = '') => { await s.open('/life/brain/sources' + query); await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(300) }
   const capture = (title, system, extra = {}) => s.api('inbox.create_item', { space: SPACE, title: `I19 ${title} ${width} ${stamp}`, source_system: system, ...extra })
   try {
-    await check('BRAIN.38', `${width} px: with no source connected Sources says what will appear and offers Add a source`, async () => {
+    await check('BRAIN.38', `${width} px: with no source connected Sources says what will appear, shows Capture as always on and has no Add a source`, async () => {
       await openSources()
       must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state')
       const t = await pg.locator('[data-sources-empty]').innerText()
-      must(t.includes('Nothing is connected yet.') && t.includes('switch them on below'), 'the empty state says: ' + t)
-      must(await pg.locator('[data-source-tile][data-system="upload"]').innerText().then((x) => x.includes('Always on')), 'the Upload tile is missing')
-      await pg.locator('[data-add-source-empty]').click()
-      await pg.locator('[data-add-more]').waitFor({ state: 'visible' })
+      must(t.includes('Nothing is connected yet.') && t.includes('Connect a source below'), 'the empty state says: ' + t)
+      must((await pg.locator('[data-capture-line]').innerText()).includes('always on'), 'Capture is not said to be always on')
+      must((await pg.locator('[data-add-source], [data-add-source-empty], [data-add-more]').count()) === 0, 'an Add a source button or grid is still there')
       await noSideways()
     })
     await check('BRAIN.39', `${width} px: connected sources show with this week's counts, matching the captures in the database`, async () => {
       for (const n of [1, 2, 3]) await capture(`hermes ${n}`, 'hermes')
-      await capture('gmail 1', 'gmail')
+      await capture('claude 1', 'claude')
       await openSources()
-      must((await pg.locator('[data-source-card]').count()) === 2, 'expected two cards, got ' + await pg.locator('[data-source-card]').count())
-      must((await pg.locator('[data-connected-count]').innerText()) === '2', 'the count in the heading is wrong')
-      for (const sys of ['hermes', 'gmail']) {
+      must((await pg.locator('[data-source-card]:not([data-state="Not connected"])').count()) === 2, 'expected two connected cards, got ' + await pg.locator('[data-source-card]:not([data-state="Not connected"])').count())
+      for (const sys of ['hermes', 'claude']) {
         const n = bench(`from frappe.utils import add_days, getdate
 d = getdate()
 print(frappe.db.count("Life Inbox Item", {"space": "${SPACE}", "source_system": "${sys}", "creation": [">=", add_days(d, -d.weekday())]}))`).split('\n').pop()
@@ -932,11 +930,10 @@ print(frappe.db.count("Life Inbox Item", {"space": "${SPACE}", "source_system": 
         must(shown === n && n !== '0', `${sys}: the card says ${shown}, the database ${n}`)
         must((await card(sys).locator('[data-source-line]').innerText()).includes(`${n} this week`), `${sys}: the line does not say ${n} this week`)
       }
-      must((await card('hermes').innerText()).includes('Agent · Telegram'), 'the kind of Hermes is missing')
-      must((await card('gmail').innerText()).includes('only people, not newsletters'), 'the Gmail note is missing')
+      must((await card('hermes').innerText()).includes('Your assistant'), 'the assistant is not called Your assistant')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
-    await check('BRAIN.40', `${width} px: switching Hermes off makes create_item from hermes fail with a clear message; switching it on again works`, async () => {
+    await check('BRAIN.40', `${width} px: switching the assistant off makes create_item from hermes fail with a clear message; switching it on again works`, async () => {
       await openSources()
       await card('hermes').locator('button[role="switch"]').click()
       await pg.waitForTimeout(800)
@@ -951,21 +948,17 @@ print(frappe.db.count("Life Inbox Item", {"space": "${SPACE}", "source_system": 
       must((await card('hermes').getAttribute('data-active')) === '1', 'the card still says Off')
       const ok = await capture('back on', 'hermes')
       must(ok.created, 'create_item should work again')
-      must((await card('hermes').getAttribute('data-week')) !== null && bench(`print(frappe.db.count("Life Inbox Item", {"title": ["like", "I19 hermes %${width} ${stamp}"]}))`).split('\n').pop() === '3', 'what Hermes brought earlier was deleted')
+      must((await card('hermes').getAttribute('data-week')) !== null && bench(`print(frappe.db.count("Life Inbox Item", {"title": ["like", "I19 hermes %${width} ${stamp}"]}))`).split('\n').pop() === '3', 'what the assistant brought earlier was deleted')
     })
-    await check('BRAIN.41', `${width} px: a Coming tile cannot be switched on`, async () => {
+    await check('BRAIN.41', `${width} px: a source that is not built cannot be switched on and shows no Coming tile`, async () => {
       await openSources()
-      const tile = pg.locator('[data-tile-coming][data-system="github"]')
-      must((await tile.innerText()).includes('Coming'), 'the GitHub tile does not say Coming')
-      must((await tile.locator('button').count()) === 0, 'a Coming tile has a button')
-      await tile.click({ force: true })
-      await pg.waitForTimeout(500)
-      must((await pg.locator('[data-source-settings]').count()) === 0 && (await card('github').count()) === 0, 'a Coming tile opened or added something')
-      for (const sys of ['github', 'whatsapp', 'wearable', 'tally', 'drive', 'erpnext']) must(await pg.locator(`[data-tile-coming][data-system="${sys}"]`).count() === 1, sys + ' is missing')
+      must((await pg.locator('[data-tile-coming]').count()) === 0 && !(await pg.locator('[data-brain-sources]').innerText()).includes('Coming'), 'a Coming tile shows')
       const r = await s.api('connections.save', { space: SPACE, system: 'github', active: 1 }, { raw: true })
       must(!r.ok() && (await r.text()).includes('not built yet'), 'the server switched GitHub on: ' + r.status())
     })
     await check('BRAIN.42', `${width} px: opening a source shows its default intent, area and goal, and saving changes what create_item uses`, async () => {
+      bench(`for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system": "gmail"}, pluck="name"): frappe.delete_doc("Life Connection", n, force=1, ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "gmail", "mailbox": "i19-${width}@example.com", "label": "i19-${width}@example.com", "active": 1}).insert(ignore_permissions=True)`)
       await openSources()
       await card('gmail').locator('[data-source-open]').click()
       const dlg = pg.locator('[data-source-settings][data-system="gmail"]')
@@ -994,6 +987,132 @@ print(json.dumps(frappe.db.get_value("Life Connection", {"space": "${SPACE}", "s
       must(boxes.length >= 2, 'expected at least two cards')
       if (phone) must(boxes.every(([x, , w]) => Math.abs(x - boxes[0][0]) < 1 && w <= width), 'the cards do not stack')
       else must(Math.abs(boxes[1][1] - boxes[0][1]) < 1 && boxes[1][0] > boxes[0][0], 'the cards are not side by side')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    // issue 101: what is really connected. Each check sets up its own mailbox rows and takes them away (a Connected App and a mail account are not in the space's connections).
+    const clear = () => bench(`frappe.set_user("Administrator")
+for c in frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc("Life Connection", c, force=1, ignore_permissions=True)
+for a in frappe.get_all("Life Mail Account", filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc("Life Mail Account", a, force=1, ignore_permissions=True)
+for a in frappe.get_all("Connected App", filters={"provider_name": ["like", "life-os-gmail-%"]}, pluck="name"): frappe.delete_doc("Connected App", a, force=1, ignore_permissions=True)
+frappe.defaults.clear_default("lifeos_redirects_confirmed", parent="__default")`)
+    const googleOn = () => JSON.parse(bench(`import json
+s = frappe.get_doc("Google Settings")
+was = {"enable": s.enable, "client_id": s.client_id, "secret": s.get_password("client_secret", raise_exception=False)}
+s.enable, s.client_id, s.client_secret = 1, "acceptance-client.apps.example", "acceptance-secret"
+s.save(ignore_permissions=True)
+frappe.clear_cache(doctype="Google Settings")
+print(json.dumps(was))`).split('\n').pop())
+    const googleBack = (was) => bench(`s = frappe.get_doc("Google Settings")
+s.enable, s.client_id, s.client_secret = ${was.enable ? 1 : 0}, ${JSON.stringify(was.client_id || '')}, ${JSON.stringify(was.secret || '')}
+s.save(ignore_permissions=True)
+frappe.clear_cache(doctype="Google Settings")`)
+    const pending = (extra = '') => bench(`from lifeos.mail import gmail
+frappe.set_user("Administrator")
+app = gmail.make_app(gmail.free_app_name())
+c = frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "gmail", "label": "Gmail", "active": 0, "connected_app": app.name, "connected_by": "owner@lifeos.test"${extra}}).insert(ignore_permissions=True)
+print(app.name)`).split('\n').pop()
+    await check('BRAIN.55', `${width} px: a half-connected Gmail shows once, Waiting, with no switch and a Remove button; after Google's error it says what happened and shows the address to add; Remove clears it`, async () => {
+      const was = googleOn()
+      try {
+        clear()
+        const app = pending()
+        await openSources()
+        const cards = pg.locator('[data-source-card][data-system="gmail"]')
+        must((await cards.count()) === 1, `Gmail shows ${await cards.count()} times`)
+        must((await cards.first().getAttribute('data-state')) === 'Waiting', 'the card is not Waiting')
+        must((await cards.first().locator('[data-source-switch]').count()) === 0 && (await cards.first().innerText()).includes('Finish signing in first'), 'the switch is not replaced by "Finish signing in first"')
+        must(await cards.first().locator('[data-source-remove]').isVisible(), 'there is no Remove button')
+        must((await pg.locator('[data-add-another], [data-source-card][data-system="gmail"] [data-source-connect]').count()) === 0, 'Gmail is offered again')
+        // Google sends the person back to Frappe's address with the error: it lands on Sources with the card showing it
+        await pg.goto(`${base}/api/method/frappe.integrations.doctype.connected_app.connected_app.callback/${app}?error=redirect_uri_mismatch&state=x`)
+        await pg.waitForURL(/\/life\/brain\/sources/, { timeout: 15000 })
+        await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 15000 })
+        must((await cards.first().locator('[data-source-error]').innerText()).includes('does not know this return address'), 'the card does not say what happened')
+        must((await cards.first().locator('[data-redirect-address]').innerText()).endsWith(`connected_app.callback/${app}`), 'the card does not show the address to add')
+        must(await cards.first().locator('[data-redirect-copy]').isVisible() && await cards.first().locator('[data-source-retry]').isVisible(), 'Copy or Try again is missing')
+        await noSideways()
+        await cards.first().locator('[data-source-remove]').click()
+        await pg.locator('[data-source-card][data-system="gmail"][data-state="Not connected"]').waitFor({ timeout: 10000 })
+        must(bench(`print(frappe.db.exists("Connected App", "${app}") or "gone")`).split('\n').pop() === 'gone', 'the Connected App is still there')
+      } finally { clear(); googleBack(was) }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.56', `${width} px: the Sources page names neither Hermes nor OpenClaw, even with both connected`, async () => {
+      clear()
+      bench(`for system in ("hermes", "openclaw", "claude"):
+    frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": system, "label": {"hermes": "Hermes", "openclaw": "OpenClaw"}.get(system), "active": 1}).insert(ignore_permissions=True)`)
+      try {
+        await openSources()
+        const text = await pg.locator('body').innerText()
+        must(!/hermes|openclaw/i.test(text), 'the page names an agent: ' + (text.match(/.{0,20}(hermes|openclaw).{0,20}/i) || [''])[0])
+        must(!/hermes|openclaw/i.test(await pg.locator('[data-source-card][data-system="hermes"]').innerText()) && (await pg.locator('[data-source-card][data-system="hermes"]').innerText()).includes('Your assistant'), 'the assistant is not Your assistant')
+        await s.open('/life/brain/sources/hermes')
+        await pg.locator('[data-source-page][data-source="hermes"]').waitFor({ timeout: 10000 })
+        must(!/hermes|openclaw/i.test(await pg.locator('body').innerText()), 'the assistant page names the agent')
+      } finally { clear() }
+    })
+    await check('BRAIN.57', `${width} px: Sources lists exactly Capture, Google Calendar, Gmail, Your assistant and Claude, with no Coming tile, no tabs and no Add a source`, async () => {
+      clear()
+      await openSources()
+      must((await pg.locator('[data-capture-line]').innerText()).startsWith('Capture'), 'Capture is not first')
+      const labels = await pg.locator('[data-source-card] [data-source-label]').allInnerTexts()
+      must(JSON.stringify(labels) === JSON.stringify(['Google Calendar', 'Gmail', 'Your assistant', 'Claude']), 'the sources are ' + labels.join(', '))
+      const text = await pg.locator('[data-brain-sources]').innerText()
+      must(!/Coming|Add a source|Add more|Channels|Kinds/.test(text) && (await pg.locator('[data-source-tile], [data-group]').count()) === 0, 'the page still shows a Coming tile, a tab or Add a source')
+      for (const sys of ['google-calendar', 'gmail', 'hermes', 'claude']) must((await pg.locator(`[data-source-card][data-system="${sys}"] [data-source-connect]`).count()) === 1, `${sys} has no Connect button`)
+      await noSideways()
+    })
+    await check('BRAIN.58', `${width} px: Connect Gmail shows the return address with Copy before leaving the site; I've added it goes on to Google; once a sign-in has come back the step is not shown`, async () => {
+      const was = googleOn()
+      clear()
+      const hits = []
+      await pg.route('https://accounts.google.com/**', (r) => { hits.push(r.request().url()); return r.fulfill({ status: 200, contentType: 'text/html', body: 'Google' }) })
+      try {
+        await openSources()
+        await pg.locator('[data-source-card][data-system="gmail"] [data-source-connect]').click()
+        await pg.locator('[data-redirect-step]').waitFor({ timeout: 10000 })
+        must((await pg.locator('[data-gmail-redirect]').innerText()).endsWith('connected_app.callback/life-os-gmail-1'), 'the address is ' + await pg.locator('[data-gmail-redirect]').innerText())
+        must(await pg.locator('[data-redirect-copy]').isVisible() && (await pg.locator('[data-redirect-link]').getAttribute('href')).startsWith('https://console.cloud.google.com/'), 'Copy or the Google Cloud link is missing')
+        must(!hits.length, 'the browser had already left for Google')
+        await pg.getByRole('button', { name: "I've added it" }).click()
+        await pg.waitForURL(/accounts\.google\.com\/o\/oauth2\/v2\/auth/, { timeout: 15000 })
+        must(hits.length >= 1 && /redirect_uri=/.test(hits[0]) && hits[0].includes('life-os-gmail-1'), 'Google was not sent the address: ' + hits[0])
+        clear()
+        const address = (await s.api('connections.gmail_setup')).redirect_uri
+        bench(`frappe.db.set_default("lifeos_redirects_confirmed", ${JSON.stringify(address)})`)
+        await openSources()
+        await pg.locator('[data-source-card][data-system="gmail"] [data-source-connect]').click()
+        await pg.locator('[data-gmail-connect]').waitFor({ timeout: 10000 })
+        await pg.getByRole('button', { name: 'Continue to Google' }).waitFor({ timeout: 10000 })
+        must((await pg.locator('[data-redirect-step]').count()) === 0, 'the step shows for an address that has been confirmed')
+      } finally { await pg.unroute('https://accounts.google.com/**'); clear(); googleBack(was) }
+    })
+    await check('BRAIN.59', `${width} px: Gmail's Try it searches the (fake) inbox for a word and shows the matches; with no inbox it says so`, async () => {
+      clear()
+      bench(`from lifeos import mail
+c = frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "gmail", "mailbox": "owner@example.com", "label": "owner@example.com", "active": 1, "connected_by": "owner@lifeos.test"}).insert(ignore_permissions=True)
+mail.account_for_connection(c)`)
+      try {
+        await s.open('/life/brain/sources/gmail?tab=try')
+        await pg.locator('[data-mail-try]').waitFor({ timeout: 15000 })
+        await pg.locator('[data-mail-query]').fill('advance')
+        await pg.locator('[data-mail-search]').click()
+        await pg.locator('[data-mail-hit]').first().waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-mail-hit]').count()) === 1 && (await pg.locator('[data-mail-subject]').innerText()) === 'Advance tax reminder', 'the matches are ' + await pg.locator('[data-mail-hits]').innerText())
+        await pg.locator('[data-mail-query]').fill('tax')
+        await pg.locator('[data-mail-search]').click()
+        await pg.waitForFunction(() => document.querySelectorAll('[data-mail-hit]').length === 2, null, { timeout: 15000 })
+        await pg.locator('[data-mail-query]').fill('zzzqqq')
+        await pg.locator('[data-mail-search]').click()
+        await pg.locator('[data-mail-none]').waitFor({ timeout: 15000 })
+        clear()
+        await pg.locator('[data-mail-query]').fill('tax')
+        await pg.locator('[data-mail-search]').click()
+        await pg.locator('[data-mail-error]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-mail-error]').innerText()).includes('No inbox is connected. Connect Gmail in Brain › Sources.'), 'the error says: ' + await pg.locator('[data-mail-error]').innerText())
+        must(!(await pg.locator('[data-mail-hit]').count()), 'hits stayed after the error')
+      } finally { clear() }
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
   } finally {
@@ -1030,12 +1149,10 @@ print(json.dumps({"aside": aside}))`).split('\n').pop())
     await check('BRAIN.44', `${width} px: Sources offers Connect Gmail, a connected mailbox says it is a daily digest searched live and "Processed by: the Brain", every card has a Processed by line`, async () => {
       await openSources()
       must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state on an empty space')
-      must((await pg.locator('[data-source-tile][data-system="upload"] [data-processed-by]').innerText()).includes('Processed by: the Brain'), 'the Upload tile has no Processed by line')
-      const tile = pg.locator('[data-source-tile][data-system="gmail"]')
-      must((await tile.innerText()).includes('Connect Gmail'), 'the Gmail tile does not say Connect Gmail: ' + await tile.innerText())
-      await tile.locator('[data-tile-add]').waitFor({ timeout: 15000 }) // the button shows once permissions have loaded
-      // the tile's Rules link (issue 84) sits above the full-tile button, so click its top-left corner, away from the link
-      await tile.locator('[data-tile-add]').click({ position: { x: 6, y: 6 } })
+      const tile = pg.locator('[data-source-card][data-system="gmail"]')
+      must((await tile.locator('[data-source-connect]').innerText()) === 'Connect' && (await tile.innerText()).includes('Gmail'), 'the Gmail row has no Connect button: ' + await tile.innerText())
+      await tile.locator('[data-source-connect]').waitFor({ timeout: 15000 }) // the button is enabled once permissions have loaded
+      await tile.locator('[data-source-connect]').click()
       await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
       const t = await pg.locator('[data-gmail-connect]').innerText()
       must(/copies none of your mail and never deletes any/.test(t) && /send, draft, archive or label/.test(t), 'the dialog does not say what it may do: ' + t)
@@ -1049,7 +1166,7 @@ for system in ("hermes", "claude", "google-calendar"):
       must((await mail.locator('[data-processed-by]').innerText()) === 'Processed by: the Brain', 'the mailbox does not say the Brain processes it')
       const lines = await pg.locator('[data-source-card] [data-processed-by]').allInnerTexts()
       must(lines.length === 4 && lines.every((x) => /^(Processed by|Not processed)/.test(x)), 'every card needs a Processed by line: ' + lines.join(' | '))
-      must(lines.includes('Processed by: Hermes') && lines.filter((x) => x === 'Not processed: kept as is').length === 2, 'the lines are wrong: ' + lines.join(' | '))
+      must(lines.includes('Processed by: Your assistant') && lines.filter((x) => x === 'Not processed: kept as is').length === 2, 'the lines are wrong: ' + lines.join(' | '))
       await mail.locator('[data-source-open]').click()
       await pg.locator('[data-source-settings][data-system="gmail"]').waitFor({ timeout: 5000 })
       must(await pg.locator('[data-gmail-include]').isVisible() && await pg.locator('[data-gmail-skip]').isVisible(), 'the always include and always skip lists are missing')
@@ -1102,14 +1219,8 @@ for (const width of WIDTHS) {
   try {
     await check('BRAIN.46', `${width} px: Sources shows channels and kinds with counts and switches; each row opens its page with the path Brain / Sources / <name>`, async () => {
       await openSources()
-      const channels = Number(await pg.locator('[data-group-count="channels"]').innerText())
-      must(channels >= 5 && (await pg.locator('[data-group-count="kinds"]').innerText()) === '6', `the counts are ${channels} and ${await pg.locator('[data-group-count="kinds"]').innerText()}`)
-      must((await pg.locator('[data-group][aria-selected="true"]').getAttribute('data-group')) === 'channels', 'Channels is not the first group')
-      await pg.locator('[data-group="kinds"]').click()
-      await pg.locator('[data-kinds]').waitFor({ timeout: 5000 })
-      must((await pg.locator('[data-kind-card]').count()) === 6, 'expected six kinds')
-      must(!(await pg.locator('[data-connected]').count()), 'the channels still show with Kinds open')
-      await pg.locator('[data-kind-card][data-kind="kind-document"] [data-kind-open]').click()
+      must((await pg.locator('[data-group], [data-kinds]').count()) === 0, 'the Channels and Kinds tabs are still there')
+      await s.open('/life/brain/sources/kind-document')
       await pg.locator('[data-source-page][data-source="kind-document"]').waitFor({ timeout: 10000 })
       must(/^Brain \/ Sources/.test(await pathOf()) && (await pg.locator('[data-page-title]').innerText()) === 'Documents (PDF)', 'the path says: ' + await pathOf())
       const strip = await pg.locator('[data-source-strip]').innerText()
@@ -1119,7 +1230,7 @@ for (const width of WIDTHS) {
       await pg.locator('[data-page-back]').click()
       await pg.locator('[data-brain-sources][data-loaded="1"]').waitFor({ timeout: 10000 })
       await openSources()
-      await pg.locator('[data-source-tile][data-system="upload"] [data-tile-rules]').click()
+      await pg.locator('[data-capture-rules]').click()
       await pg.locator('[data-source-page][data-source="upload"]').waitFor({ timeout: 10000 })
       must((await pathOf()).startsWith('Brain / Sources') && (await pg.locator('[data-page-title]').innerText()) === 'Upload', 'the Upload path says: ' + await pathOf())
       await noSideways()
@@ -1172,13 +1283,10 @@ conns = frappe.get_all("Life Connection", filters={"space": "${SPACE}"}, pluck="
 for n in conns: frappe.db.set_value("Life Connection", n, "space", "${aside}", update_modified=False)
 print(json.dumps({"names": names, "conns": conns}))`).split('\n').pop())
       try {
-        await openSources('?group=kinds')
-        for (const k of ['kind-document', 'kind-photo', 'kind-video', 'kind-link', 'kind-voice', 'kind-email'])
-          must((await pg.locator(`[data-kind-card][data-kind="${k}"] [data-kind-line]`).innerText()) === 'Nothing yet', `${k} does not say Nothing yet`)
         await openSources()
         must(await pg.locator('[data-sources-empty]').isVisible(), 'no empty state')
         must(await pg.locator('[data-email-in]').isVisible(), 'the email-in address does not say how to set it up')
-        for (const sys of ['gmail', 'google-calendar']) must((await pg.locator(`[data-source-tile][data-system="${sys}"]`).innerText()).length > 10, `${sys} has no hint`)
+        for (const sys of ['gmail', 'google-calendar']) must((await pg.locator(`[data-source-card][data-system="${sys}"]`).innerText()).length > 10, `${sys} has no hint`)
         await s.open('/life/brain/sources/gmail')
         await pg.locator('[data-source-page][data-source="gmail"]').waitFor({ timeout: 10000 })
         const t = await pg.locator('[data-source-connect]').innerText()

@@ -6,6 +6,8 @@ from unittest import mock
 
 import frappe
 
+from frappe.utils import add_to_date, now_datetime
+
 from lifeos import mail, permissions
 from lifeos.agents import acts
 from lifeos.mail import digest, gmail, microsoft
@@ -113,7 +115,7 @@ class TestConnectGmail(GmailCase):
 			app = frappe.get_doc("Connected App", conn.connected_app)
 			self.assertEqual([r.scope for r in app.scopes], list(gmail.SCOPES))
 			self.assertTrue(app.name.startswith(gmail.APP_PREFIX))
-			card = next(c for c in connections.sources(space=PRIVATE)["connected"] if c["name"] == conn.name)
+			card = next(c for c in connections.sources(space=PRIVATE)["sources"] if c["name"] == conn.name)
 			self.assertEqual((card["pending"], card["processed_by"]), (1, "Processed by: the Brain"))
 			self.assertEqual(connections.gmail_setup()["ready"], 1)
 			with self.assertRaises(frappe.PermissionError):
@@ -150,11 +152,123 @@ class TestConnectGmail(GmailCase):
 
 	def test_two_mailboxes_are_two_cards(self):
 		frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "mailbox": "second@example.com", "label": "second@example.com", "active": 1}).insert()
-		cards = [c for c in connections.sources(space=PRIVATE)["connected"] if c["system"] == "gmail"]
+		cards = [c for c in connections.sources(space=PRIVATE)["sources"] if c["system"] == "gmail"]
 		self.assertEqual(len(cards), 2)
 		with self.assertRaises(frappe.DuplicateEntryError):
 			frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "mailbox": "second@example.com"}).insert()
-		self.assertIn("gmail", [t["system"] for t in connections.sources(space=PRIVATE)["available"]])  # another can be connected
+		self.assertEqual([c.get("add_another") for c in cards], [None, 1])  # another can be connected, from the last row
+
+
+class TestConnectingAddresses(GmailCase):
+	"""Issue 101: the return address of each mailbox, what comes back when Google refuses, what an abandoned sign-in leaves, and why a search finds no inbox."""
+
+	def setUp(self):
+		super().setUp()
+		frappe.defaults.clear_default(connections.CONFIRMED_KEY, parent="__default")
+		self.addCleanup(lambda: frappe.defaults.clear_default(connections.CONFIRMED_KEY, parent="__default"))
+
+	def google_settings(self):
+		settings = frappe.get_doc("Google Settings")
+		before = (settings.enable, settings.client_id, settings.get_password("client_secret", raise_exception=False))
+		settings.enable, settings.client_id, settings.client_secret = 1, "client-id-123.apps.example", "client-secret-xyz-789"
+		settings.save(ignore_permissions=True)
+		frappe.clear_cache(doctype="Google Settings")
+
+		def restore():
+			settings.enable, settings.client_id, settings.client_secret = before[0], before[1], before[2] or ""
+			settings.save(ignore_permissions=True)
+			frappe.clear_cache(doctype="Google Settings")
+		self.addCleanup(restore)
+
+	def pending(self, age_minutes=0, name=None):
+		"""A mailbox card still waiting for sign-in, made `age_minutes` ago, with its Connected App."""
+		app = gmail.make_app(name or gmail.free_app_name())
+		conn = frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "label": "Gmail", "active": 0, "connected_app": app.name,
+			"connected_by": OWNER}).insert()
+		frappe.db.set_value("Life Connection", conn.name, "creation", add_to_date(now_datetime(), minutes=-age_minutes), update_modified=False)
+		return conn
+
+	def test_setup_names_the_address_for_the_next_mailbox_and_a_successful_sign_in_confirms_it(self):
+		self.google_settings()
+		self.as_user(OWNER)
+		first = connections.gmail_setup()
+		self.assertEqual((first["ready"], first["confirmed"]), (1, 0))
+		self.assertTrue(first["redirect_uri"].endswith(f"connected_app.callback/{gmail.free_app_name()}"))
+		self.assertTrue(first["console_url"].startswith("https://console.cloud.google.com/"))
+		conn = self.pending()
+		with mock.patch("lifeos.mail.gmail.finish"):
+			connections.gmail_finish(conn.name)
+		frappe.db.set_value("Life Connection", conn.name, "mailbox", "third@example.com")  # finish is faked: the mailbox is read by the real one
+		self.assertTrue(connections.redirect_confirmed(gmail.redirect_uri(conn.connected_app)))
+		again = connections.gmail_setup()  # the next mailbox has the next address, which nobody has confirmed
+		self.assertNotEqual(again["redirect_uri"], gmail.redirect_uri(conn.connected_app))
+		self.assertEqual(again["confirmed"], 0)
+
+	def test_google_sending_the_person_back_with_an_error_leaves_the_error_and_the_address_on_the_card(self):
+		self.google_settings()
+		conn = self.pending()
+		path = f"/api/method/frappe.integrations.doctype.connected_app.connected_app.callback/{conn.connected_app}"
+		self.as_user(OWNER)
+		with mock.patch.object(frappe, "request", frappe._dict(path=path)), mock.patch("frappe.db.commit"):
+			connections.oauth_callback(error="redirect_uri_mismatch", state="x")
+		self.assertEqual(frappe.local.response["location"], "/life/brain/sources")
+		card = next(c for c in connections.sources(space=PRIVATE)["sources"] if c["name"] == conn.name)
+		self.assertEqual((card["state"], card["pending"]), ("Waiting", 1))
+		self.assertIn("does not know this return address", card["error"])
+		self.assertEqual(card["redirect_uri"], gmail.redirect_uri(conn.connected_app))
+		with mock.patch.object(frappe, "request", frappe._dict(path=path)), mock.patch("frappe.db.commit"):
+			connections.oauth_callback(error="access_denied", error_description="The person said no", state="x")
+		self.assertIn("The person said no", frappe.db.get_value("Life Connection", conn.name, "last_error"))
+
+	def test_an_error_for_another_persons_connection_is_ignored(self):
+		self.google_settings()
+		conn = self.pending()
+		path = f"/api/method/frappe.integrations.doctype.connected_app.connected_app.callback/{conn.connected_app}"
+		self.as_user(FAMILY)
+		with mock.patch.object(frappe, "request", frappe._dict(path=path)), mock.patch("frappe.db.commit"):
+			connections.oauth_callback(error="access_denied", state="x")
+		self.assertFalse(frappe.db.get_value("Life Connection", conn.name, "last_error"))
+
+	def test_a_sign_in_left_for_an_hour_is_removed_with_its_connected_app(self):
+		self.google_settings()
+		old, fresh = self.pending(61, "life-os-gmail-91"), self.pending(10, "life-os-gmail-92")
+		bare = frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "active": 1}).insert()  # an agent's defaults, never a sign-in
+		frappe.db.set_value("Life Connection", bare.name, "creation", add_to_date(now_datetime(), days=-3), update_modified=False)
+		connections.clean_abandoned()
+		self.assertTrue(frappe.db.exists("Life Connection", bare.name))
+		self.assertFalse(frappe.db.exists("Life Connection", old.name))
+		self.assertFalse(frappe.db.exists("Connected App", "life-os-gmail-91"))
+		self.assertTrue(frappe.db.exists("Life Connection", fresh.name))
+		self.assertTrue(frappe.db.exists("Connected App", "life-os-gmail-92"))
+		self.assertTrue(frappe.db.exists("Life Connection", self.conn.name))  # a connected mailbox is never cleaned
+
+	def test_a_pending_card_is_waiting_and_its_switch_note_is_there(self):
+		self.google_settings()
+		conn = self.pending()
+		card = next(c for c in connections.sources(space=PRIVATE)["sources"] if c["name"] == conn.name)
+		self.assertEqual((card["state"], card["pending"], card["active"]), ("Waiting", 1, 0))
+		self.assertEqual([c["state"] for c in connections.sources(space=PRIVATE)["sources"] if c["system"] == "gmail"], ["On", "Waiting"])
+		self.assertEqual(len([c for c in connections.sources(space=PRIVATE)["sources"] if c["system"] == "gmail" and c.get("add_another")]), 0)  # not until all are connected
+
+	def test_a_search_says_which_case_it_is_when_there_is_no_inbox(self):
+		self.as_user(OWNER)
+		frappe.db.delete("Life Connection", {"space": PRIVATE})
+		with self.assertRaises(frappe.ValidationError) as e:
+			mail_api.search(fields={"text": "invoice"}, space=PRIVATE)
+		self.assertIn("No inbox is connected. Connect Gmail in Brain › Sources.", str(e.exception))
+		frappe.set_user("Administrator")
+		off = frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "mailbox": MAILBOX, "active": 0, "connected_by": OWNER}).insert()
+		self.as_user(OWNER)
+		with self.assertRaises(frappe.ValidationError) as e:
+			mail_api.search(fields={"text": "invoice"}, space=PRIVATE)
+		self.assertIn("Gmail is connected but switched off. Switch it on in Brain › Sources.", str(e.exception))
+		frappe.set_user("Administrator")
+		frappe.delete_doc("Life Connection", off.name, force=True)
+		frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "gmail", "active": 0, "connected_by": OWNER}).insert()
+		self.as_user(OWNER)
+		with self.assertRaises(frappe.ValidationError) as e:
+			mail_api.search(fields={"text": "invoice"}, space=PRIVATE)
+		self.assertIn("Gmail sign-in wasn't finished. Connect again in Brain › Sources.", str(e.exception))
 
 
 class TestSourceCards(GmailCase):
@@ -163,13 +277,13 @@ class TestSourceCards(GmailCase):
 		for system in ("hermes", "claude", "google-calendar"):
 			frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": system, "active": 1}).insert()
 		got = connections.sources(space=PRIVATE)
-		by = {c["system"]: c["processed_by"] for c in got["connected"]}
+		by = {c["system"]: c["processed_by"] for c in got["sources"]}
 		self.assertEqual(by["gmail"], "Processed by: the Brain")
-		self.assertEqual(by["hermes"], "Processed by: Hermes")
+		self.assertEqual(by["hermes"], "Processed by: Your assistant")
 		self.assertEqual(by["claude"], "Not processed: kept as is")
 		self.assertEqual(by["google-calendar"], "Not processed: kept as is")
-		self.assertEqual(got["available"][0]["processed_by"], "Processed by: the Brain")  # Upload
-		for c in got["connected"]:
+		self.assertEqual(got["capture"]["processed_by"], "Processed by: the Brain")
+		for c in got["sources"]:
 			self.assertTrue(c["lands"])
 
 
@@ -651,7 +765,8 @@ class TestConnectMicrosoft(MicrosoftCase):
 		conn = frappe.get_doc("Life Connection", out["connection"])
 		self.assertEqual((conn.system, conn.active, conn.connected_by), ("microsoft", 0, OWNER))
 		self.assertEqual([r.scope for r in frappe.get_doc("Connected App", conn.connected_app).scopes], list(microsoft.SCOPES))
-		card = next(c for c in connections.sources(space=PRIVATE)["connected"] if c["name"] == conn.name)
+		with mock.patch.dict(frappe.conf, {"lifeos_more_sources": 1}):
+			card = next(c for c in connections.sources(space=PRIVATE)["sources"] if c["name"] == conn.name)
 		self.assertEqual((card["pending"], card["system"]), (1, "microsoft"))
 		with self.assertRaises(frappe.PermissionError):
 			self.as_user(AGENT)
@@ -679,11 +794,14 @@ class TestConnectMicrosoft(MicrosoftCase):
 
 	def test_sources_offers_both_providers_and_a_microsoft_card_says_who_processes_it(self):
 		self.as_user(OWNER)
-		out = connections.sources(space=PRIVATE)
-		self.assertEqual({"gmail", "microsoft"} - {t["system"] for t in out["available"]}, set())
-		self.assertEqual({t["system"]: t["hint"] for t in out["available"]}["microsoft"], "Connect Microsoft")
+		self.assertNotIn("microsoft", [c["system"] for c in connections.sources(space=PRIVATE)["sources"]])  # hidden unless the site shows more sources
+		with mock.patch.dict(frappe.conf, {"lifeos_more_sources": 1}):
+			out = connections.sources(space=PRIVATE)
+		self.assertEqual({"gmail", "microsoft"} - {t["system"] for t in out["sources"]}, set())
+		self.assertEqual(next(c for c in out["sources"] if c["system"] == "microsoft")["connected"], 0)
 		frappe.set_user("Administrator")
 		frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": "microsoft", "mailbox": MS_ADDRESS, "label": "Work", "active": 1}).insert()
 		self.as_user(OWNER)
-		card = next(c for c in connections.sources(space=PRIVATE)["connected"] if c["system"] == "microsoft")
+		with mock.patch.dict(frappe.conf, {"lifeos_more_sources": 1}):
+			card = next(c for c in connections.sources(space=PRIVATE)["sources"] if c["system"] == "microsoft" and c.get("name"))
 		self.assertEqual((card["label"], card["active"], card["mailbox"], card["processed_by"]), ("Work", 1, MS_ADDRESS, "Processed by: the Brain"))

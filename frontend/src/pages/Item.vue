@@ -128,8 +128,8 @@ const item = ref(null)
 const missing = ref(false)
 const showTranscript = ref(false)
 
-// the source: the system it came through (Gmail, Hermes…), else the kind of capture
-const SYSTEMS = { gmail: ['Gmail', 'lucide-mail'], hermes: ['Hermes', 'lucide-bot'], openclaw: ['OpenClaw', 'lucide-bot'], claude: ['Claude', 'lucide-sparkles'],
+// the source: the system it came through (Gmail, your assistant…), else the kind of capture
+const SYSTEMS = { gmail: ['Gmail', 'lucide-mail'], hermes: ['Your assistant', 'lucide-bot'], openclaw: ['Another agent', 'lucide-bot'], claude: ['Claude', 'lucide-sparkles'],
   chatgpt: ['ChatGPT', 'lucide-sparkles'], telegram: ['Telegram', 'lucide-send'], whatsapp: ['WhatsApp', 'lucide-message-circle'],
   calendar: ['Calendar', 'lucide-calendar'], upload: ['Upload', 'lucide-upload'] }
 const TYPES = { Upload: 'lucide-upload', 'Journal Photo': 'lucide-camera', 'Voice Note': 'lucide-mic', Email: 'lucide-mail', 'Email Digest': 'lucide-mail',

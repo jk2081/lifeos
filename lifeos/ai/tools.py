@@ -83,6 +83,7 @@ class Context:
 		self._scope_names = None
 		self.mails = []  # threads a search found: {thread_id, account, subject, from, date, link}
 		self.mails_read = []  # of those, the ones read in full
+		self.no_tools = False  # the service takes no tools (issue 102): Ask answers from one search of the question
 		self.turn_cost = 0.0  # the AI cost of the model turn that is calling a tool; a search is logged with it
 		self._has_mail = None
 
@@ -430,7 +431,20 @@ def t_suggest(ctx, actions):
 
 
 def tools_for(ctx):
-	return [*TOOLS, *MAIL_TOOLS] if ctx.has_mail() else TOOLS
+	return None if ctx.no_tools else [*TOOLS, *MAIL_TOOLS] if ctx.has_mail() else TOOLS
+
+
+def ask_call(ctx, system, question, messages, on_text, space):
+	"""One model turn of Ask. A service that refuses tools gets one search of the question as data instead, and the turn is repeated."""
+	from lifeos.ai import client
+
+	try:
+		return client.call("Ask", system, messages, tools=tools_for(ctx), on_text=on_text, space=space)
+	except client.ToolsRefused:
+		ctx.no_tools = True
+		found = run_tool(ctx, "search", {"query": question})
+		messages[-1] = {"role": "user", "content": f"{messages[-1]['content']}\n\nSearch results (the only records you can use):\n{json.dumps(found, default=str)[:24000]}"}
+		return client.call("Ask", system, messages, on_text=on_text, space=space)
 
 
 def t_mail_search(ctx, text=None, has_attachment=None, account=None, **fields):

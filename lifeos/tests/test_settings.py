@@ -594,12 +594,15 @@ class TestLadder(LifeTestCase):
 	def setUp(self):
 		super().setUp()
 		self.as_user("Administrator")
-		for dt in ("Life Task", "Life Inbox Item", "Life Goal", "Life Review"):
+		for dt in ("Life Task", "Life Inbox Item", "Life Goal", "Life Review", "Life Connection"):
 			frappe.db.delete(dt, {"space": HER} if dt != "Life Review" else {"user": ANYA})
 		frappe.db.delete("Life Space Member", {"parent": HER, "user": ("!=", ANYA)})
 		frappe.db.set_value("Life Area", {"space": HER}, "is_on", 0)
 		frappe.defaults.clear_default(ladder.DISMISSED_KEY, parent=ANYA)
 		ladder.forget(ANYA)
+		key = patch("lifeos.ai.client.is_set_up", return_value=True)  # a site with a key; the tests of the key itself say otherwise
+		key.start()
+		self.addCleanup(key.stop)
 
 	def level(self):
 		ladder.forget(ANYA)
@@ -620,43 +623,66 @@ class TestLadder(LifeTestCase):
 	def test_1_each_step_moves_the_level_up_by_one(self):
 		self.assertEqual(self.level()["level"], 1)
 		self.mk("Life Task", title="i26 task")
-		self.assertEqual(self.level()["level"], 1)
+		self.assertEqual(self.level()["level"], 2)  # the key is set, so the task app and the key are done
 		self.mk("Life Inbox Item", title="i26 mail", source_type="Email", source_system="gmail")
-		self.assertEqual(self.level()["level"], 2)
-		self.areas_on(3)
-		self.assertEqual(self.level()["level"], 2)  # three areas but no goal yet
-		self.mk("Life Goal", title="i26 goal", horizon="Year", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
 		self.assertEqual(self.level()["level"], 3)
-		self.mk("Life Review", user=ANYA, kind="Weekly", status="Locked", title="i26 review", period_start="2026-11-09", period_end="2026-11-15")
+		self.areas_on(3)
+		self.assertEqual(self.level()["level"], 3)  # three areas but no goal yet
+		self.mk("Life Goal", title="i26 goal", horizon="Year", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
 		self.assertEqual(self.level()["level"], 4)
-		self.mk("Life Inbox Item", title="i26 job", job_id="i26-job", status="Done", claimed_by=ANYA)
+		self.mk("Life Review", user=ANYA, kind="Weekly", status="Locked", title="i26 review", period_start="2026-11-09", period_end="2026-11-15")
 		self.assertEqual(self.level()["level"], 5)
+		self.mk("Life Inbox Item", title="i26 job", job_id="i26-job", status="Done", claimed_by=ANYA)
+		self.assertEqual(self.level()["level"], 6)
 		self.assertFalse(self.level()["complete"])
 		sp = frappe.get_doc("Life Space", HER)
 		sp.append("members", {"user": "family@lifeos.test", "access": "Write"})
 		sp.save(ignore_permissions=True)
 		out = self.level()
-		self.assertEqual(out["level"], 6)
+		self.assertEqual((out["level"], out["of"]), (7, 7))
 		self.assertTrue(out["complete"] and out["next"] is None)
 
 	def test_2_levels_do_not_skip(self):
 		self.mk("Life Task", title="i26 task")
 		self.mk("Life Review", user=ANYA, kind="Weekly", status="Locked", title="i26 review", period_start="2026-11-09", period_end="2026-11-15")
 		out = self.level()
-		self.assertEqual(out["level"], 1)
+		self.assertEqual(out["level"], 2)
 		self.assertEqual(out["next"]["title"], "Connect a source")
 		self.assertTrue(out["next"]["text"].startswith("Next: Connect a source"))
 
 	def test_3_the_next_step_for_a_weekly_review_and_an_upload_is_not_a_source(self):
 		self.mk("Life Task", title="i26 task")
 		self.mk("Life Inbox Item", title="i26 file", source_type="Upload")
-		self.assertEqual(self.level()["level"], 1)
+		self.assertEqual(self.level()["next"]["title"], "Connect a source")
 		self.mk("Life Inbox Item", title="i26 mail", source_type="Email", source_system="gmail")
 		self.areas_on(3)
 		self.mk("Life Goal", title="i26 goal", horizon="Year", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
 		nxt = self.level()["next"]
 		self.assertEqual(nxt["to"], "/review")
 		self.assertIn("a weekly review · 30 minutes on Sunday. Review joins the menu after your first one.", nxt["text"])
+
+	def test_a_connected_calendar_counts_as_a_source_however_it_was_connected(self):
+		"""Issue 101: the level reads what is set up, not what came in after the guide."""
+		self.mk("Life Task", title="i101 task")
+		self.assertEqual(self.level()["next"]["title"], "Connect a source")
+		self.mk("Life Connection", system="google-calendar", active=1)
+		out = self.level()
+		self.assertEqual((out["level"], out["next"]["title"]), (3, "Describe your life"))
+		frappe.db.delete("Life Connection", {"space": HER})
+		self.mk("Life Connection", system="gmail", active=0, connected_app=None)  # half connected: signed in but no mailbox
+		self.assertEqual(self.level()["next"]["title"], "Connect a source")
+		with patch("lifeos.review.gcal.is_connected", return_value=True):  # Settings > Calendar, with no card in Sources yet
+			self.assertEqual(self.level()["next"]["title"], "Describe your life")
+
+	def test_without_an_ai_key_the_next_step_is_to_add_it_and_only_an_admin_is_asked(self):
+		self.mk("Life Task", title="i101 task")
+		with patch("lifeos.ai.client.is_set_up", return_value=False):
+			self.assertEqual(self.level()["next"]["title"], "Connect a source")  # the key is the site's: a person who cannot add it is not held at it
+			with patch("lifeos.review.ladder.permissions.is_admin", return_value=True):
+				out = self.level()
+		self.assertEqual((out["level"], out["next"]["title"]), (1, "Add your AI key"))
+		self.assertTrue(out["next"]["text"].startswith("Next: Add your AI key"))
+		self.assertEqual(out["next"]["to"], "/settings?tab=advanced")
 
 	def test_4_dismiss_hides_the_card_for_that_person_only_and_undo_brings_it_back(self):
 		self.assertFalse(self.level()["dismissed"])
@@ -690,3 +716,341 @@ class TestOneSpace(LifeTestCase):
 	def test_boot_lists_the_spaces(self):
 		self.as_user(OWNER)
 		self.assertIn(PRIVATE, [s["name"] for s in session.boot()["spaces"]])
+
+
+class FakeStream:
+	"""What `anthropic.Anthropic().messages.stream(...)` returns: a context manager over no events, with a final message."""
+
+	def __init__(self, text="ok"):
+		self.text = text
+
+	def __enter__(self):
+		return self
+
+	def __exit__(self, *a):
+		return False
+
+	def __iter__(self):
+		return iter(())
+
+	def get_final_message(self):
+		from types import SimpleNamespace
+
+		block = SimpleNamespace(to_dict=lambda: {"type": "text", "text": self.text})
+		return SimpleNamespace(content=[block], stop_reason="end_turn", model="deepseek-chat",
+			usage=SimpleNamespace(input_tokens=10, output_tokens=5, cache_read_input_tokens=0, cache_creation_input_tokens=0))
+
+
+def client_module():
+	from lifeos.ai import client
+
+	return client
+
+
+def fake_backend(response=None):
+	from lifeos.ai import fake
+
+	return fake.ScriptedFake([response or {"content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn"}])
+
+
+class TestAIProvider(LifeTestCase):
+	"""Issue 102: Anthropic or another Anthropic-compatible service, the real reason for a failure, prices of unknown models."""
+
+	SECRET = "sk-secret-key-0123456789"
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		s = frappe.get_single("Life Settings")
+		self.before = {f: s.get(f) for f in ("ai_provider", "ask_model", "short_model")}
+		self.addCleanup(self.restore)
+		frappe.flags.lifeos_ai_backend = None
+		frappe.db.delete("Life AI Usage")
+		frappe.db.delete("Life Action Log", {"kind": "AI unavailable"})
+		frappe.defaults.clear_default(client_module().OFF_KEY, parent="__default")
+		frappe.db.set_single_value("Life Settings", "monthly_cap_usd", 30)
+		self.ai(anthropic_api_key=self.SECRET)  # also drops a price left by an earlier run
+
+	def restore(self):
+		frappe.flags.lifeos_ai_backend = None
+		self.ai(ai_provider=self.before["ai_provider"] or "Anthropic", ai_base_url=None, ai_other_key=None, ask_model=self.before["ask_model"],
+			short_model=self.before["short_model"], anthropic_api_key=None)
+		frappe.defaults.clear_default(client_module().OFF_KEY, parent="__default")
+
+	def ai(self, **values):
+		s = frappe.get_single("Life Settings")
+		s.update(values)
+		s.set("ai_prices", [r for r in s.ai_prices if r.model != "deepseek-chat"])  # the price this class adds never outlives it
+		s.save()
+
+	def other(self):
+		self.ai(ai_provider="Another service (Anthropic-compatible)", ai_base_url="https://api.deepseek.com/anthropic", ai_other_key=self.SECRET,
+			ask_model="deepseek-chat", short_model="deepseek-chat")
+
+	def sent(self, schema=None, text="ok"):
+		"""Run one call through the real backend with the SDK mocked; returns (the Anthropic constructor mock, the stream call's kwargs)."""
+		with patch("anthropic.Anthropic") as ctor, patch.object(frappe, "get_site_config", return_value={}):
+			ctor.return_value.messages.stream.return_value = FakeStream(text)
+			client_module().call("Ask", "system text", [{"role": "user", "content": "hi"}], schema=schema)
+		return ctor, ctor.return_value.messages.stream.call_args.kwargs
+
+	def test_1_another_service_gets_its_address_and_key_and_none_of_the_anthropic_extras(self):
+		self.other()
+		ctor, req = self.sent()
+		self.assertEqual(ctor.call_args.kwargs["base_url"], "https://api.deepseek.com/anthropic")
+		self.assertEqual(ctor.call_args.kwargs["api_key"], self.SECRET)
+		self.assertNotIn("output_config", req)
+		self.assertNotIn("extra_headers", req)
+		self.assertNotIn("extra_body", req)
+		self.assertEqual(req["model"], "deepseek-chat")
+
+	def test_2_anthropic_is_sent_exactly_as_before(self):
+		self.ai(ask_model="claude-sonnet-5-5")
+		ctor, req = self.sent()
+		self.assertNotIn("base_url", ctor.call_args.kwargs)
+		self.assertEqual(req["output_config"], {"effort": "medium"})
+		self.assertEqual(req["extra_headers"], {"anthropic-beta": "server-side-fallback-2026-07-01"})
+		self.assertEqual(req["extra_body"], {"fallbacks": "default"})
+
+	def test_3_a_schema_goes_into_the_system_text_and_invalid_json_is_retried_once(self):
+		client = client_module()
+		self.other()
+		schema = {"type": "object", "properties": {"a": {"type": "string"}}}
+		answers = iter([FakeStream("not json"), FakeStream('{"a": "x"}')])
+		with patch("anthropic.Anthropic") as ctor, patch.object(frappe, "get_site_config", return_value={}):
+			ctor.return_value.messages.stream.side_effect = lambda **kw: next(answers)
+			out = client.call("Ask", "system text", [{"role": "user", "content": "hi"}], schema=schema)
+			calls = ctor.return_value.messages.stream.call_args_list
+		self.assertEqual(len(calls), 2)
+		self.assertIn("Answer with JSON only, matching this schema:", calls[0].kwargs["system"])
+		self.assertNotIn("output_config", calls[0].kwargs)
+		self.assertEqual(client.json_of(out["content"]), {"a": "x"})
+		# a second invalid answer is not retried again
+		answers = iter([FakeStream("no"), FakeStream("still no"), FakeStream('{"a": "late"}')])
+		with patch("anthropic.Anthropic") as ctor, patch.object(frappe, "get_site_config", return_value={}):
+			ctor.return_value.messages.stream.side_effect = lambda **kw: next(answers)
+			out = client.call("Ask", "system text", [{"role": "user", "content": "hi"}], schema=schema)
+			self.assertEqual(ctor.return_value.messages.stream.call_count, 2)
+		self.assertIsNone(client.json_of(out["content"]))
+
+	def test_4_a_credit_failure_says_so_keeps_the_key_out_and_logs_once_an_hour(self):
+		import anthropic
+		import httpx
+
+		client = client_module()
+
+		def fail(**kw):
+			resp = httpx.Response(400, request=httpx.Request("POST", "https://api.anthropic.com/v1/messages"))
+			raise anthropic.BadRequestError(f"Error 400 {self.SECRET}", response=resp,
+				body={"error": {"type": "invalid_request_error", "message": f"Your credit balance is too low to access the Anthropic API. {self.SECRET}"}})
+
+		self.ai(ask_model="claude-sonnet-5-5")
+		for _n in range(2):
+			with patch("anthropic.Anthropic") as ctor, patch.object(frappe, "get_site_config", return_value={}):
+				ctor.return_value.messages.stream.side_effect = fail
+				with self.assertRaises(client.AIError) as cm:
+					client.call("Ask", "s", [{"role": "user", "content": "hi"}])
+			self.assertIn("credit", str(cm.exception))
+			self.assertNotIn(self.SECRET, str(cm.exception))
+			self.assertNotIn("(400)", str(cm.exception))
+		rows = frappe.get_all("Life Action Log", filters={"kind": "AI unavailable"}, fields=["reason"])
+		self.assertEqual(len(rows), 1)
+		self.assertNotIn(self.SECRET, rows[0].reason)
+		self.assertIn("credit", client.brain_off())
+		# a call that works clears it
+		frappe.flags.lifeos_ai_backend = fake_backend()
+		client.call("Ask", "s", [{"role": "user", "content": "hi"}])
+		self.assertIsNone(client.brain_off())
+
+	def test_5_a_model_with_no_price_is_counted_at_the_highest_known_price(self):
+		client = client_module()
+		table = client.price_table()
+		top = (max(p[0] for p in table.values()), max(p[1] for p in table.values()))
+		self.assertEqual(client.cost_of("no-such-model", 1_000_000, 1_000_000), round(top[0] + top[1], 6))
+		self.other()
+		self.assertEqual(client.unpriced(), ["deepseek-chat"])
+		self.assertEqual(settings.ai_settings()["unpriced"], ["deepseek-chat"])
+		settings.set_ai_price("deepseek-chat", 0.3, 1.1)
+		self.assertEqual(client.unpriced(), [])
+		self.assertAlmostEqual(client.cost_of("deepseek-chat", 1_000_000, 0), 0.3)
+
+	def test_6_a_provider_that_refuses_tools_is_a_tools_error(self):
+		client = client_module()
+		self.assertIsInstance(client.error_from(400, "tools are not supported by this model"), client.ToolsRefused)
+
+	def test_7_test_connection_says_working_or_the_reason(self):
+		client = client_module()
+		frappe.flags.lifeos_ai_backend = fake_backend()
+		out = settings.test_ai_connection()
+		self.assertTrue(out["ok"])
+		self.assertIn("Working", out["text"])
+
+		def refuse(params):
+			raise client.error_from(401, "Authentication Fails, your api key is invalid")
+
+		frappe.flags.lifeos_ai_backend = fake_backend(refuse)
+		out = settings.test_ai_connection()
+		self.assertFalse(out["ok"])
+		self.assertIn("refused the API key", out["text"])
+
+
+class TestUpdates(LifeTestCase):
+	"""Settings > Advanced > Updates (issue 103): who may ask, the check against a temporary repository, the runner's steps and its
+	rollback, a target that is not on the remote, and one runner at a time."""
+
+	def setUp(self):
+		super().setUp()
+		import shutil
+		import tempfile
+
+		self.tmp = tempfile.mkdtemp(prefix="lifeos-upd-")
+		self.addCleanup(shutil.rmtree, self.tmp, True)
+		self.addCleanup(self.clean)
+
+	def clean(self):
+		frappe.set_user("Administrator")
+		for name in frappe.get_all("Life Update", pluck="name"):  # system: the test's own requests
+			frappe.db.delete("Notification Log", {"document_type": "Life Update", "document_name": name})
+			frappe.delete_doc("Life Update", name, force=True, ignore_permissions=True)  # system: the test's own requests
+		frappe.db.set_single_value("Life Settings", "updater_heartbeat", None)
+		frappe.db.set_single_value("Life Settings", "update_state", None)
+		frappe.db.commit()  # nosemgrep: frappe-manual-commit -- the runner under test commits, so the test cleans up with a commit
+
+	def git(self, repo, *args):
+		import subprocess
+
+		return subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t.t", *args], cwd=repo, check=True, capture_output=True, text=True).stdout.strip()
+
+	def repos(self):
+		"""A remote with one commit, and a clone of it; then a second commit on the remote. Returns (remote, clone, second sha)."""
+		import os
+
+		remote, clone = os.path.join(self.tmp, "remote"), os.path.join(self.tmp, "clone")
+		os.makedirs(remote)
+		self.git(remote, "init", "-q", "-b", "main")
+		with open(os.path.join(remote, "a.txt"), "w") as f:
+			f.write("one")
+		self.git(remote, "add", ".")
+		self.git(remote, "commit", "-q", "-m", "First")
+		self.git(self.tmp, "clone", "-q", remote, clone)
+		os.makedirs(os.path.join(remote, "lifeos", "patches"))
+		with open(os.path.join(remote, "lifeos", "patches", "p.py"), "w") as f:
+			f.write("x = 1")
+		self.git(remote, "add", ".")
+		self.git(remote, "commit", "-q", "-m", "Merge pull request #5 from jk2081/batch-9", "-m", "Goals get a result bar")
+		return remote, clone, self.git(remote, "rev-parse", "HEAD")
+
+	def request(self, commit="b" * 40):
+		return frappe.get_doc({"doctype": "Life Update", "to_commit": commit, "summary": "One\nTwo"}).insert()
+
+	def steps(self, fail=None, refuse=False):
+		calls = []
+
+		class Fake:
+			def __getattr__(me, name):
+				def step(*args):
+					calls.append(name if not args else (name, *args))
+					if (refuse and name == "verify") or name == fail:
+						raise RuntimeError("it broke | token=abc123")
+					return {"backup": "BK", "record": "a" * 40}.get(name)
+				return step
+
+		return Fake(), calls
+
+	def test_1_only_the_owner_can_ask_for_an_update(self):
+		from lifeos.api import updates
+
+		self.as_user(FAMILY)
+		with self.assertRaises(frappe.PermissionError):
+			self.request()
+		with self.assertRaises(frappe.PermissionError):
+			updates.get()
+		self.as_user(OWNER)
+		doc = self.request("C" * 40)
+		self.assertEqual((doc.status, doc.to_commit, doc.requested_by), ("Queued", "c" * 40, OWNER))
+		with self.assertRaises(frappe.ValidationError):
+			self.request("not a commit; rm -rf /")
+
+	def test_2_the_check_finds_the_newer_commit_and_its_title(self):
+		from lifeos.updater import status
+
+		remote, clone, second = self.repos()
+		out = status.check(repo=clone, remote_name="origin", branch_name="main")
+		self.assertIsNone(out["error"])
+		self.assertEqual(out["available"]["commit"], second)
+		self.assertEqual([c["title"] for c in out["available"]["changes"]], ["Goals get a result bar"])
+		self.assertTrue(out["available"]["migrations"])
+		self.assertEqual(out["installed"]["title"], "First")
+		self.assertEqual(status.state()["available"]["commit"], second)
+		self.git(clone, "pull", "-q", "origin", "main")  # up to date: nothing is offered
+		self.assertIsNone(status.check(repo=clone, remote_name="origin", branch_name="main")["available"])
+
+	def test_3_the_runner_goes_through_the_steps_then_rolls_back_a_failed_migrate(self):
+		from lifeos.updater import runner
+
+		fake, calls = self.steps()
+		doc = self.request()
+		self.assertEqual(runner.execute(doc, fake), "Done")
+		self.assertEqual([c if isinstance(c, str) else c[0] for c in calls],
+			["verify", "backup", "record", "maintenance_on", "checkout", "requirements", "migrate", "build", "restart", "health", "maintenance_off"])
+		self.assertEqual(frappe.db.get_value("Life Update", doc.name, "status"), "Done")
+		self.assertTrue(frappe.db.exists("Notification Log", {"for_user": OWNER, "document_name": doc.name}))
+
+		fake, calls = self.steps(fail="migrate")
+		doc = self.request()
+		self.assertEqual(runner.execute(doc, fake), "Rolled back")
+		tail = [c if isinstance(c, str) else c[0] for c in calls][6:]
+		self.assertEqual(tail, ["migrate", "rollback_checkout", "restore", "build", "restart", "maintenance_off"])
+		self.assertIn(("rollback_checkout", "a" * 40), calls)
+		log = frappe.db.get_value("Life Update", doc.name, "log")
+		self.assertIn("migrate: failed", log)
+		self.assertNotIn("abc123", log)  # a line that looks like a secret never reaches the log
+
+		fake, calls = self.steps(fail="requirements")  # before migrate started: the checkout is undone, the database is not restored
+		doc = self.request()
+		self.assertEqual(runner.execute(doc, fake), "Rolled back")
+		self.assertNotIn("restore", [c if isinstance(c, str) else c[0] for c in calls])
+
+	def test_4_a_commit_that_is_not_on_the_remote_is_refused_before_any_step(self):
+		from lifeos.updater import runner
+
+		fake, calls = self.steps(refuse=True)
+		doc = self.request()
+		self.assertEqual(runner.execute(doc, fake), "Failed")
+		self.assertEqual(calls, [("verify", doc.to_commit)])
+		# the real check: a commit of the remote's history passes, one that is not there is refused
+		remote, clone, second = self.repos()
+		real = runner.BenchSteps.__new__(runner.BenchSteps)
+		real.repo, real.remote, real.branch = clone, "origin", "main"
+		real.verify(second)
+		with self.assertRaises(RuntimeError):
+			real.verify("d" * 40)
+
+	def test_5_a_second_runner_leaves_when_the_lock_is_held(self):
+		from lifeos.updater import runner, status
+
+		self.assertFalse(status.runner_alive())
+		doc = self.request()
+		fake, calls = self.steps()
+		with runner.lock() as mine:
+			self.assertTrue(mine)
+			self.assertEqual(runner.run_once(fake), "locked")
+		self.assertEqual(calls, [])
+		self.assertEqual(frappe.db.get_value("Life Update", doc.name, "status"), "Queued")
+		self.assertTrue(status.runner_alive())  # the heartbeat is written either way
+		self.assertEqual(runner.run_once(fake), "Done")
+
+	def test_6_update_now_needs_a_runner_and_something_newer(self):
+		from lifeos.api import updates
+		from lifeos.updater import status
+
+		with self.assertRaises(frappe.ValidationError):
+			updates.request_update()
+		status.save_state({"installed": {"commit": "a" * 40}, "available": {"commit": "e" * 40, "changes": [{"title": "Thing"}]}})
+		with self.assertRaises(frappe.ValidationError):  # no heartbeat
+			updates.request_update()
+		status.heartbeat()
+		out = updates.request_update()
+		self.assertEqual((out["history"][0]["status"], out["history"][0]["to_commit"], out["busy"]), ("Queued", "e" * 40, True))
+		with self.assertRaises(frappe.ValidationError):  # one at a time
+			updates.request_update()
