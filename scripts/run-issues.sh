@@ -185,6 +185,8 @@ Nobody is watching this run. Do not ask questions and do not wait for input.
 
 Pull request #$pr in $REPO, on the branch $branch, holds the work for issues $(hashes "$issues"). Its GitHub Actions run failed.
 Read .issue/ci-failure.log, find the cause, fix it on this branch with commits starting "CI fix:", and check the fix locally by rerunning only what failed: the failed acceptance checks with node tools/acceptance.mjs --only=$(failed_checks) and only the unit modules that failed. Do not run the full unit suite or the whole acceptance walk: GitHub runs them again on the pull request as soon as you finish. Follow docs/ISSUE_RULES.md. Start the local stack as STATUS.md describes first.
+The file starts with the failed jobs and checks, then each failed job's errors. If the run tested an older commit than the branch's head, check whether a later commit already fixed it.
+When a failed check contradicts another check or a newer issue, the newer issue wins: change the older check (say which and why in the commit), never undo the newer issue's work.
 When the fix is in, write the single word done to .issue/result. If you cannot fix it, write blocked to .issue/result and the reason to .issue/blocked.md. Then stop.
 Do not stop, restart, remove or change any Docker container, image, volume or network whose name does not start with lifeos-.
 EOF
