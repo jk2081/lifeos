@@ -6,7 +6,6 @@
   </PageHead>
   <div class="page-body" data-year-view :data-shift="shift">
     <template v-if="d">
-      <ViewLinks :links="LINKS" />
       <!-- the cycles around today: columns across, a row for the score, one for each area that is on, key dates by week, weekly reviews -->
       <div ref="wrap" class="relative max-md:hidden" data-year-timeline>
         <div class="overflow-hidden rounded-5 border border-outline-gray-2">
@@ -132,7 +131,6 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import PageHead from '@/components/PageHead.vue'
-import ViewLinks from './ViewLinks.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import { todayData } from '@/data/today'
@@ -141,7 +139,6 @@ import { store } from '@/lib/store'
 import { onRecordChanged, openRef } from '@/lib/pane'
 import { MONTHS, addDays, long, parse, short } from '@/lib/dates'
 
-const LINKS = [{ label: '12 Week Year', to: '/goals/cycles' }]
 const route = useRoute()
 const router = useRouter()
 const shift = computed(() => Number(route.query.shift) || 0)
