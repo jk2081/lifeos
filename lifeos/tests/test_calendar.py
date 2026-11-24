@@ -7,6 +7,7 @@ import frappe
 from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 
 from lifeos.api import calendar, calendar as calendar_api, gcal as gcal_api, goals, goals as goal_api, review
+from lifeos.calendar import notes
 from lifeos.review import findings, followups, gcal, gcal_write, meetings
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import CalCase, gevent, item, ME, set_key, task
@@ -412,3 +413,90 @@ class TestNeverWritesToGoogle(CalCase):
 		n = gcal.sync_user(OWNER, source=gcal.FakeSource(), space=PRIVATE)
 		self.assertGreaterEqual(n, 7)
 		self.assertEqual(frappe.db.count("Event", {"life_space": PRIVATE, "life_matters": 1}), 4)  # Board, ITR-U, Dalmia, Foxin
+
+
+class TestEventNotes(CalCase):
+	"""Issue 99: notes on an event are Frappe Comments, kept through every re-sync, never written to Google."""
+
+	def google_event(self, key="n1", title="Wedding n99"):
+		ev = gevent(key, f"{today()} 10:00:00", 60, title, [])
+		return self.read(ev)[title]["name"]
+
+	def test_a_note_is_a_comment_and_survives_a_resync(self):
+		name = self.google_event()
+		note = calendar_api.add_note(name, "Bring the gift")
+		row = frappe.get_doc("Comment", note["name"])
+		self.assertEqual((row.comment_type, row.reference_doctype, row.reference_name, row.content), ("Comment", "Event", name, "Bring the gift"))
+		self.read(gevent("n1", f"{today()} 11:00:00", 60, "Wedding n99 moved", []))  # Google changed the event
+		self.assertEqual([n["text"] for n in notes.listing(name)], ["Bring the gift"])
+		self.assertEqual(calendar_api.entry("event", name)["notes"][0]["by"], "You")
+
+	def test_each_repeat_has_its_own_notes(self):
+		first = calendar_api.add_event(space=PRIVATE, subject="Weekly n99", starts_on=f"{today()} 09:00:00")["name"]
+		frappe.db.set_value("Event", first, {"repeat_this_event": 1, "repeat_on": "Weekly", "monday": 1, "tuesday": 1, "wednesday": 1,
+			"thursday": 1, "friday": 1, "saturday": 1, "sunday": 1})
+		later = str(add_days(today(), 1))
+		calendar_api.add_note(first, "today only", occurrence=str(today()))
+		calendar_api.add_note(first, "tomorrow only", occurrence=later)
+		self.assertEqual([n["text"] for n in notes.listing(first, str(today()))], ["today only"])
+		self.assertEqual([n["text"] for n in notes.listing(first, later)], ["tomorrow only"])
+		self.assertEqual(calendar_api.entry("event", f"{first}@{later}")["occurrence"], later)
+
+	def test_an_agent_adds_notes_but_cannot_change_the_owners(self):
+		name = self.google_event()
+		mine = calendar_api.add_note(name, "owner's note")["name"]
+		self.as_user(AGENT)
+		theirs = calendar_api.add_note(name, "agent's note")
+		self.assertTrue(theirs["agent"])
+		with self.assertRaises(frappe.PermissionError):
+			calendar_api.update_note(mine, "changed")
+		with self.assertRaises(frappe.PermissionError):
+			calendar_api.delete_note(mine)
+		with self.assertRaises(frappe.PermissionError):
+			calendar_api.delete_note(theirs["name"])
+		self.assertEqual(frappe.db.get_value("Comment", mine, "content"), "owner's note")
+		self.as_user(OWNER)
+		self.assertEqual([n["agent"] for n in notes.listing(name)], [False, True])
+		calendar_api.update_note(mine, "edited")
+		calendar_api.delete_note(theirs["name"])
+		self.assertEqual([n["text"] for n in notes.listing(name)], ["edited"])
+
+	def test_make_a_task_from_a_note(self):
+		name = self.google_event()
+		note = calendar_api.add_note(name, "Book the flights")["name"]
+		out = calendar_api.note_to_task(note)
+		task = frappe.get_doc("Life Task", out["task"])
+		self.assertEqual((task.title, task.event, task.space), ("Book the flights", name, PRIVATE))
+		self.assertEqual(calendar_api.note_to_task(note), {"task": task.name, "made": False})  # once for each note
+		self.assertEqual(notes.listing(name)[0]["task"], task.name)
+
+	def test_hide_in_life_os_sets_a_flag_and_never_calls_google(self):
+		name = self.google_event()
+		rec = Recorder()
+		with patch.object(gcal_write, "service_for", lambda user: rec):
+			frappe.defaults.set_user_default(gcal_write.KEY, "cal-1", OWNER)
+			self.addCleanup(lambda: frappe.defaults.clear_default(gcal_write.KEY, parent=OWNER))
+			calendar_api.hide_event(name)
+			with self.assertRaises(frappe.ValidationError):
+				calendar_api.delete_event(name)  # an event from Google is never deleted here
+		self.assertEqual(rec.calls, [])
+		self.assertEqual(frappe.db.get_value("Event", name, "life_hidden"), 1)
+		week = (str(today()), str(today()))
+		shown = lambda **kw: titles(calendar_api.get(space=PRIVATE, from_date=week[0], to_date=week[1], **kw)["items"], "event")
+		self.assertEqual(shown(), [])
+		self.assertEqual(shown(show_hidden=1), ["Wedding n99"])
+		self.read(gevent("n1", f"{today()} 12:00:00", 60, "Wedding n99", []))  # a re-sync keeps it hidden
+		self.assertEqual(shown(), [])
+		calendar_api.hide_event(name, hidden=0)
+		self.assertEqual(shown(), ["Wedding n99"])
+
+	def test_events_made_here_can_be_deleted_and_a_core_pulled_all_day_end_reads_as_the_last_day(self):
+		mine = calendar_api.add_event(space=PRIVATE, subject="Mine n99", starts_on=f"{today()} 10:00:00")["name"]
+		calendar_api.delete_event(mine)
+		self.assertFalse(frappe.db.exists("Event", mine))
+		wed = frappe.get_doc({"doctype": "Event", "subject": "Core pulled n99", "starts_on": f"{today()} 00:00:00", "ends_on": f"{add_days(today(), 1)} 00:00:00",
+			"all_day": 1, "event_type": "Public", "life_space": PRIVATE, "pulled_from_google_calendar": 1}).insert()
+		out = calendar_api.entry("event", wed.name)
+		self.assertEqual((out["starts_on"][:10], out["ends_on"][:10], out["from_google"]), (str(today()), str(today()), True))
+		item = [i for i in calendar_api.get(space=PRIVATE, from_date=str(today()), to_date=str(today()))["items"] if i["title"] == "Core pulled n99"][0]
+		self.assertFalse(item["multi_day"])

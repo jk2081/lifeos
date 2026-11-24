@@ -3,8 +3,6 @@
   <ReviewPage v-if="tab === 'week' && route.query.view === 'review'" />
   <PlanRhythm v-else-if="tab === 'week'" title="Week" :views="WEEK" :initial="'calendar'">
     <template #above="{ view }"><WeekScore v-if="view !== 'review'" /></template>
-    <template #actions><Button icon-left="lucide-rotate-ccw" label="Reset" route="/settings?tab=data" data-plan-reset>
-      <template v-if="navDot('Reset')" #suffix><span class="size-2 rounded-full bg-surface-amber-7" role="img" :aria-label="navDot('Reset').label" /></template></Button></template>
   </PlanRhythm>
   <PlanRhythm v-else-if="tab === 'month'" title="Month" :views="MONTH" />
   <PlanRhythm v-else-if="tab === 'year'" title="Year" :views="YEAR" />
@@ -12,15 +10,13 @@
 <script setup>
 // Plan's rhythms (UX fixes, set 6), now the Week, Month and Year tabs of Today (issue 14). The month goals and the 12 Week Year
 // are Goals > Cycles (issue 45); their old views redirect there. Since issue 16 the Week, Month and Year open on their own screens (components/today); the views below are the ones
-// with `view=` in the URL. Reset is a section of Settings > Data, reached from the Week's button and from All tasks.
+// with `view=` in the URL. Reset is a section of Settings > Data, reached from All tasks (the Week's button went in issue 99).
 import { useRoute } from 'vue-router'
-import { Button } from 'frappe-ui'
 import PlanRhythm from '@/components/goals/PlanRhythm.vue'
 import WeekScore from '@/components/goals/WeekScore.vue'
 import ReviewPage from '@/components/review/ReviewPage.vue'
 import Habits from '@/components/goals/Habits.vue'
 import JournalGoals from '@/components/goals/Goals.vue'
-import { navDot } from '@/lib/newMenu'
 
 defineProps({ tab: String })
 const route = useRoute()

@@ -100,16 +100,12 @@ for (const width of WIDTHS) {
     return `${done.length + 1} numbers`
   })
 
-  await check('TODAY.5', `${width} px: Today: no Open band, the list of tasks in order, the rail; Someday never shows; the amber dot on the Week's Reset`, async () => {
-    // an overdue task, a task due today, a parked task due today, three stuck tasks for a decision
+  await check('TODAY.5', `${width} px: Today: no Open band, the list of tasks in order, the rail; Someday never shows`, async () => {
+    // an overdue task, a task due today, a parked task due today
     const over = await s.api('tasks.quick_add', { text: S5('overdue'), space: SPACE, area: uxArea, due_date: addDays(-2) })
     const due = await s.api('tasks.quick_add', { text: S5('due today'), space: SPACE, area: uxArea, due_date: today })
     const parked = await s.api('tasks.quick_add', { text: S5('parked'), space: SPACE, area: uxArea, due_date: today })
     await s.api('someday.park', { doctype: 'Life Task', name: parked.name })
-    const stuck = []
-    for (let i = 0; i < 3; i++) stuck.push((await s.api('tasks.quick_add', { text: S5('stuck ' + i), space: SPACE, area: areaId('Learning') })).name)
-    bench(`for n in ${JSON.stringify(stuck)}: frappe.db.set_value("Life Task", n, "last_touched_on", frappe.utils.add_days(frappe.utils.today(), -120))`)
-    await s.api('insights.refresh', { space: SPACE })
     await s.open('/life')
     must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is still on Today (issue 55)')
     const groups = await pg.locator('[data-next-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-next-group')))
@@ -122,17 +118,6 @@ for (const width of WIDTHS) {
     must(!next.includes(S5('parked')), 'a Someday task is on Today')
     must(await pg.locator('[data-next-row][data-why="12WY"]').count() === 0 && await pg.locator('[data-next-group="decisions"]').count() === 0, 'a 12 Week Year row or a decision is in the list')
     must(await pg.locator('[data-rail-today]').isVisible() && await pg.locator('[data-rail-week]').isVisible(), 'the rail is missing')
-    // the stuck count over the limit puts an amber dot on the Week's Reset; the limit is put back after
-    const limit = (await s.api('counts.get', { space: SPACE })).rules.stuck_limit
-    await s.api('settings.save', { values: { stuck_limit: 0 } })
-    try {
-      if (!phone) { // set 6: the dot sits on the Week's Reset button (issue 14: the sidebar has no Week item)
-        await s.open('/life/today/week?view=calendar')
-        must(await pg.locator('[data-plan-reset] [role="img"]').count(), "no amber dot on the Week's Reset button")
-      }
-    } finally {
-      await s.api('settings.save', { values: { stuck_limit: limit } })
-    }
     return `${groups.join(', ')}`
   })
 
@@ -1139,5 +1124,112 @@ update_site_config("lifeos_fake_ai_error", {})`)
     })
   } finally {
     if (one) await one.ctx.close()
+  }
+}
+
+// Issue 99: notes on events, hiding a Google event, all-day dates, the week's bars and its drawer. Two events that came from Google are made
+// in the week of today (Google's all-day end is the day after the last day), and removed after.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const { pg, s, settle } = await uxKit(width)
+  const D = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const M = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const mon = plusDays(today, -((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7))
+  const [tue, wed, thu] = [1, 2, 3].map((n) => plusDays(mon, n))
+  const dm = (d) => `${Number(d.slice(8))} ${M[Number(d.slice(5, 7)) - 1]}`
+  const wedding = `Wedding ${stamp} ${width}`, trip = `Trip ${stamp} ${width}`, mine = `Lunch ${stamp} ${width}`
+  const make = (title, a, b, google) => bench(`import json
+d = frappe.get_doc({"doctype": "Event", "subject": "${title}", "starts_on": "${a}", "ends_on": "${b}", "all_day": ${google ? 1 : 0}, "event_type": "Public", "life_space": "Private", "pulled_from_google_calendar": ${google ? 1 : 0}}).insert(ignore_permissions=True)
+print(d.name)`).split('\n').pop()
+  const ev = {
+    wedding: make(wedding, `${mon} 00:00:00`, `${tue} 00:00:00`, true), trip: make(trip, `${tue} 00:00:00`, `${thu} 00:00:00`, true),
+    mine: make(mine, `${wed} 12:00:00`, `${wed} 13:00:00`, false),
+  }
+  const chip = (name) => pg.locator(`[data-week-grid] [data-ref="event:${name}"]`)
+  const open = async (name) => { await s.open('/life/today/week'); await pg.locator('[data-week-grid]').waitFor({ timeout: 10000 }); await pg.locator(`[data-ref="event:${name}"]`).first().click(); await settle() }
+  try {
+    await check('TODAY.50', `${width} px: an event in Week opens without "Open full page", the path reads "Week / Event" and a note shows at once`, async () => {
+      await open(ev.mine)
+      must(await pg.locator('[data-pane-full]').count() === 0, 'an event has Open full page')
+      must((await pg.locator('[data-pane-path]').innerText()).trim() === 'Week / Event', 'the path reads ' + await pg.locator('[data-pane-path]').innerText())
+      await pg.locator('[data-note-box]').fill(`Bring the deck ${stamp}`)
+      await pg.locator('[data-note-add]').click()
+      await pg.locator('[data-note]', { hasText: `Bring the deck ${stamp}` }).waitFor({ timeout: 8000 })
+      must((await pg.locator('[data-note]').first().innerText()).includes('You'), 'the note does not say who wrote it')
+      await pg.locator('[data-note-make-task]').first().click()
+      await pg.locator('[data-note-task]').first().waitFor({ timeout: 8000 })
+      // it is still there after the pane is closed and opened again
+      await open(ev.mine)
+      must(await pg.locator('[data-note]', { hasText: `Bring the deck ${stamp}` }).count() === 1, 'the note is gone after reopening')
+      await pg.locator('[data-note-delete]').first().click()
+      await pg.getByRole('button', { name: 'Delete', exact: true }).last().click()
+      await pg.locator('[data-notes-empty]').waitFor({ timeout: 8000 })
+    })
+    await check('TODAY.51', `${width} px: a Google event offers Hide in Life OS (not red, no Remove); hiding it takes it off the week and Show hidden events brings it back`, async () => {
+      await open(ev.wedding)
+      const hide = pg.locator('[data-event-hide]')
+      must(await hide.count() === 1 && !/red/.test(await hide.getAttribute('class')), 'no plain Hide in Life OS button')
+      must(await pg.locator('[data-event-delete]').count() === 0 && await pg.getByRole('button', { name: 'Remove' }).count() === 0, 'a Google event can be removed')
+      await hide.click()
+      await pg.locator('[data-pane]').waitFor({ state: 'detached', timeout: 8000 })
+      await settle()
+      must(await chip(ev.wedding).count() === 0, 'a hidden event is still on the week')
+      must(bench(`print(frappe.db.exists("Event", "${ev.wedding}") and frappe.db.get_value("Event", "${ev.wedding}", "life_hidden"))`).split('\n').pop() === '1', 'the flag is not set, or the event is gone')
+      await pg.locator('[data-week-menu]').click()
+      await pg.getByRole('menuitem', { name: 'Show hidden events' }).click()
+      await chip(ev.wedding).first().waitFor({ timeout: 8000 })
+      await chip(ev.wedding).first().click()
+      await settle()
+      await pg.locator('[data-event-show]').click()
+      await settle()
+    })
+    await check('TODAY.52', `${width} px: a Google all-day event reads "weekday, day month · all day"; a two-day one is one bar across its days`, async () => {
+      await open(ev.wedding)
+      const want = `${D[new Date(mon + 'T12:00:00Z').getUTCDay()]}, ${dm(mon)} · all day`
+      must((await pg.locator('[data-event-when]').innerText()).trim() === want, `reads "${await pg.locator('[data-event-when]').innerText()}", not "${want}"`)
+      await open(ev.trip)
+      const want2 = `${Number(tue.slice(8))}–${dm(wed)} · all day`
+      must((await pg.locator('[data-event-when]').innerText()).trim() === want2, `reads "${await pg.locator('[data-event-when]').innerText()}", not "${want2}"`)
+      await pg.keyboard.press('Escape')
+      await settle()
+      must(await pg.locator(`[data-week-bar][data-ref="event:${ev.trip}"]`).count() === 1, 'the trip is not one bar')
+      must(await chip(ev.trip).count() === 0, 'the trip is also a card on each day')
+      if (!phone) {
+        const bar = await pg.locator(`[data-week-bar][data-ref="event:${ev.trip}"]`).boundingBox()
+        const day = await pg.locator('[data-week-grid] [data-day]').first().boundingBox()
+        must(bar.width > day.width * 1.8, `the bar (${bar.width}) does not span two days (${day.width})`)
+      }
+    })
+    if (!phone) await check('TODAY.53', `${width} px: with the drawer open all seven day headers of Week are visible`, async () => {
+      await open(ev.mine)
+      const pane = await pg.locator('[data-pane]').boundingBox()
+      const heads = await pg.locator('[data-week-grid] [data-open-day]').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, w: r.width } }))
+      must(heads.length === 7 && heads.every((h) => h.w > 0 && h.r <= pane.x + 1 && h.l >= 0), `the days are ${JSON.stringify(heads)} beside a drawer at ${pane.x}`)
+    })
+    await check('TODAY.54', `${width} px: the Week toolbar has no Reset and nothing cut off, the heading is the dates, and + Capture offers Important date`, async () => {
+      for (const url of ['/life/today/week?view=calendar', '/life/today/week']) {
+        await s.open(url)
+        await pg.locator('[data-page-head]').waitFor({ timeout: 10000 })
+        const head = await pg.locator('[data-page-head]').evaluate((el) => ({ text: el.innerText, cut: el.scrollWidth > el.clientWidth + 1, page: document.documentElement.scrollWidth > window.innerWidth + 1 }))
+        must(!/Reset|Add important/.test(head.text) && !head.cut && !head.page, `the toolbar on ${url}: ${JSON.stringify(head)}`)
+        must(/^\d+( [A-Za-z]+)? – \d+ [A-Za-z]+/m.test(head.text), `the heading on ${url} is not a date range: ${head.text.slice(0, 80)}`)
+      }
+      await s.open('/life')
+      await pg.locator(phone ? '[data-tabbar] [data-tab-capture]' : '[data-nav-capture]').click()
+      await settle()
+      await pg.locator('[data-capture-kind="date"]').click()
+      await pg.getByRole('dialog', { name: 'Add important date' }).waitFor({ timeout: 8000 })
+      await pg.keyboard.press('Escape')
+    })
+    await check('TODAY.55', `${width} px: Day has no builder's note under "Today"`, async () => {
+      await s.open('/life/today')
+      await pg.locator('[data-next]').waitFor({ timeout: 10000 })
+      must(!/the top three, what is due/i.test(await pg.locator('[data-next]').innerText()), 'the note is still there')
+    })
+  } finally {
+    bench(`for n in ${JSON.stringify(Object.values(ev))}:
+    frappe.db.delete("Comment", {"reference_doctype": "Event", "reference_name": n})
+    frappe.db.delete("Life Task", {"event": n})
+    frappe.delete_doc("Event", n, force=1, ignore_permissions=True)`)
   }
 }

@@ -12,6 +12,8 @@ MEETING_FIELDS = [
 	{"fieldname": "life_matters", "label": "Life Matters", "fieldtype": "Check", "insert_after": "life_recurring"},
 	{"fieldname": "life_matters_set_by", "label": "Life Matters Set By", "fieldtype": "Select", "options": "\nRule\nOwner",
 		"insert_after": "life_matters"},
+	{"fieldname": "life_hidden", "label": "Hidden in Life OS", "fieldtype": "Check", "insert_after": "life_matters_set_by", "no_copy": 1,
+		"description": "Life OS stops showing this event. Set from the event's drawer; nothing is deleted or sent to Google."},
 	{"fieldname": "life_followups_on", "label": "Life Follow-ups Read On", "fieldtype": "Datetime", "insert_after": "life_matters_set_by",
 		"read_only": 1},
 ]

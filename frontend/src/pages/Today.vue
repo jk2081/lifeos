@@ -42,8 +42,7 @@
       <div class="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_18.5rem]">
         <!-- Next: one list in a fixed order, the order written at the top -->
         <section class="md:col-start-1" data-next>
-          <h2 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-base"><span class="font-semibold text-ink-gray-9">Today</span>
-            <span class="text-sm text-ink-gray-6 max-md:hidden">the top three, what is due today, overdue folded, then this week's tasks under your goals</span></h2>
+          <h2 class="mb-2 text-base font-semibold text-ink-gray-9">Today</h2>
           <Card flush class="!px-4">
             <template v-for="g in visibleGroups" :key="g.key">
               <div class="flex items-center gap-2 border-b border-outline-gray-1 pb-1.5 pt-3 text-xs font-semibold uppercase tracking-wide text-ink-gray-6" :data-next-group="g.key">

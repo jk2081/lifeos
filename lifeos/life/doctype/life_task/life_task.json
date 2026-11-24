@@ -18,6 +18,7 @@
   "top_three_week",
   "goal",
   "inbox_item",
+  "event",
   "source_url",
   "notes_md",
   "waiting_on",
@@ -92,6 +93,13 @@
    "fieldname": "duration_min",
    "fieldtype": "Int",
    "label": "Length (minutes)"
+  },
+  {
+   "fieldname": "event",
+   "fieldtype": "Link",
+   "label": "Event",
+   "options": "Event",
+   "description": "The calendar event this task was made from (a note on the event, issue 99)."
   },
   {
    "fieldname": "google_event_id",

@@ -17,7 +17,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_people.py` | People and organisations, the person page and its mentions |
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection), Updates (who may ask, the check against a temporary repository, the runner's steps and rollback, a target not on the remote, one runner at a time, Update now) |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
-| `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it |
+| `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it, notes on events (Comments), Hide in Life OS |
 | `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers, the return address to add, Google's error, an abandoned sign-in cleaned up, which case a search with no inbox is), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check, the connector (report, pull, confirm), the owner's changes, an agent's switches and the areas it may read |
 | `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings; no component, page or `App.vue` calls `api(`; every `.vue` file is imported or routed |
@@ -49,7 +49,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 
 ## Acceptance checks by place
 
-### Today (`tools/acceptance/today.mjs`, 49 checks)
+### Today (`tools/acceptance/today.mjs`, 55 checks)
 
 Day, Week, Month and Year, the numbers that open lists, Reset, rhythm banners, the first-run guide, Today's tasks.
 
@@ -59,7 +59,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.2` Add a birthday and see it on the calendar this year and next
 - `TODAY.3` Vault document expiring in 30 days shows a badge on Today
 - `TODAY.4` every number is a door, and the list count equals the number clicked
-- `TODAY.5` Today: no Open band, the list of tasks in order, the rail; Someday never shows; the amber dot on the Week's Reset button
+- `TODAY.5` Today: no Open band, the list of tasks in order, the rail; Someday never shows
 - `TODAY.6` counts: every number on Today, Reset, Someday and the sidebar opens a list with exactly that many rows
 - `TODAY.7` Insights: rules make Stuck, 12 Week Year and Habit insights from seeded data; a dismissed one does not return; a snoozed one returns after its date; at most 12 new a day
 - `TODAY.8` Reset: each rule batch finds its seeded items; a batch changes exactly those and Undo reverts; one by one with the keys; Delete then Restore from the trash; stuck task…
@@ -104,6 +104,12 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.47` with no key the AI key step comes between areas and first things, and Skip goes to first things
 - `TODAY.48` a fake key is saved encrypted and shows "The Brain is on", and the first thing then gets the model's area
 - `TODAY.49` with a key already set the AI key step shows "The Brain is on" and Next goes straight on
+- `TODAY.50` an event in Week opens without "Open full page", the path reads "Week / Event", and a note shows at once (and can become a task, and be deleted)
+- `TODAY.51` a Google event offers Hide in Life OS (not red, no Remove); hiding it takes it off the week and Show hidden events brings it back
+- `TODAY.52` a Google all-day event reads "weekday, day month · all day"; a two-day one is one bar across its days
+- `TODAY.53` with the drawer open all seven day headers of Week are visible (1440 px)
+- `TODAY.54` the Week toolbar has no Reset and nothing cut off, the heading is the dates, and + Capture offers Important date
+- `TODAY.55` Day has no builder's note under "Today"
 
 ### Brain (`tools/acceptance/brain.mjs`, 53 checks)
 

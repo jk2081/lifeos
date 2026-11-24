@@ -16,29 +16,53 @@ DATE_KINDS = ("Birthday", "Anniversary", "Other")
 UNKNOWN_YEAR = 2000  # a leap year, long before anything the calendar shows
 
 
-def _events(space, start, end):
-	"""Core Event records of a space between two dates, with repeats expanded by core's own get_events."""
+def last_moment(starts, ends, all_day, google_core):
+	"""The end of an event as people read it. Frappe's own Google pull keeps Google's all-day end, which is the day after the last
+	day, so one day comes off it (issue 99); Life OS's own read (review/gcal.py, which always sets `life_attendees`) and events made here already store the last day."""
+	ends = ends or starts
+	if all_day and google_core and ends > starts and ends.hour == ends.minute == ends.second == 0:
+		ends = ends - timedelta(days=1)
+	return max(ends, starts)
+
+
+def _flags(names):
+	"""What the calendar needs of each event that core's get_events does not return."""
+	if not names:
+		return {}
+	rows = frappe.get_all("Event", filters={"name": ("in", list(names))}, fields=["name", "life_hidden", "pulled_from_google_calendar", "life_attendees"],
+		limit=len(names) + 1, ignore_permissions=True)  # system: the names came from a space-filtered read
+	return {r.name: r for r in rows}
+
+
+def _events(space, start, end, show_hidden=False):
+	"""Core Event records of a space between two dates, with repeats expanded by core's own get_events. Events hidden in Life OS
+	are left out unless asked for."""
 	from frappe.desk.doctype.event.event import get_events
 
+	found = get_events(start, end, filters={"life_space": space})
+	flags = _flags({e.name for e in found})
 	out = []
-	for e in get_events(start, end, filters={"life_space": space}):
+	for e in found:
+		f = flags.get(e.name)
+		hidden = bool(f and f.life_hidden)
+		if hidden and not show_hidden:
+			continue
 		starts = get_datetime(e.starts_on)
-		ends = get_datetime(e.ends_on) if e.ends_on else starts
-		if ends < starts:
-			ends = starts
+		ends = last_moment(starts, get_datetime(e.ends_on) if e.ends_on else starts, e.all_day, bool(f and f.pulled_from_google_calendar and not f.life_attendees))
 		multi = ends.date() > starts.date()
 		out.append({
 			"source": "event", "name": e.name, "title": e.subject, "start": str(starts)[:19], "end": str(ends)[:19],
 			"date": str(starts.date()), "end_date": str(ends.date()), "all_day": 1 if (e.all_day or multi) else 0,
 			"multi_day": multi, "description": e.description, "repeats": bool(e.repeat_this_event),
 			"yearly_date": bool(e.all_day and not multi and e.repeat_this_event and e.repeat_on == "Yearly"),
+			"from_google": bool(f and f.pulled_from_google_calendar), "hidden": hidden,
 		})
 	return out
 
 
-def events_between(space, start, end):
+def events_between(space, start, end, show_hidden=False):
 	"""The Events of a space between two dates, without its important dates."""
-	return [e for e in _events(space, start, end) if not e["yearly_date"]]
+	return [e for e in _events(space, start, end, show_hidden) if not e["yearly_date"]]
 
 
 def important_dates_between(space, start, end):
