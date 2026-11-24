@@ -118,10 +118,30 @@ wait_ci() {   # blocks until the checks finish; prints pass or fail
 }
 
 save_ci_failure() {
-  local branch="$1" run
-  run=$(gh run list -R "$REPO" --branch "$branch" --status failure --limit 1 --json databaseId -q '.[0].databaseId')
-  { echo "GitHub Actions failed on this branch (run $run). The failing steps' logs:"; echo
-    gh run view "$run" -R "$REPO" --log-failed 2>&1 | tail -n 400; } > .issue/ci-failure.log
+  # Only what failed, for the commit being fixed: the failed jobs, the failed checks, and each failed job's errors. Passing jobs
+  # are left out, so the reason is on the first screen.
+  local branch="$1" sha run jobs
+  sha=$(git rev-parse "origin/$branch" 2>/dev/null || git rev-parse HEAD)
+  run=$(gh run list -R "$REPO" --commit "$sha" --status failure --limit 1 --json databaseId -q '.[0].databaseId')
+  [ -z "$run" ] && run=$(gh run list -R "$REPO" --branch "$branch" --status failure --limit 1 --json databaseId -q '.[0].databaseId')
+  jobs=$(gh run view "$run" -R "$REPO" --json jobs -q '.jobs[] | select(.conclusion == "failure") | "\(.databaseId)\t\(.name)"')
+  {
+    echo "GitHub Actions failed on $branch (run $run, commit ${sha:0:7})."
+    echo "Failed jobs: $(printf '%s\n' "$jobs" | cut -f2 | paste -sd, - | sed 's/,/, /g')"
+    echo
+    printf '%s\n' "$jobs" | while IFS=$'\t' read -r id name; do
+      [ -z "$id" ] && continue
+      log=$(gh api "repos/$REPO/actions/jobs/$id/logs" 2>/dev/null | sed -E 's/^[0-9T:.-]+Z //')
+      echo "== $name =="
+      echo "-- failed checks and errors --"
+      printf '%s\n' "$log" | grep -E '^(FAIL |ERROR: | FAIL |Traceback|[A-Za-z]*Error:|AssertionError|frappe\.exceptions\.|    at file:|FAILED \(|Ran [0-9]+ tests|[0-9]+ of [0-9]+ acceptance checks)' | head -n 80
+      echo "-- each traceback in full --"
+      printf '%s\n' "$log" | awk '/Traceback \(most recent call last\)|^ FAIL |^ERROR: /{n=30} n>0{print; n--}' | head -n 200
+      echo "-- the job's last lines --"
+      printf '%s\n' "$log" | grep -v -E '^(PASS |\[command\]|##\[|Post job|Temporarily|  [A-Z_]+: )' | tail -n 40
+      echo
+    done
+  } > .issue/ci-failure.log
 }
 
 # A line every PROGRESS_EVERY seconds (default 600) while a round runs, so a quiet round is not mistaken for a hang.

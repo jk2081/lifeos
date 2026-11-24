@@ -1501,8 +1501,9 @@ frappe.delete_doc("Life Note", "${jp}", force=1, ignore_permissions=True)`)
       }
     })
 
-    await check('GOALS.54', `${width} px: the Month and Year headers link to Goals > Cycles`, async () => {
-      for (const [from, link] of [['/life/today/month', 'Month goals'], ['/life/today/year', '12 Week Year']]) {
+    // #100 took the "Also:" links off Year (TODAY.59 checks there are none); Month keeps its link to Goals > Cycles
+    await check('GOALS.54', `${width} px: the Month header links to Goals > Cycles`, async () => {
+      for (const [from, link] of [['/life/today/month', 'Month goals']]) {
         await s.open(from)
         await pg.locator('[data-view-links]').waitFor({ timeout: 10000 })
         must(await pg.locator('[data-view-links] a', { hasText: link }).first().getAttribute('href') === '/life/goals/cycles', `${from}'s header does not link to Goals > Cycles`)
