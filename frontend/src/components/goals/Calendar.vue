@@ -1,17 +1,15 @@
 <template>
-  <PageHead :title="place || title" :sub="place ? title : undefined">
+  <PageHead :title="mode === 'week' ? title : place || title" :sub="mode !== 'week' && place ? title : undefined">
     <TabButtons v-if="switchOptions" :model-value="switchValue" :options="switchOptions" aria-label="Views" data-plan-views />
     <slot name="actions" />
     <Button icon="lucide-chevron-left" label="Previous" tooltip="Previous" data-cal-prev @click="step(-1)" />
     <Button icon="lucide-chevron-right" label="Next" tooltip="Next" data-cal-next @click="step(1)" />
-    <Button class="max-md:hidden" variant="ghost" label="Today" data-cal-today @click="goToday" />
-    <template v-if="canWrite()">
-      <Button label="Add important date" @click="openDate(cursor)" />
-      <Button variant="solid" icon-left="lucide-plus" label="Add event" @click="openEvent(cursor)" />
-    </template>
+    <Button variant="ghost" label="Today" data-cal-today @click="goToday" />
+    <Button v-if="canWrite()" variant="solid" icon-left="lucide-plus" label="Add event" @click="openEvent(cursor)" />
+    <WeekMenu v-if="mode === 'week'" />
   </PageHead>
 
-  <div class="page-body" data-calendar :data-view="mode">
+  <div class="page-body" :class="mode === 'week' && paneOpen && WEEK_ROOM" data-calendar :data-view="mode">
     <slot name="above" />
     <Alert v-if="google && !google.connected" title="Google Calendar is not connected" description="Connect it to see your meetings here and in the weekly review. Events added here stay on this site."
       :primary-action="{ label: 'Connect Google Calendar', route: { path: '/settings', query: { tab: 'calendar' } } }" data-google-prompt />
@@ -70,13 +68,14 @@
 
     <!-- week -->
     <template v-else-if="mode === 'week' && data">
+      <WeekBars :days="weekDays" :items="data.items" />
       <div class="grid grid-cols-7 items-start gap-2 max-md:grid-cols-1" data-week-grid>
         <Card v-for="dte in weekDays" :key="dte" class="flex min-h-40 min-w-0 flex-col gap-1.5 !p-2.5 max-md:min-h-0" :class="dte === data.today && '!border-outline-gray-5'" :data-day="dte" :data-today="dte === data.today || undefined">
           <Button class="-mx-1 !justify-start" variant="ghost" :label="`${weekday(dte, 3)} ${short(dte)}`" @click="openDay(dte)" />
-          <div v-for="(it, i) in itemsOn(dte)" :key="i" class="relative cursor-pointer rounded px-1.5 py-[3px] text-sm [overflow-wrap:anywhere]" :class="CHIP[chipType(it)]">
+          <div v-for="(it, i) in itemsOn(dte).filter((x) => !isBar(x))" :key="i" class="relative cursor-pointer rounded px-1.5 py-[3px] text-sm [overflow-wrap:anywhere]" :class="[CHIP[chipType(it)], it.hidden && 'line-through opacity-60']">
             <button type="button" class="absolute inset-0 rounded focus-visible:focus-ring" :aria-label="it.label || it.title" :data-ref="itemRef(it)" @click="openRef(itemRef(it))" />
             <span v-if="!it.all_day" class="tabular-nums text-ink-gray-6">{{ time(it.start) }}</span> {{ it.label || it.title }}</div>
-          <div v-if="!itemsOn(dte).length" class="text-sm text-ink-gray-6">Nothing</div>
+          <div v-if="!itemsOn(dte).filter((x) => !isBar(x)).length" class="text-sm text-ink-gray-6">Nothing</div>
         </Card>
       </div>
     </template>
@@ -116,7 +115,10 @@ import { tryCall } from '@/lib/api'
 import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
-import { MONTHS, addDays, iso, long, parse, short, startOfWeek as mondayOf, time, weekday } from '@/lib/dates'
+import WeekBars from '@/components/today/WeekBars.vue'
+import WeekMenu from '@/components/today/WeekMenu.vue'
+import { WEEK_ROOM, isBar, itemRef, paneOpen, showHidden } from '@/lib/calRange'
+import { MONTHS, addDays, dayRange, iso, long, parse, short, startOfWeek as mondayOf, time, weekday } from '@/lib/dates'
 
 // In Plan (UX fixes, set 6) the calendar is a view of the Week, Month and Year tabs: `place` is the tab's title (the
 // calendar's own title becomes the line under it) and `switchOptions` the tab's view switch, which replaces the calendar's.
@@ -160,7 +162,7 @@ const title = computed(() => {
   const d = parse(cursor.value)
   if (mode.value === 'year') return String(d.getFullYear())
   if (mode.value === 'month') return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`
-  if (mode.value === 'week') return `Week of ${short(startOfWeek(cursor.value))}`
+  if (mode.value === 'week') return dayRange(startOfWeek(cursor.value), addDays(startOfWeek(cursor.value), 6))
   return `From ${short(cursor.value)}`
 })
 const range = computed(() => {
@@ -226,7 +228,7 @@ async function reload() {
     if (res) yearData.value = res
     if (!google.value) google.value = (await tryCall(() => goalsData.calendar.get({ space: store.space, from_date: store.today, to_date: store.today })))?.google
   } else {
-    const res = await tryCall(() => goalsData.calendar.get({ space: store.space, from_date: range.value[0], to_date: range.value[1], area: store.lensArea || undefined }))
+    const res = await tryCall(() => goalsData.calendar.get({ space: store.space, from_date: range.value[0], to_date: range.value[1], area: store.lensArea || undefined, show_hidden: showHidden.value ? 1 : undefined }))
     if (res) {
       data.value = res
       google.value = res.google
@@ -246,7 +248,6 @@ function goToday() {
 }
 // a day opens in the record pane; its entries open their own records from there
 const openDay = (dte) => openRef('day:' + dte)
-const itemRef = (it) => ({ event: 'event', important: 'date', task: 'task', vault: 'vault' }[it.source] + ':' + it.name)
 const onAdd = (e) => (e.detail.kind === 'event' ? openEvent(e.detail.date) : openDate(e.detail.date))
 const saved = () => { reload(); recordChanged('day') }
 onRecordChanged((ref_) => { if (ref_ !== 'day') reload() })
@@ -274,5 +275,5 @@ async function saveDate(v) {
   await goalsData.calendar.add_important_date({ space: store.space, title: v.title, kind: v.kind, day: d.getDate(), month: d.getMonth() + 1, year: v.year || null })
   toast.success('Added. It shows on this day every year.')
 }
-watch([mode, cursor], reload, { immediate: true })
+watch([mode, cursor, showHidden], reload, { immediate: true })
 </script>

@@ -6,12 +6,13 @@ import base64
 import frappe
 from frappe.utils import add_days, getdate, today
 
-from lifeos.library import archive
+from lifeos import install
+from lifeos.library import archive, globalsearch
 from lifeos import permissions
 from lifeos.ai.tools import Context, t_get_record
 from lifeos.api import archive as archive_api, chats, everything, files as files_api, goals as goal_api, graph, inbox, jobs, library, links, search, sources, timeline, today as today_api, vault, wiki
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
-from lifeos.tests.helpers import item, task, upload
+from lifeos.tests.helpers import find, item, task, upload
 
 
 def link_rows(doc):
@@ -290,22 +291,14 @@ def names(res):
 
 
 class TestSearch(LifeTestCase):
-	def test_finds_a_word_in_a_transcript(self):
-		item = inbox.create_item(title="Journal photo m8", source_type="Journal Photo", space=PRIVATE)
-		self.as_user(AGENT)
-		claimed = inbox.claim_next(space=PRIVATE)
-		while claimed and claimed["name"] != item["name"]:
-			inbox.submit_result(claimed["name"], summary_md="skip")
-			claimed = inbox.claim_next(space=PRIVATE)
-		inbox.submit_result(item["name"], transcript_md="Discuss going with Nowrojeezzz about the leased gardens", summary_md="s")
-		frappe.db.commit()  # the full-text index sees committed rows only
-		self.as_user(OWNER)
-		res = search.query("nowrojeezzz", space=PRIVATE)
+	def test_finds_a_capture_by_its_title_and_text(self):
+		item = inbox.create_item(title="Journal photo Nowrojeezzz m8", source_type="Journal Photo", space=PRIVATE)
+		frappe.db.commit()
+		res = find("nowrojeezzz", space=PRIVATE)
 		self.assertEqual(names(res), [item["name"]])
-		self.assertEqual(res["results"][0]["kind"], "Inbox")
-		self.assertIn("Nowrojeezzz", res["results"][0]["snippet"])
+		self.assertEqual(res["results"][0]["kind"], "Capture")
 		self.assertEqual(res["results"][0]["route"], f"/item/{item['name']}")
-		self.assertEqual(names(search.query("nowrojeez", space=PRIVATE)), [item["name"]])  # prefix
+		self.assertEqual(names(find("nowrojeez", space=PRIVATE)), [item["name"]])  # prefix
 
 	def test_searches_every_filed_type(self):
 		made = {
@@ -316,22 +309,22 @@ class TestSearch(LifeTestCase):
 			"page": self.make("Life Note", title="Journal page m8", page_date=today(), content_md="quartzite on the page"),
 		}
 		frappe.db.commit()
-		got = names(search.query("quartzite"))
+		got = names(find("quartzite"))
 		for doc in made.values():
 			self.assertIn(doc.name, got)
-		self.assertEqual(names(search.query("zebrafish")), [made["note"].name])
-		self.assertEqual(names(search.query("quartzite zebrafish")), [made["note"].name])  # every word must match
-		self.assertEqual(names(search.query("m8 xyznotthere")), [])
-		self.assertEqual(search.query("   ")["results"], [])
-		self.assertLessEqual(len(search.query("quartzite", limit=2)["results"]), 2)
+		self.assertEqual(names(find("zebrafish")), [made["note"].name])
+		self.assertEqual(names(find("quartzite zebrafish")), [made["note"].name])  # every word must match
+		self.assertEqual(names(find("m8 xyznotthere")), [])
+		self.assertEqual(find("   ")["results"], [])
+		self.assertLessEqual(len(find("quartzite", limit=2)["results"]), 2)
 
 	def test_outsider_finds_nothing_from_a_private_space(self):
 		secret = self.make("Life Note", title="Obsidianite secret m8", content_md="obsidianite plans")
 		shared = self.make("Life Note", space=SHARED, title="Obsidianite shopping m8")
 		frappe.db.commit()
-		self.assertEqual(sorted(names(search.query("obsidianite"))), sorted([secret.name, shared.name]))
+		self.assertEqual(sorted(names(find("obsidianite"))), sorted([secret.name, shared.name]))
 		self.as_user(FAMILY)
-		self.assertEqual(names(search.query("obsidianite")), [shared.name])
+		self.assertEqual(names(find("obsidianite")), [shared.name])
 		self.assertRaises(frappe.PermissionError, search.query, "obsidianite", space=PRIVATE)
 		frappe.set_user("Guest")
 		self.assertRaises(frappe.PermissionError, search.query, "obsidianite")
@@ -339,14 +332,14 @@ class TestSearch(LifeTestCase):
 	def test_archived_records_are_hidden_unless_asked(self):
 		note = self.make("Life Note", title="Feldsparite archived m8", is_archived=1)
 		frappe.db.commit()
-		self.assertEqual(names(search.query("feldsparite")), [])
-		self.assertEqual(names(search.query("feldsparite", include_archived=1)), [note.name])
+		self.assertEqual(names(find("feldsparite")), [])
+		self.assertEqual(names(find("feldsparite", include_archived=1)), [note.name])
 
 	def test_short_and_odd_words_fall_back(self):
 		note = self.make("Life Note", title="ZQ m8 pan", content_md="x")
 		frappe.db.commit()
-		self.assertIn(note.name, names(search.query("zq")))
-		self.assertEqual(search.query("+-*()\"")["results"], [])
+		self.assertIn(note.name, names(find("zq")))
+		self.assertEqual(find("+-*()\"")["results"], [])
 
 
 class TestGraph(LifeTestCase):
@@ -536,7 +529,7 @@ class TestSensitive(LifeTestCase):
 		self.as_user(AGENT)
 		self.assertRaises(frappe.PermissionError, permissions.get_doc_checked, "Life Note", note.name)
 		self.assertNotIn(note.name, [r.name for r in library.list(space=SHARED, collection="all", page_length=100)["notes"]])
-		self.assertFalse([r for r in search.query(text="kumquatsecret", space=SHARED)["results"] if r.ref_name == note.name])
+		self.assertFalse([r for r in find(text="kumquatsecret", space=SHARED)["results"] if r.ref_name == note.name])
 		set_switch(SHARED, "agents_can_read_vault", 1)
 		self.as_user(AGENT)
 		self.assertEqual(permissions.get_doc_checked("Life Note", note.name).name, note.name)
@@ -667,3 +660,86 @@ class TestScreenFolders(LifeTestCase):
 		self.assertNotIn("RecordPane.vue", item)
 		self.assertNotIn("PaneBody.vue", item)
 		self.assertIn("ItemView.vue", item)
+
+
+def titles(res):
+	return [r["title"] for r in res["results"]]
+
+
+class TestGlobalSearch(LifeTestCase):
+	"""Issue 98: search reads Frappe's Global Search, and every hit passes our space rules."""
+
+	def event(self, subject, space=PRIVATE, **values):
+		return frappe.get_doc({"doctype": "Event", "subject": subject, "starts_on": f"{today()} 10:00:00", "life_space": space, **values}).insert()
+
+	def test_1_an_event_is_found_by_the_start_of_any_word(self):
+		event = self.event("RSH Global meeting q98")
+		for word in ("rsh", "global", "RSH glob", "q98"):
+			res = find(word, space=PRIVATE)
+			self.assertEqual(names(res), [event.name], word)
+		hit = find("rsh")["results"][0]
+		self.assertEqual((hit["kind"], hit["group"], hit["title"], hit["record_date"]), ("Event", "Events", "RSH Global meeting q98", today()))
+		self.assertEqual(hit["route"], f"/today?open=event:{event.name}")
+		self.assertEqual(find("rsh xyznotthere")["results"], [])
+
+	def test_2_an_event_in_a_space_the_user_cannot_read_is_not_returned(self):
+		event = self.event("Zebra board q98")
+		self.assertEqual(names(find("zebra")), [event.name])
+		self.as_user(FAMILY)
+		self.assertEqual(find("zebra")["results"], [])
+		self.assertTrue(frappe.db.exists("__global_search", {"doctype": "Event", "name": event.name}))
+
+	def test_3_a_vault_document_is_found_by_its_title_only(self):
+		doc = self.make("Life Vault Document", title="Passport quillfeather q98", notes_md="contentsecret98 inside")
+		self.assertEqual(names(find("quillfeather")), [doc.name])
+		self.assertEqual(names(find("contentsecret98")), [])
+		self.assertEqual(find("quillfeather")["results"][0]["snippet"], "")
+
+	def test_4_a_goal_an_area_part_a_person_and_a_habit_are_found_by_name(self):
+		from lifeos.tools import seed
+		part = seed.make_areas(PRIVATE, ["BTWq98"])["BTWq98"]
+		goal = self.make("Life Goal", title="Grandgoal q98", horizon="Long term", area=part)
+		person = self.make("Life Person", full_name="Pernilla q98", aliases="Nilla98")
+		habit = self.make("Life Habit", title="Walkaround q98")
+		for word, doctype, name in (("btwq98", "Life Area", part), ("grandgoal", "Life Goal", goal.name), ("pernilla", "Life Person", person.name),
+				("nilla98", "Life Person", person.name), ("walkaround", "Life Habit", habit.name)):
+			got = [(r["ref_doctype"], r["ref_name"]) for r in find(word)["results"]]
+			self.assertIn((doctype, name), got, word)
+
+	def test_5_a_comment_finds_the_record_it_is_on(self):
+		event = self.event("Dinner q98")
+		event.add_comment("Comment", "send gift98 to Anya")
+		res = find("send gift98")
+		self.assertEqual([(r["ref_doctype"], r["ref_name"], r["kind"]) for r in res["results"]], [("Event", event.name, "Event")])
+		self.assertIn("gift98", res["results"][0]["snippet"])
+		self.as_user(FAMILY)
+		self.assertEqual(find("gift98")["results"], [])
+
+	def test_6_system_records_are_never_returned(self):
+		from frappe.utils.global_search import sync_value
+		usage = frappe.get_doc({"doctype": "Life AI Usage", "user": OWNER, "month": "2026-11", "model": "m", "cost": 1, "purpose": "Ask sysrow98"}).insert(ignore_permissions=True)
+		log = frappe.get_all("Life Action Log", pluck="name", limit=1)
+		for doctype, name in [("Life AI Usage", usage.name), *([("Life Action Log", log[0])] if log else [])]:
+			sync_value({"doctype": doctype, "name": name, "content": "Purpose : sysrow98", "published": 0, "title": "sysrow98", "route": ""})
+		self.assertEqual(find("sysrow98")["results"], [])
+		self.assertTrue(frappe.db.exists("__global_search", {"doctype": "Life AI Usage", "name": usage.name}))
+		for dt in ("Life AI Usage", "Life AI Price", "Life Action Log", "Life Agent Action", "Life Agent Job", "Life Skill Run", "Life Settings", "Life Index"):
+			self.assertNotIn(dt, globalsearch.FIELDS)
+
+	def test_7_an_archived_record_and_another_space_follow_the_filters(self):
+		note = self.make("Life Note", title="Archivalx q98", is_archived=1)
+		self.assertEqual(names(find("archivalx")), [])
+		self.assertEqual(names(find("archivalx", include_archived=1)), [note.name])
+		self.assertEqual(names(find("archivalx", space=SHARED, include_archived=1)), [])
+
+	def test_10_a_fresh_install_lists_the_record_types(self):
+		frappe.db.delete("Global Search DocType")
+		for dt in globalsearch.FIELDS:
+			frappe.db.delete("Property Setter", {"doc_type": dt, "property": "in_global_search"})
+			frappe.clear_cache(doctype=dt)
+		install.setup()
+		listed = set(frappe.get_all("Global Search DocType", pluck="document_type"))
+		self.assertEqual(listed, {dt for dt in globalsearch.FIELDS if frappe.get_meta(dt).module != "Core"})
+		self.assertTrue({"Event", "Life Goal", "Life Person", "Life Habit", "Life Area", "Life Vault Document", "Life Task"} <= listed)
+		for dt, (_kind, fields) in globalsearch.FIELDS.items():
+			self.assertEqual(sorted(f.fieldname for f in frappe.get_meta(dt).get_global_search_fields()), sorted(fields), dt)

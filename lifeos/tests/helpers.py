@@ -282,3 +282,13 @@ class Keyed(LifeTestCase):
 		frappe.set_user("Administrator")
 		set_key("")
 		super().tearDown()
+
+
+def find(text, **kwargs):
+	"""`search.query` after the records the test saved are written to the search index (in use a job does it; a search is a GET and cannot)."""
+	from frappe.utils.global_search import sync_global_search
+
+	from lifeos.api import search
+
+	sync_global_search()
+	return search.query(text, **kwargs)

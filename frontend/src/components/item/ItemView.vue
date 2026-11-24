@@ -59,7 +59,7 @@
 // slide-over from the right, the list still usable beside it. Phone: frappe-ui's BottomSheet. Which record is open lives in
 // the URL (lib/pane.js). The inside is defined once and used in both places.
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { createReusableTemplate, useMediaQuery } from '@vueuse/core'
 import { Alert, BottomSheet, Button } from 'frappe-ui'
 import TabBar from '@/components/TabBar.vue'
@@ -84,12 +84,20 @@ import { store } from '@/lib/store'
 
 const [DefineInner, ItemInner] = createReusableTemplate()
 const router = useRouter()
+const route = useRoute()
 const phone = useMediaQuery('(max-width: 767px)')
 const el = ref(null)
 const meta = ref({})
 const missing = ref(false)
 const stamp = ref(0)
-const place = computed(() => (cur.value ? TYPES[cur.value.type].place : ''))
+// the path names the view the record was opened in: Week / Event, Month / Event (issue 99); Day when it is Day or somewhere else
+const CALENDAR_VIEW = { '/today/week': 'Week', '/today/month': 'Month', '/today/year': 'Year' }
+const place = computed(() => {
+  if (!cur.value) return ''
+  const t = TYPES[cur.value.type]
+  const path = route.path.replace(/^\/life/, '')
+  return t.place === 'Today' ? CALENDAR_VIEW[path] || (path === '/today' ? 'Day' : t.place) : t.place
+})
 const label = computed(() => (cur.value ? meta.value?.kind || TYPES[cur.value.type].label : ''))
 let lastRef = ''
 let opener = null

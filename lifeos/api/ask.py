@@ -103,7 +103,7 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 	try:
 		client.check("Ask")
 	except client.NotSetUp:
-		return _refuse(t, question, "not_set_up", _("Ask is not set up yet."))
+		return _refuse(t, question, "not_set_up", _("Ask needs an AI key. Add one in Settings › AI."))
 	except client.CapReached as e:
 		return _refuse(t, question, "cap", str(e))
 	history = engine.history_messages(t.name)

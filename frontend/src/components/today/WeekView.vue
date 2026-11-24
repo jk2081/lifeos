@@ -1,17 +1,20 @@
 <template>
   <PageHead :title="title" :sub="sub">
     <Button icon="lucide-chevron-left" label="Previous week" tooltip="Previous week" data-cal-prev @click="step(-1)" />
-    <Button label="This week" data-cal-today @click="go(store.today)" />
+    <Button label="Today" data-cal-today @click="go(store.today)" />
     <Button icon="lucide-chevron-right" label="Next week" tooltip="Next week" data-cal-next @click="step(1)" />
+    <WeekMenu />
   </PageHead>
-  <div class="page-body" data-week-view :data-week-start="first">
+  <div class="page-body" :class="paneOpen && WEEK_ROOM" data-week-view :data-week-start="first">
     <ViewLinks :links="LINKS" />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>meetings</span>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-blue-3"></i>goal work</span>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-red-3"></i>due dates</span>
     </div>
-    <div class="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1fr)_18.5rem]">
+    <div class="grid grid-cols-1 gap-5" :class="!paneOpen && 'md:grid-cols-[minmax(0,1fr)_18.5rem]'">
+      <div class="flex min-w-0 flex-col gap-2">
+      <WeekBars :days="days" :items="data?.items" />
       <div class="grid min-w-0 grid-cols-7 items-start gap-2 max-md:grid-cols-1" data-week-grid>
         <Card v-for="day in days" :key="day" class="flex min-h-48 min-w-0 flex-col gap-1.5 !p-2 max-md:min-h-0" :data-day="day" :data-today="day === store.today || undefined">
           <Button class="!justify-start" :variant="day === store.today ? 'solid' : 'ghost'" :label="`${weekday(day, 3)} ${parse(day).getDate()}`" :aria-label="`Open ${long(day)} in Day`"
@@ -22,6 +25,7 @@
           </div>
           <div v-if="!itemsOn(day).length" class="text-sm text-ink-gray-6 max-md:hidden">Nothing</div>
         </Card>
+      </div>
       </div>
       <aside class="flex min-w-0 flex-col gap-4" data-week-side>
         <Card data-week-focus>
@@ -64,11 +68,13 @@ import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import ViewLinks from './ViewLinks.vue'
+import WeekBars from './WeekBars.vue'
+import WeekMenu from './WeekMenu.vue'
 import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
-import { chipClass, itemLabel, itemRef, openDay, useCalendarRange } from '@/lib/calRange'
+import { WEEK_ROOM, chipClass, isBar, itemLabel, itemRef, openDay, paneOpen, useCalendarRange } from '@/lib/calRange'
 import { onRecordChanged, openRef } from '@/lib/pane'
-import { MONTHS, addDays, long, parse, startOfWeek, time, weekday } from '@/lib/dates'
+import { addDays, dayRange, long, parse, startOfWeek, time, weekday } from '@/lib/dates'
 
 const route = useRoute()
 const router = useRouter()
@@ -76,7 +82,8 @@ const LINKS = [{ label: 'Weekly review', to: { path: '/today/week', query: { vie
 // Settings > Rhythms: the week starts on Monday or Sunday
 const first = computed(() => { const d = startOfWeek(route.query.date || store.today); return store.settings?.week_starts_on === 'Sunday' ? addDays(d, -1) : d })
 const days = computed(() => Array.from({ length: 7 }, (_, i) => addDays(first.value, i)))
-const { itemsOn } = useCalendarRange(computed(() => [first.value, addDays(first.value, 6)]))
+const { data, itemsOn: allOn } = useCalendarRange(computed(() => [first.value, addDays(first.value, 6)]))
+const itemsOn = (day) => allOn(day).filter((it) => !isBar(it))  // a multi-day all-day event is a bar above the days
 const plan = ref(null)
 async function loadPlan() {
   const res = await tryCall(() => todayData.calendar.week_plan({ space: store.space, week_start: first.value, area: store.lensArea || undefined }))
@@ -86,10 +93,7 @@ watch(first, loadPlan, { immediate: true })
 onRecordChanged(loadPlan)
 
 const hours = (m) => `${Math.round(m / 6) / 10} h`
-const title = computed(() => {
-  const a = parse(first.value), b = parse(addDays(first.value, 6))
-  return a.getMonth() === b.getMonth() ? `${a.getDate()} to ${b.getDate()} ${MONTHS[b.getMonth()]}` : `${a.getDate()} ${MONTHS[a.getMonth()]} to ${b.getDate()} ${MONTHS[b.getMonth()]}`
-})
+const title = computed(() => dayRange(first.value, addDays(first.value, 6)))
 const sub = computed(() => [plan.value?.score ? `Week ${plan.value.score.week} of the 12 Week Year` : 'Not in a 12 Week Year', plan.value?.goal_minutes ? `${hours(plan.value.goal_minutes)} of goal work planned` : null].filter(Boolean).join(' · ') || ' ')
 const go = (date) => router.push({ path: route.path, query: { ...route.query, open: undefined, date: date === store.today ? undefined : date } })
 const step = (n) => go(addDays(first.value, 7 * n))

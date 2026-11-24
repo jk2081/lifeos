@@ -7,6 +7,7 @@ from frappe import _
 from frappe.utils import add_days, get_datetime, getdate, today
 
 from lifeos.calendar import calendar_data as data
+from lifeos.calendar import notes
 from lifeos import permissions
 from lifeos.api.utils import flag, in_area, lens_area
 
@@ -30,9 +31,10 @@ def google_status():
 
 
 @frappe.whitelist(methods=["GET"])
-def get(space: str | None = None, from_date: str | None = None, to_date: str | None = None, area: str | None = None):
+def get(space: str | None = None, from_date: str | None = None, to_date: str | None = None, area: str | None = None, show_hidden: bool | int = 0):
 	"""Everything on the calendar between two dates (at most 100 days): events, important dates, tasks due and documents expiring.
-	`area` is the lens: tasks and documents keep to the area; events and important dates have no area and always show."""
+	`area` is the lens: tasks and documents keep to the area; events and important dates have no area and always show.
+	`show_hidden` brings back the events that were hidden in Life OS (issue 99)."""
 	space = permissions.resolve_space(space)
 	area = lens_area(area)
 	start = getdate(from_date or today())
@@ -41,7 +43,7 @@ def get(space: str | None = None, from_date: str | None = None, to_date: str | N
 		start, end = end, start
 	if (end - start).days > MAX_RANGE_DAYS:
 		end = add_days(start, MAX_RANGE_DAYS)
-	items = (data.events_between(space, start, end) + data.important_dates_between(space, start, end)
+	items = (data.events_between(space, start, end, flag(show_hidden)) + data.important_dates_between(space, start, end)
 		+ lens_items(space, area, data.task_dues_between(space, start, end) + data.task_slots_between(space, start, end)
 		+ data.vault_expiries_between(space, start, end)))
 	items.sort(key=lambda i: (i["date"], 0 if i.get("all_day") else 1, i.get("start") or "", i["title"]))
@@ -141,20 +143,62 @@ def add_event(space: str | None = None, subject: str | None = None, starts_on: s
 	return {"name": doc.name, "synced_to_google": False}
 
 
-@frappe.whitelist(methods=["POST"])
-def delete_event(event: str):
-	"""Delete an event of a space the user can write to."""
-	# Core Event lets only its creator delete it. In a space, any person with Write access may, so an
-	# event filed by an agent can be removed by the owner. The checks below replace the core one.
+def _event_to_change(event):
+	"""An event of a space the user can write to."""
 	doc = permissions.get_doc_checked("Event", event, "read")
 	if not doc.get("life_space"):
 		frappe.throw(_("This event does not belong to a Life OS space."), frappe.PermissionError, title=_("Event is not in a space"))
 	permissions.require_space(doc.life_space, write=True)
+	return doc
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_event(event: str):
+	"""Delete an event made in Life OS, in a space the user can write to. An event that came from Google is never deleted here:
+	Frappe's sync could write the deletion to Google, or bring the event back (issue 99). Hide it instead (`hide_event`)."""
+	# Core Event lets only its creator delete it. In a space, any person with Write access may, so an
+	# event filed by an agent can be removed by the owner. The checks below replace the core one.
+	doc = _event_to_change(event)
 	if permissions.is_agent():
 		frappe.throw(_("Agents cannot delete records."), frappe.PermissionError, title=_("Agents cannot delete"))
+	if doc.get("pulled_from_google_calendar"):  # one Life OS wrote to Google itself (issue 31) is still Life OS's, and deleting it deletes it there
+		frappe.throw(_("This event comes from Google Calendar. Hide it in Life OS instead."), title=_("Event is from Google"))
 	# an accepted proposal still names the event it made; that is a record of what happened, not a reason to keep the event
 	frappe.delete_doc("Event", doc.name, force=True, ignore_permissions=True)  # system: the event is made for the person after the space check above
 	return {"deleted": event}
+
+
+@frappe.whitelist(methods=["POST"])
+def hide_event(event: str, hidden: bool | int = 1):
+	"""Hide an event in Life OS (or show it again): sets `life_hidden`. The Event stays and nothing is sent to Google."""
+	doc = _event_to_change(event)
+	# a flag only: db_set skips the Event's save hooks, which are the ones that push to Google
+	doc.db_set("life_hidden", 1 if flag(hidden) else 0, update_modified=False)
+	return {"name": doc.name, "hidden": bool(flag(hidden))}
+
+
+@frappe.whitelist(methods=["POST"])
+def add_note(event: str, text: str, occurrence: str | None = None):
+	"""Add a note to an event: a Frappe Comment on it, never written to Google. Agents may add notes."""
+	return notes.add(event, text, occurrence)
+
+
+@frappe.whitelist(methods=["POST"])
+def update_note(note: str, text: str):
+	"""Change a note. Agents may not."""
+	return notes.update(note, text)
+
+
+@frappe.whitelist(methods=["POST"])
+def delete_note(note: str):
+	"""Delete a note. Agents may not."""
+	return notes.remove(note)
+
+
+@frappe.whitelist(methods=["POST"])
+def note_to_task(note: str):
+	"""Make a task titled with the note, linked to its event."""
+	return notes.make_task(note)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -169,11 +213,19 @@ def add_important_date(space: str | None = None, title: str | None = None, day: 
 def entry(kind: str, name: str):
 	"""One calendar entry for the record pane: kind is "event" or "date" (an important date)."""
 	if kind == "event":
+		name, _sep, occurrence = name.partition("@")  # a repeat of a repeating event is `name@date`
 		doc = permissions.get_doc_checked("Event", name, "read")
+		starts = get_datetime(doc.starts_on)
+		ends = data.last_moment(starts, get_datetime(doc.ends_on) if doc.ends_on else starts, doc.all_day, bool(doc.get("pulled_from_google_calendar") and not doc.get("life_attendees")))
+		if occurrence and doc.repeat_this_event:  # the repeat's own day, the length of the first one
+			shift = getdate(occurrence) - starts.date()
+			starts, ends = starts + shift, ends + shift
+		google = bool(doc.get("pulled_from_google_calendar"))
 		return {"kind": "event", "name": doc.name, "title": doc.subject, "space": doc.get("life_space"), "all_day": bool(doc.all_day),
-			"starts_on": str(doc.starts_on)[:16] if doc.starts_on else None, "ends_on": str(doc.ends_on)[:16] if doc.ends_on else None,
+			"starts_on": str(starts)[:16], "ends_on": str(ends)[:16], "occurrence": str(starts.date()) if doc.repeat_this_event else None,
 			"description": frappe.utils.strip_html(doc.description or ""), "repeats": bool(doc.repeat_this_event),
-			"synced_to_google": bool(doc.get("pulled_from_google_calendar"))}
+			"from_google": google, "hidden": bool(doc.get("life_hidden")),
+			"notes": notes.listing(doc.name, str(starts.date()) if doc.repeat_this_event else None)}
 	if kind == "date":
 		doc = permissions.get_doc_checked("Event", name, "read")
 		first = getdate(doc.starts_on)

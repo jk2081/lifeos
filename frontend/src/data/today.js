@@ -6,7 +6,7 @@ export const todayData = {
   session: group('session', ['boot', 'counts']),
   someday: group('someday', ['create', 'list']),
   tasks: group('tasks', ['confirm_area', 'list', 'quick_add', 'reschedule_overdue', 'set_status', 'update']),
-  calendar: group('calendar', ['week_plan', 'year_plan']),
+  calendar: group('calendar', ['add_important_date', 'week_plan', 'year_plan']),
   trash: group('trash', ['list', 'restore']),
   archive: group('archive', ['list', 'restore']),
   focus: group('focus', ['get']),

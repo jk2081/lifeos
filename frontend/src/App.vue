@@ -45,7 +45,10 @@
 
       <NewRecord v-if="store.newKind === 'someday'" :model-value="true" title="Park on Someday" action="Park on Someday" :fields="somedayFields" :save="createSomeday"
         @update:model-value="(v) => !v && (store.newKind = '')" />
+      <NewRecord v-if="store.newKind === 'date'" :model-value="true" title="Add important date" action="Add date" :fields="DATE_FIELDS" :initial="{ date: store.today, kind: 'Birthday' }"
+        :save="createDate" @update:model-value="(v) => !v && (store.newKind = '')" />
       <OnboardingGuide v-if="onboarding.show" />
+      <Button v-if="onboarding.show && onboarding.away" class="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 shadow-lg" variant="solid" label="Back to the guide" data-guide-return @click="onboarding.away = false" />
       <MoreSheet v-model:open="moreOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
       <ItemView />
       <AskPanel />
@@ -131,6 +134,18 @@ async function createSomeday(v) {
   store.newKind = ''
   recordChanged('task:new')
   toast.success('Parked on the Someday list.')
+}
+// an important date from + Capture (issue 99): it repeats on this day every year
+const DATE_FIELDS = [{ name: 'title', label: 'Name', required: true, placeholder: 'For example: Ruchi' },
+  { name: 'kind', label: 'Kind', options: ['Birthday', 'Anniversary', 'Other'], required: true },
+  { name: 'date', label: 'Date', type: 'date', required: true, help: 'It repeats on this day every year.' },
+  { name: 'year', label: 'Year it first happened (optional)', type: 'number' }]
+async function createDate(v) {
+  const d = new Date(`${v.date}T00:00:00`)
+  await todayData.calendar.add_important_date({ space: store.space, title: v.title, kind: v.kind, day: d.getDate(), month: d.getMonth() + 1, year: v.year || null })
+  store.newKind = ''
+  recordChanged('day')
+  toast.success('Added. It shows on this day every year.')
 }
 function goalCreated(g) {
   store.newKind = ''

@@ -100,16 +100,12 @@ for (const width of WIDTHS) {
     return `${done.length + 1} numbers`
   })
 
-  await check('TODAY.5', `${width} px: Today: no Open band, the list of tasks in order, the rail; Someday never shows; the amber dot on the Week's Reset`, async () => {
-    // an overdue task, a task due today, a parked task due today, three stuck tasks for a decision
+  await check('TODAY.5', `${width} px: Today: no Open band, the list of tasks in order, the rail; Someday never shows`, async () => {
+    // an overdue task, a task due today, a parked task due today
     const over = await s.api('tasks.quick_add', { text: S5('overdue'), space: SPACE, area: uxArea, due_date: addDays(-2) })
     const due = await s.api('tasks.quick_add', { text: S5('due today'), space: SPACE, area: uxArea, due_date: today })
     const parked = await s.api('tasks.quick_add', { text: S5('parked'), space: SPACE, area: uxArea, due_date: today })
     await s.api('someday.park', { doctype: 'Life Task', name: parked.name })
-    const stuck = []
-    for (let i = 0; i < 3; i++) stuck.push((await s.api('tasks.quick_add', { text: S5('stuck ' + i), space: SPACE, area: areaId('Learning') })).name)
-    bench(`for n in ${JSON.stringify(stuck)}: frappe.db.set_value("Life Task", n, "last_touched_on", frappe.utils.add_days(frappe.utils.today(), -120))`)
-    await s.api('insights.refresh', { space: SPACE })
     await s.open('/life')
     must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is still on Today (issue 55)')
     const groups = await pg.locator('[data-next-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-next-group')))
@@ -122,17 +118,6 @@ for (const width of WIDTHS) {
     must(!next.includes(S5('parked')), 'a Someday task is on Today')
     must(await pg.locator('[data-next-row][data-why="12WY"]').count() === 0 && await pg.locator('[data-next-group="decisions"]').count() === 0, 'a 12 Week Year row or a decision is in the list')
     must(await pg.locator('[data-rail-today]').isVisible() && await pg.locator('[data-rail-week]').isVisible(), 'the rail is missing')
-    // the stuck count over the limit puts an amber dot on the Week's Reset; the limit is put back after
-    const limit = (await s.api('counts.get', { space: SPACE })).rules.stuck_limit
-    await s.api('settings.save', { values: { stuck_limit: 0 } })
-    try {
-      if (!phone) { // set 6: the dot sits on the Week's Reset button (issue 14: the sidebar has no Week item)
-        await s.open('/life/today/week?view=calendar')
-        must(await pg.locator('[data-plan-reset] [role="img"]').count(), "no amber dot on the Week's Reset button")
-      }
-    } finally {
-      await s.api('settings.save', { values: { stuck_limit: limit } })
-    }
     return `${groups.join(', ')}`
   })
 
@@ -519,6 +504,10 @@ from lifeos.tools import devtools
 devtools.purge_space("${space}", drop=True)
 frappe.db.delete("DefaultValue", {"parent": "${user}"})
 if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  const keyWas = bench('from lifeos.ai import client\nprint(client.api_key() or "")').split('\n').pop()
+  // the AI key as the check needs it: none, or a fake one (a key starting "fake-" is never sent anywhere)
+  const keyIs = (v) => bench(`doc = frappe.get_doc("Life Settings")\ndoc.anthropic_api_key = ${v ? JSON.stringify(v) : 'None'}\ndoc.save()`)
+  const fakeArea = (name) => bench(`from frappe.installer import update_site_config\nupdate_site_config("lifeos_fake_ai_area", "${name}")`)
   let one = null
   try {
     bench(`from lifeos.tools import devtools
@@ -534,24 +523,64 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
     const stepKey = () => pg.locator('[data-guide]').getAttribute('data-step')
     const guideOpens = async () => { await one.open('/life'); await pg.locator('[data-guide]').waitFor({ timeout: 10000 }) }
     const path = () => new URL(pg.url()).pathname
+    const STEP_KEYS = ['welcome', 'you', 'areas', 'brain', 'things', 'done']
+    // a new person's site again: no tasks, only Career and Health on, no parts, no AI key, the guide not yet seen
+    const fresh = ({ key = '', area = '' } = {}) => {
+      bench(`frappe.set_user("Administrator")
+for n in frappe.get_all("Life Task", filters={"space": "${space}"}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+frappe.db.delete("Life Action Log", {"space": "${space}"})
+for n in frappe.get_all("Life Area", filters={"space": "${space}", "is_life_area": 0}, pluck="name"): frappe.delete_doc("Life Area", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Area", filters={"space": "${space}", "is_life_area": 1}, pluck="name"):
+    frappe.db.set_value("Life Area", n, "is_on", 1 if frappe.db.get_value("Life Area", n, "area_name") in ("Career", "Health") else 0)
+frappe.defaults.clear_default("lifeos_onboarding", parent="${user}")
+frappe.db.set_value("User", "${user}", "preferred_name", None)
+frappe.clear_cache()`)
+      keyIs(key)
+      fakeArea(area)
+    }
+    const toStep = async (key) => {
+      for (let guard = 0; guard < 8 && await stepKey() !== key; guard++) {
+        const was = await stepKey()
+        await pg.locator('[data-guide-next]').click()
+        await pg.waitForFunction((k) => document.querySelector('[data-guide]')?.dataset.step !== k, was, { timeout: 8000 })
+      }
+      must(await stepKey() === key, `could not reach ${key}`)
+    }
+    // open the guide on its first screen, with nothing left over from an earlier check
+    const openGuide = async (key = 'welcome') => {
+      await pg.evaluate(() => sessionStorage.clear())
+      await guideOpens()
+      await toStep(key)
+    }
+    const zoneTrigger = () => pg.locator('[data-guide-zone]').first()
+    const pickZone = async (city) => {
+      await zoneTrigger().click()
+      await pg.getByRole('option', { name: new RegExp(`— ${city} `) }).first().click()
+    }
 
-    await check('TODAY.17', `${width} px: the first visit opens the guide; skipping every step lands on Today and the guide does not return`, async () => {
+    await check('TODAY.17', `${width} px: the first visit opens the guide; Start, Next, Skip and Done land on Today and the guide does not return`, async () => {
+      fresh()
       await guideOpens()
       must(await stepKey() === 'welcome', 'the guide does not open on Welcome')
       must((await pg.locator('[data-guide-flow] li').count()) === 3, 'Welcome does not show Sources, Brain and Plan')
-      await pg.locator('[data-guide-next]').click()
-      for (const key of ['you', 'areas', 'things']) {
+      for (const key of ['welcome', 'you', 'areas']) {
+        must(await stepKey() === key, `expected the ${key} step, at ${await stepKey()}`)
+        await pg.locator('[data-guide-next]').click()
+        await pg.waitForFunction((k) => document.querySelector('[data-guide]')?.dataset.step !== k, key, { timeout: 8000 })
+      }
+      for (const key of ['brain', 'things']) {
         must(await stepKey() === key, `expected the ${key} step, at ${await stepKey()}`)
         await pg.locator('[data-guide-skip]').click()
+        await pg.waitForFunction((k) => document.querySelector('[data-guide]')?.dataset.step !== k, key, { timeout: 8000 })
       }
-      must(await stepKey() === 'next', 'the last step is not Next step')
-      await pg.locator('[data-guide-today]').click()
+      must(await stepKey() === 'done', 'the last step is not You are set up')
+      await pg.locator('[data-guide-next]').click() // Done
       await pg.waitForFunction(() => location.pathname === '/life/today', null, { timeout: 8000 })
       must(await pg.locator('[data-guide]').count() === 0, 'the guide is still open')
       await one.open('/life')
       await pg.waitForTimeout(1200)
       must(await pg.locator('[data-guide]').count() === 0, 'the guide came back after a reload')
-      must((await one.api('onboarding.state')).status === 'skipped', 'the guide is not recorded as skipped')
+      must((await one.api('onboarding.state')).done, 'the guide is not recorded as finished')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
@@ -559,14 +588,14 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
       reset()
       await check('TODAY.18', `${width} px: the guide shows one screen at a time and each screen fits the phone`, async () => {
         await guideOpens()
-        for (const key of ['welcome', 'you', 'areas', 'things', 'next']) {
+        for (const key of STEP_KEYS) {
           must(await stepKey() === key, `expected ${key}, at ${await stepKey()}`)
           must(await pg.locator('[data-guide-step]:visible').count() === 1, `${key}: more than one screen is shown`)
           must(!(await pg.evaluate(() => document.querySelector('[data-guide]').scrollWidth > window.innerWidth + 1)), `${key}: the screen scrolls sideways`)
-          if (key !== 'next') {
-            const box = await pg.locator('[data-guide-next]').boundingBox()
-            must(box && box.x >= 0 && box.x + box.width <= width, `${key}: the Next button is off the screen`)
-            await pg.locator('[data-guide-skip], [data-guide-next]').last().click()
+          const box = await pg.locator('[data-guide-next]').boundingBox()
+          must(box && box.x >= 0 && box.x + box.width <= width, `${key}: the Next button is off the screen`)
+          if (key !== 'done') {
+            await pg.locator('[data-guide-next]').click()
             await pg.waitForFunction((k) => document.querySelector('[data-guide]')?.dataset.step !== k, key, { timeout: 8000 })
           }
         }
@@ -592,41 +621,43 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.20', `${width} px: going through the guide sets the name and time zone, switches on a third area and turns three typed things into tasks with areas`, async () => {
-      reset()
+    await check('TODAY.20', `${width} px: going through the guide sets what to call the person and the time zone, switches on a third area, adds a part and turns three typed things into tasks with areas`, async () => {
+      fresh()
       await guideOpens()
       await pg.locator('[data-guide-next]').click() // Start
-      const name = `Asha Newcomer ${stamp}`
-      await pg.locator('[data-guide-name] input, input[data-guide-name]').first().fill(name)
-      await pg.locator('[data-guide-zone] select, select[data-guide-zone]').first().selectOption('Asia/Dubai')
+      await pg.locator('[data-guide-name] input, input[data-guide-name]').first().fill('Asha')
+      await pickZone('Dubai')
       await pg.locator('[data-guide-next]').click()
       await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'areas', null, { timeout: 8000 })
       must(await pg.locator('[data-guide-area][data-on="1"]').count() === 2, 'Career and Health are not the two areas on')
       await pg.locator('[data-guide-switch="Mind"]').click()
       await pg.waitForFunction(() => document.querySelector('[data-guide-area="Mind"]')?.dataset.on === '1', null, { timeout: 8000 })
+      await pg.locator('[data-guide-add-part="Career"]').click()
       await pg.locator('[data-guide-part-title] input, input[data-guide-part-title]').first().fill(`I49 part ${stamp}`)
       await pg.locator('[data-guide-part-add]').click()
-      await pg.locator('[data-guide-parts]').waitFor({ timeout: 8000 })
+      await pg.locator('[data-guide-area="Career"] [data-guide-part]').waitFor({ timeout: 8000 })
       await pg.locator('[data-guide-next]').click()
+      await pg.locator('[data-guide-skip]').click() // the AI key: later
       await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'things', null, { timeout: 8000 })
       const things = [`I49 book the dentist ${stamp}`, `I49 pay the electricity bill ${stamp}`, `I49 read a chapter of my book ${stamp}`]
       for (const [i, t] of things.entries()) await pg.locator(`[data-guide-thing="${i}"] input, input[data-guide-thing="${i}"]`).first().fill(t)
       await pg.locator('[data-guide-next]').click()
-      await pg.locator('[data-guide-made]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-guide-task]').first().waitFor({ timeout: 10000 })
       must(await pg.locator('[data-guide-task]').count() === 3, 'three tasks were not made')
       const areas = await pg.locator('[data-guide-task-area]').allInnerTexts()
       must(areas.every((a) => a && a !== 'No area'), 'a task has no area: ' + areas.join())
-      await pg.locator('[data-guide-next]').click() // Continue
-      await pg.locator('[data-guide-today]').click()
+      await pg.locator('[data-guide-next]').click() // on, to the end
+      must(/3 areas, 1 part, 3 tasks/.test(await pg.locator('[data-guide-summary]').innerText()), 'the summary is ' + await pg.locator('[data-guide-summary]').innerText())
+      await pg.locator('[data-guide-next]').click() // Done
       await pg.waitForFunction(() => location.pathname === '/life/today', null, { timeout: 8000 })
       const out = JSON.parse(bench(`import json
 doc = frappe.get_doc("User", "${user}")
 on = frappe.get_all("Life Area", filters={"space": "${space}", "is_life_area": 1, "is_on": 1}, pluck="area_name")
 tasks = frappe.get_all("Life Task", filters={"space": "${space}"}, fields=["title", "area"])
-print(json.dumps({"name": doc.full_name, "zone": frappe.db.get_single_value("System Settings", "time_zone"), "on": sorted(on),
+print(json.dumps({"name": doc.full_name, "call": doc.preferred_name, "zone": frappe.db.get_single_value("System Settings", "time_zone"), "on": sorted(on),
   "tasks": len(tasks), "unfiled": len([t for t in tasks if not t.area]),
   "part": frappe.db.exists("Life Area", {"space": "${space}", "area_name": "I49 part ${stamp}"}) is not None}))`).split('\n').pop())
-      must(out.name === name, 'the name is ' + out.name)
+      must(out.call === 'Asha' && out.name === 'Newcomer', `called ${out.call}, full name ${out.name}`)
       must(out.zone === 'Asia/Dubai', 'the time zone is ' + out.zone)
       must(out.on.join() === 'Career,Health,Mind', 'the areas on are ' + out.on.join())
       must(out.tasks === 3 && out.unfiled === 0, `tasks: ${out.tasks}, without an area: ${out.unfiled}`)
@@ -635,19 +666,256 @@ print(json.dumps({"name": doc.full_name, "zone": frappe.db.get_single_value("Sys
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.21', `${width} px: after the guide the ladder card shows level 2 and connect a source`, async () => {
+    await check('TODAY.21', `${width} px: after the guide the ladder card shows level 1 of 7 and the next step, the AI key`, async () => {
       await one.open('/life/today')
       if (phone) await pg.locator('[data-more-title]').click()
       const card = pg.locator('[data-setup-card]:visible')
       await card.waitFor({ timeout: 10000 })
       const t = await card.innerText()
-      must(t.includes('level 2 of 7'), 'the card says: ' + t.replace(/\n/g, ' | '))
-      must(/connect a source/i.test(t), 'the next step is not to connect a source: ' + t)
+      must(t.includes('level 1 of 7'), 'the card says: ' + t.replace(/\n/g, ' | '))
+      must(/AI key/i.test(t), 'the next step is not the AI key: ' + t)
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    // ---- issue 97: the guide's one layout, step by step. Every check starts from `fresh()` and opens the guide on the step it tests. ----
+    // what each step looks like, measured in the page, once for each colour scheme
+    const walked = {}
+    const walk = async (scheme, key = '') => {
+      if (walked[scheme]) return walked[scheme]
+      fresh({ key })
+      await pg.emulateMedia({ colorScheme: scheme })
+      await openGuide()
+      const out = []
+      for (const k of STEP_KEYS) {
+        await toStep(k)
+        await pg.mouse.move(1, 1) // off the button, so no hover colour
+        await pg.waitForTimeout(350)
+        out.push({ key: k, ...(await pg.evaluate(() => {
+          const g = document.querySelector('[data-guide]')
+          const last = g.querySelector('[data-guide-step]').lastElementChild
+          const foot = g.querySelector('[data-guide-footer]')
+          const style = (el) => { const c = getComputedStyle(el); return `${c.borderTopWidth} ${c.borderTopColor} ${c.backgroundColor}` }
+          const inputs = [...g.querySelectorAll('input, [role="combobox"]')].filter((e) => e.getBoundingClientRect().width).map(style)
+          const clipped = [...g.querySelectorAll('*')].filter((e) => !e.children.length && e.clientWidth && e.scrollWidth > e.clientWidth + 1).map((e) => (e.textContent || e.tagName).slice(0, 30))
+          const buttons = [...g.querySelectorAll('button')].map((b) => b.textContent.trim())
+          return { gap: foot.getBoundingClientRect().top - last.getBoundingClientRect().bottom, primary: getComputedStyle(g.querySelector('[data-guide-next]')).backgroundColor,
+            label: g.querySelector('[data-guide-next]').textContent.trim(), skip: !!g.querySelector('[data-guide-skip]'), inputs, clipped, buttons, text: g.innerText }
+        })) })
+      }
+      walked[scheme] = out
+      return out
+    }
+
+    await check('TODAY.31', `${width} px: on every step the footer sits under the content, within 48 px`, async () => {
+      for (const m of await walk('light')) must(m.gap >= 0 && m.gap <= 48, `${m.key}: the footer is ${Math.round(m.gap)} px under the content`)
+    })
+
+    await check('TODAY.32', `${width} px: every step has the same primary button colour, and every text box and select the same border and background`, async () => {
+      const all = await walk('light')
+      must(new Set(all.map((m) => m.primary)).size === 1, 'the primary button colours differ: ' + [...new Set(all.map((m) => m.primary))].join(' | '))
+      const styles = new Set(all.flatMap((m) => m.inputs))
+      must(all.some((m) => m.inputs.length) && styles.size === 1, 'the input styles differ: ' + [...styles].join(' | '))
+    })
+
+    await check('TODAY.33', `${width} px: the primary button reads Start, Next, Next, Next, Next, Done and nothing reads Continue`, async () => {
+      const all = await walk('light')
+      must(all.map((m) => m.label).join() === 'Start,Next,Next,Next,Next,Done', 'the labels are ' + all.map((m) => m.label).join())
+      must(!all.some((m) => m.buttons.includes('Continue')), 'a button reads Continue')
+    })
+
+    await check('TODAY.34', `${width} px: Skip is shown only where the step is optional and starts empty (the AI key, and what is on your mind)`, async () => {
+      const skips = (await walk('light')).filter((m) => m.skip).map((m) => m.key)
+      must(skips.join() === 'brain,things', 'Skip is on ' + skips.join())
+    })
+
+    await check('TODAY.35', `${width} px: Welcome shades none of its three cards`, async () => {
+      fresh()
+      await openGuide()
+      const bgs = await pg.locator('[data-guide-card]').evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor))
+      must(bgs.length === 3 && new Set(bgs).size === 1, 'the cards are shaded differently: ' + bgs.join(' | '))
+    })
+
+    await check('TODAY.36', `${width} px: You: the call-me field holds the first word of the full name, saving it leaves the full name, and the time zone reads as a place with its offset`, async () => {
+      fresh()
+      await openGuide('you')
+      must(await pg.locator('[data-guide-name] input, input[data-guide-name]').first().inputValue() === 'Newcomer', 'the field is not the first word of the full name')
+      must(await pg.getByText('What should we call you?').count() > 0, 'the field is not labelled "What should we call you?"')
+      const zone = await zoneTrigger().innerText()
+      must(zone.includes('Kolkata') && zone.includes('GMT+5:30') && zone.includes('India'), 'the time zone reads ' + zone)
+      must(await zoneTrigger().evaluate((e) => e.scrollHeight <= e.clientHeight), 'the time zone text is clipped')
+      await pg.locator('[data-guide-name] input, input[data-guide-name]').first().fill('Jai')
+      await pg.locator('[data-guide-next]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'areas', null, { timeout: 8000 })
+      const s = await one.api('onboarding.state')
+      must(s.call_me === 'Jai' && s.full_name === 'Newcomer', `called ${s.call_me}, full name ${s.full_name}`)
+    })
+
+    await check('TODAY.37', `${width} px: Areas: switching Money on and off changes no text under the title, and each switch is right of its area's name`, async () => {
+      fresh()
+      await openGuide('areas')
+      const line = () => pg.locator('[data-guide-line]').innerText()
+      const before = await line()
+      await pg.locator('[data-guide-switch="Money"]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide-area="Money"]')?.dataset.on === '1', null, { timeout: 8000 })
+      must(await line() === before, 'the line changed: ' + await line())
+      await pg.locator('[data-guide-switch="Money"]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide-area="Money"]')?.dataset.on === '0', null, { timeout: 8000 })
+      must(await line() === before, 'the line changed: ' + await line())
+      for (const area of ['Career', 'Money']) {
+        const name = await pg.locator(`[data-guide-area="${area}"] .text-base-medium`).first().boundingBox()
+        const sw = await pg.locator(`[data-guide-switch="${area}"]`).boundingBox()
+        must(sw.x > name.x + name.width - 1, `${area}: the switch is not to the right of the name`)
+      }
+    })
+
+    await check('TODAY.38', `${width} px: Areas: a part sits indented under its area with an ×, stays greyed as Kept when the area goes off, and there is no area drop-down`, async () => {
+      fresh()
+      await openGuide('areas')
+      await pg.locator('[data-guide-add-part="Career"]').click()
+      await pg.locator('[data-guide-part-title] input, input[data-guide-part-title]').first().fill(`Tea ${stamp}`)
+      await pg.locator('[data-guide-part-add]').click()
+      const part = pg.locator('[data-guide-area="Career"] [data-guide-part]')
+      await part.waitFor({ timeout: 8000 })
+      const head = await pg.locator('[data-guide-area="Career"] .text-base-medium').first().boundingBox()
+      must((await part.boundingBox()).x > head.x + 8, 'the part is not indented under Career')
+      must(await pg.locator('[data-guide] select, [data-guide-part-area]').count() === 0, 'the page has an area drop-down')
+      await pg.locator('[data-guide-switch="Career"]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide-area="Career"]')?.dataset.on === '0', null, { timeout: 8000 })
+      must(/Kept/.test(await part.innerText()) && await part.locator('[data-guide-part-remove]').count() === 0, 'the part is not shown as Kept')
+      await pg.locator('[data-guide-switch="Career"]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide-area="Career"]')?.dataset.on === '1', null, { timeout: 8000 })
+      await part.locator('[data-guide-part-remove]').click()
+      await part.waitFor({ state: 'detached', timeout: 8000 })
+    })
+
+    await check('TODAY.39', `${width} px: What's on your mind: three empty boxes with no placeholder`, async () => {
+      fresh()
+      await openGuide('things')
+      const boxes = await pg.locator('[data-guide-thing] input, input[data-guide-thing]').evaluateAll((els) => els.map((e) => [e.value, e.placeholder]))
+      must(boxes.length === 3 && boxes.every(([v, p]) => !v && !p), 'the boxes are ' + JSON.stringify(boxes))
+    })
+
+    // type one thing on the things step and press Next; the row's area label comes back
+    const file = async (text) => {
+      await pg.locator('[data-guide-thing="0"] input, input[data-guide-thing="0"]').first().fill(text)
+      await pg.locator('[data-guide-next]').click()
+      await pg.locator('[data-guide-task]').first().waitFor({ timeout: 10000 })
+      await pg.waitForFunction(() => !/Filing/.test(document.querySelector('[data-guide-task-area]')?.textContent || ''), null, { timeout: 12000 })
+      return (await pg.locator('[data-guide-task-area]').first().innerText()).trim()
+    }
+    const switchOn = async (area) => {
+      await pg.locator(`[data-guide-switch="${area}"]`).click()
+      await pg.waitForFunction((a) => document.querySelector(`[data-guide-area="${a}"]`)?.dataset.on === '1', area, { timeout: 8000 })
+    }
+
+    await check('TODAY.40', `${width} px: with a model that answers Money, the first thing shows Money, not Career`, async () => {
+      fresh({ key: 'fake-i97-key-0001', area: 'Money' })
+      await openGuide('areas')
+      await switchOn('Money')
+      await toStep('things')
+      must(await file('Finish tax return meeting') === 'Money', 'the row is not filed under Money')
+    })
+
+    await check('TODAY.41', `${width} px: with no AI key the first thing's label reads Not sure`, async () => {
+      fresh()
+      await openGuide('things')
+      must(await file('Finish tax return meeting') === 'Not sure', 'the label is not Not sure')
+    })
+
+    await check('TODAY.42', `${width} px: tapping the label and picking Health saves Health on the task and logs a correction`, async () => {
+      fresh()
+      await openGuide('things')
+      await file('Finish tax return meeting')
+      await pg.locator('[data-guide-task-area]').first().click()
+      await pg.getByRole('menuitem', { name: 'Health' }).click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide-task-area]')?.textContent.trim() === 'Health', null, { timeout: 8000 })
+      const out = bench(`t = frappe.get_all("Life Task", filters={"space": "${space}"}, fields=["name", "area"])[0]
+print(frappe.db.get_value("Life Area", t.area, "area_name"), frappe.db.count("Life Action Log", {"kind": "Area correction", "task": t.name}))`).split('\n').pop()
+      must(out === 'Health 1', 'the task and its correction are: ' + out)
+    })
+
+    await check('TODAY.43', `${width} px: a model that answers Relationships while it is off shows "Relationships (off)", and Switch on files the task there`, async () => {
+      fresh({ key: 'fake-i97-key-0001', area: 'Relationships' })
+      await openGuide('things')
+      must(await file('Call mum on Sunday') === 'Relationships (off)', 'the label is not "Relationships (off)"')
+      await pg.locator('[data-guide-task-area]').first().click()
+      await pg.getByRole('menuitem', { name: 'Switch on Relationships' }).click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide-task-area]')?.textContent.trim() === 'Relationships', null, { timeout: 8000 })
+      const out = bench(`t = frappe.get_all("Life Task", filters={"space": "${space}"}, fields=["name", "area"])[0]
+a = frappe.db.get_value("Life Area", t.area, ["area_name", "is_on"])
+print(a[0], a[1])`).split('\n').pop()
+      must(out === 'Relationships 1', 'the task is filed: ' + out)
+    })
+
+    await check('TODAY.44', `${width} px: the microphone hint shows on a phone and not on a computer`, async () => {
+      fresh()
+      await openGuide('things')
+      must((await pg.locator('[data-guide-mic]').count() === 1) === phone, `the hint is ${phone ? 'missing' : 'shown'}`)
+    })
+
+    await check('TODAY.45', `${width} px: You're set up: the summary counts what was made, no "level", and Done opens Today`, async () => {
+      fresh()
+      await openGuide('areas')
+      await pg.locator('[data-guide-add-part="Career"]').click()
+      await pg.locator('[data-guide-part-title] input, input[data-guide-part-title]').first().fill(`Tea ${stamp}`)
+      await pg.locator('[data-guide-part-add]').click()
+      await pg.locator('[data-guide-area="Career"] [data-guide-part]').waitFor({ timeout: 8000 })
+      await toStep('things')
+      await file('Pay the electricity bill')
+      await toStep('done')
+      must(await pg.locator('[data-guide-title]').innerText() === "You're set up", 'the title is wrong')
+      must(await pg.locator('[data-guide-summary]').innerText() === '2 areas, 1 part, 1 task', 'the summary is ' + await pg.locator('[data-guide-summary]').innerText())
+      must(!/level/i.test(await pg.locator('[data-guide]').innerText()), 'the page says "level"')
+      must(await pg.locator('[data-guide-brain-off]').count() === 1, 'it does not say the Brain is off')
+      await pg.locator('[data-guide-next]').click()
+      await pg.waitForFunction(() => location.pathname === '/life/today', null, { timeout: 8000 })
+    })
+
+    await check('TODAY.46', `${width} px: every step in light and dark: no script error and no clipped text`, async () => {
+      for (const scheme of ['light', 'dark']) {
+        for (const m of await walk(scheme)) must(!m.clipped.length, `${scheme}, ${m.key}: clipped text: ${m.clipped.join(' | ')}`)
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      await pg.emulateMedia({ colorScheme: 'light' })
+    })
+
+    await check('TODAY.47', `${width} px: with no key the AI key step comes between areas and first things, and Skip goes on to first things`, async () => {
+      fresh()
+      await openGuide('areas')
+      await pg.locator('[data-guide-next]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'brain', null, { timeout: 8000 })
+      must(await pg.locator('[data-guide-title]').innerText() === 'Turn on the Brain', 'the title is wrong')
+      must(await pg.locator('[data-guide-key-help]').innerText() === 'Where do I get a key?', 'there is no key link')
+      await pg.locator('[data-guide-skip]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'things', null, { timeout: 8000 })
+    })
+
+    await check('TODAY.48', `${width} px: a fake key is saved and shows "The Brain is on", and the first thing then gets the model's area`, async () => {
+      fresh()
+      await openGuide('brain')
+      await pg.locator('[data-guide-key] input, input[data-guide-key]').first().fill('fake-i97-key-0002')
+      await pg.locator('[data-guide-next]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'things', null, { timeout: 12000 })
+      must((await one.api('onboarding.state')).ai_set, 'the key was not saved')
+      must(bench('from lifeos.ai import client\nprint(client.api_key() == "fake-i97-key-0002")').split('\n').pop() === 'True', 'the key was not stored')
+      must(bench('print(frappe.db.get_value("Life Settings", None, "anthropic_api_key") != "fake-i97-key-0002")').split('\n').pop() === 'True', 'the key is stored in the clear')
+      const label = await file('Finish tax return meeting')
+      must(label && label !== 'Not sure', 'the label is ' + label)
+    })
+
+    await check('TODAY.49', `${width} px: with a key already set, the step shows "The Brain is on" and Next goes straight on`, async () => {
+      fresh({ key: 'fake-i97-key-0003' })
+      await openGuide('brain')
+      must(await pg.locator('[data-guide-brain-on]').innerText().then((t) => /The Brain is on/.test(t)), 'it does not say the Brain is on')
+      must(await pg.locator('[data-guide-skip]').count() === 0 && await pg.locator('[data-guide-key]').count() === 0, 'it still asks for a key')
+      await pg.locator('[data-guide-next]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-guide]')?.dataset.step === 'things', null, { timeout: 8000 })
     })
   } finally {
     if (one) await one.ctx.close()
     restore()
+    keyIs(keyWas)
+    fakeArea('')
   }
 }
 
@@ -856,5 +1124,112 @@ update_site_config("lifeos_fake_ai_error", {})`)
     })
   } finally {
     if (one) await one.ctx.close()
+  }
+}
+
+// Issue 99: notes on events, hiding a Google event, all-day dates, the week's bars and its drawer. Two events that came from Google are made
+// in the week of today (Google's all-day end is the day after the last day), and removed after.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const { pg, s, settle } = await uxKit(width)
+  const D = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const M = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const mon = plusDays(today, -((new Date(today + 'T12:00:00Z').getUTCDay() + 6) % 7))
+  const [tue, wed, thu] = [1, 2, 3].map((n) => plusDays(mon, n))
+  const dm = (d) => `${Number(d.slice(8))} ${M[Number(d.slice(5, 7)) - 1]}`
+  const wedding = `Wedding ${stamp} ${width}`, trip = `Trip ${stamp} ${width}`, mine = `Lunch ${stamp} ${width}`
+  const make = (title, a, b, google) => bench(`import json
+d = frappe.get_doc({"doctype": "Event", "subject": "${title}", "starts_on": "${a}", "ends_on": "${b}", "all_day": ${google ? 1 : 0}, "event_type": "Public", "life_space": "Private", "pulled_from_google_calendar": ${google ? 1 : 0}}).insert(ignore_permissions=True)
+print(d.name)`).split('\n').pop()
+  const ev = {
+    wedding: make(wedding, `${mon} 00:00:00`, `${tue} 00:00:00`, true), trip: make(trip, `${tue} 00:00:00`, `${thu} 00:00:00`, true),
+    mine: make(mine, `${wed} 12:00:00`, `${wed} 13:00:00`, false),
+  }
+  const chip = (name) => pg.locator(`[data-week-grid] [data-ref="event:${name}"]`)
+  const open = async (name) => { await s.open('/life/today/week'); await pg.locator('[data-week-grid]').waitFor({ timeout: 10000 }); await pg.locator(`[data-ref="event:${name}"]`).first().click(); await settle() }
+  try {
+    await check('TODAY.50', `${width} px: an event in Week opens without "Open full page", the path reads "Week / Event" and a note shows at once`, async () => {
+      await open(ev.mine)
+      must(await pg.locator('[data-pane-full]').count() === 0, 'an event has Open full page')
+      must((await pg.locator('[data-pane-path]').innerText()).trim() === 'Week / Event', 'the path reads ' + await pg.locator('[data-pane-path]').innerText())
+      await pg.locator('[data-note-box]').fill(`Bring the deck ${stamp}`)
+      await pg.locator('[data-note-add]').click()
+      await pg.locator('[data-note]', { hasText: `Bring the deck ${stamp}` }).waitFor({ timeout: 8000 })
+      must((await pg.locator('[data-note]').first().innerText()).includes('You'), 'the note does not say who wrote it')
+      await pg.locator('[data-note-make-task]').first().click()
+      await pg.locator('[data-note-task]').first().waitFor({ timeout: 8000 })
+      // it is still there after the pane is closed and opened again
+      await open(ev.mine)
+      must(await pg.locator('[data-note]', { hasText: `Bring the deck ${stamp}` }).count() === 1, 'the note is gone after reopening')
+      await pg.locator('[data-note-delete]').first().click()
+      await pg.getByRole('button', { name: 'Delete', exact: true }).last().click()
+      await pg.locator('[data-notes-empty]').waitFor({ timeout: 8000 })
+    })
+    await check('TODAY.51', `${width} px: a Google event offers Hide in Life OS (not red, no Remove); hiding it takes it off the week and Show hidden events brings it back`, async () => {
+      await open(ev.wedding)
+      const hide = pg.locator('[data-event-hide]')
+      must(await hide.count() === 1 && !/red/.test(await hide.getAttribute('class')), 'no plain Hide in Life OS button')
+      must(await pg.locator('[data-event-delete]').count() === 0 && await pg.getByRole('button', { name: 'Remove' }).count() === 0, 'a Google event can be removed')
+      await hide.click()
+      await pg.locator('[data-pane]').waitFor({ state: 'detached', timeout: 8000 })
+      await settle()
+      must(await chip(ev.wedding).count() === 0, 'a hidden event is still on the week')
+      must(bench(`print(frappe.db.exists("Event", "${ev.wedding}") and frappe.db.get_value("Event", "${ev.wedding}", "life_hidden"))`).split('\n').pop() === '1', 'the flag is not set, or the event is gone')
+      await pg.locator('[data-week-menu]').click()
+      await pg.getByRole('menuitem', { name: 'Show hidden events' }).click()
+      await chip(ev.wedding).first().waitFor({ timeout: 8000 })
+      await chip(ev.wedding).first().click()
+      await settle()
+      await pg.locator('[data-event-show]').click()
+      await settle()
+    })
+    await check('TODAY.52', `${width} px: a Google all-day event reads "weekday, day month · all day"; a two-day one is one bar across its days`, async () => {
+      await open(ev.wedding)
+      const want = `${D[new Date(mon + 'T12:00:00Z').getUTCDay()]}, ${dm(mon)} · all day`
+      must((await pg.locator('[data-event-when]').innerText()).trim() === want, `reads "${await pg.locator('[data-event-when]').innerText()}", not "${want}"`)
+      await open(ev.trip)
+      const want2 = `${Number(tue.slice(8))}–${dm(wed)} · all day`
+      must((await pg.locator('[data-event-when]').innerText()).trim() === want2, `reads "${await pg.locator('[data-event-when]').innerText()}", not "${want2}"`)
+      await pg.keyboard.press('Escape')
+      await settle()
+      must(await pg.locator(`[data-week-bar][data-ref="event:${ev.trip}"]`).count() === 1, 'the trip is not one bar')
+      must(await chip(ev.trip).count() === 0, 'the trip is also a card on each day')
+      if (!phone) {
+        const bar = await pg.locator(`[data-week-bar][data-ref="event:${ev.trip}"]`).boundingBox()
+        const day = await pg.locator('[data-week-grid] [data-day]').first().boundingBox()
+        must(bar.width > day.width * 1.8, `the bar (${bar.width}) does not span two days (${day.width})`)
+      }
+    })
+    if (!phone) await check('TODAY.53', `${width} px: with the drawer open all seven day headers of Week are visible`, async () => {
+      await open(ev.mine)
+      const pane = await pg.locator('[data-pane]').boundingBox()
+      const heads = await pg.locator('[data-week-grid] [data-open-day]').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, w: r.width } }))
+      must(heads.length === 7 && heads.every((h) => h.w > 0 && h.r <= pane.x + 1 && h.l >= 0), `the days are ${JSON.stringify(heads)} beside a drawer at ${pane.x}`)
+    })
+    await check('TODAY.54', `${width} px: the Week toolbar has no Reset and nothing cut off, the heading is the dates, and + Capture offers Important date`, async () => {
+      for (const url of ['/life/today/week?view=calendar', '/life/today/week']) {
+        await s.open(url)
+        await pg.locator('[data-page-head]').waitFor({ timeout: 10000 })
+        const head = await pg.locator('[data-page-head]').evaluate((el) => ({ text: el.innerText, cut: el.scrollWidth > el.clientWidth + 1, page: document.documentElement.scrollWidth > window.innerWidth + 1 }))
+        must(!/Reset|Add important/.test(head.text) && !head.cut && !head.page, `the toolbar on ${url}: ${JSON.stringify(head)}`)
+        must(/^\d+( [A-Za-z]+)? – \d+ [A-Za-z]+/m.test(head.text), `the heading on ${url} is not a date range: ${head.text.slice(0, 80)}`)
+      }
+      await s.open('/life')
+      await pg.locator(phone ? '[data-tabbar] [data-tab-capture]' : '[data-nav-capture]').click()
+      await settle()
+      await pg.locator('[data-capture-kind="date"]').click()
+      await pg.getByRole('dialog', { name: 'Add important date' }).waitFor({ timeout: 8000 })
+      await pg.keyboard.press('Escape')
+    })
+    await check('TODAY.55', `${width} px: Day has no builder's note under "Today"`, async () => {
+      await s.open('/life/today')
+      await pg.locator('[data-next]').waitFor({ timeout: 10000 })
+      must(!/the top three, what is due/i.test(await pg.locator('[data-next]').innerText()), 'the note is still there')
+    })
+  } finally {
+    bench(`for n in ${JSON.stringify(Object.values(ev))}:
+    frappe.db.delete("Comment", {"reference_doctype": "Event", "reference_name": n})
+    frappe.db.delete("Life Task", {"event": n})
+    frappe.delete_doc("Event", n, force=1, ignore_permissions=True)`)
   }
 }

@@ -1032,8 +1032,13 @@ print(json.dumps(out))`).split('\n').pop()))
       must(n.area === uxArea && n.goal === ux.goal, 'the note was not filed to the chosen area and goal')
       must(n.image && (await pg.request.get(base + n.image)).ok(), 'the photo is not attached')
       // found by a word of the transcript
-      const found = await owner.api('search.query', { text: 'MoneyOS', space: SPACE, limit: 100 })
-      must(found.results.some((r) => r.ref_name === note), 'search does not find the page by a word of its transcript')
+      // the index is written by a background job a moment after the save, so ask again for up to 30 seconds
+      let found = false
+      for (let i = 0; i < 30 && !found; i++) {
+        found = (await owner.api('search.query', { text: 'MoneyOS', space: SPACE, limit: 100 })).results.some((r) => r.ref_name === note)
+        if (!found) await pg.waitForTimeout(1000)
+      }
+      must(found, 'search does not find the page by a word of its transcript')
       // listed in Library > Notes, and on its goal's page
       await s.open('/life/library/notes?view=list&all=1')
       await pg.getByText(n.title).filter({ visible: true }).first().waitFor({ timeout: 15000 })
@@ -1050,3 +1055,59 @@ for dt, n in (("Life Note", "${note || ''}"), ("Life Inbox Item", "${item || ''}
     await s.ctx.close()
   }
 }
+
+// Search covers the whole app (issue 98): Frappe's Global Search, screens by name, and Ask without a key
+{
+  const subject = `RSH Global ${stamp}`
+  const event = bench(`ev = frappe.get_doc({"doctype": "Event", "subject": "${subject}", "starts_on": frappe.utils.today() + " 16:00:00", "event_type": "Private", "life_space": "Private"}).insert(ignore_permissions=True)
+frappe.db.commit()
+print(ev.name)`).split('\n').pop()
+  const pg = owner.page
+  // the index is written by a background job a moment after the save: wait until search finds the event
+  for (let i = 0; i < 30; i++) {
+    const r = await owner.api('search.query', { text: `rsh ${stamp}`, limit: 5 })
+    if (r.results.some((x) => x.ref_name === event)) break
+    await owner.page.waitForTimeout(1000)
+  }
+  const palette = async (text) => {
+    await owner.open('/life/today')
+    await pg.keyboard.press('Meta+k')
+    await pg.locator('input[aria-label="Search or ask anything"]').fill(text)
+    await pg.waitForTimeout(1200)
+  }
+  try {
+    await check('LIBRARY.39', '1440 px: search finds a calendar event by the start of a word, under Events, and Enter opens its drawer', async () => {
+      await palette(`rsh ${stamp}`)
+      const group = pg.locator('[data-search-group="Events"]')
+      must(await group.count() === 1 && (await group.innerText()).includes(subject), 'the event is not under Events')
+      await pg.keyboard.press('Enter')
+      await pg.waitForTimeout(1200)
+      must(new URL(pg.url()).searchParams.get('open') === `event:${event}`, `Enter did not open the event: ${pg.url()}`)
+      must((await pg.locator('[data-pane-title]').innerText()).includes(subject), 'the drawer shows another record')
+    })
+    await check('LIBRARY.40', '1440 px: "ai key" offers Settings › AI and Enter opens it', async () => {
+      await palette('ai key')
+      must((await pg.locator('[data-search-screen]').first().innerText()).includes('Settings › AI'), 'Settings › AI is not offered')
+      await pg.keyboard.press('Enter')
+      await pg.waitForTimeout(1200)
+      const u = new URL(pg.url())
+      must(u.pathname === '/life/settings' && u.searchParams.get('tab') === 'advanced' && u.searchParams.get('part') === 'ai', `Enter went to ${pg.url()}`)
+    })
+    await check('LIBRARY.41', '1440 px: with no AI key, Ask says it needs one, links to Settings › AI, and shows what search finds for the same words', async () => {
+      bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = None; s.save()')
+      try {
+        await palette(`rsh ${stamp}`)
+        await pg.locator('[data-search-ask]').click()
+        await pg.locator('[data-refusal="not_set_up"]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-ask-refusal]').innerText()).includes('Ask needs an AI key. Add one in Settings › AI.'), 'the key message is not shown')
+        must((await pg.locator('[data-ask-key-link]').getAttribute('href')).includes('part=ai'), 'the link does not go to Settings › AI')
+        must((await pg.locator('[data-ask-search-hits]').innerText()).includes(subject), 'the search result is not under the message')
+      } finally {
+        bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()')
+      }
+    })
+  } finally {
+    bench(`frappe.delete_doc("Event", "${event}", force=1, ignore_permissions=True)`)
+  }
+}
+

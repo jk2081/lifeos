@@ -83,6 +83,7 @@ const MORE = [
   { key: 'files', label: 'Files or a photo', icon: 'lucide-paperclip', run: () => { showFiles.value = true } },
   { key: 'goal', label: 'Goal', icon: 'lucide-target', run: () => { close(); store.newKind = 'goal' } },
   { key: 'note', label: 'Note', icon: 'lucide-file-text', run: () => { close(); store.newKind = 'note' } },
+  { key: 'date', label: 'Important date', icon: 'lucide-cake', run: () => { close(); store.newKind = 'date' } },
   { key: 'someday', label: 'Park on Someday', icon: 'lucide-lightbulb', run: () => { close(); store.newKind = 'someday' } },
 ]
 

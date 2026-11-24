@@ -24,7 +24,7 @@ from lifeos.ai import fake
 from lifeos.api import archive, ask, chats, client_errors, connections, goals, graph, inbox, library, search, session, settings, someday, sources, tasks, timeline, today as today_api, vault
 from lifeos.api.utils import in_area
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
-from lifeos.tests.helpers import answer, AskCase, item, task, text
+from lifeos.tests.helpers import answer, AskCase, find, item, task, text
 
 
 class TestSpacePermissions(LifeTestCase):
@@ -611,12 +611,12 @@ class TestCleanup(IntegrationTestCase):
 		files = {p.resolve() for p in SRC.rglob("*") if p.suffix in (".vue", ".js")}
 		self.assertEqual(sorted(str(p.relative_to(SRC.resolve())) for p in files - seen), [])
 
-	def test_patches_txt_is_empty_and_a_site_installs_and_migrates_without_patches(self):
-
+	def test_patches_txt_lists_only_the_search_index_patch_and_a_site_installs_and_migrates(self):
+		# issue 98: the one patch indexes the records that exist for Global Search; the schema still comes from the DocTypes
 		lines = [x.strip() for x in (APP_cleanup / "patches.txt").read_text().splitlines()]
-		self.assertEqual([x for x in lines if x and not x.startswith(("#", "["))], [])
-		self.assertFalse((APP_cleanup / "patches").exists())
-		self.assertEqual(get_patches_from_app("lifeos"), [])
+		self.assertEqual([x for x in lines if x and not x.startswith(("#", "["))], ["lifeos.patches.index_global_search"])
+		self.assertEqual(sorted(p.name for p in (APP_cleanup / "patches").glob("*.py")), ["__init__.py", "index_global_search.py"])  # glob order is the file system's
+		self.assertEqual(get_patches_from_app("lifeos"), ["lifeos.patches.index_global_search"])
 		install.after_migrate()
 		install.after_migrate()  # again: the schema comes from the DocTypes and setup is repeatable
 
@@ -821,9 +821,9 @@ class TestLens(LifeTestCase):
 
 	def test_search(self):
 		names = self.filed("Life Note", content_md="zanzibarlens")
-		res = search.query(text="zanzibarlens", space=PRIVATE, area=self.parent)
+		res = find("zanzibarlens", space=PRIVATE, area=self.parent)
 		self.check(names, [r.ref_name for r in res["results"]], "search.query")
-		self.assertEqual(len(search.query(text="zanzibarlens", space=PRIVATE)["results"]), 3)
+		self.assertEqual(len(find("zanzibarlens", space=PRIVATE)["results"]), 3)
 
 	def test_counts_and_today(self):
 		names = self.filed("Life Task", status="Open", due_date=today())

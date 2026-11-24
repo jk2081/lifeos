@@ -23,24 +23,31 @@
       </div>
     </template>
     <Alert v-if="ask.refusal" :theme="ask.refusal.error === 'cap' ? 'amber' : 'gray'" :title="ask.refusal.error_text" data-ask-refusal :data-refusal="ask.refusal.error">
-      <template v-if="ask.refusal.error === 'not_set_up'">An administrator adds the Anthropic API key in Settings, Advanced, AI key and cost.
-        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'advanced' } }" @click="ask.open = false">Open the setting</RouterLink></template>
-      <template v-else-if="ask.refusal.error === 'cap'">{{ ask.refusal.spend?.text }}. The cap is in
-        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'advanced' } }" @click="ask.open = false">Settings, Advanced, AI key and cost</RouterLink>.</template>
-      <template v-else-if="ask.refusal.error === 'off'">The owner can turn it on in
-        <RouterLink v-if="manySpaces" class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'members', view: 'spaces' } }" @click="ask.open = false">Settings, Members, Spaces</RouterLink>
-        <RouterLink v-else class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'advanced' } }" @click="ask.open = false">Settings, Advanced</RouterLink>.</template>
+      <template #description>
+        <template v-if="ask.refusal.error === 'not_set_up'">
+          <RouterLink v-if="store.isAdmin" class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'advanced', part: 'ai' } }" data-ask-key-link @click="ask.open = false">Open Settings › AI</RouterLink>
+          <template v-else>An administrator adds the key in Settings › AI.</template></template>
+        <template v-else-if="ask.refusal.error === 'cap'">{{ ask.refusal.spend?.text }}. The cap is in
+          <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'advanced' } }" @click="ask.open = false">Settings, Advanced, AI key and cost</RouterLink>.</template>
+        <template v-else-if="ask.refusal.error === 'off'">The owner can turn it on in
+          <RouterLink v-if="manySpaces" class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'members', view: 'spaces' } }" @click="ask.open = false">Settings, Members, Spaces</RouterLink>
+          <RouterLink v-else class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'advanced' } }" @click="ask.open = false">Settings, Advanced</RouterLink>.</template>
+      </template>
     </Alert>
+    <AskSearchHits v-if="ask.refusal && ask.refusal.error === 'not_set_up' && lastQuestion" :query="lastQuestion" />
   </div>
 </template>
 <script setup>
 // One Ask thread: questions on the right, answers with numbered citations, the suggested actions and the sources.
 // Clicking a citation opens the record in the pane; a suggested action changes nothing until it is clicked.
 import { useMediaQuery } from '@vueuse/core'
+import { computed } from 'vue'
 import { Alert, Button, LoadingIndicator } from 'frappe-ui'
 import Md from '../Md.vue'
 import { manySpaces } from '@/lib/lens'
-import { canWrite } from '@/lib/store'
+import { canWrite, store } from '@/lib/store'
+import AskSearchHits from './AskSearchHits.vue'
 import { ask, openCite, runAction } from '@/lib/ask'
 const phone = useMediaQuery('(max-width: 767px)')
+const lastQuestion = computed(() => [...ask.messages].reverse().find((m) => m.role === 'user')?.text || '')
 </script>

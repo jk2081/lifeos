@@ -12,6 +12,8 @@ MEETING_FIELDS = [
 	{"fieldname": "life_matters", "label": "Life Matters", "fieldtype": "Check", "insert_after": "life_recurring"},
 	{"fieldname": "life_matters_set_by", "label": "Life Matters Set By", "fieldtype": "Select", "options": "\nRule\nOwner",
 		"insert_after": "life_matters"},
+	{"fieldname": "life_hidden", "label": "Hidden in Life OS", "fieldtype": "Check", "insert_after": "life_matters_set_by", "no_copy": 1,
+		"description": "Life OS stops showing this event. Set from the event's drawer; nothing is deleted or sent to Google."},
 	{"fieldname": "life_followups_on", "label": "Life Follow-ups Read On", "fieldtype": "Datetime", "insert_after": "life_matters_set_by",
 		"read_only": 1},
 ]
@@ -29,6 +31,10 @@ FILE_FIELDS = [
 	{"fieldname": "life_version_of", "label": "Life OS Earlier Version Of", "fieldtype": "Data", "insert_after": "life_sha256",
 		"read_only": 1, "search_index": 1, "no_copy": 1, "description": "The current File row this earlier version was replaced by."},
 ]
+
+
+# issue 97: what the person likes to be called; the full name on the account is left alone
+USER_FIELDS = [{"fieldname": "preferred_name", "label": "Preferred Name", "fieldtype": "Data", "insert_after": "last_name", "no_copy": 1}]
 
 
 def make_file_fields():
@@ -51,11 +57,14 @@ def setup():
 			"insert_after": "event_type", "search_index": 1,
 		}, *MEETING_FIELDS],
 		"Google Calendar": GOOGLE_FIELDS,
+		"User": USER_FIELDS,
 		"File": FILE_FIELDS,
 	}, ignore_validate=True)
 	from lifeos.library import index
 	index.ensure_indexes()
 	make_spaces()
+	from lifeos.library import globalsearch
+	globalsearch.install()  # issue 98: search covers the whole app, through Frappe's Global Search
 	from lifeos.skills import runner, store
 
 	runner.ensure_brain_user()  # issue 28: the user skills run as

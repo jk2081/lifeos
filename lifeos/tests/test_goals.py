@@ -14,7 +14,7 @@ from lifeos.api import area, focus, goals, inbox, library, links, reset, review,
 from lifeos.life.doctype.life_goal.life_goal import derive_horizon
 from lifeos.review import stale
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
-from lifeos.tests.helpers import item, set_key, task, text
+from lifeos.tests.helpers import find, item, set_key, task, text
 
 
 class JournalCase(LifeTestCase):
@@ -1271,7 +1271,7 @@ class TestAgentsAndTheVault(LifeTestCase):
 		seen["count"] = vault.list(space=PRIVATE, filters=frappe.as_json([["title", "like", "ux3 secret%"]]))["total"] > 0
 		seen["rest"] = bool(frappe.get_list("Life Vault Document", filters={"name": self.doc.name}))
 		seen["index"] = bool(frappe.get_list("Life Index", filters={"ref_name": self.doc.name}))
-		seen["search"] = any(r.ref_name == self.doc.name for r in search.query("ux3vaultword")["results"])
+		seen["search"] = any(r.ref_name == self.doc.name for r in find("ux3 secret")["results"])  # a Vault document is found by its title only (issue 98)
 		entries = [e for d in timeline.get(space=PRIVATE, page_length=200)["days"] for e in d["entries"]]
 		seen["timeline"] = any(e.ref_name == self.doc.name for e in entries)
 		# area pages went in set 6: the lens narrows the timeline to the area instead

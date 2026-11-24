@@ -311,7 +311,6 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
         await via('/life/library', '[data-place-link="timeline"]', '/life/library/timeline')
         await via('/life/library/documents', '[data-place-link="sensitive"]', '/life/library/documents', { sensitive: '1', tab: 'documents' })
         await via('/life/goals/tasks', '[data-all-tasks-reset]', '/life/settings', { tab: 'data' }) // issue 55: Reset moved from Today's band to All tasks; issue 72: it is Settings > Data
-        await via('/life/today/week?view=calendar', '[data-plan-reset]', '/life/settings', { tab: 'data' })
         // Settings > Data lists every page with no other home
         await s.open('/life/settings?tab=places')
         const listed = await pg.locator('[data-settings-places] [data-elsewhere]').evaluateAll((els) => els.map((e) => e.getAttribute('data-elsewhere')))
