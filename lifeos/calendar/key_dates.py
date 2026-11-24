@@ -37,6 +37,13 @@ def track_change(doc):
 		doc.flags.ask_key_date = True
 
 
+def backfill():
+	"""The events made before key dates existed get the rule's answer (run by the migrate step; it only touches events that were never judged)."""
+	for name in frappe.get_all("Event", filters={"life_key_date_set_by": ("in", ["", None])}, pluck="name", limit=100000, ignore_permissions=True):  # system: a migrate step
+		doc = frappe.get_doc("Event", name)
+		frappe.db.set_value("Event", name, {"life_key_date": by_rule(doc), "life_key_date_set_by": "Rule"}, update_modified=False)
+
+
 def model_possible() -> bool:
 	f = frappe.flags
 	if f.in_install or f.in_migrate or f.in_patch or f.in_import:

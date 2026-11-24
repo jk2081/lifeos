@@ -64,6 +64,8 @@ def setup():
 		"User": USER_FIELDS,
 		"File": FILE_FIELDS,
 	}, ignore_validate=True)
+	from lifeos.calendar import key_dates
+	key_dates.backfill()  # issue 100: the events already on the calendar get the rule's answer
 	from lifeos.library import index
 	index.ensure_indexes()
 	make_spaces()
