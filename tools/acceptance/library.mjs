@@ -1179,7 +1179,7 @@ print(json.dumps({"org": org, "people": people, "emails": emails, "part": part})
         must((await pg.locator('[data-page-open] [data-open-task]').innerText()).includes('send the quote'), 'Open does not list the linked task')
         must((await pg.locator('[data-page-people] [data-page-person]').count()) === 2, 'People does not list the two people')
         must((await pg.locator('[data-page-files] [data-page-file]').count()) === 3, 'Files does not list the three files')
-        must((await pg.locator('[data-page-timeline] [data-timeline-row]').count()) === 4, 'the Timeline does not list the four emails')
+        must((await pg.locator('[data-page-timeline] [data-timeline-row]', { hasText: `${T} email ` }).count()) === 4, 'the Timeline does not list the four emails')  // LIBRARY.43 at the first width links one more item
         must(await pg.locator('[data-page-timeline] [data-timeline-row][data-kind="Email"] .lucide-mail').first().isVisible(), 'a timeline line has no kind icon')
         must(await pg.locator('[data-page-notes] [data-notes-input]').isVisible(), 'no Your notes')
         await pg.locator('[data-brief-source][data-n="2"]').click()
