@@ -555,10 +555,10 @@ const memberSpace = ref('')
 // The menu (issue 44): eight items in four groups and Advanced at the foot. `level` is the first level of the ladder at which a person
 // who is not a Life Admin sees the item; a Life Admin sees all. A page left out of the menu is still reached by its link.
 const MENU = [
-  { key: 'me', label: 'Me', items: [{ value: 'profile', label: 'Profile', level: 1 }, { value: 'calendar', label: 'Calendar', level: 2 }] },
-  { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas', level: 1 }, { value: 'rhythms', label: 'Rhythms', level: 4 }, { value: 'habits', label: 'Habits', level: 3 }, { value: 'data', label: 'Data', level: 4 }] },
-  { key: 'brain', label: 'Brain', items: [{ value: 'sources', label: 'Sources', level: 1 }, { value: 'rules', label: 'Rules', level: 3 }] },
-  { key: 'people', label: 'People and agents', items: [{ value: 'members', label: 'Members', level: 6, admin: true }] },
+  { key: 'me', label: 'Me', items: [{ value: 'profile', label: 'Profile', level: 1 }, { value: 'calendar', label: 'Calendar', level: 3 }] },
+  { key: 'space', label: 'Your life', items: [{ value: 'areas', label: 'Areas', level: 1 }, { value: 'rhythms', label: 'Rhythms', level: 5 }, { value: 'habits', label: 'Habits', level: 4 }, { value: 'data', label: 'Data', level: 5 }] },
+  { key: 'brain', label: 'Brain', items: [{ value: 'sources', label: 'Sources', level: 1 }, { value: 'rules', label: 'Rules', level: 4 }] },
+  { key: 'people', label: 'People and agents', items: [{ value: 'members', label: 'Members', level: 7, admin: true }] },
   { key: 'advanced', label: '', items: [{ value: 'advanced', label: 'Advanced', level: 1, admin: true }] },
 ]
 const ADVANCED = [{ label: 'AI key and cost', value: 'ai' }, { label: 'Import and export', value: 'import' }, { label: 'Backups', value: 'backups' },
@@ -572,7 +572,7 @@ const isAdmin = computed(() => !!d.value?.is_admin)
 // items that need a Life Admin (Members, Advanced) are never shown to anyone else; the rest by the person's level
 const seen = (it) => (it.admin ? isAdmin.value : true) && (isAdmin.value || ladder.level >= it.level)
 const groups = computed(() => MENU.map((g) => ({ ...g, items: g.items.filter(seen) })).filter((g) => g.items.length))
-// "Rhythms at level 4, Members at level 6": what is still to come, for a person who is not a Life Admin
+// "Rhythms at level 5, Members at level 7": what is still to come, for a person who is not a Life Admin
 const later = computed(() => {
   if (isAdmin.value) return ''
   const hidden = MENU.flatMap((g) => g.items).filter((it) => !it.admin && !seen(it) && it.value !== 'sources').sort((x, y) => x.level - y.level)

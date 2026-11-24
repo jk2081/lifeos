@@ -594,12 +594,15 @@ class TestLadder(LifeTestCase):
 	def setUp(self):
 		super().setUp()
 		self.as_user("Administrator")
-		for dt in ("Life Task", "Life Inbox Item", "Life Goal", "Life Review"):
+		for dt in ("Life Task", "Life Inbox Item", "Life Goal", "Life Review", "Life Connection"):
 			frappe.db.delete(dt, {"space": HER} if dt != "Life Review" else {"user": ANYA})
 		frappe.db.delete("Life Space Member", {"parent": HER, "user": ("!=", ANYA)})
 		frappe.db.set_value("Life Area", {"space": HER}, "is_on", 0)
 		frappe.defaults.clear_default(ladder.DISMISSED_KEY, parent=ANYA)
 		ladder.forget(ANYA)
+		key = patch("lifeos.ai.client.is_set_up", return_value=True)  # a site with a key; the tests of the key itself say otherwise
+		key.start()
+		self.addCleanup(key.stop)
 
 	def level(self):
 		ladder.forget(ANYA)
@@ -620,43 +623,66 @@ class TestLadder(LifeTestCase):
 	def test_1_each_step_moves_the_level_up_by_one(self):
 		self.assertEqual(self.level()["level"], 1)
 		self.mk("Life Task", title="i26 task")
-		self.assertEqual(self.level()["level"], 1)
+		self.assertEqual(self.level()["level"], 2)  # the key is set, so the task app and the key are done
 		self.mk("Life Inbox Item", title="i26 mail", source_type="Email", source_system="gmail")
-		self.assertEqual(self.level()["level"], 2)
-		self.areas_on(3)
-		self.assertEqual(self.level()["level"], 2)  # three areas but no goal yet
-		self.mk("Life Goal", title="i26 goal", horizon="Year", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
 		self.assertEqual(self.level()["level"], 3)
-		self.mk("Life Review", user=ANYA, kind="Weekly", status="Locked", title="i26 review", period_start="2026-11-09", period_end="2026-11-15")
+		self.areas_on(3)
+		self.assertEqual(self.level()["level"], 3)  # three areas but no goal yet
+		self.mk("Life Goal", title="i26 goal", horizon="Year", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
 		self.assertEqual(self.level()["level"], 4)
-		self.mk("Life Inbox Item", title="i26 job", job_id="i26-job", status="Done", claimed_by=ANYA)
+		self.mk("Life Review", user=ANYA, kind="Weekly", status="Locked", title="i26 review", period_start="2026-11-09", period_end="2026-11-15")
 		self.assertEqual(self.level()["level"], 5)
+		self.mk("Life Inbox Item", title="i26 job", job_id="i26-job", status="Done", claimed_by=ANYA)
+		self.assertEqual(self.level()["level"], 6)
 		self.assertFalse(self.level()["complete"])
 		sp = frappe.get_doc("Life Space", HER)
 		sp.append("members", {"user": "family@lifeos.test", "access": "Write"})
 		sp.save(ignore_permissions=True)
 		out = self.level()
-		self.assertEqual(out["level"], 6)
+		self.assertEqual((out["level"], out["of"]), (7, 7))
 		self.assertTrue(out["complete"] and out["next"] is None)
 
 	def test_2_levels_do_not_skip(self):
 		self.mk("Life Task", title="i26 task")
 		self.mk("Life Review", user=ANYA, kind="Weekly", status="Locked", title="i26 review", period_start="2026-11-09", period_end="2026-11-15")
 		out = self.level()
-		self.assertEqual(out["level"], 1)
+		self.assertEqual(out["level"], 2)
 		self.assertEqual(out["next"]["title"], "Connect a source")
 		self.assertTrue(out["next"]["text"].startswith("Next: Connect a source"))
 
 	def test_3_the_next_step_for_a_weekly_review_and_an_upload_is_not_a_source(self):
 		self.mk("Life Task", title="i26 task")
 		self.mk("Life Inbox Item", title="i26 file", source_type="Upload")
-		self.assertEqual(self.level()["level"], 1)
+		self.assertEqual(self.level()["next"]["title"], "Connect a source")
 		self.mk("Life Inbox Item", title="i26 mail", source_type="Email", source_system="gmail")
 		self.areas_on(3)
 		self.mk("Life Goal", title="i26 goal", horizon="Year", target_date="2027-12-31", area=frappe.db.get_value("Life Area", {"space": HER, "is_on": 1}))
 		nxt = self.level()["next"]
 		self.assertEqual(nxt["to"], "/review")
 		self.assertIn("a weekly review · 30 minutes on Sunday. Review joins the menu after your first one.", nxt["text"])
+
+	def test_a_connected_calendar_counts_as_a_source_however_it_was_connected(self):
+		"""Issue 101: the level reads what is set up, not what came in after the guide."""
+		self.mk("Life Task", title="i101 task")
+		self.assertEqual(self.level()["next"]["title"], "Connect a source")
+		self.mk("Life Connection", system="google-calendar", active=1)
+		out = self.level()
+		self.assertEqual((out["level"], out["next"]["title"]), (3, "Describe your life"))
+		frappe.db.delete("Life Connection", {"space": HER})
+		self.mk("Life Connection", system="gmail", active=0, connected_app=None)  # half connected: signed in but no mailbox
+		self.assertEqual(self.level()["next"]["title"], "Connect a source")
+		with patch("lifeos.review.gcal.is_connected", return_value=True):  # Settings > Calendar, with no card in Sources yet
+			self.assertEqual(self.level()["next"]["title"], "Describe your life")
+
+	def test_without_an_ai_key_the_next_step_is_to_add_it_and_only_an_admin_is_asked(self):
+		self.mk("Life Task", title="i101 task")
+		with patch("lifeos.ai.client.is_set_up", return_value=False):
+			self.assertEqual(self.level()["next"]["title"], "Connect a source")  # the key is the site's: a person who cannot add it is not held at it
+			with patch("lifeos.review.ladder.permissions.is_admin", return_value=True):
+				out = self.level()
+		self.assertEqual((out["level"], out["next"]["title"]), (1, "Add your AI key"))
+		self.assertTrue(out["next"]["text"].startswith("Next: Add your AI key"))
+		self.assertEqual(out["next"]["to"], "/settings?tab=advanced")
 
 	def test_4_dismiss_hides_the_card_for_that_person_only_and_undo_brings_it_back(self):
 		self.assertFalse(self.level()["dismissed"])

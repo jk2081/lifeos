@@ -25,6 +25,7 @@
  "lifeos.api.connections.list",
  "lifeos.api.connections.gmail_setup",
  "lifeos.api.connections.microsoft_setup",
+ "lifeos.api.connections.oauth_callback",
  "lifeos.api.connections.import_status",
  "lifeos.api.context.get",
  "lifeos.api.context.card",

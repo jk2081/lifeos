@@ -75,7 +75,8 @@ doc_events["File"] = {"after_insert": "lifeos.library.files.after_insert"}
 doc_events["Communication"] = {"on_update": "lifeos.brain.email_in.communication_received"}
 # issue 7: a Life OS record's file is stored once per space by content, and the same file sent again is not attached twice
 extend_doctype_class = {"File": ["lifeos.library.files.LifeFile"]}
-override_whitelisted_methods = {"upload_file": "lifeos.library.files.upload_file", "frappe.handler.upload_file": "lifeos.library.files.upload_file"}
+override_whitelisted_methods = {"upload_file": "lifeos.library.files.upload_file", "frappe.handler.upload_file": "lifeos.library.files.upload_file",
+	"frappe.integrations.doctype.connected_app.connected_app.callback": "lifeos.api.connections.oauth_callback"}
 doc_events["User"] = {"validate": "lifeos.permissions.validate_user_roles"}
 before_request = ["lifeos.permissions.no_desk_redirect", "lifeos.web.strict_get.before_request", "lifeos.web.gone_names.before_request"]
 
@@ -90,7 +91,7 @@ scheduler_events = {
 		# set 7: Inbox items left too long, before the morning
 		"30 5 * * *": ["lifeos.brain.old_inbox.run_nightly"]},
 	# set 8: Google Calendar, read only, hourly
-	"hourly": ["lifeos.review.gcal.sync_all"],
+	"hourly": ["lifeos.review.gcal.sync_all", "lifeos.api.connections.clean_abandoned"],
 }
 
 # the Outbox (set 7) is a record of what happened: an exit naming an area or a record never stops that area from being deleted

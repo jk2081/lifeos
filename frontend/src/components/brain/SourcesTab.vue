@@ -1,76 +1,57 @@
 <template>
   <PageHead title="Brain" sub="Where information comes from. The Brain reads only what you switch on." />
   <div class="page-body flex max-w-6xl flex-col gap-6" data-brain-sources :data-loaded="loaded ? 1 : 0">
-    <!-- issue 84: two groups. Channels are where a thing comes from, kinds are what it is; a thing passes its channel's rules first, then its kind's. -->
-    <div class="flex flex-col gap-1" data-source-groups>
-      <div class="inline-flex w-fit rounded-5 bg-surface-gray-2 p-0.5" role="tablist" aria-label="Sources">
-        <button v-for="g in GROUPS" :key="g.value" type="button" role="tab" :aria-selected="group === g.value" class="min-h-9 rounded-4 px-3 text-sm focus-visible:focus-ring"
-          :class="group === g.value ? 'bg-surface-base text-ink-gray-9 shadow-sm' : 'text-ink-gray-7'" :data-group="g.value" @click="setGroup(g.value)">{{ g.label }} <span class="tabular-nums text-ink-gray-6" :data-group-count="g.value">{{ g.count }}</span></button>
-      </div>
-      <p class="text-sm text-ink-gray-6">{{ group === 'kinds' ? 'What it is. After the rules of the channel it came by, a thing is read with the rules of its kind.' : 'Where it comes from. Everything passes its channel\'s rules first.' }}</p>
-    </div>
+    <!-- issue 101: one list of the sources in use. Capture is always on, so it is a line, not a card. -->
+    <p v-if="capture" class="text-sm text-ink-gray-7" data-capture-line>
+      <span class="text-sm-medium text-ink-gray-9">Capture</span> · always on · {{ capture.line }}<template v-if="capture.this_week"> · {{ capture.this_week }} this week</template> · <RouterLink class="underline focus-visible:focus-ring" to="/brain/sources/upload" data-capture-rules>Rules</RouterLink>
+    </p>
 
-    <section v-if="group === 'kinds'" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3" data-kinds>
-      <Card v-for="k in kinds" :key="k.key" class="relative flex flex-col gap-1.5 hover:bg-surface-gray-1" data-kind-card :data-kind="k.key" :data-week="k.this_week">
-        <RouterLink :to="`/brain/sources/${k.key}`" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="`Open ${k.title}`" data-kind-open />
-        <div class="text-base-medium text-ink-gray-9">{{ k.title }}</div>
-        <div class="text-sm text-ink-gray-6">{{ k.line }}</div>
-        <div class="flex flex-wrap items-center gap-x-2 text-sm text-ink-gray-8"><span data-kind-line>{{ k.this_week ? `${k.this_week} this week` : 'Nothing yet' }}</span><span class="text-ink-gray-5">{{ k.skill }} v{{ k.version }}</span></div>
-      </Card>
-    </section>
-
-    <section v-if="group === 'channels'" class="flex flex-col gap-3" data-connected>
-      <div class="flex items-center justify-between gap-2">
-        <h2 class="text-base-medium text-ink-gray-9">Connected · <span data-connected-count>{{ connected.length }}</span></h2>
-        <Button v-if="writable" variant="solid" icon-left="lucide-plus" label="Add a source" data-add-source @click="toAddMore" />
-      </div>
-      <div v-if="connected.length" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <Card v-for="c in connected" :key="c.name" class="relative flex flex-col gap-2 hover:bg-surface-gray-1" data-source-card :data-system="c.system" :data-active="c.active" :data-week="c.this_week">
-          <RouterLink :to="`/brain/sources/${c.system}`" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="`Open ${c.label}`" data-source-page />
+    <section class="flex flex-col gap-3" data-connected>
+      <p v-if="loaded && !sources.some((c) => c.connected !== 0)" class="text-sm text-ink-gray-7" data-sources-empty>Nothing is connected yet. Things you capture yourself are always read. Connect a source below and what it brings in is filed for you.</p>
+      <div v-if="sources.length" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <Card v-for="c in sources" :key="c.name || c.system" class="relative flex flex-col gap-2" :class="c.connected === 0 ? '' : 'hover:bg-surface-gray-1'" data-source-card
+          :data-system="c.system" :data-state="c.state" :data-active="c.active" :data-week="c.this_week">
+          <RouterLink v-if="c.name && !c.pending" :to="`/brain/sources/${c.system}`" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="`Open ${c.label}`" data-source-page />
           <div class="flex items-center gap-3">
             <span class="flex size-9 flex-none items-center justify-center rounded-4 bg-surface-gray-2 text-sm-medium text-ink-gray-8" aria-hidden="true">{{ c.icon }}</span>
-            <div class="min-w-0 flex-1"><div class="truncate text-base-medium text-ink-gray-9">{{ c.label }}</div><div class="truncate text-sm text-ink-gray-6">{{ c.kind }}</div></div>
-            <Switch class="relative" :model-value="!!c.active" :disabled="!writable" :label="c.active ? 'On' : 'Off'" data-source-switch @update:model-value="(v) => toggle(c, v)" />
-            <Button class="relative" variant="ghost" icon="lucide-settings-2" :aria-label="`Settings of ${c.label}`" data-source-open @click="openSettings(c)" />
+            <div class="min-w-0 flex-1"><div class="truncate text-base-medium text-ink-gray-9" data-source-label>{{ c.label }}<template v-if="c.mailbox && c.mailbox !== c.label"> · {{ c.mailbox }}</template></div><div class="truncate text-sm text-ink-gray-6">{{ c.kind }}</div></div>
+            <Badge v-if="c.state === 'Waiting'" theme="amber" label="Waiting" data-source-state />
+            <Button v-else-if="c.connected === 0" class="relative" variant="solid" :label="`Connect`" :disabled="!writable" :aria-label="`Connect ${c.label}`" data-source-connect @click="connect(c)" />
+            <Switch v-else class="relative" :model-value="!!c.active" :disabled="!writable" :label="c.active ? 'On' : 'Off'" data-source-switch @update:model-value="(v) => toggle(c, v)" />
+            <Button v-if="c.name && !c.pending" class="relative" variant="ghost" icon="lucide-settings-2" :aria-label="`Settings of ${c.label}`" data-source-open @click="openSettings(c)" />
           </div>
           <p class="text-sm text-ink-gray-6" data-source-line>{{ c.line }}</p>
+          <p v-if="c.pending" class="text-sm text-ink-gray-6" data-switch-note>Finish signing in first.</p>
           <p class="text-sm text-ink-gray-8" data-processed-by>{{ c.processed_by }}</p>
           <p v-if="c.error" class="text-sm text-ink-red-4" data-source-error>{{ c.error }}</p>
-          <p v-if="c.active && c.quiet" class="text-sm text-ink-amber-9" data-source-quiet>Nothing has arrived for a while.</p>
+          <div v-if="c.pending && c.redirect_uri && c.error" class="flex flex-col gap-1" data-pending-address>
+            <span class="text-sm text-ink-gray-6">Add this address in {{ c.system === 'microsoft' ? 'Azure' : 'Google Cloud' }} › Credentials › your OAuth client › Authorized redirect URIs:</span>
+            <span class="flex flex-wrap items-center gap-2"><span class="break-all font-mono text-xs text-ink-gray-8" data-redirect-address>{{ c.redirect_uri }}</span>
+              <Button size="sm" label="Copy" data-redirect-copy @click="copy(c.redirect_uri)" /></span>
+          </div>
+          <p v-if="c.active && c.quiet && !c.pending" class="text-sm text-ink-amber-9" data-source-quiet>{{ c.error ? 'The last read failed.' : 'Nothing has arrived for a while.' }}</p>
+          <div v-if="c.pending && writable" class="relative flex flex-wrap gap-2">
+            <Button v-if="c.error" variant="solid" label="Try again" data-source-retry @click="retry(c)" />
+            <Button variant="subtle" theme="red" label="Remove" data-source-remove @click="removePending(c)" />
+          </div>
+          <div v-if="c.add_another && writable" class="relative"><Button variant="subtle" :label="`Add another ${c.system === 'microsoft' ? 'Microsoft inbox' : 'Gmail'}`" icon-left="lucide-plus" data-add-another @click="openGmail(c.system === 'microsoft')" /></div>
         </Card>
       </div>
-      <Card v-else-if="loaded" class="py-2" data-sources-empty>
-        <Empty title="Nothing is connected yet.">
-          <p class="mt-1">Things you add yourself are always read. Email, a calendar or an agent show up here once you switch them on below.</p>
-          <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Add a source" data-add-source-empty @click="toAddMore" />
-        </Empty>
-      </Card>
     </section>
 
-    <section v-if="group === 'channels'" ref="more" class="flex flex-col gap-3" data-add-more>
-      <h2 class="text-base-medium text-ink-gray-9">Add more <span class="text-sm font-normal text-ink-gray-6">One click each. Nothing is read until you switch it on.</span></h2>
+    <section v-if="more" class="flex flex-col gap-3" data-more-sources>
+      <h2 class="text-base-medium text-ink-gray-9">Not built yet <span class="text-sm font-normal text-ink-gray-6">Shown because more sources are switched on for this site.</span></h2>
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <div v-for="t in available" :key="t.system" class="relative flex flex-col items-center gap-0.5 rounded-5 border border-dashed border-outline-gray-2 px-3 py-4 text-center"
-          :class="t.always_on ? '' : 'hover:bg-surface-gray-1'" data-source-tile :data-system="t.system" :data-always-on="t.always_on ? 1 : 0">
-          <button v-if="writable && !t.always_on" type="button" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="MAIL.includes(t.system) ? `Connect ${t.label}` : `Add ${t.label}`" data-tile-add @click="add(t)" />
-          <span class="text-base-medium text-ink-gray-9">{{ t.label }}</span>
-          <span class="text-sm text-ink-gray-6">{{ t.hint }}</span>
-          <span v-if="t.processed_by" class="mt-0.5 text-xs text-ink-gray-5" data-processed-by>{{ t.processed_by }}</span>
-          <Badge v-if="t.always_on" class="mt-1" theme="green" label="Always on" />
-          <RouterLink :to="`/brain/sources/${t.system}`" class="relative mt-1 text-xs underline focus-visible:focus-ring" :aria-label="`Rules of ${t.label}`" data-tile-rules>Rules</RouterLink>
-        </div>
-        <div class="relative flex flex-col items-center gap-0.5 rounded-5 border border-dashed border-outline-gray-2 px-3 py-4 text-center hover:bg-surface-gray-1" data-source-tile data-system="other-agent">
-          <button v-if="writable" type="button" class="absolute inset-0 rounded-5 focus-visible:focus-ring" aria-label="Add another agent" data-tile-other @click="otherOpen = true" />
-          <span class="text-base-medium text-ink-gray-9">Another agent</span><span class="text-sm text-ink-gray-6">Any MCP agent</span>
-        </div>
         <div v-for="t in coming" :key="t.system" class="flex flex-col items-center gap-0.5 rounded-5 border border-dashed border-outline-gray-2 px-3 py-4 text-center opacity-80"
           data-source-tile data-tile-coming :data-system="t.system" aria-disabled="true">
           <span class="text-base-medium text-ink-gray-9">{{ t.label }}</span><span class="text-sm text-ink-gray-6">{{ t.hint }}</span>
           <Badge class="mt-1" theme="gray" label="Coming" />
         </div>
       </div>
+      <div v-if="writable"><Button label="Add another agent" icon-left="lucide-plus" data-tile-other @click="otherOpen = true" /></div>
     </section>
-    <section v-if="group === 'channels'" class="flex flex-col gap-3" data-email-in :data-configured="emailIn.configured ? 1 : 0">
+
+    <section class="flex flex-col gap-3" data-email-in :data-configured="emailIn.configured ? 1 : 0">
       <h2 class="text-base-medium text-ink-gray-9">Email-in address <span class="text-sm font-normal text-ink-gray-6">Optional. Forward an email to capture it.</span></h2>
       <Card class="flex flex-col gap-2">
         <p class="text-sm text-ink-gray-8" data-email-in-address>
@@ -116,13 +97,19 @@
     </template>
   </Dialog>
 
-  <Dialog v-model:open="gmailOpen" :title="`Connect ${microsoft ? 'Microsoft' : 'Gmail'}`" :actions="gmailSetup?.ready && writable ? [{ label: `Continue to ${microsoft ? 'Microsoft' : 'Google'}`, variant: 'solid', onClick: connectGmail }] : []">
+  <Dialog v-model:open="gmailOpen" :title="`Connect ${microsoft ? 'Microsoft' : 'Gmail'}`" :actions="gmailSetup?.ready && writable ? [{ label: needsAddress ? `I've added it` : `Continue to ${microsoft ? 'Microsoft' : 'Google'}`, variant: 'solid', onClick: connectGmail }] : []">
     <template #default>
       <div class="flex flex-col gap-2" data-gmail-connect>
         <p class="text-sm text-ink-gray-8">You sign in with {{ microsoft ? 'Microsoft (Outlook or Microsoft 365)' : 'Google' }} in this browser. Life OS asks to <strong>read</strong> this mailbox when you or your agent search it, and to send, draft, archive or label mail{{ microsoft ? '' : ' and change your calendar' }} when you ask your agent to or approve what it suggests. It copies none of your mail and never deletes any. Several mailboxes can be connected, one card each.</p>
         <p v-if="gmailSetup && !gmailSetup.ready && microsoft" class="text-sm text-ink-amber-9" data-gmail-not-ready>Microsoft sign-in is not set up yet. Put the Azure app's client ID and secret in the site config (docs/MICROSOFT.md), then come back here.</p>
         <p v-else-if="gmailSetup && !gmailSetup.ready" class="text-sm text-ink-amber-9" data-gmail-not-ready>Google sign-in is not set up yet. In Frappe, open Google Settings and enter the OAuth client (client ID and secret), then come back here.</p>
-        <p v-else-if="gmailSetup" class="text-sm text-ink-gray-6">If {{ microsoft ? 'Microsoft' : 'Google' }} says the redirect address does not match, add this one to the {{ microsoft ? 'Azure app registration' : 'OAuth client in Google Cloud' }}: <span class="break-all font-mono text-xs" data-gmail-redirect>{{ gmailSetup.redirect_uri }}</span></p>
+        <!-- the first time through an address, it has to be allowed in the provider's console before it will send the person back -->
+        <div v-else-if="needsAddress" class="flex flex-col gap-2" data-redirect-step>
+          <p class="text-sm text-ink-gray-8">Add this address in {{ microsoft ? 'Azure' : 'Google Cloud' }} › {{ microsoft ? 'App registrations › your app › Authentication › Redirect URIs' : 'Credentials › your OAuth client › Authorized redirect URIs' }}:</p>
+          <div class="flex flex-wrap items-center gap-2"><span class="break-all font-mono text-xs text-ink-gray-9" data-gmail-redirect>{{ gmailSetup.redirect_uri }}</span>
+            <Button size="sm" label="Copy" data-redirect-copy @click="copy(gmailSetup.redirect_uri)" /></div>
+          <a :href="gmailSetup.console_url" target="_blank" rel="noopener" class="w-fit text-sm text-ink-blue-8 underline focus-visible:focus-ring" data-redirect-link>Open {{ microsoft ? 'the Azure portal' : 'Google Cloud credentials' }}</a>
+        </div>
       </div>
     </template>
   </Dialog>
@@ -137,14 +124,12 @@
   </Dialog>
 </template>
 <script setup>
-// Brain > Sources (issue 19): where information comes from, switched on one by one. A card for each connected source
-// (a Life Connection), tiles for what can be added, and "Coming" tiles for what is not built yet. A source that is off
-// makes the server refuse its captures; nothing it brought in is deleted.
+// Brain > Sources (issue 19, simplified in 101): one list of the sources in use, each with its state (On, Off, Waiting) and its Connect or settings
+// button. A source that is off makes the server refuse its captures; nothing it brought in is deleted.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dialog, FormControl, Switch, TextInput, Textarea } from 'frappe-ui'
+import { Badge, Button, Dialog, FormControl, Switch, TextInput, Textarea, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
 import Pick from '@/components/Pick.vue'
 import PageHead from '@/components/PageHead.vue'
 import { tryCall } from '@/lib/api'
@@ -155,11 +140,11 @@ import { canWrite, store } from '@/lib/store'
 
 const INTENTS = [{ label: 'Process', value: 'Process' }, { label: 'Add to wiki', value: 'Add to wiki' }, { label: 'Just keep', value: 'Just keep' }]
 const writable = computed(() => canWrite() && !store.isAgent)
-const connected = ref([])
-const available = ref([])
+const sources = ref([])
+const capture = ref(null)
+const more = ref(false)
 const coming = ref([])
 const loaded = ref(false)
-const more = ref(null)
 const settingsOpen = ref(false)
 const current = ref(null)
 const draft = ref({})
@@ -168,31 +153,24 @@ const otherName = ref('')
 const gmailOpen = ref(false)
 const gmailSetup = ref(null)
 const microsoft = ref(false)
+const needsAddress = computed(() => !!gmailSetup.value?.ready && !gmailSetup.value.confirmed)
 const MAIL = ['gmail', 'microsoft']
 const emailIn = ref({})
 const sendersText = ref('')
 const accountName = ref('')
 const route = useRoute()
 const router = useRouter()
-const channels = ref([])
-const kinds = ref([])
-const group = computed(() => (route.query.group === 'kinds' ? 'kinds' : 'channels'))
-const GROUPS = computed(() => [{ value: 'channels', label: 'Channels', count: channels.value.length }, { value: 'kinds', label: 'Kinds', count: kinds.value.length }])
-const setGroup = (v) => router.replace({ query: { ...route.query, group: v === 'channels' ? undefined : v } })
 
 const goalOptions = computed(() => (lookups.goals || []).filter((g) => !draft.value.default_area || g.area === draft.value.default_area).map((g) => ({ value: g.name, label: g.title })))
-const toAddMore = () => more.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 function lastReceived(c) {
   if (!c.last_received_on) return 'Nothing has arrived yet.'
   return `Last received: ${c.last_received_what ? c.last_received_what + ', ' : ''}${dateTime(c.last_received_on)}`
 }
 async function load() {
   loadLookups()
-  const g = await tryCall(() => brainData.sourcePage.groups({ space: store.space }))
-  if (g) { channels.value = g.channels; kinds.value = g.kinds }
   const res = await tryCall(() => brainData.connections.sources({ space: store.space }))
   if (res) {
-    connected.value = res.connected; available.value = res.available; coming.value = res.coming
+    sources.value = res.sources; capture.value = res.capture; more.value = !!res.more; coming.value = res.coming
     emailIn.value = res.email_in || {}
     sendersText.value = (res.email_in?.senders || []).join('\n')
     if (store.isAdmin) accountName.value = (await tryCall(() => brainData.settings.get({ space: store.space })))?.settings?.email_in_account || ''
@@ -205,7 +183,7 @@ async function saveEmailIn() {
 }
 async function toggle(c, on) {
   const res = await tryCall(() => brainData.connections.save({ name: c.name, active: on ? 1 : 0 }), on ? `${c.label} is on.` : `${c.label} is off. Nothing it brought in was deleted.`)
-  if (res) Object.assign(c, { active: res.active, quiet: res.quiet })
+  if (res) Object.assign(c, { active: res.active, quiet: res.quiet, state: res.active ? 'On' : 'Off' })
 }
 function openSettings(c) {
   current.value = c
@@ -222,13 +200,24 @@ async function save() {
   settingsOpen.value = false
   await load()
 }
-async function add(t) {
+async function connect(t) {
   if (MAIL.includes(t.system)) return openGmail(t.system === 'microsoft')
   const res = await tryCall(() => brainData.connections.save({ space: store.space, system: t.system, active: 1 }), `${t.label} is on.`)
   if (!res) return
+  if (t.system === 'google-calendar') return router.push({ path: '/settings', query: { tab: 'calendar' } }) // the sign-in is Settings > Calendar
   await load()
-  const c = connected.value.find((x) => x.system === t.system)
+  const c = sources.value.find((x) => x.system === t.system)
   if (c) openSettings(c)
+}
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text) } catch (e) { /* the address stays on screen to select */ }
+  toast.success('Copied.')
+}
+async function removePending(c) {
+  if (await tryCall(() => brainData.connections.gmail_remove({ name: c.name }), 'Removed.')) await load()
+}
+async function retry(c) {
+  if (await tryCall(() => brainData.connections.gmail_remove({ name: c.name }))) { await load(); openGmail(c.system === 'microsoft') }
 }
 async function openGmail(isMicrosoft = false) {
   microsoft.value = isMicrosoft
@@ -245,7 +234,7 @@ async function finishGmail(name, isMicrosoft = false) {
   await router.replace({ path: route.path, query: { ...route.query, gmail: undefined, microsoft: undefined } })
   const res = await tryCall(() => (isMicrosoft ? brainData.connections.microsoft_finish({ name }) : brainData.connections.gmail_finish({ name })), `${isMicrosoft ? 'Microsoft' : 'Gmail'} is connected. Life OS searches it when asked and lists its mail in the daily digest.`)
   await load()
-  const c = res && connected.value.find((x) => x.name === res.name)
+  const c = res && sources.value.find((x) => x.name === res.name)
   if (c) openSettings(c)
 }
 async function removeGmail() {
@@ -262,7 +251,7 @@ async function addOther() {
   otherOpen.value = false
   otherName.value = ''
   await load()
-  const c = connected.value.find((x) => x.system === system)
+  const c = sources.value.find((x) => x.system === system)
   if (c) openSettings(c)
 }
 watch(() => store.space, async () => { await load(); if (route.query.gmail) await finishGmail(String(route.query.gmail)); if (route.query.microsoft) await finishGmail(String(route.query.microsoft), true) }, { immediate: true })

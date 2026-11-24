@@ -32,6 +32,20 @@ def account(user):
 	return frappe.get_doc("Google Calendar", name) if name else None
 
 
+def is_connected(user) -> bool:
+	"""The person's own Google Calendar is connected: Frappe's record is enabled and holds a refresh token."""
+	acc = account(user)
+	return bool(acc and acc.enable and acc.get_password("refresh_token", raise_exception=False))
+
+
+def last_sync(user):
+	"""(when the calendar was last read, why the last read failed or None): from Frappe's record, or from the fake source's marker on a site that uses it."""
+	acc = account(user)
+	if acc and (acc.get("life_last_synced") or acc.get("life_sync_error")):
+		return acc.get("life_last_synced"), acc.get("life_sync_error")
+	return _fake_synced(user), None
+
+
 def state(user):
 	"""What Settings > Me > Calendar shows."""
 	fake = bool(frappe.conf.get("lifeos_fake_calendar"))
@@ -192,6 +206,9 @@ def sync_user(user, source=None, now=None, space=None):
 			n += 1
 	if acc:
 		frappe.db.set_value("Google Calendar", acc.name, {"life_last_synced": now_datetime(), "life_sync_error": None}, update_modified=False)
+		from lifeos.api import connections
+
+		connections.ensure(space, "google-calendar")  # Brain > Sources lists a calendar that is really connected, however it was connected
 	else:
 		frappe.cache.set_value(f"lifeos_fake_calendar_synced:{user}", str(now_datetime())[:19])
 	return n
@@ -199,6 +216,9 @@ def sync_user(user, source=None, now=None, space=None):
 
 def _fake_synced(user):
 	return frappe.cache.get_value(f"lifeos_fake_calendar_synced:{user}") if frappe.conf.get("lifeos_fake_calendar") else None
+
+
+CHANGED_FIELDS = ("subject", "description", "starts_on", "ends_on", "all_day", "google_calendar_id", "life_attendees", "life_recurring", "status", "life_matters")
 
 
 def upsert(user, space, calendar_id, ev):
@@ -214,11 +234,14 @@ def upsert(user, space, calendar_id, ev):
 	ends = get_datetime(_when(ev.get("end") or ev["start"])).replace(tzinfo=None)
 	attendees = [{"email": (a.get("email") or "").lower(), "name": a.get("displayName") or ""} for a in ev.get("attendees") or [] if a.get("email")]
 	doc = frappe.get_doc("Event", name) if name else frappe.new_doc("Event")
+	before = {k: doc.get(k) for k in CHANGED_FIELDS} if name else None
 	doc.update({"subject": (ev.get("summary") or "No title")[:140], "description": ev.get("description"), "starts_on": starts,
 		"ends_on": add_days(ends, -1) if all_day and ends > starts else ends, "all_day": 1 if all_day else 0, "life_space": space,
 		"google_calendar_event_id": key, "google_calendar_id": calendar_id, "pulled_from_google_calendar": 1, "sync_with_google_calendar": 0,
 		"life_attendees": json.dumps(attendees), "life_recurring": 1 if ev.get("recurringEventId") else 0, "status": "Open"})
 	meetings.apply_rule(doc)
+	if before is not None and all(str(before[k] or "") == str(doc.get(k) or "") for k in CHANGED_FIELDS):
+		return doc.name  # unchanged: leave `modified` alone, so "synced in the last 7 days" counts what was created or changed (issue 101)
 	doc.flags.ignore_permissions = True  # system: the sync job keeps the person's own calendar account up to date
 	doc.save() if name else doc.insert()
 	if not name:

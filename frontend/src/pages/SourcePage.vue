@@ -114,7 +114,21 @@
     </section>
 
     <!-- Try it -->
-    <section v-if="tab === 'try'" class="flex flex-col gap-3" data-tab-panel="try">
+    <section v-if="tab === 'try' && d.key === 'gmail'" class="flex flex-col gap-3" data-tab-panel="try">
+      <!-- issue 101: for Gmail, Try it is a live search of the connected inbox. It shows the five newest matches and files nothing. -->
+      <Card class="flex flex-col gap-3" data-mail-try>
+        <p class="text-sm text-ink-gray-7">Search your connected inbox live. It shows the five newest matches and files nothing.</p>
+        <form class="flex gap-2" @submit.prevent="searchMail"><TextInput v-model="mailQuery" class="min-w-0 flex-1" placeholder="A word, a sender or a subject" aria-label="Search the inbox" data-mail-query />
+          <Button type="submit" variant="solid" label="Search" icon-left="lucide-search" :loading="searching" data-mail-search /></form>
+        <p v-if="mailError" class="text-sm text-ink-red-4" data-mail-error>{{ mailError }}</p>
+        <div v-if="mailHits" class="flex flex-col" data-mail-hits>
+          <p v-if="!mailHits.length" class="text-sm text-ink-gray-6" data-mail-none>Nothing matches.</p>
+          <div v-for="h in mailHits" :key="h.thread_id" class="flex flex-col gap-0.5 border-b border-outline-gray-1 py-2 text-sm last:border-0" data-mail-hit>
+            <span class="text-ink-gray-9" data-mail-subject>{{ h.subject || '(no subject)' }}</span><span class="text-ink-gray-6">{{ h.from }} · {{ h.date }}</span></div>
+        </div>
+      </Card>
+    </section>
+    <section v-else-if="tab === 'try'" class="flex flex-col gap-3" data-tab-panel="try">
       <Card class="flex flex-col gap-3" data-try-form>
         <p class="text-sm text-ink-gray-7">Drop or pick a sample. It shows what these rules would do with it, and files nothing.</p>
         <label class="flex cursor-pointer flex-col items-center gap-1 rounded-5 border border-dashed border-outline-gray-3 px-4 py-6 text-center text-sm text-ink-gray-7 hover:bg-surface-gray-1" data-try-drop
@@ -165,7 +179,7 @@ import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
 import PageHead from '@/components/PageHead.vue'
 import TabBar from '@/components/TabBar.vue'
-import { tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
 import { brainData } from '@/data/brain'
 import { canWrite, store } from '@/lib/store'
 import { uploadFile } from '@/lib/upload'
@@ -192,6 +206,10 @@ const uploading = ref(false)
 const filing = ref(false)
 const teachOpen = ref(false)
 const lesson = ref('')
+const mailQuery = ref('')
+const mailHits = ref(null)
+const mailError = ref('')
+const searching = ref(false)
 const writable = computed(() => canWrite() && !store.isAgent && !!d.value?.can_edit)
 // an agent has one more tab (issue 85): what it knows, can do, did and waits for, and it opens on it
 const TABS = computed(() => (d.value?.is_agent ? [{ value: 'agent', label: 'Your agent' }, ...BASE_TABS] : BASE_TABS))
@@ -269,6 +287,17 @@ const args = () => ({ key: d.value.key, title: file.value?.name || '', text: sam
 async function tryIt() {
   trying.value = true
   try { result.value = (await tryCall(() => brainData.sourcePage.try_it(args()))) || result.value } finally { trying.value = false }
+}
+// Gmail's Try it: the live search the assistant uses, on this person's inboxes; the answer's own words when it cannot
+async function searchMail() {
+  if (!mailQuery.value.trim()) return
+  searching.value = true
+  mailError.value = ''
+  try {
+    const res = await brainData.mail.search({ fields: { text: mailQuery.value.trim() }, max: 5, space: store.space })
+    mailHits.value = res.hits
+    if (res.errors?.length) mailError.value = res.errors.map((e) => `${e.inbox}: ${e.error}`).join('. ')
+  } catch (e) { mailHits.value = null; mailError.value = errorText(e) } finally { searching.value = false }
 }
 async function fileIt() {
   filing.value = true

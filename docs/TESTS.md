@@ -7,7 +7,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | File | What it covers |
 | --- | --- |
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc` |
-| `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources (two groups, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
+| `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
@@ -15,10 +15,10 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
 | `test_library.py` | Library: notes, the vault, search, the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions |
-| `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder, one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection) |
+| `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection) |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it |
-| `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools |
+| `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers, the return address to add, Google's error, an abandoned sign-in cleaned up, which case a search with no inbox is), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check, the connector (report, pull, confirm), the owner's changes, an agent's switches and the areas it may read |
 | `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings; no component, page or `App.vue` calls `api(`; every `.vue` file is imported or routed |
 
@@ -75,7 +75,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.18` the guide shows one screen at a time and each screen fits the phone
 - `TODAY.19` Today, Brain, Goals and Library on a fresh site each show their empty state with one action
 - `TODAY.20` going through the guide sets the name and time zone, switches on a third area and turns three typed things into tasks with areas
-- `TODAY.21` after the guide the ladder card shows level 1 and connect a source
+- `TODAY.21` after the guide the ladder card shows level 2 of 7 and connect a source
 - `TODAY.22` on an empty site Today shows its empty state and no Open band
 - `TODAY.23` cycle goals with lead actions and no task this week are not rows on Today
 - `TODAY.24` a task planned this week under a cycle goal shows with its goal, and ticking it records the lead action's tick
@@ -131,15 +131,15 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.35` a failed capture shows its reason and Retry puts it back in the queue
 - `BRAIN.36` the Outbox piles in Activity show the same numbers as the Outbox
 - `BRAIN.37` the feed is one column and nothing scrolls sideways
-- `BRAIN.38` with no source connected Sources says what will appear and offers Add a source
+- `BRAIN.38` with no source connected Sources says what will appear, shows Capture as always on and has no Add a source
 - `BRAIN.39` connected sources show with this week's counts, matching the captures in the database
-- `BRAIN.40` switching Hermes off makes create_item from hermes fail with a clear message; switching it on again works
-- `BRAIN.41` a Coming tile cannot be switched on
+- `BRAIN.40` switching the assistant off makes create_item from hermes fail with a clear message; switching it on again works
+- `BRAIN.41` a source that is not built cannot be switched on and shows no Coming tile
 - `BRAIN.42` opening a source shows its default intent, area and goal, and saving changes what create_item uses
 - `BRAIN.43` the cards sit in a grid and nothing scrolls sideways
 - `BRAIN.44` Sources offers Connect Gmail (it says what it reads and may do, and that nothing is copied or deleted), a connected mailbox says it is a daily digest searched live and "Processed by: the Brain", every card has a Processed by line
 - `BRAIN.45` a capture the Brain could not process is in Needs you with Retry and File it myself; File it myself takes it out
-- `BRAIN.46` Sources shows channels and kinds with counts and switches; each row opens its page with the path Brain / Sources / <name>, the strip and the five tabs
+- `BRAIN.46` there are no Channels or Kinds tabs; a source page opens with the path Brain / Sources / <name>, the strip and the five tabs, and Capture's Rules link opens Upload's
 - `BRAIN.47` Rules: add a Skip chip and save to see version n+1, go back restores it; Try it on a sample PDF (fake AI) shows the result and files nothing until File it for real
 - `BRAIN.48` on a new site the sources say Nothing yet and how to connect each
 - `BRAIN.49` an agent's page shows Waiting, Knows, Can, May read, Scheduled and Did from the connector's report; approving a waiting item moves it to Did
@@ -147,6 +147,11 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.51` an agent that has reported nothing says what will appear in each section
 - `BRAIN.52` an agent's suggested reply waits in Needs you and on its page; approving sends it (fake Google) and moves it to Did, with who asked; the owner's own request is in Did with his words
 - `BRAIN.53` Ask "find the 2014 tax return" (fake AI, fake Gmail) shows the threads it found and a File it button; filing makes a Brain item linked to Gmail
+- `BRAIN.55` a half-connected Gmail shows once, Waiting, with no switch ("Finish signing in first") and a Remove button; after Google's error the card says what happened and shows the address to add with Copy and Try again; Remove clears it with its Connected App
+- `BRAIN.56` the Sources page and the assistant's page name neither Hermes nor OpenClaw, even with both connected
+- `BRAIN.57` Sources lists exactly Capture, Google Calendar, Gmail, Your assistant and Claude, each not yet connected with a Connect button; no Coming tile, no tabs, no Add a source
+- `BRAIN.58` Connect Gmail shows the return address with Copy and a Google Cloud link before leaving the site; "I've added it" goes on to Google's address; once an address has been confirmed the step is not shown
+- `BRAIN.59` Gmail's Try it searches the (fake) inbox for a word and shows the matching messages, none for a word that matches nothing, and says "No inbox is connected" with no inbox
 - `BRAIN.54` the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item
 
 ### Goals (`tools/acceptance/goals.mjs`, 71 checks)
@@ -339,7 +344,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.25` every old ?tab= value lands on its new place
 - `SETTINGS.26` Members lists people and agents with filters and a Spaces view that still switches Ask and sensitive-item access
 - `SETTINGS.27` Settings has no Tags page; Library's Trash and archive is where ?tab=tags goes
-- `SETTINGS.28` a person who is not a Life Admin at level 1 sees Profile, Areas and Sources and the footer line; Rhythms appears at level 4
+- `SETTINGS.28` a person who is not a Life Admin at level 1 sees Profile, Areas and Sources and the footer line; Rhythms appears at level 5
 - `SETTINGS.29` a person who is not a Life Admin does not see Advanced; the owner's Advanced opens AI key and cost, Import and export and Backups
 - `SETTINGS.30` the menu is the first screen on a phone and every page opens with Back
 - `SETTINGS.31` on a one-space site no space picker, chip or Spaces view appears on any screen
@@ -352,7 +357,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.38` Skills: every built-in skill has its card, and Test passes the examples of each
 - `SETTINGS.39` Settings > Data holds the Reset section; /today/reset lands on Today and says that page moved
 - `SETTINGS.40` Settings > Sources shows the email-in address and the allowed senders, and the onboarding guide says nothing about forwarding
-- `SETTINGS.41` Sources offers Connect Gmail and Connect Microsoft; a connected (fake) Microsoft inbox shows with its label and an on/off switch; Connect Microsoft says what it reads and sends
+- `SETTINGS.41` Sources offers Connect Gmail, and with more sources on Connect Microsoft; a connected (fake) Microsoft inbox shows with its label and an on/off switch; Connect Microsoft says what it reads and sends
 - `SETTINGS.42` Settings > Advanced > AI offers the provider; Another service shows the address, key, models and the data line
 - `SETTINGS.43` Test connection says Working with the fake AI, and the provider's own reason when it fails on credit
 

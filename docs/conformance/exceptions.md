@@ -6,17 +6,20 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | Rule | Exceptions |
 | --- | --- |
-| frappe-manual-commit | 8 |
+| frappe-manual-commit | 9 |
 | frappe-missing-translate-function-python | 1 |
-| frappe-security-file-traversal | 6 |
+| frappe-security-file-traversal | 7 |
 | frappe-setuser | 16 |
 | frappe-sql-format-injection | 1 |
-| Total | 32 |
+| guest-whitelisted-method | 1 |
+| whitelisted-side-effect-on-get | 1 |
+| Total | 36 |
 
 ## frappe-manual-commit
 
 | File | Line | Reason |
 | --- | --- | --- |
+| `lifeos/api/connections.py` | 490 | Frappe's return address is a GET and rolls back at its end; the card must keep what the provider said |
 | `lifeos/brain/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
 | `lifeos/install.py` | 63 | after_install: the spaces and index DDL must be kept before install-app goes on |
 | `lifeos/install.py` | 152 | a bench execute command: the user and the space are kept when it ends |
@@ -36,9 +39,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/settings.py` | 235 | the site's own backup folder, names only |
-| `lifeos/brain/sources.py` | 104 | a fixed name in a temporary folder made here |
-| `lifeos/brain/sources.py` | 114 | pdftoppm's own output in a temporary folder made here |
+| `lifeos/api/settings.py` | 237 | the site's own backup folder, names only |
+| `lifeos/brain/sources.py` | 107 | a fixed name in a temporary folder made here |
+| `lifeos/brain/sources.py` | 117 | pdftoppm's own output in a temporary folder made here |
+| `lifeos/brain/video.py` | 38 | ffmpeg's own output in a temporary folder made here |
 | `lifeos/library/files.py` | 90 | local_path keeps the path inside the site's files folders |
 | `lifeos/tools/tidy_files.py` | 170 | _path_of keeps the path inside the site's files folders |
 | `lifeos/web/pwa.py` | 18 | a fixed file of this app; no part of the path comes from the request |
@@ -47,8 +51,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/skills/runner.py` | 90 | the run is the Life Brain's, a Life Agent; the session user is put back below |
-| `lifeos/skills/runner.py` | 104 | back to the user whose request or job it was |
+| `lifeos/skills/runner.py` | 91 | the run is the Life Brain's, a Life Agent; the session user is put back below |
+| `lifeos/skills/runner.py` | 105 | back to the user whose request or job it was |
 | `lifeos/tools/demo.py` | 104 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/tools/demo.py` | 261 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/tools/demo.py` | 265 | demo data: records are made through the API as the owner and the agent would make them |
@@ -69,3 +73,15 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | File | Line | Reason |
 | --- | --- | --- |
 | `lifeos/library/index.py` | 86 | column names come from the fixed COLUMNS list; every value is a %s parameter |
+
+## guest-whitelisted-method
+
+| File | Line | Reason |
+| --- | --- | --- |
+| `lifeos/api/connections.py` | 470 | the same door as Frappe's own callback, which sends a guest to log in |
+
+## whitelisted-side-effect-on-get
+
+| File | Line | Reason |
+| --- | --- | --- |
+| `lifeos/api/connections.py` | 490 | Frappe's return address is a GET and rolls back at its end; the card must keep what the provider said |

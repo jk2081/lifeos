@@ -43,6 +43,17 @@ def accounts_for(user: str, space: str | None = None, account: str | None = None
 	return rows
 
 
+def no_inbox(user: str, space: str | None = None):
+	"""Say which case it is when there is no inbox to search (issue 101): none connected, connected but switched off, or a sign-in left unfinished."""
+	filters = {"system": ["in", ["gmail", "microsoft"]], "connected_by": user, **({"space": space} if space else {})}
+	rows = frappe.get_all("Life Connection", filters=filters, fields=["mailbox", "active"])  # system: the person's own connections, named in the filter
+	if any(r.mailbox and not r.active for r in rows):
+		frappe.throw(_("Gmail is connected but switched off. Switch it on in Brain › Sources."), title=_("Gmail is switched off"))
+	if any(not r.mailbox for r in rows):
+		frappe.throw(_("Gmail sign-in wasn't finished. Connect again in Brain › Sources."), title=_("Gmail sign-in not finished"))
+	frappe.throw(_("No inbox is connected. Connect Gmail in Brain › Sources."), title=_("No inbox connected"))
+
+
 def label_of(account) -> str:
 	return account.label or account.address
 
@@ -109,7 +120,7 @@ def search(user: str, space: str, fields: dict, account: str | None = None, max_
 	max_results = max(1, min(int(max_results or 10), MAX_HITS))
 	accounts = accounts_for(user, space, account)
 	if not accounts:
-		frappe.throw(_("No inbox is connected. Connect one in Brain > Sources."), title=_("No inbox connected"))
+		no_inbox(user)
 	hits, errors, queries = [], [], []
 	for row in accounts:
 		doc = frappe._dict(row)
@@ -145,7 +156,7 @@ def _find(user: str, space: str, thread_id: str, account: str | None):
 			last = e
 	if last:
 		raise last
-	frappe.throw(_("No inbox is connected. Connect one in Brain > Sources."), title=_("No inbox connected"))
+	no_inbox(user)
 
 
 def get_thread(user: str, space: str, thread_id: str, account: str | None = None) -> dict:

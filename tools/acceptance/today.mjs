@@ -635,13 +635,13 @@ print(json.dumps({"name": doc.full_name, "zone": frappe.db.get_single_value("Sys
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.21', `${width} px: after the guide the ladder card shows level 1 and connect a source`, async () => {
+    await check('TODAY.21', `${width} px: after the guide the ladder card shows level 2 and connect a source`, async () => {
       await one.open('/life/today')
       if (phone) await pg.locator('[data-more-title]').click()
       const card = pg.locator('[data-setup-card]:visible')
       await card.waitFor({ timeout: 10000 })
       const t = await card.innerText()
-      must(t.includes('level 1 of 6'), 'the card says: ' + t)
+      must(t.includes('level 2 of 7'), 'the card says: ' + t.replace(/\n/g, ' | '))
       must(/connect a source/i.test(t), 'the next step is not to connect a source: ' + t)
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })

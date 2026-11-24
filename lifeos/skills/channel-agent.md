@@ -1,6 +1,6 @@
 ---
 name: channel-agent
-title: Agents (Hermes and other agents)
+title: Agents (your assistant and other agents)
 when_to_use: Something an agent filed for the owner: check what it did, then read it by its kind. Every agent shares these rules.
 trigger: Served
 tools: []
@@ -52,7 +52,7 @@ Captures an agent files on the owner's behalf: forwarded messages, voice notes, 
 
 ## Examples
 
-- A voice note from Hermes: read it by the rules for voice notes
+- A voice note from your assistant: read it by the rules for voice notes
 - A finished report from an agent: a summary, and a task for each follow-up it lists
 
 ## Lessons from the owner's corrections
