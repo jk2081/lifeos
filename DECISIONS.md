@@ -1332,3 +1332,9 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **The digest.** One item for the person and day, with a section for each inbox, Gmail and Microsoft together; each line says Open in Gmail or Open in Outlook. The item's `source_system` is `gmail` when a Gmail inbox is in it, else `microsoft`. The cheap rules are the same in code (`microsoft.judge`: no mailing list or no-reply sender, the always lists, not the person's own mail); Graph has no Promotions or Social flag, so those are not skipped by a rule.
 - **Fakes.** `frappe.flags.lifeos_microsoft` (unit tests, by address) or the site config `lifeos_fake_microsoft` (`lifeos/mail/fake.py`, set by `scripts/acceptance-site.sh`) stand in for Graph; the writes use the same `lifeos_google` fake as Google's. No test calls Microsoft.
 - **Not tested against Microsoft itself.** Graph's exact answers (search ranking, `$expand` on attachments, `move` to `archive`, `reply`) were written from its documentation and are untested against a real Outlook or Microsoft 365 inbox. The first real connection should be tried with a search, a thread with an attachment, a draft and an archive before relying on it.
+
+## Issue 90 (offline page)
+
+- The offline pages are written in the service worker and follow the system's light or dark setting (`prefers-color-scheme`), not the theme chosen in Settings: a worker cannot read the app's saved choice. Colours are the app's white and #161616.
+- A 502, 503 or 504 answer counts as "not responding", like a failed fetch. The retry fetches the page itself every 5 seconds and reloads on any other answer.
+- Acceptance only (TOOLING.9, TOOLING.10); there is no server code. The checks block the route with `context.route`, since `page.route` does not see requests a service worker makes.

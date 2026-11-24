@@ -394,6 +394,8 @@ Unit tests: none: these check the tools, not the app
 - `TOOLING.2` CI has an acceptance job that builds the front end, makes acceptance.localhost, serves it and runs every check
 - `TOOLING.3` A failed check saves screenshots, and CI uploads them with the logs as an artifact
 - `TOOLING.4` No password or key in the workflow file or in the logs a failed run uploads
+- `TOOLING.9` With the browser offline, /life/today shows the offline page saying "this device", in dark mode too
+- `TOOLING.10` Online but the server gives no answer: "not responding", Today loads by itself once it answers; dark in dark mode
 
 ### End of every run (`tools/acceptance/end.mjs`)
 
