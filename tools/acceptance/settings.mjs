@@ -1306,7 +1306,12 @@ for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system
       must((await pg.locator('[data-source-tile][data-system="gmail"] [data-tile-add]').getAttribute('aria-label')) === 'Connect Gmail', 'there is no Connect Gmail')
       const tile = pg.locator('[data-source-tile][data-system="microsoft"]')
       must((await tile.locator('[data-tile-add]').getAttribute('aria-label')) === 'Connect Microsoft', 'there is no Connect Microsoft')
-      await tile.locator('[data-tile-add]').click()
+      // the tile can still be settling after load (CI timed out here once at 1440 px): scroll to it and try again
+      for (let i = 0; i < 3 && !(await pg.locator('[data-gmail-connect]').isVisible()); i++) {
+        await tile.locator('[data-tile-add]').scrollIntoViewIfNeeded()
+        await tile.locator('[data-tile-add]').click({ timeout: 8000 }).catch(() => {})
+        await pg.locator('[data-gmail-connect]').waitFor({ timeout: 2500 }).catch(() => {})
+      }
       await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
       const said = await pg.locator('[data-gmail-connect]').innerText()
       must(/Microsoft \(Outlook or Microsoft 365\)/.test(said) && /never deletes any/.test(said) && !/calendar/.test(said), 'the dialog does not say what it may do: ' + said)
