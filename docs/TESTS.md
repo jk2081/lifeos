@@ -49,11 +49,11 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 
 ## Acceptance checks by place
 
-### Today (`tools/acceptance/today.mjs`, 30 checks)
+### Today (`tools/acceptance/today.mjs`, 49 checks)
 
 Day, Week, Month and Year, the numbers that open lists, Reset, rhythm banners, the first-run guide, Today's tasks.
 
-Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal work); `test_settings.py` (first run, the guide); `test_tasks.py` (counts, Reset, Someday)
+Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal work); `test_settings.py` (first run, the guide: what to call the person, the AI key step, the first things and where they are filed); `test_tasks.py` (counts, Reset, Someday)
 
 - `TODAY.1` Log in, open /life, Today is filled from seed data
 - `TODAY.2` Add a birthday and see it on the calendar this year and next
@@ -71,11 +71,11 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.14` an area that is off has no lane
 - `TODAY.15` clicking a goal opens the goal; clicking a month opens Month
 - `TODAY.16` Week, Month and Year have no sideways scroll
-- `TODAY.17` the first visit opens the guide; skipping every step lands on Today and the guide does not return
+- `TODAY.17` the first visit opens the guide; Start, Next, Skip and Done land on Today and the guide does not return
 - `TODAY.18` the guide shows one screen at a time and each screen fits the phone
 - `TODAY.19` Today, Brain, Goals and Library on a fresh site each show their empty state with one action
-- `TODAY.20` going through the guide sets the name and time zone, switches on a third area and turns three typed things into tasks with areas
-- `TODAY.21` after the guide the ladder card shows level 2 of 7 and connect a source
+- `TODAY.20` going through the guide sets what to call the person and the time zone, switches on a third area, adds a part and turns three typed things into tasks with areas
+- `TODAY.21` after the guide the ladder card shows level 1 of 7 and the AI key as the next step
 - `TODAY.22` on an empty site Today shows its empty state and no Open band
 - `TODAY.23` cycle goals with lead actions and no task this week are not rows on Today
 - `TODAY.24` a task planned this week under a cycle goal shows with its goal, and ticking it records the lead action's tick
@@ -85,6 +85,25 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.28` the order is Needs you, the list, habits, then the rail
 - `TODAY.29` each moved number is in its new place with the count the old card had (All tasks, Goals, Library, Brain Activity)
 - `TODAY.30` with the fake AI failing on credit, Ask shows the credit message and Today shows "The Brain is off" with a link to Settings > AI, until a call works
+- `TODAY.31` on every guide step the footer sits under the content, within 48 px
+- `TODAY.32` every guide step has the same primary button colour, and every text box and select the same border and background
+- `TODAY.33` the guide's primary button reads Start, Next, Next, Next, Next, Done, and nothing reads Continue
+- `TODAY.34` Skip is shown only on the AI key step and on What's on your mind
+- `TODAY.35` Welcome shades none of its three cards
+- `TODAY.36` You: the call-me field holds the first word of the full name, saving it leaves the full name, the time zone reads "India — Kolkata (GMT+5:30)" and is not clipped
+- `TODAY.37` Areas: switching Money on and off changes no text under the title, and each switch is right of its area's name
+- `TODAY.38` Areas: a part is indented under its area with an ×, stays greyed as Kept when the area goes off, and there is no area drop-down
+- `TODAY.39` What's on your mind: three empty boxes with no placeholder
+- `TODAY.40` with a model that answers Money, the first thing shows Money, not Career
+- `TODAY.41` with no AI key the first thing's label reads Not sure
+- `TODAY.42` tapping the label and picking Health saves Health on the task and logs an area correction
+- `TODAY.43` a model that answers an area that is off shows "Relationships (off)", and Switch on files the task there
+- `TODAY.44` the microphone hint shows at 390 px and not at 1440 px
+- `TODAY.45` You're set up: the summary counts the areas, parts and tasks made, no "level", and Done opens Today
+- `TODAY.46` every guide step in light and dark: no script error and no clipped text
+- `TODAY.47` with no key the AI key step comes between areas and first things, and Skip goes to first things
+- `TODAY.48` a fake key is saved encrypted and shows "The Brain is on", and the first thing then gets the model's area
+- `TODAY.49` with a key already set the AI key step shows "The Brain is on" and Next goes straight on
 
 ### Brain (`tools/acceptance/brain.mjs`, 53 checks)
 

@@ -5,7 +5,8 @@ import { group } from '@/data/call'
 export const settingsData = {
   area: group('area', ['tree']),
   settings: group('settings', ['area_open_work', 'create_space', 'find_users', 'focus_offers', 'get', 'reorder', 'save', 'save_item', 'set_agent_vault', 'set_ai_key', 'set_ai_price', 'set_feature_cap', 'set_member', 'set_space_ask', 'test_ai_connection']),
-  onboarding: group('onboarding', ['add_first_things', 'reset', 'save_you']),
+  onboarding: group('onboarding', ['add_first_things', 'guess_area', 'remove_first_thing', 'reset', 'save_ai_key', 'save_you']),
+  tasks: group('tasks', ['update']),
   gcal: group('gcal', ['calendars', 'connect', 'disconnect', 'set_read', 'set_write', 'state', 'sync']),
   updates: group('updates', ['check_now', 'get', 'request_update']),
   connections: group('connections', ['import_status', 'start_import']),

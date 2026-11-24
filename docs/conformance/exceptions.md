@@ -6,14 +6,14 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | Rule | Exceptions |
 | --- | --- |
-| frappe-manual-commit | 9 |
+| frappe-manual-commit | 15 |
 | frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 7 |
 | frappe-setuser | 16 |
 | frappe-sql-format-injection | 1 |
 | guest-whitelisted-method | 1 |
 | whitelisted-side-effect-on-get | 1 |
-| Total | 36 |
+| Total | 42 |
 
 ## frappe-manual-commit
 
@@ -21,13 +21,19 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | --- | --- | --- |
 | `lifeos/api/connections.py` | 490 | Frappe's return address is a GET and rolls back at its end; the card must keep what the provider said |
 | `lifeos/brain/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
-| `lifeos/install.py` | 63 | after_install: the spaces and index DDL must be kept before install-app goes on |
-| `lifeos/install.py` | 152 | a bench execute command: the user and the space are kept when it ends |
+| `lifeos/install.py` | 68 | after_install: the spaces and index DDL must be kept before install-app goes on |
+| `lifeos/install.py` | 157 | a bench execute command: the user and the space are kept when it ends |
 | `lifeos/skills/__init__.py` | 20 | bench execute: keep the examples' last result |
+| `lifeos/tests/test_settings.py` | 996 | the runner under test commits, so the test cleans up with a commit |
 | `lifeos/tools/loadtest.py` | 116 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/tools/loadtest.py` | 260 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/tools/loadtest.py` | 319 | load test: its removal must stick even when run inside a test |
 | `lifeos/tools/tidy.py` | 125 | bench execute run: the copies are removed only after the rows that used them are saved |
+| `lifeos/updater/runner.py` | 54 | the runner is a background process: each step's outcome is saved at once |
+| `lifeos/updater/runner.py` | 71 | the runner is a background process: each step's outcome is saved at once |
+| `lifeos/updater/runner.py` | 92 | the runner is a background process: each step's outcome is saved at once |
+| `lifeos/updater/runner.py` | 184 | the runner is a background process: each step's outcome is saved at once |
+| `lifeos/updater/runner.py` | 296 | the runner is a background process: a fresh view of the table |
 
 ## frappe-missing-translate-function-python
 

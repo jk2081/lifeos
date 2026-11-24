@@ -31,6 +31,10 @@ FILE_FIELDS = [
 ]
 
 
+# issue 97: what the person likes to be called; the full name on the account is left alone
+USER_FIELDS = [{"fieldname": "preferred_name", "label": "Preferred Name", "fieldtype": "Data", "insert_after": "last_name", "no_copy": 1}]
+
+
 def make_file_fields():
 	create_custom_fields({"File": FILE_FIELDS}, ignore_validate=True)
 
@@ -51,6 +55,7 @@ def setup():
 			"insert_after": "event_type", "search_index": 1,
 		}, *MEETING_FIELDS],
 		"Google Calendar": GOOGLE_FIELDS,
+		"User": USER_FIELDS,
 		"File": FILE_FIELDS,
 	}, ignore_validate=True)
 	from lifeos.library import index

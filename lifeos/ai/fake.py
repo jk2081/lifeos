@@ -275,6 +275,9 @@ def _area(data):
 	"""The first part that shares a word with the title or notes, else the first area given, 40% sure."""
 	text = _words(f"{data.get('title') or ''} {data.get('notes') or ''}")
 	listed = data.get("areas") or []
+	forced = frappe.get_site_config().get("lifeos_fake_ai_area")  # the acceptance site: always answer this area, whether it is on or off
+	if forced and (hit := next((a for a in listed if a["name"] == forced), None)):
+		return {"area": hit["id"], "confidence": 80}
 	pick = next((a for a in listed if a.get("part_of") and text & _words(f"{a['name']} {a.get('description') or ''}")), None) or (listed[0] if listed else {})
 	return {"area": pick.get("id") or "", "confidence": 40}
 

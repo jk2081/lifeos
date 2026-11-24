@@ -549,20 +549,99 @@ class TestFirstRun(LifeTestCase):
 		self.assertTrue(all(t["area"] for t in things))
 		self.assertFalse(onboarding.state()["show"])
 
-	def test_you_step_sets_the_name_and_time_zone(self):
+	def _new_owner(self):
 		frappe.get_doc({"doctype": "Life Space", "space_name": FRESH, "owner_user": "Administrator"}).insert()
 		with patch.object(frappe.db, "commit"):
 			install.new_owner(NEW, "Asha Rao", send_welcome_email=0, space=FRESH)
 		permissions.clear_cache()
+
+	def test_you_step_sets_what_to_call_the_person_and_the_time_zone_and_leaves_the_full_name(self):
+		self._new_owner()
 		was = frappe.db.get_single_value("System Settings", "time_zone")
 		frappe.set_user(NEW)
+		self.assertEqual(onboarding.state()["call_me"], "Asha")  # the first word of the full name
 		with self.assertRaises(frappe.ValidationError):
-			onboarding.save_you("Asha Rao", "Not/AZone")
-		out = onboarding.save_you("  Asha  K Rao ", "Asia/Kolkata")
-		self.assertEqual(out["full_name"], "Asha K Rao")
-		self.assertEqual(out["time_zone"], "Asia/Kolkata")
+			onboarding.save_you("Asha", "Not/AZone")
+		out = onboarding.save_you("  Ash  ", "Asia/Kolkata")
+		self.assertEqual(out, {"call_me": "Ash", "time_zone": "Asia/Kolkata"})
+		state = onboarding.state()
+		self.assertEqual((state["call_me"], state["full_name"]), ("Ash", "Asha Rao"))
+		self.assertEqual(frappe.db.get_value("User", NEW, ["first_name", "last_name"]), ("Asha", "Rao"))
 		frappe.set_user("Administrator")
 		frappe.db.set_single_value("System Settings", "time_zone", was)
+
+	def test_ai_key_step_stores_a_working_key_and_takes_out_one_that_fails(self):
+		from lifeos.ai import client, fake
+
+		self._new_owner()
+		frappe.set_user(NEW)
+		self.assertFalse(onboarding.state()["ai_set"])
+		frappe.flags.lifeos_ai_backend = fake.ScriptedFake([{"content": [{"type": "text", "text": "ok"}]}])
+		try:
+			self.assertEqual(onboarding.save_ai_key(" fake-1234567890 "), {"ai_set": True})
+			self.assertTrue(onboarding.state()["ai_set"])
+			frappe.set_user("Administrator")
+			def refuse(params):
+				raise client.AIError("no")
+			frappe.flags.lifeos_ai_backend = fake.ScriptedFake([refuse])
+			frappe.set_user(NEW)
+			with self.assertRaises(frappe.ValidationError) as caught:
+				onboarding.save_ai_key("fake-bad-key-000")
+			self.assertIn("That key didn't work", str(caught.exception))
+			self.assertEqual(client.api_key(), "fake-1234567890")  # the earlier key is back
+		finally:
+			frappe.flags.lifeos_ai_backend = None
+			frappe.set_user("Administrator")
+			frappe.db.set_single_value("Life Settings", "anthropic_api_key", "")
+			frappe.db.sql("delete from __Auth where doctype='Life Settings' and fieldname='anthropic_api_key'")
+			frappe.clear_cache()
+
+	def test_first_things_wait_for_the_model_and_only_a_fallback_is_unsure(self):
+		from lifeos.ai import fake
+		from lifeos.brain import area_guess
+
+		self._new_owner()
+		frappe.set_user(NEW)
+		made = onboarding.add_first_things(["Finish tax return meeting"], space=FRESH)
+		self.assertEqual(made[0]["unsure"], 1)  # no word matches an area: the Career fallback, shown as "Not sure"
+		self.assertEqual(frappe.db.get_value("Life Task", made[0]["name"], "area_confidence"), area_guess.FALLBACK_CONFIDENCE)
+		self.assertFalse(frappe.flags.lifeos_no_refine)
+		# no key: nothing to ask
+		self.assertIsNone(onboarding.guess_area(made[0]["name"]))
+		seen = []
+
+		def answer(params):
+			seen.append(fake.asked(params)[1])
+			ids = {a["name"]: a["id"] for a in seen[-1]["areas"]}
+			return {"content": [{"type": "text", "text": '{"area": "%s", "confidence": 90}' % ids["Money"]}]}
+
+		frappe.flags.lifeos_ai_backend = fake.ScriptedFake([answer, answer])
+		try:
+			with patch.object(onboarding, "ai_set", return_value=True), patch("lifeos.ai.client.is_set_up", return_value=True):
+				out = onboarding.guess_area(made[0]["name"])
+				self.assertEqual(out["area_name"], "Money")
+				self.assertEqual(out["is_on"], 0)  # Money is off: asked about, not filed
+				self.assertEqual(len(seen[0]["areas"]), 7)  # all seven, each marked on or off
+				self.assertEqual({a["name"] for a in seen[0]["areas"] if a["on"]}, {"Career", "Health"})
+				self.assertEqual(frappe.db.get_value("Life Task", made[0]["name"], "area_confidence"), area_guess.FALLBACK_CONFIDENCE)
+				frappe.db.set_value("Life Area", {"space": FRESH, "area_name": "Money"}, "is_on", 1)
+				out = onboarding.guess_area(made[0]["name"])
+				self.assertEqual(out["is_on"], 1)
+				self.assertEqual(frappe.db.get_value("Life Task", made[0]["name"], ["area_name", "area_confidence", "area_guessed"]) if False else
+					(frappe.db.get_value("Life Area", frappe.db.get_value("Life Task", made[0]["name"], "area"), "area_name"),
+					frappe.db.get_value("Life Task", made[0]["name"], "area_guessed")), ("Money", 1))
+		finally:
+			frappe.flags.lifeos_ai_backend = None
+
+	def test_a_first_thing_can_be_taken_back_and_a_correction_is_logged(self):
+		self._new_owner()
+		frappe.set_user(NEW)
+		made = onboarding.add_first_things(["Call mum on Sunday"], space=FRESH)
+		health = frappe.db.get_value("Life Area", {"space": FRESH, "area_name": "Health"})
+		tasks.update(made[0]["name"], {"area": health})
+		self.assertTrue(frappe.db.exists("Life Action Log", {"kind": "Area correction", "task": made[0]["name"], "new_area": health}))
+		self.assertEqual(onboarding.remove_first_thing(made[0]["name"]), {"removed": made[0]["name"]})
+		self.assertFalse(frappe.db.exists("Life Task", made[0]["name"]))
 
 	def test_an_agent_and_a_family_user_never_get_the_guide(self):
 		self.as_user(OWNER)

@@ -46,6 +46,7 @@
       <NewRecord v-if="store.newKind === 'someday'" :model-value="true" title="Park on Someday" action="Park on Someday" :fields="somedayFields" :save="createSomeday"
         @update:model-value="(v) => !v && (store.newKind = '')" />
       <OnboardingGuide v-if="onboarding.show" />
+      <Button v-if="onboarding.show && onboarding.away" class="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 shadow-lg" variant="solid" label="Back to the guide" data-guide-return @click="onboarding.away = false" />
       <MoreSheet v-model:open="moreOpen" @logout="logout" @shortcuts="shortcutsOpen = true" />
       <ItemView />
       <AskPanel />

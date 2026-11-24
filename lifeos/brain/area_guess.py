@@ -16,6 +16,7 @@ import re
 
 import frappe
 
+from lifeos.ai import client
 from lifeos.goals import areas
 
 # confidence, in percent, of each step
@@ -117,10 +118,8 @@ def fallback(candidates):
 
 def model_possible():
 	"""Step 4 runs only with an AI key set, and never for a task saved during install, migrate, a patch or an import."""
-	from lifeos.ai import client
-
 	f = frappe.flags
-	if f.in_install or f.in_migrate or f.in_patch or f.in_import:
+	if f.lifeos_no_refine or f.in_install or f.in_migrate or f.in_patch or f.in_import:
 		return False
 	return client.is_set_up()
 
@@ -153,7 +152,7 @@ def ask_model(doc, candidates):
 	ids = {f"A{i + 1}": a for i, a in enumerate(candidates[:80])}
 	names = {a.name: a.area_name for a in candidates}
 	got = call.ask("guess-area", {"title": doc.title, "notes": (doc.notes_md or "")[:1500], "areas": [{"id": k, "name": a.area_name,
-		"part_of": names.get(a.parent_area), "description": a.description or ""} for k, a in ids.items()]}, space=doc.space, reference=(doc.doctype, doc.name))
+		"part_of": names.get(a.parent_area), "description": a.description or "", "on": bool(a.get("is_on", 1))} for k, a in ids.items()]}, space=doc.space, reference=(doc.doctype, doc.name))
 	key = str(got.get("area") or "").strip()
 	pick = ids.get(key) or next((a for a in ids.values() if a.area_name.lower() == key.lower()), None)
 	if not pick:
