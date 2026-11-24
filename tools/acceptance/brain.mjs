@@ -70,8 +70,15 @@ await check('LIBRARY.1', 'Note with a [[link]]: the target shows the backlink, b
 })
 
 await check('BRAIN.3', 'Search for a word in a transcript finds the inbox item', async () => {
-  const res = await owner.api('search.query', { text: `Nowrojee ${stamp}` }) // the word is in the transcript, the stamp in the title of this run's item
-  must(res.results.some((r) => r.ref_doctype === 'Life Inbox Item' && r.ref_name === photoItem), 'the inbox item was not found')
+  // the word is in the transcript, the stamp in the title of this run's item. Global Search is written by a background job after the save
+  // (and since issue 104 the same worker reads the files first), so on a slow runner the item appears a little late: wait up to a minute
+  let found = false
+  for (let i = 0; i < 30 && !found; i++) {
+    const res = await owner.api('search.query', { text: `Nowrojee ${stamp}` })
+    found = res.results.some((r) => r.ref_doctype === 'Life Inbox Item' && r.ref_name === photoItem)
+    if (!found) await owner.page.waitForTimeout(2000)
+  }
+  must(found, 'the inbox item was not found')
   await owner.page.keyboard.press('Control+k')
   await owner.page.keyboard.type(`Nowrojee ${stamp}`)
   await owner.page.waitForTimeout(900)
