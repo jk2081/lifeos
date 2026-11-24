@@ -7,7 +7,7 @@ from frappe.query_builder import Order
 from frappe.query_builder import functions as fn
 from frappe.utils import add_to_date, now_datetime
 
-from lifeos.library import files, links
+from lifeos.library import extract, files, links
 from lifeos import permissions
 from lifeos.brain import proposals
 from lifeos.api.utils import (area_criterion, count_by, count_tabs, count_where, filter_criteria, flag, group_summary, in_order_of, list_query, names_map, order_terms,
@@ -177,17 +177,19 @@ def claim_next(space: str | None = None):
 	item.error = None
 	item.save()
 	out = _item_dict(item)
+	out.update(extract.of_item(item))
 	out["context"] = space_context(item.space)
 	# what the agent must respect: the intent, and the filing defaults of the system it came from
 	from lifeos.api import connections
 
 	out["connection"] = connections.defaults(item.space, item.source_system) if item.source_system else None
 	out["rules"] = {
-		"Process": "Extract text, summarise and propose records for review.",
-		"Add to wiki": "Extract text, then create or edit wiki pages directly with lifeos.api.wiki (cite this item). Propose tasks or events "
+		"Process": "Use extracted_text, summarise and propose records for review.",
+		"Add to wiki": "Use extracted_text, then create or edit wiki pages directly with lifeos.api.wiki (cite this item). Propose tasks or events "
 			"for review as usual; do not propose notes.",
-		"Just keep": "Extract text (transcript, OCR, PDF text) so it is searchable. Propose nothing.",
-	}[item.intent or "Process"]
+		"Just keep": "The text is already read and searchable (extracted_text). Propose nothing.",
+	}[item.intent or "Process"] + " Life OS has read the files on its own server: read a file yourself only when needs_closer_read is true, or when " \
+		"extraction_pending is true and you cannot wait."
 	return out
 
 
@@ -440,6 +442,7 @@ def get(item: str):
 	"""One inbox item with its files, proposals and the choices for the filing chips."""
 	doc = permissions.get_doc_checked("Life Inbox Item", item)
 	out = _item_dict(doc)
+	out.update(extract.of_item(doc))
 	users = user_names([doc.owner, doc.claimed_by])
 	out["filed_by"], out["processed_by"] = users.get(doc.owner), users.get(doc.claimed_by)
 	out["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None

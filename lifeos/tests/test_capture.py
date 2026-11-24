@@ -3,6 +3,8 @@ import io
 import json
 import os
 import re
+import shutil
+from unittest import mock
 
 import frappe
 from frappe.core.doctype.file.utils import find_file_by_url, get_content_hash
@@ -10,7 +12,7 @@ from frappe.utils import add_to_date, now_datetime, today
 
 from lifeos.calendar import calendar_data
 from lifeos.goals import cycles
-from lifeos.library import files, links, trash
+from lifeos.library import extract, files, links, trash
 from lifeos import permissions
 from lifeos.brain import email_in, proposals
 from lifeos.api import chats, connections, inbox, meta, review, wiki
@@ -18,7 +20,7 @@ from lifeos.tools.devtools import attach, load_fake_agent, LocalClient, pdf_byte
 from lifeos.web.pwa import SW_PATH
 from lifeos.review import meetings
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
-from lifeos.tests.helpers import item, task, upload
+from lifeos.tests.helpers import find, item, NoModel, printed_png, scanned_pdf, scribble_png, SkillCase, speech_wav, task, text_pdf, upload, answer
 from lifeos.tools import tidy
 
 
@@ -891,3 +893,146 @@ class TestRulesOnTheDocType(LifeTestCase):
 		frappe.get_doc(fields).insert()
 		with self.assertRaises(frappe.DuplicateEntryError):
 			frappe.get_doc(fields).insert()
+
+
+class TestReadLocally(SkillCase):
+	"""Issue 104: files are read on this server, with no model, before the Brain sees them."""
+
+	def filed(self, file_name, content, **values):
+		item = self.capture(text="", source_type="Upload", **values)
+		attach("Life Inbox Item", item.name, file_name, content)
+		return item
+
+	def read(self, item):
+		extract.run("Life Inbox Item", item.name)
+		item.reload()
+		return item
+
+	def sent(self):
+		"""What the model was sent: the text of the request, and the kinds of its other blocks."""
+		content = self.backend.received[0]["messages"][0]["content"]
+		return "".join(b.get("text", "") for b in content if b.get("type") == "text"), [b["type"] for b in content]
+
+	def test_a_text_pdf_is_read_by_pypdf_with_no_model_call(self):
+		frappe.flags.lifeos_ai_backend = NoModel()
+		before = NoModel.calls
+		item = self.read(self.filed("tractor.pdf", text_pdf("Quarterly tractor invoice 4471")))
+		self.assertIn("tractor invoice 4471", item.extracted_text)
+		self.assertEqual((item.extracted_by, item.needs_closer_read), ("pypdf", 0))
+		self.assertGreaterEqual(item.extract_confidence, 60)
+		self.assertEqual(NoModel.calls, before)
+		self.assertIn("tractor invoice", frappe.db.get_value("Life Index", {"ref_name": item.name}, "search_text"))  # searchable
+
+	def test_the_model_is_given_the_text_and_not_the_file(self):
+		item = self.filed("tractor.pdf", text_pdf("Quarterly tractor invoice 4471"))
+		self.backend = self.script(answer("An invoice."))
+		log = self.process(item)
+		self.assertEqual(log.status, "Done", log.error)
+		text, kinds = self.sent()
+		self.assertIn("<file_text", text)
+		self.assertIn("tractor invoice 4471", text)
+		self.assertEqual([k for k in kinds if k != "text"], [])  # no document and no image
+
+	def test_a_scanned_pdf_is_read_by_ocrmypdf(self):
+		item = self.read(self.filed("bill.pdf", scanned_pdf(["Electricity bill", "Amount due 3200 rupees", "Customer Sharma"])))
+		self.assertEqual(item.extracted_by, "ocrmypdf", item.extract_note)
+		self.assertIn("electricity", item.extracted_text.lower())
+		self.assertIn("Sharma", item.extracted_text)
+
+	def test_a_photo_of_printed_text_is_read_by_rapidocr(self):
+		item = self.read(self.filed("sign.png", printed_png(["Please pay the water bill", "before the fifth of December"])))
+		self.assertEqual(item.extracted_by, "rapidocr", item.extract_note)
+		self.assertIn("water bill", item.extracted_text.lower())
+		self.assertGreater(item.extract_confidence, 60)
+		self.assertEqual(item.needs_closer_read, 0)
+
+	def test_speech_is_turned_into_text_by_whisper(self):
+		item = self.read(self.filed("note.wav", speech_wav()))
+		self.assertEqual(item.extracted_by, "whisper", item.extract_note)
+		self.assertIn("electricity", item.extracted_text.lower())
+
+	def test_word_and_excel_files_are_read(self):
+		import docx
+		from openpyxl import Workbook
+
+		doc = docx.Document()
+		doc.add_paragraph("Lease agreement for the Pune flat")
+		buf = io.BytesIO()
+		doc.save(buf)
+		item = self.read(self.filed("lease.docx", buf.getvalue()))
+		self.assertEqual(item.extracted_by, "docx")
+		self.assertIn("Pune flat", item.extracted_text)
+		book = Workbook()
+		book.active.append(["Rent", 42000])
+		buf = io.BytesIO()
+		book.save(buf)
+		item = self.read(self.filed("rent.xlsx", buf.getvalue()))
+		self.assertEqual(item.extracted_by, "xlsx")
+		self.assertIn("42000", item.extracted_text)
+
+	def test_a_weak_reading_is_marked_and_only_then_the_model_gets_the_image(self):
+		item = self.read(self.filed("scrawl.png", scribble_png()))
+		self.assertEqual(item.needs_closer_read, 1)
+		self.assertTrue(item.extract_note)
+		self.backend = self.script(answer("Handwriting."))
+		log = self.process(item)
+		self.assertEqual(log.status, "Done", log.error)
+		self.assertIn("image", self.sent()[1])
+
+	def test_a_bad_file_falls_back_to_the_model_with_no_crash(self):
+		item = self.read(self.filed("fake.png", b"\x89PNG fake"))
+		self.assertEqual(item.needs_closer_read, 1)
+		self.assertFalse(item.extracted_text)
+
+	def test_the_threshold_is_a_setting(self):
+		item = self.read(self.filed("sign.png", printed_png(["Please pay the water bill"])))
+		self.assertEqual(item.needs_closer_read, 0)
+		frappe.db.set_single_value("Life Settings", "extract_min_confidence", 100)
+		try:
+			item = self.filed("sign2.png", printed_png(["Please pay the electricity bill"]))
+			extract.run("Life Inbox Item", item.name, force=True)
+			self.assertEqual(frappe.db.get_value("Life Inbox Item", item.name, "needs_closer_read"), 1)
+		finally:
+			frappe.db.set_single_value("Life Settings", "extract_min_confidence", 60)
+
+	def test_a_missing_tesseract_leaves_a_line_and_no_error(self):
+		def which(name, *a, **k):
+			return None if name in ("tesseract", "ocrmypdf") else shutil.which(name, *a, **k)
+
+		with mock.patch("lifeos.library.extract.shutil.which", which):
+			item = self.read(self.filed("bill2.pdf", scanned_pdf(["Gas bill"])))
+		self.assertIn("Install tesseract-ocr", item.extract_note)
+		self.assertFalse(item.extracted_text)
+		self.assertEqual(item.needs_closer_read, 1)
+
+	def test_a_file_over_the_limit_is_skipped_with_the_reason(self):
+		item = self.filed("huge.pdf", text_pdf("Big"))
+		file_doc = frappe.get_doc("File", {"attached_to_name": item.name})
+		file_doc.file_size = extract.MAX_BYTES + 1
+		self.assertIn("over 50 MB", extract.read_file(file_doc)["note"])
+
+	def test_a_file_is_read_once(self):
+		item = self.read(self.filed("tractor.pdf", text_pdf("Tractor")))
+		with mock.patch("lifeos.library.extract.read_file") as reader:
+			extract.run("Life Inbox Item", item.name)
+		reader.assert_not_called()
+
+	def test_a_vault_documents_text_never_reaches_a_model_and_is_found_only_by_who_may_open_it(self):
+		from lifeos.ai import tools as ask_tools
+
+		frappe.flags.lifeos_ai_backend = NoModel()
+		before = NoModel.calls
+		frappe.db.set_value("Life Space", PRIVATE, {"ask_enabled": 1, "ask_can_read_vault": 1})
+		doc = frappe.get_doc({"doctype": "Life Vault Document", "space": PRIVATE, "title": "Passport q104", "doc_type": "Other"}).insert()
+		attach("Life Vault Document", doc.name, "passport.pdf", text_pdf("Passport quokkaville 99"), "file")
+		extract.run("Life Vault Document", doc.name)
+		self.assertIn("quokkaville", frappe.db.get_value("Life Vault Document", doc.name, "extracted_text"))
+		self.assertTrue(find("quokkaville")["results"])  # the owner finds it
+		self.as_user(FAMILY)
+		self.assertFalse(find("quokkaville")["results"])  # a person outside the space does not
+		self.as_user(OWNER)
+		ctx = ask_tools.Context(PRIVATE)
+		got = json.dumps([ask_tools.run_tool(ctx, "search", {"query": "quokkaville"}),
+			ask_tools.run_tool(ctx, "get_record", {"doctype": "Life Vault Document", "name": doc.name})])
+		self.assertNotIn("quokkaville", got)  # what Ask would send to a model
+		self.assertEqual(NoModel.calls, before)

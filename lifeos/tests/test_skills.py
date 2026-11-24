@@ -260,7 +260,7 @@ class TestServing(SkillCase):
 		"""Skills.get("lifeos") for an agent in that space."""
 		self.as_user(AGENT)
 		got = skills_api.get("lifeos")
-		self.assertEqual((got["name"], got["version"]), ("lifeos", 4))
+		self.assertEqual((got["name"], got["version"]), ("lifeos", 5))
 		self.assertIn("Life OS agent instructions", got["instructions"])
 		self.assertIn("lifeos", [s["name"] for s in skills_api.list(space=PRIVATE)])
 		self.assertEqual({s["name"] for s in skills_api.list()}, BUILT_IN)

@@ -17,6 +17,27 @@ await check('LIBRARY.1', 'Security: rendered Markdown is sanitised', async () =>
   must(!found.pwned && !found.scripts && !found.handlers && !found.js, JSON.stringify(found))
 })
 
+await check('LIBRARY.48', 'A scanned bill is read on the server and found by a word from its contents', async () => {
+  // a PDF that is only a picture: the worker reads it with OCRmyPDF (no model), then search finds it by a word that is in the picture alone
+  const word = 'Hartwell'
+  bench(`from lifeos.tests.helpers import scanned_pdf
+from lifeos.tools.devtools import attach
+item = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "Scanned bill ${stamp}", "source_type": "Upload", "intent": "Just keep", "status": "Done"}).insert(ignore_permissions=True)
+attach("Life Inbox Item", item.name, "bill-${stamp}.pdf", scanned_pdf(["Electricity bill", "Customer ${word}", "Amount due 3200 rupees"]))`)
+  let found = false
+  for (let i = 0; i < 90 && !found; i++) {
+    found = (await owner.api('search.query', { text: word, space: SPACE })).results.some((r) => (r.title || '').includes(`Scanned bill ${stamp}`))
+    if (!found) await new Promise((r) => setTimeout(r, 2000))
+  }
+  must(found, `search did not find the scanned bill by "${word}" (is a worker running, and are tesseract-ocr and ocrmypdf installed?)`)
+  const row = JSON.parse(bench(`import json
+print(json.dumps(frappe.db.get_value("Life Inbox Item", {"title": "Scanned bill ${stamp}"}, ["extracted_by", "needs_closer_read"], as_dict=True)))`).split('\n').pop())
+  must(row.extracted_by === 'ocrmypdf' && !row.needs_closer_read, JSON.stringify(row))
+  bench(`frappe.set_user("Administrator")
+for n in frappe.get_all("Life Inbox Item", filters={"title": "Scanned bill ${stamp}"}, pluck="name"):
+    frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+})
+
 for (const width of WIDTHS) {
   const { S5, asAgent, clickRow, count, docOf, editorEnd, errors, nav, overflow, pane, paneTitle, pg, phone, pickQuick, s, settle, tag } = await uxKit(width)
   await check('LIBRARY.2', `${width} px: a row opens a pane on every list screen and the list stays in the page`, async () => {

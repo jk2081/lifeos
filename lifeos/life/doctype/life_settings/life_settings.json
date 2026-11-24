@@ -40,6 +40,7 @@
   "brain_section",
   "brain_auto_threshold",
   "brain_auto_kinds",
+  "extract_min_confidence",
   "ai_prices",
   "insights_run_on",
   "updater_heartbeat",
@@ -288,6 +289,13 @@
    "description": "A JSON list of proposal kinds. Empty: it files nothing on its own."
   },
   {
+   "fieldname": "extract_min_confidence",
+   "fieldtype": "Int",
+   "label": "Least Confidence to Trust a Local Reading",
+   "default": "60",
+   "description": "A file read locally with less confidence than this is marked Needs a closer read, and only then may a model look at it."
+  },
+  {
    "fieldname": "updater_heartbeat",
    "fieldtype": "Datetime",
    "label": "Updater last seen",
@@ -316,7 +324,7 @@
   {
    "fieldname": "subject_seen_days",
    "fieldtype": "Int",
-   "label": "\u2026within this many days",
+   "label": "…within this many days",
    "default": "30"
   }
  ],

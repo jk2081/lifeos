@@ -261,7 +261,7 @@ def _area(area):
 	return frappe.db.get_value("Life Area", area, "area_name") if area else None
 
 
-TEXT_FIELDS = {"Life Note": ["summary", "content_md"], "Life Task": ["notes_md", "waiting_on"], "Life Inbox Item": ["instruction", "summary_md", "transcript_md", "raw_text"],
+TEXT_FIELDS = {"Life Note": ["summary", "content_md"], "Life Task": ["notes_md", "waiting_on"], "Life Inbox Item": ["instruction", "summary_md", "transcript_md", "raw_text", "extracted_text"],
 	"Life Chat Log": ["summary_md", "transcript_md"],
 	"Life Goal": ["done_when", "notes_md", "result_note"], "Life Vault Document": ["notes_md"], "Life Insight": ["body"]}
 FIELDS = {"Life Task": ["status", "due_date", "priority", "goal", "completed_on", "last_touched_on", "someday_review_on"],

@@ -292,3 +292,68 @@ def find(text, **kwargs):
 
 	sync_global_search()
 	return search.query(text, **kwargs)
+
+
+# ---------- issue 104: files to read on this server ----------
+
+def text_pdf(words):
+	"""A one-page PDF whose text layer holds `words` (written by hand: Helvetica, one line)."""
+	content = f"BT /F1 18 Tf 72 720 Td ({words}) Tj ET".encode()
+	objects = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+		b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+		b"<< /Length %d >>\nstream\n%s\nendstream" % (len(content), content), b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+	out, offsets = b"%PDF-1.4\n", []
+	for i, body in enumerate(objects, 1):
+		offsets.append(len(out))
+		out += b"%d 0 obj\n%s\nendobj\n" % (i, body)
+	start = len(out)
+	out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offsets)
+	return out + b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF" % (len(objects) + 1, start)
+
+
+def printed_png(lines, size=44):
+	"""A photo-like image of printed text (white page, black letters)."""
+	from PIL import Image, ImageDraw, ImageFont
+
+	font = ImageFont.load_default(size=size)
+	img = Image.new("RGB", (1500, 120 * len(lines) + 80), "white")
+	draw = ImageDraw.Draw(img)
+	for i, line in enumerate(lines):
+		draw.text((50, 50 + i * 110), line, fill="black", font=font)
+	buf = io.BytesIO()
+	img.save(buf, format="PNG")
+	return buf.getvalue()
+
+
+def scanned_pdf(lines):
+	"""A PDF that is only a picture of printed text, with no text layer."""
+	from PIL import Image
+
+	img = Image.open(io.BytesIO(printed_png(lines, size=60))).convert("L")
+	buf = io.BytesIO()
+	img.save(buf, format="PDF", resolution=150)
+	return buf.getvalue()
+
+
+def scribble_png():
+	"""Handwriting-like marks no printed-text reader can make words of: random strokes."""
+	import random
+
+	from PIL import Image, ImageDraw
+
+	rng = random.Random(7)
+	img = Image.new("RGB", (900, 500), "white")
+	draw = ImageDraw.Draw(img)
+	for _i in range(60):
+		draw.line([(rng.randint(0, 900), rng.randint(0, 500)) for _j in range(4)], fill=(rng.randint(0, 90),) * 3, width=rng.randint(2, 5))
+	buf = io.BytesIO()
+	img.save(buf, format="PNG")
+	return buf.getvalue()
+
+
+def speech_wav():
+	"""A recording of one spoken sentence about paying the electricity bill on Friday."""
+	import os
+
+	with open(os.path.join(os.path.dirname(__file__), "fixtures", "speech.wav"), "rb") as fh:  # nosemgrep: frappe-security-file-traversal -- a fixture of this repository
+		return fh.read()

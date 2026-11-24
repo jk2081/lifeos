@@ -6,7 +6,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 
 | File | What it covers |
 | --- | --- |
-| `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc` |
+| `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc`, files read on the server before any model (`TestReadLocally`) |
 | `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
@@ -323,6 +323,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.45` Your notes takes text, and a brief rewrite afterwards leaves it unchanged
 - `LIBRARY.46` the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library
 - `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
+- `LIBRARY.48` a scanned bill is read on the server (OCRmyPDF) and found by a word from its contents
 
 ### Review (`tools/acceptance/review.mjs`, 23 checks)
 

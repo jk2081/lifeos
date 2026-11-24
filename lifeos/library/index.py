@@ -47,7 +47,8 @@ def build_rows(doc) -> list[dict]:
 	rows = [base]
 	if dt == "Life Inbox Item":
 		base["record_date"] = getdate(doc.received_on or doc.creation)
-		base["search_text"] = _text(doc.title, doc.instruction, doc.summary_md, doc.transcript_md, doc.raw_text)
+		base["search_text"] = _text(doc.title, doc.instruction, doc.summary_md, doc.transcript_md, doc.raw_text,
+			None if doc.vault_document or doc.get("is_sensitive") else doc.extracted_text)  # what a Vault source says is found by Global Search only (issue 104)
 		base.update({"media_kind": doc.media_kind or "", "source_system": doc.source_system or "", "intent": doc.intent or "",
 			"thumbnail": doc.thumbnail or "", "vault_locked": 1 if doc.vault_document or doc.get("is_sensitive") else 0})
 	elif dt == "Life Task":

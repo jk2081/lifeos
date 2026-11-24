@@ -5,7 +5,7 @@ when_to_use: An agent works the Life OS inbox: claims captures, transcribes, sum
 trigger: Served
 output: Answer
 model: Smart
-version: 4
+version: 5
 ---
 
 # Life OS agent instructions
@@ -69,9 +69,10 @@ There is one kind of goal, with a **horizon**: Year (an annual goal), 12 weeks o
 - It returns one item, or nothing. Process the item you get before claiming another. A claim lapses after 30 minutes and the item goes back to New, so do not hold one.
 - The item comes with `files` (name, URL, size) and `context`: the space's areas, people, habits and every goal in progress (with `horizon` and `area`). Use the context for filing. Do not invent areas. `context.areas` lists the areas of life that are switched on (Career, Health, Relationships, Money, Emotions, Mind, Environment), each followed by its parts (`parent_area` set, for example Tea & Coffee under Career); file into a part when one fits. `context.areas_off` names the areas that are off: nothing can be filed there, and a proposal that names one (or a part of one) is refused. You cannot switch an area on; tell the owner instead.
 - **Respect the item's `intent`** (it also comes with `rules`, one line saying what the intent asks):
-  - **Process** (the default): as below. Extract the text, summarise, propose records.
-  - **Add to wiki**: extract the text (transcript, OCR, PDF text) and send it as `transcript_md`, then write the wiki directly (see "The wiki"), citing this item. You may still propose tasks and events for review; **do not propose notes** (they are refused). When nothing is pending the item is Done.
-  - **Just keep**: extract the text so it is searchable and send it as `transcript_md`, with **no proposals** (they are refused). The item is Done without review.
+  - **Process** (the default): as below. Use `extracted_text`, summarise, propose records.
+  - **Add to wiki**: use `extracted_text` (the transcript, OCR or PDF text Life OS read on its own server) and send it as `transcript_md`, then write the wiki directly (see "The wiki"), citing this item. You may still propose tasks and events for review; **do not propose notes** (they are refused). When nothing is pending the item is Done.
+  - **Just keep**: the text is already read and searchable; send `extracted_text` as `transcript_md`, with **no proposals** (they are refused). The item is Done without review.
+- **Files are read before you see them** (issue 104): Life OS reads every PDF, photo, voice note, Word and Excel file on its own server and puts the words in `extracted_text` (with `extracted_by` and `extract_confidence`). Use that text; do not read the file yourself. Read the file only when `needs_closer_read` is true (the local reading failed or was not sure, for example handwriting), and when `extraction_pending` is true wait for the next poll unless you cannot. `extract_note` says why a file was not read (for example a tool that is not installed).
 - `connection` holds the filing defaults of the system the item came from (`default_area`, `default_goal`, `default_intent`), when it has a `source_system`. Read them with `lifeos.api.connections.defaults` (`space`, `system`) too.
 - When the owner sends you a message, an email or a link in chat that should be kept, create the item yourself with `lifeos.api.inbox.create_item` (`title`, `source_type`, `space`, `raw_text`, `instruction`, `source_url`, `intent`), attach any files with `/api/method/upload_file` (`doctype=Life Inbox Item`, `docname=<item>`, `is_private=1`), then claim and process it as usual. Sending the same file again is fine and costs nothing: Life OS stores each file once per space by its content (SHA-256), so the same bytes sent to the same item answer with the file already there, and the same bytes on another record are linked, not stored again. On an item with an `external_id`, a different file under the same name becomes the current file and keeps the old one as an earlier version.
 

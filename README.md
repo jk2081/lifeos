@@ -19,6 +19,16 @@ bench build --app lifeos                                 # only if get-app did n
 bench restart                                            # or restart bench start
 ```
 
+### Server packages
+
+Life OS reads PDFs, photos, voice notes and Word and Excel files on the server before any model sees them (issue 104). The Python parts come with `bench get-app` (`pyproject.toml`). The system parts are installed once with apt, on the server that runs the workers:
+
+```
+sudo apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin tesseract-ocr-ben ocrmypdf ffmpeg
+```
+
+A tool that is missing is skipped, never a crash: the capture says what to install (for example "Install tesseract-ocr and ocrmypdf to read scanned PDFs") and the file is left to the model. The speech model (faster-whisper, `small`, on the CPU) is downloaded the first time a voice note is read. Files over 50 MB, and audio over 60 minutes, are skipped. Settings has "Least confidence to trust a local reading" (`extract_min_confidence`, default 60).
+
 Install creates the roles `Life Admin`, `Life User` and `Life Agent`, the spaces `Private` and `Shared` with the seven areas of life (Career, Health, Relationships, Money, Emotions, Mind, Environment; Career and Health on) and check-in dimensions, the `life_space` field on `Event`, and the database indexes. The user who runs the install (or `Administrator`) owns both spaces. Then:
 
 ```

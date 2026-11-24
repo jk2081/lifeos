@@ -22,6 +22,9 @@ def after_insert(doc, method=None):
 		return
 	if not doc.is_private:
 		frappe.throw(frappe._("Files attached to Life OS records must be private."), title=frappe._("File must be private"))
+	from lifeos.library import extract
+
+	extract.file_attached(doc)  # issue 104: read it on this server, in a job, before any model
 	if doc.attached_to_doctype != "Life Inbox Item" or frappe.flags.lifeos_making_preview:
 		return
 	if not doc.attached_to_field and keep_earlier_versions(doc):
