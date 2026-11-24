@@ -743,3 +743,207 @@ class TestGlobalSearch(LifeTestCase):
 		self.assertTrue({"Event", "Life Goal", "Life Person", "Life Habit", "Life Area", "Life Vault Document", "Life Task"} <= listed)
 		for dt, (_kind, fields) in globalsearch.FIELDS.items():
 			self.assertEqual(sorted(f.fieldname for f in frappe.get_meta(dt).get_global_search_fields()), sorted(fields), dt)
+
+
+# ---------------------------------------------------------------- pages that build themselves (issue 111)
+import json
+
+from lifeos.ai import client as ai_client
+from lifeos.api import pages as pages_api, review as review_api
+from lifeos.library import briefs, pins as pins_lib, subjects
+from lifeos.tests.helpers import AskCase
+from lifeos.tools import actions
+
+
+def say(obj):
+	return {"content": [{"type": "text", "text": json.dumps(obj)}], "stop_reason": "end_turn"}
+
+
+def who(**kw):
+	return say({"context": "business", "person": "Anirudh Poddar", "role": "", "organisation": "", "same_as": "", "unsure_of": "", "reason": "x", **kw})
+
+
+def mail(n, address="anirudh@sap-partner.example", name="Anirudh Poddar", **kw):
+	return {"thread_id": f"thread-{n}", "address": address, "sender_name": name, "subject": f"Blueprint {n}", "text": f"Message {n} about the blueprint.", "signature": "Anirudh, SAP Partner Pvt Ltd",
+		"replied": False, "bulk": False, "url": f"https://mail.example/{n}", **kw}
+
+
+class TestPages(AskCase):
+	def setUp(self):
+		super().setUp()
+		for dt in ("Life Sender Sighting", "Life Pin", "Life Page Visit"):
+			frappe.db.delete(dt)
+		frappe.db.delete("Life Link", {"origin": ("in", ("Brain", "Owner"))})
+		frappe.db.delete("Life Skill Correction", {"skill": "link-subjects"})
+		frappe.db.delete("Life Agent Action", {"agent": subjects.BRAIN})
+		frappe.db.delete("Life Proposal", {"kind": ("in", ("New Subject", "Same Subject"))})
+
+	def person(self, name, **kw):
+		return self.make("Life Person", full_name=name, space=PRIVATE, **kw)
+
+	def test_1_a_filed_email_from_a_known_person_is_linked_to_them_and_their_organisation(self):
+		org = self.person("Ambaji Foods q111", kind="Organisation")
+		anirudh = self.person("Anirudh q111", email="anirudh@ambaji.example", organisation=org.name)
+		it = inbox.create_item(title="Blueprint email q111", source_type="Email", space=PRIVATE, raw_text="The blueprint is attached.")["name"]
+		got = subjects.see_email(PRIVATE, mail(1, "anirudh@ambaji.example", "Anirudh q111"), it)
+		self.assertEqual({n for _d, n in got["linked"]}, {anirudh.name, org.name})
+		line, total = subjects.timeline("Life Person", org.name)
+		self.assertEqual(total, 1)
+		self.assertEqual((line[0]["kind"], line[0]["title"]), ("Email", "Blueprint email q111"))
+
+	def test_2_a_reply_thread_with_a_new_sender_makes_a_person_and_a_company_and_undo_removes_both(self):
+		self.script(who(organisation="SAP Partner Pvt Ltd", role="Solutions Lead"))
+		got = subjects.see_email(PRIVATE, mail(2, replied=True))
+		self.assertEqual(len(got["made"]), 2)
+		person = frappe.db.get_value("Life Person", {"space": PRIVATE, "email": "anirudh@sap-partner.example"}, ["name", "organisation", "kind"], as_dict=True)
+		self.assertEqual(frappe.db.get_value("Life Person", person.organisation, "full_name"), "SAP Partner Pvt Ltd")
+		self.assertEqual(frappe.db.get_value("Life Person", person.organisation, "kind"), "Organisation")
+		row = frappe.get_all("Life Agent Action", filters={"agent": subjects.BRAIN, "action": "subjects.make"}, fields=["name", "undone"])
+		self.assertEqual(len(row), 1)
+		self.assertEqual(subjects.timeline("Life Person", person.organisation)[1], 1)
+		actions.undo(row[0].name)
+		self.assertFalse(frappe.db.exists("Life Person", person.name))
+		self.assertFalse(frappe.db.exists("Life Person", person.organisation))
+		self.assertFalse(frappe.db.exists("Life Link", {"to_name": ("in", [person.name, person.organisation])}))
+
+	def test_3_three_emails_without_a_reply_make_one_proposal_not_a_page(self):
+		self.script(who(organisation="SAP Partner Pvt Ltd"))
+		for n in (3, 4, 5):
+			got = subjects.see_email(PRIVATE, mail(n))
+		self.assertTrue(got["proposed"])
+		self.assertEqual(frappe.db.count("Life Person", {"space": PRIVATE, "email": "anirudh@sap-partner.example"}), 0)
+		subjects.see_email(PRIVATE, mail(6))  # asked once
+		props = frappe.get_all("Life Proposal", filters={"kind": "New Subject", "space": PRIVATE, "status": "Pending"}, fields=["name", "preview"])
+		self.assertEqual([p.preview for p in props], ["New company: SAP Partner Pvt Ltd. Make a page?"])
+		review_api.decide(props[0].name, "accept")
+		org = frappe.db.get_value("Life Person", {"space": PRIVATE, "full_name": "SAP Partner Pvt Ltd"})
+		self.assertTrue(org)
+		line, total = subjects.timeline("Life Person", org)
+		self.assertGreaterEqual(total, 3)
+		self.assertTrue({"Blueprint 3", "Blueprint 4", "Blueprint 5"} <= {e["title"] for e in line})
+
+	def test_4_a_promotion_makes_no_subject(self):
+		before = frappe.db.count("Life Person", {"space": PRIVATE})
+		for n in (7, 8, 9, 10):
+			got = subjects.see_email(PRIVATE, mail(n, "deals@shop.example", "Shop", bulk=True))
+		self.assertEqual(got["made"], [])
+		self.assertEqual(frappe.db.count("Life Person", {"space": PRIVATE}), before)
+		self.assertEqual(frappe.db.count("Life Proposal", {"kind": "New Subject", "space": PRIVATE}), 0)
+
+	def test_5_same_company_merges_adds_the_alias_and_links_later_mail(self):
+		ambaji = self.person("Shri Ambaji Food Products", kind="Organisation")
+		self.script(who(organisation="Shakambhari Foods", unsure_of="Shri Ambaji Food Products", person="Hari"))
+		got = subjects.see_email(PRIVATE, mail(11, "hari@shak.example", "Hari", replied=True))
+		self.assertTrue(got["asked"])
+		prop = frappe.get_doc("Life Proposal", got["asked"])
+		self.assertEqual(prop.preview, "Is Shakambhari Foods the same as Shri Ambaji Food Products?")
+		shak = self.person("Shakambhari Foods", kind="Organisation")  # made meanwhile: the answer joins the two
+		old = item("Old email q111", raw_text="x")
+		subjects.link(PRIVATE, "Life Inbox Item", old, "Life Person", shak.name)
+		review_api.decide(prop.name, "accept")
+		self.assertFalse(frappe.db.exists("Life Person", shak.name))
+		self.assertIn("Shakambhari Foods", subjects.split_aliases(frappe.db.get_value("Life Person", ambaji.name, "aliases")))
+		self.assertIn("Old email q111", [e["title"] for e in subjects.timeline("Life Person", ambaji.name)[0]])
+		later = subjects.see_email(PRIVATE, mail(12, "other@elsewhere.example", "Someone", text="Regards from Shakambhari Foods", replied=True))
+		self.assertIn(("Life Person", ambaji.name), later["linked"])
+
+	def linked_item(self, subject, title, **kw):
+		it = item(title, raw_text=kw.pop("raw_text", "Some text about it."), **kw)
+		subjects.link(PRIVATE, "Life Inbox Item", it, "Life Person", subject.name)
+		return it
+
+	def test_6_the_daily_job_rewrites_only_subjects_with_something_new_and_never_reads_a_vault_item(self):
+		a, b = self.person("Brief A q111", kind="Organisation"), self.person("Brief B q111", kind="Organisation")
+		one = self.linked_item(a, "Quote for tea q111", raw_text="The quote is 4.2 lakh for tea.")
+		secret = self.linked_item(a, "Passport scan q111", raw_text="passport-secret-text")
+		frappe.db.set_value("Life Inbox Item", secret, "is_sensitive", 1)
+		self.linked_item(b, "Hello q111")
+		frappe.db.set_value("Life Person", b.name, "brief_on", frappe.utils.add_to_date(frappe.utils.now_datetime(), hours=1))  # written after the last link: nothing new
+		model = self.script(say({"sentences": [{"text": "They asked for a quote of 4.2 lakh.", "sources": [1]}, {"text": "Nothing cited.", "sources": []}]}))
+		briefs.run_daily()
+		brief = briefs.read("Life Person", a.name)
+		self.assertIn("They asked for a quote of 4.2 lakh. [1]", brief["md"])
+		self.assertNotIn("Nothing cited", brief["md"])
+		self.assertIn("1 sensitive document", brief["md"])
+		self.assertEqual([(s["doctype"], s["name"]) for s in brief["sources"]], [("Life Inbox Item", one)])
+		self.assertIsNone(briefs.read("Life Person", b.name))
+		self.assertEqual(len(model.received), 1)
+		self.assertNotIn("passport-secret-text", json.dumps(model.received))
+		self.assertFalse(briefs.stale("Life Person", a.name))
+		self.linked_item(a, "Another q111")
+		self.assertTrue(briefs.stale("Life Person", a.name))
+		briefs.run_daily()  # not again on the same day
+		self.assertEqual(len(model.received), 1)
+
+	def test_7_a_brief_is_counted_in_ai_usage_and_skipped_at_the_cap(self):
+		a = self.person("Brief C q111", kind="Organisation")
+		self.linked_item(a, "Quote q111")
+		self.script(say({"sentences": [{"text": "A quote came.", "sources": [1]}]}))
+		self.assertTrue(briefs.rewrite("Life Person", a.name)["written"])
+		self.assertEqual(frappe.db.count("Life AI Usage", {"purpose": "Skill: write-brief"}), 1)
+		self.linked_item(a, "More q111")
+		frappe.db.set_single_value("Life Settings", "monthly_cap_usd", 0.000001)
+		frappe.clear_cache(doctype="Life Settings")
+		try:
+			frappe.db.set_value("Life Person", a.name, "brief_on", frappe.utils.add_days(frappe.utils.now_datetime(), -2))
+			res = briefs.rewrite("Life Person", a.name)
+			self.assertFalse(res["written"])
+			self.assertTrue(res.get("capped"))
+			self.assertEqual(frappe.db.count("Life AI Usage", {"purpose": "Skill: write-brief"}), 1)
+		finally:
+			frappe.db.set_single_value("Life Settings", "monthly_cap_usd", 30)
+			frappe.clear_cache(doctype="Life Settings")
+
+	def test_8_pins_are_per_user_and_stop_at_seven(self):
+		people = [self.person(f"Pin {i} q111") for i in range(8)]
+		for p in people[:7]:
+			self.assertTrue(pages_api.pin("Life Person", p.name)["pinned"])
+		refused = pages_api.pin("Life Person", people[7].name)
+		self.assertTrue(refused["refused"])
+		self.assertEqual(len(refused["choose_to_unpin"]), 7)
+		frappe.set_user(FAMILY)
+		self.assertEqual(pages_api.pinned()["pins"], [])
+		frappe.set_user(OWNER)
+		again = pages_api.pin("Life Person", people[7].name, replace=f"Life Person:{people[0].name}")
+		self.assertEqual(len(again["pins"]), 7)
+		self.assertEqual(again["pins"][-1]["name"], people[7].name)
+		order = [f"Life Person:{p.name}" for p in reversed(people[1:])]
+		self.assertEqual([p["name"] for p in pages_api.reorder(order)["pins"]], [p.name for p in reversed(people[1:])])
+
+	def test_9_a_wrong_link_is_removed_kept_as_a_correction_and_not_made_again(self):
+		org = self.person("Wrong q111", kind="Organisation")
+		it = item("About something else q111", raw_text="x")
+		subjects.link(PRIVATE, "Life Inbox Item", it, "Life Person", org.name)
+		row = frappe.db.get_value("Life Link", {"to_name": org.name, "origin": "Brain"})
+		pages_api.remove_link(row)
+		self.assertEqual(subjects.timeline("Life Person", org.name)[1], 0)
+		self.assertTrue(frappe.db.exists("Life Skill Correction", {"skill": "link-subjects", "correction_type": "Link"}))
+		self.assertFalse(subjects.link(PRIVATE, "Life Inbox Item", it, "Life Person", org.name))
+
+	def test_10_your_notes_are_kept_when_the_brief_is_rewritten(self):
+		org = self.person("Notes q111", kind="Organisation")
+		self.linked_item(org, "Email q111")
+		pages_api.add_note("Life Person", org.name, "My own thought")
+		self.script(say({"sentences": [{"text": "An email came.", "sources": [1]}]}))
+		briefs.rewrite("Life Person", org.name, force=True)
+		page = pages_api.get("Life Person", org.name)
+		self.assertEqual([n["text"] for n in page["notes"]], ["My own thought"])
+		self.assertEqual(page["brief"]["n_sources"], 1)
+		frappe.set_user(AGENT)
+		with self.assertRaises(frappe.PermissionError):
+			pages_api.add_note("Life Person", org.name, "from an agent")
+		frappe.set_user(OWNER)
+
+	def test_11_ask_reads_a_page_first_and_cites_it(self):
+		org = self.person("Read me q111", kind="Organisation")
+		it = self.linked_item(org, "Quote email q111", raw_text="The quote is 4.2 lakh.")
+		self.script(say({"sentences": [{"text": "A quote of 4.2 lakh came.", "sources": [1]}]}))
+		briefs.rewrite("Life Person", org.name, force=True)
+		from lifeos.ai import tools as ask_tools
+
+		ctx = Context(PRIVATE)
+		got = ask_tools.run_tool(ctx, "read_page", {"name": "Read me q111"})
+		self.assertIn("4.2 lakh", got["brief"]["text"])
+		self.assertEqual(got["timeline"][0]["title"], "Quote email q111")
+		self.assertEqual(ctx.refs[got["page"]]["route"], f"/library/pages/Life Person/{org.name}")
+		self.assertIn("error", ask_tools.run_tool(ctx, "read_page", {"name": "No such page q111"}))

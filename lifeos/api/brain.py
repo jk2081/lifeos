@@ -20,7 +20,7 @@ from lifeos.skills import lessons
 MAX_ROWS = 7
 SECONDS_EACH = 20  # the guess at how long one decision takes: "about 2 minutes" for 7
 # the kind as a person says it: a Reading is "Read later" (the mockup's word)
-KIND_LABEL = {"Reading": "Read later"}
+KIND_LABEL = {"Reading": "Read later", "New Subject": "New page", "Same Subject": "Same as?"}
 
 
 def kind_label(kind):

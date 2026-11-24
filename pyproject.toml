@@ -6,7 +6,7 @@ requires-python = ">=3.14"
 readme = "README.md"
 license = "MIT"
 dynamic = ["version"]
-dependencies = ["anthropic==2.9.0"]
+dependencies = ["anthropic==2.9.0", "pypdf", "python-docx", "openpyxl", "rapidocr-onnxruntime", "faster-whisper"]
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]

@@ -13,7 +13,7 @@ from lifeos.constants import SEARCHED_DOCTYPES
 # record type -> (kind shown on a result, searched fields)
 FIELDS = {
 	"Life Task": ("Task", ["title", "notes_md"]),
-	"Life Inbox Item": ("Capture", ["title", "raw_text", "transcript_md"]),  # a photo or recording's transcript is the capture's text
+	"Life Inbox Item": ("Capture", ["title", "raw_text", "transcript_md", "extracted_text"]),  # a photo or recording's transcript is the capture's text
 	"Life Note": ("Note", ["title", "content_md"]),
 	"Life Chat Log": ("Chat", ["title", "summary_md"]),
 	"Event": ("Event", ["subject", "description", "location"]),
@@ -25,7 +25,7 @@ FIELDS = {
 	"Life Review": ("Weekly review", ["went_well", "do_differently"]),
 	"Life Insight": ("Insight", ["title", "body"]),
 	"Life Ask Thread": ("Ask thread", ["title"]),
-	"Life Vault Document": ("Vault document", ["title"]),  # the title only: what is inside a document is never indexed
+	"Life Vault Document": ("Vault document", ["title", "extracted_text"]),  # what a document says is read on this server (issue 104); a hit is opened with has_permission, so only who may open the document finds it. Life Index, which Ask reads, never holds it
 	"Life Proposal": ("Needs you", ["preview"]),
 	"Life Skill": ("Skill", ["title"]),
 	"Life Source Setting": ("Source", ["source"]),

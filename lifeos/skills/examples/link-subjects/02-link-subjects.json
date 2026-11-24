@@ -1,0 +1,35 @@
+{
+ "title": "A stranger asks about prices",
+ "input": {
+  "data": {
+   "from": "Ravi <ravi@gmail.com>",
+   "subject": "Price of 1 kg tea?",
+   "text": "Hi, what is the price of 1 kg of your tea?",
+   "signature": "Ravi",
+   "owner_replied": false,
+   "existing_subjects": [
+    "Meera Shah"
+   ]
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "context",
+    "equals": "other"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"context\": \"other\", \"person\": \"Ravi\", \"role\": \"\", \"organisation\": \"\", \"same_as\": \"\", \"unsure_of\": \"\", \"reason\": \"A one-off enquiry\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "e2b3682316682acd"
+}

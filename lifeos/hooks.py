@@ -66,6 +66,10 @@ doc_events["Life Inbox Item"]["after_insert"] = [*doc_events["Life Inbox Item"][
 for _dt in ("Life Task", "Life Goal", "Life Note"):
 	doc_events[_dt]["on_update"] = [*([doc_events[_dt]["on_update"]] if isinstance(doc_events[_dt]["on_update"], str) else doc_events[_dt]["on_update"]),
 		"lifeos.skills.triggers.record_changed"]
+# issue 111: a page that goes takes its links and pins with it
+for _dt in ("Life Person", "Life Area"):
+	_have = doc_events[_dt].get("on_trash")
+	doc_events[_dt]["on_trash"] = [*([_have] if isinstance(_have, str) else _have or []), "lifeos.library.subjects.on_trash"]
 # issue 54: the core card and the index are rebuilt when a record they are made from changes
 for _dt in ("Life Note", "Life Person", "Life Goal", "Life Area", "Life Cycle", "Life Space", "Life Settings"):
 	for _event in ("on_update", "after_insert", "on_trash"):
@@ -91,6 +95,8 @@ scheduler_events = {
 		"lifeos.skills.triggers.route_unclaimed"],
 		# issue 86: the daily email digest (and the Sunday roll-up) is made at 07:00 site time; Gmail is searched live, never copied
 		"0 7 * * *": ["lifeos.mail.digest.run_daily"],
+		# issue 111: the briefs of pages with something new, after the digest has linked the day's mail; once a day each, within the month's cap
+		"30 7 * * *": ["lifeos.library.briefs.run_daily", "lifeos.library.pins.purge_visits"],
 		# insights: nightly at 06:00 site time (the owner's time zone is the site's, Asia/Kolkata)
 		"0 6 * * *": ["lifeos.review.insights.run_nightly"],
 		# set 7: Inbox items left too long, before the morning

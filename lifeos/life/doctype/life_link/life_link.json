@@ -10,7 +10,9 @@
   "from_name",
   "to_doctype",
   "to_name",
-  "link_text"
+  "link_text",
+  "origin",
+  "made_subject"
  ],
  "fields": [
   {
@@ -54,6 +56,20 @@
    "fieldname": "link_text",
    "fieldtype": "Data",
    "label": "Link Text"
+  },
+  {
+   "fieldname": "origin",
+   "fieldtype": "Select",
+   "label": "Origin",
+   "options": "Text\nBrain\nOwner",
+   "default": "Text",
+   "description": "Text: a [[link]] written in a note. Brain or Owner: a record linked to the subject it is about."
+  },
+  {
+   "fieldname": "made_subject",
+   "fieldtype": "Check",
+   "label": "Made the subject",
+   "description": "This link is why the subject's page was made, so Undo removes it too."
   }
  ],
  "in_create": 1,

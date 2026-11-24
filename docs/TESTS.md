@@ -6,19 +6,19 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 
 | File | What it covers |
 | --- | --- |
-| `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc` |
+| `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc`, files read on the server before any model (`TestReadLocally`) |
 | `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
-| `test_library.py` | Library: notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
+| `test_library.py` | Library (`TestPages`: pages that build themselves, issue 111: an email linked to a known person and their organisation, a page made on a reply thread with Undo, a proposal after three emails, no page for a promotion, "same company" merging and adding the alias, the daily briefs with sources and no Vault text, AI usage and the cap, per-user pins capped at seven, a wrong link taken off, Your notes kept): notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions |
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection), Updates (who may ask, the check against a temporary repository, the runner's steps and rollback, a target not on the remote, one runner at a time, Update now) |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it, notes on events (Comments), Hide in Life OS |
-| `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers, the return address to add, Google's error, an abandoned sign-in cleaned up, which case a search with no inbox is), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools |
+| `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers, the return address to add, Google's error, an abandoned sign-in cleaned up, which case a search with no inbox is), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools, Ask's tools (read a period page by page, the daily digests, save an attachment, make pages and people, save notes and tasks, each write logged with Undo, an agent's switches, a long read run in the background, a question with choices, File buttons named for what they file) |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check, the connector (report, pull, confirm), the owner's changes, an agent's switches and the areas it may read |
 | `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings; no component, page or `App.vue` calls `api(`; every `.vue` file is imported or routed |
 
@@ -47,6 +47,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `improve-skill` | `test_skills.TestCorrections` | `SETTINGS.38` |
 | `lifeos` | `test_skills.TestServing` | `SETTINGS.38` |
 | `lifeos-file-work` | `test_skills.TestServing` | `SETTINGS.38` |
+| `link-subjects`, `write-brief` (pages that build themselves) | `test_library.TestPages`, `test_skills.TestExamples` | `SETTINGS.38`, `LIBRARY.42` to `LIBRARY.47` |
 
 ## Acceptance checks by place
 
@@ -117,7 +118,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.59` on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link
 - `TODAY.60` Year and Month in light and dark have no script error and nothing cut off
 
-### Brain (`tools/acceptance/brain.mjs`, 53 checks)
+### Brain (`tools/acceptance/brain.mjs`, 55 checks)
 
 Capture and the Brain's filing, Needs you, Activity, Sources, the item page, jobs from agents, Ask, and the checks that need the records of the first photo capture.
 
@@ -177,12 +178,14 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.50` editing a fact, pausing a job and changing a switch show waiting until the connector confirms, then applied; a change it cannot apply is failed
 - `BRAIN.51` an agent that has reported nothing says what will appear in each section
 - `BRAIN.52` an agent's suggested reply waits in Needs you and on its page; approving sends it (fake Google) and moves it to Did, with who asked; the owner's own request is in Did with his words
-- `BRAIN.53` Ask "find the 2014 tax return" (fake AI, fake Gmail) shows the threads it found and a File it button; filing makes a Brain item linked to Gmail
+- `BRAIN.53` Ask "find the 2014 tax return" (fake AI, fake Gmail) shows the threads it found and a File button named for the email ("File the email “…” from …"); filing makes a Brain item linked to Gmail
 - `BRAIN.55` a half-connected Gmail shows once, Waiting, with no switch ("Finish signing in first") and a Remove button; after Google's error the card says what happened and shows the address to add with Copy and Try again; Remove clears it with its Connected App
 - `BRAIN.56` the Sources page and the assistant's page name neither Hermes nor OpenClaw, even with both connected
 - `BRAIN.57` Sources lists exactly Capture, Google Calendar, Gmail, Your assistant and Claude, each not yet connected with a Connect button; no Coming tile, no tabs, no Add a source
 - `BRAIN.58` Connect Gmail shows the return address with Copy and a Google Cloud link before leaving the site; "I've added it" goes on to Google's address; once an address has been confirmed the step is not shown
 - `BRAIN.59` Gmail's Try it searches the (fake) inbox for a word and shows the matching messages, none for a word that matches nothing, and says "No inbox is connected" with no inbox
+- `BRAIN.60` Ask "file the blueprint" (fake AI, fake Gmail) makes the Ambaji Prospect page, saves the blueprint on it and adds Anirudh; the answer lists the three under Done with Undo; the page and its file are in Library > Files; Undo takes one back
+- `BRAIN.61` Ask "read my mail" over a period of 4 pages shows "Reading 1–14 Nov… (page n of 4)" and then the answer
 - `BRAIN.54` the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item
 
 ### Goals (`tools/acceptance/goals.mjs`, 71 checks)
@@ -267,7 +270,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.74` in Cycles a goal's name opens its goal page
 - `GOALS.75` Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone
 
-### Library (`tools/acceptance/library.mjs`, 38 checks)
+### Library (`tools/acceptance/library.mjs`, 47 checks)
 
 Everything, Notes, Documents, People, Chats, files, search and the graph, and the list screens' panes, filters and remembered views.
 
@@ -314,6 +317,13 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.39` search finds a calendar event by the start of a word, under Events, and Enter opens its drawer
 - `LIBRARY.40` "ai key" offers Settings › AI and Enter opens it
 - `LIBRARY.41` with no AI key, Ask says it needs one, links to Settings › AI and shows what search finds for the same words
+- `LIBRARY.42` a company page shows its header with the status and part, the brief with source numbers, Open, People, Files, Timeline and Your notes; a source number opens its email
+- `LIBRARY.43` Pin puts the page in the sidebar with the company icon; a new link shows "· 1" until the page is opened; dragging reorders the pins
+- `LIBRARY.44` Library > Pages is the first section, filters by kind and by status, and lists the seeded pages
+- `LIBRARY.45` Your notes takes text, and a brief rewrite afterwards leaves it unchanged
+- `LIBRARY.46` the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library
+- `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
+- `LIBRARY.48` a scanned bill is read on the server (OCRmyPDF) and found by a word from its contents
 
 ### Review (`tools/acceptance/review.mjs`, 23 checks)
 

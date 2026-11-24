@@ -17,6 +17,13 @@
   "instruction",
   "raw_text",
   "transcript_md",
+  "extract_section",
+  "extracted_text",
+  "extracted_by",
+  "extract_confidence",
+  "needs_closer_read",
+  "extract_note",
+  "extract_files",
   "summary_md",
   "source_url",
   "status",
@@ -128,6 +135,59 @@
    "fieldname": "transcript_md",
    "fieldtype": "Long Text",
    "label": "Transcript"
+  },
+  {
+   "fieldname": "extract_section",
+   "fieldtype": "Section Break",
+   "label": "Read on this server"
+  },
+  {
+   "fieldname": "extracted_text",
+   "fieldtype": "Long Text",
+   "label": "Extracted Text",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "The words of the files, read locally (PDF text, OCR, speech to text) before any model."
+  },
+  {
+   "fieldname": "extracted_by",
+   "fieldtype": "Data",
+   "label": "Extracted By",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "pypdf, ocrmypdf, rapidocr, whisper, docx or xlsx"
+  },
+  {
+   "fieldname": "extract_confidence",
+   "fieldtype": "Int",
+   "label": "Extract Confidence",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "0 to 100"
+  },
+  {
+   "fieldname": "needs_closer_read",
+   "fieldtype": "Check",
+   "label": "Needs a Closer Read",
+   "read_only": 1,
+   "no_copy": 1,
+   "description": "Local reading failed or was not sure enough; a model may look at the file."
+  },
+  {
+   "fieldname": "extract_note",
+   "fieldtype": "Small Text",
+   "label": "Extract Note",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "extract_files",
+   "fieldtype": "Code",
+   "label": "Extract Per File",
+   "options": "JSON",
+   "read_only": 1,
+   "no_copy": 1,
+   "hidden": 1
   },
   {
    "fieldname": "summary_md",

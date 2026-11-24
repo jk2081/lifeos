@@ -99,6 +99,7 @@ import { initLens, manySpaces } from './lib/lens'
 import MoreSheet from './components/MoreSheet.vue'
 import OnboardingGuide from './components/OnboardingGuide.vue'
 import { loadOnboarding, onboarding } from './lib/onboarding'
+import { loadPins } from './lib/pins'
 import { errorText } from './lib/api'
 import { stepTab } from './lib/tabs'
 import { clearOffline, queue, startQueue } from './lib/offline'
@@ -169,6 +170,8 @@ async function logout() {
 }
 
 watch(() => route.fullPath, () => (moreOpen.value = false))
+// issue 111: the counts on the pinned pages follow what was linked; a page that is opened refreshes them itself, once it has said it was opened
+watch(() => route.path, (p) => { if (store.ready && !store.isAgent && !p.startsWith('/life/library/pages/') && !p.startsWith('/library/pages/')) loadPins() })
 
 // Keyboard: Cmd/Ctrl+K search, n new task, g then a letter to jump, ? the shortcut list, Esc closes panels.
 // frappe-ui dialogs close themselves on Esc; the record pane listens for the event below.
@@ -204,6 +207,7 @@ onMounted(async () => {
   window.addEventListener('keydown', onKey)
   try {
     await boot({ beforeReady: initLens })
+    if (!store.isAgent) { loadPins(); window.addEventListener('lifeos-pins-stale', loadPins) } // issue 111: the pinned pages in the sidebar
     startQueue() // issue 50: send what was captured offline, now and whenever the connection returns
     if (store.isAdmin && !store.isAgent) loadOnboarding() // the first-run guide (issue 49) and whether the site is still empty
   } catch (e) {

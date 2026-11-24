@@ -179,6 +179,10 @@ def execute(name: str) -> dict:
 		frappe.throw(_("That cannot be run."), title=_("Already decided"))
 	p = json.loads(row.params)
 	tool = p.pop("tool")
+	from lifeos.tools import actions
+
+	if tool in actions.ABILITY:  # an Ask tool an agent asked to run (issue 107): it runs as the owner who approved it
+		return actions.approved(row.name)
 	person = person_of(row.space)
 	try:
 		account = _inbox(person, row.space, p, tool)

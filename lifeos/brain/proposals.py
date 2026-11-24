@@ -133,6 +133,18 @@ SCHEMA = {
 		"example": {"goal": "Ghillidary yield to 1,800 kg/ha", "value": 1640, "date": "2026-11-14", "excerpt": "Yield this flush came to 1,640 kg/ha"},
 	},
 }
+# issue 111: a page for a new sender, and the question "is this the same as ..?"; the Brain proposes, only a person's Accept makes or joins
+SCHEMA["New Subject"] = {
+	"target": "Life Person", "filed": False,
+	"fields": {"name": F("text", True, "The company's name, or the person's when there is no company."), "kind": F("select", options=["Person", "Organisation"]),
+		"person": F("text", help="The person who wrote, when the page is for their company."), "email": F("text"), "role": F("text"), "address": F("text")},
+	"example": {"name": "Shri Ambaji Food Products", "kind": "Organisation", "person": "Anirudh Poddar", "email": "anirudh@example.com"},
+}
+SCHEMA["Same Subject"] = {
+	"target": "Life Person", "filed": False,
+	"fields": {"name": F("text", True, "The name seen in the email."), "same_as": F("text", True, "The existing subject it may be (its id)."), "address": F("text"), "kind": F("text")},
+	"example": {"name": "Shakambhari Foods", "same_as": "abc123"},
+}
 AREA_REQUIRED = ("Task", "Note", "Vault Document")
 # kinds stored straight away instead of waiting in the Inbox for review
 DIRECT = tuple(k for k, s in SCHEMA.items() if s.get("direct"))
@@ -401,6 +413,10 @@ def apply(kind, payload, item) -> tuple:
 		return "Life Goal", goal.name
 	elif kind == "Someday":
 		return _apply_someday(p, item)
+	elif kind in ("New Subject", "Same Subject"):
+		from lifeos.library import subjects
+
+		return "Life Person", (subjects.accept_new if kind == "New Subject" else subjects.accept_same)(space, p, item)[1]
 	elif kind == "Journal Page":
 		title = f"Journal page {p['page_number']}" if p.get("page_number") else "Journal page"
 		doc = frappe.get_doc({"doctype": "Life Note", **base, "title": f"{title}, {p['page_date']}", "collection": "My notes", "page_date": p["page_date"],

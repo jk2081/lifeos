@@ -45,7 +45,7 @@ def backlinks(doctype: str, name: str):
 		out.append({"doctype": dt, "name": n, "title": _title(dt, n), "kind": KIND.get(dt, dt.replace("Life ", "")),
 			"why": why, "route": rules.route_of(dt, n)})
 
-	for r in frappe.get_list("Life Link", filters={"to_doctype": doctype, "to_name": name, "space": doc.space}, fields=["from_doctype", "from_name"], limit=100):
+	for r in frappe.get_list("Life Link", filters={"to_doctype": doctype, "to_name": name, "space": doc.space, "origin": ("in", ("Text", ""))}, fields=["from_doctype", "from_name"], limit=100):
 		add(r.from_doctype, r.from_name, "links here")
 	for dt, field, why in FIELD_TIES.get(doctype, []):
 		for n in frappe.get_list(dt, filters={field: name, "space": doc.space}, pluck="name", limit=50, order_by="creation desc"):

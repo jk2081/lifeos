@@ -8,7 +8,7 @@ const page = (name) => () => import(`./pages/${name}.vue`)
 const TODAY = ['week', 'month', 'year']
 const BRAIN = ['activity', 'captures', 'sources', 'skills', 'outbox', 'queue']
 const GOALS = ['tasks', 'no-goal', 'cycles', 'someday']
-const LIBRARY = ['notes', 'documents', 'people', 'chats', 'files', 'timeline', 'archive']
+const LIBRARY = ['pages', 'notes', 'documents', 'people', 'chats', 'files', 'timeline', 'archive']
 
 const routes = [
   { path: '/', redirect: '/today' },
@@ -25,6 +25,8 @@ const routes = [
   { path: '/goals/:id', name: 'Goal', component: page('Goal'), props: true },
   { path: '/focus/:id', name: 'Focus', component: page('Focus'), props: true },
   { path: `/library/:tab(${LIBRARY.join('|')})?`, name: 'Library', component: page('LibraryPlace'), props: true },
+  // issue 111: a page for a person, a company, a part or a note
+  { path: '/library/pages/:doctype/:name', name: 'Page', component: page('PagePage'), props: true },
   { path: '/library/people/:person', name: 'Person', component: page('LibraryPlace'), props: (r) => ({ tab: 'people', person: r.params.person }) },
   { path: '/library/:id', name: 'Note', component: page('Library'), props: true },
   // the weekly review: in the sidebar once one is locked, or on its day

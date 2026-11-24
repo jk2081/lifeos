@@ -1,0 +1,44 @@
+{
+ "title": "One old source gives one sentence",
+ "input": {
+  "data": {
+   "about": {
+    "name": "Meera Shah",
+    "kind": "person"
+   },
+   "sources": [
+    {
+     "n": 1,
+     "kind": "Email",
+     "date": "2026-10-02",
+     "title": "Quote for 200 kg",
+     "text": "Could you send me a quote for 200 kg of the estate blend by Friday?"
+    }
+   ],
+   "sensitive_sources_not_shown": 1
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "sentences",
+    "count": {
+     "min": 1,
+     "max": 2
+    }
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"sentences\": [{\"text\": \"Meera Shah asked for a quote for 200 kg of the estate blend.\", \"sources\": [1]}]}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "60dc90c5cd801208"
+}

@@ -12,7 +12,7 @@ AUTO, ASK, OFF = "auto", "ask", "off"
 MODES = (AUTO, ASK, OFF)
 # key, what a person calls it
 ACTIONS = (("read_email", "Read email"), ("send_email", "Send email"), ("change_calendar", "Change the calendar"), ("chase_people", "Chase people"),
-	("use_websites", "Use websites"), ("pay", "Pay"))
+	("use_websites", "Use websites"), ("save_files", "Save files"), ("write_pages", "Make pages and people"), ("pay", "Pay"))
 DEFAULT_MODE = ASK
 DEFAULT_NAME = "Your assistant"
 # a doctype whose rows carry an `area`: the rows an agent cannot read when the area is off for it

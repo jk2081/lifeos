@@ -21,7 +21,11 @@
     <section v-if="on('text')" data-source-text>
       <MdField v-if="writable || s.transcript_md" v-model="s.transcript_md" :save="saveText" :space="s.space" :readonly="!writable" label="Transcript or extracted text"
         placeholder="The agent puts the transcript or extracted text here." />
-      <Card v-else><Empty title="No text yet." hint="The agent extracts the text (transcript, OCR, PDF text) when it processes the source." /></Card>
+      <Card v-else-if="s.extracted_text">
+        <div class="mb-2 text-sm text-ink-gray-6" data-extract-line>Read on the server by {{ s.extracted_by }}, {{ s.extract_confidence }}% sure<template v-if="s.needs_closer_read"> · Needs a closer read</template></div>
+        <Md :text="s.extracted_text" read />
+      </Card>
+      <Card v-else><Empty :title="s.needs_closer_read ? 'Needs a closer read.' : 'No text yet.'" :hint="s.needs_closer_read ? (s.extract_note || 'The text could not be read on the server.') : 'Life OS reads the text of a file (PDF text, OCR, speech) on its own server when the file arrives.'" /></Card>
     </section>
     <section v-if="on('summary')" data-source-summary>
       <Card><Md v-if="s.summary_md" :text="s.summary_md" /><Empty v-else title="No summary." hint="The agent adds a summary when it processes the source." /></Card>

@@ -7,9 +7,18 @@
         <template v-else>
           <Md v-if="m.text" :text="m.text" :cites="m.cited || []" @cite="(n) => openCite(m, n)" />
           <div v-if="m.status === 'Working'" class="flex items-center gap-2 text-sm text-ink-gray-6" aria-live="polite" data-ask-working>
-            <LoadingIndicator class="size-3.5" />{{ m.text ? 'Writing…' : 'Reading your records…' }}</div>
+            <LoadingIndicator class="size-3.5" /><span v-if="m.reading" data-ask-reading>{{ m.reading }}</span><template v-else>{{ m.text ? 'Writing…' : 'Reading your records…' }}</template></div>
+          <div v-if="m.done && m.done.length" class="flex flex-col gap-1.5 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5" data-ask-done>
+            <div class="text-sm text-ink-gray-6">Done</div>
+            <div v-for="(d, j) in m.done" :key="j" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-ink-gray-9" data-ask-done-line :data-undone="d.undone ? 1 : 0">
+              <span class="min-w-0 flex-[1_1_240px]" :class="d.undone && 'text-ink-gray-5 line-through'">{{ d.text }}</span>
+              <a v-if="d.pane && !d.undone" href="#" class="text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" data-ask-done-open @click.prevent="openPane(d.pane)">Open</a>
+              <span v-if="d.undone" class="text-sm text-ink-gray-6">Undone</span>
+              <Button v-else-if="d.undo && canWrite()" size="sm" variant="subtle" label="Undo" data-ask-undo @click="undoDone(m, j)" />
+            </div>
+          </div>
           <div v-if="m.actions && m.actions.length" class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5" data-ask-actions>
-            <div class="text-sm text-ink-gray-6">Suggested</div>
+            <div class="text-sm text-ink-gray-6">{{ m.actions.some((a) => a.kind === 'choose') ? 'Pick one' : 'Suggested' }}</div>
             <div class="flex flex-wrap gap-2" :class="phone && 'flex-col'">
               <Button v-for="(a, j) in m.actions" :key="j" class="!h-auto min-h-8 min-w-0 max-w-full !whitespace-normal py-1.5 text-left [&_.truncate]:!whitespace-normal" :size="phone ? 'lg' : 'md'" :variant="j === 0 ? 'solid' : 'subtle'" :label="a.done ? a.label + ' · done' : a.label"
                 :disabled="a.done || !canWrite()" :data-ask-action="a.kind" @click="runAction(m, j)" />
@@ -47,7 +56,7 @@ import Md from '../Md.vue'
 import { manySpaces } from '@/lib/lens'
 import { canWrite, store } from '@/lib/store'
 import AskSearchHits from './AskSearchHits.vue'
-import { ask, openCite, runAction } from '@/lib/ask'
+import { ask, openCite, openPane, runAction, undoDone } from '@/lib/ask'
 const phone = useMediaQuery('(max-width: 767px)')
 const lastQuestion = computed(() => [...ask.messages].reverse().find((m) => m.role === 'user')?.text || '')
 </script>

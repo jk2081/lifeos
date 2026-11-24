@@ -1,14 +1,14 @@
 """Ask's engine (UX fixes, set 5): one question, answered by the model from tool results only, with citations and
 suggested actions. Runs as the asking user; see tools.py for what it may read."""
 import json
-import re
 import time
 
 import frappe
 from frappe.utils import now_datetime, today
 
 from lifeos.ai import client
-from lifeos.ai.tools import Context, ask_call, file_actions, run_tool
+from lifeos.ai.cite import cite
+from lifeos.ai.tools import Context, NeedsBackground, ask_call, file_actions, run_tool
 
 MAX_TOOL_CALLS = 8
 TOKEN_BUDGET = 80000  # input and output tokens for one question, across its turns
@@ -50,13 +50,15 @@ def history_messages(thread, upto=None):
 	return clean
 
 
-def answer(space, question, scope, history=None, on_text=None):
-	"""Run the question. Returns {text, cited, actions, read, input_tokens, output_tokens, cost, limited}."""
+def answer(space, question, scope, history=None, on_text=None, background=False, progress=None):
+	"""Run the question: {text, cited, actions, done, read, …}. Over 3 pages of mail it raises `NeedsBackground`, unless `background` (then `progress` is told each page)."""
 	ctx = Context(space, scope)
+	ctx.background, ctx.progress = background, progress
+	max_calls, budget, max_turns = (40, 400000, 45) if background else (MAX_TOOL_CALLS, TOKEN_BUDGET, MAX_TURNS)
 	messages = list(history or []) + [{"role": "user", "content": f"{_scope_line(scope)}\nToday: {today()}\n\nQuestion: {question}"}]
 	parts, tin, tout, cost, limited = [], 0, 0, 0.0, False
-	for _turn in range(MAX_TURNS):
-		allow = ctx.calls < MAX_TOOL_CALLS and tin + tout < TOKEN_BUDGET
+	for _turn in range(max_turns):
+		allow = ctx.calls < max_calls and tin + tout < budget
 		out = ask_call(ctx, system_text(), question, messages, on_text, space)
 		tin, tout, cost, ctx.turn_cost = tin + out["usage"]["input_tokens"], tout + out["usage"]["output_tokens"], cost + out["cost"], out["cost"]  # a mail search is logged with its turn's cost
 		content = out["content"]
@@ -78,7 +80,9 @@ def answer(space, question, scope, history=None, on_text=None):
 			else:
 				res = run_tool(ctx, u.get("name"), u.get("input") or {})
 			results.append({"type": "tool_result", "tool_use_id": u["id"], "content": json.dumps(res, default=str)[:24000]})
-		if not (ctx.calls < MAX_TOOL_CALLS and tin + tout < TOKEN_BUDGET):
+		if ctx.choice:  # the question with choices is the end of the turn: the owner's tap comes back as the next message
+			break
+		if not (ctx.calls < max_calls and tin + tout < budget):
 			limited = True
 			results.append({"type": "text", "text": "The tool limit for this question is reached. Answer now with what you found, cite it, and say what was not checked. Do not call more tools."})
 		messages.append({"role": "user", "content": results})
@@ -94,30 +98,6 @@ def answer(space, question, scope, history=None, on_text=None):
 	if limited and "not check" not in text.lower():
 		text += "\n\n_I stopped at the limit for one question, so some records were not checked._"
 	read = [{"ref": r, **{k: ctx.refs[r][k] for k in ("doctype", "name", "title", "kind", "pane")}} for r in ctx.read]
-	return {"text": text or "I could not find that.", "cited": cited, "actions": [*ctx.actions, *file_actions(ctx)], "read": read, "input_tokens": tin,
+	return {"text": text or (ctx.choice or {}).get("question") or ("Done." if ctx.done else "I could not find that."), "cited": cited, "actions": [*ctx.actions, *file_actions(ctx)],
+		"done": ctx.done, "read": read, "input_tokens": tin,
 		"output_tokens": tout, "cost": round(cost, 6), "limited": limited}
-
-
-MARK = re.compile(r"\[(R\d+(?:\s*,\s*R\d+)*)\]")
-
-
-def cite(text, ctx):
-	"""Turn [R3] markers into numbered markers [1] in order of first use, and list the cited records."""
-	order = []
-
-	def sub(m):
-		nums = []
-		for r in re.split(r"\s*,\s*", m.group(1)):
-			if r not in ctx.refs:
-				continue
-			if r not in order:
-				order.append(r)
-			nums.append(str(order.index(r) + 1))
-		return "".join(f"[{n}]" for n in nums)
-
-	text = MARK.sub(sub, text or "")
-	cited = []
-	for i, r in enumerate(order, 1):
-		x = ctx.refs[r]
-		cited.append({"n": i, "doctype": x["doctype"], "name": x["name"], "title": x["title"], "kind": x["kind"], "date": x["date"], "pane": x["pane"]})
-	return text, cited

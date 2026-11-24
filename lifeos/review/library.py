@@ -21,7 +21,15 @@ def data(review, user):
 	shown = findings.revelations(review)
 	rows = findings.rows(shown)
 	return {"strip": strip(space, start, end, user), "came_in": came_in(space, start, end),
-		"revelations": [_revelation(r) for r in rows if r.status == "New"], "revelations_shown": len(rows), "ai": ai}
+		"revelations": [_revelation(r) for r in rows if r.status == "New"], "revelations_shown": len(rows), "ai": ai,
+		"unused_pins": _unused_pins(user)}
+
+
+def _unused_pins(user):
+	"""Pins not opened for 30 days, offered "Unpin?" (issue 111); never unpinned on their own."""
+	from lifeos.library import pins
+
+	return [{"doctype": p["doctype"], "name": p["name"], "title": p["title"], "kind": p["kind"]} for p in pins.unused(user)]
 
 
 def strip(space, start, end, user):

@@ -14,6 +14,13 @@
       <Skeleton v-if="!d" class="h-80 w-full" />
       <template v-else>
         <CalendarStrip :strip="d.strip" :open="meetingName" @open="openMeeting" @list="listOpen = true" />
+        <Card v-if="d.unused_pins?.length" class="flex flex-col gap-2" data-unused-pins>
+          <h3 class="text-base-medium text-ink-gray-9">Pinned, not opened for a month</h3>
+          <div v-for="p in d.unused_pins" :key="p.doctype + p.name" class="flex items-center justify-between gap-2" data-unused-pin :data-name="p.name">
+            <span class="min-w-0 truncate text-base text-ink-gray-8">{{ p.title }}</span>
+            <Button size="sm" :label="`Unpin ${p.title}`" data-unpin @click="dropPin(p)" />
+          </div>
+        </Card>
         <div class="grid grid-cols-[minmax(0,1fr)] items-start gap-4 md:grid-cols-[minmax(280px,1fr)_2fr]">
           <Card class="flex flex-col gap-1" data-came-in>
             <h3 class="mb-1 text-base-medium text-ink-gray-9">Came in · {{ d.came_in.total }}</h3>
@@ -57,6 +64,7 @@ import { Button, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import Drawer from '@/components/ui/Drawer.vue'
+import { unpin } from '@/lib/pins'
 import CalendarStrip from '@/components/review/CalendarStrip.vue'
 import FindingRow from '@/components/review/FindingRow.vue'
 import MeetingDrawer from '@/components/review/MeetingDrawer.vue'
@@ -113,4 +121,8 @@ async function doneMeeting(m) {
 }
 watch(() => r.head?.name, load)
 onMounted(load)
+async function dropPin(p) {
+  await unpin(p.doctype, p.name)
+  d.value.unused_pins = d.value.unused_pins.filter((x) => x.name !== p.name)
+}
 </script>

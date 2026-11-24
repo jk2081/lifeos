@@ -11,11 +11,18 @@
   "kind",
   "organisation",
   "role",
+  "email",
   "aliases",
   "area",
   "wiki_page",
   "user",
-  "notes_md"
+  "notes_md",
+  "status",
+  "brief_section",
+  "brief_md",
+  "brief_sources",
+  "brief_on",
+  "is_archived"
  ],
  "fields": [
   {
@@ -88,6 +95,51 @@
    "fieldtype": "Link",
    "label": "Wiki page",
    "options": "Life Note"
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nProspect\nClient\nPartner\nPast",
+   "depends_on": "eval:doc.kind=='Organisation'",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "brief_section",
+   "fieldtype": "Section Break",
+   "label": "Brain brief"
+  },
+  {
+   "fieldname": "brief_md",
+   "fieldtype": "Long Text",
+   "label": "Brief",
+   "description": "Written by the Brain from what is linked to this page. Never edited by hand.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "brief_sources",
+   "fieldtype": "Long Text",
+   "label": "Brief sources",
+   "read_only": 1,
+   "description": "JSON: the records the brief's numbers point to"
+  },
+  {
+   "fieldname": "brief_on",
+   "fieldtype": "Datetime",
+   "label": "Brief written",
+   "read_only": 1
+  },
+  {
+   "fieldname": "is_archived",
+   "fieldtype": "Check",
+   "label": "Archived",
+   "default": "0"
   }
  ],
  "links": [],

@@ -55,6 +55,8 @@ def make(user: str, space: str, days: int = 1, weekly: bool = False, today=None)
 		except Exception as e:  # noqa: BLE001 - an inbox that fails is said in the digest, the others still count
 			sections.append(f"## {mail.label_of(doc)}\n\n_This inbox could not be read: {scrub(e)[:120]}_")
 			continue
+		for h in hits:  # issue 111: every email seen is linked to the subjects it is about (the Brain's pages)
+			_seen(space, h)
 		items = []
 		for h in sorted((h for h in hits if h["person"]), key=lambda h: h["at"], reverse=True)[:PER_INBOX]:
 			line = _one_line(h, space)
@@ -79,6 +81,16 @@ def make(user: str, space: str, days: int = 1, weekly: bool = False, today=None)
 	if sensitive:
 		frappe.db.set_value("Life Inbox Item", done["name"], "is_sensitive", 1, update_modified=False)
 	return done["name"]
+
+
+def _seen(space: str, hit: dict):
+	"""Link an email the digest saw to the subjects it is about; a failure here never stops the digest."""
+	from lifeos.library import subjects
+
+	try:
+		subjects.see_email(space, subjects.mail_of_hit(hit))
+	except Exception:  # noqa: BLE001 - the digest is what the owner reads; a page that could not be linked waits for the next one
+		frappe.log_error(title="Life OS: could not link an email to its pages")
 
 
 def _listed(sender: str, text: str) -> bool:

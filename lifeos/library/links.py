@@ -62,7 +62,7 @@ def rebuild(doc):
 	fields = md_fields(doc)
 	if not fields:
 		return
-	frappe.db.delete("Life Link", {"from_doctype": doc.doctype, "from_name": doc.name})
+	frappe.db.delete("Life Link", {"from_doctype": doc.doctype, "from_name": doc.name, "origin": ("in", ("Text", ""))})  # the links to subjects (issue 111) are not written in the text
 	seen = set()
 	for field in fields:
 		for m in LINK_RE.finditer(doc.get(field) or ""):
@@ -136,7 +136,7 @@ def route_of(doctype, name):
 def outgoing(doc):
 	"""Links stored for this record: link text, target and the target's current title. `ambiguous` is set when more than one
 	wiki page has the link's title (the link resolves to the oldest; the screen shows a warning)."""
-	rows = frappe.get_all("Life Link", filters={"from_doctype": doc.doctype, "from_name": doc.name}, fields=["to_doctype", "to_name", "link_text"], limit=0)
+	rows = frappe.get_all("Life Link", filters={"from_doctype": doc.doctype, "from_name": doc.name, "origin": ("in", ("Text", ""))}, fields=["to_doctype", "to_name", "link_text"], limit=0)
 	pinned = {m.group(1).strip().lower() for m in LINK_RE.finditer("\n".join(doc.get(f) or "" for f in md_fields(doc))) if m.group(2)}
 	out = []
 	for r in rows:

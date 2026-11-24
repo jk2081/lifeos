@@ -19,7 +19,11 @@
   "is_focus",
   "part_kind",
   "standard",
-  "principles"
+  "principles",
+  "brief_section",
+  "brief_md",
+  "brief_sources",
+  "brief_on"
  ],
  "fields": [
   {
@@ -121,6 +125,29 @@
    "label": "Principles",
    "options": "Life Area Principle",
    "description": "Short lines on how to work, in order."
+  },
+  {
+   "fieldname": "brief_section",
+   "fieldtype": "Section Break",
+   "label": "Brain brief"
+  },
+  {
+   "fieldname": "brief_md",
+   "fieldtype": "Long Text",
+   "label": "Brief",
+   "read_only": 1
+  },
+  {
+   "fieldname": "brief_sources",
+   "fieldtype": "Long Text",
+   "label": "Brief sources",
+   "read_only": 1
+  },
+  {
+   "fieldname": "brief_on",
+   "fieldtype": "Datetime",
+   "label": "Brief written",
+   "read_only": 1
   }
  ],
  "links": [],

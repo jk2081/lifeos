@@ -108,7 +108,7 @@ for (const width of WIDTHS) {
     must(JSON.stringify(tabs) === JSON.stringify(['day', 'week', 'month', 'year']), `Today's tabs are ${tabs}`)
     await s.open('/life/library/notes')
     const lib = await pg.locator('[data-place-tabs] [data-tab]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab')))
-    must(JSON.stringify(lib) === JSON.stringify(['all', 'notes', 'documents', 'people', 'chats', 'files']), `Library's tabs are ${lib}`)
+    must(JSON.stringify(lib) === JSON.stringify(['pages', 'all', 'notes', 'documents', 'people', 'chats', 'files']), `Library's tabs are ${lib}`)
     if (!phone) {
       await s.open('/life/today/month')
       await pg.locator('body').click({ position: { x: 600, y: 10 } })
@@ -639,7 +639,7 @@ print(json.dumps({"item": first("Life Inbox Item"), "goal": first("Life Goal"), 
         '/': '/life', '/today/:tab(week|month|year)?': '/life/today/month', '/brain/:tab(...)?': '/life/brain/activity',
         '/brain/skills/:name': `/life/brain/skills/${ids.skill}`, '/brain/sources/:key': '/life/brain/sources/gmail', '/brain/review/:id': `/life/brain/review/${ids.item}`, '/share': '/life/share',
         '/item/:id': `/life/item/${ids.item}`, '/goals/:tab(...)?': '/life/goals/cycles', '/goals/:id': `/life/goals/${ids.goal}`,
-        '/focus/:id': `/life/focus/${ids.area}`, '/library/:tab(...)?': '/life/library/notes', '/library/people/:person': `/life/library/people/${ids.person}`,
+        '/focus/:id': `/life/focus/${ids.area}`, '/library/:tab(...)?': '/life/library/notes', '/library/pages/:doctype/:name': `/life/library/pages/Life%20Person/${ids.person}`, '/library/people/:person': `/life/library/people/${ids.person}`,
         '/library/:id': `/life/library/${ids.note}`, '/review': '/life/review', '/how-it-works': '/life/how-it-works', '/ask': '/life/ask', '/settings': '/life/settings',
         '/dev/editor': '/life/dev/editor',
       }

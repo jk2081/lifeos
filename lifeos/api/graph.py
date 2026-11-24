@@ -53,7 +53,7 @@ def get(space: str | None = None, center: str | None = None, collection: str | N
 	for d in docs:
 		add("Life Vault Document", d.name, d.title)
 
-	link_rows = frappe.get_list("Life Link", filters={"space": space}, fields=["from_doctype", "from_name", "to_doctype", "to_name"], limit=2000)
+	link_rows = frappe.get_list("Life Link", filters={"space": space, "origin": ("in", ("Text", ""))}, fields=["from_doctype", "from_name", "to_doctype", "to_name"], limit=2000)
 	hidden = {VAULT} if permissions.vault_hidden(space) else set()
 	ends = [(dt, name) for r in link_rows for dt, name in ((r.from_doctype, r.from_name), (r.to_doctype, r.to_name))
 		if dt in TYPES and dt not in hidden and key(dt, name) not in nodes]

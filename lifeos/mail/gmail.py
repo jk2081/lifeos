@@ -305,20 +305,26 @@ class GmailAdapter:
 	def query(self, fields: dict) -> str:
 		return build_query(fields)
 
+	def _hit(self, ref: dict) -> dict | None:
+		thread = self.client.get_thread(ref["id"], "metadata")
+		messages = thread.get("messages") or []
+		if not messages:
+			return None
+		head = headers_of(messages[-1])
+		first = headers_of(messages[0])
+		return {"thread_id": thread["id"], "subject": subject_of(thread), "from": who(head), "date": head.get("date", ""),
+			"at": int(messages[-1].get("internalDate") or 0) // 1000, "snippet": " ".join(str(ref.get("snippet") or thread.get("snippet") or "").split())[:SNIPPET_CHARS],
+			"messages": len(messages), "started_by": who(first), "link": link_of(thread["id"], self.account.address)}
+
 	def search(self, fields: dict, max_results: int = 10) -> list:
 		listing = self.client.list_threads(self.query(fields), None, max(1, min(int(max_results or 10), 25)))
-		hits = []
-		for ref in listing.get("threads") or []:
-			thread = self.client.get_thread(ref["id"], "metadata")
-			messages = thread.get("messages") or []
-			if not messages:
-				continue
-			head = headers_of(messages[-1])
-			first = headers_of(messages[0])
-			hits.append({"thread_id": thread["id"], "subject": subject_of(thread), "from": who(head), "date": head.get("date", ""),
-				"at": int(messages[-1].get("internalDate") or 0) // 1000, "snippet": " ".join(str(ref.get("snippet") or thread.get("snippet") or "").split())[:SNIPPET_CHARS],
-				"messages": len(messages), "started_by": who(first), "link": link_of(thread["id"], self.account.address)})
-		return hits
+		return [h for h in (self._hit(ref) for ref in listing.get("threads") or []) if h]
+
+	def list_page(self, fields: dict, page_token: str | None = None, size: int = 25) -> dict:
+		"""One page of every thread the fields match (issue 107): its hits, the token of the next page (None at the end) and Gmail's estimate of the whole."""
+		listing = self.client.list_threads(self.query(fields), page_token or None, max(1, min(int(size or 25), 100)))
+		return {"hits": [h for h in (self._hit(ref) for ref in listing.get("threads") or []) if h], "next": listing.get("nextPageToken") or None,
+			"estimate": listing.get("resultSizeEstimate")}
 
 	def get_thread(self, thread_id: str) -> dict:
 		thread = self.client.get_thread(thread_id)
@@ -358,7 +364,9 @@ class GmailAdapter:
 				last = messages[-1]
 				theirs = [m for m in messages if sender_of(m) != self.account.address.lower() and "SENT" not in (m.get("labelIds") or [])] or [last]
 				head = headers_of(theirs[-1])
-				out.append({"thread_id": thread["id"], "subject": subject_of(thread), "from": who(head), "sender": sender_of(theirs[-1]), "at": int(last.get("internalDate") or 0) // 1000,
+				mine = [m for m in messages if m not in theirs]
+				body = text_of(theirs[-1])
+				out.append({"replied": bool(mine), "text": body[:1500], "signature": body[-500:], "list_mail": "list-unsubscribe" in head, "thread_id": thread["id"], "subject": subject_of(thread), "from": who(head), "sender": sender_of(theirs[-1]), "at": int(last.get("internalDate") or 0) // 1000,
 					"snippet": " ".join(text_of(theirs[-1]).split())[:SNIPPET_CHARS], "person": keep, "why": why, "messages": len(messages),
 					"link": link_of(thread["id"], self.account.address), "to": headers_of(theirs[-1]).get("to", ""), "date": head.get("date", "")})
 			page = listing.get("nextPageToken")
