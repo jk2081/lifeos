@@ -31,6 +31,8 @@
       <div><div class="mb-1 text-sm-medium text-ink-gray-7">Kind</div><div class="text-base text-ink-gray-8">{{ e.date_kind }}{{ e.person_name ? ' · ' + e.person_name : '' }}</div></div>
     </template>
     <div v-if="writable" class="flex flex-wrap items-center gap-2">
+      <!-- issue 100: a key date shows in Year and Month; the star corrects the Brain's judgement and teaches the key-date skill -->
+      <Button v-if="e.kind === 'event'" icon-left="lucide-star" label="Key date" :variant="e.key_date ? 'solid' : 'subtle'" :aria-pressed="!!e.key_date" data-event-key @click="star" />
       <!-- an event from Google is hidden in Life OS, never deleted: nothing goes to Google (issue 99) -->
       <template v-if="e.kind === 'event' && e.from_google">
         <Button v-if="!e.hidden" label="Hide in Life OS" data-event-hide @click="hide(1)" />
@@ -41,7 +43,7 @@
   </template>
 </template>
 <script setup>
-// An event or an important date in the pane. An event has Notes (Frappe Comments on it), Hide in Life OS when it came from Google, and
+// An event or an important date in the pane. An event has Notes (Frappe Comments on it), Hide in Life OS when it came from Google, a Key date star, and
 // Delete when it was made here. A repeat of a repeating event is `name@date` and has its own notes.
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
@@ -82,6 +84,13 @@ function removeNote(n) {
   dialog.danger({ title: 'Delete note', message: 'Delete this note?', confirmLabel: 'Delete', onConfirm: async () => {
     if (await tryCall(() => itemData.calendar.delete_note({ note: n.name }), 'Deleted.') !== undefined) e.value.notes = e.value.notes.filter((x) => x.name !== n.name)
   } })
+}
+async function star() {
+  const on = e.value.key_date ? 0 : 1
+  if (await tryCall(() => itemData.calendar.set_key_date({ event: e.value.name, key: on }), on ? 'Marked as a key date.' : 'No longer a key date.') !== undefined) {
+    e.value.key_date = !!on
+    emit('changed')
+  }
 }
 async function hide(on) {
   if (await tryCall(() => itemData.calendar.hide_event({ event: e.value.name, hidden: on }), on ? 'Hidden in Life OS.' : 'Shown again.') !== undefined) {

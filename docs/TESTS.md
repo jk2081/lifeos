@@ -34,6 +34,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `plan-week` | `test_skills.TestPlanWeek` | `SETTINGS.38` |
 | `notice` | `test_skills.TestNotice` | `SETTINGS.38` |
 | `define-goal` | `test_skills.TestDefineGoal` | `SETTINGS.38` |
+| `key-date` | `test_calendar.TestKeyDates`, `test_skills` (examples) | `SETTINGS.38`, `TODAY.56` |
 | `reflect` | `test_review` (Reflect), `test_skills.TestNewSkillsExamples` | `SETTINGS.38` |
 | `ask` | `test_skills.TestAnswer` | `SETTINGS.38` |
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
@@ -53,7 +54,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 
 Day, Week, Month and Year, the numbers that open lists, Reset, rhythm banners, the first-run guide, Today's tasks.
 
-Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal work); `test_settings.py` (first run, the guide: what to call the person, the AI key step, the first things and where they are filed); `test_tasks.py` (counts, Reset, Someday)
+Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of the year, reviews since setup, key dates by week, the week's goal work); `test_calendar.py` (key dates: the rule without a key, the skill, the star); `test_settings.py` (first run, the guide: what to call the person, the AI key step, the first things and where they are filed); `test_tasks.py` (counts, Reset, Someday)
 
 - `TODAY.1` Log in, open /life, Today is filled from seed data
 - `TODAY.2` Add a birthday and see it on the calendar this year and next
@@ -66,10 +67,10 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.9` 390 px: a rhythm banner shows on Today on its day and Skip hides it
 - `TODAY.10` Rhythm banners: the weekly review, Plan <month>, Plan your next 12 weeks and Close this cycle each show on Today on their day (the clock moved with at=); Skip hides ea…
 - `TODAY.11` Week shows this week's calendar events and due tasks on the right days, and a day opens Day
-- `TODAY.12` Month shows events and due tasks on the right dates; next and previous months work
-- `TODAY.13` Year shows a bar for each goal in its area's lane, and one tick per weekly review with the right count
+- `TODAY.12` Month shows key dates and due tasks on the right dates and counts meetings; next and previous months work
+- `TODAY.13` Year shows a bar for each goal in its area's lane, and one tick per weekly review since setup with the right count
 - `TODAY.14` an area that is off has no lane
-- `TODAY.15` clicking a goal opens the goal; clicking a month opens Month
+- `TODAY.15` clicking a goal on Year opens the goal
 - `TODAY.16` Week, Month and Year have no sideways scroll
 - `TODAY.17` the first visit opens the guide; Start, Next, Skip and Done land on Today and the guide does not return
 - `TODAY.18` the guide shows one screen at a time and each screen fits the phone
@@ -110,6 +111,11 @@ Unit tests: `test_today.py` (Today's tasks, banners, the year, the week's goal w
 - `TODAY.53` with the drawer open all seven day headers of Week are visible (1440 px)
 - `TODAY.54` the Week toolbar has no Reset and nothing cut off, the heading is the dates, and + Capture offers Important date
 - `TODAY.55` Day has no builder's note under "Today"
+- `TODAY.56` Year shows five key dates of one week as one dot "5" that lists them (each opens its event, with the Key date star), and no two key-date labels overlap
+- `TODAY.57` Year has four cycle columns with today's line in the second; back moves one cycle and Today returns; no hint line
+- `TODAY.58` Month names a key date, counts the day's meetings, and the count opens Day
+- `TODAY.59` on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link
+- `TODAY.60` Year and Month in light and dark have no script error and nothing cut off
 
 ### Brain (`tools/acceptance/brain.mjs`, 53 checks)
 

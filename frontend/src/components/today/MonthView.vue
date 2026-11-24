@@ -7,7 +7,7 @@
   <div class="page-body" data-month-view :data-month="month">
     <ViewLinks :links="LINKS" />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
-      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>meetings</span>
+      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>other events, counted</span>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-blue-3"></i>goal work and key dates</span>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-red-3"></i>due dates</span>
     </div>
@@ -19,30 +19,36 @@
         <span class="inline-flex size-6 items-center justify-center rounded-full text-sm tabular-nums"
           :class="c.date === store.today ? 'bg-surface-gray-9 font-semibold text-ink-base' : c.inMonth ? 'text-ink-gray-8' : 'text-ink-gray-6'">{{ c.day }}</span>
         <template v-if="!phone">
-          <div v-for="(it, i) in itemsOn(c.date).slice(0, MAX)" :key="i" class="relative truncate rounded px-[5px] text-xs leading-[1.5]" :class="chipClass(it)" data-month-item :data-source="it.source">
+          <div v-for="(it, i) in shownOn(c.date).slice(0, MAX)" :key="i" class="relative truncate rounded px-[5px] text-xs leading-[1.5]" :class="chipClass(it)" data-month-item :data-source="it.source">
             <button type="button" class="absolute inset-0 rounded focus-visible:focus-ring" :aria-label="itemLabel(it)" :data-ref="itemRef(it)" @click="openRef(itemRef(it))" />
             {{ it.all_day ? '' : time(it.start) + ' ' }}{{ itemLabel(it) }}</div>
-          <span v-if="itemsOn(c.date).length > MAX" class="text-xs text-ink-gray-6">+{{ itemsOn(c.date).length - MAX }} more</span>
+          <span v-if="shownOn(c.date).length > MAX" class="text-xs text-ink-gray-6">+{{ shownOn(c.date).length - MAX }} more</span>
+          <!-- the day's other events are a count: it opens Day, where every event is -->
+          <div v-if="meetingsOn(c.date)" class="relative truncate rounded px-[5px] text-xs leading-[1.5] text-ink-gray-7" data-meetings :data-count="meetingsOn(c.date)">
+            <button type="button" class="absolute inset-0 rounded focus-visible:focus-ring" :aria-label="meetingsText(c.date) + ', open the day'" @click="openDay(c.date)" />{{ meetingsText(c.date) }}</div>
         </template>
-        <span v-else class="flex gap-0.5"><i v-for="(it, i) in itemsOn(c.date).slice(0, 3)" :key="i" class="size-1.5 rounded-full" :class="dotClass(it)" /></span>
+        <span v-else class="flex gap-0.5"><i v-for="(it, i) in shownOn(c.date).slice(0, 3)" :key="i" class="size-1.5 rounded-full" :class="dotClass(it)" /><i v-if="meetingsOn(c.date)" class="size-1.5 rounded-full bg-surface-gray-5" /></span>
       </div>
     </div></div>
     <!-- a phone: the grid is compact, the chosen day's items are listed below it -->
     <section v-if="phone" data-month-list>
       <SectionHead>{{ weekday(picked) }}, {{ long(picked) }}</SectionHead>
       <Card flush>
-        <Row v-for="(it, i) in itemsOn(picked)" :key="i" :pane="itemRef(it)" :label="itemLabel(it)" class="!items-center">
+        <Row v-for="(it, i) in shownOn(picked)" :key="i" :pane="itemRef(it)" :label="itemLabel(it)" class="!items-center">
           <span class="w-14 flex-none text-sm tabular-nums text-ink-gray-6">{{ it.all_day ? 'All day' : time(it.start) }}</span>
           <span class="min-w-0 flex-1 break-words rounded px-1.5 py-0.5 text-base" :class="chipClass(it)">{{ itemLabel(it) }}</span>
         </Row>
-        <Empty v-if="!itemsOn(picked).length" title="Nothing on this day." />
+        <Row v-if="meetingsOn(picked)" :pane="null" class="!items-center" data-meetings-row>
+          <span class="min-w-0 flex-1 text-base text-ink-gray-7">{{ meetingsText(picked) }}</span>
+        </Row>
+        <Empty v-if="!shownOn(picked).length && !meetingsOn(picked)" title="Nothing on this day." />
       </Card>
       <Button class="mt-2" label="Open in Day" data-open-day @click="openDay(picked)" />
     </section>
   </div>
 </template>
 <script setup>
-// Today > Month (issue 16): the month grid with meetings, goal work, due tasks and key dates. A day opens in Day and an item in the
+// Today > Month (issue 16): the month grid with key dates, goal work, due tasks and a count of the other events (issue 100). A day opens in Day and an item in the
 // record pane; on a phone the grid is compact and the chosen day is listed below it. The cursor is `date=`.
 import { computed, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
@@ -79,6 +85,13 @@ const cells = computed(() => {
   })
 })
 const { data, itemsOn } = useCalendarRange(computed(() => [first.value, addDays(first.value, 41)]))
+// Month shows its own level (issue 100): key dates, goal work and due dates by name, and every other event as a count that opens Day
+const isOther = (it) => it.source === 'event' && !it.key_date
+// key dates come first, so a busy day never hides one under "+n more"
+const isKey = (it) => it.source === 'important' || it.source === 'vault' || (it.source === 'event' && it.key_date)
+const shownOn = (date) => itemsOn(date).filter((it) => !isOther(it)).sort((a, b) => Number(isKey(b)) - Number(isKey(a)))
+const meetingsOn = (date) => itemsOn(date).filter(isOther).length
+const meetingsText = (date) => `${meetingsOn(date)} meeting${meetingsOn(date) === 1 ? '' : 's'}`
 const picked = ref(store.today)
 watch(month, (m) => { picked.value = store.today.startsWith(m) ? store.today : `${m}-01` }, { immediate: true })
 

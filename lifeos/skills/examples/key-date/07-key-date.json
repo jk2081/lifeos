@@ -1,0 +1,34 @@
+{
+ "title": "A one-to-one is not a key date",
+ "input": {
+  "data": {
+   "title": "1:1 with Ravi",
+   "notes": "",
+   "all_day": false,
+   "starts": "2026-11-26 15:00",
+   "ends": "2026-11-26 15:30",
+   "repeats": "Weekly",
+   "attendees": 2
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "key",
+    "equals": false
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"key\": false, \"reason\": \"A routine one-to-one.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "33b0ef2c1f5feb40"
+}

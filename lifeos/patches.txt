@@ -2,3 +2,4 @@
 
 [post_model_sync]
 lifeos.patches.index_global_search
+lifeos.patches.key_dates_by_rule

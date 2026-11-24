@@ -500,3 +500,68 @@ class TestEventNotes(CalCase):
 		self.assertEqual((out["starts_on"][:10], out["ends_on"][:10], out["from_google"]), (str(today()), str(today()), True))
 		item = [i for i in calendar_api.get(space=PRIVATE, from_date=str(today()), to_date=str(today()))["items"] if i["title"] == "Core pulled n99"][0]
 		self.assertFalse(item["multi_day"])
+
+
+class TestKeyDates(LifeTestCase):
+	"""Issue 100: which events shape the plan."""
+
+	def tearDown(self):
+		frappe.db.delete("Event", {"subject": ("like", "i100 %")})
+		frappe.db.delete("Life Skill Correction", {"skill": "key-date"})
+		set_key("")
+		frappe.flags.lifeos_ai_backend = None
+		super().tearDown()
+
+	def event(self, title, start, end=None, all_day=0):
+		return frappe.get_doc({"doctype": "Event", "subject": title, "starts_on": start, "ends_on": end, "all_day": all_day, "event_type": "Public", "life_space": PRIVATE}).insert()
+
+	def test_without_a_key_all_day_and_multi_day_events_are_key_dates_and_meetings_are_not(self):
+		set_key("")
+		day, meeting = self.event("i100 Diwali", f"{today()} 00:00:00", all_day=1), self.event("i100 Sync", f"{today()} 10:00:00", f"{today()} 11:00:00")
+		trip = self.event("i100 Away", f"{today()} 10:00:00", f"{add_days(today(), 3)} 10:00:00")
+		self.assertEqual([e.life_key_date for e in (day, meeting, trip)], [1, 0, 1])
+		self.assertEqual(day.life_key_date_set_by, "Rule")
+		made = calendar_api.add_important_date(space=PRIVATE, title="i100 Anya", day=3, month=12)["name"]
+		self.assertTrue(frappe.db.get_value("Event", made, "life_key_date"))  # an important date is an all-day event
+		items = {i["title"]: i for i in calendar_api.get(space=PRIVATE, from_date=str(today()), to_date=str(today()))["items"]}
+		self.assertTrue(items["i100 Diwali"]["key_date"])
+		self.assertFalse(items["i100 Sync"]["key_date"])
+
+	def test_the_skill_decides_when_there_is_a_key(self):
+		from lifeos.ai import fake
+		from lifeos.calendar import key_dates
+
+		set_key("sk-test-not-real")
+		frappe.flags.lifeos_ai_backend = backend = fake.SiteFake()
+		with patch("frappe.enqueue") as enqueue:
+			board, sync = self.event("i100 Board meeting", f"{today()} 10:00:00", f"{today()} 11:00:00"), self.event("i100 Sync", f"{today()} 12:00:00", f"{today()} 12:30:00")
+		self.assertEqual(board.life_key_date, 0)  # the save is quick: the rule first, the skill in a job after the commit
+		self.assertEqual([c.args[0] for c in enqueue.call_args_list if c.args[0].endswith("key_dates.refine")], ["lifeos.calendar.key_dates.refine"] * 2)
+		self.assertTrue(key_dates.refine(board.name))
+		self.assertFalse(key_dates.refine(sync.name))
+		self.assertEqual(frappe.db.get_value("Event", board.name, ["life_key_date", "life_key_date_set_by"]), (1, "Skill"))
+		self.assertEqual(frappe.db.get_value("Event", sync.name, "life_key_date"), 0)
+		self.assertTrue(frappe.db.exists("Life AI Usage", {"purpose": "Skill: key-date"}))
+		del backend
+
+	def test_starring_sets_a_key_date_and_keeps_a_correction_for_the_skill(self):
+		set_key("")
+		sync = self.event("i100 Sync", f"{today()} 12:00:00", f"{today()} 12:30:00")
+		out = calendar_api.set_key_date(sync.name, 1)
+		self.assertTrue(out["key_date"])
+		self.assertEqual(frappe.db.get_value("Event", sync.name, ["life_key_date", "life_key_date_set_by"]), (1, "Owner"))
+		fix = frappe.get_all("Life Skill Correction", filters={"skill": "key-date"}, fields=["correction_type", "capture_title", "key"])
+		self.assertEqual([(f.correction_type, f.capture_title) for f in fix], [("Key date", "i100 Sync")])
+		sync.reload()
+		sync.subject = "i100 Sync again"
+		sync.save()  # the owner's word is final: a change does not ask the rule or the skill again
+		self.assertEqual(frappe.db.get_value("Event", sync.name, "life_key_date"), 1)
+		calendar_api.set_key_date(sync.name, 0)
+		self.assertEqual(frappe.db.get_value("Event", sync.name, "life_key_date"), 0)
+		self.assertEqual(frappe.db.count("Life Skill Correction", {"skill": "key-date"}), 2)
+
+	def test_a_person_without_write_access_cannot_star(self):
+		sync = self.event("i100 Sync", f"{today()} 12:00:00", f"{today()} 12:30:00")
+		frappe.set_user(FAMILY)
+		with self.assertRaises(frappe.PermissionError):
+			calendar_api.set_key_date(sync.name, 1)

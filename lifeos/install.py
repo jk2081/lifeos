@@ -14,6 +14,10 @@ MEETING_FIELDS = [
 		"insert_after": "life_matters"},
 	{"fieldname": "life_hidden", "label": "Hidden in Life OS", "fieldtype": "Check", "insert_after": "life_matters_set_by", "no_copy": 1,
 		"description": "Life OS stops showing this event. Set from the event's drawer; nothing is deleted or sent to Google."},
+	{"fieldname": "life_key_date", "label": "Key Date", "fieldtype": "Check", "insert_after": "life_hidden", "no_copy": 1, "search_index": 1,
+		"description": "An event that shapes the plan (a trip, a birthday, a deadline, an exam), shown in Year and Month. Set by the key-date skill, or by hand."},
+	{"fieldname": "life_key_date_set_by", "label": "Key Date Set By", "fieldtype": "Select", "options": "\nRule\nSkill\nOwner",
+		"insert_after": "life_key_date", "no_copy": 1, "read_only": 1},
 	{"fieldname": "life_followups_on", "label": "Life Follow-ups Read On", "fieldtype": "Datetime", "insert_after": "life_matters_set_by",
 		"read_only": 1},
 ]

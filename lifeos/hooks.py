@@ -55,7 +55,8 @@ for _dt in ("Life Task", "Life Goal", "Life Inbox Item", "Life Note"):
 # set 8: a reading confirmed or rejected anywhere clears its finding in the weekly review
 _have = doc_events["Life Goal Reading"].get("on_update")
 doc_events["Life Goal Reading"]["on_update"] = [*([_have] if isinstance(_have, str) else _have or []), "lifeos.review.findings.reading_changed"]
-doc_events["Event"] = {"validate": "lifeos.calendar.events.validate_event", "on_update": "lifeos.review.gcal_write.event_updated",
+doc_events["Event"] = {"validate": "lifeos.calendar.events.validate_event",
+	"on_update": ["lifeos.review.gcal_write.event_updated", "lifeos.calendar.key_dates.after_save"],
 	"on_trash": "lifeos.review.gcal_write.event_trashed"}
 # issue 31: a goal block already written to Google follows its task
 for _event, _fn in (("on_update", "task_updated"), ("on_trash", "task_trashed")):

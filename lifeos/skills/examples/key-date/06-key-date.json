@@ -1,0 +1,34 @@
+{
+ "title": "A stand-up is not a key date",
+ "input": {
+  "data": {
+   "title": "Daily stand-up",
+   "notes": "",
+   "all_day": false,
+   "starts": "2026-11-25 09:30",
+   "ends": "2026-11-25 09:45",
+   "repeats": "Daily",
+   "attendees": 6
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "key",
+    "equals": false
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"key\": false, \"reason\": \"A routine meeting.\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "33b0ef2c1f5feb40"
+}

@@ -29,7 +29,7 @@ def _flags(names):
 	"""What the calendar needs of each event that core's get_events does not return."""
 	if not names:
 		return {}
-	rows = frappe.get_all("Event", filters={"name": ("in", list(names))}, fields=["name", "life_hidden", "pulled_from_google_calendar", "life_attendees"],
+	rows = frappe.get_all("Event", filters={"name": ("in", list(names))}, fields=["name", "life_hidden", "life_key_date", "pulled_from_google_calendar", "life_attendees"],
 		limit=len(names) + 1, ignore_permissions=True)  # system: the names came from a space-filtered read
 	return {r.name: r for r in rows}
 
@@ -56,6 +56,7 @@ def _events(space, start, end, show_hidden=False):
 			"multi_day": multi, "description": e.description, "repeats": bool(e.repeat_this_event),
 			"yearly_date": bool(e.all_day and not multi and e.repeat_this_event and e.repeat_on == "Yearly"),
 			"from_google": bool(f and f.pulled_from_google_calendar), "hidden": hidden,
+			"key_date": bool(f and f.life_key_date) or bool(e.all_day and e.repeat_this_event and e.repeat_on == "Yearly"),
 		})
 	return out
 
@@ -72,7 +73,7 @@ def important_dates_between(space, start, end):
 		if e["yearly_date"]:
 			kind = frappe.utils.strip_html(e["description"] or "").strip()
 			out.append({"source": "important", "name": e["name"], "title": e["title"], "label": e["title"], "date": e["date"],
-				"kind": kind if kind in DATE_KINDS else "Other", "all_day": 1})
+				"kind": kind if kind in DATE_KINDS else "Other", "all_day": 1, "key_date": True})
 	return out
 
 

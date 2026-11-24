@@ -282,4 +282,14 @@ def _area(data):
 	return {"area": pick.get("id") or "", "confidence": 40}
 
 
-SKILLS = {"tidy-backlog": _tidy, "plan-week": _plan, "notice": _notice, "define-goal": _define, "reflect": _reflect, "guess-area": _area}
+KEY_WORDS = ("board", "birthday", "anniversary", "deadline", "due", "exam", "trip", "flight", "wedding", "audit", "results", "holiday", "launch")
+
+
+def _key_date(data):
+	"""A key date when the event is all day or the title holds a word that marks one (board, exam, deadline, trip …)."""
+	text = f"{data.get('title') or ''} {data.get('notes') or ''}".lower()
+	key = bool(data.get("all_day")) or any(w in text for w in KEY_WORDS)
+	return {"key": key, "reason": "marks something in the plan" if key else "a routine meeting"}
+
+
+SKILLS = {"tidy-backlog": _tidy, "plan-week": _plan, "notice": _notice, "define-goal": _define, "reflect": _reflect, "guess-area": _area, "key-date": _key_date}
