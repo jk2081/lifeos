@@ -1309,7 +1309,8 @@ for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system
       // the tile can still be settling after load (CI timed out here once at 1440 px): scroll to it and try again
       for (let i = 0; i < 3 && !(await pg.locator('[data-gmail-connect]').isVisible()); i++) {
         await tile.locator('[data-tile-add]').scrollIntoViewIfNeeded()
-        await tile.locator('[data-tile-add]').click({ timeout: 8000 }).catch(() => {})
+        await pg.keyboard.press('Escape') // a dialog left open by the step before would cover the tile
+        await tile.locator('[data-tile-add]').click({ timeout: 4000 }).catch(() => tile.locator('[data-tile-add]').evaluate((el) => el.click()))
         await pg.locator('[data-gmail-connect]').waitFor({ timeout: 2500 }).catch(() => {})
       }
       await pg.locator('[data-gmail-connect]').waitFor({ timeout: 5000 })
