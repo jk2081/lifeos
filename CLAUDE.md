@@ -16,6 +16,7 @@
 - **Never write secrets** to the repo, logs, issues or pull requests.
 - **Keep this repo private.**
 - **Judgment is a skill with examples, not code.** Code is plumbing: records, permissions, schedules, deduplication, scoring, costs and screens.
+- **Use Frappe before writing your own.** Before building anything, check whether Frappe already does it: comments, global search, versions, tags, assignments, auto repeat, notifications, files, email, OAuth (Connected App). Use it and extend it. Write your own only when it cannot, and say why in `DECISIONS.md`.
 - **Prefer deleting to adding.** When an issue replaces something, remove the old code, screens, routes and tests in the same change.
 - Do not read or change anything outside this repository and the local bench.
 - Do not stop, restart, remove or change any Docker container, image, volume or network whose name does not start with `lifeos-`.

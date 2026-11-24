@@ -11,6 +11,7 @@ From 20 November 2026, build work comes from GitHub issues in `jk2081/lifeos`, n
 
 ## While working
 
+- **Use Frappe before writing your own.** Before building a feature, check whether Frappe already has it (Comment, Global Search, Version, Tags, Assignment, Auto Repeat, Notification Log, File, Email Account, Connected App). Use it and extend it; write your own only when it cannot do the job, and record why in `DECISIONS.md` under the issue.
 - **Judgment is a skill with examples, not code** (from 21 November 2026, once the skills engine, #28, exists). Code is plumbing: records, permissions, schedules, deduplication, scoring, costs and screens. Never write a model prompt in Python outside `lifeos/skills/` and `lifeos/ai/client.py`.
 - Keep the change to what the issue asks. If you find something else broken, note it in the pull request under "Found, not fixed"; do not fix it here.
 - Every screen works at 390 px and 1440 px, light and dark.
