@@ -1478,3 +1478,14 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **Not read:** `.doc`, `.xls`, `.pptx`, `.txt` and video are left as they were (the issue lists the types above). HEIC is read only when Pillow can open it. Languages: Tesseract uses `eng+hin+ben` when installed; RapidOCR reads English and Chinese.
 - **Limits.** Over 50 MB, or audio over 60 minutes: skipped, with the reason in `extract_note`. One file at a time per worker (a job reads its files one after the other; the worker runs one job at a time).
 - **Set-up.** Python packages in `pyproject.toml`; apt packages in README "Server packages" and in both CI apt lines. The local bench has them installed by hand (the container's apt layer is lost if it is recreated).
+
+## Issue 108 (Frappe Flow trial)
+
+- **Frappe 16.61.0.** CI (both `bench init` lines), the README and the Docker bench are on v16.61.0 (Flow ships from 16.60). The unit suite passes unchanged; no Life OS code needed a fix. The older notes above that say 16.56.0 describe what was proven then.
+- **The wrappers call Ask's own `run_tool`** (`lifeos/ai/flow.py`) with a `Context` built for the asking user's default space, so the space, Vault and scope rules are Ask's and not a second copy. Cost: Flow picks the default space; a user in two spaces cannot name one (written up in `docs/FLOW_TRIAL.md`, section 2).
+- **`suggest_actions` and `ask_one_question` are not Flow tools.** They draw Ask's own buttons and choices. The agent's instructions say to offer a next step in a sentence.
+- **No tool has `requires_confirmation`.** Writes show with Undo in Ask; nothing here sends or deletes.
+- **The agent is registered only when a Flow Model is enabled** (`flow.agents()` returns none otherwise), and takes the first one; the owner can change the model in the desk. The skill folder `skills/ask/SKILL.md` repeats Ask's skill; a unit test checks the two bodies are equal.
+- **`tools/fake_openai.py` and `tools/flow_trial.py`** are trial tooling (a fake model, and a script that runs the agent through the live Flow Server). Not part of the app.
+- **Flow's chat screen was not screenshotted:** its front-end island needs Flow's own `yarn install` at build time, which did not finish on the local bench. The evidence is the live server and its API.
+- **`Flow User` has desk access.** Flow lets only holders of that role chat, so giving it to a Life User makes them a System User, which Life OS forbids (`test_life_user_and_agent_roles_have_no_desk_access`). Nothing in this issue grants it; the trial users were cleaned afterwards. Open for the follow-up (see `docs/FLOW_TRIAL.md`, section 2).

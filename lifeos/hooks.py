@@ -109,3 +109,26 @@ scheduler_events = {
 ignore_links_on_delete = ["Life Exit"]
 
 fixtures = []
+
+# Frappe Flow (issue 108): Ask's tools and the "Life OS" agent, for trying at /flow
+flow_tools = [
+	"lifeos.ai.flow.search",
+	"lifeos.ai.flow.read_page",
+	"lifeos.ai.flow.get_record",
+	"lifeos.ai.flow.list_records",
+	"lifeos.ai.flow.counts",
+	"lifeos.ai.flow.cycle_state",
+	"lifeos.ai.flow.timeline",
+	"lifeos.ai.flow.mail_search",
+	"lifeos.ai.flow.mail_thread",
+	"lifeos.ai.flow.mail_list_threads",
+	"lifeos.ai.flow.digests_read",
+	"lifeos.ai.flow.save_attachment",
+	"lifeos.ai.flow.create_page",
+	"lifeos.ai.flow.update_page",
+	"lifeos.ai.flow.add_person",
+	"lifeos.ai.flow.save_note",
+	"lifeos.ai.flow.make_task",
+	"lifeos.ai.flow.add_event",
+]
+flow_agents = ["lifeos.ai.flow.agents"]
