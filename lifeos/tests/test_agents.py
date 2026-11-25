@@ -17,7 +17,7 @@ from lifeos.brain import agent_page as pages
 from lifeos.mail import gmail
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.test_gmail import FakeGmail, message
-from lifeos.tests.helpers import Keyed, find, set_key, task, text
+from lifeos.tests.helpers import AskCase, Keyed, find, set_key, task, text
 
 
 DECK = b"issue 8 standard deck"
@@ -805,3 +805,70 @@ class TestAgentMethodsExist(LifeTestCase):
 			if fn is None or fn not in frappe.whitelisted:
 				missing.append(f"lifeos.api.{module}.{method}")
 		self.assertEqual(missing, [])
+
+
+class TestFlow(AskCase):
+	"""Issue 108: Life OS's tools and agent for Frappe Flow (try them at /flow)."""
+
+	def ctx(self, user):
+		from frappe.flow import ToolContext
+
+		return ToolContext(session_id="t", agent="lifeos/Life OS", user=user)
+
+	def test_1_every_flow_tool_imports_with_a_docstring_and_type_hints(self):
+		from frappe.flow import Tool
+
+		from lifeos.ai import flow
+		self.assertEqual(frappe.get_hooks("flow_tools"), [f"lifeos.ai.flow.{n}" for n in flow.TOOL_NAMES])
+		for path in frappe.get_hooks("flow_tools"):
+			t = frappe.get_attr(path)
+			self.assertIsInstance(t, Tool, path)
+			self.assertTrue(t.description.strip(), path)
+			hints = {k for k in t.func.__annotations__ if k != "return"}
+			params = set(__import__("inspect").signature(t.func).parameters)
+			self.assertEqual(hints, params, path)
+			self.assertEqual(set(t.parameters["properties"]), params - {"ctx"}, path)
+			self.assertFalse(t.requires_confirmation, path)  # writes show with Undo; nothing here sends or deletes
+
+	def test_2_the_life_os_agent_is_registered_after_sync_and_lists_the_tools(self):
+		from frappe.flow.lib.agent import sync_agents, sync_tools
+
+		from lifeos.ai import flow
+		frappe.set_user("Administrator")
+		if not frappe.db.exists("Flow Provider", "openai"):
+			frappe.get_doc({"doctype": "Flow Provider", "provider": "openai", "api_key": "sk-test-not-real"}).insert()
+		model = frappe.db.get_value("Flow Model", {"enabled": 1, "embedding": 0}, "name") or frappe.get_doc(
+			{"doctype": "Flow Model", "title": "t108 model", "provider": "openai", "model_id": "gpt-test"}).insert().name
+		self.assertTrue(flow.agents())
+		from frappe.flow.doctype.flow_skill.flow_skill import sync_skills
+		sync_skills()
+		sync_tools()
+		sync_agents()
+		agent = frappe.get_doc("Flow Agent", "lifeos/Life OS")
+		self.assertTrue(frappe.db.exists("Flow Model", model))
+		self.assertEqual({r.tool for r in agent.tools if r.tool.startswith("lifeos/")}, {f"lifeos/{n}" for n in flow.TOOL_NAMES})
+		self.assertIn("cite every claim", agent.instructions.lower())
+		self.assertEqual([r.skill for r in agent.skills], ["lifeos/ask"])
+
+	def test_3_the_flow_skill_is_the_ask_skill(self):
+		from pathlib import Path
+
+		from lifeos.skills import store
+		body = (Path(frappe.get_app_source_path("lifeos", "skills")) / "ask" / "SKILL.md").read_text().split("\n---\n", 1)[1].strip()
+		self.assertEqual(body, (Path(store.DIR) / "ask.md").read_text().split("\n---\n", 1)[1].strip())
+
+	def test_4_a_second_user_cannot_read_or_change_the_owners_space_through_a_tool(self):
+		from unittest.mock import patch
+
+		from lifeos.ai import flow
+
+		self.make("Life Task", title="t108 owner-only secret")
+		with patch("lifeos.permissions.default_space", return_value=PRIVATE):
+			mine = flow.list_records(kind="tasks", ctx=self.ctx(OWNER))
+			self.assertIn("t108 owner-only secret", str(mine))
+			# even when the tool is handed the owner's space, a user who is not in it is refused
+			for out in (flow.list_records(kind="tasks", ctx=self.ctx(FAMILY)), flow.search(query="t108 owner-only secret", ctx=self.ctx(FAMILY)),
+					flow.make_task(title="t108 family writes", ctx=self.ctx(FAMILY))):
+				self.assertIn("error", out)
+				self.assertNotIn("t108 owner-only secret", str(out))
+		self.assertFalse(frappe.db.exists("Life Task", {"title": "t108 family writes"}))

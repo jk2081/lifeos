@@ -77,8 +77,8 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client libmariadb-dev tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin tesseract-ocr-ben ocrmypdf ffmpeg >/dev/null  # issue 104: the tools that read files on the server
           npm install -g yarn >/dev/null
           pip install -q frappe-bench
-          # the Frappe release the owner's server runs
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" --frappe-branch v16.56.0 ~/frappe-bench
+          # the Frappe release Life OS is tested on (Flow ships from v16.60, issue 108)
+          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" --frappe-branch v16.61.0 ~/frappe-bench
           mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'; SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
 
       - name: Install Life OS
@@ -173,8 +173,8 @@ jobs:
           npm install -g yarn >/dev/null
           pip install -q frappe-bench
           pipx install semgrep >/dev/null
-          # the Frappe release the owner's server runs, with its own assets built (the desk and login pages)
-          bench init --skip-redis-config-generation --python "$(which python)" --frappe-branch v16.56.0 "$LIFEOS_BENCH_PATH"
+          # the Frappe release Life OS is tested on (Flow ships from v16.60, issue 108), with its own assets built (the desk and login pages)
+          bench init --skip-redis-config-generation --python "$(which python)" --frappe-branch v16.61.0 "$LIFEOS_BENCH_PATH"
           # as on the Docker bench
           cd "$LIFEOS_BENCH_PATH" && bench set-config -g developer_mode 1
 

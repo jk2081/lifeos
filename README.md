@@ -8,7 +8,7 @@ A personal operating system on Frappe v16: inbox and review, tasks, calendar, a 
 
 ## Install on an existing bench
 
-The bench must run Frappe v16 (built and tested on 16.56.0), with Node 20 or newer and yarn for the front-end build. The front end uses `@framework/ui`, Frappe's own Vue package, straight from `apps/frappe/ui` in the same bench (`link:../../frappe/ui`), so it can only be built with the app at `apps/lifeos` beside `apps/frappe`. After any Frappe update, rebuild the front end (`bench build --app lifeos`) and run `node tools/acceptance.mjs` before using the site.
+The bench must run Frappe v16 (built and tested on 16.61.0), with Node 20 or newer and yarn for the front-end build. The front end uses `@framework/ui`, Frappe's own Vue package, straight from `apps/frappe/ui` in the same bench (`link:../../frappe/ui`), so it can only be built with the app at `apps/lifeos` beside `apps/frappe`. After any Frappe update, rebuild the front end (`bench build --app lifeos`) and run `node tools/acceptance.mjs` before using the site.
 
 ```
 cd ~/frappe-bench
