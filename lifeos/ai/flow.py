@@ -18,7 +18,7 @@ def _run(name: str, ctx: ToolContext, **args) -> dict:
 	from lifeos.permissions import default_space, require_space
 
 	if frappe.session.user != ctx.user:
-		frappe.set_user(ctx.user)
+		frappe.set_user(ctx.user)  # nosemgrep: frappe-setuser -- Flow names the asking user in ctx; a call made without that session runs as that user, never wider
 	space = default_space(ctx.user)
 	if not space:
 		return {"error": "Not allowed: you are not in any space."}
