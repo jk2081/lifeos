@@ -1073,6 +1073,7 @@ class TestUpdates(LifeTestCase):
 		self.assertEqual(runner.execute(doc, fake), "Done")
 		self.assertEqual([c if isinstance(c, str) else c[0] for c in calls],
 			["verify", "backup", "record", "maintenance_on", "checkout", "requirements", "migrate", "build", "restart", "health", "maintenance_off"])
+		self.assertIn(("checkout", doc.to_commit), calls)  # the live site failed here: checkout was called without the commit
 		self.assertEqual(frappe.db.get_value("Life Update", doc.name, "status"), "Done")
 		self.assertTrue(frappe.db.exists("Notification Log", {"for_user": OWNER, "document_name": doc.name}))
 
