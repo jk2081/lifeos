@@ -89,7 +89,10 @@ import { PLACES } from './places.mjs'
 export const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7)
 export const PART = (process.argv.find((a) => a.startsWith('--part=')) || '').slice(7)
 if (PART && !PLACES.includes(PART)) throw new Error(`--part= takes one of ${PLACES.join(', ')}`)
-export const WIDTHS = [1440, 390]
+// LIFEOS_WIDTH=390 walks one width (CI runs 1440 and 390 as two jobs side by side); without it, both, one after the other
+const ONE_WIDTH = Number(process.env.LIFEOS_WIDTH || 0)
+if (ONE_WIDTH && ![1440, 390].includes(ONE_WIDTH)) throw new Error('LIFEOS_WIDTH takes 1440 or 390')
+export const WIDTHS = ONE_WIDTH ? [ONE_WIDTH] : [1440, 390]
 // a place is walked when --part names it, or --only names one of its checks, or neither is given
 export const placeRuns = (place) => {
   if (PART) return PART === place
