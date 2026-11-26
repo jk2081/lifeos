@@ -16,6 +16,11 @@
       <p class="mt-2 text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/brain/outbox" data-outbox-link>Open the Outbox</RouterLink> for the full list, other periods and Bring back.</p>
     </Card>
 
+    <div v-if="data?.new_rules?.length" class="flex flex-col gap-1 text-sm text-ink-gray-6" data-new-rules>
+      <div v-for="nr in data.new_rules" :key="nr.name" data-new-rule>New rule: {{ nr.words.replace(/^When /, '').replace(': ', ' → ') }} ·
+        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'rules' } }" data-new-rule-change>Change</RouterLink></div>
+    </div>
+
     <div class="flex flex-wrap items-center gap-2" data-activity-filters>
       <div class="flex flex-wrap gap-1.5" role="group" aria-label="What the Brain did">
         <button v-for="f in FILTERS" :key="f.value" type="button" class="rounded-full border px-3 py-1 text-sm focus-visible:focus-ring"

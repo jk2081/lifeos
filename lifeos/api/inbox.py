@@ -72,7 +72,7 @@ INTENTS = ("Process", "Add to wiki", "Just keep")
 @frappe.whitelist(methods=["POST"])
 def create_item(title: str | None = None, source_type: str = "Upload", space: str | None = None, raw_text: str | None = None,
 		instruction: str | None = None, source_url: str | None = None, intent: str | None = None, source_system: str | None = None,
-		external_id: str | None = None, area: str | None = None, goal: str | None = None):
+		external_id: str | None = None, area: str | None = None, goal: str | None = None, sender: str | None = None):
 	"""Create an inbox item. Attach files afterwards with /api/method/upload_file (doctype, docname, is_private=1).
 
 	intent: Process (the default), Add to wiki or Just keep. With source_system (gmail, claude, upload…) the space's connection for
@@ -80,7 +80,7 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 	an item that already exists is updated instead of created: every argument passed (title, raw_text, source_url, instruction,
 	intent, area, goal) replaces the old value and an argument left out keeps it. A Done item whose content changed, or a Done or
 	Failed item whose intent changed, goes back to New so the agent processes it again. The answer carries `created` and `updated`
-	(true or false), and on an update `changed_fields`."""
+	(true or false), and on an update `changed_fields`. `sender` is the address an email came from; the owner's rules match on it."""
 	from lifeos.api import connections
 
 	space = permissions.resolve_space(space, write=True)
@@ -97,7 +97,7 @@ def create_item(title: str | None = None, source_type: str = "Upload", space: st
 			"source_url": source_url, "instruction": instruction, "intent": intent, "area": area, "goal": goal})
 	conn = connections.connection(space, system) if system else None
 	title = (title or "").strip() or f"{source_type}, {frappe.utils.format_datetime(now_datetime(), 'd MMM HH:mm')}"
-	item = frappe.get_doc({"doctype": "Life Inbox Item", "space": space, "title": title[:140], "source_type": source_type,
+	item = frappe.get_doc({"doctype": "Life Inbox Item", "space": space, "title": title[:140], "source_type": source_type, "sender": (sender or "").strip().lower()[:140] or None,
 		"raw_text": raw_text, "instruction": instruction, "source_url": source_url, "status": "New",
 		"intent": intent or (conn.default_intent if conn and conn.active else None) or "Process",
 		"source_system": system, "external_id": (external_id or "").strip() or None,

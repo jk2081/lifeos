@@ -616,8 +616,11 @@ print(json.dumps(out))`).split('\n').pop())
       must(rb.includes('Mentions both Tea and Mind') && rb.includes('Tea & Coffee') && /\bor\b/.test(rb) && rb.includes('Mind'), 'row 2: ' + rb)
       must(rc.includes('Career') && !rc.includes('✦'), 'row 3 (no reason, no mark): ' + rc)
       must((await row(b.proposal).locator('[data-area-chip]').count()) === 2 && (await row(a.proposal).locator('[data-area-chip]').count()) === 1, 'the area chips are wrong')
-      must(await row(a.proposal).locator('[data-keep]').count() && await row(a.proposal).locator('[data-change]').count() && await row(a.proposal).locator('[data-drop]').count(), 'a row lacks Keep, Change or Drop')
-      must(!(await row(b.proposal).locator('[data-keep]').count()) && (await row(b.proposal).locator('[data-pick]').count()) === 2, 'the torn row has Keep, or not two choices')
+      // issue 117: the guess is taken as right, so a row has one button, Change; the choices are behind it
+      for (const r of [a, b, c]) must((await row(r.proposal).locator('button').count()) === 2 || (await row(r.proposal).locator('[data-row-actions] button').count()) === 1, 'a row has more than one button')
+      must(!(await row(a.proposal).locator('[data-keep]').count()) && (await row(a.proposal).locator('[data-change]').count()) === 1 && !(await row(a.proposal).locator('[data-drop]').count()), 'a row is not Change alone')
+      await row(b.proposal).locator('[data-change]').click()
+      must((await row(b.proposal).locator('[data-pick]').count()) === 2, 'the torn row does not offer its two choices under Change')
       must((await pg.locator('[data-stat-needs]').getAttribute('data-n')) === '3', 'the Needs you number is not 3')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
       made.k = { a, b, c }
@@ -631,11 +634,12 @@ print(json.dumps(out))`).split('\n').pop())
       await openNeeds()  // at phone width the pane is a full screen; come back to Needs you either way
       must(await row(a.proposal).count(), 'the row left after only looking at it')
     })
-    await check('BRAIN.22', `${width} px: Keep accepts the proposal, the row leaves, and the record exists with the guessed area`, async () => {
-      const { a } = made.k
+    await check('BRAIN.22', `${width} px: Done files a row that was not changed, with its guess, and the record exists with the guessed area`, async () => {
+      const { a, c } = made.k
       await openNeeds()
-      await row(a.proposal).locator('[data-keep]').click()
+      await pg.locator('[data-file-all]').click()
       await row(a.proposal).waitFor({ state: 'detached', timeout: 10000 })
+      await row(c.proposal).waitFor({ state: 'detached', timeout: 10000 })
       const got = JSON.parse(bench(`import json
 p = frappe.get_doc("Life Proposal", "${a.proposal}")
 print(json.dumps({"status": p.status, "area": frappe.db.get_value(p.created_doctype, p.created_name, "area"), "dt": p.created_doctype}))`).split('\n').pop())
@@ -644,15 +648,17 @@ print(json.dumps({"status": p.status, "area": frappe.db.get_value(p.created_doct
     await check('BRAIN.23', `${width} px: picking the second of two area chips files it there`, async () => {
       const { b } = made.k
       await openNeeds()
+      await row(b.proposal).locator('[data-change]').click()
       await row(b.proposal).locator('[data-pick="second"]').click()
       await row(b.proposal).waitFor({ state: 'detached', timeout: 10000 })
       const area = bench(`p = frappe.get_doc("Life Proposal", "${b.proposal}")
 print(p.status, frappe.db.get_value(p.created_doctype, p.created_name, "area"))`).split('\n').pop()
       must(area === `Accepted ${made.mind}`, 'after the second chip: ' + area)
     })
-    await check('BRAIN.24', `${width} px: Drop discards it and it appears in the Outbox as Discarded`, async () => {
-      const { c } = made.k
+    await check('BRAIN.24', `${width} px: Change, Not needed discards it and it appears in the Outbox as Discarded`, async () => {
+      const c = await mk('plain', { area: made.career, hours: 1 })
       await openNeeds()
+      await row(c.proposal).locator('[data-change]').click()
       await row(c.proposal).locator('[data-drop]').click()
       await row(c.proposal).waitFor({ state: 'detached', timeout: 10000 })
       const listed = await s.api('outbox.list', { space: SPACE, pile: 'Discarded', page_length: 500 })
@@ -678,9 +684,11 @@ print(p.status, frappe.db.get_value(p.created_doctype, p.created_name, "area"))`
       must((await pg.locator('[data-needs-row]').count()) === 7, `${await pg.locator('[data-needs-row]').count()} rows, not 7`)
       must((await pg.locator('[data-stat-needs]').getAttribute('data-n')) === '9', 'the Needs you number is not 9')
       must(!(await row(rows[7].proposal).count()), 'the eighth is already shown')
+      await row(rows[0].proposal).locator('[data-change]').click()
       await row(rows[0].proposal).locator('[data-drop]').click()
       await row(rows[7].proposal).waitFor({ timeout: 10000 })
       must((await pg.locator('[data-needs-row]').count()) === 7, 'a row did not come in')
+      await row(rows[1].proposal).locator('[data-change]').click()
       await row(rows[1].proposal).locator('[data-drop]').click()
       await row(rows[8].proposal).waitFor({ timeout: 10000 })
       must((await pg.locator('[data-needs-row]').count()) === 7, 'the ninth did not come in')
@@ -713,22 +721,27 @@ print(json.dumps({"n": len(rows), "sources": len({r.source_type for r in rows})}
       await pg.locator('[data-see-activity]').click()
       await pg.waitForURL((u) => u.pathname === '/life/brain/activity', { timeout: 10000 })
     })
-    await check('BRAIN.28', `${width} px: each row stacks at 390 px, with Keep, Change and Drop reachable and no sideways scroll`, async () => {
+    await check('BRAIN.28', `${width} px: each row stacks at 390 px, with Change and what is behind it reachable and no sideways scroll`, async () => {
       const r = await mk('stack', { area: made.tea, reason: 'A long reason that needs room to wrap on a phone, with more words than fit on one line', hours: 1 })
       await openNeeds()
       const rw = row(r.proposal)
       await rw.waitFor({ timeout: 10000 })
       const box = await rw.boundingBox()
-      for (const sel of ['[data-keep]', '[data-change]', '[data-drop]']) {
+      {
+        const b = await rw.locator('[data-change]').boundingBox()
+        must(b && b.x >= 0 && b.x + b.width <= width + 1 && b.y >= box.y && b.y + b.height <= box.y + box.height + 1, `Change is not inside the row (${JSON.stringify(b)})`)
+      }
+      await rw.locator('[data-change]').click()
+      for (const sel of ['[data-drop]', '[data-always-ask]', '[data-open-capture]']) {
         const b = await rw.locator(sel).boundingBox()
-        must(b && b.x >= 0 && b.x + b.width <= width + 1 && b.y >= box.y && b.y + b.height <= box.y + box.height + 1, `${sel} is not inside the row (${JSON.stringify(b)})`)
+        must(b && b.x >= 0 && b.x + b.width <= width + 1, `${sel} is not on the screen (${JSON.stringify(b)})`)
       }
       if (phone) {
         const text = await rw.locator('[data-row-title]').boundingBox(), acts = await rw.locator('[data-row-actions]').boundingBox()
         must(acts.y >= text.y + text.height - 1, 'on a phone the actions do not sit under the text')
       }
       await noSideways()
-      await rw.locator('[data-change]').click()
+      await rw.locator('[data-open-capture]').click()
       await pg.waitForURL((u) => u.pathname.startsWith('/life/item/'), { timeout: 10000 })
       await queue()
     })
@@ -749,6 +762,7 @@ print(json.dumps({"item": it["name"], "proposal": res["created"][0]["name"], "er
       const rw = row(out.proposal)
       await rw.waitFor({ timeout: 10000 })
       must((await rw.locator('[data-area-chip]').count()) === 2, 'not two area chips')
+      await rw.locator('[data-change]').click()
       await rw.locator('[data-pick="second"]').click()
       await rw.waitFor({ state: 'detached', timeout: 10000 })
       const area = bench(`p = frappe.get_doc("Life Proposal", "${out.proposal}")
@@ -1566,6 +1580,164 @@ for n in frappe.get_all("Life Connection", filters={"system": "${system}"}, pluc
 for dt in ("Life Mail Account", "Life Mail Search"):
     for n in frappe.get_all(dt, filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
 for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "source_system": "gmail"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 117: a Brain that learns. Rules (made by hand, by the Brain from corrections, by Ask), Needs you with one button, and how a source is processed.
+// Senders and titles start "I117 " / "i117-" so the clean-up finds them; the rules made here are deleted at the end of each width.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const SENDER = `i117-${width}-${stamp}@rungamattee.com`
+  const rulesNow = () => JSON.parse(bench(`import json
+print(json.dumps([{"name": r.name, "sender": r.sender, "action": r.action, "enabled": r.enabled, "builtin": r.builtin, "used": r.used_count, "made_by": r.made_by, "no_area": r.no_area, "item_kind": r.item_kind}
+  for r in frappe.get_all("Life Rule", filters={"space": "${SPACE}"}, fields=["*"])]))`).split('\n').pop())
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openRules = async () => { await s.open('/life/settings?tab=rules'); await pg.locator('[data-brain-rules]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(400) }
+  const pick = async (name) => { await pg.getByRole('menuitem', { name }).first().click() }
+  bench(`frappe.set_user("Administrator")
+from lifeos.brain import rules
+rules.ensure_builtins("${SPACE}")
+frappe.db.set_single_value("Life Settings", "own_domains", "rungamattee.com")`)
+  try {
+    await check('BRAIN.63', `${width} px: Settings > Brain > Rules lists the built-in rules in plain words; + Add a rule makes one through the form, "used 0 times"; Change > Switch off, then on, then Delete`, async () => {
+      await openRules()
+      const t = await pg.locator('[data-brain-rules]').innerText()
+      must(/your own company's address/.test(t) && /it is a chat or email digest or journal photo/.test(t), 'the built-in rules are not listed in plain words: ' + t)
+      await pg.locator('[data-add-rule]').first().click()
+      await pg.getByLabel('Is from this address').waitFor({ timeout: 5000 })
+      await pg.getByLabel('Is from this address').fill(SENDER)
+      await pg.getByLabel('No area').check()
+      await pg.getByRole('button', { name: 'Add rule' }).click()
+      const row = pg.locator('[data-rule-row]', { hasText: SENDER })
+      await row.waitFor({ timeout: 10000 })
+      const text = await row.innerText()
+      must(text.includes(`When mail is from ${SENDER}: file with no area`) && text.includes('used 0 times'), 'the rule reads: ' + text)
+      await row.locator('[data-rule-change]').click()
+      await pick('Switch off')
+      await pg.locator('[data-rule-row][data-enabled="0"]', { hasText: SENDER }).waitFor({ timeout: 10000 })
+      must(rulesNow().find((r) => r.sender === SENDER)?.enabled === 0, 'the rule is not off on the server')
+      await pg.locator('[data-rule-row]', { hasText: SENDER }).locator('[data-rule-change]').click()
+      await pick('Switch on')
+      await pg.locator('[data-rule-row][data-enabled="1"]', { hasText: SENDER }).waitFor({ timeout: 10000 })
+      await noSideways()
+      await pg.locator('[data-rule-row]', { hasText: SENDER }).locator('[data-rule-change]').click()
+      await pick('Delete')
+      await pg.locator('[data-rule-row]', { hasText: SENDER }).waitFor({ state: 'detached', timeout: 10000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.64', `${width} px: a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"`, async () => {
+      const item = () => JSON.parse(bench(`import json
+frappe.set_user("Administrator")
+from frappe.utils import add_to_date, now_datetime
+d = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "I117 noise ${width} ${stamp}", "source_type": "Email", "sender": "${SENDER}", "source_system": "gmail", "status": "To Review",
+  "raw_text": "Weekly noise.", "received_on": add_to_date(now_datetime(), days=-900)}).insert(ignore_permissions=True)
+career = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Career"})
+p = frappe.get_doc({"doctype": "Life Proposal", "space": "${SPACE}", "inbox_item": d.name, "kind": "Task", "preview": "Read the noise", "payload": frappe.as_json({"title": "Read the noise", "area": career}),
+  "confidence": 0.6, "status": "Pending", "reason": "Weekly mail from this sender"}).insert(ignore_permissions=True)
+print(json.dumps({"item": d.name, "proposal": p.name}))`).split('\n').pop())
+      for (let n = 0; n < 2; n++) {
+        const made = item()
+        await s.open('/life/brain')
+        const row = pg.locator(`[data-needs-row][data-proposal="${made.proposal}"]`)
+        await row.waitFor({ timeout: 10000 })
+        const counts = [await row.locator('[data-row-actions] button').count(), await row.locator('[data-change]').count(), await row.locator('[data-keep], [data-drop]').count()]
+        must(counts.join() === '1,1,0', 'the row has more than Change (buttons, change, keep or drop): ' + counts.join())
+        await row.locator('[data-change]').click()
+        await row.locator('[data-drop]').click()
+        await row.waitFor({ state: 'detached', timeout: 10000 })
+        if (n === 0) must(!rulesNow().some((r) => r.sender === SENDER), 'one correction already made a rule')
+      }
+      const made = rulesNow().find((r) => r.sender === SENDER)
+      must(made && made.action === 'Drop' && made.made_by === 'Brain', 'no drop rule after the second Not needed: ' + JSON.stringify(made))
+      await s.open('/life/brain/activity')
+      const line = pg.locator('[data-new-rule]', { hasText: SENDER })
+      await line.waitFor({ timeout: 10000 })
+      must((await line.innerText()).includes('New rule:') && (await line.locator('[data-new-rule-change]').innerText()) === 'Change', 'the line is: ' + await line.innerText())
+      await noSideways()
+    })
+    await check('BRAIN.65', `${width} px: Ask "file Claude's recaps without an area" saves a rule, the answer shows "New rule … Change", and Undo removes it`, async () => {
+      const before = rulesNow().length
+      await s.open('/life/today')
+      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill("file Claude's recaps without an area"); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type("file Claude's recaps without an area"); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
+      await pg.locator('[data-ask-answer]:visible').last().waitFor({ timeout: 15000 })
+      for (let i = 0; i < 60 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
+      const line = pg.locator('[data-ask-done]:visible [data-ask-done-line]').first()
+      await line.waitFor({ timeout: 10000 })
+      const t = await line.innerText()
+      must(t.includes('New rule:') && t.includes('chat') && (await line.locator('[data-ask-rule-change]').count()) === 1, 'the Done line is: ' + t)
+      must(rulesNow().length === before + 1, 'Ask did not save a rule')
+      await line.locator('[data-ask-undo]').click()
+      await pg.locator('[data-ask-done]:visible [data-ask-done-line][data-undone="1"]').first().waitFor({ timeout: 8000 })
+      must(rulesNow().length === before, 'Undo did not remove the rule')
+    })
+    await check('BRAIN.66', `${width} px: Gmail's Rules tab lists the sender rule and the two built-in rules in the order they are tried with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings`, async () => {
+      bench(`frappe.set_user("Administrator")
+frappe.db.delete("Life Rule", {"space": "${SPACE}", "made_by": ["in", ["Brain", "Owner"]]})
+for d in (dict(sender="${SENDER}", source="gmail", action="File", no_area=1), dict(source="google-calendar", action="Drop"), dict(title_words="I117 invoice", action="File", no_area=1)):
+    frappe.get_doc({"doctype": "Life Rule", "space": "${SPACE}", "made_by": "Owner", "enabled": 1, "used_count": 3 if d.get("sender") else 0, **d}).insert(ignore_permissions=True)`)
+      await s.open('/life/brain/sources/gmail?tab=rules')
+      await pg.locator('[data-source-rules]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-rule-row]').first().waitFor({ timeout: 10000 })
+      const rows = await pg.locator('[data-source-rules] [data-rule-row]').allInnerTexts()
+      must(rows.length === 4, `${rows.length} rules, not 4: ${rows.join(' | ')}`)
+      must(rows[0].includes(SENDER) && rows[0].includes('used 3 times'), 'the sender rule is not first with its use: ' + rows[0])
+      must(rows.some((r) => /your own company's address/.test(r)) && rows.some((r) => /chat or email digest/.test(r)), 'the built-in rules are missing')
+      must(rows.some((r) => r.includes('I117 invoice') && r.includes('all sources')), 'the all-sources rule is not marked')
+      must(!rows.some((r) => r.includes('Google Calendar')), 'the Calendar rule is on Gmail\'s page')
+      const brain = await pg.locator('[data-brain-line]').innerText()
+      must(brain.startsWith('Everything else: the Brain reads it') && (await pg.locator('[data-brain-skill]').getAttribute('href')).endsWith('/brain/skills/process-capture'), 'the Brain line is: ' + brain)
+      await pg.locator('[data-recently]').waitFor({ timeout: 5000 })
+      await noSideways()
+      const mine = pg.locator('[data-source-rules] [data-rule-row]', { hasText: SENDER })
+      await mine.locator('[data-rule-change]').click()
+      await pick('Switch off')
+      await pg.locator('[data-source-rules] [data-rule-row][data-enabled="0"]', { hasText: SENDER }).waitFor({ timeout: 10000 })
+      await openRules()
+      await pg.locator('[data-rule-row][data-enabled="0"]', { hasText: SENDER }).waitFor({ timeout: 10000 })
+    })
+    await check('BRAIN.67', `${width} px: Recently on Gmail's page says "Rule: …" for an item a rule filed and "The Brain" for one it guessed`, async () => {
+      bench(`frappe.set_user("Administrator")
+for title, by in (("I117 by rule ${width}", "Rule: when mail is from ${SENDER}: file with no area"), ("I117 by brain ${width}", "process-capture v1")):
+    frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": title, "source_type": "Email", "source_system": "gmail", "status": "Done", "processed_by": by,
+      "raw_text": "x"}).insert(ignore_permissions=True)`)
+      await s.open('/life/brain/sources/gmail?tab=rules')
+      const rows = pg.locator('[data-recently] [data-recent-row]')
+      await rows.first().waitFor({ timeout: 10000 })
+      const text = Object.fromEntries((await rows.allInnerTexts()).map((t) => t.split('\n').filter(Boolean)).map(([a, b]) => [a, b]))
+      must((text[`I117 by rule ${width}`] || '').startsWith('Rule: '), 'the rule-filed item says: ' + JSON.stringify(text))
+      must(text[`I117 by brain ${width}`] === 'The Brain', 'the guessed item says: ' + JSON.stringify(text))
+    })
+    await check('BRAIN.68', `${width} px: a reason line on a Needs you row has no "Jai" and no "requested"`, async () => {
+      bench(`frappe.set_user("Administrator")
+from lifeos.skills import runner
+frappe.db.set_value("Life Skill", "process-capture", "active", 1)
+from frappe.utils import add_to_date, now_datetime
+d = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "I117 Conversation recap — 18–25 November 2026 ${width}", "source_type": "Email", "status": "New",
+  "raw_text": "A summary of my chats this week.", "received_on": add_to_date(now_datetime(), days=-899)}).insert(ignore_permissions=True)
+frappe.db.commit()
+runner.run("process-capture", {"doctype": "Life Inbox Item", "name": d.name, "space": "${SPACE}"}, "Button")
+frappe.db.set_value("Life Skill", "process-capture", "active", 0)`)
+      await s.open('/life/brain')
+      await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 })
+      const reasons = await pg.locator('[data-needs-row] [data-row-reason]').allInnerTexts()
+      must(reasons.length > 0, 'no row has a reason line')
+      must(!reasons.some((t) => /\bJai\b|requested/i.test(t)), 'a reason is written about the owner or the instructions: ' + reasons.join(' | '))
+      const skill = bench('print("second person" in frappe.db.get_value("Life Skill", "process-capture", "instructions") or "in the second person" in frappe.db.get_value("Life Skill", "process-capture", "instructions"))').split('\n').pop()
+      must(skill === 'True', 'process-capture does not tell the Brain to write for the owner')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+frappe.db.delete("Life Rule", {"space": "${SPACE}", "made_by": ["in", ["Brain", "Owner"]]})
+frappe.db.set_single_value("Life Settings", "own_domains", "")
+frappe.db.set_value("Life Skill", "process-capture", "active", 0)
+for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "title": ["like", "I117 %"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

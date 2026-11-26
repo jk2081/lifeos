@@ -14,7 +14,8 @@
               <span class="min-w-0 flex-[1_1_240px]" :class="d.undone && 'text-ink-gray-5 line-through'">{{ d.text }}</span>
               <a v-if="d.pane && !d.undone" href="#" class="text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" data-ask-done-open @click.prevent="openPane(d.pane)">Open</a>
               <span v-if="d.undone" class="text-sm text-ink-gray-6">Undone</span>
-              <Button v-else-if="d.undo && canWrite()" size="sm" variant="subtle" label="Undo" data-ask-undo @click="undoDone(m, j)" />
+              <RouterLink v-if="d.kind === 'rule' && !d.undone" class="text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="{ path: '/settings', query: { tab: 'rules' } }" data-ask-rule-change>Change</RouterLink>
+              <Button v-if="!d.undone && d.undo && canWrite()" size="sm" variant="subtle" label="Undo" data-ask-undo @click="undoDone(m, j)" />
             </div>
           </div>
           <div v-if="m.actions && m.actions.length" class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5" data-ask-actions>

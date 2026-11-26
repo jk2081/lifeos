@@ -222,6 +222,13 @@
         </template>
         <!-- Rules: the note rules page, then who may read sensitive items -->
         <template v-if="show('rules')">
+          <SectionHead>How the Brain files</SectionHead>
+          <p class="text-sm text-ink-gray-6">Rules are tried before the Brain reads anything: the first that fits decides, and it costs nothing. The Brain makes one when you change the same guess twice.</p>
+          <Card data-brain-rules>
+            <div class="flex justify-end"><Button v-if="d.is_admin || canWrite()" icon-left="lucide-plus" label="Add a rule" data-add-rule @click="addingRule = true" /></div>
+            <RuleList :rules="brainRules" :writable="d.is_admin || canWrite()" empty="No rules yet. Change a guess twice and the Brain makes one, or add one here." @changed="loadRules" />
+          </Card>
+          <RuleDialog v-model:open="addingRule" @saved="loadRules" />
           <SectionHead>What agents know about you</SectionHead>
           <p class="text-sm text-ink-gray-6">The first thing an agent reads. Life OS writes it from your areas, goals, the 12 Week Year and your rules, and rebuilds it when they change. You cannot edit it here; change what it is made from.</p>
           <Card data-agent-card :data-words="agentCard?.words"><Md v-if="agentCard" :text="agentCard.card" /><Empty v-else title="Nothing to show yet." hint="It appears as soon as your areas and goals are set." /></Card>
@@ -478,6 +485,9 @@
 </template>
 <script setup>
 import { settingsData } from '@/data/settings'
+import { brainData } from '@/data/brain'
+import RuleDialog from '@/components/brain/RuleDialog.vue'
+import RuleList from '@/components/brain/RuleList.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
@@ -505,7 +515,7 @@ import MemberRow from '@/components/settings/MemberRow.vue'
 import AddMemberDialog from '@/components/settings/AddMemberDialog.vue'
 import LifeLink from '@/framework/LifeLink.vue'
 import { errorText, tryCall } from '@/lib/api'
-import { boot, store } from '@/lib/store'
+import { boot, canWrite, store } from '@/lib/store'
 import { loadLookups } from '@/lib/lookups'
 import { loadOnboarding, onboarding } from '@/lib/onboarding'
 import { dateTime, short } from '@/lib/dates'
@@ -661,6 +671,10 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
 
 // What agents know about you (issue 54): the core card, read only
 const agentCard = ref(null)
+const brainRules = ref([])
+const addingRule = ref(false)
+async function loadRules() { brainRules.value = (await tryCall(() => brainData.rules.list({ space: store.space })))?.rules || [] }
+watch(() => section.value, (sec) => { if (sec === 'rules') loadRules() }, { immediate: true })
 watch(() => section.value, async (sec) => { if (sec === 'rules' && !agentCard.value) agentCard.value = await tryCall(() => settingsData.context.card()) }, { immediate: true })
 // Note rules: the rules page of the assistant's notes in this space
 const rulesDoc = ref(null)

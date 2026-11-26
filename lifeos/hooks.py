@@ -66,6 +66,8 @@ doc_events["Life Inbox Item"]["after_insert"] = [*doc_events["Life Inbox Item"][
 for _dt in ("Life Task", "Life Goal", "Life Note"):
 	doc_events[_dt]["on_update"] = [*([doc_events[_dt]["on_update"]] if isinstance(doc_events[_dt]["on_update"], str) else doc_events[_dt]["on_update"]),
 		"lifeos.skills.triggers.record_changed"]
+# issue 117: a new space gets the two built-in rules
+doc_events.setdefault("Life Space", {})["after_insert"] = "lifeos.brain.rules.space_made"
 # issue 111: a page that goes takes its links and pins with it
 for _dt in ("Life Person", "Life Area"):
 	_have = doc_events[_dt].get("on_trash")
@@ -130,5 +132,6 @@ flow_tools = [
 	"lifeos.ai.flow.save_note",
 	"lifeos.ai.flow.make_task",
 	"lifeos.ai.flow.add_event",
+	"lifeos.ai.flow.make_rule",
 ]
 flow_agents = ["lifeos.ai.flow.agents"]

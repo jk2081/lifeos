@@ -12,6 +12,7 @@
   "intent",
   "media_kind",
   "source_system",
+  "sender",
   "external_id",
   "job_id",
   "instruction",
@@ -105,6 +106,14 @@
    "label": "Source System",
    "length": 40,
    "search_index": 1
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Data",
+   "label": "Sender",
+   "length": 140,
+   "search_index": 1,
+   "description": "The address an email came from, lower case; rules match on it"
   },
   {
    "fieldname": "external_id",

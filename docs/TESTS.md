@@ -8,7 +8,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | --- | --- |
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc`, files read on the server before any model (`TestReadLocally`) |
 | `test_brain.py` | The Brain: who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
-| `test_skills.py` | The skills engine and every built-in skill: runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
+| `test_skills.py` | The skills engine and every built-in skill (`TestRules`, issue 117: recent decisions as examples, rules before any model, the same correction twice makes a rule, built-in rules, most specific first, the rules API, a source's page, Not needed twice and Always ask): runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
@@ -118,7 +118,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.59` on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link
 - `TODAY.60` Year and Month in light and dark have no script error and nothing cut off
 
-### Brain (`tools/acceptance/brain.mjs`, 55 checks)
+### Brain (`tools/acceptance/brain.mjs`, 61 checks)
 
 Capture and the Brain's filing, Needs you, Activity, Sources, the item page, jobs from agents, Ask, and the checks that need the records of the first photo capture.
 
@@ -147,13 +147,13 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.19` the item page is one column with no sideways scroll
 - `BRAIN.20` on an empty space Needs you says what will appear and offers + Capture
 - `BRAIN.21` with 3 waiting captures (one with two possible areas) Needs you shows 3 rows with their best guesses and reasons
-- `BRAIN.22` Keep accepts the proposal, the row leaves, and the record exists with the guessed area
+- `BRAIN.22` Done files a row that was not changed, with its guess, and the record exists with the guessed area
 - `BRAIN.23` picking the second of two area chips files it there
-- `BRAIN.24` Drop discards it and it appears in the Outbox as Discarded
+- `BRAIN.24` Change, Not needed discards it and it appears in the Outbox as Discarded
 - `BRAIN.25` Done, file all files every row in one go
 - `BRAIN.26` with more than 7 waiting, 7 show and the rest come in as rows are cleared
 - `BRAIN.27` the two numbers match the captures of the last 24 hours
-- `BRAIN.28` each row stacks at 390 px, with Keep, Change and Drop reachable and no sideways scroll
+- `BRAIN.28` each row stacks at 390 px, with Change and what is behind it reachable and no sideways scroll
 - `BRAIN.29` an agent's proposal with alt_area shows two area chips; picking the second files it in that area
 - `BRAIN.30` a Reading proposal shows as Read later
 - `BRAIN.31` a capture that failed is listed under Unfiled with Retry, never lost
@@ -186,6 +186,12 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.59` Gmail's Try it searches the (fake) inbox for a word and shows the matching messages, none for a word that matches nothing, and says "No inbox is connected" with no inbox
 - `BRAIN.60` Ask "file the blueprint" (fake AI, fake Gmail) makes the Ambaji Prospect page, saves the blueprint on it and adds Anirudh; the answer lists the three under Done with Undo; the page and its file are in Library > Files; Undo takes one back
 - `BRAIN.61` Ask "read my mail" over a period of 4 pages shows "Reading 1–14 Nov… (page n of 4)" and then the answer
+- `BRAIN.63` Settings > Brain > Rules lists the built-in rules in plain words; + Add a rule makes one through the form ("used 0 times"); Change > Switch off, Switch on, Delete
+- `BRAIN.64` a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"
+- `BRAIN.65` Ask "file Claude's recaps without an area" saves a rule, the answer shows "New rule … Change", and Undo removes it
+- `BRAIN.66` Gmail's Rules tab lists its sender rule and the two built-in rules in the order they are tried, with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings
+- `BRAIN.67` Recently on Gmail's page says "Rule: …" for an item a rule filed and "The Brain" for one it guessed
+- `BRAIN.68` a reason line on a Needs you row has no "Jai" and no "requested"
 - `BRAIN.54` the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item
 
 ### Goals (`tools/acceptance/goals.mjs`, 71 checks)

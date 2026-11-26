@@ -97,7 +97,7 @@ def file_email(comm) -> str | None:
 	above, forwarded = split_forward(plain(comm.content))
 	title = PREFIX.sub("", comm.subject or "").strip() or _("Email")
 	done = inbox.create_item(space=space, title=title, source_type="Email", source_system=SYSTEM, external_id=message_id,
-		raw_text=forwarded, instruction=instruction_of(above))
+		raw_text=forwarded, instruction=instruction_of(above), sender=sender)
 	keep_files(comm, done["name"])
 	return done["name"]
 
