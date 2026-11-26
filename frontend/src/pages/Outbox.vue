@@ -65,7 +65,7 @@ const tab = computed(() => list.value?.tab || 'Done')
 const custom = computed(() => (route.query.from && route.query.to ? { from: String(route.query.from), to: String(route.query.to) } : null))
 const period = computed(() => (custom.value ? 'custom' : ['week', 'month', '12weeks'].includes(route.query.period) ? route.query.period : 'week'))
 const periods = computed(() => (custom.value ? [...PERIODS, { label: 'Review period', value: 'custom' }] : PERIODS))
-const rowRef = (r) => (r.exists === false ? null : r.doctype === 'Life Inbox Item' ? `source:${r.record}` : refOf(r.doctype, r.record))
+const rowRef = (r) => (r.exists === false ? null : r.doctype === 'Life Inbox Item' ? `inbox:${r.record}` : refOf(r.doctype, r.record))
 function setPeriod(v) {
   if (v === 'custom') return
   router.push({ query: { ...route.query, period: v === 'week' ? undefined : v, from: undefined, to: undefined, open: undefined } })

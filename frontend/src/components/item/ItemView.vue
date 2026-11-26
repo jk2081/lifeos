@@ -106,7 +106,7 @@ let opener = null
 const tabs = computed(() => (missing.value ? [] : meta.value.tabs || []))
 // the header's buttons: small beside a desktop pane's title, full size (40 px) to tap on a phone
 const btnSize = computed(() => (phone.value ? 'md' : 'sm'))
-const ptab = useUrlTab('ptab', tabs, { replace: true })
+const ptab = useUrlTab('ptab', tabs, { replace: true, fallback: () => (route.query.focus === 'pending' ? 'decisions' : null) }) // a link to the pending proposals opens on Decisions
 // "Ask about this": the record and the records linked to it are the question's scope
 const ASKABLE = { task: 'Life Task', note: 'Life Note', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
   inbox: 'Life Inbox Item', vault: 'Life Vault Document' }

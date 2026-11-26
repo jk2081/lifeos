@@ -1,6 +1,6 @@
 // Brain: capture, Needs you, Activity, Sources, the item page, Ask and the fake agent.
 // Checks are numbered BRAIN.<n> in the order they appear here; `node tools/acceptance.mjs --only=BRAIN` runs this file's checks.
-import { PDF, SPACE, WIDTHS, agentFetch, agentKey, agentSecret, areaId, areas, base, bench, browser, check, env, execFileSync, fs, must, owner, path, root, runAgent, session, stamp, today } from './context.mjs'
+import { PDF, SPACE, WIDTHS, agentFetch, agentKey, agentSecret, areaId, areas, base, bench, browser, check, env, execFileSync, fs, must, owner, path, pathOf, root, runAgent, session, stamp, today } from './context.mjs'
 import { ux, uxArea, uxKit } from './ux.mjs'
 
 // records the checks of this place hand on to each other
@@ -852,7 +852,7 @@ print(json.dumps(out))`).split('\n').pop())
       must(t.includes(T('filed')) && t.includes('Tea & Coffee') && t.includes('Email'), 'the row says: ' + t)
       const href = await rw.locator('[data-made-link]').first().getAttribute('href')
       must(href && href.includes(a.task), 'the link to the record is ' + href)
-      must((await rw.locator('[data-row-item]').getAttribute('href')) === `/life/item/${a.item}`, 'the item page link is wrong')
+      must((await rw.locator('[data-row-item]').getAttribute('data-ref')) === `inbox:${a.item}`, 'the row does not open the item in the pane')  // issue 118: a drawer, not the page
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
     await check('BRAIN.34', `${width} px: the source filter narrows the feed to that source`, async () => {
@@ -1738,6 +1738,111 @@ frappe.db.delete("Life Rule", {"space": "${SPACE}", "made_by": ["in", ["Brain", 
 frappe.db.set_single_value("Life Settings", "own_domains", "")
 frappe.db.set_value("Life Skill", "process-capture", "active", 0)
 for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "title": ["like", "I117 %"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 118: Activity opens a drawer; the item's pane is tabbed; the summary is scanned (To act on, Updates, Reports). Titles start "I118 ".
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I118 ${what} ${width} ${stamp}`
+  const seed = (what, withSummary) => JSON.parse(bench(`import json
+frappe.set_user("Administrator")
+from lifeos.brain import asks
+raw = "\\n".join(f"- Email {n}: a message from someone about thing {n}" for n in range(1, 10))
+item = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "${T(what)}", "source_type": "Email Digest", "status": "Done", "raw_text": "## Mail\\n" + raw,
+  "received_on": frappe.utils.now_datetime(), "sender": "digest-${what}-${stamp}@x.example"}).insert(ignore_permissions=True)
+if ${withSummary ? 'True' : 'False'}:
+  asks.apply(item, {"line": "9 emails, 26 Nov", "to_act_on": [
+    {"who": "Arijit Chatterjee (HDFC Bank)", "what": "wants the signed KYC form by Friday", "source": "Email 1", "route": "plate"},
+    {"who": "Anindita Goswami", "what": "proposes an audit call; your CA is copied", "source": "Email 4", "route": "waiting", "waiting_on": "Rohan CA"},
+    {"who": "Ravi Singh", "what": "unclear what he needs on the notice", "source": "Email 5"}],
+    "updates": [{"what": "Two trademark threads with Ravi Singh: renewal filed, objection open", "source": "Email 6"}],
+    "reports": [{"title": "Tea price list", "source": "Email 7"}, {"title": "Ghatia lots", "source": "Email 8"}, {"title": "GST reconciliation", "source": "Email 9"}]})
+frappe.db.commit()
+print(json.dumps({"item": item.name}))`).split('\n').pop())
+  const row = (i) => pg.locator(`[data-activity-row][data-item="${i}"]`)
+  const feed = async () => { await s.open('/life/brain/activity?source=Email%20Digest'); await pg.locator('[data-activity]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(500) }
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  let a, b
+  try {
+    a = await seed('plain', false)
+    b = await seed('summarised', true)
+    await check('BRAIN.69', `${width} px: an Activity row opens the item in the side pane with the list beside it; j steps to the next row; Open full page opens /item/<id>`, async () => {
+      await feed()
+      await row(b.item).locator('[data-row-item]').click()
+      await pg.locator(`[data-pane][data-pane-ref="inbox:${b.item}"]`).waitFor({ timeout: 10000 })
+      must(pathOf(pg) === '/life/brain/activity', 'the page left Activity')
+      must(await row(b.item).isVisible(), 'the list is gone')
+      if (!phone) {
+        const order = await pg.locator('[data-activity-row]').evaluateAll((els) => els.map((e) => e.getAttribute('data-item')))
+        const next = order[order.indexOf(b.item) + 1]
+        must(next, 'there is no next row')
+        await pg.locator('[data-pane]').focus()
+        await pg.keyboard.press('j')
+        await pg.locator(`[data-pane][data-pane-ref="inbox:${next}"]`).waitFor({ timeout: 10000 })
+        await pg.keyboard.press('k')
+        await pg.locator(`[data-pane][data-pane-ref="inbox:${b.item}"]`).waitFor({ timeout: 10000 })
+      }
+      await pg.locator('[data-pane-full]').click()
+      await pg.waitForURL((u) => u.pathname === `/life/item/${b.item}`, { timeout: 10000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.70', `${width} px: the pane's tabs are Summary, Emails 9, Decisions 0 and What came of it 0; it opens on Summary; ptab=emails opens Emails; the page has the same tabs`, async () => {
+      await s.open(`/life/brain/activity?source=Email%20Digest&open=inbox:${a.item}`)
+      const tabs = pg.locator('[data-pane-tabs]')
+      await tabs.waitFor({ timeout: 10000 })
+      const names = (await tabs.locator('[role="tab"]').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+      must(JSON.stringify(names) === JSON.stringify(['Summary', 'Emails 9', 'Decisions 0', 'What came of it 0']), 'the tabs are ' + JSON.stringify(names))
+      must((await tabs.getAttribute('data-tab-current')) === 'summary', 'it did not open on Summary')
+      await s.open(`/life/brain/activity?source=Email%20Digest&open=inbox:${a.item}&ptab=emails`)
+      await pg.locator('[data-pane-tabs]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-pane-tabs]').getAttribute('data-tab-current')) === 'emails', 'ptab=emails did not open Emails')
+      must(await pg.locator('[data-pane] [data-digest]').isVisible(), 'the emails are not shown')
+      await s.open(`/life/item/${a.item}`)
+      await pg.locator('[data-item-tabs]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-item-tabs] [role="tab"]').count()) === 4, 'the page does not have four tabs')
+      await noSideways()
+    })
+    await check('BRAIN.71', `${width} px: the Summary tab shows To act on, Updates and Reports with their counts; Change moves a line and its task`, async () => {
+      await s.open(`/life/brain/activity?source=Email%20Digest&open=inbox:${b.item}`)
+      const pane = pg.locator('[data-pane]')
+      await pane.locator('[data-summary]').waitFor({ timeout: 10000 })
+      const n = async (g) => Number(await pane.locator(`[data-summary-group="${g}"] [data-group-count]`).first().innerText())
+      must((await n('act')) === 3 && (await n('updates')) === 1 && (await n('reports')) === 3, 'the counts are wrong')
+      must((await pane.locator('[data-summary-line]').innerText()) === '9 emails, 26 Nov', 'the line on top is wrong')
+      must((await pane.locator('[data-summary-reports]').innerText()).includes('Tea price list · Ghatia lots'), 'the reports are not one line')
+      const unsure = pane.locator('[data-summary-line-row="act"]').nth(2)
+      must((await unsure.locator('[data-line-where]').getAttribute('data-where')) === 'waiting', 'the unsure line is not in the waiting pile')
+      await unsure.locator('[data-line-change]').click()
+      await pg.getByRole('menuitem', { name: 'Your plate' }).click()
+      await pg.waitForFunction(() => document.querySelectorAll('[data-pane] [data-summary-line-row="act"]')[2]?.querySelector('[data-line-where]')?.getAttribute('data-where') === 'plate', null, { timeout: 10000 })
+      const came = (await pane.locator('[data-pane-tabs] [role="tab"]').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+      must(came[3] === 'What came of it 3', 'the tasks of the lines are not under What came of it: ' + came[3])
+      const task = JSON.parse(bench(`import json
+print(json.dumps(frappe.get_all("Life Task", filters={"inbox_item": "${b.item}", "title": ["like", "Ravi Singh%"]}, fields=["status", "waiting_on"])))`).split('\n').pop())
+      must(task[0].status === 'Open', 'the task did not move to the plate: ' + JSON.stringify(task))
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.72', `${width} px: on a phone the pane fills the width, the tabs fit or scroll sideways, and nothing is cut off`, async () => {
+      await s.open(`/life/brain/activity?source=Email%20Digest&open=inbox:${b.item}`)
+      const pane = pg.locator('[data-pane]')
+      await pane.locator('[data-summary]').waitFor({ timeout: 10000 })
+      const box = await pane.boundingBox()
+      if (phone) must(box.width >= width - 2, `the pane is ${box.width} px of ${width}`)
+      must(await pane.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), 'something in the pane is cut off sideways')
+      must(await pane.locator('[data-pane-tabs]').isVisible(), 'no tabs')
+      await noSideways()
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+items = frappe.get_all("Life Inbox Item", filters={"title": ["like", "I118 %"]}, pluck="name")
+for n in frappe.get_all("Life Task", filters={"inbox_item": ["in", items or [""]]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+for n in items: frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

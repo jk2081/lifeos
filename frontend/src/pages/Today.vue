@@ -18,6 +18,11 @@
         <Button size="sm" variant="ghost" label="Skip" data-banner-skip @click="skipBanner" />
       </div>
       <!-- issue 102: the AI service is not answering (credit, the key or the provider), until a call works again -->
+      <!-- issue 118: the waiting pile is never on Today; one line says when some of it is past its check-by date -->
+      <div v-if="d.waiting_past?.count" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-4 py-2.5" role="status" data-waiting-past>
+        <span class="min-w-0 flex-1 text-base text-ink-gray-9">{{ d.waiting_past.count }} waiting {{ d.waiting_past.count === 1 ? 'item is' : 'items are' }} past their check date · {{ d.waiting_past.names.join(', ') }}</span>
+        <Button size="sm" label="Look now" :route="{ path: '/today/week', query: { view: 'review', tab: 'tasks' } }" data-waiting-look />
+      </div>
       <div v-if="d.brain_off" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-amber-1 bg-surface-amber-1 px-4 py-2.5" role="status" data-brain-off>
         <span class="lucide-triangle-alert size-4 text-ink-amber-8" aria-hidden="true" />
         <span class="min-w-0 flex-1 text-base text-ink-gray-9">The Brain is off: {{ d.brain_off }}</span>
