@@ -669,9 +669,9 @@ print(json.dumps({"task": d.name, "status": d.status, "waiting_on": d.waiting_on
     must((await s.api('outbox.list', { space: SPACE, pile: 'Delegated', page_length: 500 })).rows.some((r) => r.record === handed.task), 'not in Delegated')
     await s.open('/life')
     const next = pg.locator('[data-next] [data-why="Scheduled"]', { hasText: `S7 plan step ${W}` })
-    const rail = pg.locator('[data-rail-task]', { hasText: `S7 plan step ${W}` })
+    const rail = pg.locator('[data-rail-task], [data-dash-panel][data-panel="schedule"] [data-dash-row]', { hasText: `S7 plan step ${W}` }) // the Day dashboard's schedule (#123) replaced the rail's timeline
     must(await next.count() || await rail.count(), 'the scheduled task is not on Today')
-    must(await rail.count(), "the scheduled task is not on the rail's timeline")
+    must(await rail.count(), "the scheduled task is not on the day's schedule")
     await s.open('/life/today/week?view=calendar')
     must((await pg.locator('[data-week-grid], [data-main]').first().innerText()).includes(`S7 plan step ${W}`), 'not in the week calendar')
     await s.open(`/life/goals/tasks?status=Waiting`)

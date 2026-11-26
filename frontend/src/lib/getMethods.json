@@ -30,6 +30,8 @@
  "lifeos.api.context.get",
  "lifeos.api.context.card",
  "lifeos.api.counts.get",
+ "lifeos.api.dashboard.get",
+ "lifeos.api.dashboard.list",
  "lifeos.api.everything.list",
  "lifeos.api.files.list",
  "lifeos.api.focus.get",

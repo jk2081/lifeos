@@ -130,7 +130,7 @@ def _time(fn, runs=5):
 
 def measure(user=None, space=None):
 	"""Time the four reads the spec names, as a member of the largest space."""
-	from lifeos.api import search, timeline
+	from lifeos.api import dashboard, search, timeline
 	from lifeos.api import today as today_api
 
 	space = space or space_names(1)[0]
@@ -151,6 +151,8 @@ def measure(user=None, space=None):
 			"search_rare_word": _time(lambda: search.query(RARE_WORD, space=space)),
 			"search_all_spaces": _time(lambda: search.query(word)),
 			"search_two_words": _time(lambda: search.query(word + " " + RARE_WORD[:5], space=space)),
+			# issue 123: each Today dashboard view is one request
+			**{f"dashboard_{v}": _time(lambda v=v: dashboard.get(v, space=space)) for v in dashboard.VIEWS},
 		}
 	finally:
 		frappe.set_user(before)  # nosemgrep: frappe-setuser -- load test: reads are timed as a member of the space, the way a request runs

@@ -6,6 +6,7 @@
     <WeekMenu />
   </PageHead>
   <div ref="root" class="page-body" :class="paneOpen && WEEK_ROOM" data-week-view :data-week-start="first">
+    <Dashboard view="week" />
     <ViewLinks :links="LINKS" />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>meetings</span>
@@ -68,6 +69,7 @@ import { Button, Progress } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
+import Dashboard from './Dashboard.vue'
 import ViewLinks from './ViewLinks.vue'
 import WeekBars from './WeekBars.vue'
 import WeekMenu from './WeekMenu.vue'

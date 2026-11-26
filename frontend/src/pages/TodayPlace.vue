@@ -3,6 +3,7 @@
     <span>That page moved. Here is Today.</span>
     <Button size="sm" variant="ghost" label="Dismiss" @click="router.replace({ query: { ...route.query, moved: undefined } })" />
   </div>
+  <Ruler v-if="!route.query.view" />
   <DayOther v-if="current === 'day' && otherDay" :date="otherDay" />
   <Today v-else-if="current === 'day'" />
   <Plan v-else-if="route.query.view" :tab="current" />
@@ -20,6 +21,7 @@ import { Button } from 'frappe-ui'
 import { useRoute, useRouter } from 'vue-router'
 import Today from '@/pages/Today.vue'
 import Plan from '@/pages/Plan.vue'
+import Ruler from '@/components/today/Ruler.vue'
 import DayOther from '@/components/today/DayOther.vue'
 import WeekView from '@/components/today/WeekView.vue'
 import MonthView from '@/components/today/MonthView.vue'

@@ -4,6 +4,8 @@
       <!-- the actions on their own line with Close pinned at the end; the kind and title below at the pane's full width,
            so the title never shares a row with buttons -->
       <div class="flex items-start gap-1.5">
+        <!-- issue 123: Back to the list a record was opened from; on a phone a list's own Back is the way to the dashboard -->
+        <Button v-if="backRef || (phone && cur.type === 'list')" class="shrink-0" :size="btnSize" icon-left="lucide-arrow-left" label="Back" data-pane-back @click="goBack" />
         <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5" data-pane-actions>
         <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" :size="btnSize" icon-left="lucide-sparkles" :label="phone ? 'Chat' : 'Chat about this'" data-pane-ask
           @click="askAbout(ASKABLE[cur.type], cur.name, meta.title)" />
@@ -48,7 +50,7 @@
   </Transition>
   <!-- Phone: frappe-ui's BottomSheet. Swipe down, tap outside or use the close button. -->
   <BottomSheet v-else :open="!!cur" @update:open="(v) => !v && closePane()">
-    <div v-if="cur" ref="el" class="flex h-[82dvh] flex-col outline-none" role="group" :aria-label="meta.title || label" tabindex="-1" data-pane :data-pane-ref="cur.ref">
+    <div v-if="cur" ref="el" class="flex flex-col outline-none" :class="cur.type === 'list' || backRef ? 'h-[100dvh]' : 'h-[82dvh]'" role="group" :aria-label="meta.title || label" tabindex="-1" data-pane :data-pane-ref="cur.ref">
       <ItemInner />
     </div>
   </BottomSheet>
@@ -72,6 +74,8 @@ import ChatPane from '@/components/item/ChatPane.vue'
 import EntryPane from '@/components/item/EntryPane.vue'
 import DayPane from '@/components/item/DayPane.vue'
 import NotePane from '@/components/item/NotePane.vue'
+import ListPane from '@/components/item/ListPane.vue'
+import PersonPane from '@/components/item/PersonPane.vue'
 import SourcePane from '@/components/item/SourcePane.vue'
 import ChangePane from '@/components/item/ChangePane.vue'
 import { itemData } from '@/data/item'
@@ -110,7 +114,7 @@ const ptab = useUrlTab('ptab', tabs, { replace: true, fallback: () => (route.que
 // "Ask about this": the record and the records linked to it are the question's scope
 const ASKABLE = { task: 'Life Task', note: 'Life Note', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
   inbox: 'Life Inbox Item', vault: 'Life Vault Document' }
-const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('@/components/review/InboxReview.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane }
+const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('@/components/review/InboxReview.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, list: ListPane, person: PersonPane }
 
 watch(() => cur.value?.ref, async (now, before) => {
   meta.value = {}
@@ -129,6 +133,12 @@ watch(() => cur.value?.ref, async (now, before) => {
   }
 }, { immediate: true })
 
+// the list this record was opened from (`back=`), when it is a list
+const backRef = computed(() => (cur.value && cur.value.type !== 'list' && /^list:/.test(String(route.query.back || '')) ? String(route.query.back) : null))
+function goBack() {
+  if (backRef.value) router.replace({ query: { ...route.query, open: backRef.value, back: undefined, focus: undefined, ptab: undefined } })
+  else closePane()
+}
 function changed() {
   if (cur.value) recordChanged(cur.value.ref)
 }

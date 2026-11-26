@@ -34,15 +34,8 @@
         <span class="min-w-0 flex-1 text-base text-ink-gray-9">{{ autoText }}</span>
         <Button size="sm" label="Undo" data-auto-inbox-undo @click="undoAuto" />
       </div>
-      <!-- Needs you (issue 15): one line to Brain when something waits for a decision -->
-      <RouterLink v-if="d.to_review.count > 0" to="/brain" class="flex items-center gap-3 rounded-5 border border-outline-violet-1 bg-surface-violet-1 px-4 py-3 hover:bg-surface-violet-2 focus-visible:focus-ring"
-        data-needs-you :data-count="d.to_review.count">
-        <span class="lucide-sparkles size-4 shrink-0 text-ink-violet-8" aria-hidden="true" />
-        <span class="min-w-0 flex-1 text-base text-ink-gray-9"><span class="font-semibold" data-needs-you-count>{{ d.to_review.count }} need{{ d.to_review.count === 1 ? 's' : '' }} you</span>
-          <span class="text-ink-gray-7 max-md:hidden"> · the Brain has {{ d.to_review.count === 1 ? 'a capture' : 'captures' }} waiting for your call</span></span>
-        <span class="text-sm-medium text-ink-gray-8 max-md:hidden">Open Brain</span>
-        <span class="lucide-chevron-right size-4 text-ink-gray-6" aria-hidden="true" />
-      </RouterLink>
+      <!-- issue 123: the dashboard (Top three, Needs you, Check today, Habits; Schedule and Top three) replaces the Needs you line, the habits row and the day's meetings -->
+      <Dashboard view="day" />
 
       <div class="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_18.5rem]">
         <!-- Next: one list in a fixed order, the order written at the top -->
@@ -96,34 +89,8 @@
             <Empty v-else-if="!groups.length" title="Nothing is next." hint="No overdue tasks, nothing due today and nothing planned for this week." />
           </Card>
         </section>
-        <!-- the day's habits: one compact row of ticks with their names (issue 55) -->
-        <section v-if="d.habits.length" class="md:col-start-1" data-today-habits>
-          <h2 class="mb-2 flex items-baseline gap-2 text-base"><span class="font-semibold text-ink-gray-9">Habits</span>
-            <span class="text-sm text-ink-gray-6" data-habit-count>{{ d.habits.filter((x) => x.done).length }} of {{ d.habits.length }} today</span></h2>
-          <div class="flex flex-wrap gap-2">
-            <Button v-for="x in d.habits" :key="x.habit" size="sm" :variant="x.done ? 'solid' : 'outline'" :disabled="!canWrite()" :label="x.title" :aria-pressed="x.done"
-              :aria-label="`${x.title}, ${x.done ? 'done' : 'not done'} today`" :data-habit="x.habit" @click="toggleHabit(x)" />
-          </div>
-        </section>
-
         <!-- the right rail; on a phone it moves below Next -->
         <aside class="flex flex-col gap-5 md:col-start-2 md:row-span-2 md:row-start-1" data-rail>
-          <section data-rail-today>
-            <h2 class="mb-2 text-base font-semibold text-ink-gray-9">Meetings and time blocks</h2>
-            <ol class="flex flex-col" aria-label="Today's events">
-              <li v-for="e in railItems" :key="e.key" class="flex items-stretch gap-2.5" :data-rail-event="e.kind">
-                <span class="w-12 shrink-0 pt-1.5 text-right text-sm tabular-nums" :class="e.kind === 'now' ? 'text-ink-red-8' : 'text-ink-gray-6'">{{ e.time }}</span>
-                <div class="relative min-w-0 flex-1 border-l border-outline-gray-2 py-1 pl-2.5">
-                  <span v-if="e.kind === 'now'" class="absolute -left-[5px] top-3 size-2 rounded-full bg-surface-red-7" aria-hidden="true" />
-                  <Button v-if="e.kind === 'event'" class="!h-auto min-h-8 w-full !justify-start !whitespace-normal !bg-surface-blue-1 py-1.5 text-left !text-ink-blue-8" :label="e.title" @click="openRef('event:' + e.name)" />
-                  <Button v-else-if="e.kind === 'task'" class="!h-auto min-h-8 w-full !justify-start !whitespace-normal !bg-surface-gray-2 py-1.5 text-left !text-ink-gray-9" icon-left="lucide-circle-check"
-                    :label="e.title" data-rail-task @click="openRef('task:' + e.name)" />
-                  <span v-else class="block pt-0.5 text-sm text-ink-gray-6">{{ e.title }}</span>
-                </div>
-              </li>
-            </ol>
-            <div v-if="!d.rail.events.length" class="mt-1 text-sm text-ink-gray-6">Nothing on the calendar today.</div>
-          </section>
           <section data-rail-week>
             <h2 class="mb-2 text-base font-semibold text-ink-gray-9">This week</h2>
             <Card flush class="!px-4">
@@ -166,6 +133,7 @@ import { Badge, Button, Checkbox, Dialog, Dropdown, Skeleton, toast } from 'frap
 import PageHead from '@/components/PageHead.vue'
 import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
+import Dashboard from '@/components/today/Dashboard.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import Row from '@/components/ui/Row.vue'
 import AreaGuess from '@/components/AreaGuess.vue'
@@ -173,7 +141,7 @@ import { optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onboarding } from '@/lib/onboarding'
 import { addDays, long, short, startOfWeek, weekday } from '@/lib/dates'
-import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
+import { onRecordChanged, paneNav } from '@/lib/pane'
 import { askScope, lensScope } from '@/lib/ask'
 
 const router = useRouter()
@@ -212,20 +180,6 @@ function duration(e) {
   return m <= 0 ? '' : m < 60 ? `${m} min` : `${Math.round(m / 6) / 10} h`
 }
 
-// the rail's timeline: events at their times, with a now marker between them
-const nowTime = ref(new Date().toTimeString().slice(0, 5))
-const railItems = computed(() => {
-  const ev = d.value.rail.events.map((e) => ({ key: 'e' + e.name + e.start, kind: e.source === 'task' ? 'task' : 'event', name: e.name, title: e.title,
-    time: e.all_day ? 'All day' : String(e.start || '').slice(11, 16) }))
-  const out = []
-  let placed = false
-  for (const e of ev) {
-    if (!placed && e.time !== 'All day' && e.time > nowTime.value) { out.push({ key: 'now', kind: 'now', title: 'Now', time: nowTime.value }); placed = true }
-    out.push(e)
-  }
-  if (!placed) out.push({ key: 'now', kind: 'now', title: 'Now', time: nowTime.value })
-  return out
-})
 const weekRef = (w) => (w.kind === 'vault' ? 'vault:' + w.name : w.kind === 'important' ? 'date:' + w.name : null)
 
 const autoText = computed(() => {
@@ -265,12 +219,6 @@ async function moveAll({ close }) {
   close()
   if (out) { toast.success(`${out.moved} task${out.moved === 1 ? '' : 's'} moved to today`); load() }
 }
-// ticking a 12 Week Year action records the week's tick; the week score follows
-function toggleHabit(x) {
-  optimistic(() => (x.done = !x.done), () => (x.done = !x.done),
-    () => todayData.goals.toggle_habit({ habit: x.habit, date: d.value.date, done: x.done ? 1 : 0 })).catch(() => {})
-}
-let clock = null
-onMounted(() => { load(); clock = setInterval(() => (nowTime.value = new Date().toTimeString().slice(0, 5)), 60000) })
-onUnmounted(() => { paneNav.rows = []; clearInterval(clock) })
+onMounted(load)
+onUnmounted(() => { paneNav.rows = [] })
 </script>

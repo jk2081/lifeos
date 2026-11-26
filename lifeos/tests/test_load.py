@@ -33,7 +33,7 @@ class TestLoad(IntegrationTestCase):
 	@unittest.skipIf(os.environ.get("LIFEOS_SKIP_TIMINGS"), "timings are checked on the Docker bench, not on CI runners")
 	def test_reads_meet_the_target(self):
 		out = loadtest.measure()
-		for key in ("today", "timeline", "today_lens", "search_common_word", "search_rare_word", "search_all_spaces"):
+		for key in ("today", "timeline", "today_lens", "search_common_word", "search_rare_word", "search_all_spaces", "dashboard_day", "dashboard_week", "dashboard_month", "dashboard_year"):
 			self.assertLess(out[key]["median_ms"], loadtest.TARGET_MS, f"{key}: {out[key]}")
 
 	def test_sources_and_wiki_reads_meet_the_target(self):

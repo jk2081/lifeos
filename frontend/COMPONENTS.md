@@ -114,6 +114,9 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | The 12 Week Year grid, habit month boxes, the year calendar | Purpose-built journal grids | `Button`-sized cells; `bg-surface-gray-9 text-ink-base` done, `bg-surface-gray-2` missed, `border-outline-gray-4` current, `text-ink-gray-4` future |
 | `LineChart.vue`, the graph | Small SVG chart; Cytoscape canvas | token variables, `tokenColor()` |
 | `SearchPalette.vue`, `QuickAdd.vue`, `Backlinks.vue` | App features | `CommandPalette` family, `Dialog`, `TextInput`, `Row` |
+| `today/Ruler.vue` (issue 123) | The ruler of where you are: twelve month ticks and the days of a month, a fixed 60 px, today in the accent. No library has a timeline strip this slim | `Button` (ghost, one for each tick), token colours |
+| `today/Dashboard.vue` (issue 123) | The four cards and two panels at the top of each Today view, drawn from what `dashboard.get` sends; every card and row opens in the pane | `Card`, `Row`, `Progress`, `Button`, `Empty`, `Skeleton`; the stretched-button pattern on a card |
+| `item/ListPane.vue`, `item/PersonPane.vue` (issue 123) | The pane's list of what a number counts (`?open=list:<kind>`, j and k, Back) and a person or company in the pane | `Card`, `Row`, `RuleList`, `Md`, `Button` |
 | `goals/DoneWhen.vue` (set 7) | "Done when…": a finish line or a number, Suggest, and the habit check, in every place a goal's measure is set | `TabButtons`, `FormControl`, `Button`, `Alert` |
 | `goals/NewGoalDialog.vue` | New goal with its measure (Plan > Goals and the New menu) | `Dialog`, `FormControl`, `DatePicker`, `DoneWhen` |
 | `goals/GoalsByArea.vue` (issue 20) | Goals > By area: sections of cards, not a list: the sections, parts, drag order and empty states are this screen's own | `Card`, `Progress`, `Badge`, `Button`, `TabButtons`, `Select`; the stretched-link pattern; native drag events for the order |

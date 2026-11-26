@@ -12,7 +12,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_skills.py` | The skills engine and every built-in skill (`TestRules`, issue 117: recent decisions as examples, rules before any model, the same correction twice makes a rule, built-in rules, most specific first, the rules API, a source's page, Not needed twice and Always ask): runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
-| `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views |
+| `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views; the dashboard (`TestDashboard`, issue 123: `dashboard.get` for each view with its cards and panels, the Brain line, coming up in six lines and the rest counted, the lists a number opens, a sensitive item counted and never named, filed alone against the month before and not counting what the owner changed, simple mode swapping the goal cards, the empty space's lines and actions, a bounded number of queries, people only) |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
 | `test_library.py` | Library (`TestPages`: pages that build themselves, issue 111: an email linked to a known person and their organisation, a page made on a reply thread with Undo, a proposal after three emails, no page for a promotion, "same company" merging and adding the alias, the daily briefs with sources and no Vault text, AI usage and the cap, per-user pins capped at seven, a wrong link taken off, Your notes kept): notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions |
@@ -21,7 +21,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it, notes on events (Comments), Hide in Life OS |
 | `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers, the return address to add, Google's error, an abandoned sign-in cleaned up, which case a search with no inbox is), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools, Ask's tools (read a period page by page, the daily digests, save an attachment, make pages and people, save notes and tasks, each write logged with Undo, an agent's switches, a long read run in the background, a question with choices, File buttons named for what they file) |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check, the connector (report, pull, confirm), the owner's changes, an agent's switches and the areas it may read |
-| `test_load.py` | The load test at the size of section 4b; no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings; no component, page or `App.vue` calls `api(`; every `.vue` file is imported or routed |
+| `test_load.py` | The load test at the size of section 4b (each dashboard view under the target, issue 123); no loose module at the top of `lifeos/`; at most 30 raw `frappe.db.sql` calls, each with a reason, and at most 10 silenced SQL-injection findings; no component, page or `App.vue` calls `api(`; every `.vue` file is imported or routed |
 
 ## Skills
 
@@ -54,7 +54,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 
 ## Acceptance checks by place
 
-### Today (`tools/acceptance/today.mjs`, 56 checks)
+### Today (`tools/acceptance/today.mjs`, 63 checks)
 
 Day, Week, Month and Year, the numbers that open lists, Reset, rhythm banners, the first-run guide, Today's tasks.
 
@@ -125,6 +125,13 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.63` "add a note: quote by Friday" with an event open adds a Comment on that event, and the Done list shows it with Change
 - `TODAY.64` a PDF dropped on the page is attached to the chat and, sent, becomes a capture for the Brain, listed with Change
 - `TODAY.65` the chat open in light and dark has no script error and nothing is cut off
+- `TODAY.66` the ruler is on all four views, this month and today carry the accent with their neighbours labelled, today opens Day, another day opens in the pane, a month tick moves the days (laptop)
+- `TODAY.67` Week: a goal row opens the goal in the pane and the dashboard stays on screen
+- `TODAY.68` Needs you opens its rows in the pane, a row opens in the same pane with Back, j moves to the next row, a reload keeps the list open
+- `TODAY.69` "past check date" opens only the overdue waiting items; "rules learned" opens the rules, each with Change
+- `TODAY.70` Day, Week, Month and Year switch in place with four cards and two panels each; Open full page goes to the record's page
+- `TODAY.71` on an empty space every card of every view says what will appear and offers one action
+- `TODAY.72` every view in light and dark has no script error and nothing cut off
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 
@@ -426,7 +433,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.45` naming the agent in Settings shows the name in Needs you; `pull` returns `assistant_name`; the failed job shows in red with its error
 - `SETTINGS.46` an act shows under the new name in Activity; the safety switch holds the owner's request in Needs you as "You asked"
 
-### Phone (`tools/acceptance/phone.mjs`, 24 checks)
+### Phone (`tools/acceptance/phone.mjs`, 25 checks)
 
 The sidebar and bottom bar, the router, keyboard keys, the PWA, offline capture and sharing to Life OS.
 
@@ -456,6 +463,7 @@ Unit tests: `test_capture.py` (the phone's captures, sent once); `test_permissio
 - `PHONE.22` Logging out empties the offline queue
 - `PHONE.23` The share target while logged out goes to login and sends nothing
 - `PHONE.24` every route in the router loads without an error; an unknown address lands on Today with "That page moved"
+- `PHONE.25` the dashboard at 390 px: only today's day labelled on the ruler, the cards two by two, the list full screen with Back and Esc, nothing cut off in light and dark
 
 ### Tooling (`tools/acceptance/tooling.mjs`, 4 checks)
 

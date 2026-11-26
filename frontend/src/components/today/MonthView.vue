@@ -5,6 +5,7 @@
     <Button icon="lucide-chevron-right" label="Next month" tooltip="Next month" data-cal-next @click="step(1)" />
   </PageHead>
   <div class="page-body" data-month-view :data-month="month">
+    <Dashboard view="month" />
     <ViewLinks :links="LINKS" />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>other events, counted</span>
@@ -59,6 +60,7 @@ import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
+import Dashboard from './Dashboard.vue'
 import ViewLinks from './ViewLinks.vue'
 import { store } from '@/lib/store'
 import { chipClass, dotClass, itemLabel, itemRef, openDay, useCalendarRange } from '@/lib/calRange'
