@@ -133,6 +133,6 @@ function review(b) {
 onRecordChanged(() => refreshSoon())
 onMounted(async () => {
   await load()
-  try { aiReady.value = (await settingsData.ask.status({ space: store.space })).ready } catch (e) { aiReady.value = false }
+  try { aiReady.value = (await settingsData.chat.status({ space: store.space })).ready } catch (e) { aiReady.value = false }
 })
 </script>

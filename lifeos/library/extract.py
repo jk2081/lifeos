@@ -324,8 +324,8 @@ def file_attached(file_doc, method=None):
 	"""A File was attached to a capture or a Vault document: read it in a background job (the long queue). In a test, a test calls `run`."""
 	if file_doc.attached_to_doctype not in DOCTYPES or file_doc.is_folder or file_doc.attached_to_field in ("preview_image", "thumbnail"):
 		return
-	if kind_of(file_doc.file_name) is None or frappe.flags.in_test and not frappe.flags.lifeos_extract_in_test:
-		return
+	if kind_of(file_doc.file_name) is None or frappe.flags.lifeos_no_extract or frappe.flags.in_test and not frappe.flags.lifeos_extract_in_test:
+		return  # lifeos_no_extract: an ID card saved to the Vault from the chat, whose text holds the full number (issue 120)
 	frappe.enqueue("lifeos.library.extract.run", queue="long", timeout=3600, enqueue_after_commit=True,
 		doctype=file_doc.attached_to_doctype, name=file_doc.attached_to_name)
 

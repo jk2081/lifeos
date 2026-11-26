@@ -1,9 +1,9 @@
 """Fake models for tests and the acceptance site (UX fixes, set 5). No test calls the real API.
 
 - ScriptedFake: replays scripted responses in order and records every request it was sent (unit tests).
-- SiteFake: a small deterministic "model" for the acceptance site (site config lifeos_fake_ai = 1). It searches with the
-  question, lists records when the search finds nothing, answers citing what it found, and suggests a Make task. Every
-  request it receives is kept in the cache (last 200), so a check can assert what was sent.
+- SiteFake: a small deterministic "model" for the acceptance site (site config lifeos_fake_ai = 1) for the Brain's calls: a capture's
+  proposal and the skills asked about data. Chat's model is Flow's (tools/fake_openai.py stands in for it). Every request it
+  receives is kept in the cache (last 200), so a check can assert what was sent.
 """
 import html
 import json
@@ -91,87 +91,7 @@ class SiteFake:
 			return self._capture(params)
 		if (params.get("output_config") or {}).get("format"):
 			return self._structured(params)
-		msgs = params["messages"]
-		last = msgs[-1]
-		results = []  # every tool result since the question
-		for m in reversed(msgs):
-			if m["role"] == "user" and isinstance(m["content"], str):
-				question = m["content"]
-				break
-			if m["role"] == "user":
-				for b in m["content"]:
-					if b.get("type") == "tool_result":
-						try:
-							results.append(json.loads(b.get("content") or "{}"))
-						except ValueError:
-							pass
-		else:
-			question = ""
-		q = question.split("Question:", 1)[-1].strip()
-		called = sum(1 for m in msgs if m["role"] == "assistant" for b in (m["content"] if isinstance(m["content"], list) else []) if b.get("type") == "tool_use")
-		refs = []
-		for res in reversed(results):
-			for row in (res.get("results") or res.get("rows") or []):
-				if row.get("ref") and row["ref"] not in [r[0] for r in refs]:
-					refs.append((row["ref"], row.get("title") or ""))
-			if res.get("ref") and res["ref"] not in [r[0] for r in refs]:
-				refs.append((res["ref"], res.get("title") or ""))
-		suggested = any(b.get("type") == "tool_use" and b.get("name") == "suggest_actions" for m in msgs if m["role"] == "assistant"
-			for b in (m["content"] if isinstance(m["content"], list) else []))
-		if any(t["name"] == "make_rule" for t in params.get("tools") or []) and re.match(r"(file claude|stop suggesting)", q, re.I):  # teaching by telling (issue 117)
-			if called == 0:
-				args = {"kind": "Chat", "action": "File", "no_area": True, "file_as": "Chat"} if q.lower().startswith("file claude") else {"domain": "rungamattee.com", "action": "Link", "never_page": True}
-				return self._out(params, on_text, "", [tool_use("make_rule", args)], "tool_use")
-			return self._done(params, on_text, "I saved a rule: it applies from now on, and you can change it or undo it below.")
-		if any(t["name"] == "mail_search" for t in params.get("tools") or []) and re.match(r"find\b", q, re.I):
-			return self._mail(params, on_text, q, results, called)
-		if any(t["name"] == "mail_list_threads" for t in params.get("tools") or []) and re.match(r"(read my mail|file the blueprint)\b", q, re.I):
-			return self._mail_work(params, on_text, q, results, called)
-		if not params.get("tools") or suggested:
-			return self._done(params, on_text, "" if suggested else "I could not check more than this.")
-		if called == 0:
-			return self._out(params, on_text, "", [tool_use("search", {"query": q})], "tool_use")
-		if called == 1 and not refs:
-			return self._out(params, on_text, "", [tool_use("list_records", {"kind": "tasks", "filters": {"status": "open"}, "limit": 10})], "tool_use")
-		if not refs:
-			return self._done(params, on_text, "I could not find that in your records.")
-		lines = [f"- {title} [{r}]" for r, title in refs[:3]]
-		text = "Here is what I found in your records.\n\n" + "\n".join(lines) + "\n"
-		first = refs[0]
-		act = tool_use("suggest_actions", {"actions": [{"kind": "make_task", "label": f"Make task: follow up {first[1][:40]}",
-			"title": f"Follow up: {first[1][:100]}", "area_ref": first[0]}]})
-		return self._out(params, on_text, text, [act], "tool_use")
-
-	def _mail(self, params, on_text, q, results, called):
-		"""Ask with an inbox connected (issue 86): one live search with the question's words, then the threads it found, named plainly."""
-		if not called:
-			words = re.sub(r"^find\s+(the\s+)?", "", q, flags=re.I).strip(" ?.")
-			return self._out(params, on_text, "", [tool_use("mail_search", {"text": words})], "tool_use")
-		rows = next((r.get("results") for r in results if r.get("results") is not None and "searched" in r), [])
-		if not rows:
-			return self._done(params, on_text, "I could not find that in your email.")
-		lines = [f"- **{r['subject']}**, from {r['from']}, {r['date']} ({r['inbox']})" for r in rows[:3]]
-		return self._done(params, on_text, "Here is what I found in your email.\n\n" + "\n".join(lines) + "\n")
-
-	def _mail_work(self, params, on_text, q, results, called):
-		"""Ask's tools for mail and writing (issue 107). "read my mail": every page of 1 to 14 November, then one line. "file the blueprint": find the email, read it,
-		make a Prospect page under Career, save the attachment to it and add the sender."""
-		last = results[0] if results else {}
-		if q.lower().startswith("read my mail"):
-			if called == 0 or last.get("next_page_token"):
-				args = {"after": "2026-11-01", "before": "2026-11-14", **({"page_token": last["next_page_token"]} if last.get("next_page_token") else {})}
-				return self._out(params, on_text, "", [tool_use("mail_list_threads", args)], "tool_use")
-			return self._done(params, on_text, f"I read your mail from 1 to 14 November: {last.get('pages', 1)} pages in all.")
-		page = next((r["page"] for r in results if r.get("page")), None)
-		steps = [("mail_search", {"text": "blueprint"}), ("mail_thread", {"thread_id": "fake-blueprint"}),
-			("create_page", {"title": "Ambaji Food Products", "area": "Career", "kind": "Prospect", "summary": "A prospective client.",
-				"body": "A prospective client. The SAP B1 Blueprint came from [[Anirudh Poddar]]."}),
-			("save_attachment", {"thread_id": "fake-blueprint", "attachment_id": "att-SAP B1 Blueprint.pdf", "area": "Career", "page": page}),
-			("add_person", {"name": "Anirudh Poddar", "email": "anirudh@sap-partner.example", "company": "SAP Partner", "link_to": page})]
-		if called < len(steps):
-			name, args = steps[called]
-			return self._out(params, on_text, "", [tool_use(name, {k: v for k, v in args.items() if v is not None})], "tool_use")
-		return self._done(params, on_text, "I made the page for Ambaji Food Products, saved the blueprint on it and added Anirudh Poddar.")
+		return self._done(params, on_text, "")
 
 	def _capture(self, params):
 		"""process-capture (issue 28): one task named after the capture's title in Career, then a summary."""

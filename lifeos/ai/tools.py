@@ -1,4 +1,4 @@
-"""The tools Ask's model reads the owner's records with (UX fixes, set 5). Every tool runs on the server as the asking
+"""The tools Chat's model reads the owner's records with (UX fixes, set 5). Every tool runs on the server as the asking
 user, inside the thread's space, with the space rules, the Vault rules and the question's scope applied. Records are
 named to the model as short references (R1, R2, …) that the answer cites; the server maps them back."""
 import json
@@ -49,15 +49,6 @@ TOOLS = [
 		"input_schema": {"type": "object", "properties": {"date_from": {"type": "string"}, "date_to": {"type": "string"}}, "required": ["date_from"]}},
 	{"name": "catch_up", "description": "For a broad question ('what's going on', 'catch me up', 'what did I miss', 'how was my week'): in one call, what needs the owner, what is waiting on others, the daily email digests, what came in and was done in the last `days` days, and the next 7 days of meetings, deadlines and due tasks. Use it before anything else for such questions.",
 		"input_schema": {"type": "object", "properties": {"days": {"type": "integer", "description": "How many days back, 1 to 14. Default 7."}}}},
-	{"name": "suggest_actions", "description": "Offer the owner buttons under the answer. Nothing changes until the owner clicks one. Use only records you cited.",
-		"input_schema": {"type": "object", "properties": {"actions": {"type": "array", "items": {"type": "object", "properties": {
-			"kind": {"type": "string", "enum": ["make_task", "move_someday", "open_reset", "open_list", "snooze_insight", "dismiss_insight", "file_mail"]},
-			"label": {"type": "string", "description": "Button text, short: 'Make task: reply to Kunal', 'Move 11 to Someday'."},
-			"title": {"type": "string", "description": "make_task: the task title"}, "area_ref": {"type": "string", "description": "make_task: a cited record whose area the task takes"},
-			"due_date": {"type": "string"}, "refs": {"type": "array", "items": {"type": "string"}, "description": "move_someday, open_reset: the cited records"},
-			"list": {"type": "string", "description": "open_list: one of the counts kinds"}, "insight_ref": {"type": "string"},
-			"thread_id": {"type": "string", "description": "file_mail: a thread you read with mail_thread. The label names the email by who sent it and what it is: 'File Ashmeet's leave email'."}},
-			"required": ["kind", "label"]}}}, "required": ["actions"]}},
 ]
 # issue 107: what Ask does when the owner asks. Each runs the plain function in lifeos/tools, as the asking person, and the answer lists what it did, each with Undo.
 WRITE_TOOLS = [
@@ -84,8 +75,6 @@ WRITE_TOOLS = [
 			"kind": {"type": "string"}, "title_words": {"type": "string", "description": "comma separated; any of them"}, "attachment_type": {"type": "string"},
 			"action": {"type": "string", "enum": ["File", "Drop", "Ask", "Link"]}, "area": {"type": "string"}, "part": {"type": "string"}, "no_area": {"type": "boolean"},
 			"file_as": {"type": "string", "enum": ["Chat", "Note", "Report", "Task"]}, "never_page": {"type": "boolean"}}, "required": ["action"]}},
-	{"name": "ask_one_question", "description": "When two records could be the one meant (for example two similar company names), ask the owner one question with each as a choice, then stop. The owner's choice comes back as their next message, and then you do the work. Do not hand the work back.",
-		"input_schema": {"type": "object", "properties": {"question": {"type": "string"}, "choices": {"type": "array", "items": {"type": "string"}, "description": "Two to four short choices."}}, "required": ["question", "choices"]}},
 ]
 TOOL_NAMES = [t["name"] for t in TOOLS]
 # issue 86: offered only to a person who has connected an inbox; the search is live, nothing is copied into Life OS
@@ -120,19 +109,17 @@ class Context:
 		self.refs = {}  # R1 -> {doctype, name, title, kind, date}
 		self.by_key = {}
 		self.read = []  # records whose text was sent
-		self.actions = []
+		self.turn_cost = 0.0  # the AI cost of the model turn that is calling a tool; a mail search is logged with it
 		self.calls = 0
 		self._scope_names = None
 		self.mails = []  # threads a search found: {thread_id, account, subject, from, date, link}
 		self.mails_read = []  # of those, the ones read in full
-		self.no_tools = False  # the service takes no tools (issue 102): Ask answers from one search of the question
-		self.turn_cost = 0.0  # the AI cost of the model turn that is calling a tool; a search is logged with it
 		self._has_mail = None
 		self.done = []  # what the answer did (issue 107): {text, undo, kind, doctype, name}; each with Undo
-		self.choice = None  # a question with choices the owner answers by tapping one
 		self.background = False  # a long read of mail runs as a background job
 		self.progress = None  # called with what is being read, for the screen
 		self.mail_pages = {}  # (after, before, query) -> pages read
+		self.owner_message = ""  # the owner's own words this turn: what a Google act they asked for carries
 
 	def has_mail(self):
 		if self._has_mail is None:
@@ -198,7 +185,7 @@ class Context:
 		return self._scope_names
 
 	def vault_criteria(self, x):
-		"""Leaves Vault rows, and sources of Vault documents, out unless the space lets Ask read the Vault."""
+		"""Leaves Vault rows, and sources of Vault documents, out unless the space lets Chat read the Vault."""
 		return [] if self.vault_ok else [(x.vault_locked == 0) & (x.ref_doctype != "Life Vault Document")]
 
 
@@ -208,10 +195,10 @@ def run_tool(ctx, name, args):
 	args = args or {}
 	try:
 		fn = {"search": t_search, "get_record": t_get_record, "list_records": t_list, "counts": t_counts,
-			"cycle_state": t_cycle, "timeline": t_timeline, "catch_up": t_catch_up, "suggest_actions": t_suggest, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
+			"cycle_state": t_cycle, "timeline": t_timeline, "catch_up": t_catch_up, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
 			"mail_list_threads": t_mail_list_threads, "read_page": t_read_page, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
 			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "add_event": t_add_event,
-			"make_rule": t_make_rule, "ask_one_question": t_ask_one_question}[name]
+			"make_rule": t_make_rule, "find_events": t_find_events, "add_note": t_add_note, "cancel_event": t_cancel_event}[name]
 	except KeyError:
 		return {"error": f"Unknown tool {name}."}
 	try:
@@ -320,14 +307,14 @@ def t_get_record(ctx, ref=None, doctype=None, name=None):
 	if doctype not in TEXT_FIELDS:
 		return {"error": "That kind of record cannot be read here."}
 	if doctype == "Life Vault Document" and not ctx.vault_ok:
-		return {"error": "Vault documents are not available to Ask in this space."}
+		return {"error": "1 sensitive document"}
 	doc = permissions.get_doc_checked(doctype, name, user=ctx.user)
 	if doc.get("space") != ctx.space:
 		return {"error": "That record is in another space."}
 	if doctype == "Life Inbox Item" and doc.get("vault_document") and not ctx.vault_ok:
-		return {"error": "This source belongs to a Vault document, which Ask may not read in this space."}
+		return {"error": "1 sensitive document"}
 	if doc.get("is_sensitive") and not ctx.vault_ok:
-		return {"error": "This item is marked sensitive, and Ask may not read sensitive items in this space."}
+		return {"error": "1 sensitive document"}
 	title = doc.get(frappe.get_meta(doctype).title_field or "title") or doc.name
 	rid = ctx.ref(doctype, name, title, doctype.replace("Life ", ""), doc.get("creation"), doc.get("area"))
 	ctx.mark_read(rid)
@@ -513,66 +500,6 @@ def t_catch_up(ctx, days=7):
 	return out
 
 
-def t_suggest(ctx, actions):
-	"""Record the buttons to show. Records are named by the references the answer cited."""
-	from lifeos.review import counts
-
-	kept = []
-	for a in (actions or [])[:4]:
-		kind = a.get("kind")
-		item = {"kind": kind, "label": str(a.get("label") or kind)[:80]}
-		if kind == "make_task":
-			item["title"] = str(a.get("title") or a.get("label") or "")[:140]
-			src = ctx.refs.get(a.get("area_ref") or "")
-			item["area"] = src.get("area") if src else None
-			item["due_date"] = a.get("due_date")
-		elif kind in ("move_someday", "open_reset"):
-			recs = [ctx.refs[r] for r in a.get("refs") or [] if r in ctx.refs]
-			item["items"] = [{"doctype": r["doctype"], "name": r["name"]} for r in recs if r["doctype"] in ("Life Task", "Life Goal")]
-			if not item["items"]:
-				continue
-		elif kind == "open_list":
-			k = a.get("list")
-			if k not in COUNT_KINDS:
-				continue
-			c = getattr(counts, k)(ctx.space)
-			if not c["n"]:  # never a button to an empty list
-				continue
-			item["to"] = c["to"]
-		elif kind == "file_mail":
-			m = next((m for m in [*ctx.mails_read, *ctx.mails] if m["thread_id"] == a.get("thread_id")), None)
-			if not m:
-				continue
-			item.update({"thread_id": m["thread_id"], "account": m["account"], "title": m["subject"], "link": m["link"]})
-		elif kind in ("snooze_insight", "dismiss_insight"):
-			r = ctx.refs.get(a.get("insight_ref") or "")
-			if not r or r["doctype"] != "Life Insight":
-				continue
-			item["insight"] = r["name"]
-		else:
-			continue
-		kept.append(item)
-	ctx.actions = kept
-	return {"ok": True, "shown": len(kept)}
-
-
-def tools_for(ctx):
-	return None if ctx.no_tools else [*TOOLS, *WRITE_TOOLS, *(MAIL_TOOLS if ctx.has_mail() else [])]
-
-
-def ask_call(ctx, system, question, messages, on_text, space):
-	"""One model turn of Ask. A service that refuses tools gets one search of the question as data instead, and the turn is repeated."""
-	from lifeos.ai import client
-
-	try:
-		return client.call("Ask", system, messages, tools=tools_for(ctx), on_text=on_text, space=space)
-	except client.ToolsRefused:
-		ctx.no_tools = True
-		found = run_tool(ctx, "search", {"query": question})
-		messages[-1] = {"role": "user", "content": f"{messages[-1]['content']}\n\nSearch results (the only records you can use):\n{json.dumps(found, default=str)[:24000]}"}
-		return client.call("Ask", system, messages, on_text=on_text, space=space)
-
-
 def t_mail_search(ctx, text=None, has_attachment=None, account=None, **fields):
 	"""A live search of the asking person's inboxes. One log record; the AI cost of this turn goes on it."""
 	from lifeos import mail
@@ -699,7 +626,7 @@ def t_save_attachment(ctx, thread_id, attachment_id, area=None, part=None, page=
 def t_make_task(ctx, title, area=None, part=None, due_date=None):
 	from lifeos.tools import work
 
-	out = work.add_task(title, area, part, due_date, ctx.space)
+	out = work.add_task(title, area, part, due_date, None, ctx.space)
 	return _did(ctx, out, "task", "Life Task", out["task"])
 
 
@@ -717,27 +644,37 @@ def t_add_event(ctx, title, start, end=None, all_day=False, description=None):
 	return _did(ctx, out, "event")
 
 
-def t_ask_one_question(ctx, question, choices):
-	"""The question is the end of the turn: the owner taps a choice, which comes back as the next message."""
-	picks = [str(c)[:80] for c in (choices or [])[:4] if str(c).strip()]
-	if len(picks) < 2:
-		return {"error": "Give two to four choices."}
-	ctx.choice = {"question": str(question)[:300], "choices": picks}
-	return {"ok": True, "note": "Write the question as your answer and stop. Do not call more tools."}
+def t_find_events(ctx, query=None, date_from=None, date_to=None):
+	"""Events on the calendar, by words in the title and dates. Each has a reference to cite and to give add_note or cancel_event."""
+	from lifeos.tools import work
+
+	rows = work.find_events(ctx.space, query, date_from, date_to)
+	return {"events": [{"ref": ctx.ref("Event", r.name, r.subject, "Event", r.starts_on), "title": r.subject, "starts": str(r.starts_on)[:16], "all_day": bool(r.all_day)} for r in rows]}
 
 
-def file_actions(ctx):
-	"""A button to file each thread the answer read (or, if none was read, the best three found), named for what it files: "File the email “LEAVE” from
-	Ashmeet". The owner's click files it; nothing is filed before. A thread the model already named in suggest_actions, or one already filed, gets none."""
-	if ctx.choice:  # a question with choices: the choices are the buttons, and nothing is offered to file
-		return [{"kind": "choose", "label": c, "question": ctx.choice["question"]} for c in ctx.choice["choices"]]
-	named = {a.get("thread_id") for a in ctx.actions if a.get("kind") == "file_mail"}
-	chosen = [m for m in (ctx.mails_read or ctx.mails)[:3] if m["thread_id"] not in named
-		and not frappe.db.exists("Life Inbox Item", {"space": ctx.space, "source_system": ["in", ["gmail", "microsoft"]], "external_id": m["thread_id"]})]
-	return [{"kind": "file_mail", "label": file_label(m), "thread_id": m["thread_id"], "account": m["account"], "title": m["subject"], "link": m["link"]} for m in chosen]
+def _target(ctx, ref, doctype, name):
+	"""The record a write is about: a reference the tools gave (R3), or doctype and name."""
+	r = ctx.refs.get(str(ref).strip()) if ref else None
+	if r:
+		return r["doctype"], r["name"]
+	if doctype and name:
+		return doctype, name
+	frappe.throw(_("Say which record: its reference, or its doctype and name."), title=_("Record not named"))
 
 
-def file_label(m):
-	""""File the email “Leave request” from Ashmeet Singh": the whole subject (the button wraps), and who sent it."""
-	who = re.sub(r"\s*[(<].*$", "", m.get("from") or "").strip().strip('"')
-	return f"File the email “{m['subject'][:100]}”" + (f" from {who}" if who else "")
+def t_add_note(ctx, text, ref=None, doctype=None, name=None):
+	"""A note on a record the owner has open or named (an event's own note, or a comment on any other record)."""
+	from lifeos.tools import work
+
+	doctype, name = _target(ctx, ref, doctype, name)
+	line, result = work.add_note(doctype, name, text, ctx.space)
+	return _did(ctx, {"done": line, "undo": None}, "note", doctype, name)
+
+
+def t_cancel_event(ctx, event=None, ref=None):
+	"""The owner said an event is cancelled: cancel it in Google (and the owner's own words are the request)."""
+	from lifeos.tools import work
+
+	_doctype, name = _target(ctx, ref, "Event", event)
+	out = work.cancel_event(ctx.space, name, ctx.owner_message or "")
+	return _did(ctx, out, "event", "Event", name)

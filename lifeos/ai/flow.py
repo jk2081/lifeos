@@ -1,25 +1,40 @@
-"""Life OS's tools and agent for Frappe Flow (issue 108): the Ask tools of `lifeos.ai.tools`, one-line wrappers.
+"""Life OS's tools and agent for Frappe Flow: the tools of `lifeos.ai.tools`, one-line wrappers (issues 108 and 119).
 
-Flow runs each as the asking user. `_run` builds Ask's own `Context` for that user's default space and calls `run_tool`,
-so the space, Vault and scope rules are the ones Ask has, and a second user without the space is refused by the same checks.
-Writes need no confirmation because the answer lists them with Undo; nothing here sends or deletes.
-Ask's own screens are unchanged; this is for trying at /flow.
+Chat runs on Flow (`lifeos.ai.chat`). Flow runs each tool as the asking user. `_run` finds the chat's thread from the session, builds the
+`Context` for its space and scope, and calls `run_tool`, so the space, Vault and scope rules are the ones the tools have, and a user outside the
+space is refused by the same checks. Writes need no confirmation: the answer lists them with Undo; nothing here sends or deletes.
 """
+import json
+
 import frappe
 from frappe.flow import Agent, ToolContext, tool
 
 from lifeos.ai.tools import Context, run_tool
 
-TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'make_rule']
+TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'find_events', 'add_note', 'cancel_event', 'make_rule']
 
 
-def _run(name: str, ctx: ToolContext, **args) -> dict:
-	"""Run Ask's tool `name` as the user Flow runs for, in their default space."""
+def _thread_of(session_id: str):
+	"""The chat thread a Flow Session belongs to; none for a session started at /flow."""
+	return frappe.db.get_value("Life Ask Thread", {"flow_session": session_id}, ["name", "space", "scope_kind", "scope_label", "scope_doctype", "scope_name"], as_dict=True)
+
+
+def _owner_words(session_id: str) -> str:
+	"""What the owner wrote in the run that is going now: a calendar change they ask for carries their own words."""
+	from lifeos.ai import chat
+
+	run = frappe.db.get_value("Flow Run", {"session": session_id}, "input", order_by="creation desc")
+	return chat.asked_text(run)[:500]
+
+
+def _run(tool: str, /, ctx: ToolContext, **args) -> dict:
+	"""Run the tool `tool` (positional only: a tool may have an argument called `name`) as the user Flow runs for, in the chat's space (a session outside Chat: the user's default space)."""
 	from lifeos.permissions import default_space, require_space
 
 	if frappe.session.user != ctx.user:
 		frappe.set_user(ctx.user)  # nosemgrep: frappe-setuser -- Flow names the asking user in ctx; a call made without that session runs as that user, never wider
-	space = default_space(ctx.user)
+	thread = _thread_of(ctx.session_id)
+	space = thread.space if thread else default_space(ctx.user)
 	if not space:
 		return {"error": "Not allowed: you are not in any space."}
 	try:
@@ -27,12 +42,23 @@ def _run(name: str, ctx: ToolContext, **args) -> dict:
 	except frappe.PermissionError:
 		frappe.clear_messages()
 		return {"error": "Not allowed: you are not in this space."}
-	c = Context(space, user=ctx.user)
+	scope = {"kind": thread.scope_kind or "space", "label": thread.scope_label, "doctype": thread.scope_doctype, "name": thread.scope_name} if thread else None
+	if scope and scope["kind"] == "items":
+		scope["items"] = frappe.parse_json(frappe.cache.hget("lifeos_ask_items", thread.name) or "[]")
+	c = Context(space, scope, user=ctx.user)
 	c.background = True  # a long read of mail runs on, not as a background job
-	out = run_tool(c, name, args)
+	if thread:  # the R-numbers the answer cites keep their meaning from one tool call to the next
+		c.refs = frappe.parse_json(frappe.db.get_value("Life Ask Thread", thread.name, "refs") or "{}")
+		c.by_key = {(r["doctype"], r["name"]): k for k, r in c.refs.items()}
+	if thread:
+		c.owner_message = _owner_words(ctx.session_id)
+	out = run_tool(c, tool, args)
+	if thread:
+		frappe.db.set_value("Life Ask Thread", thread.name, "refs", json.dumps(c.refs, default=str), update_modified=False)
 	if c.done and isinstance(out, dict):
 		out["done_list"] = c.done
 	return out
+
 
 @tool
 def search(query: str, kinds: list[str] | None = None, date_from: str | None = None, date_to: str | None = None, *, ctx: ToolContext) -> dict:
@@ -149,6 +175,24 @@ def add_event(title: str, start: str, end: str | None = None, all_day: bool = Fa
 
 
 @tool
+def find_events(query: str | None = None, date_from: str | None = None, date_to: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Find events on the calendar by words in the title and a date range (30 days back to 120 ahead by default). Use it to find the event the owner means."""
+	return _run("find_events", ctx, query=query, date_from=date_from, date_to=date_to)
+
+
+@tool
+def add_note(text: str, ref: str | None = None, doctype: str | None = None, name: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Add a note to a record when the owner asks ("add a note: they want a quote by Friday"). The record is the one the owner has open, or one you found: give its reference, or its doctype and name."""
+	return _run("add_note", ctx, text=text, ref=ref, doctype=doctype, name=name)
+
+
+@tool
+def cancel_event(event: str | None = None, ref: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Cancel an event in the owner's Google Calendar, only when the owner said it is cancelled or asked you to cancel it. Find it with find_events first; give its reference or name."""
+	return _run("cancel_event", ctx, event=event, ref=ref)
+
+
+@tool
 def make_rule(action: str = "File", sender: str | None = None, domain: str | None = None, source: str | None = None, kind: str | None = None, title_words: str | None = None,
 		area: str | None = None, part: str | None = None, no_area: bool = False, file_as: str | None = None, never_page: bool = False, *, ctx: ToolContext) -> dict:
 	"""Teach the Brain, only when the owner said how to treat things from now on: when a capture has the sender, domain, source, kind or title words, file it under an area (or no area), drop it, always ask, or never make a page."""
@@ -161,7 +205,7 @@ TOOLS = [globals()[n] for n in TOOL_NAMES]
 
 NOTE = """
 In this chat there are no suggest_actions and ask_one_question tools: offer a next step in a sentence, and ask a question in plain text and stop.
-Writes you make are listed in the answer with Undo by Life OS; say what you did.
+Writes you make are listed in the answer with Undo by Life OS; say what you did. Cite the records you used by their references, such as [R3].
 """
 
 
@@ -177,7 +221,7 @@ def agents() -> list[Agent]:
 		Agent(
 			name="Life OS",
 			model=model,
-			description="Answers from the owner's Life OS records and files what is asked, each write with Undo.",
+			description="Chat in Life OS: answers from the owner's records and files what is asked, each write with Undo.",
 			instructions=store.instructions_of("ask") + NOTE,
 			tools=TOOLS,
 			skills=["ask"],

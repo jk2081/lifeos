@@ -7,6 +7,7 @@
           <Badge theme="blue" :label="r.action_label" />
           <span class="break-words text-base-medium text-ink-gray-9" data-request-title>{{ r.title }}</span>
         </div>
+        <p class="mt-1 break-words text-sm text-ink-gray-7" data-request-who :data-asked-by="r.asked_by">{{ r.asked_by === 'owner' ? `You asked: “${r.request}”` : `${r.agent_name} suggests` }}</p>
         <p v-if="r.draft" class="mt-1 whitespace-pre-wrap break-words rounded-md bg-surface-gray-2 p-2 text-sm text-ink-gray-7" data-request-draft>{{ r.draft }}</p>
       </div>
       <div v-if="writable" class="flex items-center gap-2">

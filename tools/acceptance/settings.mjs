@@ -1,6 +1,6 @@
 // Settings: Profile, Areas, Rhythms, Members, Sources, Rules, Skills, Cost, the ladder and the calendar connection.
 // Checks are numbered SETTINGS.<n> in the order they appear here; `node tools/acceptance.mjs --only=SETTINGS` runs this file's checks.
-import { SPACE, WIDTHS, areaId, areas, base, bench, check, must, owner, pathOf, results, session, stamp, today } from './context.mjs'
+import { SPACE, WIDTHS, agentFetch, areaId, areas, base, bench, check, must, owner, pathOf, results, session, stamp, today } from './context.mjs'
 import { uxKit } from './ux.mjs'
 
 for (const width of WIDTHS) {
@@ -1043,7 +1043,7 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I46 task 
 
     await check('SETTINGS.31', `${width} px: on a one-space site no space picker, chip or Spaces view appears on any screen`, async () => {
       const screens = ['/life', '/life/brain', '/life/brain/captures', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/goals/cycles', '/life/library',
-        '/life/library/notes', '/life/library/people', '/life/library/timeline', '/life/library/archive', '/life/today/week?view=calendar', '/life/ask',
+        '/life/library/notes', '/life/library/people', '/life/library/timeline', '/life/library/archive', '/life/today/week?view=calendar', '/life/insights',
         ...['profile', 'appearance', 'calendar', 'areas', 'rhythms', 'habits', 'rules', 'members', 'sources', 'advanced'].map((t) => `/life/settings?tab=${t}`),
         '/life/settings?tab=members&view=spaces', '/life/settings?tab=spaces']
       for (const p of screens) {
@@ -1413,6 +1413,81 @@ frappe.db.set_single_value("Life Settings", "update_state", None)`)
 frappe.db.set_single_value("Life Settings", "email_in_senders", None)
 frappe.clear_cache(doctype="Life Settings")
 for n in frappe.get_all("Life Connection", filters={"space": "${SPACE}", "system": "microsoft"}, pluck="name"): frappe.delete_doc("Life Connection", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 125: the assistant's name is set on its card in Settings and shows in Activity and Needs you; the connector's pull carries it; a failed job shows in red.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const KEY = 'hermes125s'
+  const AGENT = 'hermes@lifeos.test'
+  try {
+    bench(`frappe.set_user("Administrator")
+from lifeos.agents import limits
+cfg = limits.config("${SPACE}", "${KEY}", create=True)
+cfg.agent_user = "${AGENT}"
+cfg.display_name = None
+cfg.save(ignore_permissions=True)
+limits.set_ability(cfg, "write_pages", "ask")
+frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "${KEY}", "label": "Hermes", "active": 1}).insert(ignore_permissions=True)
+frappe.get_doc({"doctype": "Life Agent Job", "space": "${SPACE}", "agent": "${KEY}", "external_id": "j1", "job_name": "Folio refresh", "schedule": "daily 07:00", "last_status": "error",
+  "last_run": "2026-11-26 07:00", "last_error": "Folio answered 401 Unauthorized"}).insert(ignore_permissions=True)
+frappe.set_user("${AGENT}")
+from lifeos.api import tools
+tools.people_add("Waiting I125S ${width} ${stamp}", space="${SPACE}", source_system="${KEY}")
+frappe.db.commit()`)
+    await check('SETTINGS.45', `${width} px: Naming the agent "Jai's assistant" in Settings shows it in Needs you and Activity; pull returns assistant_name; the failed job is in red with its error`, async () => {
+      await s.open('/life/settings?tab=members&view=agents')
+      const input = pg.locator(`[data-agent-name="${AGENT}"] input, input[data-agent-name="${AGENT}"]`).first()
+      await input.waitFor({ timeout: 10000 })
+      await input.fill("Jai's assistant")
+      await input.press('Tab')
+      await pg.waitForTimeout(800)
+      const failed = pg.locator(`[data-agent-failed-job="${AGENT}"]`)
+      must((await failed.innerText()).includes('Folio answered 401 Unauthorized'), 'the failed job does not show its error')
+      must(await failed.evaluate((e) => getComputedStyle(e).color !== getComputedStyle(document.body).color), 'the failed job is not in a warning colour')
+      const pulled = (await (await agentFetch('agent_connector.pull', { source_system: KEY, space: SPACE })).json()).message
+      must(pulled.assistant_name === "Jai's assistant", 'pull returned ' + pulled.assistant_name)
+      await s.open('/life/brain')
+      const card = pg.locator('[data-agent-request]', { hasText: 'Waiting I125S' }).first()
+      await card.waitFor({ timeout: 10000 })
+      must((await card.innerText()).includes("Jai's assistant suggests"), 'Needs you reads: ' + (await card.innerText()).replace(/\s+/g, ' '))
+      must(!(await card.innerText()).includes('Hermes'), 'Needs you still says Hermes')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('SETTINGS.46', `${width} px: an act the agent did shows under the agent's new name in Activity; the safety switch holds the owner's next request in Needs you as "You asked"`, async () => {
+      bench(`frappe.set_user("${AGENT}")
+from lifeos.api import tools
+tools.people_add("Done I125S ${width} ${stamp}", space="${SPACE}", source_system="${KEY}", asked_by="owner", owner_message="Add the person")
+frappe.db.commit()`)
+      await s.open('/life/brain/activity')
+      const row = pg.locator('[data-assistant-row]', { hasText: 'Done I125S' }).first()
+      await row.waitFor({ timeout: 10000 })
+      must((await row.innerText()).includes("Jai's assistant · you asked"), 'Activity reads: ' + (await row.innerText()).replace(/\s+/g, ' '))
+      await s.open('/life/settings?tab=members&view=agents')
+      const sw = pg.locator(`[data-agent-runs-now="${AGENT}"]`)
+      await sw.waitFor({ timeout: 10000 })
+      await sw.click()
+      await pg.waitForTimeout(800)
+      bench(`frappe.set_user("${AGENT}")
+from lifeos.api import tools
+tools.people_add("Held I125S ${width} ${stamp}", space="${SPACE}", source_system="${KEY}", asked_by="owner", owner_message="Add the held person")
+frappe.db.commit()`)
+      await s.open('/life/brain')
+      const card = pg.locator('[data-agent-request]', { hasText: 'Held I125S' }).first()
+      await card.waitFor({ timeout: 10000 })
+      must((await card.innerText()).includes('You asked: “Add the held person”'), 'the card reads: ' + (await card.innerText()).replace(/\s+/g, ' '))
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for n in frappe.get_all("Life Person", filters={"space": "${SPACE}", "full_name": ["like", "% I125S %"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+for dt in ("Life Agent Action", "Life Agent Job", "Life Agent Config"): frappe.db.delete(dt, {"space": "${SPACE}", "agent": "${KEY}"})
+frappe.db.delete("Life Connection", {"space": "${SPACE}", "system": "${KEY}"})`)
     await s.ctx.close()
   }
 }

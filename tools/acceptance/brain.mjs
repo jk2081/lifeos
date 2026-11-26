@@ -1,6 +1,6 @@
-// Brain: capture, Needs you, Activity, Sources, the item page, Ask and the fake agent.
+// Brain: capture, Needs you, Activity, Sources, the item page, Chat and the fake agent.
 // Checks are numbered BRAIN.<n> in the order they appear here; `node tools/acceptance.mjs --only=BRAIN` runs this file's checks.
-import { PDF, SPACE, WIDTHS, agentFetch, agentKey, agentSecret, areaId, areas, base, bench, browser, check, env, execFileSync, fs, must, owner, path, pathOf, root, runAgent, session, stamp, today } from './context.mjs'
+import { PDF, SPACE, WIDTHS, agentFetch, agentKey, agentSecret, areaId, areas, base, bench, browser, chatOff, chatOn, check, env, execFileSync, fs, must, owner, path, pathOf, root, runAgent, session, stamp, today } from './context.mjs'
 import { ux, uxArea, uxKit } from './ux.mjs'
 
 // records the checks of this place hand on to each other
@@ -79,7 +79,7 @@ await check('BRAIN.3', 'Search for a word in a transcript finds the inbox item',
     if (!found) await owner.page.waitForTimeout(2000)
   }
   must(found, 'the inbox item was not found')
-  await owner.page.keyboard.press('Control+k')
+  await owner.page.keyboard.press('/')
   await owner.page.keyboard.type(`Nowrojee ${stamp}`)
   await owner.page.waitForTimeout(900)
   must((await owner.page.locator('body').innerText()).includes(`Journal photo ${stamp}`), 'the search palette does not show it')
@@ -197,88 +197,29 @@ await check('BRAIN.7', 'Security: the PWA manifest and icons are served; an agen
 
 for (const width of WIDTHS) {
   const { S5, askOn, count, pane, paneTitle, pg, phone, s, settle, tag, tasksLike } = await uxKit(width)
-  await check('BRAIN.8', `${width} px: Ask: from Today, Today under an area, a goal page and a record pane, with the scope of the screen; citations open their records; Make task only when clicked; the panel closes and the screen is as it was`, async () => {
+  await check('BRAIN.8', `${width} px: Chat: from Today, Today under an area, a goal page and a record pane, the chip names the scope of the screen; the panel closes and the screen is as it was`, async () => {
     const done = []
-    // set 6: the area page became the lens (Ask's scope is the lens), the project page the goal's page
+    // set 6: the area page became the lens (Chat's scope is the lens), the project page the goal's page
     for (const [path, scope] of [['/life', 'Everything in this space'], ['/life?area=' + uxArea, areas.find((x) => x.name === uxArea).area_name],
-      ['/life/goals/' + ux.goal, ux.goalTitle]]) {
+      ['/life/goals/' + ux.goal, 'About: ' + ux.goalTitle]]) {
       await askOn(path, scope)
       const here = new URL(pg.url()).pathname
-      const cites = pg.locator('[data-ask-cite]:visible')
-      if (await cites.count()) {
-        const title = (await cites.first().innerText()).replace(/^\d+\s*/, '')
-        await cites.first().click()
-        await settle()
-        must(await pane.count() && (await paneTitle()).trim() === title.trim(), `${path}: the citation did not open "${title}"`)
-        if (phone) await pg.locator('[data-pane-close]:visible').first().click() // a phone closes the sheet with its button
-        else await pg.keyboard.press('Escape')
-        await settle()
-      }
       if (!phone) { await pg.locator('[data-ask-close]').click(); await settle() } else { await pg.keyboard.press('Escape'); await settle() }
       must(!(await pg.locator('[data-ask-panel]:visible').count()), `${path}: the panel did not close`)
       must(new URL(pg.url()).pathname === here && here.replace(/\/$/, '') === (path.split('?')[0] === '/life' ? '/life/today' : path.split('?')[0]), `${path}: the screen changed under the panel (${new URL(pg.url()).pathname})`)
       done.push(scope)
     }
-    // a record pane: Ask about this
-    const task = await s.api('tasks.quick_add', { text: S5('ask about'), space: SPACE, area: uxArea })
-    await s.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%${S5('ask about')}%`]]))}`)
+    // a record pane: Chat about this
+    const task = await s.api('tasks.quick_add', { text: S5('chat about'), space: SPACE, area: uxArea })
+    await s.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%${S5('chat about')}%`]]))}`)
     await pg.locator(`[data-ref="task:${task.name}"]`).first().click()
     await settle()
     await pg.locator('[data-pane-ask]').click()
     await settle()
-    must((await pg.locator('[data-ask-scope]:visible').first().innerText()).trim() === S5('ask about'), 'Ask about this does not take the record as its scope')
-    await pg.locator('[data-ask-panel] textarea').fill(`${S5('ask about')}?`)
-    await pg.locator('[data-ask-send]:visible').click()
-    for (let i = 0; i < 40 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
-    await settle()
-    must(await pg.locator('[data-ask-cite]:visible').count(), 'the answer cites nothing')
-    // a suggested Make task creates a task only when clicked
-    const made = async () => (await tasksLike('Follow up: ' + S5('ask about'))).length
-    must((await made()) === 0, 'a task was made before the click')
-    await pg.locator('[data-ask-action="make_task"]:visible').first().click()
-    await pg.waitForTimeout(900)
-    must((await made()) === 1, 'Make task did not make one task')
+    must((await pg.locator('[data-ask-scope]:visible').first().innerText()).trim() === 'About: ' + S5('chat about'), 'Chat about this does not take the record as its scope')
     return done.join(', ') + ', a task pane'
   })
 
-  if (!phone) await check('BRAIN.9', 'Ask: with no key it says it is not set up; at the cap it refuses and shows the spend; the family user never gets a Private record; a Vault document is never sent while the switch is off', async () => {
-    // no key
-    bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = None; s.save()')
-    try {
-      await s.open('/life')
-      await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type('What is open this week?'); await pg.waitForTimeout(500); await pg.keyboard.press('Enter')
-      await pg.waitForTimeout(1500)
-      must(await pg.locator('[data-refusal="not_set_up"]').count() && (await pg.locator('[data-ask-refusal]').innerText()).includes('Ask needs an AI key'), 'no "not set up" message')
-      await pg.locator('[data-ask-close]').click()
-    } finally {
-      bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = "fake-key-acceptance"; s.save()')
-    }
-    // the cap
-    bench(`frappe.get_doc({"doctype": "Life AI Usage", "user": "owner@lifeos.test", "month": frappe.utils.now_datetime().strftime("%Y-%m"), "model": "claude-sonnet-5-5", "cost": 99, "purpose": "Test"}).insert(ignore_permissions=True)`)
-    try {
-      const res = await s.api('ask.ask', { question: 'What is open?', space: SPACE })
-      must(res.error === 'cap' && /\$\d+\.\d\d of \$30/.test(res.error_text), `the cap did not refuse: ${JSON.stringify(res).slice(0, 200)}`)
-      await s.open('/life/ask')
-      must((await pg.locator('[data-ask-spend]').innerText()).includes('of $30'), 'the Ask page does not show the spend')
-    } finally {
-      bench('frappe.db.delete("Life AI Usage", {"purpose": "Test"})')
-    }
-    // the family user asks in Shared about a word only a Private record holds
-    const secret = await s.api('tasks.quick_add', { text: S5('kumquat private'), space: SPACE, area: uxArea })
-    bench('from lifeos.ai import fake\nfake.clear_received()')
-    const fam = await session('family@lifeos.test', width)
-    const r = await fam.api('ask.ask', { question: `kumquat ${stamp}?`, space: 'Shared' })
-    must(!(r.message?.cited || []).some((c) => c.title.includes('kumquat')), 'the family user was given a Private record')
-    must(!bench('from lifeos.ai import fake\nimport json\nprint(json.dumps(fake.received()))').includes(S5('kumquat private')), 'a Private record was sent for the family user')
-    await fam.ctx.close()
-    // a Vault document is never sent while "Ask may read Vault documents" is off
-    await s.api('vault.save', { space: SPACE, values: { title: S5('zebra passport'), doc_type: 'ID', notes_md: `secret-${stamp}`, area: areaId('Money & Legal') } })
-    bench('from lifeos.ai import fake\nfake.clear_received()')
-    await s.api('ask.ask', { question: `Where is my zebra passport ${stamp}?`, space: SPACE })
-    const sent = bench('from lifeos.ai import fake\nimport json\nprint(json.dumps(fake.received()))')
-    must(sent.length > 10 && !sent.includes(`secret-${stamp}`) && !sent.includes(S5('zebra passport')), 'a Vault document reached the model')
-    return 'no key, cap, family, Vault'
-  })
 
   if (!phone) await check('BRAIN.10', 'streams: chats.log twice with one external_id leaves one log; importing the Claude and ChatGPT fixtures creates the expected logs, and again creates and updates none', async () => {
     const ext = `s4-${stamp}`
@@ -526,8 +467,8 @@ for (const width of WIDTHS) {
     await full(`/life/brain/captures?open=${encodeURIComponent('source:' + id)}`, 'Library')
     await s.open('/life/library/notes')
     if (width < 768) await pg.locator('[data-phone-search]').click()
-    else await pg.keyboard.press('Meta+k')
-    await pg.locator('input[aria-label="Search or ask anything"]').fill(title)
+    else await pg.keyboard.press('/')
+    await pg.locator('input[aria-label="Search or chat"]').fill(title)
     await pg.waitForTimeout(900)
     await pg.keyboard.press('Enter')
     await settle()
@@ -597,13 +538,13 @@ print(json.dumps(out))`).split('\n').pop())
   const rowsOf = async () => (await s.api('brain.needs_you', { space: SPACE })).rows
   const queue = async () => { for (const r of await rowsOf()) await s.api('review.decide', { proposal: r.proposal, decision: 'reject' }) }
   try {
-    await check('BRAIN.20', `${width} px: on an empty space Needs you says what will appear and offers + Capture`, async () => {
+    await check('BRAIN.20', `${width} px: on an empty space Needs you says what will appear and offers Chat`, async () => {
       await openNeeds()
       must(await pg.locator('[data-needs-empty]').isVisible(), 'no empty state')
       const t = await pg.locator('[data-needs-empty]').innerText()
       must(t.includes('Nothing needs you.') && t.includes('Things you capture or connect will show up here.'), 'the empty state says: ' + t)
       await pg.locator('[data-needs-capture]').click()
-      await pg.locator('[data-capture-text]').first().waitFor({ timeout: 5000 })
+      await pg.locator('[data-ask-panel]:visible').first().waitFor({ timeout: 5000 })
       await pg.keyboard.press('Escape')
       await noSideways()
     })
@@ -832,13 +773,13 @@ print(json.dumps(out))`).split('\n').pop())
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
   const openFeed = async (q = '') => { await s.open('/life/brain/activity' + q); await pg.locator('[data-activity]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(500) }
   try {
-    await check('BRAIN.32', `${width} px: on a space with nothing captured Activity says what will appear and offers + Capture`, async () => {
+    await check('BRAIN.32', `${width} px: on a space with nothing captured Activity says what will appear and offers Chat`, async () => {
       await openFeed()
       must(await pg.locator('[data-activity-empty]').isVisible(), 'no empty state')
       const t = await pg.locator('[data-activity-empty]').innerText()
       must(t.includes('Nothing has come in yet.') && t.includes('will show up here'), 'the empty state says: ' + t)
       await pg.locator('[data-activity-capture]').click()
-      await pg.locator('[data-capture-text]').first().waitFor({ timeout: 5000 })
+      await pg.locator('[data-ask-panel]:visible').first().waitFor({ timeout: 5000 })
       await pg.keyboard.press('Escape')
       await noSideways()
     })
@@ -1370,7 +1311,7 @@ for (const width of WIDTHS) {
       must((await pg.locator('[data-page-title]').innerText()) === 'Your assistant', 'the agent is not shown as Your assistant: ' + await pg.locator('[data-page-title]').innerText())
       for (const k of ['waiting', 'knows', 'can', 'read', 'scheduled', 'did', 'connector']) must(await pg.locator(`[data-agent-section="${k}"]`).isVisible(), `no ${k} section`)
       must((await pg.locator('[data-fact]').count()) === 2 && (await pg.locator('[data-fact-origin]').first().innerText()).includes('WhatsApp'), 'the facts or where they came from are missing')
-      must((await pg.locator('[data-ability]').count()) === 8 && (await pg.locator('[data-ability-key="pay"] [data-ability-fixed]').innerText()) === 'Always off', 'the eight actions, with pay always off, are missing')
+      must((await pg.locator('[data-ability]').count()) === 9 && (await pg.locator('[data-ability-key="pay"] [data-ability-fixed]').innerText()) === 'Always off', 'the eight actions, with pay always off, are missing')
       must((await pg.locator('[data-area]').count()) >= 1 && await pg.locator('[data-area-vault]').isVisible(), 'the areas and the Vault are missing')
       must((await pg.locator('[data-job]').count()) === 1, 'the job is missing')
       must((await pg.locator('[data-agent-skills]').innerText()).includes('chase'), 'the skill it reported is missing')
@@ -1483,26 +1424,6 @@ acts.request("${SPACE}", "${system}", "calendar.create", {"title": "I86 lunch ${
       must(bench('from lifeos.mail import fake\nprint([c["call"] for c in fake.calls()])').includes('send'), 'approving did not send it (fake Google): ' + bench(`print(frappe.get_all("Life Agent Action", filters={"agent": "${system}"}, fields=["status", "error", "title"]))`).split('\\n').pop())
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
-    await check('BRAIN.53', `${width} px: Ask "find the 2014 tax return" (fake AI, fake Gmail) shows the threads it found and a File it button; filing makes a Brain item linked to Gmail`, async () => {
-      bench(`frappe.set_user("Administrator")
-for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
-      await s.open('/life/today')
-      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill('find the 2014 tax return'); await pg.locator('[data-ask-send]:visible').click() }
-      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type('find the 2014 tax return'); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
-      const answer = pg.locator('[data-ask-answer]:visible').last()
-      await answer.waitFor({ timeout: 15000 })
-      for (let i = 0; i < 40 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
-      must((await answer.innerText()).includes('2014 tax return'), 'the answer does not name the thread: ' + await answer.innerText())
-      const file = pg.locator('[data-ask-action="file_mail"]:visible')
-      must((await file.count()) === 1 && (await file.innerText()).includes('File the email') && (await file.innerText()).includes('2014 tax return'), 'there is not one File button named for the email: ' + await file.allInnerTexts())
-      must(bench(`print(frappe.db.exists("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}))`).split('\n').pop() === 'None', 'it was filed before the owner clicked')
-      await noSideways()
-      await file.click()
-      let made = 'None'
-      for (let i = 0; i < 20 && made === 'None'; i++) { await pg.waitForTimeout(300); made = bench(`print(frappe.db.get_value("Life Inbox Item", {"space": "${SPACE}", "source_system": "gmail", "external_id": "fake-tax-2014"}, "source_url"))`).split('\n').pop() }
-      must(made.includes('mail.google.com'), 'filing did not make a Brain item linked to Gmail: ' + made)
-      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-    })
     await check('BRAIN.54', `${width} px: the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item`, async () => {
       const digest = bench(`from lifeos.mail import digest
 frappe.set_user("Administrator")
@@ -1523,57 +1444,10 @@ print(digest.make("owner@lifeos.test", "${SPACE}", 1))`).split('\n').pop()
     })
     const askUi = async (question) => {
       await s.open('/life/today')
-      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill(question); await pg.locator('[data-ask-send]:visible').click() }
-      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type(question); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
+      if (phone) { await pg.locator('[data-chat-bar-open]').first().click(); await pg.locator('[data-ask-panel] textarea').fill(question); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500); await pg.keyboard.type(question); await pg.waitForTimeout(300); await pg.keyboard.press('Enter') }
       await pg.locator('[data-ask-answer]:visible').last().waitFor({ timeout: 15000 })
     }
-    await check('BRAIN.60', `${width} px: Ask "file the blueprint" (fake AI, fake Gmail) makes the Ambaji Prospect page, saves the blueprint on it and adds Anirudh; the answer lists the three under Done with Undo; the page and its file are in Library; Undo takes one back`, async () => {
-      bench(`frappe.set_user("Administrator")
-for dt, f in (("Life Note", "title"), ("Life Person", "full_name"), ("Life Inbox Item", "external_id")):
-    for n in frappe.get_all(dt, filters={"space": "${SPACE}", f: ["in", ["Ambaji Food Products", "Anirudh Poddar", "SAP Partner", "fake-blueprint"]]}, pluck="name"):
-        if dt == "Life Note": frappe.db.delete("Life Wiki Change", {"note": n})
-        frappe.db.set_value("Life Person", {"wiki_page": n}, "wiki_page", None) if dt == "Life Note" else None
-        frappe.db.set_value("Life Note", {"person": n}, "person", None) if dt == "Life Person" else None
-        frappe.delete_doc(dt, n, force=1, ignore_permissions=True)`)
-      await askUi('file the blueprint from Anirudh Poddar into Career as a prospect')
-      for (let i = 0; i < 60 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
-      const lines = pg.locator('[data-ask-done]:visible [data-ask-done-line]')
-      must((await lines.count()) === 3, `the Done list has ${await lines.count()} lines, not 3: ${await pg.locator('[data-ask-answer]:visible').last().innerText()}`)
-      const text = (await lines.allInnerTexts()).join(' | ')
-      must(text.includes('Created page Ambaji Food Products (Prospect, Career)') && text.includes('Saved SAP B1 Blueprint.pdf') && text.includes('Added Anirudh Poddar'), 'the Done lines are wrong: ' + text)
-      must((await pg.locator('[data-ask-done]:visible [data-ask-undo]').count()) === 3, 'every Done line needs an Undo')
-      const page = bench(`print(frappe.db.get_value("Life Note", {"space": "${SPACE}", "title": "Ambaji Food Products"}, ["name", "kind"]))`).split('\n').pop()
-      must(page.includes('Prospect'), 'the page is not a Prospect: ' + page)
-      const name = page.match(/'([^']+)'/)[1]
-      must(bench(`print(frappe.db.exists("File", {"attached_to_doctype": "Life Note", "attached_to_name": "${name}", "file_name": "SAP B1 Blueprint.pdf"}) is not None)`).split('\n').pop() === 'True', 'the blueprint is not attached to the page')
-      must(bench(`print(frappe.db.exists("Life Agent Action", {"space": "${SPACE}", "asked_by": "owner", "agent": "ask", "action": "write_pages"}) is not None)`).split('\n').pop() === 'True', 'the writes are not in the log with asked_by owner')
-      await noSideways()
-      await s.open('/life/library/files')
-      await pg.locator('[data-library-files][data-loaded="1"]').waitFor({ timeout: 10000 })
-      must((await pg.locator('[data-file-row]', { hasText: 'SAP B1 Blueprint' }).count()) >= 1, 'the file is not in Library > Files')
-      await s.open('/life/library/notes?open=note:' + name)
-      await pg.getByText('Ambaji Food Products').first().waitFor({ timeout: 10000 }).catch(() => {})
-      must((await pg.locator('body').innerText()).includes('Ambaji Food Products'), 'the page does not open in Library')
-      // Undo: the page goes, and the line says so
-      await askUi('file the blueprint from Anirudh Poddar into Career as a prospect')
-      for (let i = 0; i < 60 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
-      await pg.locator('[data-ask-done]:visible [data-ask-undo]').last().click()
-      await pg.locator('[data-ask-done]:visible [data-ask-done-line][data-undone="1"]').first().waitFor({ timeout: 8000 })
-      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-    })
-    await check('BRAIN.61', `${width} px: Ask "read my mail" over a period of 4 pages shows "Reading 1–14 Nov… (page n of 4)" and then the answer`, async () => {
-      await askUi('read my mail from 1 to 14 November')
-      const seen = new Set()
-      for (let i = 0; i < 120 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) {
-        for (const t of await pg.locator('[data-ask-reading]:visible').allInnerTexts()) seen.add(t.trim())
-        await pg.waitForTimeout(150)
-      }
-      const answer = await pg.locator('[data-ask-answer]:visible').last().innerText()
-      must(answer.includes('4 pages in all'), 'the answer is not the finished one: ' + answer)
-      must([...seen].some((t) => /^Reading 1–14 Nov… \(page \d of 4\)$/.test(t)), 'the reading line was never shown: ' + [...seen].join(' | '))
-      await noSideways()
-      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-    })
   } finally {
     bench(`frappe.set_user("Administrator")
 for dt in ("Life Agent Action", "Life Agent Config"):
@@ -1661,22 +1535,6 @@ print(json.dumps({"item": d.name, "proposal": p.name}))`).split('\n').pop())
       await line.waitFor({ timeout: 10000 })
       must((await line.innerText()).includes('New rule:') && (await line.locator('[data-new-rule-change]').innerText()) === 'Change', 'the line is: ' + await line.innerText())
       await noSideways()
-    })
-    await check('BRAIN.65', `${width} px: Ask "file Claude's recaps without an area" saves a rule, the answer shows "New rule … Change", and Undo removes it`, async () => {
-      const before = rulesNow().length
-      await s.open('/life/today')
-      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill("file Claude's recaps without an area"); await pg.locator('[data-ask-send]:visible').click() }
-      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type("file Claude's recaps without an area"); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
-      await pg.locator('[data-ask-answer]:visible').last().waitFor({ timeout: 15000 })
-      for (let i = 0; i < 60 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
-      const line = pg.locator('[data-ask-done]:visible [data-ask-done-line]').first()
-      await line.waitFor({ timeout: 10000 })
-      const t = await line.innerText()
-      must(t.includes('New rule:') && t.includes('chat') && (await line.locator('[data-ask-rule-change]').count()) === 1, 'the Done line is: ' + t)
-      must(rulesNow().length === before + 1, 'Ask did not save a rule')
-      await line.locator('[data-ask-undo]').click()
-      await pg.locator('[data-ask-done]:visible [data-ask-done-line][data-undone="1"]').first().waitFor({ timeout: 8000 })
-      must(rulesNow().length === before, 'Undo did not remove the rule')
     })
     await check('BRAIN.66', `${width} px: Gmail's Rules tab lists the sender rule and the two built-in rules in the order they are tried with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings`, async () => {
       bench(`frappe.set_user("Administrator")
@@ -1845,6 +1703,147 @@ print(json.dumps(frappe.get_all("Life Task", filters={"inbox_item": "${b.item}",
 items = frappe.get_all("Life Inbox Item", filters={"title": ["like", "I118 %"]}, pluck="name")
 for n in frappe.get_all("Life Task", filters={"inbox_item": ["in", items or [""]]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
 for n in items: frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 125: what an agent did shows in Activity with who asked, a drawer and Undo; Chat lists the owner's conversation on the agent's channel, read only.
+const ASSISTANT = 'hermes125'
+const assistantSeed = (width) => `import json
+frappe.set_user("Administrator")
+from lifeos.agents import limits
+cfg = limits.config("${SPACE}", "${ASSISTANT}", create=True)
+cfg.display_name = "Hermes"
+cfg.agent_user = "hermes@lifeos.test"
+cfg.save(ignore_permissions=True)
+limits.set_ability(cfg, "write_pages", "ask")
+frappe.set_user("hermes@lifeos.test")
+from lifeos.api import tools
+done = tools.people_add("Ekta Jalan I125 ${width} ${stamp}", space="${SPACE}", source_system="${ASSISTANT}", asked_by="owner", owner_message="Make Ekta Jalan a person")
+frappe.db.commit()
+print(json.dumps({"action": done["action"], "person": done["person"]}))`
+const assistantClean = `frappe.set_user("Administrator")
+for n in frappe.get_all("Life Person", filters={"space": "${SPACE}", "full_name": ["like", "% I125 %"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+frappe.db.delete("Life Agent Action", {"space": "${SPACE}", "agent": "${ASSISTANT}"})
+frappe.db.delete("Life Agent Job", {"space": "${SPACE}", "agent": "${ASSISTANT}"})
+frappe.db.delete("Life Agent Config", {"space": "${SPACE}", "agent": "${ASSISTANT}"})
+for t in frappe.get_all("Life Ask Thread", filters={"space": "${SPACE}", "source_system": "${ASSISTANT}"}, pluck="name"):
+  frappe.delete_doc("Life Ask Thread", t, force=1, ignore_permissions=True)`
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  try {
+    const seeded = JSON.parse(bench(assistantSeed(width)).split('\n').pop())
+    await check('BRAIN.73', `${width} px: Activity lists "Hermes · you asked" for an agent's act with its request in the drawer; the Assistant chip shows only those; Undo removes the person`, async () => {
+      await s.open('/life/brain/activity')
+      const row = pg.locator(`[data-assistant-row][data-action="${seeded.action}"]`)
+      await row.waitFor({ timeout: 10000 })
+      const text = (await row.innerText()).replace(/\s+/g, ' ')
+      must(/Hermes · you asked/.test(text) && /Added Ekta Jalan/i.test(text), 'the row reads: ' + text)
+      await noSideways()
+      await row.locator('[data-assistant-open]').click()
+      must((await row.locator('[data-assistant-request]').innerText()).includes('Make Ekta Jalan a person'), 'the drawer does not show the request')
+      await noSideways()
+      await pg.locator('[data-outcome="assistant"]').click()
+      await pg.waitForFunction(() => !document.querySelector('[data-activity-row]:not([data-assistant-row])') && document.querySelector('[data-assistant-row]'), null, { timeout: 10000 })
+      await row.locator('[data-assistant-undo]').click()
+      for (let i = 0; i < 40 && bench(`print(frappe.db.exists("Life Person", "${seeded.person}") or "gone")`).split('\n').pop() !== 'gone'; i++) await pg.waitForTimeout(250)
+      must(bench(`print(frappe.db.exists("Life Person", "${seeded.person}") or "gone")`).split('\n').pop() === 'gone', 'Undo left the person')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.74', `${width} px: Chat's History lists the relayed conversation "on Telegram"; it opens read only with its turns in order and no question box`, async () => {
+      const turns3 = [{ role: 'owner', text: 'Add a task to call Ekta', at: '2026-11-26 09:00:00' }, { role: 'assistant', text: 'Done, it is on Today.', at: '2026-11-26 09:00:05' },
+        { role: 'owner', text: 'Thanks', at: '2026-11-26 09:01:00' }]
+      const out = (await (await agentFetch('chats.relay', { turns: JSON.stringify(turns3), channel: 'Telegram', source_system: ASSISTANT, external_id: `tg-${width}-${stamp}`, space: SPACE })).json()).message
+      must(out?.added === 3, 'the relay answered ' + JSON.stringify(out))
+      await s.open('/life')
+      // issue 120: History is inside the chat panel (laptop) or the chat sheet (phone)
+      if (phone) await pg.locator('[data-chat-bar-open]').first().click(); else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500) }
+      await pg.locator('[data-ask-history-open]:visible').first().click()
+      const rowH = pg.locator('[data-history-row]', { hasText: 'on Telegram' }).first()
+      await rowH.waitFor({ timeout: 10000 })
+      must((await rowH.innerText()).includes('Hermes · Telegram'), 'the row reads: ' + (await rowH.innerText()))
+      await noSideways()
+      await rowH.locator('a').first().click()
+      await pg.locator('[data-ask-readonly]:visible').first().waitFor({ timeout: 10000 })
+      const turns = await pg.locator('[data-ask-thread]:visible [data-ask-question], [data-ask-thread]:visible [data-ask-answer]').allInnerTexts()
+      must(turns.map((t) => t.trim()).join('|') === 'Add a task to call Ekta|Done, it is on Today.|Thanks', 'the turns are: ' + turns.join('|'))
+      must((await pg.locator('[data-ask-input]:visible').count()) === 0, 'there is a question box on a relayed thread')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    // Chat on Flow (issue 119): the real run (Flow's agent, tools, usage) against the fake model of tools/fake_openai.py
+    await check('BRAIN.75', `${width} px: Chat runs on Flow: the box reads "Search or chat", a question streams an answer in the Chat panel and writes one usage row, the Chat panel opens with the shortcut, /life/ask goes to Today, and no visible text says Ask`, async () => {
+      chatOn()
+      try {
+        await s.open('/life')
+        const nav = await pg.locator('body').innerText()
+        must(!/\bAsk\b/.test(nav), 'the screen says Ask: ' + (nav.match(/.{20}\bAsk\b.{20}/s) || [''])[0])
+        if (!phone) {
+          must((await pg.locator('[data-ask-box]').innerText()).includes('Search or chat'), 'the box does not read "Search or chat"')
+          await pg.keyboard.press('/'); await pg.waitForTimeout(300)
+          must(await pg.locator('input[aria-label="Search or chat"]').count(), 'the palette does not say "Search or chat"')
+          must(!/\bAsk\b/.test(await pg.locator('[role="dialog"]').first().innerText()), 'the palette says Ask')
+          await pg.keyboard.press('Escape'); await pg.waitForTimeout(300)
+          await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500) // issue 120: the shortcut opens the chat panel itself, with the box ready
+          await pg.keyboard.type('What tasks do I have?'); await pg.waitForTimeout(300)
+          await pg.keyboard.press('Enter')
+        } else await pg.locator('[data-chat-bar-open]').first().click()
+        await pg.waitForTimeout(600)
+        if (phone) { await pg.locator('[data-ask-panel] textarea').fill('What tasks do I have?'); await pg.locator('[data-ask-send]:visible').click() }
+        const panel = pg.locator('[data-ask-panel]:visible')
+        await pg.waitForTimeout(700) // the one ongoing conversation may hold earlier answers: wait for the new one
+        await panel.locator('[data-ask-working]').waitFor({ state: 'detached', timeout: 90000 })
+        await panel.locator('[data-ask-answer][data-status="Done"]').last().waitFor({ timeout: 5000 })
+        must((await panel.locator('[data-ask-answer]').last().innerText()).includes('From the tool'), 'the answer is not the model\'s')
+        must(!/\bAsk\b/.test(await panel.innerText()), 'the panel says Ask')
+        must((await panel.locator('h2').first().innerText()).trim() === 'Chat', 'the panel is not titled Chat')
+        const usage = bench('print(frappe.db.count("Life AI Usage", {"purpose": "Chat", "creation": [">", frappe.utils.add_to_date(frappe.utils.now_datetime(), minutes=-3)]}))').split('\n').pop()
+        must(Number(usage) >= 1, 'no Chat usage row was written: ' + usage)
+        if (!phone) await pg.locator('[data-ask-close]').click(); else await pg.keyboard.press('Escape')
+        await s.open('/life/ask?tab=history')
+        must(new URL(pg.url()).pathname === '/life/today', '/life/ask did not go to Today: ' + pg.url())
+        must(!/\bAsk\b/.test(await pg.locator('body').innerText()), 'the screen says Ask')
+        await s.open('/life/settings?tab=advanced&part=ai')
+        await pg.locator('[data-ai-chat-card]').waitFor({ timeout: 10000 })
+        must(!/\bAsk\b/.test(await pg.locator('body').innerText()), 'Settings says Ask')
+      } finally {
+        chatOff()
+      }
+    })
+
+    // with no provider set in Flow: the question shows what search finds and the key line (the result is the same at the cap, which names the spend)
+    await check('BRAIN.76', `${width} px: with no model in Flow, a question says "Chat needs an AI key" with its link, and at the monthly cap Chat refuses and shows the spend`, async () => {
+      await s.open('/life')
+      if (phone) { await pg.locator('[data-chat-bar-open]').first().click(); await pg.locator('[data-ask-panel] textarea').fill('What is open this week?'); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500); await pg.keyboard.type('What is open this week?'); await pg.waitForTimeout(300); await pg.keyboard.press('Enter') }
+      await pg.locator('[data-refusal="not_set_up"]').waitFor({ timeout: 15000 })
+      must((await pg.locator('[data-ask-refusal]').innerText()).includes('Chat needs an AI key'), 'no "Chat needs an AI key" message')
+      must((await pg.locator('[data-ask-key-link]').getAttribute('href')).includes('part=ai'), 'the link does not go to Settings › AI')
+      if (!phone) await pg.locator('[data-ask-close]').click(); else await pg.keyboard.press('Escape')
+      chatOn()
+      bench(`frappe.get_doc({"doctype": "Life AI Usage", "user": "owner@lifeos.test", "month": frappe.utils.now_datetime().strftime("%Y-%m"), "model": "m", "cost": 99, "purpose": "Test"}).insert(ignore_permissions=True)`)
+      try {
+        const res = await s.api('chat.send', { question: 'What is open?', space: SPACE })
+        must(res.error === 'cap' && /\$\d+\.\d\d of \$30/.test(res.error_text), `the cap did not refuse: ${JSON.stringify(res).slice(0, 200)}`)
+        await s.open('/life')
+        if (phone) await pg.locator('[data-chat-bar-open]').first().click(); else await pg.locator('[data-nav-chat]').click()
+        await pg.locator('[data-ask-panel] textarea').fill('What is open?')
+        await pg.locator('[data-ask-send]:visible').click()
+        await pg.locator('[data-refusal="cap"]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-refusal="cap"]').innerText()).includes('of $30'), 'the refusal does not show the spend')
+      } finally {
+        bench('frappe.db.delete("Life AI Usage", {"purpose": "Test"})')
+        chatOff()
+      }
+    })
+  } finally {
+    bench(assistantClean)
     await s.ctx.close()
   }
 }

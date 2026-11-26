@@ -12,7 +12,7 @@
   </section>
 </template>
 <script setup>
-// What search finds for the words of a question, shown under "Ask needs an AI key" so that the question is not wasted (issue 98).
+// What search finds for the words of a question, shown under "Chat needs an AI key" so that the question is not wasted (issue 98).
 import { ref, watch } from 'vue'
 import { Badge } from 'frappe-ui'
 import { libraryData } from '@/data/library'

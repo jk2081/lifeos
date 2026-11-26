@@ -24,7 +24,7 @@ FIELDS = {
 	"Life Habit": ("Habit", ["title"]),
 	"Life Review": ("Weekly review", ["went_well", "do_differently"]),
 	"Life Insight": ("Insight", ["title", "body"]),
-	"Life Ask Thread": ("Ask thread", ["title"]),
+	"Life Ask Thread": ("Chat thread", ["title"]),
 	"Life Vault Document": ("Vault document", ["title", "extracted_text"]),  # what a document says is read on this server (issue 104); a hit is opened with has_permission, so only who may open the document finds it. Life Index, which Ask reads, never holds it
 	"Life Proposal": ("Needs you", ["preview"]),
 	"Life Skill": ("Skill", ["title"]),

@@ -1,4 +1,4 @@
-// The counts the navigation shows. (The New menu became + Capture and its sheet in issue 14: components/CaptureSheet.vue.)
+// The counts the navigation shows. (The New menu became + Capture in issue 14, and + Capture became the chat in issue 120: components/ask/.)
 import { store } from './store'
 
 // The navigation's numbers come from the count helper with the list each opens (UX fixes, set 5): Inbox, Tasks (due

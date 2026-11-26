@@ -12,7 +12,7 @@ AUTO, ASK, OFF = "auto", "ask", "off"
 MODES = (AUTO, ASK, OFF)
 # key, what a person calls it
 ACTIONS = (("read_email", "Read email"), ("send_email", "Send email"), ("change_calendar", "Change the calendar"), ("chase_people", "Chase people"),
-	("use_websites", "Use websites"), ("save_files", "Save files"), ("write_pages", "Make pages and people"), ("pay", "Pay"))
+	("use_websites", "Use websites"), ("save_files", "Save files"), ("write_pages", "Make pages and people"), ("add_planning", "Add tasks and events"), ("pay", "Pay"))
 DEFAULT_MODE = ASK
 DEFAULT_NAME = "Your assistant"
 # a doctype whose rows carry an `area`: the rows an agent cannot read when the area is off for it
@@ -113,3 +113,45 @@ def area_condition(doctype: str, blocked_areas: list) -> str:
 
 def display_name(cfg) -> str:
 	return (cfg.display_name if cfg and cfg.display_name else "").strip() or DEFAULT_NAME
+
+
+# ---------------------------------------------------------------- who asked: the one gate (issue 125)
+OWNER, AGENT = "owner", "agent"
+RUN, WAIT = "run", "wait"
+
+
+def owner_runs_now(cfg) -> bool:
+	"""The safety switch "Your requests through this agent run at once": on unless the owner switched it off."""
+	value = cfg.get("owner_runs_now") if cfg else None
+	return value is None or bool(value)
+
+
+def claim_owner(space: str, user: str | None = None) -> None:
+	"""`asked_by: owner` is only the space's owner speaking: through an agent's key (the agent acts for the space's owner) or as the owner themself.
+	Anyone else in the space (a family member) cannot ask on the owner's behalf."""
+	from lifeos import permissions
+
+	user = user or frappe.session.user
+	if user == "Administrator" or permissions.is_agent(user) or user == frappe.db.get_value("Life Space", space, "owner_user"):
+		return
+	frappe.throw(_("Only the space's owner is the owner: you cannot ask on their behalf."), frappe.PermissionError, title=_("Not the owner"))
+
+
+def gate(space: str, agent: str, ability: str, asked_by: str | None, owner_message: str | None = None) -> str:
+	"""The one rule for everything an agent does, for the Ask tools and for Google alike. Returns RUN (do it now) or WAIT (hold it in Needs you); refuses
+	when the act is switched off for the agent's own idea, or the owner's request has no message.
+
+	- `asked_by: owner` (with the owner's words): runs at once, unless the owner switched "Your requests through this agent run at once" off;
+	- `asked_by: agent` (its own idea): on its own runs, asks you waits, off is refused."""
+	if asked_by not in (OWNER, AGENT):
+		frappe.throw(_("Say who asked: owner (the owner told the agent to) or agent (its own idea)."), title=_("Who asked?"))
+	cfg = config(space, agent)
+	if asked_by == OWNER:
+		if not " ".join((owner_message or "").split()):
+			frappe.throw(_("An act the owner asked for carries the owner's message."), title=_("The owner's message is missing"))
+		claim_owner(space)
+		return RUN if owner_runs_now(cfg) else WAIT
+	mode = abilities(cfg)[ability]
+	if mode == OFF:
+		frappe.throw(_("The owner has switched “{0}” off for this agent.").format(dict(ACTIONS)[ability]), frappe.PermissionError, title=_("Switched off"))
+	return RUN if mode == AUTO else WAIT

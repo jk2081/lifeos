@@ -5,7 +5,7 @@ import { num, ux, uxArea, uxKit } from './ux.mjs'
 
 for (const width of WIDTHS) {
   const { closeMore, count, errors, nav, openMore, overflow, pg, phone, s, settle, tag } = await uxKit(width)
-  await check('PHONE.1', `${width} px: navigation: ${phone ? 'the phone bar is Today, Brain, Capture, Goals and Library; each opens; Capture opens its sheet; Ask is in the header; the lens sheet holds Settings; the Brain count' : 'the sidebar is the lens, Capture, Today, Brain, Goals, Library and Settings; the active item; the place tabs; the Brain count; the capture sheet and each of its entries'}; /graph is the Graph view of Notes`, async () => {
+  await check('PHONE.1', `${width} px: navigation: ${phone ? 'the phone bar is Today, Brain, Goals and Library under the chat bar; each opens; the chat bar opens the chat sheet; the lens sheet holds Settings; the Brain count' : 'the sidebar is the lens, Chat, Today, Brain, Goals, Library and Settings; the active item; the place tabs; the Brain count; the chat panel and what + adds'}; /graph is the Graph view of Notes`, async () => {
     let step = 'start'
     try {
     const PLACES = ['Today', 'Brain', 'Goals', 'Library']
@@ -14,22 +14,17 @@ for (const width of WIDTHS) {
       await s.open('/life')
       const items = await pg.locator('[data-tabbar] [data-tab-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab-item')))
       must(JSON.stringify(items) === JSON.stringify(PLACES), `the phone bar is ${items}`)
-      must(await pg.locator('[data-tabbar] [data-tab-capture]').count(), 'the phone bar has no capture button')
+      must(!(await pg.locator('[data-tab-capture]').count()), 'the phone bar still has a Capture button')
+      must(await pg.locator('[data-tabbar] [data-chat-bar]').count(), 'the phone bar has no chat bar')
       step = 'each place opens from the bar'
       for (const [label, want] of [['Brain', '/life/brain'], ['Goals', '/life/goals'], ['Library', '/life/library'], ['Today', '/life/today']]) {
         await nav(label)
         must(path() === want, `${label} opened ${path()}`)
       }
-      step = 'Capture opens its sheet'
-      await pg.locator('[data-tabbar] [data-tab-capture]').click()
+      step = 'the chat bar opens the chat sheet'
+      await pg.locator('[data-chat-bar-open]').click()
       await settle()
-      must(await pg.locator('[data-capture-text]').count(), 'Capture did not open its sheet')
-      await pg.keyboard.press('Escape')
-      await settle()
-      step = 'Ask is in the header and opens its sheet'
-      await pg.locator('[data-phone-ask]').first().click()
-      await settle()
-      must(await pg.locator('[data-ask-sheet]:visible').count(), 'Ask did not open its sheet')
+      must(await pg.locator('[data-ask-sheet]:visible').count(), 'the chat bar did not open the chat sheet')
       await pg.keyboard.press('Escape')
       await settle()
       step = 'the Brain count'
@@ -50,7 +45,7 @@ for (const width of WIDTHS) {
       const navItems = () => pg.locator('[data-nav-places] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')).filter((x) => x !== 'Review'))
       must(JSON.stringify(await navItems()) === JSON.stringify(PLACES), `the places are ${await navItems()}`)
       must(JSON.stringify(await pg.locator('[data-nav-bottom] [data-nav-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-nav-item')))) === JSON.stringify(['Settings']), 'the bottom is not Settings')
-      must(await pg.locator('[data-nav-capture]').count() && await pg.locator('[data-ask-box]').count(), 'Capture or the header box is missing')
+      must(await pg.locator('[data-nav-chat]').count() && await pg.locator('[data-ask-box]').count(), 'Chat or the header box is missing')
       step = 'each place opens and is the active item'
       const active = () => pg.locator('[data-sidebar] [aria-current="page"]').evaluateAll((els) => [...new Set(els.map((e) =>
         (e.closest('[data-nav-item]') || e.querySelector('[data-nav-item]'))?.getAttribute('data-nav-item')).filter(Boolean))])
@@ -72,23 +67,23 @@ for (const width of WIDTHS) {
       const t = await s.api('session.counts', { space: SPACE })
       const brain = (await pg.locator('[data-nav-count="Brain"]').count()) ? num(await pg.locator('[data-nav-count="Brain"]').innerText()) : 0
       must(brain === t.doors.inbox.n, `the sidebar says ${brain} for the Brain, the count helper says ${t.doors.inbox.n}`)
-      step = 'Capture opens its sheet and each entry works'
+      step = 'the chat panel opens and + holds what Capture held'
       await s.open('/life')
-      await pg.locator('[data-nav-capture]').click()
-      await settle()
-      const entries = (await pg.locator('[role="dialog"] button').allInnerTexts()).map((x) => x.trim()).filter(Boolean)
-      for (const e of ['Add as a task', 'Send to the Brain', 'Files or a photo', 'Goal', 'Note', 'Park on Someday']) must(entries.includes(e), `the capture sheet has no ${e}: ${entries}`)
-      await pg.keyboard.press('Escape')
-      for (const [kind, ok] of [['goal', async () => pg.getByRole('dialog', { name: 'New goal' }).isVisible()], ['note', async () => pg.getByRole('dialog', { name: 'New note' }).isVisible()],
-        ['someday', async () => pg.getByRole('dialog', { name: 'Park on Someday' }).isVisible()], ['files', async () => pg.locator('[data-capture-files]').isVisible()]]) {
-        await s.open('/life')
-        await pg.locator('[data-nav-capture]').click()
+      await pg.locator('[data-nav-chat]').click()
+      await pg.locator('[data-ask-panel]:visible').waitFor({ timeout: 10000 })
+      must(!(await pg.locator('[data-nav-capture], [data-capture-sheet]').count()), 'the Capture button or sheet is still there')
+      for (const [kind, ok] of [['Goal', async () => pg.getByRole('dialog', { name: 'New goal' }).isVisible()], ['Note', async () => pg.getByRole('dialog', { name: 'New note' }).isVisible()],
+        ['Park on Someday', async () => pg.getByRole('dialog', { name: 'Park on Someday' }).isVisible()], ['Important date', async () => pg.getByRole('dialog', { name: 'Add important date' }).isVisible()]]) {
+        await pg.locator('[data-ask-attach]:visible').click()
+        await pg.getByRole('menuitem', { name: kind }).click()
         await settle()
-        await pg.locator(`[data-capture-kind="${kind}"]`).click()
-        await settle()
-        must(await ok(), `Capture, ${kind} did not open`)
+        must(await ok(), `+, ${kind} did not open`)
         await pg.keyboard.press('Escape')
+        if (!(await pg.locator('[data-ask-panel]:visible').count())) await pg.locator('[data-nav-chat]').click()
       }
+      await pg.locator('[data-ask-attach]:visible').click()
+      must(await pg.getByRole('menuitem', { name: 'Files or a photo' }).count(), '+ has no Files or a photo')
+      await pg.keyboard.press('Escape')
     }
     // the Graph view of Library > Notes
     step = 'the Graph view of Notes'
@@ -142,7 +137,7 @@ for (const width of WIDTHS) {
       '/life/today/year?view=goals', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/library', '/life/library/notes',
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
       '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/library/timeline',
-      '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
+      '/life/library/archive', '/life/library/archive?type=trash', '/life/insights', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
       ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'connections', 'ai', 'cost', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
@@ -171,7 +166,7 @@ await check('PHONE.4', 'Keyboard: G then T, I, O or L opens a place; the older G
     ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/goals/cycles'], ['c', '/life/today/year'], ['e', '/life/settings', { tab: 'data' }],
     ['n', '/life/library/notes'], ['u', '/life/brain/activity'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
     ['x', '/life/library/notes', { by: 'assistant' }], ['g', '/life/library/notes', { view: 'graph' }], ['r', '/life/library/archive'], ['b', '/life/brain/outbox'], ['d', '/life/review'],
-    ['q', '/life/ask'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
+    ['q', '/life/insights'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
     await owner.open(key === 't' ? '/life/brain' : '/life')
     await pg.locator('[data-page-head]').first().click({ position: { x: 5, y: 5 } }).catch(() => {})
     await pg.keyboard.press('g')
@@ -212,12 +207,12 @@ await check('PHONE.4', 'Keyboard: G then T, I, O or L opens a place; the older G
       const f = await session('family@lifeos.test', width)
       const fe = errs(f.page)
       try {
-        await check('PHONE.5', `${width} px: the sidebar shows + Capture, Today, Brain, Goals, Library and Settings, in that order, and no other place`, async () => {
+        await check('PHONE.5', `${width} px: the sidebar shows Chat, Today, Brain, Goals, Library and Settings, in that order, and no other place`, async () => {
           await f.open('/life/today')
-          const order = await f.page.locator('[data-sidebar] [data-nav-capture], [data-sidebar] [data-nav-item]').evaluateAll((els) =>
-            els.map((e) => (e.hasAttribute('data-nav-capture') ? '+ Capture' : e.getAttribute('data-nav-item'))))
-          must(JSON.stringify(order) === JSON.stringify(['+ Capture', 'Today', 'Brain', 'Goals', 'Library', 'Settings']), 'the sidebar reads ' + order.join(', '))
-          must((await f.page.locator('[data-sidebar] [data-nav-capture]').innerText()).includes('Capture'), 'the first button is not Capture')
+          const order = await f.page.locator('[data-sidebar] [data-nav-chat], [data-sidebar] [data-nav-item]').evaluateAll((els) =>
+            els.map((e) => (e.hasAttribute('data-nav-chat') ? 'Chat' : e.getAttribute('data-nav-item'))))
+          must(JSON.stringify(order) === JSON.stringify(['Chat', 'Today', 'Brain', 'Goals', 'Library', 'Settings']), 'the sidebar reads ' + order.join(', '))
+          must((await f.page.locator('[data-sidebar] [data-nav-chat]').innerText()).includes('Chat'), 'the first button is not Chat')
           for (const gone of ['[data-nav-pin]', '[data-nav-plan]', '[data-nav-new]']) must(!(await f.page.locator(gone).count()), 'the sidebar still has ' + gone)
           must(await f.page.locator('[data-page-head] [data-ask-box]').count(), 'Ask is not in the header')
           must(!fe.length, 'script errors: ' + fe.slice(0, 3).join(' | '))
@@ -319,24 +314,27 @@ frappe.get_doc({"doctype": "Life Review", "space": "Shared", "user": "family@lif
         must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
       })
       if (phone) {
-        await check('PHONE.10', `${width} px: the bottom bar shows Today, Brain, the capture button, Goals and Library; capture opens the capture sheet`, async () => {
-          await s.open('/life/today')
+        await check('PHONE.10', `${width} px: the chat bar is above the tabs on every screen and there is no + Capture; "buy rakhi thread", with no question, makes a capture`, async () => {
+          for (const path of ['/life/today', '/life/brain', '/life/goals', '/life/library']) {
+            await s.open(path)
+            must(await pg.locator('[data-tabbar] [data-chat-bar]').isVisible(), `no chat bar on ${path}`)
+            must(!(await pg.locator('[data-tab-capture], [data-nav-capture]').count()), `a Capture button on ${path}`)
+            for (const sel of ['[data-ask-attach]', '[data-ask-camera]', '[data-ask-mic]']) must(await pg.locator(`[data-chat-bar] ${sel}`).count(), `the chat bar has no ${sel} on ${path}`)
+          }
           const bar = pg.locator('[data-tabbar]')
           const items = await bar.locator('[data-tab-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-tab-item')))
           must(JSON.stringify(items) === JSON.stringify(['Today', 'Brain', 'Goals', 'Library']), 'the bar reads ' + items.join(', '))
-          const x = async (sel) => (await bar.locator(sel).first().boundingBox()).x
-          const cap = await x('[data-tab-capture]')
-          must(cap > await x('[data-tab-item="Brain"]') && cap < await x('[data-tab-item="Goals"]'), 'the capture button is not in the middle')
-          await bar.locator('[data-tab-capture]').click()
-          const sheet = pg.locator('[role="dialog"]').filter({ has: pg.locator('[data-capture-text]') })
-          await sheet.waitFor({ timeout: 5000 })
-          const title = `I14 captured ${width} ${stamp}`
-          await sheet.locator('[data-capture-text] textarea, textarea[data-capture-text]').first().fill(title)
-          await sheet.locator('[data-capture-task]').click()
-          await sheet.waitFor({ state: 'detached', timeout: 5000 })
-          const made = JSON.parse(bench(`import json\nprint(json.dumps(frappe.get_all("Life Task", filters={"title": "${title}"}, pluck="name")))`).split('\n').pop())
-          must(made.length === 1, 'the capture sheet did not add the task')
-          await s.api('frappe.client.delete', { doctype: 'Life Task', name: made[0] }).catch(() => {})
+          const above = await pg.evaluate(() => document.querySelector('[data-chat-bar]').getBoundingClientRect().bottom <= document.querySelector('[data-tabbar] nav, [data-tabbar] [aria-label="Places"]').getBoundingClientRect().top + 1)
+          must(above, 'the chat bar is not above the tabs')
+          await s.open('/life/today')
+          const title = `buy rakhi thread ${width} ${stamp}`
+          await pg.locator('[data-chat-bar-input] input, input[data-chat-bar-input]').first().fill(title)
+          await pg.locator('[data-chat-bar-send]').click()
+          let made = []
+          for (let i = 0; i < 20 && !made.length; i++) { made = JSON.parse(bench(`import json\nprint(json.dumps(frappe.get_all("Life Inbox Item", filters={"title": "${title}"}, pluck="name")))`).split('\n').pop()); if (!made.length) await pg.waitForTimeout(500) }
+          must(made.length === 1, 'the message with no question did not make a capture')
+          must(!(await pg.locator('[data-ask-sheet]:visible').count()), 'a capture opened the chat sheet')
+          bench(`frappe.delete_doc("Life Inbox Item", "${made[0]}", force=1, ignore_permissions=True)`)
           await noSideways(pg)
           must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
         })
@@ -490,8 +488,8 @@ print(json.dumps(rows))`).split('\n').pop())
   const queued = () => pg.evaluate(() => new Promise((res) => { const r = indexedDB.open('lifeos-phone', 1)
     r.onupgradeneeded = () => { for (const n of ['queue', 'shares']) if (!r.result.objectStoreNames.contains(n)) r.result.createObjectStore(n, { keyPath: 'id' }) }
     r.onsuccess = () => { const q = r.result.transaction('queue').objectStore('queue').count(); q.onsuccess = () => { r.result.close(); res(q.result) } } }))
-  const openCapture = async () => { await pg.locator('[data-tab-capture]').click(); await pg.locator('[data-capture-text]').waitFor() }
-  const typeAndSend = async (text) => { await pg.locator('[data-capture-text] textarea, textarea[data-capture-text]').first().fill(text); await pg.locator('[data-capture-brain]').click() }
+  const openCapture = async () => { await pg.locator('[data-chat-bar-input]').waitFor() }
+  const typeAndSend = async (text) => { await pg.locator('[data-chat-bar-input] input, input[data-chat-bar-input]').first().fill(text); await pg.locator('[data-chat-bar-send]').click() }
   const waitCount = (n) => pg.waitForFunction((n) => (document.querySelector('[data-queue-note]')?.textContent.match(/(\d+) waiting/) || [0, 0])[1] == n, n, { timeout: 15000 })
   const where = `title like 'I50 %${stamp}%'`
   try {
@@ -500,7 +498,7 @@ print(json.dumps(rows))`).split('\n').pop())
     await pg.goto(base + '/life/today', { waitUntil: 'networkidle' })
     await pg.evaluate(() => navigator.serviceWorker.ready)
     await pg.reload({ waitUntil: 'networkidle' }) // now the worker controls the page
-    await pg.locator('[data-tab-capture]').waitFor()
+    await pg.locator('[data-chat-bar-input]').waitFor()
 
     await check('PHONE.17', 'The manifest is valid and the service worker is registered (phone profile)', async () => {
       const m = await (await ctx.request.get(base + '/assets/lifeos/manifest.webmanifest')).json()
@@ -521,7 +519,7 @@ print(json.dumps(rows))`).split('\n').pop())
       must(!bad.length, 'cached and not static: ' + bad.slice(0, 3).join(' '))
     })
 
-    await check('PHONE.19', 'Posting to the share target with a photo and text opens the capture screen; Save makes one capture with the file', async () => {
+    await check('PHONE.19', 'Posting to the share target with a photo and text opens the share screen; Save puts it in the chat, which keeps the file as a capture', async () => {
       const png = await pg.screenshot()
       const url = await pg.evaluate(async ({ stamp, bytes }) => {
         const f = new FormData()
@@ -539,9 +537,10 @@ print(json.dumps(rows))`).split('\n').pop())
       must(items(where).length === 0, 'something was sent before Save')
       await pg.getByLabel('Instruction (optional)').fill('I50 summarise')
       await pg.locator('[data-share-save]').click()
-      await pg.waitForFunction(() => location.pathname.startsWith('/life/brain'), null, { timeout: 15000 })
-      const rows = items(where)
-      must(rows.length === 1 && rows[0].source_type === 'Phone' && rows[0].files === 1 && rows[0].instruction === 'I50 summarise', 'the capture is wrong: ' + JSON.stringify(rows))
+      await pg.waitForFunction(() => location.pathname.startsWith('/life/today'), null, { timeout: 15000 })
+      let rows = []
+      for (let i = 0; i < 20 && !rows.length; i++) { rows = items(`title = 'shared-${stamp}.png'`); if (!rows.length) await pg.waitForTimeout(500) }
+      must(rows.length === 1 && rows[0].source_type === 'Upload' && rows[0].files === 1 && rows[0].instruction.includes('I50 summarise'), 'the capture is wrong: ' + JSON.stringify(rows))
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
@@ -551,10 +550,10 @@ print(json.dumps(rows))`).split('\n').pop())
       await pg.waitForFunction(() => !navigator.onLine)
       await openCapture()
       await typeAndSend(`I50 offline one ${stamp}`)
-      await pg.locator('[data-capture-text]').waitFor({ state: 'hidden' })
+      await pg.waitForTimeout(500)
       await openCapture()
       await typeAndSend(`I50 offline two ${stamp}`)
-      await pg.locator('[data-capture-text]').waitFor({ state: 'hidden' })
+      await pg.waitForTimeout(500)
       await waitCount(2)
       must((await pg.locator('[data-queue-note]').innerText()).includes('2 waiting to send'), 'the note does not say "2 waiting to send"')
       must(await pg.locator('[data-offline]').count() === 1, 'no offline note on the screen')
@@ -568,24 +567,18 @@ print(json.dumps(rows))`).split('\n').pop())
     })
 
     await ctx.setOffline(false)
-    await check('PHONE.21', 'Recording on + Capture (fake microphone) makes an audio capture marked not transcribed yet', async () => {
+    await check('PHONE.21', 'The mic on the chat bar records (fake microphone) and sends the recording to the server to be turned into text; nothing is captured and the recording is not kept', async () => {
       await pg.goto(base + '/life/today', { waitUntil: 'networkidle' })
-      await openCapture()
-      await pg.locator('[data-capture-voice]').click()
-      await pg.waitForFunction(() => /Stop recording/.test(document.querySelector('[data-capture-voice]')?.textContent || ''), null, { timeout: 10000 })
+      const before = items(`source_type = 'Voice Note'`).length
+      await pg.locator('[data-chat-bar] [data-ask-mic]').click()
+      await pg.waitForFunction(() => document.querySelector('[data-chat-bar] [data-ask-mic]')?.getAttribute('aria-label')?.startsWith('Stop'), null, { timeout: 10000 })
       await pg.waitForTimeout(1500)
-      await pg.locator('[data-capture-voice]').click()
-      await pg.locator('[data-capture-files]').getByText(/voice-note-/).first().waitFor({ timeout: 10000 }).catch(async (e) => { await pg.screenshot({ path: '/tmp/i50-5.png' }); throw e })
-      must(/voice-note-.*\.(webm|m4a|ogg)/.test(await pg.locator('[data-capture-files]').innerText()), 'the recording is not among the files')
-      await pg.locator('[data-capture-files] input[aria-label="Instruction"]').fill(`I50 voice ${stamp}`)
-      await pg.locator('[data-capture-brain]').click()
-      await pg.locator('[data-capture-text]').waitFor({ state: 'hidden' })
-      let rows = []
-      for (let i = 0; i < 20 && !rows.length; i++) { rows = items(`instruction = 'I50 voice ${stamp}'`); if (!rows.length) await pg.waitForTimeout(500) }
-      must(rows.length === 1 && rows[0].source_type === 'Voice Note' && rows[0].files === 1, 'the audio capture is wrong: ' + JSON.stringify(rows))
-      await pg.goto(`${base}/life/item/${rows[0].name}`, { waitUntil: 'networkidle' })
-      await pg.locator('[data-item-untranscribed]').waitFor({ timeout: 10000 })
-      must(/not transcribed yet/.test(await pg.locator('[data-item-untranscribed]').innerText()), 'the capture does not say it is not transcribed yet')
+      const answered = pg.waitForResponse((r) => r.url().includes('chat.transcribe'), { timeout: 60000 })
+      await pg.locator('[data-chat-bar] [data-ask-mic]').click()
+      await answered // the text (or, for a beep, "nothing was heard") comes from faster-whisper on the server
+      must(items(`source_type = 'Voice Note'`).length === before, 'the recording was captured instead of written down')
+      const left = bench(`print(frappe.db.count("File", {"file_name": ["like", "voice-%"], "attached_to_doctype": ["is", "not set"]}))`).split('\n').pop()
+      must(Number(left) === 0, 'the recording was kept: ' + left)
     })
 
     await check('PHONE.22', 'Logging out empties the offline queue', async () => {
@@ -593,7 +586,7 @@ print(json.dumps(rows))`).split('\n').pop())
       await pg.route('**/api/method/lifeos.api.inbox.create_item', (r) => r.abort('connectionfailed')) // sending fails: it stays queued
       await openCapture()
       await typeAndSend(`I50 queued at logout ${stamp}`)
-      await pg.locator('[data-capture-text]').waitFor({ state: 'hidden' })
+      await pg.waitForTimeout(500)
       await waitCount(1)
       must(await queued() === 1, 'one capture should be waiting')
       await pg.locator('[data-more-title]').click()
@@ -610,7 +603,7 @@ print(json.dumps(rows))`).split('\n').pop())
       must(new URL(pg.url()).pathname === '/login', 'went to ' + pg.url())
       await pg.waitForTimeout(1500)
       must(apiCalls.length === before, 'something was sent: ' + apiCalls.slice(before).join(' '))
-      must(items(`title = 'I50 shared ${stamp}'`).length === 1 && items(`title like 'I50 queued%${stamp}%'`).length === 0, 'no new capture should exist') // the one saved in I50.3
+      must(items(`title = 'shared-${stamp}.png'`).length === 1 && items(`title like 'I50 queued%${stamp}%'`).length === 0, 'no new capture should exist') // the one saved in I50.3
     })
   } finally {
     bench(`for n in frappe.get_all("Life Inbox Item", filters={"instruction": "I50 voice ${stamp}"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
@@ -640,7 +633,7 @@ print(json.dumps({"item": first("Life Inbox Item"), "goal": first("Life Goal"), 
         '/brain/skills/:name': `/life/brain/skills/${ids.skill}`, '/brain/sources/:key': '/life/brain/sources/gmail', '/brain/review/:id': `/life/brain/review/${ids.item}`, '/share': '/life/share',
         '/item/:id': `/life/item/${ids.item}`, '/goals/:tab(...)?': '/life/goals/cycles', '/goals/:id': `/life/goals/${ids.goal}`,
         '/focus/:id': `/life/focus/${ids.area}`, '/library/:tab(...)?': '/life/library/notes', '/library/pages/:doctype/:name': `/life/library/pages/Life%20Person/${ids.person}`, '/library/people/:person': `/life/library/people/${ids.person}`,
-        '/library/:id': `/life/library/${ids.note}`, '/review': '/life/review', '/how-it-works': '/life/how-it-works', '/ask': '/life/ask', '/settings': '/life/settings',
+        '/library/:id': `/life/library/${ids.note}`, '/review': '/life/review', '/how-it-works': '/life/how-it-works', '/insights': '/life/insights', '/settings': '/life/settings',
         '/dev/editor': '/life/dev/editor',
       }
       const source = fs.readFileSync(path.join(root, 'frontend/src/router.js'), 'utf8')

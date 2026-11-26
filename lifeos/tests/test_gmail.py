@@ -14,7 +14,6 @@ from lifeos.brain import agent_page as pages_agent
 from lifeos.ai import fake
 from lifeos.mail import digest, gmail, microsoft
 from lifeos.api import connections, inbox, settings
-from lifeos.api import ask as ask_api
 from lifeos.api import mail as mail_api
 from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import AskCase, item, set_key, SKILL, SkillCase, text, use
@@ -477,60 +476,6 @@ class TestDigest(GmailCase):
 
 
 
-class TestAskSearchesMail(AskCase):
-	"""Ask with an inbox connected (issue 86): it searches live, offers File it for what it read, and files only on the owner's click."""
-
-	def setUp(self):
-		super().setUp()
-		frappe.set_user("Administrator")
-		frappe.db.delete("Life Mail Account", {"space": PRIVATE})
-		frappe.db.delete("Life Mail Search", {"space": PRIVATE})
-		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": MAILBOX, "label": "Personal", "is_default": 1}).insert()
-		self.gmail = FakeGmail([person("t-tax", "Anil <anil@ca.example>", "2014 tax return", "Your 2014 return is attached.")])
-		frappe.flags.lifeos_gmail = {MAILBOX: self.gmail}
-		self.addCleanup(lambda: setattr(frappe.flags, "lifeos_gmail", {}))
-		frappe.set_user(OWNER)
-
-	def test_10_ask_finds_the_thread_and_offers_file_it_and_filing_makes_a_brain_item_linked_to_gmail(self):
-		backend = self.script(use("mail_search", {"text": "tax return", "after": "2014-04-01", "before": "2015-03-31"}),
-			use("mail_thread", {"thread_id": "t-tax"}, id="t2"),
-			{"content": [text("Anil Shah sent your 2014 tax return on 23 Nov.")], "stop_reason": "end_turn"})
-		res = ask_api.ask("find the 2014 tax return", space=PRIVATE)
-		offered = [t["name"] for t in backend.received[0]["tools"]]
-		self.assertIn("mail_search", offered)
-		self.assertIn("after:2014/04/01", self.gmail.query)
-		msg = res["message"]
-		self.assertEqual([(a["kind"], a["thread_id"]) for a in msg["actions"]], [("file_mail", "t-tax")])
-		self.assertEqual(msg["actions"][0]["label"], "File the email “2014 tax return” from Anil")
-		self.assertEqual(frappe.db.count("Life Inbox Item", {"space": PRIVATE, "source_system": "gmail"}), 0)  # nothing is filed until the owner clicks
-		log = frappe.get_all("Life Mail Search", filters={"space": PRIVATE}, fields=["user", "results", "query", "cost"])
-		self.assertEqual((log[0].user, log[0].results), (OWNER, 1))
-		self.assertGreater(log[0].cost, 0)  # the AI cost of the turn that searched
-		with mock.patch("frappe.enqueue"):
-			done = ask_api.run_action(msg["name"], 0)
-		item = frappe.get_doc("Life Inbox Item", done["item"])
-		self.assertEqual((item.source_system, item.external_id, item.title), ("gmail", "t-tax", "2014 tax return"))
-		self.assertIn("mail.google.com", item.source_url)
-
-	def test_without_an_inbox_ask_is_not_offered_the_mail_tools(self):
-		frappe.set_user("Administrator")
-		frappe.db.delete("Life Mail Account", {"space": PRIVATE})
-		frappe.set_user(OWNER)
-		backend = self.script({"content": [text("Nothing here.")], "stop_reason": "end_turn"})
-		ask_api.ask("find the 2014 tax return", space=PRIVATE)
-		self.assertNotIn("mail_search", [t["name"] for t in backend.received[0]["tools"]])
-
-	def test_a_family_member_asking_never_reaches_the_owners_inbox(self):
-		self.as_user = lambda u: (permissions.clear_cache(), frappe.set_user(u))
-		frappe.set_user("Administrator")
-		frappe.db.set_value("Life Space", SHARED, "ask_enabled", 1)
-		frappe.set_user(FAMILY)
-		backend = self.script({"content": [text("Nothing here.")], "stop_reason": "end_turn"})
-		ask_api.ask("find the 2014 tax return", space=SHARED)
-		self.assertNotIn("mail_search", [t["name"] for t in backend.received[0]["tools"]])
-		self.assertEqual(self.gmail.calls, [])
-
-
 # ---------------------------------------------------------------- Ask's tools (issue 107)
 
 DAY_MS = 86_400_000
@@ -736,64 +681,6 @@ class TestAskTools(GmailCase):
 		self.as_user(AGENT)
 		with self.assertRaises(frappe.PermissionError):
 			mail_tools.save_attachment("t-bp", "att-blueprint.txt", area="Career", space=PRIVATE, source_system=self.KEY)
-
-	def test_7_ask_writes_when_the_owner_asks_lists_each_line_under_done_with_undo_and_undo_takes_it_back(self):
-		self.blueprint()
-		self.steps(lambda p: use("create_page", {"title": "Ambaji Food Products", "area": "Career", "part": "Tea", "kind": "Prospect", "body": "Prospective client."}, id="a"),
-			lambda p: use("save_attachment", {"thread_id": "t-bp", "attachment_id": "att-blueprint.txt", "page": p["page"], "area": "Career", "part": "Tea"}, id="b"),
-			lambda p: use("add_person", {"name": "Anirudh Poddar", "email": "anirudh@sap.example", "company": "SAP Partner", "link_to": p["page"]}, id="c"),
-			lambda p: {"content": [text("Done: the page, the blueprint and Anirudh.")], "stop_reason": "end_turn"})
-		res = ask_api.ask("Create a page on Ambaji Food Products as Prospect in Tea and save the blueprint there", space=PRIVATE)
-		msg = res["message"]
-		self.assertEqual(len(msg["done"]), 3)
-		self.assertTrue(all(d["undo"] for d in msg["done"]))
-		self.assertIn("Created page Ambaji Food Products (Prospect, Career › Tea)", msg["done"][0]["text"])
-		self.assertTrue(frappe.db.exists("Life Note", {"title": "Ambaji Food Products", "kind": "Prospect"}))
-		self.assertEqual(frappe.get_all("Life Agent Action", filters={"space": PRIVATE, "asked_by": "owner"}, pluck="agent"), ["ask"] * 3)
-		for i in (2, 1, 0):
-			ask_api.undo_done(msg["name"], i)
-		self.assertFalse(frappe.db.exists("Life Note", {"title": "Ambaji Food Products"}))
-		self.assertFalse(frappe.db.exists("File", {"file_name": "blueprint.txt"}))
-		self.assertFalse(frappe.db.exists("Life Person", {"space": PRIVATE, "full_name": "Anirudh Poddar"}))
-		self.assertTrue(all(d.get("undone") for d in ask_api.message(msg["name"])["done"]))
-		with self.assertRaises(frappe.ValidationError):
-			ask_api.undo_done(msg["name"], 0)
-
-	def test_8_a_question_needing_more_than_three_pages_runs_in_the_background_and_says_which_page(self):
-		self.busy_inbox(per_day=7)  # 105 threads: 5 pages
-		reads = lambda token: use("mail_list_threads", {"after": "2026-11-01", "before": "2026-11-15", **({"page_token": token} if token else {})}, id=f"p{token}")  # noqa: E731
-		self.steps(lambda p: reads(None))
-		with mock.patch("frappe.enqueue") as enq:
-			res = ask_api.ask("Summarize my emails from 1 to 15 Nov", space=PRIVATE, client_id="c1")
-		self.assertEqual(res.get("background"), 1)
-		self.assertEqual(res["message"]["status"], "Working")
-		self.assertEqual(enq.call_args.args[0], "lifeos.ai.ask_job.run_background")
-		seen = []
-
-		def next_page(p):  # each turn reads the next page with the token the last one gave
-			seen.append(frappe.cache.get_value(f"lifeos_ask_req:{OWNER}:c1")["reading"])
-			return reads(p["next_page_token"]) if p.get("next_page_token") else {"content": [text("A summary of 105 threads.")], "stop_reason": "end_turn"}
-		self.steps(lambda p: reads(None), *[next_page] * 6)
-		from lifeos.ai import ask_job
-
-		ask_job.run_background(**{k: v for k, v in enq.call_args.kwargs.items() if k not in ("queue", "timeout", "enqueue_after_commit")})
-		done = ask_api.message(res["message"]["name"])
-		self.assertEqual((done["status"], done["text"]), ("Done", "A summary of 105 threads."))
-		self.assertEqual(seen, [f"Reading 1–15 Nov… (page {n} of 5)" for n in range(1, 6)])
-
-	def test_9_ask_asks_one_question_with_choices_and_the_choice_is_the_next_message(self):
-		self.script(use("ask_one_question", {"question": "Which one?", "choices": ["Shakambhari Foods", "Shri Ambaji Food Products"]}),
-			{"content": [text("Which one did you mean?")], "stop_reason": "end_turn"})
-		msg = ask_api.ask("Create a page on Ambaji Foods", space=PRIVATE)["message"]
-		self.assertEqual([(a["kind"], a["label"]) for a in msg["actions"]], [("choose", "Shakambhari Foods"), ("choose", "Shri Ambaji Food Products")])
-		self.assertEqual(ask_api.run_action(msg["name"], 1)["answer"], "Shri Ambaji Food Products")
-
-	def test_10_file_it_buttons_are_named_for_what_they_file_and_a_filed_email_gets_none(self):
-		from lifeos.ai.tools import Context, file_actions
-
-		ctx = Context(PRIVATE)
-		ctx.mails_read = [{"thread_id": "t1", "account": "a", "subject": "LEAVE", "from": "Ashmeet Singh (ashmeet@x.example)", "date": "", "link": "l"}]
-		self.assertEqual(file_actions(ctx)[0]["label"], "File the email “LEAVE” from Ashmeet Singh")
 
 	def test_the_tools_are_whitelisted_methods_that_do_what_the_functions_do(self):
 		from lifeos.api import tools

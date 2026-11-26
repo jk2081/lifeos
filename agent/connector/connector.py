@@ -101,7 +101,9 @@ def job_row(j: dict) -> dict:
 		schedule = schedule.get("display") or schedule.get("expr") or json.dumps(schedule)
 	paused = j.get("paused") if "paused" in j else (j.get("enabled") is False)
 	return {"id": str(j.get("id") or j.get("name")), "name": str(j.get("name") or j.get("prompt") or "")[:140], "schedule": str(schedule or ""),
-		"next_run": str(j.get("next_run_at") or j.get("next_run") or ""), "paused": bool(paused)}
+		"next_run": str(j.get("next_run_at") or j.get("next_run") or ""), "paused": bool(paused),
+		# how its last run went, so a job that fails every day is seen in Life OS (issue 125)
+		"last_status": str(j.get("last_status") or ""), "last_run": str(j.get("last_run_at") or j.get("last_run") or ""), "last_error": str(j.get("last_error") or "")[:300]}
 
 
 def skill_rows(home: Path) -> list:
@@ -153,6 +155,14 @@ def apply_hermes_fact(home: Path, kind: str, target: str, payload: dict) -> None
 	raise RuntimeError("That fact is no longer in the agent's memory")
 
 
+def set_assistant_name(home: Path, name: str | None) -> None:
+	"""The name the owner gave the agent in Life OS goes into its settings file, so it uses it in its replies (issue 125)."""
+	settings = read_json(settings_file(home), {})
+	if name and settings.get("assistant_name") != name:
+		settings["assistant_name"] = name
+		settings_file(home).write_text(json.dumps(settings, indent=1))
+
+
 def apply_change(home: Path, change: dict) -> None:
 	"""Apply one change from Life OS to the agent's files; raises with a plain reason when it cannot."""
 	kind, target, payload = change["kind"], change["target"], change.get("payload") or {}
@@ -195,6 +205,7 @@ def apply_change(home: Path, change: dict) -> None:
 def run_once(life: Life, home: Path, system: str, space: str | None) -> dict:
 	"""Pick up and apply what the owner changed first, so the report that follows says what is true now; then report, then confirm."""
 	pulled = life.call("pull", get=True, source_system=system, space=space)
+	set_assistant_name(home, pulled.get("assistant_name"))
 	results = []
 	for ch in pulled["changes"]:
 		try:

@@ -30,6 +30,8 @@ ABILITY = {
 	"pages.update": ("write_pages", "Change a page"),
 	"people.add": ("write_pages", "Add a person"),
 	"notes.save": ("write_pages", "Save a note"),
+	"tasks.add": ("add_planning", "Add a task"),
+	"events.add": ("add_planning", "Add an event"),
 }
 
 
@@ -63,26 +65,28 @@ def check_read(space: str, source_system: str | None = None) -> None:
 		acts._need_switch(space, agent_key(space, source_system), "mail.search")
 
 
-def write(tool: str, space: str | None, params: dict, source_system: str | None = None, request: str | None = None) -> dict:
+def write(tool: str, space: str | None, params: dict, source_system: str | None = None, request: str | None = None, asked_by: str | None = None) -> dict:
 	"""Run a tool that writes, or hold it for the owner. Returns the tool's result with `done` (a line), `undo` (the log row to undo it with) and `action`;
-	or {waiting: <log row>, title} when an agent's request waits in Needs you."""
+	or {waiting: <log row>, title} when an agent's request waits in Needs you.
+
+	A person's call runs now. An agent's call goes through `limits.gate`, the one rule Google's acts follow too: the owner's request (`asked_by: owner`,
+	`request` the owner's words) runs now unless the owner switched that off for the agent, and the agent's own idea follows its switch."""
 	space = permissions.resolve_space(space, write=True)
 	ability, label = ABILITY.get(tool, (None, None))
 	title, draft = _describe(tool, params)
 	if not permissions.is_agent():
+		if asked_by == OWNER:
+			limits.claim_owner(space)  # a family member cannot say the owner asked
 		return _run(tool, space, params, ASK, OWNER, request, title, draft)
-	if not ability:  # a task or an event the owner asked Ask for: agents have their own ways to make these
+	if not ability:  # a rule the owner asked Ask for: agents have their own ways to make these
 		frappe.throw(_("Only the owner asks for this."), frappe.PermissionError, title=_("Owner only"))
 	agent = agent_key(space, source_system)
-	mode = limits.abilities(limits.config(space, agent))[ability]
-	if mode == limits.OFF:
-		frappe.throw(_("The owner has switched “{0}” off for this agent.").format(dict(limits.ACTIONS)[ability]), frappe.PermissionError, title=_("Switched off"))
-	if mode == limits.ASK:
-		row = frappe.get_doc({"doctype": "Life Agent Action", "space": space, "agent": agent, "action": ability, "title": f"{label}: {title}"[:200], "draft": draft[:5000],
-			"status": "Waiting", "asked_by": AGENT, "params": json.dumps({"tool": tool, **params}, default=str), "happened_on": now_datetime(),
-			"delivered": 1}).insert(ignore_permissions=True)  # system: the agent's own log; the space write check is above
-		return {"waiting": row.name, "title": title}
-	return _run(tool, space, params, agent, AGENT, request, title, draft)
+	if limits.gate(space, agent, ability, asked_by or AGENT, request) == limits.RUN:
+		return _run(tool, space, params, agent, asked_by or AGENT, request, title, draft)
+	row = frappe.get_doc({"doctype": "Life Agent Action", "space": space, "agent": agent, "action": ability, "title": f"{label}: {title}"[:200], "draft": draft[:5000],
+		"status": "Waiting", "asked_by": asked_by or AGENT, "request": " ".join((request or "").split())[:500] or None,
+		"params": json.dumps({"tool": tool, **params}, default=str), "happened_on": now_datetime(), "delivered": 1}).insert(ignore_permissions=True)  # system: the agent's own log; the space write check is above
+	return {"waiting": row.name, "title": title}
 
 
 def _describe(tool: str, p: dict) -> tuple[str, str]:
@@ -101,7 +105,7 @@ def _run(tool: str, space: str, params: dict, agent: str, asked_by: str, request
 		name = existing
 	else:
 		name = frappe.get_doc({"doctype": "Life Agent Action", "space": space, "agent": agent, "action": ABILITY.get(tool, (tool,))[0], "draft": draft[:5000], "asked_by": asked_by,
-			"request": (request or "")[:500] or None, "params": json.dumps({"tool": tool, **params}, default=str)[:60000], "delivered": 1, **values}).insert(ignore_permissions=True).name  # system: the log of what was done; the space write check is in `write`
+			"request": " ".join((request or "").split())[:500] or None, "params": json.dumps({"tool": tool, **params}, default=str)[:60000], "delivered": 1, **values}).insert(ignore_permissions=True).name  # system: the log of what was done; the space write check is in `write`
 	return {**result, "done": line, "undo": name if undo else None, "action": name}
 
 

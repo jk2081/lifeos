@@ -1,38 +1,9 @@
 <template>
-  <PageHead title="Ask" :sub="sub">
-    <span v-if="tab.current.value === 'ask' && st" class="text-sm text-ink-gray-7" data-ask-spend>{{ st.text }}</span>
-    <Button v-if="tab.current.value === 'insights' && canWrite()" label="Refresh insights" :loading="refreshing" data-insights-refresh @click="refresh" />
+  <PageHead title="Insights" sub="Insights are written every morning at 06:00 and when you click Refresh">
+    <Button v-if="canWrite()" label="Refresh insights" :loading="refreshing" data-insights-refresh @click="refresh" />
   </PageHead>
-  <TabBar inset :tabs="TABS_SHOWN" :model-value="tab.current.value" label="Ask sections" @update:model-value="tab.set" />
-
-  <!-- Ask: a thread, with the records it used and questions to try -->
-  <div v-show="tab.current.value === 'ask'" class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_22rem]" data-ask-page>
-    <div class="flex min-h-[60vh] flex-col gap-4 px-4 pb-6 pt-4 md:px-7">
-      <div class="flex-1"><AskThread />
-        <div v-if="!ask.messages.length && !ask.refusal" class="text-base text-ink-gray-6" data-ask-empty>Ask about anything in your records. Answers cite where they came from and suggest
-          what to do; nothing changes until you click.</div></div>
-      <div class="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-4"><AskComposer /></div>
-    </div>
-    <aside class="flex flex-col gap-5 border-outline-gray-1 px-4 py-4 md:border-l md:px-5">
-      <section v-if="lastAnswer && lastAnswer.cited?.length" data-ask-used>
-        <h2 class="mb-2 text-base-medium text-ink-gray-9">Records used for this answer</h2>
-        <div v-for="c in lastAnswer.cited" :key="c.n" class="flex gap-2.5 border-b border-outline-gray-1 py-2.5 last:border-b-0">
-          <Badge theme="blue" :label="String(c.n)" />
-          <div class="min-w-0"><a href="#" class="break-words text-base text-ink-blue-8 hover:underline" @click.prevent="openCite(lastAnswer, c.n)">{{ c.title }}</a>
-            <div class="text-sm text-ink-gray-6">{{ [c.kind, c.date && short(c.date)].filter(Boolean).join(' · ') }}</div></div>
-        </div>
-      </section>
-      <p class="text-sm text-ink-gray-6">Ask reads only what you can see{{ inSpace }}<template v-if="st && !st.vault">, never the Vault</template>. It never changes anything until you click a suggested action.</p>
-      <section v-if="st?.suggested">
-        <h2 class="mb-1.5 text-base-medium text-ink-gray-9">Try asking</h2>
-        <Button v-for="q in st.suggested" :key="q" variant="ghost" class="!h-auto w-full !justify-start !whitespace-normal py-1.5 text-left !font-normal !text-ink-gray-7" :label="q"
-          data-ask-try @click="tryAsk(q)" />
-      </section>
-    </aside>
-  </div>
-
   <!-- Insights: status chips with counts, filters by kind and area, and how they are made -->
-  <div v-if="tab.shown('insights')" v-show="tab.current.value === 'insights'" class="page-body" data-insights>
+  <div class="page-body" data-insights>
     <div class="flex flex-wrap items-center gap-2">
       <TabButtons :model-value="istatus" :options="STATUS.map((s) => ({ label: `${s.label} ${ins?.tabs?.[s.value] ?? ''}`, value: s.value }))" data-insight-status
         @update:model-value="(v) => setQuery({ istatus: v === 'New' ? undefined : v })" />
@@ -81,76 +52,38 @@
       <p v-if="ins?.run_on" class="mt-1 text-sm text-ink-gray-6">Last run {{ ins.run_on }}.</p>
     </Card>
   </div>
-
-  <!-- History: past threads, searchable, deletable -->
-  <div v-if="tab.shown('history')" v-show="tab.current.value === 'history'" class="page-body" data-ask-history>
-    <TextInput class="max-w-md" :model-value="hq" placeholder="Search your questions and answers" aria-label="Search history" @update:model-value="(v) => { hq = v; loadHistory() }" />
-    <Card flush class="!px-4">
-      <Row v-for="t in hist.rows" :key="t.name" class="!items-center" data-history-row>
-        <div class="min-w-0 flex-1"><a href="#" class="break-words text-base text-ink-gray-9 hover:underline" @click.prevent="openThread(t.name)">{{ t.title }}</a>
-          <div class="text-sm text-ink-gray-6">{{ [t.scope_label, t.questions + ' question' + (t.questions === 1 ? '' : 's'), t.last_message_on].filter(Boolean).join(' · ') }}</div></div>
-        <Button variant="ghost" icon="lucide-trash-2" :label="'Delete ' + t.title" data-history-delete @click="remove(t)" />
-      </Row>
-      <Empty v-if="!hist.rows.length" title="No questions yet." hint="Questions you ask from any screen are kept here, for you only." />
-    </Card>
-  </div>
 </template>
 
 <script setup>
 import { brainData } from '@/data/brain'
-import { inSpace } from '@/lib/lens'
-// The Ask page (UX fixes, set 5): Ask (a thread, the records it used, questions to try), Insights and History.
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+// Insights (issue 120): what the Brain noticed. It was a tab of the Ask page; the chat moved to the panel on every screen and its History into the panel.
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, Select, TabButtons, TextInput, dialog, toast } from 'frappe-ui'
+import { Badge, Button, Dropdown, Select, TabButtons, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
-import TabBar from '@/components/TabBar.vue'
-import AskThread from '@/components/ask/AskThread.vue'
-import AskComposer from '@/components/ask/AskComposer.vue'
 import Card from '@/components/ui/Card.vue'
-import Row from '@/components/ui/Row.vue'
 import Empty from '@/components/Empty.vue'
 import { db, errorText } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
-import { useUrlTab } from '@/lib/tabs'
-import { ask, loadThread, openCite, scopeFromRoute, send } from '@/lib/ask'
 
 const route = useRoute()
 const router = useRouter()
-const st = ref(null)
 const ins = ref(null)
 const refreshing = ref(false)
 const openRow = ref('')
-const hq = ref('')
-const hist = reactive({ rows: [], total: 0 })
 const STATUS = [{ value: 'New', label: 'New' }, { value: 'Snoozed', label: 'Snoozed' }, { value: 'Acted', label: 'Acted on' }, { value: 'Dismissed', label: 'Dismissed' }]
 const KINDS = ['Stuck', 'Waiting on you', 'Promise', '12 Week Year', 'Habit', 'Check-in', 'Theme', 'Someday']
 const KIND_THEME = { Stuck: 'red', 'Waiting on you': 'amber', Promise: 'amber', '12 Week Year': 'blue', Habit: 'green', 'Check-in': 'green', Theme: 'violet', Someday: 'violet' }
 const REASONS = ['Not relevant', 'Already done', 'Wrong']
 const SNOOZE = [{ label: 'For 3 days', days: 3 }, { label: 'For a week', days: 7 }, { label: 'For a month', days: 30 }]
-const TABS_SHOWN = computed(() => [{ value: 'ask', label: 'Ask' }, { value: 'insights', label: 'Insights', count: ins.value?.tabs?.New }, { value: 'history', label: 'History' }])
-const tab = useUrlTab('tab', TABS_SHOWN)
 const istatus = computed(() => route.query.istatus || 'New')
-const lastAnswer = computed(() => [...ask.messages].reverse().find((m) => m.role === 'assistant'))
-const sub = computed(() => tab.current.value === 'insights' ? 'Insights are written every morning at 06:00 and when you click Refresh'
-  : `Answers come from your records${inSpace.value}${st.value && !st.value.vault ? ' · Vault excluded' : ''}`)
 const statusText = (r) => r.status === 'Snoozed' ? `Snoozed to ${short(r.snooze_until)}` : r.status === 'Acted' ? `Acted${r.acted_note ? ' · ' + r.acted_note : ''}`
   : r.status === 'Dismissed' ? `Dismissed${r.dismiss_reason ? ' · ' + r.dismiss_reason.toLowerCase() : ''}` : 'New'
 const setQuery = (q) => router.replace({ query: { ...route.query, ...q } })
 
-function tryAsk(q) {
-  ask.thread = null
-  ask.messages = []
-  ask.scope = scopeFromRoute()
-  send(q)
-}
-async function openThread(name) {
-  await loadThread(name)
-  tab.set('ask')
-}
 async function loadInsights() {
   try {
     ins.value = await brainData.insights.list({ space: store.space, status: istatus.value === 'all' ? 'all' : istatus.value, kind: route.query.kind, area: route.query.area,
@@ -189,21 +122,9 @@ async function dismiss(r, reason) {
   loadInsights()
 }
 async function restore(r) { await db.set('Life Insight', r.name, { status: 'New' }); loadInsights() }
-async function loadHistory() {
-  try { Object.assign(hist, await brainData.ask.threads({ space: store.space, q: hq.value || undefined })) } catch (e) { /* shown as empty */ }
-}
-function remove(t) {
-  dialog.danger({ title: 'Delete this question?', message: `“${t.title}” and its answers are deleted for good.`, confirmLabel: 'Delete',
-    onConfirm: async () => { await brainData.ask.delete_thread({ name: t.name }); if (ask.thread === t.name) { ask.thread = null; ask.messages = [] } loadHistory() } })
-}
 watch(() => [route.query.istatus, route.query.kind, route.query.area, route.query.actionable], loadInsights)
-watch(() => tab.current.value, (v) => { if (v === 'history') loadHistory() })
-watch(() => route.query.thread, (v) => { if (v) loadThread(String(v)) }, { immediate: true })
 onMounted(async () => {
   loadLookups()
-  if (!ask.scope) ask.scope = scopeFromRoute()
-  try { st.value = await brainData.ask.status({ space: store.space }) } catch (e) { st.value = null }
   loadInsights()
-  if (tab.current.value === 'history') loadHistory()
 })
 </script>

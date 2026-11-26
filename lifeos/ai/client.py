@@ -159,10 +159,15 @@ def spend_status():
 		"text": f"This month: ${s:,.2f} of ${c:,.0f}"}
 
 
-def check(purpose="Ask"):
+def check(purpose="Brain"):
 	"""Stop before a call: no key, the month's spend has reached the cap, or this feature has reached its own cap."""
 	if not is_set_up():
-		raise NotSetUp(_("Ask is not set up yet."))
+		raise NotSetUp(_("The AI is not set up yet."))
+	return check_cap(purpose)
+
+
+def check_cap(purpose):
+	"""Stop before a call when the month's spend has reached the cap, or this feature has reached its own cap. Chat runs on Flow's own key, so it checks only this."""
 	st = spend_status()
 	if st["reached"]:
 		raise CapReached(_("This month's AI spend has reached the cap: ${0} of ${1}.").format(f"{st['spent']:,.2f}", f"{st['cap']:,.0f}"))

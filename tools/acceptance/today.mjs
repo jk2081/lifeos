@@ -1,6 +1,6 @@
 // Today: Day, Week, Month and Year, the lists' counts, rhythm banners, Reset and the first-run guide.
 // Checks are numbered TODAY.<n> in the order they appear here; `node tools/acceptance.mjs --only=TODAY` runs this file's checks.
-import { SPACE, WIDTHS, addDays, areaId, areas, base, bench, browser, check, must, nextWeekday, owner, path, plusDays, session, stamp, today } from './context.mjs'
+import { PDF, SPACE, WIDTHS, addDays, areaId, areas, base, bench, browser, chatOff, chatOn, check, must, nextWeekday, owner, path, plusDays, session, stamp, today } from './context.mjs'
 import { ROW, num, ux, uxArea, uxKit } from './ux.mjs'
 
 await check('TODAY.1', 'Log in, open /life, Today is filled from seed data', async () => {
@@ -197,7 +197,7 @@ while d <= last:
     bench(`frappe.db.set_value("Life Insight", "${other.name}", "snooze_until", frappe.utils.add_days(frappe.utils.today(), -1))`)
     await s.api('insights.refresh', { space: SPACE })
     must((await s.api('insights.list', { space: SPACE, status: 'New', page_length: 100 })).rows.some((r) => r.name === other.name), 'the snoozed insight did not return after its date')
-    await s.open('/life/ask?tab=insights')
+    await s.open('/life/insights')
     must(await pg.locator('[data-insight-row]').count() && await pg.locator('[data-insights-how]').isVisible(), 'the Insights tab shows no insights')
     return [...kinds].join(', ')
   })
@@ -1095,20 +1095,12 @@ for (const width of WIDTHS) {
       await pg.locator('[data-main]').waitFor({ timeout: 10000 })
     })
     // issue 102: the AI service has no credit
-    await check('TODAY.30', `${width} px: with the fake AI failing on credit, Ask shows the credit message and Today shows "The Brain is off" with a link to Settings > AI, until a call works`, async () => {
-      const task = await one.api('tasks.quick_add', { text: `Brain off ${stamp} ${width}`, space: SPACE })
+    await check('TODAY.30', `${width} px: with the fake AI failing on credit, Today shows "The Brain is off" with a link to Settings > AI, until a call works`, async () => {
       bench(`from frappe.installer import update_site_config
 update_site_config("lifeos_fake_ai_error", {"status": 400, "message": "Your credit balance is too low to access the Anthropic API."})
 frappe.defaults.clear_default("lifeos_ai_off", parent="__default")`)
       try {
-        await one.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%Brain off ${stamp} ${width}%`]]))}`)
-        await pg.locator(`[data-ref="task:${task.name}"]`).first().click()
-        await pg.locator('[data-pane-ask]').click()
-        await pg.locator('[data-ask-panel] textarea').fill('What is open?')
-        await pg.locator('[data-ask-send]:visible').click()
-        await pg.locator('[data-ask-error], [data-ask-refusal]').first().waitFor({ timeout: 20000 })
-        const said = await pg.locator('[data-ask-error], [data-ask-refusal]').first().innerText()
-        must(/credit/i.test(said) && !/\(400\)/.test(said), 'Ask does not show the credit message: ' + said)
+        bench(`from lifeos.ai import client\nclient.note_unavailable(client.error_from(400, "Your credit balance is too low to access the Anthropic API."))`) // a Brain call failed on credit
         await one.open('/life')
         await pg.locator('[data-brain-off]').waitFor({ timeout: 15000 })
         must(/The Brain is off: .*credit/i.test(await pg.locator('[data-brain-off]').innerText()), 'Today does not say the Brain is off')
@@ -1217,9 +1209,10 @@ print(d.name)`).split('\n').pop()
         must(/^\d+( [A-Za-z]+)? – \d+ [A-Za-z]+/m.test(head.text), `the heading on ${url} is not a date range: ${head.text.slice(0, 80)}`)
       }
       await s.open('/life')
-      await pg.locator(phone ? '[data-tabbar] [data-tab-capture]' : '[data-nav-capture]').click()
+      if (!phone) { await pg.locator('[data-nav-chat]').click(); await pg.locator('[data-ask-panel]:visible').waitFor({ timeout: 8000 }) }
+      await pg.locator(phone ? '[data-chat-bar] [data-ask-attach]' : '[data-ask-panel] [data-ask-attach]').click()
       await settle()
-      await pg.locator('[data-capture-kind="date"]').click()
+      await pg.getByRole('menuitem', { name: 'Important date' }).click()
       await pg.getByRole('dialog', { name: 'Add important date' }).waitFor({ timeout: 8000 })
       await pg.keyboard.press('Escape')
     })
@@ -1398,6 +1391,111 @@ frappe.db.set_value("Life Task", "${name}", "check_by", add_days(today(), -1))`)
     })
   } finally {
     bench(`for n in frappe.get_all("Life Task", filters={"title": ["like", "I118T %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 120: one chat on every screen. The panel (laptop) stays open between screens, knows the record on screen, takes dropped files and notes on the open event;
+// the real run (Flow's agent and tools) against the fake model of tools/fake_openai.py.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const made = { events: [], goals: [], items: [] }
+  const panel = () => pg.locator('[data-ask-panel]:visible').first()
+  // the thread holds earlier answers: wait until the one just asked for is written
+  const answered = async () => { await pg.waitForTimeout(700); await panel().locator('[data-ask-working]').waitFor({ state: 'detached', timeout: 90000 }); await panel().locator('[data-ask-answer][data-status="Done"]').last().waitFor({ timeout: 5000 }) }
+  const openPanel = async () => {
+    if (phone) { await pg.locator('[data-chat-bar-open]').click() } else if (!(await pg.locator('[data-ask-panel]:visible').count())) await pg.locator('[data-nav-chat]').click()
+    await panel().waitFor({ timeout: 10000 })
+  }
+  try {
+    chatOn()
+    if (!phone) {
+      await check('TODAY.62', `${width} px: the chat panel stays open with its messages from Today to the Library to a goal, and its chip shows the goal`, async () => {
+        const goal = bench(`g = frappe.get_doc({"doctype": "Life Goal", "space": "${SPACE}", "title": "I120 chip goal ${stamp}", "area": "${areaId('Career')}", "horizon": "Long term", "done_when": "Done"}).insert(ignore_permissions=True)
+print(g.name)`).split('\n').pop()
+        made.goals.push(goal)
+        await s.open('/life/today')
+        await pg.locator('[data-nav-chat]').click()
+        await panel().waitFor({ timeout: 10000 })
+        await pg.locator('[data-ask-input]:visible').fill('What tasks do I have?')
+        await pg.locator('[data-ask-send]:visible').click()
+        await answered()
+        await pg.locator('[data-sidebar] [data-nav-item="Library"]').first().click()
+        await pg.waitForURL((u) => u.pathname.startsWith('/life/library'), { timeout: 10000 })
+        const kept = await pg.locator('[data-ask-panel]:visible').count() ? (await pg.locator('[data-ask-panel]:visible [data-ask-answer]').last().innerText()).slice(0, 80) : 'NO PANEL'
+        must(kept.includes('From the tool'), 'the panel lost its messages on the Library: ' + kept)
+        await pg.evaluate((g) => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push(`/goals/${g}`), goal) // in the app, not a reload: the panel keeps its messages
+        await pg.locator('[data-ask-scope]:visible').waitFor({ timeout: 10000 })
+        await pg.waitForFunction((t) => document.querySelector('[data-ask-scope]')?.textContent.includes(t), `I120 chip goal ${stamp}`, { timeout: 10000 })
+        must((await pg.locator('[data-ask-scope]').first().innerText()).startsWith('About:'), 'the chip does not say About')
+        await pg.locator('[data-ask-scope-clear]').click()
+        must((await pg.locator('[data-ask-scope]').first().innerText()).includes('Everything'), 'removing the chip did not make it about everything')
+        await pg.locator('[data-ask-expand]').click()
+        must(await pg.locator('[data-ask-panel][data-wide="1"]').count(), 'Expand did not widen the panel')
+        await pg.locator('[data-ask-close]').click()
+      })
+    }
+    if (!phone) await check('TODAY.63', `${width} px: "add a note: quote by Friday" with an event open adds a Comment on that event, and the Done list shows it with Change`, async () => {
+      const ev = bench(`e = frappe.get_doc({"doctype": "Event", "subject": "I120 RSH Global meeting ${stamp}", "starts_on": frappe.utils.today() + " 21:00:00", "event_type": "Public", "life_space": "${SPACE}"}).insert(ignore_permissions=True)
+print(e.name)`).split('\n').pop()
+      made.events.push(ev)
+      await s.open(`/life/today/week?open=event:${ev}`)
+      await pg.locator('[data-pane-title]').waitFor({ timeout: 10000 })
+      await openPanel()
+      await pg.waitForFunction(() => /About:/.test(document.querySelector('[data-ask-scope]')?.textContent || ''), null, { timeout: 10000 })
+      await pg.locator('[data-ask-input]:visible').fill('add a note: quote by Friday')
+      await pg.locator('[data-ask-send]:visible').click()
+      await answered()
+      const line = panel().locator('[data-ask-done-line]').last()
+      must((await line.innerText()).includes('Change'), 'the Done line has no Change: ' + await line.innerText())
+      const n = bench(`print(frappe.db.count("Comment", {"reference_doctype": "Event", "reference_name": "${ev}", "content": "quote by Friday"}))`).split('\n').pop()
+      must(Number(n) === 1, 'no Comment on the event: ' + n)
+    })
+    if (!phone) {
+      await check('TODAY.64', `${width} px: a PDF bill dropped on the page is attached to the chat and, sent, becomes a capture for the Brain, listed with Change`, async () => {
+        await s.open('/life/today')
+        await pg.evaluate(async (b64) => {
+          const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))
+          const dt = new DataTransfer()
+          dt.items.add(new File([bytes], 'water-bill-I120.pdf', { type: 'application/pdf' }))
+          for (const type of ['dragenter', 'dragover', 'drop']) document.body.dispatchEvent(new DragEvent(type, { dataTransfer: dt, bubbles: true, cancelable: true }))
+        }, PDF.toString('base64'))
+        await pg.locator('[data-ask-file]:visible').waitFor({ timeout: 10000 })
+        must((await pg.locator('[data-ask-file]').first().innerText()).includes('water-bill-I120.pdf'), 'the dropped file is not attached')
+        await pg.locator('[data-ask-input]:visible').fill('file this bill')
+        await pg.locator('[data-ask-send]:visible').click()
+        await answered()
+        const line = panel().locator('[data-ask-done-line]').last()
+        must((await line.innerText()).includes('water-bill-I120.pdf') && (await line.innerText()).includes('Change'), 'the Done line is: ' + await line.innerText())
+        const item = bench(`print(frappe.db.get_value("Life Inbox Item", {"title": "water-bill-I120.pdf", "space": "${SPACE}"}, "name") or "")`).split('\n').pop()
+        must(item, 'no capture was made for the bill')
+        made.items.push(item)
+      })
+    }
+    await check('TODAY.65', `${width} px, light and dark: the chat open has no script error and nothing is cut off`, async () => {
+      for (const scheme of ['light', 'dark']) {
+        await pg.emulateMedia({ colorScheme: scheme })
+        await s.open('/life/today')
+        await openPanel()
+        await pg.waitForTimeout(400)
+        await noSideways()
+        const cut = await pg.evaluate(() => { const r = document.querySelector('[data-ask-panel]')?.getBoundingClientRect(); return !r || r.right > window.innerWidth + 1 || r.left < -1 })
+        must(!cut, `the chat is cut off in ${scheme}`)
+        if (phone) await pg.keyboard.press('Escape'); else await pg.locator('[data-ask-close]').click()
+      }
+      await pg.emulateMedia({ colorScheme: 'light' })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    chatOff()
+    bench(`for n in ${JSON.stringify(made.events)}: frappe.delete_doc("Event", n, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.goals)}: frappe.delete_doc("Life Goal", n, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.items)}: frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

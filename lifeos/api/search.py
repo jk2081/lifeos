@@ -19,13 +19,13 @@ ASK_MORE = 4  # rows asked for per row shown
 GROUPS = {
 	"Task": "Tasks", "Capture": "Captures", "Note": "Notes", "Wiki page": "Wiki pages", "Chat": "Chats", "Event": "Events", "Goal": "Goals",
 	"Cycle": "Cycles", "Focus": "Focuses", "Area": "Areas", "Person": "People", "Habit": "Habits", "Weekly review": "Weekly reviews",
-	"Insight": "Insights", "Ask thread": "Ask threads", "Vault document": "Vault documents", "Needs you": "Needs you", "Skill": "Skills",
+	"Insight": "Insights", "Chat thread": "Chat threads", "Vault document": "Vault documents", "Needs you": "Needs you", "Skill": "Skills",
 	"Source": "Sources",
 }
 # where a record opens when links.route_of has no page of its own for it
 ROUTES = {
 	"Event": "/today?open=event:{0}", "Life Area": "/settings?tab=areas", "Life Cycle": "/goals/cycles", "Life Person": "/library/people/{0}",
-	"Life Habit": "/settings?tab=habits", "Life Review": "/review", "Life Insight": "/ask?tab=insights", "Life Ask Thread": "/ask?thread={0}",
+	"Life Habit": "/settings?tab=habits", "Life Review": "/review", "Life Insight": "/chat?tab=insights", "Life Ask Thread": "/chat?thread={0}",
 	"Life Proposal": "/brain", "Life Skill": "/brain/skills/{0}", "Life Source Setting": "/brain/sources",
 }
 DATE_FIELD = {"Event": "starts_on", "Life Task": "due_date", "Life Chat Log": "date", "Life Goal": "target_date", "Life Cycle": "start_date"}
@@ -154,7 +154,7 @@ class Finder:
 @frappe.whitelist(methods=["GET"])
 def query(text: str, limit: int | None = 20, space: str | None = None, include_archived: bool | int | None = 0, area: str | None = None):
 	"""Search everything the person can open: tasks, captures, notes, chats, events, goals, areas, people, habits, reviews, insights,
-	Ask threads, Vault document titles, items in Needs you, skills, sources and comments on them. Results are grouped by kind, best
+	Chat threads, Vault document titles, items in Needs you, skills, sources and comments on them. Results are grouped by kind, best
 	match first. Archived records are left out unless asked for. `area` (the lens, with `space`) keeps records filed under it."""
 	permissions.require_login()
 	limit = min(max(int(limit or 20), 1), 100)

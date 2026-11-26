@@ -1,5 +1,5 @@
 <template>
-  <!-- The sidebar (issue 14): the logo (on a site with two or more spaces it opens the space picker; issue 46 removed the lens and the pinned areas), + Capture, then Today, Brain (with the
+  <!-- The sidebar (issue 14): the logo (on a site with two or more spaces it opens the space picker; issue 46 removed the lens and the pinned areas), Chat, then Today, Brain (with the
        Needs you count), Goals and Library, with Review between Goals and Library once it is earned; Settings and the user
        at the bottom. The whole bar collapses to an icon rail. -->
   <Sidebar :collapsible="true" :collapsed="nav.rail" width="232px" aria-label="Places" data-sidebar @update:collapsed="onCollapse">
@@ -7,8 +7,8 @@
       <template #prefix><span class="grid size-full place-items-center bg-surface-gray-10 text-sm font-semibold text-ink-base" aria-hidden="true">L</span></template>
     </SidebarHeader>
     <div class="px-2 pb-2 pt-1" :class="nav.rail && 'flex flex-col items-center'">
-      <Button v-if="nav.rail" icon="lucide-plus" label="Capture" variant="solid" tooltip="Capture" data-nav-capture @click="store.captureOpen = true" />
-      <Button v-else class="w-full" icon-left="lucide-plus" label="Capture" variant="solid" data-nav-capture @click="store.captureOpen = true" />
+      <Button v-if="nav.rail" icon="lucide-message-square" label="Chat" variant="solid" tooltip="Chat (⌘K)" data-nav-chat @click="toggleChat()" />
+      <Button v-else class="w-full" icon-left="lucide-message-square" label="Chat" variant="solid" data-nav-chat @click="toggleChat()" />
     </div>
     <div class="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-2" data-nav-groups>
       <nav class="flex flex-col gap-0.5" aria-label="Places" data-nav-places>
@@ -42,6 +42,7 @@ import { computed, h } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { Avatar, Badge, Button, Dropdown, Sidebar, SidebarCollapseToggle, SidebarHeader, SidebarItem } from 'frappe-ui'
 import { PLACES, REVIEW, SETTINGS } from '@/lib/nav'
+import { toggleChat } from '@/lib/ask'
 import { activePlace, nav, reviewShown, setRail } from '@/lib/sidebar'
 import { manySpaces, setSpace } from '@/lib/lens'
 import { store } from '@/lib/store'

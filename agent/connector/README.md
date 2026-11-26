@@ -32,8 +32,9 @@ All are in the `--home` folder. A missing file is an empty list.
 | File | Holds |
 | --- | --- |
 | `memory.json` | `[{"id": "f1", "text": "Prefers mornings for calls", "origin": "WhatsApp, 1 Nov", "learned_on": "2026-11-01"}]` (without an `id`, one is made from the text) |
-| `jobs.json` | `[{"id": "j1", "name": "Morning digest", "schedule": "Every day 7:00", "next_run": "tomorrow 7:00", "paused": false}]` |
+| `jobs.json` | `[{"id": "j1", "name": "Morning digest", "schedule": "Every day 7:00", "next_run": "tomorrow 7:00", "paused": false, "last_status": "error", "last_error": "Folio refresh: 401", "last_run": "2026-11-26 07:00"}]` (the last three are optional: a failed job shows in red on the agent's page) |
 | `skills/<name>/SKILL.md` | one folder for each skill; the first line of text is its description |
+| `settings.json` (`lifeos-settings.json` for Hermes) | the connector also writes `"assistant_name"`: what you call the agent in Life OS, for it to use in its replies. |
 | `settings.json` | `{"abilities": {"send_email": "ask", "read_email": "auto", "pay": "off"}}`; each is `auto` (on its own), `ask` (asks you) or `off`. Pay is always off |
 | `actions.json` | `[{"id": "a1", "action": "send_email", "title": "Chase Mehi Motors", "draft": "...", "status": "Waiting", "cost": 0.01, "when": "2026-11-23 10:00"}]`. `Waiting` is something it will not do until you approve; `Done` is something it did |
 

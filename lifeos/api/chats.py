@@ -1,5 +1,6 @@
 """Chat log: one record per AI chat, and the chats report."""
 import builtins
+import json
 import datetime
 
 import frappe
@@ -12,6 +13,73 @@ from lifeos import permissions
 from lifeos.api.timeline import index_rows
 from lifeos.api.utils import (area_criterion, count_tabs, count_where, filter_criteria, flag, group_summary, list_query, names_map, order_terms, page, parse,
 	sort_terms)
+
+
+RELAY_MAX_TURNS = 200
+
+
+def relay_title(space: str, source_system: str, channel: str) -> str:
+	"""What a relayed thread is called: the agent under the name the owner gave it, then the channel ("Jai's assistant · Telegram")."""
+	from lifeos.agents import limits
+
+	cfg = limits.config(space, source_system)
+	name = limits.display_name(cfg) if cfg and cfg.display_name else (source_system or "").title()
+	return f"{name} · {channel}"[:140]
+
+
+@frappe.whitelist(methods=["POST"])
+def relay(turns: str | builtins.list, channel: str, source_system: str, external_id: str, space: str | None = None):
+	"""An agent hands over the owner's conversation on one of its channels (Telegram): `turns` is [{role: owner or assistant, text, at, id}] in the order they were said.
+	They are added to one thread for this agent and channel ("Hermes · Telegram"), which the owner reads in Chat, read only. `external_id` is the agent's own ID of
+	the first message (a turn may carry its own `id`): sending a turn again adds nothing. It is the owner's own words on another channel, so it needs no switch; it
+	is refused only while the agent's source is switched off in Brain > Sources. Returns {thread, added}."""
+	permissions.require_login()
+	if not permissions.is_agent():
+		frappe.throw(_("Only an agent relays a conversation."), frappe.PermissionError, title=_("Agents only"))
+	space = permissions.resolve_space(space, write=True)
+	system = (source_system or "").strip().lower()
+	channel = " ".join((channel or "").split())[:60]
+	ext = " ".join((external_id or "").split())[:100]
+	if not system or not channel or not ext:
+		frappe.throw(_("A relay names the agent (source_system), the channel and the agent's own message ID (external_id)."), title=_("Relay not understood"))
+	from lifeos.api import connections
+
+	connections.require_on(space, system)
+	rows = parse(turns, []) if isinstance(turns, str) else turns
+	if not isinstance(rows, builtins.list) or len(rows) > RELAY_MAX_TURNS:
+		frappe.throw(_("turns must be a list of at most {0}.").format(RELAY_MAX_TURNS), title=_("Relay not understood"))
+	owner = frappe.db.get_value("Life Space", space, "owner_user")
+	if not owner:
+		frappe.throw(_("This space has no owner to relay for."), title=_("No owner"))
+	name = frappe.db.get_value("Life Ask Thread", {"space": space, "user": owner, "source_system": system, "channel": channel})
+	if not name:
+		name = frappe.get_doc({"doctype": "Life Ask Thread", "space": space, "user": owner, "title": relay_title(space, system, channel), "channel": channel,
+			"source_system": system}).insert(ignore_permissions=True).name  # system: the owner's own conversation, written by their agent; the space write check is above
+	held = frappe.db.get_value("Life Ask Thread", name, "transcript")
+	kept = frappe.parse_json(held) if held else []
+	seen = {m.get("id") for m in kept}
+	added, last = 0, None
+	for i, turn in enumerate(rows):
+		text = (turn.get("text") or "").strip() if isinstance(turn, dict) else ""
+		if not text or turn.get("role") not in ("owner", "assistant"):
+			continue
+		mid = " ".join(str(turn.get("id") or f"{ext}:{i}").split())[:140]
+		if mid in seen:
+			continue
+		try:
+			at = frappe.utils.get_datetime(turn["at"]) if turn.get("at") else frappe.utils.now_datetime()
+		except Exception:  # noqa: BLE001 - a time the agent could not format is now
+			at = frappe.utils.now_datetime()
+		kept.append({"id": mid, "role": "user" if turn["role"] == "owner" else "assistant", "text": text, "at": str(at)[:19]})
+		seen.add(mid)
+		added += 1
+		last = max(last, at) if last else at
+	if added:
+		kept.sort(key=lambda m: m["at"])  # a late turn goes where it was said
+		frappe.db.set_value("Life Ask Thread", name, "transcript", json.dumps(kept))
+	if last:
+		frappe.db.set_value("Life Ask Thread", name, "last_message_on", max(last, frappe.db.get_value("Life Ask Thread", name, "last_message_on") or last))
+	return {"thread": name, "added": added}
 
 
 @frappe.whitelist(methods=["GET"])

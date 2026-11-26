@@ -123,7 +123,7 @@ const STEPS = [
   { key: 'welcome', title: 'Welcome to Life OS', line: "Everything you capture is filed onto your areas and goals. You decide only what it can't." },
   { key: 'you', title: 'You', line: 'What should Life OS call you, and where are you?' },
   { key: 'areas', title: 'Your areas', line: 'Seven areas cover a whole life. Switch on the ones you want; you can change them later.' },
-  { key: 'brain', title: 'Turn on the Brain', line: 'An AI key lets Life OS file things into the right area, answer questions in Ask, and write your daily summary. It stays encrypted on your server.' },
+  { key: 'brain', title: 'Turn on the Brain', line: 'An AI key lets Life OS file things into the right area, answer questions in Chat, and write your daily summary. It stays encrypted on your server.' },
   { key: 'things', title: "What's on your mind?", line: 'Up to three things. Each becomes a task in the right area. For example: pay the electricity bill.' },
   { key: 'done', title: "You're set up", line: '' },
 ]

@@ -12,7 +12,8 @@
   "abilities",
   "areas_off",
   "skills",
-  "last_report"
+  "last_report",
+  "owner_runs_now"
  ],
  "fields": [
   {
@@ -69,6 +70,13 @@
    "fieldname": "last_report",
    "fieldtype": "Datetime",
    "label": "Last Report"
+  },
+  {
+   "fieldname": "owner_runs_now",
+   "fieldtype": "Check",
+   "label": "Your requests run at once",
+   "default": "1",
+   "description": "What you ask this agent to do runs at once; off, it waits in Needs you like the agent's own idea"
   }
  ],
  "links": [],

@@ -5,11 +5,13 @@ from frappe.query_builder import Order
 from frappe.query_builder import functions as fn
 
 from lifeos import permissions
+from lifeos.agents import limits
+from lifeos.brain import agent_page
 from lifeos.goals import readings
 from lifeos.api.utils import parse
 
 SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "score_target", "archive_after_days", "stale_task_days",
-	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
+	# UX fixes, set 5: Reset rules and the AI behind the Brain (the key has its own method and is never sent back)
 	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
 	# UX fixes, set 6: Rhythms
 	"start_of_day", "week_starts_on", "cycle_break_week", "planning_period", "require_done_when", "use_focuses",
@@ -121,11 +123,19 @@ def _agents(spaces):
 	people = _people([u for u in users if _visible_user(u)])
 	last = _last_filed(list(people))
 	out = []
+	configs = {}  # the agent's own settings in Life OS (issue 125): what the owner calls it, its safety switch and its last failed job
+	rows = frappe.get_all("Life Agent Config", filters={"agent_user": ("in", list(people) or ["-"])}, order_by="creation asc",  # system: the owner's own list, as above
+		fields=["name", "space", "agent", "agent_user", "display_name", "owner_runs_now"])
+	for c in rows:
+		configs.setdefault(c.agent_user, c)
 	for u, p in people.items():
 		if not p["is_agent"]:
 			continue
 		mine = {r["space"]: r for r in reach.get(u, [])}
-		out.append({"user": u, "full_name": p["full_name"], "image": p["image"], "last_filed": str(last[u]) if last.get(u) else None,
+		cfg = configs.get(u)
+		failed = agent_page.failed_job(cfg.space, cfg.agent) if cfg else None
+		out.append({"user": u, "key": cfg.agent if cfg else None, "config_space": cfg.space if cfg else None, "assistant_name": (cfg.display_name or "") if cfg else "",
+			"owner_runs_now": int(limits.owner_runs_now(cfg)) if cfg else 1, "failed_job": failed, "full_name": p["full_name"], "image": p["image"], "last_filed": str(last[u]) if last.get(u) else None,
 			"spaces": [mine.get(s["name"]) or {"space": s["name"], "access": None, "agents_can_read_vault": s["agents_can_read_vault"]} for s in spaces]})
 	return sorted(out, key=lambda a: a["full_name"].lower())
 
@@ -301,7 +311,7 @@ def test_ai_connection():
 
 @frappe.whitelist(methods=["POST"])
 def set_feature_cap(feature: str, cap: float = 0):
-	"""A monthly cap in dollars for one feature (Ask, Area guess, …); 0 removes it."""
+	"""A monthly cap in dollars for one feature (Chat, Area guess, …); 0 removes it."""
 	_admin_only()
 	import json
 
@@ -334,7 +344,7 @@ def set_ai_price(model: str, input_per_mtok: float, output_per_mtok: float, cach
 
 @frappe.whitelist(methods=["POST"])
 def set_space_ask(space: str, ask_enabled: bool | int | None = None, ask_can_read_vault: bool | int | None = None):
-	"""Ask on or off for a space, and whether Ask may read its Vault documents. Owner only."""
+	"""Chat on or off for a space, and whether Chat may read its Vault documents. Owner only."""
 	_admin_only()
 	doc = frappe.get_doc("Life Space", space)
 	if ask_enabled is not None:

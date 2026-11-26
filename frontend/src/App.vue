@@ -5,7 +5,7 @@
         <AppSidebar @logout="logout" @shortcuts="shortcutsOpen = true" />
       </div>
 
-      <main class="flex min-w-0 flex-1 flex-col pb-[calc(72px+env(safe-area-inset-bottom))] md:pb-0" data-main>
+      <main class="flex min-w-0 flex-1 flex-col pb-[calc(128px+env(safe-area-inset-bottom))] md:pb-0" :class="ask.open && ask.wide && 'md:hidden'" data-main>
         <!-- phone: "Life OS" (the space too, on a site with two or more) at the top of every screen; tapping it opens the menu sheet -->
         <div class="sticky top-0 z-20 flex items-center border-b border-outline-gray-1 bg-surface-base px-2 py-1 md:hidden" data-more-bar>
           <Button class="min-w-0 !justify-start" variant="ghost" size="md" :label="manySpaces ? `Life OS · ${store.space}` : 'Life OS'" icon-right="lucide-chevron-down"
@@ -21,14 +21,12 @@
         </RouterView>
       </main>
 
-      <!-- phone (issue 14): Today and Brain, the round capture button, Goals and Library; Settings is in the menu sheet, Ask in every header -->
+      <!-- phone (issue 120): the chat bar above the tabs on every screen (+, the camera, the mic; a message with no question is a capture), then Today, Brain, Goals and Library;
+           Settings is in the menu sheet -->
       <div class="fixed inset-x-0 bottom-0 z-30 md:hidden" data-tabbar>
+        <ChatBar v-if="!store.isAgent" />
         <MobileNav aria-label="Places">
-          <template v-for="(n, i) in PLACES" :key="n.to">
-            <div v-if="i === 2" class="flex items-center justify-center">
-              <Button class="!size-12 -translate-y-1 !rounded-full shadow-lg" variant="solid" size="lg" icon="lucide-plus" label="Capture" data-tab-capture
-                @click="store.captureOpen = true" />
-            </div>
+          <template v-for="n in PLACES" :key="n.to">
             <MobileNavItem :label="n.label" :icon="navCount(n.label) ? undefined : n.icon" :route="n.to" :active="activePlace === n.base" :data-tab-item="n.label">
               <!-- Brain carries the sidebar's count -->
               <span v-if="navCount(n.label)" class="relative inline-flex"><span :class="n.icon" class="size-5" aria-hidden="true" />
@@ -54,7 +52,6 @@
       <AskPanel />
       <SearchPalette v-model:open="store.searchOpen" />
       <QuickAdd v-model:open="store.quickAdd" />
-      <CaptureSheet v-model:open="store.captureOpen" />
       <KeyboardShortcutsDialog v-model:open="shortcutsOpen">
         <div class="grid gap-6 sm:grid-cols-3">
           <section v-for="g in SHORTCUTS" :key="g.title">
@@ -93,7 +90,8 @@ import ItemView from '@/components/item/ItemView.vue'
 import ScreenBoundary from './components/ScreenBoundary.vue'
 import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'
-import CaptureSheet from './components/CaptureSheet.vue'
+import ChatBar from './components/ask/ChatBar.vue'
+import { ask, toggleChat } from './lib/ask'
 import { boot, store } from './lib/store'
 import { initLens, manySpaces } from './lib/lens'
 import MoreSheet from './components/MoreSheet.vue'
@@ -111,7 +109,7 @@ const shortcutsOpen = ref(false)
 const bootError = ref('')
 const SHORTCUTS = [
   { title: 'Anywhere', shortcuts: [
-    { label: 'Search', combo: 'Mod+K', altCombos: ['Slash'] }, { label: 'New task', combo: 'N' }, { label: 'Close the pane or dialog', combo: 'Escape' },
+    { label: 'Chat', combo: 'Mod+K' }, { label: 'Search', combo: 'Slash' }, { label: 'New task', combo: 'N' }, { label: 'Close the pane or dialog', combo: 'Escape' },
     { label: 'Previous tab', combo: 'BracketLeft' }, { label: 'Next tab', combo: 'BracketRight' },
     { label: 'This list of shortcuts', combo: 'Shift+Slash' }] },
   { title: 'Go to: press G, then', shortcuts: GO.map((n) => ({ label: n.label, combo: n.key.toUpperCase() })) },
@@ -179,7 +177,8 @@ let gAt = 0
 function onKey(e) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault()
-    store.searchOpen = !store.searchOpen
+    if (!store.isAgent) toggleChat() // the chat panel (issue 120); search is on / and in the header box
+    else store.searchOpen = !store.searchOpen
     return
   }
   if (e.key === 'Escape') {

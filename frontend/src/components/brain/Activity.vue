@@ -35,16 +35,40 @@
     </div>
 
     <Card v-if="loaded && !rows.length" class="py-2" data-activity-empty>
-      <Empty :title="data?.all ? 'Nothing matches these filters.' : 'Nothing has come in yet.'">
-        <p class="mt-1">{{ data?.all ? 'Clear a filter to see the rest.' : 'What you capture or connect, and what the Brain does with it, will show up here.' }}</p>
-        <Button v-if="writable && !data?.all" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-activity-capture @click="store.captureOpen = true" />
+      <Empty :title="data?.all || data?.counts?.assistant ? 'Nothing matches these filters.' : 'Nothing has come in yet.'">
+        <p class="mt-1">{{ data?.all || data?.counts?.assistant ? 'Clear a filter to see the rest.' : 'What you capture or connect, and what the Brain does with it, will show up here.' }}</p>
+        <Button v-if="writable && !data?.all && !data?.counts?.assistant" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-activity-capture @click="openChat()" />
       </Empty>
     </Card>
 
     <section v-for="g in groups" :key="g.day" class="flex flex-col gap-1.5" data-activity-day :data-day="g.day">
       <h2 class="text-sm-medium text-ink-gray-6">{{ g.label }}</h2>
       <Card flush>
-        <div v-for="r in g.rows" :key="r.item" class="flex flex-col gap-1.5 border-b border-outline-gray-1 py-3 last:border-b-0 md:flex-row md:items-start md:gap-3"
+        <template v-for="r in g.rows" :key="r.kind === 'assistant' ? 'a' + r.name : r.item">
+        <!-- issue 125: what an agent did for you, in the same list as the captures -->
+        <div v-if="r.kind === 'assistant'" class="flex flex-col gap-1.5 border-b border-outline-gray-1 py-3 last:border-b-0 md:flex-row md:items-start md:gap-3"
+          data-activity-row data-assistant-row :data-action="r.name" :data-asked-by="r.asked_by">
+          <span class="w-12 flex-none text-sm tabular-nums text-ink-gray-6">{{ time(r.received_on) }}</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge theme="blue" :label="r.agent_name" data-assistant-name />
+              <button type="button" class="break-words text-left text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :aria-expanded="opened === r.name"
+                data-assistant-open @click="opened = opened === r.name ? '' : r.name">{{ r.title }}</button>
+            </div>
+            <div class="mt-0.5 text-sm text-ink-gray-6" data-assistant-who>{{ r.agent_name }} · {{ r.asked_by === 'owner' ? 'you asked' : 'its idea' }}<template v-if="r.undone"> · undone</template></div>
+            <div v-if="r.status === 'Failed'" class="mt-0.5 text-sm text-ink-red-8" data-assistant-error><span aria-hidden="true">✦</span> {{ r.error || 'It did not work.' }}</div>
+            <div v-if="opened === r.name" class="mt-2 flex flex-col gap-1.5 rounded-md bg-surface-gray-2 p-2 text-sm text-ink-gray-7" data-assistant-drawer>
+              <p v-if="r.request" class="break-words" data-assistant-request><b class="text-ink-gray-9">You asked:</b> “{{ r.request }}”</p>
+              <p v-if="r.draft" class="whitespace-pre-wrap break-words" data-assistant-draft><b class="text-ink-gray-9">What was sent:</b> {{ r.draft }}</p>
+              <p v-if="r.result" class="break-words" data-assistant-result><b class="text-ink-gray-9">The answer:</b> {{ r.result }}</p>
+            </div>
+          </div>
+          <div class="flex flex-none flex-wrap items-center gap-2 max-md:pl-14">
+            <Badge :theme="r.status === 'Failed' ? 'red' : 'green'" :label="r.status === 'Failed' ? 'Failed' : r.undone ? 'Undone' : 'Done'" />
+            <Button v-if="r.can_undo && writable" size="sm" label="Undo" data-assistant-undo @click="undo(r)" />
+          </div>
+        </div>
+        <div v-else class="flex flex-col gap-1.5 border-b border-outline-gray-1 py-3 last:border-b-0 md:flex-row md:items-start md:gap-3"
           data-activity-row :data-item="r.item" :data-outcome-of="r.outcome" :data-source="r.source">
           <span class="w-12 flex-none text-sm tabular-nums text-ink-gray-6">{{ time(r.received_on) }}</span>
           <div class="min-w-0 flex-1">
@@ -67,6 +91,7 @@
             <Button v-if="r.outcome === 'failed' && writable" size="sm" label="Retry" data-retry @click="retry(r)" />
           </div>
         </div>
+        </template>
       </Card>
     </section>
 
@@ -74,6 +99,7 @@
   </div>
 </template>
 <script setup>
+import { openChat } from '@/lib/ask'
 // Brain > Activity (issue 18): what came in and what the Brain did with it, newest first, by day. Filters: source, area and
 // what was done. A failed capture says why and can be retried. This week's Outbox piles sit on top, with the flow line; the
 // Outbox page keeps the full list, other periods and Bring back.
@@ -92,7 +118,7 @@ import { iso, long, time, addDays } from '@/lib/dates'
 import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
 
 const FILTERS = [{ value: '', label: 'All' }, { value: 'filed', label: 'Filed on its own' }, { value: 'waiting', label: 'Waiting for you' },
-  { value: 'dropped', label: 'Dropped' }, { value: 'failed', label: 'Failed' }]
+  { value: 'dropped', label: 'Dropped' }, { value: 'failed', label: 'Failed' }, { value: 'assistant', label: 'Assistant' }]
 const LABEL = { filed: 'Filed', decided: 'You decided', waiting: 'Waiting for you', dropped: 'Dropped', failed: 'Failed', working: 'Reading' }
 const THEME = { filed: 'green', decided: 'blue', waiting: 'amber', dropped: 'gray', failed: 'red', working: 'gray' }
 const SAYS = { filed: 'Filed on its own', decided: 'Filed after your decision', waiting: 'Waiting for your decision', dropped: 'Let go',
@@ -101,6 +127,8 @@ const route = useRoute()
 const router = useRouter()
 const data = ref(null)
 const rows = ref([])
+const assistant = ref([])
+const opened = ref('')
 const loaded = ref(false)
 const more = ref(false)
 const writable = computed(() => canWrite() && !store.isAgent)
@@ -117,7 +145,8 @@ const madeTo = (m) => m.route || `/item/${m.name}`
 const groups = computed(() => {
   const today = iso(new Date())
   const out = []
-  for (const r of rows.value) {
+  const merged = [...rows.value, ...assistant.value].sort((a, b) => String(b.received_on).localeCompare(String(a.received_on)))
+  for (const r of merged) {
     const day = String(r.received_on).slice(0, 10)
     let g = out[out.length - 1]
     if (!g || g.day !== day) out.push((g = { day, label: day === today ? 'Today' : day === addDays(today, -1) ? 'Yesterday' : long(day), rows: [] }))
@@ -134,7 +163,7 @@ function setQuery(patch) {
 const args = () => ({ space: store.space, outcome: outcome.value || undefined, source: source.value || undefined, area: area.value || undefined })
 async function load() {
   const res = await tryCall(() => brainData.brain.activity(args()))
-  if (res) { data.value = res; rows.value = res.rows }
+  if (res) { data.value = res; rows.value = res.rows; assistant.value = res.assistant || [] }
   loaded.value = true
 }
 async function loadMore() {
@@ -142,6 +171,9 @@ async function loadMore() {
   const res = await tryCall(() => brainData.brain.activity({ ...args(), start: rows.value.length }))
   if (res) rows.value = [...rows.value, ...res.rows]
   more.value = false
+}
+async function undo(r) {
+  if (await tryCall(() => brainData.agentPage.undo({ request: r.name, space: store.space }), 'Undone.')) await load()
 }
 async function retry(r) {
   if (await tryCall(() => brainData.inbox.retry({ item: r.item }), 'Sent back to the agent.')) await load()

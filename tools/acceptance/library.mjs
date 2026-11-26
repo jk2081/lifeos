@@ -155,8 +155,8 @@ for (const width of WIDTHS) {
         must(await pane.isVisible() && !(await pg.locator('[data-pane-title]').innerText()).match(/Loading|Not found/), `the pane did not load ${ref}`)
       }
       await s.open('/life/library/timeline')
-      await pg.keyboard.press('Meta+k')
-      await pg.locator('input[aria-label="Search or ask anything"]').fill(`UX note ${stamp}`)
+      await pg.keyboard.press('/')
+      await pg.locator('input[aria-label="Search or chat"]').fill(`UX note ${stamp}`)
       await pg.waitForTimeout(900)
       await pg.keyboard.press('Enter')
       await settle()
@@ -341,7 +341,7 @@ for (const width of WIDTHS) {
   await check('LIBRARY.10', `${width} px: no sideways scrolling and no script errors on the new screens`, async () => {
     const before = errors.length
     const bad = []
-    for (const p of ['/life', '/life/settings?tab=data', '/life/goals/someday', '/life/ask', '/life/ask?tab=insights', '/life/ask?tab=history', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
+    for (const p of ['/life', '/life/settings?tab=data', '/life/goals/someday', '/life/insights', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
       await s.open(p)
       if ((await overflow()) > 0) bad.push(`${p} scrolls sideways by ${await overflow()} px`)
     }
@@ -351,14 +351,9 @@ for (const width of WIDTHS) {
   })
 
   await check('LIBRARY.11', `${width} px: intent: Just keep is in Library > Captures, not the Inbox, with text and no proposals; Add to wiki writes pages and leaves no wiki proposals`, async () => {
-    // Just keep, dropped through the box
-    // (issue 17: the drop zone and the intent moved from the Inbox to the + Capture sheet)
-    await s.open('/life/brain')
-    await pg.locator('[data-nav-capture]:visible, [data-tab-capture]:visible').first().click()
-    await pg.locator('[data-capture-text] textarea, textarea[data-capture-text]').first().fill(`S4 keep ${width} ${stamp}\nA note to keep.`)
-    await pg.locator('[role="dialog"] [data-intent]').getByText('Just keep', { exact: true }).click()
-    await pg.locator('[data-capture-brain]').click()
-    await pg.waitForTimeout(1200)
+    // Just keep (issue 120: the + Capture sheet and its intent switch are gone; the API still takes the intent)
+    await s.api('inbox.create_item', { title: `S4 keep ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'A note to keep.', intent: 'Just keep' })
+    await pg.waitForTimeout(600)
     const kept = (await s.api('inbox.list', { space: SPACE, page_length: 5, filters: [['title', 'like', `S4 keep ${width} ${stamp}%`]] })).items[0]
     must(kept, 'the Just keep item was not created')
     runAgent()
@@ -370,16 +365,6 @@ for (const width of WIDTHS) {
     must(!queue.items.some((i) => i.name === kept.name), 'the Just keep item is still in the Inbox')
     await s.open('/life/brain/captures?tab=text')
     must((await pg.locator('[data-main]').innerText()).includes(`S4 keep ${width} ${stamp}`), 'the Just keep item is not in Sources')
-    // the intent is remembered
-    await s.open('/life/brain')
-    await pg.waitForTimeout(1200)
-    await pg.reload({ waitUntil: 'networkidle' })
-    await pg.locator('[data-nav-capture]:visible, [data-tab-capture]:visible').first().click()
-    const keepBtn = pg.locator('[role="dialog"] [data-intent] button, [role="dialog"] [data-intent] [role="radio"]').filter({ hasText: 'Just keep' }).first()
-    must(await keepBtn.evaluate((e) => ['true'].includes(e.getAttribute('aria-checked')) || ['on', 'checked', 'active'].includes(e.getAttribute('data-state')) || e.getAttribute('aria-pressed') === 'true'),
-      'the last intent is not remembered')
-    await pg.locator('[role="dialog"] [data-intent]').getByText('Process', { exact: true }).click()
-    await pg.keyboard.press('Escape')
     // Add to wiki: pages are created and edited directly; no wiki proposals for review
     const w = await s.api('inbox.create_item', { title: `S4 wiki ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'Mithun runs the Ghatia factory.', intent: 'Add to wiki' })
     runAgent()
@@ -683,8 +668,8 @@ frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("zz-
           await openLib(p)
           must(await pg.locator('[data-lib-empty]').isVisible(), `no empty state at ${p}`)
           const t = await pg.locator('[data-lib-empty]').innerText()
-          must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
-          must(await pg.locator('[data-lib-capture]').isVisible(), 'no Capture button')
+          must(t.includes('will show up here') && t.includes('Chat'), 'the empty state says: ' + t)
+          must(await pg.locator('[data-lib-capture]').isVisible(), 'no Chat button')
           must((await pg.locator('[data-lib-count]').innerText()).startsWith('0 items'), 'the count is not 0')
         }
         await noSideways()
@@ -926,8 +911,8 @@ print(json.dumps(rows))`).split('\n').pop())
         await openFiles()
         must(await pg.locator('[data-files-empty]').isVisible(), 'no empty state')
         const t = await pg.locator('[data-files-empty]').innerText()
-        must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
-        must(await pg.locator('[data-files-capture]').isVisible(), 'no Capture button')
+        must(t.includes('will show up here') && t.includes('Chat'), 'the empty state says: ' + t)
+        must(await pg.locator('[data-files-capture]').isVisible(), 'no Chat button')
         await noSideways()
       } finally {
         bench(`import json
@@ -1030,8 +1015,8 @@ print(json.dumps(out))`).split('\n').pop()))
         await openPeople()
         must(await pg.locator('[data-people-empty]').isVisible(), 'no empty state')
         const t = await pg.locator('[data-people-empty]').innerText()
-        must(t.includes('will show up here') && t.includes('Capture'), 'the empty state says: ' + t)
-        must(await pg.locator('[data-people-capture]').isVisible(), 'no Capture button')
+        must(t.includes('will show up here') && t.includes('Chat'), 'the empty state says: ' + t)
+        must(await pg.locator('[data-people-capture]').isVisible(), 'no Chat button')
         await noSideways()
       } finally {
         bench(`frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("${SPACE}", "zz-i25-aside-${width}"))`)
@@ -1055,12 +1040,10 @@ print(json.dumps(out))`).split('\n').pop()))
   try {
     await check('LIBRARY.38', '390 px: a photo of a journal page captured from the phone becomes a note with the photo, the transcript and its date; search finds it and its goal shows it', async () => {
       await s.open('/life')
-      await pg.locator('[data-tabbar] [data-tab-capture]').click()
-      await pg.locator('[data-capture-kind="files"]').click()
-      await pg.locator('[data-capture-files] input[type="file"]').setInputFiles({ name, mimeType: 'image/png', buffer: await pg.screenshot() })
-      await pg.locator('[data-capture-files] input[aria-label="Instruction"]').fill('transcribe and update my journal')
-      await pg.locator('[data-capture-brain]').click()
-      await pg.waitForTimeout(2500)
+      await pg.locator('[data-chat-bar] [data-ask-camera-input]').setInputFiles({ name, mimeType: 'image/png', buffer: await pg.screenshot() })
+      await pg.locator('[data-ask-sheet] [data-ask-input]').fill('transcribe and update my journal')
+      await pg.locator('[data-ask-sheet] [data-ask-send]').click()
+      await pg.waitForTimeout(3500)
       item = bench(`print(frappe.db.get_value("Life Inbox Item", {"title": "${name}"}, "name"))`).split('\n').pop()
       must(item && item !== 'None', 'the capture was not made')
       runAgent() // the fake AI reads the photo
@@ -1100,7 +1083,7 @@ for dt, n in (("Life Note", "${note || ''}"), ("Life Inbox Item", "${item || ''}
   }
 }
 
-// Search covers the whole app (issue 98): Frappe's Global Search, screens by name, and Ask without a key
+// Search covers the whole app (issue 98): Frappe's Global Search, screens by name, and Chat without a key
 {
   const subject = `RSH Global ${stamp}`
   const event = bench(`ev = frappe.get_doc({"doctype": "Event", "subject": "${subject}", "starts_on": frappe.utils.today() + " 16:00:00", "event_type": "Private", "life_space": "Private"}).insert(ignore_permissions=True)
@@ -1115,8 +1098,8 @@ print(ev.name)`).split('\n').pop()
   }
   const palette = async (text) => {
     await owner.open('/life/today')
-    await pg.keyboard.press('Meta+k')
-    await pg.locator('input[aria-label="Search or ask anything"]').fill(text)
+    await pg.keyboard.press('/')
+    await pg.locator('input[aria-label="Search or chat"]').fill(text)
     await pg.waitForTimeout(1200)
   }
   try {
@@ -1137,13 +1120,13 @@ print(ev.name)`).split('\n').pop()
       const u = new URL(pg.url())
       must(u.pathname === '/life/settings' && u.searchParams.get('tab') === 'advanced' && u.searchParams.get('part') === 'ai', `Enter went to ${pg.url()}`)
     })
-    await check('LIBRARY.41', '1440 px: with no AI key, Ask says it needs one, links to Settings › AI, and shows what search finds for the same words', async () => {
+    await check('LIBRARY.41', '1440 px: with no AI key, Chat says it needs one, links to Settings › AI, and shows what search finds for the same words', async () => {
       bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = None; s.save()')
       try {
         await palette(`rsh ${stamp}`)
         await pg.locator('[data-search-ask]').click()
         await pg.locator('[data-refusal="not_set_up"]').waitFor({ timeout: 15000 })
-        must((await pg.locator('[data-ask-refusal]').innerText()).includes('Ask needs an AI key. Add one in Settings › AI.'), 'the key message is not shown')
+        must((await pg.locator('[data-ask-refusal]').innerText()).includes('Chat needs an AI key. Add one in Settings › AI.'), 'the key message is not shown')
         must((await pg.locator('[data-ask-key-link]').getAttribute('href')).includes('part=ai'), 'the link does not go to Settings › AI')
         must((await pg.locator('[data-ask-search-hits]').innerText()).includes(subject), 'the search result is not under the message')
       } finally {
@@ -1313,8 +1296,8 @@ subjects.link("${SPACE}", "Life Inbox Item", it, "Life Person", "${seeded.org}")
           await u.open('/life/library/pages')
           await pg.locator('[data-pages-empty]').waitFor({ timeout: 15000 })
           const text = await pg.locator('[data-pages-empty]').innerText()
-          must(text.includes('No pages yet.') && text.includes('Capture'), 'the empty state says: ' + text)
-          must(await pg.locator('[data-pages-capture]').isVisible(), 'no Capture button')
+          must(text.includes('No pages yet.') && text.includes('Chat'), 'the empty state says: ' + text)
+          must(await pg.locator('[data-pages-capture]').isVisible(), 'no Chat button')
         } finally {
           await pg.evaluate(() => localStorage.setItem('lifeos-space', 'Private'))
         }

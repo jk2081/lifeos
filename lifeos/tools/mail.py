@@ -37,13 +37,13 @@ def list_threads(after: str, before: str, query: str | None = None, page_token: 
 
 
 def save_attachment(thread_id: str, attachment_id: str, area: str | None = None, part: str | None = None, page: str | None = None, vault_type: str | None = None,
-		account: str | None = None, space: str | None = None, source_system: str | None = None) -> dict:
+		account: str | None = None, space: str | None = None, source_system: str | None = None, asked_by: str | None = None, owner_message: str | None = None) -> dict:
 	"""Download one attachment of an email and save it in Life OS: under the `area` or `part` (names), attached to `page` (a page's name) when one is given.
 	The email it came from is kept with it. For an ID card, a statement or another document that belongs in the Vault, pass `vault_type` (ID, Travel,
 	Insurance, Property, Tax, Medical or Other): it is saved as a Vault document. Saving the same attachment twice keeps one file. Returns what was done,
 	with an `undo` token that removes what this call made."""
 	return actions.write("mail.save_attachment", space, {"thread_id": thread_id, "attachment_id": attachment_id, "area": area, "part": part, "page": page,
-		"vault_type": vault_type, "account": account}, source_system)
+		"vault_type": vault_type, "account": account}, source_system, owner_message, asked_by)
 
 
 def _save_attachment(space: str, thread_id: str, attachment_id: str, area: str | None = None, part: str | None = None, page: str | None = None,

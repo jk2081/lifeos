@@ -11,12 +11,12 @@ ABOUT = {"Prospect": "Organisation", "Client": "Organisation", "Person": "Person
 
 
 def create(title: str, area: str, part: str | None = None, kind: str | None = None, body: str | None = None, sources: list | None = None,
-		summary: str | None = None, space: str | None = None, source_system: str | None = None) -> dict:
+		summary: str | None = None, space: str | None = None, source_system: str | None = None, asked_by: str | None = None, owner_message: str | None = None) -> dict:
 	"""Create a wiki page called `title` under an `area` (and a `part` of it), by their names. `kind` is one of Prospect, Client, Project, Person or Note.
 	A Prospect, Client or Person page is also made a person or organisation, so they can be linked. `body` is Markdown and may link people and pages as
 	[[Name]]. `summary` is one line on what the page is about (the start of the body when left out). `sources` are emails or captures it is written from, as
 	"Life Inbox Item:<name>". Refuses a title the wiki already has: update that page."""
-	return actions.write("pages.create", space, {"title": title, "area": area, "part": part, "kind": kind, "body": body, "sources": sources, "summary": summary}, source_system)
+	return actions.write("pages.create", space, {"title": title, "area": area, "part": part, "kind": kind, "body": body, "sources": sources, "summary": summary}, source_system, owner_message, asked_by)
 
 
 def _create(space: str, title: str, area: str | None, part: str | None = None, kind: str | None = None, body: str | None = None,
@@ -47,10 +47,10 @@ def _place(area: str | None) -> str:
 	return f"{frappe.db.get_value('Life Area', parent, 'area_name')} › {name}" if parent else name
 
 
-def update(page: str, body: str | None = None, add_links: list | None = None, space: str | None = None, source_system: str | None = None) -> dict:
+def update(page: str, body: str | None = None, add_links: list | None = None, space: str | None = None, source_system: str | None = None, asked_by: str | None = None, owner_message: str | None = None) -> dict:
 	"""Change a wiki page: replace its text with `body` (Markdown), and/or add `add_links`, a list of page or person titles to link under "Links" as
 	[[Title]]. Read the page first when you only add to it, and send its whole new text."""
-	return actions.write("pages.update", space, {"page": page, "body": body, "add_links": add_links}, source_system)
+	return actions.write("pages.update", space, {"page": page, "body": body, "add_links": add_links}, source_system, owner_message, asked_by)
 
 
 def _update(space: str, page: str, body: str | None = None, add_links: list | None = None) -> tuple[str, dict, dict | None]:

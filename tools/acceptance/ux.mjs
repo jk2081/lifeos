@@ -126,13 +126,13 @@ export async function uxKit(width) {
       await pg.locator(`[data-ref="${paneRef}"]`).first().click()
       await settle()
       await pg.locator('[data-pane-ask]').click()
-    } else if (phone) await pg.locator('[data-phone-ask]:visible').first().click()
-    else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type(`What is still open in ${stamp} here?`); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
+    } else if (phone) await pg.locator('[data-chat-bar-open]').first().click()
+    else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500); await pg.keyboard.type(`What is still open in ${stamp} here?`); await pg.waitForTimeout(300); await pg.keyboard.press('Enter') }
     await settle()
     const panel = pg.locator('[data-ask-panel]:visible')
     must(await panel.count(), `${path}: the Ask panel did not open`)
     if (phone) must(await pg.locator('[data-ask-sheet]:visible').count(), 'not a bottom sheet on a phone')
-    else must(Math.abs((await panel.boundingBox()).width - 480) < 2, 'the panel is not 480 px wide')
+    else must(Math.abs((await panel.boundingBox()).width - 460) < 2, 'the panel is not 460 px wide')
     const scope = (await pg.locator('[data-ask-scope]:visible').first().innerText()).trim()
     must(scope === wantScope, `${path}: the scope chip says "${scope}", not "${wantScope}"`)
     if (phone || paneRef) { await pg.locator('[data-ask-panel] textarea').fill('What is still open here?'); await pg.locator('[data-ask-send]:visible').click() }

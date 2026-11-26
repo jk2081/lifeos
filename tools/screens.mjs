@@ -132,7 +132,7 @@ for (const scheme of schemes) {
       ...(wikiPage ? ['note', 'sources', 'links', 'history'].map((t) => [`assistant-pane-${t}`, `/life/library/notes?by=assistant&area=&open=note:${wikiPage}&ptab=${t}`]) : []),
       ...(wikiChange ? [['assistant-change', `/life/library/notes?view=changes&area=&open=change:${wikiChange}`]] : []),
       ['task-pane-notes', `/life/plan/tasks?view=list&area=&open=task:${task}&ptab=notes`], ['goal-pane-history', `/life/plan/goals?status=all&area=&open=goal:${goal}&ptab=history`],
-      ['ask', '/life/ask'], ['ask-insights', '/life/ask?tab=insights'], ['ask-history', '/life/ask?tab=history'],
+      ['insights', '/life/insights'],
       ['ask-panel', '/life/?area='], ['ask-pane', `/life/plan/tasks?view=list&area=&open=task:${task}`],
       ['more-sheet', '/life/?area='], ['dev-editor', '/life/dev/editor'],
       // set 7: the Outbox, a number goal, New goal with "Done when…", the old Inbox items' batch
@@ -158,7 +158,7 @@ for (const scheme of schemes) {
       }
       if (name === 'ask-panel' || name === 'ask-pane') { // a question asked from the screen, in the panel (a sheet on a phone)
         if (name === 'ask-pane') await page.locator('[data-pane-ask]').first().click()
-        else if (width < 800) await page.locator('[data-phone-ask]').first().click()
+        else if (width < 800) await page.locator('[data-chat-bar-open]').first().click()
         else { await page.keyboard.press('Meta+k'); await page.waitForTimeout(300); await page.keyboard.type('What is stuck in Ghillidary?'); await page.keyboard.press('Enter') }
         await page.waitForTimeout(500)
         const box = page.locator('[data-ask-panel] textarea')

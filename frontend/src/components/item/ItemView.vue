@@ -5,7 +5,7 @@
            so the title never shares a row with buttons -->
       <div class="flex items-start gap-1.5">
         <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5" data-pane-actions>
-        <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" :size="btnSize" icon-left="lucide-sparkles" :label="phone ? 'Ask' : 'Ask about this'" data-pane-ask
+        <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" :size="btnSize" icon-left="lucide-sparkles" :label="phone ? 'Chat' : 'Chat about this'" data-pane-ask
           @click="askAbout(ASKABLE[cur.type], cur.name, meta.title)" />
         <!-- the sensitive mark (UX fixes, set 6): a lock while it is on; anyone who may edit marks it, only the space's owner unmarks it -->
         <Button v-if="meta.sensitive && !store.isAgent" :size="btnSize" :icon-left="meta.sensitive.on ? 'lucide-lock' : 'lucide-lock-open'" :variant="meta.sensitive.on ? 'subtle' : 'ghost'"
@@ -41,8 +41,8 @@
   <!-- Desktop: a slide-over on the right; the list stays usable beside it. -->
   <Transition v-if="!phone" enter-active-class="transition-transform duration-200 ease-out motion-reduce:transition-none" leave-active-class="transition-transform duration-200 ease-out motion-reduce:transition-none"
     enter-from-class="translate-x-full" leave-to-class="translate-x-full">
-    <aside v-if="cur" ref="el" class="fixed inset-y-0 right-0 z-40 flex flex-col border-l border-outline-gray-2 bg-surface-base shadow-2xl outline-none"
-      :class="cur.type === 'inbox' ? 'w-[min(760px,100vw)]' : 'w-[min(520px,100vw)]'" role="dialog" :aria-label="meta.title || label" tabindex="-1" data-pane :data-pane-ref="cur.ref">
+    <aside v-if="cur" ref="el" class="fixed inset-y-0 z-40 flex flex-col border-l border-outline-gray-2 bg-surface-base shadow-2xl outline-none"
+      :class="[cur.type === 'inbox' ? 'w-[min(760px,100vw)]' : 'w-[min(520px,100vw)]', ask.open && !ask.wide ? 'right-[420px] xl:right-[460px]' : 'right-0']" role="dialog" :aria-label="meta.title || label" tabindex="-1" data-pane :data-pane-ref="cur.ref">
       <ItemInner />
     </aside>
   </Transition>
@@ -79,7 +79,7 @@ import { tryCall } from '@/lib/api'
 import { TYPES, closePane, current as cur, openRef, paneNav, recordChanged } from '@/lib/pane'
 import { useUrlTab } from '@/lib/tabs'
 import { park } from '@/lib/someday'
-import { askAbout } from '@/lib/ask'
+import { ask, askAbout } from '@/lib/ask'
 import { store } from '@/lib/store'
 
 const [DefineInner, ItemInner] = createReusableTemplate()

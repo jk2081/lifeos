@@ -12,7 +12,14 @@
   "scope_name",
   "scope_label",
   "scope_kind",
-  "last_message_on"
+  "last_message_on",
+  "channel",
+  "source_system",
+  "flow_session",
+  "transcript",
+  "refs",
+  "undone",
+  "filed"
  ],
  "fields": [
   {
@@ -68,6 +75,52 @@
    "label": "Last Message On",
    "search_index": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "channel",
+   "fieldtype": "Data",
+   "label": "Channel",
+   "description": "Set on a conversation relayed from an assistant's channel (Telegram); read only in the app"
+  },
+  {
+   "fieldname": "source_system",
+   "fieldtype": "Data",
+   "label": "Source System"
+  },
+  {
+   "fieldname": "flow_session",
+   "fieldtype": "Data",
+   "label": "Flow Session",
+   "read_only": 1,
+   "description": "The Flow Session that holds this chat's messages (Chat runs on Flow)"
+  },
+  {
+   "fieldname": "transcript",
+   "fieldtype": "Long Text",
+   "label": "Earlier messages",
+   "read_only": 1,
+   "description": "Read only: what was asked before Chat ran on Flow, and what an assistant relayed from its channel. JSON list of {id, role, text, at}."
+  },
+  {
+   "fieldname": "refs",
+   "fieldtype": "Long Text",
+   "label": "References",
+   "read_only": 1,
+   "description": "The records the chat has read, by their R-numbers, so citations keep their numbers across tool calls"
+  },
+  {
+   "fieldname": "undone",
+   "fieldtype": "Long Text",
+   "label": "Undone",
+   "read_only": 1,
+   "description": "The lines of Done lists that were taken back"
+  },
+  {
+   "fieldname": "filed",
+   "fieldtype": "Long Text",
+   "label": "Filed",
+   "read_only": 1,
+   "description": "Files put in the chat: what was done with each (a JSON object by run) and the questions that wait"
   }
  ],
  "links": [],

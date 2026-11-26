@@ -314,7 +314,7 @@ class TestActivity(LifeTestCase):
 		decided = self.capture("i18 decided")
 		self.proposal(decided, "Accepted")
 		counts = self.feed()["counts"]
-		self.assertEqual({k: counts[k] for k in counts}, {"filed": 1, "waiting": 1, "dropped": 1, "failed": 1, "decided": 1, "working": 1})
+		self.assertEqual({k: counts[k] for k in counts}, {"filed": 1, "waiting": 1, "dropped": 1, "failed": 1, "decided": 1, "working": 1, "assistant": 0})
 		self.assertEqual([r["title"] for r in self.feed(outcome="dropped")["rows"]], ["i18 dropped"])
 		self.assertEqual(self.feed(outcome="dropped")["total"], 1)
 

@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const page = (name) => () => import(`./pages/${name}.vue`)
 
-// The places (issue 14): Today, Brain, Goals and Library, each tab its own path, with Review, Settings and the Ask page
+// The places (issue 14): Today, Brain, Goals and Library, each tab its own path, with Review, Settings and the Chat page
 // beside them. Housekeeping pages live inside the place they belong to and are not tabs: the Outbox
 // under Brain, Someday under Goals, the Timeline and the trash and archive under Library.
 const TODAY = ['week', 'month', 'year']
@@ -33,7 +33,8 @@ const routes = [
   { path: '/review', name: 'WeeklyReview', component: page('WeeklyReview') },
 
   { path: '/how-it-works', name: 'HowItWorks', component: page('HowItWorks') },
-  { path: '/ask', name: 'Ask', component: page('Ask') },
+  { path: '/insights', name: 'Insights', component: page('Insights') },
+  // the Ask page is gone (issue 120): the chat is a panel on every screen, and /chat and /ask land on Today with "That page moved"; its insights have their own page above
   { path: '/settings', name: 'Settings', component: page('Settings') },
 
   // development only: the editor on a sample note (owner only, not in the sidebar)

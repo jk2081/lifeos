@@ -27,6 +27,7 @@ ACTS = {
 	"calendar.create": ("change_calendar", "Add an event", ("title", "start", "end")),
 	"calendar.move": ("change_calendar", "Move an event", ("event_id", "start", "end")),
 	"calendar.respond": ("change_calendar", "Answer an invitation", ("event_id", "response")),
+	"calendar.cancel": ("change_calendar", "Cancel an event", ("event_id",)),  # issue 120: "the meeting is cancelled", said by the owner in Chat; not a delete of the owner's data
 }
 READS = {"mail.search": "read_email", "mail.get_thread": "read_email", "mail.get_attachment": "read_email", "calendar.list": "change_calendar"}
 TOOLS = [*READS, *ACTS]
@@ -128,6 +129,8 @@ def _describe(tool: str, p: dict) -> tuple[str, str]:
 		return f"Add “{p['title']}” on {p['start']}", f"{p['title']}\n{p['start']} to {p['end']}" + (f"\nWith: {', '.join(p['attendees'])}" if p.get("attendees") else "")
 	if tool == "calendar.move":
 		return f"Move “{p.get('title') or p['event_id']}” to {p['start']}", f"{p['start']} to {p['end']}"
+	if tool == "calendar.cancel":
+		return f"Cancel “{p.get('title') or p['event_id']}”", ""
 	return f"{p['response'].capitalize()}: “{p.get('title') or p['event_id']}”", ""
 
 
@@ -135,16 +138,10 @@ def request(space: str, agent: str, tool: str, params: dict, asked_by: str, owne
 	"""An agent's act. Returns {status: done | waiting | failed, action, result}; refused (an error) when it is switched off or the request is not understood."""
 	if tool not in ACTS:
 		frappe.throw(_("{0} is not something an agent can do. The tools are: {1}.").format(tool, ", ".join(TOOLS)), title=_("Unknown tool"))
-	if asked_by not in (OWNER, AGENT):
-		frappe.throw(_("Say who asked: owner (the owner told the agent to) or agent (its own idea)."), title=_("Who asked?"))
 	message = " ".join((owner_message or "").split())
-	if asked_by == OWNER and not message:
-		frappe.throw(_("An act the owner asked for carries the owner's message."), title=_("The owner's message is missing"))
 	p = _clean(tool, params)
-	if asked_by == AGENT:
-		_need_switch(space, agent, tool)
+	run_now = limits.gate(space, agent, ACTS[tool][0], asked_by, message) == limits.RUN
 	title, draft = _describe(tool, p)
-	run_now = asked_by == OWNER or mode_of(space, agent, tool) == limits.AUTO
 	row = frappe.get_doc({"doctype": "Life Agent Action", "space": space, "agent": agent, "action": ACTS[tool][0], "title": title[:200], "draft": draft[:5000],
 		"status": "Waiting", "asked_by": asked_by, "request": message[:500] or None, "params": json.dumps({"tool": tool, **p}), "happened_on": now_datetime(),
 		"delivered": 1}).insert(ignore_permissions=True)  # system: the agent's own log; the space write check is in the API
@@ -215,6 +212,9 @@ def _run(tool: str, account, p: dict) -> tuple[dict, dict | None]:
 	if tool == "calendar.move":
 		ev = g.move_event(p["event_id"], p["start"], p["end"])
 		return {"event_id": p["event_id"], "start": ev.get("start")}, None
+	if tool == "calendar.cancel":
+		g.delete_event(p["event_id"])
+		return {"event_id": p["event_id"]}, None
 	g.respond(p["event_id"], p["response"], account.address)
 	return {"event_id": p["event_id"], "response": p["response"]}, None
 

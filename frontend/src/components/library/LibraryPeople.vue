@@ -36,12 +36,13 @@
       <Empty :title="filtered ? 'Nothing matches.' : 'No people or organisations yet.'">
         <p class="mt-1">{{ filtered ? 'Try a different word, or clear the filters.' : 'People and organisations you capture, or the Brain finds in what you keep, will show up here.' }}</p>
         <Button v-if="filtered" class="mt-3" label="Clear filters" data-people-clear @click="clear" />
-        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-people-capture @click="store.captureOpen = true" />
+        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-people-capture @click="openChat()" />
       </Empty>
     </Card>
   </div>
 </template>
 <script setup>
+import { openChat } from '@/lib/ask'
 // Library > People (issue 25): one row per person or organisation with its kind, a line about them, area and the newest thing
 // that mentions them. Kind, Area and the search narrow the list (kind, area and q live in the address). A row opens the person's page.
 import { computed, onMounted, ref, watch } from 'vue'

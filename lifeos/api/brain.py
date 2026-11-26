@@ -133,6 +133,7 @@ def _failed(space):
 
 # Brain > Activity (issue 18): the feed of what came in and what the Brain did with it.
 OUTCOMES = ("filed", "waiting", "dropped", "failed")
+ASSISTANT = "assistant"  # the filter that shows only what an agent did (issue 125)
 
 
 def outcome_term(i):
@@ -166,7 +167,8 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 	"""The Activity feed: captures of the last `days` days, newest first, each with its source, what it was, what the Brain did
 	(`outcome`: filed on its own, decided by you, waiting, dropped, failed or working), the area and goal, the error of a failed one,
 	and the records made from it. `counts` has every outcome under the other filters; `sources` the source types present;
-	`plate` is this week's Outbox piles and flow line, the numbers the Outbox shows."""
+	`plate` is this week's Outbox piles and flow line, the numbers the Outbox shows. `assistant` is what agents changed for you in the same days
+	(who, what, who asked, Undo where there is one); the outcome `assistant` shows only those."""
 	permissions.require_login()
 	space = permissions.resolve_space(space)
 	area = lens_area(area)
@@ -177,13 +179,15 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 	counts = dict(frappe.qb.from_(captures([outcome_term(i).as_("o")], where).as_("t")).select(Field("o"), fn.Count("*")).groupby(Field("o")).run())  # system: wrapped query, permissions applied inside
 	total = sum(counts.values())
 	counts = {k: int(counts.get(k, 0)) for k in (*OUTCOMES, "decided", "working")}
+	assistant = agent_page.feed(space, days) if not permissions.is_agent() and not source and not area else []  # an agent's act has no source or area
+	counts[ASSISTANT] = len(assistant)
 	fields = [i.name.as_("item"), i.title, i.source_type.as_("source"), i.media_kind, i.received_on, i.status, i.error, i.intent, i.area, i.goal,
 		i.is_sensitive, i.processed_by, outcome_term(i).as_("outcome")]
 	inner = captures(fields, where).as_("t")
 	rows = frappe.qb.from_(inner).select(inner.star)
 	if outcome in OUTCOMES:
 		rows = rows.where(Field("outcome") == outcome)
-	rows = rows.orderby(Field("received_on"), order=Order.desc).orderby(Field("item"), order=Order.desc).limit(page_length).offset(start).run(as_dict=True)  # system: wrapped query, permissions applied inside
+	rows = rows.orderby(Field("received_on"), order=Order.desc).orderby(Field("item"), order=Order.desc).limit(page_length).offset(start).run(as_dict=True) if outcome != ASSISTANT else []  # system: wrapped query, permissions applied inside
 	areas = names_map("Life Area", [r.area for r in rows if r.area], "area_name")
 	goals = names_map("Life Goal", [r.goal for r in rows if r.goal], "title")
 	made = _made(space, [r.item for r in rows])
@@ -194,8 +198,8 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 			filed_by=r.processed_by if r.item in own or (r.processed_by or "").startswith("Rule:") else None)
 		r.pop("processed_by", None)
 	sources = captures([i.source_type], _activity_where(space, days, None, area)).distinct().orderby(i.source_type).run(pluck=True)
-	shown = counts[outcome] if outcome in OUTCOMES else total
-	return {"rows": rows, "total": shown, "all": total, "counts": counts, "sources": sources, "days": days, "plate": plate(space, area),
+	shown = counts[outcome] if outcome in (*OUTCOMES, ASSISTANT) else total
+	return {"rows": rows, "total": shown, "all": total, "counts": counts, "assistant": assistant if not outcome or outcome == ASSISTANT else [], "sources": sources, "days": days, "plate": plate(space, area),
 		"new_rules": rules.recent(space) if not permissions.is_agent() else []}
 
 

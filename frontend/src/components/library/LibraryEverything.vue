@@ -40,12 +40,13 @@
       <Empty :title="filtered ? 'Nothing matches.' : tab === 'people' ? 'No people kept yet.' : 'Nothing kept yet.'">
         <p class="mt-1">{{ filtered ? 'Try a different word, or clear the filters.' : 'Notes, documents, people and chats you keep, or the Brain files for you, will show up here.' }}</p>
         <Button v-if="filtered" class="mt-3" label="Clear filters" data-lib-clear @click="clear" />
-        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-lib-capture @click="store.captureOpen = true" />
+        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-lib-capture @click="openChat()" />
       </Empty>
     </Card>
   </div>
 </template>
 <script setup>
+import { openChat } from '@/lib/ask'
 // Library > Everything and Library > People (issue 23): notes, documents, people and chats in one list, newest first. Each row has a
 // kind letter (N, P, D, C), a title, a line about it, its area and goal, and a date. The search box reads titles and bodies;
 // Area, Goal and Source narrow the list. Filters live in the address (q, area, goal, source). Sensitive items follow the Vault's rules on the server.

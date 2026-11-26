@@ -739,7 +739,7 @@ class TestGoogleActs(LifeTestCase):
 		for word in ("delete", "trash", "remove", "purge", "spam"):
 			self.assertEqual([n for n in names if word in n], [])
 		self.assertEqual(sorted(n for n in names if n.startswith("email.")), ["email.archive", "email.draft", "email.label", "email.send"])
-		self.assertEqual(sorted(n for n in names if n.startswith("calendar.")), ["calendar.create", "calendar.list", "calendar.move", "calendar.respond"])
+		self.assertEqual(sorted(n for n in names if n.startswith("calendar.")), ["calendar.cancel", "calendar.create", "calendar.list", "calendar.move", "calendar.respond"])
 		with self.assertRaises(frappe.ValidationError):
 			self.act("email.delete", {"thread_id": "t"}, "owner", "delete it")
 		whitelisted = {f.__name__ for f in frappe.whitelisted if f.__module__ in ("lifeos.api.google", "lifeos.api.mail")}
@@ -780,6 +780,161 @@ class TestGoogleActs(LifeTestCase):
 		self.assertEqual(row.status, "Failed")
 		self.assertNotIn("SECRETSECRET", row.error)
 		self.assertEqual(pages.sections(PRIVATE, self.KEY)["did"][0]["status"], "Failed")
+
+
+class TestOneAssistant(LifeTestCase):
+	"""Issue 125: what the owner asks an agent runs at once, whichever tool it uses; the agent's own idea follows its switch; one gate for both."""
+	KEY = "i125agent"
+	ADDRESS = "owner125@example.com"
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		for dt in ("Life Agent Action", "Life Agent Config", "Life Mail Account"):
+			frappe.db.delete(dt, {"space": PRIVATE})
+		frappe.db.delete("Life Person", {"space": PRIVATE})
+		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": self.ADDRESS, "label": "Personal", "is_default": 1}).insert()
+		self.google = RecordingGoogle()
+		frappe.flags.lifeos_google = {self.ADDRESS: self.google}
+		self.addCleanup(lambda: setattr(frappe.flags, "lifeos_google", {}))
+		self.config(display_name="Hermes")
+		permissions.clear_cache()
+
+	def config(self, **values):
+		frappe.set_user("Administrator")
+		cfg = limits.config(PRIVATE, self.KEY, create=True)
+		cfg.update(values)
+		cfg.save(ignore_permissions=True)
+
+	def mode(self, action, mode):
+		frappe.set_user("Administrator")
+		limits.set_ability(limits.config(PRIVATE, self.KEY, create=True), action, mode)
+
+	def person(self, **kw):
+		from lifeos.api import tools
+
+		self.as_user(AGENT)
+		return tools.people_add("Ekta Jalan", space=PRIVATE, source_system=self.KEY, **kw)
+
+	# 1
+	def test_1_the_owners_request_through_people_add_runs_at_once_even_when_the_ability_asks(self):
+		from lifeos.api import tools
+
+		self.mode("write_pages", "ask")
+		out = self.person(asked_by="owner", owner_message="Make Ekta Jalan a person")
+		self.assertIn("person", out)
+		row = frappe.get_doc("Life Agent Action", out["action"])
+		self.assertEqual((row.status, row.asked_by, row.request, row.agent), ("Done", "owner", "Make Ekta Jalan a person", self.KEY))
+		self.assertTrue(row.undo)
+		self.as_user(OWNER)
+		tools.undo(out["action"])
+		self.assertFalse(frappe.db.exists("Life Person", out["person"]))
+
+	# 2
+	def test_2_the_owners_words_are_needed_the_agents_idea_waits_and_the_safety_switch_holds_the_owners_request(self):
+		self.mode("write_pages", "ask")
+		with self.assertRaises(frappe.ValidationError):
+			self.person(asked_by="owner")
+		with self.assertRaises(frappe.ValidationError):
+			self.person(asked_by="someone")
+		idea = self.person(asked_by="agent")
+		self.assertIn("waiting", idea)
+		self.assertFalse(frappe.db.exists("Life Person", {"space": PRIVATE, "full_name": "Ekta Jalan"}))
+		self.config(owner_runs_now=0)
+		held = self.person(asked_by="owner", owner_message="Make Ekta Jalan a person")
+		self.assertIn("waiting", held)
+		self.as_user(OWNER)
+		cards = {c["name"]: c for c in pages.requests(PRIVATE)}
+		self.assertEqual((cards[held["waiting"]]["asked_by"], cards[held["waiting"]]["request"], cards[held["waiting"]]["agent_name"]), ("owner", "Make Ekta Jalan a person", "Hermes"))
+		self.assertEqual(cards[idea["waiting"]]["asked_by"], "agent")
+		pages.decide(PRIVATE, held["waiting"], "approve", OWNER)  # approved, it runs
+		self.assertTrue(frappe.db.exists("Life Person", {"space": PRIVATE, "full_name": "Ekta Jalan"}))
+		self.assertEqual(frappe.db.get_value("Life Agent Action", held["waiting"], ["asked_by", "status"]), ("owner", "Done"))
+
+	# 3
+	def test_3_tasks_add_and_events_add_follow_the_owners_request_and_the_add_tasks_and_events_switch(self):
+		from lifeos.api import tools
+
+		frappe.set_user("Administrator")
+		ekta = frappe.get_doc({"doctype": "Life Person", "space": PRIVATE, "full_name": "Ekta Jalan", "kind": "Person"}).insert()
+		self.as_user(AGENT)
+		out = tools.tasks_add("Agree a time with Ekta for 1 Dec", area="Tea", due_date="2026-11-27", person="Ekta Jalan", space=PRIVATE, source_system=self.KEY, asked_by="owner",
+			owner_message="add a task 'Agree a time with Ekta for 1 Dec', due 27 Nov")
+		task = frappe.get_doc("Life Task", out["task"])
+		self.assertEqual((str(task.due_date), task.area), ("2026-11-27", self.areas["Tea"]))
+		self.assertTrue(frappe.db.exists("Life Link", {"from_doctype": "Life Task", "from_name": task.name, "to_doctype": "Life Person", "to_name": ekta.name}))
+		event = tools.events_add("Lunch with Ekta", "2026-12-01 13:00", "2026-12-01 14:00", space=PRIVATE, source_system=self.KEY, asked_by="owner", owner_message="Lunch with Ekta on 1 Dec at 1")
+		self.assertTrue(frappe.db.exists("Event", event["event"]))
+		self.assertEqual(limits.abilities(limits.config(PRIVATE, self.KEY))["add_planning"], "ask")  # the default
+		idea = tools.tasks_add("Chase Ekta", space=PRIVATE, source_system=self.KEY)
+		self.assertIn("waiting", idea)
+		self.mode("add_planning", "auto")
+		self.as_user(AGENT)
+		self.assertIn("task", tools.tasks_add("Chase Ekta", space=PRIVATE, source_system=self.KEY))
+		self.mode("add_planning", "off")
+		self.as_user(AGENT)
+		with self.assertRaises(frappe.PermissionError):
+			tools.events_add("Lunch", "2026-12-02", space=PRIVATE, source_system=self.KEY)
+		self.assertIn("event", tools.events_add("Lunch", "2026-12-02", space=PRIVATE, source_system=self.KEY, asked_by="owner", owner_message="Lunch on 2 Dec"))  # the owner may still ask
+
+	# 4
+	def test_4_google_act_and_the_tools_give_the_same_answer_for_the_same_asked_by_and_switch(self):
+		from lifeos.api import tools
+
+		def verdict(call):
+			try:
+				out = call()
+			except frappe.PermissionError:
+				return "refused"
+			except frappe.ValidationError:
+				return "invalid"
+			return "waiting" if out.get("status") == "waiting" or "waiting" in out else "done"
+
+		cases = [(who, msg, mode, runs) for who in ("owner", "agent") for msg in (None, "Do it") for mode in ("auto", "ask", "off") for runs in (1, 0)]
+		for who, msg, mode, runs in cases:
+			frappe.db.delete("Life Person", {"space": PRIVATE})
+			self.mode("send_email", mode)
+			self.mode("write_pages", mode)
+			self.config(owner_runs_now=runs)
+			self.as_user(AGENT)
+			google_says = verdict(lambda: google.act(self.KEY, "email.archive", {"thread_id": "t1"}, who, msg, space=PRIVATE))
+			tool_says = verdict(lambda: tools.people_add("Ekta Jalan", space=PRIVATE, source_system=self.KEY, asked_by=who, owner_message=msg))
+			self.assertEqual(google_says, tool_says, (who, msg, mode, runs))
+			expected = ("invalid" if not msg else "done" if runs else "waiting") if who == "owner" else {"auto": "done", "ask": "waiting", "off": "refused"}[mode]
+			self.assertEqual(tool_says, expected, (who, msg, mode, runs))
+
+	def test_a_waiting_google_request_reads_you_asked_when_the_owner_asked(self):
+		self.config(owner_runs_now=0)
+		self.as_user(AGENT)
+		out = google.act(self.KEY, "email.archive", {"thread_id": "t1"}, "owner", "Archive that thread", space=PRIVATE)
+		self.assertEqual(out["status"], "waiting")
+		self.as_user(OWNER)
+		card = [c for c in pages.requests(PRIVATE) if c["name"] == out["action"]][0]
+		self.assertEqual((card["asked_by"], card["request"]), ("owner", "Archive that thread"))
+
+	def test_the_activity_feed_lists_what_changed_with_who_asked_and_undo_for_a_tool_act(self):
+		out = self.person(asked_by="owner", owner_message="Make Ekta Jalan a person")
+		self.as_user(OWNER)
+		got = brain.activity(space=PRIVATE)
+		self.assertEqual([(r["agent_name"], r["asked_by"], r["request"], r["can_undo"]) for r in got["assistant"]], [("Hermes", "owner", "Make Ekta Jalan a person", 1)])
+		self.assertEqual(got["counts"]["assistant"], 1)
+		only = brain.activity(space=PRIVATE, outcome="assistant")
+		self.assertEqual((only["rows"], len(only["assistant"])), ([], 1))
+		self.assertEqual(brain.activity(space=PRIVATE, outcome="failed")["assistant"], [])
+		agent_page.undo(out["action"], PRIVATE)
+		self.assertFalse(frappe.db.exists("Life Person", out["person"]))
+		self.assertEqual(brain.activity(space=PRIVATE)["assistant"][0]["undone"], 1)
+
+	def test_the_name_goes_to_the_connector_and_a_failed_job_is_reported(self):
+		self.config(display_name="Jai's assistant")
+		self.assertEqual(connector.pull(PRIVATE, self.KEY)["assistant_name"], "Jai's assistant")
+		connector.report(PRIVATE, self.KEY, AGENT, jobs=[{"id": "j1", "name": "Folio refresh", "schedule": "daily", "last_status": "error", "last_run": "2026-11-26 07:00", "last_error": "401 Unauthorized"},
+			{"id": "j2", "name": "Digest", "schedule": "daily", "last_status": "ok"}])
+		self.as_user(OWNER)
+		sec = pages.sections(PRIVATE, self.KEY)
+		self.assertEqual((sec["failed_job"]["title"], sec["failed_job"]["error"]), ("Folio refresh", "401 Unauthorized"))
+		self.assertEqual([j["failed"] for j in sec["jobs"]], [0, 1])
+		self.assertEqual(sec["name"], "Jai's assistant")
 
 
 class TestAgentMethodsExist(LifeTestCase):
