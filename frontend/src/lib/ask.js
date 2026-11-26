@@ -211,7 +211,7 @@ export async function send(question, record = null) {
     if (res.error) {
       ask.refusal = res
       if (res.done?.length) Object.assign(answer, { status: 'Done', done: res.done }) // the files were saved all the same: no model is needed for that
-      else { ask.messages.splice(-2, 2); ask.files.unshift(...sending) }
+      else { ask.messages.pop(); ask.files.unshift(...sending) } // the question stays, with what search finds for it
     } else {
       Object.assign(answer, res.message)
       while (answer.status === 'Working') {
