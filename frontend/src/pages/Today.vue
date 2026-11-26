@@ -200,6 +200,8 @@ async function load() {
   const res = await tryCall(() => todayData.today.get({ space: store.space, area: store.lensArea || undefined, at: route.query.at || undefined }))
   if (!res) return
   d.value = res
+  // a list layer (open or underneath) owns j and k; Today's own rows must not replace the list's
+  if (route.query.under || String(route.query.open || '').startsWith('list:')) return
   paneNav.rows = res.next.groups.flatMap((g) => g.rows.map((r) => (r.type === 'event' ? 'event:' + r.name : !r.type || r.type === 'task' ? 'task:' + r.name : null)).filter(Boolean))
 }
 onRecordChanged(() => load())
