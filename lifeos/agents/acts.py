@@ -27,6 +27,7 @@ ACTS = {
 	"calendar.create": ("change_calendar", "Add an event", ("title", "start", "end")),
 	"calendar.move": ("change_calendar", "Move an event", ("event_id", "start", "end")),
 	"calendar.respond": ("change_calendar", "Answer an invitation", ("event_id", "response")),
+	"calendar.cancel": ("change_calendar", "Cancel an event", ("event_id",)),  # issue 120: "the meeting is cancelled", said by the owner in Chat; not a delete of the owner's data
 }
 READS = {"mail.search": "read_email", "mail.get_thread": "read_email", "mail.get_attachment": "read_email", "calendar.list": "change_calendar"}
 TOOLS = [*READS, *ACTS]
@@ -128,6 +129,8 @@ def _describe(tool: str, p: dict) -> tuple[str, str]:
 		return f"Add “{p['title']}” on {p['start']}", f"{p['title']}\n{p['start']} to {p['end']}" + (f"\nWith: {', '.join(p['attendees'])}" if p.get("attendees") else "")
 	if tool == "calendar.move":
 		return f"Move “{p.get('title') or p['event_id']}” to {p['start']}", f"{p['start']} to {p['end']}"
+	if tool == "calendar.cancel":
+		return f"Cancel “{p.get('title') or p['event_id']}”", ""
 	return f"{p['response'].capitalize()}: “{p.get('title') or p['event_id']}”", ""
 
 
@@ -209,6 +212,9 @@ def _run(tool: str, account, p: dict) -> tuple[dict, dict | None]:
 	if tool == "calendar.move":
 		ev = g.move_event(p["event_id"], p["start"], p["end"])
 		return {"event_id": p["event_id"], "start": ev.get("start")}, None
+	if tool == "calendar.cancel":
+		g.delete_event(p["event_id"])
+		return {"event_id": p["event_id"]}, None
 	g.respond(p["event_id"], p["response"], account.address)
 	return {"event_id": p["event_id"], "response": p["response"]}, None
 

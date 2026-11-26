@@ -117,6 +117,7 @@ class Context:
 		self.background = False  # a long read of mail runs as a background job
 		self.progress = None  # called with what is being read, for the screen
 		self.mail_pages = {}  # (after, before, query) -> pages read
+		self.owner_message = ""  # the owner's own words this turn: what a Google act they asked for carries
 
 	def has_mail(self):
 		if self._has_mail is None:
@@ -195,7 +196,7 @@ def run_tool(ctx, name, args):
 			"cycle_state": t_cycle, "timeline": t_timeline, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
 			"mail_list_threads": t_mail_list_threads, "read_page": t_read_page, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
 			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "add_event": t_add_event,
-			"make_rule": t_make_rule}[name]
+			"make_rule": t_make_rule, "find_events": t_find_events, "add_note": t_add_note, "cancel_event": t_cancel_event}[name]
 	except KeyError:
 		return {"error": f"Unknown tool {name}."}
 	try:
@@ -605,3 +606,39 @@ def t_add_event(ctx, title, start, end=None, all_day=False, description=None):
 
 	out = work.add_event(title, start, end, bool(all_day), description, ctx.space)
 	return _did(ctx, out, "event")
+
+
+def t_find_events(ctx, query=None, date_from=None, date_to=None):
+	"""Events on the calendar, by words in the title and dates. Each has a reference to cite and to give add_note or cancel_event."""
+	from lifeos.tools import work
+
+	rows = work.find_events(ctx.space, query, date_from, date_to)
+	return {"events": [{"ref": ctx.ref("Event", r.name, r.subject, "Event", r.starts_on), "title": r.subject, "starts": str(r.starts_on)[:16], "all_day": bool(r.all_day)} for r in rows]}
+
+
+def _target(ctx, ref, doctype, name):
+	"""The record a write is about: a reference the tools gave (R3), or doctype and name."""
+	r = ctx.refs.get(str(ref).strip()) if ref else None
+	if r:
+		return r["doctype"], r["name"]
+	if doctype and name:
+		return doctype, name
+	frappe.throw(_("Say which record: its reference, or its doctype and name."), title=_("Record not named"))
+
+
+def t_add_note(ctx, text, ref=None, doctype=None, name=None):
+	"""A note on a record the owner has open or named (an event's own note, or a comment on any other record)."""
+	from lifeos.tools import work
+
+	doctype, name = _target(ctx, ref, doctype, name)
+	line, result = work.add_note(doctype, name, text, ctx.space)
+	return _did(ctx, {"done": line, "undo": None}, "note", doctype, name)
+
+
+def t_cancel_event(ctx, event=None, ref=None):
+	"""The owner said an event is cancelled: cancel it in Google (and the owner's own words are the request)."""
+	from lifeos.tools import work
+
+	_doctype, name = _target(ctx, ref, "Event", event)
+	out = work.cancel_event(ctx.space, name, ctx.owner_message or "")
+	return _did(ctx, out, "event", "Event", name)

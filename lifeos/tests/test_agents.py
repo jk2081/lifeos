@@ -739,7 +739,7 @@ class TestGoogleActs(LifeTestCase):
 		for word in ("delete", "trash", "remove", "purge", "spam"):
 			self.assertEqual([n for n in names if word in n], [])
 		self.assertEqual(sorted(n for n in names if n.startswith("email.")), ["email.archive", "email.draft", "email.label", "email.send"])
-		self.assertEqual(sorted(n for n in names if n.startswith("calendar.")), ["calendar.create", "calendar.list", "calendar.move", "calendar.respond"])
+		self.assertEqual(sorted(n for n in names if n.startswith("calendar.")), ["calendar.cancel", "calendar.create", "calendar.list", "calendar.move", "calendar.respond"])
 		with self.assertRaises(frappe.ValidationError):
 			self.act("email.delete", {"thread_id": "t"}, "owner", "delete it")
 		whitelisted = {f.__name__ for f in frappe.whitelisted if f.__module__ in ("lifeos.api.google", "lifeos.api.mail")}

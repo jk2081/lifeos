@@ -59,13 +59,17 @@ def context_text(space: str, scope: dict | None, record: dict | None) -> str:
 	"""What the model is told before the question: today, the scope, and the record the owner has open."""
 	lines = [f"Today: {today()}", f"Scope: {(scope or {}).get('label') or 'Everything in this space'}"]
 	if record and record.get("doctype") and record.get("name"):
-		title = frappe.db.get_value(record["doctype"], record["name"], frappe.get_meta(record["doctype"]).title_field or "name") or record["name"]
-		lines.append(f"The owner has this open: {record['doctype'].replace('Life ', '')} “{title}” ({record['doctype']} {record['name']}). Read it with get_record before answering about it.")
+		dt, name = record["doctype"], record["name"]
+		title = frappe.db.get_value(dt, name, "subject" if dt == "Event" else (frappe.get_meta(dt).title_field or "name")) or name
+		lines.append(f"The owner has this open: {dt.replace('Life ', '')} “{title}” ({dt} {name}). When they say “this” or “it”, they mean this record. "
+			+ ("Its time is " + str(frappe.db.get_value(dt, name, "starts_on"))[:16] + ". " if dt == "Event" else "Read it with get_record before answering about it. ")
+			+ "To add a note to it, call add_note with this doctype and name.")
 	return "\n".join(lines)
 
 
-def start(thread, text: str, scope: dict | None, record: dict | None = None):
-	"""Send `text` in the thread's Flow Session (made on the first message). Returns the Flow Run."""
+def start(thread, text: str, scope: dict | None, record: dict | None = None, filed: dict | None = None):
+	"""Send `text` in the thread's Flow Session (made on the first message). Returns the Flow Run. `filed` is what was done with the files that came with it
+	(`lifeos.ai.chat_files.process`): the model is told in `block`, and the answer lists `lines` and asks `pending`."""
 	from frappe.flow.lib.session import new_session
 
 	give_flow_role(thread.user)
@@ -74,8 +78,10 @@ def start(thread, text: str, scope: dict | None, record: dict | None = None):
 		session = new_session(agent, title=thread.title)
 		thread.db_set("flow_session", session.name)
 	session = frappe.get_doc("Flow Session", thread.flow_session)
-	body = context_text(thread.space, scope, record) + QUESTION + text
+	body = context_text(thread.space, scope, record) + (f"\n\n{filed['block']}" if filed and filed.get("block") else "") + QUESTION + text
 	run = session.chat(body, on_complete="lifeos.ai.chat.run_done", reference_doctype="Life Ask Thread", reference_name=thread.name)
+	if filed and (filed.get("lines") or filed.get("pending")):
+		save_filed(thread, run.name, {"lines": filed["lines"], "pending": filed["pending"]})
 	thread.db_set("last_message_on", now_datetime())
 	return run
 
@@ -83,6 +89,16 @@ def start(thread, text: str, scope: dict | None, record: dict | None = None):
 def asked_text(run_input: str) -> str:
 	"""The owner's own words in a run's input."""
 	return (run_input or "").split(QUESTION, 1)[-1].strip()
+
+
+def filed_of(thread) -> dict:
+	return frappe.parse_json(thread.filed) if thread.get("filed") else {}
+
+
+def save_filed(thread, run: str, data: dict):
+	all_ = filed_of(thread)
+	all_[run] = data
+	thread.db_set("filed", json.dumps(all_, default=str), update_modified=False)
 
 
 def run_done(run):
@@ -133,14 +149,17 @@ def answer_of(thread, run) -> dict:
 	done = _done_lines(run.name, run.session)
 	for i, d in enumerate(done):
 		d["undone"] = int(bool(undone.get(f"{run.name}:{i}")))
+	filed = filed_of(thread).get(run.name) or {}
+	done += [{**d, "undone": 0} for d in filed.get("lines") or []]  # after the tools' own lines, so the numbers Undo uses do not move
 	status = _status(run)
 	error = run.error if status == "Error" else None
 	if status == "Error":
 		error = _("The answer could not be written. {0}").format(frappe.utils.strip_html(run.error or "")[:200]).strip()
 	if status == "Done" and not text:
-		text = _("Done.") if done else _("I could not find that.")
+		text = _("Done.") if done or filed.get("pending") else _("I could not find that.")
 	usage = frappe.parse_json(run.usage) if run.usage else {}
 	return {"name": run.name, "thread": thread.name, "role": "assistant", "text": text, "status": status, "error": error, "cited": cited, "actions": [], "done": done, "read": [],
+		"questions": [{"index": i, "text": q["text"], "file_name": q["file_name"], "options": q["options"]} for i, q in enumerate(filed.get("pending") or []) if q],
 		"cost": flt(usage.get("cost")), "created": str(run.creation)[:19]}
 
 

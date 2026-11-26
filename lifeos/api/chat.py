@@ -8,6 +8,7 @@ from frappe.query_builder import Order
 from frappe.query_builder import functions as fn
 
 from lifeos import permissions
+from lifeos.ai import chat_files, idcards
 from lifeos.api.utils import count_where, list_query, page, parse
 
 SUGGESTED = ["What did I promise people this week?", "What is stuck, and what should I do about it?",
@@ -74,16 +75,20 @@ def _record(record, space):
 
 
 @frappe.whitelist(methods=["POST"])
-def send(question: str, space: str | None = None, thread: str | None = None, scope: str | dict | None = None, record: str | dict | None = None):
+def send(question: str | None = None, space: str | None = None, thread: str | None = None, scope: str | dict | None = None, record: str | dict | None = None,
+		files: str | list | None = None):
 	"""Send a message, or a follow-up in a thread (same scope unless `scope` changes it). `record` is the record the person has open ({doctype, name}).
-	It checks the monthly cap, starts the run in the thread's Flow Session and returns at once with the thread and the answer, `Working`; the screen
+	`files` are the File names of what the owner put in the chat (uploaded private, attached to nothing): each is read on the server and saved before the model
+	is asked (`lifeos.ai.chat_files`). It checks the monthly cap, starts the run in the thread's Flow Session and returns at once with the thread and the answer, `Working`; the screen
 	polls `progress` until it is Done."""
 	from lifeos.ai import chat, client
 
 	_person()
-	question = " ".join((question or "").split())
-	if not question:
+	names = [n for n in (parse(files, []) or []) if isinstance(n, str)][:chat_files.MAX_FILES]
+	question = idcards.mask(" ".join((question or "").split()))  # a number the owner typed does not reach the model either
+	if not question and not names:
 		frappe.throw(_("Type a question."), title=_("Question is empty"))
+	question = question or _("I added a file.")
 	if thread:
 		t = _thread(thread)
 		if t.channel:  # a conversation the owner had on another channel: you answer there, not here (issue 125)
@@ -113,7 +118,10 @@ def send(question: str, space: str | None = None, thread: str | None = None, sco
 	except client.CapReached as e:
 		return _refuse(t, question, "cap", str(e))
 	try:
-		run = chat.start(t, question, sc, rec)
+		filed = chat_files.process(space, question, names) if names else None
+		run = chat.start(t, question, sc, rec, filed)
+	except frappe.PermissionError:
+		raise
 	except Exception as e:
 		frappe.log_error(title="Life OS Chat failed")
 		text = _("Something went wrong while starting the answer. It has been logged.")
@@ -218,3 +226,60 @@ def undo_done(message: str, index: int | str):
 	undone[f"{message}:{i}"] = 1
 	t.db_set("undone", json.dumps(undone), update_modified=False)
 	return {"undone": out["undone"], "index": i}
+
+
+@frappe.whitelist(methods=["POST"])
+def answer_card(thread: str, message: str, index: int | str, holder: str):
+	"""The owner's tap on "Whose is this?" under an answer: the ID card is saved to the Vault for that person. Returns the Done line."""
+	from lifeos.ai import chat
+
+	_person()
+	t = _thread(thread)
+	filed = chat.filed_of(t)
+	data = filed.get(message) or {}
+	try:
+		pending = (data.get("pending") or [])[int(index)]
+	except (IndexError, ValueError, TypeError):
+		pending = None
+	if not pending:
+		frappe.throw(_("No such question."), title=_("Question not found"))
+	line = chat_files.answer_card(t.space, pending, holder)
+	data["pending"][int(index)] = None
+	data.setdefault("lines", []).append(line)
+	chat.save_filed(t, message, data)
+	return {"line": line}
+
+
+@frappe.whitelist(methods=["POST"])
+def transcribe(file: str):
+	"""The mic: an audio File the owner just recorded (private, attached to nothing) is turned into text on this server (faster-whisper) and deleted. The text goes into the
+	box for the owner to check and send; no audio goes to a model. Returns {text}."""
+	from lifeos.library import extract
+
+	_person()
+	(doc,) = chat_files.loose_files([file])
+	try:
+		out = extract.read_file(doc)
+	finally:
+		frappe.delete_doc("File", doc.name, force=True, ignore_permissions=True)  # system: the recording was the person's own and is not kept
+	if not out["ok"]:
+		frappe.throw(out.get("note") or _("Nothing could be heard."), title=_("Nothing was heard"))
+	return {"text": out["text"]}
+
+
+@frappe.whitelist(methods=["GET"])
+def about(doctype: str, name: str):
+	"""The chip's label for a record the owner has open: "About: <title>", checked like a scope (readable, in a space of the person)."""
+	_person()
+	doc = permissions.get_doc_checked(doctype, name)
+	field = "subject" if doctype == "Event" else frappe.get_meta(doctype).title_field or "name"
+	return {"label": doc.get(field) or name, "doctype": doctype, "name": name}
+
+
+@frappe.whitelist(methods=["GET"])
+def latest(space: str | None = None):
+	"""The one ongoing conversation: the person's newest thread in the space that they can answer in (not one relayed from another channel), or none."""
+	_person()
+	space = permissions.resolve_space(space)
+	rows = frappe.get_all("Life Ask Thread", filters={"user": frappe.session.user, "space": space}, fields=["name", "channel"], order_by="last_message_on desc, creation desc", limit=10)  # nosemgrep: frappe-missing-permission-check -- the person's own threads, by user
+	return {"name": next((r.name for r in rows if not r.channel), None)}

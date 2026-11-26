@@ -18,7 +18,8 @@
   "flow_session",
   "transcript",
   "refs",
-  "undone"
+  "undone",
+  "filed"
  ],
  "fields": [
   {
@@ -113,6 +114,13 @@
    "label": "Undone",
    "read_only": 1,
    "description": "The lines of Done lists that were taken back"
+  },
+  {
+   "fieldname": "filed",
+   "fieldtype": "Long Text",
+   "label": "Filed",
+   "read_only": 1,
+   "description": "Files put in the chat: what was done with each (a JSON object by run) and the questions that wait"
   }
  ],
  "links": [],

@@ -8,10 +8,11 @@ import frappe
 from frappe.flow import ToolContext
 
 from lifeos.ai import chat as engine
+from lifeos.ai import idcards
 from lifeos.ai import client, flow
 from lifeos.api import chat
 from lifeos.tests.base import AGENT, FAMILY, OWNER, PRIVATE, SHARED
-from lifeos.tests.helpers import AskCase
+from lifeos.tests.helpers import AskCase, printed_png, speech_wav
 
 
 def ctx(thread, user=OWNER):
@@ -215,3 +216,134 @@ class TestChatPatchAndDeletions(ChatCase):
 		self.assertFalse(frappe.db.exists("DocType", "Life Ask Message"))
 		self.assertFalse(frappe.db.table_exists("Life Ask Message"))
 		self.assertTrue(frappe.db.exists("DocType", "Life Ask Thread"))
+
+
+PAN_PAGE = ["INCOME TAX DEPARTMENT", "Permanent Account Number", "ABCDE1234F", "JAI KEJRIWAL"]
+
+
+def loose_file(name, content):
+	"""A file as the chat's upload leaves it: private, belonging to the person, attached to nothing."""
+	return frappe.get_doc({"doctype": "File", "file_name": name, "is_private": 1, "content": content}).insert().name
+
+
+class TestChatEverywhere(ChatCase):
+	"""Issue 120: files (the ID documents are Vault safe), the mic, notes on the open record, and the calendar from chat."""
+
+	def person(self, name):
+		return self.make("Life Person", full_name=name, kind="Person").name
+
+	def test_1_id_numbers_are_found_by_patterns_and_only_the_last_four_leave(self):
+		pan = idcards.detect("INCOME TAX DEPARTMENT\nPermanent Account Number\nABCDE1234F\nJAI KEJRIWAL")
+		self.assertEqual((pan["type"], pan["last4"], pan["doc_type"]), ("PAN", "234F", "ID"))
+		passport = idcards.detect("REPUBLIC OF INDIA PASSPORT\nP1234567\nDate of Expiry 12/03/2031")
+		self.assertEqual((passport["type"], passport["last4"], passport["expiry"]), ("Passport", "4567", "2031-03-12"))
+		self.assertEqual(idcards.detect("Aadhaar\n2345 6789 0123")["last4"], "0123")
+		self.assertIsNone(idcards.detect("Call me on 2345 6789 0123 about the invoice ABCDE1234F"))  # no card words: not a card
+		self.assertNotIn("ABCDE1234F", idcards.mask("my PAN is ABCDE1234F"))
+		self.assertEqual(idcards.mask("my PAN is ABCDE1234F"), "my PAN is ••••234F")
+
+	def test_2_a_pan_image_is_saved_to_the_vault_with_its_last_four_and_the_model_never_sees_the_number(self):
+		jai = self.person("Jai Kejriwal")
+		f = loose_file("pan.png", printed_png(PAN_PAGE))
+		res = chat.send("this is my PAN", space=PRIVATE, files=[f])
+		run = frappe.get_doc("Flow Run", res["message"]["name"])
+		doc = frappe.get_doc("Life Vault Document", {"space": PRIVATE, "holder": jai, "doc_type": "ID"})
+		self.assertEqual(doc.number_last4, "234F")
+		self.assertFalse(doc.extracted_text)  # the page's own text holds the full number: it is not kept
+		self.assertNotIn("ABCDE1234F", json.dumps(doc.as_dict(), default=str))
+		self.assertNotIn("ABCDE1234F", run.input)
+		self.assertIn("••••234F", run.input)
+		self.assertFalse(frappe.db.exists("File", f))  # the loose upload became the document's own file
+		self.assertTrue(frappe.db.exists("File", {"attached_to_doctype": "Life Vault Document", "attached_to_name": doc.name, "is_private": 1}))
+		self.finish(run.name, "Saved your PAN.")
+		got = chat.progress(res["thread"], run.name)
+		self.assertIn("PAN (Jai Kejriwal, ••••234F)", got["done"][0]["text"])
+		self.assertEqual(got["done"][0]["pane"], f"vault:{doc.name}")
+
+	def test_3_when_it_cannot_be_told_whose_card_it_is_one_question_with_tappable_answers_then_it_saves(self):
+		a, b = self.person("Meera Kejriwal"), self.person("Ruchi Kejriwal")
+		f = loose_file("card.png", printed_png(["INCOME TAX DEPARTMENT", "Permanent Account Number", "PQRST5678X"]))
+		res = chat.send("", space=PRIVATE, files=[f])
+		self.assertFalse(frappe.db.exists("Life Vault Document", {"space": PRIVATE, "number_last4": "678X"}))
+		self.finish(res["message"]["name"], "Whose is it?")
+		got = chat.progress(res["thread"], res["message"]["name"])
+		self.assertEqual(len(got["questions"]), 1)
+		self.assertIn(a, [o["value"] for o in got["questions"][0]["options"]])
+		out = chat.answer_card(res["thread"], res["message"]["name"], 0, b)
+		doc = frappe.get_doc("Life Vault Document", {"space": PRIVATE, "number_last4": "678X"})
+		self.assertEqual(doc.holder, b)
+		self.assertIn("Ruchi Kejriwal", out["line"]["text"])
+		self.assertEqual(chat.progress(res["thread"], res["message"]["name"])["questions"], [])
+
+	def test_4_another_file_becomes_a_capture_for_the_brain_and_its_text_goes_to_the_model(self):
+		f = loose_file("bill.png", printed_png(["Water bill", "Invoice date 12 November 2026"]))
+		res = chat.send("file this bill", space=PRIVATE, files=[f])
+		item = frappe.get_all("Life Inbox Item", filters={"space": PRIVATE, "title": "bill.png"}, fields=["name", "source_type"], order_by="creation desc", limit=1)[0]
+		self.assertEqual(item.source_type, "Upload")
+		self.assertTrue(frappe.db.exists("File", {"attached_to_doctype": "Life Inbox Item", "attached_to_name": item.name}))
+		self.assertIn("water bill", frappe.db.get_value("Flow Run", res["message"]["name"], "input").lower())
+		self.finish(res["message"]["name"], "Filed.")
+		self.assertEqual(chat.progress(res["thread"], res["message"]["name"])["done"][0]["pane"], f"source:{item.name}")
+
+	def test_5_a_file_that_is_not_the_persons_own_is_refused(self):
+		f = loose_file("x.png", printed_png(["hello"]))
+		self.as_user(FAMILY)
+		with self.assertRaises(frappe.PermissionError):
+			chat.send("add", space=SHARED, files=[f])
+
+	def test_6_the_mic_turns_speech_into_text_on_the_server_and_no_model_is_called(self):
+		f = loose_file("voice.wav", speech_wav())
+		with mock.patch("lifeos.ai.chat.start") as start:
+			out = chat.transcribe(f)
+		self.assertIn("electricity", out["text"].lower())
+		start.assert_not_called()
+		self.assertEqual(self.runs, [])
+		self.assertFalse(frappe.db.exists("File", f))  # the recording is not kept
+
+	def test_7_a_note_lands_on_the_open_event_and_is_listed_with_a_way_to_change_it(self):
+		ev = frappe.get_doc({"doctype": "Event", "subject": "t120 RSH Global meeting", "starts_on": "2026-12-01 10:00:00", "event_type": "Public", "life_space": PRIVATE}).insert()
+		res = chat.send("add a note: quote by Friday", space=PRIVATE, record={"doctype": "Event", "name": ev.name})
+		run = frappe.get_doc("Flow Run", res["message"]["name"])
+		self.assertIn("t120 RSH Global meeting", run.input)
+		t = frappe.get_doc("Life Ask Thread", res["thread"])
+		out = flow.add_note(text="quote by Friday", doctype="Event", name=ev.name, ctx=ctx(t))
+		self.assertIn("t120 RSH Global meeting", out["done_list"][0]["text"])
+		self.assertEqual(out["done_list"][0]["pane"], f"event:{ev.name}")
+		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Event", "reference_name": ev.name, "content": "quote by Friday"}))
+		note = self.make("Life Note", title="t120 a page", content_md="x")
+		flow.add_note(text="check the draft", ref=None, doctype="Life Note", name=note.name, ctx=ctx(t))
+		self.assertTrue(frappe.db.exists("Comment", {"reference_doctype": "Life Note", "reference_name": note.name, "content": "check the draft"}))
+
+	def test_8_cancelled_means_deleted_in_google_after_the_owners_own_message_and_an_agent_asks_first(self):
+		from lifeos.agents import acts, limits
+		from lifeos.tests.test_agents import RecordingGoogle
+
+		address = "t120owner@example.com"
+		google = RecordingGoogle()
+		frappe.flags.lifeos_google = {address: google}
+		self.addCleanup(lambda: setattr(frappe.flags, "lifeos_google", {}))
+		frappe.db.delete("Life Mail Account", {"space": PRIVATE})
+		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": address, "label": "Personal", "is_default": 1}).insert()
+		ev = frappe.get_doc({"doctype": "Event", "subject": "Twinings meet", "starts_on": "2026-12-03 11:00:00", "event_type": "Public", "life_space": PRIVATE,
+			"google_calendar_event_id": "g-twinings", "pulled_from_google_calendar": 1}).insert()
+		res = chat.send("Twinings meet is cancelled, follow up with Ajay Bhaiyya in 6 months", space=PRIVATE)
+		t = frappe.get_doc("Life Ask Thread", res["thread"])
+		found = flow.find_events(query="Twinings", ctx=ctx(t))
+		self.assertEqual(found["events"][0]["title"], "Twinings meet")
+		out = flow.cancel_event(ref=found["events"][0]["ref"], ctx=ctx(t))
+		self.assertIn("Cancelled Twinings meet", out["done_list"][0]["text"])
+		self.assertEqual([c[1]["event_id"] for c in google.calls if c[0] == "delete_event"], ["g-twinings"])
+		row = frappe.get_all("Life Agent Action", filters={"space": PRIVATE, "action": "change_calendar", "asked_by": "owner"}, fields=["status", "request"], order_by="creation desc", limit=1)[0]
+		self.assertEqual(row.status, "Done")
+		self.assertIn("Twinings meet is cancelled", row.request)  # the owner's own words
+		self.assertEqual(frappe.db.get_value("Event", ev.name, "life_hidden"), 1)
+		task = flow.make_task(title="Follow up with Ajay Bhaiyya", area="Tea", due_date=frappe.utils.add_months(frappe.utils.today(), 6), ctx=ctx(t))
+		self.assertIn("Follow up with Ajay Bhaiyya", task["done_list"][0]["text"])
+		# an agent that is set to ask first only puts it in Needs you
+		frappe.set_user("Administrator")
+		limits.set_ability(limits.config(PRIVATE, "t120agent", create=True), "change_calendar", "ask")
+		frappe.set_user(OWNER)
+		google.calls.clear()
+		waiting = acts.request(PRIVATE, "t120agent", "calendar.cancel", {"event_id": "g-other", "title": "Other"}, "agent")
+		self.assertEqual(waiting["status"], "waiting")
+		self.assertEqual([c for c in google.calls if c[0] == "delete_event"], [])

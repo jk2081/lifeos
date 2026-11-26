@@ -11,12 +11,20 @@ from frappe.flow import Agent, ToolContext, tool
 
 from lifeos.ai.tools import Context, run_tool
 
-TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'make_rule']
+TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'find_events', 'add_note', 'cancel_event', 'make_rule']
 
 
 def _thread_of(session_id: str):
 	"""The chat thread a Flow Session belongs to; none for a session started at /flow."""
 	return frappe.db.get_value("Life Ask Thread", {"flow_session": session_id}, ["name", "space", "scope_kind", "scope_label", "scope_doctype", "scope_name"], as_dict=True)
+
+
+def _owner_words(session_id: str) -> str:
+	"""What the owner wrote in the run that is going now: a calendar change they ask for carries their own words."""
+	from lifeos.ai import chat
+
+	run = frappe.db.get_value("Flow Run", {"session": session_id}, "input", order_by="creation desc")
+	return chat.asked_text(run)[:500]
 
 
 def _run(tool: str, /, ctx: ToolContext, **args) -> dict:
@@ -42,6 +50,8 @@ def _run(tool: str, /, ctx: ToolContext, **args) -> dict:
 	if thread:  # the R-numbers the answer cites keep their meaning from one tool call to the next
 		c.refs = frappe.parse_json(frappe.db.get_value("Life Ask Thread", thread.name, "refs") or "{}")
 		c.by_key = {(r["doctype"], r["name"]): k for k, r in c.refs.items()}
+	if thread:
+		c.owner_message = _owner_words(ctx.session_id)
 	out = run_tool(c, tool, args)
 	if thread:
 		frappe.db.set_value("Life Ask Thread", thread.name, "refs", json.dumps(c.refs, default=str), update_modified=False)
@@ -156,6 +166,24 @@ def make_task(title: str, area: str | None = None, part: str | None = None, due_
 def add_event(title: str, start: str, end: str | None = None, all_day: bool = False, description: str | None = None, *, ctx: ToolContext) -> dict:
 	"""Put an event on the calendar now, only when the owner asked for it."""
 	return _run("add_event", ctx, title=title, start=start, end=end, all_day=all_day, description=description)
+
+
+@tool
+def find_events(query: str | None = None, date_from: str | None = None, date_to: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Find events on the calendar by words in the title and a date range (30 days back to 120 ahead by default). Use it to find the event the owner means."""
+	return _run("find_events", ctx, query=query, date_from=date_from, date_to=date_to)
+
+
+@tool
+def add_note(text: str, ref: str | None = None, doctype: str | None = None, name: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Add a note to a record when the owner asks ("add a note: they want a quote by Friday"). The record is the one the owner has open, or one you found: give its reference, or its doctype and name."""
+	return _run("add_note", ctx, text=text, ref=ref, doctype=doctype, name=name)
+
+
+@tool
+def cancel_event(event: str | None = None, ref: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Cancel an event in the owner's Google Calendar, only when the owner said it is cancelled or asked you to cancel it. Find it with find_events first; give its reference or name."""
+	return _run("cancel_event", ctx, event=event, ref=ref)
 
 
 @tool
