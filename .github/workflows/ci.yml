@@ -4,6 +4,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]   # labeled: adding `quick` re-plans the walk
   push:
     branches: [main]
   workflow_dispatch:
