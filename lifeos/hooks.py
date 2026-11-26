@@ -119,6 +119,7 @@ flow_tools = [
 	"lifeos.ai.flow.counts",
 	"lifeos.ai.flow.cycle_state",
 	"lifeos.ai.flow.timeline",
+	"lifeos.ai.flow.catch_up",
 	"lifeos.ai.flow.mail_search",
 	"lifeos.ai.flow.mail_thread",
 	"lifeos.ai.flow.mail_list_threads",

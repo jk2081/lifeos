@@ -77,6 +77,12 @@ def timeline(date_from: str, date_to: str | None = None, *, ctx: ToolContext) ->
 
 
 @tool
+def catch_up(days: int | None = None, *, ctx: ToolContext) -> dict:
+	"""For a broad question ('what's going on', 'catch me up'): what needs the owner, what waits on others, the email digests, what came in and was done, and the next 7 days."""
+	return _run("catch_up", ctx, days=days)
+
+
+@tool
 def mail_search(text: str | None = None, has_attachment: bool | None = None, account: str | None = None, subject: str | None = None, filename: str | None = None, after: str | None = None, before: str | None = None, *, ctx: ToolContext) -> dict:
 	"""Search the person's own inbox live, with plain fields. Up to 10 threads, newest first."""
 	return _run("mail_search", ctx, text=text, has_attachment=has_attachment, account=account, subject=subject, filename=filename, after=after, before=before)
