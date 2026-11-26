@@ -6,6 +6,32 @@ Each idea keeps the owner's own words, then a short note on what it would take.
 
 ## Open
 
+### Deploying to many customers: one container stack per customer
+> "all of this will have to be done when this is mass deployed?" … "i imagine some kind of a saas frontend deploys a docker container on a vps as a site with all of this setup" … "each site is isolated in its own container" (26 Nov)
+
+Decided: **each customer's site is isolated in its own container stack**, with its own web, workers, scheduler, socket.io, Flow server, MariaDB and Redis. Several stacks can share one VPS behind one proxy for domains and HTTPS. A big customer moves to a VPS of their own by moving their stack.
+
+1. **The image.** CI builds Life OS with Frappe 16.61 (Flow included) from each merge to main, starting from Frappe's official `frappe_docker`. It comes with a compose file for one stack and a health check that prints one line per check. Each process is its own container, so there is no sudo and no Supervisor. An update pulls the new image and migrates. A rollback means the previous image plus a restore. Nothing is checked out or built on a customer's server.
+2. **The control plane** (the SaaS front end): sign-up and payment, creating the customer's stack, domain and HTTPS, off-server backups (#34), rolling out updates, and every customer's version and health at a glance. **Check Frappe's first:** Frappe Cloud's control plane (Press) is open source, and BTW Central already runs Frappe Cloud site work. Verify whether Frappe Cloud runs the Flow server, and where Hermes would live.
+3. **The customer's own steps,** in onboarding: connect Google, an AI key (now Flow's provider), and optionally Hermes.
+
+Order: the updater fix (below), the image, the control plane decision, the control plane.
+
+### The updater: check before changing, don't roll back a good migrate
+> The live update failed twice on 26 Nov: `restart: failed … 'sudo supervisorctl status' returned non-zero exit status 1`, then `restore the backup: failed. bench --site exited 1:` with no reason. The site was left on old code with a migrated database.
+
+What was found:
+- The updater runs from cron with no terminal, and `frappe` had no password-free sudo for `supervisorctl`. The owner fixed it by hand with a sudoers line. Frappe's `bench setup sudoers frappe` does the same.
+- `bench restore` needs the MariaDB root password, which cron can't type. So the rollback's restore could never have worked on this server.
+
+To build:
+- **Check before changing anything.** Before backup, `verify` also checks that a restart and a restore can run without a person. If not, it refuses with the one-line fix, and Settings › Updates shows a "Ready to update" list.
+- **Only the restart failed:** no rollback (new code and the migrated database belong together). The status is "Needs restart", with a Restart now button.
+- **A restore that works without root:** load the dump with the site's own database user (`bench --site X mariadb`).
+- **Every failed step** logs its command, exit code and the last lines of stdout and stderr. Never "exited 1:" with nothing after it.
+
+The full draft issue text was written in chat on 26 Nov. Much of this goes away with the image (above), but the bench install needs it until then.
+
 ### Life in four layers, and the ladder
 > "life works in two slices time and area of work/focus, is there anything else?" … "So simplest is time & people, then area (goals), then systems, then energy?" … "I think 1 & 2 are easy to understand. park this discussion in ideas but the ladder should be 1 & 2 for now." (26 Nov)
 
