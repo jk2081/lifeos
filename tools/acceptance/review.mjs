@@ -26,21 +26,18 @@ archive.run_daily()`)
 
 for (const width of WIDTHS) {
   const { count, overflow, pane, pg, phone, s, settle, tag } = await uxKit(width)
-  await check('REVIEW.2', `${width} px: the review screen shows tabs on a phone only`, async () => {
+  await check('REVIEW.2', `${width} px: an inbox item's pane and full review page are tabbed: Summary first, then the original, Decisions and What came of it`, async () => {
     await s.open('/life/brain/queue?open=inbox:' + ux.inbox)
-    const review = pg.locator('[data-review-tabs]')
-    if (!phone) must(!(await review.count()), 'the review screen shows tabs at 1440 px')
-    else {
-      must(JSON.stringify((await review.locator('[role="tab"]').allInnerTexts()).map((t) => t.replace(/\s*\d+$/, '').trim())) === JSON.stringify(['Original', 'Transcript', 'Summary', 'Proposals']), 'the review tabs are wrong')
-      const pendingNow = (await s.api('inbox.get', { item: ux.inbox })).proposals.some((x) => x.status === 'Pending')
-      must((await review.getAttribute('data-tab-current')) === (pendingNow ? 'proposals' : 'summary'), `the review opened on ${await review.getAttribute('data-tab-current')}`)
-      await review.locator('[data-tab="original"]').click()
-      await settle()
-      must(new URL(pg.url()).searchParams.get('ptab') === 'original', 'the review tab is not in the URL as ptab= in the pane')
-      await s.open(`/life/brain/review/${ux.inbox}?tab=transcript`) // the full page uses tab=
-      must((await pg.locator('[data-review-tabs]').getAttribute('data-tab-current')) === 'transcript', 'the full review page does not open on tab=transcript')
-      if (pendingNow) must(await pg.getByRole('button', { name: /Accept all/ }).isVisible(), 'Accept all is hidden on the Original tab')
-    }
+    const bar = pg.locator('[data-pane-tabs]')
+    await bar.waitFor({ timeout: 10000 })
+    const names = (await bar.locator('[role="tab"]').allInnerTexts()).map((t) => t.replace(/\s*\d+$/, '').trim())
+    must(names.length === 4 && names[0] === 'Summary' && names[2] === 'Decisions' && names[3] === 'What came of it', 'the tabs are ' + JSON.stringify(names))
+    must((await bar.getAttribute('data-tab-current')) === 'summary', `it opened on ${await bar.getAttribute('data-tab-current')}`)
+    await bar.locator('[data-tab="decisions"]').click()
+    await settle()
+    must(new URL(pg.url()).searchParams.get('ptab') === 'decisions', 'the tab is not in the URL as ptab= in the pane')
+    await s.open(`/life/brain/review/${ux.inbox}?tab=decisions`) // the full page uses tab=
+    must((await pg.locator('[data-review-tabs]').getAttribute('data-tab-current')) === 'decisions', 'the full review page does not open on tab=decisions')
     must((await overflow()) <= 0, 'the page scrolls sideways')
   })
   await s.ctx.close()
@@ -704,6 +701,50 @@ print(json.dumps({"status": cyc.status, "score": cyc.final_score, "next": nxt.st
     })
   } finally {
     try { cleanup() } catch (e) { /* reported by the debris check */ }
+    await s.ctx.close()
+  }
+}
+
+// Issue 118: Weekly review > Tasks > Waiting on others: the waiting pile by person, oldest first; Done, Move to my plate, Still waiting.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const tag = `I118W ${width} ${stamp}`
+  const mk = (who, title, days) => bench(`import json
+from frappe.utils import add_days, now_datetime
+t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "${tag} ${title}", "status": "Waiting", "waiting_on": "${who}", "check_by": add_days(frappe.utils.today(), 3)}).insert(ignore_permissions=True)
+frappe.db.set_value("Life Task", t.name, "creation", add_days(now_datetime(), -${days}), update_modified=False)
+print(t.name)`).split('\n').pop()
+  try {
+    await check('REVIEW.24', `${width} px: Waiting on others groups the waiting tasks by person, oldest first; Done closes one, Move to my plate puts one on Today's list, Still waiting moves check-by on by 7 days`, async () => {
+      const ravi1 = mk('Ravi I118W', 'old photos', 12)
+      const ravi2 = mk('Ravi I118W', 'newer sheet', 3)
+      const meera = mk('Meera I118W', 'fee form', 8)
+      await s.open('/life/today/week?view=review&tab=tasks')
+      const sec = pg.locator('[data-waiting-on-others]')
+      await sec.locator(`[data-waiting-task][data-task="${ravi1}"]`).waitFor({ timeout: 15000 })
+      const rows = async (who) => sec.locator(`[data-waiting-group][data-who="${who}"] [data-waiting-task]`).evaluateAll((els) => els.map((e) => e.getAttribute('data-task')))
+      must(JSON.stringify(await rows('Ravi I118W')) === JSON.stringify([ravi1, ravi2]), 'the person group is not oldest first: ' + JSON.stringify(await rows('Ravi I118W')))
+      must((await sec.locator(`[data-waiting-task][data-task="${meera}"]`).innerText()).includes('since'), 'a row does not say since when')
+      await sec.locator(`[data-waiting-task][data-task="${ravi2}"] [data-waiting-done]`).click()
+      await pg.waitForFunction((n) => !document.querySelector(`[data-waiting-task][data-task="${n}"]`), ravi2, { timeout: 10000 })
+      const status = (n) => bench(`print(frappe.db.get_value("Life Task", "${n}", "status"))`).split('\n').pop()
+      must(status(ravi2) === 'Done', 'Done did not close the task')
+      const before = bench(`print(frappe.db.get_value("Life Task", "${meera}", "check_by"))`).split('\n').pop()
+      await sec.locator(`[data-waiting-task][data-task="${meera}"] [data-waiting-change]`).click()
+      await pg.getByRole('menuitem', { name: 'Still waiting' }).click()
+      await pg.waitForTimeout(800)
+      const after = bench(`print(frappe.db.get_value("Life Task", "${meera}", "check_by"))`).split('\n').pop()
+      must(Math.round((Date.parse(after) - Date.parse(before)) / 86400e3) === 7, `check-by went from ${before} to ${after}`)
+      await sec.locator(`[data-waiting-task][data-task="${ravi1}"] [data-waiting-change]`).click()
+      await pg.getByRole('menuitem', { name: 'Move to my plate' }).click()
+      await pg.waitForFunction((n) => !document.querySelector(`[data-waiting-task][data-task="${n}"]`), ravi1, { timeout: 10000 })
+      const t = JSON.parse(bench(`import json
+print(json.dumps(frappe.db.get_value("Life Task", "${ravi1}", ["status", "due_date"], as_dict=True), default=str))`).split('\n').pop())
+      must(t.status === 'Open' && t.due_date === today, 'the task is not on the plate: ' + JSON.stringify(t))
+    })
+  } finally {
+    bench(`for n in frappe.get_all("Life Task", filters={"title": ["like", "I118W %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

@@ -15,6 +15,11 @@
       </Stat>
     </div>
 
+    <div v-if="newRules.length" class="flex flex-col gap-1 text-sm text-ink-gray-6" data-new-rules>
+      <div v-for="nr in newRules" :key="nr.name" data-new-rule>New rule: {{ nr.words.replace(/^When /, '').replace(': ', ' → ') }} ·
+        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'rules' } }" data-new-rule-change>Change</RouterLink></div>
+    </div>
+
     <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length && !contradictions.length && !agentRequests.length" class="py-2" data-needs-empty>
       <Empty title="Nothing needs you.">
         <p class="mt-1">Things you capture or connect will show up here.</p>
@@ -54,17 +59,10 @@
             <span v-else-if="r.takes_area" class="text-ink-gray-6">no area yet</span>
           </div>
           <div v-if="writable" class="flex flex-wrap items-center gap-2" data-row-actions>
-            <template v-if="r.alt_area">
-              <Button :disabled="busy.has(r.proposal)" :label="r.area_name" :aria-label="`File in ${r.area_name}`" data-pick="first" @click="decide(r, 'accept', r.area)" />
-              <Button :disabled="busy.has(r.proposal)" :label="r.alt_area_name" :aria-label="`File in ${r.alt_area_name}`" data-pick="second" @click="decide(r, 'accept', r.alt_area)" />
-            </template>
-            <template v-else>
-              <Button variant="solid" label="Keep" :disabled="busy.has(r.proposal) || !!r.blocked" data-keep @click="decide(r, 'accept')" />
-              <Button label="Change" :disabled="busy.has(r.proposal)" data-change @click="change(r)" />
-            </template>
-            <Button label="Drop" :disabled="busy.has(r.proposal)" data-drop @click="decide(r, 'reject')" />
+            <Button label="Change" icon-right="lucide-chevron-down" :disabled="busy.has(r.proposal)" :aria-expanded="changing === r.proposal" data-change @click="changing = changing === r.proposal ? null : r.proposal" />
           </div>
         </div>
+        <ChangeMenu v-if="writable && changing === r.proposal" :row="r" :busy="busy.has(r.proposal)" @decide="(...a) => decide(r, ...a)" @always-ask="alwaysAsk(r)" @open="change(r)" />
       </div>
     </Card>
 
@@ -104,9 +102,9 @@
             <Badge :theme="r.kind === 'Task' ? 'blue' : 'gray'" :label="r.kind_label" />
             <Pick v-if="writable" :model-value="null" :options="areaOptions()" placeholder="Choose an area" :clearable="false" data-unfiled-area
               @update:model-value="(v) => v && decide(r, 'accept', v)" />
-            <Button v-if="writable" label="Change" @click="change(r)" />
-            <Button v-if="writable" label="Drop" :disabled="busy.has(r.proposal)" data-drop @click="decide(r, 'reject')" />
+            <Button v-if="writable" label="Change" icon-right="lucide-chevron-down" :aria-expanded="changing === r.proposal" data-change @click="changing = changing === r.proposal ? null : r.proposal" />
           </div>
+          <ChangeMenu v-if="writable && changing === r.proposal" class="basis-full" :row="r" :busy="busy.has(r.proposal)" @decide="(...a) => decide(r, ...a)" @always-ask="alwaysAsk(r)" @open="change(r)" />
         </div>
         <div v-for="u in data?.unfiled || []" :key="u.item" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-b border-outline-gray-1 py-3 last:border-b-0"
           data-needs-row data-failed-row :data-item="u.item">
@@ -125,7 +123,7 @@
 
     <div v-if="rows.length || data?.waiting" class="flex flex-wrap items-center justify-between gap-3 pt-1" data-needs-foot>
       <div class="text-sm text-ink-gray-6">
-        <span v-if="rows.length">Every choice teaches the Brain. Next time it files these on its own.</span>
+        <span v-if="rows.length">Each row is the Brain's best guess and is taken as right unless you change it. Every change teaches the Brain.</span>
         <RouterLink v-if="data?.waiting" class="ml-1 text-ink-blue-8 hover:underline" :to="{ path: '/brain/queue', query: { status: 'Waiting' } }" data-waiting-link>
           {{ plural(data.waiting, 'capture') }} still with the agent</RouterLink>
       </div>
@@ -135,7 +133,7 @@
 </template>
 <script setup>
 // Brain > Needs you (issue 17): what the Brain asks you to decide, at most seven at a time, each with its best guess and
-// the reason. Keep accepts the guess, Change opens the capture's page, Drop rejects (the Outbox keeps it as Discarded). A
+// the reason. The guess is taken as right: a row has one button, Change (another area or part, Not needed, Always ask), and Done files the rest. A
 // proposal the Brain is torn on shows two area chips and you pick one. All of it is review.decide and review.decide_all.
 // Lessons (issue 30): what your corrections taught a skill, to Accept, Edit or Reject.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
@@ -147,6 +145,7 @@ import Empty from '@/components/Empty.vue'
 import Card from '@/components/ui/Card.vue'
 import Stat from '@/components/ui/Stat.vue'
 import OldItems from '@/components/inbox/OldItems.vue'
+import ChangeMenu from '@/components/brain/ChangeMenu.vue'
 import LessonCard from '@/components/brain/LessonCard.vue'
 import AgentRequests from '@/components/brain/AgentRequests.vue'
 import ContradictionCard from '@/components/brain/ContradictionCard.vue'
@@ -166,6 +165,8 @@ const writable = computed(() => canWrite() && !store.isAgent)
 const rows = computed(() => data.value?.rows || [])
 const lessons = computed(() => data.value?.lessons || [])
 const agentRequests = computed(() => data.value?.agent_requests || [])
+const newRules = computed(() => data.value?.new_rules || [])
+const changing = ref(null)
 const contradictions = computed(() => data.value?.contradictions || [])
 // a proposal that takes an area and has none cannot be kept as it is: it sits under Unfiled until you choose one
 const unfiled = computed(() => rows.value.filter((r) => r.unfiled))
@@ -179,14 +180,14 @@ async function load() {
   if (res) data.value = res
   loaded.value = true
 }
-// Keep, Drop and a picked area chip are one decision on one proposal. `area` replaces the proposal's area (the chip picked).
+// Not needed and a picked area are one decision on one proposal. `area` replaces the proposal's area (the chip picked).
 async function decide(r, decision, area) {
   if (busy.has(r.proposal)) return
   busy.add(r.proposal)
   try {
     const payload = area ? { ...r.payload, area } : undefined
     await brainData.review.decide({ proposal: r.proposal, decision, payload })
-    toast.success(decision === 'reject' ? `Dropped “${r.title}”.` : `Filed “${r.title}”${area ? ` under ${areaLabel(area)}` : ''}.`)
+    toast.success(decision === 'reject' ? `Not needed: “${r.title}”.` : `Filed “${r.title}”${area ? ` under ${areaLabel(area)}` : ''}.`)
   } catch (e) {
     toast.error(errorText(e))
   } finally {
@@ -195,6 +196,10 @@ async function decide(r, decision, area) {
   await load()
 }
 const areaLabel = (id) => (lookups.areas || []).find((a) => a.name === id)?.area_name || ''
+async function alwaysAsk(r) {
+  if (await tryCall(() => brainData.rules.always_ask({ proposal: r.proposal }), 'Rule made: always ask about this one.')) changing.value = null
+  await load()
+}
 function change(r) {
   router.push(`/item/${r.item}`)
 }

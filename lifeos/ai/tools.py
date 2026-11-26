@@ -79,6 +79,11 @@ WRITE_TOOLS = [
 	{"name": "add_event", "description": "Put an event on the calendar now, only when the owner asked for it.",
 		"input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "start": {"type": "string", "description": "YYYY-MM-DD or YYYY-MM-DD HH:MM"}, "end": {"type": "string"},
 			"all_day": {"type": "boolean"}, "description": {"type": "string"}}, "required": ["title", "start"]}},
+	{"name": "make_rule", "description": "Teach the Brain, only when the owner told you how to treat things from now on. Saves a rule at once: when a capture has the sender, domain, source, kind (Chat, Email Digest, Voice Note...), title words or attachment type, then file it under an area or part (or no area), drop it, always ask, or never make a page.",
+		"input_schema": {"type": "object", "properties": {"sender": {"type": "string"}, "domain": {"type": "string"}, "source": {"type": "string", "description": "gmail, claude, upload, google-calendar, phone..."},
+			"kind": {"type": "string"}, "title_words": {"type": "string", "description": "comma separated; any of them"}, "attachment_type": {"type": "string"},
+			"action": {"type": "string", "enum": ["File", "Drop", "Ask", "Link"]}, "area": {"type": "string"}, "part": {"type": "string"}, "no_area": {"type": "boolean"},
+			"file_as": {"type": "string", "enum": ["Chat", "Note", "Report", "Task"]}, "never_page": {"type": "boolean"}}, "required": ["action"]}},
 	{"name": "ask_one_question", "description": "When two records could be the one meant (for example two similar company names), ask the owner one question with each as a choice, then stop. The owner's choice comes back as their next message, and then you do the work. Do not hand the work back.",
 		"input_schema": {"type": "object", "properties": {"question": {"type": "string"}, "choices": {"type": "array", "items": {"type": "string"}, "description": "Two to four short choices."}}, "required": ["question", "choices"]}},
 ]
@@ -206,7 +211,7 @@ def run_tool(ctx, name, args):
 			"cycle_state": t_cycle, "timeline": t_timeline, "catch_up": t_catch_up, "suggest_actions": t_suggest, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
 			"mail_list_threads": t_mail_list_threads, "read_page": t_read_page, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
 			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "add_event": t_add_event,
-			"ask_one_question": t_ask_one_question}[name]
+			"make_rule": t_make_rule, "ask_one_question": t_ask_one_question}[name]
 	except KeyError:
 		return {"error": f"Unknown tool {name}."}
 	try:
@@ -644,7 +649,7 @@ def t_digests_read(ctx, start, end):
 def _did(ctx, out, kind, doctype=None, name=None):
 	"""Remember a write for the "Done" list under the answer; the model gets the same line back."""
 	ctx.done.append({"text": out["done"], "undo": out.get("undo"), "kind": kind, "doctype": doctype, "name": name, "pane": ref_of(doctype, name) if doctype and name else None})
-	return {"done": out["done"], **{k: v for k, v in out.items() if k in ("page", "person", "note", "task", "event", "item", "file", "file_name", "title", "organisation", "vault_document")}}
+	return {"done": out["done"], **{k: v for k, v in out.items() if k in ("page", "person", "note", "task", "event", "rule", "item", "file", "file_name", "title", "organisation", "vault_document")}}
 
 
 def _page_arg(ctx, page):
@@ -696,6 +701,13 @@ def t_make_task(ctx, title, area=None, part=None, due_date=None):
 
 	out = work.add_task(title, area, part, due_date, ctx.space)
 	return _did(ctx, out, "task", "Life Task", out["task"])
+
+
+def t_make_rule(ctx, **values):
+	from lifeos.tools import rules
+
+	out = rules.add_rule(space=ctx.space, **values)
+	return _did(ctx, out, "rule")
 
 
 def t_add_event(ctx, title, start, end=None, all_day=False, description=None):

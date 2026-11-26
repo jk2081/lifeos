@@ -75,6 +75,10 @@ def setup():
 
 	runner.ensure_brain_user()  # issue 28: the user skills run as
 	store.install()  # the built-in skills and their examples; an owner's edit is kept
+	from lifeos.brain import rules
+
+	for space in frappe.get_all("Life Space", pluck="name"):  # system: setup runs before any person has roles
+		rules.ensure_builtins(space)  # issue 117: each space has the two built-in rules
 	frappe.db.commit()  # nosemgrep: frappe-manual-commit -- after_install: the spaces and index DDL must be kept before install-app goes on
 
 

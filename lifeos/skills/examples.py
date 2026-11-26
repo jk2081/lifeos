@@ -45,7 +45,11 @@ def evaluate(checks, output, proposals) -> list:
 	"""[(check, passed, detail)]: each check is one of summary_contains, has_proposal {kind, area, title_contains, min_confidence},
 	no_proposal {kind}, proposal_count {min, max}, answer {path, equals | contains | count}, waits (every proposal is below the auto-file threshold)."""
 	results = []
-	summary = (output or {}).get("summary_md", "") if isinstance(output, dict) else ""
+	summary = ""
+	if isinstance(output, dict):  # issue 118: the summary is data; its words are checked as the Markdown they render to
+		from lifeos.brain import asks
+
+		summary = asks.render_md(asks.clean(output["summary"])) if isinstance(output.get("summary"), dict) else output.get("summary_md", "")
 	for check in checks:
 		(name, arg), = check.items()
 		ok, detail = False, ""

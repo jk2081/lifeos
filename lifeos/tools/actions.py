@@ -35,10 +35,10 @@ ABILITY = {
 
 def run_for(tool: str):
 	"""The `_do` of a tool by name (for an approved request)."""
-	from lifeos.tools import mail, notes, pages, people, work
+	from lifeos.tools import mail, notes, pages, people, rules, work
 
 	return {"mail.save_attachment": mail._save_attachment, "pages.create": pages._create, "pages.update": pages._update, "people.add": people._add,
-		"notes.save": notes._save, "tasks.add": work._add_task, "events.add": work._add_event}[tool]
+		"notes.save": notes._save, "tasks.add": work._add_task, "events.add": work._add_event, "rules.add": rules._add_rule}[tool]
 
 
 def agent_key(space: str, source_system: str | None) -> str:

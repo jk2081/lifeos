@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Today dashboard (issue 123)</title>
+<!-- One file, four mockups: open with #week, #periods, #phone or #simple. Seeded with made-up numbers. -->
+<style>
+:root{--t:#171717;--t2:#6B6B6B;--t3:#8A8A8A;--b:#EDEDED;--b2:#DADADA;--b3:#A3A3A3;--bg:#F3F3F3;--s:#FFFFFF;--page:#FAFAFA;--ac:#0062B3;--acbg:#E6F4FF;--wa:#A8480A;--ok:#2E7D32;--sel:#EDEDED}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;color:var(--t);background:var(--page);font-size:14px}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.sb{border-right:1px solid var(--b);padding:18px 12px;display:flex;flex-direction:column;gap:2px;background:var(--s)}
+.sb .logo{font-weight:600;padding:4px 10px 16px;font-size:15px}
+.sb a{display:flex;justify-content:space-between;padding:8px 10px;border-radius:8px;color:var(--t2)}
+.sb a.on{background:var(--sel);color:var(--t);font-weight:500}
+.sb .ct{font-size:12px;background:var(--acbg);color:var(--ac);border-radius:9px;padding:0 7px}
+.mn{padding:20px 32px 40px;max-width:1220px}
+.r{display:flex;align-items:flex-end;height:30px}
+.r>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.r .t{width:1px;height:6px;background:var(--b3)}.r .p .t{background:var(--b2)}
+.r .lb{font-size:12px;color:var(--t2);margin-bottom:3px;white-space:nowrap}
+.r .nb .t{height:9px}.r .now .t{width:2px;height:13px;background:var(--ac);border-radius:1px}.r .now .lb{color:var(--ac);font-weight:600}
+.hr{height:1px;background:var(--b);margin:8px 0 14px}
+.hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.hd b{font-size:20px;font-weight:600}.mu{color:var(--t2)}.wa{color:var(--wa)}.ac{color:var(--ac)}.ok{color:var(--ok)}
+.tb{display:flex;gap:2px;background:var(--bg);border-radius:8px;padding:3px}
+.tb span{padding:4px 12px;border-radius:6px;color:var(--t2);font-size:13px}.tb .on{background:var(--s);color:var(--t);font-weight:500}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.m{background:var(--bg);border-radius:10px;padding:12px 14px}
+.l{font-size:13px;color:var(--t2);margin:0}.n{font-size:26px;font-weight:600;margin:2px 0}.s{font-size:12px;color:var(--t3);margin:0}
+.two{display:grid;grid-template-columns:1.35fr 1fr;gap:12px}
+.c{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:12px 16px}
+.h{font-size:14px;font-weight:600;margin:0 0 6px}
+.row{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--b);font-size:13px}
+.row span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gb{margin:9px 0;font-size:13px}.gb>div:first-child{display:flex;justify-content:space-between;margin-bottom:4px}
+.bar{height:6px;border-radius:3px;background:var(--bg);overflow:hidden}.bar>i{display:block;height:100%;background:var(--ac)}
+.brain{margin-top:12px;font-size:13px}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:8px}
+.wk>div{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:8px;min-height:110px;font-size:12px}
+.wk .td{border-color:var(--ac)}.wk .td>div:first-child{color:var(--ac);font-weight:600}
+.ev{background:var(--bg);border-radius:5px;padding:3px 6px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.av{display:inline-flex;width:22px;height:22px;border-radius:11px;background:var(--acbg);color:var(--ac);font-size:10px;align-items:center;justify-content:center;margin-right:8px;vertical-align:middle;font-weight:600}
+.lab{font-size:13px;color:var(--t3);margin:28px 0 8px;text-transform:none}
+.sec{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:16px 22px 20px;margin-bottom:8px}
+/* phone */
+.phones{display:grid;grid-template-columns:repeat(4,390px);gap:28px;padding:28px}
+.ph{width:390px;height:844px;background:var(--page);border:1px solid var(--b2);border-radius:36px;padding:18px 14px 0;display:flex;flex-direction:column;overflow:hidden}
+.ph .r{height:24px}.ph .r .lb{font-size:11px}
+.ph .tb{margin:10px 0 8px}.ph .tb span{flex:1;text-align:center}
+.ph .ti{font-size:17px;font-weight:600;margin:4px 0 10px}
+.ph .g4{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}.ph .n{font-size:22px}
+.ph .c{margin-bottom:8px}
+.bb{margin-top:auto;display:flex;justify-content:space-around;align-items:center;border-top:1px solid var(--b);padding:10px 0 22px;font-size:12px;color:var(--t2);background:var(--s);margin-left:-14px;margin-right:-14px}
+.bb .on{color:var(--t);font-weight:600}.bb .cap{width:42px;height:42px;border-radius:21px;background:var(--t);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px}
+.plab{font-size:14px;color:var(--t2);margin:0 0 10px 6px}
+</style></head><body><div id="root"></div>
+<script>
+const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function ruler(phone){
+  let mo='';M.forEach((m,i)=>{let c=i<10?'p':'',lb='';if(i==10){c='now';lb=phone?'Nov':'November'}else if(i==9||i==11){c+=' nb';lb=m}mo+=`<div class="${c}">${lb?`<span class="lb">${lb}</span>`:''}<i class="t"></i></div>`});
+  if(phone)mo=mo.replace(/<div class="p"><i/g,'<div class="p"><i');
+  const span=phone?0:2;let dy='';for(let d=1;d<=30;d++){let c=d<26?'p':'',lb='';if(d==26){c='now';lb=phone?'26':'Thu 26'}else if(Math.abs(d-26)<=span){c+=' nb';lb=String(d)}dy+=`<div class="${c}">${lb?`<span class="lb">${lb}</span>`:''}<i class="t"></i></div>`}
+  return `<div class="r">${mo}</div><div class="r">${dy}</div>`}
+const tabs=on=>`<div class="tb">${['Day','Week','Month','Year'].map(t=>`<span class="${t==on?'on':''}">${t}</span>`).join('')}</div>`;
+const card=(l,n,s,k)=>`<div class="m"><p class="l">${l}</p><p class="n">${n}</p><p class="s ${k||''}">${s}</p></div>`;
+const rows=a=>a.map(r=>`<div class="row"><span>${r[0]}</span><span class="${r[2]||'mu'}">${r[1]}</span></div>`).join('');
+const bars=a=>a.map(r=>`<div class="gb"><div><span>${r[0]}</span><span class="${r[3]||'mu'}">${r[1]}</span></div><div class="bar"><i style="width:${r[2]}%;${r[3]=='wa'?'background:var(--wa)':''}"></i></div></div>`).join('');
+const panel=(h,body)=>`<div class="c"><p class="h">${h}</p>${body}</div>`;
+const BRAIN=`<div class="c brain"><b>The Brain this week</b> <span class="mu">· 142 came in · 122 filed alone · 17 to waiting · 3 to you · 4 rules learned</span></div>`;
+const V={
+ Day:{title:'Thursday 26 Nov',sub:'week 7 of 12',cards:[card('Top three','1 of 3','done today'),card('Needs you','3','oldest 2 days'),card('Check today','2','waiting items due','wa'),card('Habits','1 of 3','meditation done')],
+  a:panel('Schedule',rows([['10:30 · Twinings meet','cancelled','wa'],['<span class="ac">11:42 · now</span>',''],['15:00 · Start using Life OS',''],['18:00 · Golf with TSG','']])),
+  b:panel('Top three',rows([['Send Foxin dealer portal scope','done','ac'],['Review Century item codes','BTW'],['Ruchi ITR papers to Vivek','Family']]))},
+ Week:{title:'Week 7 of 12',sub:'23 to 29 Nov',cards:[card('Week score','78%','target 85% · last week 71%'),card('Needs you','3','oldest 2 days'),card('Waiting on others','11','2 past check date','wa'),card('Brain filed alone','86%','up from 61% in Oct','ok')],
+  a:panel('Goals by area',bars([['BTW · 5 founding customers','2 of 5',40],['Rungamattee · Ghillidary yield','on track',62],['Family · Ruchi ITR filed','due 15 Dec',30,'wa'],['Health · 4 workouts a week','3 this week',75],['Life OS · Chat everywhere','4 of 6',66]])),
+  b:panel('Coming up',rows([['CIS board meeting','Fri'],['Century Rubber review','Mon'],['Car insurance renews','in 9 days','wa']]))+`<div style="height:12px"></div>`+panel('Habits',rows([['Meditation','6 of 7'],['Reading','2 of 5','wa']]))},
+ Month:{title:'November',sub:'weeks 4 to 8 of 12',cards:[card('Month score','74%','average of 4 weeks'),card('Month plan','3 of 5','outcomes met'),card('Goals due','2','1 behind','wa'),card('Brain filed alone','81%','up from 61% in Oct','ok')],
+  a:panel('Weeks',bars([['Week 4 · 2 to 8','72%',72],['Week 5 · 9 to 15','69%',69],['Week 6 · 16 to 22','71%',71],['<span class="ac">Week 7 · 23 to 29</span>','78%',78],['Week 8 · 30 Nov','next',0]])),
+  b:panel('Key dates',rows([['CIS board meeting','27 Nov'],['Weekly review','29 Nov'],['Car insurance renews','5 Dec','wa'],['Ruchi ITR due','15 Dec','wa']]))},
+ Year:{title:'2026',sub:'35 days left',cards:[card('Year goals','4 of 9','met so far'),card('This cycle','76%','week 7 of 12'),card('Reviews locked','38 of 47','weeks this year'),card('Brain filed alone','61% → 86%','Sep to Nov','ok')],
+  a:panel('Year goals by area',bars([['BTW · revenue target','71%',71],['Rungamattee · yield per hectare','64%',64],['Health · fitness test','behind',40,'wa']])),
+  b:panel('Cycles',rows([['Cycle 1 · Jan to Mar','82%'],['Cycle 2 · Apr to Jun','71%'],['Cycle 3 · Jul to Sep','79%'],['<span class="ac">Cycle 4 · now</span>','76%','ac']]))},
+ Simple:{title:'This week',sub:'23 to 29 Nov',cards:[card('Done this week','14','tasks · last week 9'),card('Needs you','3','oldest 2 days'),card('Waiting on others','11','2 past check date','wa'),card('Brain filed alone','86%','up from 61% in Oct','ok')],
+  a:panel('Most active this week',rows([['<span class="av">FX</span>Foxin','6 emails · 2 tasks'],['<span class="av">VJ</span>Vivek Jaykishan','3 emails · waiting'],['<span class="av">CR</span>Century Rubber','1 meeting · 4 files'],['<span class="av">CIS</span>CIS board','2 emails · Fri']])),
+  b:panel('Coming up',rows([['CIS board meeting','Fri'],['Century Rubber review','Mon'],['Car insurance renews','in 9 days','wa']]))}};
+function desk(k,tabOn,inner){const v=V[k];return `${ruler()}<div class="hr"></div><div class="hd"><span><b>${v.title}</b> <span class="mu">· ${v.sub}</span></span>${tabs(tabOn)}</div><div class="g4">${v.cards.join('')}</div><div class="two">${v.a}<div>${v.b}</div></div>${inner||''}`}
+function week(){const W=['Mon 23','Tue 24','Wed 25','Thu 26','Fri 27','Sat 28','Sun 29'],E=[['Ghatia lots'],['BTW standup','Foxin call'],['Ruchi ITR meet'],['Start using Life OS','Twinings meet'],['CIS board'],[],['Weekly review']];
+  return `<p class="h" style="margin-top:22px">This week</p><div class="wk">${W.map((w,i)=>`<div class="${i==3?'td':''}"><div>${w}</div>${E[i].map(e=>`<div class="ev">${e}</div>`).join('')}</div>`).join('')}</div>`}
+function shell(main){return `<div class="app"><div class="sb"><div class="logo">Life OS</div><a style="color:var(--t)">+ Capture</a><a class="on">Today</a><a>Brain <span class="ct">3</span></a><a>Goals</a><a>Library</a><div style="flex:1"></div><a>Chat</a><a>Settings</a></div><div class="mn">${main}</div></div>`}
+function phone(k,tabOn){const v=V[k];return `<div><p class="plab">${k=='Simple'?'Week · goals off':k}</p><div class="ph">${ruler(true)}${tabs(tabOn)}<p class="ti">${v.title} <span class="mu" style="font-weight:400;font-size:13px">· ${v.sub}</span></p><div class="g4">${v.cards.join('')}</div>${v.a}${v.b}<div class="bb"><span class="on">Today</span><span>Brain</span><span class="cap">+</span><span>Goals</span><span>Library</span></div></div></div>`}
+const h=location.hash.slice(1)||'week',root=document.getElementById('root');
+if(h=='week')root.innerHTML=shell(desk('Week','Week',BRAIN+week()));
+if(h=='periods')root.innerHTML=shell(['Day','Month','Year'].map(k=>`<p class="lab">${k}</p><div class="sec">${desk(k,k)}</div>`).join(''));
+if(h=='simple')root.innerHTML=shell(desk('Simple','Week',BRAIN));
+if(h=='phone')root.innerHTML=`<div class="phones">${['Day','Week','Month','Year'].map(k=>phone(k,k)).join('')}</div><div class="phones" style="padding-top:0">${phone('Simple','Week')}</div>`;
+</script></body></html>

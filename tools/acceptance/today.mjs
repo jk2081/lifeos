@@ -1370,3 +1370,34 @@ for n in ${JSON.stringify(made.active)}: frappe.db.set_value("Life Cycle", n, "s
     await s.ctx.close()
   }
 }
+
+// Issue 118: the waiting pile is never on Today; one line says when some of it is past its check-by date.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const title = `I118T waiting ${width} ${stamp}`
+  try {
+    await check('TODAY.61', `${width} px: a waiting task is not on Today; past its check-by date it is one line that names who and leads to the review`, async () => {
+      const name = bench(`from frappe.utils import add_days, today
+t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "${title}", "status": "Waiting", "waiting_on": "Meera I118T", "due_date": today(), "check_by": add_days(today(), 2)}).insert(ignore_permissions=True)
+print(t.name)`).split('\n').pop()
+      await s.open('/life/today')
+      await pg.locator("[data-today-sub]").first().waitFor({ timeout: 15000 }).catch(() => {})
+      await pg.waitForTimeout(1200)
+      must(!(await pg.getByText(title).count()), 'the waiting task is on Today')
+      must(!(await pg.locator('[data-waiting-past]').count()), 'the line shows before the check-by date')
+      bench(`from frappe.utils import add_days, today
+frappe.db.set_value("Life Task", "${name}", "check_by", add_days(today(), -1))`)
+      await s.open('/life/today')
+      await pg.locator('[data-waiting-past]').waitFor({ timeout: 15000 })
+      const t = await pg.locator('[data-waiting-past]').innerText()
+      must(/past their check date|past its check date/.test(t) && t.includes('Meera I118T'), 'the line says: ' + t)
+      must(!(await pg.getByText(title).count()), 'the waiting task is on Today past its date')
+      await pg.locator('[data-waiting-look]').click()
+      await pg.waitForURL((u) => u.pathname === '/life/today/week', { timeout: 10000 })
+    })
+  } finally {
+    bench(`for n in frappe.get_all("Life Task", filters={"title": ["like", "I118T %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}

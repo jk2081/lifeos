@@ -25,6 +25,6 @@ export const reviewData = {
   weekly: (method, args) => run(`weekly.${method}`, args),
   periodic: (method, args) => run(`periodic.${method}`, args),
   due: call('periodic', 'due'),
-  inbox: { get: call('inbox', 'get'), retry: call('inbox', 'retry') },
+  inbox: { get: call('inbox', 'get'), item_page: call('inbox', 'item_page'), retry: call('inbox', 'retry') },
   goals: { goal_readings: call('goals', 'goal_readings'), update: call('goals', 'update') },
 }

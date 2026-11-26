@@ -387,6 +387,12 @@ def see_email(space: str, mail: dict, item: str | None = None) -> dict:
 		for t in targets:
 			out["linked"] += link_all(space, *t, known)
 		return out
+	from lifeos.brain import rules
+
+	if rules.never_page(space, address):  # a rule says this sender never gets a page: the owner's own company, by the built-in rule (issue 117)
+		for t in targets:
+			out["linked"] += link_all(space, *t, known)
+		return out
 	# the sender is new (a known subject may be mentioned in the text); the table decides
 	count = _count(space, address)
 	need, _days = settings()

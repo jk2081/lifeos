@@ -7,7 +7,7 @@ from unittest import mock
 import frappe
 from frappe.utils import add_days, add_months, add_to_date, getdate, now_datetime, today
 
-from lifeos.brain import area_guess, chat_import, old_inbox, sources as sources_lifeos
+from lifeos.brain import area_guess, asks, chat_import, old_inbox, sources as sources_lifeos
 from lifeos.review import counts
 from lifeos.library import index, trash
 from lifeos import permissions
@@ -1555,7 +1555,7 @@ class TestSourcePages(SkillCase):
 
 		items = frappe.db.count("Life Inbox Item", {"space": PRIVATE})
 		self.script(task("Pay the Try-it fees", confidence=0.9), {"content": [{"type": "text", "text": json.dumps(
-			{"transcript_md": "", "summary_md": "A fee notice.", "skipped": ["The letterhead"]})}], "stop_reason": "end_turn"})
+			{"transcript_md": "", "summary": {"line": "A fee notice."}, "skipped": ["The letterhead"]})}], "stop_reason": "end_turn"})
 		res = source_page.try_it("kind-document", title="Fee notice", text="School fees of Rs 20,000 are due on 5 December.", space=PRIVATE)
 		self.assertEqual((res["summary"], res["skipped"]), ("A fee notice.", ["The letterhead"]))
 		self.assertEqual(res["proposals"][0]["title"], "Pay the Try-it fees")
@@ -1570,3 +1570,130 @@ class TestSourcePages(SkillCase):
 		set_key("")
 		with self.assertRaises(frappe.ValidationError):
 			source_page.try_it("kind-document", text="x", space=PRIVATE)
+
+
+def digest_answer(**extra):
+	"""A scripted answer for a digest of nine emails, in the summary's fixed shape (issue 118)."""
+	long = "wants the signed account mandate returned together with the board resolution and the updated address proof before the end of this week please"
+	summary = {"line": "9 emails, 26 Nov",
+		"to_act_on": [{"who": "Arijit Chatterjee (HDFC Bank)", "what": long, "source": "Email 1", "route": "plate"},
+			{"who": "Anindita Goswami", "what": "proposes a call on the audit; your CA is copied", "source": "Email 4", "route": "waiting", "waiting_on": "Rohan CA"},
+			{"who": "Ravi Singh", "what": "unclear what he needs on the notice", "source": "Email 5"}],
+		"updates": [{"what": "Two trademark threads with Ravi Singh: renewal filed, objection window open", "source": "Email 6"}],
+		"reports": [{"title": "Tea price list", "source": "Email 7"}, {"title": "Ghatia lot selection", "source": "Email 8"}, {"title": "GST reconciliation", "source": "Email 9"}],
+		"sensitive": 1}
+	return {"content": [{"type": "text", "text": json.dumps({"transcript_md": "", "summary": summary, **extra})}], "stop_reason": "end_turn"}
+
+
+class TestSummaryLines(SkillCase):
+	"""Issue 118: the summary as data, its To act on lines going to the plate or the waiting pile, the waiting pile off Today."""
+
+	def digest(self, **values):
+		return self.capture("Nine emails.\n" * 9, **{"title": "Morning digest", "source_type": "Email Digest", "sender": "digest@gmail.example", **values})
+
+	def run_digest(self, item=None, **extra):
+		item = item or self.digest()
+		self.script(digest_answer(**extra))
+		self.process(item)
+		return item
+
+	def test_the_summary_has_three_groups_each_line_with_its_source_and_none_over_20_words(self):
+		item = self.run_digest()
+		s = json.loads(item.summary_json)
+		self.assertEqual((s["line"], len(s["to_act_on"]), len(s["updates"]), len(s["reports"])), ("9 emails, 26 Nov", 3, 1, 3))
+		for line in [*s["to_act_on"], *s["updates"]]:
+			self.assertLessEqual(len(line["what"].split()), 21, line["what"])  # 20 words and the ellipsis
+		self.assertTrue(all(r["source"] for r in [*s["to_act_on"][:2], *s["updates"], *s["reports"]]))
+		self.assertIn("**To act on · 3**", item.summary_md)
+		self.assertIn("Tea price list · Ghatia lot selection · GST reconciliation", item.summary_md)
+
+	def test_a_sensitive_line_is_only_ever_one_sensitive_item(self):
+		raw = json.loads(digest_answer()["content"][0]["text"])
+		raw["summary"]["to_act_on"].append({"who": "Dr Mehta", "what": "biopsy result is positive, call the clinic", "source": "Email 2", "sensitive": True})
+		self.script({"content": [{"type": "text", "text": json.dumps(raw)}], "stop_reason": "end_turn"})
+		item = self.digest()
+		self.process(item)
+		self.assertNotIn("biopsy", item.summary_json + item.summary_md)
+		self.assertNotIn("Mehta", item.summary_json + item.summary_md)
+		self.assertEqual(json.loads(item.summary_json)["sensitive"], 2)
+		self.assertIn("2 sensitive items", item.summary_md)
+
+	def test_asks_go_to_the_plate_or_the_waiting_pile_and_unsure_goes_to_the_pile(self):
+		item = self.run_digest()
+		tasks = {t.title.split(":")[0]: t for t in frappe.get_all("Life Task", filters={"inbox_item": item.name}, fields=["*"])}
+		plate, pile, unsure = tasks["Arijit Chatterjee (HDFC Bank)"], tasks["Anindita Goswami"], tasks["Ravi Singh"]
+		self.assertEqual((plate.status, str(plate.due_date)), ("Open", today()))
+		self.assertEqual((pile.status, pile.waiting_on, str(pile.check_by)), ("Waiting", "Rohan CA", asks.next_review_date()))
+		self.assertEqual((unsure.status, str(unsure.check_by)), ("Waiting", asks.next_review_date()))
+		self.assertGreater(getdate(asks.next_review_date()), getdate(today()))
+
+	def test_a_waiting_task_is_never_on_today_and_past_its_check_date_it_is_one_line(self):
+		item = self.run_digest()
+		names = frappe.get_all("Life Task", filters={"inbox_item": item.name, "status": "Waiting"}, pluck="name")
+		frappe.db.set_value("Life Task", {"inbox_item": item.name}, "due_date", today())
+		frappe.set_user(OWNER)
+		got = today_api.get(space=PRIVATE)
+		shown = {t["name"] for t in [*got["tasks"]["items"], *got["tasks"]["today"], *got["tasks"]["overdue_items"]]}
+		self.assertFalse(shown & set(names))
+		self.assertEqual(got["waiting_past"]["count"], 0)
+		for n in names:
+			frappe.db.set_value("Life Task", n, "check_by", add_days(today(), -2))
+		got = today_api.get(space=PRIVATE)
+		self.assertEqual(got["waiting_past"]["count"], 2)
+		self.assertIn("Rohan CA", got["waiting_past"]["names"])
+
+	def test_change_moves_a_line_and_the_same_move_twice_for_a_sender_makes_a_rule(self):
+		sender = "arijit@hdfc.example"
+		moved = []
+		for n in range(2):
+			item = self.run_digest(item=self.digest(sender=sender))
+			frappe.set_user(OWNER)
+			index = 2  # the unsure line went to the pile
+			out = asks.change(item.name, index, "plate")
+			moved.append(frappe.db.get_value("Life Task", out["task"], ["status", "waiting_on"]))
+			frappe.set_user("Administrator")
+			self.script()
+		self.assertEqual(moved, [("Open", None), ("Open", None)])
+		rule = frappe.get_all("Life Rule", filters={"action": "Route", "sender": sender}, fields=["asks_to", "made_by"])
+		self.assertEqual([(r.asks_to, r.made_by) for r in rule], [("Plate", "Brain")])
+		# the rule decides before the model: the next digest from this sender puts the unsure ask on the plate
+		third = self.run_digest(item=self.digest(sender=sender))
+		unsure = frappe.get_all("Life Task", filters={"inbox_item": third.name, "title": ("like", "Ravi Singh%")}, fields=["status"])[0]
+		self.assertEqual(unsure.status, "Open")
+
+	def test_one_move_is_not_a_rule(self):
+		item = self.run_digest(item=self.digest(sender="once@x.example"))
+		frappe.set_user(OWNER)
+		asks.change(item.name, 2, "plate")
+		self.assertFalse(frappe.db.exists("Life Rule", {"action": "Route", "sender": "once@x.example"}))
+
+	def test_a_reply_that_says_done_closes_the_waiting_task_and_lists_it(self):
+		first = self.run_digest(item=self.digest(sender="ravi@x.example", source_system="gmail", external_id="thread-1"))
+		waiting = frappe.get_all("Life Task", filters={"inbox_item": first.name, "status": "Waiting"}, pluck="name")[0]
+		reply = self.capture("Done, I sent the papers yesterday.", title="Re: the notice", sender="ravi@x.example")
+		self.script(answer("Ravi says it is done."))
+		self.process(reply)
+		self.assertEqual(frappe.db.get_value("Life Task", waiting, "status"), "Waiting")  # the model did not say so: nothing closes
+		self.script({"content": [{"type": "text", "text": json.dumps({"transcript_md": "", "summary": {"line": "Ravi says it is done."}, "closes": [{"task": waiting}, {"task": "NOT-OFFERED"}]})}],
+			"stop_reason": "end_turn"})
+		reply2 = self.capture("Done, I sent the papers yesterday.", title="Re: the notice 2", sender="ravi@x.example")
+		self.process(reply2)
+		self.assertEqual(frappe.db.get_value("Life Task", waiting, ["status", "closed_by_brain", "closed_by_item"]), ("Done", 1, reply2.name))
+		frappe.set_user(OWNER)
+		row = next(r for r in brain.activity(space=PRIVATE)["rows"] if r["item"] == reply2.name)
+		self.assertEqual([m["kind"] for m in row["made"]], ["Closed by itself"])
+		self.assertEqual([c["name"] for c in asks.closed_by_itself(PRIVATE, add_days(today(), -7))], [waiting])
+		asks.reopen(waiting)
+		self.assertEqual(frappe.db.get_value("Life Task", waiting, "status"), "Waiting")
+
+	def test_the_waiting_review_groups_by_person_oldest_first_and_changes_a_task(self):
+		item = self.run_digest()
+		frappe.set_user(OWNER)
+		rows = [r for r in asks.waiting_rows(PRIVATE) if r["item"] == item.name]
+		self.assertEqual(sorted(r["who"] for r in rows), ["Ravi Singh", "Rohan CA"])
+		first = rows[0]["name"]
+		out = asks.waiting_change(first, "still")
+		self.assertEqual(out["check_by"], str(add_days(getdate(asks.next_review_date()), 7)))
+		asks.waiting_change(first, "plate")
+		self.assertEqual(frappe.db.get_value("Life Task", first, ["status", "waiting_on"]), ("Open", None))
+		self.assertIn("nudge", asks.nudge(rows[1]["name"])["text"])

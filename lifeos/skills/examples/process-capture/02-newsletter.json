@@ -21,11 +21,11 @@
    "content": [
     {
      "type": "text",
-     "text": "{\"transcript_md\": \"\", \"summary_md\": \"A gardening newsletter about ten plants that survive a dry summer. Nothing in it asks anything of you.\"}"
+     "text": "{\"transcript_md\": \"\", \"summary\": {\"line\": \"A gardening newsletter about ten plants that survive a dry summer. Nothing in it asks anything of you.\"}}"
     }
    ],
    "stop_reason": "end_turn"
   }
  ],
- "skill_hash": "b3b4477cae9fb09f"
+ "skill_hash": "8834ec361f01f147"
 }

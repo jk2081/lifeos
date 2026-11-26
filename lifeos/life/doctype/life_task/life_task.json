@@ -23,6 +23,9 @@
   "notes_md",
   "waiting_on",
   "waiting_on_person",
+  "check_by",
+  "closed_by_brain",
+  "closed_by_item",
   "delegated_to",
   "completed_on",
   "carried_from",
@@ -269,6 +272,25 @@
    "fieldtype": "Link",
    "label": "Waiting on (person)",
    "options": "Life Person"
+  },
+  {
+   "fieldname": "check_by",
+   "fieldtype": "Date",
+   "label": "Check by",
+   "description": "A waiting task is looked at again on this date, in the weekly review."
+  },
+  {
+   "fieldname": "closed_by_brain",
+   "fieldtype": "Check",
+   "label": "Closed by the Brain",
+   "read_only": 1
+  },
+  {
+   "fieldname": "closed_by_item",
+   "fieldtype": "Link",
+   "label": "Closed by item",
+   "options": "Life Inbox Item",
+   "read_only": 1
   },
   {
    "fieldname": "delegated_to",

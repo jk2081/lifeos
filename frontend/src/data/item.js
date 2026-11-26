@@ -3,7 +3,7 @@
 import { group } from '@/data/call'
 
 export const itemData = {
-  inbox: group('inbox', ['get', 'item_page', 'retry']),
+  inbox: group('inbox', ['change_line', 'get', 'item_page', 'retry']),
   sources: group('sources', ['made_from']),
   review: group('review', ['decide', 'update_payload']),
   meta: group('meta', ['proposal_schema']),
