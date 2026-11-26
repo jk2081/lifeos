@@ -341,7 +341,7 @@ for (const width of WIDTHS) {
   await check('LIBRARY.10', `${width} px: no sideways scrolling and no script errors on the new screens`, async () => {
     const before = errors.length
     const bad = []
-    for (const p of ['/life', '/life/settings?tab=data', '/life/goals/someday', '/life/chat', '/life/chat?tab=insights', '/life/chat?tab=history', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
+    for (const p of ['/life', '/life/settings?tab=data', '/life/goals/someday', '/life/insights', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
       await s.open(p)
       if ((await overflow()) > 0) bad.push(`${p} scrolls sideways by ${await overflow()} px`)
     }

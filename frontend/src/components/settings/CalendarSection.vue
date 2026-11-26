@@ -7,7 +7,7 @@
         data-calendar-not-configured />
       <Card flush>
         <SettingRow label="Google Calendar" :help="s.fake ? 'This site reads a fixture calendar instead of Google (tests and acceptance).' :
-          'Life OS reads your calendar to show last week\'s meetings in the weekly review. It writes only if you choose a calendar below.'">
+          'Life OS reads your calendar to show last week\'s meetings in the weekly review. It writes only if you choose a calendar below. Life OS will change your calendar only when you ask: when you tell Chat an event is cancelled, or an agent you let change it does.'">
           <div class="flex items-center gap-2">
             <Badge :theme="s.connected ? 'green' : 'gray'" :label="s.connected ? 'Connected' : 'Not connected'" data-calendar-status />
             <Button v-if="!s.connected" variant="solid" label="Connect Google Calendar" :disabled="!s.configured" data-calendar-connect @click="connect" />

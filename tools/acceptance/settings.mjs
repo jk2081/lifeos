@@ -1043,7 +1043,7 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I46 task 
 
     await check('SETTINGS.31', `${width} px: on a one-space site no space picker, chip or Spaces view appears on any screen`, async () => {
       const screens = ['/life', '/life/brain', '/life/brain/captures', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/goals/cycles', '/life/library',
-        '/life/library/notes', '/life/library/people', '/life/library/timeline', '/life/library/archive', '/life/today/week?view=calendar', '/life/chat',
+        '/life/library/notes', '/life/library/people', '/life/library/timeline', '/life/library/archive', '/life/today/week?view=calendar', '/life/insights',
         ...['profile', 'appearance', 'calendar', 'areas', 'rhythms', 'habits', 'rules', 'members', 'sources', 'advanced'].map((t) => `/life/settings?tab=${t}`),
         '/life/settings?tab=members&view=spaces', '/life/settings?tab=spaces']
       for (const p of screens) {

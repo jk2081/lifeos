@@ -24,7 +24,7 @@
       <!-- phone (issue 120): the chat bar above the tabs on every screen (+, the camera, the mic; a message with no question is a capture), then Today, Brain, Goals and Library;
            Settings is in the menu sheet -->
       <div class="fixed inset-x-0 bottom-0 z-30 md:hidden" data-tabbar>
-        <ChatBar v-if="!store.isAgent && canWrite()" />
+        <ChatBar v-if="!store.isAgent" />
         <MobileNav aria-label="Places">
           <template v-for="n in PLACES" :key="n.to">
             <MobileNavItem :label="n.label" :icon="navCount(n.label) ? undefined : n.icon" :route="n.to" :active="activePlace === n.base" :data-tab-item="n.label">
@@ -92,7 +92,7 @@ import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'
 import ChatBar from './components/ask/ChatBar.vue'
 import { ask, toggleChat } from './lib/ask'
-import { boot, canWrite, store } from './lib/store'
+import { boot, store } from './lib/store'
 import { initLens, manySpaces } from './lib/lens'
 import MoreSheet from './components/MoreSheet.vue'
 import OnboardingGuide from './components/OnboardingGuide.vue'

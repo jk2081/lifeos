@@ -34,9 +34,7 @@ const routes = [
 
   { path: '/how-it-works', name: 'HowItWorks', component: page('HowItWorks') },
   { path: '/insights', name: 'Insights', component: page('Insights') },
-  // the Ask page is gone (issue 120): the chat is a panel on every screen; its insights have their own page
-  { path: '/chat', redirect: (to) => (to.query.tab === 'insights' ? { path: '/insights' } : { path: '/today' }) },
-  { path: '/ask', redirect: (to) => ({ path: '/chat', query: to.query, hash: to.hash }) },
+  // the Ask page is gone (issue 120): the chat is a panel on every screen, and /chat and /ask land on Today with "That page moved"; its insights have their own page above
   { path: '/settings', name: 'Settings', component: page('Settings') },
 
   // development only: the editor on a sample note (owner only, not in the sidebar)

@@ -197,7 +197,7 @@ while d <= last:
     bench(`frappe.db.set_value("Life Insight", "${other.name}", "snooze_until", frappe.utils.add_days(frappe.utils.today(), -1))`)
     await s.api('insights.refresh', { space: SPACE })
     must((await s.api('insights.list', { space: SPACE, status: 'New', page_length: 100 })).rows.some((r) => r.name === other.name), 'the snoozed insight did not return after its date')
-    await s.open('/life/chat?tab=insights')
+    await s.open('/life/insights')
     must(await pg.locator('[data-insight-row]').count() && await pg.locator('[data-insights-how]').isVisible(), 'the Insights tab shows no insights')
     return [...kinds].join(', ')
   })

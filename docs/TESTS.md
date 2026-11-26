@@ -7,7 +7,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | File | What it covers |
 | --- | --- |
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc`, files read on the server before any model (`TestReadLocally`) |
-| `test_chat.py` | Chat on Flow (issue 119): `chat.send` starts the thread's Flow Session and a run with the scope and the open record, writes one usage row and refuses at the cap; the tools' Vault ("1 sensitive document"), space and scope rules; the Done list with Undo; citations that keep their numbers; the patch that moves old Ask threads; the deleted modules |
+| `test_chat.py` | Chat everywhere (issue 120: `TestChatEverywhere`: ID numbers found by patterns and only the last four kept, a PAN image saved to the Vault with the model's input holding no number, one question when whose card it is cannot be told, other files to the Brain, a file not the person's own refused, the mic turns speech into text on the server with no model, a note on the open event, "cancelled" deleting the event in Google after the owner's own message while an agent that asks first only waits, files saved with no model). Chat on Flow (issue 119): `chat.send` starts the thread's Flow Session and a run with the scope and the open record, writes one usage row and refuses at the cap; the tools' Vault ("1 sensitive document"), space and scope rules; the Done list with Undo; citations that keep their numbers; the patch that moves old Ask threads; the deleted modules |
 | `test_brain.py` | The Brain: summaries as data, asks to the plate or the waiting pile, learnt routes, closing by itself (`TestSummaryLines`, issue 118); who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill (`TestRules`, issue 117: recent decisions as examples, rules before any model, the same correction twice makes a rule, built-in rules, most specific first, the rules API, a source's page, Not needed twice and Always ask): runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
@@ -113,7 +113,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.51` a Google event offers Hide in Life OS (not red, no Remove); hiding it takes it off the week and Show hidden events brings it back
 - `TODAY.52` a Google all-day event reads "weekday, day month · all day"; a two-day one is one bar across its days
 - `TODAY.53` with the drawer open all seven day headers of Week are visible (1440 px)
-- `TODAY.54` the Week toolbar has no Reset and nothing cut off, the heading is the dates, and + Capture offers Important date
+- `TODAY.54` the Week toolbar has no Reset and nothing cut off, the heading is the dates, and the chat's + offers Important date
 - `TODAY.55` Day has no builder's note under "Today"
 - `TODAY.56` Year shows five key dates of one week as one dot "5" that lists them (each opens its event, with the Key date star), and no two key-date labels overlap
 - `TODAY.57` Year has four cycle columns with today's line in the second; back moves one cycle and Today returns; no hint line
@@ -121,6 +121,10 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.59` on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link
 - `TODAY.60` Year and Month in light and dark have no script error and nothing cut off
 - `TODAY.61` a waiting task is not on Today; past its check-by date it is one line naming who, with Look now to the review
+- `TODAY.62` the chat panel stays open with its messages from Today to the Library to a goal, and its chip shows the goal (removing it makes the chat about everything; Expand widens the panel) (issue 120)
+- `TODAY.63` "add a note: quote by Friday" with an event open adds a Comment on that event, and the Done list shows it with Change
+- `TODAY.64` a PDF dropped on the page is attached to the chat and, sent, becomes a capture for the Brain, listed with Change
+- `TODAY.65` the chat open in light and dark has no script error and nothing is cut off
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 
@@ -148,7 +152,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.17` the item page opens from the Inbox list, from Library and from search
 - `BRAIN.18` a user without access to the item's space gets "Not found" rather than its content
 - `BRAIN.19` the item page is one column with no sideways scroll
-- `BRAIN.20` on an empty space Needs you says what will appear and offers + Capture
+- `BRAIN.20` on an empty space Needs you says what will appear and offers Chat
 - `BRAIN.21` with 3 waiting captures (one with two possible areas) Needs you shows 3 rows with their best guesses and reasons
 - `BRAIN.22` Done files a row that was not changed, with its guess, and the record exists with the guessed area
 - `BRAIN.23` picking the second of two area chips files it there
@@ -160,7 +164,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.29` an agent's proposal with alt_area shows two area chips; picking the second files it in that area
 - `BRAIN.30` a Reading proposal shows as Read later
 - `BRAIN.31` a capture that failed is listed under Unfiled with Retry, never lost
-- `BRAIN.32` on a space with nothing captured Activity says what will appear and offers + Capture
+- `BRAIN.32` on a space with nothing captured Activity says what will appear and offers Chat
 - `BRAIN.33` a capture filed on its own today shows under Today with its area and a link to the record
 - `BRAIN.34` the source filter narrows the feed to that source
 - `BRAIN.35` a failed capture shows its reason and Retry puts it back in the queue
@@ -193,8 +197,8 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.72` at 390 px the pane fills the width, the tabs are there and nothing is cut off
 - `BRAIN.73` Activity lists "Hermes · you asked" for an agent's act, its drawer shows the request, the Assistant chip shows only those rows and Undo removes the person; no sideways scroll at 390 px
 - `BRAIN.74` Ask's History lists a relayed conversation "on Telegram"; it opens read only with its turns in order and no question box
-- `BRAIN.75` Chat runs on Flow (a real Flow Server, the fake model of `tools/fake_openai.py`): the box reads "Search or chat", a question streams an answer in the Chat panel and writes a usage row, `/life/ask` goes to `/life/chat`, and no visible text says Ask (screen, panel, ⌘K, Chat page, Settings)
-- `BRAIN.76` with no model in Flow, a question says "Chat needs an AI key" with its link to Settings › AI, and at the monthly cap Chat refuses and the Chat page shows the spend
+- `BRAIN.75` Chat runs on Flow (a real Flow Server, the fake model of `tools/fake_openai.py`): the box reads "Search or chat", a question streams an answer in the Chat panel and writes a usage row, ⌘K opens the Chat panel, `/` the search palette, `/life/ask` goes to Today, and no visible text says Ask (screen, panel, ⌘K, Chat page, Settings)
+- `BRAIN.76` with no model in Flow, a question says "Chat needs an AI key" with its link to Settings › AI, and at the monthly cap Chat refuses and shows the spend
 - `BRAIN.64` a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"
 - `BRAIN.66` Gmail's Rules tab lists its sender rule and the two built-in rules in the order they are tried, with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings
 - `BRAIN.67` Recently on Gmail's page says "Rule: …" for an item a rule filed and "The Brain" for one it guessed
@@ -299,7 +303,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.8` a list remembers its view on every device, a link with a query wins, Clear clears
 - `LIBRARY.9` the record pane shows the tabs of its kind; ptab= survives a reload; a pane with one tab has no tab bar
 - `LIBRARY.10` no sideways scrolling and no script errors on the new screens
-- `LIBRARY.11` intent: Just keep is in Library > Captures, not the Inbox, with text and no proposals; Add to wiki writes pages and leaves no wiki proposals
+- `LIBRARY.11` intent (through the API, the Capture sheet is gone): Just keep is in Library > Captures, not the Inbox, with text and no proposals; Add to wiki writes pages and leaves no wiki proposals
 - `LIBRARY.12` Captures: each tab's count matches its rows; Photos shows thumbnails; Made from this lists the task and the assistant's note; /chats lands on the Chats tab
 - `LIBRARY.13` editor: headings, bold, checklists and [[links]] render; Cmd-B; the / menu inserts a table; a pasted image shows; Show Markdown; no Edit or Done
 - `LIBRARY.14` conflict: an agent edits the open page; typing then saving shows the conflict and nothing is lost
@@ -326,7 +330,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.35` an organisation page lists its people
 - `LIBRARY.36` the facts sit beside the text and mentions
 - `LIBRARY.37` with no people the screen says what will appear and offers + Capture
-- `LIBRARY.38` a photo of a journal page captured from the phone becomes a note with the photo, the transcript and its date; search finds it and its goal shows it
+- `LIBRARY.38` a photo of a journal page sent from the phone's chat bar becomes a note with the photo, the transcript and its date; search finds it and its goal shows it
 - `LIBRARY.39` search finds a calendar event by the start of a word, under Events, and Enter opens its drawer
 - `LIBRARY.40` "ai key" offers Settings › AI and Enter opens it
 - `LIBRARY.41` with no AI key, Ask says it needs one, links to Settings › AI and shows what search finds for the same words
@@ -428,16 +432,16 @@ The sidebar and bottom bar, the router, keyboard keys, the PWA, offline capture 
 
 Unit tests: `test_capture.py` (the phone's captures, sent once); `test_permissions.py` (navigation, the router's routes)
 
-- `PHONE.1` navigation: the sidebar is the lens, Capture, Today, Brain, Goals, Library and Settings; the active item; the place tabs; the Brain count; the capture sheet and each o…
+- `PHONE.1` navigation: the sidebar is the lens, Chat, Today, Brain, Goals, Library and Settings; the active item; the place tabs; the Brain count; the chat panel and what + adds
 - `PHONE.2` a place's tabs: the path holds the tab, the view switch is in the URL, [ and ] move, the phone row scrolls
 - `PHONE.3` no screen scrolls sideways: every place, Plan and Library tab and view, Settings section, a goal and a note page, with and without an area
 - `PHONE.4` Keyboard: G then T, I, O or L opens a place; the older G letters open their new homes
-- `PHONE.5` the sidebar shows + Capture, Today, Brain, Goals, Library and Settings, in that order, and no other place
+- `PHONE.5` the sidebar shows Chat, Today, Brain, Goals, Library and Settings, in that order, and no other place
 - `PHONE.6` Review is hidden for a user who has never locked a review, and shown between Goals and Library after one is locked
 - `PHONE.7` Brain shows the Needs you count, the same number as the Inbox count
 - `PHONE.8` an old address lands on Today with the moved note, and every route of the router loads without an error
 - `PHONE.9` Archive, Outbox, Graph, Timeline, Reset and Vault are reached from their new homes
-- `PHONE.10` the bottom bar shows Today, Brain, the capture button, Goals and Library; capture opens the capture sheet
+- `PHONE.10` the chat bar is above the tabs on every screen with +, the camera and the mic, there is no + Capture, and "buy rakhi thread", with no question, makes a capture
 - `PHONE.11` tabs are routes: each tab has its own path, and reloading /life/goals/tasks lands on Goals > All tasks
 - `PHONE.12` Today > Day shows today's tasks, the top three and the day's events from the calendar
 - `PHONE.13` ticking a task on Today marks it done and updates the counts
@@ -446,9 +450,9 @@ Unit tests: `test_capture.py` (the phone's captures, sent once); `test_permissio
 - `PHONE.16` the layout matches the mockups (the plate with the calendar beside it), with no sideways scroll
 - `PHONE.17` The manifest is valid and the service worker is registered (phone profile)
 - `PHONE.18` The service worker's cache holds only static app files, never an /api/ response
-- `PHONE.19` Posting to the share target with a photo and text opens the capture screen; Save makes one capture with the file
+- `PHONE.19` Posting to the share target with a photo and text opens the share screen; Save puts it in the chat, which keeps the file as a capture
 - `PHONE.20` Offline, two captures are queued ("2 waiting to send"); back online both are sent, once each
-- `PHONE.21` Recording on + Capture (fake microphone) makes an audio capture marked not transcribed yet
+- `PHONE.21` the mic on the chat bar records (fake microphone) and the recording is turned into text on the server and not kept; nothing is captured
 - `PHONE.22` Logging out empties the offline queue
 - `PHONE.23` The share target while logged out goes to login and sends nothing
 - `PHONE.24` every route in the router loads without an error; an unknown address lands on Today with "That page moved"

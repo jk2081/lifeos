@@ -5,7 +5,7 @@ import { onMounted, onUnmounted, reactive, watch } from 'vue'
 import router from '@/router'
 import { toast } from 'frappe-ui'
 import { api, errorText } from './api'
-import { store } from './store'
+import { canWrite, store } from './store'
 import { lookups } from './lookups'
 import { openRef, parseOpen, recordChanged, TYPES } from './pane'
 import { submitCapture } from './offline'
@@ -164,6 +164,7 @@ export async function transcribe(blob, name) {
   const file = new File([blob], name, { type: blob.type })
   const up = await uploadFile(file)
   const out = await api('chat.transcribe', { file: up.name })
+  if (!out.text) toast.info(out.note || 'Nothing was heard.')
   return out.text
 }
 
@@ -171,7 +172,7 @@ export async function transcribe(blob, name) {
 export async function sendOrCapture(text) {
   const t = String(text || '').trim()
   if (!t && !ask.files.length) return
-  if (t && !ask.files.length && !ask.record && !isQuestion(t) && !COMMAND.test(t)) return capture(t)
+  if (t && canWrite() && !ask.files.length && !ask.record && !isQuestion(t) && !COMMAND.test(t)) return capture(t)
   await openChat() // the answer is shown in the panel or sheet
   return send(t)
 }

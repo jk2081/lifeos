@@ -257,7 +257,7 @@ def answer_card(thread: str, message: str, index: int | str, holder: str):
 @frappe.whitelist(methods=["POST"])
 def transcribe(file: str):
 	"""The mic: an audio File the owner just recorded (private, attached to nothing) is turned into text on this server (faster-whisper) and deleted. The text goes into the
-	box for the owner to check and send; no audio goes to a model. Returns {text}."""
+	box for the owner to check and send; no audio goes to a model. Returns {text} (empty, with a note, when nothing was heard)."""
 	from lifeos.library import extract
 
 	_person()
@@ -266,9 +266,7 @@ def transcribe(file: str):
 		out = extract.read_file(doc)
 	finally:
 		frappe.delete_doc("File", doc.name, force=True, ignore_permissions=True)  # system: the recording was the person's own and is not kept
-	if not out["ok"]:
-		frappe.throw(out.get("note") or _("Nothing could be heard."), title=_("Nothing was heard"))
-	return {"text": out["text"]}
+	return {"text": out["text"] if out["ok"] else "", "note": None if out["ok"] else (out.get("note") or _("Nothing could be heard."))}  # not an error: the recording is already gone
 
 
 @frappe.whitelist(methods=["GET"])
@@ -285,5 +283,5 @@ def latest(space: str | None = None):
 	"""The one ongoing conversation: the person's newest thread in the space that they can answer in (not one relayed from another channel), or none."""
 	_person()
 	space = permissions.resolve_space(space)
-	rows = frappe.get_all("Life Ask Thread", filters={"user": frappe.session.user, "space": space}, fields=["name", "channel"], order_by="last_message_on desc, creation desc", limit=10)  # nosemgrep: frappe-missing-permission-check -- the person's own threads, by user
+	rows = frappe.get_all("Life Ask Thread", filters={"user": frappe.session.user, "space": space}, fields=["name", "channel"], order_by="last_message_on desc, creation desc", limit=10)  # system: the person's own threads, filtered by user
 	return {"name": next((r.name for r in rows if not r.channel), None)}

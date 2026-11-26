@@ -33,7 +33,7 @@ async function start() {
     busy.value = true
     try {
       const text = await transcribe(new Blob(chunks, { type }), `voice-${Date.now()}.${ext}`)
-      emit('text', text)
+      if (text) emit('text', text)
     } catch (e) { toast.error(errorText(e)) } finally { busy.value = false }
   }
   recorder.start()

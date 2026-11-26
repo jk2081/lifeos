@@ -14,19 +14,19 @@
 import { onMounted, ref } from 'vue'
 import { Button, TextInput, dialog } from 'frappe-ui'
 import Empty from '../Empty.vue'
-import { api } from '@/lib/api'
+import { brainData } from '@/data/brain'
 import { ask, loadThread, newChat } from '@/lib/ask'
 import { store } from '@/lib/store'
 
 const rows = ref([])
 const q = ref('')
 async function load() {
-  try { rows.value = (await api('chat.threads', { space: store.space, q: q.value || undefined })).rows } catch (e) { rows.value = [] }
+  try { rows.value = (await brainData.chat.threads({ space: store.space, q: q.value || undefined })).rows } catch (e) { rows.value = [] }
 }
 const open = (name) => loadThread(name)
 function remove(t) {
   dialog.danger({ title: 'Delete this chat?', message: `“${t.title}” and its answers are deleted for good.`, confirmLabel: 'Delete',
-    onConfirm: async () => { await api('chat.delete_thread', { name: t.name }); if (ask.thread === t.name) newChat(); ask.view = 'history'; load() } })
+    onConfirm: async () => { await brainData.chat.delete_thread({ name: t.name }); if (ask.thread === t.name) newChat(); ask.view = 'history'; load() } })
 }
 onMounted(load)
 </script>
