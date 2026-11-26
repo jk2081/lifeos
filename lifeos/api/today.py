@@ -30,7 +30,7 @@ def task_lens(space, area):
 
 def open_tasks(t, space, area):
 	"""The criteria of open, unarchived tasks in the lens."""
-	return [*task_lens(space, area), t.status.isin(OPEN), t.is_archived == 0]
+	return [*task_lens(space, area), t.status.isin(OPEN) | ((t.status == "Waiting") & (t.is_top_three == 1)), t.is_archived == 0]  # a waiting task the owner starred stays
 
 
 def planned_this_week(space, now, area=None, cycle=None, limit=None):
