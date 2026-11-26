@@ -21,7 +21,7 @@ from lifeos.api import rules as rules_api
 from lifeos.api.utils import names_map
 from lifeos.brain import asks, rules as rules_engine
 from lifeos.calendar import calendar_data
-from lifeos.goals import cycles, habits as habit_rules, readings, year_plan
+from lifeos.goals import areas, cycles, habits as habit_rules, readings, year_plan
 
 VIEWS = ("day", "week", "month", "year")
 LIST_KINDS = ("needs-you", "waiting", "waiting-overdue", "waiting-due", "rules", "filed-alone", "came-in", "done", "active", "score", "coming-up", "habits",
@@ -214,11 +214,18 @@ def cycle_weeks(cycle):
 	return out
 
 
+def _shown(rows, space):
+	"""The goals left when those of an area that is off are taken out (the Year lanes leave them out too)."""
+	hidden = set(areas.off(space))
+	return [r for r in rows if r.get("area") not in hidden]
+
+
 def goal_rows(space, now, horizon_filter=None, limit=60):
 	"""Each active goal as a bar: percent, and `behind` when it is behind its time and its date is close."""
 	filters = {"space": space, "is_archived": 0, "is_someday": 0, "outcome": "In Progress"}
 	rows = frappe.get_list("Life Goal", filters=filters, fields=["name", "title", "area", "horizon", "cycle", "target_date", "creation", "measure_kind", "start_value", "target_value",
 		"current_value", "current_on", "unit", "measure"], order_by="sort_order asc, creation asc", limit=limit)
+	rows = _shown(rows, space)
 	counts = goals_api.task_counts([r.name for r in rows])
 	cyc = {c.name: c for c in frappe.get_list("Life Cycle", filters={"space": space}, fields=["name", "start_date", "end_date", "status"], limit=200)}
 	ticks_of = {}
@@ -476,7 +483,8 @@ def _month(space, on, new, simple):
 		met = sum(1 for g in mg if g["status"] == "Done")
 		cards.append(card("plan", _("Month plan"), f"{met} of {len(mg)}" if mg else None, _("outcomes met") if mg else None, "list:goals-due" if mg else None,
 			empty=_line(new or not mg, _("Your month's outcomes show here once you plan the month."), _("Plan the month"), "/goals/cycles")))
-		due = frappe.get_list("Life Goal", filters={"space": space, "is_archived": 0, "outcome": "In Progress", "target_date": ("between", [start, end])}, fields=["name", "target_date"], limit=LIST_MAX)
+		due = frappe.get_list("Life Goal", filters={"space": space, "is_archived": 0, "outcome": "In Progress", "target_date": ("between", [start, end])}, fields=["name", "target_date", "area"], limit=LIST_MAX)
+		due = _shown(due, space)
 		behind = sum(1 for g in due if getdate(g.target_date) < getdate(today()))
 		cards.append(card("due", _("Goals due this month"), len(due), _("{0} behind").format(behind) if behind else None, "list:goals-due" if due else None, tone="warn" if behind else None,
 			empty=_line(new, _("Goals with a date this month show here."), _("Set a goal"), "/goals?new=goal")))
@@ -510,6 +518,7 @@ def _year(space, on, new, simple):
 			kind="months", empty=_line(new, _("Connect a source and the Brain starts filing."), _("Connect"), "/settings?tab=sources")))
 		return cards, panels, None
 	goals = frappe.get_list("Life Goal", filters={"space": space, "is_archived": 0, "horizon": "Year", "target_date": ("between", [start, end])}, fields=["name", "outcome", "title", "area"], limit=LIST_MAX)
+	goals = _shown(goals, space)
 	met = sum(1 for g in goals if g.outcome == "Achieved")
 	cards.append(card("year-goals", _("Year goals met"), f"{met} of {len(goals)}" if goals else None, _("achieved") if goals else None, "list:goals-due" if goals else None,
 		empty=_line(new or not goals, _("Your year goals show here once you set one."), _("Set a goal"), "/goals?new=goal")))
@@ -659,7 +668,8 @@ def _l_cycle(name):
 
 
 def _l_goals_due(space, start, end):
-	rows = frappe.get_list("Life Goal", filters={"space": space, "is_archived": 0, "target_date": ("between", [start, end])}, fields=["name", "title", "target_date", "outcome"], order_by="target_date asc", limit=LIST_MAX)
+	rows = frappe.get_list("Life Goal", filters={"space": space, "is_archived": 0, "target_date": ("between", [start, end])}, fields=["name", "title", "target_date", "outcome", "area"], order_by="target_date asc", limit=LIST_MAX)
+	rows = _shown(rows, space)
 	return {"title": _("Goals due"), "rows": [row(r.title, f"{_short(r.target_date)} · {r.outcome}", f"goal:{r.name}") for r in rows]}
 
 
