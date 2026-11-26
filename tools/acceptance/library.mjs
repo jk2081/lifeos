@@ -27,6 +27,8 @@ attach("Life Inbox Item", item.name, "bill-${stamp}.pdf", scanned_pdf(["Electric
   const wait = async (tries) => {
     for (let i = 0; i < tries; i++) {
       if ((await owner.api('search.query', { text: word, space: SPACE })).results.some((r) => (r.title || '').includes(`Scanned bill ${stamp}`))) return true
+      // Frappe queues global search updates and writes them on a scheduled job; the walk's site may not run it in time
+      if (i % 5 === 4) bench('from frappe.utils.global_search import sync_global_search\nsync_global_search()')
       await new Promise((r) => setTimeout(r, 2000))
     }
     return false
@@ -37,7 +39,9 @@ attach("Life Inbox Item", item.name, "bill-${stamp}.pdf", scanned_pdf(["Electric
     const state = bench(`import json
 name = frappe.db.get_value("Life Inbox Item", {"title": "Scanned bill ${stamp}"})
 row = frappe.db.get_value("Life Inbox Item", name, ["extracted_by", "extract_note", "needs_closer_read", "extract_files"], as_dict=True)
-row["indexed"] = (frappe.db.get_value("__global_search", {"doctype": "Life Inbox Item", "name": name}, "content") or "")[:200]
+gs = frappe.qb.Table("__global_search")  # no creation column: frappe.db.get_value would order by it (Frappe 16.61)
+hit = frappe.qb.from_(gs).select(gs.content).where((gs.doctype == "Life Inbox Item") & (gs.name == name)).run()
+row["indexed"] = ((hit[0][0] if hit else "") or "")[:200]
 print(json.dumps(row, default=str))`).split('\n').pop()
     console.log(`LIBRARY.48 not found after 60 s: ${state}`)
     bench(`from frappe.utils.global_search import sync_global_search
