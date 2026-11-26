@@ -15,5 +15,6 @@ export const todayData = {
   timeline: group('timeline', ['get']),
   old_items: group('old_items', ['undo_auto']),
   today: group('today', ['get', 'skip_banner']),
+  dashboard: group('dashboard', ['get', 'list']),
   goals: group('goals', ['toggle_habit']),
 }

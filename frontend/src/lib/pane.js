@@ -14,6 +14,8 @@ export const TYPES = {
   event: { place: 'Today', label: 'Event', doctype: 'Event' },
   date: { place: 'Today', label: 'Important date' },
   day: { place: 'Today', label: 'Day' },
+  person: { place: 'Library', label: 'Person' },
+  list: { place: 'Today', label: 'List' }, // issue 123: what a number counts (`list:needs-you`), shown by dashboard.list
 }
 const BY_DOCTYPE = Object.fromEntries(Object.entries(TYPES).filter(([, t]) => t.doctype).map(([k, t]) => [t.doctype, k]))
 
@@ -44,7 +46,9 @@ export function refOfRoute(path) {
 export function openRef(ref, extra = {}) {
   if (!ref) return
   const r = router.currentRoute.value
-  const query = { ...r.query, focus: undefined, ptab: undefined, ...extra, open: ref }
+  // `back` is the list a record was opened from (the pane's Back button); a record opened from anywhere else has none
+  const from = parseOpen(r)
+  const query = { ...r.query, focus: undefined, ptab: undefined, back: from?.type === 'list' ? from.ref : undefined, ...extra, open: ref }
   return parseOpen(r) ? router.replace({ query }) : router.push({ query })
 }
 // Open the record a server route points to: in the pane when it has one, else by going there.
@@ -52,10 +56,15 @@ export function openRoute(path) {
   const ref = refOfRoute(path)
   return ref ? openRef(ref) : router.push(String(path || '/').replace(/^\/life/, '') || '/')
 }
+// Esc reaches the pane twice on a phone (our handler and the sheet's own), and router.back() is not instant: a second call would go back again
+let closing = false
+router.afterEach(() => { closing = false })
 export function closePane() {
   const r = router.currentRoute.value
-  if (!r.query.open) return
-  const target = router.resolve({ path: r.path, query: { ...r.query, open: undefined, focus: undefined, ptab: undefined } })
+  if (!r.query.open || closing) return
+  closing = true
+  setTimeout(() => { closing = false }, 600)
+  const target = router.resolve({ path: r.path, query: { ...r.query, open: undefined, back: undefined, focus: undefined, ptab: undefined } })
   if (window.history.state && window.history.state.back === target.fullPath) router.back()
   else router.replace(target)
 }

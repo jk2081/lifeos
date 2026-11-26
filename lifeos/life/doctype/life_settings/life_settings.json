@@ -19,6 +19,7 @@
   "planning_period",
   "require_done_when",
   "use_focuses",
+  "simple_mode",
   "cycle_break_week",
   "archive_after_days",
   "stale_task_days",
@@ -149,6 +150,13 @@
    "fieldtype": "Check",
    "label": "Use focuses",
    "description": "Focuses are ongoing work under a part, each with a standard, principles and an annual goal. Off for a new site."
+  },
+  {
+   "default": "0",
+   "description": "Run Life OS without areas and goals. The Today dashboard then shows cards that are not about goals. The switch itself is issue 109's.",
+   "fieldname": "simple_mode",
+   "fieldtype": "Check",
+   "label": "Simple mode"
   },
   {
    "default": "1",

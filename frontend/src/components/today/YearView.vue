@@ -5,6 +5,7 @@
     <Button icon="lucide-chevron-right" label="Forward one cycle" tooltip="Forward one cycle" data-year-next @click="go(shift + 1)" />
   </PageHead>
   <div class="page-body" data-year-view :data-shift="shift">
+    <Dashboard view="year" />
     <template v-if="d">
       <!-- the cycles around today: columns across, a row for the score, one for each area that is on, key dates by week, weekly reviews -->
       <div ref="wrap" class="relative max-md:hidden" data-year-timeline>
@@ -130,6 +131,7 @@ import { onClickOutside, useElementSize } from '@vueuse/core'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
+import Dashboard from './Dashboard.vue'
 import PageHead from '@/components/PageHead.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'

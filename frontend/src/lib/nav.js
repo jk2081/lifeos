@@ -67,3 +67,5 @@ export const ELSEWHERE = [
 export function withPage(tabs, current, pages) {
   return pages[current] ? [...tabs, { value: current, label: pages[current], group: 'page' }] : tabs
 }
+// the Today view a path is (/today, /today/week, ...): the period a dashboard list counts
+export const viewOfPath = (path) => (/^\/(?:life\/)?today\/(week|month|year)/.exec(path) || [])[1] || 'day'
