@@ -258,6 +258,7 @@ def _blocks_of(item, with_files=True, extra_files=()):
 	if item.get("sender"):
 		parts.append(f"<sender>{_data(item.sender)}</sender>")
 	parts += _decided_like(item)
+	parts += _waiting_like(item)
 	blocks, unread = [], []
 	read = extract.ensure("Life Inbox Item", item.name) if with_files else {}  # the files are read on this server first, if the job has not yet
 	for f in [*(files.attachments("Life Inbox Item", item.name) if with_files else []), *extra_files]:
@@ -281,6 +282,18 @@ def _decided_like(item) -> list:
 		return []
 	lines = [f"<decision>{_data(g['title'])}{' / ' + _data(g['sender']) if g['sender'] else ''} -> {_data(g['decided'])}</decision>" for g in got]
 	return ["<how_the_owner_decided_similar_captures>", *lines, "</how_the_owner_decided_similar_captures>"]
+
+
+def _waiting_like(item) -> list:
+	"""The waiting tasks of the same sender or thread (issue 118), so a reply that says "done" can close one."""
+	from lifeos.brain import asks
+
+	if not item.get("space") or item.get("name") == "EXAMPLE" or item.get("is_sensitive") or item.get("vault_document"):
+		return []
+	got = asks.waiting_for(item)
+	if not got:
+		return []
+	return ["<waiting_tasks_on_this_thread>", *[f"<task id=\"{g['task']}\">{_data(g['title'])} (waiting on {_data(g['waiting_on'] or '')})</task>" for g in got], "</waiting_tasks_on_this_thread>"]
 
 
 def _scheduled_blocks(space):
@@ -399,7 +412,13 @@ def _write_capture(doc, item, state):
 
 	out = state["output"] if isinstance(state["output"], dict) else {}
 	rows = state["proposals"] if item.intent != "Just keep" else []
-	done = inbox.submit_result(item.name, transcript_md=out.get("transcript_md") or None, summary_md=out.get("summary_md") or None, proposals=rows)
+	from lifeos.brain import asks
+
+	summary = asks.clean(out["summary"]) if isinstance(out.get("summary"), dict) else None  # issue 118: the summary is data in a fixed shape
+	done = inbox.submit_result(item.name, transcript_md=out.get("transcript_md") or None, summary_md=asks.render_md(summary) if summary else out.get("summary_md") or None, proposals=rows)
+	if summary:
+		asks.apply(frappe.get_doc("Life Inbox Item", item.name), summary)  # a task for each To act on line: his plate, or the waiting pile
+	asks.close_waiting(item, out.get("closes"))
 	label = store.label(doc.name, doc.version)
 	frappe.db.set_value("Life Inbox Item", item.name, "processed_by", label)
 	from lifeos.brain import rules

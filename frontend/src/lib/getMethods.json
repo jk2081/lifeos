@@ -129,6 +129,8 @@
  "lifeos.api.weekly.meeting",
  "lifeos.api.weekly.meetings_list",
  "lifeos.api.weekly.stale_tasks",
+ "lifeos.api.weekly.waiting",
+ "lifeos.api.weekly.waiting_nudge",
  "lifeos.api.weekly.plate",
  "lifeos.api.weekly.goals",
  "lifeos.api.weekly.goal",

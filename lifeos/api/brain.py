@@ -212,6 +212,11 @@ def _made(space, items):
 		if len(bucket) >= MADE_EACH or any(e["name"] == p.created_name for e in bucket) or not item_page._readable(p.created_doctype, p.created_name, space):
 			continue
 		bucket.append(item_page._entry(item_page.KIND_OF.get(p.created_doctype, p.kind), p.created_doctype, p.created_name, title=p.preview))
+	# a waiting task the Brain closed because this capture said it was done (issue 118)
+	for t in frappe.get_list("Life Task", filters={"closed_by_item": ("in", items)}, fields=["name", "closed_by_item"], order_by="completed_on desc", limit=len(items) * MADE_EACH):
+		bucket = out.setdefault(t.closed_by_item, [])
+		if len(bucket) < MADE_EACH and item_page._readable("Life Task", t.name, space):
+			bucket.append({**item_page._entry("Closed", "Life Task", t.name), "kind": "Closed by itself"})
 	return out
 
 

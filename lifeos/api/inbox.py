@@ -9,7 +9,7 @@ from frappe.utils import add_to_date, now_datetime
 
 from lifeos.library import extract, files, links
 from lifeos import permissions
-from lifeos.brain import proposals
+from lifeos.brain import asks, proposals
 from lifeos.api.utils import (area_criterion, count_by, count_tabs, count_where, filter_criteria, flag, group_summary, in_order_of, list_query, names_map, order_terms,
 	page, parse, sort_terms, user_names)
 
@@ -458,7 +458,14 @@ def get(item: str):
 			p["exists"] = bool(frappe.db.exists(p.created_doctype, p.created_name))
 	out["proposals"] = props
 	out["context"] = space_context(doc.space)
+	out["summary"] = asks.stored(doc)  # issue 118: the summary as data (To act on, Updates, Reports), None for an older item
 	return out
+
+
+@frappe.whitelist(methods=["POST"])
+def change_line(item: str, index: int, to: str, waiting_on: str | None = None):
+	"""Change where one To act on line of an item's summary goes: plate, waiting (with who), calendar or not_needed (issue 118)."""
+	return asks.change(item, index, to, waiting_on)
 
 
 @frappe.whitelist(methods=["GET"])

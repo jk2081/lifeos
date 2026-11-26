@@ -13,7 +13,7 @@ from frappe.utils import cint, now_datetime
 
 from lifeos import permissions
 
-ACTIONS = ("File", "Link", "Drop", "Ask")
+ACTIONS = ("File", "Link", "Drop", "Ask")  # a Route rule (asks to the plate or the pile) is made only by lifeos/brain/asks.py
 FILE_AS = ("Chat", "Note", "Report", "Task")
 SAME_CORRECTION = 2  # the same correction this many times (the one just made included) makes a rule
 EXAMPLES = 8  # recent decisions shown to the Brain with each capture
@@ -54,7 +54,9 @@ def when_words(rule) -> str:
 
 
 def then_words(rule) -> str:
-	if rule.action == "Drop":
+	if rule.action == "Route":
+		out = _("its asks go to your plate") if rule.asks_to == "Plate" else _("its asks go to the waiting pile")
+	elif rule.action == "Drop":
 		out = _("not needed")
 	elif rule.action == "Ask":
 		out = _("always ask me")
@@ -152,7 +154,7 @@ def first_match(item):
 	"""The rule that decides this capture, or None."""
 	f = facts(item)
 	for rule in rules_of(item.space):
-		if matches(rule, f):
+		if rule.action != "Route" and matches(rule, f):  # a Route rule is about the asks in a capture, not about filing it (lifeos/brain/asks.py)
 			return rule
 	return None
 
@@ -184,6 +186,8 @@ def apply_first(item) -> dict | None:
 		return None
 	label = _("Rule: {0}").format(words(rule))
 	used(rule)
+	if rule.builtin == "context-items" and item.get("source_type") == "Email Digest":
+		return None  # issue 118: a digest needs no area, but it is still read: its summary (To act on, Updates, Reports) is the point
 	if rule.action == "Link":
 		if rule.page_doctype and rule.page:
 			from lifeos.library import subjects

@@ -45,7 +45,7 @@
    "content": [
     {
      "type": "text",
-     "text": "{\"transcript_md\": \"\", \"summary_md\": \"Dr Rao's advice after your visit: walk daily, less sugar in tea, and a repeat blood test in three months.\"}"
+     "text": "{\"transcript_md\": \"\", \"summary\": {\"line\": \"Dr Rao's advice after your visit: walk daily, less sugar in tea, and a repeat blood test in three months.\"}}"
     }
    ],
    "stop_reason": "end_turn"

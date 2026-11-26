@@ -26,6 +26,7 @@
   "extract_note",
   "extract_files",
   "summary_md",
+  "summary_json",
   "source_url",
   "status",
   "claimed_by",
@@ -202,6 +203,13 @@
    "fieldname": "summary_md",
    "fieldtype": "Long Text",
    "label": "Summary"
+  },
+  {
+   "fieldname": "summary_json",
+   "fieldtype": "Long Text",
+   "label": "Summary (structured)",
+   "hidden": 1,
+   "read_only": 1
   },
   {
    "fieldname": "source_url",

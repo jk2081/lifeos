@@ -69,7 +69,7 @@ def use(name, args, id="t1"):
 
 
 def answer(summary="A summary.", transcript=""):
-	return {"content": [{"type": "text", "text": json.dumps({"transcript_md": transcript, "summary_md": summary})}], "stop_reason": "end_turn"}
+	return {"content": [{"type": "text", "text": json.dumps({"transcript_md": transcript, "summary": {"line": summary}})}], "stop_reason": "end_turn"}
 
 
 def task(title, area="Money", confidence=0.9, reason="It is a bill.", **extra):

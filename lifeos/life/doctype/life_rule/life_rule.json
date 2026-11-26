@@ -18,6 +18,7 @@
   "attachment_type",
   "then_section",
   "action",
+  "asks_to",
   "file_as",
   "area",
   "no_area",
@@ -113,9 +114,16 @@
    "fieldname": "action",
    "fieldtype": "Select",
    "label": "Action",
-   "options": "File\nLink\nDrop\nAsk",
+   "options": "File\nLink\nDrop\nAsk\nRoute",
    "default": "File",
    "reqd": 1
+  },
+  {
+   "fieldname": "asks_to",
+   "fieldtype": "Select",
+   "label": "Asks go to",
+   "options": "\nPlate\nWaiting",
+   "depends_on": "eval:doc.action=='Route'"
   },
   {
    "fieldname": "file_as",

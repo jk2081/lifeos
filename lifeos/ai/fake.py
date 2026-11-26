@@ -182,7 +182,7 @@ class SiteFake:
 		if not called:
 			return self._out(params, None, "", [tool_use("propose", {"kind": "Task", "preview": title, "confidence": 0.6, "reason": "The acceptance site's stand-in model files everything under Career.",
 				"payload": {"title": title, "area": "Career"}})], "tool_use")
-		return self._done(params, None, json.dumps({"transcript_md": "", "summary_md": f"{title}. Read by the acceptance site's stand-in model."}))
+		return self._done(params, None, json.dumps({"transcript_md": "", "summary": {"line": f"{title}. Read by the acceptance site's stand-in model."}}))
 
 	def _structured(self, params):
 		"""A skill asked about data (lifeos/skills/call.py): the answer the skill's rules would give, from the data in the request."""

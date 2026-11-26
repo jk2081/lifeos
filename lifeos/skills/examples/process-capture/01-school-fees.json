@@ -49,7 +49,7 @@
    "content": [
     {
      "type": "text",
-     "text": "{\"transcript_md\": \"\", \"summary_md\": \"The school reminds you that Aarav's second term fee of Rs 48,000 is due on 5 December.\"}"
+     "text": "{\"transcript_md\": \"\", \"summary\": {\"line\": \"The school reminds you that Aarav's second term fee of Rs 48,000 is due on 5 December.\"}}"
     }
    ],
    "stop_reason": "end_turn"
