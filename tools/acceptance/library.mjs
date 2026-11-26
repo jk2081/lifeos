@@ -156,7 +156,7 @@ for (const width of WIDTHS) {
       }
       await s.open('/life/library/timeline')
       await pg.keyboard.press('Meta+k')
-      await pg.locator('input[aria-label="Search or ask anything"]').fill(`UX note ${stamp}`)
+      await pg.locator('input[aria-label="Search or chat"]').fill(`UX note ${stamp}`)
       await pg.waitForTimeout(900)
       await pg.keyboard.press('Enter')
       await settle()
@@ -341,7 +341,7 @@ for (const width of WIDTHS) {
   await check('LIBRARY.10', `${width} px: no sideways scrolling and no script errors on the new screens`, async () => {
     const before = errors.length
     const bad = []
-    for (const p of ['/life', '/life/settings?tab=data', '/life/goals/someday', '/life/ask', '/life/ask?tab=insights', '/life/ask?tab=history', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
+    for (const p of ['/life', '/life/settings?tab=data', '/life/goals/someday', '/life/chat', '/life/chat?tab=insights', '/life/chat?tab=history', '/life/library/archive?type=trash', '/life/settings?tab=ai', '/life/settings?tab=reset']) {
       await s.open(p)
       if ((await overflow()) > 0) bad.push(`${p} scrolls sideways by ${await overflow()} px`)
     }
@@ -1100,7 +1100,7 @@ for dt, n in (("Life Note", "${note || ''}"), ("Life Inbox Item", "${item || ''}
   }
 }
 
-// Search covers the whole app (issue 98): Frappe's Global Search, screens by name, and Ask without a key
+// Search covers the whole app (issue 98): Frappe's Global Search, screens by name, and Chat without a key
 {
   const subject = `RSH Global ${stamp}`
   const event = bench(`ev = frappe.get_doc({"doctype": "Event", "subject": "${subject}", "starts_on": frappe.utils.today() + " 16:00:00", "event_type": "Private", "life_space": "Private"}).insert(ignore_permissions=True)
@@ -1116,7 +1116,7 @@ print(ev.name)`).split('\n').pop()
   const palette = async (text) => {
     await owner.open('/life/today')
     await pg.keyboard.press('Meta+k')
-    await pg.locator('input[aria-label="Search or ask anything"]').fill(text)
+    await pg.locator('input[aria-label="Search or chat"]').fill(text)
     await pg.waitForTimeout(1200)
   }
   try {
@@ -1137,13 +1137,13 @@ print(ev.name)`).split('\n').pop()
       const u = new URL(pg.url())
       must(u.pathname === '/life/settings' && u.searchParams.get('tab') === 'advanced' && u.searchParams.get('part') === 'ai', `Enter went to ${pg.url()}`)
     })
-    await check('LIBRARY.41', '1440 px: with no AI key, Ask says it needs one, links to Settings › AI, and shows what search finds for the same words', async () => {
+    await check('LIBRARY.41', '1440 px: with no AI key, Chat says it needs one, links to Settings › AI, and shows what search finds for the same words', async () => {
       bench('s = frappe.get_single("Life Settings"); s.anthropic_api_key = None; s.save()')
       try {
         await palette(`rsh ${stamp}`)
         await pg.locator('[data-search-ask]').click()
         await pg.locator('[data-refusal="not_set_up"]').waitFor({ timeout: 15000 })
-        must((await pg.locator('[data-ask-refusal]').innerText()).includes('Ask needs an AI key. Add one in Settings › AI.'), 'the key message is not shown')
+        must((await pg.locator('[data-ask-refusal]').innerText()).includes('Chat needs an AI key. Add one in Settings › AI.'), 'the key message is not shown')
         must((await pg.locator('[data-ask-key-link]').getAttribute('href')).includes('part=ai'), 'the link does not go to Settings › AI')
         must((await pg.locator('[data-ask-search-hits]').innerText()).includes(subject), 'the search result is not under the message')
       } finally {

@@ -11,7 +11,7 @@ from lifeos.goals import readings
 from lifeos.api.utils import parse
 
 SETTING_FIELDS = ("default_space", "weekly_review_day", "weekly_review_time", "score_target", "archive_after_days", "stale_task_days",
-	# UX fixes, set 5: Reset rules and the AI behind Ask (the key has its own method and is never sent back)
+	# UX fixes, set 5: Reset rules and the AI behind the Brain (the key has its own method and is never sent back)
 	"stuck_after_days", "stuck_limit", "open_task_goal", "someday_review_months", "ask_model", "short_model", "monthly_cap_usd",
 	# UX fixes, set 6: Rhythms
 	"start_of_day", "week_starts_on", "cycle_break_week", "planning_period", "require_done_when", "use_focuses",
@@ -311,7 +311,7 @@ def test_ai_connection():
 
 @frappe.whitelist(methods=["POST"])
 def set_feature_cap(feature: str, cap: float = 0):
-	"""A monthly cap in dollars for one feature (Ask, Area guess, …); 0 removes it."""
+	"""A monthly cap in dollars for one feature (Chat, Area guess, …); 0 removes it."""
 	_admin_only()
 	import json
 
@@ -344,7 +344,7 @@ def set_ai_price(model: str, input_per_mtok: float, output_per_mtok: float, cach
 
 @frappe.whitelist(methods=["POST"])
 def set_space_ask(space: str, ask_enabled: bool | int | None = None, ask_can_read_vault: bool | int | None = None):
-	"""Ask on or off for a space, and whether Ask may read its Vault documents. Owner only."""
+	"""Chat on or off for a space, and whether Chat may read its Vault documents. Owner only."""
 	_admin_only()
 	doc = frappe.get_doc("Life Space", space)
 	if ask_enabled is not None:

@@ -188,7 +188,7 @@ def _gmail_card(row, out, meta):
 	sign-in has no mailbox yet: it shows the address Google must be told about and can be removed."""
 	pending = not row.mailbox
 	provider = "Microsoft" if row.system == "microsoft" else "Google"
-	line = _("Waiting for you to finish signing in with {0}.").format(provider) if pending else _("Daily digest, and searched live by Ask and your agent")
+	line = _("Waiting for you to finish signing in with {0}.").format(provider) if pending else _("Daily digest, and searched live by Chat and your agent")
 	return {**out, "kind": meta["kind"], "icon": meta["icon"], "this_week": 0, "line": line, "pending": int(pending), "mailbox": row.mailbox,
 		"state": "Waiting" if pending else ("On" if row.active else "Off"), "quiet": False,
 		"redirect_uri": gmail.redirect_uri(row.connected_app) if pending and row.connected_app else None,

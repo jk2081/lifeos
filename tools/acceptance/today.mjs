@@ -197,7 +197,7 @@ while d <= last:
     bench(`frappe.db.set_value("Life Insight", "${other.name}", "snooze_until", frappe.utils.add_days(frappe.utils.today(), -1))`)
     await s.api('insights.refresh', { space: SPACE })
     must((await s.api('insights.list', { space: SPACE, status: 'New', page_length: 100 })).rows.some((r) => r.name === other.name), 'the snoozed insight did not return after its date')
-    await s.open('/life/ask?tab=insights')
+    await s.open('/life/chat?tab=insights')
     must(await pg.locator('[data-insight-row]').count() && await pg.locator('[data-insights-how]').isVisible(), 'the Insights tab shows no insights')
     return [...kinds].join(', ')
   })
@@ -1095,20 +1095,12 @@ for (const width of WIDTHS) {
       await pg.locator('[data-main]').waitFor({ timeout: 10000 })
     })
     // issue 102: the AI service has no credit
-    await check('TODAY.30', `${width} px: with the fake AI failing on credit, Ask shows the credit message and Today shows "The Brain is off" with a link to Settings > AI, until a call works`, async () => {
-      const task = await one.api('tasks.quick_add', { text: `Brain off ${stamp} ${width}`, space: SPACE })
+    await check('TODAY.30', `${width} px: with the fake AI failing on credit, Today shows "The Brain is off" with a link to Settings > AI, until a call works`, async () => {
       bench(`from frappe.installer import update_site_config
 update_site_config("lifeos_fake_ai_error", {"status": 400, "message": "Your credit balance is too low to access the Anthropic API."})
 frappe.defaults.clear_default("lifeos_ai_off", parent="__default")`)
       try {
-        await one.open(`/life/goals/tasks?view=list&status=all&f=${encodeURIComponent(JSON.stringify([['title', 'like', `%Brain off ${stamp} ${width}%`]]))}`)
-        await pg.locator(`[data-ref="task:${task.name}"]`).first().click()
-        await pg.locator('[data-pane-ask]').click()
-        await pg.locator('[data-ask-panel] textarea').fill('What is open?')
-        await pg.locator('[data-ask-send]:visible').click()
-        await pg.locator('[data-ask-error], [data-ask-refusal]').first().waitFor({ timeout: 20000 })
-        const said = await pg.locator('[data-ask-error], [data-ask-refusal]').first().innerText()
-        must(/credit/i.test(said) && !/\(400\)/.test(said), 'Ask does not show the credit message: ' + said)
+        bench(`from lifeos.ai import client\nclient.note_unavailable(client.error_from(400, "Your credit balance is too low to access the Anthropic API."))`) // a Brain call failed on credit
         await one.open('/life')
         await pg.locator('[data-brain-off]').waitFor({ timeout: 15000 })
         must(/The Brain is off: .*credit/i.test(await pg.locator('[data-brain-off]').innerText()), 'Today does not say the Brain is off')

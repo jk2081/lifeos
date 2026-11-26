@@ -142,7 +142,7 @@ for (const width of WIDTHS) {
       '/life/today/year?view=goals', '/life/goals', '/life/goals/tasks', '/life/goals/someday', '/life/library', '/life/library/notes',
       '/life/library/notes?view=tree', '/life/library/notes?view=graph', '/life/library/notes?view=changes', '/life/library/notes?view=health', '/life/library/notes?by=assistant',
       '/life/brain/captures', '/life/library/documents?tab=documents&sensitive=1', '/life/brain/captures?tab=photos', '/life/library/timeline',
-      '/life/library/archive', '/life/library/archive?type=trash', '/life/ask', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
+      '/life/library/archive', '/life/library/archive?type=trash', '/life/chat', `/life/goals/${ux.goal}`, `/life/library/${ux.note}`,
       ...['profile', 'appearance', 'notifications', 'shortcuts', 'calendar', 'areas', 'rhythms', 'habits', 'data', 'connections', 'ai', 'cost', 'sensitive',
         'note-rules', 'spaces', 'members', 'agents', 'archive', 'import', 'backups'].map((t) => `/life/settings?tab=${t}`)]
     for (const p of screens) for (const area of ['', uxArea]) {
@@ -171,7 +171,7 @@ await check('PHONE.4', 'Keyboard: G then T, I, O or L opens a place; the older G
     ['y', '/life/goals/someday'], ['w', '/life/today/week'], ['m', '/life/today/month'], ['j', '/life/goals/cycles'], ['c', '/life/today/year'], ['e', '/life/settings', { tab: 'data' }],
     ['n', '/life/library/notes'], ['u', '/life/brain/activity'], ['h', '/life/library/chats', { tab: 'chats' }], ['v', '/life/library/documents', { tab: 'documents', sensitive: '1' }],
     ['x', '/life/library/notes', { by: 'assistant' }], ['g', '/life/library/notes', { view: 'graph' }], ['r', '/life/library/archive'], ['b', '/life/brain/outbox'], ['d', '/life/review'],
-    ['q', '/life/ask'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
+    ['q', '/life/chat'], ['a', '/life/settings', { tab: 'areas' }], ['s', '/life/settings']]) {
     await owner.open(key === 't' ? '/life/brain' : '/life')
     await pg.locator('[data-page-head]').first().click({ position: { x: 5, y: 5 } }).catch(() => {})
     await pg.keyboard.press('g')
@@ -640,7 +640,7 @@ print(json.dumps({"item": first("Life Inbox Item"), "goal": first("Life Goal"), 
         '/brain/skills/:name': `/life/brain/skills/${ids.skill}`, '/brain/sources/:key': '/life/brain/sources/gmail', '/brain/review/:id': `/life/brain/review/${ids.item}`, '/share': '/life/share',
         '/item/:id': `/life/item/${ids.item}`, '/goals/:tab(...)?': '/life/goals/cycles', '/goals/:id': `/life/goals/${ids.goal}`,
         '/focus/:id': `/life/focus/${ids.area}`, '/library/:tab(...)?': '/life/library/notes', '/library/pages/:doctype/:name': `/life/library/pages/Life%20Person/${ids.person}`, '/library/people/:person': `/life/library/people/${ids.person}`,
-        '/library/:id': `/life/library/${ids.note}`, '/review': '/life/review', '/how-it-works': '/life/how-it-works', '/ask': '/life/ask', '/settings': '/life/settings',
+        '/library/:id': `/life/library/${ids.note}`, '/review': '/life/review', '/how-it-works': '/life/how-it-works', '/chat': '/life/chat', '/settings': '/life/settings',
         '/dev/editor': '/life/dev/editor',
       }
       const source = fs.readFileSync(path.join(root, 'frontend/src/router.js'), 'utf8')

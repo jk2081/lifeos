@@ -16,7 +16,7 @@ export const brainData = {
   insights: group('insights', ['act', 'list', 'refresh']),
   reset: group('reset', ['undo']),
   mail: group('mail', ['file', 'search']),
-  ask: group('ask', ['delete_thread', 'status', 'threads']),
+  chat: group('chat', ['delete_thread', 'status', 'threads']),
   sources: group('sources', ['list', 'refile']),
   rules: group('rules', ['add', 'always_ask', 'change', 'for_source', 'list']),
   sourcePage: group('source_page', ['file_it', 'get', 'go_back', 'groups', 'save_rules', 'save_settings', 'teach', 'try_it']),

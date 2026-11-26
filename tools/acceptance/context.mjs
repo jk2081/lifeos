@@ -45,6 +45,47 @@ export function bench(code, site = SITE) {
   }
 }
 
+// Chat runs on Flow (issue 119): a real Flow Server, with tools/fake_openai.py as the model (no key, no network), for the checks that need an answer.
+// `chatOn` starts both, registers the model as a Flow Provider and Model and writes the "Life OS" agent; `chatOff` switches the model off, so the other checks see a site with
+// no model ("Chat needs an AI key").
+// The Flow Server calls the site back on the bench's web server (`flow_server_url` of common_site_config.json, port 8000 by default, which serves the default site);
+// the acceptance site has its own server, which is what the callback must reach.
+export function chatOn() {
+  const port = process.env.LIFEOS_BENCH_CMD === 'local' ? 19000 : 9000
+  bench(`import os, shutil, subprocess, sys, time
+from frappe.installer import update_site_config
+update_site_config("flow_server_url", "http://127.0.0.1:${port}", site_config_path=os.path.join(frappe.utils.get_bench_path(), "sites", "common_site_config.json"))
+from frappe.flow.doctype.flow_skill.flow_skill import sync_skills
+from frappe.flow.lib.agent import sync_agents, sync_tools
+fake = os.path.join(os.path.dirname(frappe.get_app_path("lifeos")), "tools", "fake_openai.py")
+subprocess.Popen([sys.executable, fake, "8765"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+bench_path = frappe.utils.get_bench_path()
+bench_cmd = shutil.which("bench") or os.path.join(os.path.dirname(sys.executable), "bench")
+for step in ("setup", "restart"):  # setup gives this site its secret; the Flow Server reads the secrets when it starts
+    subprocess.run([bench_cmd, "flow-server", step], cwd=bench_path, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+frappe.set_user("Administrator")
+if not frappe.db.exists("Flow Provider", "openai"):
+    frappe.get_doc({"doctype": "Flow Provider", "provider": "openai", "api_key": "sk-fake-not-real", "base_url": "http://127.0.0.1:8765/v1"}).insert()
+if not frappe.db.exists("Flow Model", {"title": "Fake model"}):
+    frappe.get_doc({"doctype": "Flow Model", "title": "Fake model", "provider": "openai", "model_id": "openai/fake-1"}).insert()
+frappe.db.set_value("Flow Model", {"title": "Fake model"}, "enabled", 1)
+frappe.db.commit()
+sync_skills(); sync_tools(); sync_agents()
+frappe.db.set_value("Flow Agent", "lifeos/Life OS", "enabled", 1)
+frappe.db.commit()
+time.sleep(1)`)
+}
+export function chatOff() {
+  bench(`import os, subprocess
+from frappe.installer import update_site_config
+update_site_config("flow_server_url", None, site_config_path=os.path.join(frappe.utils.get_bench_path(), "sites", "common_site_config.json"))
+subprocess.run(["pkill", "-f", "fake_openai.py"])
+frappe.set_user("Administrator")
+frappe.db.set_value("Flow Model", {"title": "Fake model"}, "enabled", 0)  # no model that is on: Chat says it needs a key
+if frappe.db.exists("Flow Agent", "lifeos/Life OS"):
+    frappe.db.set_value("Flow Agent", "lifeos/Life OS", "enabled", 0)`)
+}
+
 export const browser = await chromium.launch({ executablePath: SETUP.chrome, headless: true })
 
 export async function session(user, width = 1440) {

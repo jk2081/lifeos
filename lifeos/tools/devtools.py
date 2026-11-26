@@ -295,8 +295,6 @@ def purge_test_debris(dry_run=True):
 		files += frappe.get_all("File", filters={"attached_to_doctype": dt, "attached_to_name": ["in", names]}, fields=["name", "file_url", "is_private"])
 		frappe.db.delete("Version", {"ref_doctype": dt, "docname": ("in", names)})
 		frappe.db.delete("Comment", {"reference_doctype": dt, "reference_name": ("in", names)})
-		if dt == "Life Ask Thread":
-			frappe.db.delete("Life Ask Message", {"thread": ("in", names)})
 		frappe.db.delete(dt, {"name": ("in", names)})
 	files += _orphan_files()
 	for f in files:

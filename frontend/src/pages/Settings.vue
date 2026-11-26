@@ -239,8 +239,8 @@
           <SectionHead>Sensitive items</SectionHead>
           <p class="text-sm text-ink-gray-6">A sensitive item is a document from the Vault, or a capture or note marked sensitive. {{ manySpaces ? 'Each space decides who may read them. ' : '' }}Anyone who can edit an item may mark it; only the space's owner may unmark it.</p>
           <Card flush data-sensitive>
-            <SettingRow v-for="sp in d.spaces" :key="sp.name" :label="manySpaces ? `Ask may read sensitive items in ${sp.name}` : 'Ask may read sensitive items'" help="Off by default. Ask answers the people in the space." :data-sensitive-space="sp.name">
-              <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="manySpaces ? `Ask may read sensitive items in ${sp.name}` : 'Ask may read sensitive items'" :data-ask-vault-switch="sp.name" :disabled="!d.is_admin"
+            <SettingRow v-for="sp in d.spaces" :key="sp.name" :label="manySpaces ? `Chat may read sensitive items in ${sp.name}` : 'Chat may read sensitive items'" help="Off by default. Chat answers the people in the space." :data-sensitive-space="sp.name">
+              <Switch :model-value="!!sp.ask_can_read_vault" :aria-label="manySpaces ? `Chat may read sensitive items in ${sp.name}` : 'Chat may read sensitive items'" :data-ask-vault-switch="sp.name" :disabled="!d.is_admin"
                 @update:model-value="(v) => setSpaceAsk(sp, 'ask_can_read_vault', v)" /></SettingRow>
           </Card>
           <Card v-if="!manySpaces && onlySpace" flush data-sensitive-agents>
@@ -262,8 +262,8 @@
                   <div class="text-sm text-ink-gray-6" :data-space-counts="sp.name">Owner {{ sp.owner_name || '—' }} · {{ plural(sp.people_count, 'person', 'people') }} · {{ plural(sp.agent_count, 'agent', 'agents') }}</div></div>
                 <Button size="sm" label="Members" :data-space-members="sp.name" @click="showMembers(sp.name)" />
               </div>
-              <SettingRow label="Ask in this space" help="People in this space can ask about its records.">
-                <Switch :model-value="!!sp.ask_enabled" :aria-label="`Ask in ${sp.name}`" :data-ask-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_enabled', v)" /></SettingRow>
+              <SettingRow label="Chat in this space" help="People in this space can chat about its records.">
+                <Switch :model-value="!!sp.ask_enabled" :aria-label="`Chat in ${sp.name}`" :data-ask-switch="sp.name" @update:model-value="(v) => setSpaceAsk(sp, 'ask_enabled', v)" /></SettingRow>
               <SettingRow label="Agents may open sensitive items" help="Off by default. With it off, agents cannot list, read or download this space's sensitive items.">
                 <Switch :model-value="!!sp.agents_can_read_vault" :aria-label="`Agents may open sensitive items in ${sp.name}`" :data-vault-switch="sp.name"
                   @update:model-value="(v) => setVault(sp, v)" /></SettingRow>
@@ -327,6 +327,11 @@
         <template v-if="show('advanced')">
           <TabButtons v-model="advPart" class="self-start" :options="ADVANCED" aria-label="Advanced" data-advanced-parts />
           <template v-if="advPart === 'ai' && d.ai">
+          <Card flush data-ai-chat-card>
+            <SettingRow label="Chat" help="Chat runs on Frappe Flow. Its model and key are Flow's Provider settings, not these.">
+              <a class="text-base text-ink-blue-8 hover:underline" href="/app/flow-provider" target="_blank" rel="noopener" data-ai-flow-link>Open Flow's Provider settings</a></SettingRow>
+            <SettingRow label="This month" help="Chat stops for the month when the spend reaches the cap below."><span class="text-base text-ink-gray-9" data-ai-chat-spend>{{ d.ai.spend.text }}</span></SettingRow>
+          </Card>
           <Card flush data-ai-settings>
             <SettingRow label="Provider" help="Anthropic, or any service that speaks Anthropic's API, such as DeepSeek.">
               <Select class="w-72" :model-value="provider" :options="PROVIDERS" aria-label="AI provider" data-setting="ai_provider"
@@ -338,14 +343,14 @@
                 <TextInput class="w-72" :model-value="d.settings.ai_base_url" placeholder="https://api.deepseek.com/anthropic" aria-label="Address of the service" data-setting="ai_base_url"
                   @change="(e) => setOne('ai_base_url', e.target.value.trim())" /></SettingRow>
             </template>
-            <SettingRow :label="isOther ? 'Key' : 'Anthropic API key'" :help="d.ai.key_set ? 'A key is set. It is stored encrypted and never shown again.' : isOther ? 'No key yet: the Brain and Ask are off.' : 'No key yet: Ask says it is not set up, and only rule insights run. Or set it with bench set-config anthropic_api_key.'">
+            <SettingRow :label="isOther ? 'Key' : 'Anthropic API key'" :help="d.ai.key_set ? 'A key is set. It is stored encrypted and never shown again.' : isOther ? 'No key yet: the Brain is off.' : 'No key yet: the Brain does not run, and only rule insights do. Or set it with bench set-config anthropic_api_key.'">
               <div class="flex items-center gap-2">
                 <TextInput v-model="aiKey" class="w-56" type="password" :placeholder="d.ai.key_set ? 'Replace the key' : isOther ? 'Key of the service' : 'sk-ant-…'" :aria-label="isOther ? 'Key of the service' : 'Anthropic API key'" autocomplete="off" data-ai-key />
                 <Button label="Save" :disabled="!aiKey" data-ai-key-save @click="saveKey" />
                 <Button v-if="d.ai.key_set" variant="ghost" theme="red" label="Remove" @click="saveKey(true)" />
               </div>
             </SettingRow>
-            <SettingRow :label="isOther ? 'Model for Ask' : 'Ask model'" help="Writes Ask's answers and the AI insights.">
+            <SettingRow :label="isOther ? 'Model for the Brain' : 'Brain model'" help="Writes the Brain's longer jobs and the AI insights. Chat uses the model set in Flow.">
               <TextInput class="w-56" :model-value="d.settings.ask_model" data-setting="ask_model" @change="(e) => setOne('ask_model', e.target.value.trim())" /></SettingRow>
             <SettingRow :label="isOther ? 'Model for quick jobs' : 'Short-task model'" help="For short wording jobs.">
               <TextInput class="w-56" :model-value="d.settings.short_model" data-setting="short_model" @change="(e) => setOne('short_model', e.target.value.trim())" /></SettingRow>
@@ -356,7 +361,7 @@
                 <span v-if="tested" class="max-w-80 text-sm" :class="tested.ok ? 'text-ink-green-8' : 'text-ink-red-8'" role="status" data-ai-test-result :data-ok="tested.ok ? 1 : 0">{{ tested.text }}</span>
               </div>
             </SettingRow>
-            <SettingRow label="Monthly cap" help="Ask and the AI insights stop for the month when the spend reaches this." :error="errors.monthly_cap_usd">
+            <SettingRow label="Monthly cap" help="Chat, the Brain and the AI insights stop for the month when the spend reaches this." :error="errors.monthly_cap_usd">
               <TextInput class="w-28" type="number" min="0" :model-value="d.settings.monthly_cap_usd" data-setting="monthly_cap_usd"
                 @change="(e) => setOne('monthly_cap_usd', Number(e.target.value))"><template #prefix><span class="text-sm text-ink-gray-6">$</span></template></TextInput></SettingRow>
           </Card>
@@ -370,10 +375,10 @@
             <p class="mt-1 text-sm text-ink-gray-6">US dollars per million tokens.</p>
           </section>
           <Card v-if="!manySpaces && onlySpace" flush data-ai-ask>
-            <SettingRow label="Ask" help="People can ask about their records. Off, Ask is closed.">
-              <Switch :model-value="!!onlySpace.ask_enabled" aria-label="Ask" data-ask-switch :disabled="!d.is_admin" @update:model-value="(v) => setSpaceAsk(onlySpace, 'ask_enabled', v)" /></SettingRow>
+            <SettingRow label="Chat" help="People can chat about their records. Off, Chat is closed.">
+              <Switch :model-value="!!onlySpace.ask_enabled" aria-label="Chat" data-ask-switch :disabled="!d.is_admin" @update:model-value="(v) => setSpaceAsk(onlySpace, 'ask_enabled', v)" /></SettingRow>
           </Card>
-          <p v-else class="text-sm text-ink-gray-6" data-ai-spaces-note>Ask is switched on or off for each space under
+          <p v-else class="text-sm text-ink-gray-6" data-ai-spaces-note>Chat is switched on or off for each space under
             <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'members', view: 'spaces' } }">People and agents, Spaces</RouterLink>.</p>
             <SectionHead>Cost</SectionHead>
           <section>
@@ -393,7 +398,7 @@
                 <TextInput class="w-28" type="number" min="0" step="1" placeholder="No cap" :model-value="f.cap || ''" :aria-label="`${f.feature} cap`" @change="(e) => setFeatureCap(f, e.target.value)"><template #prefix><span class="text-sm text-ink-gray-6">$</span></template></TextInput></Row>
               <Row v-if="!d.ai.feature_caps.length"><span class="text-sm text-ink-gray-6">A feature appears here after its first call.</span></Row>
             </Card>
-            <p class="mt-1 text-sm text-ink-gray-6">The monthly cap of ${{ d.ai.monthly_cap_usd }} is set under Ask and AI. Over a cap a feature falls back: area guesses use the rules, the Brain leaves items in Needs you.</p>
+            <p class="mt-1 text-sm text-ink-gray-6">The monthly cap of ${{ d.ai.monthly_cap_usd }} is set under Chat and AI. Over a cap a feature falls back: area guesses use the rules, the Brain leaves items in Needs you.</p>
           </section>
           <section>
             <SectionHead>By day</SectionHead>
@@ -417,7 +422,7 @@
           </template>
           <template v-if="advPart === 'backups' && d.backups">
           <Card flush data-settings-backups>
-            <SettingRow label="Scheduled backups" :help="d.backups.configured ? 'From this site\'s configuration.' : 'Not set up on this site. Ask whoever runs the server to switch on backups.'">
+            <SettingRow label="Scheduled backups" :help="d.backups.configured ? 'From this site\'s configuration.' : 'Not set up on this site. Whoever runs the server can switch on backups.'">
               <Badge :theme="d.backups.configured ? 'green' : 'amber'" :label="d.backups.configured ? (d.backups.settings.backup_frequency || 'On') : 'Not set up on this site'" data-backups-state />
             </SettingRow>
             <SettingRow v-for="(v, k) in d.backups.settings" :key="k" :label="k.replace(/_/g, ' ')" help="Site configuration"><span class="text-base text-ink-gray-8">{{ v }}</span></SettingRow>
@@ -659,7 +664,7 @@ const shownAreas = computed(() => {
   const on = all.filter((a) => a.is_life_area && a.is_on)
   return on.flatMap((a) => [a, ...all.filter((p) => p.parent_area === a.name && p.is_on)])
 })
-// the one space of a site that has one: its Ask and sensitive-items switches are plain settings (issue 46)
+// the one space of a site that has one: its Chat and sensitive-items switches are plain settings (issue 46)
 const onlySpace = computed(() => (!manySpaces.value ? d.value?.spaces.find((x) => x.name === store.space) || null : null))
 const mSpace = computed(() => d.value?.spaces.find((s) => s.name === memberSpace.value))
 // Members: All, People, Agents, with counts

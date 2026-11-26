@@ -1,5 +1,6 @@
 """Chat log: one record per AI chat, and the chats report."""
 import builtins
+import json
 import datetime
 
 import frappe
@@ -54,23 +55,28 @@ def relay(turns: str | builtins.list, channel: str, source_system: str, external
 	if not name:
 		name = frappe.get_doc({"doctype": "Life Ask Thread", "space": space, "user": owner, "title": relay_title(space, system, channel), "channel": channel,
 			"source_system": system}).insert(ignore_permissions=True).name  # system: the owner's own conversation, written by their agent; the space write check is above
+	held = frappe.db.get_value("Life Ask Thread", name, "transcript")
+	kept = frappe.parse_json(held) if held else []
+	seen = {m.get("id") for m in kept}
 	added, last = 0, None
 	for i, turn in enumerate(rows):
 		text = (turn.get("text") or "").strip() if isinstance(turn, dict) else ""
 		if not text or turn.get("role") not in ("owner", "assistant"):
 			continue
 		mid = " ".join(str(turn.get("id") or f"{ext}:{i}").split())[:140]
-		if frappe.db.exists("Life Ask Message", {"thread": name, "source_system": system, "external_id": mid}):
+		if mid in seen:
 			continue
 		try:
 			at = frappe.utils.get_datetime(turn["at"]) if turn.get("at") else frappe.utils.now_datetime()
 		except Exception:  # noqa: BLE001 - a time the agent could not format is now
 			at = frappe.utils.now_datetime()
-		m = frappe.get_doc({"doctype": "Life Ask Message", "thread": name, "role": "user" if turn["role"] == "owner" else "assistant", "text": text, "status": "Done",
-			"source_system": system, "external_id": mid}).insert(ignore_permissions=True)  # system: as above
-		frappe.db.set_value("Life Ask Message", m.name, "creation", at, update_modified=False)
+		kept.append({"id": mid, "role": "user" if turn["role"] == "owner" else "assistant", "text": text, "at": str(at)[:19]})
+		seen.add(mid)
 		added += 1
 		last = max(last, at) if last else at
+	if added:
+		kept.sort(key=lambda m: m["at"])  # a late turn goes where it was said
+		frappe.db.set_value("Life Ask Thread", name, "transcript", json.dumps(kept))
 	if last:
 		frappe.db.set_value("Life Ask Thread", name, "last_message_on", max(last, frappe.db.get_value("Life Ask Thread", name, "last_message_on") or last))
 	return {"thread": name, "added": added}

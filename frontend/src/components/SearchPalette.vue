@@ -1,11 +1,11 @@
 <template>
-  <CommandPalette v-model:open="open" v-model:query="text" :filterable="false" title="Search or ask" @select="go">
-    <CommandPaletteInput ref="field" placeholder="Search or ask anything" aria-label="Search or ask anything" />
+  <CommandPalette v-model:open="open" v-model:query="text" :filterable="false" title="Search or chat" @select="go">
+    <CommandPaletteInput ref="field" placeholder="Search or chat" aria-label="Search or chat" />
     <CommandPaletteList>
       <!-- Ask (UX fixes, set 5): first when the text reads as a question, so Enter asks; last otherwise -->
-      <CommandPaletteItem v-if="askFirst" :value="ASK" :label="'Ask: ' + text" data-search-ask>
+      <CommandPaletteItem v-if="askFirst" :value="ASK" :label="'Chat: ' + text" data-search-ask>
         <div class="flex min-w-0 items-center gap-2 py-0.5"><span class="lucide-sparkles size-4 text-ink-gray-7" aria-hidden="true" />
-          <span class="truncate text-base-medium text-ink-gray-9">Ask: {{ text.trim() }}</span></div>
+          <span class="truncate text-base-medium text-ink-gray-9">Chat: {{ text.trim() }}</span></div>
         <template #suffix><Badge theme="blue" :label="askScopeLabel" /></template>
       </CommandPaletteItem>
       <!-- screens and settings by name -->
@@ -26,9 +26,9 @@
           <template #suffix><Badge :label="r.kind" /></template>
         </CommandPaletteItem>
       </CommandPaletteGroup>
-      <CommandPaletteItem v-if="text.trim() && !askFirst" :value="ASK" :label="'Ask: ' + text" data-search-ask>
+      <CommandPaletteItem v-if="text.trim() && !askFirst" :value="ASK" :label="'Chat: ' + text" data-search-ask>
         <div class="flex min-w-0 items-center gap-2 py-0.5"><span class="lucide-sparkles size-4 text-ink-gray-7" aria-hidden="true" />
-          <span class="truncate text-base-medium text-ink-gray-9">Ask: {{ text.trim() }}</span></div>
+          <span class="truncate text-base-medium text-ink-gray-9">Chat: {{ text.trim() }}</span></div>
         <template #suffix><Badge theme="blue" :label="askScopeLabel" /></template>
       </CommandPaletteItem>
     </CommandPaletteList>
@@ -45,7 +45,7 @@
           <Button size="sm" variant="ghost" icon-left="lucide-lightbulb" label="Insights" data-search-insights @click="toAsk('insights')" />
         </div>
         <span class="flex items-center gap-1 text-sm text-ink-gray-6"><KeyboardShortcut bg combo="ArrowUp" use-icons /><KeyboardShortcut bg combo="ArrowDown" use-icons /> to move,
-          <KeyboardShortcut bg combo="Enter" use-icons /> to open<template v-if="askFirst">, or to ask</template></span>
+          <KeyboardShortcut bg combo="Enter" use-icons /> to open<template v-if="askFirst">, or to chat</template></span>
       </div>
     </CommandPaletteFooter>
   </CommandPalette>
@@ -115,7 +115,7 @@ watch([text, archived], () => {
 watch(open, (on) => { if (!on) { results.value = []; searched.value = '' } })
 function toAsk(tab) {
   open.value = false
-  router.push({ path: '/ask', query: { tab } })
+  router.push({ path: '/chat', query: { tab } })
 }
 function go(r) {
   if (!r) return

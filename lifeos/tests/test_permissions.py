@@ -21,7 +21,7 @@ from lifeos.web import gone_names
 from lifeos import install, permissions
 from lifeos.brain import proposals
 from lifeos.ai import fake
-from lifeos.api import archive, ask, chats, client_errors, connections, goals, graph, inbox, library, search, session, settings, someday, sources, tasks, timeline, today as today_api, vault
+from lifeos.api import archive, chats, client_errors, connections, goals, graph, inbox, library, search, session, settings, someday, sources, tasks, timeline, today as today_api, vault
 from lifeos.api.utils import in_area
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import answer, AskCase, find, item, task, text
@@ -203,25 +203,6 @@ class TestWhitelistConventions(IntegrationTestCase):
 
 
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures")
-
-
-class TestAskCommitsOnce(AskCase):
-	def test_progress_comes_from_the_cache_and_ends_done(self):
-		self.script({"content": [text("Nothing open on drainage.")], "stop_reason": "end_turn"})
-		res = ask.ask("What about drainage?", space=PRIVATE, client_id="pre6-progress")
-		got = ask.progress("pre6-progress")
-		self.assertEqual((got["status"], got["text"], got["message"]), ("Done", "Nothing open on drainage.", res["message"]["name"]))
-
-	def test_an_unexpected_failure_is_an_error_answer_not_a_working_message(self):
-		def boom(_payload):
-			raise RuntimeError("the model client broke")
-
-		self.script(boom)
-		res = ask.ask("What about drainage?", space=PRIVATE, client_id="pre6-boom")
-		self.assertEqual(res["error"], "ai")
-		self.assertEqual(frappe.db.get_value("Life Ask Message", res["message"]["name"], "status"), "Error")
-		self.assertEqual(ask.progress("pre6-boom")["status"], "Error")
-		self.assertNotIn("the model client broke", res["error_text"])
 
 
 class TestChatImportSavepoints(LifeTestCase):
@@ -425,8 +406,6 @@ class TestPermissionHooksAnswerTrueOrFalse(LifeTestCase):
 		self.assertTrue(got[(OWNER, "read")])
 		self.assertFalse(got[(FAMILY, "read")])
 		self.assertFalse(got[(AGENT, "read")])
-		message = self._all(permissions.ask_has_permission, self._doc({"doctype": "Life Ask Message", "thread": "no-such-thread"}))
-		self.assertTrue(message[(FAMILY, "read")])  # no thread, no owner to protect
 
 	def test_files(self):
 		vault = self.make("Life Vault Document", title="pre6 permit")
@@ -627,12 +606,12 @@ class TestCleanup(IntegrationTestCase):
 		files = {p.resolve() for p in SRC.rglob("*") if p.suffix in (".vue", ".js")}
 		self.assertEqual(sorted(str(p.relative_to(SRC.resolve())) for p in files - seen), [])
 
-	def test_patches_txt_lists_only_the_search_index_patch_and_a_site_installs_and_migrates(self):
-		# issue 98: the one patch indexes the records that exist for Global Search; the schema still comes from the DocTypes
+	def test_patches_txt_lists_only_the_search_index_and_chat_patches_and_a_site_installs_and_migrates(self):
+		# issue 98: one patch indexes the records that exist for Global Search; issue 119: one moves Ask's messages to the threads; the schema still comes from the DocTypes
 		lines = [x.strip() for x in (APP_cleanup / "patches.txt").read_text().splitlines()]
-		self.assertEqual([x for x in lines if x and not x.startswith(("#", "["))], ["lifeos.patches.index_global_search"])
-		self.assertEqual(sorted(p.name for p in (APP_cleanup / "patches").glob("*.py")), ["__init__.py", "index_global_search.py"])  # glob order is the file system's
-		self.assertEqual(get_patches_from_app("lifeos"), ["lifeos.patches.index_global_search"])
+		self.assertEqual([x for x in lines if x and not x.startswith(("#", "["))], ["lifeos.patches.index_global_search", "lifeos.patches.ask_threads_to_chat"])
+		self.assertEqual(sorted(p.name for p in (APP_cleanup / "patches").glob("*.py")), ["__init__.py", "ask_threads_to_chat.py", "index_global_search.py"])  # glob order is the file system's
+		self.assertEqual(get_patches_from_app("lifeos"), ["lifeos.patches.index_global_search", "lifeos.patches.ask_threads_to_chat"])
 		install.after_migrate()
 		install.after_migrate()  # again: the schema comes from the DocTypes and setup is repeatable
 

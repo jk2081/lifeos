@@ -18,13 +18,6 @@
               <Button v-if="!d.undone && d.undo && canWrite()" size="sm" variant="subtle" label="Undo" data-ask-undo @click="undoDone(m, j)" />
             </div>
           </div>
-          <div v-if="m.actions && m.actions.length" class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5" data-ask-actions>
-            <div class="text-sm text-ink-gray-6">{{ m.actions.some((a) => a.kind === 'choose') ? 'Pick one' : 'Suggested' }}</div>
-            <div class="flex flex-wrap gap-2" :class="phone && 'flex-col'">
-              <Button v-for="(a, j) in m.actions" :key="j" class="!h-auto min-h-8 min-w-0 max-w-full !whitespace-normal py-1.5 text-left [&_.truncate]:!whitespace-normal" :size="phone ? 'lg' : 'md'" :variant="j === 0 ? 'solid' : 'subtle'" :label="a.done ? a.label + ' · done' : a.label"
-                :disabled="a.done || !canWrite()" :data-ask-action="a.kind" @click="runAction(m, j)" />
-            </div>
-          </div>
           <div v-if="m.cited && m.cited.length" class="text-sm text-ink-gray-6" data-ask-sources>Sources:
             <template v-for="(c, j) in m.cited" :key="c.n"><span v-if="j"> · </span><a href="#" class="text-ink-blue-8 hover:underline focus-visible:focus-ring" :data-ask-cite="c.n"
               @click.prevent="openCite(m, c.n)">{{ c.n }} {{ c.title }}</a></template>
@@ -48,16 +41,14 @@
   </div>
 </template>
 <script setup>
-// One Ask thread: questions on the right, answers with numbered citations, the suggested actions and the sources.
-// Clicking a citation opens the record in the pane; a suggested action changes nothing until it is clicked.
-import { useMediaQuery } from '@vueuse/core'
+// One Chat thread: messages on the right, answers with numbered citations, what Chat did (each line with Change) and the sources.
+// Clicking a citation opens the record in the pane.
 import { computed } from 'vue'
 import { Alert, Button, LoadingIndicator } from 'frappe-ui'
 import Md from '../Md.vue'
 import { manySpaces } from '@/lib/lens'
 import { canWrite, store } from '@/lib/store'
 import AskSearchHits from './AskSearchHits.vue'
-import { ask, openCite, openPane, runAction, undoDone } from '@/lib/ask'
-const phone = useMediaQuery('(max-width: 767px)')
+import { ask, openCite, openPane, undoDone } from '@/lib/ask'
 const lastQuestion = computed(() => [...ask.messages].reverse().find((m) => m.role === 'user')?.text || '')
 </script>

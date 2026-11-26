@@ -1,16 +1,15 @@
 <template>
-  <PageHead title="Ask" :sub="sub">
+  <PageHead title="Chat" :sub="sub">
     <span v-if="tab.current.value === 'ask' && st" class="text-sm text-ink-gray-7" data-ask-spend>{{ st.text }}</span>
     <Button v-if="tab.current.value === 'insights' && canWrite()" label="Refresh insights" :loading="refreshing" data-insights-refresh @click="refresh" />
   </PageHead>
-  <TabBar inset :tabs="TABS_SHOWN" :model-value="tab.current.value" label="Ask sections" @update:model-value="tab.set" />
+  <TabBar inset :tabs="TABS_SHOWN" :model-value="tab.current.value" label="Chat sections" @update:model-value="tab.set" />
 
-  <!-- Ask: a thread, with the records it used and questions to try -->
+  <!-- Chat: a thread, with the records it used and questions to try -->
   <div v-show="tab.current.value === 'ask'" class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_22rem]" data-ask-page>
     <div class="flex min-h-[60vh] flex-col gap-4 px-4 pb-6 pt-4 md:px-7">
       <div class="flex-1"><h2 v-if="ask.channel" class="mb-3 text-base-medium text-ink-gray-9" data-ask-channel-title>{{ ask.title }}</h2><AskThread />
-        <div v-if="!ask.messages.length && !ask.refusal" class="text-base text-ink-gray-6" data-ask-empty>Ask about anything in your records. Answers cite where they came from and suggest
-          what to do; nothing changes until you click.</div></div>
+        <div v-if="!ask.messages.length && !ask.refusal" class="text-base text-ink-gray-6" data-ask-empty>Chat about anything in your records, or ask for something to be filed. Answers cite where they came from, and what Chat does is listed with Undo.</div></div>
       <div class="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-4"><AskComposer /></div>
     </div>
     <aside class="flex flex-col gap-5 border-outline-gray-1 px-4 py-4 md:border-l md:px-5">
@@ -22,9 +21,9 @@
             <div class="text-sm text-ink-gray-6">{{ [c.kind, c.date && short(c.date)].filter(Boolean).join(' · ') }}</div></div>
         </div>
       </section>
-      <p class="text-sm text-ink-gray-6">Ask reads only what you can see{{ inSpace }}<template v-if="st && !st.vault">, never the Vault</template>. It never changes anything until you click a suggested action.</p>
+      <p class="text-sm text-ink-gray-6">Chat reads only what you can see{{ inSpace }}<template v-if="st && !st.vault">, never the Vault</template>. It changes something only when you ask, and lists it with Undo.</p>
       <section v-if="st?.suggested">
-        <h2 class="mb-1.5 text-base-medium text-ink-gray-9">Try asking</h2>
+        <h2 class="mb-1.5 text-base-medium text-ink-gray-9">Try asking Chat</h2>
         <Button v-for="q in st.suggested" :key="q" variant="ghost" class="!h-auto w-full !justify-start !whitespace-normal py-1.5 text-left !font-normal !text-ink-gray-7" :label="q"
           data-ask-try @click="tryAsk(q)" />
       </section>
@@ -91,7 +90,7 @@
           <div class="text-sm text-ink-gray-6">{{ [t.channel ? 'on ' + t.channel : t.scope_label, t.questions + (t.channel ? ' message' : ' question') + (t.questions === 1 ? '' : 's'), t.last_message_on].filter(Boolean).join(' · ') }}</div></div>
         <Button variant="ghost" icon="lucide-trash-2" :label="'Delete ' + t.title" data-history-delete @click="remove(t)" />
       </Row>
-      <Empty v-if="!hist.rows.length" title="No questions yet." hint="Questions you ask from any screen are kept here, for you only." />
+      <Empty v-if="!hist.rows.length" title="No chats yet." hint="What you chat about from any screen is kept here, for you only." />
     </Card>
   </div>
 </template>
@@ -99,7 +98,7 @@
 <script setup>
 import { brainData } from '@/data/brain'
 import { inSpace } from '@/lib/lens'
-// The Ask page (UX fixes, set 5): Ask (a thread, the records it used, questions to try), Insights and History.
+// The Chat page (UX fixes, set 5; Chat since issue 119): Chat (a thread, the records it used, questions to try), Insights and History.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dropdown, Select, TabButtons, TextInput, dialog, toast } from 'frappe-ui'
@@ -131,7 +130,7 @@ const KINDS = ['Stuck', 'Waiting on you', 'Promise', '12 Week Year', 'Habit', 'C
 const KIND_THEME = { Stuck: 'red', 'Waiting on you': 'amber', Promise: 'amber', '12 Week Year': 'blue', Habit: 'green', 'Check-in': 'green', Theme: 'violet', Someday: 'violet' }
 const REASONS = ['Not relevant', 'Already done', 'Wrong']
 const SNOOZE = [{ label: 'For 3 days', days: 3 }, { label: 'For a week', days: 7 }, { label: 'For a month', days: 30 }]
-const TABS_SHOWN = computed(() => [{ value: 'ask', label: 'Ask' }, { value: 'insights', label: 'Insights', count: ins.value?.tabs?.New }, { value: 'history', label: 'History' }])
+const TABS_SHOWN = computed(() => [{ value: 'ask', label: 'Chat' }, { value: 'insights', label: 'Insights', count: ins.value?.tabs?.New }, { value: 'history', label: 'History' }])
 const tab = useUrlTab('tab', TABS_SHOWN)
 const istatus = computed(() => route.query.istatus || 'New')
 const lastAnswer = computed(() => [...ask.messages].reverse().find((m) => m.role === 'assistant'))
@@ -191,11 +190,11 @@ async function dismiss(r, reason) {
 }
 async function restore(r) { await db.set('Life Insight', r.name, { status: 'New' }); loadInsights() }
 async function loadHistory() {
-  try { Object.assign(hist, await brainData.ask.threads({ space: store.space, q: hq.value || undefined })) } catch (e) { /* shown as empty */ }
+  try { Object.assign(hist, await brainData.chat.threads({ space: store.space, q: hq.value || undefined })) } catch (e) { /* shown as empty */ }
 }
 function remove(t) {
-  dialog.danger({ title: 'Delete this question?', message: `“${t.title}” and its answers are deleted for good.`, confirmLabel: 'Delete',
-    onConfirm: async () => { await brainData.ask.delete_thread({ name: t.name }); if (ask.thread === t.name) { ask.thread = null; ask.channel = ''; ask.messages = [] } loadHistory() } })
+  dialog.danger({ title: 'Delete this chat?', message: `“${t.title}” and its answers are deleted for good.`, confirmLabel: 'Delete',
+    onConfirm: async () => { await brainData.chat.delete_thread({ name: t.name }); if (ask.thread === t.name) { ask.thread = null; ask.channel = ''; ask.messages = [] } loadHistory() } })
 }
 watch(() => [route.query.istatus, route.query.kind, route.query.area, route.query.actionable], loadInsights)
 watch(() => tab.current.value, (v) => { if (v === 'history') loadHistory() })
@@ -203,7 +202,7 @@ watch(() => route.query.thread, (v) => { if (v) loadThread(String(v)) }, { immed
 onMounted(async () => {
   loadLookups()
   if (!ask.scope) ask.scope = scopeFromRoute()
-  try { st.value = await brainData.ask.status({ space: store.space }) } catch (e) { st.value = null }
+  try { st.value = await brainData.chat.status({ space: store.space }) } catch (e) { st.value = null }
   loadInsights()
   if (tab.current.value === 'history') loadHistory()
 })

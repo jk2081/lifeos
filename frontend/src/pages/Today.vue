@@ -136,7 +136,7 @@
           </section>
           <section v-if="d.rail.insights_total" data-rail-insights>
             <h2 class="mb-1 flex items-baseline gap-2 text-base"><span class="font-semibold text-ink-gray-9">Insights</span>
-              <span class="text-sm text-ink-gray-6">{{ d.rail.insights_total }} · <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/ask', query: { tab: 'insights' } }">see all</RouterLink></span></h2>
+              <span class="text-sm text-ink-gray-6">{{ d.rail.insights_total }} · <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/chat', query: { tab: 'insights' } }">see all</RouterLink></span></h2>
             <ul class="flex flex-col gap-1 text-sm text-ink-gray-6">
               <li v-for="i in d.rail.insights" :key="i.name" data-rail-insight>{{ i.title }}</li>
             </ul>

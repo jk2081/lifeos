@@ -11,7 +11,7 @@ export const settingsData = {
   updates: group('updates', ['check_now', 'get', 'request_update']),
   connections: group('connections', ['import_status', 'start_import']),
   reset: group('reset', ['apply_batch', 'decide', 'get', 'next_item', 'undo']),
-  ask: group('ask', ['status']),
+  chat: group('chat', ['status']),
   context: group('context', ['card']),
   library: group('library', ['get']),
   skills: group('skills', ['accept_update', 'detail', 'rollback', 'run_log', 'save', 'set_active', 'test']),

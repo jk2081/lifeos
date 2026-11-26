@@ -14,7 +14,11 @@
   "scope_kind",
   "last_message_on",
   "channel",
-  "source_system"
+  "source_system",
+  "flow_session",
+  "transcript",
+  "refs",
+  "undone"
  ],
  "fields": [
   {
@@ -81,6 +85,34 @@
    "fieldname": "source_system",
    "fieldtype": "Data",
    "label": "Source System"
+  },
+  {
+   "fieldname": "flow_session",
+   "fieldtype": "Data",
+   "label": "Flow Session",
+   "read_only": 1,
+   "description": "The Flow Session that holds this chat's messages (Chat runs on Flow)"
+  },
+  {
+   "fieldname": "transcript",
+   "fieldtype": "Long Text",
+   "label": "Earlier messages",
+   "read_only": 1,
+   "description": "Read only: what was asked before Chat ran on Flow, and what an assistant relayed from its channel. JSON list of {id, role, text, at}."
+  },
+  {
+   "fieldname": "refs",
+   "fieldtype": "Long Text",
+   "label": "References",
+   "read_only": 1,
+   "description": "The records the chat has read, by their R-numbers, so citations keep their numbers across tool calls"
+  },
+  {
+   "fieldname": "undone",
+   "fieldtype": "Long Text",
+   "label": "Undone",
+   "read_only": 1,
+   "description": "The lines of Done lists that were taken back"
   }
  ],
  "links": [],

@@ -1,4 +1,4 @@
-// Search, shared by the palette and Ask's "needs an AI key" notice (issue 98): the screens and settings that can be
+// Search, shared by the palette and Chat's "needs an AI key" notice (issue 98): the screens and settings that can be
 // found by name, and what a click on a result does.
 import router from '@/router'
 import { store } from '@/lib/store'
@@ -23,7 +23,7 @@ export const SCREENS = [
   { label: 'Weekly review', words: 'review', to: '/review' },
   { label: 'Skills', words: 'skills brain', to: '/brain/skills' },
   { label: 'Archive and trash', words: 'archive trash deleted', to: '/library/archive' },
-  { label: 'Ask history and insights', words: 'ask history insights threads', to: '/ask?tab=history' },
+  { label: 'Chat history and insights', words: 'chat ask history insights threads', to: '/chat?tab=history' },
 ]
 
 const WORDS = /[\p{L}\p{N}]+/gu

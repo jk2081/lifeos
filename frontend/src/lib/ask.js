@@ -1,4 +1,4 @@
-// Ask from any screen (UX fixes, set 5): the state of the Ask panel and the scope each screen gives a question.
+// Chat from any screen (UX fixes, set 5; Chat since issue 119): the state of the Chat panel and the scope each screen gives a question.
 // A screen calls askScope({...}) in its setup; the pane's "Ask about this" and the goal pages give
 // their own. With none, the scope comes from the route (see scopeFromRoute).
 import { onMounted, onUnmounted, reactive } from 'vue'
@@ -22,7 +22,7 @@ export const ask = reactive({
   draft: '',
   scopeChanged: false,
   seq: 0, // bumped to send `draft` as soon as the panel opens
-  returnTo: null, // phone: the path to reopen the Ask sheet on once the cited record is closed
+  returnTo: null, // phone: the path to reopen the Chat sheet on once the cited record is closed
 })
 
 export function askScope(scope) {
@@ -62,35 +62,22 @@ export function startAsk(question = '', scope = null) {
   if (question) send(question)
 }
 
-/** Send a question in the open thread (a follow-up keeps the thread's scope unless the chip was changed). */
-export async function send(question) {
+/** Send a message in the open thread (a follow-up keeps the thread's scope unless the chip was changed). The run is Flow's: `chat.send` starts it and the
+ *  screen polls `chat.progress` until the answer is Done. The record the person has open (the pane's, or a goal or note page) travels with it. */
+export async function send(question, record = null) {
   const q = String(question || '').trim()
   if (!q || ask.busy) return
   ask.draft = ''
   ask.refusal = null
   ask.busy = true
-  const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36)
   ask.messages.push({ role: 'user', text: q })
   const answer = reactive({ role: 'assistant', text: '', status: 'Working', cited: [], actions: [], done: [], read: [], reading: '' })
   ask.messages.push(answer)
-  // the answer streams: realtime is not always there, so the text so far is polled
-  let polling = true
-  const poll = async () => {
-    while (polling) {
-      await new Promise((r) => setTimeout(r, 700))
-      if (!polling) break
-      try {
-        const p = await api('ask.progress', { client_id: clientId })
-        if (polling && p.text) answer.text = p.text
-        if (polling) answer.reading = p.reading || ''
-      } catch (e) { /* the final answer will come */ }
-    }
-  }
-  poll()
   try {
     const scope = ask.scope ? { ...ask.scope, items: typeof ask.scope.items === 'function' ? ask.scope.items() : ask.scope.items } : null
-    const res = await api('ask.ask', { question: q, space: store.space, thread: ask.thread || undefined, scope: ask.thread && !ask.scopeChanged ? undefined : JSON.stringify(scope),
-      client_id: clientId })
+    const open = record || recordOf(ask.scope)
+    const res = await api('chat.send', { question: q, space: store.space, thread: ask.thread || undefined, scope: ask.thread && !ask.scopeChanged ? undefined : JSON.stringify(scope),
+      record: open ? JSON.stringify(open) : undefined })
     ask.thread = res.thread
     ask.scopeChanged = false
     if (res.error) {
@@ -98,23 +85,26 @@ export async function send(question) {
       ask.refusal = res
     } else {
       Object.assign(answer, res.message)
-      // more than 3 pages of mail: the answer is written by a background job; "Reading 9–24 Nov… (page 2 of 6)" shows meanwhile (polled above)
-      while (res.background && answer.status === 'Working') {
-        await new Promise((r) => setTimeout(r, 1000))
-        Object.assign(answer, await api('ask.message', { name: res.message.name }), { reading: answer.reading })
+      while (answer.status === 'Working') {
+        await new Promise((r) => setTimeout(r, 900))
+        try { Object.assign(answer, await api('chat.progress', { thread: res.thread, message: answer.name })) } catch (e) { /* the next poll will tell */ }
       }
-      answer.reading = ''
+      if (answer.done?.length) { window.dispatchEvent(new CustomEvent('lifeos-counts-stale')); recordChanged('') }
     }
   } catch (e) {
     Object.assign(answer, { status: 'Error', error: errorText(e) })
   } finally {
-    polling = false
     ask.busy = false
   }
 }
 
+/** The record a scope is about (a goal page, a note, the pane's record), when it is one. */
+function recordOf(scope) {
+  return scope && scope.doctype && scope.name ? { doctype: scope.doctype, name: scope.name } : null
+}
+
 export async function loadThread(name) {
-  const t = await api('ask.thread', { name })
+  const t = await api('chat.thread', { name })
   ask.thread = t.name
   ask.channel = t.channel || ''
   ask.title = t.title || ''
@@ -123,31 +113,11 @@ export async function loadThread(name) {
   ask.refusal = null
 }
 
-/** A suggested action: nothing changed until this click; the normal methods run with the person's permissions. */
-export async function runAction(message, index) {
-  const a = message.actions[index]
-  try {
-    const out = await api('ask.run_action', { message: message.name, index })
-    if (out.kind === 'choose') { a.done = true; return send(out.answer) } // the pick is the owner's next message
-    if (out.to) { ask.open = false; return router.push(out.to) }
-    a.done = true
-    window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))
-    if (out.kind === 'make_task') {
-      recordChanged('task:' + out.task)
-      toast.success(`Task made: ${out.title}`, { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('ask.undo_made_task', { task: out.task }); a.done = false; recordChanged('task:' + out.task) } } })
-    } else if (out.kind === 'file_mail') {
-      toast.success(`Filed: ${out.title}`, { duration: 60000, action: { label: 'Open', onClick: () => { ask.open = false; router.push('/item/' + out.item) } } })
-    } else if (out.undo) {
-      toast.success(`${a.label}: done.`, { duration: 60000, action: { label: 'Undo', onClick: async () => { await api('reset.undo', { log: JSON.stringify(out.undo) }); a.done = false; recordChanged('') } } })
-    } else toast.success('Done.')
-  } catch (e) { toast.error(errorText(e)) }
-}
-
-/** One line of an answer's Done list taken back: what Ask made is removed, and the line says so. */
+/** One line of an answer's Done list taken back: what Chat made is removed, and the line says so. */
 export async function undoDone(message, index) {
   const line = message.done[index]
   try {
-    await api('ask.undo_done', { message: message.name, index })
+    await api('chat.undo_done', { message: message.name, index })
     line.undone = 1
     window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))
     recordChanged('')
@@ -155,8 +125,8 @@ export async function undoDone(message, index) {
   } catch (e) { toast.error(errorText(e)) }
 }
 
-/** Open a record from the Ask panel. On a phone both are bottom sheets and the record's would open under the Ask sheet: hand over to the record, and
- *  bring the Ask sheet back, with its thread, when the record is closed on the same screen (AskPanel watches this). */
+/** Open a record from the Chat panel. On a phone both are bottom sheets and the record's would open under the Chat sheet: hand over to the record, and
+ *  bring the Chat sheet back, with its thread, when the record is closed on the same screen (AskPanel watches this). */
 export function openPane(pane) {
   if (window.matchMedia('(max-width: 767px)').matches && ask.open) {
     ask.returnTo = router.currentRoute.value.path
@@ -172,7 +142,7 @@ export function openCite(message, n) {
   else if (c) toast.info(`${c.kind}: ${c.title}`)
 }
 
-/** The record pane's "Ask about this": the record and the records linked to it. */
+/** The record pane's "Chat about this": the record and the records linked to it. */
 export function askAbout(doctype, name, title) {
   startAsk('', { kind: 'record', label: title || 'This record', doctype, name })
 }

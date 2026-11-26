@@ -257,14 +257,12 @@ def view_state_has_permission(doc, ptype=None, user=None, debug=False):
 
 
 def ask_query_conditions(user=None, doctype=None):
-	"""Ask's threads and messages are private to the person who asked, the site owner included. Agents see none."""
+	"""Chat's threads are private to the person who asked, the site owner included. Agents see none."""
 	user = user or frappe.session.user
 	if user == "Administrator":
 		return ""
 	if is_agent(user):
 		return "1=0"
-	if doctype == "Life Ask Message":
-		return f"`tabLife Ask Message`.`thread` in (select name from `tabLife Ask Thread` where `user` = {frappe.db.escape(user)})"
 	return f"`tabLife Ask Thread`.`user` = {frappe.db.escape(user)}"
 
 
@@ -274,7 +272,7 @@ def ask_has_permission(doc, ptype=None, user=None, debug=False):
 		return True
 	if is_agent(user):
 		return False
-	owner = doc.get("user") if doc.doctype == "Life Ask Thread" else frappe.db.get_value("Life Ask Thread", doc.get("thread"), "user")
+	owner = doc.get("user")
 	return not owner or owner == user
 
 

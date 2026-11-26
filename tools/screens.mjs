@@ -132,7 +132,7 @@ for (const scheme of schemes) {
       ...(wikiPage ? ['note', 'sources', 'links', 'history'].map((t) => [`assistant-pane-${t}`, `/life/library/notes?by=assistant&area=&open=note:${wikiPage}&ptab=${t}`]) : []),
       ...(wikiChange ? [['assistant-change', `/life/library/notes?view=changes&area=&open=change:${wikiChange}`]] : []),
       ['task-pane-notes', `/life/plan/tasks?view=list&area=&open=task:${task}&ptab=notes`], ['goal-pane-history', `/life/plan/goals?status=all&area=&open=goal:${goal}&ptab=history`],
-      ['ask', '/life/ask'], ['ask-insights', '/life/ask?tab=insights'], ['ask-history', '/life/ask?tab=history'],
+      ['ask', '/life/chat'], ['ask-insights', '/life/chat?tab=insights'], ['ask-history', '/life/chat?tab=history'],
       ['ask-panel', '/life/?area='], ['ask-pane', `/life/plan/tasks?view=list&area=&open=task:${task}`],
       ['more-sheet', '/life/?area='], ['dev-editor', '/life/dev/editor'],
       // set 7: the Outbox, a number goal, New goal with "Done when…", the old Inbox items' batch

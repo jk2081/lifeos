@@ -34,7 +34,7 @@ has_permission["Event"] = "lifeos.permissions.event_has_permission"
 has_permission["Life View State"] = "lifeos.permissions.view_state_has_permission"
 has_permission["File"] = "lifeos.permissions.file_has_permission"
 # Ask's threads and messages belong to the person who asked; agents never read them (UX fixes, set 5)
-for _dt in ("Life Ask Thread", "Life Ask Message"):
+for _dt in ("Life Ask Thread",):
 	permission_query_conditions[_dt] = "lifeos.permissions.ask_query_conditions"
 	has_permission[_dt] = "lifeos.permissions.ask_has_permission"
 
@@ -112,7 +112,7 @@ ignore_links_on_delete = ["Life Exit"]
 
 fixtures = []
 
-# Frappe Flow (issue 108): Ask's tools and the "Life OS" agent, for trying at /flow
+# Frappe Flow (issues 108 and 119): the tools and the "Life OS" agent that Chat runs on
 flow_tools = [
 	"lifeos.ai.flow.search",
 	"lifeos.ai.flow.read_page",

@@ -35,7 +35,7 @@ export const GO = [
   { label: 'Library: Notes', to: '/library/notes', key: 'n' }, { label: 'Library: Chats', to: '/library/chats', key: 'h' },
   { label: 'Library: Sensitive documents', to: '/library/documents?tab=documents&sensitive=1', key: 'v' },
   { label: "Library: The assistant's notes", to: '/library/notes?by=assistant', key: 'x' }, { label: 'Library: Graph', to: '/library/notes?view=graph', key: 'g' },
-  { label: 'Library: Trash and archive', to: '/library/archive', key: 'r' }, { label: 'Ask: history and insights', to: '/ask', key: 'q' },
+  { label: 'Library: Trash and archive', to: '/library/archive', key: 'r' }, { label: 'Chat: history and insights', to: '/chat', key: 'q' },
   { label: 'Settings: Areas', to: '/settings?tab=areas', key: 'a' }, SETTINGS,
 ]
 export const TOOLTIPS = { Today: 'What to do now', Brain: 'What came in and what the Brain did with it', Goals: 'Where you are going', Library: 'What you have and know' }
@@ -57,7 +57,7 @@ export const ELSEWHERE = [
   { key: 'vault', label: 'Sensitive documents', home: 'Library > Documents, by the lock', to: { path: '/library/documents', query: { tab: 'documents', sensitive: '1' } } },
   { key: 'pages', label: 'Journal pages', home: 'Library > Notes', to: { path: '/library/notes', query: { view: 'list' } } },
   { key: 'archive', label: 'Trash and archive', home: 'Library', to: '/library/archive' },
-  { key: 'ask', label: 'Ask: history and insights', home: 'The Ask box in every header', to: '/ask' },
+  { key: 'ask', label: 'Chat: history and insights', home: 'The Chat box in every header', to: '/chat' },
 ]
 /**
  * A place's tab row while `current` is open. A page of the place that is not one of its tabs (the Outbox, Someday, the

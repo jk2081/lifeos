@@ -183,7 +183,7 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | --- | --- | --- |
 | `graph.get` | `space=None, center=None` | Nodes and edges for the graph view. `center` is "DocType/name": the graph is then limited to two steps around that record. |
 
-**`lifeos.api.tools`** (the Ask tools, issue 107; also what Ask calls). A person's call runs at once and returns what it did with an `undo` token; an agent names itself with `source_system` and follows its "Save files" and "Make pages and people" switches (a write it may not do on its own waits in Needs you).
+**`lifeos.api.tools`** (the Chat tools, issue 107; also what Chat calls). A person's call runs at once and returns what it did with an `undo` token; an agent names itself with `source_system` and follows its "Save files" and "Make pages and people" switches (a write it may not do on its own waits in Needs you).
 
 | Method | Arguments | Does |
 | --- | --- | --- |
