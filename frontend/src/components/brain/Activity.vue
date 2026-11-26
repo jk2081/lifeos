@@ -16,6 +16,11 @@
       <p class="mt-2 text-sm text-ink-gray-6"><RouterLink class="text-ink-blue-8 hover:underline" to="/brain/outbox" data-outbox-link>Open the Outbox</RouterLink> for the full list, other periods and Bring back.</p>
     </Card>
 
+    <div v-if="data?.new_rules?.length" class="flex flex-col gap-1 text-sm text-ink-gray-6" data-new-rules>
+      <div v-for="nr in data.new_rules" :key="nr.name" data-new-rule>New rule: {{ nr.words.replace(/^When /, '').replace(': ', ' → ') }} ·
+        <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'rules' } }" data-new-rule-change>Change</RouterLink></div>
+    </div>
+
     <div class="flex flex-wrap items-center gap-2" data-activity-filters>
       <div class="flex flex-wrap gap-1.5" role="group" aria-label="What the Brain did">
         <button v-for="f in FILTERS" :key="f.value" type="button" class="rounded-full border px-3 py-1 text-sm focus-visible:focus-ring"
@@ -45,7 +50,9 @@
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <Badge theme="gray" :label="r.source" data-row-source />
-              <RouterLink :to="`/item/${r.item}`" class="break-words text-base-medium text-ink-gray-9 hover:underline" data-row-item>{{ r.title }}</RouterLink>
+              <!-- issue 118: a row opens the item in the side pane, the list still beside it; Open full page is in the pane -->
+              <button type="button" class="break-words text-left text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :aria-label="`Open ${r.title}`" :data-ref="'inbox:' + r.item"
+                data-row-item @click="openRef('inbox:' + r.item)">{{ r.title }}</button>
             </div>
             <div class="mt-0.5 text-sm text-ink-gray-6" data-row-what>
               {{ SAYS[r.outcome] }}<template v-if="r.filed_by"> · <span class="text-ink-gray-9" data-row-filed-by>Filed by {{ r.filed_by }}</span></template><template v-if="r.area_name"> under <span class="inline-flex items-center gap-1 text-ink-gray-9" data-row-area><span class="size-2 rounded-full" :class="dot(r.area)" aria-hidden="true" />{{ r.area_name }}</span></template><template v-if="r.goal_title"> · goal <span class="text-ink-gray-9" data-row-goal>{{ r.goal_title }}</span></template>
@@ -70,7 +77,7 @@
 // Brain > Activity (issue 18): what came in and what the Brain did with it, newest first, by day. Filters: source, area and
 // what was done. A failed capture says why and can be retried. This week's Outbox piles sit on top, with the flow line; the
 // Outbox page keeps the full list, other periods and Bring back.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
@@ -82,6 +89,7 @@ import { canWrite, store } from '@/lib/store'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { dotClass } from '@/lib/lens'
 import { iso, long, time, addDays } from '@/lib/dates'
+import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
 
 const FILTERS = [{ value: '', label: 'All' }, { value: 'filed', label: 'Filed on its own' }, { value: 'waiting', label: 'Waiting for you' },
   { value: 'dropped', label: 'Dropped' }, { value: 'failed', label: 'Failed' }]
@@ -138,6 +146,10 @@ async function loadMore() {
 async function retry(r) {
   if (await tryCall(() => brainData.inbox.retry({ item: r.item }), 'Sent back to the agent.')) await load()
 }
+// j and k step through these rows while the pane is open
+watch(rows, () => { paneNav.rows = rows.value.map((r) => 'inbox:' + r.item) }, { immediate: true })
+onUnmounted(() => (paneNav.rows = []))
+onRecordChanged(load)
 onMounted(async () => { await loadLookups(); await load() })
 watch(() => [store.space, route.query.outcome, route.query.source, route.query.area, store.lensArea], load)
 </script>

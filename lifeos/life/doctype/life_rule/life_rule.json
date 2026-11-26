@@ -1,0 +1,222 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-11-26 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "space",
+  "enabled",
+  "made_by",
+  "builtin",
+  "when_section",
+  "sender",
+  "domain",
+  "source",
+  "item_kind",
+  "title_words",
+  "attachment_type",
+  "then_section",
+  "action",
+  "asks_to",
+  "file_as",
+  "area",
+  "no_area",
+  "never_page",
+  "page_doctype",
+  "page",
+  "record_section",
+  "used_count",
+  "last_used",
+  "learned_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "space",
+   "fieldtype": "Link",
+   "label": "Space",
+   "options": "Life Space",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "On",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "made_by",
+   "fieldtype": "Select",
+   "label": "Made by",
+   "options": "Owner\nBrain\nBuilt-in",
+   "default": "Owner",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "builtin",
+   "fieldtype": "Data",
+   "label": "Built-in key",
+   "length": 40,
+   "description": "Set on the rules Life OS ships (own-domains, context-items)"
+  },
+  {
+   "fieldname": "when_section",
+   "fieldtype": "Section Break",
+   "label": "When"
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Data",
+   "label": "Sender address",
+   "length": 140
+  },
+  {
+   "fieldname": "domain",
+   "fieldtype": "Data",
+   "label": "Sender domain",
+   "length": 140
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Data",
+   "label": "Source",
+   "length": 60,
+   "description": "A source's key (gmail, claude, upload...); empty means every source"
+  },
+  {
+   "fieldname": "item_kind",
+   "fieldtype": "Data",
+   "label": "Kind of capture",
+   "length": 140,
+   "description": "One or more of the capture's kinds (Chat, Email Digest, Voice Note...), comma separated"
+  },
+  {
+   "fieldname": "title_words",
+   "fieldtype": "Small Text",
+   "label": "Words in the title",
+   "description": "Any of these, comma separated"
+  },
+  {
+   "fieldname": "attachment_type",
+   "fieldtype": "Data",
+   "label": "Attachment type",
+   "length": 20,
+   "description": "A file type such as pdf or xlsx"
+  },
+  {
+   "fieldname": "then_section",
+   "fieldtype": "Section Break",
+   "label": "Then"
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Select",
+   "label": "Action",
+   "options": "File\nLink\nDrop\nAsk\nRoute",
+   "default": "File",
+   "reqd": 1
+  },
+  {
+   "fieldname": "asks_to",
+   "fieldtype": "Select",
+   "label": "Asks go to",
+   "options": "\nPlate\nWaiting",
+   "depends_on": "eval:doc.action=='Route'"
+  },
+  {
+   "fieldname": "file_as",
+   "fieldtype": "Select",
+   "label": "File as",
+   "options": "\nChat\nNote\nReport\nTask"
+  },
+  {
+   "fieldname": "area",
+   "fieldtype": "Link",
+   "label": "Area or part",
+   "options": "Life Area"
+  },
+  {
+   "fieldname": "no_area",
+   "fieldtype": "Check",
+   "label": "No area"
+  },
+  {
+   "fieldname": "never_page",
+   "fieldtype": "Check",
+   "label": "Never make a page"
+  },
+  {
+   "fieldname": "page_doctype",
+   "fieldtype": "Select",
+   "label": "Page of",
+   "options": "\nLife Person\nLife Area\nLife Note"
+  },
+  {
+   "fieldname": "page",
+   "fieldtype": "Dynamic Link",
+   "label": "Page",
+   "options": "page_doctype"
+  },
+  {
+   "fieldname": "record_section",
+   "fieldtype": "Section Break",
+   "label": "Record"
+  },
+  {
+   "fieldname": "used_count",
+   "fieldtype": "Int",
+   "label": "Times used",
+   "default": "0",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_used",
+   "fieldtype": "Datetime",
+   "label": "Last used",
+   "read_only": 1
+  },
+  {
+   "fieldname": "learned_from",
+   "fieldtype": "Data",
+   "label": "Learned from",
+   "length": 200,
+   "read_only": 1,
+   "description": "The correction that made it"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-26 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Life",
+ "name": "Life Rule",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "Life Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life User",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1
+  },
+  {
+   "role": "Life Agent",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

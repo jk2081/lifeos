@@ -10,7 +10,7 @@ from frappe.flow import Agent, ToolContext, tool
 
 from lifeos.ai.tools import Context, run_tool
 
-TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event']
+TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'make_rule']
 
 
 def _run(name: str, ctx: ToolContext, **args) -> dict:
@@ -140,6 +140,14 @@ def make_task(title: str, area: str | None = None, part: str | None = None, due_
 def add_event(title: str, start: str, end: str | None = None, all_day: bool = False, description: str | None = None, *, ctx: ToolContext) -> dict:
 	"""Put an event on the calendar now, only when the owner asked for it."""
 	return _run("add_event", ctx, title=title, start=start, end=end, all_day=all_day, description=description)
+
+
+@tool
+def make_rule(action: str = "File", sender: str | None = None, domain: str | None = None, source: str | None = None, kind: str | None = None, title_words: str | None = None,
+		area: str | None = None, part: str | None = None, no_area: bool = False, file_as: str | None = None, never_page: bool = False, *, ctx: ToolContext) -> dict:
+	"""Teach the Brain, only when the owner said how to treat things from now on: when a capture has the sender, domain, source, kind or title words, file it under an area (or no area), drop it, always ask, or never make a page."""
+	return _run("make_rule", ctx, action=action, sender=sender, domain=domain, source=source, kind=kind, title_words=title_words, area=area, part=part, no_area=no_area,
+		file_as=file_as, never_page=never_page)
 
 
 TOOLS = [globals()[n] for n in TOOL_NAMES]

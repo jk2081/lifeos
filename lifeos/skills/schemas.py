@@ -7,10 +7,33 @@ from frappe import _
 
 SCHEMAS = {
 	"capture-result": {
-		"title": "capture-result", "type": "object", "additionalProperties": False, "required": ["transcript_md", "summary_md"],
+		"title": "capture-result", "type": "object", "additionalProperties": False, "required": ["transcript_md", "summary"],
 		"properties": {
 			"transcript_md": {"type": "string", "description": "The text of the capture, cleaned up; empty when the capture is already text."},
-			"summary_md": {"type": "string", "description": "A short summary in Markdown, in the owner's words. Mention anything odd in the capture."},
+			"summary": {
+				"type": "object", "additionalProperties": False, "required": ["line"],
+				"description": "The summary as data: one line on top, then what to act on, what is moving and what was only filed.",
+				"properties": {
+					"line": {"type": "string", "description": "One line: what it is, for example '9 emails, 26 Nov'."},
+					"to_act_on": {"type": "array", "description": "One line per thing that asks something. Under 15 words each.", "items": {
+						"type": "object", "additionalProperties": False, "required": ["who", "what"], "properties": {
+							"who": {"type": "string", "description": "The person or organisation."},
+							"what": {"type": "string", "description": "What they want, under 15 words."},
+							"source": {"type": "string", "description": "Where the line comes from: the email's link, or 'Email 3'."},
+							"route": {"type": "string", "enum": ["plate", "waiting"], "description": "plate: only the owner can do it. waiting: someone else is on it, or you are not sure."},
+							"waiting_on": {"type": "string", "description": "For waiting: the person who is on it."},
+							"due": {"type": "string", "description": "A date the text names, YYYY-MM-DD."},
+							"check_by": {"type": "string", "description": "For waiting: a date the text names to look again, YYYY-MM-DD."},
+							"sensitive": {"type": "boolean"}}}},
+					"updates": {"type": "array", "description": "Things moving that need nothing now; several items on one subject make one line.", "items": {
+						"type": "object", "additionalProperties": False, "required": ["what"], "properties": {"what": {"type": "string"}, "source": {"type": "string"}, "sensitive": {"type": "boolean"}}}},
+					"reports": {"type": "array", "description": "Filed, nothing to do: a short title each.", "items": {
+						"type": "object", "additionalProperties": False, "required": ["title"], "properties": {"title": {"type": "string"}, "source": {"type": "string"}, "sensitive": {"type": "boolean"}}}},
+					"facts": {"type": "array", "items": {"type": "string"}, "description": "For a single item: up to 5 key facts."},
+				},
+			},
+			"closes": {"type": "array", "description": "Waiting tasks this capture settles (a reply that says it is done): only ids from waiting_tasks_on_this_thread.", "items": {
+				"type": "object", "additionalProperties": False, "required": ["task"], "properties": {"task": {"type": "string"}, "reason": {"type": "string"}}}},
 			"skipped": {"type": "array", "items": {"type": "string"}, "description": "What was left out on purpose, one short line each."},
 		},
 	},

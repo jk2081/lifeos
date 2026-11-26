@@ -12,6 +12,7 @@
   "intent",
   "media_kind",
   "source_system",
+  "sender",
   "external_id",
   "job_id",
   "instruction",
@@ -25,6 +26,7 @@
   "extract_note",
   "extract_files",
   "summary_md",
+  "summary_json",
   "source_url",
   "status",
   "claimed_by",
@@ -105,6 +107,14 @@
    "label": "Source System",
    "length": 40,
    "search_index": 1
+  },
+  {
+   "fieldname": "sender",
+   "fieldtype": "Data",
+   "label": "Sender",
+   "length": 140,
+   "search_index": 1,
+   "description": "The address an email came from, lower case; rules match on it"
   },
   {
    "fieldname": "external_id",
@@ -193,6 +203,13 @@
    "fieldname": "summary_md",
    "fieldtype": "Long Text",
    "label": "Summary"
+  },
+  {
+   "fieldname": "summary_json",
+   "fieldtype": "Long Text",
+   "label": "Summary (structured)",
+   "hidden": 1,
+   "read_only": 1
   },
   {
    "fieldname": "source_url",

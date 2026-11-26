@@ -257,7 +257,9 @@ def try_it(space: str, key: str, title: str | None = None, text: str | None = No
 	rows = [{"kind": p["kind"], "title": (p.get("payload") or {}).get("title") or p.get("preview") or p["kind"], "area": (p.get("payload") or {}).get("area"),
 		"confidence": round(100 * flt(p.get("confidence"))), "reason": p.get("reason"),
 		"files_alone": bool(p["kind"] in rule["kinds"] and flt(p.get("confidence")) >= threshold)} for p in state["proposals"]]
-	return {"summary": out.get("summary_md") or "", "transcript": out.get("transcript_md") or "", "skipped": out.get("skipped") or [], "proposals": rows,
+	from lifeos.brain import asks
+
+	return {"summary": asks.render_md(asks.clean(out["summary"])) if isinstance(out.get("summary"), dict) else out.get("summary_md") or "", "transcript": out.get("transcript_md") or "", "skipped": out.get("skipped") or [], "proposals": rows,
 		"skills_used": used, "lessons_used": lessons_in(skill["instructions"]), "cost": state["cost"], "threshold": round(100 * threshold)}
 
 

@@ -118,6 +118,11 @@ class SiteFake:
 				refs.append((res["ref"], res.get("title") or ""))
 		suggested = any(b.get("type") == "tool_use" and b.get("name") == "suggest_actions" for m in msgs if m["role"] == "assistant"
 			for b in (m["content"] if isinstance(m["content"], list) else []))
+		if any(t["name"] == "make_rule" for t in params.get("tools") or []) and re.match(r"(file claude|stop suggesting)", q, re.I):  # teaching by telling (issue 117)
+			if called == 0:
+				args = {"kind": "Chat", "action": "File", "no_area": True, "file_as": "Chat"} if q.lower().startswith("file claude") else {"domain": "rungamattee.com", "action": "Link", "never_page": True}
+				return self._out(params, on_text, "", [tool_use("make_rule", args)], "tool_use")
+			return self._done(params, on_text, "I saved a rule: it applies from now on, and you can change it or undo it below.")
 		if any(t["name"] == "mail_search" for t in params.get("tools") or []) and re.match(r"find\b", q, re.I):
 			return self._mail(params, on_text, q, results, called)
 		if any(t["name"] == "mail_list_threads" for t in params.get("tools") or []) and re.match(r"(read my mail|file the blueprint)\b", q, re.I):
@@ -177,7 +182,7 @@ class SiteFake:
 		if not called:
 			return self._out(params, None, "", [tool_use("propose", {"kind": "Task", "preview": title, "confidence": 0.6, "reason": "The acceptance site's stand-in model files everything under Career.",
 				"payload": {"title": title, "area": "Career"}})], "tool_use")
-		return self._done(params, None, json.dumps({"transcript_md": "", "summary_md": f"{title}. Read by the acceptance site's stand-in model."}))
+		return self._done(params, None, json.dumps({"transcript_md": "", "summary": {"line": f"{title}. Read by the acceptance site's stand-in model."}}))
 
 	def _structured(self, params):
 		"""A skill asked about data (lifeos/skills/call.py): the answer the skill's rules would give, from the data in the request."""

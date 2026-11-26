@@ -1263,3 +1263,193 @@ class TestSourceSkills(SkillCase):
 		text = frappe.db.get_value("Life Skill", "ingest-photo", "instructions")
 		self.assertEqual(text.count(template.LESSONS_HEADING), 1)
 		self.assertIn("chemist", template.sections_of(text)[template.LESSONS])
+
+
+class TestRules(LessonCase):
+	"""Issue 117: the Brain learns. Recent decisions are examples; rules decide before any model; the same correction twice makes a rule."""
+
+	SENDER = "sales2@rungamattee.com"
+
+	def setUp(self):
+		super().setUp()
+		from lifeos.brain import rules
+
+		self.rules = rules
+		frappe.db.delete("Life Rule", {"space": PRIVATE})
+		for dt in ("Life Proposal", "Life Skill Correction", "Life Chat Log", "Life Inbox Item"):
+			frappe.db.delete(dt, {"space": PRIVATE})
+		frappe.db.set_single_value("Life Settings", "own_domains", "rungamattee.com")
+		rules.ensure_builtins(PRIVATE)
+		self.script()  # a model that records what it is asked, and answers nothing useful
+
+	def tearDown(self):
+		frappe.db.set_single_value("Life Settings", "own_domains", "")
+		frappe.db.delete("Life Rule", {"space": PRIVATE})
+		super().tearDown()
+
+	def make_rule(self, **values):
+		return frappe.get_doc({"doctype": "Life Rule", "space": PRIVATE, "made_by": "Owner", "enabled": 1, **values}).insert()
+
+	def asked(self):
+		return frappe.flags.lifeos_ai_backend.received
+
+	def decide_area(self, title, sender, area="Tea"):
+		item, prop = self.processed(title, sender=sender)
+		review.decide(prop.name, "accept", {"title": title, "area": self.areas[area]})
+		return item
+
+	def test_1_a_recent_decision_is_an_example_in_the_next_filing_call_and_a_vault_item_never_is(self):
+		self.decide_area("Robusta prices w1", "someone@elsewhere.example")
+		sensitive, prop = self.processed("Passport scan", sender="someone@elsewhere.example", is_sensitive=1)
+		review.decide(prop.name, "accept", {"title": "Passport scan", "area": self.areas["Tea"]})
+		self.script(answer("Prices."))
+		item = self.capture("Robusta prices w2: up again.", title="Robusta prices w2", sender="someone@elsewhere.example")
+		self.process(item)
+		sent = json.dumps(self.asked()[0]["messages"])
+		self.assertIn("Robusta prices w1", sent)
+		self.assertIn("kind Task, area", sent)
+		self.assertNotIn("Passport scan", sent)
+		self.assertEqual([e["title"] for e in self.rules.examples_for(item)], ["Robusta prices w1"])
+
+	def test_2_a_rule_files_a_matching_capture_with_no_model_call_and_counts_its_use(self):
+		rule = self.make_rule(domain="rungamattee.com", title_words="SALE", action="File", file_as="Report", area=self.areas["Tea"], never_page=1)
+		item = self.capture("The prices.", title="SALE 48 KOL HIGHEST TO LOWEST PRICES", sender=self.SENDER)
+		self.process(item)
+		self.assertEqual(self.asked(), [], "no model call")
+		self.assertEqual((item.status, item.error), ("Done", None))
+		self.assertTrue(item.processed_by.startswith("Rule: "), item.processed_by)
+		self.assertIn("Tea", item.processed_by)
+		prop = frappe.get_all("Life Proposal", filters={"inbox_item": item.name}, fields=["status", "kind", "filed_by", "reason"])[0]
+		self.assertEqual((prop.status, prop.kind), ("Accepted", "Note"))
+		self.assertTrue(prop.reason.startswith("Rule: "))
+		rule.reload()
+		self.assertEqual((rule.used_count, bool(rule.last_used)), (1, True))
+		self.assertEqual(frappe.db.get_value("Life Skill Run", {"input_name": item.name}, "cost"), 0)
+
+	def test_3_the_same_correction_twice_makes_a_rule_without_asking_and_the_next_capture_follows_it(self):
+		self.decide_area("Robusta prices a", "tea3@rungamattee.com")
+		self.assertEqual(frappe.db.count("Life Rule", {"space": PRIVATE, "made_by": "Brain"}), 0)
+		self.decide_area("Robusta prices b", "tea3@rungamattee.com")
+		made = frappe.get_all("Life Rule", filters={"space": PRIVATE, "made_by": "Brain"}, fields=["name", "sender", "area", "source", "action"])
+		self.assertEqual(len(made), 1)
+		self.assertEqual((made[0].sender, made[0].area, made[0].action), ("tea3@rungamattee.com", self.areas["Tea"], "File"))
+		self.assertEqual(len(self.rules.recent(PRIVATE)), 1)
+		self.decide_area("Robusta prices c", "tea3@rungamattee.com")  # a third correction makes no second rule
+		self.assertEqual(frappe.db.count("Life Rule", {"space": PRIVATE, "made_by": "Brain"}), 1)
+		item = self.capture("More prices.", title="Robusta prices d", sender="tea3@rungamattee.com")
+		self.process(item)
+		self.assertEqual(self.asked(), [])
+		self.assertEqual((item.status, item.area), ("Done", self.areas["Tea"]))
+		self.assertTrue(item.processed_by.startswith("Rule: "))
+
+	def test_3b_a_rule_the_owner_switched_off_is_not_made_again(self):
+		self.decide_area("Robusta prices a", "tea3b@rungamattee.com")
+		self.decide_area("Robusta prices b", "tea3b@rungamattee.com")
+		rule = frappe.get_all("Life Rule", filters={"made_by": "Brain"}, pluck="name")[0]
+		frappe.db.set_value("Life Rule", rule, "enabled", 0)
+		self.decide_area("Robusta prices c", "tea3b@rungamattee.com")
+		self.assertEqual(frappe.db.count("Life Rule", {"space": PRIVATE, "made_by": "Brain"}), 1)
+
+	def test_4_mail_from_an_own_domain_never_proposes_a_page(self):
+		from lifeos.library import subjects
+
+		for n in range(3):
+			got = subjects.see_email(PRIVATE, {"thread_id": f"i117-{n}", "address": self.SENDER, "sender_name": "Sales", "subject": f"SALE {n}", "text": "Prices.",
+				"signature": "", "replied": False, "bulk": False})
+		self.assertEqual((got["proposed"], got["asked"], got["made"]), (None, None, []))
+		self.assertFalse(frappe.db.exists("Life Proposal", {"space": PRIVATE, "kind": ("in", ("New Subject", "Same Subject"))}))
+
+	def test_5_a_chat_recap_is_filed_as_a_chat_with_no_area_and_linked_to_the_pages_it_names(self):
+		person = self.make("Life Person", full_name="Anirudh Poddar", space=PRIVATE)
+		item = self.capture("This week I talked with Anirudh Poddar about tea.", title="Conversation recap — 18–25 November 2026", source_type="Chat")
+		self.process(item)
+		self.assertEqual(self.asked(), [])
+		self.assertEqual((item.status, item.area), ("Done", None))
+		chat = frappe.db.get_value("Life Chat Log", {"inbox_item": item.name}, ["name", "area"], as_dict=True)
+		self.assertTrue(chat)
+		self.assertIsNone(chat.area)
+		self.assertTrue(frappe.db.exists("Life Link", {"from_doctype": "Life Chat Log", "from_name": chat.name, "to_doctype": "Life Person", "to_name": person.name}))
+		self.assertFalse(frappe.db.exists("Life Proposal", {"inbox_item": item.name}))
+		self.assertEqual([u["item"] for u in brain.needs_you(PRIVATE)["unfiled"]], [])
+
+	def test_6_rules_run_most_specific_first_and_a_rule_switched_off_is_skipped(self):
+		by_source = self.make_rule(source="gmail", action="File", area=self.areas["Money"])
+		by_domain = self.make_rule(domain="rungamattee.com", action="File", area=self.life["Career"])
+		by_sender = self.make_rule(sender=self.SENDER, action="File", area=self.areas["Tea"])
+		item = frappe._dict(name="X", space=PRIVATE, sender=self.SENDER, source_system="gmail", source_type="Email", title="Hello", is_new=1)
+		order = [by_sender.name, by_domain.name, by_source.name]
+		self.assertEqual([r.name for r in self.rules.rules_of(PRIVATE) if r.name in order], order)
+		self.assertEqual(self.rules.first_match(item).name, by_sender.name)
+		frappe.db.set_value("Life Rule", by_sender.name, "enabled", 0)
+		self.assertEqual(self.rules.first_match(item).name, by_domain.name)
+		frappe.db.set_value("Life Rule", by_domain.name, "enabled", 0)
+		self.assertEqual(self.rules.first_match(item).name, by_source.name)
+
+	def test_7_the_rules_api_lists_in_plain_words_and_change_switches_edits_and_deletes(self):
+		from lifeos.api import rules as api
+
+		made = api.add(space=PRIVATE, sender=self.SENDER, action="File", file_as="Report", area=self.areas["Tea"], never_page=1)
+		self.assertEqual(made["words"], f"When mail is from {self.SENDER}: file under Tea as a report, never a page")
+		got = api.list(space=PRIVATE)
+		mine = next(r for r in got["rules"] if r["name"] == made["name"])
+		self.assertEqual((mine["used"], mine["enabled"], mine["made_by"]), (0, 1, "Owner"))
+		self.assertEqual({r["builtin"] for r in got["rules"] if r["builtin"]}, {"own-domains", "context-items"})
+		self.assertEqual(api.change(made["name"], "off")["enabled"], 0)
+		self.assertEqual(api.change(made["name"], "on")["enabled"], 1)
+		self.assertEqual(api.change(made["name"], "edit", {"area": self.areas["Money"]})["values"]["area"], self.areas["Money"])
+		api.change(made["name"], "delete")
+		self.assertFalse(frappe.db.exists("Life Rule", made["name"]))
+		with self.assertRaises(frappe.ValidationError):
+			api.add(space=PRIVATE, action="File", area=self.areas["Tea"])  # nothing to match
+		builtin = frappe.db.get_value("Life Rule", {"space": PRIVATE, "builtin": "context-items"})
+		with self.assertRaises(frappe.ValidationError):
+			api.change(builtin, "delete")
+
+	def test_8_a_source_page_lists_its_rules_in_order_with_the_brain_line_and_what_decided_each(self):
+		from lifeos.api import rules as api
+
+		mine = self.make_rule(sender=self.SENDER, source="gmail", action="File", area=self.areas["Tea"])
+		self.make_rule(source="google-calendar", action="Drop")
+		everywhere = self.make_rule(title_words="invoice", action="File", area=self.areas["Money"])
+		page = api.for_source("gmail", space=PRIVATE)
+		names = [r["name"] for r in page["rules"]]
+		self.assertIn(mine.name, names)
+		self.assertEqual(sum(1 for r in page["rules"] if r["builtin"]), 2)
+		self.assertTrue(next(r for r in page["rules"] if r["name"] == everywhere.name)["all_sources"])
+		self.assertEqual(names.index(mine.name), 0)
+		self.assertEqual(len(api.for_source("google-calendar", space=PRIVATE)["rules"]) - len(page["rules"]), 0)  # the calendar's own rule replaces Gmail's
+		self.assertTrue(page["brain_line"].startswith("Everything else: the Brain reads it"))
+		self.assertEqual(page["skill"], "process-capture")
+		ruled = self.capture("Prices.", title="By rule", sender=self.SENDER, source_system="gmail")
+		self.process(ruled)
+		guessed = self.capture("A bill.", title="By brain", source_system="gmail")
+		self.script(task("Pay it"), answer("A bill."))
+		self.process(guessed)
+		by = {r["title"]: r["decided"] for r in api.for_source("gmail", space=PRIVATE)["recently"]}
+		self.assertTrue(by["By rule"].startswith("Rule: "))
+		self.assertEqual(by["By brain"], "The Brain")
+
+	def test_9_not_needed_twice_makes_a_drop_rule_and_always_ask_keeps_it_for_the_owner(self):
+		from lifeos.api import rules as api
+
+		sender = "noise@rungamattee.com"
+		for n in range(2):
+			_item, prop = self.processed(f"Weekly noise {n}", sender=sender)
+			review.decide(prop.name, "reject")
+		drop = frappe.get_all("Life Rule", filters={"made_by": "Brain"}, fields=["name", "action", "sender"])
+		self.assertEqual([(d.action, d.sender) for d in drop], [("Drop", sender)])
+		item = self.capture("Noise.", title="Weekly noise 3", sender=sender)
+		self.process(item)
+		self.assertEqual((item.status, self.asked()), ("Done", []))
+		self.assertEqual(frappe.db.count("Life Proposal", {"inbox_item": item.name}), 0)
+		# Always ask: the Brain proposes, and nothing is filed on its own even when it is sure
+		frappe.db.delete("Life Rule", {"made_by": "Brain"})
+		_item, prop = self.processed("Weekly noise 4", sender=sender)
+		ask = api.always_ask(prop.name)
+		self.assertEqual(ask["values"]["action"], "Ask")
+		frappe.db.set_single_value("Life Settings", "brain_auto_kinds", json.dumps(["Task"]))
+		frappe.clear_cache(doctype="Life Settings")
+		more = self.capture("Noise.", title="Weekly noise 5", sender=sender)
+		self.script(task("Read the noise", confidence=0.99), answer("Noise."))
+		self.process(more)
+		self.assertEqual(frappe.db.get_value("Life Proposal", {"inbox_item": more.name}, "status"), "Pending")

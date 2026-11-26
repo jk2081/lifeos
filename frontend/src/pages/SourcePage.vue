@@ -33,7 +33,10 @@
     </section>
 
     <!-- Rules -->
-    <div v-if="tab === 'rules'" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]" data-tab-panel="rules">
+    <div v-if="tab === 'rules'" class="flex flex-col gap-4" data-tab-panel="rules">
+      <SourceRules :source-key="d.key" :writable="writable" />
+      <h2 class="text-base-medium text-ink-gray-9" data-reading-rules>How the Brain reads it</h2>
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div class="flex min-w-0 flex-col gap-3">
         <Card v-for="s in sections" :key="s.title" class="flex flex-col gap-2" data-rule-section :data-section="s.title">
           <h2 class="text-base-medium text-ink-gray-9">{{ s.title }}</h2>
@@ -86,6 +89,7 @@
           <div v-if="writable"><Button label="Save" :disabled="!sideDirty" data-settings-save @click="saveSide" /></div>
         </Card>
       </aside>
+      </div>
     </div>
 
     <!-- Examples and lessons -->
@@ -174,6 +178,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, Dialog, FormControl, Switch, TextInput, Textarea } from 'frappe-ui'
 import AgentPanel from '@/components/brain/AgentPanel.vue'
+import SourceRules from '@/components/brain/SourceRules.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'

@@ -11,7 +11,7 @@ from frappe.query_builder import functions as fn
 from frappe.utils import add_to_date, now_datetime
 
 from lifeos import permissions
-from lifeos.brain import agent_page, proposals
+from lifeos.brain import agent_page, proposals, rules
 from lifeos.goals import readings
 from lifeos.library import wiki_check
 from lifeos.api.utils import area_criterion, lens_area, names_map, page
@@ -109,7 +109,8 @@ def needs_you(space: str | None = None, limit: int = MAX_ROWS):
 		})
 	waiting = captures([fn.Count("*")], [i.space == space, i.is_archived == 0, i.status.isin(["New", "Processing"]), *([guard] if guard is not None else [])]).run()[0][0]
 	out.update({"agent_requests": agent_page.requests(space) if not permissions.is_agent() else [], "lessons": lessons.proposed(space) if not permissions.is_agent() else [],
-		"contradictions": wiki_check.open_findings(space) if not permissions.is_agent() else [], "total": total, "waiting": waiting, "rows": rows, "minutes": minutes(len(rows)), "unfiled": _failed(space), "max_rows": limit})
+		"contradictions": wiki_check.open_findings(space) if not permissions.is_agent() else [], "total": total, "waiting": waiting, "rows": rows, "minutes": minutes(len(rows)), "unfiled": _failed(space), "max_rows": limit,
+		"new_rules": rules.recent(space, days=1) if not permissions.is_agent() else []})
 	return out
 
 
@@ -190,11 +191,12 @@ def activity(space: str | None = None, days: int = 14, source: str | None = None
 	own = set(frappe.get_list("Life Proposal", filters={"inbox_item": ("in", [r.item for r in rows] or [""]), "filed_by": ("is", "set")}, pluck="inbox_item"))
 	for r in rows:
 		r.update(received_on=str(r.received_on)[:19], area_name=areas.get(r.area), goal_title=goals.get(r.goal), made=made.get(r.item, []),
-			filed_by=r.processed_by if r.item in own else None)
+			filed_by=r.processed_by if r.item in own or (r.processed_by or "").startswith("Rule:") else None)
 		r.pop("processed_by", None)
 	sources = captures([i.source_type], _activity_where(space, days, None, area)).distinct().orderby(i.source_type).run(pluck=True)
 	shown = counts[outcome] if outcome in OUTCOMES else total
-	return {"rows": rows, "total": shown, "all": total, "counts": counts, "sources": sources, "days": days, "plate": plate(space, area)}
+	return {"rows": rows, "total": shown, "all": total, "counts": counts, "sources": sources, "days": days, "plate": plate(space, area),
+		"new_rules": rules.recent(space) if not permissions.is_agent() else []}
 
 
 def _made(space, items):
@@ -210,6 +212,11 @@ def _made(space, items):
 		if len(bucket) >= MADE_EACH or any(e["name"] == p.created_name for e in bucket) or not item_page._readable(p.created_doctype, p.created_name, space):
 			continue
 		bucket.append(item_page._entry(item_page.KIND_OF.get(p.created_doctype, p.kind), p.created_doctype, p.created_name, title=p.preview))
+	# a waiting task the Brain closed because this capture said it was done (issue 118)
+	for t in frappe.get_list("Life Task", filters={"closed_by_item": ("in", items)}, fields=["name", "closed_by_item"], order_by="completed_on desc", limit=len(items) * MADE_EACH):
+		bucket = out.setdefault(t.closed_by_item, [])
+		if len(bucket) < MADE_EACH and item_page._readable("Life Task", t.name, space):
+			bucket.append({**item_page._entry("Closed", "Life Task", t.name), "kind": "Closed by itself"})
 	return out
 
 

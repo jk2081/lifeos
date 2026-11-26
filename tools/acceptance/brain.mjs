@@ -1,6 +1,6 @@
 // Brain: capture, Needs you, Activity, Sources, the item page, Ask and the fake agent.
 // Checks are numbered BRAIN.<n> in the order they appear here; `node tools/acceptance.mjs --only=BRAIN` runs this file's checks.
-import { PDF, SPACE, WIDTHS, agentFetch, agentKey, agentSecret, areaId, areas, base, bench, browser, check, env, execFileSync, fs, must, owner, path, root, runAgent, session, stamp, today } from './context.mjs'
+import { PDF, SPACE, WIDTHS, agentFetch, agentKey, agentSecret, areaId, areas, base, bench, browser, check, env, execFileSync, fs, must, owner, path, pathOf, root, runAgent, session, stamp, today } from './context.mjs'
 import { ux, uxArea, uxKit } from './ux.mjs'
 
 // records the checks of this place hand on to each other
@@ -16,7 +16,7 @@ await check('BRAIN.1', 'Journal photo: agent submits 5 proposals; accept 3, edit
   must(got.status === 'To Review', 'item is ' + got.status)
   must(got.transcript_md && got.proposals.length === 5, `expected 5 proposals, got ${got.proposals.length}`)
   // accept the first and reject the second with the buttons on the Review screen
-  await owner.open('/life/brain/queue?open=inbox:' + item.name)
+  await owner.open('/life/brain/queue?open=inbox:' + item.name + '&ptab=decisions') // issue 118: the proposals are on the Decisions tab
   await owner.page.getByRole('button', { name: 'Accept', exact: true }).first().click()
   await owner.page.waitForTimeout(800)
   await owner.page.getByRole('button', { name: 'Reject', exact: true }).first().click()
@@ -137,7 +137,7 @@ await check('BRAIN.5', 'At review, change the area with one tap and add a second
     must((await owner.page.locator('[data-main]').innerText()).includes(title), `not on Plan > Tasks with ${name} in the lens`)
   }
   const item = await owner.api('inbox.list', { space: SPACE, status: 'To Review' })
-  await owner.open('/life/brain/queue?open=inbox:' + item.items[0].name)
+  await owner.open('/life/brain/queue?open=inbox:' + item.items[0].name + '&ptab=decisions')
   must(await owner.page.locator('text=also in').count() > 0, 'the Review screen has no area chips')
 })
 
@@ -378,7 +378,7 @@ for (const width of WIDTHS) {
     const again = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v1)
     must(again.name === first.name, 'the same file sent again was attached a second time')
     must((await s.api('inbox.get', { item: item.name })).files.length === 1, 'the item has more than one attachment')
-    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the summary
+    await s.open(`/life/brain/review/${item.name}?tab=file`) // issue 118: a file with no text opens under File
     must(await pg.locator(`${original} a[href="${first.file_url}"]`).count() === 1, 'the review does not show the one attachment once')
     must(!(await pg.locator('[data-file-versions]').count()), 'a file with one version shows versions')
     // a changed file of the same name: one current file and the old one as an earlier version
@@ -386,7 +386,7 @@ for (const width of WIDTHS) {
     const second = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v2)
     const got = await s.api('inbox.get', { item: item.name })
     must(got.files.length === 1 && got.files[0].file_url === second.file_url && got.files[0].versions.length === 1, 'not one current file with one earlier version: ' + JSON.stringify(got.files))
-    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the summary
+    await s.open(`/life/brain/review/${item.name}?tab=file`) // issue 118: a file with no text opens under File
     const toggle = pg.locator('[data-file-versions-toggle]')
     must(/^2 versions, latest \d+ \w{3}$/.test((await toggle.innerText()).trim()), 'the versions line says: ' + (await toggle.innerText()))
     await toggle.click()
@@ -427,19 +427,20 @@ for (const width of WIDTHS) {
     await s.open('/life/brain/queue')
     const shown = await pg.locator('[data-row]', { hasText: title }).count()
     must(shown === 1, `the Inbox shows the job in ${shown} rows`)
-    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the proposals
+    await s.open(`/life/brain/review/${item.name}?tab=original`) // issue 118: the outputs are under the original
     must(await pg.locator('[data-review-outputs]').count() === 1, 'no Outputs section')
     for (const ext of ['txt', 'html'])
-      must(await pg.locator('[data-review-original] a', { hasText: `${title}.${ext}` }).count() === 1, `the output ${title}.${ext} is not shown once`)
+      must(await pg.locator('[data-file-view] a', { hasText: `${title}.${ext}` }).count() === 1, `the output ${title}.${ext} is not shown once`)
     const inputs = pg.locator('[data-review-inputs] [data-review-input]')
     must(await inputs.count() === 2, `${await inputs.count()} inputs shown`)
     const inputText = await pg.locator('[data-review-inputs]').innerText()
     must(inputText.includes('Standard sales deck.txt') && inputText.includes('Brand guidelines.txt'), 'the inputs are not named')
-    must(!(await pg.locator('[data-review-original] a', { hasText: 'Standard sales deck.txt' }).count()), 'an input is listed as an output')
-    must(await pg.locator('[data-review-filed-with]').count() === 1, 'the wiki page and chat log filed with it are not shown')
+    must(!(await pg.locator('[data-file-view] a', { hasText: 'Standard sales deck.txt' }).count()), 'an input is listed as an output')
+    await s.open(`/life/brain/review/${item.name}?tab=came`) // issue 118: what was filed with it is under What came of it
+    must(await pg.locator('[data-related]').count() >= 1, 'the wiki page and chat log filed with it are not shown')
     await s.open(`/life/brain/review/${item.name}?tab=summary`)
     must((await pg.locator('body').innerText()).includes('An owner-first deck'), 'the summary is not shown')
-    await s.open(`/life/brain/review/${item.name}?tab=proposals`)
+    await s.open(`/life/brain/review/${item.name}?tab=decisions`)
     must(await pg.locator('[data-proposal="Pending"]').count() === 2, 'the two proposals are not shown')
     const overflow = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
     must(!overflow, 'the page scrolls sideways')
@@ -466,44 +467,44 @@ for (const width of WIDTHS) {
   runAgent()
   const first = (await s.api('inbox.get', { item: id })).proposals[0]
   await s.api('review.decide', { proposal: first.name, decision: 'accept' })
-  const section = (name) => pg.locator(`[data-item-section="${name}"]`)
-  const openAll = async () => { // on a phone the folded sections are opened first
-    const folded = pg.locator('[data-item-toggle][aria-expanded="false"]')
-    for (let n = 0; n < 6 && await folded.count(); n++) await folded.first().click()
-  }
+  // issue 118: the page has tabs (Summary, File, Decisions, What came of it), one at a time, in the URL as tab=
+  const openTab = async (tab) => { await s.open(`/life/item/${id}?tab=${tab}`); await pg.locator(`[data-item-tab="${tab}"]`).waitFor({ timeout: 10000 }) }
   const settle = () => pg.waitForTimeout(700)
 
-  await check('BRAIN.15', `${width} px: an item with a file, a summary, 2 waiting proposals and 1 accepted task shows every section right`, async () => {
-    await s.open(`/life/item/${id}`)
-    await openAll()
+  await check('BRAIN.15', `${width} px: an item with a file, a summary, 2 waiting proposals and 1 accepted task shows every tab right`, async () => {
+    await openTab('summary')
     const head = await pg.locator('[data-item-head]').innerText()
     must((await pg.locator('h1').first().innerText()).includes(title), 'the title is not in the header')
     must(head.includes('Upload') && head.includes('Private'), 'the header does not say the source and the space: ' + head)
-    must(await section('came-in').locator('[data-file-view]', { hasText: pdfName }).count() === 1, 'the file is not under What came in once')
-    must((await section('came-in').innerText()).includes('summarise and extract to-dos'), 'the instruction is not under What came in')
-    must((await section('brain').innerText()).includes('summarised'), 'the summary is not under What the Brain made of it')
-    must(await section('decisions').locator('[data-proposal="Pending"]').count() === 2, 'Decisions does not show the 2 waiting proposals')
-    must(!(await section('decisions').locator('[data-proposal="Accepted"]').count()), 'an accepted proposal is still under Decisions')
-    const rows = section('came-of-it').locator('[data-came-of-it]')
+    must((await pg.locator('[data-item-tab="summary"]').innerText()).includes('summarised'), 'the summary is not on the Summary tab')
+    await openTab('file')
+    must(await pg.locator('[data-file-view]', { hasText: pdfName }).count() === 1, 'the file is not under File once')
+    must((await pg.locator('[data-item-tab="file"]').innerText()).includes('summarise and extract to-dos'), 'the instruction is not under File')
+    await openTab('decisions')
+    must(await pg.locator('[data-proposal="Pending"]').count() === 2, 'Decisions does not show the 2 waiting proposals')
+    must(!(await pg.locator('[data-proposal="Accepted"]').count()), 'an accepted proposal is still under Decisions')
+    await openTab('came')
+    const rows = pg.locator('[data-came-of-it]')
     must(await rows.count() === 1, `What came of it shows ${await rows.count()} records`)
     const row = await rows.first().innerText()
     must(row.includes(first.preview) && row.includes('Task') && row.includes('Open'), 'the accepted task is not shown with its state: ' + row)
-    must(await section('related').count() === 1, 'no Related section')
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
   })
 
   await check('BRAIN.16', `${width} px: accepting a proposal on the item page moves it to What came of it without a reload`, async () => {
-    await s.open(`/life/item/${id}`)
-    await openAll()
+    await openTab('decisions')
     await pg.evaluate(() => { window.__i10 = 1 })
-    const card = section('decisions').locator('[data-proposal="Pending"]').first()
+    const card = pg.locator('[data-proposal="Pending"]').first()
     const preview = (await card.locator('.text-base-medium').first().innerText()).trim()
     await card.getByRole('button', { name: 'Accept', exact: true }).click()
     await settle()
     must(await pg.evaluate(() => window.__i10 === 1), 'the page reloaded')
-    must(await section('decisions').locator('[data-proposal="Pending"]').count() === 1, 'the accepted proposal is still waiting')
-    const rows = await section('came-of-it').locator('[data-came-of-it]').allInnerTexts()
+    must(await pg.locator('[data-proposal="Pending"]').count() === 1, 'the accepted proposal is still waiting')
+    await pg.locator('[data-item-tabs] [role="tab"]', { hasText: 'What came of it' }).click() // a tab click, not a reload
+    await pg.locator('[data-item-tab="came"]').waitFor({ timeout: 10000 })
+    const rows = await pg.locator('[data-came-of-it]').allInnerTexts()
     must(rows.length === 2 && rows.some((r) => r.includes(preview)), `What came of it does not list "${preview}": ${rows.join(' | ')}`)
+    must(await pg.evaluate(() => window.__i10 === 1), 'the page reloaded')
   })
 
   await check('BRAIN.17', `${width} px: the item page opens from the Inbox list, from Library and from search`, async () => {
@@ -548,11 +549,12 @@ for (const width of WIDTHS) {
   })
 
   await check('BRAIN.19', `${width} px: the item page is one column with no sideways scroll`, async () => {
-    await s.open(`/life/item/${id}`)
-    await openAll()
-    must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
-    const lefts = await pg.locator('[data-item-section]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)))
-    must(lefts.length === 5 && new Set(lefts).size === 1, 'the sections are not one column: ' + lefts.join(', '))
+    for (const tab of ['summary', 'file', 'decisions', 'came']) {
+      await openTab(tab)
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `the ${tab} tab scrolls sideways`)
+      const lefts = await pg.locator(`[data-item-tab="${tab}"] > *`).evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)))
+      must(new Set(lefts).size <= 1, `the ${tab} tab is not one column: ` + lefts.join(', '))
+    }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
   })
   await s.ctx.close()
@@ -616,8 +618,11 @@ print(json.dumps(out))`).split('\n').pop())
       must(rb.includes('Mentions both Tea and Mind') && rb.includes('Tea & Coffee') && /\bor\b/.test(rb) && rb.includes('Mind'), 'row 2: ' + rb)
       must(rc.includes('Career') && !rc.includes('✦'), 'row 3 (no reason, no mark): ' + rc)
       must((await row(b.proposal).locator('[data-area-chip]').count()) === 2 && (await row(a.proposal).locator('[data-area-chip]').count()) === 1, 'the area chips are wrong')
-      must(await row(a.proposal).locator('[data-keep]').count() && await row(a.proposal).locator('[data-change]').count() && await row(a.proposal).locator('[data-drop]').count(), 'a row lacks Keep, Change or Drop')
-      must(!(await row(b.proposal).locator('[data-keep]').count()) && (await row(b.proposal).locator('[data-pick]').count()) === 2, 'the torn row has Keep, or not two choices')
+      // issue 117: the guess is taken as right, so a row has one button, Change; the choices are behind it
+      for (const r of [a, b, c]) must((await row(r.proposal).locator('button').count()) === 2 || (await row(r.proposal).locator('[data-row-actions] button').count()) === 1, 'a row has more than one button')
+      must(!(await row(a.proposal).locator('[data-keep]').count()) && (await row(a.proposal).locator('[data-change]').count()) === 1 && !(await row(a.proposal).locator('[data-drop]').count()), 'a row is not Change alone')
+      await row(b.proposal).locator('[data-change]').click()
+      must((await row(b.proposal).locator('[data-pick]').count()) === 2, 'the torn row does not offer its two choices under Change')
       must((await pg.locator('[data-stat-needs]').getAttribute('data-n')) === '3', 'the Needs you number is not 3')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
       made.k = { a, b, c }
@@ -631,11 +636,12 @@ print(json.dumps(out))`).split('\n').pop())
       await openNeeds()  // at phone width the pane is a full screen; come back to Needs you either way
       must(await row(a.proposal).count(), 'the row left after only looking at it')
     })
-    await check('BRAIN.22', `${width} px: Keep accepts the proposal, the row leaves, and the record exists with the guessed area`, async () => {
-      const { a } = made.k
+    await check('BRAIN.22', `${width} px: Done files a row that was not changed, with its guess, and the record exists with the guessed area`, async () => {
+      const { a, c } = made.k
       await openNeeds()
-      await row(a.proposal).locator('[data-keep]').click()
+      await pg.locator('[data-file-all]').click()
       await row(a.proposal).waitFor({ state: 'detached', timeout: 10000 })
+      await row(c.proposal).waitFor({ state: 'detached', timeout: 10000 })
       const got = JSON.parse(bench(`import json
 p = frappe.get_doc("Life Proposal", "${a.proposal}")
 print(json.dumps({"status": p.status, "area": frappe.db.get_value(p.created_doctype, p.created_name, "area"), "dt": p.created_doctype}))`).split('\n').pop())
@@ -644,15 +650,17 @@ print(json.dumps({"status": p.status, "area": frappe.db.get_value(p.created_doct
     await check('BRAIN.23', `${width} px: picking the second of two area chips files it there`, async () => {
       const { b } = made.k
       await openNeeds()
+      await row(b.proposal).locator('[data-change]').click()
       await row(b.proposal).locator('[data-pick="second"]').click()
       await row(b.proposal).waitFor({ state: 'detached', timeout: 10000 })
       const area = bench(`p = frappe.get_doc("Life Proposal", "${b.proposal}")
 print(p.status, frappe.db.get_value(p.created_doctype, p.created_name, "area"))`).split('\n').pop()
       must(area === `Accepted ${made.mind}`, 'after the second chip: ' + area)
     })
-    await check('BRAIN.24', `${width} px: Drop discards it and it appears in the Outbox as Discarded`, async () => {
-      const { c } = made.k
+    await check('BRAIN.24', `${width} px: Change, Not needed discards it and it appears in the Outbox as Discarded`, async () => {
+      const c = await mk('plain', { area: made.career, hours: 1 })
       await openNeeds()
+      await row(c.proposal).locator('[data-change]').click()
       await row(c.proposal).locator('[data-drop]').click()
       await row(c.proposal).waitFor({ state: 'detached', timeout: 10000 })
       const listed = await s.api('outbox.list', { space: SPACE, pile: 'Discarded', page_length: 500 })
@@ -678,9 +686,11 @@ print(p.status, frappe.db.get_value(p.created_doctype, p.created_name, "area"))`
       must((await pg.locator('[data-needs-row]').count()) === 7, `${await pg.locator('[data-needs-row]').count()} rows, not 7`)
       must((await pg.locator('[data-stat-needs]').getAttribute('data-n')) === '9', 'the Needs you number is not 9')
       must(!(await row(rows[7].proposal).count()), 'the eighth is already shown')
+      await row(rows[0].proposal).locator('[data-change]').click()
       await row(rows[0].proposal).locator('[data-drop]').click()
       await row(rows[7].proposal).waitFor({ timeout: 10000 })
       must((await pg.locator('[data-needs-row]').count()) === 7, 'a row did not come in')
+      await row(rows[1].proposal).locator('[data-change]').click()
       await row(rows[1].proposal).locator('[data-drop]').click()
       await row(rows[8].proposal).waitFor({ timeout: 10000 })
       must((await pg.locator('[data-needs-row]').count()) === 7, 'the ninth did not come in')
@@ -713,22 +723,27 @@ print(json.dumps({"n": len(rows), "sources": len({r.source_type for r in rows})}
       await pg.locator('[data-see-activity]').click()
       await pg.waitForURL((u) => u.pathname === '/life/brain/activity', { timeout: 10000 })
     })
-    await check('BRAIN.28', `${width} px: each row stacks at 390 px, with Keep, Change and Drop reachable and no sideways scroll`, async () => {
+    await check('BRAIN.28', `${width} px: each row stacks at 390 px, with Change and what is behind it reachable and no sideways scroll`, async () => {
       const r = await mk('stack', { area: made.tea, reason: 'A long reason that needs room to wrap on a phone, with more words than fit on one line', hours: 1 })
       await openNeeds()
       const rw = row(r.proposal)
       await rw.waitFor({ timeout: 10000 })
       const box = await rw.boundingBox()
-      for (const sel of ['[data-keep]', '[data-change]', '[data-drop]']) {
+      {
+        const b = await rw.locator('[data-change]').boundingBox()
+        must(b && b.x >= 0 && b.x + b.width <= width + 1 && b.y >= box.y && b.y + b.height <= box.y + box.height + 1, `Change is not inside the row (${JSON.stringify(b)})`)
+      }
+      await rw.locator('[data-change]').click()
+      for (const sel of ['[data-drop]', '[data-always-ask]', '[data-open-capture]']) {
         const b = await rw.locator(sel).boundingBox()
-        must(b && b.x >= 0 && b.x + b.width <= width + 1 && b.y >= box.y && b.y + b.height <= box.y + box.height + 1, `${sel} is not inside the row (${JSON.stringify(b)})`)
+        must(b && b.x >= 0 && b.x + b.width <= width + 1, `${sel} is not on the screen (${JSON.stringify(b)})`)
       }
       if (phone) {
         const text = await rw.locator('[data-row-title]').boundingBox(), acts = await rw.locator('[data-row-actions]').boundingBox()
         must(acts.y >= text.y + text.height - 1, 'on a phone the actions do not sit under the text')
       }
       await noSideways()
-      await rw.locator('[data-change]').click()
+      await rw.locator('[data-open-capture]').click()
       await pg.waitForURL((u) => u.pathname.startsWith('/life/item/'), { timeout: 10000 })
       await queue()
     })
@@ -749,6 +764,7 @@ print(json.dumps({"item": it["name"], "proposal": res["created"][0]["name"], "er
       const rw = row(out.proposal)
       await rw.waitFor({ timeout: 10000 })
       must((await rw.locator('[data-area-chip]').count()) === 2, 'not two area chips')
+      await rw.locator('[data-change]').click()
       await rw.locator('[data-pick="second"]').click()
       await rw.waitFor({ state: 'detached', timeout: 10000 })
       const area = bench(`p = frappe.get_doc("Life Proposal", "${out.proposal}")
@@ -838,7 +854,7 @@ print(json.dumps(out))`).split('\n').pop())
       must(t.includes(T('filed')) && t.includes('Tea & Coffee') && t.includes('Email'), 'the row says: ' + t)
       const href = await rw.locator('[data-made-link]').first().getAttribute('href')
       must(href && href.includes(a.task), 'the link to the record is ' + href)
-      must((await rw.locator('[data-row-item]').getAttribute('href')) === `/life/item/${a.item}`, 'the item page link is wrong')
+      must((await rw.locator('[data-row-item]').getAttribute('data-ref')) === `inbox:${a.item}`, 'the row does not open the item in the pane')  // issue 118: a drawer, not the page
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
     await check('BRAIN.34', `${width} px: the source filter narrows the feed to that source`, async () => {
@@ -1566,6 +1582,269 @@ for n in frappe.get_all("Life Connection", filters={"system": "${system}"}, pluc
 for dt in ("Life Mail Account", "Life Mail Search"):
     for n in frappe.get_all(dt, filters={"space": "${SPACE}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
 for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "source_system": "gmail"}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 117: a Brain that learns. Rules (made by hand, by the Brain from corrections, by Ask), Needs you with one button, and how a source is processed.
+// Senders and titles start "I117 " / "i117-" so the clean-up finds them; the rules made here are deleted at the end of each width.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const SENDER = `i117-${width}-${stamp}@rungamattee.com`
+  const rulesNow = () => JSON.parse(bench(`import json
+print(json.dumps([{"name": r.name, "sender": r.sender, "action": r.action, "enabled": r.enabled, "builtin": r.builtin, "used": r.used_count, "made_by": r.made_by, "no_area": r.no_area, "item_kind": r.item_kind}
+  for r in frappe.get_all("Life Rule", filters={"space": "${SPACE}"}, fields=["*"])]))`).split('\n').pop())
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const openRules = async () => { await s.open('/life/settings?tab=rules'); await pg.locator('[data-brain-rules]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(400) }
+  const pick = async (name) => { await pg.getByRole('menuitem', { name }).first().click() }
+  bench(`frappe.set_user("Administrator")
+from lifeos.brain import rules
+rules.ensure_builtins("${SPACE}")
+frappe.db.set_single_value("Life Settings", "own_domains", "rungamattee.com")`)
+  try {
+    await check('BRAIN.63', `${width} px: Settings > Brain > Rules lists the built-in rules in plain words; + Add a rule makes one through the form, "used 0 times"; Change > Switch off, then on, then Delete`, async () => {
+      await openRules()
+      const t = await pg.locator('[data-brain-rules]').innerText()
+      must(/your own company's address/.test(t) && /it is a chat or email digest or journal photo/.test(t), 'the built-in rules are not listed in plain words: ' + t)
+      await pg.locator('[data-add-rule]').first().click()
+      await pg.getByLabel('Is from this address').waitFor({ timeout: 5000 })
+      await pg.getByLabel('Is from this address').fill(SENDER)
+      await pg.getByLabel('No area').check()
+      await pg.getByRole('button', { name: 'Add rule' }).click()
+      const row = pg.locator('[data-rule-row]', { hasText: SENDER })
+      await row.waitFor({ timeout: 10000 })
+      const text = await row.innerText()
+      must(text.includes(`When mail is from ${SENDER}: file with no area`) && text.includes('used 0 times'), 'the rule reads: ' + text)
+      await row.locator('[data-rule-change]').click()
+      await pick('Switch off')
+      await pg.locator('[data-rule-row][data-enabled="0"]', { hasText: SENDER }).waitFor({ timeout: 10000 })
+      must(rulesNow().find((r) => r.sender === SENDER)?.enabled === 0, 'the rule is not off on the server')
+      await pg.locator('[data-rule-row]', { hasText: SENDER }).locator('[data-rule-change]').click()
+      await pick('Switch on')
+      await pg.locator('[data-rule-row][data-enabled="1"]', { hasText: SENDER }).waitFor({ timeout: 10000 })
+      await noSideways()
+      await pg.locator('[data-rule-row]', { hasText: SENDER }).locator('[data-rule-change]').click()
+      await pick('Delete')
+      await pg.locator('[data-rule-row]', { hasText: SENDER }).waitFor({ state: 'detached', timeout: 10000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.64', `${width} px: a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"`, async () => {
+      const item = () => JSON.parse(bench(`import json
+frappe.set_user("Administrator")
+from frappe.utils import add_to_date, now_datetime
+d = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "I117 noise ${width} ${stamp}", "source_type": "Email", "sender": "${SENDER}", "source_system": "gmail", "status": "To Review",
+  "raw_text": "Weekly noise.", "received_on": add_to_date(now_datetime(), days=-900)}).insert(ignore_permissions=True)
+career = frappe.db.get_value("Life Area", {"space": "${SPACE}", "area_name": "Career"})
+p = frappe.get_doc({"doctype": "Life Proposal", "space": "${SPACE}", "inbox_item": d.name, "kind": "Task", "preview": "Read the noise", "payload": frappe.as_json({"title": "Read the noise", "area": career}),
+  "confidence": 0.6, "status": "Pending", "reason": "Weekly mail from this sender"}).insert(ignore_permissions=True)
+print(json.dumps({"item": d.name, "proposal": p.name}))`).split('\n').pop())
+      for (let n = 0; n < 2; n++) {
+        const made = item()
+        await s.open('/life/brain')
+        const row = pg.locator(`[data-needs-row][data-proposal="${made.proposal}"]`)
+        await row.waitFor({ timeout: 10000 })
+        const counts = [await row.locator('[data-row-actions] button').count(), await row.locator('[data-change]').count(), await row.locator('[data-keep], [data-drop]').count()]
+        must(counts.join() === '1,1,0', 'the row has more than Change (buttons, change, keep or drop): ' + counts.join())
+        await row.locator('[data-change]').click()
+        await row.locator('[data-drop]').click()
+        await row.waitFor({ state: 'detached', timeout: 10000 })
+        if (n === 0) must(!rulesNow().some((r) => r.sender === SENDER), 'one correction already made a rule')
+      }
+      const made = rulesNow().find((r) => r.sender === SENDER)
+      must(made && made.action === 'Drop' && made.made_by === 'Brain', 'no drop rule after the second Not needed: ' + JSON.stringify(made))
+      await s.open('/life/brain/activity')
+      const line = pg.locator('[data-new-rule]', { hasText: SENDER })
+      await line.waitFor({ timeout: 10000 })
+      must((await line.innerText()).includes('New rule:') && (await line.locator('[data-new-rule-change]').innerText()) === 'Change', 'the line is: ' + await line.innerText())
+      await noSideways()
+    })
+    await check('BRAIN.65', `${width} px: Ask "file Claude's recaps without an area" saves a rule, the answer shows "New rule … Change", and Undo removes it`, async () => {
+      const before = rulesNow().length
+      await s.open('/life/today')
+      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill("file Claude's recaps without an area"); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type("file Claude's recaps without an area"); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
+      await pg.locator('[data-ask-answer]:visible').last().waitFor({ timeout: 15000 })
+      for (let i = 0; i < 60 && await pg.locator('[data-ask-answer][data-status="Working"]').count(); i++) await pg.waitForTimeout(250)
+      const line = pg.locator('[data-ask-done]:visible [data-ask-done-line]').first()
+      await line.waitFor({ timeout: 10000 })
+      const t = await line.innerText()
+      must(t.includes('New rule:') && t.includes('chat') && (await line.locator('[data-ask-rule-change]').count()) === 1, 'the Done line is: ' + t)
+      must(rulesNow().length === before + 1, 'Ask did not save a rule')
+      await line.locator('[data-ask-undo]').click()
+      await pg.locator('[data-ask-done]:visible [data-ask-done-line][data-undone="1"]').first().waitFor({ timeout: 8000 })
+      must(rulesNow().length === before, 'Undo did not remove the rule')
+    })
+    await check('BRAIN.66', `${width} px: Gmail's Rules tab lists the sender rule and the two built-in rules in the order they are tried with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings`, async () => {
+      bench(`frappe.set_user("Administrator")
+frappe.db.delete("Life Rule", {"space": "${SPACE}", "made_by": ["in", ["Brain", "Owner"]]})
+for d in (dict(sender="${SENDER}", source="gmail", action="File", no_area=1), dict(source="google-calendar", action="Drop"), dict(title_words="I117 invoice", action="File", no_area=1)):
+    frappe.get_doc({"doctype": "Life Rule", "space": "${SPACE}", "made_by": "Owner", "enabled": 1, "used_count": 3 if d.get("sender") else 0, **d}).insert(ignore_permissions=True)`)
+      await s.open('/life/brain/sources/gmail?tab=rules')
+      await pg.locator('[data-source-rules]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-rule-row]').first().waitFor({ timeout: 10000 })
+      const rows = await pg.locator('[data-source-rules] [data-rule-row]').allInnerTexts()
+      must(rows.length === 4, `${rows.length} rules, not 4: ${rows.join(' | ')}`)
+      must(rows[0].includes(SENDER) && rows[0].includes('used 3 times'), 'the sender rule is not first with its use: ' + rows[0])
+      must(rows.some((r) => /your own company's address/.test(r)) && rows.some((r) => /chat or email digest/.test(r)), 'the built-in rules are missing')
+      must(rows.some((r) => r.includes('I117 invoice') && r.includes('all sources')), 'the all-sources rule is not marked')
+      must(!rows.some((r) => r.includes('Google Calendar')), 'the Calendar rule is on Gmail\'s page')
+      const brain = await pg.locator('[data-brain-line]').innerText()
+      must(brain.startsWith('Everything else: the Brain reads it') && (await pg.locator('[data-brain-skill]').getAttribute('href')).endsWith('/brain/skills/process-capture'), 'the Brain line is: ' + brain)
+      await pg.locator('[data-recently]').waitFor({ timeout: 5000 })
+      await noSideways()
+      const mine = pg.locator('[data-source-rules] [data-rule-row]', { hasText: SENDER })
+      await mine.locator('[data-rule-change]').click()
+      await pick('Switch off')
+      await pg.locator('[data-source-rules] [data-rule-row][data-enabled="0"]', { hasText: SENDER }).waitFor({ timeout: 10000 })
+      await openRules()
+      await pg.locator('[data-rule-row][data-enabled="0"]', { hasText: SENDER }).waitFor({ timeout: 10000 })
+    })
+    await check('BRAIN.67', `${width} px: Recently on Gmail's page says "Rule: …" for an item a rule filed and "The Brain" for one it guessed`, async () => {
+      bench(`frappe.set_user("Administrator")
+for title, by in (("I117 by rule ${width}", "Rule: when mail is from ${SENDER}: file with no area"), ("I117 by brain ${width}", "process-capture v1")):
+    frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": title, "source_type": "Email", "source_system": "gmail", "status": "Done", "processed_by": by,
+      "raw_text": "x"}).insert(ignore_permissions=True)`)
+      await s.open('/life/brain/sources/gmail?tab=rules')
+      const rows = pg.locator('[data-recently] [data-recent-row]')
+      await rows.first().waitFor({ timeout: 10000 })
+      const text = Object.fromEntries((await rows.allInnerTexts()).map((t) => t.split('\n').filter(Boolean)).map(([a, b]) => [a, b]))
+      must((text[`I117 by rule ${width}`] || '').startsWith('Rule: '), 'the rule-filed item says: ' + JSON.stringify(text))
+      must(text[`I117 by brain ${width}`] === 'The Brain', 'the guessed item says: ' + JSON.stringify(text))
+    })
+    await check('BRAIN.68', `${width} px: a reason line on a Needs you row has no "Jai" and no "requested"`, async () => {
+      bench(`frappe.set_user("Administrator")
+from lifeos.skills import runner
+frappe.db.set_value("Life Skill", "process-capture", "active", 1)
+from frappe.utils import add_to_date, now_datetime
+d = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "I117 Conversation recap — 18–25 November 2026 ${width}", "source_type": "Email", "status": "New",
+  "raw_text": "A summary of my chats this week.", "received_on": add_to_date(now_datetime(), days=-899)}).insert(ignore_permissions=True)
+frappe.db.commit()
+runner.run("process-capture", {"doctype": "Life Inbox Item", "name": d.name, "space": "${SPACE}"}, "Button")
+frappe.db.set_value("Life Skill", "process-capture", "active", 0)`)
+      await s.open('/life/brain')
+      await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 })
+      const reasons = await pg.locator('[data-needs-row] [data-row-reason]').allInnerTexts()
+      must(reasons.length > 0, 'no row has a reason line')
+      must(!reasons.some((t) => /\bJai\b|requested/i.test(t)), 'a reason is written about the owner or the instructions: ' + reasons.join(' | '))
+      const skill = bench('print("second person" in frappe.db.get_value("Life Skill", "process-capture", "instructions") or "in the second person" in frappe.db.get_value("Life Skill", "process-capture", "instructions"))').split('\n').pop()
+      must(skill === 'True', 'process-capture does not tell the Brain to write for the owner')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+frappe.db.delete("Life Rule", {"space": "${SPACE}", "made_by": ["in", ["Brain", "Owner"]]})
+frappe.db.set_single_value("Life Settings", "own_domains", "")
+frappe.db.set_value("Life Skill", "process-capture", "active", 0)
+for n in frappe.get_all("Life Inbox Item", filters={"space": "${SPACE}", "title": ["like", "I117 %"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 118: Activity opens a drawer; the item's pane is tabbed; the summary is scanned (To act on, Updates, Reports). Titles start "I118 ".
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const T = (what) => `I118 ${what} ${width} ${stamp}`
+  const seed = (what, withSummary) => JSON.parse(bench(`import json
+frappe.set_user("Administrator")
+from lifeos.brain import asks
+raw = "\\n".join(f"- Email {n}: a message from someone about thing {n}" for n in range(1, 10))
+item = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "${T(what)}", "source_type": "Email Digest", "status": "Done", "raw_text": "## Mail\\n" + raw,
+  "received_on": frappe.utils.now_datetime(), "sender": "digest-${what}-${stamp}@x.example"}).insert(ignore_permissions=True)
+if ${withSummary ? 'True' : 'False'}:
+  asks.apply(item, {"line": "9 emails, 26 Nov", "to_act_on": [
+    {"who": "Arijit Chatterjee (HDFC Bank)", "what": "wants the signed KYC form by Friday", "source": "Email 1", "route": "plate"},
+    {"who": "Anindita Goswami", "what": "proposes an audit call; your CA is copied", "source": "Email 4", "route": "waiting", "waiting_on": "Rohan CA"},
+    {"who": "Ravi Singh", "what": "unclear what he needs on the notice", "source": "Email 5"}],
+    "updates": [{"what": "Two trademark threads with Ravi Singh: renewal filed, objection open", "source": "Email 6"}],
+    "reports": [{"title": "Tea price list", "source": "Email 7"}, {"title": "Ghatia lots", "source": "Email 8"}, {"title": "GST reconciliation", "source": "Email 9"}]})
+frappe.db.commit()
+print(json.dumps({"item": item.name}))`).split('\n').pop())
+  const row = (i) => pg.locator(`[data-activity-row][data-item="${i}"]`)
+  const feed = async () => { await s.open('/life/brain/activity?source=Email%20Digest'); await pg.locator('[data-activity]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(500) }
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  let a, b
+  try {
+    a = await seed('plain', false)
+    b = await seed('summarised', true)
+    await check('BRAIN.69', `${width} px: an Activity row opens the item in the side pane with the list beside it; j steps to the next row; Open full page opens /item/<id>`, async () => {
+      await feed()
+      await row(b.item).locator('[data-row-item]').click()
+      await pg.locator(`[data-pane][data-pane-ref="inbox:${b.item}"]`).waitFor({ timeout: 10000 })
+      must(pathOf(pg) === '/life/brain/activity', 'the page left Activity')
+      must(await row(b.item).isVisible(), 'the list is gone')
+      if (!phone) {
+        const order = await pg.locator('[data-activity-row]').evaluateAll((els) => els.map((e) => e.getAttribute('data-item')))
+        const next = order[order.indexOf(b.item) + 1]
+        must(next, 'there is no next row')
+        await pg.locator('[data-pane]').focus()
+        await pg.keyboard.press('j')
+        await pg.locator(`[data-pane][data-pane-ref="inbox:${next}"]`).waitFor({ timeout: 10000 })
+        await pg.keyboard.press('k')
+        await pg.locator(`[data-pane][data-pane-ref="inbox:${b.item}"]`).waitFor({ timeout: 10000 })
+      }
+      await pg.locator('[data-pane-full]').click()
+      await pg.waitForURL((u) => u.pathname === `/life/item/${b.item}`, { timeout: 10000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.70', `${width} px: the pane's tabs are Summary, Emails 9, Decisions 0 and What came of it 0; it opens on Summary; ptab=emails opens Emails; the page has the same tabs`, async () => {
+      await s.open(`/life/brain/activity?source=Email%20Digest&open=inbox:${a.item}`)
+      const tabs = pg.locator('[data-pane-tabs]')
+      await tabs.waitFor({ timeout: 10000 })
+      const names = (await tabs.locator('[role="tab"]').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+      must(JSON.stringify(names) === JSON.stringify(['Summary', 'Emails 9', 'Decisions 0', 'What came of it 0']), 'the tabs are ' + JSON.stringify(names))
+      must((await tabs.getAttribute('data-tab-current')) === 'summary', 'it did not open on Summary')
+      await s.open(`/life/brain/activity?source=Email%20Digest&open=inbox:${a.item}&ptab=emails`)
+      await pg.locator('[data-pane-tabs]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-pane-tabs]').getAttribute('data-tab-current')) === 'emails', 'ptab=emails did not open Emails')
+      must(await pg.locator('[data-pane] [data-digest]').isVisible(), 'the emails are not shown')
+      await s.open(`/life/item/${a.item}`)
+      await pg.locator('[data-item-tabs]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-item-tabs] [role="tab"]').count()) === 4, 'the page does not have four tabs')
+      await noSideways()
+    })
+    await check('BRAIN.71', `${width} px: the Summary tab shows To act on, Updates and Reports with their counts; Change moves a line and its task`, async () => {
+      await s.open(`/life/brain/activity?source=Email%20Digest&open=inbox:${b.item}`)
+      const pane = pg.locator('[data-pane]')
+      await pane.locator('[data-summary]').waitFor({ timeout: 10000 })
+      const n = async (g) => Number(await pane.locator(`[data-summary-group="${g}"] [data-group-count]`).first().innerText())
+      must((await n('act')) === 3 && (await n('updates')) === 1 && (await n('reports')) === 3, 'the counts are wrong')
+      must((await pane.locator('[data-summary-line]').innerText()) === '9 emails, 26 Nov', 'the line on top is wrong')
+      must((await pane.locator('[data-summary-reports]').innerText()).includes('Tea price list · Ghatia lots'), 'the reports are not one line')
+      const unsure = pane.locator('[data-summary-line-row="act"]').nth(2)
+      must((await unsure.locator('[data-line-where]').getAttribute('data-where')) === 'waiting', 'the unsure line is not in the waiting pile')
+      await unsure.locator('[data-line-change]').click()
+      await pg.getByRole('menuitem', { name: 'Your plate' }).click()
+      await pg.waitForFunction(() => document.querySelectorAll('[data-pane] [data-summary-line-row="act"]')[2]?.querySelector('[data-line-where]')?.getAttribute('data-where') === 'plate', null, { timeout: 10000 })
+      const came = (await pane.locator('[data-pane-tabs] [role="tab"]').allInnerTexts()).map((t) => t.replace(/\s+/g, ' ').trim())
+      must(came[3] === 'What came of it 3', 'the tasks of the lines are not under What came of it: ' + came[3])
+      const task = JSON.parse(bench(`import json
+print(json.dumps(frappe.get_all("Life Task", filters={"inbox_item": "${b.item}", "title": ["like", "Ravi Singh%"]}, fields=["status", "waiting_on"])))`).split('\n').pop())
+      must(task[0].status === 'Open', 'the task did not move to the plate: ' + JSON.stringify(task))
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.72', `${width} px: on a phone the pane fills the width, the tabs fit or scroll sideways, and nothing is cut off`, async () => {
+      await s.open(`/life/brain/activity?source=Email%20Digest&open=inbox:${b.item}`)
+      const pane = pg.locator('[data-pane]')
+      await pane.locator('[data-summary]').waitFor({ timeout: 10000 })
+      const box = await pane.boundingBox()
+      if (phone) must(box.width >= width - 2, `the pane is ${box.width} px of ${width}`)
+      must(await pane.evaluate((e) => e.scrollWidth <= e.clientWidth + 1), 'something in the pane is cut off sideways')
+      must(await pane.locator('[data-pane-tabs]').isVisible(), 'no tabs')
+      await noSideways()
+    })
+  } finally {
+    bench(`frappe.set_user("Administrator")
+items = frappe.get_all("Life Inbox Item", filters={"title": ["like", "I118 %"]}, pluck="name")
+for n in frappe.get_all("Life Task", filters={"inbox_item": ["in", items or [""]]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+for n in items: frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

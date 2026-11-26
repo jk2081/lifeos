@@ -5,7 +5,7 @@ from frappe.utils import now_datetime
 
 from lifeos.library import links
 from lifeos import permissions
-from lifeos.brain import proposals
+from lifeos.brain import proposals, rules
 from lifeos.api.inbox import _finish_if_decided
 from lifeos.api.utils import parse
 from lifeos.skills import lessons
@@ -41,6 +41,10 @@ def _decide(prop, decision, payload=None):
 		lessons.record(prop, item)  # a decision that is not the skill's best guess is kept against the skill, for its lessons
 	except Exception:  # a lesson must never stop a decision
 		frappe.log_error(title="Lesson: could not record a correction")
+	try:
+		rules.learn(prop, item)  # the same correction twice makes a rule (issue 117)
+	except Exception:  # a rule must never stop a decision
+		frappe.log_error(title="Rule: could not learn from a decision")
 	return item
 
 

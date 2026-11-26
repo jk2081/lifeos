@@ -6,6 +6,7 @@ writes are refused. Every change is a POST that starts (or resumes) the review a
 """
 import frappe
 from frappe import _
+from frappe.utils import add_days, today
 
 from lifeos import permissions
 from lifeos.review import stale
@@ -219,6 +220,47 @@ def settle_stale(task: str, decision: str, space: str | None = None):
 	stale.settle(rv, task, decision)
 	rv.save()
 	return {"stale": stale.tab(rv), "header": rv.header()}
+
+
+@frappe.whitelist(methods=["GET"])
+def waiting(space: str | None = None):
+	"""Waiting on others (issue 118): the waiting pile grouped by person, oldest first, and what the Brain closed by itself this week."""
+	from lifeos.brain import asks
+
+	rv = _current(space)
+	rows = asks.waiting_rows(rv.doc.space)
+	groups = {}
+	for r in rows:
+		groups.setdefault(r["who"], []).append(r)
+	return {"groups": [{"who": who, "rows": rs} for who, rs in groups.items()], "total": len(rows),
+		"closed": asks.closed_by_itself(rv.doc.space, add_days(today(), -7))}
+
+
+@frappe.whitelist(methods=["POST"])
+def waiting_change(task: str, to: str, space: str | None = None):
+	"""Done, Move to my plate (plate), Still waiting (still: check-by a week on) or Not needed (not_needed) for one waiting task."""
+	from lifeos.brain import asks
+
+	_open(space)
+	return asks.waiting_change(task, to)
+
+
+@frappe.whitelist(methods=["GET"])
+def waiting_nudge(task: str, space: str | None = None):
+	"""A two-line follow-up to the person a task waits on, for the owner to copy or open in Gmail. Nothing is sent."""
+	from lifeos.brain import asks
+
+	_current(space)
+	return asks.nudge(task)
+
+
+@frappe.whitelist(methods=["POST"])
+def closed_change(task: str, space: str | None = None):
+	"""Change on an item the Brain closed by itself: it goes back to the waiting pile."""
+	from lifeos.brain import asks
+
+	_open(space)
+	return asks.reopen(task)
 
 
 @frappe.whitelist(methods=["GET"])

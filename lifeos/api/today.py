@@ -10,7 +10,7 @@ from frappe.utils import add_days, get_datetime, getdate, today
 from lifeos.ai import client as ai_client
 from lifeos.calendar import calendar_data
 from lifeos.goals import cycles, rhythms
-from lifeos.brain import old_inbox
+from lifeos.brain import asks, old_inbox
 from lifeos import permissions
 from lifeos.goals import habits as habit_rules
 from lifeos.api import tasks as task_api
@@ -20,7 +20,7 @@ from lifeos.api.utils import area_criterion, count_by, descendants, in_area, len
 GROUP_ROWS = 7
 
 
-OPEN = ("Open", "Doing", "Waiting")
+OPEN = ("Open", "Doing")  # the waiting pile is never on Today (issue 118); one line says when some of it is past its check-by date
 
 
 def task_lens(space, area):
@@ -30,7 +30,7 @@ def task_lens(space, area):
 
 def open_tasks(t, space, area):
 	"""The criteria of open, unarchived tasks in the lens."""
-	return [*task_lens(space, area), t.status.isin(OPEN), t.is_archived == 0]
+	return [*task_lens(space, area), t.status.isin(OPEN) | ((t.status == "Waiting") & (t.is_top_three == 1)), t.is_archived == 0]  # a waiting task the owner starred stays
 
 
 def planned_this_week(space, now, area=None, cycle=None, limit=None):
@@ -147,7 +147,7 @@ def get(space: str | None = None, area: str | None = None, at: str | None = None
 		"tasks": {"items": due, "due": due_count, "overdue": overdue, "today": due_today, "today_count": today_count,
 			"overdue_items": overdue_rows, "oldest_overdue": str(oldest) if oldest else None, "group_rows": GROUP_ROWS},
 		"events": events, "habits": habits,
-		"open_loops": task_api.open_loops_count(space), "area": area,
+		"open_loops": task_api.open_loops_count(space), "area": area, "waiting_past": None if permissions.is_agent() else asks.past_check(space),
 		"banner": None if permissions.is_agent() else rhythms.banner(space, at),
 		"brain_off": None if permissions.is_agent() else ai_client.brain_off(),  # issue 102: why the AI service is not answering, until a call works again
 		"auto_inbox": None if permissions.is_agent() else old_inbox.recent_auto(space, area),

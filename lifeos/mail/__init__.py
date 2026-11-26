@@ -256,6 +256,13 @@ def thread_text(thread: dict) -> str:
 	return ("\n\n---\n\n".join(out))[:TEXT_CHARS]
 
 
+def subjects_sender(thread: dict, mailbox: str) -> str | None:
+	"""The address of the first person in the thread who is not the mailbox's owner, for the owner's rules."""
+	from lifeos.library import subjects
+
+	return (subjects.mail_of_thread(thread, "", mailbox).get("address") or "").strip().lower() or None
+
+
 def file_thread(user: str, space: str, thread_id: str, area: str | None = None, account: str | None = None) -> dict:
 	"""After the owner says so: the thread becomes a Brain item with a link back to it in Gmail; the Brain summarises it. Filing it again is the same item."""
 	from lifeos.api import inbox
@@ -263,7 +270,8 @@ def file_thread(user: str, space: str, thread_id: str, area: str | None = None, 
 
 	doc, thread = _find(user, space, thread_id, account)
 	done = inbox.create_item(space=space, source_type="Email", source_system=doc.provider, external_id=thread_id, title=sanitize_html(thread["subject"])[:140],
-		raw_text=sanitize_html(thread_text(thread)), source_url=thread["link"], area=area or None)
+		raw_text=sanitize_html(thread_text(thread)), source_url=thread["link"], area=area or None,
+		sender=subjects_sender(thread, doc.address))
 	try:  # issue 111: the filed email is linked to the subjects it is about
 		from lifeos.library import subjects
 
