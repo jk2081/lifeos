@@ -47,6 +47,8 @@ TOOLS = [
 		"input_schema": {"type": "object", "properties": {}}},
 	{"name": "timeline", "description": "What happened in a period: records by day (created, completed, captured).",
 		"input_schema": {"type": "object", "properties": {"date_from": {"type": "string"}, "date_to": {"type": "string"}}, "required": ["date_from"]}},
+	{"name": "catch_up", "description": "For a broad question ('what's going on', 'catch me up', 'what did I miss', 'how was my week'): in one call, what needs the owner, what is waiting on others, the daily email digests, what came in and was done in the last `days` days, and the next 7 days of meetings, deadlines and due tasks. Use it before anything else for such questions.",
+		"input_schema": {"type": "object", "properties": {"days": {"type": "integer", "description": "How many days back, 1 to 14. Default 7."}}}},
 	{"name": "suggest_actions", "description": "Offer the owner buttons under the answer. Nothing changes until the owner clicks one. Use only records you cited.",
 		"input_schema": {"type": "object", "properties": {"actions": {"type": "array", "items": {"type": "object", "properties": {
 			"kind": {"type": "string", "enum": ["make_task", "move_someday", "open_reset", "open_list", "snooze_insight", "dismiss_insight", "file_mail"]},
@@ -206,7 +208,7 @@ def run_tool(ctx, name, args):
 	args = args or {}
 	try:
 		fn = {"search": t_search, "get_record": t_get_record, "list_records": t_list, "counts": t_counts,
-			"cycle_state": t_cycle, "timeline": t_timeline, "suggest_actions": t_suggest, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
+			"cycle_state": t_cycle, "timeline": t_timeline, "catch_up": t_catch_up, "suggest_actions": t_suggest, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
 			"mail_list_threads": t_mail_list_threads, "read_page": t_read_page, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
 			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "add_event": t_add_event,
 			"make_rule": t_make_rule, "ask_one_question": t_ask_one_question}[name]
@@ -477,6 +479,40 @@ def t_timeline(ctx, date_from, date_to=None):
 		"kind": r.kind, "title": r.title, "date": str(r.record_date)} for r in rows]}
 
 
+def t_catch_up(ctx, days=7):
+	"""Everything worth knowing about the last few days and the next week, in one read, so a broad question is answered from what is there."""
+	from lifeos.api import calendar
+	from lifeos.review import counts
+
+	days = max(1, min(cint(days) or 7, 14))
+	now = getdate(today())
+	since = add_days(now, -days)
+	area = ctx.scope.get("name") if ctx.scope.get("kind") == "area" else None
+	out = {"period": f"{since} to {now}", "needs_you": counts.inbox_to_review(ctx.space, area)["n"],
+		"overdue_tasks": counts.overdue_tasks(ctx.space, area)["n"], "due_today_tasks": counts.due_today_tasks(ctx.space, area)["n"]}
+	waiting = frappe.get_list("Life Task", filters={"space": ctx.space, "status": "Waiting", **({"area": area} if area else {})},
+		fields=["name", "title", "waiting_on", "waiting_on_person", "modified", "area"], order_by="modified asc", limit=30)
+	out["waiting_on_others"] = [{"ref": ctx.ref("Life Task", r.name, r.title, "Task", r.modified, r.area), "title": r.title,
+		"on": r.waiting_on or r.waiting_on_person or "", "since": str(r.modified)[:10]} for r in waiting]
+	if ctx.has_mail():
+		try:
+			from lifeos.tools import digests
+
+			d = digests.read(str(since), str(now), ctx.space)
+			out["email_digests"] = [{"ref": ctx.ref("Life Inbox Item", x["item"], x["title"], "Email digest", x["date"]), "date": x["date"], "text": x["text"][:2500]}
+				for x in d["digests"][-days:]]
+			out["days_without_email_digest"] = d["missing_days"]
+		except frappe.ValidationError:
+			frappe.clear_messages()
+	out["came_in_or_done"] = t_timeline(ctx, str(since), str(now))["rows"][:40]
+	upcoming = calendar.get(space=ctx.space, from_date=str(now), to_date=str(add_days(now, 7)), area=area)["items"]
+	doctypes = {"event": "Event", "task": "Life Task"}
+	out["coming_up"] = [{**({"ref": ctx.ref(doctypes[i["source"]], i["name"], i["title"], i["source"].title(), i["date"])} if i.get("source") in doctypes and i.get("name") else {}),
+		"date": i["date"], "time": i.get("start") or "", "title": i["title"], "kind": i.get("source") or ""}
+		for i in upcoming if i.get("source") != "vault" or ctx.vault_ok][:40]
+	return out
+
+
 def t_suggest(ctx, actions):
 	"""Record the buttons to show. Records are named by the references the answer cited."""
 	from lifeos.review import counts
@@ -499,7 +535,10 @@ def t_suggest(ctx, actions):
 			k = a.get("list")
 			if k not in COUNT_KINDS:
 				continue
-			item["to"] = getattr(counts, k)(ctx.space)["to"]
+			c = getattr(counts, k)(ctx.space)
+			if not c["n"]:  # never a button to an empty list
+				continue
+			item["to"] = c["to"]
 		elif kind == "file_mail":
 			m = next((m for m in [*ctx.mails_read, *ctx.mails] if m["thread_id"] == a.get("thread_id")), None)
 			if not m:
