@@ -10,6 +10,7 @@ from frappe.utils import add_to_date, flt, getdate, now_datetime, nowdate
 from lifeos.agents import acts, connector, limits
 
 DECISIONS = {"approve": "Approved", "no": "Declined"}
+FAILED_STATES = ("error", "failed", "failure")
 
 
 def is_agent_key(space: str, key: str) -> bool:
@@ -40,11 +41,30 @@ def _change_out(c) -> dict | None:
 def requests(space: str, agent: str | None = None) -> list:
 	"""What agents want to do that needs the owner's OK, oldest first: the same rows on an agent's page and in Needs you."""
 	filters = {"space": space, "status": "Waiting", **({"agent": agent} if agent else {})}
-	rows = frappe.get_all("Life Agent Action", filters=filters, fields=["name", "agent", "action", "title", "draft", "happened_on"], order_by="happened_on asc, creation asc", limit=100)  # system: the owner's list; the space check is in the API
+	rows = frappe.get_all("Life Agent Action", filters=filters, fields=["name", "agent", "action", "title", "draft", "happened_on", "asked_by", "request"], order_by="happened_on asc, creation asc", limit=100)  # system: the owner's list; the space check is in the API
 	names = {c.agent: limits.display_name(limits.config(space, c.agent)) for c in rows}
 	labels = dict(limits.ACTIONS)
 	return [{"name": r.name, "agent": r.agent, "agent_name": names[r.agent], "action": r.action, "action_label": labels.get(r.action, r.action), "title": r.title, "draft": r.draft,
-		"when": str(r.happened_on)[:16]} for r in rows]
+		"when": str(r.happened_on)[:16], "asked_by": r.asked_by or "agent", "request": r.request or ""} for r in rows]
+
+
+def failed_job(space: str, key: str) -> dict | None:
+	"""The agent's job that failed last, with the error line it reported (a job that fails every day is seen in Life OS)."""
+	rows = frappe.get_all("Life Agent Job", filters={"space": space, "agent": key, "last_status": ("in", list(FAILED_STATES))}, fields=["job_name", "last_run", "last_error"],
+		order_by="last_run desc", limit=1)  # system: this agent's schedule, read by the owner
+	return {"title": rows[0].job_name, "error": rows[0].last_error or "", "when": rows[0].last_run or ""} if rows else None
+
+
+def feed(space: str, days: int = 14) -> list:
+	"""What agents changed for the owner, for Brain > Activity (issue 125): Done and Failed acts, newest first. Reads (mail searches, calendar lists) are not logged,
+	so only what changed something is here."""
+	rows = frappe.get_all("Life Agent Action", filters={"space": space, "status": ("in", ["Done", "Failed"]), "happened_on": (">=", add_to_date(now_datetime(), days=-days))},
+		fields=["name", "agent", "action", "title", "draft", "status", "asked_by", "request", "result", "undo", "undone", "error", "happened_on", "cost"],
+		order_by="happened_on desc, creation desc", limit=100)  # system: the owner's list; the space check is in the API
+	names = {a: limits.display_name(limits.config(space, a)) for a in {r.agent for r in rows}}
+	return [{"name": r.name, "kind": "assistant", "agent": r.agent, "agent_name": names[r.agent], "action": r.action, "title": r.title, "draft": r.draft or "", "status": r.status,
+		"asked_by": r.asked_by or "agent", "request": r.request or "", "result": r.result or "", "error": r.error or "", "received_on": str(r.happened_on)[:19],
+		"can_undo": int(bool(r.undo) and not r.undone and r.status == "Done"), "undone": int(r.undone or 0)} for r in rows if r.agent != "ask"]
 
 
 def sections(space: str, key: str) -> dict:
@@ -57,8 +77,8 @@ def sections(space: str, key: str) -> dict:
 		if f["change"] and f["change"]["kind"] == connector.FACT_EDIT:
 			f["text"] = json.loads(frappe.db.get_value("Life Agent Change", f["change"]["name"], "payload") or "{}").get("text", f["text"])
 	jobs = [{"name": j.name, "id": j.external_id, "title": j.job_name, "schedule": j.schedule, "next_run": j.next_run, "paused": int(j.paused or 0),
-		"change": _change_out(held.get(("job", j.external_id)))} for j in frappe.get_all("Life Agent Job", filters={"space": space, "agent": key},
-		fields=["name", "external_id", "job_name", "schedule", "next_run", "paused"], order_by="job_name asc", limit=200)]  # system: as above
+		"failed": int((j.last_status or "") in FAILED_STATES), "last_run": j.last_run or "", "last_error": j.last_error or "", "change": _change_out(held.get(("job", j.external_id)))} for j in frappe.get_all("Life Agent Job", filters={"space": space, "agent": key},
+		fields=["name", "external_id", "job_name", "schedule", "next_run", "paused", "last_status", "last_run", "last_error"], order_by="job_name asc", limit=200)]  # system: as above
 	for j in jobs:  # a waiting pause or resume shows the state the owner asked for
 		if j["change"] and j["change"]["status"] == "waiting":
 			j["paused"] = int(j["change"]["kind"] == connector.JOB_PAUSE)
@@ -73,7 +93,8 @@ def sections(space: str, key: str) -> dict:
 	did = [{"name": r.name, "action": r.action, "title": r.title, "status": r.status, "cost": flt(r.cost), "when": str(r.happened_on)[:16], "asked_by": r.asked_by or "",
 		"request": r.request or "", "can_undo": int(bool(r.undo) and not r.undone and r.status == "Done"), "undone": int(r.undone or 0), "error": r.error or ""} for r in rows]
 	return {"name": limits.display_name(cfg), "has_name": int(bool(cfg and cfg.display_name)), "reported": str(cfg.last_report)[:16] if cfg and cfg.last_report else None,
-		"waiting": requests(space, key), "facts": facts, "can": can, "areas": areas, "vault": "off", "jobs": jobs, "did": did,
+		"waiting": requests(space, key), "facts": facts, "can": can, "areas": areas, "vault": "off", "jobs": jobs,
+		"failed_job": failed_job(space, key), "owner_runs_now": int(limits.owner_runs_now(cfg)), "did": did,
 		"cost_week": round(sum(d["cost"] for d in did), 4), "skills": json.loads(cfg.skills) if cfg and cfg.skills else [],
 		"changes": {"waiting": sum(1 for c in held.values() if c.status == "Waiting"), "failed": sum(1 for c in held.values() if c.status == "Failed")}}
 
@@ -121,6 +142,14 @@ def set_area(space: str, key: str, area: str, on: bool) -> dict:
 	return sections(space, key)
 
 
+def set_owner_runs_now(space: str, key: str, on: bool) -> dict:
+	"""The safety switch: your requests through this agent run at once (on) or wait in Needs you like the agent's own idea (off)."""
+	cfg = limits.config(space, key, create=True)
+	cfg.owner_runs_now = int(bool(on))
+	cfg.save(ignore_permissions=True)  # system: only the owner reaches this, in the API
+	return sections(space, key)
+
+
 def rename(space: str, key: str, name: str) -> dict:
 	cfg = limits.config(space, key, create=True)
 	cfg.display_name = " ".join((name or "").split())[:80] or None
@@ -147,7 +176,11 @@ def undo(space: str, name: str) -> dict:
 	"""Take back something an agent did in Google where Google allows it."""
 	if not frappe.db.exists("Life Agent Action", {"name": name, "space": space}):
 		frappe.throw(_("That is not in this space."), frappe.DoesNotExistError, title=_("Action not found"))
-	return acts.undo(name)
+	if "\"call\"" in (frappe.db.get_value("Life Agent Action", name, "undo") or ""):  # something done in Google
+		return acts.undo(name)
+	from lifeos.tools import actions
+
+	return actions.undo(name)  # something done in Life OS (a person, a page, a task)
 
 
 def flag_stale(space: str, key: str, name: str, reason: str | None) -> None:

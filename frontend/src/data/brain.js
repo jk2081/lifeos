@@ -3,7 +3,7 @@
 import { group } from '@/data/call'
 
 export const brainData = {
-  agentPage: group('agent_page', ['decide', 'delete_fact', 'edit_fact', 'get', 'pause_job', 'rename', 'set_ability', 'set_area', 'undo']),
+  agentPage: group('agent_page', ['decide', 'delete_fact', 'edit_fact', 'get', 'pause_job', 'rename', 'set_ability', 'set_area', 'set_owner_runs_now', 'undo']),
   brain: group('brain', ['activity', 'needs_you']),
   inbox: group('inbox', ['file_myself', 'list', 'retry']),
   review: group('review', ['decide', 'decide_all']),

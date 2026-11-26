@@ -297,6 +297,17 @@
               <Badge theme="blue" label="Agent" />
               <Button size="sm" icon-right="lucide-external-link" label="Keys in Frappe" :href="`/app/user/${encodeURIComponent(a.user)}`" :data-agent-user-link="a.user" />
             </div>
+            <!-- issue 125: what you call it, the safety switch for your requests, and the job that failed last -->
+            <template v-if="a.key">
+              <SettingRow label="Name" help="What you call it, for example Jai's assistant. Life OS and the assistant both use it." :data-agent-name-row="a.user">
+                <TextInput class="w-56" :model-value="a.assistant_name" placeholder="Your assistant" aria-label="Name" :data-agent-name="a.user" @change="(e) => setAgentName(a, e.target.value)" />
+              </SettingRow>
+              <SettingRow label="Your requests through this agent run at once" help="Off, what you ask it to do waits in Needs you like its own ideas.">
+                <Switch :model-value="!!a.owner_runs_now" aria-label="Your requests through this agent run at once" :data-agent-runs-now="a.user" @update:model-value="(v) => setAgentRunsNow(a, v)" />
+              </SettingRow>
+              <p v-if="a.failed_job" class="border-b border-outline-gray-1 px-4 py-2.5 text-sm text-ink-red-8" :data-agent-failed-job="a.user"><span aria-hidden="true">✦</span>
+                Failed job: {{ a.failed_job.title }}<template v-if="a.failed_job.when"> ({{ a.failed_job.when }})</template>: {{ a.failed_job.error || 'no reason given' }}</p>
+            </template>
             <div v-for="r in a.spaces" :key="r.space" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" :data-agent-space="a.user + '|' + r.space">
               <span class="min-w-24 flex-1 text-base text-ink-gray-8">{{ manySpaces ? r.space : 'Access' }}</span>
               <span class="text-sm text-ink-gray-6" :data-agent-sensitive="a.user + '|' + r.space">{{ r.agents_can_read_vault ? 'Opens sensitive items' : 'No sensitive items' }}</span>
@@ -838,6 +849,12 @@ async function createSpace() {
 async function setAgent(space, user, access, before) {
   if ((access || '') === (before || '')) return
   await setMember(space, user, access || before, access ? 0 : 1)
+}
+async function setAgentName(a, name) {
+  if (await tryCall(() => brainData.agentPage.rename({ key: a.key, name, space: a.config_space }), 'Saved')) load()
+}
+async function setAgentRunsNow(a, on) {
+  if (await tryCall(() => brainData.agentPage.set_owner_runs_now({ key: a.key, on: on ? 1 : 0, space: a.config_space }), 'Saved')) load()
 }
 async function setVault(s, on) {
   if (await tryCall(() => settingsData.settings.set_agent_vault({ space: s.name, allowed: on ? 1 : 0 }), 'Saved')) load()

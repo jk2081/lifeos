@@ -15,6 +15,8 @@ export const ask = reactive({
   refusal: null, // { error: 'not_set_up' | 'cap' | 'off' | 'ai', error_text, spend }
   open: false, // the panel (desktop) or sheet (phone)
   thread: null, // the thread shown
+  channel: '', // set when it is a conversation relayed from an assistant's channel ("Telegram"): read only here
+  title: '',
   scope: null, // the scope chip of the next question: { kind, label, doctype, name, items }
   pageScope: null, // what the current screen offers
   draft: '',
@@ -52,6 +54,7 @@ export function startAsk(question = '', scope = null) {
   ask.scope = scope || scopeFromRoute()
   ask.returnTo = null
   ask.thread = null
+  ask.channel = ''
   ask.messages = []
   ask.refusal = null
   ask.draft = question
@@ -113,6 +116,8 @@ export async function send(question) {
 export async function loadThread(name) {
   const t = await api('ask.thread', { name })
   ask.thread = t.name
+  ask.channel = t.channel || ''
+  ask.title = t.title || ''
   ask.scope = t.scope
   ask.messages = t.messages
   ask.refusal = null

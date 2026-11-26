@@ -41,6 +41,11 @@
       <section class="flex flex-col gap-2" data-agent-section="can">
         <div><h2 class="text-base-medium text-ink-gray-9">What it can do</h2><p class="text-sm text-ink-gray-6">On its own, asks you first, or off.</p></div>
         <Card flush>
+          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-outline-gray-1 py-3" data-owner-runs-now :data-on="a.owner_runs_now">
+            <div><span class="text-base text-ink-gray-9">Your requests through this agent run at once</span><p class="text-sm text-ink-gray-6">Off, what you ask it waits in Needs you.</p></div>
+            <Switch :model-value="!!a.owner_runs_now" :disabled="!writable" aria-label="Your requests through this agent run at once"
+              @update:model-value="(v) => act(() => brainData.agentPage.set_owner_runs_now({ key, on: v ? 1 : 0, space: store.space }))" />
+          </div>
           <div v-for="c in a.can" :key="c.key" class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-outline-gray-1 py-3 last:border-b-0" data-ability :data-ability-key="c.key" :data-mode="c.mode"
             :data-state="c.change ? c.change.status : ''">
             <div class="flex flex-wrap items-center gap-2"><span class="text-base text-ink-gray-9">{{ c.label }}</span><ChangeBadge :change="c.change" /></div>
@@ -70,6 +75,7 @@
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2"><span class="break-words text-base text-ink-gray-9" data-job-title>{{ j.title }}</span><Badge v-if="j.paused" theme="gray" label="Paused" data-job-paused /><ChangeBadge :change="j.change" /></div>
               <div class="text-sm text-ink-gray-6">{{ [j.schedule, j.next_run && `next ${j.next_run}`].filter(Boolean).join(' · ') || 'No time given' }}</div>
+              <div v-if="j.failed" class="text-sm text-ink-red-8" data-job-failed><span aria-hidden="true">✦</span> Failed{{ j.last_run ? ` ${j.last_run}` : '' }}: {{ j.last_error || 'no reason given' }}</div>
             </div>
             <Button v-if="writable" size="sm" :label="j.paused ? 'Resume' : 'Pause'" data-job-toggle @click="act(() => brainData.agentPage.pause_job({ key, job: j.name, paused: j.paused ? 0 : 1, space: store.space }))" />
           </div>
@@ -99,7 +105,7 @@
           <p v-if="!a.reported" data-connector-how>Set it up with the README in <code>agent/connector/</code>, on the agent's server.</p>
           <div v-if="a.skills.length" data-agent-skills><div class="text-ink-gray-9">Skills it reported</div>
             <ul class="mt-1 list-disc pl-5"><li v-for="s in a.skills" :key="s.name">{{ s.name }}<span v-if="s.description" class="text-ink-gray-6"> · {{ s.description }}</span></li></ul></div>
-          <form v-if="writable" class="flex flex-wrap items-end gap-2" @submit.prevent="rename"><FormControl v-model="nameDraft" label="Shown as" class="w-64" data-agent-rename-input />
+          <form v-if="writable" class="flex flex-wrap items-end gap-2" @submit.prevent="rename"><FormControl v-model="nameDraft" label="Name" class="w-64" data-agent-rename-input />
             <Button label="Save name" type="submit" :disabled="nameDraft.trim() === (a.has_name ? a.name : '')" data-agent-rename /></form>
         </Card>
       </section>

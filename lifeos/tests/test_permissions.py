@@ -156,6 +156,22 @@ def lifeos_whitelisted():
 	return [f for f in frappe.whitelisted if (getattr(f, "__module__", "") or "").startswith("lifeos.")]
 
 
+class TestOnlyTheOwnerIsTheOwner(LifeTestCase):
+	"""Issue 125: `asked_by: owner` is the space's owner speaking, through an agent's key or as themself; nobody else can say it for them."""
+
+	def test_9_a_person_who_is_not_the_spaces_owner_cannot_ask_as_the_owner(self):
+		from lifeos.api import google, tools
+
+		self.as_user(FAMILY)  # a member of the shared space with write access, not its owner
+		with self.assertRaises(frappe.PermissionError):
+			google.act("hermes", "email.archive", {"thread_id": "t1"}, "owner", "Archive it", space=SHARED)
+		with self.assertRaises(frappe.PermissionError):
+			tools.people_add("Someone", space=SHARED, asked_by="owner", owner_message="The owner said so")
+		self.assertEqual(frappe.db.count("Life Agent Action", {"space": SHARED, "request": "The owner said so"}), 0)
+		self.as_user(OWNER)  # the owner themself may
+		self.assertIn("person", tools.people_add("Someone", space=SHARED, asked_by="owner", owner_message="Add Someone"))
+
+
 class TestWhitelistConventions(IntegrationTestCase):
 	def setUp(self):
 		import lifeos.api  # noqa: F401

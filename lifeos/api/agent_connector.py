@@ -19,7 +19,7 @@ def _system(space: str, source_system: str) -> str:
 @frappe.whitelist(methods=["POST"])
 def report(source_system: str, facts: str | list | None = None, jobs: str | list | None = None, skills: str | list | None = None, settings: str | dict | None = None,
 		actions: str | list | None = None, space: str | None = None):
-	"""Send everything the agent holds, when it changes and once a day. `facts`: [{id, text, origin, learned_on}], `jobs`: [{id, name, schedule, next_run, paused}],
+	"""Send everything the agent holds, when it changes and once a day. `facts`: [{id, text, origin, learned_on}], `jobs`: [{id, name, schedule, next_run, paused, last_status, last_run, last_error}],
 	`skills`: [{name, description}], `settings`: {abilities: {action: on its own, asks you or off}}, `actions`: [{id, action, title, draft, status (Done or Waiting), cost, when}].
 	Each list is the whole of it: what is left out is dropped from Life OS. A repeated report changes nothing. A list left out is not touched."""
 	permissions.require_login()
@@ -31,7 +31,7 @@ def report(source_system: str, facts: str | list | None = None, jobs: str | list
 @frappe.whitelist(methods=["GET"])
 def pull(source_system: str, space: str | None = None):
 	"""What to do now: `abilities` (the owner's switch for each action), `changes` waiting (edit or delete a fact, pause or resume a job, a setting) and
-	`decisions` on what the agent asked to do. Apply them, then call `confirm`."""
+	`decisions` on what the agent asked to do, and `assistant_name`, what the owner calls the agent (write it into the agent's settings). Apply them, then call `confirm`."""
 	permissions.require_login()
 	space = permissions.resolve_space(space)
 	return connector.pull(space, _system(space, source_system))

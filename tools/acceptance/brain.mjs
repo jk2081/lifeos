@@ -1370,7 +1370,7 @@ for (const width of WIDTHS) {
       must((await pg.locator('[data-page-title]').innerText()) === 'Your assistant', 'the agent is not shown as Your assistant: ' + await pg.locator('[data-page-title]').innerText())
       for (const k of ['waiting', 'knows', 'can', 'read', 'scheduled', 'did', 'connector']) must(await pg.locator(`[data-agent-section="${k}"]`).isVisible(), `no ${k} section`)
       must((await pg.locator('[data-fact]').count()) === 2 && (await pg.locator('[data-fact-origin]').first().innerText()).includes('WhatsApp'), 'the facts or where they came from are missing')
-      must((await pg.locator('[data-ability]').count()) === 8 && (await pg.locator('[data-ability-key="pay"] [data-ability-fixed]').innerText()) === 'Always off', 'the eight actions, with pay always off, are missing')
+      must((await pg.locator('[data-ability]').count()) === 9 && (await pg.locator('[data-ability-key="pay"] [data-ability-fixed]').innerText()) === 'Always off', 'the eight actions, with pay always off, are missing')
       must((await pg.locator('[data-area]').count()) >= 1 && await pg.locator('[data-area-vault]').isVisible(), 'the areas and the Vault are missing')
       must((await pg.locator('[data-job]').count()) === 1, 'the job is missing')
       must((await pg.locator('[data-agent-skills]').innerText()).includes('chase'), 'the skill it reported is missing')
@@ -1845,6 +1845,79 @@ print(json.dumps(frappe.get_all("Life Task", filters={"inbox_item": "${b.item}",
 items = frappe.get_all("Life Inbox Item", filters={"title": ["like", "I118 %"]}, pluck="name")
 for n in frappe.get_all("Life Task", filters={"inbox_item": ["in", items or [""]]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
 for n in items: frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 125: what an agent did shows in Activity with who asked, a drawer and Undo; Chat lists the owner's conversation on the agent's channel, read only.
+const ASSISTANT = 'hermes125'
+const assistantSeed = (width) => `import json
+frappe.set_user("Administrator")
+from lifeos.agents import limits
+cfg = limits.config("${SPACE}", "${ASSISTANT}", create=True)
+cfg.display_name = "Hermes"
+cfg.agent_user = "hermes@lifeos.test"
+cfg.save(ignore_permissions=True)
+limits.set_ability(cfg, "write_pages", "ask")
+frappe.set_user("hermes@lifeos.test")
+from lifeos.api import tools
+done = tools.people_add("Ekta Jalan I125 ${width} ${stamp}", space="${SPACE}", source_system="${ASSISTANT}", asked_by="owner", owner_message="Make Ekta Jalan a person")
+frappe.db.commit()
+print(json.dumps({"action": done["action"], "person": done["person"]}))`
+const assistantClean = `frappe.set_user("Administrator")
+for n in frappe.get_all("Life Person", filters={"space": "${SPACE}", "full_name": ["like", "% I125 %"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+frappe.db.delete("Life Agent Action", {"space": "${SPACE}", "agent": "${ASSISTANT}"})
+frappe.db.delete("Life Agent Job", {"space": "${SPACE}", "agent": "${ASSISTANT}"})
+frappe.db.delete("Life Agent Config", {"space": "${SPACE}", "agent": "${ASSISTANT}"})
+for t in frappe.get_all("Life Ask Thread", filters={"space": "${SPACE}", "source_system": "${ASSISTANT}"}, pluck="name"):
+  frappe.db.delete("Life Ask Message", {"thread": t})
+  frappe.delete_doc("Life Ask Thread", t, force=1, ignore_permissions=True)`
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  try {
+    const seeded = JSON.parse(bench(assistantSeed(width)).split('\n').pop())
+    await check('BRAIN.73', `${width} px: Activity lists "Hermes · you asked" for an agent's act with its request in the drawer; the Assistant chip shows only those; Undo removes the person`, async () => {
+      await s.open('/life/brain/activity')
+      const row = pg.locator(`[data-assistant-row][data-action="${seeded.action}"]`)
+      await row.waitFor({ timeout: 10000 })
+      const text = (await row.innerText()).replace(/\s+/g, ' ')
+      must(/Hermes · you asked/.test(text) && /Added Ekta Jalan/i.test(text), 'the row reads: ' + text)
+      await noSideways()
+      await row.locator('[data-assistant-open]').click()
+      must((await row.locator('[data-assistant-request]').innerText()).includes('Make Ekta Jalan a person'), 'the drawer does not show the request')
+      await noSideways()
+      await pg.locator('[data-outcome="assistant"]').click()
+      await pg.waitForFunction(() => !document.querySelector('[data-activity-row]:not([data-assistant-row])') && document.querySelector('[data-assistant-row]'), null, { timeout: 10000 })
+      await row.locator('[data-assistant-undo]').click()
+      for (let i = 0; i < 40 && bench(`print(frappe.db.exists("Life Person", "${seeded.person}") or "gone")`).split('\n').pop() !== 'gone'; i++) await pg.waitForTimeout(250)
+      must(bench(`print(frappe.db.exists("Life Person", "${seeded.person}") or "gone")`).split('\n').pop() === 'gone', 'Undo left the person')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+    await check('BRAIN.74', `${width} px: Ask's History lists the relayed conversation "on Telegram"; it opens read only with its turns in order and no question box`, async () => {
+      const turns3 = [{ role: 'owner', text: 'Add a task to call Ekta', at: '2026-11-26 09:00:00' }, { role: 'assistant', text: 'Done, it is on Today.', at: '2026-11-26 09:00:05' },
+        { role: 'owner', text: 'Thanks', at: '2026-11-26 09:01:00' }]
+      const out = (await (await agentFetch('chats.relay', { turns: JSON.stringify(turns3), channel: 'Telegram', source_system: ASSISTANT, external_id: `tg-${width}-${stamp}`, space: SPACE })).json()).message
+      must(out?.added === 3, 'the relay answered ' + JSON.stringify(out))
+      await s.open('/life/ask?tab=history')
+      const rowH = pg.locator('[data-history-row]', { hasText: 'on Telegram' }).first()
+      await rowH.waitFor({ timeout: 10000 })
+      must((await rowH.innerText()).includes('Hermes · Telegram'), 'the row reads: ' + (await rowH.innerText()))
+      await noSideways()
+      await rowH.locator('a').first().click()
+      await pg.locator('[data-ask-readonly]:visible').first().waitFor({ timeout: 10000 })
+      const turns = await pg.locator('[data-ask-thread]:visible [data-ask-question], [data-ask-thread]:visible [data-ask-answer]').allInnerTexts()
+      must(turns.map((t) => t.trim()).join('|') === 'Add a task to call Ekta|Done, it is on Today.|Thanks', 'the turns are: ' + turns.join('|'))
+      must((await pg.locator('[data-ask-input]:visible').count()) === 0, 'there is a question box on a relayed thread')
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(assistantClean)
     await s.ctx.close()
   }
 }

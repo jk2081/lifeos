@@ -84,6 +84,8 @@ def ask(question: str, space: str | None = None, thread: str | None = None, scop
 		frappe.throw(_("Type a question."), title=_("Question is empty"))
 	if thread:
 		t = _thread(thread)
+		if t.channel:  # a conversation the owner had on another channel: you answer there, not here (issue 125)
+			frappe.throw(_("This conversation is on {0}. Reply there.").format(t.channel), title=_("Read only"))
 		space = t.space
 		permissions.require_space(space)
 		if scope:
@@ -195,12 +197,19 @@ def message(name: str):
 	return _message_out(m)
 
 
+def _title(t) -> str:
+	"""A relayed thread is shown under the agent's current name."""
+	from lifeos.api import chats
+
+	return chats.relay_title(t.space, t.source_system, t.channel) if t.channel and t.source_system else t.title
+
+
 @frappe.whitelist(methods=["GET"])
 def thread(name: str):
 	_person()
 	t = _thread(name)
 	msgs = frappe.get_list("Life Ask Message", filters={"thread": t.name}, fields=["*"], order_by="creation asc")
-	return {"name": t.name, "title": t.title, "space": t.space, "scope": {"kind": t.scope_kind or "space", "label": t.scope_label,
+	return {"name": t.name, "title": _title(t), "channel": t.channel or "", "readonly": int(bool(t.channel)), "space": t.space, "scope": {"kind": t.scope_kind or "space", "label": t.scope_label,
 		"doctype": t.scope_doctype, "name": t.scope_name}, "messages": [_message_out(frappe._dict(m)) for m in msgs]}
 
 
@@ -216,12 +225,16 @@ def threads(space: str | None = None, q: str | None = None, start: int | str | N
 		said = frappe.qb.from_(m).select(m.thread).where(m.text.like(f"%{q}%"))
 		where.append(t.title.like(f"%{q}%") | t.name.isin(said))
 	questions = frappe.qb.from_(m).select(fn.Count("*")).where((m.thread == t.name) & (m.role == "user")).as_("questions")
-	rows = list_query("Life Ask Thread", ["name", "title", "scope_label", "last_message_on", "creation"], where, [(fn.IfNull(t.last_message_on, t.creation), Order.desc)])
+	rows = list_query("Life Ask Thread", ["name", "title", "scope_label", "last_message_on", "creation", "channel", "source_system", "space"], where, [(fn.IfNull(t.last_message_on, t.creation), Order.desc)])
 	rows = rows.select(questions).limit(page_length).offset(start).run(as_dict=True)
 	total = count_where("Life Ask Thread", where)
 	for r in rows:
 		r["last_message_on"] = str(r.last_message_on or r.creation)[:16]
+		r["title"] = _title(r)
+		r["channel"] = r.channel or ""
 		r.pop("creation", None)
+		r.pop("source_system", None)
+		r.pop("space", None)
 	return {"rows": rows, "total": total}
 
 

@@ -660,7 +660,7 @@ def t_save_attachment(ctx, thread_id, attachment_id, area=None, part=None, page=
 def t_make_task(ctx, title, area=None, part=None, due_date=None):
 	from lifeos.tools import work
 
-	out = work.add_task(title, area, part, due_date, ctx.space)
+	out = work.add_task(title, area, part, due_date, None, ctx.space)
 	return _did(ctx, out, "task", "Life Task", out["task"])
 
 

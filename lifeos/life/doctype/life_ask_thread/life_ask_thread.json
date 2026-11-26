@@ -12,7 +12,9 @@
   "scope_name",
   "scope_label",
   "scope_kind",
-  "last_message_on"
+  "last_message_on",
+  "channel",
+  "source_system"
  ],
  "fields": [
   {
@@ -68,6 +70,17 @@
    "label": "Last Message On",
    "search_index": 1,
    "in_list_view": 1
+  },
+  {
+   "fieldname": "channel",
+   "fieldtype": "Data",
+   "label": "Channel",
+   "description": "Set on a conversation relayed from an assistant's channel (Telegram); read only in the app"
+  },
+  {
+   "fieldname": "source_system",
+   "fieldtype": "Data",
+   "label": "Source System"
   }
  ],
  "links": [],

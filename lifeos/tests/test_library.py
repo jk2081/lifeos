@@ -947,3 +947,73 @@ class TestPages(AskCase):
 		self.assertEqual(got["timeline"][0]["title"], "Quote email q111")
 		self.assertEqual(ctx.refs[got["page"]]["route"], f"/library/pages/Life Person/{org.name}")
 		self.assertIn("error", ask_tools.run_tool(ctx, "read_page", {"name": "No such page q111"}))
+
+
+class TestRelayedChat(LifeTestCase):
+	"""Issue 125: the owner's conversation on an agent's channel, kept in one read-only thread in Chat."""
+	KEY = "i125relay"
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		frappe.db.delete("Life Connection", {"space": PRIVATE, "system": self.KEY})
+		frappe.db.delete("Life Agent Config", {"space": PRIVATE, "agent": self.KEY})
+		for name in frappe.get_all("Life Ask Thread", filters={"space": ("in", [PRIVATE, SHARED]), "source_system": self.KEY}, pluck="name"):
+			frappe.db.delete("Life Ask Message", {"thread": name})
+			frappe.delete_doc("Life Ask Thread", name, force=True, ignore_permissions=True)
+		self.connection = frappe.get_doc({"doctype": "Life Connection", "space": PRIVATE, "system": self.KEY, "label": "Hermes", "active": 1}).insert()
+		self.cfg = frappe.get_doc({"doctype": "Life Agent Config", "space": PRIVATE, "agent": self.KEY, "display_name": "Hermes"}).insert()
+		self.as_user(AGENT)
+
+	TURNS = [{"role": "owner", "text": "Add a task to call Ekta", "at": "2026-11-26 09:00:00"}, {"role": "assistant", "text": "Done, it is on Today.", "at": "2026-11-26 09:00:05"},
+		{"role": "owner", "text": "Thanks", "at": "2026-11-26 09:01:00"}]
+
+	def relay(self, turns=None, external_id="tg-100"):
+		return chats.relay(turns or self.TURNS, "Telegram", self.KEY, external_id, space=PRIVATE)
+
+	# 5
+	def test_5_three_turns_make_one_thread_a_repeat_adds_nothing_a_switched_off_source_is_refused_and_no_one_else_reads_it(self):
+		from lifeos.api import ask
+
+		out = self.relay()
+		self.assertEqual(out["added"], 3)
+		self.assertEqual(self.relay()["added"], 0)  # the same external_id again
+		self.assertEqual(self.relay()["thread"], out["thread"])
+		thread = frappe.get_doc("Life Ask Thread", out["thread"])
+		self.assertEqual((thread.title, thread.channel, thread.user), ("Hermes · Telegram", "Telegram", OWNER))
+		self.assertEqual(frappe.db.count("Life Ask Thread", {"space": PRIVATE, "source_system": self.KEY}), 1)
+		self.as_user(OWNER)
+		got = ask.thread(out["thread"])
+		self.assertEqual([(m["role"], m["text"]) for m in got["messages"]], [("user", "Add a task to call Ekta"), ("assistant", "Done, it is on Today."), ("user", "Thanks")])
+		self.assertEqual((got["readonly"], got["channel"], got["title"]), (1, "Telegram", "Hermes · Telegram"))
+		listed = [t for t in ask.threads(space=PRIVATE, q="Telegram")["rows"] if t["name"] == out["thread"]]
+		self.assertEqual((listed[0]["channel"], listed[0]["title"], listed[0]["questions"]), ("Telegram", "Hermes · Telegram", 2))
+		with self.assertRaises(frappe.ValidationError):  # you reply on the channel, not here
+			ask.ask("hello", space=PRIVATE, thread=out["thread"])
+		self.as_user(AGENT)
+		shared = chats.relay(self.TURNS, "Telegram", self.KEY, "tg-100", space=SHARED)  # the same talk in a space with a family member in it
+		self.as_user(FAMILY)  # another member of the space
+		with self.assertRaises(frappe.DoesNotExistError):
+			ask.thread(shared["thread"])
+		self.assertEqual([t for t in ask.threads(space=SHARED, q="Telegram")["rows"] if t["name"] == shared["thread"]], [])
+		self.as_user(AGENT)  # an agent cannot read it back
+		self.assertFalse(frappe.has_permission("Life Ask Thread", "read", doc=out["thread"], user=AGENT))
+		self.assertFalse(frappe.has_permission("Life Ask Message", "read", doc=frappe.get_all("Life Ask Message", filters={"thread": out["thread"]}, limit=1)[0].name, user=AGENT))  # system: the test reads as the site
+		frappe.set_user("Administrator")
+		frappe.db.set_value("Life Connection", self.connection.name, "active", 0)
+		self.as_user(AGENT)
+		with self.assertRaises(frappe.PermissionError):
+			self.relay([{"role": "owner", "text": "More", "at": "2026-11-26 10:00:00"}], "tg-200")
+		self.as_user(OWNER)
+		with self.assertRaises(frappe.PermissionError):  # only an agent relays
+			self.relay()
+
+	def test_a_turn_with_its_own_id_is_added_once_and_a_new_name_shows_in_the_title(self):
+		from lifeos.api import ask
+
+		self.relay([{"role": "owner", "text": "One", "id": "m1"}], "tg-1")
+		self.assertEqual(self.relay([{"role": "owner", "text": "One", "id": "m1"}, {"role": "assistant", "text": "Two", "id": "m2"}], "tg-2")["added"], 1)
+		frappe.set_user("Administrator")
+		frappe.db.set_value("Life Agent Config", self.cfg.name, "display_name", "Jai's assistant")
+		self.as_user(OWNER)
+		self.assertIn("Jai's assistant · Telegram", [t["title"] for t in ask.threads(space=PRIVATE, q="Telegram")["rows"]])

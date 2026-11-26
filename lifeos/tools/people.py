@@ -8,10 +8,10 @@ from lifeos.tools import actions
 
 
 def add(name: str, email: str | None = None, company: str | None = None, link_to: str | None = None, space: str | None = None,
-		source_system: str | None = None) -> dict:
+		source_system: str | None = None, asked_by: str | None = None, owner_message: str | None = None) -> dict:
 	"""Add a person by `name`, with their `email` and `company` (made as an organisation when it is new), and link them to a page (`link_to`, a page's name):
 	the page then lists them under "People" as [[Name]]. A person who is already there is reused, not added twice."""
-	return actions.write("people.add", space, {"name": name, "email": email, "company": company, "link_to": link_to}, source_system)
+	return actions.write("people.add", space, {"name": name, "email": email, "company": company, "link_to": link_to}, source_system, owner_message, asked_by)
 
 
 def _add(space: str, name: str, email: str | None = None, company: str | None = None, link_to: str | None = None) -> tuple[str, dict, dict | None]:

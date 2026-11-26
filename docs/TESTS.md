@@ -39,6 +39,8 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `ask` | `test_skills.TestAnswer` | `SETTINGS.38` |
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
 | `ingest-email` (was `triage-email`) | `test_gmail.TestDigest`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
+| one assistant: the owner's requests through an agent, the gate, `tasks_add`/`events_add`, Activity's Assistant rows, the name and the failed job | `test_agents.TestOneAssistant`, `test_permissions.TestOnlyTheOwnerIsTheOwner` | `BRAIN.73`, `SETTINGS.45`, `SETTINGS.46` |
+| relayed conversations (`chats.relay`) in Ask's History | `test_library.TestRelayedChat` | `BRAIN.74` |
 | the agent connector (`agent/connector/`) | `test_agents.TestConnector` | `BRAIN.49` to `BRAIN.51` |
 | Google through Life OS: acts, switches, the log and undo | `test_agents.TestGoogleActs`, `test_gmail.TestMailSearch`, `test_gmail.TestAskSearchesMail` | `BRAIN.52` to `BRAIN.54` |
 | Microsoft inboxes: Graph adapter, merged search, attachments, replies, the digest, connect | `test_gmail.TestMicrosoftInbox`, `test_gmail.TestConnectMicrosoft` | `SETTINGS.41` |
@@ -192,6 +194,8 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.70` the pane's tabs are Summary, Emails 9, Decisions 0 and What came of it 0, open on Summary; `ptab=emails` opens Emails; the page has the same four tabs
 - `BRAIN.71` the Summary tab shows To act on, Updates and Reports with counts and Reports as one line; Change moves a line and its task to the plate
 - `BRAIN.72` at 390 px the pane fills the width, the tabs are there and nothing is cut off
+- `BRAIN.73` Activity lists "Hermes · you asked" for an agent's act, its drawer shows the request, the Assistant chip shows only those rows and Undo removes the person; no sideways scroll at 390 px
+- `BRAIN.74` Ask's History lists a relayed conversation "on Telegram"; it opens read only with its turns in order and no question box
 - `BRAIN.64` a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"
 - `BRAIN.65` Ask "file Claude's recaps without an area" saves a rule, the answer shows "New rule … Change", and Undo removes it
 - `BRAIN.66` Gmail's Rules tab lists its sender rule and the two built-in rules in the order they are tried, with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings
@@ -417,6 +421,8 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.42` Settings > Advanced > AI offers the provider; Another service shows the address, key, models and the data line
 - `SETTINGS.43` Test connection says Working with the fake AI, and the provider's own reason when it fails on credit
 - `SETTINGS.44` Settings > Advanced > Updates shows the installed commit; with no heartbeat it shows the set-up command and no Update now; with a heartbeat Update now queues a request
+- `SETTINGS.45` naming the agent in Settings shows the name in Needs you; `pull` returns `assistant_name`; the failed job shows in red with its error
+- `SETTINGS.46` an act shows under the new name in Activity; the safety switch holds the owner's request in Needs you as "You asked"
 
 ### Phone (`tools/acceptance/phone.mjs`, 24 checks)
 

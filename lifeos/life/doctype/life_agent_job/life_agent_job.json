@@ -11,7 +11,10 @@
   "job_name",
   "schedule",
   "next_run",
-  "paused"
+  "paused",
+  "last_status",
+  "last_run",
+  "last_error"
  ],
  "fields": [
   {
@@ -63,6 +66,21 @@
    "fieldname": "paused",
    "fieldtype": "Check",
    "label": "Paused"
+  },
+  {
+   "fieldname": "last_status",
+   "fieldtype": "Data",
+   "label": "Last Status"
+  },
+  {
+   "fieldname": "last_run",
+   "fieldtype": "Data",
+   "label": "Last Run"
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Small Text",
+   "label": "Last Error"
   }
  ],
  "links": [],

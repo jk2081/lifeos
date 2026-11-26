@@ -135,16 +135,10 @@ def request(space: str, agent: str, tool: str, params: dict, asked_by: str, owne
 	"""An agent's act. Returns {status: done | waiting | failed, action, result}; refused (an error) when it is switched off or the request is not understood."""
 	if tool not in ACTS:
 		frappe.throw(_("{0} is not something an agent can do. The tools are: {1}.").format(tool, ", ".join(TOOLS)), title=_("Unknown tool"))
-	if asked_by not in (OWNER, AGENT):
-		frappe.throw(_("Say who asked: owner (the owner told the agent to) or agent (its own idea)."), title=_("Who asked?"))
 	message = " ".join((owner_message or "").split())
-	if asked_by == OWNER and not message:
-		frappe.throw(_("An act the owner asked for carries the owner's message."), title=_("The owner's message is missing"))
 	p = _clean(tool, params)
-	if asked_by == AGENT:
-		_need_switch(space, agent, tool)
+	run_now = limits.gate(space, agent, ACTS[tool][0], asked_by, message) == limits.RUN
 	title, draft = _describe(tool, p)
-	run_now = asked_by == OWNER or mode_of(space, agent, tool) == limits.AUTO
 	row = frappe.get_doc({"doctype": "Life Agent Action", "space": space, "agent": agent, "action": ACTS[tool][0], "title": title[:200], "draft": draft[:5000],
 		"status": "Waiting", "asked_by": asked_by, "request": message[:500] or None, "params": json.dumps({"tool": tool, **p}), "happened_on": now_datetime(),
 		"delivered": 1}).insert(ignore_permissions=True)  # system: the agent's own log; the space write check is in the API

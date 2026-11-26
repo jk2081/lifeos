@@ -5,9 +5,9 @@ from frappe import _
 from lifeos.tools import actions
 
 
-def save(title: str, body: str, area: str, part: str | None = None, space: str | None = None, source_system: str | None = None) -> dict:
+def save(title: str, body: str, area: str, part: str | None = None, space: str | None = None, source_system: str | None = None, asked_by: str | None = None, owner_message: str | None = None) -> dict:
 	"""Save `body` (Markdown), for example a summary you wrote, as a note called `title` under an `area` (and a `part`), by their names."""
-	return actions.write("notes.save", space, {"title": title, "body": body, "area": area, "part": part}, source_system)
+	return actions.write("notes.save", space, {"title": title, "body": body, "area": area, "part": part}, source_system, owner_message, asked_by)
 
 
 def _save(space: str, title: str, body: str, area: str, part: str | None = None) -> tuple[str, dict, dict | None]:

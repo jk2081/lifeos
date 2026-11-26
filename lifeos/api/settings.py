@@ -5,6 +5,8 @@ from frappe.query_builder import Order
 from frappe.query_builder import functions as fn
 
 from lifeos import permissions
+from lifeos.agents import limits
+from lifeos.brain import agent_page
 from lifeos.goals import readings
 from lifeos.api.utils import parse
 
@@ -121,11 +123,19 @@ def _agents(spaces):
 	people = _people([u for u in users if _visible_user(u)])
 	last = _last_filed(list(people))
 	out = []
+	configs = {}  # the agent's own settings in Life OS (issue 125): what the owner calls it, its safety switch and its last failed job
+	rows = frappe.get_all("Life Agent Config", filters={"agent_user": ("in", list(people) or ["-"])}, order_by="creation asc",  # system: the owner's own list, as above
+		fields=["name", "space", "agent", "agent_user", "display_name", "owner_runs_now"])
+	for c in rows:
+		configs.setdefault(c.agent_user, c)
 	for u, p in people.items():
 		if not p["is_agent"]:
 			continue
 		mine = {r["space"]: r for r in reach.get(u, [])}
-		out.append({"user": u, "full_name": p["full_name"], "image": p["image"], "last_filed": str(last[u]) if last.get(u) else None,
+		cfg = configs.get(u)
+		failed = agent_page.failed_job(cfg.space, cfg.agent) if cfg else None
+		out.append({"user": u, "key": cfg.agent if cfg else None, "config_space": cfg.space if cfg else None, "assistant_name": (cfg.display_name or "") if cfg else "",
+			"owner_runs_now": int(limits.owner_runs_now(cfg)) if cfg else 1, "failed_job": failed, "full_name": p["full_name"], "image": p["image"], "last_filed": str(last[u]) if last.get(u) else None,
 			"spaces": [mine.get(s["name"]) or {"space": s["name"], "access": None, "agents_can_read_vault": s["agents_can_read_vault"]} for s in spaces]})
 	return sorted(out, key=lambda a: a["full_name"].lower())
 

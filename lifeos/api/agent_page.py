@@ -71,6 +71,13 @@ def rename(key: str, name: str, space: str | None = None):
 
 
 @frappe.whitelist(methods=["POST"])
+def set_owner_runs_now(key: str, on: int = 1, space: str | None = None):
+	"""The safety switch: your requests through this agent run at once (on, the default) or wait in Needs you like the agent's own idea (off)."""
+	space, key = _owner(space, key)
+	return pages.set_owner_runs_now(space, key, bool(int(on)))
+
+
+@frappe.whitelist(methods=["POST"])
 def decide(request: str, decision: str, space: str | None = None):
 	"""Approve (approve) or say no (no) to something an agent waits to do. The same list as Brain > Needs you."""
 	permissions.require_login()

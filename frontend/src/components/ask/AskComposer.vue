@@ -1,5 +1,6 @@
 <template>
-  <div class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-base px-3 py-2.5 focus-within:border-outline-gray-4" data-ask-composer>
+  <p v-if="ask.channel" class="rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5 text-sm text-ink-gray-7" data-ask-readonly>This conversation is on {{ ask.channel }}. You reply there, not here.</p>
+  <div v-else class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-base px-3 py-2.5 focus-within:border-outline-gray-4" data-ask-composer>
     <Textarea ref="box" v-model="ask.draft" variant="ghost" class="!px-0" :rows="2" :placeholder="placeholder" aria-label="Your question" data-ask-input
       @keydown.enter.exact.prevent="go" />
     <div class="flex flex-wrap items-center gap-2">

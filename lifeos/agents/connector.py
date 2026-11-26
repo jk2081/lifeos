@@ -80,7 +80,8 @@ def _sync_jobs(space, agent, jobs) -> int:
 	for r in _check_rows(jobs, "jobs"):
 		ext = _text(r["id"], 140)
 		keep.add(ext)
-		values = {"job_name": _text(r.get("name"), 140) or ext, "schedule": _text(r.get("schedule"), 140), "next_run": _text(r.get("next_run"), 60)}
+		values = {"job_name": _text(r.get("name"), 140) or ext, "schedule": _text(r.get("schedule"), 140), "next_run": _text(r.get("next_run"), 60),
+			"last_status": _text(r.get("last_status"), 40).lower(), "last_run": _text(r.get("last_run"), 60), "last_error": _text(r.get("last_error"), 300)}
 		if ext not in held:
 			values["paused"] = cint(bool(r.get("paused")))
 		wrote += _upsert("Life Agent Job", space, agent, ext, values)
@@ -168,7 +169,7 @@ def pull(space: str, system: str) -> dict:
 		filters={"space": space, "agent": system, "status": "Waiting"}, fields=["name", "kind", "target", "payload"], order_by="creation asc", limit=500)]  # system: the connector's queue
 	decisions = [{"id": a.external_id, "decision": "approved" if a.status == "Approved" else "declined"} for a in frappe.get_all("Life Agent Action",
 		filters={"space": space, "agent": system, "status": ("in", ["Approved", "Declined"]), "delivered": 0, "external_id": ("is", "set")}, fields=["external_id", "status"], limit=500)]  # system: as above
-	return {"abilities": limits.abilities(cfg), "changes": changes, "decisions": decisions}
+	return {"abilities": limits.abilities(cfg), "changes": changes, "decisions": decisions, "assistant_name": limits.display_name(cfg)}
 
 
 def confirm(space: str, system: str, changes=None, delivered=None) -> dict:

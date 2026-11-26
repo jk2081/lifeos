@@ -8,7 +8,7 @@
   <!-- Ask: a thread, with the records it used and questions to try -->
   <div v-show="tab.current.value === 'ask'" class="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_22rem]" data-ask-page>
     <div class="flex min-h-[60vh] flex-col gap-4 px-4 pb-6 pt-4 md:px-7">
-      <div class="flex-1"><AskThread />
+      <div class="flex-1"><h2 v-if="ask.channel" class="mb-3 text-base-medium text-ink-gray-9" data-ask-channel-title>{{ ask.title }}</h2><AskThread />
         <div v-if="!ask.messages.length && !ask.refusal" class="text-base text-ink-gray-6" data-ask-empty>Ask about anything in your records. Answers cite where they came from and suggest
           what to do; nothing changes until you click.</div></div>
       <div class="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-4"><AskComposer /></div>
@@ -88,7 +88,7 @@
     <Card flush class="!px-4">
       <Row v-for="t in hist.rows" :key="t.name" class="!items-center" data-history-row>
         <div class="min-w-0 flex-1"><a href="#" class="break-words text-base text-ink-gray-9 hover:underline" @click.prevent="openThread(t.name)">{{ t.title }}</a>
-          <div class="text-sm text-ink-gray-6">{{ [t.scope_label, t.questions + ' question' + (t.questions === 1 ? '' : 's'), t.last_message_on].filter(Boolean).join(' · ') }}</div></div>
+          <div class="text-sm text-ink-gray-6">{{ [t.channel ? 'on ' + t.channel : t.scope_label, t.questions + (t.channel ? ' message' : ' question') + (t.questions === 1 ? '' : 's'), t.last_message_on].filter(Boolean).join(' · ') }}</div></div>
         <Button variant="ghost" icon="lucide-trash-2" :label="'Delete ' + t.title" data-history-delete @click="remove(t)" />
       </Row>
       <Empty v-if="!hist.rows.length" title="No questions yet." hint="Questions you ask from any screen are kept here, for you only." />
@@ -143,6 +143,7 @@ const setQuery = (q) => router.replace({ query: { ...route.query, ...q } })
 
 function tryAsk(q) {
   ask.thread = null
+  ask.channel = ''
   ask.messages = []
   ask.scope = scopeFromRoute()
   send(q)
@@ -194,7 +195,7 @@ async function loadHistory() {
 }
 function remove(t) {
   dialog.danger({ title: 'Delete this question?', message: `“${t.title}” and its answers are deleted for good.`, confirmLabel: 'Delete',
-    onConfirm: async () => { await brainData.ask.delete_thread({ name: t.name }); if (ask.thread === t.name) { ask.thread = null; ask.messages = [] } loadHistory() } })
+    onConfirm: async () => { await brainData.ask.delete_thread({ name: t.name }); if (ask.thread === t.name) { ask.thread = null; ask.channel = ''; ask.messages = [] } loadHistory() } })
 }
 watch(() => [route.query.istatus, route.query.kind, route.query.area, route.query.actionable], loadInsights)
 watch(() => tab.current.value, (v) => { if (v === 'history') loadHistory() })
