@@ -20,12 +20,29 @@
         <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/settings', query: { tab: 'rules' } }" data-new-rule-change>Change</RouterLink></div>
     </div>
 
-    <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length && !contradictions.length && !agentRequests.length" class="py-2" data-needs-empty>
+    <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length && !contradictions.length && !agentRequests.length && !looksDone.length" class="py-2" data-needs-empty>
       <Empty title="Nothing needs you.">
         <p class="mt-1">Things you capture or connect will show up here.</p>
         <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-needs-capture @click="openChat()" />
       </Empty>
     </Card>
+
+    <section v-if="looksDone.length" class="flex flex-col gap-2" data-needs-looks-done>
+      <div>
+        <h2 class="text-base-medium text-ink-gray-9">Looks done</h2>
+        <p class="text-sm text-ink-gray-6">A reply seems to answer something you were waiting for. Confirm and it is done; Not yet keeps it waiting.</p>
+      </div>
+      <Card flush class="!px-4">
+        <Row v-for="t in looksDone" :key="t.name" :pane="'task:' + t.name" :label="t.title" class="!items-center" data-needs-row data-looks-done-row :data-task="t.name">
+          <div class="min-w-0 flex-1">
+            <div class="break-words text-base-medium text-ink-gray-9">Looks done: {{ t.looks_done_note || t.waiting_on }}</div>
+            <div class="text-sm text-ink-gray-6">{{ t.title }} · {{ t.waiting_on }}</div>
+          </div>
+          <Button v-if="writable" class="relative" size="sm" variant="solid" label="Confirm" :aria-label="`Confirm: ${t.title}`" data-looks-done-confirm @click="confirmLooks(t)" />
+          <Button v-if="writable" class="relative" size="sm" label="Not yet" data-looks-done-not-yet @click="notYetLooks(t)" />
+        </Row>
+      </Card>
+    </section>
 
     <section v-if="agentRequests.length" class="flex flex-col gap-2" data-needs-agent>
       <div>
@@ -153,7 +170,9 @@ import ContradictionCard from '@/components/brain/ContradictionCard.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { brainData } from '@/data/brain'
 import { canWrite, store } from '@/lib/store'
-import { openRef } from '@/lib/pane'
+import { onRecordChanged, openRef } from '@/lib/pane'
+import { confirmDone, notYet } from '@/lib/handoff'
+import Row from '@/components/ui/Row.vue'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { dotClass } from '@/lib/lens'
 
@@ -165,6 +184,7 @@ const allBusy = ref(false)
 const writable = computed(() => canWrite() && !store.isAgent)
 const rows = computed(() => data.value?.rows || [])
 const lessons = computed(() => data.value?.lessons || [])
+const looksDone = computed(() => data.value?.looks_done || [])
 const agentRequests = computed(() => data.value?.agent_requests || [])
 const newRules = computed(() => data.value?.new_rules || [])
 const changing = ref(null)
@@ -176,6 +196,8 @@ const filable = computed(() => asked.value.filter((r) => !r.alt_area && !r.block
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`
 const dot = (area) => dotClass((lookups.areas || []).find((a) => a.name === area))
 
+const confirmLooks = async (t) => { await confirmDone(t.name, t.title); await load() }
+const notYetLooks = async (t) => { await notYet(t.name); await load() }
 async function load() {
   const res = await tryCall(() => brainData.brain.needs_you({ space: store.space }))
   if (res) data.value = res
@@ -243,6 +265,7 @@ async function retry(u) {
 async function fileMyself(u) {
   if (await tryCall(() => brainData.inbox.file_myself({ item: u.item }))) router.push(`/item/${u.item}`)
 }
+onRecordChanged(load)
 onMounted(async () => { await loadLookups(); await load() })
 watch(() => [store.space], load)
 </script>

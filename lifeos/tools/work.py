@@ -26,6 +26,35 @@ def _add_task(space: str, title: str, area: str | None = None, part: str | None 
 	return _("Made task {0}").format(task["title"]), {"task": task["name"], "title": task["title"], "due_date": str(task.get("due_date") or ""), "person": found.full_name if found else ""}, {"delete": [["Life Task", task["name"]]]}
 
 
+def hand_off(person: str, what: str, check_by: str | None = None, how: str = "track", channel: str = "email", space: str | None = None, source_system: str | None = None,
+		asked_by: str | None = None, owner_message: str | None = None) -> dict:
+	"""Hand something off to `person`: a Waiting task (`what`, looked at again on `check_by`). `how`: track (nothing is sent, the default), draft (a message is written for
+	the owner to send, edit or drop) or send (an email goes at once: only when the owner said send). `channel` is email or whatsapp; Life OS never sends WhatsApp, it
+	makes the link. `how: done` says the person already sent it: their waiting task is Done."""
+	return actions.write("tasks.hand_off", space, {"person": person, "what": what, "check_by": check_by, "how": how, "channel": channel, "asked_by": asked_by or actions.OWNER,
+		"owner_message": owner_message}, source_system, owner_message, asked_by)
+
+
+def _hand_off(space: str, person: str, what: str, check_by: str | None = None, how: str = "track", channel: str = "email", asked_by: str = "owner",
+		owner_message: str | None = None) -> tuple[str, dict, dict | None]:
+	from lifeos.tasks import handoff
+
+	if how == "done":
+		out = handoff.said_done(space, person, what)
+		return _("Marked “{0}” done: {1} sent it").format(out["title"], out["who"]), {"task": out["task"], "title": out["title"]}, None
+	out = handoff.hand_off_task(space, person, what, check_by, how, channel, None, asked_by, owner_message, what)
+	if out["sent"]:
+		line = _("Sent the email to {0} and waiting on them for {1} (look again {2})").format(out["who"], what, out["check_by"])
+	elif out["waiting"]:
+		line = _("Waiting on {0} for {1}; the email waits for your OK in Needs you").format(out["who"], what)
+	elif out["how"] == "draft":
+		line = _("Waiting on {0} for {1} (look again {2}); a message is drafted, nothing is sent").format(out["who"], what, out["check_by"])
+	else:
+		line = _("Waiting on {0} for {1} (look again {2}); nothing was sent").format(out["who"], what, out["check_by"])
+	return line, {"task": out["task"], "title": what, "person": out["who"], "how": out["how"], "channel": channel, "check_by": out["check_by"], "message": out["message"] or "",
+		"whatsapp": out["whatsapp"] or "", "needs_phone": int(out["needs_phone"])}, out["undo"]
+
+
 def add_event(title: str, start: str, end: str | None = None, all_day: bool = False, description: str | None = None, space: str | None = None, source_system: str | None = None, asked_by: str | None = None, owner_message: str | None = None) -> dict:
 	"""Put an event on the calendar: `start` and `end` as YYYY-MM-DD or YYYY-MM-DD HH:MM."""
 	return actions.write("events.add", space, {"title": title, "start": start, "end": end, "all_day": all_day, "description": description}, source_system, owner_message, asked_by)

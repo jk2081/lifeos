@@ -8,10 +8,10 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | --- | --- |
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc`, files read on the server before any model (`TestReadLocally`) |
 | `test_chat.py` | Chat everywhere (issue 120: `TestChatEverywhere`: ID numbers found by patterns and only the last four kept, a PAN image saved to the Vault with the model's input holding no number, one question when whose card it is cannot be told, other files to the Brain, a file not the person's own refused, the mic turns speech into text on the server with no model, a note on the open event, "cancelled" deleting the event in Google after the owner's own message while an agent that asks first only waits, files saved with no model). Chat on Flow (issue 119): `chat.send` starts the thread's Flow Session and a run with the scope and the open record, writes one usage row and refuses at the cap; the tools' Vault ("1 sensitive document"), space and scope rules; the Done list with Undo; citations that keep their numbers; the patch that moves old Ask threads; the deleted modules |
-| `test_brain.py` | The Brain: summaries as data, asks to the plate or the waiting pile, learnt routes, closing by itself (`TestSummaryLines`, issue 118); who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
+| `test_brain.py` | The Brain: summaries as data, asks to the plate or the waiting pile, learnt routes, a close as a proposal (`TestSummaryLines`, issue 118; `TestLooksDone`, issue 130: Looks done, Confirm, Not yet, closing by itself after three confirmations, a new date moves the check date); who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill (`TestRules`, issue 117: recent decisions as examples, rules before any model, the same correction twice makes a rule, built-in rules, most specific first, the rules API, a source's page, Not needed twice and Always ask): runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
-| `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc` |
+| `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc`; handing off (`TestHandOff`, issue 130: track, draft and send with the fake Google, WhatsApp as a link, a person with a user in the space assigned, the default check date, nudges, the waiting list's groups and a person's owed items) |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views; the dashboard (`TestDashboard`, issue 123: `dashboard.get` for each view with its cards and panels, the Brain line, coming up in six lines and the rest counted, the lists a number opens, a sensitive item counted and never named, filed alone against the month before and not counting what the owner changed, simple mode swapping the goal cards, the empty space's lines and actions, a bounded number of queries, people only) |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
 | `test_library.py` | Library (`TestPages`: pages that build themselves, issue 111: an email linked to a known person and their organisation, a page made on a reply thread with Undo, a proposal after three emails, no page for a promotion, "same company" merging and adding the alias, the daily briefs with sources and no Vault text, AI usage and the cap, per-user pins capped at seven, a wrong link taken off, Your notes kept): notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
@@ -29,7 +29,8 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 
 | Skill | Unit test | Acceptance |
 | --- | --- | --- |
-| `process-capture` | `test_brain.TestRouting`, `test_skills.TestExamples` | `SETTINGS.38` |
+| `process-capture` | `test_brain.TestRouting`, `test_brain.TestLooksDone`, `test_skills.TestExamples` | `SETTINGS.38`, `TODAY.73` |
+| `hand-off` | `test_tasks.TestHandOff`, `test_skills.TestExamples` | `BRAIN.77`, `TODAY.73` |
 | `guess-area` | `test_brain` (task areas), `test_skills.TestNewSkillsExamples` | `SETTINGS.38` |
 | `tidy-backlog` | `test_skills.TestTidyBacklog` | `SETTINGS.38` |
 | `plan-week` | `test_skills.TestPlanWeek` | `SETTINGS.38` |
@@ -142,6 +143,10 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.70` Day, Week, Month and Year switch in place with four cards and two panels each; Open full page goes to the record's page
 - `TODAY.71` on an empty space every card of every view says what will appear and offers one action
 - `TODAY.72` every view in light and dark has no script error and nothing cut off
+- `TODAY.73` the Waiting card shows the count, late and looks done and opens the list grouped Looks done, Late, This week, Later; Confirm closes a looks-done row and Needs you drops by one; Nudge opens the draft; By person regroups
+- `TODAY.74` a waiting row opens the task layer with what was asked, the message and the reply; Back returns to the list
+- `TODAY.75` the list and the task layer are full screen with Back at 390 px; the WhatsApp link has the phone and the text, URL-encoded, and a WhatsApp draft has no Send
+- `TODAY.76` on an empty space the Waiting list says what will appear and offers + Hand off
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 
@@ -215,6 +220,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.73` Activity lists "Hermes · you asked" for an agent's act, its drawer shows the request, the Assistant chip shows only those rows and Undo removes the person; no sideways scroll at 390 px
 - `BRAIN.74` Ask's History lists a relayed conversation "on Telegram"; it opens read only with its turns in order and no question box
 - `BRAIN.75` Chat runs on Flow (a real Flow Server, the fake model of `tools/fake_openai.py`): the box reads "Search or chat", a question streams an answer in the Chat panel and writes a usage row, ⌘K opens the Chat panel, `/` the search palette, `/life/ask` goes to Today, and no visible text says Ask (screen, panel, ⌘K, Chat page, Settings)
+- `BRAIN.77` in Chat "Vivek owes me the ITR draft by Friday" makes a waiting task and says nothing was sent; "Ask Vivek for the ITR draft by Friday" drafts, with Send on the task
 - `BRAIN.76` with no model in Flow, a question says "Chat needs an AI key" with its link to Settings › AI, and at the monthly cap Chat refuses and shows the spend
 - `BRAIN.64` a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"
 - `BRAIN.66` Gmail's Rules tab lists its sender rule and the two built-in rules in the order they are tried, with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings
@@ -358,6 +364,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.45` Your notes takes text, and a brief rewrite afterwards leaves it unchanged
 - `LIBRARY.46` the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library
 - `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
+- `LIBRARY.50` a person's layer shows "What they owe you" with the ITR draft, and "What you owe them"
 - `LIBRARY.49` person: shows a company's people and mentions, a person opens on top of it with Back, and an empty person says what will appear
 - `LIBRARY.48` a scanned bill is read on the server (OCRmyPDF) and found by a word from its contents
 

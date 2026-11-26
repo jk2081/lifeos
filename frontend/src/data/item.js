@@ -11,7 +11,7 @@ export const itemData = {
   trash: group('trash', ['delete']),
   library: group('library', ['get', 'set_sensitive']),
   wiki: group('wiki', ['changes', 'move']),
-  tasks: group('tasks', ['carry_forward', 'get', 'quick_add', 'set_status', 'update']),
+  tasks: group('tasks', ['carry_forward', 'get', 'hand_off', 'handoff_discard', 'handoff_edit', 'handoff_get', 'handoff_send', 'looks_done_confirm', 'looks_done_not_yet', 'nudge', 'nudge_decide', 'person_owed', 'person_phone', 'quick_add', 'set_status', 'update']),
   goals: group('goals', ['add_to_cycle', 'close', 'detail', 'get', 'set_status', 'toggle_habit', 'update']),
   chats: group('chats', ['close_item', 'get', 'make_task']),
   someday: group('someday', ['create']),

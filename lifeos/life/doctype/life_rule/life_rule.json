@@ -122,7 +122,7 @@
    "fieldname": "asks_to",
    "fieldtype": "Select",
    "label": "Asks go to",
-   "options": "\nPlate\nWaiting",
+   "options": "\nPlate\nWaiting\nClose",
    "depends_on": "eval:doc.action=='Route'"
   },
   {

@@ -1,0 +1,41 @@
+{
+ "title": "An ask by email names the thing and the date",
+ "input": {
+  "data": {
+   "kind": "ask",
+   "channel": "email",
+   "owner": "Jai",
+   "person": "Vivek Shah",
+   "what": "the ITR draft",
+   "by": "2026-11-28",
+   "nudges": 0,
+   "asked_on": null
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "body",
+    "contains": "ITR draft"
+   }
+  },
+  {
+   "answer": {
+    "path": "subject",
+    "contains": "ITR"
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"subject\": \"ITR draft by Friday\", \"body\": \"Hi Vivek,\\n\\nCould you send me the ITR draft by Friday 28 Nov?\\n\\nThanks,\\nJai\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "2dd23f697d18b3cd"
+}

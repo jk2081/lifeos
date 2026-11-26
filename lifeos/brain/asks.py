@@ -5,9 +5,10 @@ writes the Markdown copy that search and the older screens read, and `route_line
 on the owner's plate when only he can do it, in the waiting pile (status Waiting, a person, a check-by date) when someone else
 is on it or when it is not sure. The owner changes a line with `change`; moving a line between plate and pile twice for one
 sender makes a Route rule (issue 117's rules), so the Brain gets it right the next time. A reply that says it is done closes
-a waiting task (`close_waiting`). The Brain never sends anything.
+a waiting task: a close is a proposal ("Looks done") the owner confirms (`lifeos.tasks.handoff`). The Brain never sends anything.
 """
 import json
+import re
 
 import frappe
 from frappe import _
@@ -15,6 +16,7 @@ from frappe.utils import add_days, cint, getdate, now_datetime, today
 
 from lifeos import permissions
 from lifeos.brain import rules
+from lifeos.tasks import handoff
 
 WORDS = 20  # the most words in one line
 FACTS = 5
@@ -245,10 +247,16 @@ def waiting_rows(space) -> list:
 
 
 def past_check(space) -> dict:
-	"""The one line Today may show about the waiting pile: how many are past their check-by date, and whose."""
-	rows = [r for r in waiting_rows(space) if r["past"]]
+	"""The one line Today may show about the waiting pile: the most overdue item ("Vivek's ITR draft is a day late"), how many are late, and whose."""
+	rows = [r for r in waiting_rows(space) if r["past"] and not frappe.db.get_value("Life Task", r["name"], "looks_done_item")]
 	names = list(dict.fromkeys(r["who"] for r in rows))
-	return {"count": len(rows), "names": names[:4]}
+	line = None
+	if rows:
+		first = min(rows, key=lambda r: r["check_by"])
+		days = (getdate(today()) - getdate(first["check_by"])).days
+		late = _("a day late") if days == 1 else _("{0} days late").format(days)
+		line = _("{0}'s {1} is {2}").format(first["who"].split(" (")[0], first["title"], late) + (" · " + _("and {0} more").format(len(rows) - 1) if len(rows) > 1 else "")
+	return {"count": len(rows), "names": names[:4], "line": line}
 
 
 def waiting_change(task: str, to: str) -> dict:
@@ -287,39 +295,49 @@ def _mark_line(item, task, to):
 			return
 
 
-def nudge(task: str) -> dict:
-	"""The two-line follow-up the owner may send himself. It is a draft: Life OS never sends on its own."""
-	doc = permissions.get_doc_checked("Life Task", task, "read")
-	who = (doc.waiting_on or "").split(" (")[0] or "there"
-	since = str(doc.creation)[:10]
-	text = _("Hi {0}, a quick nudge on this: {1}. It has been open since {2}. Could you let me know where it stands?").format(who.split(" ")[0], doc.title, since)
-	return {"text": text, "to": who}
-
-
 # ---- a reply that says it is done ----
+WAITING_CAP = 10  # the waiting tasks offered to the model for one capture
+
+
+def _address(text) -> str:
+	"""The email address in a sender such as "Vivek <vivek@x.com>"; "" when there is none."""
+	m = re.search(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+", text or "")
+	return m.group(0).lower() if m else ""
+
+
 def waiting_for(item) -> list:
-	"""The open waiting tasks the Brain may close from this capture: those of the same sender or the same thread. They are given to the model."""
-	sender = (item.get("sender") or "").strip().lower()
+	"""The open waiting tasks the Brain may close or move from this capture: those of the person who wrote it (the sender's address is the person's email,
+	or the task was handed off or came in on the same thread), at most 10, newest first. They are given to the model."""
+	sender = _address(item.get("sender")) or (item.get("sender") or "").strip().lower()
 	thread = item.get("external_id")
+	emails = {p.name: (p.email or "").strip().lower() for p in frappe.get_all("Life Person", filters={"space": item.space, "email": ("is", "set")}, fields=["name", "email"], limit=5000)} if sender else {}  # system: the owner's own people, to match the sender
 	rows = []
-	for t in frappe.get_all("Life Task", filters={"space": item.space, "status": "Waiting", "is_archived": 0}, fields=["name", "title", "waiting_on", "inbox_item"], limit=50):  # system: the owner's own waiting pile
+	for t in frappe.get_all("Life Task", filters={"space": item.space, "status": "Waiting", "is_archived": 0}, fields=["name", "title", "waiting_on", "waiting_on_person", "inbox_item", "handed_off_thread"],  # system: the owner's own waiting pile
+			order_by="creation desc", limit=200):
 		origin = frappe.db.get_value("Life Inbox Item", t.inbox_item, ["sender", "external_id"], as_dict=True) if t.inbox_item else None
-		if origin and t.inbox_item != item.name and ((thread and origin.external_id == thread) or (sender and (origin.sender or "").lower() == sender)):
+		same_thread = thread and (t.handed_off_thread == thread or (origin and origin.external_id == thread))
+		same_person = sender and (emails.get(t.waiting_on_person) == sender or (origin and t.inbox_item != item.name and sender in ((origin.sender or "").lower(), _address(origin.sender))))
+		if (same_thread or same_person) and t.inbox_item != item.name:
 			rows.append({"task": t.name, "title": t.title, "waiting_on": t.waiting_on})
+		if len(rows) >= WAITING_CAP:
+			break
 	return rows
 
 
-def close_waiting(item, closes) -> list:
-	"""Mark Done the waiting tasks the model says this capture settles. Only tasks it was offered count. Each says which item closed it, so
-	Activity lists it and the weekly review shows it under "Closed by itself" with Change."""
+def close_waiting(item, closes, moves=None) -> dict:
+	"""What the model says about the waiting tasks it was offered: `closes` are proposals ("Looks done", for the owner to confirm; closed straight away only for a
+	person whose answers the owner has taught it to close), `moves` give a new check date. Only tasks it was offered count."""
 	offered = {r["task"] for r in waiting_for(item)}
-	done = []
+	out = {"closed": [], "proposed": [], "moved": []}
 	for c in closes or []:
 		name = c.get("task") if isinstance(c, dict) else None
 		if name in offered and frappe.db.get_value("Life Task", name, "status") == "Waiting":
-			frappe.db.set_value("Life Task", name, {"status": "Done", "completed_on": today(), "closed_by_brain": 1, "closed_by_item": item.name})
-			done.append(name)
-	return done
+			out["closed" if handoff.propose_close(item, name, c.get("reason")) else "proposed"].append(name)
+	for m in moves or []:
+		name = m.get("task") if isinstance(m, dict) else None
+		if name in offered and name not in out["closed"] + out["proposed"] and frappe.db.get_value("Life Task", name, "status") == "Waiting" and handoff.move_check(item, name, m.get("check_by"), m.get("reason")):
+			out["moved"].append(name)
+	return out
 
 
 def closed_by_itself(space, since) -> list:
@@ -333,4 +351,6 @@ def reopen(task: str) -> dict:
 	doc = permissions.get_doc_checked("Life Task", task, "write")
 	doc.update({"status": "Waiting", "completed_on": None, "closed_by_brain": 0, "closed_by_item": None, "check_by": next_review_date()})
 	doc.save()
+	if doc.waiting_on_person:
+		handoff.forget_rule(doc.space, doc.waiting_on_person)  # Change on a close it made by itself is a Not yet: the rule goes
 	return {"task": doc.name, "status": doc.status}

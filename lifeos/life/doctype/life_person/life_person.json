@@ -12,6 +12,8 @@
   "organisation",
   "role",
   "email",
+  "phone",
+  "close_confirms",
   "aliases",
   "area",
   "wiki_page",
@@ -139,6 +141,20 @@
    "fieldname": "is_archived",
    "fieldtype": "Check",
    "label": "Archived",
+   "default": "0"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "close_confirms",
+   "fieldtype": "Int",
+   "label": "Answers confirmed in a row",
+   "read_only": 1,
+   "hidden": 1,
    "default": "0"
   }
  ],

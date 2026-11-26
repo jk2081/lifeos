@@ -34,6 +34,8 @@ SCHEMAS = {
 			},
 			"closes": {"type": "array", "description": "Waiting tasks this capture settles (a reply that says it is done): only ids from waiting_tasks_on_this_thread.", "items": {
 				"type": "object", "additionalProperties": False, "required": ["task"], "properties": {"task": {"type": "string"}, "reason": {"type": "string"}}}},
+			"moves": {"type": "array", "description": "Waiting tasks this capture gives a new date for (\"will send Monday\"): only ids from waiting_tasks_on_this_thread.", "items": {
+				"type": "object", "additionalProperties": False, "required": ["task", "check_by"], "properties": {"task": {"type": "string"}, "check_by": {"type": "string", "description": "YYYY-MM-DD"}, "reason": {"type": "string"}}}},
 			"skipped": {"type": "array", "items": {"type": "string"}, "description": "What was left out on purpose, one short line each."},
 		},
 	},
@@ -76,6 +78,7 @@ SCHEMAS.update({
 	"brief-result": _obj(["sentences"], {"sentences": _list(_obj(["text", "sources"], {"text": _S, "sources": _list({"type": "integer"})}))}),
 	"reflect-result": _obj(["sentence"], {"sentence": _S}),
 	"key-date": _obj(["key", "reason"], {"key": {"type": "boolean"}, "reason": _S}),
+	"hand-off-message": _obj(["subject", "body"], {"subject": _S, "body": _S}),
 	"area-guess": _obj(["area", "confidence"], {"area": _S, "confidence": {"type": "integer"}}),
 	"wiki-check": _obj(["orphans", "missing", "stale", "contradictions"], {
 		"orphans": _list(_obj(["page", "action"], {"page": _S, "action": {"type": "string", "enum": ["link", "archive"]}, "link_to": _S, "reason": _S})),

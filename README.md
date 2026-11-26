@@ -323,6 +323,14 @@ Every method is whitelisted under `lifeos.api`, checks space membership before i
 | `tasks.confirm_area` | `task, area=None` | Confirm the area the Brain guessed for a task (a task saved without an area gets one, marked `area_guessed` with `area_confidence`), or move it to `area`. Either clears the mark; a move is kept as an area correction in `Life Action Log`. |
 | `tasks.carry_forward` | `task` | Copy an open task into next month's plan, mark the old one Carried and set carried_from. |
 | `tasks.open_loops` | `space=None, start=0, page_length=50` | Open tasks older than 14 days with no due date. |
+| `tasks.hand_off` | `person, what=None, check_by=None, how='track', channel='email', task=None, space=None` | Hand something off: a Waiting task with the person and a check date (the one named, else the person's usual days, else 3 working days). `how`: track (nothing sent), draft (a message written for you to send, edit or drop) or send (an email goes at once). Life OS never sends WhatsApp: it returns a link. |
+| `tasks.handoff_get` | `task` | What the task layer shows of a hand-off: the ask, the message, replies and nudges, the WhatsApp link. |
+| `tasks.handoff_edit` · `handoff_send` · `handoff_discard` | `task, text` · `task, text=None` · `task` | Edit a draft, send the drafted email, or drop the draft. |
+| `tasks.person_phone` | `person, phone` | Save a person's phone, for the WhatsApp link. |
+| `tasks.nudge` | `task, channel=None` | A two-line follow-up as an email draft or the WhatsApp link; the check date moves 3 days on. |
+| `tasks.nudge_decide` | `task, to` | After two nudges: `week`, `plate` or `drop`. |
+| `tasks.looks_done_confirm` · `looks_done_not_yet` | `task` | Confirm that a reply answered a waiting task (it is Done, the attachment filed with it), or leave it waiting. |
+| `tasks.waiting_list` · `person_owed` | `space=None` · `person` | The waiting list in its groups (looks_done, late, week, later); what a person owes you and what you owe them. |
 
 **`lifeos.api.timeline`**
 

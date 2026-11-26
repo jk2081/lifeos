@@ -239,4 +239,13 @@ def _key_date(data):
 	return {"key": key, "reason": "marks something in the plan" if key else "a routine meeting"}
 
 
-SKILLS = {"tidy-backlog": _tidy, "plan-week": _plan, "notice": _notice, "define-goal": _define, "reflect": _reflect, "guess-area": _area, "key-date": _key_date}
+def _hand_off(data):
+	"""The acceptance site's stand-in for the hand-off skill: a short ask or a two-line nudge, naming the thing and the date."""
+	first = (data.get("person") or "there").split(" ")[0]
+	what, by = data.get("what") or "it", data.get("by")
+	if data.get("kind") == "nudge":
+		return {"subject": f"Re: {what}"[:60] if data.get("channel") == "email" else "", "body": f"Hi {first}, a quick nudge on {what}. Could you let me know where it stands?"}
+	return {"subject": f"{what}{' by ' + by if by else ''}"[:60] if data.get("channel") == "email" else "", "body": f"Hi {first}, could you send me {what}{' by ' + by if by else ''}? Thanks, {data.get('owner') or ''}".strip()}
+
+
+SKILLS = {"hand-off": _hand_off, "tidy-backlog": _tidy, "plan-week": _plan, "notice": _notice, "define-goal": _define, "reflect": _reflect, "guess-area": _area, "key-date": _key_date}

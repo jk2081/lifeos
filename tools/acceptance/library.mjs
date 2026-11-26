@@ -1370,3 +1370,37 @@ for n in frappe.get_all("Life Task", filters={"title": ["like", "${T}%"]}, pluck
     frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
   }
 }
+
+// Issue 130: a person's layer shows what they owe you and what you owe them.
+for (const width of WIDTHS) {
+  const u = await session('owner@lifeos.test', width)
+  const pg = u.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  try {
+    const seeded = JSON.parse(bench(`import json
+from frappe.utils import add_days, today
+for n in frappe.get_all("Life Task", filters={"title": ["like", "I130L %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "%I130L"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+p = frappe.get_doc({"doctype": "Life Person", "space": "${SPACE}", "full_name": "Vivek I130L", "kind": "Person"}).insert(ignore_permissions=True)
+t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "I130L ITR draft", "status": "Waiting", "waiting_on": p.full_name, "waiting_on_person": p.name, "check_by": add_days(today(), 2)}).insert(ignore_permissions=True)
+m = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "I130L Sign the mandate", "status": "Open", "notes_md": "With [[Vivek I130L]]"}).insert(ignore_permissions=True)
+print(json.dumps({"person": p.name, "task": t.name, "mine": m.name}))`).split('\n').pop())
+    await check('LIBRARY.50', `${width} px: a person's layer shows "What they owe you" with the ITR draft and "What you owe them"`, async () => {
+      await u.open(`/life/today?open=person:${seeded.person}`)
+      await pg.locator('[data-person-owed]').waitFor({ timeout: 15000 })
+      must((await pg.locator('[data-person-owe-me]').innerText()).includes('What they owe you') && (await pg.locator('[data-person-owe-me]').innerText()).includes('I130L ITR draft'), 'the person does not owe the ITR draft: ' + await pg.locator('[data-person-owed]').innerText())
+      must((await pg.locator('[data-person-i-owe]').innerText()).includes('What you owe them'), 'what you owe them is missing')
+      await pg.locator('[data-person-owe-me] [data-person-owe-row] button').first().click()
+      await pg.waitForFunction((t) => new URL(location.href).searchParams.get('open') === `task:${t}`, seeded.task, { timeout: 8000 })
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      must(!errors.length, 'script errors: ' + errors.join(' | '))
+    })
+  } finally {
+    bench(`for n in frappe.get_all("Life Task", filters={"title": ["like", "I130L %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "%I130L"]}, pluck="name"):
+    frappe.db.delete("Life Link", {"to_doctype": "Life Person", "to_name": n})
+    frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)`)
+    await u.ctx.close()
+  }
+}

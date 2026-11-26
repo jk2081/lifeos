@@ -14,6 +14,7 @@ from lifeos import permissions
 from lifeos.web import queries
 from lifeos.ai import fake
 from lifeos.api import brain, chats, connections, goals, inbox, jobs, library, meta, old_items, outbox, reset, review, settings, someday, sources, tasks, today as today_api, wiki
+from lifeos.tasks import handoff
 from lifeos.tools.devtools import attach, load_fake_agent, LocalClient, pdf_bytes
 from lifeos.skills import runner, triggers
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
@@ -1678,10 +1679,11 @@ class TestSummaryLines(SkillCase):
 			"stop_reason": "end_turn"})
 		reply2 = self.capture("Done, I sent the papers yesterday.", title="Re: the notice 2", sender="ravi@x.example")
 		self.process(reply2)
-		self.assertEqual(frappe.db.get_value("Life Task", waiting, ["status", "closed_by_brain", "closed_by_item"]), ("Done", 1, reply2.name))
+		self.assertEqual(frappe.db.get_value("Life Task", waiting, ["status", "looks_done_item"]), ("Waiting", reply2.name))  # issue 130: a close is a proposal
 		frappe.set_user(OWNER)
-		row = next(r for r in brain.activity(space=PRIVATE)["rows"] if r["item"] == reply2.name)
-		self.assertEqual([m["kind"] for m in row["made"]], ["Closed by itself"])
+		handoff.confirm(waiting)
+		self.assertEqual(frappe.db.get_value("Life Task", waiting, ["status", "closed_by_item"]), ("Done", reply2.name))
+		frappe.db.set_value("Life Task", waiting, {"status": "Done", "closed_by_brain": 1, "completed_on": today()})
 		self.assertEqual([c["name"] for c in asks.closed_by_itself(PRIVATE, add_days(today(), -7))], [waiting])
 		asks.reopen(waiting)
 		self.assertEqual(frappe.db.get_value("Life Task", waiting, "status"), "Waiting")
@@ -1696,4 +1698,93 @@ class TestSummaryLines(SkillCase):
 		self.assertEqual(out["check_by"], str(add_days(getdate(asks.next_review_date()), 7)))
 		asks.waiting_change(first, "plate")
 		self.assertEqual(frappe.db.get_value("Life Task", first, ["status", "waiting_on"]), ("Open", None))
-		self.assertIn("nudge", asks.nudge(rows[1]["name"])["text"])
+
+
+def needs_you_count(space):
+	from lifeos.api import dashboard
+
+	return dashboard.needs_you(space)["n"]
+
+
+class TestLooksDone(SkillCase):
+	"""Issue 130: a reply from the same person on another thread proposes "Looks done"; Confirm closes, Not yet leaves it; three confirmations teach the Brain."""
+	VIVEK = "vivek130@x.example"
+
+	def setUp(self):
+		super().setUp()
+		frappe.db.delete("Life Rule", {"space": PRIVATE, "action": "Route", "asks_to": "Close"})
+		self.person = frappe.get_doc({"doctype": "Life Person", "space": PRIVATE, "full_name": "Vivek I130", "kind": "Person", "email": self.VIVEK}).insert()
+		self.addCleanup(lambda: (frappe.db.delete("Life Rule", {"space": PRIVATE, "action": "Route", "asks_to": "Close"}), frappe.db.delete("Life Task", {"space": PRIVATE, "title": ("like", "I130 %")})))
+
+	def owed(self, what="I130 ITR draft"):
+		return frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": what, "status": "Waiting", "waiting_on": "Vivek I130", "waiting_on_person": self.person.name,
+			"check_by": add_days(today(), 3), "handed_off_how": "track"}).insert().name
+
+	def reply(self, offered, closes=None, moves=None, n=1):
+		"""An email from Vivek on a new thread, with the fake model's `closes` and `moves`."""
+		self.script({"content": [{"type": "text", "text": json.dumps({"transcript_md": "", "summary": {"line": "Vivek sent it."}, "closes": closes if closes is not None else [{"task": offered, "reason": "Vivek sent the ITR draft"}],
+			**({"moves": moves} if moves else {})})}], "stop_reason": "end_turn"})
+		item = self.capture("Here is the draft.", title=f"Re: ITR {n} {frappe.generate_hash(length=5)}", sender=self.VIVEK, source_system="gmail", external_id=f"other-thread-{frappe.generate_hash(length=6)}")
+		self.process(item)
+		return item
+
+	def test_3_a_reply_from_the_person_on_a_new_thread_is_a_proposal_not_a_close_and_confirm_or_not_yet_decides(self):
+		task = self.owed()
+		item = self.reply(task)
+		self.assertEqual(frappe.db.get_value("Life Task", task, ["status", "looks_done_item", "looks_done_note"]), ("Waiting", item.name, "Vivek sent the ITR draft"))
+		frappe.set_user(OWNER)
+		self.assertEqual([r["name"] for r in handoff.looks_done(PRIVATE)], [task])
+		before = needs_you_count(PRIVATE)
+		handoff.not_yet(task)
+		self.assertEqual(frappe.db.get_value("Life Task", task, ["status", "looks_done_item"]), ("Waiting", None))
+		self.assertEqual(needs_you_count(PRIVATE), before - 1)
+		frappe.set_user("Administrator")
+		item2 = self.reply(task, n=2)
+		frappe.set_user(OWNER)
+		out = handoff.confirm(task)
+		self.assertEqual(out["status"], "Done")
+		self.assertEqual(frappe.db.get_value("Life Task", task, ["status", "closed_by_item", "looks_done_item"]), ("Done", item2.name, None))
+		self.assertEqual(frappe.db.get_value("Life Task", task, "closed_by_brain"), 0)
+
+	def test_4_after_three_confirmations_the_next_close_is_by_itself_with_change_and_not_yet_removes_the_rule(self):
+		for n in range(3):
+			task = self.owed(f"I130 Draft {n}")
+			frappe.set_user("Administrator")
+			self.reply(task, n=n)
+			frappe.set_user(OWNER)
+			handoff.confirm(task)
+			self.assertEqual(bool(frappe.db.exists("Life Rule", {"action": "Route", "asks_to": "Close", "page": self.person.name})), n == 2)
+		frappe.set_user("Administrator")
+		fourth = self.owed("I130 Draft 4")
+		item = self.reply(fourth, n=4)
+		self.assertEqual(frappe.db.get_value("Life Task", fourth, ["status", "closed_by_brain", "closed_by_item"]), ("Done", 1, item.name))
+		frappe.set_user(OWNER)
+		row = next(r for r in brain.activity(space=PRIVATE)["rows"] if r["item"] == item.name)
+		self.assertEqual([m["kind"] for m in row["made"]], ["Closed by itself"])
+		asks.reopen(fourth)  # Change
+		self.assertEqual(frappe.db.get_value("Life Task", fourth, "status"), "Waiting")
+		self.assertFalse(frappe.db.exists("Life Rule", {"action": "Route", "asks_to": "Close", "page": self.person.name}))
+		self.assertEqual(frappe.db.get_value("Life Person", self.person.name, "close_confirms"), 0)
+
+	def test_5_a_new_date_moves_check_by_to_the_coming_monday_with_one_line_in_the_tasks_activity(self):
+		task = self.owed()
+		frappe.set_user("Administrator")
+		self.reply(task, closes=[], moves=[{"task": task, "check_by": "Monday", "reason": "will send Monday"}])
+		monday = getdate(today())
+		while True:
+			monday = add_days(monday, 1)
+			if monday.weekday() == 0:
+				break
+		self.assertEqual(frappe.db.get_value("Life Task", task, ["status", "check_by", "looks_done_item"]), ("Waiting", monday, None))
+		lines = frappe.get_all("Comment", filters={"reference_doctype": "Life Task", "reference_name": task, "comment_type": "Info"}, pluck="content")
+		self.assertEqual(len(lines), 1)
+		self.assertIn(str(monday), lines[0])
+
+	def test_the_model_is_offered_the_waiting_tasks_of_the_person_not_of_other_people_and_at_most_ten(self):
+		other = frappe.get_doc({"doctype": "Life Person", "space": PRIVATE, "full_name": "Other I130", "kind": "Person", "email": "other130@x.example"}).insert()
+		mine = [self.owed(f"I130 Mine {n}") for n in range(12)]
+		frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "I130 Theirs", "status": "Waiting", "waiting_on": "Other", "waiting_on_person": other.name, "check_by": today()}).insert()
+		item = self.capture("x", title="Re: ITR offered", sender=self.VIVEK)
+		got = [r["task"] for r in asks.waiting_for(item)]
+		self.assertEqual(len(got), 10)
+		self.assertEqual(got, list(reversed(mine))[:10])  # newest first

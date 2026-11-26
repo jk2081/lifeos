@@ -2,6 +2,24 @@
   <div class="flex flex-col gap-4" data-person-pane>
     <Card v-if="brief" data-person-brief><Md :text="brief" /></Card>
     <Card v-else-if="loaded"><Empty title="No brief yet." hint="The Brain writes one once there is enough about them." /></Card>
+    <section v-if="owe.owe_me.length || owe.i_owe.length" class="flex flex-col gap-3" data-person-owed>
+      <div v-if="owe.owe_me.length" data-person-owe-me>
+        <SectionHead :count="owe.owe_me.length">What they owe you</SectionHead>
+        <Card flush class="!px-4">
+          <Row v-for="t in owe.owe_me" :key="t.name" :pane="'task:' + t.name" :label="t.title" class="!items-center" data-person-owe-row>
+            <span class="min-w-0 flex-1 break-words text-base text-ink-gray-9">{{ t.title }}</span><span v-if="t.check_by" class="flex-none text-sm text-ink-gray-6">by {{ short(t.check_by) }}</span>
+          </Row>
+        </Card>
+      </div>
+      <div v-if="owe.i_owe.length" data-person-i-owe>
+        <SectionHead :count="owe.i_owe.length">What you owe them</SectionHead>
+        <Card flush class="!px-4">
+          <Row v-for="t in owe.i_owe" :key="t.name" :pane="'task:' + t.name" :label="t.title" class="!items-center" data-person-owe-row>
+            <span class="min-w-0 flex-1 break-words text-base text-ink-gray-9">{{ t.title }}</span><span v-if="t.due_date" class="flex-none text-sm text-ink-gray-6">due {{ short(t.due_date) }}</span>
+          </Row>
+        </Card>
+      </div>
+    </section>
     <section v-if="details.length" data-person-details>
       <SectionHead>Details</SectionHead>
       <Card><dl class="flex flex-col gap-1 text-base"><div v-for="x in details" :key="x[0]" class="flex gap-3"><dt class="w-24 flex-none text-sm text-ink-gray-6">{{ x[0] }}</dt><dd class="min-w-0 break-words text-ink-gray-9">{{ x[1] }}</dd></div></dl></Card>
@@ -60,6 +78,7 @@ const total = ref(0)
 const company = ref(false)
 const details = ref([])
 const loaded = ref(false)
+const owe = ref({ owe_me: [], i_owe: [] })
 onMounted(async () => {
   const res = await tryCall(() => itemData.pages.get({ doctype: 'Life Person', name: props.name }))
   if (!res) return emit('missing')
@@ -70,8 +89,9 @@ onMounted(async () => {
   company.value = h.kind === 'company'
   mentions.value = (res.timeline || []).slice(0, 12)
   total.value = res.timeline_total || 0
-  details.value = [['Role', h.role], ['Email', h.email], ['Works at', h.organisation?.title], ['Also called', (h.aliases || []).join(', ')]].filter((x) => x[1])
+  details.value = [['Role', h.role], ['Email', h.email], ['Phone', h.phone], ['Works at', h.organisation?.title], ['Also called', (h.aliases || []).join(', ')]].filter((x) => x[1])
   loaded.value = true
+  owe.value = (await tryCall(() => itemData.tasks.person_owed({ person: props.name }))) || owe.value
   emit('meta', { title: h.title, kind: h.kind_label, sub: [h.role, h.path].filter(Boolean).join(' · '), fullPage: `/library/pages/Life Person/${props.name}` })
 })
 </script>

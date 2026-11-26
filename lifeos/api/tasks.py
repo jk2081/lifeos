@@ -18,7 +18,7 @@ from lifeos.api.utils import (area_criterion, count_tabs, extra_fields, filter_c
 
 OPEN = ("Open", "Doing", "Waiting")
 FIELDS = ["name", "title", "status", "priority", "due_date", "area", "area_guessed", "area_confidence", "goal", "inbox_item", "carried_from", "waiting_on",
-	"waiting_on_person", "delegated_to", "creation", "completed_on", "source_url", "is_archived", "notes_md", "last_touched_on", "owner", "scheduled_at", "duration_min"]
+	"waiting_on_person", "delegated_to", "handed_off_how", "creation", "completed_on", "source_url", "is_archived", "notes_md", "last_touched_on", "owner", "scheduled_at", "duration_min"]
 OPEN_LOOP_DAYS = 14
 
 
@@ -538,3 +538,111 @@ def reschedule_overdue(space: str | None = None, to_date: str | date | None = No
 		doc.due_date = to
 		doc.save()
 	return {"moved": len(names), "due_date": str(to)}
+
+
+# ---- handing off, nudging and the answer (issue 130) ----
+def _writable(space: str | None) -> str:
+	return permissions.resolve_space(space, write=True)
+
+
+@frappe.whitelist(methods=["POST"])
+def hand_off(person: str, what: str | None = None, check_by: str | None = None, how: str = "track", channel: str = "email", task: str | None = None,
+		space: str | None = None):
+	"""Hand something off to a person: a Waiting task with the check date. `how` is track (nothing sent, the default), draft (a message written for you to
+	send, edit or drop) or send (an email goes at once). `task` hands off a task that exists. Life OS never sends WhatsApp: that is a link."""
+	from lifeos.tasks import handoff
+
+	space = frappe.db.get_value("Life Task", task, "space") if task else _writable(space)
+	permissions.require_space(space, write=True)
+	out = handoff.hand_off_task(space, person, what or "", check_by, how, channel, task, "owner", _("Hand off by button"), what)
+	return {**out, "task_row": get(out["task"])}
+
+
+@frappe.whitelist(methods=["GET"])
+def handoff_get(task: str):
+	"""What the task layer shows of a hand-off: what was asked, the message, the replies and nudges, the WhatsApp link."""
+	from lifeos.tasks import handoff
+
+	return handoff.detail(task)
+
+
+@frappe.whitelist(methods=["POST"])
+def handoff_edit(task: str, text: str):
+	"""Change the words of a draft."""
+	from lifeos.tasks import handoff
+
+	return handoff.edit_message(task, text)
+
+
+@frappe.whitelist(methods=["POST"])
+def handoff_send(task: str, text: str | None = None):
+	"""Send a drafted email now (the owner pressed Send)."""
+	from lifeos.tasks import handoff
+
+	return handoff.send_draft(task, text)
+
+
+@frappe.whitelist(methods=["POST"])
+def handoff_discard(task: str):
+	"""Drop a draft; the task goes on as tracking only."""
+	from lifeos.tasks import handoff
+
+	return handoff.discard_draft(task)
+
+
+@frappe.whitelist(methods=["POST"])
+def person_phone(person: str, phone: str):
+	"""Save a person's phone, asked for once when a WhatsApp link needs it."""
+	from lifeos.tasks import handoff
+
+	return handoff.set_phone(person, phone)
+
+
+@frappe.whitelist(methods=["POST"])
+def nudge(task: str, channel: str | None = None):
+	"""A two-line follow-up in the owner's voice, opened the way the hand-off went (an email draft, or the WhatsApp link). The check date moves 3 days on."""
+	from lifeos.tasks import handoff
+
+	return handoff.nudge(task, channel)
+
+
+@frappe.whitelist(methods=["POST"])
+def nudge_decide(task: str, to: str):
+	"""After two nudges: week (wait a week), plate (take it back) or drop."""
+	from lifeos.tasks import handoff
+
+	return handoff.decide_nudged(task, to)
+
+
+@frappe.whitelist(methods=["POST"])
+def looks_done_confirm(task: str):
+	"""Confirm: the reply answered it, so the task is Done and the attachment is filed with it."""
+	from lifeos.tasks import handoff
+
+	return handoff.confirm(task)
+
+
+@frappe.whitelist(methods=["POST"])
+def looks_done_not_yet(task: str):
+	"""Not yet: it stays waiting."""
+	from lifeos.tasks import handoff
+
+	return handoff.not_yet(task)
+
+
+@frappe.whitelist(methods=["GET"])
+def waiting_list(space: str | None = None):
+	"""Everything waited on, in the groups the Waiting list shows: looks_done, late, week, later."""
+	from lifeos.tasks import handoff
+
+	return handoff.waiting_list(permissions.resolve_space(space))
+
+
+@frappe.whitelist(methods=["GET"])
+def person_owed(person: str):
+	"""A person's layer: what they owe you (open waiting tasks on them) and what you owe them (open tasks about them)."""
+	from lifeos.tasks import handoff
+
+	space = frappe.db.get_value("Life Person", person, "space")
+	permissions.require_space(space)
+	return handoff.owed(space, person)

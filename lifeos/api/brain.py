@@ -108,7 +108,11 @@ def needs_you(space: str | None = None, limit: int = MAX_ROWS):
 			"blocked": _(readings.REQUIRED_MESSAGE) if r.kind in ("Goal", "Month Goal") and not readings.has_finish_line(data) and readings.done_when_required() else None,
 		})
 	waiting = captures([fn.Count("*")], [i.space == space, i.is_archived == 0, i.status.isin(["New", "Processing"]), *([guard] if guard is not None else [])]).run()[0][0]
-	out.update({"agent_requests": agent_page.requests(space) if not permissions.is_agent() else [], "lessons": lessons.proposed(space) if not permissions.is_agent() else [],
+	from lifeos.tasks import handoff
+
+	looks = handoff.looks_done(space) if not permissions.is_agent() else []  # a reply that seems to answer a waiting task: Confirm or Not yet (issue 130)
+	total += len(looks)
+	out.update({"looks_done": looks, "agent_requests": agent_page.requests(space) if not permissions.is_agent() else [], "lessons": lessons.proposed(space) if not permissions.is_agent() else [],
 		"contradictions": wiki_check.open_findings(space) if not permissions.is_agent() else [], "total": total, "waiting": waiting, "rows": rows, "minutes": minutes(len(rows)), "unfiled": _failed(space), "max_rows": limit,
 		"new_rules": rules.recent(space, days=1) if not permissions.is_agent() else []})
 	return out

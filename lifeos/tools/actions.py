@@ -32,6 +32,7 @@ ABILITY = {
 	"notes.save": ("write_pages", "Save a note"),
 	"tasks.add": ("add_planning", "Add a task"),
 	"events.add": ("add_planning", "Add an event"),
+	"tasks.hand_off": ("add_planning", "Hand off a task"),
 }
 
 
@@ -40,7 +41,7 @@ def run_for(tool: str):
 	from lifeos.tools import mail, notes, pages, people, rules, work
 
 	return {"mail.save_attachment": mail._save_attachment, "pages.create": pages._create, "pages.update": pages._update, "people.add": people._add,
-		"notes.save": notes._save, "tasks.add": work._add_task, "events.add": work._add_event, "rules.add": rules._add_rule}[tool]
+		"notes.save": notes._save, "tasks.add": work._add_task, "events.add": work._add_event, "tasks.hand_off": work._hand_off, "rules.add": rules._add_rule}[tool]
 
 
 def agent_key(space: str, source_system: str | None) -> str:

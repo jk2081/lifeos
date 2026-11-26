@@ -35,6 +35,9 @@ def _list(text) -> list:
 
 
 def when_words(rule) -> str:
+	if rule.action == "Route" and rule.asks_to == "Close":
+		who = frappe.db.get_value("Life Person", rule.page, "full_name") if rule.page else None
+		return _("When {0} answers something they owe you").format(who or _("a person"))
 	parts = []
 	if rule.sender:
 		parts.append(_("mail is from {0}").format(rule.sender))
@@ -55,7 +58,7 @@ def when_words(rule) -> str:
 
 def then_words(rule) -> str:
 	if rule.action == "Route":
-		out = _("its asks go to your plate") if rule.asks_to == "Plate" else _("its asks go to the waiting pile")
+		out = (_("close what they owe you by itself") if rule.asks_to == "Close" else _("its asks go to your plate") if rule.asks_to == "Plate" else _("its asks go to the waiting pile"))
 	elif rule.action == "Drop":
 		out = _("not needed")
 	elif rule.action == "Ask":

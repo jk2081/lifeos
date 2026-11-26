@@ -133,6 +133,7 @@ flow_tools = [
 	"lifeos.ai.flow.save_note",
 	"lifeos.ai.flow.make_task",
 	"lifeos.ai.flow.add_event",
+	"lifeos.ai.flow.hand_off",
 	"lifeos.ai.flow.find_events",
 	"lifeos.ai.flow.add_note",
 	"lifeos.ai.flow.cancel_event",

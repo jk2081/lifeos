@@ -1847,3 +1847,57 @@ for (const width of WIDTHS) {
     await s.ctx.close()
   }
 }
+
+// Issue 130: handing off in Chat, with the fake model of tools/fake_openai.py. "Vivek owes me …" only tracks and the answer says nothing was sent; "Ask Vivek for …" drafts, and the
+// draft is on the task with Send (nothing is sent until then).
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const phone = width < 800
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  try {
+    bench(`for n in frappe.get_all("Life Task", filters={"title": ["like", "the ITR draft%"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+if not frappe.db.exists("Life Person", {"space": "${SPACE}", "full_name": "Vivek I130"}):
+    frappe.get_doc({"doctype": "Life Person", "space": "${SPACE}", "full_name": "Vivek I130", "kind": "Person", "email": "vivek130@example.com", "phone": "+91 98765 43210"}).insert(ignore_permissions=True)
+if not frappe.db.exists("Life Mail Account", {"space": "${SPACE}", "user": "owner@lifeos.test"}):
+    frappe.get_doc({"doctype": "Life Mail Account", "space": "${SPACE}", "user": "owner@lifeos.test", "provider": "gmail", "address": "owner@example.com", "label": "Personal", "is_default": 1}).insert(ignore_permissions=True)
+from lifeos.mail import fake
+fake.clear()`)
+    await check('BRAIN.77', `${width} px: in Chat "Vivek owes me the ITR draft by Friday" makes a waiting task and says nothing was sent; "Ask Vivek for the ITR draft by Friday" drafts, with Send on the task`, async () => {
+      chatOn()
+      try {
+        const panel = () => pg.locator('[data-ask-panel]:visible').first()
+        const answered = async () => { await pg.waitForTimeout(700); await panel().locator('[data-ask-working]').waitFor({ state: 'detached', timeout: 90000 }); await panel().locator('[data-ask-answer][data-status="Done"]').last().waitFor({ timeout: 5000 }) }
+        const say = async (text) => { await pg.locator('[data-ask-input]:visible').fill(text); await pg.locator('[data-ask-send]:visible').click(); await answered() }
+        await s.open('/life/today')
+        if (!phone) { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(600) } else { await pg.locator('[data-chat-bar-open]').first().click(); await pg.waitForTimeout(800) }
+        await say('Vivek owes me the ITR draft by Friday')
+        const answer = await panel().locator('[data-ask-answer]').last().innerText()
+        must(/nothing was sent/i.test(answer), 'the answer does not say nothing was sent: ' + answer)
+        const made = JSON.parse(bench(`import json
+from lifeos.mail import fake
+t = frappe.get_all("Life Task", filters={"space": "${SPACE}", "title": "the ITR draft"}, fields=["status", "waiting_on", "handed_off_how", "check_by"])
+print(json.dumps({"tasks": [[x.status, x.waiting_on, x.handed_off_how, str(x.check_by)] for x in t], "sent": [c["call"] for c in fake.calls()]}))`).split('\n').pop())
+        must(made.tasks.length === 1 && made.tasks[0][0] === 'Waiting' && made.tasks[0][1] === 'Vivek I130' && made.tasks[0][2] === 'track', 'the task is ' + JSON.stringify(made.tasks))
+        must(!made.sent.length, 'something was sent: ' + made.sent)
+        await say('Ask Vivek for the ITR draft by Friday')
+        must(/drafted/i.test(await panel().locator('[data-ask-answer]').last().innerText()), 'the answer does not say it is drafted')
+        await panel().locator('[data-ask-done-open]').last().click()
+        await pg.locator('[data-handoff-send]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-handoff-message]').innerText()).includes('ITR draft'), 'the draft does not name the ITR draft')
+        const calls = bench('from lifeos.mail import fake\nprint([c["call"] for c in fake.calls()])').split('\n').pop()
+        must(calls.includes('draft') && !calls.includes("'send'"), 'the calls are ' + calls)
+        must(!errors.length, 'script errors: ' + errors.join(' | '))
+      } finally {
+        chatOff()
+      }
+    })
+  } finally {
+    bench(`for n in frappe.get_all("Life Task", filters={"title": ["like", "the ITR draft%"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+frappe.db.delete("Life Agent Action", {"space": "${SPACE}", "agent": "lifeos-chat"})
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "%I130"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Mail Account", filters={"space": "${SPACE}", "user": "owner@lifeos.test"}, pluck="name"): frappe.delete_doc("Life Mail Account", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}

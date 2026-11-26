@@ -1,0 +1,41 @@
+{
+ "title": "A WhatsApp nudge is two lines with no subject",
+ "input": {
+  "data": {
+   "kind": "nudge",
+   "channel": "whatsapp",
+   "owner": "Jai",
+   "person": "Vivek Shah",
+   "what": "the ITR draft",
+   "by": "2026-11-28",
+   "nudges": 0,
+   "asked_on": "2026-11-26"
+  }
+ },
+ "checks": [
+  {
+   "answer": {
+    "path": "body",
+    "contains": "nudge"
+   }
+  },
+  {
+   "answer": {
+    "path": "subject",
+    "equals": ""
+   }
+  }
+ ],
+ "fixture": [
+  {
+   "content": [
+    {
+     "type": "text",
+     "text": "{\"subject\": \"\", \"body\": \"Hi Vivek, a quick nudge on the ITR draft. Could you let me know where it stands?\"}"
+    }
+   ],
+   "stop_reason": "end_turn"
+  }
+ ],
+ "skill_hash": "2dd23f697d18b3cd"
+}

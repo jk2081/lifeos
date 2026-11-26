@@ -245,15 +245,6 @@ def waiting_change(task: str, to: str, space: str | None = None):
 	return asks.waiting_change(task, to)
 
 
-@frappe.whitelist(methods=["GET"])
-def waiting_nudge(task: str, space: str | None = None):
-	"""A two-line follow-up to the person a task waits on, for the owner to copy or open in Gmail. Nothing is sent."""
-	from lifeos.brain import asks
-
-	_current(space)
-	return asks.nudge(task)
-
-
 @frappe.whitelist(methods=["POST"])
 def closed_change(task: str, space: str | None = None):
 	"""Change on an item the Brain closed by itself: it goes back to the waiting pile."""
