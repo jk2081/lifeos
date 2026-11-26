@@ -347,3 +347,12 @@ class TestChatEverywhere(ChatCase):
 		waiting = acts.request(PRIVATE, "t120agent", "calendar.cancel", {"event_id": "g-other", "title": "Other"}, "agent")
 		self.assertEqual(waiting["status"], "waiting")
 		self.assertEqual([c for c in google.calls if c[0] == "delete_event"], [])
+
+	def test_9_with_no_model_a_file_is_still_saved_where_it_belongs(self):
+		f = loose_file("licence-i120.png", printed_png(["BILL", "Invoice date 3 November 2026"]))
+		with mock.patch("lifeos.ai.chat.ready", return_value=False):
+			res = chat.send("file this", space=PRIVATE, files=[f])
+		self.assertEqual(res["error"], "not_set_up")
+		self.assertIn("licence-i120.png", res["done"][0]["text"])
+		self.assertTrue(frappe.db.exists("Life Inbox Item", {"space": PRIVATE, "title": "licence-i120.png"}))
+		self.assertEqual(self.runs, [])  # no model run

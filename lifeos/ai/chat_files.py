@@ -91,7 +91,8 @@ def save_capture(space: str, file_doc, message: str) -> dict:
 	from lifeos.api import inbox
 
 	kind = extract.kind_of(file_doc.file_name)
-	item = inbox.create_item(title=file_doc.file_name[:140], source_type="Voice Note" if kind == "audio" else "Upload", space=space, instruction=(message or "")[:500] or None,
+	journal = kind == "image" and "journal" in (message or "").lower()  # a photo the owner calls a journal page, as + Capture did
+	item = inbox.create_item(title=file_doc.file_name[:140], source_type="Voice Note" if kind == "audio" else "Journal Photo" if journal else "Upload", space=space, instruction=(message or "")[:500] or None,
 		source_system=None, intent="Process")
 	content = files.read(file_doc)
 	frappe.get_doc({"doctype": "File", "file_name": file_doc.file_name, "attached_to_doctype": "Life Inbox Item", "attached_to_name": item["name"], "is_private": 1, "content": content}).insert()
@@ -99,8 +100,8 @@ def save_capture(space: str, file_doc, message: str) -> dict:
 	return _line("file", f"{file_doc.file_name}: sent to the Brain, which files it", "Life Inbox Item", item["name"])
 
 
-def process(space: str, message: str, names) -> dict:
-	"""Read each file, then save it where it belongs. Returns {block, lines, pending}."""
+def process(space: str, message: str, names, ask: bool = True) -> dict:
+	"""Read each file, then save it where it belongs. Returns {block, lines, pending}. With `ask` off (no answer is coming to ask in), a card whose holder cannot be told is saved with none."""
 	permissions.require_space(space, write=True)
 	block, lines, pending = [], [], []
 	people = people_in(space, message)
@@ -112,6 +113,8 @@ def process(space: str, message: str, names) -> dict:
 			options = holder_options(space)
 			if not who and len(options) <= 1:  # nobody to choose from: the card is the owner's, or has no holder
 				who = [o["value"] for o in options] or [None]
+			if not ask and len(who) != 1:
+				who = [None]
 			if len(who) == 1:
 				line = save_card(space, f, card, who[0])
 				lines.append(line)

@@ -33,8 +33,10 @@ const routes = [
   { path: '/review', name: 'WeeklyReview', component: page('WeeklyReview') },
 
   { path: '/how-it-works', name: 'HowItWorks', component: page('HowItWorks') },
-  { path: '/chat', name: 'Chat', component: page('Ask') },
-  { path: '/ask', redirect: (to) => ({ path: '/chat', query: to.query, hash: to.hash }) }, // Ask was renamed Chat (issue 119)
+  { path: '/insights', name: 'Insights', component: page('Insights') },
+  // the Ask page is gone (issue 120): the chat is a panel on every screen; its insights have their own page
+  { path: '/chat', redirect: (to) => (to.query.tab === 'insights' ? { path: '/insights' } : { path: '/today' }) },
+  { path: '/ask', redirect: (to) => ({ path: '/chat', query: to.query, hash: to.hash }) },
   { path: '/settings', name: 'Settings', component: page('Settings') },
 
   // development only: the editor on a sample note (owner only, not in the sidebar)

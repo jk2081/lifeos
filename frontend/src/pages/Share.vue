@@ -5,7 +5,7 @@
       <Skeleton v-if="share === undefined" class="h-24 w-full rounded-4" />
       <Card v-else-if="!share" data-share-empty><Empty title="Nothing was shared.">
         In another app, choose Share, then Life OS, and it opens here. Or capture something now.<br />
-        <Button class="mt-2" variant="solid" icon-left="lucide-plus" label="Capture" @click="store.captureOpen = true" /></Empty></Card>
+        <Button class="mt-2" variant="solid" icon-left="lucide-message-square" label="Chat" @click="openChat()" /></Empty></Card>
       <template v-else>
         <Card class="flex flex-col gap-2" data-share-what>
           <div v-if="share.title" class="text-base-medium text-ink-gray-9" data-share-title>{{ share.title }}</div>
@@ -38,6 +38,7 @@ import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import { errorText } from '@/lib/api'
+import { addFiles, openChat, send } from '@/lib/ask'
 import { dropShare, getShare, latestShare, submitCapture } from '@/lib/offline'
 import { fileSize } from '@/lib/upload'
 import { canWrite, store } from '@/lib/store'
@@ -71,8 +72,17 @@ async function save() {
     const text = [s.text, s.url && !s.text.includes(s.url) ? s.url : ''].filter(Boolean).join('\n').trim()
     const first = s.files[0]?.name
     const title = (s.title || (first ? (s.files.length > 1 ? `${first} and ${s.files.length - 1} more` : first) : text.split('\n')[0]) || 'Shared').slice(0, 80)
+    const files = s.files.map((f) => new File([f.blob], f.name, { type: f.type }))
+    if (navigator.onLine) { // issue 120: what is shared lands in the chat as a message with its attachment
+      addFiles(files)
+      if (s.id) await dropShare(s.id)
+      router.replace('/today')
+      await openChat()
+      await send([instruction.value, s.title, text].filter(Boolean).join('\n').trim() || 'Shared with Life OS')
+      return
+    }
     const how = await submitCapture({ title, source_type: 'Phone', space: store.space, instruction: instruction.value, raw_text: text, source_url: safeUrl.value || undefined,
-      intent: 'Process', files: s.files.map((f) => new File([f.blob], f.name, { type: f.type })) })
+      intent: 'Process', files })
     if (s.id) await dropShare(s.id)
     toast.success(how === 'sent' ? 'Sent to the Brain. It files it and asks you only if it needs to.' : 'Kept on this phone. It is sent when you are back online.')
     router.replace('/brain')

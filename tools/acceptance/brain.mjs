@@ -79,7 +79,7 @@ await check('BRAIN.3', 'Search for a word in a transcript finds the inbox item',
     if (!found) await owner.page.waitForTimeout(2000)
   }
   must(found, 'the inbox item was not found')
-  await owner.page.keyboard.press('Control+k')
+  await owner.page.keyboard.press('/')
   await owner.page.keyboard.type(`Nowrojee ${stamp}`)
   await owner.page.waitForTimeout(900)
   must((await owner.page.locator('body').innerText()).includes(`Journal photo ${stamp}`), 'the search palette does not show it')
@@ -201,7 +201,7 @@ for (const width of WIDTHS) {
     const done = []
     // set 6: the area page became the lens (Chat's scope is the lens), the project page the goal's page
     for (const [path, scope] of [['/life', 'Everything in this space'], ['/life?area=' + uxArea, areas.find((x) => x.name === uxArea).area_name],
-      ['/life/goals/' + ux.goal, ux.goalTitle]]) {
+      ['/life/goals/' + ux.goal, 'About: ' + ux.goalTitle]]) {
       await askOn(path, scope)
       const here = new URL(pg.url()).pathname
       if (!phone) { await pg.locator('[data-ask-close]').click(); await settle() } else { await pg.keyboard.press('Escape'); await settle() }
@@ -216,7 +216,7 @@ for (const width of WIDTHS) {
     await settle()
     await pg.locator('[data-pane-ask]').click()
     await settle()
-    must((await pg.locator('[data-ask-scope]:visible').first().innerText()).trim() === S5('chat about'), 'Chat about this does not take the record as its scope')
+    must((await pg.locator('[data-ask-scope]:visible').first().innerText()).trim() === 'About: ' + S5('chat about'), 'Chat about this does not take the record as its scope')
     return done.join(', ') + ', a task pane'
   })
 
@@ -467,7 +467,7 @@ for (const width of WIDTHS) {
     await full(`/life/brain/captures?open=${encodeURIComponent('source:' + id)}`, 'Library')
     await s.open('/life/library/notes')
     if (width < 768) await pg.locator('[data-phone-search]').click()
-    else await pg.keyboard.press('Meta+k')
+    else await pg.keyboard.press('/')
     await pg.locator('input[aria-label="Search or ask anything"]').fill(title)
     await pg.waitForTimeout(900)
     await pg.keyboard.press('Enter')
@@ -538,13 +538,13 @@ print(json.dumps(out))`).split('\n').pop())
   const rowsOf = async () => (await s.api('brain.needs_you', { space: SPACE })).rows
   const queue = async () => { for (const r of await rowsOf()) await s.api('review.decide', { proposal: r.proposal, decision: 'reject' }) }
   try {
-    await check('BRAIN.20', `${width} px: on an empty space Needs you says what will appear and offers + Capture`, async () => {
+    await check('BRAIN.20', `${width} px: on an empty space Needs you says what will appear and offers Chat`, async () => {
       await openNeeds()
       must(await pg.locator('[data-needs-empty]').isVisible(), 'no empty state')
       const t = await pg.locator('[data-needs-empty]').innerText()
       must(t.includes('Nothing needs you.') && t.includes('Things you capture or connect will show up here.'), 'the empty state says: ' + t)
       await pg.locator('[data-needs-capture]').click()
-      await pg.locator('[data-capture-text]').first().waitFor({ timeout: 5000 })
+      await pg.locator('[data-ask-panel]:visible').first().waitFor({ timeout: 5000 })
       await pg.keyboard.press('Escape')
       await noSideways()
     })
@@ -773,13 +773,13 @@ print(json.dumps(out))`).split('\n').pop())
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
   const openFeed = async (q = '') => { await s.open('/life/brain/activity' + q); await pg.locator('[data-activity]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(500) }
   try {
-    await check('BRAIN.32', `${width} px: on a space with nothing captured Activity says what will appear and offers + Capture`, async () => {
+    await check('BRAIN.32', `${width} px: on a space with nothing captured Activity says what will appear and offers Chat`, async () => {
       await openFeed()
       must(await pg.locator('[data-activity-empty]').isVisible(), 'no empty state')
       const t = await pg.locator('[data-activity-empty]').innerText()
       must(t.includes('Nothing has come in yet.') && t.includes('will show up here'), 'the empty state says: ' + t)
       await pg.locator('[data-activity-capture]').click()
-      await pg.locator('[data-capture-text]').first().waitFor({ timeout: 5000 })
+      await pg.locator('[data-ask-panel]:visible').first().waitFor({ timeout: 5000 })
       await pg.keyboard.press('Escape')
       await noSideways()
     })
@@ -1444,8 +1444,8 @@ print(digest.make("owner@lifeos.test", "${SPACE}", 1))`).split('\n').pop()
     })
     const askUi = async (question) => {
       await s.open('/life/today')
-      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill(question); await pg.locator('[data-ask-send]:visible').click() }
-      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type(question); await pg.waitForTimeout(600); await pg.keyboard.press('Enter') }
+      if (phone) { await pg.locator('[data-chat-bar-open]').first().click(); await pg.locator('[data-ask-panel] textarea').fill(question); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500); await pg.keyboard.type(question); await pg.waitForTimeout(300); await pg.keyboard.press('Enter') }
       await pg.locator('[data-ask-answer]:visible').last().waitFor({ timeout: 15000 })
     }
   } finally {
@@ -1775,7 +1775,7 @@ for (const width of WIDTHS) {
     })
 
     // Chat on Flow (issue 119): the real run (Flow's agent, tools, usage) against the fake model of tools/fake_openai.py
-    await check('BRAIN.75', `${width} px: Chat runs on Flow: the box reads "Search or chat", a question streams an answer in the Chat panel and writes one usage row, /life/ask goes to /life/chat, and no visible text says Ask`, async () => {
+    await check('BRAIN.75', `${width} px: Chat runs on Flow: the box reads "Search or chat", a question streams an answer in the Chat panel and writes one usage row, the Chat panel opens with the shortcut, /life/ask goes to Today, and no visible text says Ask`, async () => {
       chatOn()
       try {
         await s.open('/life')
@@ -1783,12 +1783,14 @@ for (const width of WIDTHS) {
         must(!/\bAsk\b/.test(nav), 'the screen says Ask: ' + (nav.match(/.{20}\bAsk\b.{20}/s) || [''])[0])
         if (!phone) {
           must((await pg.locator('[data-ask-box]').innerText()).includes('Search or chat'), 'the box does not read "Search or chat"')
-          await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300)
+          await pg.keyboard.press('/'); await pg.waitForTimeout(300)
           must(await pg.locator('input[aria-label="Search or chat"]').count(), 'the palette does not say "Search or chat"')
-          await pg.keyboard.type('What tasks do I have?'); await pg.waitForTimeout(600)
           must(!/\bAsk\b/.test(await pg.locator('[role="dialog"]').first().innerText()), 'the palette says Ask')
+          await pg.keyboard.press('Escape'); await pg.waitForTimeout(300)
+          await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500) // issue 120: the shortcut opens the chat panel itself, with the box ready
+          await pg.keyboard.type('What tasks do I have?'); await pg.waitForTimeout(300)
           await pg.keyboard.press('Enter')
-        } else await pg.locator('[data-phone-ask]:visible').first().click()
+        } else await pg.locator('[data-chat-bar-open]').first().click()
         await pg.waitForTimeout(600)
         if (phone) { await pg.locator('[data-ask-panel] textarea').fill('What tasks do I have?'); await pg.locator('[data-ask-send]:visible').click() }
         const panel = pg.locator('[data-ask-panel]:visible')
@@ -1798,10 +1800,10 @@ for (const width of WIDTHS) {
         must((await panel.locator('h2').first().innerText()).trim() === 'Chat', 'the panel is not titled Chat')
         const usage = bench('print(frappe.db.count("Life AI Usage", {"purpose": "Chat", "creation": [">", frappe.utils.add_to_date(frappe.utils.now_datetime(), minutes=-3)]}))').split('\n').pop()
         must(Number(usage) >= 1, 'no Chat usage row was written: ' + usage)
-        await pg.keyboard.press('Escape')
+        if (!phone) await pg.locator('[data-ask-close]').click(); else await pg.keyboard.press('Escape')
         await s.open('/life/ask?tab=history')
-        must(new URL(pg.url()).pathname === '/life/chat' && new URL(pg.url()).searchParams.get('tab') === 'history', '/life/ask did not go to /life/chat: ' + pg.url())
-        must(!/\bAsk\b/.test(await pg.locator('body').innerText()), 'the Chat page says Ask')
+        must(new URL(pg.url()).pathname === '/life/today', '/life/ask did not go to Today: ' + pg.url())
+        must(!/\bAsk\b/.test(await pg.locator('body').innerText()), 'the screen says Ask')
         await s.open('/life/settings?tab=advanced&part=ai')
         await pg.locator('[data-ai-chat-card]').waitFor({ timeout: 10000 })
         must(!/\bAsk\b/.test(await pg.locator('body').innerText()), 'Settings says Ask')
@@ -1811,10 +1813,10 @@ for (const width of WIDTHS) {
     })
 
     // with no provider set in Flow: the question shows what search finds and the key line (the result is the same at the cap, which names the spend)
-    await check('BRAIN.76', `${width} px: with no model in Flow, a question says "Chat needs an AI key" with its link, and at the monthly cap Chat refuses and the Chat page shows the spend`, async () => {
+    await check('BRAIN.76', `${width} px: with no model in Flow, a question says "Chat needs an AI key" with its link, and at the monthly cap Chat refuses and shows the spend`, async () => {
       await s.open('/life')
-      if (phone) { await pg.locator('[data-phone-ask]:visible').first().click(); await pg.locator('[data-ask-panel] textarea').fill('What is open this week?'); await pg.locator('[data-ask-send]:visible').click() }
-      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(300); await pg.keyboard.type('What is open this week?'); await pg.waitForTimeout(500); await pg.keyboard.press('Enter') }
+      if (phone) { await pg.locator('[data-chat-bar-open]').first().click(); await pg.locator('[data-ask-panel] textarea').fill('What is open this week?'); await pg.locator('[data-ask-send]:visible').click() }
+      else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500); await pg.keyboard.type('What is open this week?'); await pg.waitForTimeout(300); await pg.keyboard.press('Enter') }
       await pg.locator('[data-refusal="not_set_up"]').waitFor({ timeout: 15000 })
       must((await pg.locator('[data-ask-refusal]').innerText()).includes('Chat needs an AI key'), 'no "Chat needs an AI key" message')
       must((await pg.locator('[data-ask-key-link]').getAttribute('href')).includes('part=ai'), 'the link does not go to Settings › AI')
@@ -1824,8 +1826,12 @@ for (const width of WIDTHS) {
       try {
         const res = await s.api('chat.send', { question: 'What is open?', space: SPACE })
         must(res.error === 'cap' && /\$\d+\.\d\d of \$30/.test(res.error_text), `the cap did not refuse: ${JSON.stringify(res).slice(0, 200)}`)
-        await s.open('/life/chat')
-        must((await pg.locator('[data-ask-spend]').innerText()).includes('of $30'), 'the Chat page does not show the spend')
+        await s.open('/life')
+        if (phone) await pg.locator('[data-chat-bar-open]').first().click(); else await pg.locator('[data-nav-chat]').click()
+        await pg.locator('[data-ask-panel] textarea').fill('What is open?')
+        await pg.locator('[data-ask-send]:visible').click()
+        await pg.locator('[data-refusal="cap"]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-refusal="cap"]').innerText()).includes('of $30'), 'the refusal does not show the spend')
       } finally {
         bench('frappe.db.delete("Life AI Usage", {"purpose": "Test"})')
         chatOff()

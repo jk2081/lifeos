@@ -49,12 +49,13 @@
       <Empty :title="filtered ? 'No file matches.' : 'No files kept yet.'">
         <p class="mt-1">{{ filtered ? 'Try a different name, or clear the filters.' : 'Files you capture or the Brain files for you will show up here, each once.' }}</p>
         <Button v-if="filtered" class="mt-3" label="Clear filters" data-files-clear @click="clear" />
-        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-files-capture @click="store.captureOpen = true" />
+        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-files-capture @click="openChat()" />
       </Empty>
     </Card>
   </div>
 </template>
 <script setup>
+import { openChat } from '@/lib/ask'
 // Library > Files (issue 24): every stored file once (issue 7 keeps one copy per space), with its type, size, date, earlier
 // versions and the records that use it. Open shows it in the browser where it can; Download saves it. Filters live in the address.
 import { computed, onMounted, reactive, ref, watch } from 'vue'

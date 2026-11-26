@@ -109,14 +109,18 @@ def send(question: str | None = None, space: str | None = None, thread: str | No
 	if sc.get("items"):
 		frappe.cache.hset("lifeos_ask_items", t.name, json.dumps(sc["items"]))
 	rec = _record(record, space)
+	refusal = None
 	if not frappe.db.get_value("Life Space", space, "ask_enabled"):
-		return _refuse(t, question, "off", _("Chat is turned off for this space."))
-	if not chat.ready():
-		return _refuse(t, question, "not_set_up", _("Chat needs an AI key. Add one in Settings › AI."))
-	try:
-		client.check_cap(chat.PURPOSE)
-	except client.CapReached as e:
-		return _refuse(t, question, "cap", str(e))
+		refusal = ("off", _("Chat is turned off for this space."))
+	elif not chat.ready():
+		refusal = ("not_set_up", _("Chat needs an AI key. Add one in Settings › AI."))
+	else:
+		try:
+			client.check_cap(chat.PURPOSE)
+		except client.CapReached as e:
+			refusal = ("cap", str(e))
+	if refusal:  # a file is still read and saved where it belongs: that needs no model
+		return _refuse(t, question, *refusal, chat_files.process(space, question, names, ask=False) if names else None)
 	try:
 		filed = chat_files.process(space, question, names) if names else None
 		run = chat.start(t, question, sc, rec, filed)
@@ -130,10 +134,10 @@ def send(question: str | None = None, space: str | None = None, thread: str | No
 		"scope": sc}
 
 
-def _refuse(t, question, code, text):
+def _refuse(t, question, code, text, filed=None):
 	from lifeos.ai import client
 
-	return {"thread": t.name, "error": code, "error_text": text, "spend": client.spend_status(), "question": question}
+	return {"thread": t.name, "error": code, "error_text": text, "spend": client.spend_status(), "question": question, **({"done": filed["lines"]} if filed and filed.get("lines") else {})}
 
 
 @frappe.whitelist(methods=["POST"])

@@ -23,7 +23,7 @@ export const SCREENS = [
   { label: 'Weekly review', words: 'review', to: '/review' },
   { label: 'Skills', words: 'skills brain', to: '/brain/skills' },
   { label: 'Archive and trash', words: 'archive trash deleted', to: '/library/archive' },
-  { label: 'Chat history and insights', words: 'chat ask history insights threads', to: '/chat?tab=history' },
+  { label: 'Insights', words: 'insights noticed stuck waiting', to: '/insights' },
 ]
 
 const WORDS = /[\p{L}\p{N}]+/gu

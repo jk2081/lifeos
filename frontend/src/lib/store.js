@@ -16,7 +16,6 @@ export const store = reactive({
   today: '',
   searchOpen: false,
   quickAdd: false,
-  captureOpen: false, // the capture sheet (issue 14)
   newKind: '', // the New menu's note, goal or Someday dialog
   lensArea: '', // the lens's area (lib/lens.js keeps it), here so the counts can follow it without importing the lens
 })

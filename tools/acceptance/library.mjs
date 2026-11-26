@@ -155,7 +155,7 @@ for (const width of WIDTHS) {
         must(await pane.isVisible() && !(await pg.locator('[data-pane-title]').innerText()).match(/Loading|Not found/), `the pane did not load ${ref}`)
       }
       await s.open('/life/library/timeline')
-      await pg.keyboard.press('Meta+k')
+      await pg.keyboard.press('/')
       await pg.locator('input[aria-label="Search or chat"]').fill(`UX note ${stamp}`)
       await pg.waitForTimeout(900)
       await pg.keyboard.press('Enter')
@@ -351,14 +351,9 @@ for (const width of WIDTHS) {
   })
 
   await check('LIBRARY.11', `${width} px: intent: Just keep is in Library > Captures, not the Inbox, with text and no proposals; Add to wiki writes pages and leaves no wiki proposals`, async () => {
-    // Just keep, dropped through the box
-    // (issue 17: the drop zone and the intent moved from the Inbox to the + Capture sheet)
-    await s.open('/life/brain')
-    await pg.locator('[data-nav-capture]:visible, [data-tab-capture]:visible').first().click()
-    await pg.locator('[data-capture-text] textarea, textarea[data-capture-text]').first().fill(`S4 keep ${width} ${stamp}\nA note to keep.`)
-    await pg.locator('[role="dialog"] [data-intent]').getByText('Just keep', { exact: true }).click()
-    await pg.locator('[data-capture-brain]').click()
-    await pg.waitForTimeout(1200)
+    // Just keep (issue 120: the + Capture sheet and its intent switch are gone; the API still takes the intent)
+    await s.api('inbox.create_item', { title: `S4 keep ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'A note to keep.', intent: 'Just keep' })
+    await pg.waitForTimeout(600)
     const kept = (await s.api('inbox.list', { space: SPACE, page_length: 5, filters: [['title', 'like', `S4 keep ${width} ${stamp}%`]] })).items[0]
     must(kept, 'the Just keep item was not created')
     runAgent()
@@ -370,16 +365,6 @@ for (const width of WIDTHS) {
     must(!queue.items.some((i) => i.name === kept.name), 'the Just keep item is still in the Inbox')
     await s.open('/life/brain/captures?tab=text')
     must((await pg.locator('[data-main]').innerText()).includes(`S4 keep ${width} ${stamp}`), 'the Just keep item is not in Sources')
-    // the intent is remembered
-    await s.open('/life/brain')
-    await pg.waitForTimeout(1200)
-    await pg.reload({ waitUntil: 'networkidle' })
-    await pg.locator('[data-nav-capture]:visible, [data-tab-capture]:visible').first().click()
-    const keepBtn = pg.locator('[role="dialog"] [data-intent] button, [role="dialog"] [data-intent] [role="radio"]').filter({ hasText: 'Just keep' }).first()
-    must(await keepBtn.evaluate((e) => ['true'].includes(e.getAttribute('aria-checked')) || ['on', 'checked', 'active'].includes(e.getAttribute('data-state')) || e.getAttribute('aria-pressed') === 'true'),
-      'the last intent is not remembered')
-    await pg.locator('[role="dialog"] [data-intent]').getByText('Process', { exact: true }).click()
-    await pg.keyboard.press('Escape')
     // Add to wiki: pages are created and edited directly; no wiki proposals for review
     const w = await s.api('inbox.create_item', { title: `S4 wiki ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'Mithun runs the Ghatia factory.', intent: 'Add to wiki' })
     runAgent()
@@ -1055,12 +1040,10 @@ print(json.dumps(out))`).split('\n').pop()))
   try {
     await check('LIBRARY.38', '390 px: a photo of a journal page captured from the phone becomes a note with the photo, the transcript and its date; search finds it and its goal shows it', async () => {
       await s.open('/life')
-      await pg.locator('[data-tabbar] [data-tab-capture]').click()
-      await pg.locator('[data-capture-kind="files"]').click()
-      await pg.locator('[data-capture-files] input[type="file"]').setInputFiles({ name, mimeType: 'image/png', buffer: await pg.screenshot() })
-      await pg.locator('[data-capture-files] input[aria-label="Instruction"]').fill('transcribe and update my journal')
-      await pg.locator('[data-capture-brain]').click()
-      await pg.waitForTimeout(2500)
+      await pg.locator('[data-chat-bar] [data-ask-camera-input]').setInputFiles({ name, mimeType: 'image/png', buffer: await pg.screenshot() })
+      await pg.locator('[data-ask-sheet] [data-ask-input]').fill('transcribe and update my journal')
+      await pg.locator('[data-ask-sheet] [data-ask-send]').click()
+      await pg.waitForTimeout(3500)
       item = bench(`print(frappe.db.get_value("Life Inbox Item", {"title": "${name}"}, "name"))`).split('\n').pop()
       must(item && item !== 'None', 'the capture was not made')
       runAgent() // the fake AI reads the photo
@@ -1115,7 +1098,7 @@ print(ev.name)`).split('\n').pop()
   }
   const palette = async (text) => {
     await owner.open('/life/today')
-    await pg.keyboard.press('Meta+k')
+    await pg.keyboard.press('/')
     await pg.locator('input[aria-label="Search or chat"]').fill(text)
     await pg.waitForTimeout(1200)
   }

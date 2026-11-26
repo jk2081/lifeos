@@ -31,12 +31,13 @@
       <Empty :title="filtered ? 'Nothing matches.' : 'No pages yet.'">
         <p class="mt-1">{{ filtered ? 'Try another kind or status, or clear the filters.' : 'A page appears here for each person, company and part that comes up in what you capture and connect, with a brief the Brain writes.' }}</p>
         <Button v-if="filtered" class="mt-3" label="Clear filters" data-pages-clear @click="clear" />
-        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-pages-capture @click="store.captureOpen = true" />
+        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-pages-capture @click="openChat()" />
       </Empty>
     </Card>
   </div>
 </template>
 <script setup>
+import { openChat } from '@/lib/ask'
 // Library > Pages (issue 111): the first section of the Library. Every person, company, part and free-form page, filtered by kind (Companies, People, Parts and
 // projects, Notes) and by status (Prospect, Client, Partner, Past), the most recently updated first; "n new" is what was linked since you last opened it.
 import { computed, onMounted, ref, watch } from 'vue'

@@ -3,10 +3,11 @@
     python3 tools/fake_openai.py 8765
 
 Chat completions only, streamed or not. With tools offered, the first turn calls the tool whose name ends in
-`__list_records` (kind: tasks) or, if the user's message starts with `make task:`, `__make_task`; once a tool result is
+`__list_records` (kind: tasks) or, if the user's message starts with `make task:`, `__make_task`, or, if the question is `add a note: …` with a record open, `__add_note`; once a tool result is
 in the conversation it answers in words, quoting the result. Used by `docs/FLOW_TRIAL.md`; not part of the app.
 """
 import json
+import re
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,7 +23,11 @@ def reply(body):
 	last = next((m for m in reversed(msgs) if m.get("role") == "user"), {})
 	text = last.get("content") if isinstance(last.get("content"), str) else json.dumps(last.get("content"))
 	pick = lambda suffix: next((t for t in sorted(tools) if t.endswith(suffix)), None)
-	if text.lower().startswith("make task:") and pick("__make_task"):
+	question = text.split("Question:", 1)[-1].strip()
+	opened = re.search(r"\((Event|Life [A-Za-z]+) ([^)\s]+)\)", text)
+	if question.lower().startswith("add a note:") and opened and pick("__add_note"):  # issue 120: a note on the record the owner has open
+		call = (pick("__add_note"), {"text": question.split(":", 1)[1].strip(), "doctype": opened.group(1), "name": opened.group(2)})
+	elif text.lower().startswith("make task:") and pick("__make_task"):
 		call = (pick("__make_task"), {"title": text.split(":", 1)[1].strip()})
 	elif pick("__list_records"):
 		call = (pick("__list_records"), {"kind": "tasks"})

@@ -37,7 +37,7 @@
     <Card v-if="loaded && !rows.length" class="py-2" data-activity-empty>
       <Empty :title="data?.all || data?.counts?.assistant ? 'Nothing matches these filters.' : 'Nothing has come in yet.'">
         <p class="mt-1">{{ data?.all || data?.counts?.assistant ? 'Clear a filter to see the rest.' : 'What you capture or connect, and what the Brain does with it, will show up here.' }}</p>
-        <Button v-if="writable && !data?.all && !data?.counts?.assistant" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-activity-capture @click="store.captureOpen = true" />
+        <Button v-if="writable && !data?.all && !data?.counts?.assistant" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-activity-capture @click="openChat()" />
       </Empty>
     </Card>
 
@@ -99,6 +99,7 @@
   </div>
 </template>
 <script setup>
+import { openChat } from '@/lib/ask'
 // Brain > Activity (issue 18): what came in and what the Brain did with it, newest first, by day. Filters: source, area and
 // what was done. A failed capture says why and can be retried. This week's Outbox piles sit on top, with the flow line; the
 // Outbox page keeps the full list, other periods and Bring back.

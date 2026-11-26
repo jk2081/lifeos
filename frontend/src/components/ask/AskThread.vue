@@ -1,7 +1,8 @@
 <template>
   <div class="flex flex-col gap-4" data-ask-thread>
     <template v-for="(m, i) in ask.messages" :key="i">
-      <div v-if="m.role === 'user'" class="max-w-[85%] self-end rounded-5 bg-surface-gray-2 px-3.5 py-2 text-base text-ink-gray-9" data-ask-question>{{ m.text }}</div>
+      <div v-if="m.role === 'user'" class="flex max-w-[85%] flex-col gap-1 self-end rounded-5 bg-surface-gray-2 px-3.5 py-2 text-base text-ink-gray-9" data-ask-question>{{ m.text }}
+        <span v-for="f in m.attached || []" :key="f" class="flex items-center gap-1.5 text-sm text-ink-gray-7" data-ask-attached><span class="lucide-paperclip size-3.5" aria-hidden="true" />{{ f }}</span></div>
       <div v-else class="flex flex-col gap-3" data-ask-answer :data-status="m.status">
         <div v-if="m.status === 'Error'"><Alert theme="red" :title="m.error || 'The answer could not be written.'" data-ask-error /></div>
         <template v-else>
@@ -12,11 +13,16 @@
             <div class="text-sm text-ink-gray-6">Done</div>
             <div v-for="(d, j) in m.done" :key="j" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-ink-gray-9" data-ask-done-line :data-undone="d.undone ? 1 : 0">
               <span class="min-w-0 flex-[1_1_240px]" :class="d.undone && 'text-ink-gray-5 line-through'">{{ d.text }}</span>
-              <a v-if="d.pane && !d.undone" href="#" class="text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" data-ask-done-open @click.prevent="openPane(d.pane)">Open</a>
+              <a v-if="d.pane && !d.undone" href="#" class="text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" data-ask-done-open @click.prevent="openPane(d.pane)">Change</a>
               <span v-if="d.undone" class="text-sm text-ink-gray-6">Undone</span>
               <RouterLink v-if="d.kind === 'rule' && !d.undone" class="text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="{ path: '/settings', query: { tab: 'rules' } }" data-ask-rule-change>Change</RouterLink>
               <Button v-if="!d.undone && d.undo && canWrite()" size="sm" variant="subtle" label="Undo" data-ask-undo @click="undoDone(m, j)" />
             </div>
+          </div>
+          <!-- whose is this card: one question with tappable answers, then it is saved -->
+          <div v-for="q in m.questions || []" :key="q.index" class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5" data-ask-question-card>
+            <div class="text-base text-ink-gray-9">{{ q.text }} <span class="text-sm text-ink-gray-6">{{ q.file_name }}</span></div>
+            <div class="flex flex-wrap gap-2"><Button v-for="o in q.options" :key="o.value" size="sm" variant="subtle" :label="o.label" data-ask-holder @click="answerCard(m, q.index, o.value)" /></div>
           </div>
           <div v-if="m.cited && m.cited.length" class="text-sm text-ink-gray-6" data-ask-sources>Sources:
             <template v-for="(c, j) in m.cited" :key="c.n"><span v-if="j"> · </span><a href="#" class="text-ink-blue-8 hover:underline focus-visible:focus-ring" :data-ask-cite="c.n"
@@ -49,6 +55,6 @@ import Md from '../Md.vue'
 import { manySpaces } from '@/lib/lens'
 import { canWrite, store } from '@/lib/store'
 import AskSearchHits from './AskSearchHits.vue'
-import { ask, openCite, openPane, undoDone } from '@/lib/ask'
+import { answerCard, ask, openCite, openPane, undoDone } from '@/lib/ask'
 const lastQuestion = computed(() => [...ask.messages].reverse().find((m) => m.role === 'user')?.text || '')
 </script>

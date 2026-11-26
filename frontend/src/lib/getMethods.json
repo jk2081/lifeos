@@ -13,6 +13,8 @@
  "lifeos.api.chat.status",
  "lifeos.api.chat.thread",
  "lifeos.api.chat.threads",
+ "lifeos.api.chat.about",
+ "lifeos.api.chat.latest",
  "lifeos.api.chats.report",
  "lifeos.api.chats.list",
  "lifeos.api.chats.get",

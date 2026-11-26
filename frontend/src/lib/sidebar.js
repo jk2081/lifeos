@@ -16,11 +16,11 @@ export function setRail(on) {
 
 // the pages that live inside a place without being one of its tabs
 const HOME = { '/item': '/brain', '/focus': '/goals', '/share': '/brain' }
-/** The place the route belongs to: '/today', '/brain', '/goals', '/library', '/review', '/settings', '/chat' or ''. */
+/** The place the route belongs to: '/today', '/brain', '/goals', '/library', '/review', '/settings', '/insights' or ''. */
 export const activePlace = computed(() => {
   const first = '/' + router.currentRoute.value.path.split('/')[1]
   if (HOME[first]) return HOME[first]
-  return ['/today', '/brain', '/goals', '/library', '/review', '/settings', '/chat', '/how-it-works'].includes(first) ? first : ''
+  return ['/today', '/brain', '/goals', '/library', '/review', '/settings', '/insights', '/how-it-works'].includes(first) ? first : ''
 })
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']

@@ -23,7 +23,7 @@
     <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length && !contradictions.length && !agentRequests.length" class="py-2" data-needs-empty>
       <Empty title="Nothing needs you.">
         <p class="mt-1">Things you capture or connect will show up here.</p>
-        <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Capture" data-needs-capture @click="store.captureOpen = true" />
+        <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-needs-capture @click="openChat()" />
       </Empty>
     </Card>
 
@@ -132,6 +132,7 @@
   </div>
 </template>
 <script setup>
+import { openChat } from '@/lib/ask'
 // Brain > Needs you (issue 17): what the Brain asks you to decide, at most seven at a time, each with its best guess and
 // the reason. The guess is taken as right: a row has one button, Change (another area or part, Not needed, Always ask), and Done files the rest. A
 // proposal the Brain is torn on shows two area chips and you pick one. All of it is review.decide and review.decide_all.
