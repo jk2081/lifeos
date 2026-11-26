@@ -62,7 +62,7 @@
                   <div class="min-w-0 flex-1">
                     <div class="break-words text-base text-ink-gray-9" :class="r._done && 'text-ink-gray-6 line-through'">{{ r.title }}</div>
                     <div class="flex min-w-0 items-center gap-1.5 text-sm text-ink-gray-6"><AreaGuess :task="r" :readonly="!canWrite()" /><span class="truncate">{{ taskLine(r) }}</span>
-                      <RouterLink v-if="r.goal && r.goal_title" class="relative shrink-0 truncate text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/goals/${r.goal}`" data-task-goal-link>{{ r.goal_title }}</RouterLink></div>
+                      <RefLink v-if="r.goal && r.goal_title" class="relative shrink-0 truncate text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`goal:${r.goal}`" data-task-goal-link>{{ r.goal_title }}</RefLink></div>
                   </div>
                   <Dropdown v-if="r.why === 'Overdue' && canWrite()" :options="triage(r)"><Button class="relative md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100" variant="ghost" size="sm"
                     icon="lucide-calendar-clock" :label="'Reschedule ' + r.title" data-triage /></Dropdown>
@@ -105,7 +105,7 @@
             <h2 class="mb-1 flex items-baseline gap-2 text-base"><span class="font-semibold text-ink-gray-9">Insights</span>
               <span class="text-sm text-ink-gray-6">{{ d.rail.insights_total }} · <RouterLink class="text-ink-blue-8 hover:underline" :to="{ path: '/insights' }">see all</RouterLink></span></h2>
             <ul class="flex flex-col gap-1 text-sm text-ink-gray-6">
-              <li v-for="i in d.rail.insights" :key="i.name" data-rail-insight>{{ i.title }}</li>
+              <li v-for="i in d.rail.insights" :key="i.name" data-rail-insight><RouterLink class="hover:underline focus-visible:focus-ring" :to="{ path: '/insights', query: { insight: i.name } }">{{ i.title }}</RouterLink></li>
             </ul>
           </section>
         </aside>
@@ -121,6 +121,7 @@
 </template>
 
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 import { openChat } from '@/lib/ask'
 // Today (issue 55): tasks only. The Needs you line, the list (the top three, today, overdue folded, tasks planned this week under a
 // goal of the cycle; never a goal or a lead action), the habits row, then the rail (events, this week, insights). A goal with nothing

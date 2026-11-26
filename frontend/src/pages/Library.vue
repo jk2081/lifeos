@@ -29,7 +29,7 @@
               <Button v-if="hasChildren" class="!size-5 shrink-0" variant="ghost" :icon="open ? 'lucide-chevron-down' : 'lucide-chevron-right'" :label="open ? 'Collapse' : 'Expand'" tabindex="-1" @click.stop="toggle()" />
               <span v-else-if="node.note" class="size-5 shrink-0" aria-hidden="true" />
               <RouterLink v-if="node.note" class="flex min-w-0 flex-1 items-center self-stretch rounded-4 text-base focus-visible:focus-ring" :class="node.key === id ? 'font-medium text-ink-gray-9' : 'text-ink-gray-8'"
-                :to="`/library/${node.key}`" :aria-current="node.key === id ? 'page' : undefined">
+                :to="`/library/${node.key}`" data-guard-allow :aria-current="node.key === id ? 'page' : undefined">
                 <span class="truncate">{{ node.label }}<span v-if="node.note.goal_title && node.top" class="text-sm font-normal text-ink-gray-6"> · {{ node.note.goal_title }}</span></span>
               </RouterLink>
               <Button v-else-if="node.more" variant="ghost" size="sm" class="!px-0 text-ink-gray-7" :label="node.label" data-tree-show-all @click.stop="showAll = [...showAll, node.more]" />
@@ -73,6 +73,7 @@
   </Dialog>
 </template>
 <script setup>
+import { openRef } from '@/lib/pane'
 import { libraryData } from '@/data/library'
 import { inSpace } from '@/lib/lens'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -185,7 +186,7 @@ function onSaved(res) {
 async function create(v) {
   const res = await libraryData.library.save({ space: store.space, title: v.title, area: v.area || '', content_md: '' })
   await loadTree()
-  router.push(`/library/${res.name}?edit=1`)
+  openRef(`note:${res.name}`)
 }
 // Part of a note that can wait becomes a Someday note
 async function selectionToSomeday() {

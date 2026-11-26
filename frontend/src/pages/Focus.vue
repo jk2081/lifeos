@@ -50,8 +50,8 @@
           <ul class="flex flex-col">
             <li v-for="r in rows" :key="r.name" class="flex flex-wrap items-center gap-3 border-b border-outline-gray-1 py-2 last:border-b-0" :class="r.finished && 'opacity-60'" data-focus-goal :data-horizon="r.tag">
               <span class="w-28 flex-none rounded-4 bg-surface-gray-2 px-2 py-0.5 text-xs text-ink-gray-7" data-goal-tag>{{ r.tag }}</span>
-              <RouterLink class="min-w-0 flex-1 break-words text-base text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/goals/${r.name}`">{{ r.title }}
-                <span v-if="r.target_date" class="text-sm text-ink-gray-6">· by {{ short(r.target_date, true) }}</span></RouterLink>
+              <RefLink class="min-w-0 flex-1 break-words text-base text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`goal:${r.name}`">{{ r.title }}
+                <span v-if="r.target_date" class="text-sm text-ink-gray-6">· by {{ short(r.target_date, true) }}</span></RefLink>
               <span class="text-sm tabular-nums text-ink-gray-7">{{ r.finished ? r.outcome : r.progress.label }}</span>
             </li>
           </ul>
@@ -90,6 +90,8 @@
     <p class="mt-1">It may be switched off, archived or in a space you cannot open.</p><Button class="mt-3" label="Back to Goals" route="/goals" /></Empty></Card>
 </template>
 <script setup>
+import { openRef } from '@/lib/pane'
+import RefLink from '@/components/ui/RefLink.vue'
 // A focus's own page (issue 57): its standard, numbered principles (edit, reorder), goals by horizon (annual, 12 Week Year, others, then
 // finished ones greyed) and how it is going. Principles and the standard are saved through settings.save_item (the owner only).
 import { todayData } from '@/data/today'
@@ -177,7 +179,7 @@ function addAnnual() {
 }
 async function goalSaved(g) {
   await load()
-  router.push(`/goals/${g.name}`)
+  openRef(`goal:${g.name}`)
 }
 watch(() => props.id, load)
 watch(goalOpen, (o) => { if (!o) goalHorizon.value = '' })

@@ -48,7 +48,7 @@
           <h2 class="mb-2 text-base font-semibold text-ink-gray-9">Goals this week</h2>
           <template v-if="plan">
             <Row v-for="g in plan.goals" :key="g.goal" class="!items-center" data-goal-block>
-              <RouterLink class="relative min-w-0 flex-1 break-words text-base text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/goals/${g.goal}`">{{ g.title }}</RouterLink>
+              <RefLink class="relative min-w-0 flex-1 break-words text-base text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`goal:${g.goal}`">{{ g.title }}</RefLink>
               <span class="text-sm tabular-nums text-ink-gray-6">{{ hours(g.minutes) }}</span>
             </Row>
             <p v-if="!plan.goals.length" class="text-sm text-ink-gray-6">No time planned for a goal yet. Plan a task at a time and it shows here.</p>
@@ -59,6 +59,7 @@
   </div>
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 // Today > Week (issue 16): seven days with what is on each (meetings, goal work, due tasks, important dates), the week's focus
 // and score, and the goal work planned by goal. A day opens in Day; an item opens in the record pane. The cursor is `date=`.
 import { todayData } from '@/data/today'

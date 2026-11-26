@@ -31,14 +31,16 @@ const props = defineProps({ tab: String })
 const route = useRoute()
 const router = useRouter()
 const current = computed(() => props.tab || 'by-area')
-// By area (issue 20) is the front of Goals; a link that names a filter or an open goal (status=, open=, f=...) still gets the list it counts
-const OWN = ['space', 'area', 'show', 'sort']
+// By area (issue 20) is the front of Goals; a link that names a filter (status=, f=...) still gets the list it counts
+// a record open in the Drawer (open=, under=) does not change which screen it is
+const LAYER = ['open', 'under', 'ptab']
+const OWN = ['space', 'area', 'show', 'sort', ...LAYER]
 const byArea = computed(() => Object.keys(route.query).every((k) => OWN.includes(k)))
 // All tasks (issue 21) is the front of Goals > All tasks; an address that names a filter of the old list (status=, view=, f=, due=...) still gets that list
-const TASK_OWN = ['space', 'area', 'group', 'show', 'q']
+const TASK_OWN = ['space', 'area', 'group', 'show', 'q', ...LAYER]
 const allTasks = computed(() => Object.keys(route.query).every((k) => TASK_OWN.includes(k)))
 // No goal (issue 22) is its own screen; an address that names a filter (goal=none, status=...) still gets the old list
-const noGoal = computed(() => Object.keys(route.query).every((k) => ['space', 'area'].includes(k)))
+const noGoal = computed(() => Object.keys(route.query).every((k) => ['space', 'area', ...LAYER].includes(k)))
 const LINKS = [{ key: 'someday', label: 'Someday', icon: 'lucide-lightbulb', to: '/goals/someday' }]
 // No goal is All tasks with goal=none; another goal picked there is All tasks with that goal
 watch(() => [current.value, route.query.goal, noGoal.value], ([c, goal, own]) => {

@@ -42,7 +42,7 @@ const route = useRoute()
 const router = useRouter()
 const current = computed(() => props.tab || 'all')
 // the list's kind each tab holds ('' for any kind)
-const OWN_QUERY = ['space', 'area', 'goal', 'source', 'q', 'open', 'ptab', 'unopened']
+const OWN_QUERY = ['space', 'area', 'goal', 'source', 'q', 'open', 'under', 'ptab', 'unopened']
 const own = computed(() => current.value === 'all' && Object.keys(route.query).every((k) => OWN_QUERY.includes(k)))
 const KIND = { all: '', documents: 'documents', chats: 'chats' }
 const LINKS = [
@@ -58,7 +58,7 @@ watch(() => route.query.tab, (t) => {
   if (!kind) return
   if (t === kind) { settled = true; return }
   if (!settled) return router.replace({ query: { ...route.query, tab: kind } })
-  router.replace({ path: KIND.documents === t || KIND.chats === t ? `/library/${t}` : '/library', query: route.query })
+  router.replace({ path: KIND.documents === t || KIND.chats === t ? `/library/${t}` : '/library', query: route.query }) // guard-allow: a tab of the Library, not a record
 }, { immediate: true })
 // the Timeline and the trash and archive are pages of the Library: each shows as a tab while it is open
 const PAGES = { timeline: 'Timeline', archive: 'Trash and archive' }

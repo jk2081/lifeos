@@ -84,8 +84,8 @@ const areaChoices = computed(() => [{ label: 'Area', value: '' }, ...areaOptions
 const goalChoices = computed(() => [{ label: 'Goal', value: '' }, { label: 'No goal', value: 'none' }, ...goalOptions(lookups.goals, { empty: null })])
 const sourceChoices = computed(() => [{ label: 'Source', value: '' }, { label: 'Made by me', value: 'me' }, { label: 'Kept by the Brain', value: 'brain' },
   ...(data.value?.sources || []).map((s) => ({ label: s.charAt(0).toUpperCase() + s.slice(1), value: s }))])
-// a Life Person opens its page (issue 25); every other row opens in the pane
-const open = (r) => (r.doctype === 'Life Person' ? router.push({ path: `/library/people/${r.name}`, query: { space: route.query.space } }) : openRef(r.ref))
+// every row opens in the Drawer, a person as the person layer
+const open = (r) => openRef(r.doctype === 'Life Person' ? `person:${r.name}` : r.ref)
 
 const setQuery = (patch) => router.replace({ query: { ...route.query, ...patch, open: route.query.open } })
 const applyQuery = () => setQuery({ q: q.value.trim() || undefined })

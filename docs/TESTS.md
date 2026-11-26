@@ -62,7 +62,7 @@ What opens over every screen: layers, the URL that holds them, Back and Esc, the
 - `CORE.2` Chat is a layer (Cmd+K); a source in an answer opens on top of it with Back; Back returns to the same chat with its answer; Esc twice closes everything
 - `CORE.3` a list, then a row, then Back returns to the list with its row marked; j moves to the next row's record
 - `CORE.4` at 1440 px the Drawer is docked and the page narrows; at 1280 px it floats and the page keeps its width; at 390 px it is full screen with Back, in light and dark
-- `CORE.5` the guard finds a link to a record route in a .vue file (a fixture fails), and the tree has none beyond the screens #129 has yet to move
+- `CORE.5` the guard finds a link to a record route in a .vue file (a fixture fails), and the tree has none
 
 ### Today (`tools/acceptance/today.mjs`, 63 checks)
 

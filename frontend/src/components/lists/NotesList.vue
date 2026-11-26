@@ -16,7 +16,7 @@
       <span class="break-words font-medium text-ink-gray-9">{{ row.title }}</span>
       <Badge v-if="row.collection === 'Wiki'" size="sm" theme="blue" label="Kept by the assistant" data-assistant-badge /></span></template>
     <template #cell-area="{ row }"><RouterLink v-if="row.area" class="relative truncate text-ink-blue-8 hover:underline" :to="{ query: { ...$route.query, area: row.area, open: undefined } }">{{ row.area_name }}</RouterLink></template>
-    <template #cell-goal="{ row }"><span class="truncate">{{ row.goal_title }}</span></template>
+    <template #cell-goal="{ row }"><RefLink v-if="row.goal" class="relative truncate text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`goal:${row.goal}`" data-note-goal>{{ row.goal_title }}</RefLink></template>
     <template #cell-record_date="{ row }"><span class="whitespace-nowrap">{{ short(row.record_date || row.modified, true) }}</span></template>
     <template #cell-kind="{ row }"><span class="truncate">{{ row.kind || 'Note' }}</span></template>
     <template #stack="{ row }"><div class="flex flex-wrap items-center gap-2"><span v-if="row.vault_locked" class="lucide-lock size-3.5 text-ink-gray-6" role="img" aria-label="Sensitive" />
@@ -25,6 +25,7 @@
   </ListView>
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 import { libraryData } from '@/data/library'
 import { inSpace } from '@/lib/lens'
 import { computed, onMounted, ref } from 'vue'

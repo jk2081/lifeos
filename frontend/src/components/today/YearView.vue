@@ -50,7 +50,7 @@
                   <template v-else>
                     <div v-for="g in row.goals" :key="g.name" class="absolute flex h-8 items-center overflow-hidden rounded-4 border-l-[3px] px-2 text-xs"
                       :class="g.grey ? 'border-outline-gray-3 bg-surface-gray-2 text-ink-gray-7' : tone(row.colour)" :style="{ ...span(g.start, g.end), top: 0.5 + g.track * 2.25 + 'rem' }" data-goal-bar :data-goal="g.name" :data-grey="g.grey || undefined">
-                      <RouterLink class="absolute inset-0 focus-visible:focus-ring" :to="`/goals/${g.name}`" :aria-label="g.title" />
+                      <RefLink class="absolute inset-0 focus-visible:focus-ring" :to="`goal:${g.name}`" :aria-label="g.title" />
                       <span class="truncate">{{ g.label }}</span></div>
                     <i v-for="g in row.goals.filter((x) => x.deadline)" :key="g.name + 'd'" class="pointer-events-none absolute size-2.5 -translate-x-1/2 rounded-[2px] bg-surface-red-7"
                       :style="{ left: pos(g.deadline < g.start ? g.start : g.deadline > g.end ? g.end : g.deadline) + '%', top: 0.5 + g.track * 2.25 + 1 - 0.3125 + 'rem' }" :title="`${g.title} is due ${long(g.deadline)}`" data-goal-deadline :data-date="g.deadline" />
@@ -102,7 +102,7 @@
           <Card flush>
             <Row :pane="null" class="!items-center"><span class="min-w-0 flex-1 text-sm text-ink-gray-6">Score</span><span class="text-sm font-semibold tabular-nums text-ink-gray-9">{{ scoreText(c) }}</span></Row>
             <Row v-for="g in goalsIn(c)" :key="g.name" :pane="null" class="!items-center">
-              <RouterLink class="min-w-0 flex-1 break-words text-base focus-visible:focus-ring" :class="g.grey ? 'text-ink-gray-7' : 'text-ink-blue-8'" :to="`/goals/${g.name}`">{{ g.label }}</RouterLink>
+              <RefLink class="min-w-0 flex-1 break-words text-base focus-visible:focus-ring" :class="g.grey ? 'text-ink-gray-7' : 'text-ink-blue-8'" :to="`goal:${g.name}`">{{ g.label }}</RefLink>
               <span class="text-sm text-ink-gray-6">{{ g.area }}</span>
             </Row>
             <Row v-for="k in keysIn(c)" :key="k.ref + k.date" class="!items-center" :pane="k.ref" :label="k.title">
@@ -121,6 +121,7 @@
   </div>
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 // Today > Year (issues 16 and 100): the cycles around today. Four columns (the last cycle, this one, the next and the one after; quarters
 // when no 12 Week Year is running), today as a red line, ‹ › one cycle at a time and Today to come back (`shift=` is in the URL). Rows: the
 // score of each cycle; one row for each area that is on, each goal a bar across the cycle it belongs to and its deadline a small square;

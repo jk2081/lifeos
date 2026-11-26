@@ -41,7 +41,6 @@ export function screenHits(text) {
 export function openHit(r) {
   if (r.screen) return router.push(r.screen)
   if (r.space && r.space !== store.space) Object.assign(store, { space: r.space, lensArea: '' }) // a result in another space: its whole space
-  if (r.ref_doctype === 'Life Inbox Item') return router.push(r.route) // a capture opens its item page (issue 10)
   const ref = refOf(r.ref_doctype, r.ref_name)
   return ref ? openRef(ref) : router.push(String(r.route || '/').replace(/^\/life/, '') || '/')
 }
