@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Today: Overview and Calendar (issue: Today has two modes)</title>
+<!-- Open with #overview or #calendar: the four views (Day, Week, Month, Year) stacked in that mode. Numbers are from the owner's site on 26 Nov 2026. -->
+<style>
+:root{--t:#171717;--t2:#6B6B6B;--t3:#8A8A8A;--b:#EDEDED;--b2:#DADADA;--b3:#A3A3A3;--bg:#F3F3F3;--s:#fff;--page:#FAFAFA;--ac:#0062B3;--acbg:#E6F4FF;--wa:#A8480A;--dabg:#FDECEC;--da:#B42318}
+*{box-sizing:border-box}body{margin:0;padding:28px;font-family:Inter,system-ui,sans-serif;color:var(--t);background:var(--page);font-size:14px;width:1440px}
+.lab{font-size:13px;color:var(--t3);margin:24px 0 8px}
+.fr{border:1px solid var(--b);border-radius:14px;background:var(--s);padding:18px 22px 22px}
+.hd{display:flex;justify-content:space-between;margin-bottom:12px}.t{font-size:20px;font-weight:600;margin:0}.st{font-size:13px;color:var(--t2);margin:3px 0 0}
+.row1{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--b);margin-bottom:14px}
+.tabs span{display:inline-block;padding:8px 12px;color:var(--t2);border-bottom:2px solid transparent}.tabs span.on{color:var(--t);border-bottom-color:var(--t)}
+.seg{display:flex;background:var(--bg);border-radius:8px;padding:3px;margin-bottom:5px}.seg span{padding:5px 14px;border-radius:6px;color:var(--t2);font-size:13px}.seg span.on{background:var(--s);color:var(--t);font-weight:500}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.m{background:var(--bg);border-radius:10px;padding:12px 14px}.l{font-size:13px;color:var(--t2);margin:0}.n{font-size:24px;font-weight:600;margin:2px 0}.s{font-size:12px;color:var(--t3);margin:0}
+.two{display:grid;grid-template-columns:1.3fr 1fr;gap:12px}
+.c{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:12px 16px}.h{font-size:14px;font-weight:600;margin:0 0 6px}
+.rw{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--b);font-size:13px}
+.mu{color:var(--t2)}.wa{color:var(--wa)}.ac{color:var(--ac)}
+.r{display:flex;align-items:flex-end;height:30px}.r>div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.r .tk{width:1px;height:6px;background:var(--b3)}.r .p .tk{background:var(--b2)}.r .lb{font-size:12px;color:var(--t2);margin-bottom:3px;white-space:nowrap}
+.r .nb .tk{height:9px}.r .now .tk{width:2px;height:13px;background:var(--ac);border-radius:1px}.r .now .lb{color:var(--ac);font-weight:600}
+.wk{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}.wk>div{background:var(--s);border:1px solid var(--b);border-radius:10px;padding:8px;min-height:130px;font-size:12px}
+.wk .td{border-color:var(--ac)}.wk .td>div:first-child{color:var(--ac);font-weight:600}
+.ev{background:var(--bg);border-radius:5px;padding:3px 6px;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ev.due{background:var(--dabg);color:var(--da)}
+.mg{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--b);border-radius:10px;overflow:hidden}
+.mg>div{border-right:1px solid var(--b);border-bottom:1px solid var(--b);padding:6px 8px;min-height:72px;font-size:12px}.mg .hdr{min-height:0;color:var(--t2);background:var(--bg)}
+.mg .out{color:var(--t3)}.mg .tdy{background:var(--acbg)}.mg .tdy>b{color:var(--ac)}
+.yg{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.yg>div{border:1px solid var(--b);border-radius:10px;padding:8px 10px;min-height:86px;font-size:12px}
+.yg .cur{border-color:var(--ac)}.yg .cur>b{color:var(--ac)}.dot{display:inline-block;width:7px;height:7px;border-radius:4px;background:var(--da);margin-right:5px}
+</style></head><body><div id="root"></div>
+<script>
+const card=(l,n,s,k)=>`<div class="m"><p class="l">${l}</p><p class="n">${n}</p><p class="s ${k||''}">${s}</p></div>`;
+const rows=a=>a.map(r=>`<div class="rw"><span>${r[0]}</span><span class="${r[2]||'mu'}">${r[1]}</span></div>`).join('');
+const pnl=(h,b)=>`<div class="c"><p class="h">${h}</p>${b}</div>`;
+const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function ruler(){let mo='';for(let k=-5;k<=5;k++){const i=(10+k+12)%12;let c=k<0?'p':'',lb='';if(k==0){c='now';lb='November'}else if(Math.abs(k)==1){c+=' nb';lb=M[i]}mo+=`<div class="${c}">${lb?`<span class="lb">${lb}</span>`:''}<i class="tk"></i></div>`}
+ let dy='';for(let k=-15;k<=15;k++){const d=new Date(2026,10,26+k);let c=k<0?'p':'',lb='';if(k==0){c='now';lb='Thu 26'}else if(Math.abs(k)<=2){c+=' nb';lb=String(d.getDate())}dy+=`<div class="${c}">${lb?`<span class="lb">${lb}</span>`:''}<i class="tk"></i></div>`}
+ return `<div style="margin:2px 0 14px"><div class="r">${mo}</div><div class="r">${dy}</div></div>`}
+const V={
+Day:{t:'Thursday, 26 November',s:'3 days left this week · 4 meetings',
+ o:()=>`<div class="g4">${card('Top three','–','set in the weekly review')}${card('Needs you','1','oldest today')}${card('Check today','0','waiting items due')}${card('Your plate','2','due today')}</div><div class="two">${pnl('Top three','<div class="mu" style="padding:8px 0">The weekly review sets your top three.</div>')}${pnl('Needs you',rows([['Agree a time with Ekta for 1 Dec','You asked','ac']]))}</div>`,
+ c:()=>`${ruler()}<div class="c">${rows([["All day · Sumedha Bansal's birthday",''],['All day · Sports Day Run (Anya &amp; Arjun)',''],['11:00 · Visit of Mr Rajesh, GGC, camera inspection',''],['13:00 · Ruchi ITR',''],['13:30 · Block',''],['<span class="ac">23:06 · now</span>',''],['Due · Agree a time with Ekta for 1 Dec','task','wa']])}</div>`},
+Week:{t:'23 – 29 November',s:'Not in a 12 Week Year',
+ o:()=>`<div class="g4">${card('Week score','–','once you have a 12-week goal')}${card('Needs you','1','oldest today')}${card('Waiting on others','3','1 late','wa')}${card('Brain filed alone','43%','3 of 7')}</div><div class="two">${pnl('Goals by area','<div class="mu" style="padding:8px 0">Your goals show here, grouped by area. <span class="ac">Set a goal</span></div>')}${pnl('Waiting on others',rows([['Ekta Jalan · confirm 1 Dec','late','wa'],['Anirudh Poddar · ERP feedback','Fri'],['Ravi · trademark receipt','Fri']]))}</div><div class="c" style="margin-top:12px;font-size:13px"><b>The Brain this week</b> <span class="mu">· 7 came in · 3 filed alone · 0 to waiting · 1 to you</span></div>`,
+ c:()=>{const W=['Mon 23','Tue 24','Wed 25','Thu 26','Fri 27','Sat 28','Sun 29'],E=[['Anniversary','14:00 Amit &lt;&gt; BTW'],[],['07:00 Arjun basketball','10:00 RSH Global','15:00 Ajay Jalan'],['Sports Day Run',"Sumedha's birthday",'11:00 Mr Rajesh','13:00 Ruchi ITR'],['!Follow up Anirudh','!Follow up Ravi','13:30 Block'],['Jr. School Sports Day','16:00 Amit M'],['18:00 Weekly review']];
+ return `${ruler()}<div class="wk">${W.map((w,i)=>`<div class="${i==3?'td':''}"><div>${w}</div>${E[i].map(e=>`<div class="ev ${e[0]=='!'?'due':''}">${e.replace('!','')}</div>`).join('')||'<div class="mu" style="margin-top:5px">Nothing</div>'}</div>`).join('')}</div>`}},
+Month:{t:'November 2026',s:'49 meetings · 5 due dates',
+ o:()=>`<div class="g4">${card('Month score','–','once you have a 12-week goal')}${card('Month plan','–','plan the month')}${card('Goals due','0','this month')}${card('Brain filed alone','43%','3 of 7')}</div><div class="two">${pnl('Weeks of the month',rows([['Week of 2 Nov','–'],['Week of 9 Nov','–'],['Week of 16 Nov','–'],['<span class="ac">Week of 23 Nov</span>','now','ac'],['Week of 30 Nov','next']]))}${pnl('Goals due','<div class="mu" style="padding:8px 0">Goals with a date this month show here.</div>')}</div>`,
+ c:()=>{let h='<div class="mg">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="hdr">${d}</div>`).join('');const kd={4:"Shubhodeep's birthday",9:'Diwali',13:'Century &lt;&gt; BTW',22:'NK Kejriwal birthday',23:'Anniversary',24:'Wedding of Rahul',26:"Sumedha's birthday",28:'Sports Day'};const mt={2:3,3:1,5:2,6:2,10:4,12:2,17:3,19:2,25:3,26:4,27:1};for(let i=0;i<42;i++){const d=i-5;const out=d<1||d>30;const dd=out?(d<1?26+i:d-30):d;h+=`<div class="${out?'out':''} ${d==26?'tdy':''}"><b>${dd}</b>${!out&&kd[d]?`<div class="ev">${kd[d]}</div>`:''}${!out&&mt[d]?`<div class="mu">${mt[d]} meeting${mt[d]>1?'s':''}</div>`:''}</div>`}return ruler()+h+'</div>'}},
+Year:{t:'2026',s:'35 days left · no 12 Week Year running',
+ o:()=>`<div class="g4">${card('Year goals','–','set one')}${card('This cycle','–','none running')}${card('Reviews locked','0 of 1','since setup')}${card('Brain filed alone','43%','Nov')}</div><div class="two">${pnl('Year goals by area',rows([['Career','no goals'],['Health','no goals'],['Money','no goals'],['Mind','no goals']]))}${pnl('Cycles','<div class="mu" style="padding:8px 0">Each 12 Week Year and its score show here. <span class="ac">Plan one</span></div>')}</div>`,
+ c:()=>{const K=[2,1,3,2,1,2,3,2,1,4,9,6];return ruler()+'<div class="yg">'+M.map((m,i)=>`<div class="${i==10?'cur':''}"><b>${m}</b><div class="mu" style="margin-top:4px">${K[i]} key dates</div>${i==10?'<div style="margin-top:4px"><span class="dot"></span>Wedding · 24th</div>':''}${i==11?'<div style="margin-top:4px"><span class="dot"></span>Ekta · 1st</div>':''}</div>`).join('')+'</div>'}}};
+const mode=(location.hash.slice(1)||'overview')=='calendar'?'Calendar':'Overview';
+document.getElementById('root').innerHTML=['Day','Week','Month','Year'].map(k=>{const v=V[k];return `<p class="lab">${k} · ${mode}</p><div class="fr"><div class="hd"><div><p class="t">${v.t}</p><p class="st">${v.s}</p></div><div class="mu">‹ Today ›</div></div><div class="row1"><div class="tabs">${['Day','Week','Month','Year'].map(t=>`<span class="${t==k?'on':''}">${t}</span>`).join('')}</div><div class="seg">${['Overview','Calendar'].map(t=>`<span class="${t==mode?'on':''}">${t}</span>`).join('')}</div></div>${mode=='Overview'?v.o():v.c()}</div>`}).join('');
+</script></body></html>
