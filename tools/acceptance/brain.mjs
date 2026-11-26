@@ -468,7 +468,7 @@ for (const width of WIDTHS) {
     await s.open('/life/library/notes')
     if (width < 768) await pg.locator('[data-phone-search]').click()
     else await pg.keyboard.press('/')
-    await pg.locator('input[aria-label="Search or ask anything"]').fill(title)
+    await pg.locator('input[aria-label="Search or chat"]').fill(title)
     await pg.waitForTimeout(900)
     await pg.keyboard.press('Enter')
     await settle()
@@ -1760,7 +1760,10 @@ for (const width of WIDTHS) {
         { role: 'owner', text: 'Thanks', at: '2026-11-26 09:01:00' }]
       const out = (await (await agentFetch('chats.relay', { turns: JSON.stringify(turns3), channel: 'Telegram', source_system: ASSISTANT, external_id: `tg-${width}-${stamp}`, space: SPACE })).json()).message
       must(out?.added === 3, 'the relay answered ' + JSON.stringify(out))
-      await s.open('/life/ask?tab=history')
+      await s.open('/life')
+      // issue 120: History is inside the chat panel (laptop) or the chat sheet (phone)
+      if (phone) await pg.locator('[data-chat-bar-open]').first().click(); else { await pg.keyboard.press('Control+k'); await pg.waitForTimeout(500) }
+      await pg.locator('[data-ask-history-open]:visible').first().click()
       const rowH = pg.locator('[data-history-row]', { hasText: 'on Telegram' }).first()
       await rowH.waitFor({ timeout: 10000 })
       must((await rowH.innerText()).includes('Hermes · Telegram'), 'the row reads: ' + (await rowH.innerText()))
