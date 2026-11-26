@@ -34,7 +34,11 @@ await check('TOOLING.2', 'CI has an acceptance job that builds the front end, ma
   for (const step of ['LIFEOS_BENCH_CMD: local', 'bench build --app lifeos', 'scripts/acceptance-site.sh', 'node tools/acceptance.mjs'])
     must(job.includes(step), 'the job lacks: ' + step)
   must(!/acceptance\.mjs[^\n]*--(only|ux)/.test(job), 'the job runs only some checks')
-  must(PLACES.every((p) => new RegExp('part: \\[[^\\]]*\\b' + p + '\\b').test(job)) && job.includes('--part=${{ matrix.part }}'), 'the job does not run every place')
+  // the places come from the plan job: every place, unless a pull request labelled `quick` names some (the nightly run walks all)
+  const plan = ciJob('plan')
+  must(plan && PLACES.every((p) => plan.includes(`"${p}"`)) && plan.includes("contains(github.event.pull_request.labels.*.name, 'quick')"), 'the plan job does not list every place, or walks fewer without the quick label')
+  must(job.includes('fromJSON(needs.plan.outputs.parts)') && job.includes('--part=${{ matrix.part }}'), 'the job does not run the planned places')
+  must(/schedule:\s*\n\s*- cron:/.test(fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8')), 'no nightly full walk')
   if (process.env.GITHUB_ACTIONS) {
     must(!ONLY, 'this CI run was given --only')
     must(SETUP.bench.startsWith('local bench') && !SETUP.chrome && SETUP.passwordFrom === 'environment', 'CI is not using the switches')

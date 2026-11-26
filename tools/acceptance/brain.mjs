@@ -622,6 +622,15 @@ print(json.dumps(out))`).split('\n').pop())
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
       made.k = { a, b, c }
     })
+    await check('BRAIN.62', `${width} px: a Needs you row's title opens the capture in the side pane, and closing it leaves the row in place`, async () => {
+      const { a } = made.k
+      await row(a.proposal).locator('[data-row-title]').click()
+      await pg.locator('[data-pane]').first().waitFor({ timeout: 5000 })
+      must((await pg.locator('[data-pane]').first().innerText()).includes(T('voice')), 'the pane does not show the capture')
+      await pg.keyboard.press('Escape')
+      await pg.locator('[data-pane]').first().waitFor({ state: 'hidden', timeout: 5000 })
+      must(await row(a.proposal).isVisible(), 'the row left after only looking at it')
+    })
     await check('BRAIN.22', `${width} px: Keep accepts the proposal, the row leaves, and the record exists with the guessed area`, async () => {
       const { a } = made.k
       await openNeeds()
