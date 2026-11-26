@@ -6,6 +6,23 @@ Each idea keeps the owner's own words, then a short note on what it would take.
 
 ## Open
 
+### Life in four layers, and the ladder
+> "life works in two slices time and area of work/focus, is there anything else?" … "So simplest is time & people, then area (goals), then systems, then energy?" … "I think 1 & 2 are easy to understand. park this discussion in ideas but the ladder should be 1 & 2 for now." (26 Nov)
+
+Users grow into four layers, each asking more of them than the last, and none offered before the one below pays off:
+
+1. **Time and people.** Free: it comes from mail, calendar and contacts. Needs you, waiting on others, people's pages, delegation, Chat and WhatsApp.
+2. **Areas and goals.** Takes intention: name the parts of your life and aim.
+3. **Systems.** Takes proven goals: focuses with a standard and a review cadence.
+4. **Energy.** Takes history: a daily one-tap check-in that later shapes plans. It is cheap to capture early and is shown last.
+
+**Decided for now: the ladder in Settings is two levels, layer 1 and layer 2.** Systems (focuses) and energy stay off the ladder for now. The owner keeps focuses on for himself.
+
+Parked, to decide later:
+- **New users start in layer 1** (no areas or goals, which is #109's simple mode). Areas and goals are offered after a few weeks of use, not in onboarding step 3.
+- **The Brain offers the next layer when there is evidence**, for example "You've delegated 20 things this month. Want to set goals?" or "Same sales goal three cycles running. Make it a system?" The user doesn't have to find it in Settings.
+- **Where Life OS stands against the layers:** layer 2 is the most built. Layer 1, the one that wins a new user in week one, still lacks the waiting pile (#118), delegation and WhatsApp. So the build leans to layer 1 first.
+
 ### The Brain page, cleaned up
 > "Inbox" title inside Brain; Needs you and Queue › To review are the same thing twice; Captures is not a tab; footer links repeat the tabs. (25 Nov)
 
