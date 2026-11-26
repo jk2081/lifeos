@@ -16,7 +16,7 @@ await check('BRAIN.1', 'Journal photo: agent submits 5 proposals; accept 3, edit
   must(got.status === 'To Review', 'item is ' + got.status)
   must(got.transcript_md && got.proposals.length === 5, `expected 5 proposals, got ${got.proposals.length}`)
   // accept the first and reject the second with the buttons on the Review screen
-  await owner.open('/life/brain/queue?open=inbox:' + item.name)
+  await owner.open('/life/brain/queue?open=inbox:' + item.name + '&ptab=decisions') // issue 118: the proposals are on the Decisions tab
   await owner.page.getByRole('button', { name: 'Accept', exact: true }).first().click()
   await owner.page.waitForTimeout(800)
   await owner.page.getByRole('button', { name: 'Reject', exact: true }).first().click()
@@ -137,7 +137,7 @@ await check('BRAIN.5', 'At review, change the area with one tap and add a second
     must((await owner.page.locator('[data-main]').innerText()).includes(title), `not on Plan > Tasks with ${name} in the lens`)
   }
   const item = await owner.api('inbox.list', { space: SPACE, status: 'To Review' })
-  await owner.open('/life/brain/queue?open=inbox:' + item.items[0].name)
+  await owner.open('/life/brain/queue?open=inbox:' + item.items[0].name + '&ptab=decisions')
   must(await owner.page.locator('text=also in').count() > 0, 'the Review screen has no area chips')
 })
 
@@ -378,7 +378,7 @@ for (const width of WIDTHS) {
     const again = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v1)
     must(again.name === first.name, 'the same file sent again was attached a second time')
     must((await s.api('inbox.get', { item: item.name })).files.length === 1, 'the item has more than one attachment')
-    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the summary
+    await s.open(`/life/brain/review/${item.name}?tab=file`) // issue 118: a file with no text opens under File
     must(await pg.locator(`${original} a[href="${first.file_url}"]`).count() === 1, 'the review does not show the one attachment once')
     must(!(await pg.locator('[data-file-versions]').count()), 'a file with one version shows versions')
     // a changed file of the same name: one current file and the old one as an earlier version
@@ -386,7 +386,7 @@ for (const width of WIDTHS) {
     const second = await s.upload('Life Inbox Item', item.name, 'BTW standard deck.txt', 'text/plain', v2)
     const got = await s.api('inbox.get', { item: item.name })
     must(got.files.length === 1 && got.files[0].file_url === second.file_url && got.files[0].versions.length === 1, 'not one current file with one earlier version: ' + JSON.stringify(got.files))
-    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the summary
+    await s.open(`/life/brain/review/${item.name}?tab=file`) // issue 118: a file with no text opens under File
     const toggle = pg.locator('[data-file-versions-toggle]')
     must(/^2 versions, latest \d+ \w{3}$/.test((await toggle.innerText()).trim()), 'the versions line says: ' + (await toggle.innerText()))
     await toggle.click()
@@ -427,19 +427,20 @@ for (const width of WIDTHS) {
     await s.open('/life/brain/queue')
     const shown = await pg.locator('[data-row]', { hasText: title }).count()
     must(shown === 1, `the Inbox shows the job in ${shown} rows`)
-    await s.open(`/life/brain/review/${item.name}?tab=original`) // phones open on the proposals
+    await s.open(`/life/brain/review/${item.name}?tab=original`) // issue 118: the outputs are under the original
     must(await pg.locator('[data-review-outputs]').count() === 1, 'no Outputs section')
     for (const ext of ['txt', 'html'])
-      must(await pg.locator('[data-review-original] a', { hasText: `${title}.${ext}` }).count() === 1, `the output ${title}.${ext} is not shown once`)
+      must(await pg.locator('[data-file-view] a', { hasText: `${title}.${ext}` }).count() === 1, `the output ${title}.${ext} is not shown once`)
     const inputs = pg.locator('[data-review-inputs] [data-review-input]')
     must(await inputs.count() === 2, `${await inputs.count()} inputs shown`)
     const inputText = await pg.locator('[data-review-inputs]').innerText()
     must(inputText.includes('Standard sales deck.txt') && inputText.includes('Brand guidelines.txt'), 'the inputs are not named')
-    must(!(await pg.locator('[data-review-original] a', { hasText: 'Standard sales deck.txt' }).count()), 'an input is listed as an output')
-    must(await pg.locator('[data-review-filed-with]').count() === 1, 'the wiki page and chat log filed with it are not shown')
+    must(!(await pg.locator('[data-file-view] a', { hasText: 'Standard sales deck.txt' }).count()), 'an input is listed as an output')
+    await s.open(`/life/brain/review/${item.name}?tab=came`) // issue 118: what was filed with it is under What came of it
+    must(await pg.locator('[data-related]').count() >= 1, 'the wiki page and chat log filed with it are not shown')
     await s.open(`/life/brain/review/${item.name}?tab=summary`)
     must((await pg.locator('body').innerText()).includes('An owner-first deck'), 'the summary is not shown')
-    await s.open(`/life/brain/review/${item.name}?tab=proposals`)
+    await s.open(`/life/brain/review/${item.name}?tab=decisions`)
     must(await pg.locator('[data-proposal="Pending"]').count() === 2, 'the two proposals are not shown')
     const overflow = await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
     must(!overflow, 'the page scrolls sideways')
@@ -466,44 +467,44 @@ for (const width of WIDTHS) {
   runAgent()
   const first = (await s.api('inbox.get', { item: id })).proposals[0]
   await s.api('review.decide', { proposal: first.name, decision: 'accept' })
-  const section = (name) => pg.locator(`[data-item-section="${name}"]`)
-  const openAll = async () => { // on a phone the folded sections are opened first
-    const folded = pg.locator('[data-item-toggle][aria-expanded="false"]')
-    for (let n = 0; n < 6 && await folded.count(); n++) await folded.first().click()
-  }
+  // issue 118: the page has tabs (Summary, File, Decisions, What came of it), one at a time, in the URL as tab=
+  const openTab = async (tab) => { await s.open(`/life/item/${id}?tab=${tab}`); await pg.locator(`[data-item-tab="${tab}"]`).waitFor({ timeout: 10000 }) }
   const settle = () => pg.waitForTimeout(700)
 
-  await check('BRAIN.15', `${width} px: an item with a file, a summary, 2 waiting proposals and 1 accepted task shows every section right`, async () => {
-    await s.open(`/life/item/${id}`)
-    await openAll()
+  await check('BRAIN.15', `${width} px: an item with a file, a summary, 2 waiting proposals and 1 accepted task shows every tab right`, async () => {
+    await openTab('summary')
     const head = await pg.locator('[data-item-head]').innerText()
     must((await pg.locator('h1').first().innerText()).includes(title), 'the title is not in the header')
     must(head.includes('Upload') && head.includes('Private'), 'the header does not say the source and the space: ' + head)
-    must(await section('came-in').locator('[data-file-view]', { hasText: pdfName }).count() === 1, 'the file is not under What came in once')
-    must((await section('came-in').innerText()).includes('summarise and extract to-dos'), 'the instruction is not under What came in')
-    must((await section('brain').innerText()).includes('summarised'), 'the summary is not under What the Brain made of it')
-    must(await section('decisions').locator('[data-proposal="Pending"]').count() === 2, 'Decisions does not show the 2 waiting proposals')
-    must(!(await section('decisions').locator('[data-proposal="Accepted"]').count()), 'an accepted proposal is still under Decisions')
-    const rows = section('came-of-it').locator('[data-came-of-it]')
+    must((await pg.locator('[data-item-tab="summary"]').innerText()).includes('summarised'), 'the summary is not on the Summary tab')
+    await openTab('file')
+    must(await pg.locator('[data-file-view]', { hasText: pdfName }).count() === 1, 'the file is not under File once')
+    must((await pg.locator('[data-item-tab="file"]').innerText()).includes('summarise and extract to-dos'), 'the instruction is not under File')
+    await openTab('decisions')
+    must(await pg.locator('[data-proposal="Pending"]').count() === 2, 'Decisions does not show the 2 waiting proposals')
+    must(!(await pg.locator('[data-proposal="Accepted"]').count()), 'an accepted proposal is still under Decisions')
+    await openTab('came')
+    const rows = pg.locator('[data-came-of-it]')
     must(await rows.count() === 1, `What came of it shows ${await rows.count()} records`)
     const row = await rows.first().innerText()
     must(row.includes(first.preview) && row.includes('Task') && row.includes('Open'), 'the accepted task is not shown with its state: ' + row)
-    must(await section('related').count() === 1, 'no Related section')
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
   })
 
   await check('BRAIN.16', `${width} px: accepting a proposal on the item page moves it to What came of it without a reload`, async () => {
-    await s.open(`/life/item/${id}`)
-    await openAll()
+    await openTab('decisions')
     await pg.evaluate(() => { window.__i10 = 1 })
-    const card = section('decisions').locator('[data-proposal="Pending"]').first()
+    const card = pg.locator('[data-proposal="Pending"]').first()
     const preview = (await card.locator('.text-base-medium').first().innerText()).trim()
     await card.getByRole('button', { name: 'Accept', exact: true }).click()
     await settle()
     must(await pg.evaluate(() => window.__i10 === 1), 'the page reloaded')
-    must(await section('decisions').locator('[data-proposal="Pending"]').count() === 1, 'the accepted proposal is still waiting')
-    const rows = await section('came-of-it').locator('[data-came-of-it]').allInnerTexts()
+    must(await pg.locator('[data-proposal="Pending"]').count() === 1, 'the accepted proposal is still waiting')
+    await pg.locator('[data-item-tabs] [role="tab"]', { hasText: 'What came of it' }).click() // a tab click, not a reload
+    await pg.locator('[data-item-tab="came"]').waitFor({ timeout: 10000 })
+    const rows = await pg.locator('[data-came-of-it]').allInnerTexts()
     must(rows.length === 2 && rows.some((r) => r.includes(preview)), `What came of it does not list "${preview}": ${rows.join(' | ')}`)
+    must(await pg.evaluate(() => window.__i10 === 1), 'the page reloaded')
   })
 
   await check('BRAIN.17', `${width} px: the item page opens from the Inbox list, from Library and from search`, async () => {
@@ -548,11 +549,12 @@ for (const width of WIDTHS) {
   })
 
   await check('BRAIN.19', `${width} px: the item page is one column with no sideways scroll`, async () => {
-    await s.open(`/life/item/${id}`)
-    await openAll()
-    must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
-    const lefts = await pg.locator('[data-item-section]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)))
-    must(lefts.length === 5 && new Set(lefts).size === 1, 'the sections are not one column: ' + lefts.join(', '))
+    for (const tab of ['summary', 'file', 'decisions', 'came']) {
+      await openTab(tab)
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `the ${tab} tab scrolls sideways`)
+      const lefts = await pg.locator(`[data-item-tab="${tab}"] > *`).evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)))
+      must(new Set(lefts).size <= 1, `the ${tab} tab is not one column: ` + lefts.join(', '))
+    }
     must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
   })
   await s.ctx.close()

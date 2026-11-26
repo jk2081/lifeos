@@ -7,15 +7,16 @@
       <SummaryView :item="item" :writable="writable" @original="emit('tab', originalKey(item))" @changed="emit('reload')" />
     </div>
 
-    <template v-else-if="tab === originalKey(item)">
+    <div v-else-if="tab === originalKey(item)" class="flex flex-col gap-4" data-review-original>
       <p v-if="item.instruction" class="text-base text-ink-gray-8" data-item-instruction><span class="text-ink-gray-6">Your instruction:</span> “{{ item.instruction }}”</p>
+      <div v-if="item.job_id && item.files.length" class="text-sm-medium text-ink-gray-7" data-review-outputs>Outputs</div>
       <FileView v-for="f in item.files" :key="f.file_url" :file="f" :preview="item.files.length === 1 ? item.preview_image : ''" />
       <Card v-if="item.raw_text" data-item-text><DigestView v-if="item.source_type === 'Email Digest'" :text="item.raw_text" /><Md v-else :text="item.raw_text" /></Card>
       <div v-if="safeLink"><Button icon-left="lucide-external-link" :label="/mail\.google\.com/.test(safeLink) ? 'Open in Gmail' : 'Open the original'" @click="openLink" /></div>
-      <template v-if="item.job_id">
+      <div v-if="item.job_id" class="flex flex-col gap-4" data-review-inputs>
         <div class="text-sm-medium text-ink-gray-7">Made from</div>
         <Card flush>
-          <Row v-for="i in item.inputs" :key="i.name" data-item-input>
+          <Row v-for="i in item.inputs" :key="i.name" data-item-input data-review-input>
             <div class="min-w-0 flex-1 break-words text-base">
               <a v-if="i.file" class="relative text-ink-blue-8 hover:underline" :href="i.file.file_url" target="_blank" rel="noopener">{{ i.name }}</a>
               <span v-else class="text-ink-gray-9">{{ i.name }}</span>
@@ -25,7 +26,7 @@
           </Row>
           <Empty v-if="!item.inputs.length" title="No inputs." hint="The agent filed no inputs with this work." />
         </Card>
-      </template>
+      </div>
       <Card v-if="!item.files.length && !item.raw_text && !safeLink && !item.instruction"><Empty title="Nothing came with it." hint="This item arrived with no file, text or link." /></Card>
       <!-- "Add a transcript" lives with the original -->
       <div v-if="item.transcript_md || writable" data-item-transcript>
@@ -38,7 +39,7 @@
         </Card>
         <p v-if="showTranscript && (item.transcript_md || '').includes('[?]')" class="mt-2 text-sm text-ink-gray-6">Words marked [?] were hard to read. Edit the transcript to correct them.</p>
       </div>
-    </template>
+    </div>
 
     <div v-else-if="tab === 'decisions'" class="flex flex-col gap-3" data-item-decisions>
       <ProposalCards :item="item" :writable="writable" only="pending" empty-title="Nothing waiting for you." :empty-hint="emptyDecisions" @decided="emit('decided')" />
