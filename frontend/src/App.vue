@@ -1,6 +1,6 @@
 <template>
   <FrappeUIProvider>
-    <div v-if="store.ready" class="flex min-h-full bg-surface-base" data-app>
+    <div v-if="store.ready" class="flex min-h-full overflow-x-clip bg-surface-base" data-app>
       <div class="sticky top-0 hidden h-screen shrink-0 border-r border-outline-gray-1 md:block">
         <AppSidebar @logout="logout" @shortcuts="shortcutsOpen = true" />
       </div>
