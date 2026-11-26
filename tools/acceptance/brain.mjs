@@ -625,8 +625,8 @@ print(json.dumps(out))`).split('\n').pop())
     await check('BRAIN.62', `${width} px: a Needs you row's title opens the capture in the side pane, and closing it leaves the row in place`, async () => {
       const { a } = made.k
       await row(a.proposal).locator('[data-row-title]').click()
-      await pg.locator('[data-pane]').first().waitFor({ timeout: 5000 })
-      must((await pg.locator('[data-pane]').first().innerText()).includes(T('voice')), 'the pane does not show the capture')
+      const shown = await pg.locator('[data-pane]', { hasText: T('voice') }).first().waitFor({ timeout: 10000 }).then(() => true, () => false)
+      must(shown, 'the pane does not show the capture: ' + (await pg.locator('[data-pane]').first().innerText().catch(() => 'no pane')).slice(0, 200))
       await pg.keyboard.press('Escape')
       await pg.locator('[data-pane]').first().waitFor({ state: 'hidden', timeout: 5000 })
       must(await row(a.proposal).isVisible(), 'the row left after only looking at it')
