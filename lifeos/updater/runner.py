@@ -129,7 +129,8 @@ def execute(doc, steps) -> str:
 				changed = True
 			elif name == "migrate":
 				migrating = True
-			log.step(name, getattr(steps, name))
+			args = (doc.to_commit,) if name == "checkout" else ()  # the one step that needs the target
+			log.step(name, getattr(steps, name), *args)
 		return _finish(doc, log, "Done")
 	except StepFailed:
 		return _finish(doc, log, _roll_back(log, steps, old, backup, switched, changed, migrating))
