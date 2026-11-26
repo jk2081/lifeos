@@ -29,6 +29,7 @@ To build:
 - **Only the restart failed:** no rollback (new code and the migrated database belong together). The status is "Needs restart", with a Restart now button.
 - **A restore that works without root:** load the dump with the site's own database user (`bench --site X mariadb`).
 - **Every failed step** logs its command, exit code and the last lines of stdout and stderr. Never "exited 1:" with nothing after it.
+- **The Updates page shows saved values, not the truth** (26 Nov): "Installed" said 73b05f9 while the server's git was at 324cbed, and "Available" kept saying 324cbed after main had moved on. So Update now ran 324cbed → 324cbed. Read Installed from the app's own `git rev-parse HEAD`. Fetch before showing Available (or show when it was last checked). Refuse an update to the commit already installed.
 
 The full draft issue text was written in chat on 26 Nov. Much of this goes away with the image (above), but the bench install needs it until then.
 
