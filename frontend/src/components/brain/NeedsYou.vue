@@ -36,7 +36,7 @@
         <div class="min-w-0 flex-[1_1_320px]">
           <div class="flex flex-wrap items-center gap-2">
             <Badge theme="gray" :label="r.source" data-row-source />
-            <span class="break-words text-base-medium text-ink-gray-9" data-row-title>{{ r.title }}</span>
+            <button type="button" class="break-words text-left text-base-medium text-ink-gray-9 hover:underline" data-row-title :aria-label="`Open ${r.title}`" @click="openRef('inbox:' + r.item)">{{ r.title }}</button>
           </div>
           <div v-if="r.reason" class="mt-0.5 text-sm text-ink-gray-6" data-row-reason><span aria-hidden="true">✦</span> {{ r.reason }}</div>
           <div v-if="r.blocked" class="mt-0.5 text-sm text-ink-amber-3" data-row-blocked>Needs a “Done when” before it can be kept. Use Change to add one.</div>
@@ -97,7 +97,7 @@
         <div v-for="r in unfiled" :key="r.proposal" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-b border-outline-gray-1 py-3 last:border-b-0"
           data-needs-row data-unfiled-row :data-proposal="r.proposal" :data-item="r.item">
           <div class="min-w-0 flex-[1_1_320px]">
-            <div class="flex flex-wrap items-center gap-2"><Badge theme="gray" :label="r.source" /><span class="break-words text-base-medium text-ink-gray-9">{{ r.title }}</span></div>
+            <div class="flex flex-wrap items-center gap-2"><Badge theme="gray" :label="r.source" /><button type="button" class="break-words text-left text-base-medium text-ink-gray-9 hover:underline" data-row-title :aria-label="`Open ${r.title}`" @click="openRef('inbox:' + r.item)">{{ r.title }}</button></div>
             <div class="mt-0.5 text-sm text-ink-gray-6"><span aria-hidden="true">✦</span> {{ r.reason || 'No area fits yet.' }}</div>
           </div>
           <div class="flex flex-wrap items-center gap-2 max-md:w-full">
@@ -153,6 +153,7 @@ import ContradictionCard from '@/components/brain/ContradictionCard.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { brainData } from '@/data/brain'
 import { canWrite, store } from '@/lib/store'
+import { openRef } from '@/lib/pane'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { dotClass } from '@/lib/lens'
 

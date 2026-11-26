@@ -4,9 +4,12 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled]   # labeled: adding `quick` re-plans the walk
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: "30 21 * * *"   # 03:00 in Kolkata: the full walk on main every night, whatever quick pull requests skipped
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -16,6 +19,31 @@ permissions:
   contents: read
 
 jobs:
+  # Which places the acceptance walk covers. Every place, except on a pull request labelled `quick` whose description has a line
+  # `Walk: brain,library`: then only those (a small fix, tested where it changed; the nightly run walks everything).
+  plan:
+    name: Plan the walk
+    runs-on: ubuntu-latest
+    outputs:
+      parts: ${{ steps.p.outputs.parts }}
+    steps:
+      - id: p
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          QUICK: ${{ contains(github.event.pull_request.labels.*.name, 'quick') }}
+        run: |
+          all='["today","brain","goals","library","review","settings","phone","tooling"]'
+          parts="$all"
+          if [ "$QUICK" = "true" ]; then
+            walk=$(printf '%s\n' "$BODY" | sed -n 's/^Walk: *//p' | head -1 | tr -d ' \r')
+            if [ -n "$walk" ]; then
+              parts=$(jq -cn --arg w "$walk" --argjson all "$all" '[$w | split(",")[] | select(. as $p | $all | index($p))] | unique')
+              [ "$parts" = "[]" ] && parts="$all"
+            fi
+          fi
+          echo "parts=$parts" >> "$GITHUB_OUTPUT"
+          echo "Walking: $parts"
+
   scan:
     name: Scan (Frappe semgrep rules)
     runs-on: ubuntu-latest
@@ -101,6 +129,7 @@ jobs:
 
   acceptance:
     name: Acceptance walk (${{ matrix.part }})
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 45
     strategy:
@@ -108,7 +137,7 @@ jobs:
       matrix:
         # the walk, one job per place side by side, each on its own bench (`--part=` in tools/acceptance.mjs; the checks of a place
         # are in tools/acceptance/<place>.mjs). `tooling` checks the setup switches and this workflow.
-        part: [today, brain, goals, library, review, settings, phone, tooling]
+        part: ${{ fromJSON(needs.plan.outputs.parts) }}
     defaults:
       run:
         # bash with pipefail, so a failed walk fails its step through `tee`
