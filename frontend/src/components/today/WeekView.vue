@@ -5,7 +5,7 @@
     <Button icon="lucide-chevron-right" label="Next week" tooltip="Next week" data-cal-next @click="step(1)" />
     <WeekMenu />
   </PageHead>
-  <div ref="root" class="page-body" :class="paneOpen && WEEK_ROOM" data-week-view :data-week-start="first">
+  <div ref="root" class="page-body" data-week-view :data-week-start="first">
     <Dashboard view="week" />
     <ViewLinks :links="LINKS" />
     <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
@@ -75,7 +75,7 @@ import WeekBars from './WeekBars.vue'
 import WeekMenu from './WeekMenu.vue'
 import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
-import { WEEK_ROOM, chipClass, isBar, itemLabel, itemRef, openDay, paneOpen, useCalendarRange } from '@/lib/calRange'
+import { chipClass, isBar, itemLabel, itemRef, openDay, paneOpen, useCalendarRange } from '@/lib/calRange'
 import { onRecordChanged, openRef } from '@/lib/pane'
 import { addDays, dayRange, long, parse, startOfWeek, time, weekday } from '@/lib/dates'
 

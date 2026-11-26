@@ -1581,3 +1581,17 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **Removed from Today's Day view** (replaced by the dashboard, not repeated): the Needs you line, the habits row and the rail's "Meetings and time blocks" (now the Schedule panel with its "now" line). Their acceptance checks (`TODAY.1`, `TODAY.5`, `TODAY.26`, `TODAY.28`, `PHONE.12`, `PHONE.14`, `PHONE.16`) read the dashboard's cards instead. Week's focus and goals asides, Month's calendar and Year's timeline stay below their dashboards as the issue says.
 - **The ruler** is `Ruler.vue`, one component at both widths, 60 px, built from frappe-ui `Button`s with token colours only. Its hover date is the tick's `title`.
 - **Not checked:** the dashboard against the owner's real data; the hover date by eye.
+
+## Issue 128 (the Drawer)
+
+- **The layer for a live chat is `ask:<thread>` / `ask:new`, not `chat:`.** `chat:<name>` already means a chat an assistant logged (`Life Chat Log`, `ChatPane`), and server routes carry it; reusing it would have mixed two kinds of record. The issue's behaviour is unchanged.
+- **The old `components/ui/Drawer.vue` is `SideSheet.vue`.** It is the weekly review's modal sheet (goal, meeting and list sheets, issue 61 to 64), not a record layer. The new `Drawer.vue` is the control the issue asks for; the review's sheets move onto it with #129.
+- **One drawer, so the pane and the chat no longer sit side by side.** Opening Chat while a record is open puts Chat on top of it with Back; a record opened from an answer goes on top of the chat. `ask.open` is now a getter on the URL (is there an `ask:` layer), so the chat's state (messages, thread, draft) stays in `lib/ask.js` and survives a record being on top of it. The chat's thread is written into the URL (`ask:<thread>`) and a reload loads it.
+- **Click inside the Drawer pushes, a click on the screen replaces.** `openRef` looks at where the click came from (a capture listener on `document`), so the 38 components that call it needed no change. `?back=` is gone; `?under=` replaces it.
+- **Scroll and the marked row of a list are kept** while a record is on top of it (`ItemView` saves the body's scroll per layer, `ListPane` the row per list), instead of keeping every layer mounted: one set of header state (meta, tabs) stays simple.
+- **A phone shows records full screen, not in a `BottomSheet`.** The issue asks for full screen with Back at 390 px. Chat keeps its bottom sheet there.
+- **An inbox item is 760 px** (it was before); it is the one layer wider than 480 px by default, because its review has two columns. Expand still makes any layer half the window.
+- **`CORE` is a new place** (`tools/acceptance/core.mjs`, `CORE.n`) for what the Drawer does everywhere; the person layer is `LIBRARY.49` and the focus layer `GOALS.76`. CI's plan job lists it. The guard has a baseline (`tools/guard-baseline.json`) because the screens that still link to record pages are #129's; the issue says the guard passes after #129, so until then it passes on "no more than the baseline".
+- **`person:` and `focus:` have no Edit.** Editing a focus's principles stays on its full page.
+- **Not changed:** `refOfRoute` still sends only notes and goals to a layer; a server route to a person or focus page keeps going to the page until #129 moves the screens.
+- **Not checked:** the Drawer on a real phone's swipe back; light and dark by eye (token classes only, CORE.4 checks both for overflow).

@@ -32,7 +32,7 @@ jobs:
           BODY: ${{ github.event.pull_request.body }}
           QUICK: ${{ contains(github.event.pull_request.labels.*.name, 'quick') }}
         run: |
-          all='["today","brain","goals","library","review","settings","phone","tooling"]'
+          all='["core","today","brain","goals","library","review","settings","phone","tooling"]'
           parts="$all"
           if [ "$QUICK" = "true" ]; then
             walk=$(printf '%s\n' "$BODY" | sed -n 's/^Walk: *//p' | head -1 | tr -d ' \r')

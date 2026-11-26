@@ -54,6 +54,16 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 
 ## Acceptance checks by place
 
+### Core: the Drawer (`tools/acceptance/core.mjs`, 5 checks)
+
+What opens over every screen: layers, the URL that holds them, Back and Esc, the widths.
+
+- `CORE.1` a task opened from Today shows in the Drawer and the screen stays; Back closes it; a reload reopens it
+- `CORE.2` Chat is a layer (Cmd+K); a source in an answer opens on top of it with Back; Back returns to the same chat with its answer; Esc twice closes everything
+- `CORE.3` a list, then a row, then Back returns to the list with its row marked; j moves to the next row's record
+- `CORE.4` at 1440 px the Drawer is docked and the page narrows; at 1280 px it floats and the page keeps its width; at 390 px it is full screen with Back, in light and dark
+- `CORE.5` the guard finds a link to a record route in a .vue file (a fixture fails), and the tree has none beyond the screens #129 has yet to move
+
 ### Today (`tools/acceptance/today.mjs`, 63 checks)
 
 Day, Week, Month and Year, the numbers that open lists, Reset, rhythm banners, the first-run guide, Today's tasks.
@@ -212,7 +222,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.68` a reason line on a Needs you row has no "Jai" and no "requested"
 - `BRAIN.54` the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item
 
-### Goals (`tools/acceptance/goals.mjs`, 71 checks)
+### Goals (`tools/acceptance/goals.mjs`, 72 checks)
 
 By area, All tasks, No goal, Cycles and the 12 Week Year, the goal page and its edit form, focuses, horizons, Someday.
 
@@ -289,12 +299,13 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.69` an existing Open goal shows To sort; Make it a focus creates the focus and an Annual goal holding the old goal's tasks
 - `GOALS.70` Settings > Areas shows focuses under each part, with switches and + Add a focus
 - `GOALS.71` focus headings and their goals stack on a phone and the focus page is one column
+- `GOALS.76` focus: opens a focus in the Drawer (standard, principles, goals, review); Open full page goes to /focus/<id>
 - `GOALS.72` ticking this week's cell on the goal page updates the week's score there and in Cycles
 - `GOALS.73` a goal without Done when shows one prompt; once set, the finish line shows with Edit
 - `GOALS.74` in Cycles a goal's name opens its goal page
 - `GOALS.75` Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone
 
-### Library (`tools/acceptance/library.mjs`, 47 checks)
+### Library (`tools/acceptance/library.mjs`, 48 checks)
 
 Everything, Notes, Documents, People, Chats, files, search and the graph, and the list screens' panes, filters and remembered views.
 
@@ -347,6 +358,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.45` Your notes takes text, and a brief rewrite afterwards leaves it unchanged
 - `LIBRARY.46` the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library
 - `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
+- `LIBRARY.49` person: shows a company's people and mentions, a person opens on top of it with Back, and an empty person says what will appear
 - `LIBRARY.48` a scanned bill is read on the server (OCRmyPDF) and found by a word from its contents
 
 ### Review (`tools/acceptance/review.mjs`, 24 checks)

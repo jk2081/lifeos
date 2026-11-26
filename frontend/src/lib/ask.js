@@ -7,7 +7,7 @@ import { toast } from 'frappe-ui'
 import { api, errorText } from './api'
 import { canWrite, store } from './store'
 import { lookups } from './lookups'
-import { openRef, parseOpen, recordChanged, TYPES } from './pane'
+import { dropLayer, openRef, popLayer, recordChanged, stack, TYPES } from './pane'
 import { submitCapture } from './offline'
 import { uploadFile } from './upload'
 
@@ -15,7 +15,8 @@ export const ask = reactive({
   messages: [], // the open thread's messages: { role, text, status, cited, actions, read }
   busy: false,
   refusal: null, // { error: 'not_set_up' | 'cap' | 'off' | 'ai', error_text, spend }
-  open: false, // the panel (desktop) or sheet (phone)
+  get open() { return stack.value.some((l) => l.type === 'ask') }, // the chat is a layer of the Drawer (issue 128); on a phone the layer shows as a sheet
+  set open(v) { if (v) openChat(); else dropLayer('ask') },
   thread: null, // the thread shown
   channel: '', // set when it is a conversation relayed from an assistant's channel ("Telegram"): read only here
   title: '',
@@ -24,8 +25,6 @@ export const ask = reactive({
   draft: '',
   scopeChanged: false,
   seq: 0, // bumped to send `draft` as soon as the panel opens
-  returnTo: null, // phone: the path to reopen the Chat sheet on once the cited record is closed
-  wide: false, // Expand: the panel takes the whole width beside the menu (issue 120)
   view: 'chat', // 'chat' or 'history' (earlier conversations)
   files: [], // what the owner added to the next message: { file, name, size }
   scopeAuto: true, // the chip follows where the owner is, until they remove it
@@ -59,29 +58,42 @@ export function lensScope() {
   return { kind: 'space', label: 'Everything in this space' }
 }
 
-/** Open the chat panel (laptop) or sheet (phone). The one ongoing conversation is opened: the newest, unless a thread is already showing. */
-export async function openChat() {
-  ask.open = true
+/** The conversation the chat layer shows: the open thread, or else the newest, once. */
+export async function ensureLoaded(name = '') {
   syncScope() // the chip is where the owner is now (the areas may have loaded since it was last set)
+  if (name && name !== 'new') {
+    if (name !== ask.thread) await loadThread(name)
+    return
+  }
   if (!ask.loaded) {
     ask.loaded = true
     if (!ask.thread && !ask.messages.length) {
       try {
-        const { name } = await api('chat.latest', { space: store.space })
-        if (name && !ask.thread && !ask.messages.length) await loadThread(name)
+        const { name: latest } = await api('chat.latest', { space: store.space })
+        if (latest && !ask.thread && !ask.messages.length) await loadThread(latest)
       } catch (e) { /* a new conversation */ }
     }
   }
 }
+/** Open the chat as a layer of the Drawer, on top of what is open. If it is already in the stack, the layers above it go. */
+export async function openChat() {
+  const layers = stack.value
+  const at = layers.findIndex((l) => l.type === 'ask')
+  if (at >= 0 && at < layers.length - 1) {
+    const r = router.currentRoute.value
+    const keep = layers.slice(0, at + 1).map((l) => l.ref)
+    router.replace({ query: { ...r.query, open: keep[keep.length - 1], under: keep.length > 1 ? keep.slice(0, -1).join('|') : undefined } })
+  } else if (at < 0) openRef(`ask:${ask.thread || 'new'}`, { push: true })
+  await ensureLoaded(ask.thread || '')
+}
 export function toggleChat() {
-  if (ask.open) ask.open = false
+  if (stack.value[stack.value.length - 1]?.type === 'ask') popLayer()
   else openChat()
 }
 
 /** Open the chat with a question, in a scope (where the owner is, by default). It joins the one ongoing conversation; an empty question just opens it. */
 export function startAsk(question = '', scope = null) {
   if (scope) { ask.scope = scope; ask.scopeAuto = false }
-  ask.returnTo = null
   ask.view = 'chat'
   ask.refusal = null
   ask.draft = question
@@ -112,8 +124,8 @@ async function labelOf(doctype, name) {
 }
 /** The record the screen is about: the pane's, or the goal or note page. */
 export function recordOnScreen(route = router.currentRoute.value) {
-  const open = parseOpen(route)
-  if (open && TYPES[open.type]?.doctype) return { doctype: TYPES[open.type].doctype, name: open.name }
+  const open = [...stack.value].reverse().find((l) => TYPES[l.type]?.doctype) // the record under the chat counts too
+  if (open) return { doctype: TYPES[open.type].doctype, name: open.name }
   if (route.name === 'Goal' && route.params.id) return { doctype: 'Life Goal', name: String(route.params.id) }
   if (route.name === 'Note' && route.params.id) return { doctype: 'Life Note', name: String(route.params.id) }
   return null
@@ -269,14 +281,9 @@ export async function undoDone(message, index) {
   } catch (e) { toast.error(errorText(e)) }
 }
 
-/** Open a record from the Chat panel. On a phone both are bottom sheets and the record's would open under the Chat sheet: hand over to the record, and
- *  bring the Chat sheet back, with its thread, when the record is closed on the same screen (AskPanel watches this). */
+/** Open a record from the chat: a layer on top of the chat, with Back to the same conversation. */
 export function openPane(pane) {
-  if (window.matchMedia('(max-width: 767px)').matches && ask.open) {
-    ask.returnTo = router.currentRoute.value.path
-    ask.open = false
-  }
-  openRef(pane)
+  openRef(pane, { push: true })
 }
 
 export function openCite(message, n) {

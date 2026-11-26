@@ -44,7 +44,7 @@
       </template>
     </div>
     <MeetingDrawer :event="meetingName" :m="meeting" :ai="d?.ai" @close="closeMeeting" @go="openMeeting" @act="meetingAct" @finding="act" @done="doneMeeting" @plan="plan" />
-    <Drawer :open="listOpen" name="meetings" title="Meetings that matter" sub="In this review's period." @close="listOpen = false">
+    <SideSheet :open="listOpen" name="meetings" title="Meetings that matter" sub="In this review's period." @close="listOpen = false">
       <div v-for="m in list" :key="m.name" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-meetings-row>
         <span class="size-2 flex-none rounded-full" :class="m.mark === 'linked' ? 'bg-surface-green-7' : 'border-2 border-outline-amber-6'" aria-hidden="true" />
         <div class="min-w-0 flex-1"><div class="truncate text-base text-ink-gray-9">{{ m.title }}</div>
@@ -52,7 +52,7 @@
         <Button size="sm" label="Open" @click="listOpen = false; openMeeting(m.name)" />
       </div>
       <p v-if="!list.length" class="text-sm text-ink-gray-6">No meetings that matter in this period.</p>
-    </Drawer>
+    </SideSheet>
     <ReviewFooter label="Next: Tasks" :line="footerLine" @next="emit('go', 'tasks')" />
   </div>
 </template>
@@ -63,7 +63,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Button, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
-import Drawer from '@/components/ui/Drawer.vue'
+import SideSheet from '@/components/ui/SideSheet.vue'
 import { unpin } from '@/lib/pins'
 import CalendarStrip from '@/components/review/CalendarStrip.vue'
 import FindingRow from '@/components/review/FindingRow.vue'

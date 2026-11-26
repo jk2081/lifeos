@@ -41,15 +41,16 @@ import RuleList from '@/components/brain/RuleList.vue'
 import { tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'
 import { canWrite, store } from '@/lib/store'
-import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
+import { listRows, onRecordChanged, openRef, paneNav } from '@/lib/pane'
 import { viewOfPath } from '@/lib/nav'
 
 const props = defineProps({ name: String, type: String })
+const rowOf = listRows
 const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
 const route = useRoute()
 const data = ref({ rows: [] })
 const loaded = ref(false)
-const active = ref(-1)
+const active = ref(rowOf[props.name] ?? -1) // the row opened last, kept while a record is on top of this list
 const kind = computed(() => props.name.split(':')[0])
 // where each list is whole: its own full page, when it has one
 const FULL = { 'needs-you': '/brain', waiting: { path: '/today/week', query: { view: 'review', tab: 'tasks' } }, 'waiting-overdue': { path: '/today/week', query: { view: 'review', tab: 'tasks' } },
@@ -66,7 +67,7 @@ async function load() {
   emit('meta', { title: res.title, kind: 'List', fullPage: FULL[kind.value] || undefined })
 }
 // the row opened last, so Back finds it marked again
-const remember = (r) => { active.value = data.value.rows.findIndex((x) => x.ref === r.ref) }
+const remember = (r) => { active.value = rowOf[props.name] = data.value.rows.findIndex((x) => x.ref === r.ref) }
 function tick(h) {
   const on = !h.done
   h.done = on
@@ -82,10 +83,10 @@ function onKey(e) {
   else if (e.key === 'Enter' && rows[active.value] && !t.closest('button, a')) { e.preventDefault(); openRef(rows[active.value].ref) }
 }
 onRecordChanged(load)
-watch(() => props.name, () => { loaded.value = false; active.value = -1; load() })
+watch(() => props.name, () => { loaded.value = false; active.value = rowOf[props.name] ?? -1; load() })
 onMounted(() => { load(); window.addEventListener('keydown', onKey) })
 onUnmounted(() => {
   window.removeEventListener('keydown', onKey)
-  if (!route.query.back) paneNav.rows = []
+  if (!route.query.under) paneNav.rows = []
 })
 </script>

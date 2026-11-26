@@ -77,15 +77,15 @@
       </div>
     </div>
     <GoalDrawer :goal="goalName" :d="detail" :focus="focus" @close="goalName = null" @save="save" @skip="skip" @unskip="unskip" @star="starFrom" @changed="reload" />
-    <Drawer :open="othersOpen" name="other-goals" title="Other goals in progress" sub="Planning one adds it to this week's rows." @close="othersOpen = false">
+    <SideSheet :open="othersOpen" name="other-goals" title="Other goals in progress" sub="Planning one adds it to this week's rows." @close="othersOpen = false">
       <div v-for="o in t?.others.rows || []" :key="o.goal" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-other-goal>
         <div class="min-w-0 flex-1"><div class="truncate text-base text-ink-gray-9">{{ o.title }}</div><div class="text-sm text-ink-gray-6">{{ o.horizon }}</div></div>
         <Button size="sm" label="Plan" data-other-goal-plan @click="addOther(o)" />
       </div>
-    </Drawer>
-    <Drawer :open="weekOpen" name="next-week" title="Next week" @close="weekOpen = false">
+    </SideSheet>
+    <SideSheet :open="weekOpen" name="next-week" title="Next week" @close="weekOpen = false">
       <WeekGlance v-if="t" :g="t.glance" @open="(g) => { weekOpen = false; open(g) }" />
-    </Drawer>
+    </SideSheet>
     <ReviewFooter back label="Next: Reflect" :disabled="!t?.ready.ok" :line="footerLine" @back="emit('go', 'tasks')" @next="emit('go', 'reflect')" />
   </div>
 </template>
@@ -96,7 +96,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Badge, Button, Progress, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Drawer from '@/components/ui/Drawer.vue'
+import SideSheet from '@/components/ui/SideSheet.vue'
 import GoalDrawer from '@/components/review/GoalDrawer.vue'
 import WeekGlance from '@/components/review/WeekGlance.vue'
 import ReviewFooter from '@/components/review/ReviewFooter.vue'

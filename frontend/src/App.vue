@@ -5,7 +5,7 @@
         <AppSidebar @logout="logout" @shortcuts="shortcutsOpen = true" />
       </div>
 
-      <main class="flex min-w-0 flex-1 flex-col pb-[calc(128px+env(safe-area-inset-bottom))] md:pb-0" :class="ask.open && ask.wide && 'md:hidden'" data-main>
+      <main class="flex min-w-0 flex-1 flex-col pb-[calc(128px+env(safe-area-inset-bottom))] md:pb-0" data-main>
         <!-- phone: "Life OS" (the space too, on a site with two or more) at the top of every screen; tapping it opens the menu sheet -->
         <div class="sticky top-0 z-20 flex items-center border-b border-outline-gray-1 bg-surface-base px-2 py-1 md:hidden" data-more-bar>
           <Button class="min-w-0 !justify-start" variant="ghost" size="md" :label="manySpaces ? `Life OS · ${store.space}` : 'Life OS'" icon-right="lucide-chevron-down"
@@ -91,7 +91,7 @@ import ScreenBoundary from './components/ScreenBoundary.vue'
 import AskPanel from './components/ask/AskPanel.vue'
 import QuickAdd from './components/QuickAdd.vue'
 import ChatBar from './components/ask/ChatBar.vue'
-import { ask, toggleChat } from './lib/ask'
+import { toggleChat } from './lib/ask'
 import { boot, store } from './lib/store'
 import { initLens, manySpaces } from './lib/lens'
 import MoreSheet from './components/MoreSheet.vue'

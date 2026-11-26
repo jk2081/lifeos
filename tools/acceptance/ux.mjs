@@ -132,7 +132,7 @@ export async function uxKit(width) {
     const panel = pg.locator('[data-ask-panel]:visible')
     must(await panel.count(), `${path}: the Ask panel did not open`)
     if (phone) must(await pg.locator('[data-ask-sheet]:visible').count(), 'not a bottom sheet on a phone')
-    else must(Math.abs((await panel.boundingBox()).width - 460) < 2, 'the panel is not 460 px wide')
+    else must(Math.abs((await panel.boundingBox()).width - 480) < 2, "the panel is not 480 px wide")
     const scope = (await pg.locator('[data-ask-scope]:visible').first().innerText()).trim()
     must(scope === wantScope, `${path}: the scope chip says "${scope}", not "${wantScope}"`)
     if (phone || paneRef) { await pg.locator('[data-ask-panel] textarea').fill('What is still open here?'); await pg.locator('[data-ask-send]:visible').click() }

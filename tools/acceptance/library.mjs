@@ -1318,3 +1318,55 @@ from lifeos.tools import devtools
 devtools.purge_space("zz-pages-empty", drop=True)`)
   }
 }
+
+// ---- the Drawer's person layer (issue 128) ----
+{
+  const T = `I128 Person ${stamp}`
+  const seeded = JSON.parse(bench(`import json
+from lifeos.library import subjects
+sp = "${SPACE}"
+org = frappe.get_doc({"doctype": "Life Person", "space": sp, "full_name": "${T} Foods", "kind": "Organisation", "status": "Prospect"}).insert(ignore_permissions=True).name
+people = [frappe.get_doc({"doctype": "Life Person", "space": sp, "full_name": f"${T} Contact {i}", "kind": "Person", "organisation": org, "email": f"c{i}-${stamp}@i128.example", "role": "Buyer"}).insert(ignore_permissions=True).name for i in (1, 2)]
+task = frappe.get_doc({"doctype": "Life Task", "space": sp, "title": "${T} send the quote", "status": "Open"}).insert(ignore_permissions=True).name
+subjects.link(sp, "Life Task", task, "Life Person", org)
+lone = frappe.get_doc({"doctype": "Life Person", "space": sp, "full_name": "${T} Alone", "kind": "Person"}).insert(ignore_permissions=True).name
+print(json.dumps({"org": org, "people": people, "task": task, "lone": lone}))`).split('\n').pop())
+  try {
+    for (const width of WIDTHS) {
+      const u = await session('owner@lifeos.test', width)
+      const pg = u.page
+      const errors = []
+      pg.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+      try {
+        await check('LIBRARY.49', `${width} px: person: shows a company's people and mentions, a person opens on top of it with Back, and a person with nothing says what will appear`, async () => {
+          await u.open(`/life/today?open=person:${seeded.org}`)
+          await pg.locator('[data-person-pane]').waitFor({ timeout: 15000 })
+          must((await pg.locator('[data-pane-title]').innerText()).includes('Foods'), 'the title is not the company')
+          must(await pg.locator('[data-person-people] [data-person-row]').count() === 2, 'the company does not list its two people')
+          must(await pg.locator('[data-person-mention]').count() >= 1, 'the mentions are missing')
+          must((await pg.locator('[data-pane-full]').getAttribute('href') || '').includes(`/library/pages/Life%20Person/${seeded.org}`) || (await pg.locator('[data-pane-full]').getAttribute('href') || '').includes(seeded.org), 'Open full page does not go to the company')
+          await pg.locator('[data-person-people] [data-person-row] button').first().click()
+          await pg.waitForFunction((p) => new URL(location.href).searchParams.get('open') === `person:${p}`, seeded.people[0], { timeout: 8000 })
+          must(new URL(pg.url()).searchParams.get('under') === `person:${seeded.org}`, 'the company is not the layer under')
+          await pg.locator('[data-pane-back]').first().click()
+          await pg.waitForFunction((o) => new URL(location.href).searchParams.get('open') === `person:${o}`, seeded.org, { timeout: 8000 })
+          await u.open(`/life/today?open=person:${seeded.lone}`)
+          await pg.locator('[data-person-pane]').waitFor({ timeout: 15000 })
+          must((await pg.locator('[data-person-pane]').innerText()).includes('No brief yet.'), 'the empty person does not say what will appear')
+          must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+          must(!errors.length, 'script errors: ' + errors.join(' | '))
+        })
+      } finally {
+        await u.ctx.close()
+      }
+    }
+  } finally {
+    bench(`frappe.set_user("Administrator")
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "${T}%"]}, pluck="name"):
+    frappe.db.delete("Life Link", {"to_doctype": "Life Person", "to_name": n})
+    frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Task", filters={"title": ["like", "${T}%"]}, pluck="name"):
+    frappe.db.delete("Life Link", {"from_doctype": "Life Task", "from_name": n})
+    frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
+  }
+}
