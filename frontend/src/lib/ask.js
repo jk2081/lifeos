@@ -62,7 +62,7 @@ export function lensScope() {
 /** Open the chat panel (laptop) or sheet (phone). The one ongoing conversation is opened: the newest, unless a thread is already showing. */
 export async function openChat() {
   ask.open = true
-  if (!ask.scope) ask.scope = scopeFromRoute()
+  syncScope() // the chip is where the owner is now (the areas may have loaded since it was last set)
   if (!ask.loaded) {
     ask.loaded = true
     if (!ask.thread && !ask.messages.length) {

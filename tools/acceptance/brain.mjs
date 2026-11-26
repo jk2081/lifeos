@@ -1794,8 +1794,10 @@ for (const width of WIDTHS) {
         await pg.waitForTimeout(600)
         if (phone) { await pg.locator('[data-ask-panel] textarea').fill('What tasks do I have?'); await pg.locator('[data-ask-send]:visible').click() }
         const panel = pg.locator('[data-ask-panel]:visible')
-        await panel.locator('[data-ask-answer][data-status="Done"]').waitFor({ timeout: 90000 })
-        must((await panel.locator('[data-ask-answer]').innerText()).includes('From the tool'), 'the answer is not the model\'s')
+        await pg.waitForTimeout(700) // the one ongoing conversation may hold earlier answers: wait for the new one
+        await panel.locator('[data-ask-working]').waitFor({ state: 'detached', timeout: 90000 })
+        await panel.locator('[data-ask-answer][data-status="Done"]').last().waitFor({ timeout: 5000 })
+        must((await panel.locator('[data-ask-answer]').last().innerText()).includes('From the tool'), 'the answer is not the model\'s')
         must(!/\bAsk\b/.test(await panel.innerText()), 'the panel says Ask')
         must((await panel.locator('h2').first().innerText()).trim() === 'Chat', 'the panel is not titled Chat')
         const usage = bench('print(frappe.db.count("Life AI Usage", {"purpose": "Chat", "creation": [">", frappe.utils.add_to_date(frappe.utils.now_datetime(), minutes=-3)]}))').split('\n').pop()
