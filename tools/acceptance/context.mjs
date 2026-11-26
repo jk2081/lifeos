@@ -108,7 +108,9 @@ export async function check(n, title, fn) {
   } catch (e) {
     const lines = String(e.message || e).split('\n')
     const at = lines.find((l) => /waiting for (locator|getBy)/.test(l)) // which element Playwright waited for
-    results.push([n, false, title, (lines[0] + (at ? ' ' + at.trim() : '')).slice(0, 400)])
+    // a bench script that failed: its Python error is the last line of stderr, not the first line ("Command failed: …")
+    const py = e.stderr ? String(e.stderr).trim().split('\n').filter((l) => /\w(Error|Exception)\b|^\w+Error:/.test(l)).pop() : ''
+    results.push([n, false, title, (lines[0].slice(0, 120) + (py ? ' — ' + py.trim() : '') + (at ? ' ' + at.trim() : '')).slice(0, 500)])
     if (FAIL_SHOTS) await failShots(n)
   }
   const [, ok, t, note] = results[results.length - 1]
