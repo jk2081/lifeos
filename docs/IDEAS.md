@@ -19,13 +19,26 @@ Settings › Advanced › Updates is hard to find. The setup card (bottom left) 
 
 Life OS (or Chat) puts a request ("cancel the Twinings meet") in the queue the connector pulls. The assistant does it on its next run and reports back the result. This needs one more kind of change in `agent/connector`.
 
-### WhatsApp
+### WhatsApp: talk to Life OS, forward to it, remind people
 > "How can I ingest WhatsApp as a source. Official is not possible." (24 Nov)
+> "people may want to talk to lifeos through a whatsapp number - that will drive adoption. so forget it reading. but let it send message reminders to people for delegated tasks and let the user also interact with lifeos via whatsapp. also forwarding information will become easy" (26 Nov)
 
-- Life OS in the phone's share sheet (partly in #120).
-- An importer for WhatsApp's "Export chat" (.txt plus media): dated messages, filed under the person, media read locally.
-- Later, if forwarding gets tiresome: the assistant on a second number through Meta's Cloud API.
-- Not unofficial libraries on the main number (they break WhatsApp's terms and risk a ban).
+Decided: Life OS never reads the owner's own WhatsApp chats. It gets a WhatsApp number people talk to.
+
+- **Talk:** the same Chat as in the app ("what's on today", "remind me at 4", "ask Vivek for the ITR draft by Friday").
+- **Forward:** a message, voice note, photo or PDF forwarded to the number lands in the Brain and is filed.
+- **Hear from it:** the morning brief, "3 things need you", "Vivek's draft is 2 days late" (the owner opts in by adding his number in his profile).
+- **Remind people you delegated to:**
+  - By default the reminder goes from the owner's own WhatsApp: Life OS drafts it and one tap opens WhatsApp with the text ready (a wa.me link). It is free, needs no opt-in, and people answer the boss's number.
+  - Optionally Life OS sends reminders itself, but only after the person opts in: the first message carries "Tap to get reminders about this from Jai's assistant". Meta requires opt-in before a business messages anyone.
+- **The official route only:** Meta's WhatsApp Cloud API. No unofficial bridges (Baileys and the like) in the product: they link the whole account, can get the number restricted, and break when WhatsApp updates.
+- **Simple first, for the owner:** a second number of his own on the Cloud API, connected straight to his site. Later, for customers: one BTW number, with a small relay that passes each message to the sender's own site. Customers then don't go through Meta's business verification themselves.
+- **Cost:** 1,000 free messages a month per number, then ₹0.115 a message before GST (India, from 1 Oct 2026).
+- **The owner's steps:** Meta Business verification, a number, display-name approval, about 5 templates (reminder, nudge, morning brief, needs you, opt-in).
+- **Build:** a WhatsApp channel and skill next to phone and email, outgoing templates, the one-tap "send from your own WhatsApp" link, and later the relay. After #120 (Chat everywhere).
+- **Goes with delegation:** "delegate from a sentence", "spot the reply that closes it" (start with "Looks done · Confirm") and "nudge with a ready follow-up", on top of #118's waiting pile.
+- **Meanwhile:** the owner connects Hermes to WhatsApp (bot mode, second number) and talks to Life OS through it.
+- **Still useful without the number:** Life OS in the phone's share sheet (partly in #120), and an importer for WhatsApp's "Export chat" (.txt plus media).
 
 ### Forms: collect information from people by link
 > "think of normal use cases that involve form building, data gathering and storing and sharing as a link and collecting info" (25 Nov)
