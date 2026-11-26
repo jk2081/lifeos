@@ -16,6 +16,14 @@ const top = (pg) => params(pg).get('open') || ''
 const under = (pg) => params(pg).get('under') || ''
 const gone = (pg) => pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
 const openIs = (pg, v) => pg.waitForFunction((x) => new URL(location.href).searchParams.get('open') === x, v, { timeout: 8000 })
+const keyUntil = async (pg, key, ref) => {
+  for (let i = 0; i < 6; i++) {
+    await pg.evaluate(() => document.activeElement?.blur?.())
+    await pg.keyboard.press(key)
+    if (await pg.waitForFunction((x) => new URL(location.href).searchParams.get('open') === x, ref, { timeout: 1500 }).then(() => true, () => false)) return
+  }
+  await openIs(pg, ref)
+}
 
 try {
   chatOn()
@@ -102,11 +110,11 @@ t.db_set("refs", json.dumps({"R1": {"doctype": "Life Task", "name": "${tasks[1]}
         await openIs(pg, refs[1])
         must(under(pg) === 'list:plate', `the layer under is "${under(pg)}"`)
         if (!phone) {
-          await pg.keyboard.press('j')
-          await openIs(pg, refs[2])
+          // the pane takes focus into a field as it loads and j is ignored there: wait for it, then press until it moves
+          await pg.locator(`[data-drawer-host] [data-pane-ref="${refs[1]}"]`).waitFor({ timeout: 8000 })
+          await keyUntil(pg, 'j', refs[2])
           must(under(pg) === 'list:plate', 'j lost the list layer')
-          await pg.keyboard.press('k')
-          await openIs(pg, refs[1])
+          await keyUntil(pg, 'k', refs[1])
         }
         await pg.locator('[data-pane-back]').first().click()
         await openIs(pg, 'list:plate')
