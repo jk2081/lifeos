@@ -8,6 +8,7 @@
 - **The target design:** `docs/DIRECTION.md`. Where it differs from older documents, it wins; where an issue differs from it, the issue wins.
 - **Mockups:** `mockups/v2/` (PNG, and the HTML each was rendered from in `mockups/v2/source/`, for exact colours, sizes and spacing; reference only, do not copy its structure). Older mockups in `mockups/` show earlier designs.
 - **What exists and why:** `STATUS.md` (what works) and `DECISIONS.md` (every deviation, with the reason).
+- **Ideas, not yet work:** `docs/IDEAS.md`. Never build from it; only GitHub issues labelled `ready` are work.
 - **History:** `docs/history/` holds the original spec (`SPEC.md`) and the briefs of the build sets before 20 November 2026. Read them only to understand why something is the way it is.
 
 ## Rules
