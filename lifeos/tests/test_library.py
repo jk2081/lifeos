@@ -934,6 +934,25 @@ class TestPages(AskCase):
 			pages_api.add_note("Life Person", org.name, "from an agent")
 		frappe.set_user(OWNER)
 
+	def test_12_catch_up_answers_a_broad_question_from_what_is_there(self):
+		"""'what's going on recently?' got "I could not find that." on the live site (26 Nov): catch_up gathers the period in one call."""
+		from frappe.utils import add_days, today
+
+		from lifeos.ai import tools as ask_tools
+
+		waiting = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "HDFC form q-catch", "status": "Waiting", "waiting_on": "Debdipto"}).insert()
+		due = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "Confirm Ekta meeting q-catch", "status": "Open", "due_date": add_days(today(), 2)}).insert()
+		ctx = Context(PRIVATE)
+		got = ask_tools.run_tool(ctx, "catch_up", {"days": 7})
+		self.assertNotIn("error", got)
+		self.assertIn("HDFC form q-catch", [w["title"] for w in got["waiting_on_others"]])
+		self.assertEqual(next(w for w in got["waiting_on_others"] if w["title"] == "HDFC form q-catch")["on"], "Debdipto")
+		self.assertIn("Confirm Ekta meeting q-catch", [c["title"] for c in got["coming_up"]])
+		for key in ("needs_you", "overdue_tasks", "due_today_tasks", "came_in_or_done"):
+			self.assertIn(key, got)
+		self.assertEqual(ctx.refs[next(w["ref"] for w in got["waiting_on_others"] if w["title"] == "HDFC form q-catch")]["name"], waiting.name)
+		self.assertTrue(due.name)
+
 	def test_11_ask_reads_a_page_first_and_cites_it(self):
 		org = self.person("Read me q111", kind="Organisation")
 		it = self.linked_item(org, "Quote email q111", raw_text="The quote is 4.2 lakh.")

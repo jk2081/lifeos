@@ -11,7 +11,7 @@ from frappe.flow import Agent, ToolContext, tool
 
 from lifeos.ai.tools import Context, run_tool
 
-TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'find_events', 'add_note', 'cancel_event', 'make_rule']
+TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'find_events', 'add_note', 'cancel_event', 'make_rule']
 
 
 def _thread_of(session_id: str):
@@ -100,6 +100,12 @@ def cycle_state(*, ctx: ToolContext) -> dict:
 def timeline(date_from: str, date_to: str | None = None, *, ctx: ToolContext) -> dict:
 	"""What happened in a period: records by day (created, completed, captured)."""
 	return _run("timeline", ctx, date_from=date_from, date_to=date_to)
+
+
+@tool
+def catch_up(days: int | None = None, *, ctx: ToolContext) -> dict:
+	"""For a broad question ('what's going on', 'catch me up'): what needs the owner, what waits on others, the email digests, what came in and was done, and the next 7 days."""
+	return _run("catch_up", ctx, days=days)
 
 
 @tool
