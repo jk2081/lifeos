@@ -26,8 +26,8 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/skills/__init__.py` | 20 | bench execute: keep the examples' last result |
 | `lifeos/tests/test_settings.py` | 997 | the runner under test commits, so the test cleans up with a commit |
 | `lifeos/tools/loadtest.py` | 116 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
-| `lifeos/tools/loadtest.py` | 260 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
-| `lifeos/tools/loadtest.py` | 319 | load test: its removal must stick even when run inside a test |
+| `lifeos/tools/loadtest.py` | 262 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
+| `lifeos/tools/loadtest.py` | 321 | load test: its removal must stick even when run inside a test |
 | `lifeos/tools/tidy.py` | 125 | bench execute run: the copies are removed only after the rows that used them are saved |
 | `lifeos/updater/runner.py` | 54 | the runner is a background process: each step's outcome is saved at once |
 | `lifeos/updater/runner.py` | 71 | the runner is a background process: each step's outcome is saved at once |
@@ -59,7 +59,7 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/ai/flow.py` | 27 | Flow names the asking user in ctx; a call made without that session runs as that user, never wider |
+| `lifeos/ai/flow.py` | 35 | Flow names the asking user in ctx; a call made without that session runs as that user, never wider |
 | `lifeos/skills/runner.py` | 92 | the run is the Life Brain's, a Life Agent; the session user is put back below |
 | `lifeos/skills/runner.py` | 106 | back to the user whose request or job it was |
 | `lifeos/tools/demo.py` | 104 | demo data: records are made through the API as the owner and the agent would make them |
@@ -71,11 +71,11 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/tools/devtools_review.py` | 20 | development tool on the acceptance site: the owner-shaped data is made as the owner |
 | `lifeos/tools/loadtest.py` | 46 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/tools/loadtest.py` | 138 | load test: reads are timed as a member of the space, the way a request runs |
-| `lifeos/tools/loadtest.py` | 156 | load test: reads are timed as a member of the space, the way a request runs |
-| `lifeos/tools/loadtest.py` | 171 | load test: reads are timed as a member of the space, the way a request runs |
-| `lifeos/tools/loadtest.py` | 275 | load test: reads are timed as a member of the space, the way a request runs |
-| `lifeos/tools/loadtest.py` | 292 | load test: reads are timed as a member of the space, the way a request runs |
-| `lifeos/tools/loadtest.py` | 313 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/tools/loadtest.py` | 158 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/tools/loadtest.py` | 173 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/tools/loadtest.py` | 277 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/tools/loadtest.py` | 294 | load test: reads are timed as a member of the space, the way a request runs |
+| `lifeos/tools/loadtest.py` | 315 | load test: reads are timed as a member of the space, the way a request runs |
 
 ## frappe-sql-format-injection
 

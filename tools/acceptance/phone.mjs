@@ -396,7 +396,7 @@ print(ev.name)`).split('\n').pop()
         const plate = await pg.locator('[data-next]').innerText()
         for (const t of names.map((_, i) => `I15 ${['one', 'two'][i]} ${width} ${stamp}`)) must(plate.includes(t), `${t} is not on the plate`)
         must(await pg.locator('[data-next-group="today"]').count(), 'no Today group')
-        const rail = await pg.locator('[data-rail-today]').innerText()
+        const rail = await pg.locator('[data-panel="schedule"]').innerText()
         must(rail.includes(meeting), 'the calendar does not show ' + meeting)
         must(!plate.includes(meeting), 'the meeting is on the plate as well as in the calendar')
         const tops = (await s.api('today.get', { space: SPACE })).next.groups.find((g) => g.key === 'top').rows
@@ -421,17 +421,16 @@ print(ev.name)`).split('\n').pop()
         await s.open('/life/today')
         must(!(await pg.locator('[data-task-row]', { hasText: `I15 two ${width} ${stamp}` }).count()), 'the done task is still on the plate')
       })
-      await check('PHONE.14', `${width} px: the Needs you line shows the waiting count and opens Brain > Needs you`, async () => {
+      await check('PHONE.14', `${width} px: the Needs you card shows the waiting count and opens them in the pane, over Today`, async () => {
         await s.open('/life/today')
-        const line = pg.locator('[data-needs-you]')
-        await line.waitFor({ timeout: 10000 })
-        const n = Number((await line.locator('[data-needs-you-count]').innerText()).replace(/\D/g, ''))
-        const total = (await s.api('inbox.list', { space: SPACE, status: '["To Review"]', page_length: 1 })).total
-        must(n === total, `the line says ${n}; the Inbox has ${total} to review`)
-        await line.click()
-        await pg.waitForURL((u) => u.pathname === '/life/brain', { timeout: 10000 }).catch(() => {})
-        must(path(pg) === '/life/brain', 'the line opened ' + path(pg))
-        must((await pg.locator('[data-place-tabs]').first().getAttribute('data-tab-current')) === 'needs-you', 'Brain is not on Needs you')
+        const card = pg.locator('[data-card="needs"]')
+        await card.locator('[data-dash-value]').waitFor({ timeout: 10000 })
+        const n = Number((await card.locator('[data-dash-value]').innerText()).replace(/\D/g, ''))
+        const total = (await s.api('brain.needs_you', { space: SPACE })).total
+        must(n === total, `the card says ${n}; Brain has ${total} waiting`)
+        await card.locator('[data-dash-open]').click()
+        await pg.locator('[data-list="needs-you"]').waitFor({ timeout: 10000 })
+        must(path(pg) === '/life/today', 'the card took the page away: ' + path(pg))
       })
       await check('PHONE.15', `${width} px: the switch moves to Week, Month and Year routes`, async () => {
         await s.open('/life/today')
@@ -444,9 +443,9 @@ print(ev.name)`).split('\n').pop()
       })
       await check('PHONE.16', `${width} px: the layout matches the mockups (${phone ? 'Needs you, the plate, then the calendar below it' : 'the plate with the calendar beside it'}), with no sideways scroll`, async () => {
         await s.open('/life/today')
-        await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 })
+        await pg.locator('[data-card="needs"]').waitFor({ timeout: 10000 })
         const box = async (sel) => (await pg.locator(sel).first().boundingBox())
-        const nu = await box('[data-needs-you]'), plate = await box('[data-next]'), rail = await box('[data-rail-today]')
+        const nu = await box('[data-card="needs"]'), plate = await box('[data-next]'), rail = await box('[data-rail-week]')
         must(nu.y < plate.y, 'Needs you is not above the plate')
         if (phone) must(rail.y > plate.y && Math.abs(rail.x - plate.x) < 4, 'the calendar is not below the plate')
         else must(rail.x > plate.x + plate.width - 4 && rail.y < plate.y + 80, 'the calendar is not beside the plate')
@@ -666,4 +665,62 @@ print(json.dumps({"item": first("Life Inbox Item"), "goal": first("Life Goal"), 
       return `${Object.keys(ROUTES).length} routes`
     })
   } finally { await s.ctx.close() }
+}
+
+// Issue 123: the dashboard at 390 px.
+for (const width of WIDTHS.filter((w) => w < 800)) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const made = []
+  try {
+    await check('PHONE.25', `${width} px: the ruler labels only today's day; the cards are two by two; the list opens full screen with Back and Esc, and an item opens from it and goes back; nothing is cut off, light and dark`, async () => {
+      for (const scheme of ['light', 'dark']) {
+        await pg.emulateMedia({ colorScheme: scheme })
+        await s.open('/life/today/week')
+        await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+        const labels = await pg.locator('[data-ruler-days] [data-ruler-label]').allInnerTexts()
+        must(labels.length === 1 && labels[0] === String(Number(today.slice(8))), `the days labelled are ${labels}`)
+        const months = await pg.locator('[data-ruler-months] [data-ruler-label]').allInnerTexts()
+        must(months.every((m) => m.length === 3), `the months are not short: ${months}`)
+        const boxes = await pg.locator('[data-dash-card]').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y)] }))
+        must(boxes.length === 4 && boxes[0][1] === boxes[1][1] && boxes[2][1] === boxes[3][1] && boxes[2][1] > boxes[0][1] && boxes[0][0] === boxes[2][0], `the cards are not two by two: ${JSON.stringify(boxes)}`)
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `the page scrolls sideways in ${scheme}`)
+      }
+      await pg.emulateMedia({ colorScheme: 'light' })
+      // the list opens full screen; its Back and Esc return to the dashboard
+      made.push(...JSON.parse(bench(`import json
+from frappe.utils import now_datetime
+out = []
+for i in range(2):
+    it = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "I123 phone " + str(i), "source_type": "Email", "status": "To Review", "raw_text": "x", "received_on": now_datetime()}).insert(ignore_permissions=True)
+    frappe.get_doc({"doctype": "Life Proposal", "space": "${SPACE}", "inbox_item": it.name, "kind": "Note", "preview": "I123 note", "payload": "{}", "status": "Pending"}).insert(ignore_permissions=True)
+    out.append(it.name)
+print(json.dumps(out))`).split('\n').pop()))
+      await s.open('/life/today/week')
+      await pg.locator('[data-card="needs"] [data-dash-open]').click()
+      await pg.locator('[data-list="needs-you"] [data-list-row]').first().waitFor({ timeout: 10000 })
+      const sheet = await pg.locator('[data-pane-ref]').first().boundingBox()
+      must(sheet.height >= 840 && sheet.width >= 388, `the list is ${sheet.width} by ${sheet.height}, not full screen`)
+      must((await pg.locator('[data-pane-back]').boundingBox()).x < 80, 'Back is not at the top left')
+      await pg.locator('[data-list="needs-you"] [data-list-row] button').first().click()
+      await pg.waitForFunction(() => /^inbox:/.test(new URL(location.href).searchParams.get('open') || ''), null, { timeout: 8000 })
+      await pg.locator('[data-pane-back]').click()
+      await pg.waitForFunction(() => new URL(location.href).searchParams.get('open') === 'list:needs-you', null, { timeout: 8000 })
+      await pg.locator('[data-pane-back]').click()
+      await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
+      must(pathOf(pg) === '/life/today/week' && (await pg.locator('[data-dash-cards]').isVisible()), 'Back did not return to the dashboard')
+      await pg.locator('[data-card="needs"] [data-dash-open]').click()
+      await pg.locator('[data-list="needs-you"] [data-list-row]').first().waitFor({ timeout: 10000 })
+      await pg.keyboard.press('Escape')
+      await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`for n in ${JSON.stringify(made)}:
+    for p in frappe.get_all("Life Proposal", filters={"inbox_item": n}, pluck="name"): frappe.delete_doc("Life Proposal", p, force=1, ignore_permissions=True)
+    frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
 }

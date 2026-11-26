@@ -1,7 +1,8 @@
 // Today: Day, Week, Month and Year, the lists' counts, rhythm banners, Reset and the first-run guide.
 // Checks are numbered TODAY.<n> in the order they appear here; `node tools/acceptance.mjs --only=TODAY` runs this file's checks.
-import { PDF, SPACE, WIDTHS, addDays, areaId, areas, base, bench, browser, chatOff, chatOn, check, must, nextWeekday, owner, path, plusDays, session, stamp, today } from './context.mjs'
+import { DAY_NAMES, PDF, SPACE, WIDTHS, addDays, areaId, areas, base, bench, browser, chatOff, chatOn, check, must, nextWeekday, owner, path, pathOf, plusDays, session, stamp, today } from './context.mjs'
 import { ROW, num, ux, uxArea, uxKit } from './ux.mjs'
+const DAY_SHORT = (d) => DAY_NAMES[new Date(d + 'T12:00:00Z').getUTCDay()].slice(0, 3)
 
 await check('TODAY.1', 'Log in, open /life, Today is filled from seed data', async () => {
   const guest = await browser.newContext()
@@ -12,9 +13,9 @@ await check('TODAY.1', 'Log in, open /life, Today is filled from seed data', asy
   await owner.open('/life')
   const text = await owner.page.locator('[data-main]').innerText()
   must(/Week \d+ of 12/.test(text), 'no 12 Week Year week on Today')
-  const habitNames = await owner.page.locator('[data-today-habits] [data-habit]').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')).join(' '))
+  await owner.page.locator('[data-card="habits"]').waitFor({ timeout: 10000 })
   const t = await owner.api('today.get', { space: SPACE })
-  must(text.includes('Habits') && t.habits.length && t.habits.every((h) => habitNames.includes(h.title)), 'habits are missing on Today')
+  must(text.includes('Habits') && t.habits.length && (await owner.page.locator('[data-card="habits"] [data-dash-value]').innerText()).includes(`of ${t.habits.length}`), 'habits are missing on Today')
   must(t.cycle, 'today.get has no cycle')
   return `week ${t.cycle.week}, ${t.habits.length} habits, ${t.tasks.due} tasks due`
 })
@@ -117,7 +118,7 @@ for (const width of WIDTHS) {
     must(next.includes(S5('overdue')) && next.includes(S5('due today')), 'the overdue or due task is not in Next')
     must(!next.includes(S5('parked')), 'a Someday task is on Today')
     must(await pg.locator('[data-next-row][data-why="12WY"]').count() === 0 && await pg.locator('[data-next-group="decisions"]').count() === 0, 'a 12 Week Year row or a decision is in the list')
-    must(await pg.locator('[data-rail-today]').isVisible() && await pg.locator('[data-rail-week]').isVisible(), 'the rail is missing')
+    must(await pg.locator('[data-rail-week]').isVisible(), 'the rail is missing')
     return `${groups.join(', ')}`
   })
 
@@ -951,6 +952,25 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
+    await check('TODAY.71', `${width} px: on an empty space every card of every view says what will appear and offers one action`, async () => {
+      for (const p of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
+        await one.open(p)
+        await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+        const cards = pg.locator('[data-dash-card]')
+        must((await cards.count()) === 4, `${p} has ${await cards.count()} cards`)
+        for (let i = 0; i < 4; i++) {
+          const c = cards.nth(i)
+          const key = await c.getAttribute('data-card')
+          must((await c.locator('[data-dash-empty]').count()) === 1, `${p}: the ${key} card has no empty line`)
+          must((await c.locator('[data-dash-empty]').innerText()).length > 10, `${p}: the ${key} card's line is empty`)
+          must((await c.locator('[data-dash-action]').count()) === 1, `${p}: the ${key} card has no action`)
+        }
+        must((await pg.locator('[data-dash-panel] [data-dash-empty]').count()) >= 1, `${p}: no panel says what will appear`)
+        await noSideways()
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
     await check('TODAY.59', `${width} px: on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link`, async () => {
       await one.open('/life/today/year')
       const empty = pg.locator(phone ? '[data-year-empty-phone]' : '[data-year-empty]')
@@ -1007,22 +1027,26 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I55 lead 
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.26', `${width} px: the Open band is gone from Today; the habits row shows today's habits by name and ticks them`, async () => {
+    await check('TODAY.26', `${width} px: the Open band is gone from Today; the Habits card counts today's habits and its list in the pane ticks them`, async () => {
       await one.api('goals.set_month_habits', { space, year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)), habits: [{ title: `I55 Walk ${width}` }, { title: `I55 Read ${width}` }] })
       await today55()
       must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is on Today')
       must(await pg.locator('[data-tile]').count() === 0, 'a tile of the band is on Today')
-      const row = pg.locator('[data-today-habits]')
-      await row.waitFor({ timeout: 10000 })
-      const text = await row.innerText()
-      must(text.includes(`I55 Walk ${width}`) && text.includes(`I55 Read ${width}`), 'the habits are not named: ' + text)
-      const walk = row.locator('button', { hasText: `I55 Walk ${width}` })
+      const card = pg.locator('[data-card="habits"]')
+      await card.waitFor({ timeout: 10000 })
+      must(/0 of 2/.test(await card.innerText()), 'the card does not count the habits: ' + (await card.innerText()))
+      await card.locator('[data-dash-open]').click()
+      const list = pg.locator('[data-list="habits"]')
+      await list.locator('[data-list-habit]').first().waitFor({ timeout: 10000 })
+      must((await list.innerText()).includes(`I55 Walk ${width}`) && (await list.innerText()).includes(`I55 Read ${width}`), 'the habits are not named in the list: ' + (await list.innerText()))
+      const walk = list.locator('[data-list-row]', { hasText: `I55 Walk ${width}` }).locator('[data-list-habit]')
       await walk.click()
       await pg.waitForTimeout(1000)
-      must(/1 of 2 today/.test(await row.innerText()), 'the count did not move: ' + (await row.innerText()))
+      must(/1 of 2/.test(await card.innerText()), 'the count did not move: ' + (await card.innerText()))
       const done = bench(`print(frappe.db.count("Life Habit Log", {"space": "${space}", "done": 1}))`).split('\n').pop()
       must(done === '1', 'the tick was not stored: ' + done)
       await walk.click() // put it back
+      await pg.waitForTimeout(500)
       await noSideways()
     })
 
@@ -1042,14 +1066,14 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I55 lead 
     })
 
     if (phone) {
-      await check('TODAY.28', `${width} px: the order is Needs you, the list, habits, then the rail`, async () => {
+      await check('TODAY.28', `${width} px: the order is the dashboard's Needs you card, the list, then the rail`, async () => {
         bench(`from frappe.utils import now_datetime
 frappe.get_doc({"doctype": "Life Inbox Item", "space": "${space}", "title": "I55 to review ${width}", "source_type": "Upload", "status": "To Review", "raw_text": "x", "received_on": now_datetime()}).insert(ignore_permissions=True)`)
         await today55()
-        await pg.locator('[data-needs-you]').waitFor({ timeout: 10000 })
+        await pg.locator('[data-card="needs"]').waitFor({ timeout: 10000 })
         const y = async (sel) => (await pg.locator(sel).first().boundingBox()).y
-        const [needs, list, habits, rail] = [await y('[data-needs-you]'), await y('[data-next]'), await y('[data-today-habits]'), await y('[data-rail]')]
-        must(needs < list && list < habits && habits < rail, `the order is Needs you ${needs}, list ${list}, habits ${habits}, rail ${rail}`)
+        const [needs, list, rail] = [await y('[data-card="needs"]'), await y('[data-next]'), await y('[data-rail]')]
+        must(needs < list && list < rail, `the order is Needs you ${needs}, list ${list}, rail ${rail}`)
         await noSideways()
       })
     }
@@ -1496,6 +1520,179 @@ print(e.name)`).split('\n').pop()
     bench(`for n in ${JSON.stringify(made.events)}: frappe.delete_doc("Event", n, force=1, ignore_permissions=True)
 for n in ${JSON.stringify(made.goals)}: frappe.delete_doc("Life Goal", n, force=1, ignore_permissions=True)
 for n in ${JSON.stringify(made.items)}: frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 123: the Today dashboard. The ruler on every view, four cards and two panels in each, everything in the pane.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const errors = []
+  pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+  const tag = `I123 ${width} ${stamp}`
+  const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+  const inPane = () => new URL(pg.url()).searchParams.get('open')
+  const dash = async (p) => { await s.open(p); await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 }) }
+  const made = { items: [], tasks: [], rules: [] }
+  try {
+    if (!phone) await check('TODAY.66', `${width} px: the ruler is on all four views; this month and today carry the accent and are labelled with their neighbours; today opens Day, another day opens in the pane, a month tick moves the days`, async () => {
+      for (const p of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
+        await dash(p)
+        must(await pg.locator('[data-ruler]').isVisible(), `no ruler on ${p}`)
+        must((await pg.locator('[data-ruler-month][data-current]').count()) === 1, 'the current month has no accent tick')
+        const h = (await pg.locator('[data-ruler]').boundingBox()).height
+        must(h <= 62, `the ruler is ${h} px tall`)
+      }
+      await dash('/life/today/week')
+      const dayNo = Number(today.slice(8))
+      const labelled = await pg.locator('[data-ruler-days] [data-ruler-label]').allInnerTexts()
+      must(labelled.some((t) => t.startsWith(DAY_SHORT(today)) && t.endsWith(String(dayNo))), `today's label is not "Thu 26" style: ${labelled}`)
+      const near = [-2, -1, 1, 2].map((n) => plusDays(today, n)).filter((d) => d.slice(0, 7) === today.slice(0, 7)).map((d) => String(Number(d.slice(8))))
+      for (const n of near) must(labelled.includes(n), `the neighbour ${n} is not labelled: ${labelled}`)
+      const months = await pg.locator('[data-ruler-months] [data-ruler-label]').allInnerTexts()
+      must(months.length === 3 || (months.length === 2 && ['January', 'December'].includes(months.find((m) => m.length > 3))), `the months labelled are ${months}`)
+      must((await pg.locator('[data-ruler-month][data-current] [data-ruler-label]').innerText()).length > 3, 'the current month is not written in full')
+      must(Boolean(await pg.locator(`[data-ruler-day="${today}"]`).getAttribute('title')), 'hovering a tick shows no date')
+      // another day opens in the pane
+      const other = today.slice(8) === '20' ? `${today.slice(0, 8)}19` : `${today.slice(0, 8)}20`
+      await pg.locator(`[data-ruler-day="${other}"]`).click()
+      await pg.waitForFunction((d) => new URL(location.href).searchParams.get('open') === 'day:' + d, other, { timeout: 8000 })
+      must(pathOf(pg) === '/life/today/week', 'a day took the page away')
+      await pg.keyboard.press('Escape')
+      await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
+      // a month tick moves the day strip, in place
+      const nextKey = today.slice(5, 7) === '12' ? `${Number(today.slice(0, 4)) - 0}-11` : `${today.slice(0, 5)}${String(Number(today.slice(5, 7)) + 1).padStart(2, '0')}`
+      await pg.locator(`[data-ruler-month="${nextKey}"]`).click()
+      must((await pg.locator('[data-ruler-days] [data-ruler-day]').first().getAttribute('data-ruler-day')).startsWith(nextKey), 'the day strip did not move to ' + nextKey)
+      must(pathOf(pg) === '/life/today/week', 'a month tick took the page away')
+      // today's label opens Day
+      await pg.locator(`[data-ruler-month="${today.slice(0, 7)}"]`).click()
+      await pg.locator(`[data-ruler-day="${today}"]`).click()
+      await pg.waitForFunction(() => location.pathname === '/life/today', null, { timeout: 8000 })
+    })
+
+    await check('TODAY.67', `${width} px: Week: a goal row opens the goal in the pane and the dashboard stays on screen`, async () => {
+      await dash('/life/today/week')
+      const row = pg.locator('[data-panel="goals"] [data-dash-row]').first()
+      await row.waitFor({ timeout: 10000 })
+      await row.locator('button').first().click()
+      await pg.waitForFunction(() => /^goal:/.test(new URL(location.href).searchParams.get('open') || ''), null, { timeout: 8000 })
+      await pg.locator('[data-pane]:visible').first().waitFor({ timeout: 10000 })
+      must(pathOf(pg) === '/life/today/week', 'the goal took the page away: ' + pathOf(pg))
+      must(await pg.locator('[data-dashboard]').count() === 1, 'the dashboard is gone')
+      if (!phone) must(await pg.locator('[data-dash-cards]').isVisible(), 'the dashboard is hidden')
+      await pg.keyboard.press('Escape')
+      await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
+    })
+
+    await check('TODAY.68', `${width} px: Needs you opens its rows in the pane; a row opens in the same pane with Back; j moves to the next; a reload keeps the list open`, async () => {
+      const ids = JSON.parse(bench(`import json
+from frappe.utils import now_datetime
+out = []
+for i in range(3):
+    it = frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "${tag} needs " + str(i), "source_type": "Email", "status": "To Review", "raw_text": "x", "received_on": now_datetime()}).insert(ignore_permissions=True)
+    frappe.get_doc({"doctype": "Life Proposal", "space": "${SPACE}", "inbox_item": it.name, "kind": "Note", "preview": "${tag} note", "payload": "{}", "status": "Pending"}).insert(ignore_permissions=True)
+    out.append(it.name)
+print(json.dumps(out))`).split('\n').pop())
+      made.items.push(...ids)
+      const total = (await s.api('brain.needs_you', { space: SPACE, limit: 50 })).total
+      await dash('/life/today/week')
+      const card = pg.locator('[data-card="needs"]')
+      must(Number((await card.locator('[data-dash-value]').innerText()).replace(/\D/g, '')) === total, 'the card does not show ' + total)
+      await card.locator('[data-dash-open]').click()
+      const list = pg.locator('[data-list="needs-you"]')
+      await list.waitFor({ timeout: 10000 })
+      await list.locator('[data-list-row]').first().waitFor({ timeout: 10000 })
+      must((await list.locator('[data-list-row]').count()) === Math.min(total, 50), `the list has ${await list.locator('[data-list-row]').count()} rows, not ${total}`)
+      must(pathOf(pg) === '/life/today/week', 'the card took the page away')
+      // a reload keeps the list open
+      await pg.reload({ waitUntil: 'networkidle' })
+      await pg.locator('[data-list="needs-you"] [data-list-row]').first().waitFor({ timeout: 10000 })
+      must(inPane() === 'list:needs-you', 'a reload lost the list: ' + inPane())
+      // a row opens in the same pane, Back returns, j moves to the next row
+      const refs = await pg.locator('[data-list="needs-you"] [data-list-row]').evaluateAll((els) => els.map((e) => e.getAttribute('data-ref')))
+      await pg.locator('[data-list="needs-you"] [data-list-row] button').first().click()
+      await pg.waitForFunction((r) => new URL(location.href).searchParams.get('open') === r, refs[0], { timeout: 8000 })
+      must(await pg.locator('[data-pane-back]').isVisible(), 'no Back in the pane')
+      await pg.locator('[data-pane-back]').click()
+      await pg.waitForFunction(() => new URL(location.href).searchParams.get('open') === 'list:needs-you', null, { timeout: 8000 })
+      await pg.locator('[data-list="needs-you"] [data-list-row]').first().waitFor({ timeout: 10000 })
+      await pg.locator('[data-list="needs-you"] [data-list-row] button').first().click()
+      await pg.waitForFunction((r) => new URL(location.href).searchParams.get('open') === r, refs[0], { timeout: 8000 })
+      await pg.waitForTimeout(600)
+      await pg.keyboard.press('j')
+      await pg.waitForFunction((r) => new URL(location.href).searchParams.get('open') === r, refs[1], { timeout: 8000 })
+      must(await pg.locator('[data-pane-back]').isVisible(), 'Back is gone after j')
+      await pg.keyboard.press('Escape')
+      await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
+      await noSideways()
+    })
+
+    await check('TODAY.69', `${width} px: "past check date" opens only the overdue waiting items; "rules learned" opens the rules, each with Change`, async () => {
+      const out = JSON.parse(bench(`import json
+from frappe.utils import add_days, today
+for i, d in enumerate((-3, -1, 4)):
+    frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "${tag} wait " + str(i), "status": "Waiting", "waiting_on": "I123 person", "check_by": add_days(today(), d)}).insert(ignore_permissions=True)
+rules = []
+for i in range(4):
+    rules.append(frappe.get_doc({"doctype": "Life Rule", "space": "${SPACE}", "made_by": "Brain", "enabled": 1, "sender": "i123-" + str(i) + "@example.com", "action": "Ask", "learned_from": "I123"}).insert(ignore_permissions=True).name)
+past = frappe.db.count("Life Task", {"space": "${SPACE}", "status": "Waiting", "is_archived": 0, "check_by": ("<", today())})
+print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
+      made.rules.push(...out.rules)
+      await dash('/life/today/week')
+      const part = pg.locator('[data-card="waiting"] [data-dash-part]')
+      must((await part.innerText()).startsWith(`${out.past} past check date`), 'the card says: ' + await part.innerText())
+      await part.click()
+      const list = pg.locator('[data-list="waiting-overdue"]')
+      await list.locator('[data-list-row]').first().waitFor({ timeout: 10000 })
+      must((await list.locator('[data-list-row]').count()) === out.past, `the list has ${await list.locator('[data-list-row]').count()} rows, not ${out.past}`)
+      must(!(await list.innerText()).includes('wait 2'), 'a waiting item that is not past is in the list')
+      await pg.keyboard.press('Escape')
+      await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
+      await pg.locator('[data-brain-part]', { hasText: 'rules learned' }).click()
+      const rules = pg.locator('[data-list="rules"]')
+      await rules.locator('[data-rule-row]').first().waitFor({ timeout: 10000 })
+      const n = await rules.locator('[data-rule-row]').count()
+      must(n >= 4 && n === await rules.locator('[data-rule-change]').count(), `${n} rules, ${await rules.locator('[data-rule-change]').count()} with Change`)
+      must(pathOf(pg) === '/life/today/week', 'the count took the page away')
+    })
+
+    await check('TODAY.70', `${width} px: Day, Week, Month and Year switch in place, each with four cards; Open full page in the pane goes to the record's page`, async () => {
+      await dash('/life/today')
+      for (const [tab, want, key] of [['week', '/life/today/week', 'score'], ['month', '/life/today/month', 'plan'], ['year', '/life/today/year', 'year-goals'], ['day', '/life/today', 'top']]) {
+        await pg.locator(`[data-place-tabs] [data-tab="${tab}"]`).first().click()
+        await pg.waitForFunction((p) => location.pathname === p, want, { timeout: 10000 })
+        await pg.locator(`[data-dashboard][data-view="${tab}"] [data-card="${key}"]`).waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-dash-card]').count()) === 4, `${tab} has ${await pg.locator('[data-dash-card]').count()} cards`)
+        must((await pg.locator('[data-dash-panel]').count()) === 2, `${tab} has ${await pg.locator('[data-dash-panel]').count()} panels`)
+        must(await pg.locator('[data-ruler]').isVisible(), `${tab} has no ruler`)
+      }
+      const goal = bench(`print(frappe.db.get_value("Life Goal", {"space": "${SPACE}", "is_archived": 0}, "name"))`).split('\n').pop()
+      await dash(`/life/today/week?open=goal:${goal}`)
+      await pg.locator('[data-pane-full]:visible').first().click()
+      await pg.waitForFunction((g) => location.pathname === '/life/goals/' + g, goal, { timeout: 10000 })
+    })
+
+    await check('TODAY.72', `${width} px, light and dark: every view has no script error and nothing cut off`, async () => {
+      for (const scheme of ['light', 'dark']) {
+        await pg.emulateMedia({ colorScheme: scheme })
+        for (const p of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
+          await dash(p)
+          await pg.waitForTimeout(300)
+          await noSideways()
+        }
+      }
+      await pg.emulateMedia({ colorScheme: 'light' })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+  } finally {
+    bench(`for n in ${JSON.stringify(made.items)}:
+    for p in frappe.get_all("Life Proposal", filters={"inbox_item": n}, pluck="name"): frappe.delete_doc("Life Proposal", p, force=1, ignore_permissions=True)
+    frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Task", filters={"title": ["like", "I123 %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.rules)}: frappe.delete_doc("Life Rule", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }
