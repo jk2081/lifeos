@@ -392,6 +392,12 @@ def _day(space, on, new, simple):
 	events = calendar_data.events_between(space, on, add_days(on, 1))
 	events.sort(key=lambda e: e["start"] or "")
 	sched = [row(e["title"], "All day" if e.get("all_day") else str(e["start"])[11:16], f"event:{e['name']}", at=str(e["start"])[11:16] if not e.get("all_day") else "") for e in events]
+	# tasks planned at a time that day are part of the day's schedule, as they were on Today's timeline before this view
+	from lifeos.api.today import scheduled_today
+	for t in scheduled_today(space, on):
+		hm = str(t.get("scheduled_at"))[11:16]
+		sched.append(row(t.get("title"), hm, f"task:{t.get('name')}", at=hm, task=1))
+	sched.sort(key=lambda r: (r.get("at") != "", r.get("at") or ""))  # all-day first, then by time
 	t = frappe.qb.DocType("Life Task")
 	if simple:
 		due = (frappe.qb.get_query("Life Task", fields=[t.name, t.title, t.due_date], ignore_permissions=False)

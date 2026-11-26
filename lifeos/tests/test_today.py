@@ -442,6 +442,14 @@ class TestDashboard(LifeTestCase):
 		self.assertEqual(len(dash.list(f"cycle:{self.cycle.name}", "year", space=PRIVATE)["rows"]), 1)
 		self.assertEqual(dash.list(f"week-work:{self.monday}", "month", space=PRIVATE)["title"], f"Week of {dash._short(self.monday)}")
 
+	def test_a_task_planned_at_a_time_is_on_the_days_schedule(self):
+		self.make("Life Task", title="i123 planned", status="Open", scheduled_at=f"{self.now} 09:30:00", duration_min=30)
+		rows = dash.get("day", space=PRIVATE)["panels"][0]["rows"]
+		hit = [r for r in rows if r["title"] == "i123 planned"]
+		self.assertEqual(len(hit), 1, "a task scheduled today is part of the day's schedule, as on the old timeline")
+		self.assertEqual(hit[0]["at"], "09:30")
+		self.assertTrue(hit[0]["ref"].startswith("task:"))
+
 	def test_with_goals_off_other_cards_take_their_place(self):  # acceptance 3
 		self.seed_brain()
 		frappe.db.set_single_value("Life Settings", "simple_mode", 1)
