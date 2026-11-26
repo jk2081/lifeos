@@ -45,6 +45,11 @@ Pages of blocks (number cards, charts, tables), stored as Frappe Dashboard Chart
 
 Life OS itself can't offer ChatGPT sign-in without being an approved OpenAI partner. The assistant (Hermes) can already run on a ChatGPT plan, so Chat could fall back to the assistant when there is no AI key.
 
+### Contacts: a directory, and people only when they matter
+> "should we create an issue to import contacts into the library - its important no?" … "Contacts could become people only if they are meaningful" (26 Nov)
+
+Google Contacts (read only, daily) and .vcf uploads go into Frappe's `Contact` as a private directory: no pages, no briefs, no AI cost. A contact becomes a `Life Person` when it matters: you replied or met; you named them in a task, capture or Chat; a saved contact writes for real (one sighting is enough, against three for a stranger); starred or in a label you mark. The first import fills in existing people, makes pages for those you've replied to or met in 90 days (one Undo), and asks once about the rest. The directory still names senders, answers "what's Ravi's number", and gets phone numbers ready for WhatsApp. Learns through #117's Change. The full proposal, with tests, is in #122 (closed, parked).
+
 ### Speak into any note box
 A mic button in Life OS's own text boxes, using faster-whisper on the server (#104). Part of #120 for the chat; this would add it everywhere else.
 
@@ -58,3 +63,4 @@ A mic button in Life OS's own text boxes, using faster-whisper on the server (#1
 - Simple mode (no goals and areas, areas suggested from use): #109 (held).
 - A learning Brain, rules, plate vs waiting pile: #117, #118.
 - Chat on Flow, renamed from Ask: #119. Chat everywhere: #120.
+- Dashboard at the top of Today › Week, everything in the drawer: #123.
