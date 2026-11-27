@@ -49,7 +49,7 @@ def _header(doctype: str, doc) -> dict:
 	kind = _kind(doctype, doc)
 	h = {"doctype": doctype, "name": doc.name, "space": doc.space, "kind": kind, "kind_label": {"company": "Company", "person": "Person", "part": "Part", "note": "Page"}[kind]}
 	if doctype == "Life Person":
-		h.update(title=doc.full_name, status=doc.status if doc.kind == "Organisation" else None, role=doc.role or doc.relation, email=doc.email, aliases=subjects.split_aliases(doc.aliases),
+		h.update(title=doc.full_name, status=doc.status if doc.kind == "Organisation" else None, role=doc.role or doc.relation, email=doc.email, phone=doc.phone, aliases=subjects.split_aliases(doc.aliases),
 			area=doc.area, path=_area_path(doc.area), organisation={"name": doc.organisation, "title": frappe.db.get_value("Life Person", doc.organisation, "full_name")} if doc.organisation else None,
 			is_archived=bool(doc.is_archived))
 	elif doctype == "Life Area":

@@ -12,7 +12,7 @@ export function api(method, args = {}) {
   if (CHANGES.test(method)) out.then(() => window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))).catch(() => {})
   return out
 }
-export const CHANGES = /^(tasks\.(set_status|update|quick_add|carry_forward|reschedule_overdue|confirm_area)|archive\.|inbox\.|review\.|periodic\.|chats\.make_task|someday\.|reset\.|trash\.|insights\.|weekly\.settle_stale)/
+export const CHANGES = /^(tasks\.(set_status|update|quick_add|carry_forward|reschedule_overdue|confirm_area|hand_off|looks_done_confirm|looks_done_not_yet|nudge_decide)|archive\.|inbox\.|review\.|periodic\.|chats\.make_task|someday\.|reset\.|trash\.|insights\.|weekly\.settle_stale)/
 
 // A query string carries only text: objects and lists as JSON, booleans as 1 or 0, and no empty values.
 export function queryParams(args) {

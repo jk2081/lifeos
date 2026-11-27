@@ -11,7 +11,7 @@ from frappe.flow import Agent, ToolContext, tool
 
 from lifeos.ai.tools import Context, run_tool
 
-TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'find_events', 'add_note', 'cancel_event', 'make_rule']
+TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'hand_off', 'find_events', 'add_note', 'cancel_event', 'make_rule']
 
 
 def _thread_of(session_id: str):
@@ -172,6 +172,12 @@ def make_task(title: str, area: str | None = None, part: str | None = None, due_
 def add_event(title: str, start: str, end: str | None = None, all_day: bool = False, description: str | None = None, *, ctx: ToolContext) -> dict:
 	"""Put an event on the calendar now, only when the owner asked for it."""
 	return _run("add_event", ctx, title=title, start=start, end=end, all_day=all_day, description=description)
+
+
+@tool
+def hand_off(person: str, what: str, check_by: str | None = None, how: str = "track", channel: str = "email", *, ctx: ToolContext) -> dict:
+	"""Hand off to a person as a Waiting task. how: track (default, sends nothing), draft ("ask": a message to send), send (only when told to send), done (they sent it)."""
+	return _run("hand_off", ctx, person=person, what=what, check_by=check_by, how=how, channel=channel)
 
 
 @tool

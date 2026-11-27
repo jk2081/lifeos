@@ -81,12 +81,13 @@
 // Someday and Drop (issue 72). Next: Goals opens once no stale task is left to decide.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Button, Dropdown, Skeleton, toast } from 'frappe-ui'
+import { Button, Dropdown, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import Empty from '@/components/Empty.vue'
 import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
+import { nudge as nudgeTask } from '@/lib/handoff'
 
 const emit = defineEmits(['go'])
 const r = useReview()
@@ -106,7 +107,7 @@ async function load() {
   s.value = stale
   w.value = waiting
 }
-// Done, Move to my plate, Still waiting (check-by a week on), Nudge (a two-line follow-up, copied; nothing is sent) and Not needed
+// Done, Move to my plate, Still waiting (check-by a week on), Nudge (a two-line follow-up as a draft or a WhatsApp link; nothing is sent) and Not needed
 const menu = (t) => [{ label: 'Move to my plate', onClick: () => change(t, 'plate') }, { label: 'Still waiting', onClick: () => change(t, 'still') },
   { label: 'Nudge', onClick: () => nudge(t) }, { label: 'Not needed', onClick: () => change(t, 'not_needed') }]
 async function change(t, to) {
@@ -118,8 +119,7 @@ async function reopen(c) {
   try { await r.act('closed_change', { task: c.name }) } finally { busy.value = '' }
 }
 async function nudge(t) {
-  const out = await r.read('waiting_nudge', { task: t.name })
-  try { await navigator.clipboard.writeText(out.text); toast.success(`Copied a follow-up to ${out.to}. Paste it where you like; nothing was sent.`) } catch { toast.info(out.text) }
+  await nudgeTask(t.name)  // a draft or the WhatsApp link, opened on the task; nothing is sent
 }
 async function settle(t, decision) {
   busy.value = t.name

@@ -9,7 +9,7 @@
     <WeekMenu v-if="mode === 'week'" />
   </PageHead>
 
-  <div class="page-body" :class="mode === 'week' && paneOpen && WEEK_ROOM" data-calendar :data-view="mode">
+  <div class="page-body" data-calendar :data-view="mode">
     <slot name="above" />
     <Alert v-if="google && !google.connected" title="Google Calendar is not connected" description="Connect it to see your meetings here and in the weekly review. Events added here stay on this site."
       :primary-action="{ label: 'Connect Google Calendar', route: { path: '/settings', query: { tab: 'calendar' } } }" data-google-prompt />
@@ -117,7 +117,7 @@ import { canWrite, store } from '@/lib/store'
 import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
 import WeekBars from '@/components/today/WeekBars.vue'
 import WeekMenu from '@/components/today/WeekMenu.vue'
-import { WEEK_ROOM, isBar, itemRef, paneOpen, showHidden } from '@/lib/calRange'
+import { isBar, itemRef, showHidden } from '@/lib/calRange'
 import { MONTHS, addDays, dayRange, iso, long, parse, short, startOfWeek as mondayOf, time, weekday } from '@/lib/dates'
 
 // In Plan (UX fixes, set 6) the calendar is a view of the Week, Month and Year tabs: `place` is the tab's title (the

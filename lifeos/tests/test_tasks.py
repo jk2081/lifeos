@@ -1,15 +1,18 @@
 """Tests for tasks."""
 import datetime
+import json
 
 import frappe
 from frappe.utils import add_days, add_to_date, getdate, now_datetime, today
 
 from lifeos.library import archive as archive_rules, trash
 from lifeos.review import counts
-from lifeos.tasks import datewords
+from lifeos.ai import fake
+from lifeos.tasks import datewords, handoff
+from lifeos.tools import work
 from lifeos.brain import outbox
 from lifeos import permissions
-from lifeos.api import archive, area as area_api, calendar as calendar_api, chats, goals, goals as goal_api, inbox, library, outbox as outbox_api, review, someday, tasks, timeline, today as today_api, vault, views
+from lifeos.api import archive, area as area_api, dashboard, calendar as calendar_api, chats, goals, goals as goal_api, inbox, library, outbox as outbox_api, review, someday, tasks, timeline, today as today_api, vault, views
 from lifeos.api.utils import filter_criteria, order_terms
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import item, set_key, task, text
@@ -1189,3 +1192,162 @@ class TestRulesOnTheDocType(LifeTestCase):
 		doc.status = "Someday"
 		with self.assertRaises(frappe.ValidationError):
 			doc.save()
+
+
+class FakeGoogle:
+	"""Stands in for Google: records what would have been sent or drafted."""
+
+	def __init__(self):
+		self.calls = []
+
+	def _note(self, what, **kw):
+		self.calls.append((what, kw))
+		return {"id": f"{what}-{len(self.calls)}", "thread_id": kw.get("thread_id") or "th-new"}
+
+	def send(self, to, subject, body, thread_id=None, cc=None):
+		return self._note("send", to=to, subject=subject, body=body, thread_id=thread_id)
+
+	def draft(self, to, subject, body, thread_id=None, cc=None):
+		return self._note("draft", to=to, subject=subject, body=body, thread_id=thread_id)
+
+	def delete_draft(self, draft_id):
+		self._note("delete_draft", id=draft_id)
+
+
+class TestHandOff(LifeTestCase):
+	"""Issue 130: hand something off, optionally with a message; the person's user is assigned; the default check date."""
+	ADDRESS = "owner130@example.com"
+
+	def setUp(self):
+		super().setUp()
+		frappe.set_user("Administrator")
+		for dt in ("Life Agent Action", "Life Mail Account"):
+			frappe.db.delete(dt, {"space": PRIVATE})
+		frappe.db.delete("Life Task", {"space": ("in", (PRIVATE, SHARED)), "title": ("like", "I130 %")})
+		frappe.db.delete("Life Person", {"space": ("in", (PRIVATE, SHARED)), "full_name": ("like", "%I130%")})
+		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": self.ADDRESS, "label": "Personal", "is_default": 1}).insert()
+		self.google = FakeGoogle()
+		frappe.flags.lifeos_google = {self.ADDRESS: self.google}
+		self.addCleanup(lambda: (setattr(frappe.flags, "lifeos_google", {}), setattr(frappe.flags, "lifeos_ai_backend", None), set_key("")))
+		self.vivek = frappe.get_doc({"doctype": "Life Person", "space": PRIVATE, "full_name": "Vivek I130", "kind": "Person", "email": "vivek130@example.com", "phone": "+91 98765 43210"}).insert()
+		permissions.clear_cache()
+		frappe.set_user(OWNER)
+
+	def model(self, subject="ITR draft by Friday", body="Hi Vivek,\n\nCould you send me the ITR draft by Friday?\n\nThanks,\nJai"):
+		set_key("sk-test-not-real")
+		frappe.flags.lifeos_ai_backend = fake.ScriptedFake([{"content": [{"type": "text", "text": json.dumps({"subject": subject, "body": body})}], "stop_reason": "end_turn"}] * 3)
+
+	def test_1_track_makes_a_waiting_task_and_sends_nothing_draft_saves_a_gmail_draft_and_send_sends_with_asked_by_owner_and_keeps_the_thread(self):
+		friday = str(add_days(getdate(today()), (4 - getdate(today()).weekday()) % 7 or 7))
+		out = work.hand_off("Vivek I130", "I130 ITR draft", friday, "track", "email", PRIVATE)
+		doc = frappe.get_doc("Life Task", out["task"])
+		self.assertEqual((doc.status, doc.waiting_on_person, doc.delegated_to, str(doc.check_by), doc.handed_off_how), ("Waiting", self.vivek.name, self.vivek.name, friday, "track"))
+		self.assertIn("nothing was sent", out["done"])
+		self.assertEqual(self.google.calls, [])
+		self.assertEqual(frappe.db.count("Life Agent Action", {"space": PRIVATE}), 1)  # only the log of the hand-off itself
+		self.model()
+		drafted = work.hand_off("Vivek I130", "I130 Tax papers", friday, "draft", "email", PRIVATE)
+		self.assertEqual([c[0] for c in self.google.calls], ["draft"])
+		self.assertEqual(self.google.calls[0][1]["to"], "vivek130@example.com")
+		task = frappe.get_doc("Life Task", drafted["task"])
+		self.assertEqual(task.handed_off_how, "draft")
+		self.assertIn("ITR draft by Friday", task.handed_off_message)
+		self.assertTrue(task.handed_off_thread)
+		sent = handoff.send_draft(task.name)  # Send on the draft: the email goes in the same thread, then the draft is deleted
+		self.assertEqual((sent["sent"], [c[0] for c in self.google.calls]), (True, ["draft", "send", "delete_draft"]))
+		self.assertEqual(self.google.calls[1][1]["thread_id"], task.handed_off_thread)
+		again = work.hand_off("Vivek I130", "I130 Send it", friday, "send", "email", PRIVATE, None, "owner", "Email Vivek for it, send it")
+		self.assertEqual(self.google.calls[-1][0], "send")
+		row = frappe.get_doc("Life Agent Action", frappe.db.get_value("Life Task", again["task"], "handed_off_action"))
+		self.assertEqual((row.asked_by, row.status), ("owner", "Done"))
+		after = frappe.get_doc("Life Task", again["task"])
+		self.assertEqual((after.handed_off_how, after.handed_off_thread), ("sent", "th-new"))
+		discarded = work.hand_off("Vivek I130", "I130 Drop it", friday, "draft", "email", PRIVATE)
+		handoff.discard_draft(discarded["task"])
+		self.assertEqual(frappe.db.get_value("Life Task", discarded["task"], "handed_off_how"), "track")
+
+	def test_a_whatsapp_hand_off_is_a_link_with_the_phone_and_the_text_and_nothing_is_sent(self):
+		self.model(subject="", body="Hi Vivek, could you send the ITR draft by Friday? Thanks & regards")
+		out = work.hand_off("Vivek I130", "I130 WA draft", None, "send", "whatsapp", PRIVATE)  # "send" by WhatsApp is still only a draft
+		self.assertEqual(self.google.calls, [])
+		self.assertEqual(out["how"], "draft")
+		self.assertTrue(out["whatsapp"].startswith("https://wa.me/919876543210?text=Hi%20Vivek%2C"))
+		self.assertIn("Thanks%20%26%20regards", out["whatsapp"])
+		nophone = work.hand_off("Nobody I130", "I130 No phone", None, "draft", "whatsapp", PRIVATE)
+		self.assertEqual((nophone["needs_phone"], nophone["whatsapp"]), (1, ""))
+
+	def test_a_new_name_is_added_as_a_person_and_a_missing_email_is_asked_for(self):
+		out = work.hand_off("Newcomer I130", "I130 New", None, "track", "email", PRIVATE)
+		self.assertTrue(frappe.db.exists("Life Person", {"space": PRIVATE, "full_name": "Newcomer I130"}))
+		self.assertEqual(frappe.db.get_value("Life Task", out["task"], "waiting_on"), "Newcomer I130")
+		with self.assertRaises(frappe.ValidationError):
+			work.hand_off("Newcomer I130", "I130 New draft", None, "draft", "email", PRIVATE)  # no email to write to
+
+	def test_2_handing_off_to_a_person_with_a_user_in_the_space_assigns_the_task_and_sends_nothing(self):
+		kin = frappe.get_doc({"doctype": "Life Person", "space": SHARED, "full_name": "Family I130", "kind": "Person", "user": FAMILY}).insert()
+		out = work.hand_off(kin.full_name, "I130 Pick up the forms", None, "track", "email", SHARED)
+		todo = frappe.get_all("ToDo", filters={"reference_type": "Life Task", "reference_name": out["task"], "status": "Open"}, pluck="allocated_to")
+		self.assertEqual(todo, [FAMILY])
+		self.assertEqual(self.google.calls, [])
+		frappe.set_user(FAMILY)
+		self.assertEqual(frappe.db.get_value("Life Task", out["task"], "waiting_on_person"), kin.name)
+
+	def test_hand_off_button_takes_an_existing_task_and_a_nudge_drafts_moves_check_by_and_stops_after_two(self):
+		self.model(subject="Re: ITR", body="Hi Vivek, a quick nudge on the ITR draft.")
+		task = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "I130 Existing", "status": "Open"}).insert()
+		out = tasks.hand_off("Vivek I130", None, None, "draft", "email", task.name)
+		self.assertEqual((out["task_row"]["status"], out["how"]), ("Waiting", "draft"))
+		first = tasks.nudge(task.name)
+		self.assertEqual((first["nudges"], first["check_by"]), (1, str(add_days(getdate(today()), 3))))
+		self.assertEqual(self.google.calls[-1][0], "draft")
+		tasks.nudge(task.name)
+		with self.assertRaises(frappe.ValidationError):
+			tasks.nudge(task.name)
+		self.assertEqual(tasks.nudge_decide(task.name, "week")["status"], "Waiting")
+		self.assertEqual(frappe.db.get_value("Life Task", task.name, "nudge_count"), 0)
+
+	def test_the_agents_method_hands_off_the_owners_request_and_logs_it_with_undo(self):
+		from lifeos.api import tools
+
+		own = tools.tasks_hand_off("Vivek I130", "I130 Owner asked", None, "track", "email", PRIVATE, "i130agent", "owner", "Vivek owes me the ITR draft")
+		self.assertTrue(frappe.db.exists("Life Task", own["task"]))
+		self.assertEqual(self.google.calls, [])
+		from lifeos.tools import actions
+
+		self.assertEqual(actions.undo(own["undo"])["removed"], [own["task"]])
+
+	def test_6_default_check_by_is_the_named_date_else_the_persons_usual_days_else_three_working_days(self):
+		def closed(days, n):
+			made = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": f"I130 Done {n}", "status": "Waiting", "waiting_on": "Vivek I130", "waiting_on_person": self.vivek.name, "check_by": today()}).insert()
+			frappe.db.set_value("Life Task", made.name, {"creation": add_days(now_datetime(), -days), "status": "Done", "completed_on": today()})
+
+		first = handoff.default_check_by(PRIVATE, self.vivek.name)
+		expected = handoff.working_days_after(3)
+		self.assertEqual(first, str(expected))
+		self.assertGreaterEqual((expected - getdate(today())).days, 3)
+		for n, d in enumerate((2, 4)):
+			closed(d, n)
+		self.assertEqual(handoff.default_check_by(PRIVATE, self.vivek.name), str(expected))  # two closed items are not enough
+		closed(6, 2)
+		self.assertEqual(handoff.default_check_by(PRIVATE, self.vivek.name), str(add_days(getdate(today()), 4)))  # the median of 2, 4 and 6
+		out = work.hand_off("Vivek I130", "I130 With a date", "2026-12-24", "track", "email", PRIVATE)
+		self.assertEqual(out["check_by"], "2026-12-24")
+		quick = work.hand_off("Vivek I130", "I130 No date", None, "track", "email", PRIVATE)
+		self.assertEqual(quick["check_by"], str(add_days(getdate(today()), 4)))
+
+	def test_the_waiting_list_groups_looks_done_late_this_week_and_later_and_the_persons_layer_shows_what_they_owe(self):
+		def make(title, check, **extra):
+			return frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": title, "status": "Waiting", "waiting_on": "Vivek I130", "waiting_on_person": self.vivek.name, "check_by": check, **extra}).insert().name
+
+		done, late, soon, later = make("I130 A", add_days(today(), -1)), make("I130 B", add_days(today(), -2)), make("I130 C", today()), make("I130 D", add_days(today(), 30))
+		item = frappe.get_doc({"doctype": "Life Inbox Item", "space": PRIVATE, "title": "I130 reply", "source_type": "Email", "raw_text": "x", "status": "Done"}).insert()
+		frappe.db.set_value("Life Task", done, {"looks_done_item": item.name, "looks_done_note": "Vivek sent it"})
+		frappe.db.set_value("Life Task", late, "nudge_count", 2)
+		grouped = handoff.waiting_list(PRIVATE)
+		self.assertEqual({g: [r["name"] for r in grouped[g] if r["name"] in (done, late, soon, later)] for g in grouped},
+			{"looks_done": [done], "late": [late], "week": [soon], "later": [later]})
+		self.assertEqual([(r["action"], r["how"]) for r in grouped["late"] if r["name"] == late], [("decide", "nudged twice")])
+		self.assertEqual([r["action"] for r in grouped["looks_done"] if r["name"] == done], ["confirm"])
+		self.assertEqual(sorted(r["name"] for r in handoff.owed(PRIVATE, self.vivek.name)["owe_me"]), sorted([done, late, soon, later]))
+		card = next(c for c in dashboard.get("week", space=PRIVATE)["cards"] if c["key"] == "waiting")
+		self.assertEqual([p["text"] for p in card["parts"]], ["1 late", "1 looks done"])

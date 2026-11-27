@@ -68,6 +68,14 @@ def events_add(title: str, start: str, end: str | None = None, all_day: bool = F
 
 
 @frappe.whitelist(methods=["POST"])
+def tasks_hand_off(person: str, what: str, check_by: str | None = None, how: str = "track", channel: str = "email", space: str | None = None, source_system: str | None = None,
+		asked_by: str = "agent", owner_message: str | None = None):
+	"""Hand something off to a person: a Waiting task with a check date. `how`: track (nothing sent), draft (a message written for the owner to send) or send (an email goes at
+	once; only when the owner said send, with `asked_by: owner`). `how: done` marks a person's waiting task done. Life OS never sends WhatsApp."""
+	return work.hand_off(person, what, check_by, how, channel, space, source_system, asked_by, owner_message)
+
+
+@frappe.whitelist(methods=["POST"])
 def undo(action: str):
 	"""Take back what one of these tools did, by the token it returned. People only."""
 	return actions.undo(action)

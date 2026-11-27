@@ -1977,3 +1977,34 @@ print(json.dumps({"focus": focus, "annual": annual, "task_goal": frappe.db.get_v
     restore()
   }
 }
+
+// ---- the Drawer's focus layer (issue 128) ----
+{
+  const focus = bench(`career = frappe.get_all("Life Area", filters={"space": "${SPACE}", "is_life_area": 1, "area_name": "Career"}, pluck="name")[0]
+part = frappe.get_doc({"doctype": "Life Area", "space": "${SPACE}", "area_name": "I128 Part ${stamp}", "parent_area": career, "part_kind": "Estate"}).insert(ignore_permissions=True)
+f = frappe.get_doc({"doctype": "Life Area", "space": "${SPACE}", "area_name": "I128 Focus ${stamp}", "parent_area": part.name, "is_focus": 1, "standard": "Every lot meets its grade", "principles": [{"line": "One system"}]}).insert(ignore_permissions=True)
+print(f.name)`).split('\n').pop()
+  for (const width of WIDTHS) {
+    const u = await session('owner@lifeos.test', width)
+    const pg = u.page
+    const errors = []
+    pg.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+    try {
+      await check('GOALS.76', `${width} px: focus: shows a focus's standard, principles, goals and review; Open full page goes to /focus/<id>`, async () => {
+        must(focus, 'the acceptance site has no focus')
+        await u.open(`/life/goals?open=focus:${focus}`)
+        await pg.locator('[data-focus-pane]').waitFor({ timeout: 15000 })
+        for (const part of ['standard', 'principles', 'goals', 'review']) must(await pg.locator(`[data-pane-focus-${part}]`).count() === 1, `the pane has no ${part}`)
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+        await pg.locator('[data-pane-full]').click()
+        await pg.waitForURL((x) => x.pathname === `/life/focus/${focus}`, { timeout: 10000 })
+        must(!errors.length, 'script errors: ' + errors.join(' | '))
+      })
+    } finally {
+      await u.ctx.close()
+    }
+  }
+  bench(`frappe.set_user("Administrator")
+for n in frappe.get_all("Life Area", filters={"area_name": ["like", "I128 Focus ${stamp}"]}, pluck="name") + frappe.get_all("Life Area", filters={"area_name": ["like", "I128 Part ${stamp}"]}, pluck="name"):
+    frappe.delete_doc("Life Area", n, force=1, ignore_permissions=True)`)
+}

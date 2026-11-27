@@ -13,7 +13,7 @@
           <template v-else>
             <b class="text-3xl-semibold tabular-nums text-ink-gray-9 max-md:text-2xl-semibold" :class="c.tone === 'warn' && '!text-ink-amber-9'" data-dash-value>{{ c.value }}</b>
             <span v-if="c.parts.length" class="flex flex-wrap gap-x-2 text-sm">
-              <Button v-for="p in c.parts" :key="p.text" class="relative !h-auto !px-0 !py-0 text-sm" :class="p.tone === 'warn' ? '!text-ink-amber-9' : '!text-ink-gray-6'" variant="ghost" :label="p.text"
+              <Button v-for="p in c.parts" :key="p.text" class="relative !h-auto !px-0 !py-0 text-sm" :class="p.tone === 'warn' ? '!text-ink-amber-9' : p.tone === 'ok' ? '!text-ink-green-8' : '!text-ink-gray-6'" variant="ghost" :label="p.text"
                 data-dash-part @click="openRef(p.open)" />
             </span>
             <span v-else-if="c.sub" class="text-sm text-ink-gray-6">{{ c.sub }}</span>

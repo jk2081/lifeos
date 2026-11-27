@@ -18,10 +18,10 @@
         <Button size="sm" variant="ghost" label="Skip" data-banner-skip @click="skipBanner" />
       </div>
       <!-- issue 102: the AI service is not answering (credit, the key or the provider), until a call works again -->
-      <!-- issue 118: the waiting pile is never on Today; one line says when some of it is past its check-by date -->
+      <!-- issue 118/130: the waiting pile is never on Today; one line says when some of it is late, and Look now opens the Waiting list -->
       <div v-if="d.waiting_past?.count" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-4 py-2.5" role="status" data-waiting-past>
-        <span class="min-w-0 flex-1 text-base text-ink-gray-9">{{ d.waiting_past.count }} waiting {{ d.waiting_past.count === 1 ? 'item is' : 'items are' }} past their check date · {{ d.waiting_past.names.join(', ') }}</span>
-        <Button size="sm" label="Look now" :route="{ path: '/today/week', query: { view: 'review', tab: 'tasks' } }" data-waiting-look />
+        <span class="min-w-0 flex-1 text-base text-ink-gray-9">{{ d.waiting_past.line }}</span>
+        <Button size="sm" label="Look now" data-waiting-look @click="openRef('list:waiting-overdue')" />
       </div>
       <div v-if="d.brain_off" class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-5 border border-outline-amber-1 bg-surface-amber-1 px-4 py-2.5" role="status" data-brain-off>
         <span class="lucide-triangle-alert size-4 text-ink-amber-8" aria-hidden="true" />
@@ -141,7 +141,7 @@ import { optimistic, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { onboarding } from '@/lib/onboarding'
 import { addDays, long, short, startOfWeek, weekday } from '@/lib/dates'
-import { onRecordChanged, paneNav } from '@/lib/pane'
+import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
 import { askScope, lensScope } from '@/lib/ask'
 
 const router = useRouter()
@@ -200,6 +200,8 @@ async function load() {
   const res = await tryCall(() => todayData.today.get({ space: store.space, area: store.lensArea || undefined, at: route.query.at || undefined }))
   if (!res) return
   d.value = res
+  // a list layer (open or underneath) owns j and k; Today's own rows must not replace the list's
+  if (route.query.under || String(route.query.open || '').startsWith('list:')) return
   paneNav.rows = res.next.groups.flatMap((g) => g.rows.map((r) => (r.type === 'event' ? 'event:' + r.name : !r.type || r.type === 'task' ? 'task:' + r.name : null)).filter(Boolean))
 }
 onRecordChanged(() => load())

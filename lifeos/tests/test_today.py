@@ -373,7 +373,7 @@ class TestDashboard(LifeTestCase):
 		self.assertIn("target 85%", cards["score"]["sub"])
 		self.assertIn("last week 100%", cards["score"]["sub"])
 		self.assertEqual((cards["needs"]["value"], cards["needs"]["open"]), (2, "list:needs-you"))
-		self.assertEqual((cards["waiting"]["value"], cards["waiting"]["parts"][0]["text"], cards["waiting"]["parts"][0]["open"]), (3, "1 past check date", "list:waiting-overdue"))
+		self.assertEqual((cards["waiting"]["value"], cards["waiting"]["parts"][0]["text"], cards["waiting"]["parts"][0]["open"]), (3, "1 late", "list:waiting-overdue"))
 		self.assertEqual(cards["filed"]["value"], "67%")  # 4 of the 6 the Brain finished with: the changed one and the one asking are not alone
 		line = {p["open"]: p["text"] for p in out["brain_line"]["parts"]}
 		self.assertEqual(line["list:came-in"], "6 came in")

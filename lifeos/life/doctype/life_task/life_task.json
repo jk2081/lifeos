@@ -27,6 +27,15 @@
   "closed_by_brain",
   "closed_by_item",
   "delegated_to",
+  "handed_off_how",
+  "handed_off_channel",
+  "handed_off_ask",
+  "handed_off_message",
+  "handed_off_thread",
+  "handed_off_action",
+  "nudge_count",
+  "looks_done_item",
+  "looks_done_note",
   "completed_on",
   "carried_from",
   "last_touched_on",
@@ -297,6 +306,66 @@
    "fieldtype": "Link",
    "label": "Delegated to",
    "options": "Life Person"
+  },
+  {
+   "fieldname": "handed_off_how",
+   "fieldtype": "Select",
+   "label": "Handed off",
+   "options": "\ntrack\ndraft\nsent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "handed_off_channel",
+   "fieldtype": "Select",
+   "label": "Handed off by",
+   "options": "\nemail\nwhatsapp",
+   "read_only": 1
+  },
+  {
+   "fieldname": "handed_off_ask",
+   "fieldtype": "Small Text",
+   "label": "What was asked",
+   "read_only": 1
+  },
+  {
+   "fieldname": "handed_off_message",
+   "fieldtype": "Long Text",
+   "label": "Message sent or drafted",
+   "read_only": 1
+  },
+  {
+   "fieldname": "handed_off_thread",
+   "fieldtype": "Data",
+   "label": "Email thread",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "handed_off_action",
+   "fieldtype": "Data",
+   "label": "Draft or send log",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "nudge_count",
+   "fieldtype": "Int",
+   "label": "Nudges",
+   "read_only": 1,
+   "default": "0"
+  },
+  {
+   "fieldname": "looks_done_item",
+   "fieldtype": "Link",
+   "label": "Looks done from",
+   "options": "Life Inbox Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "looks_done_note",
+   "fieldtype": "Data",
+   "label": "Looks done: what came",
+   "read_only": 1
   }
  ],
  "links": [],

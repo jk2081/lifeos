@@ -45,9 +45,8 @@ export function weekBars(days, items) {
 }
 /** Events hidden in Life OS: Show hidden events in the week menu brings them back. */
 export const showHidden = ref(false)
-/** True while the record pane is open on a desktop: the week makes room for it instead of lying under it. */
+/** True while the Drawer is open: the week keeps to one column (the Drawer itself makes room for the page, from 1440 px). */
 export const paneOpen = computed(() => !!current.value)
-export const WEEK_ROOM = 'md:!pr-[532px]'
 export const itemLabel = (it) => it.label || it.title
 /** Day opens for a date: Today's own screen, held to that day. */
 export const openDay = (date) => router.push({ path: '/today', query: { ...router.currentRoute.value.query, open: undefined, date: date === store.today ? undefined : date } })

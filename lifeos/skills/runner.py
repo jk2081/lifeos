@@ -418,7 +418,7 @@ def _write_capture(doc, item, state):
 	done = inbox.submit_result(item.name, transcript_md=out.get("transcript_md") or None, summary_md=asks.render_md(summary) if summary else out.get("summary_md") or None, proposals=rows)
 	if summary:
 		asks.apply(frappe.get_doc("Life Inbox Item", item.name), summary)  # a task for each To act on line: his plate, or the waiting pile
-	asks.close_waiting(item, out.get("closes"))
+	asks.close_waiting(item, out.get("closes"), out.get("moves"))
 	label = store.label(doc.name, doc.version)
 	frappe.db.set_value("Life Inbox Item", item.name, "processed_by", label)
 	from lifeos.brain import rules

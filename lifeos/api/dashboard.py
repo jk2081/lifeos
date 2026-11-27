@@ -97,17 +97,26 @@ def needs_you(space):
 		q = q.where(guard)
 	n, oldest = q.run()[0]
 	age = (getdate(today()) - getdate(oldest)).days if oldest else None
-	return {"n": int(n or 0), "oldest_days": age}
+	return {"n": int(n or 0) + waiting(space)["looks_done"], "oldest_days": age}  # a reply that seems to answer a waiting task is one more decision
 
 
 def waiting(space):
-	"""The waiting pile: how many, how many are past their check-by date, and how many are due today or past it."""
+	"""The waiting pile: how many, how many are late (past their check-by date, not already settled by a reply), how many are due today or past it,
+	and how many "look done" (a reply seems to have answered them; the owner confirms)."""
 	t = frappe.qb.DocType("Life Task")
 	now = getdate(today())
-	row = (frappe.qb.get_query("Life Task", fields=[fn.Count("*"), fn.Sum(frappe.query_builder.Case().when(t.check_by < now, 1).else_(0)),
-		fn.Sum(frappe.query_builder.Case().when(t.check_by <= now, 1).else_(0))], ignore_permissions=False)
+	case = frappe.query_builder.Case
+	looks = fn.IfNull(t.looks_done_item, "") != ""
+	row = (frappe.qb.get_query("Life Task", fields=[fn.Count("*"), fn.Sum(case().when((t.check_by < now) & ~looks, 1).else_(0)),
+		fn.Sum(case().when(t.check_by <= now, 1).else_(0)), fn.Sum(case().when(looks, 1).else_(0))], ignore_permissions=False)
 		.where((t.space == space) & (t.status == "Waiting") & (t.is_archived == 0))).run()[0]
-	return {"n": int(row[0] or 0), "past": int(row[1] or 0), "due": int(row[2] or 0)}
+	return {"n": int(row[0] or 0), "past": int(row[1] or 0), "due": int(row[2] or 0), "looks_done": int(row[3] or 0)}
+
+
+def waiting_due_names(space, limit=3):
+	"""Whose waiting items have their check date today or past: their names, for Day's "Check today" card."""
+	rows = frappe.get_list("Life Task", filters={"space": space, "status": "Waiting", "is_archived": 0, "check_by": ("<=", getdate(today()))}, fields=["waiting_on"], order_by="check_by asc", limit=50)
+	return [*dict.fromkeys((r.waiting_on or _("Someone")).split(" (")[0] for r in rows)][:limit]
 
 
 def filed_alone(space, start, end):
@@ -280,8 +289,12 @@ def needs_card(space, new):
 
 def waiting_card(space, new, label=None):
 	w = waiting(space)
-	parts = [{"text": _("{0} past check date").format(w["past"]), "open": "list:waiting-overdue", "tone": "warn"}] if w["past"] else []
-	return card("waiting", label or _("Waiting on others"), w["n"], None if w["past"] else (_("on someone else") if w["n"] else None), "list:waiting" if w["n"] else None, parts=parts,
+	parts = []
+	if w["past"]:
+		parts.append({"text": _("{0} late").format(w["past"]), "open": "list:waiting-overdue", "tone": "warn"})
+	if w["looks_done"]:
+		parts.append({"text": _("{0} looks done").format(w["looks_done"]), "open": "list:waiting", "tone": "ok"})
+	return card("waiting", label or _("Waiting on others"), w["n"], None if parts else (_("on someone else") if w["n"] else None), "list:waiting" if w["n"] else None, parts=parts,
 		empty=None if w["n"] else _line(new, _("Things you wait on others for will show up here."), _("Chat"), "chat"))
 
 
@@ -416,7 +429,7 @@ def _day(space, on, new, simple):
 			empty=_line(new, _("The weekly review sets your top three."), _("Chat"), "chat"))
 	cards.append(needs_card(space, new))
 	w = waiting(space)
-	cards.append(card("check", _("Check today"), w["due"], _("waiting items to chase") if w["due"] else None, "list:waiting-due" if w["due"] else None,
+	cards.append(card("check", _("Check today"), w["due"], ", ".join(waiting_due_names(space)) if w["due"] else None, "list:waiting-due" if w["due"] else None,
 		empty=_line(new, _("Waiting items whose check date has come show here."), _("Chat"), "chat")))
 	habits = habits_today(space, on)
 	if habits or not simple:
@@ -591,16 +604,28 @@ def list(kind: str, view: str = "week", date: str | None = None, space: str | No
 
 
 def _l_needs(space):
+	from lifeos.tasks import handoff
+
 	rows = brain_api.needs_you(space, limit=50)["rows"]
-	return {"title": _("Needs you"), "rows": [row(_masked(r["title"], False), r["kind_label"], f"inbox:{r['item']}", proposal=r["proposal"]) for r in rows]}
+	looks = [row(_("Looks done: {0}").format(x["looks_done_note"] or x["waiting_on"]), x["title"], f"task:{x['name']}", looks_done=1, task=x["name"]) for x in handoff.looks_done(space)]
+	return {"title": _("Needs you"), "rows": looks + [row(_masked(r["title"], False), r["kind_label"], f"inbox:{r['item']}", proposal=r["proposal"]) for r in rows]}
 
 
 def _l_waiting(space, which):
+	"""The Waiting list: grouped Looks done, Late, This week, Later; each row has the person, what, the check date, how it went and at most one action."""
+	from lifeos.tasks import handoff
+
 	now = getdate(today())
-	rows = asks.waiting_rows(space)
-	rows = [r for r in rows if which == "all" or (which == "past" and r["past"]) or (which == "due" and r["check_by"] and getdate(r["check_by"]) <= now)]
-	title = {"all": _("Waiting on others"), "past": _("Past their check date"), "due": _("Check today")}[which]
-	return {"title": title, "rows": [row(r["title"], _("{0} · check by {1}").format(r["who"], _short(r["check_by"])) if r["check_by"] else r["who"], f"task:{r['name']}", tone="warn" if r["past"] else None) for r in rows]}
+	groups = handoff.waiting_list(space)
+	flat = [r for g in handoff.GROUPS for r in groups[g]]
+	if which == "past":
+		flat = [r for r in flat if r["late"] and r["group"] != "looks_done"]
+	elif which == "due":
+		flat = [r for r in flat if r["check_by"] and getdate(r["check_by"]) <= now]
+	title = {"all": _("Waiting on others"), "past": _("Late"), "due": _("Check today")}[which]
+	rows = [row(r["title"], _("{0} · check by {1}").format(r["who"], _short(r["check_by"])) if r["check_by"] else r["who"], f"task:{r['name']}", tone="warn" if r["late"] and r["group"] != "looks_done" else None,
+		**{k: r[k] for k in ("who", "person", "check_by", "how", "group", "action", "note", "nudges", "late")}, task=r["name"]) for r in flat]
+	return {"title": title, "rows": rows, "grouped": which == "all", "group_order": [*handoff.GROUPS]}
 
 
 def _l_rules(space, start, end):

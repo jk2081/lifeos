@@ -1,5 +1,5 @@
 <template>
-  <Drawer :open="!!event" name="meeting" :title="m?.title || 'Meeting'" @close="emit('close')">
+  <SideSheet :open="!!event" name="meeting" :title="m?.title || 'Meeting'" @close="emit('close')">
     <template #sub>
       <span v-if="m" data-meeting-sub>{{ when }}<template v-if="people"> · {{ people }}</template><template v-if="m.area_name"> · {{ m.area_name }}</template></span>
     </template>
@@ -42,14 +42,14 @@
       <span class="flex-1 text-sm text-ink-gray-6 max-md:hidden">← → for the previous or next meeting</span>
       <Button variant="solid" :label="m?.done ? 'Done' : 'Done with this meeting'" data-meeting-done @click="emit('done', m)" />
     </template>
-  </Drawer>
+  </SideSheet>
 </template>
 <script setup>
 // A meeting opened from Library (board 29): what is linked, the follow-ups found, a line that becomes a task linked to the
 // meeting (and the goal shown), and the previous and next meeting that matters with ← and →.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge, Button, Dropdown, Select, Skeleton, Switch, TextInput } from 'frappe-ui'
-import Drawer from '@/components/ui/Drawer.vue'
+import SideSheet from '@/components/ui/SideSheet.vue'
 import FindingRow from '@/components/review/FindingRow.vue'
 import { openRef } from '@/lib/pane'
 import { store } from '@/lib/store'

@@ -971,6 +971,18 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
+    await check('TODAY.76', `${width} px: on an empty space the Waiting list says what will appear and offers + Hand off`, async () => {
+      await one.open('/life/today/week?open=list:waiting')
+      await pg.locator('[data-list="waiting"] [data-list-empty]').waitFor({ timeout: 15000 })
+      must((await pg.locator('[data-list="waiting"] [data-list-empty]').innerText()).includes('Nobody owes you anything'), 'the empty list says: ' + await pg.locator('[data-list="waiting"] [data-list-empty]').innerText())
+      must(await pg.locator('[data-waiting-handoff]').count() === 1, 'the empty list has no Hand off')
+      await pg.locator('[data-waiting-handoff]').click()
+      await pg.getByText('Hand off to someone').waitFor({ timeout: 8000 })
+      for (const label of ['Just track', 'Draft a message', 'Send']) must(await pg.getByText(label, { exact: true }).count() >= 1, `the dialog has no ${label}`)
+      await noSideways()
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
     await check('TODAY.59', `${width} px: on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link`, async () => {
       await one.open('/life/today/year')
       const empty = pg.locator(phone ? '[data-year-empty-phone]' : '[data-year-empty]')
@@ -1388,7 +1400,7 @@ for n in ${JSON.stringify(made.active)}: frappe.db.set_value("Life Cycle", n, "s
   }
 }
 
-// Issue 118: the waiting pile is never on Today; one line says when some of it is past its check-by date.
+// Issue 118: the waiting pile is never on Today; one line says when some of it is late.
 for (const width of WIDTHS) {
   const s = await session('owner@lifeos.test', width)
   const pg = s.page
@@ -1408,10 +1420,10 @@ frappe.db.set_value("Life Task", "${name}", "check_by", add_days(today(), -1))`)
       await s.open('/life/today')
       await pg.locator('[data-waiting-past]').waitFor({ timeout: 15000 })
       const t = await pg.locator('[data-waiting-past]').innerText()
-      must(/past their check date|past its check date/.test(t) && t.includes('Meera I118T'), 'the line says: ' + t)
-      must(!(await pg.getByText(title).count()), 'the waiting task is on Today past its date')
+      must(/a day late/.test(t) && t.includes('Meera I118T'), 'the line says: ' + t)
+      must(!(await pg.getByText(title, { exact: true }).count()), 'the waiting task is on Today past its date')  // the one line names it inside a sentence; it is not a row
       await pg.locator('[data-waiting-look]').click()
-      await pg.waitForURL((u) => u.pathname === '/life/today/week', { timeout: 10000 })
+      await pg.locator('[data-list="waiting-overdue"]').waitFor({ timeout: 10000 })
     })
   } finally {
     bench(`for n in frappe.get_all("Life Task", filters={"title": ["like", "I118T %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
@@ -1625,6 +1637,9 @@ print(json.dumps(out))`).split('\n').pop())
       await pg.keyboard.press('j')
       await pg.waitForFunction((r) => new URL(location.href).searchParams.get('open') === r, refs[1], { timeout: 8000 })
       must(await pg.locator('[data-pane-back]').isVisible(), 'Back is gone after j')
+      await pg.keyboard.press('Escape') // Esc takes one layer off, the list shows; the second closes the Drawer
+      await pg.waitForFunction(() => new URL(location.href).searchParams.get('open') === 'list:needs-you', null, { timeout: 8000 })
+      await pg.waitForTimeout(700)
       await pg.keyboard.press('Escape')
       await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
       await noSideways()
@@ -1643,7 +1658,7 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
       made.rules.push(...out.rules)
       await dash('/life/today/week')
       const part = pg.locator('[data-card="waiting"] [data-dash-part]')
-      must((await part.innerText()).startsWith(`${out.past} past check date`), 'the card says: ' + await part.innerText())
+      must((await part.innerText()).startsWith(`${out.past} late`), 'the card says: ' + await part.innerText())
       await part.click()
       const list = pg.locator('[data-list="waiting-overdue"]')
       await list.locator('[data-list-row]').first().waitFor({ timeout: 10000 })
@@ -1693,6 +1708,140 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
     frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)
 for n in frappe.get_all("Life Task", filters={"title": ["like", "I123 %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
 for n in ${JSON.stringify(made.rules)}: frappe.delete_doc("Life Rule", n, force=1, ignore_permissions=True)`)
+    await s.ctx.close()
+  }
+}
+
+// Issue 130: the Waiting card and list (Looks done, Late, This week, Later; Confirm, Nudge, By person), a row opening the task layer with the message and the reply, and the
+// WhatsApp link. Seeded here: Vivek with a phone and an email, an inbox for the owner (the site's fake Google records what is drafted), and five waiting tasks of his.
+const SEED130 = `import json
+from frappe.utils import add_days, today
+sp = "${SPACE}"
+for n in frappe.get_all("Life Task", filters={"title": ["like", "I130 %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+person = frappe.db.get_value("Life Person", {"space": sp, "full_name": "Vivek I130"})
+if not person:
+    person = frappe.get_doc({"doctype": "Life Person", "space": sp, "full_name": "Vivek I130", "kind": "Person", "email": "vivek130@example.com", "phone": "+91 98765 43210"}).insert(ignore_permissions=True).name
+made_mail = 0
+if not frappe.db.exists("Life Mail Account", {"space": sp, "user": "owner@lifeos.test"}):
+    frappe.get_doc({"doctype": "Life Mail Account", "space": sp, "user": "owner@lifeos.test", "provider": "gmail", "address": "owner@example.com", "label": "Personal", "is_default": 1}).insert(ignore_permissions=True)
+    made_mail = 1
+item = frappe.get_doc({"doctype": "Life Inbox Item", "space": sp, "title": "I130 Re: the ITR draft", "source_type": "Email", "raw_text": "Here is the ITR draft, attached.", "status": "Done", "sender": "vivek130@example.com"}).insert(ignore_permissions=True)
+def make(title, check, **extra):
+    return frappe.get_doc({"doctype": "Life Task", "space": sp, "title": title, "status": "Waiting", "waiting_on": "Vivek I130", "waiting_on_person": person, "check_by": check, "handed_off_how": "track", **extra}).insert(ignore_permissions=True).name
+ids = {
+    "late": make("I130 ITR draft", add_days(today(), -2), handed_off_how="draft", handed_off_channel="email", handed_off_ask="Vivek owes me the ITR draft by Friday", handed_off_message="ITR draft by Friday\\n\\nHi Vivek, could you send me the ITR draft by Friday? Thanks, Jai"),
+    "twice": make("I130 Tax papers", add_days(today(), -1), nudge_count=2, handed_off_how="draft", handed_off_channel="email", handed_off_message="Re: tax papers\\n\\nHi Vivek, a quick nudge on the tax papers."),
+    "looks": make("I130 Form 16", add_days(today(), 2), looks_done_item=item.name, looks_done_note="Vivek sent the Form 16"),
+    "week": make("I130 Bank letter", today()),
+    "later": make("I130 Audit file", add_days(today(), 30)),
+}
+doc = frappe.get_doc("Life Task", ids["twice"])
+doc.add_comment("Info", "A reply came in: I130 Re: the ITR draft")
+from lifeos.api import dashboard
+print(json.dumps({"ids": ids, "person": person, "item": item.name, "mail": made_mail, "needs": dashboard.needs_you("${SPACE}")["n"], "waiting": dashboard.waiting("${SPACE}")}))`
+const CLEAN130 = (made) => `for n in frappe.get_all("Life Task", filters={"title": ["like", "I130 %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Inbox Item", filters={"title": ["like", "I130 %"]}, pluck="name"): frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)
+frappe.db.delete("Life Agent Action", {"space": "${SPACE}", "agent": "lifeos-chat"})
+for n in frappe.get_all("Life Rule", filters={"action": "Route", "asks_to": "Close"}, pluck="name"): frappe.delete_doc("Life Rule", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "%I130"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+${made.mail ? 'for n in frappe.get_all("Life Mail Account", filters={"space": "' + SPACE + '", "user": "owner@lifeos.test"}, pluck="name"): frappe.delete_doc("Life Mail Account", n, force=1, ignore_permissions=True)' : ''}`
+
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const phone = width < 800
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  let seed = null
+  const dash = async (p) => { await s.open(p); await pg.locator('[data-dashboard] [data-dash-card]').first().waitFor({ timeout: 20000 }); await pg.waitForTimeout(400) }
+  const card = (key) => pg.locator(`[data-card="${key}"]`)
+  const row = (id) => pg.locator(`[data-waiting-row][data-task="${id}"]`)
+  try {
+    seed = JSON.parse(bench(SEED130).split('\n').pop())
+    await check('TODAY.73', `${width} px: the Waiting card shows the count, late and looks done; it opens the list grouped Looks done, Late, This week, Later; Confirm closes a looks-done row and Needs you drops by one; Nudge opens the draft; By person regroups`, async () => {
+      await dash('/life/today/week')
+      const w = seed.waiting
+      must((await card('waiting').locator('[data-dash-value]').innerText()).trim() === String(w.n), `the card says ${await card('waiting').locator('[data-dash-value]').innerText()}, the server ${w.n}`)
+      const parts = await card('waiting').locator('[data-dash-part]').allInnerTexts()
+      must(parts.includes(`${w.past} late`) && parts.includes(`${w.looks_done} looks done`), 'the card parts are ' + parts.join(' | '))
+      must(w.looks_done >= 1 && w.past >= 2, `seed: ${JSON.stringify(w)}`)
+      const before = Number((await card('needs').locator('[data-dash-value]').innerText()).trim())
+      must(before === seed.needs, `Needs you says ${before}, the server ${seed.needs}`)
+      await card('waiting').locator('[data-dash-value], [data-dash-open]').first().click()
+      const list = pg.locator('[data-list="waiting"]')
+      await list.locator('[data-waiting-row]').first().waitFor({ timeout: 15000 })
+      const order = await list.locator('[data-waiting-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-waiting-group')))
+      must(JSON.stringify(order) === JSON.stringify(['looks_done', 'late', 'week', 'later']), 'the groups are ' + order.join(', '))
+      must(!(await row(seed.ids.later).count()), 'Later is not folded')
+      await list.locator('[data-waiting-later-toggle]').click()
+      await row(seed.ids.later).waitFor({ timeout: 5000 })
+      must(await row(seed.ids.looks).locator('[data-waiting-confirm]').count() === 1 && await row(seed.ids.late).locator('[data-waiting-nudge]').count() === 1, 'Confirm or Nudge is missing on its row')
+      must((await row(seed.ids.twice).innerText()).includes('Nudged twice'), 'a row nudged twice does not say so')
+      must((await row(seed.ids.late).innerText()).includes('by email'), 'the row does not say how it went: ' + await row(seed.ids.late).innerText())
+      await row(seed.ids.looks).locator('[data-waiting-confirm]').click()
+      await row(seed.ids.looks).waitFor({ state: 'detached', timeout: 10000 })
+      const done = bench(`print(frappe.db.get_value("Life Task", "${seed.ids.looks}", ["status", "closed_by_item"]))`).split('\n').pop()
+      must(done.includes('Done') && done.includes(seed.item), 'the task is not Done by the reply: ' + done)
+      await row(seed.ids.late).locator('[data-waiting-nudge]').click()
+      await pg.waitForFunction((t) => new URL(location.href).searchParams.get('open') === `task:${t}`, seed.ids.late, { timeout: 15000 })
+      await pg.locator('[data-handoff-text-shown], [data-handoff-text]').first().waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-handoff-message]').innerText()).includes('nudge'), 'the nudge is not drafted: ' + await pg.locator('[data-handoff-message]').innerText())
+      must(await pg.locator('[data-handoff-send]').count() === 1, 'the draft has no Send')
+      const sent = bench(`print(frappe.db.count("Life Agent Action", {"space": "${SPACE}", "agent": "lifeos-chat", "action": "send_email"}))`).split('\n').pop()
+      must(sent === '1', 'the nudge drafted ' + sent + ' emails')
+      await pg.locator('[data-pane-back]').first().click()
+      await list.locator('[data-waiting-row]').first().waitFor({ timeout: 10000 })
+      await list.locator('[data-waiting-by-person]').click()
+      await pg.locator('[data-waiting-list][data-by="person"]').waitFor({ timeout: 5000 })
+      must((await pg.locator('[data-waiting-list]').innerText()).includes('Vivek I130'), 'By person has no section for Vivek')
+      await pg.keyboard.press('Escape')
+      await dash('/life/today/week')
+      must(Number((await card('needs').locator('[data-dash-value]').innerText()).trim()) === before - 1, 'Needs you did not drop by one')
+      must(!errors.length, 'script errors: ' + errors.join(' | '))
+    })
+
+    await check('TODAY.74', `${width} px: a row opens the task layer with what was asked, the message and the reply; Back returns to the list`, async () => {
+      await s.open(`/life/today/week?open=list:waiting`)
+      const list = pg.locator('[data-list="waiting"]')
+      await list.locator('[data-waiting-row]').first().waitFor({ timeout: 15000 })
+      await row(seed.ids.twice).locator('button[data-ref]').click()
+      await pg.waitForFunction((t) => new URL(location.href).searchParams.get('open') === `task:${t}`, seed.ids.twice, { timeout: 10000 })
+      await pg.locator('[data-handoff-card]').waitFor({ timeout: 10000 })
+      must((await pg.locator('[data-handoff-message]').innerText()).includes('quick nudge on the tax papers'), 'the message is not shown')
+      must((await pg.locator('[data-handoff-activity]').innerText()).includes('A reply came in'), 'the reply is not shown')
+      must(await pg.locator('[data-handoff-edit]').count() === 1 && await pg.locator('[data-handoff-discard]').count() === 1, 'the draft has no Edit or Discard')
+      must(await pg.locator('[data-task-handoff]').count() === 1, 'the task layer has no Hand off button')
+      await pg.locator('[data-pane-back]').first().click()
+      await pg.waitForFunction(() => new URL(location.href).searchParams.get('open') === 'list:waiting', null, { timeout: 10000 })
+      await pg.locator('[data-list="waiting"] [data-waiting-row]').first().waitFor({ timeout: 10000 })
+    })
+
+    await check('TODAY.75', `${width} px: the list and the task layer ${phone ? 'are full screen with Back' : 'open in the Drawer'}; the WhatsApp link has the phone and the text, URL-encoded`, async () => {
+      const text = 'Hi Vivek, could you send the ITR draft & Form 16 by Friday?'
+      bench(`t = frappe.get_doc("Life Task", "${seed.ids.week}")
+t.update({"handed_off_how": "draft", "handed_off_channel": "whatsapp", "handed_off_message": ${JSON.stringify(text)}})
+t.save()`)
+      await s.open(`/life/today/week?open=list:waiting`)
+      await pg.locator('[data-list="waiting"] [data-waiting-row]').first().waitFor({ timeout: 15000 })
+      if (phone) {
+        const box = await pg.locator('[data-drawer-host]').boundingBox()
+        must(box.width >= 388 && box.height >= 840, `the list is ${box.width} by ${box.height}`)
+        must(await pg.locator('[data-pane-back]').count() >= 1, 'the list has no Back')
+      }
+      await row(seed.ids.week).locator('button[data-ref]').click()
+      await pg.locator('[data-handoff-whatsapp]').waitFor({ timeout: 10000 })
+      const href = await pg.locator('[data-handoff-whatsapp]').getAttribute('data-href')
+      must(href === `https://wa.me/919876543210?text=${encodeURIComponent(text)}`, 'the link is ' + href)
+      must(await pg.locator('[data-handoff-send]').count() === 0, 'a WhatsApp draft has a Send')
+      if (phone) {
+        const box = await pg.locator('[data-drawer-host]').boundingBox()
+        must(box.width >= 388 && box.height >= 840, `the task layer is ${box.width} by ${box.height}`)
+        must(await pg.locator('[data-pane-back]').count() >= 1, 'the task layer has no Back')
+      }
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+    })
+  } finally {
+    bench(CLEAN130(seed || { mail: 0 }))
     await s.ctx.close()
   }
 }

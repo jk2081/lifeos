@@ -1,5 +1,5 @@
 <template>
-  <Drawer :open="!!goal" name="goal" :title="d?.title || 'Goal'" @close="emit('close')">
+  <SideSheet :open="!!goal" name="goal" :title="d?.title || 'Goal'" @close="emit('close')">
     <template #sub><span v-if="d" data-goal-drawer-sub>{{ subLine }}</span></template>
     <Skeleton v-if="!d" class="h-64 w-full" />
     <div v-else class="flex flex-col gap-4" data-goal-drawer :data-goal="d.goal">
@@ -61,14 +61,14 @@
       <span class="flex-1" />
       <Button v-if="d && !d.plan.skip" variant="solid" label="Save" data-goal-save @click="save" />
     </template>
-  </Drawer>
+  </SideSheet>
 </template>
 <script setup>
 // A goal opened from the Goals tab (board 32): its next action (or one of its other open tasks), when and how long, the
 // free slots that fit, who, what is needed, the top-three star, Skip this goal this week (with a reason) and Save.
 import { computed, reactive, ref, watch } from 'vue'
 import { Alert, Button, Checkbox, DateTimePicker, Dropdown, FormControl, Skeleton, TextInput } from 'frappe-ui'
-import Drawer from '@/components/ui/Drawer.vue'
+import SideSheet from '@/components/ui/SideSheet.vue'
 import DoneWhen from '@/components/goals/DoneWhen.vue'
 import SuggestedReadings from '@/components/goals/SuggestedReadings.vue'
 import { tryCall } from '@/lib/api'

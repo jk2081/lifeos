@@ -15,6 +15,7 @@
     <FormControl type="select" label="Delegated to" :model-value="task.delegated_to || ''" :options="peopleOptions" :disabled="!writable"
       data-task-delegated @update:model-value="(v) => save({ delegated_to: v || null })" />
   </div>
+  <HandOffCard v-if="task.status === 'Waiting' || task.handed_off_how" :task="name" :writable="writable" @changed="load" />
   <div><div class="mb-1.5 text-sm text-ink-gray-6">Filed under</div>
     <div class="flex flex-wrap items-center gap-2">
       <div class="contents" data-task-area><Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" /></div>
@@ -32,10 +33,12 @@
     <div>Created {{ short(task.creation, true) }}<span v-if="task.completed_on"> · closed {{ short(task.completed_on, true) }}</span></div>
   </div>
   <div v-if="writable || canRestore" class="flex flex-wrap items-center gap-2">
+    <Button v-if="writable && OPEN.includes(task.status)" label="Hand off" icon-left="lucide-user-round-check" data-task-handoff @click="handOpen = true" />
     <Button v-if="writable && OPEN.includes(task.status)" label="Carry to next month" icon-right="lucide-arrow-right" @click="carry" />
     <Button v-if="writable" label="Archive" @click="archive" />
     <Button v-if="canRestore && !isAgent" variant="ghost" theme="red" label="Delete" @click="remove" />
   </div>
+  <HandOffDialog v-if="writable" v-model="handOpen" :task="name" :space="task.space" :person="task.waiting_on_person || ''" @done="load" />
   </template>
   <template v-if="on('notes')">
     <div class="flex items-center gap-2 text-sm text-ink-gray-6"><span class="text-sm-medium text-ink-gray-7">Notes</span><span v-if="writable" data-save-state aria-live="polite">{{ notesState }}</span></div>
@@ -57,6 +60,8 @@ import { openRef } from '@/lib/pane'
 import { db, errorText, tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'
 import AreaGuess from '@/components/AreaGuess.vue'
+import HandOffCard from '@/components/item/HandOffCard.vue'
+import HandOffDialog from '@/components/item/HandOffDialog.vue'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { OPEN, PRIORITIES } from '@/lib/tasks'
@@ -67,6 +72,7 @@ const emit = defineEmits(['close', 'changed', 'meta', 'missing'])
 const task = ref(null)
 const askWaiting = ref(false)
 const waitInput = ref(null)
+const handOpen = ref(false)
 const links = ref([])
 // the pane's tabs: Details (all fields and filing), Notes, Links
 const on = (t) => !props.tab || props.tab === t
