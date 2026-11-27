@@ -24,7 +24,7 @@
       </div>
       <Card v-else flush class="!px-4">
         <template v-for="(r, i) in data.rows" :key="r.ref + i">
-          <WaitingRow v-if="r.task" :r="r" :active="i === active" @open="remember" @changed="load" />
+          <WaitingRow v-if="r.task && kind.startsWith('waiting')" :r="r" :active="i === active" @open="remember" @changed="load" />
           <Row v-else :pane="r.ref" :label="r.title" class="!items-center" :class="i === active && '!bg-surface-gray-2'" data-list-row :data-active="i === active || undefined"
             :data-ref="r.ref" @click.capture="remember(r)">
             <div class="min-w-0 flex-1">
