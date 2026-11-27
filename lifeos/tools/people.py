@@ -15,23 +15,18 @@ def add(name: str, email: str | None = None, company: str | None = None, link_to
 
 
 def _add(space: str, name: str, email: str | None = None, company: str | None = None, link_to: str | None = None) -> tuple[str, dict, dict | None]:
-	name = " ".join((name or "").split())
-	if not name:
-		frappe.throw(_("A person needs a name."), title=_("Person needs a name"))
 	page = permissions.get_doc_checked("Life Note", link_to, "write") if link_to else None
 	if page and page.space != space:
 		frappe.throw(_("That page is in another space."), title=_("Page is in another space"))
 	made, found_org = [], None
-	found = library.find(space, name)
-	if found:
-		person = frappe.get_doc("Life Person", found.name)
+	person, new = library.add(space, name, email=email)
+	if new:
+		made.append(("Life Person", person.name))
+	else:
 		found_org = person.organisation
 		if email and not person.email:
 			person.email = email
 			person.save()
-	else:
-		person = frappe.get_doc({"doctype": "Life Person", "space": space, "full_name": name[:140], "kind": "Person", "email": email or None}).insert()
-		made.append(("Life Person", person.name))
 	org = None
 	if company and company.strip():
 		org = library.find(space, company)

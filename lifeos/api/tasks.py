@@ -505,16 +505,6 @@ def open_loops_count(space):
 	return count_where([t.space == space, *open_loops_criteria(t)])
 
 
-@frappe.whitelist(methods=["GET"])
-def open_loops(space: str | None = None, start: int | str | None = 0, page_length: int | str | None = 50):
-	"""Open tasks older than 14 days with no due date."""
-	space = permissions.resolve_space(space)
-	start, page_length = page(start, page_length)
-	t = frappe.qb.DocType("Life Task")
-	rows = query(space, open_loops_criteria(t), [(t.creation, Order.asc)], start, page_length)
-	return {"tasks": rows, "total": open_loops_count(space), "today": today()}
-
-
 def stale_tasks(space, limit=50):
 	"""Open tasks not touched for `stale_task_days`. Never archived."""
 	days = frappe.db.get_single_value("Life Settings", "stale_task_days") or 90
@@ -628,14 +618,6 @@ def looks_done_not_yet(task: str):
 	from lifeos.tasks import handoff
 
 	return handoff.not_yet(task)
-
-
-@frappe.whitelist(methods=["GET"])
-def waiting_list(space: str | None = None):
-	"""Everything waited on, in the groups the Waiting list shows: looks_done, late, week, later."""
-	from lifeos.tasks import handoff
-
-	return handoff.waiting_list(permissions.resolve_space(space))
 
 
 @frappe.whitelist(methods=["GET"])

@@ -9,7 +9,8 @@ import frappe
 from frappe import _
 from frappe.query_builder import Order
 
-from lifeos.library import people as rules
+from lifeos.api import pages
+from lifeos.library import briefs, people as rules, subjects
 from lifeos import permissions
 from lifeos.api.timeline import index_where
 from lifeos.api.utils import count_by, descendants, list_query, names_map, page
@@ -37,9 +38,13 @@ def _terms(person) -> list[str]:
 	return [n for i, n in enumerate(names) if i == 0 or len(n) >= 3]
 
 
-def _mentions(space, person, limit=MENTION_CAP):
-	"""Where a person is mentioned, newest first: [{ref, doctype, name, kind, title, date, how}], and how many there are in all."""
+def _mentions(space, person, limit=MENTION_CAP, linked=()):
+	"""Where a person is mentioned, newest first: [{ref, doctype, name, kind, title, date, how}], and how many there are in all. `linked` is what the
+	Brain or the owner linked to them (`subjects.timeline`): those count as mentions too."""
 	found = {}
+	for e in linked:
+		found[(e["doctype"], e["name"])] = {"doctype": e["doctype"], "name": e["name"], "kind": e["kind"], "title": e["title"] or "Untitled", "date": e["date"], "at": e["date"],
+			"how": None, "ref": e["ref"]}
 	terms = _terms(person)
 	if terms:
 		pat = _pattern(terms)
@@ -123,14 +128,20 @@ def _text(person):
 @frappe.whitelist(methods=["GET"])
 def get(name: str):
 	"""One person or organisation: who they are (the wiki page's text), their organisation or its people, and Mentioned in: captures,
-	notes, tasks (also those waiting on them or delegated to them), meetings and chats, newest first (at most 100; `mentioned_total` is all)."""
+	notes, tasks (also those waiting on them or delegated to them), meetings and chats, newest first (at most 100; `mentioned_total` is all).
+	The Library's page and the Drawer's layer both read this: the Drawer also shows `brief` (the Brain's, or null), `open` (linked open tasks and
+	upcoming events), `related` (the organisation, its people, or people often with them, each with `why`), `email`, `phone` and `path`."""
 	doc = permissions.get_doc_checked("Life Person", name, "read")
 	p = doc.as_dict()
 	who = _text(p)
-	mentioned, total = _mentions(doc.space, p)
+	mentioned, total = _mentions(doc.space, p, linked=[e for e in subjects.timeline("Life Person", doc.name)[0] if e.get("ref")])
 	org = frappe.db.get_value("Life Person", doc.organisation, ["name", "full_name"], as_dict=True) if doc.organisation else None
 	members = frappe.get_list("Life Person", filters={"space": doc.space, "organisation": doc.name}, fields=["name", "full_name", "role", "relation"], order_by="full_name asc", limit=500)
+	linked = pages.linked_items("Life Person", doc.name)
+	brief = briefs.read("Life Person", doc.name)
 	return {"name": doc.name, "space": doc.space, "kind": doc.kind or "Person", "title": doc.full_name, "role": doc.role or doc.relation,
+		"email": doc.email, "phone": doc.phone, "path": pages.area_path(doc.area), "brief": brief["md"] if brief else None,
+		"open": pages.open_work("Life Person", doc, linked), "related": pages.related_people("Life Person", doc, linked),
 		"aliases": split_aliases(doc.aliases), "area": doc.area, "area_name": frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None,
 		"organisation": org, "people": [{"name": m.name, "title": m.full_name, "role": m.role or m.relation} for m in members],
 		"wiki": who["page"], "text": who["text"], "mentioned": [{k: v for k, v in r.items() if k != "at"} for r in mentioned], "mentioned_total": total}

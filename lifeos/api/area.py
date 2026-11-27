@@ -7,13 +7,6 @@ from lifeos.api import tasks as task_api
 from lifeos.api.utils import count_by, flag
 
 
-def chat_open_counts(names):
-	if not names:
-		return {}
-	o = frappe.qb.DocType("Life Chat Open Item")
-	return count_by("Life Chat Open Item", "parent", [o.parenttype == "Life Chat Log", o.status == "Open", o.parent.isin(names)])
-
-
 @frappe.whitelist(methods=["GET"])
 def tree(space: str | None = None, include_archived: bool | int = 0, include_off: bool | int = 0):
 	"""Every area of a space with its parent and small counts, for the Areas screen and for pickers: each of the seven areas of

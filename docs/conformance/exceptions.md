@@ -6,34 +6,36 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | Rule | Exceptions |
 | --- | --- |
-| frappe-manual-commit | 15 |
+| frappe-manual-commit | 17 |
 | frappe-missing-translate-function-python | 1 |
 | frappe-security-file-traversal | 9 |
-| frappe-setuser | 17 |
+| frappe-setuser | 14 |
 | frappe-sql-format-injection | 1 |
 | guest-whitelisted-method | 1 |
 | whitelisted-side-effect-on-get | 1 |
-| Total | 45 |
+| Total | 44 |
 
 ## frappe-manual-commit
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/connections.py` | 490 | Frappe's return address is a GET and rolls back at its end; the card must keep what the provider said |
+| `lifeos/api/connections.py` | 479 | Frappe's return address is a GET and rolls back at its end; the card must keep what the provider said |
 | `lifeos/brain/chat_import.py` | 221 | long background job: progress is saved every 25 conversations |
-| `lifeos/install.py` | 82 | after_install: the spaces and index DDL must be kept before install-app goes on |
-| `lifeos/install.py` | 171 | a bench execute command: the user and the space are kept when it ends |
+| `lifeos/install.py` | 78 | after_install: the spaces and index DDL must be kept before install-app goes on |
+| `lifeos/install.py` | 167 | a bench execute command: the user and the space are kept when it ends |
 | `lifeos/skills/__init__.py` | 20 | bench execute: keep the examples' last result |
-| `lifeos/tests/test_settings.py` | 997 | the runner under test commits, so the test cleans up with a commit |
+| `lifeos/tests/test_updater.py` | 29 | the runner under test commits, so the test cleans up with a commit |
+| `lifeos/tests/test_updater.py` | 295 | the backup reads what is committed, and the restore replaces the tables |
+| `lifeos/tests/test_updater.py` | 301 | written after the backup, so the restore must take it away |
 | `lifeos/tools/loadtest.py` | 116 | load test: 100,000 seeded rows are committed so the timed reads see them as a real site would |
 | `lifeos/tools/loadtest.py` | 262 | load test: the seeded sources and wiki pages are committed so the timed reads see them as a real site would |
 | `lifeos/tools/loadtest.py` | 321 | load test: its removal must stick even when run inside a test |
 | `lifeos/tools/tidy.py` | 125 | bench execute run: the copies are removed only after the rows that used them are saved |
-| `lifeos/updater/runner.py` | 54 | the runner is a background process: each step's outcome is saved at once |
-| `lifeos/updater/runner.py` | 71 | the runner is a background process: each step's outcome is saved at once |
-| `lifeos/updater/runner.py` | 92 | the runner is a background process: each step's outcome is saved at once |
-| `lifeos/updater/runner.py` | 185 | the runner is a background process: each step's outcome is saved at once |
-| `lifeos/updater/runner.py` | 297 | the runner is a background process: a fresh view of the table |
+| `lifeos/updater/runner.py` | 52 | the runner is a background process: each step's outcome is saved at once |
+| `lifeos/updater/runner.py` | 69 | the runner is a background process: each step's outcome is saved at once |
+| `lifeos/updater/runner.py` | 90 | the runner is a background process: each step's outcome is saved at once |
+| `lifeos/updater/runner.py` | 210 | the runner is a background process: each step's outcome is saved at once |
+| `lifeos/updater/runner.py` | 346 | the runner is a background process: a fresh view of the table |
 
 ## frappe-missing-translate-function-python
 
@@ -65,9 +67,6 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 | `lifeos/tools/demo.py` | 104 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/tools/demo.py` | 261 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/tools/demo.py` | 265 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/tools/demo.py` | 333 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/tools/demo.py` | 347 | demo data: records are made through the API as the owner and the agent would make them |
-| `lifeos/tools/demo.py` | 363 | demo data: records are made through the API as the owner and the agent would make them |
 | `lifeos/tools/devtools_review.py` | 20 | development tool on the acceptance site: the owner-shaped data is made as the owner |
 | `lifeos/tools/loadtest.py` | 46 | load test: reads are timed as a member of the space, the way a request runs |
 | `lifeos/tools/loadtest.py` | 138 | load test: reads are timed as a member of the space, the way a request runs |
@@ -87,10 +86,10 @@ This list is written from those comments by `python3 tools/scan_exceptions.py`; 
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/connections.py` | 470 | the same door as Frappe's own callback, which sends a guest to log in |
+| `lifeos/api/connections.py` | 459 | the same door as Frappe's own callback, which sends a guest to log in |
 
 ## whitelisted-side-effect-on-get
 
 | File | Line | Reason |
 | --- | --- | --- |
-| `lifeos/api/connections.py` | 490 | Frappe's return address is a GET and rolls back at its end; the card must keep what the provider said |
+| `lifeos/api/connections.py` | 479 | Frappe's return address is a GET and rolls back at its end; the card must keep what the provider said |

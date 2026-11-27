@@ -6,7 +6,6 @@ import { api, errorText } from './api'
 import { recordChanged } from './pane'
 
 export const UNDO_MS = 60000
-export const TYPE_LABEL = { 'Life Task': 'Task', 'Life Goal': 'Goal', 'Life Note': 'Note' }
 export const REF_TYPE = { 'Life Task': 'task', 'Life Goal': 'goal', 'Life Note': 'note' }
 
 function changed(doctype, name) {

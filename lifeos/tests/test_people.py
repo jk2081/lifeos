@@ -1,8 +1,8 @@
 """Tests for people."""
 import frappe
 
-from lifeos.library import people
-from lifeos.api import people as people_api, tasks, wiki
+from lifeos.library import people, subjects
+from lifeos.api import people as people_api, tasks, tools as tools_api, vault, wiki
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, PRIVATE
 from lifeos.tests.helpers import task
 
@@ -149,3 +149,35 @@ class TestPeople(LifeTestCase):
 		hit = people_api.options(space=PRIVATE, q="P54")
 		self.assertEqual([r["label"] for r in hit["rows"]], ["i136 P54"])  # past the first 50, found by typing
 		self.assertEqual(people_api.options(space=PRIVATE, include=frappe.db.get_value("Life Person", {"full_name": "i136 P54", "space": PRIVATE}))["rows"][-1]["label"], "i136 P54")
+
+	def test_12_the_vault_adds_a_person_through_the_same_check_as_the_tool(self):
+		a = vault.add_person(space=PRIVATE, full_name="i142 Meera Shah", relation="Wife")
+		again = vault.add_person(space=PRIVATE, full_name="  i142 MEERA   shah ")  # any case, any spacing
+		self.assertEqual(again["name"], a["name"])
+		self.assertEqual(frappe.db.count("Life Person", {"space": PRIVATE, "full_name": ("like", "i142 %")}), 1)
+		out = tools_api.people_add("i142 meera shah", space=PRIVATE, asked_by="owner", owner_message="add Meera")
+		self.assertEqual(out["person"], a["name"])  # the tool finds the person the Vault added, and the Vault one the tool added
+		made = tools_api.people_add("i142 Dev Rao", space=PRIVATE, asked_by="owner", owner_message="add Dev")["person"]
+		self.assertEqual(vault.add_person(space=PRIVATE, full_name="i142 Dev Rao")["name"], made)
+		self.assertRaises(frappe.ValidationError, vault.add_person, space=PRIVATE, full_name=" ")
+
+	def test_13_one_method_returns_what_the_library_page_and_the_drawer_both_show(self):
+		org = self.make("Life Person", full_name="i142 Acme", kind="Organisation").name
+		asha = self.make("Life Person", full_name="i142 Asha", organisation=org, role="Buyer", email="asha@example.com", phone="555", aliases="Ashu").name
+		self.make("Life Person", full_name="i142 Ravi", organisation=org, role="Sales")
+		t = self.make("Life Task", title="i142 chase quote", status="Waiting", waiting_on="Asha", waiting_on_person=asha).name
+		linked = self.make("Life Note", title="i142 linked note", content_md="nothing in it that names anyone")
+		subjects.link(PRIVATE, "Life Note", linked.name, "Life Person", asha)
+		page = people_api.get(asha)
+		# the Library's page
+		self.assertEqual((page["title"], page["kind"], page["role"], page["aliases"], page["organisation"]["name"]), ("i142 Asha", "Person", "Buyer", ["Ashu"], org))
+		self.assertIn("task:" + t, [m["ref"] for m in page["mentioned"]])
+		self.assertIn("note:" + linked.name, [m["ref"] for m in page["mentioned"]])  # what was linked to them counts as a mention
+		# the Drawer's layer
+		self.assertEqual((page["email"], page["phone"]), ("asha@example.com", "555"))
+		self.assertIsNone(page["brief"])
+		self.assertIn(t, [x["name"] for x in page["open"]["tasks"]])
+		self.assertEqual(page["related"][0]["name"], org)  # their organisation first
+		company = people_api.get(org)
+		self.assertEqual({p["name"] for p in company["related"]}, {asha, frappe.db.get_value("Life Person", {"full_name": "i142 Ravi"})})
+		self.assertEqual([p["name"] for p in company["people"]], [p["name"] for p in company["related"]])

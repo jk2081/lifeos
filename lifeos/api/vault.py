@@ -8,6 +8,7 @@ from frappe.query_builder import functions as fn
 from frappe.utils import add_days, getdate, today
 
 from lifeos import permissions
+from lifeos.library import people as people_rules
 from lifeos.api.utils import (area_criterion, count_tabs, count_where, extra_fields, filter_criteria, flag, group_summary, list_query, names_map, null_last, order_terms,
 	page, parse, sort_terms)
 
@@ -175,5 +176,5 @@ def set_file(document: str, file_url: str):
 def add_person(space: str | None = None, full_name: str | None = None, relation: str | None = None):
 	"""Add a person, for example a document holder."""
 	space = permissions.resolve_space(space, write=True)
-	doc = frappe.get_doc({"doctype": "Life Person", "space": space, "full_name": full_name, "relation": relation}).insert()
+	doc, _new = people_rules.add(space, full_name, relation=relation)
 	return {"name": doc.name, "full_name": doc.full_name}

@@ -41,10 +41,6 @@ FILE_FIELDS = [
 USER_FIELDS = [{"fieldname": "preferred_name", "label": "Preferred Name", "fieldtype": "Data", "insert_after": "last_name", "no_copy": 1}]
 
 
-def make_file_fields():
-	create_custom_fields({"File": FILE_FIELDS}, ignore_validate=True)
-
-
 def after_install():
 	setup()
 
@@ -187,11 +183,3 @@ def add_member(space, user, access="Write", role="Life User"):
 		doc.append("members", {"user": user, "access": access})
 	doc.save(ignore_permissions=True)  # system: install runs before any person has roles
 
-
-def make_personal_space(user, space_name=None):
-	"""Create a private space for a family member. Like every new space it gets the seven areas of life (issue 11)."""
-	from lifeos.tools import seed
-	space_name = space_name or f"{frappe.db.get_value('User', user, 'first_name') or user}'s space"
-	doc = frappe.get_doc({"doctype": "Life Space", "space_name": space_name, "owner_user": user,
-		"members": [{"user": user, "access": "Write"}]}).insert(ignore_permissions=True)  # system: install runs before any person has roles
-	return doc.name

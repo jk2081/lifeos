@@ -29,7 +29,7 @@ def _check(doctype: str, name: str, ptype: str = "read"):
 	return permissions.get_doc_checked(doctype, name, ptype)
 
 
-def _area_path(area: str | None) -> str | None:
+def area_path(area: str | None) -> str | None:
 	"""Career › BTW"""
 	names = []
 	while area and len(names) < 4:
@@ -50,21 +50,21 @@ def _header(doctype: str, doc) -> dict:
 	h = {"doctype": doctype, "name": doc.name, "space": doc.space, "kind": kind, "kind_label": {"company": "Company", "person": "Person", "part": "Part", "note": "Page"}[kind]}
 	if doctype == "Life Person":
 		h.update(title=doc.full_name, status=doc.status if doc.kind == "Organisation" else None, role=doc.role or doc.relation, email=doc.email, phone=doc.phone, aliases=subjects.split_aliases(doc.aliases),
-			area=doc.area, path=_area_path(doc.area), organisation={"name": doc.organisation, "title": frappe.db.get_value("Life Person", doc.organisation, "full_name")} if doc.organisation else None,
+			area=doc.area, path=area_path(doc.area), organisation={"name": doc.organisation, "title": frappe.db.get_value("Life Person", doc.organisation, "full_name")} if doc.organisation else None,
 			is_archived=bool(doc.is_archived))
 	elif doctype == "Life Area":
-		h.update(title=doc.area_name, status=None, aliases=[], area=doc.name, path=_area_path(doc.name), is_archived=bool(doc.is_archived))
+		h.update(title=doc.area_name, status=None, aliases=[], area=doc.name, path=area_path(doc.name), is_archived=bool(doc.is_archived))
 	else:
-		h.update(title=doc.title, status=None, aliases=[], area=doc.area, path=_area_path(doc.area), is_archived=bool(doc.is_archived))
+		h.update(title=doc.title, status=None, aliases=[], area=doc.area, path=area_path(doc.area), is_archived=bool(doc.is_archived))
 	return h
 
 
-def _linked_items(doctype: str, name: str) -> list:
+def linked_items(doctype: str, name: str) -> list:
 	"""(doctype, name) of every record linked to the page."""
 	return [(r.from_doctype, r.from_name) for r in subjects.links_to(doctype, name)]
 
 
-def _open(doctype: str, doc, linked: list) -> dict:
+def open_work(doctype: str, doc, linked: list) -> dict:
 	"""What is open: linked open tasks (and those of an email linked to it, waiting on or delegated to the person, or in the part), upcoming events and Needs you."""
 	task_names, item_names = set(), set()
 	for dt, n in linked:
@@ -101,7 +101,7 @@ def _open(doctype: str, doc, linked: list) -> dict:
 		"needs_you": [{"name": p.name, "item": p.inbox_item, "title": p.preview or p.kind, "kind": p.kind} for p in needs]}
 
 
-def _people(doctype: str, doc, linked: list) -> list:
+def related_people(doctype: str, doc, linked: list) -> list:
 	rows = []
 	if doctype == "Life Person" and doc.kind == "Organisation":
 		rows = frappe.get_list("Life Person", filters={"space": doc.space, "organisation": doc.name, "is_archived": 0}, fields=["name", "full_name", "role", "relation", "email"], order_by="full_name asc", limit=50)
@@ -165,10 +165,10 @@ def get(doctype: str, name: str):
 	if doctype == "Life Note":
 		out["note"] = {"text": doc.content_md or "", "collection": doc.collection, "summary": doc.summary}
 		return out
-	linked = _linked_items(doctype, name)
+	linked = linked_items(doctype, name)
 	line, total = subjects.timeline(doctype, name)
 	brief = briefs.read(doctype, name)
-	out.update(brief=({**brief, "n_sources": len(brief["sources"])} if brief else None), open=_open(doctype, doc, linked), people=_people(doctype, doc, linked),
+	out.update(brief=({**brief, "n_sources": len(brief["sources"])} if brief else None), open=open_work(doctype, doc, linked), people=related_people(doctype, doc, linked),
 		files=_files(linked, doctype, name), timeline=line, timeline_total=total, notes=_notes(doctype, name), can_rewrite=bool(line))
 	return out
 
@@ -183,13 +183,13 @@ def index(space: str | None = None, kind: str | None = None, status: str | None 
 	rows = []
 	for p in frappe.get_list("Life Person", filters={"space": space, "is_archived": 0}, fields=["name", "full_name", "kind", "status", "area", "modified", "organisation"], limit=2000):
 		rows.append({"doctype": "Life Person", "name": p.name, "title": p.full_name, "kind": "company" if p.kind == "Organisation" else "person", "status": p.status if p.kind == "Organisation" else None,
-			"path": _area_path(p.area), "updated": str(p.modified)})
+			"path": area_path(p.area), "updated": str(p.modified)})
 	for a in frappe.get_list("Life Area", filters={"space": space, "is_archived": 0, "is_focus": 0, "is_life_area": 0, "parent_area": ("is", "set")}, fields=["name", "area_name", "parent_area", "modified"], limit=2000):
-		rows.append({"doctype": "Life Area", "name": a.name, "title": a.area_name, "kind": "part", "status": None, "path": _area_path(a.parent_area), "updated": str(a.modified)})
+		rows.append({"doctype": "Life Area", "name": a.name, "title": a.area_name, "kind": "part", "status": None, "path": area_path(a.parent_area), "updated": str(a.modified)})
 	linked_notes = set(frappe.get_all("Life Person", filters={"space": space, "wiki_page": ("is", "set")}, pluck="wiki_page", limit=5000))  # system: the space's linked wiki pages, only to leave them out of the list; the list itself is read with permissions
 	for n in frappe.get_list("Life Note", filters={"space": space, "is_archived": 0, "collection": "Wiki", "person": ("is", "not set")}, fields=["name", "title", "area", "modified"], limit=2000):
 		if n.name not in linked_notes:
-			rows.append({"doctype": "Life Note", "name": n.name, "title": n.title, "kind": "note", "status": None, "path": _area_path(n.area), "updated": str(n.modified)})
+			rows.append({"doctype": "Life Note", "name": n.name, "title": n.title, "kind": "note", "status": None, "path": area_path(n.area), "updated": str(n.modified)})
 	counts = {k: sum(1 for r in rows if r["kind"] == k) for k in KINDS}
 	if kind in KINDS:
 		rows = [r for r in rows if r["kind"] == kind]

@@ -156,21 +156,10 @@ export function canonical(query = {}, spec = [], keep = []) {
 }
 
 // ---- presets shared by the screens ----
-const addDays = (iso, n) => {
-  const [y, m, d] = iso.split('-').map(Number)
-  const date = new Date(Date.UTC(y, m - 1, d + n))
-  return date.toISOString().slice(0, 10)
-}
 export const DUE_PRESETS = {
   overdue: (today) => ['due_date', '<', today],
   today: (today) => ['due_date', '=', today],
   'today,overdue': (today) => ['due_date', '<=', today],
   week: () => ['due_date', 'timespan', 'this week'],
   none: () => ['due_date', 'is', 'not set'],
-}
-export const EXPIRY_PRESETS = {
-  expired: (today) => ['expiry_date', '<', today],
-  soon: (today) => ['expiry_date', 'between', [today, addDays(today, 60)]],
-  later: (today) => ['expiry_date', '>', addDays(today, 60)],
-  none: () => ['expiry_date', 'is', 'not set'],
 }

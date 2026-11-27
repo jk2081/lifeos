@@ -103,13 +103,13 @@ class TestTasks(LifeTestCase):
 		self.assertRaises(frappe.ValidationError, tasks.carry_forward, t.name)  # already carried
 
 	def test_open_loops(self):
-		before = tasks.open_loops(space=PRIVATE)["total"]
+		before = today_api.get(space=PRIVATE)["open_loops"]
 		old = self.make("Life Task", title="Old loop")
 		frappe.db.set_value("Life Task", old.name, "creation", add_to_date(now_datetime(), days=-15), update_modified=False)
 		recent = self.make("Life Task", title="Recent, no date")
 		dated = self.make("Life Task", title="Old with date", due_date=add_days(today(), 3))
 		frappe.db.set_value("Life Task", dated.name, "creation", add_to_date(now_datetime(), days=-30), update_modified=False)
-		res = tasks.open_loops(space=PRIVATE)
+		res = tasks.list(space=PRIVATE, loops=1)
 		names = [t["name"] for t in res["tasks"]]
 		self.assertEqual(res["total"], before + 1)
 		self.assertIn(old.name, names)
@@ -665,7 +665,7 @@ class TestListFilters(LifeTestCase):
 		old = self.make("Life Task", title="ux1 loop", goal=goal.name, area=self.areas["Tea"])
 		frappe.db.set_value("Life Task", old.name, "creation", add_days(today(), -30), update_modified=False)
 		self.assertEqual(self.names(get(loops=1)["tasks"]), {old.name})
-		self.assertEqual(tasks.list(space=PRIVATE, loops=1)["total"], tasks.open_loops(space=PRIVATE)["total"])
+		self.assertEqual(tasks.list(space=PRIVATE, loops=1)["total"], today_api.get(space=PRIVATE)["open_loops"])
 
 	def test_area_filter_takes_sub_areas(self):
 		career = self.life["Career"]  # issue 11: an area of life with its parts

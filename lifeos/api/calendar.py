@@ -1,5 +1,4 @@
 """The calendar screen: core Event records, important dates, task due dates and vault expiry dates, merged."""
-import calendar as pycal
 from datetime import date, timedelta
 
 import frappe

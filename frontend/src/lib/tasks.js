@@ -1,4 +1,4 @@
-import { diffDays, short, startOfWeek, addDays } from './dates'
+import { diffDays, short } from './dates'
 
 export const PRIORITIES = ['I', 'II', 'III', 'IV']
 export const OPEN = ['Open', 'Doing', 'Waiting']
@@ -32,19 +32,4 @@ export function taskMeta(t, today, { withDue = false } = {}) {
   return parts.join(' · ')
 }
 
-export function groupByDue(tasks, today) {
-  const weekEnd = addDays(startOfWeek(today), 6)
-  const groups = [['Overdue', []], ['Today', []], ['This week', []], ['Later', []], ['No date', []]]
-  for (const t of tasks) {
-    const d = t.due_date
-    const i = !d ? 4 : d < today ? 0 : d === today ? 1 : d <= weekEnd ? 2 : 3
-    groups[i][1].push(t)
-  }
-  return groups.filter(([, list]) => list.length).map(([label, list]) => ({ label, tasks: list }))
-}
-
-export const VAULT_TYPES = ['ID', 'Travel', 'Insurance', 'Property', 'Tax', 'Medical', 'Other']
 export { plural } from './plural'
-// "4 of 10 tasks done" leads to the tasks of the goal with Show done on. Archived ones are counted, so they are listed too.
-// "x of y tasks done" counts every task of the goal but the carried ones: the All tab with that one condition
-export const doneLink = (g) => ({ path: '/goals/tasks', query: { goal: g.name, archived: '1', f: JSON.stringify([['status', '!=', 'Carried']]) } })

@@ -1,11 +1,7 @@
 """Insights for the screens (UX fixes, set 5): the Ask page's Insights tab, Today's Next list and rail. People only."""
-import json
-from datetime import date
-
 import frappe
 from frappe import _
 from frappe.query_builder import Order
-from frappe.utils import add_days, getdate, today
 
 from lifeos.review import insights as rules
 from lifeos import permissions
@@ -143,13 +139,3 @@ def act(insight: str, index: int | str = 0):
 	doc.status = "Acted"
 	doc.save()
 	return out
-
-
-@frappe.whitelist(methods=["GET"])
-def summary(space: str | None = None):
-	"""Today's use: actionable New insights for Next, and the rest in one line for the rail."""
-	_person()
-	space = permissions.resolve_space(space)
-	act_rows = list(space=space, status="New", actionable=1, page_length=20)
-	rest = list(space=space, status="New", actionable=0, page_length=5)
-	return {"actionable": act_rows["rows"], "actionable_total": act_rows["total"], "other": rest["rows"], "other_total": rest["total"]}

@@ -556,7 +556,7 @@ class TestOnlyText(LessonCase):
 	def test_the_lessons_api_takes_no_settings(self):
 		import inspect
 
-		for fn in (lessons_api.accept, lessons_api.edit, lessons_api.reject, lessons_api.remove):
+		for fn in (lessons_api.accept, lessons_api.reject, lessons_api.remove):
 			self.assertLessEqual(set(inspect.signature(fn.__wrapped__ if hasattr(fn, "__wrapped__") else fn).parameters), {"lesson", "text"})
 
 

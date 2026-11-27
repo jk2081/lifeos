@@ -10,7 +10,7 @@ import re
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, getdate, now_datetime, nowdate
+from frappe.utils import add_days, cint, now_datetime, nowdate
 
 from lifeos.life.doctype.life_person.life_person import split_aliases
 
@@ -26,10 +26,6 @@ def settings() -> tuple[int, int]:
 	"""(how many sightings, within how many days) make a new sender worth proposing: defaults from Settings."""
 	s = frappe.get_cached_doc("Life Settings")
 	return cint(s.get("subject_seen_count")) or 3, cint(s.get("subject_seen_days")) or 30
-
-
-def is_part(area) -> bool:
-	return bool(area.parent_area) and not area.is_life_area and not area.is_focus
 
 
 def kind_of_subject(doctype: str, name: str) -> str:

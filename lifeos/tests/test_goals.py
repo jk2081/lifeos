@@ -112,7 +112,7 @@ class TestCycles(JournalCase):
 		cycle, (g1, g2) = self.make_cycle(start=add_days(today(), -90), status="Active", goals=[("One", [("A", 1)]), ("Two", [("B", 1)])])
 		for week in range(1, 13):
 			goals.tick(g1.actions[0].name, week, 1)
-		out = goals.close_cycle(cycle.name, outcomes=[{"goal": g1.name, "outcome": "Achieved", "result_note": "Did it"},
+		out = rules.close_cycle(cycle.name, outcomes=[{"goal": g1.name, "outcome": "Achieved", "result_note": "Did it"},
 			{"goal": g2.name, "outcome": "Not Achieved"}])
 		self.assertEqual(out["final_score"], 50.0)
 		cycle.reload()
@@ -128,11 +128,11 @@ class TestCycles(JournalCase):
 		cycle.title = "Changed"
 		self.assertRaises(frappe.ValidationError, cycle.save)
 		self.assertRaises(frappe.ValidationError, goals.save_goal, cycle=cycle.name, title="Late goal")
-		self.assertRaises(frappe.ValidationError, goals.close_cycle, cycle.name)
+		self.assertRaises(frappe.ValidationError, rules.close_cycle, cycle.name)
 
 	def test_cannot_close_before_the_end_date(self):
 		cycle, _ = self.make_cycle(status="Active", goals=[("One", [("A", 1)])])
-		self.assertRaises(frappe.ValidationError, goals.close_cycle, cycle.name)
+		self.assertRaises(frappe.ValidationError, rules.close_cycle, cycle.name)
 
 	def test_plan_next_cycle_copies_only_chosen_goals_with_open_actions(self):
 		cycle, (keep, leave) = self.make_cycle(start="2026-10-05", status="Active", goals=[
@@ -158,13 +158,13 @@ class TestCycles(JournalCase):
 		for week in (1, 2, 3):
 			goals.tick(g1.actions[0].name, week, 1)
 		n2 = goals.plan_next_cycle(c1.name, goals=[g1.name])
-		goals.close_cycle(c1.name, outcomes=[{"goal": g1.name, "outcome": "Carried"}])
+		rules.close_cycle(c1.name, outcomes=[{"goal": g1.name, "outcome": "Carried"}])
 		goals.start_cycle(n2["cycle"])
 		g2 = frappe.get_doc("Life Goal", n2["carried"][0])
 		for week in range(1, 7):
 			goals.tick(g2.actions[0].name, week, 1)
 		n3 = goals.plan_next_cycle(n2["cycle"], goals=[g2.name])
-		goals.close_cycle(n2["cycle"], outcomes=[{"goal": g2.name, "outcome": "Carried"}])
+		rules.close_cycle(n2["cycle"], outcomes=[{"goal": g2.name, "outcome": "Carried"}])
 		g3 = n3["carried"][0]
 		for start_from in (g1.name, g2.name, g3):
 			history = goals.detail(start_from)["history"]
@@ -175,7 +175,7 @@ class TestCycles(JournalCase):
 	def test_goals_tab_groups_by_cycle(self):
 		frappe.flags.lifeos_allow_early_close = True
 		old, _ = self.make_cycle(start="2025-07-07", status="Active", title="Old", goals=[("Old goal", [("A", 1)])])
-		goals.close_cycle(old.name)
+		rules.close_cycle(old.name)
 		active, (ag,) = self.make_cycle(status="Active", title="Now", goals=[("Now goal", [("A", 1)])])
 		goals.plan_next_cycle(active.name, goals=[ag.name])
 		data = goals.across_cycles(space=PRIVATE)

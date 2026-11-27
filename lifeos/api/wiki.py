@@ -63,10 +63,6 @@ def _page_doc(name, ptype="read"):
 	return doc
 
 
-def _require_wiki_writer(space):
-	permissions.require_space(space, write=True)
-
-
 def ensure_rules(space):
 	"""The one rules page of a space, made with the starter text the first time anyone opens the Wiki or asks for it."""
 	name = frappe.db.get_value("Life Note", {"space": space, "is_rules": 1})

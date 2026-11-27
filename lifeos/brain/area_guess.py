@@ -206,20 +206,3 @@ def confirm(doc, area=None):
 	doc.save()
 	return doc
 
-
-def fill_missing():
-	"""The patch's work: give every task without an area a guessed one, by steps 1 to 3 and 5 (no model call). Writes the
-	fields directly (no `modified` change) and refreshes each task's index row. Returns how many were filled."""
-	from lifeos.library import index
-
-	filled = 0
-	for name in frappe.get_all("Life Task", filters={"area": ("is", "not set")}, pluck="name", limit=0):
-		doc = frappe.get_doc("Life Task", name)
-		found = apply(doc)
-		if not found:
-			continue
-		frappe.db.set_value("Life Task", name, {"area": doc.area, "area_guessed": 1, "area_confidence": doc.area_confidence},
-			update_modified=False)
-		index.update(doc)
-		filled += 1
-	return filled

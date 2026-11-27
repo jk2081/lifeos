@@ -12,15 +12,13 @@ from frappe import _
 from frappe.query_builder import Field
 from frappe.query_builder import functions as fn
 from pypika.terms import Function
-from frappe.utils import add_days, add_to_date, cint, flt, getdate, today
+from frappe.utils import add_days, cint, flt, getdate, today
 
 from lifeos import permissions
 from lifeos.api import brain as brain_api
 from lifeos.api import goals as goals_api
 from lifeos.api import rules as rules_api
 from lifeos.api.utils import names_map
-from lifeos.brain import asks, rules as rules_engine
-from lifeos.calendar import calendar_data
 from lifeos.goals import areas, cycles, habits as habit_rules, readings, year_plan
 
 VIEWS = ("day", "week", "month", "year")
@@ -172,13 +170,6 @@ def tasks_done(space, start, end):
 	return int(q.run()[0][0] or 0)
 
 
-def done_by_month(space, year):
-	t = frappe.qb.DocType("Life Task")
-	rows = (frappe.qb.get_query("Life Task", fields=[MONTH(t.completed_on), fn.Count("*")], ignore_permissions=False)
-		.where((t.space == space) & (t.status == "Done") & (t.completed_on >= f"{year}-01-01") & (t.completed_on <= f"{year}-12-31")).groupby(MONTH(t.completed_on)).run())
-	return {int(m): int(n) for m, n in rows}
-
-
 def most_active(space, start, end, limit=5):
 	"""The people and companies with the most links made in the period, each with what happened ("6 emails · 2 tasks"). One query for the links,
 	one for the kinds of the inbox items among them."""
@@ -229,7 +220,7 @@ def _shown(rows, space):
 	return [r for r in rows if r.get("area") not in hidden]
 
 
-def goal_rows(space, now, horizon_filter=None, limit=60):
+def goal_rows(space, now, limit=60):
 	"""Each active goal as a bar: percent, and `behind` when it is behind its time and its date is close."""
 	filters = {"space": space, "is_archived": 0, "is_someday": 0, "outcome": "In Progress"}
 	rows = frappe.get_list("Life Goal", filters=filters, fields=["name", "title", "area", "horizon", "cycle", "target_date", "creation", "measure_kind", "start_value", "target_value",

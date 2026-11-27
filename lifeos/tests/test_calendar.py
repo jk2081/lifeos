@@ -6,7 +6,7 @@ from unittest.mock import patch
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 
-from lifeos.api import calendar, calendar as calendar_api, gcal as gcal_api, goals, goals as goal_api, review
+from lifeos.api import calendar, calendar as calendar_api, connections as connections_api, goals, goals as goal_api, review
 from lifeos.calendar import notes
 from lifeos.review import findings, followups, gcal, gcal_write, meetings
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
@@ -260,12 +260,12 @@ class TestChoice(LifeTestCase):
 	def test_5_the_choice_is_saved_listed_and_can_be_turned_off(self):
 		self.addCleanup(lambda: frappe.defaults.clear_default(gcal_write.KEY, parent=OWNER))
 		with patch.object(gcal, "source_for", lambda acc: gcal.FakeSource()), patch.dict(frappe.local.conf, {"lifeos_fake_calendar": 1}):
-			self.assertIsNone(gcal_api.state()["write"])
-			self.assertEqual(gcal_api.set_write("primary")["write"], "primary")
-			self.assertEqual(gcal_api.calendars()["write"], "primary")
+			self.assertIsNone(connections_api.gcal_state()["write"])
+			self.assertEqual(connections_api.gcal_set_write("primary")["write"], "primary")
+			self.assertEqual(connections_api.gcal_calendars()["write"], "primary")
 			with self.assertRaises(frappe.ValidationError):
-				gcal_api.set_write("someone-elses")
-			self.assertIsNone(gcal_api.set_write("")["write"])
+				connections_api.gcal_set_write("someone-elses")
+			self.assertIsNone(connections_api.gcal_set_write("")["write"])
 
 
 class SetRecorder:
