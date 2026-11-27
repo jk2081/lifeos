@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col gap-4" data-dashboard :data-view="view" :data-simple="d?.simple ? 1 : undefined">
+  <div class="flex flex-col gap-4" data-dashboard :data-view="view" :data-mode="d?.mode">
     <template v-if="d">
       <!-- four cards: a number, what it is, and what it leads to. Two by two on a phone -->
       <div class="grid grid-cols-2 gap-3 md:gap-4" :class="d.cards.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4'" data-dash-cards>
@@ -33,9 +33,10 @@
           </template>
 
           <template v-else-if="p.rows.length">
-            <Row v-for="(r, i) in p.rows" :key="(r.ref || '') + i" :pane="r.ref" :label="r.title" class="!block !py-2" data-dash-row :data-accent="r.accent || undefined">
-              <div class="flex items-baseline justify-between gap-3">
-                <span class="min-w-0 break-words text-base" :class="r.accent ? 'text-ink-blue-8' : r.done ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ r.title }}</span>
+            <Row v-for="(r, i) in p.rows" :key="(r.ref || '') + i" :pane="r.ref" :label="r.title" class="!block !py-2" data-dash-row :data-accent="r.accent || undefined" :data-task="r.task || undefined">
+              <div class="flex items-center gap-3">
+                <Checkbox v-if="r.checkable" class="relative shrink-0" :model-value="false" :aria-label="`Mark done: ${r.title}`" data-plate-check @update:model-value="markDone(r)" />
+                <span class="min-w-0 flex-1 break-words text-base" :class="r.accent ? 'text-ink-blue-8' : r.done ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ r.title }}</span>
                 <span class="shrink-0 text-sm tabular-nums" :class="r.tone === 'warn' ? 'text-ink-amber-9' : r.accent ? 'text-ink-blue-8' : 'text-ink-gray-6'">{{ r.sub }}</span>
               </div>
               <Progress v-if="r.percent != null && ['weeks', 'cycles', 'months'].includes(p.kind)" class="mt-1.5" size="sm" :value="Math.min(r.percent, 100)"
@@ -44,7 +45,7 @@
             <div v-if="p.more" class="pt-1"><Button class="!px-0 !text-ink-blue-8" variant="ghost" :label="`${p.more.n} more`" data-dash-more @click="openRef(p.more.open)" /></div>
           </template>
 
-          <EmptyState v-else-if="p.empty" :line="p.empty.line" :action="p.empty.action ? { label: p.empty.action, click: () => act(p.empty) } : null" data-dash-empty />
+          <p v-else class="py-2 text-sm text-ink-gray-6" data-dash-empty>Nothing here yet.</p>
 
         </Card>
       </div>
@@ -63,23 +64,22 @@
 </template>
 <script setup>
 import SectionHead from '@/components/ui/SectionHead.vue'
-// The dashboard of a Today view (issue 123): four cards and two panels, and on Week one line about the Brain. One request (`dashboard.get`) loads a view. Every card, row and
+// The dashboard of a Today view (issue 123): four cards and two panels in a mode (Overview, or Goals), and on Week Overview one line about the Brain. One request (`dashboard.get`) loads a view. Every card, row and
 // count opens in the side pane (a record, or `list:<kind>` for what a count counts); nothing here takes the person away from the page. With goals switched off the server sends
-// other cards in their place, so this component draws whatever it is given.
+// the cards of the mode asked for (Overview or Goals), so this component draws whatever it is given.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Progress, Skeleton } from 'frappe-ui'
+import { Button, Checkbox, Progress, Skeleton, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Stat from '@/components/ui/Stat.vue'
 import Row from '@/components/ui/Row.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import { todayData } from '@/data/today'
-import { openChat } from '@/lib/ask'
-import { tryCall } from '@/lib/api'
+import { api, errorText, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
-import { onRecordChanged, openRef } from '@/lib/pane'
+import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
+import { UNDO_MS } from '@/lib/someday'
 
-const props = defineProps({ view: String })
+const props = defineProps({ view: String, mode: { type: String, default: 'overview' } })
 const emit = defineEmits(['loaded'])
 const route = useRoute()
 const router = useRouter()
@@ -87,17 +87,23 @@ const d = ref(null)
 let seq = 0
 async function load() {
   const mine = ++seq
-  const res = await tryCall(() => todayData.dashboard.get({ view: props.view, date: route.query.date || undefined, space: store.space }))
-  if (res && mine === seq) { d.value = res; emit('loaded', res) }
+  const res = await tryCall(() => todayData.dashboard.get({ view: props.view, mode: props.mode, date: route.query.date || undefined, space: store.space }))
+  if (res && mine === seq) { d.value = res; store.goalsMode = res.goals; emit('loaded', res) }
 }
-watch(() => [props.view, route.query.date, store.space], load)
+watch(() => [props.view, props.mode, route.query.date, store.space], load)
 onRecordChanged(load)
 onMounted(load)
 
-// an empty card's one action: Chat, or a screen
-function act(e) {
-  if (e.to === 'chat') openChat()
-  else if (e.to) router.push(e.to)
+// a plate row's checkbox marks the task Done in place; Undo puts it back
+async function markDone(r) {
+  try {
+    await api('tasks.set_status', { task: r.task, status: 'Done' })
+  } catch (e) {
+    toast.error(errorText(e))
+    return load()
+  }
+  recordChanged(`task:${r.task}`)
+  toast.success(`Done: ${r.title}`, { duration: UNDO_MS, action: { label: 'Undo', onClick: async () => { await tryCall(() => api('tasks.set_status', { task: r.task, status: 'Open' })); recordChanged(`task:${r.task}`) } } })
 }
 defineExpose({ reload: load, data: computed(() => d.value) })
 </script>

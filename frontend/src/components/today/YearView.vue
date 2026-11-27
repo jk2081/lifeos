@@ -5,7 +5,7 @@
     <Button icon="lucide-chevron-right" label="Next year" tooltip="Next year" data-year-next @click="step(1)" />
   </PageHead>
   <div class="page-body" data-year-view :data-year="year">
-    <Dashboard v-if="mode === 'overview'" view="year" />
+    <Dashboard v-if="mode !== 'calendar'" view="year" :mode="mode" />
     <template v-else>
       <Ruler />
       <!-- twelve months: how many key dates each holds and the next one or two, by name; this month is outlined -->

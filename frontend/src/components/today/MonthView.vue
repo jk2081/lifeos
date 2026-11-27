@@ -5,8 +5,8 @@
     <Button icon="lucide-chevron-right" label="Next month" tooltip="Next month" data-cal-next @click="step(1)" />
   </PageHead>
   <div class="page-body" data-month-view :data-month="month">
-    <Dashboard v-if="mode === 'overview'" view="month" />
-    <ViewLinks v-if="mode === 'overview'" :links="LINKS" />
+    <Dashboard v-if="mode !== 'calendar'" view="month" :mode="mode" />
+    <ViewLinks v-if="mode !== 'calendar'" :links="LINKS" />
     <div v-if="mode === 'calendar'" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>other events, counted</span>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-blue-3"></i>goal work and key dates</span>

@@ -361,17 +361,15 @@ class TestDashboard(LifeTestCase):
 		for i in range(2):
 			self.make("Life Task", title=f"i123 done {i}", status="Done", completed_on=self.now)
 
-	def test_week_has_the_four_cards_and_the_panels(self):  # acceptance 1
+	def test_week_overview_has_the_four_cards_and_the_panels(self):  # acceptance 3
 		self.seed_brain()
-		top = self.make("Life Task", title="i123 top", is_top_three=1, top_three_week=self.monday, status="Open", due_date=add_days(self.now, 2))
-		self.make("Life Habit", title="i123 walk", days_per_week=7, tracked_from=add_days(self.now, -30))
+		self.make("Life Task", title="i135 later", status="Open", due_date=add_days(self.now, 2))
 		out = dash.get("week", space=PRIVATE)
 		cards = {c["key"]: c for c in out["cards"]}
-		self.assertEqual(list(cards), ["score", "needs", "waiting", "filed"])
-		self.assertEqual(len(out["panels"]), 2)
-		self.assertEqual(cards["score"]["value"], "50%")
-		self.assertIn("target 85%", cards["score"]["sub"])
-		self.assertIn("last week 100%", cards["score"]["sub"])
+		self.assertEqual(list(cards), ["done", "needs", "waiting", "filed"])
+		self.assertEqual(cards["done"]["value"], 2)  # done counts tasks marked Done in the period
+		self.assertEqual(cards["done"]["open"], "list:done-week")
+		self.assertIn("still due", cards["done"]["sub"])
 		self.assertEqual((cards["needs"]["value"], cards["needs"]["open"]), (2, "list:needs-you"))
 		self.assertEqual((cards["waiting"]["value"], cards["waiting"]["parts"][0]["text"], cards["waiting"]["parts"][0]["open"]), (3, "1 late", "list:waiting-overdue"))
 		self.assertEqual(cards["filed"]["value"], "67%")  # 4 of the 6 the Brain finished with: the changed one and the one asking are not alone
@@ -380,13 +378,33 @@ class TestDashboard(LifeTestCase):
 		self.assertEqual(line["list:filed-alone"], "4 filed alone")  # the sensitive one is counted, as the Activity list counts it
 		self.assertEqual(line["list:needs-you"], "1 to you")
 		self.assertEqual(line["list:rules"], "1 rules learned")
-		goals_panel, waiting = out["panels"]
-		self.assertEqual(goals_panel["groups"][0]["rows"][0]["ref"], f"goal:{self.goal.name}")
-		self.assertEqual(waiting["key"], "waiting")  # #132: Waiting on others replaces Coming up
+		self.assertEqual([p["key"] for p in out["panels"]], ["active", "waiting"])
+		waiting = out["panels"][1]
 		self.assertEqual(len(waiting["rows"]), 3)
 		self.assertTrue(all(r["ref"].startswith("task:") for r in waiting["rows"]))
-		self.assertEqual(waiting["more"], 0)
-		self.assertNotIn("coming", [p["key"] for p in out["panels"]])
+		self.assertEqual(waiting["more"], False)
+
+	def test_most_active_ranks_pages_by_links_in_the_period(self):  # acceptance 3
+		people = [frappe.get_doc({"doctype": "Life Person", "space": PRIVATE, "full_name": n, "kind": "Person"}).insert() for n in ("Ekta Jalan", "Ruchi")]
+		for person, n in ((people[0], 1), (people[1], 3)):
+			for i in range(n):
+				task = self.make("Life Task", title=f"i135 link {person.name} {i}", status="Open")
+				self.make("Life Link", from_doctype="Life Task", from_name=task.name, to_doctype="Life Person", to_name=person.name, link_text="x", origin="Brain")
+		for view in ("week", "month", "year"):
+			rows = {p["key"]: p for p in dash.get(view, space=PRIVATE)["panels"]}["active"]["rows"]
+			self.assertEqual([(r["title"], r["sub"]) for r in rows], [("Ruchi", "3 tasks"), ("Ekta Jalan", "1 task")], view)
+
+	def test_week_goals_has_its_cards_and_panels(self):  # acceptance 3
+		self.make("Life Task", title="i135 top", is_top_three=1, top_three_week=self.monday, status="Open", due_date=add_days(self.now, 2))
+		self.make("Life Habit", title="i135 walk", days_per_week=7, tracked_from=add_days(self.now, -30))
+		out = dash.get("week", space=PRIVATE, mode="goals")
+		cards = {c["key"]: c for c in out["cards"]}
+		self.assertEqual(list(cards), ["score", "top", "track", "habits"])
+		self.assertEqual(cards["score"]["value"], "50%")
+		self.assertIn("target 85%", cards["score"]["sub"])
+		self.assertIn("last week 100%", cards["score"]["sub"])
+		self.assertEqual([p["key"] for p in out["panels"]], ["goals", "goal-work"])
+		self.assertEqual(out["panels"][0]["groups"][0]["rows"][0]["ref"], f"goal:{self.goal.name}")
 
 	def test_the_waiting_panel_is_six_lines_and_the_rest_counted(self):
 		for i in range(9):
@@ -407,7 +425,7 @@ class TestDashboard(LifeTestCase):
 		filed = dash.list("filed-alone", "week", space=PRIVATE)["rows"]
 		self.assertEqual(len(filed), 4)
 		self.assertTrue(all(r["ref"].startswith("inbox:") for r in filed))
-		self.assertEqual(len(dash.list("done", "week", space=PRIVATE)["rows"]), 2)
+		self.assertEqual(len(dash.list("done-week", "week", space=PRIVATE)["rows"]), 2)
 		self.assertRaises(frappe.ValidationError, dash.list, "nonsense", "week", space=PRIVATE)
 
 	def test_a_sensitive_item_is_counted_and_never_named(self):
@@ -425,26 +443,94 @@ class TestDashboard(LifeTestCase):
 		sub = {c["key"]: c for c in dash.get("week", space=PRIVATE)["cards"]}["filed"]["sub"]
 		self.assertEqual(sub, "up from 67% in " + dash.SHORT[last_month.month - 1])
 
-	def test_day_month_and_year_have_their_cards_and_panels(self):  # acceptance 2
+	def test_day_overview_counts_the_real_tasks_and_lists_your_plate(self):  # acceptance 1
+		from frappe.utils import getdate as gd
+
+		on = gd(self.now)
+		end = dash.bounds("week", on)[1]
+		overdue = self.make("Life Task", title="i135 overdue", status="Open", due_date=add_days(on, -2))
+		today_tasks = [self.make("Life Task", title=f"i135 today {i}", status="Open", due_date=on, priority="II") for i in range(5)]
+		later = [add_days(on, 1), add_days(on, 1)] if end > on else []  # Sunday has no days left in the week
+		for d in later:
+			self.make("Life Task", title="i135 later", status="Open", due_date=d)
+		self.make("Life Task", title="i135 waits", status="Waiting", waiting_on="Ekta", due_date=on)  # not the owner's to do
+		day = dash.get("day", space=PRIVATE)
+		cards = {c["key"]: c for c in day["cards"]}
+		self.assertEqual(list(cards), ["due", "needs", "check", "done"])
+		self.assertEqual(cards["due"]["value"], 6)  # the overdue one counts
+		self.assertEqual(cards["due"]["open"], "list:plate")
+		if later:
+			self.assertEqual(cards["due"]["sub"], "2 more this week")
+		for c in day["cards"]:
+			self.assertNotIn("empty", c)
+		plate = day["panels"][0]
+		self.assertEqual([p["key"] for p in day["panels"]], ["plate", "needs"])
+		self.assertEqual(plate["rows"][0]["task"], overdue.name)  # overdue first
+		self.assertEqual({r["task"] for r in plate["rows"][1:]}, {t.name for t in today_tasks})
+		self.assertTrue(all(r["checkable"] for r in plate["rows"]))
+		self.assertEqual(len(dash.list("plate", "day", space=PRIVATE)["rows"]), 6)
+
+	def test_your_plate_puts_the_top_three_first_and_stops_at_eight(self):
+		for i in range(9):
+			self.make("Life Task", title=f"i135 p{i}", status="Open", due_date=self.now)
+		top = self.make("Life Task", title="i135 top", is_top_three=1, top_three_week=self.monday, status="Open", due_date=self.now, priority="IV")
+		plate = dash.get("day", space=PRIVATE)["panels"][0]
+		self.assertEqual((len(plate["rows"]), plate["more"]["n"], plate["more"]["open"]), (8, 2, "list:plate"))
+		self.assertEqual((plate["rows"][0]["task"], plate["rows"][0]["accent"]), (top.name, True))
+
+	def test_done_counts_for_the_period_and_the_lists_open(self):
+		self.seed_brain()
+		day = {c["key"]: c for c in dash.get("day", space=PRIVATE)["cards"]}
+		self.assertEqual((day["done"]["value"], day["done"]["open"]), (2, "list:done-day"))
+		self.assertEqual(len(dash.list("done-day", "day", space=PRIVATE)["rows"]), 2)
+		self.assertEqual(len(dash.list("done-year", "day", space=PRIVATE)["rows"]), 2)
+
+	def test_month_and_year_overview_have_their_cards_and_panels(self):  # acceptance 3
+		self.seed_brain()
+		person = frappe.get_doc({"doctype": "Life Person", "space": PRIVATE, "full_name": "Ekta Jalan", "kind": "Person"}).insert()
+		month = dash.get("month", space=PRIVATE)
+		self.assertEqual([c["key"] for c in month["cards"]], ["done", "needs", "waiting", "filed"])
+		self.assertEqual([p["key"] for p in month["panels"]], ["active", "waiting"])
+		year = dash.get("year", space=PRIVATE)
+		cards = {c["key"]: c for c in year["cards"]}
+		self.assertEqual(list(cards), ["done", "came", "people", "filed"])
+		self.assertEqual(cards["came"]["value"], 6)  # inbox items captured in the year
+		self.assertEqual((cards["people"]["value"], cards["people"]["open"]), (1, "/library/people"))
+		self.assertEqual([p["key"] for p in year["panels"]], ["active", "by-month"])
+		self.assertEqual(year["panels"][1]["rows"][0]["sub"], "2 done")
+		self.assertTrue(person.name)
+
+	def test_goals_day_month_and_year_have_their_cards_and_panels(self):  # acceptance 3
 		self.seed_brain()
 		self.make("Life Task", title="i123 top", is_top_three=1, top_three_week=self.monday, status="Done", completed_on=self.now)
-		day = dash.get("day", space=PRIVATE)
-		self.assertEqual([c["key"] for c in day["cards"]], ["top", "needs", "check", "habits"])
-		self.assertEqual([p["key"] for p in day["panels"]], ["top", "needs"])  # #132: Needs you replaces Schedule
-		self.assertEqual(len(day["panels"][1]["rows"]), 2)
+		day = dash.get("day", space=PRIVATE, mode="goals")
+		self.assertEqual([c["key"] for c in day["cards"]], ["top", "habits", "score", "work"])
+		self.assertEqual([p["key"] for p in day["panels"]], ["top", "habits"])
 		self.assertEqual(day["cards"][0]["value"], "1 of 3")
-		self.assertEqual(day["cards"][2]["value"], 2)
-		month = dash.get("month", space=PRIVATE)
-		self.assertEqual([c["key"] for c in month["cards"]], ["score", "plan", "due", "filed"])
-		self.assertEqual([p["key"] for p in month["panels"]], ["weeks", "goals-due"])  # #132: Goals due replaces Key dates
+		month = dash.get("month", space=PRIVATE, mode="goals")
+		self.assertEqual([c["key"] for c in month["cards"]], ["score", "plan", "due", "reviews"])
+		self.assertEqual([p["key"] for p in month["panels"]], ["weeks", "goals-due"])
 		self.assertTrue(any(r["accent"] for r in month["panels"][0]["rows"]))  # the current week
-		year = dash.get("year", space=PRIVATE)
-		self.assertEqual([c["key"] for c in year["cards"]], ["year-goals", "cycle", "reviews", "filed"])
+		year = dash.get("year", space=PRIVATE, mode="goals")
+		self.assertEqual([c["key"] for c in year["cards"]], ["year-goals", "cycle", "reviews", "habits"])
 		self.assertEqual([p["key"] for p in year["panels"]], ["goals", "cycles"])
 		self.assertEqual(year["cards"][1]["sub"], "week 4 of 12")
 		self.assertEqual(year["panels"][1]["rows"][0]["ref"], f"list:cycle:{self.cycle.name}")
 		self.assertEqual(len(dash.list(f"cycle:{self.cycle.name}", "year", space=PRIVATE)["rows"]), 1)
 		self.assertEqual(dash.list(f"week-work:{self.monday}", "month", space=PRIVATE)["title"], f"Week of {dash._short(self.monday)}")
+
+	def test_goals_is_a_mode_only_once_a_goal_exists(self):  # acceptance 2
+		self.clear()
+		out = dash.get("week", space=PRIVATE, mode="goals")
+		self.assertEqual((out["goals"], out["mode"]), (False, "overview"))  # no goal: back to Overview
+		self.assertEqual([c["key"] for c in out["cards"]], ["done", "needs", "waiting", "filed"])
+		self.make("Life Goal", title="i135 goal", area=self.areas["Tea"], horizon="Year", target_date=add_days(self.now, 30))
+		out = dash.get("week", space=PRIVATE, mode="goals")
+		self.assertEqual((out["goals"], out["mode"]), (True, "goals"))
+		self.assertEqual([p["key"] for p in out["panels"]], ["goals", "goal-work"])
+		frappe.db.set_single_value("Life Settings", "simple_mode", 1)
+		out = dash.get("week", space=PRIVATE, mode="goals")
+		self.assertEqual((out["goals"], out["mode"]), (False, "overview"))  # simple mode hides goals
 
 	def test_the_dashboard_has_no_schedule_coming_up_or_key_dates_panel(self):  # #132
 		for view in dash.VIEWS:
@@ -454,15 +540,18 @@ class TestDashboard(LifeTestCase):
 		self.assertRaises(frappe.ValidationError, dash.list, "coming-up", "week", space=PRIVATE)
 
 	def test_the_mode_is_remembered_for_each_person(self):  # #132
-		self.assertEqual(dash.remembered_mode(), "calendar")  # Calendar opens by default
-		dash.set_mode("overview")
-		self.assertEqual(dash.remembered_mode(), "overview")
-		self.assertEqual(frappe.defaults.get_user_default(dash.MODE_KEY), "overview")
+		frappe.defaults.clear_user_default(dash.MODE_KEY)
+		self.assertEqual(dash.remembered_mode(), "overview")  # Overview opens by default (#135)
+		dash.set_mode("goals")
+		self.assertEqual(dash.remembered_mode(), "goals")
+		self.assertEqual(frappe.defaults.get_user_default(dash.MODE_KEY), "goals")
+		dash.set_mode("calendar")
+		self.assertEqual(dash.remembered_mode(), "calendar")
 		frappe.set_user("family@lifeos.test")
-		self.assertEqual(dash.remembered_mode(), "calendar")  # another person has their own
+		self.assertEqual(dash.remembered_mode(), "overview")  # another person has their own
 		frappe.set_user(OWNER)
 		self.assertRaises(frappe.ValidationError, dash.set_mode, "sideways")
-		dash.set_mode("calendar")
+		frappe.defaults.clear_user_default(dash.MODE_KEY)
 
 	def test_year_months_count_key_dates_and_name_the_next_ones(self):  # #132
 		from lifeos.api import calendar as cal
@@ -474,43 +563,16 @@ class TestDashboard(LifeTestCase):
 		self.assertGreaterEqual(m["count"], 1)
 		self.assertTrue(any("i132 key" in k["title"] for k in m["next"]))
 
-	def test_with_goals_off_other_cards_take_their_place(self):  # acceptance 3
-		self.seed_brain()
-		frappe.db.set_single_value("Life Settings", "simple_mode", 1)
-		person = frappe.get_doc({"doctype": "Life Person", "space": PRIVATE, "full_name": "Ekta Jalan", "kind": "Person"}).insert()
-		mail = self.capture("i123 mail")
-		for dt, name in (("Life Inbox Item", mail.name), ("Life Task", self.make("Life Task", title="i123 t", status="Open").name)):
-			self.make("Life Link", from_doctype=dt, from_name=name, to_doctype="Life Person", to_name=person.name, link_text="x", origin="Brain")
-		week = dash.get("week", space=PRIVATE)
-		self.assertTrue(week["simple"])
-		self.assertEqual([c["key"] for c in week["cards"]], ["done", "needs", "waiting", "filed"])
-		self.assertEqual(week["cards"][0]["value"], 2)
-		self.assertEqual(week["panels"][0]["key"], "active")
-		self.assertEqual([p["key"] for p in dash.get("month", space=PRIVATE)["panels"]], ["weeks", "waiting"])  # no goals: the waiting list takes Goals due's place
-		self.assertEqual((week["panels"][0]["rows"][0]["title"], week["panels"][0]["rows"][0]["sub"]), ("Ekta Jalan", "1 email · 1 task"))
-		for view in dash.VIEWS:
-			out = dash.get(view, space=PRIVATE)
-			self.assertNotRegex(frappe.as_json(out).lower(), r"goal|score|top three|cycle", view)
-		self.assertEqual([c["key"] for c in dash.get("day", space=PRIVATE)["cards"]], ["plate", "needs", "check"])  # no habits: no Habits card
-		self.make("Life Habit", title="i123 walk", days_per_week=7, tracked_from=add_days(self.now, -30))
-		self.assertEqual([c["key"] for c in dash.get("day", space=PRIVATE)["cards"]][-1], "habits")
-		self.assertEqual([c["key"] for c in dash.get("month", space=PRIVATE)["cards"]], ["done", "active", "keys", "filed"])
-		self.assertEqual([c["key"] for c in dash.get("year", space=PRIVATE)["cards"]], ["done", "reviews", "needs", "filed"])
-		self.assertEqual([p["key"] for p in dash.get("year", space=PRIVATE)["panels"]], ["active", "filed-months"])
-
-	def test_an_empty_space_shows_every_card_as_a_number_and_every_empty_panel_with_at_most_one_action(self):  # acceptance 9
+	def test_an_empty_space_shows_every_card_as_a_number(self):
 		self.clear()
-		for view in dash.VIEWS:
-			out = dash.get(view, space=PRIVATE)
-			self.assertTrue(out["new"])
-			for c in out["cards"]:
-				self.assertNotIn("empty", c, f"{view} {c['key']}")
-				self.assertIsNotNone(c["value"], f"{view} {c['key']}")
-			for p in out["panels"]:
-				if not p["rows"] and not p.get("groups"):
-					self.assertTrue(p["empty"] and p["empty"]["line"], f"{view} {p['key']}")
-		frappe.db.set_single_value("Life Settings", "simple_mode", 1)
-		self.assertEqual(dash.get("week", space=PRIVATE)["cards"][0]["value"], 0)
+		for mode in ("overview", "goals"):
+			for view in dash.VIEWS:
+				out = dash.get(view, space=PRIVATE, mode=mode)
+				for c in out["cards"]:
+					self.assertNotIn("empty", c, f"{view} {c['key']}")
+					self.assertIsNotNone(c["value"], f"{view} {c['key']}")
+				for p in out["panels"]:
+					self.assertNotIn("empty", p, f"{view} {p['key']}")
 
 	def test_the_dashboard_is_for_people_and_reads_a_bounded_number_of_queries(self):
 		self.seed_brain()

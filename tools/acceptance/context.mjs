@@ -118,7 +118,7 @@ export async function session(user, width = 1440) {
   const open = async (p) => {
     const u = new URL(base + p)
     if (u.pathname.startsWith('/life') && !u.searchParams.has('area')) u.searchParams.set('area', '')
-    // Today has two modes (issue 132) and opens in Calendar; the checks that read the cards and panels open it in Overview, those that read the calendar say `mode=calendar`
+    // Today has three modes (issues 132 and 135) and opens in Overview; a check that reads Goals' cards says `mode=goals`, one that reads the calendar says `mode=calendar`
     if (/^\/life(\/today(\/.*)?)?\/?$/.test(u.pathname) && !u.searchParams.has('mode') && !u.searchParams.has('view')) u.searchParams.set('mode', 'overview')
     await page.goto(u.toString(), { waitUntil: 'networkidle' }); await page.waitForTimeout(400)
   }

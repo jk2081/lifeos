@@ -75,6 +75,7 @@ export function refOfRoute(path) {
 // from the screen it replaces the layers, so Close still empties the Drawer.
 export function openRef(ref, extra = {}) {
   if (!ref) return
+  if (ref.startsWith('/')) return router.push(ref) // a card that leads to a screen, not a record (Year's People)
   const r = router.currentRoute.value
   const { push, ...query } = extra
   const layers = stack.value.map((l) => l.ref)

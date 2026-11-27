@@ -12,7 +12,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_skills.py` | The skills engine and every built-in skill (`TestRules`, issue 117: recent decisions as examples, rules before any model, the same correction twice makes a rule, built-in rules, most specific first, the rules API, a source's page, Not needed twice and Always ask): runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
 | `test_goals.py` | Goals (opening on All open with no cycle, Year goals and their 12-week goals in This cycle, counts rolling up the tree, goals also in other places; the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc`; handing off (`TestHandOff`, issue 130: track, draft and send with the fake Google, WhatsApp as a link, a person with a user in the space assigned, the default check date, nudges, the waiting list's groups and a person's owed items); a task refuses a company as Delegated to or Waiting on (person) |
-| `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views; the dashboard (`TestDashboard`, issue 123: `dashboard.get` for each view with its cards and panels, the Brain line, coming up in six lines and the rest counted, the lists a number opens, a sensitive item counted and never named, filed alone against the month before and not counting what the owner changed, simple mode swapping the goal cards, the empty space's lines and actions, a bounded number of queries, people only) |
+| `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views; the dashboard (`TestDashboard`, issue 123: `dashboard.get` for each view with its cards and panels, the Brain line, coming up in six lines and the rest counted, the lists a number opens, a sensitive item counted and never named, filed alone against the month before and not counting what the owner changed, Overview's cards and Your plate on a seeded day (#135), Goals as a mode only once a goal exists and never in simple mode, Most active by links in the period, an empty space showing numbers and no empty text, a bounded number of queries, people only) |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
 | `test_library.py` | Library (`TestPages`: pages that build themselves, issue 111: an email linked to a known person and their organisation, a page made on a reply thread with Undo, a proposal after three emails, no page for a promotion, "same company" merging and adding the alias, the daily briefs with sources and no Vault text, AI usage and the cap, per-user pins capped at seven, a wrong link taken off, Your notes kept): notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions, the person picker's options (people only, company and email search, name matches first, recent first, no silent cap), one way to add a person (the Vault and the tool share the duplicate check) and one read for a person that the Library page and the Drawer both use |
@@ -73,7 +73,7 @@ What opens over every screen: layers, the URL that holds them, Back and Esc, the
 - `CORE.8` G3: no raw `<button>`, `<select>`, `<input>` or `<textarea>` outside `components/ui/`; a fixture with a raw `<select>` fails
 - `CORE.9` G4: every file in `components/ui/` is listed in `COMPONENTS.md`; a hand-built row or heading in a file outside the baseline fails
 
-### Today (`tools/acceptance/today.mjs`, 64 checks)
+### Today (`tools/acceptance/today.mjs`, 66 checks)
 
 Day, Week, Month and Year, the numbers that open lists, Reset, rhythm banners, the first-run guide, Today's tasks.
 
@@ -91,7 +91,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.10` Rhythm banners: the weekly review, Plan <month>, Plan your next 12 weeks and Close this cycle each show on Today on their day (the clock moved with at=); Skip hides ea…
 - `TODAY.11` Week shows this week's calendar events and due tasks on the right days, and a day opens Day
 - `TODAY.12` Month shows key dates and due tasks on the right dates and counts meetings; next and previous months work
-- `TODAY.13` Year's Overview shows a goal under its area and the weekly reviews locked since setup
+- `TODAY.13` Year's Goals shows a goal under its area and the weekly reviews locked since setup
 - `TODAY.14` an area that is off has no goals on Year
 - `TODAY.15` clicking a goal on Year's Overview opens the goal in the Drawer
 - `TODAY.16` Week, Month and Year have no sideways scroll
@@ -131,7 +131,6 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.53` with the drawer open all seven day headers of Week are visible (1440 px)
 - `TODAY.54` the Week toolbar has no Reset and nothing cut off, the heading is the dates, and the chat's + offers Important date
 - `TODAY.58` Month names a key date, counts the day's meetings, and the count opens Day
-- `TODAY.59` on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link
 - `TODAY.60` Year and Month in Calendar, light and dark, have no script error and nothing cut off
 - `TODAY.61` a waiting task is not on Today; past its check-by date it is one line naming who, with Look now to the review
 - `TODAY.62` the chat panel stays open with its messages from Today to the Library to a goal, and its chip shows the goal (removing it makes the chat about everything; Expand widens the panel) (issue 120)
@@ -142,20 +141,23 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.67` Week: a goal row opens the goal in the pane and the dashboard stays on screen
 - `TODAY.68` Needs you opens its rows in the pane, a row opens in the same pane with Back, j moves to the next row, a reload keeps the list open
 - `TODAY.69` "past check date" opens only the overdue waiting items; "rules learned" opens the rules, each with Change
-- `TODAY.70` Day, Week, Month and Year switch in place; Overview has four cards and two panels; Open full page goes to the record's page
-- `TODAY.71` on an empty space every card of every view shows a number (0 included) and every empty list is one `EmptyState` with at most one action
+- `TODAY.70` Day, Week, Month and Year switch in place; Overview and Goals each have four cards and two panels; Open full page goes to the record's page
 - `TODAY.72` every view, in Overview and in Calendar, in light and dark has no script error and nothing cut off
 - `TODAY.73` the Waiting card shows the count, late and looks done and opens the list grouped Looks done, Late, This week, Later; Confirm closes a looks-done row and Needs you drops by one; Nudge opens the draft; By person regroups
 - `TODAY.74` a waiting row opens the task layer with what was asked, the message and the reply; Back returns to the list
 - `TODAY.75` the list and the task layer are full screen with Back at 390 px; the WhatsApp link has the phone and the text, URL-encoded, and a WhatsApp draft has no Send
 - `TODAY.76` on an empty space the Waiting list says what will appear and offers + Hand off
-- `TODAY.77` each of Day, Week, Month and Year has Overview · Calendar; switching keeps the period and sets `?mode=`, a reload keeps it, Today opens in the last mode used; full width under the tabs at 390 px
-- `TODAY.78` Overview has the four cards and two panels of its view and no calendar or ruler; Calendar has the ruler directly above the calendar and no cards
+- `TODAY.77` each of Day, Week, Month and Year has Overview · Goals · Calendar; switching keeps the period and sets `?mode=`, a reload keeps it, Today opens in the last mode used (Overview when never chosen); full width under the tabs on a phone
+- `TODAY.78` Overview and Goals each have the four cards and two panels of their view and no calendar or ruler; Calendar has the ruler directly above the calendar and no cards
 - `TODAY.79` Day Calendar lists an all-day event, a timed event, a task planned at 09:30 and a task due today in that order with the now line in place, each once
 - `TODAY.80` Week Overview's Waiting panel lists the waiting items and a row opens in the Drawer
 - `TODAY.81` in a task's pane the goal picker is searchable: typing part of a goal's title filters it
 - `TODAY.82` Chat: "mark it done" on a task open in the Drawer: the Done list shows the line with Undo and the task leaves the open list
 - `TODAY.83` Chat: "tell Subhangee it's done, email ok" shows a draft card with Send, Edit and Drop and sends nothing; Send sends it once and the Done list shows "Emailed …" with no Undo
+- `TODAY.84` a new person's Today opens in Overview with a number on every card; with no goal the switch is Overview · Calendar and `?mode=goals` shows Overview; Calendar is remembered across a reload
+- `TODAY.85` after a goal exists the switch is Overview · Goals · Calendar, and Goals on Week shows Goals by area with the goal, whose row opens in the Drawer
+- `TODAY.86` no card on any view, in Overview or Goals, shows a paragraph or a Set a goal button; each shows a number; two by two on a phone; light and dark
+- `TODAY.87` Day Overview counts what is due today (overdue included) and Your plate lists the overdue task first; a tick marks it Done, the count drops and Undo brings it back; a title opens the Drawer
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 

@@ -10,7 +10,7 @@ await check('TODAY.1', 'Log in, open /life, Today is filled from seed data', asy
   must(res.status() === 302 && (res.headers().location || '').includes('/login'), 'a guest is not sent to login')
   must((await guest.request.get(base + '/api/method/lifeos.api.today.get')).status() >= 400, 'a guest can call the API')
   await guest.close()
-  await owner.open('/life')
+  await owner.open('/life?mode=goals') // the habits card is Goals' (issue 135)
   const text = await owner.page.locator('[data-main]').innerText()
   must(/Week \d+ of 12/.test(text), 'no 12 Week Year week on Today')
   await owner.page.locator('[data-card="habits"]').waitFor({ timeout: 10000 })
@@ -406,7 +406,7 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
       await pg.waitForFunction((k) => document.querySelector('[data-month-view]')?.getAttribute('data-month') === k, month, { timeout: 10000 })
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
-    await check('TODAY.13', `${width} px: Year's Overview shows a goal under its area and the weekly reviews locked since setup`, async () => {
+    await check('TODAY.13', `${width} px: Year's Goals shows a goal under its area and the weekly reviews locked since setup`, async () => {
       const before = await s.api('calendar.year_plan', { space: SPACE })
       const week = before.reviews.weeks.find((w) => !w.done && w.start <= today)
       must(week, 'no week since setup without a review')
@@ -415,7 +415,7 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
 print(r.name)`).split('\n').pop()
       const after = await s.api('calendar.year_plan', { space: SPACE })
       must(after.reviews.done === before.reviews.done + 1, `the server counts ${after.reviews.done} reviews; it was ${before.reviews.done}`)
-      await s.open('/life/today/year?mode=overview')
+      await s.open('/life/today/year?mode=goals')
       await pg.locator('[data-year-view] [data-dash-card]').first().waitFor({ timeout: 10000 })
       await pg.waitForFunction((t) => document.querySelector('[data-panel="goals"]')?.innerText.includes(t), goalTitle, { timeout: 10000 })
       must((await pg.locator('[data-card="reviews"]').innerText()).includes(`${after.reviews.done} of ${after.reviews.total}`), 'the Reviews locked card does not say ' + `${after.reviews.done} of ${after.reviews.total}`)
@@ -424,18 +424,18 @@ print(r.name)`).split('\n').pop()
     await check('TODAY.14', `${width} px: an area that is off has no goals on Year`, async () => {
       const out = await s.api('calendar.year_plan', { space: SPACE })
       must(!out.lanes.some((l) => l.area === made.mind), 'the server sent a lane for an area that is off')
-      await s.open('/life/today/year?mode=overview')
+      await s.open('/life/today/year?mode=goals')
       await pg.locator('[data-year-view] [data-dash-card]').first().waitFor({ timeout: 10000 })
       await pg.waitForFunction((t) => document.querySelector('[data-panel="goals"]')?.innerText.includes(t), goalTitle, { timeout: 10000 })
       must(!(await pg.locator('[data-year-view]').innerText()).includes(offTitle), 'the goal of an area that is off is shown')
       bench(`frappe.db.set_value("Life Area", "${made.mind}", "is_on", 1)`)
-      await s.open('/life/today/year?mode=overview')
+      await s.open('/life/today/year?mode=goals')
       await pg.locator('[data-year-view] [data-dash-card]').first().waitFor({ timeout: 10000 })
       await pg.waitForFunction((t) => document.querySelector('[data-year-view]')?.innerText.includes(t), offTitle, { timeout: 10000 })
       bench(`frappe.db.set_value("Life Area", "${made.mind}", "is_on", 0)`)
     })
-    await check('TODAY.15', `${width} px: clicking a goal on Year's Overview opens the goal in the Drawer`, async () => {
-      await s.open('/life/today/year?mode=overview')
+    await check('TODAY.15', `${width} px: clicking a goal on Year's Goals opens the goal in the Drawer`, async () => {
+      await s.open('/life/today/year?mode=goals')
       const row = pg.locator('[data-panel="goals"] [data-dash-row]', { hasText: goalTitle }).first()
       await row.waitFor({ timeout: 10000 })
       await row.locator('button').first().click()
@@ -937,29 +937,6 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.71', `${width} px: on an empty space every card of every view shows a number (0 included) and every empty list says what will appear with at most one action`, async () => {
-      for (const p of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
-        await one.open(p)
-        await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
-        const cards = pg.locator('[data-dash-card]')
-        must((await cards.count()) === 4, `${p} has ${await cards.count()} cards`)
-        for (let i = 0; i < 4; i++) {
-          const c = cards.nth(i)
-          const key = await c.getAttribute('data-card')
-          must((await c.locator('[data-empty]').count()) === 0, `${p}: the ${key} card says a sentence instead of its number`)
-          must(/\d/.test(await c.locator('[data-stat-value]').innerText()), `${p}: the ${key} card shows no number`)
-        }
-        const empties = pg.locator('[data-dash-panel] [data-empty]')
-        must((await empties.count()) >= 1, `${p}: no panel says what will appear`)
-        for (let i = 0; i < await empties.count(); i++) {
-          must((await empties.nth(i).innerText()).length > 10, `${p}: an empty panel has no line`)
-          must((await empties.nth(i).locator('[data-empty-action]').count()) <= 1, `${p}: an empty panel has two actions`)
-        }
-        await noSideways()
-      }
-      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-    })
-
     await check('TODAY.76', `${width} px: on an empty space the Waiting list says what will appear and offers + Hand off`, async () => {
       await one.open('/life/today/week?open=list:waiting')
       await pg.locator('[data-list="waiting"] [data-list-empty]').waitFor({ timeout: 15000 })
@@ -972,13 +949,27 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.59', `${width} px: on a new space with no goals Year's Overview says what will appear in Goals by area, with a Set a goal button`, async () => {
-      await one.open('/life/today/year?mode=overview')
-      const empty = pg.locator('[data-panel="goals"] [data-empty]')
-      await empty.waitFor({ timeout: 10000 })
-      must((await empty.innerText()).includes('Your goals show here'), 'the empty line is missing: ' + await empty.innerText())
-      must(await empty.getByRole('button', { name: 'Set a goal' }).isVisible(), 'there is no Set a goal button')
-      await noSideways()
+    await check('TODAY.84', `${width} px: a new person's Today opens in Overview with numbers, and with no goal the switch is Overview · Calendar and ?mode=goals shows Overview; Calendar is remembered across a reload`, async () => {
+      await one.open('/life/today')
+      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+      must(await pg.locator('[data-ruler]').count() === 0, 'a new person\'s Today did not open in Overview')
+      for (const path of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
+        await one.open(path)
+        await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-dash-card]').count()) === 4, `${path} has ${await pg.locator('[data-dash-card]').count()} cards`)
+        for (const c of await pg.locator('[data-dash-card] [data-stat-value]').allInnerTexts()) must(/\d/.test(c), `${path}: a card shows "${c}" instead of a number`)
+        await noSideways()
+      }
+      must((await pg.locator('[data-mode-option]').allInnerTexts()).join('|') === 'Overview|Calendar', 'with no goal the switch is not Overview · Calendar')
+      await one.open('/life/today/week?mode=goals')
+      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+      must(await pg.locator('[data-dashboard][data-mode="overview"]').count() === 1 && await pg.locator('[data-panel="goals"]').count() === 0, '?mode=goals without goals did not show Overview')
+      await pg.locator('[data-mode-option="calendar"]').click()
+      await pg.locator('[data-ruler]').waitFor({ timeout: 15000 })
+      await pg.goto(new URL('/life/today', pg.url()).href, { waitUntil: 'networkidle' })
+      await pg.locator('[data-ruler]').waitFor({ timeout: 15000 })
+      await pg.locator('[data-mode-option="overview"]').click()
+      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
@@ -1002,9 +993,77 @@ print(json.dumps({"cycle": cycle.name, "goals": [g.name for g in goals], "action
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
+    await check('TODAY.85', `${width} px: after a goal exists the switch is Overview · Goals · Calendar, and Goals on Week shows Goals by area with the goal, whose row opens in the Drawer`, async () => {
+      await one.open('/life/today/week?mode=overview')
+      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+      must((await pg.locator('[data-mode-option]').allInnerTexts()).join('|') === 'Overview|Goals|Calendar', 'the switch is not Overview · Goals · Calendar')
+      await pg.locator('[data-mode-option="goals"]').click()
+      await pg.locator('[data-panel="goals"]').waitFor({ timeout: 15000 })
+      const row = pg.locator('[data-panel="goals"] [data-dash-row]', { hasText: 'I55 goal 0' }).first()
+      await row.waitFor({ timeout: 10000 })
+      await row.locator('button').first().click()
+      await pg.waitForFunction((g) => new URL(location.href).searchParams.get('open') === 'goal:' + g, made.goals[0], { timeout: 10000 })
+      must(pathOf(pg) === '/life/today/week', 'the goal took the page away')
+      await pg.keyboard.press('Escape')
+      await pg.locator('[data-mode-option="overview"]').click()
+    })
+
+    await check('TODAY.86', `${width} px, light and dark: no card on any view, in Overview or in Goals, shows a paragraph or a Set a goal button; each shows a number; the cards sit two by two on a phone`, async () => {
+      for (const scheme of ['light', 'dark']) {
+        await pg.emulateMedia({ colorScheme: scheme })
+        for (const mode of ['overview', 'goals']) {
+          for (const p of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
+            await one.open(`${p}?mode=${mode}`)
+            await pg.locator('[data-dashboard][data-mode="' + mode + '"] [data-dash-card]').first().waitFor({ timeout: 15000 })
+            const cards = pg.locator('[data-dash-card]')
+            must((await cards.count()) === 4, `${p} ${mode} has ${await cards.count()} cards`)
+            for (let i = 0; i < 4; i++) {
+              const c = cards.nth(i), key = await c.getAttribute('data-card')
+              must(/\d/.test(await c.locator('[data-stat-value]').innerText()), `${p} ${mode}: the ${key} card shows no number`)
+              must((await c.locator('[data-empty], [data-empty-action]').count()) === 0 && !(await c.innerText()).includes('Set a goal'), `${p} ${mode}: the ${key} card has a paragraph or a button`)
+            }
+            if (phone) {
+              const xs = await cards.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().x)))
+              must(new Set(xs).size === 2, `${p} ${mode}: the cards are not two by two (${xs})`)
+              const sw = await pg.locator('[data-mode-switch]').boundingBox()
+              must(sw.x >= 0 && sw.x + sw.width <= 391, `${p}: the switch does not fit`)
+            }
+            await noSideways()
+          }
+        }
+      }
+      await pg.emulateMedia({ colorScheme: 'light' })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check('TODAY.87', `${width} px: Day Overview counts what is due today (overdue included), Your plate lists the overdue task first; ticking a row marks it Done, the count drops by one and Undo brings it back; a title opens the task in the Drawer`, async () => {
+      const late = `I135 overdue ${width}`, now = `I135 today ${width}`
+      await one.api('tasks.quick_add', { text: late, space, due_date: addDays(-30) })
+      await one.api('tasks.quick_add', { text: now, space, due_date: today })
+      await one.open('/life/today?mode=overview')
+      const due = pg.locator('[data-card="due"] [data-stat-value]')
+      await pg.waitForFunction((t) => document.querySelector('[data-panel="plate"]')?.innerText.includes(t), now, { timeout: 15000 })
+      const n = Number(await due.innerText())
+      const plate = pg.locator('[data-panel="plate"] [data-dash-row]')
+      must(n >= 2 && n === (await one.api('dashboard.get', { view: 'day', space, mode: 'overview' })).cards[0].value, `Due today says ${n}`)
+      must((await plate.first().innerText()).includes(late), 'the overdue task is not first on Your plate: ' + (await plate.first().innerText()))
+      await plate.first().getByRole('checkbox').click()
+      await pg.waitForFunction(([sel, v]) => document.querySelector(sel)?.innerText.trim() === String(v), ['[data-card="due"] [data-stat-value]', n - 1], { timeout: 10000 })
+      must(!(await pg.locator('[data-panel="plate"]').innerText()).includes(late), 'a done task is still on Your plate')
+      await pg.getByRole('button', { name: 'Undo' }).first().click()
+      await pg.waitForFunction(([sel, v]) => document.querySelector(sel)?.innerText.trim() === String(v), ['[data-card="due"] [data-stat-value]', n], { timeout: 10000 })
+      const first = pg.locator('[data-panel="plate"] [data-dash-row]').first()
+      await first.locator('button').first().click()
+      await pg.waitForFunction(() => /^task:/.test(new URL(location.href).searchParams.get('open') || ''), null, { timeout: 10000 })
+      must(pathOf(pg) === '/life/today' && await pg.locator('[data-dashboard]').count() === 1, 'the task took the dashboard away')
+      await noSideways()
+      await pg.keyboard.press('Escape')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
     await check('TODAY.26', `${width} px: the Open band is gone from Today; the Habits card counts today's habits and its list in the pane ticks them`, async () => {
       await one.api('goals.set_month_habits', { space, year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)), habits: [{ title: `I55 Walk ${width}` }, { title: `I55 Read ${width}` }] })
-      await today55()
+      await one.open('/life/today?mode=goals'); await pg.locator('[data-dash-cards]').waitFor({ timeout: 10000 }); await pg.waitForTimeout(500)
       must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is on Today')
       must(await pg.locator('[data-tile]').count() === 0, 'a tile of the band is on Today')
       const card = pg.locator('[data-card="habits"]')
@@ -1545,8 +1604,8 @@ for (const width of WIDTHS) {
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.67', `${width} px: Week: a goal row opens the goal in the pane and the dashboard stays on screen`, async () => {
-      await dash('/life/today/week')
+    await check('TODAY.67', `${width} px: Week's Goals: a goal row opens the goal in the pane and the dashboard stays on screen`, async () => {
+      await dash('/life/today/week?mode=goals')
       const row = pg.locator('[data-panel="goals"] [data-dash-row]').first()
       await row.waitFor({ timeout: 10000 })
       await row.locator('button').first().click()
@@ -1634,9 +1693,9 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
       must(pathOf(pg) === '/life/today/week', 'the count took the page away')
     })
 
-    await check('TODAY.70', `${width} px: Day, Week, Month and Year switch in place; Overview has four cards and two panels; Open full page in the pane goes to the record's page`, async () => {
-      await dash('/life/today')
-      for (const [tab, want, key] of [['week', '/life/today/week', 'score'], ['month', '/life/today/month', 'plan'], ['year', '/life/today/year', 'year-goals'], ['day', '/life/today', 'top']]) {
+    await check('TODAY.70', `${width} px: Day, Week, Month and Year switch in place; Overview and Goals each have four cards and two panels; Open full page in the pane goes to the record's page`, async () => {
+      await dash('/life/today?mode=overview')
+      for (const [tab, want, key] of [['week', '/life/today/week', 'done'], ['month', '/life/today/month', 'done'], ['year', '/life/today/year', 'came'], ['day', '/life/today', 'due']]) {
         await pg.locator(`[data-place-tabs] [data-tab="${tab}"]`).first().click()
         await pg.waitForFunction((p) => location.pathname === p, want, { timeout: 10000 })
         await pg.locator(`[data-dashboard][data-view="${tab}"] [data-card="${key}"]`).waitFor({ timeout: 15000 })
@@ -1645,8 +1704,13 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
         must(await pg.locator('[data-ruler], [data-day-timeline], [data-week-grid], [data-month-grid], [data-year-months]').count() === 0, `${tab} Overview has part of a calendar`)
         for (const gone of ['schedule', 'coming', 'key-dates']) must(await pg.locator(`[data-panel="${gone}"]`).count() === 0, `${tab} has the ${gone} panel`)
       }
+      for (const [tab, path, key] of [['week', '/life/today/week', 'score'], ['month', '/life/today/month', 'plan'], ['year', '/life/today/year', 'year-goals'], ['day', '/life/today', 'top']]) {
+        await dash(path + '?mode=goals')
+        await pg.locator(`[data-dashboard][data-view="${tab}"][data-mode="goals"] [data-card="${key}"]`).waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-dash-card]').count()) === 4 && (await pg.locator('[data-dash-panel]').count()) === 2, `${tab} Goals has ${await pg.locator('[data-dash-card]').count()} cards and ${await pg.locator('[data-dash-panel]').count()} panels`)
+      }
       const goal = bench(`print(frappe.db.get_value("Life Goal", {"space": "${SPACE}", "is_archived": 0}, "name"))`).split('\n').pop()
-      await dash(`/life/today/week?open=goal:${goal}`)
+      await dash(`/life/today/week?mode=goals&open=goal:${goal}`)
       await pg.locator('[data-pane-full]:visible').first().click()
       await pg.waitForFunction((g) => location.pathname === '/life/goals/' + g, goal, { timeout: 10000 })
     })
@@ -1670,17 +1734,22 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
 
     // issue 132: Today has two modes
     const VIEWS132 = [['day', '/life/today'], ['week', '/life/today/week'], ['month', '/life/today/month'], ['year', '/life/today/year']]
-    await check('TODAY.77', `${width} px: each of Day, Week, Month and Year has Overview · Calendar; switching keeps the period and sets ?mode=, a reload keeps it, and Today opens in the last mode used${phone ? '; on a phone the switch is full width under the tabs' : ''}`, async () => {
+    await check('TODAY.77', `${width} px: each of Day, Week, Month and Year has Overview · Goals · Calendar; switching keeps the period and sets ?mode=, a reload keeps it, and Today opens in the last mode used${phone ? '; on a phone the switch is full width under the tabs' : ''}`, async () => {
       const there = (mode) => pg.waitForFunction((m) => new URL(location.href).searchParams.get('mode') === m, mode, { timeout: 8000 })
+      bench(`frappe.defaults.clear_user_default("lifeos_today_mode", user="owner@lifeos.test")\nfrappe.db.commit()`)  // a person who has never chosen
       for (const [view, path] of VIEWS132) {
         await s.open(path + '?mode=calendar')
         await pg.locator('[data-mode-switch]').waitFor({ timeout: 15000 })
-        must((await pg.locator('[data-mode-option]').allInnerTexts()).join('|') === 'Overview|Calendar', `${view} has no Overview · Calendar`)
+        must((await pg.locator('[data-mode-option]').allInnerTexts()).join('|') === 'Overview|Goals|Calendar', `${view} has no Overview · Goals · Calendar`)
         if (phone) {
           const sw = await pg.locator('[data-mode-switch]').boundingBox(), tabs = await pg.locator('[data-place-tabs]').boundingBox()
           must(sw.width >= 390 - 40 && sw.y >= tabs.y + tabs.height - 2, `the switch is ${Math.round(sw.width)} px wide at y ${Math.round(sw.y)}, the tabs end at ${Math.round(tabs.y + tabs.height)}`)
         }
       }
+      // never chosen: Today opens in Overview
+      await s.open('/life/today')
+      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+      must(await pg.locator('[data-ruler]').count() === 0, 'Today did not open in Overview for someone who has not chosen')
       // the period is kept: the week after this one, Calendar to Overview and back
       const next = plusDays(today, 7)
       await s.open(`/life/today/week?mode=calendar&date=${next}`)
@@ -1693,30 +1762,40 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
       await pg.reload({ waitUntil: 'networkidle' })
       await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
       must(new URL(pg.url()).searchParams.get('mode') === 'overview', 'a reload lost the mode')
+      await pg.locator('[data-mode-option="goals"]').click()
+      await there('goals')
+      await pg.locator('[data-dashboard][data-mode="goals"] [data-dash-card]').first().waitFor({ timeout: 15000 })
       // Today opens later in the last mode used (a user default, not browser storage)
       await pg.goto(new URL('/life/today?area=', pg.url()).href, { waitUntil: 'networkidle' })
-      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
-      must(await pg.locator('[data-ruler]').count() === 0, 'Today did not open in the last mode used (Overview)')
+      await pg.locator('[data-dashboard][data-mode="goals"] [data-dash-card]').first().waitFor({ timeout: 15000 })
       await pg.locator('[data-mode-option="calendar"]').click()
       await there('calendar')
       await pg.locator('[data-ruler]').waitFor({ timeout: 15000 })
       await pg.goto(new URL('/life/today?area=', pg.url()).href, { waitUntil: 'networkidle' })
       await pg.locator('[data-ruler]').waitFor({ timeout: 15000 })
       must(await pg.locator('[data-dash-card]').count() === 0, 'Today did not open in Calendar after it was chosen')
+      await pg.locator('[data-mode-option="overview"]').click() // leave the owner where the other checks expect him
+      await there('overview')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.78', `${width} px: Overview has the four cards and two panels of its view and no calendar or ruler; Calendar has the ruler directly above the calendar and no cards`, async () => {
-      const PANELS = { day: ['top', 'needs'], week: ['goals', 'waiting'], month: ['weeks', 'goals-due'], year: ['goals', 'cycles'] }
+    await check('TODAY.78', `${width} px: Overview and Goals each have the four cards and two panels of their view and no calendar or ruler; Calendar has the ruler directly above the calendar and no cards`, async () => {
+      const PANELS = { overview: { day: ['plate', 'needs'], week: ['active', 'waiting'], month: ['active', 'waiting'], year: ['active', 'by-month'] },
+        goals: { day: ['top', 'habits'], week: ['goals', 'goal-work'], month: ['weeks', 'goals-due'], year: ['goals', 'cycles'] } }
+      const CARDS = { overview: { day: 'due|needs|check|done', week: 'done|needs|waiting|filed', month: 'done|needs|waiting|filed', year: 'done|came|people|filed' },
+        goals: { day: 'top|habits|score|work', week: 'score|top|track|habits', month: 'score|plan|due|reviews', year: 'year-goals|cycle|reviews|habits' } }
       const CAL = { day: '[data-day-timeline]', week: '[data-week-grid]', month: '[data-month-grid]', year: '[data-year-months]' }
       for (const [view, path] of VIEWS132) {
-        await dash(path + '?mode=overview')
-        must((await pg.locator('[data-dash-card]').count()) === 4, `${view} Overview has ${await pg.locator('[data-dash-card]').count()} cards`)
-        const keys = await pg.locator('[data-dash-panel]').evaluateAll((els) => els.map((e) => e.getAttribute('data-panel')))
-        must(JSON.stringify(keys) === JSON.stringify(PANELS[view]), `${view} Overview panels are ${keys}`)
-        must(await pg.locator(`[data-ruler], ${CAL[view]}`).count() === 0, `${view} Overview has a calendar or the ruler`)
-        const text = await pg.locator('[data-main]').innerText()
-        for (const gone of ['Schedule', 'Coming up', 'Key dates']) must(!text.includes(gone), `${view} Overview still has ${gone}`)
+        for (const mode of ['overview', 'goals']) {
+          await dash(`${path}?mode=${mode}`)
+          const cards = await pg.locator('[data-dash-card]').evaluateAll((els) => els.map((e) => e.getAttribute('data-card')).join('|'))
+          must(cards === CARDS[mode][view], `${view} ${mode} cards are ${cards}`)
+          const keys = await pg.locator('[data-dash-panel]').evaluateAll((els) => els.map((e) => e.getAttribute('data-panel')))
+          must(JSON.stringify(keys) === JSON.stringify(PANELS[mode][view]), `${view} ${mode} panels are ${keys}`)
+          must(await pg.locator(`[data-ruler], ${CAL[view]}`).count() === 0, `${view} ${mode} has a calendar or the ruler`)
+          const text = await pg.locator('[data-main]').innerText()
+          for (const gone of ['Schedule', 'Coming up', 'Key dates']) must(!text.includes(gone), `${view} ${mode} still has ${gone}`)
+        }
         await s.open(path + '?mode=calendar')
         await pg.locator(CAL[view]).first().waitFor({ timeout: 15000 })
         must(await pg.locator('[data-dash-card], [data-dash-panel]').count() === 0, `${view} Calendar has cards or panels`)

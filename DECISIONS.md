@@ -1756,3 +1756,16 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **The card is the answer's `drafts`,** read from the draft's own state each time the thread loads (so it shows Sent after a send); a dropped draft is gone. The Done line for a Send pressed on the card is kept like the line of "Whose is this?" (`Life Ask Thread.filed`).
 - **A person is found by name, alias or company** and never invented (unlike a hand-off, which adds a new name). Two matches: the tool says so and Chat asks which.
 - **WhatsApp is not built:** `messages.CHANNELS` is the one place to add it; the tool and the card already carry `channel`.
+
+## Issue 135 (Today: Overview, Goals, Calendar)
+
+- **Goals is a mode only once a goal exists.** `dashboard.goals_available(space)` is true when the space has a Life Goal that is not archived and simple mode is off. `dashboard.get(mode=...)` falls back to Overview when Goals is asked for and is not available, and returns `goals` so the screen knows. Boot (`session.boot`, `goals_mode`) carries the same flag for the switch while Calendar is open (Calendar does not load the dashboard); it is read for the person's default space and every dashboard load updates it for the space on screen.
+- **Your plate and "Due today" count only Open and Doing tasks.** A task that is Waiting is on someone else and has its own card and list; the old simple-mode plate counted it. The issue says "open tasks"; this is how I read it.
+- **"Still due" and "still open" are open tasks with a due date up to the end of the period** (overdue included). A task with no date is in neither.
+- **Your plate: a top-three task is marked and comes first only if it is also due today or overdue.** The plate is the day's tasks; the top three is Goals' card and panel.
+- **The Done lists are `list:done-day|week|month|year`** (period from the Today view and its date); the old `list:done` is gone with its one card. `list:goal-work` is new, for Goals' "Goal work" card and panel.
+- **Card refs may be a route.** Year's People opens Library › People, so `openRef` pushes a ref that starts with `/` as a route. Came in opens `list:came-in`, whose "Open full page" is Brain › Activity as before.
+- **An empty panel shows "Nothing here yet."** (written by the screen, not sent by the server). The per-panel empty text, its action and `empty_state` are deleted with the `simple` swaps; a brand-new person's first action is the setup card and + Capture, not a button inside a card.
+- **Week Overview keeps the Brain line** (not in the issue's table or the mockup); I left it as built by #123.
+- **LIBRARY.8 stays reading the Overdue door from the server.** Your plate is a list in the Drawer (`list:plate`) and its rows open tasks; it is not the old Overdue link to Goals › Tasks, so there is nothing on Today to click there.
+- **Acceptance numbers:** TODAY.59 and TODAY.71 are deleted. TODAY.84 to 87 are new (new person and no goals; with a goal; no card with a paragraph, two by two, light and dark; Day Overview and Your plate). TODAY.13, 15, 26, 67, 70, 77 and 78 now read Goals or both modes; TODAY.19 and TODAY.22 already open Calendar's empty state and still pass unchanged.
