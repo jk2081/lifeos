@@ -250,6 +250,42 @@ export async function answerCard(message, index, holder) {
   } catch (e) { toast.error(errorText(e)) }
 }
 
+/** A message Chat drafted (issue 150): Send, Edit and Drop work on the draft the answer shows; nothing goes until Send. */
+function setDraft(message, draft, card) {
+  Object.assign(draft, card)
+  message.drafts = [...message.drafts]
+}
+
+export async function draftSend(message, draft) {
+  try {
+    const out = await api('chat.draft_send', { thread: ask.thread, message: message.name, draft: draft.name })
+    setDraft(message, draft, out.card)
+    if (out.line) message.done = [...(message.done || []), out.line]
+    if (out.sent) { toast.success('Sent.'); recordChanged('') } else if (out.already) toast.info('It had already gone.')
+  } catch (e) { toast.error(errorText(e)) }
+}
+
+export async function draftEdit(draft, text) {
+  try {
+    Object.assign(draft, await api('chat.draft_edit', { draft: draft.name, text }))
+    return true
+  } catch (e) { toast.error(errorText(e)); return false }
+}
+
+export async function draftAddress(draft, address) {
+  try {
+    Object.assign(draft, await api('chat.draft_edit', { draft: draft.name, address }))
+    recordChanged('')
+  } catch (e) { toast.error(errorText(e)) }
+}
+
+export async function draftDrop(message, draft) {
+  try {
+    await api('chat.draft_drop', { draft: draft.name })
+    message.drafts = message.drafts.filter((x) => x.name !== draft.name)
+  } catch (e) { toast.error(errorText(e)) }
+}
+
 /** The record a scope is about (a goal page, a note, the pane's record), when it is one. */
 function recordOf(scope) {
   return scope && scope.doctype && scope.name ? { doctype: scope.doctype, name: scope.name } : null

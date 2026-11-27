@@ -11,7 +11,7 @@ from frappe.flow import Agent, ToolContext, tool
 
 from lifeos.ai.tools import Context, run_tool
 
-TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'finish_task', 'reopen_task', 'merge_tasks', 'add_event', 'hand_off', 'find_events', 'add_note', 'cancel_event', 'make_rule']
+TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'finish_task', 'reopen_task', 'merge_tasks', 'message', 'send_message', 'edit_message', 'add_event', 'hand_off', 'find_events', 'add_note', 'cancel_event', 'make_rule']
 
 
 def _thread_of(session_id: str):
@@ -52,11 +52,14 @@ def _run(tool: str, /, ctx: ToolContext, **args) -> dict:
 		c.by_key = {(r["doctype"], r["name"]): k for k, r in c.refs.items()}
 	if thread:
 		c.owner_message = _owner_words(ctx.session_id)
+		c.turn_started = frappe.db.get_value("Flow Run", {"session": ctx.session_id}, "creation", order_by="creation desc")
 	out = run_tool(c, tool, args)
 	if thread:
 		frappe.db.set_value("Life Ask Thread", thread.name, "refs", json.dumps(c.refs, default=str), update_modified=False)
 	if c.done and isinstance(out, dict):
 		out["done_list"] = c.done
+	if c.drafts and isinstance(out, dict):
+		out["draft_list"] = c.drafts
 	return out
 
 
@@ -184,6 +187,24 @@ def reopen_task(task: str, *, ctx: ToolContext) -> dict:
 def merge_tasks(keep: str, drop: str, *, ctx: ToolContext) -> dict:
 	"""Two tasks are the same: keep one, drop the other. Notes and missing links move to the kept task; the other is set Dropped. Give references (R3) or names."""
 	return _run("merge_tasks", ctx, keep=keep, drop=drop)
+
+
+@tool
+def message(person: str, text: str, channel: str = "email", about: list[str] | None = None, subject: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Write a message to a person for the owner to send, when he asks you to tell, notify or email someone. It saves a draft and sends nothing; the screen shows it with Send, Edit and Drop. Then ask: Send it?"""
+	return _run("message", ctx, person=person, text=text, channel=channel, about=about, subject=subject)
+
+
+@tool
+def send_message(draft: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Send a drafted message, only when the owner has said send, yes or send it in his latest message, never in the turn you wrote it. Leave draft out for the newest one."""
+	return _run("send_message", ctx, draft=draft)
+
+
+@tool
+def edit_message(draft: str | None = None, text: str | None = None, address: str | None = None, *, ctx: ToolContext) -> dict:
+	"""Change a drafted message's words, or give the email address of a person who has none (it is saved to them). Sends nothing."""
+	return _run("edit_message", ctx, draft=draft, text=text, address=address)
 
 
 @tool

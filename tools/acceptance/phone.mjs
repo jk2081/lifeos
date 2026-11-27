@@ -398,7 +398,7 @@ frappe.db.set_value("Life Task", "${names[0]}", {"is_top_three": 1, "top_three_w
         for (const t of names.map((_, i) => `I15 ${['one', 'two'][i]} ${width} ${stamp}`)) must(plate.includes(t), `${t} is not on the day's calendar`)
         must(plate.split(meeting).length === 2, 'the meeting is on the calendar more than once')
         const tops = (await s.api('today.get', { space: SPACE })).next.groups.find((g) => g.key === 'top').rows
-        await s.open('/life/today?mode=overview')
+        await s.open('/life/today?mode=goals')
         await pg.locator('[data-panel="top"]').waitFor({ timeout: 10000 })
         must(tops.some((r) => r.name === names[0]) && (await pg.locator('[data-panel="top"] [data-dash-row]').count()) >= 1, 'the top three are not in the Top three panel')
         must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is gone from Today (issue 55)')
@@ -424,11 +424,11 @@ frappe.db.set_value("Life Task", "${names[0]}", {"is_top_three": 1, "top_three_w
           must(path(pg) === want, `${t} opened ${path(pg)}`)
         }
       })
-      await check('PHONE.16', `${width} px: the layout matches the mockups (Overview: the cards, then the Top three and Needs you panels${phone ? ' stacked' : ' side by side'}; Calendar: the ruler, then the timeline), with no sideways scroll`, async () => {
+      await check('PHONE.16', `${width} px: the layout matches the mockups (Overview: the cards, then the Your plate and Needs you panels${phone ? ' stacked' : ' side by side'}; Calendar: the ruler, then the timeline), with no sideways scroll`, async () => {
         await s.open('/life/today?mode=overview')
         await pg.locator('[data-card="needs"]').waitFor({ timeout: 10000 })
         const box = async (sel) => (await pg.locator(sel).first().boundingBox())
-        const nu = await box('[data-card="needs"]'), top = await box('[data-panel="top"]'), needs = await box('[data-panel="needs"]')
+        const nu = await box('[data-card="needs"]'), top = await box('[data-panel="plate"]'), needs = await box('[data-panel="needs"]')
         must(nu.y < top.y, 'Needs you is not above the panels')
         if (phone) must(needs.y > top.y && Math.abs(needs.x - top.x) < 4, 'the panels are not stacked')
         else must(needs.x > top.x + top.width - 4 && Math.abs(needs.y - top.y) < 4, 'the panels are not side by side')

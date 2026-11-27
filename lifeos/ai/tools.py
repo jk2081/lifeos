@@ -73,6 +73,14 @@ WRITE_TOOLS = [
 		"input_schema": {"type": "object", "properties": {"task": {"type": "string", "description": "The task's reference, like R3, or its name."}}, "required": ["task"]}},
 	{"name": "merge_tasks", "description": "Two tasks are the same: keep one, drop the other. The dropped task's notes and missing links move to the kept one and the dropped one is set Dropped.",
 		"input_schema": {"type": "object", "properties": {"keep": {"type": "string", "description": "The task that stays: reference or name."}, "drop": {"type": "string", "description": "The task that goes into it: reference or name."}}, "required": ["keep", "drop"]}},
+	{"name": "message", "description": "Write a message to a person for the owner to send, when he asks you to tell, notify or email someone. It only saves a draft and sends nothing: the screen shows it with Send, Edit and Drop. Then end your answer with the question: Send it?",
+		"input_schema": {"type": "object", "properties": {"person": {"type": "string", "description": "The person or company, by name."}, "text": {"type": "string", "description": "The words, in the owner's voice."},
+			"channel": {"type": "string", "description": "email (the only one for now)."}, "about": {"type": "array", "items": {"type": "string"}, "description": "References (R3) or names of the tasks or records it concerns."},
+			"subject": {"type": "string"}}, "required": ["person", "text"]}},
+	{"name": "send_message", "description": "Send a drafted message, only when the owner has said send, yes or send it in his latest message (not in the same turn you wrote it). Leave draft out for the newest one.",
+		"input_schema": {"type": "object", "properties": {"draft": {"type": "string"}}}},
+	{"name": "edit_message", "description": "Change a drafted message's words, or give the address of a person who has none (it is saved to the person). Sends nothing.",
+		"input_schema": {"type": "object", "properties": {"draft": {"type": "string"}, "text": {"type": "string"}, "address": {"type": "string"}}}},
 	{"name": "add_event", "description": "Put an event on the calendar now, only when the owner asked for it.",
 		"input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "start": {"type": "string", "description": "YYYY-MM-DD or YYYY-MM-DD HH:MM"}, "end": {"type": "string"},
 			"all_day": {"type": "boolean"}, "description": {"type": "string"}}, "required": ["title", "start"]}},
@@ -125,10 +133,12 @@ class Context:
 		self.mails = []  # threads a search found: {thread_id, account, subject, from, date, link}
 		self.mails_read = []  # of those, the ones read in full
 		self._has_mail = None
+		self.drafts = []  # messages the answer drafted or sent: their names, for the cards under it (issue 150)
 		self.done = []  # what the answer did (issue 107): {text, undo, kind, doctype, name}; each with Undo
 		self.background = False  # a long read of mail runs as a background job
 		self.progress = None  # called with what is being read, for the screen
 		self.mail_pages = {}  # (after, before, query) -> pages read
+		self.turn_started = None  # when the run that is going began: a draft written after it is not yet asked about
 		self.owner_message = ""  # the owner's own words this turn: what a Google act they asked for carries
 
 	def has_mail(self):
@@ -207,7 +217,7 @@ def run_tool(ctx, name, args):
 		fn = {"search": t_search, "get_record": t_get_record, "list_records": t_list, "counts": t_counts,
 			"cycle_state": t_cycle, "timeline": t_timeline, "catch_up": t_catch_up, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
 			"mail_list_threads": t_mail_list_threads, "read_page": t_read_page, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
-			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "finish_task": t_finish_task, "reopen_task": t_reopen_task, "merge_tasks": t_merge_tasks, "add_event": t_add_event,
+			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "finish_task": t_finish_task, "reopen_task": t_reopen_task, "merge_tasks": t_merge_tasks, "message": t_message, "send_message": t_send_message, "edit_message": t_edit_message, "add_event": t_add_event,
 			"make_rule": t_make_rule, "hand_off": t_hand_off, "find_events": t_find_events, "add_note": t_add_note, "cancel_event": t_cancel_event}[name]
 	except KeyError:
 		return {"error": f"Unknown tool {name}."}
@@ -586,7 +596,7 @@ def t_digests_read(ctx, start, end):
 def _did(ctx, out, kind, doctype=None, name=None):
 	"""Remember a write for the "Done" list under the answer; the model gets the same line back."""
 	ctx.done.append({"text": out["done"], "undo": out.get("undo"), "kind": kind, "doctype": doctype, "name": name, "pane": ref_of(doctype, name) if doctype and name else None})
-	return {"done": out["done"], **{k: v for k, v in out.items() if k in ("page", "person", "note", "task", "event", "rule", "item", "file", "file_name", "title", "organisation", "vault_document", "dropped", "differ", "how", "message", "whatsapp", "needs_phone", "check_by")}}
+	return {"done": out["done"], **{k: v for k, v in out.items() if k in ("page", "person", "note", "task", "event", "rule", "item", "file", "file_name", "title", "organisation", "vault_document", "draft", "needs_address", "dropped", "differ", "how", "message", "whatsapp", "needs_phone", "check_by")}}
 
 
 def _page_arg(ctx, page):
@@ -726,3 +736,52 @@ def t_cancel_event(ctx, event=None, ref=None):
 	_doctype, name = _target(ctx, ref, "Event", event)
 	out = work.cancel_event(ctx.space, name, ctx.owner_message or "")
 	return _did(ctx, out, "event", "Event", name)
+
+
+def _about_arg(ctx, about):
+	"""The records a message concerns: references (R3) or task names."""
+	out = []
+	for a in about or []:
+		r = ctx.refs.get(str(a).strip())
+		out.append((r["doctype"], r["name"]) if r else ("Life Task", a))
+	return out
+
+
+def _card(ctx, card, **more):
+	ctx.drafts.append(card["name"])
+	return {"draft": card["name"], "to": card["to"], "address": card["address"], "subject": card["subject"], "status": card["status"], "needs_address": card["needs_address"], **more}
+
+
+def t_message(ctx, person, text, channel="email", about=None, subject=None):
+	"""A draft for a person; nothing is sent. A person with no email keeps the draft and the answer asks for the address."""
+	from lifeos.tools import messages
+
+	card = messages.draft(ctx.space, person, text, channel, _about_arg(ctx, about), subject)
+	note = _("{0} has no email yet: ask the owner for the address, then call edit_message with it.").format(card["to"]) if card["needs_address"] else _("Drafted and shown with Send, Edit and Drop. Nothing was sent. Ask: Send it?")
+	return _card(ctx, card, note=note)
+
+
+def _draft_arg(ctx, draft):
+	from lifeos.tools import messages
+
+	name = draft or messages.latest(ctx.space)
+	if not name:
+		frappe.throw(_("There is no draft to use."), title=_("No draft"))
+	return name
+
+
+def t_edit_message(ctx, draft=None, text=None, address=None):
+	from lifeos.tools import messages
+
+	return _card(ctx, messages.edit(_draft_arg(ctx, draft), text, address), note=_("Changed. Nothing was sent. Ask: Send it?"))
+
+
+def t_send_message(ctx, draft=None):
+	"""The owner said send: the draft goes out once. A draft written in this same turn is refused."""
+	from lifeos.tools import messages
+
+	name = _draft_arg(ctx, draft)
+	out = messages.send(name, None, ctx.owner_message or None, not_after=ctx.turn_started)
+	if out["line"]:
+		ctx.done.append(out["line"])
+	return _card(ctx, out["card"], sent=out["sent"], already=out["already"], note=_("Sent. A sent email cannot be taken back; say so.") if out["sent"] else _("It had already gone, or is waiting for the owner's approval."))

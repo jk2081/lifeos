@@ -255,6 +255,41 @@ def answer_card(thread: str, message: str, index: int | str, holder: str):
 
 
 @frappe.whitelist(methods=["POST"])
+def draft_send(thread: str, message: str, draft: str, text: str | None = None):
+	"""The owner pressed Send on a drafted message under an answer (issue 150): it goes out once, and the answer's Done list gets the line (no Undo: a sent email cannot be taken back)."""
+	from lifeos.ai import chat
+	from lifeos.tools import messages
+
+	_person()
+	t = _thread(thread)
+	permissions.require_space(t.space, write=True)
+	out = messages.send(draft, text)
+	if out["line"]:
+		data = chat.filed_of(t).get(message) or {}
+		data.setdefault("lines", []).append(out["line"])
+		chat.save_filed(t, message, data)
+	return out
+
+
+@frappe.whitelist(methods=["POST"])
+def draft_edit(draft: str, text: str | None = None, address: str | None = None):
+	"""Change a drafted message's words, or give the address it goes to (saved to the person)."""
+	from lifeos.tools import messages
+
+	_person()
+	return messages.edit(draft, text, address)
+
+
+@frappe.whitelist(methods=["POST"])
+def draft_drop(draft: str):
+	"""Drop a drafted message: the draft is deleted."""
+	from lifeos.tools import messages
+
+	_person()
+	return messages.drop(draft)
+
+
+@frappe.whitelist(methods=["POST"])
 def transcribe(file: str):
 	"""The mic: an audio File the owner just recorded (private, attached to nothing) is turned into text on this server (faster-whisper) and deleted. The text goes into the
 	box for the owner to check and send; no audio goes to a model. Returns {text} (empty, with a note, when nothing was heard)."""

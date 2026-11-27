@@ -39,7 +39,7 @@
         <Button size="sm" label="Undo" data-auto-inbox-undo @click="undoAuto" />
       </div>
       <!-- issue 132: Overview is the work slice (cards and panels); Calendar is the time slice, with the ruler directly above it -->
-      <Dashboard v-if="mode === 'overview'" view="day" />
+      <Dashboard v-if="mode !== 'calendar'" view="day" :mode="mode" />
       <template v-else>
         <Ruler />
         <DayTimeline :date="date" />
