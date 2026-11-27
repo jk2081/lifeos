@@ -61,7 +61,7 @@
             <div class="truncate text-sm text-ink-gray-6">{{ [short(r.received), r.area_name].filter(Boolean).join(' · ') }}</div></div>
         </div>
       </div>
-      <Card v-else-if="loaded"><Empty :title="EMPTY[list?.tab] || 'No sources yet.'" hint="Photos and scans show here as thumbnails." /></Card>
+      <Card v-else-if="loaded"><EmptyState :line="`${EMPTY[list?.tab] || 'No sources yet.'} Photos and scans show here as thumbnails.`" /></Card>
     </template>
   </ListView>
 
@@ -69,7 +69,7 @@
     :actions="[{ label: 'Set area', variant: 'solid', onClick: refile }]">
     <template #default>
       <div class="flex flex-col gap-3" data-refile-dialog>
-        <FormControl v-model="refileArea" type="select" label="Area" :options="[{ label: 'Unfiled', value: '' }, ...areaOptions()]" />
+        <AreaPicker v-model="refileArea" label="Area" placeholder="Unfiled" />
         <p class="text-sm text-ink-gray-6">A goal that does not belong to the new area is taken off.</p>
       </div>
     </template>
@@ -86,12 +86,13 @@ import { Badge, Button, Checkbox, Dialog, FormControl, Select } from 'frappe-ui'
 import { WRITTEN_BY } from '@/lib/nav'
 import ListView from '@/components/ListView.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { long, short, weekday } from '@/lib/dates'
-import { areaOptions, loadLookups } from '@/lib/lookups'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import { loadLookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 
 const KINDS = [{ value: 'all', label: 'All' }, { value: 'chats', label: 'Chats' },

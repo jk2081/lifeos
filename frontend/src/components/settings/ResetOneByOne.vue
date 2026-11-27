@@ -3,7 +3,7 @@
     <template v-if="item">
       <div class="text-sm text-ink-gray-6" data-obo-position>{{ phone ? 'One by one · ' : 'Item ' }}{{ decided + 1 }} of {{ left + decided }}{{ phone ? '' : ' left' }}</div>
       <div>
-        <button type="button" class="text-left text-lg-semibold text-ink-gray-9 hover:underline focus-visible:focus-ring" data-obo-title @click="openRef(item.ref)">{{ item.title }}</button>
+        <LinkButton class="text-lg-semibold !text-ink-gray-9" data-obo-title @click="openRef(item.ref)">{{ item.title }}</LinkButton>
         <div class="mt-0.5 text-sm text-ink-gray-6" data-obo-meta>{{ [item.type, item.area_name, item.goal_title, 'created ' + short(item.created), `untouched ${item.days} day${item.days === 1 ? '' : 's'}`, !item.goal_title && item.type === 'Task' ? 'no goal' : ''].filter(Boolean).join(' · ') }}</div>
       </div>
       <div v-if="item.source" class="rounded-4 bg-surface-gray-1 px-3 py-2 text-base text-ink-gray-7" data-obo-source>
@@ -18,7 +18,7 @@
       </div>
       <p v-if="!phone" class="text-sm text-ink-gray-6">Do asks for a date. Waiting asks for whom. Someday moves it to the Someday list with its creation date kept; it comes back for review in {{ months }} months. Deleted items stay in the trash for 30 days.</p>
     </template>
-    <Empty v-else-if="loaded" title="Nothing left to decide." hint="Every open task and open-ended goal has been looked at in this session." />
+    <EmptyState v-else-if="loaded" line="Nothing left to decide. Every open task and open-ended goal has been looked at in this session." />
     <Dialog v-model:open="ask.open" :title="ask.kind === 'do' ? 'When will you do it?' : 'Waiting on whom?'" size="sm"
       :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: ask.kind === 'do' ? 'Set date' : 'Mark waiting', variant: 'solid', onClick: confirmAsk }]">
       <DatePicker v-if="ask.kind === 'do'" v-model="ask.date" label="Date" format="D MMM YYYY" data-obo-date />
@@ -34,7 +34,8 @@ import { settingsData } from '@/data/settings'
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { Button, DatePicker, Dialog, KeyboardShortcut, TextInput, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import LinkButton from '@/components/ui/LinkButton.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { errorText } from '@/lib/api'
 import { store } from '@/lib/store'
 import { addDays, short } from '@/lib/dates'

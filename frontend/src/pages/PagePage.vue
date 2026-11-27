@@ -6,7 +6,7 @@
     </template>
   </PageHead>
   <div class="page-body max-w-5xl" data-library-page :data-loaded="page ? 1 : 0" :data-kind="page?.header.kind" :data-doctype="doctype" :data-name="name">
-    <Card v-if="missing" class="py-2" data-page-missing><Empty title="Not found." hint="This page is gone, or is not in a space you can see." /></Card>
+    <Card v-if="missing" class="py-2" data-page-missing><EmptyState line="Not found. This page is gone, or is not in a space you can see." /></Card>
     <template v-else-if="page">
       <!-- the header -->
       <Card class="flex flex-wrap items-center gap-x-4 gap-y-2" data-page-header>
@@ -38,11 +38,11 @@
       <template v-else>
         <!-- the Brain's brief -->
         <Card data-page-brief :data-has-brief="page.brief ? 1 : 0">
-          <h3 class="mb-2 flex items-center gap-2 text-base-medium text-ink-gray-9"><span class="lucide-sparkles size-4 text-ink-gray-6" aria-hidden="true" />Brief</h3>
+          <SectionHead><span class="lucide-sparkles size-4 text-ink-gray-6" aria-hidden="true" />Brief</SectionHead>
           <template v-if="page.brief">
             <p class="text-base leading-6 text-ink-gray-9" data-brief-text>
-              <template v-for="(part, i) in briefParts" :key="i"><template v-if="part.n"><button type="button" class="mx-0.5 rounded px-1 text-sm font-medium text-ink-blue-8 hover:bg-surface-gray-2 focus-visible:focus-ring"
-                :aria-label="`Source ${part.n}`" data-brief-source :data-n="part.n" @click="openSource(part.n)">{{ part.n }}</button></template><template v-else>{{ part.text }}</template></template>
+              <template v-for="(part, i) in briefParts" :key="i"><template v-if="part.n"><Button class="mx-0.5 !h-auto !px-1 !py-0 text-sm font-medium !text-ink-blue-8" variant="ghost"
+                :aria-label="`Source ${part.n}`" data-brief-source :data-n="part.n" @click="openSource(part.n)">{{ part.n }}</Button></template><template v-else>{{ part.text }}</template></template>
             </p>
             <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-gray-6" data-brief-by>
               <span>by the Brain · as of {{ short(page.brief.on) }} · {{ page.brief.n_sources }} {{ page.brief.n_sources === 1 ? 'source' : 'sources' }}</span>
@@ -59,70 +59,70 @@
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
           <!-- open -->
           <Card data-page-open>
-            <h3 class="mb-2 text-base-medium text-ink-gray-9">Open</h3>
+            <SectionHead>Open</SectionHead>
             <ul v-if="openCount" class="flex flex-col gap-1">
               <li v-for="n in page.open.needs_you" :key="n.name" class="text-base" data-open-needs><RefLink class="text-ink-blue-8 hover:underline" :to="`inbox:${n.item}`">{{ n.title }}</RefLink><span class="text-sm text-ink-gray-6"> · needs you</span></li>
-              <li v-for="t in page.open.tasks" :key="t.name" class="text-base" data-open-task><button type="button" class="text-left text-ink-gray-9 hover:underline" @click="openRef(t.ref)">{{ t.title }}</button><span v-if="t.due_date" class="text-sm text-ink-gray-6"> · due {{ short(t.due_date) }}</span></li>
-              <li v-for="e in page.open.events" :key="e.name" class="text-base" data-open-event><button type="button" class="text-left text-ink-gray-9 hover:underline" @click="openRef(e.ref)">{{ e.title }}</button><span class="text-sm text-ink-gray-6"> · {{ short(e.starts_on) }}</span></li>
+              <li v-for="t in page.open.tasks" :key="t.name" class="text-base" data-open-task><LinkButton class="!inline-flex !text-ink-gray-9" @click="openRef(t.ref)">{{ t.title }}</LinkButton><span v-if="t.due_date" class="text-sm text-ink-gray-6"> · due {{ short(t.due_date) }}</span></li>
+              <li v-for="e in page.open.events" :key="e.name" class="text-base" data-open-event><LinkButton class="!inline-flex !text-ink-gray-9" @click="openRef(e.ref)">{{ e.title }}</LinkButton><span class="text-sm text-ink-gray-6"> · {{ short(e.starts_on) }}</span></li>
             </ul>
-            <p v-else class="text-sm text-ink-gray-6" data-open-empty>Nothing is open about this.</p>
+            <EmptyState v-else data-open-empty>Nothing is open about this.</EmptyState>
           </Card>
           <!-- people -->
           <Card data-page-people>
-            <h3 class="mb-2 text-base-medium text-ink-gray-9">People</h3>
+            <SectionHead>People</SectionHead>
             <ul v-if="page.people.length" class="flex flex-col gap-1">
               <li v-for="p in page.people" :key="p.name" class="text-base" data-page-person :data-name="p.name">
                 <RouterLink class="text-ink-blue-8 hover:underline" :to="pagePath('Life Person', p.name)">{{ p.title }}</RouterLink><span v-if="p.role" class="text-sm text-ink-gray-6"> · {{ p.role }}</span><span v-else class="text-sm text-ink-gray-6"> · {{ p.why }}</span>
               </li>
             </ul>
-            <p v-else class="text-sm text-ink-gray-6" data-people-empty>No one is linked yet.</p>
+            <EmptyState v-else data-people-empty>No one is linked yet.</EmptyState>
           </Card>
         </div>
 
         <!-- files -->
         <Card data-page-files>
-          <h3 class="mb-2 text-base-medium text-ink-gray-9">Files <span class="text-sm text-ink-gray-6" data-files-count>{{ page.files.length }}</span></h3>
+          <SectionHead>Files <span class="text-sm text-ink-gray-6" data-files-count>{{ page.files.length }}</span></SectionHead>
           <ul v-if="page.files.length" class="flex flex-col">
-            <li v-for="f in page.files" :key="f.name" class="flex items-center gap-2 border-t border-outline-gray-1 py-1.5 first:border-t-0" data-page-file>
+            <Row as="li" bare v-for="f in page.files" :key="f.name" class="flex items-center gap-2 py-1.5" data-page-file>
               <span class="lucide-paperclip size-4 flex-none text-ink-gray-6" aria-hidden="true" />
               <a class="min-w-0 flex-1 truncate text-base text-ink-blue-8 hover:underline" :href="f.url" target="_blank" rel="noopener">{{ f.title }}</a>
               <span class="flex-none text-sm text-ink-gray-6">{{ short(f.date) }}</span>
-            </li>
+            </Row>
           </ul>
-          <p v-else class="text-sm text-ink-gray-6" data-files-empty>Files attached here, or to anything linked to this page, will show up here.</p>
+          <EmptyState v-else data-files-empty>Files attached here, or to anything linked to this page, will show up here.</EmptyState>
         </Card>
 
         <!-- timeline -->
         <Card flush class="!p-0" data-page-timeline>
-          <h3 class="px-4 pt-3 text-base-medium text-ink-gray-9">Timeline <span class="text-sm text-ink-gray-6" data-timeline-count>{{ page.timeline_total }}</span></h3>
+          <SectionHead class="px-4 pt-3">Timeline <span class="text-sm text-ink-gray-6" data-timeline-count>{{ page.timeline_total }}</span></SectionHead>
           <ul v-if="page.timeline.length" class="mt-2 flex flex-col">
-            <li v-for="e in page.timeline" :key="e.link" class="flex items-start gap-3 border-t border-outline-gray-1 px-4 py-2.5" data-timeline-row :data-kind="e.kind" :data-ref="e.ref || ''">
+            <Row as="li" bare v-for="e in page.timeline" :key="e.link" class="flex items-start gap-3 px-4 py-2.5" data-timeline-row :data-kind="e.kind" :data-ref="e.ref || ''">
               <span :class="ITEM_ICON[e.kind] || 'lucide-circle'" class="mt-0.5 size-4 flex-none text-ink-gray-6" :title="e.kind" aria-hidden="true" />
               <div class="min-w-0 flex-1">
-                <button v-if="e.ref" type="button" class="break-words text-left text-base text-ink-gray-9 hover:underline focus-visible:focus-ring" data-timeline-title @click="openRef(e.ref)">{{ e.title }}</button>
+                <LinkButton v-if="e.ref" class="text-base !font-normal !text-ink-gray-9" data-timeline-title @click="openRef(e.ref)">{{ e.title }}</LinkButton>
                 <a v-else-if="e.url" class="break-words text-base text-ink-blue-8 hover:underline" :href="e.url" target="_blank" rel="noopener" data-timeline-title>{{ e.title }}</a>
                 <span v-else class="break-words text-base text-ink-gray-9" data-timeline-title>{{ e.title }}</span>
               </div>
               <span class="flex-none whitespace-nowrap text-sm text-ink-gray-6" data-timeline-date>{{ short(e.date) }}</span>
               <Button v-if="canEdit" class="-my-1 flex-none" size="sm" variant="ghost" icon="lucide-x" label="Not about this" :tooltip="'Not about this'" data-timeline-remove @click="removeLink(e)" />
-            </li>
+            </Row>
           </ul>
-          <p v-else class="px-4 pb-3 pt-1 text-sm text-ink-gray-6" data-timeline-empty>Emails, captures, meetings, notes and tasks about {{ page.header.title }} will show up here, newest first.</p>
+          <EmptyState v-else data-timeline-empty>Emails, captures, meetings, notes and tasks about {{ page.header.title }} will show up here, newest first.</EmptyState>
         </Card>
 
         <!-- your notes -->
         <Card data-page-notes>
-          <h3 class="mb-1 text-base-medium text-ink-gray-9">Your notes</h3>
+          <SectionHead>Your notes</SectionHead>
           <p class="mb-2 text-sm text-ink-gray-6">Only you write here. The Brain and agents never change it.</p>
           <div v-if="canEdit" class="flex flex-col gap-2">
             <FormControl v-model="draft" type="textarea" :rows="3" placeholder="Write a note about this page" aria-label="Your notes" data-notes-input />
             <div><Button variant="solid" label="Save note" :loading="saving" :disabled="!draft.trim()" data-notes-save @click="saveNote" /></div>
           </div>
           <ul v-if="page.notes.length" class="mt-3 flex flex-col">
-            <li v-for="n in page.notes" :key="n.name" class="flex items-start gap-2 border-t border-outline-gray-1 py-2 first:border-t-0" data-note-row>
+            <Row as="li" bare v-for="n in page.notes" :key="n.name" class="flex items-start gap-2 py-2" data-note-row>
               <div class="min-w-0 flex-1"><p class="whitespace-pre-wrap break-words text-base text-ink-gray-9" data-note-text>{{ n.text }}</p><div class="text-sm text-ink-gray-6">{{ short(n.on) }}</div></div>
               <Button v-if="canEdit" size="sm" variant="ghost" icon="lucide-trash-2" label="Delete note" :tooltip="'Delete note'" @click="dropNote(n)" />
-            </li>
+            </Row>
           </ul>
         </Card>
       </template>
@@ -140,6 +140,9 @@
   <NewRecord v-if="merging" :model-value="true" title="Merge with another" action="Merge" :fields="mergeFields" :save="doMerge" @update:model-value="(v) => !v && (merging = false)" />
 </template>
 <script setup>
+import LinkButton from '@/components/ui/LinkButton.vue'
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 import RefLink from '@/components/ui/RefLink.vue'
 // A page (issue 111): a person, a company, a part or a note, laid out top to bottom as header, the Brain's brief with numbered sources, Open, People, Files,
 // Timeline and Your notes. The Brain writes the brief and links what it files; the owner's own text is Your notes, which nothing else writes. A free-form page
@@ -148,7 +151,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dialog, Dropdown, FormControl, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Md from '@/components/Md.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import PageHead from '@/components/PageHead.vue'

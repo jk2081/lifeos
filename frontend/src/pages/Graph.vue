@@ -16,8 +16,7 @@
       <span v-else class="text-sm text-ink-gray-6">Click a record to select it. Double-click to open it.</span>
     </div>
     <div v-show="d && d.nodes.length" ref="host" class="min-h-[520px] flex-1 rounded-5 border border-outline-gray-1 bg-surface-gray-1 max-md:min-h-[60vh]" role="img" aria-label="Graph of linked records" />
-    <Card v-if="d && !d.nodes.length"><Empty title="Nothing to draw yet."
-      hint="Notes, people, goals and vault documents show here, joined by [[links]], parent notes and fields such as a document's holder." /></Card>
+    <Card v-if="d && !d.nodes.length"><EmptyState line="Nothing to draw yet. Notes, people, goals and vault documents show here, joined by [[links]], parent notes and fields such as a document's holder." /></Card>
     <details v-if="d && d.edges.length" class="text-sm text-ink-gray-6"><summary class="cursor-pointer">The same links as a list</summary>
       <ul class="mt-2 list-disc pl-5"><li v-for="(e, i) in d.edges.slice(0, 200)" :key="i">{{ label(e.source) }} → {{ label(e.target) }} <span>({{ e.kind }})</span></li></ul></details>
   </div>
@@ -32,7 +31,7 @@ import { Button, TabButtons } from 'frappe-ui'
 import { NOTES_VIEWS } from '@/lib/nav'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 

@@ -3,9 +3,7 @@
   <div class="page-body" data-share>
     <div class="mx-auto flex w-full max-w-[640px] flex-col gap-4">
       <Skeleton v-if="share === undefined" class="h-24 w-full rounded-4" />
-      <Card v-else-if="!share" data-share-empty><Empty title="Nothing was shared.">
-        In another app, choose Share, then Life OS, and it opens here. Or capture something now.<br />
-        <Button class="mt-2" variant="solid" icon-left="lucide-message-square" label="Chat" @click="openChat()" /></Empty></Card>
+      <Card v-else-if="!share" data-share-empty><EmptyState line="Nothing was shared. In another app, choose Share, then Life OS, and it opens here. Or capture something now." :action="{ label: 'Chat', icon: 'lucide-message-square', click: openChat }" /></Card>
       <template v-else>
         <Card class="flex flex-col gap-2" data-share-what>
           <div v-if="share.title" class="text-base-medium text-ink-gray-9" data-share-title>{{ share.title }}</div>
@@ -36,7 +34,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Button, FormControl, Skeleton, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { errorText } from '@/lib/api'
 import { addFiles, openChat, send } from '@/lib/ask'
 import { dropShare, getShare, latestShare, submitCapture } from '@/lib/offline'

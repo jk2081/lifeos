@@ -9,7 +9,7 @@
       <Skeleton v-if="!d" class="h-80 w-full" />
       <div v-else class="grid items-start gap-4" :class="monthly && 'lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]'">
         <Card class="flex min-w-0 flex-col gap-3" data-plan-goals>
-          <h3 class="text-base-medium text-ink-gray-9">Goals · {{ d.goals.length }}</h3>
+          <SectionHead>Goals · {{ d.goals.length }}</SectionHead>
           <ol class="flex flex-col gap-3">
             <li v-for="(g, i) in d.goals" :key="g.id" class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 p-3" data-plan-goal :data-carried="g.carried_from ? 1 : 0">
               <div class="flex flex-wrap items-center gap-2">
@@ -25,8 +25,8 @@
                 </template>
               </div>
               <div v-if="!g.carried_from" class="grid gap-2 md:grid-cols-2">
-                <FormControl type="select" label="Area" :model-value="g.area || ''" placeholder="Choose" :options="areaOptions()" data-plan-area @update:model-value="(v) => edit(g, { area: v })" />
-                <FormControl type="select" :label="monthly ? 'Serves (optional)' : 'Serves (optional)'" :model-value="g.serves || ''" :options="[{ label: '—', value: '' }, ...(d.serves_options || goalChoices)]"
+                <AreaPicker label="Area" :model-value="g.area || ''" placeholder="Choose" data-plan-area @update:model-value="(v) => edit(g, { area: v })" />
+                <GoalPicker label="Serves (optional)" :model-value="g.serves || ''" :options="d.serves_options || goalChoices" placeholder="None" data-plan-serves
                   @update:model-value="(v) => edit(g, { serves: v })" />
               </div>
               <FormControl v-if="monthly && !g.carried_from && store.settings.require_done_when" type="text" label="Done when" :model-value="g.done_when" placeholder="What is true when it is done"
@@ -47,12 +47,12 @@
               </template>
             </li>
           </ol>
-          <Empty v-if="!d.goals.length" :title="monthly ? 'No goals for next month yet.' : 'No goals for the next cycle yet.'" hint="Add one, or carry a goal on in the step before." />
+          <EmptyState v-if="!d.goals.length" :line="`${monthly ? 'No goals for next month yet.' : 'No goals for the next cycle yet.'} Add one, or carry a goal on in the step before.`" />
           <div><Button icon-left="lucide-plus" label="Add a goal" data-plan-add @click="add" /></div>
         </Card>
         <Card v-if="!monthly && d.focuses?.length" class="flex min-w-0 flex-col gap-3" data-plan-focuses>
           <div>
-            <h3 class="text-base-medium text-ink-gray-9">Focuses with no goal this cycle</h3>
+            <SectionHead>Focuses with no goal this cycle</SectionHead>
             <p class="text-sm text-ink-gray-6">One question each: set a goal this cycle, or just maintain it.</p>
           </div>
           <div v-for="f in d.focuses" :key="f.name" class="flex flex-wrap items-center gap-2 rounded-5 border border-outline-gray-2 p-3" data-plan-focus :data-focus="f.area_name">
@@ -62,13 +62,13 @@
           </div>
         </Card>
         <Card v-if="monthly" class="flex min-w-0 flex-col gap-3" data-plan-habits>
-          <h3 class="text-base-medium text-ink-gray-9">Habits for {{ d.title }}</h3>
+          <SectionHead>Habits for {{ d.title }}</SectionHead>
           <div v-for="h in d.habits" :key="h.habit" class="grid grid-cols-[minmax(0,1fr)_8rem_auto] items-center gap-2" data-plan-habit>
             <span class="min-w-0 truncate text-ink-gray-9">{{ h.title }}</span>
             <FormControl type="select" :model-value="String(h.days_per_week)" :options="HOW_OFTEN" :aria-label="`How often: ${h.title}`" @update:model-value="(v) => setHabit(h, Number(v))" />
             <Button variant="ghost" icon="lucide-x" label="Remove habit" @click="dropHabit(h)" />
           </div>
-          <p v-if="!d.habits.length" class="text-sm text-ink-gray-6">No habits for the month.</p>
+          <EmptyState v-if="!d.habits.length">No habits for the month.</EmptyState>
           <FormControl v-if="unused.length" type="select" label="Add a habit" :model-value="''" placeholder="Choose" :options="unused" data-plan-add-habit @update:model-value="addHabit" />
         </Card>
       </div>
@@ -77,15 +77,18 @@
   </div>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 // Monthly review tab 3 (Plan) and 12-week review tab 3 (Plan the next cycle). The goals carried come first and cannot be removed
 // here (change the decision to take one out); goals added here are in the order given. Saved as it is edited.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge, Button, FormControl, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import GoalPicker from '@/components/ui/GoalPicker.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
-import { areaOptions, goalOptions, loadLookups } from '@/lib/lookups'
+import { goalOptions, loadLookups } from '@/lib/lookups'
 import { long, short } from '@/lib/dates'
 import { store } from '@/lib/store'
 

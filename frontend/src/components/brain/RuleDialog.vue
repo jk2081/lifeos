@@ -21,7 +21,7 @@
         </div>
         <div v-if="v.action === 'File'" class="flex flex-wrap items-end gap-3">
           <div v-if="!v.no_area" class="flex flex-col gap-1"><span class="text-sm text-ink-gray-6">Under</span>
-            <Pick v-model="v.area" :options="areaOptions()" placeholder="Choose an area or part" data-rule-area /></div>
+            <AreaPicker v-model="v.area" placeholder="Choose an area or part" data-rule-area /></div>
           <Checkbox v-model="v.no_area" label="No area" data-rule-no-area />
         </div>
         <Checkbox v-model="v.never_page" label="Never make a page for the sender" data-rule-never-page />
@@ -35,10 +35,9 @@ import SectionHead from '@/components/ui/SectionHead.vue'
 // The form behind "+ Add a rule" and a rule's Change > Edit (issue 117): what a capture is like, then what to do with it.
 import { reactive, ref, watch } from 'vue'
 import { Checkbox, Dialog, FormControl } from 'frappe-ui'
-import Pick from '@/components/Pick.vue'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
 import { errorText } from '@/lib/api'
 import { brainData } from '@/data/brain'
-import { areaOptions } from '@/lib/lookups'
 import { store } from '@/lib/store'
 
 const props = defineProps({ rule: { type: Object, default: null }, source: { type: String, default: '' } })

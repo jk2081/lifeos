@@ -648,6 +648,28 @@ print(json.dumps({"cycle": cyc.name, "goals": out, "expected": cycles.cycle_aver
       await noSideways()
     })
 
+    await check('REVIEW.29', `${width} px: on an empty space the weekly and periodic reviews show [data-empty] on every empty list, each with at most one action`, async () => {
+      bench(`if not frappe.db.exists("Life Space", "zz-review-empty"):
+    frappe.get_doc({"doctype": "Life Space", "space_name": "zz-review-empty", "owner_user": "owner@lifeos.test", "members": [{"user": "owner@lifeos.test", "access": "Write"}]}).insert(ignore_permissions=True)`)
+      try {
+        await pg.evaluate(() => localStorage.setItem('lifeos-space', 'zz-review-empty'))
+        for (const p of ['/life/today/week?view=review&tab=tasks', '/life/today/week?view=review&tab=library', '/life/today/week?view=review&tab=goals', '/life/review?kind=monthly']) {
+          await s.open(p)
+          await pg.locator('[data-empty]').first().waitFor({ timeout: 15000 })
+          const empties = pg.locator('[data-main] [data-empty]')
+          for (let i = 0; i < await empties.count(); i++) {
+            must((await empties.nth(i).innerText()).length > 10, `${p}: an empty list has no line`)
+            must((await empties.nth(i).locator('[data-empty-action]').count()) <= 1, `${p}: an empty list has two actions`)
+          }
+          await noSideways()
+        }
+      } finally {
+        await pg.evaluate(() => localStorage.setItem('lifeos-space', 'Private'))
+        bench(`from lifeos.tools import devtools
+devtools.purge_space("zz-review-empty", drop=True)`)
+      }
+    })
+
     await check('REVIEW.18', `${width} px: the 12-week review's Score shows the twelve weekly scores and the cycle view's average`, async () => {
       const c = seedCycle()
       await open('/review?kind=12-weeks')

@@ -8,9 +8,9 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | --- | --- |
 | `test_capture.py` | A capture arriving: items, claiming, results and review decisions, files stored once, re-filing, the item page, the phone's captures, email forwarded to the email-in address, the rules of a capture saved through `frappe.get_doc`, files read on the server before any model (`TestReadLocally`) |
 | `test_chat.py` | Chat everywhere (issue 120: `TestChatEverywhere`: ID numbers found by patterns and only the last four kept, a PAN image saved to the Vault with the model's input holding no number, one question when whose card it is cannot be told, other files to the Brain, a file not the person's own refused, the mic turns speech into text on the server with no model, a note on the open event, "cancelled" deleting the event in Google after the owner's own message while an agent that asks first only waits, files saved with no model). an answer never shows a bracketed note `[word: …]` or a bare record ID (stripped once, one Error Log entry, links kept). Chat on Flow (issue 119): `chat.send` starts the thread's Flow Session and a run with the scope and the open record, writes one usage row and refuses at the cap; the tools' Vault ("1 sensitive document"), space and scope rules; the Done list with Undo; citations that keep their numbers; the patch that moves old Ask threads; the deleted modules |
-| `test_brain.py` | The Brain: summaries as data, asks to the plate or the waiting pile, learnt routes, a close as a proposal (`TestSummaryLines`, issue 118; `TestLooksDone`, issue 130: Looks done, Confirm, Not yet, closing by itself after three confirmations, a new date moves the check date); who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
+| `test_brain.py` | The Brain (a task filed in an area is offered a goal also in that area): summaries as data, asks to the plate or the waiting pile, learnt routes, a close as a proposal (`TestSummaryLines`, issue 118; `TestLooksDone`, issue 130: Looks done, Confirm, Not yet, closing by itself after three confirmations, a new date moves the check date); who processes a capture, Needs you, Activity, Sources (one list of the five sources in use and the site setting for more, a calendar's count, a page each, a source's confidence and readers, Try it, videos over 500 MB), old items, Reset (now Settings > Data), Someday, the wiki and its rules, chat imports, task areas |
 | `test_skills.py` | The skills engine and every built-in skill (`TestRules`, issue 117: recent decisions as examples, rules before any model, the same correction twice makes a rule, built-in rules, most specific first, the rules API, a source's page, Not needed twice and Always ask): runner, examples, lessons, versions, the source skills' one template (sections, base then channel then kind, Rules saved as versions), the one gateway for model calls (cost and caps), Ask, insights (and an insight's snooze rule) |
-| `test_goals.py` | Goals (the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
+| `test_goals.py` | Goals (opening on All open with no cycle, Year goals and their 12-week goals in This cycle, counts rolling up the tree, goals also in other places; the goal page carries the cycle's weeks for its own grid; count labels in `frontend/tests/plural.test.js`): cycles, the grid, habits, Month goals, goals serving goals, readings, edit and "Done when", focuses, horizons, Someday, the Goals list on the shared query-builder machinery (filters, order, tabs, Group By), the rules of a goal saved through `frappe.get_doc`, the goals components in one folder that reach the server only through `frontend/src/data/goals.js` |
 | `test_tasks.py` | Tasks: quick add, lists, filters and views, All tasks, No goal, the Outbox, tab counts, the Someday rule of a task saved through `frappe.get_doc`; handing off (`TestHandOff`, issue 130: track, draft and send with the fake Google, WhatsApp as a link, a person with a user in the space assigned, the default check date, nudges, the waiting list's groups and a person's owed items); a task refuses a company as Delegated to or Waiting on (person) |
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views; the dashboard (`TestDashboard`, issue 123: `dashboard.get` for each view with its cards and panels, the Brain line, coming up in six lines and the rest counted, the lists a number opens, a sensitive item counted and never named, filed alone against the month before and not counting what the owner changed, simple mode swapping the goal cards, the empty space's lines and actions, a bounded number of queries, people only) |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
@@ -147,6 +147,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.78` Overview has the four cards and two panels of its view and no calendar or ruler; Calendar has the ruler directly above the calendar and no cards
 - `TODAY.79` Day Calendar lists an all-day event, a timed event, a task planned at 09:30 and a task due today in that order with the now line in place, each once
 - `TODAY.80` Week Overview's Waiting panel lists the waiting items and a row opens in the Drawer
+- `TODAY.81` in a task's pane the goal picker is searchable: typing part of a goal's title filters it
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 
@@ -223,6 +224,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.77` in Chat "Vivek owes me the ITR draft by Friday" makes a waiting task and says nothing was sent; "Ask Vivek for the ITR draft by Friday" drafts, with Send on the task
 - `BRAIN.78` a "What it did" row that changed a task opens it in the Drawer and the agent's page stays; a failed act stays plain; a reported skill that is also a Life OS skill links to its page
 - `BRAIN.79` a "Recently" row on a source's Rules tab opens the capture in the Drawer
+- `BRAIN.80` Activity's filters are the shared filter bar, and a chosen filter is in the address and survives a reload
 - `BRAIN.76` with no model in Flow, a question says "Chat needs an AI key" with its link to Settings › AI, and at the monthly cap Chat refuses and shows the spend
 - `BRAIN.64` a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"
 - `BRAIN.66` Gmail's Rules tab lists its sender rule and the two built-in rules in the order they are tried, with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings
@@ -230,7 +232,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.68` a reason line on a Needs you row has no "Jai" and no "requested"
 - `BRAIN.54` the daily email digest is one Brain item of the real people's mail by inbox, each line with Open in Gmail and File it; File it makes the thread's own item
 
-### Goals (`tools/acceptance/goals.mjs`, 72 checks)
+### Goals (`tools/acceptance/goals.mjs`, 75 checks)
 
 By area, All tasks, No goal, Cycles and the 12 Week Year, the goal page and its edit form, focuses, horizons, Someday.
 
@@ -302,7 +304,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.64` Suggest with the assistant faked fills a finish line from the goal's title; with no key it shows two examples
 - `GOALS.65` the setting is on on a new site and can be switched off in Settings
 - `GOALS.66` Goals > By area shows each focus as a heading in its part, its annual goal first, then 12 Week Year goals, then part-level goals
-- `GOALS.67` a focus with no active Annual goal shows "No annual goal" and + Annual goal; adding one clears it
+- `GOALS.67` a focus with no goal is one line, "no goal yet" and + Annual goal; adding an Annual goal clears it
 - `GOALS.68` a focus page shows the standard, numbered principles (edit and reorder) and goals by horizon
 - `GOALS.69` an existing Open goal shows To sort; Make it a focus creates the focus and an Annual goal holding the old goal's tasks
 - `GOALS.70` Settings > Areas shows focuses under each part, with switches and + Add a focus
@@ -313,6 +315,10 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.74` in Cycles a goal's name opens its goal in the Drawer and Cycles stays
 - `GOALS.75` Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone
 - `GOALS.78` an action row of a goal's grid opens its goal in the Drawer and the screen stays
+- `GOALS.79` in New goal, typing part of an area's name filters the area picker to it
+- `GOALS.80` with no 12 Week Year Goals opens on All open (This cycle is not offered, `?show=cycle` falls back), both goals show under their focuses, Career's chip says 1, and a focus with no goal is one line with + Annual goal
+- `GOALS.81` adding Career to a goal's also in from its layer lists it under Career marked also in (counted once), and opening it there opens the same goal
+- `GOALS.82` Goals with an also-in goal and a focus with no goal fits at 390 and 1440 px in light and dark
 
 ### Library (`tools/acceptance/library.mjs`, 52 checks)
 
@@ -367,6 +373,8 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.45` Your notes takes text, and a brief rewrite afterwards leaves it unchanged
 - `LIBRARY.46` the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library
 - `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
+- `LIBRARY.55` on an empty space every Library list (Everything, Pages, People, Files) shows `[data-empty]` with one line and at most one action
+- `LIBRARY.56` Everything and People use the shared filter bar; a chosen filter is in the address and survives a reload
 - `LIBRARY.54` the person picker is readable in light and dark, and nothing scrolls sideways
 - `LIBRARY.53` Hand off's Who uses the same person picker
 - `LIBRARY.52` a new name offers "Add '…' as a person"; choosing it makes the person and selects them
@@ -408,6 +416,7 @@ Unit tests: `test_review.py`
 - `REVIEW.25` a meeting in the weekly review's week at a glance opens the event in the Drawer and the review stays
 - `REVIEW.26` in the weekly review a goal opens as the goal's Drawer layer (`?open=` names it, 480 px, full screen with Back at 390 px), Back closes it, the review stays; no SideSheet is ever in the page
 - `REVIEW.27` the same for a meeting (`?open=meeting:<event>`)
+- `REVIEW.29` on an empty space the weekly and monthly reviews show `[data-empty]` on every empty list, each with at most one action
 - `REVIEW.28` the meetings list and Other goals open as dialogs, and a meeting opened from the list is a Drawer layer
 
 ### Settings (`tools/acceptance/settings.mjs`, 42 checks)
@@ -460,6 +469,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.42` Settings > Advanced > AI offers the provider; Another service shows the address, key, models and the data line
 - `SETTINGS.43` Test connection says Working with the fake AI, and the provider's own reason when it fails on credit
 - `SETTINGS.44` Settings > Advanced > Updates shows the installed commit; with no heartbeat it shows the set-up command and no Update now; with a heartbeat Update now queues a request
+- `SETTINGS.48` on an empty space the Settings lists show `[data-empty]` with one line and at most one action
 - `SETTINGS.47` Updates shows Ready to update with a tick or cross for each check and Update now off while one has a cross; a Needs restart request shows in the warning colour with its command and Restart now (390 px: no sideways scroll)
 - `SETTINGS.45` naming the agent in Settings shows the name in Needs you; `pull` returns `assistant_name`; the failed job shows in red with its error
 - `SETTINGS.46` an act shows under the new name in Activity; the safety switch holds the owner's request in Needs you as "You asked"

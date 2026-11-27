@@ -584,7 +584,7 @@ frappe.clear_cache()`)
 
     await check('TODAY.19', `${width} px: Today, Brain, Goals and Library on a fresh site each show their empty state with one action`, async () => {
       reset()
-      for (const [p, sel] of [['/life/today?mode=calendar', '[data-timeline-empty]'], ['/life/brain', '[data-needs-empty]'], ['/life/goals', '[data-goals-empty]'], ['/life/library', '[data-lib-empty]']]) {
+      for (const [p, sel] of [['/life/today?mode=calendar', '[data-timeline-empty]'], ['/life/brain', '[data-needs-empty]'], ['/life/goals', '[data-goals-empty]'], ['/life/library', '[data-lv-empty]']]) {
         await one.open(p)
         // the guide opens on a new site: close it to see the screen under it
         const g = pg.locator('[data-guide-close]')
@@ -1067,7 +1067,7 @@ for (const width of WIDTHS) {
       for (const [k, n] of [['goals', band.goals.n], ['open_goals', band.open_goals.n], ['idle_goals', band.idle_goals.n]]) {
         must(await num(`[data-goal-number="${k}"]`) === n, `Goals says ${k} ${await num(`[data-goal-number="${k}"]`)}, the old card ${n}`)
       }
-      await one.open('/life/library')
+      await one.open('/life/library?all=1') // all=1: not the filters the list remembered from the width before
       await pg.locator('[data-lib-numbers]').waitFor({ timeout: 10000 })
       must(await num('[data-lib-number="notes_sources"]') === band.notes_sources.n, 'Library notes and sources differ from the old card')
       must(await num('[data-lib-unopened]') === band.notes_unopened.n, `Not opened in 90 days says ${await num('[data-lib-unopened]')}, the old card ${band.notes_unopened.n}`)
@@ -1715,6 +1715,30 @@ print(frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "I13
         await row.first().locator('button').first().click()
         await pg.waitForFunction((n) => new URL(location.href).searchParams.get('open') === 'task:' + n, name, { timeout: 8000 })
         must(pathOf(pg) === '/life/today/week', 'the row took the page away')
+        await pg.keyboard.press('Escape')
+      } finally {
+        bench(`frappe.delete_doc("Life Task", "${name}", force=1, ignore_permissions=True)`)
+      }
+    })
+
+    await check('TODAY.81', `${width} px: in a task's pane the goal picker is searchable: typing part of a goal's title filters it`, async () => {
+      const goals = (await s.api('meta.space_context', { space: SPACE })).goals
+      must(goals.length > 1, 'the space has fewer than two goals')
+      const word = goals[0].title.replace(/[^A-Za-z]/g, '').slice(1, 5).toLowerCase()
+      const name = bench(`print(frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "I147 pane ${width} ${stamp}"}).insert(ignore_permissions=True).name)`).split('\n').pop()
+      try {
+        await s.open(`/life/today?open=task:${name}`)
+        const picker = pg.locator('[data-task-goal-picker]')
+        await picker.waitFor({ timeout: 15000 })
+        await picker.locator(width < 800 ? '[data-goal-open]' : 'button').first().click()
+        const search = width < 800 ? pg.locator('[data-goal-search] input, input[data-goal-search]').first() : pg.locator('[data-slot="content"] input[data-slot="input"]').last()
+        await search.waitFor({ timeout: 8000 })
+        const names = async () => (await (width < 800 ? pg.locator('[data-goal-option]') : pg.locator('[data-slot="item"]')).allInnerTexts()).map((t) => t.toLowerCase())
+        const before = (await names()).length
+        await search.fill(word)
+        await pg.waitForTimeout(500)
+        const after = await names()
+        must(after.length > 0 && after.length < before && after.every((t) => t.replace(/[^a-z]/g, '').includes(word)), `typing "${word}" leaves ${after.length} of ${before} goals: ${after.join(' | ')}`)
         await pg.keyboard.press('Escape')
       } finally {
         bench(`frappe.delete_doc("Life Task", "${name}", force=1, ignore_permissions=True)`)

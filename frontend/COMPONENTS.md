@@ -66,7 +66,7 @@ Before using a library component, read its source and types: `node_modules/frapp
 | `a.num` | `NumLink` |
 | `.st` in `.stats` | `Stat` inside `<div class="stats">` |
 | `.br` progress | `Progress` |
-| `.empty` | `ui/EmptyState.vue` (on screens not yet moved, `Empty.vue`); `Alert` for a notice with an action |
+| `.empty` | `ui/EmptyState.vue`; `Alert` for a notice with an action |
 | `.only-phone`, `.only-desktop` | `md:hidden`, `max-md:hidden` |
 | `.lbl` + control | the control's own `label` prop |
 | Loading text | `Skeleton`, `LoadingIndicator` |
@@ -100,7 +100,6 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `ui/Row.vue`, `TaskRow.vue` | Rows of mixed content inside a section card, opening the pane. Props: `pane`, `label`, and (issue 144) `as` (`li`, `label`: the tag) and `bare` (keep the border and the pane behaviour, leave flex, grid, gap and padding to the row's own classes, for a row that is a grid or a column) | The stretched-button pattern of frappe-ui's list guide, `Checkbox`, `Badge` |
 | `ui/Stat.vue` | A number with a label, 0 included. Props (issue 144): `tint` (Today's grey card), `warn` (amber number), `open` (a pane reference the whole card opens; the `sub` slot's buttons need the class `relative`) | `Card`, `text-3xl-semibold` |
 | `ui/EmptyState.vue` (issue 144) | What a list says when it has nothing: one line and at most one action; frappe-ui has no such part | token text classes, `Button` |
-| `Empty.vue` | Still used by Library, the reviews, Settings and the older pages until issue 145 moves them to `ui/EmptyState.vue` and deletes it | token text classes |
 | `ScreenBoundary.vue`, `ScreenErrorMessage.vue` (bug fix 1) | The error boundary around the routed page: a screen that fails shows "This screen could not be shown." with Reload and a reference; the rest of the app keeps working (`lib/screenError.js`) | `Card`, `Button` |
 | `Pick.vue` | One-tap change of a filing value | `Dropdown`, `Button` |
 | `FileAttach.vue` | Attach one private file to a record, in one step | frappe-ui `FileUploader`, `Button`, `ErrorMessage` |

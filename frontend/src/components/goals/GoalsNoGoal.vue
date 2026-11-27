@@ -38,7 +38,7 @@
               <Checkbox class="relative mt-0.5" :model-value="false" :disabled="!writable" :aria-label="`Done: ${t.title}`" @update:model-value="done(t)" />
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <button type="button" class="break-words text-left text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" data-task-title @click="openRef('task:' + t.name)">{{ t.title }}</button>
+                  <LinkButton class="text-base-medium !text-ink-gray-9" data-task-title @click="openRef('task:' + t.name)">{{ t.title }}</LinkButton>
                   <span v-if="t.is_top_three" class="text-ink-amber-3" aria-label="Top three">★</span>
                   <AreaGuess :task="t" :readonly="!writable" @confirmed="onConfirmed" />
                 </div>
@@ -65,6 +65,7 @@
   </div>
 </template>
 <script setup>
+import LinkButton from '@/components/ui/LinkButton.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 // Goals > No goal (issue 22): open tasks with no goal, grouped by the area they are filed in (✦ where the Brain guessed it).

@@ -47,7 +47,7 @@
         <a v-if="p.route && p.exists" href="#" class="text-ink-blue-8 underline" @click.prevent="openRoute(p.route)">Open</a>
       </div>
     </Card>
-    <Card v-if="!shown.length"><EmptyState :line="`${emptyTitle} ${emptyHint}`" /></Card>
+    <Card v-if="!shown.length"><EmptyState :line="`${emptyTitle}${emptyHint ? ' ' + emptyHint : ''}`" /></Card>
   </div>
 
   <Dialog v-model:open="editOpen" title="Edit proposal" size="xl"
@@ -57,6 +57,9 @@
         <FormControl v-if="spec.type === 'markdown'" v-model="draft[field]" type="textarea" :rows="5" :label="fieldLabel(field)" :required="spec.required" :description="spec.help" />
         <FormControl v-else-if="spec.type === 'select'" v-model="draft[field]" type="select" :options="spec.options.map((o) => ({ label: o || '—', value: o }))"
           :label="fieldLabel(field)" :required="spec.required" :description="spec.help" />
+        <AreaPicker v-else-if="spec.type === 'link' && spec.doctype === 'Life Area'" :model-value="draft[field] ?? ''" :options="areaOptions" :label="fieldLabel(field)" @update:model-value="(v) => (draft[field] = v || undefined)" />
+        <GoalPicker v-else-if="spec.type === 'link' && spec.doctype === 'Life Goal'" :model-value="draft[field] ?? ''" :options="linkOptions('Life Goal')" :label="fieldLabel(field)" @update:model-value="(v) => (draft[field] = v || undefined)" />
+        <PersonPicker v-else-if="spec.type === 'link' && spec.doctype === 'Life Person'" :model-value="draft[field] ?? ''" :label="fieldLabel(field)" :allow-new="false" @update:model-value="(v) => (draft[field] = v || undefined)" />
         <FormControl v-else-if="spec.type === 'link'" type="select" :model-value="draft[field] ?? ''" :options="[{ label: '—', value: '' }, ...linkOptions(spec.doctype)]"
           :label="fieldLabel(field)" :required="spec.required" :description="spec.help" @update:model-value="(v) => (draft[field] = v || undefined)" />
         <DatePicker format="D MMM YYYY" v-else-if="spec.type === 'date'" :model-value="draft[field] || ''" clearable :label="fieldLabel(field)" :required="spec.required" :description="spec.help"
@@ -79,6 +82,9 @@ import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Checkbox, DatePicker, DateTimePicker, Dialog, FormControl, toast } from 'frappe-ui'
 import Card from '../ui/Card.vue'
 import Pick from '../Pick.vue'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import GoalPicker from '@/components/ui/GoalPicker.vue'
+import PersonPicker from '@/components/ui/PersonPicker.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'

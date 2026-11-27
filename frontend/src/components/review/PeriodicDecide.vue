@@ -8,13 +8,10 @@
       <Skeleton v-if="!d" class="h-80 w-full" />
       <template v-else>
         <div class="grid grid-cols-3 gap-2 md:gap-4" data-piles>
-          <Card v-for="p in PILES" :key="p.key" tint class="flex flex-col gap-0.5 !p-3" data-pile :data-pile-key="p.key">
-            <span class="flex items-center gap-2 text-sm-medium text-ink-gray-8"><span class="size-2 rounded-full" :class="p.dot" aria-hidden="true" />{{ p.label }}</span>
-            <span class="text-xl-semibold tabular-nums text-ink-gray-9" data-pile-count>{{ d.piles[p.key] }}</span>
-          </Card>
+          <Stat v-for="p in PILES" :key="p.key" tint compact :label="p.label" data-pile :data-pile-key="p.key"><span data-pile-count>{{ d.piles[p.key] }}</span></Stat>
         </div>
         <Card class="flex min-w-0 flex-col" flush data-decide-goals>
-          <div v-for="g in d.goals" :key="g.name" class="flex flex-col gap-2 border-b border-outline-gray-1 px-4 py-3 last:border-b-0" data-decide-goal :data-goal="g.name"
+          <Row bare v-for="g in d.goals" :key="g.name" class="flex flex-col gap-2 px-4 py-3" data-decide-goal :data-goal="g.name"
             :data-pile="g.decision?.pile || ''">
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span class="min-w-0 flex-1 break-words text-base-medium text-ink-gray-9">{{ g.title }}</span>
@@ -32,9 +29,9 @@
               @update:model-value="(v) => queue(g, { pile: 'drop', reason: v })" /></div>
             <div v-if="!monthly && g.decision?.pile === 'carry' && g.measure_kind === 'Number'" class="max-w-xs"><FormControl type="number" :label="`New target${g.unit ? ' (' + g.unit + ')' : ''}`"
               :model-value="g.decision.target ?? g.target_value" data-decide-target @update:model-value="(v) => queue(g, { pile: 'carry', target: v })" /></div>
-          </div>
+          </Row>
           <div v-if="!d.goals.length" class="p-4" data-decide-empty>
-            <Empty :title="monthly ? 'No goals are left open this month.' : 'No goals are left open in this cycle.'" hint="Everything is already done or closed. Go on to the plan." />
+            <EmptyState :line="`${monthly ? 'No goals are left open this month.' : 'No goals are left open in this cycle.'} Everything is already done or closed. Go on to the plan.`" />
           </div>
         </Card>
       </template>
@@ -43,13 +40,15 @@
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import Stat from '@/components/ui/Stat.vue'
 // Monthly review tab 2 (Decide) and 12-week review tab 2 (Each goal): each goal that is not done goes into a pile. Finish needs a
 // date, Drop a reason; Carry (with a new target on a number goal) needs nothing. Saved as each choice is made; nothing reaches the
 // goals until Lock.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge, Button, FormControl, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 

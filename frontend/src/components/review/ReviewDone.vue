@@ -25,11 +25,11 @@
       </ul>
       <div v-if="kind === 'weekly'">
         <div class="mb-1 text-sm-medium text-ink-gray-8">Top three</div>
-        <div v-for="t in d.top" :key="t.task" class="flex items-center gap-2 border-b border-outline-gray-1 py-1.5 last:border-b-0" data-done-top>
+        <Row bare v-for="t in d.top" :key="t.task" class="flex items-center gap-2 py-1.5" data-done-top>
           <span class="lucide-star size-4 shrink-0 text-ink-amber-9" aria-hidden="true" />
           <span class="min-w-0 flex-1 truncate text-base text-ink-gray-9">{{ t.title }}</span>
           <span class="text-sm tabular-nums text-ink-gray-6">{{ t.slot ? `${weekday(t.slot, 3)} ${time(t.slot)}` : 'No set time' }}</span>
-        </div>
+        </Row>
       </div>
       <p v-if="kind === 'weekly'" class="text-sm text-ink-gray-7" data-review-next-date>Next review: {{ weekday(d.next.date) }} {{ long(d.next.date) }}, {{ d.next.time }}</p>
       <div class="flex flex-wrap gap-2">
@@ -46,6 +46,7 @@
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 // The done screen after Lock, for the weekly, monthly and cycle review: the time it took, what was decided, and where to see it
 // (the week: the top three, Go to Today and See the week; the month and the cycle: Goals > Cycles).
 import { computed, onMounted, ref } from 'vue'

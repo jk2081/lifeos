@@ -2,7 +2,7 @@
   <!-- One list of Settings: areas or habits. Rename in place, reorder by dragging the handle
        (Alt+Up and Alt+Down on a focused row, Move up and Move down in the row menu), nest areas one level, archive. -->
   <Card flush :data-settings-list="kind">
-    <div v-for="r in shown" :key="r.name" class="group relative flex min-h-11 items-center gap-2 border-b border-outline-gray-1 py-1.5 last:border-b-0 focus-visible:focus-ring"
+    <Row bare v-for="r in shown" :key="r.name" class="group flex min-h-11 items-center gap-2 py-1.5 focus-visible:focus-ring"
       :class="[r.depth ? 'pl-6' : '', over === r.name ? (where === 'under' ? 'bg-surface-gray-2' : '') : '', over === r.name && where === 'before' ? 'border-t-2 border-t-outline-gray-4' : '',
         over === r.name && where === 'after' ? '!border-b-2 !border-b-outline-gray-4' : '']"
       tabindex="0" :data-row-name="r.name" :data-depth="r.depth" :aria-label="r.title" @keydown="onKey($event, r)"
@@ -21,8 +21,8 @@
       <Dropdown v-if="writable" :options="menu(r)" placement="right">
         <Button variant="ghost" icon="lucide-ellipsis" :label="`More for ${r.title}`" data-row-menu />
       </Dropdown>
-    </div>
-    <Empty v-if="!shown.length" :title="`No ${noun} yet.`" :hint="hint" />
+    </Row>
+    <EmptyState v-if="!shown.length" :line="`No ${noun} yet.${hint ? ' ' + hint : ''}`" />
   </Card>
 
   <Dialog v-model:open="underOpen" :title="`Move ${moving?.title || ''} under`" size="sm"
@@ -31,11 +31,12 @@
   </Dialog>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import { computed, nextTick, ref } from 'vue'
 import { Button, Dialog, Dropdown, Select, TextInput } from 'frappe-ui'
 import Card from '../ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
-import Empty from '../Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 
 const props = defineProps({
   kind: String, // area, habit

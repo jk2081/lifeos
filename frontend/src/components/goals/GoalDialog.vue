@@ -2,7 +2,7 @@
   <Dialog v-model:open="open" :title="goal ? 'Edit goal' : 'Add goal'" size="lg">
     <div class="flex flex-col gap-3">
       <FormControl v-model="form.title" label="Goal" placeholder="For example: Golf: hit 5 birdies" />
-      <FormControl v-model="form.area" type="select" label="Area" :options="[{ label: '—', value: '' }, ...areaOptions()]" />
+      <AreaPicker v-model="form.area" label="Area" />
       <DoneWhen :model-value="m" :title="form.title" @habit="toHabit" />
       <div>
         <div class="mb-1.5 text-sm text-ink-gray-6">Actions, and how many times a week</div>
@@ -25,7 +25,8 @@ import { reactive, ref, watch } from 'vue'
 import { Button, Dialog, FormControl, TextInput, dialog, toast } from 'frappe-ui'
 import { tryCall } from '@/lib/api'
 import { goalsData } from '@/data/goals'
-import { areaOptions, loadLookups } from '@/lib/lookups'
+import { loadLookups } from '@/lib/lookups'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
 import DoneWhen from '@/components/goals/DoneWhen.vue'
 import { doneWhenRequired, emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
 

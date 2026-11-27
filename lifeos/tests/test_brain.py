@@ -11,6 +11,7 @@ from lifeos.brain import area_guess, asks, chat_import, old_inbox, sources as so
 from lifeos.review import counts
 from lifeos.library import index, trash
 from lifeos import permissions
+from lifeos.goals import areas
 from lifeos.web import queries
 from lifeos.ai import fake
 from lifeos.api import brain, chats, connections, goals, inbox, jobs, library, meta, old_items, outbox, reset, review, settings, someday, sources, tasks, today as today_api, wiki
@@ -45,6 +46,19 @@ class TestTaskAreas(LifeTestCase):
 		self.assertEqual(t.area, self.areas["Tea"])
 		self.assertTrue(t.area_guessed)
 		self.assertGreaterEqual(t.area_confidence, 90)
+
+	def test_a_task_filed_in_an_area_is_offered_a_goal_also_in_that_area(self):  # issue 137
+		career = self.life["Career"]
+		frappe.db.set_value("Life Area", self.life["Health"], "is_on", 1)
+		own = self.make("Life Goal", title="i137 own", horizon="Year", target_date="2027-12-01", area=self.areas["Tea"])
+		also = self.make("Life Goal", title="i137 also", horizon="Year", target_date="2027-12-01", area=self.life["Health"], also_in=[{"area": career}])
+		other = self.make("Life Goal", title="i137 other", horizon="Year", target_date="2027-12-01", area=self.life["Health"])
+		offered = areas.goals_for(PRIVATE, career)
+		self.assertIn(also.name, offered)  # in its also in
+		self.assertIn(own.name, offered)  # in a part of Career
+		self.assertNotIn(other.name, offered)
+		ctx = {g["name"]: g for g in inbox.space_context(PRIVATE)["goals"]}
+		self.assertEqual(ctx[also.name]["also_in"], [career])
 
 	# 2
 	def test_a_task_from_a_capture_gets_the_captures_area(self):

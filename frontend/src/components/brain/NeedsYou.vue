@@ -54,7 +54,7 @@
         <div class="min-w-0 flex-[1_1_320px]">
           <div class="flex flex-wrap items-center gap-2">
             <Badge theme="gray" :label="r.source" data-row-source />
-            <button type="button" class="break-words text-left text-base-medium text-ink-gray-9 hover:underline" data-row-title :aria-label="`Open ${r.title}`" @click="openRef('inbox:' + r.item)">{{ r.title }}</button>
+            <LinkButton class="text-base-medium !text-ink-gray-9" data-row-title :aria-label="`Open ${r.title}`" @click="openRef('inbox:' + r.item)">{{ r.title }}</LinkButton>
           </div>
           <div v-if="r.reason" class="mt-0.5 text-sm text-ink-gray-6" data-row-reason><span aria-hidden="true">✦</span> {{ r.reason }}</div>
           <div v-if="r.blocked" class="mt-0.5 text-sm text-ink-amber-3" data-row-blocked>Needs a “Done when” before it can be kept. Use Change to add one.</div>
@@ -107,7 +107,7 @@
       <Card flush>
         <Row bare v-for="r in unfiled" :key="r.proposal" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 py-3" data-needs-row data-unfiled-row :data-proposal="r.proposal" :data-item="r.item">
           <div class="min-w-0 flex-[1_1_320px]">
-            <div class="flex flex-wrap items-center gap-2"><Badge theme="gray" :label="r.source" /><button type="button" class="break-words text-left text-base-medium text-ink-gray-9 hover:underline" data-row-title :aria-label="`Open ${r.title}`" @click="openRef('inbox:' + r.item)">{{ r.title }}</button></div>
+            <div class="flex flex-wrap items-center gap-2"><Badge theme="gray" :label="r.source" /><LinkButton class="text-base-medium !text-ink-gray-9" data-row-title :aria-label="`Open ${r.title}`" @click="openRef('inbox:' + r.item)">{{ r.title }}</LinkButton></div>
             <div class="mt-0.5 text-sm text-ink-gray-6"><span aria-hidden="true">✦</span> {{ r.reason || 'No area fits yet.' }}</div>
           </div>
           <div class="flex flex-wrap items-center gap-2 max-md:w-full">
@@ -143,6 +143,7 @@
   </div>
 </template>
 <script setup>
+import LinkButton from '@/components/ui/LinkButton.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import { openChat } from '@/lib/ask'
 // Brain > Needs you (issue 17): what the Brain asks you to decide, at most seven at a time, each with its best guess and

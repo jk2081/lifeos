@@ -84,7 +84,7 @@ import { activePlace } from './lib/sidebar'
 import { navCount } from './lib/newMenu'
 import { db } from './lib/api'
 import { openRef, recordChanged } from './lib/pane'
-import { areaOptions, loadLookups } from './lib/lookups'
+import { loadLookups } from './lib/lookups'
 import SearchPalette from './components/SearchPalette.vue'
 import ItemView from '@/components/item/ItemView.vue'
 import ScreenBoundary from './components/ScreenBoundary.vue'
@@ -126,7 +126,7 @@ async function createNote(v) {
   openRef(`note:${note.name}`)
 }
 const somedayFields = computed(() => [{ name: 'title', label: 'What to park', required: true },
-  { name: 'as_note', label: 'It is', options: [{ label: 'A task', value: 0 }, { label: 'A thought with no action (a note)', value: 1 }] }, { name: 'area', label: 'Area', options: areaOptions() },
+  { name: 'as_note', label: 'It is', options: [{ label: 'A task', value: 0 }, { label: 'A thought with no action (a note)', value: 1 }] }, { name: 'area', label: 'Area', pick: 'area' },
   { name: 'body_md', label: 'More detail', type: 'textarea' }, { name: 'note', label: 'Why it can wait (optional)' }])
 async function createSomeday(v) {
   await todayData.someday.create({ space: store.space, ...v })

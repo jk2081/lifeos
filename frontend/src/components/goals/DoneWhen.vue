@@ -6,7 +6,7 @@
     </div>
     <div v-if="examples.length" class="flex flex-col gap-1.5 rounded-md bg-surface-gray-1 p-2.5" data-measure-examples>
       <span class="text-sm text-ink-gray-6">Two examples for this kind of goal. Tap one to start from it.</span>
-      <button v-for="(x, i) in examples" :key="i" type="button" class="text-left text-sm text-ink-gray-8 hover:underline focus-visible:focus-ring" data-measure-example @click="useExample(x)">{{ x }}</button>
+      <LinkButton v-for="(x, i) in examples" :key="i" class="text-sm !text-ink-gray-8" data-measure-example @click="useExample(x)">{{ x }}</LinkButton>
     </div>
     <TabButtons :model-value="m.measure_kind || ''" :options="KINDS" data-measure-kind @update:model-value="setKind" />
     <FormControl v-if="m.measure_kind === 'Milestone'" v-model="m.done_when" type="textarea" :rows="2" label="Finish line" :disabled="disabled"
@@ -32,6 +32,7 @@
   </div>
 </template>
 <script setup>
+import LinkButton from '@/components/ui/LinkButton.vue'
 // "Done when…" (set 7): how a goal will be known to be done. A finish line (Milestone, `done_when`) or a number (Number:
 // what is measured, its unit, a start and a target). Suggest asks the assistant (or simple rules without a key). A title or
 // finish line that reads as a frequency ("daily", "3 times a week") offers Make it a habit instead.

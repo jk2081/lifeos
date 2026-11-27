@@ -43,8 +43,7 @@
             <template v-if="lead(goal)">
               <span class="min-w-0 truncate text-ink-gray-8" data-lead-action>{{ lead(goal).title }}<span class="text-ink-gray-6"> · {{ lead(goal).per_week }}/wk</span></span>
               <span class="flex gap-1" role="group" :aria-label="`Ticks for ${lead(goal).title}`">
-                <button v-for="i in lead(goal).per_week" :key="i" type="button" class="size-[22px] rounded-4 border focus-visible:focus-ring max-md:size-8"
-                  :class="i <= count(lead(goal)) ? 'border-outline-gray-9 bg-surface-gray-9' : 'border-outline-gray-3 bg-surface-base'" :disabled="!canTick"
+                <Button v-for="i in lead(goal).per_week" :key="i" :variant="i <= count(lead(goal)) ? 'solid' : 'outline'" class="!size-[22px] !min-w-0 !p-0 max-md:!size-8" :disabled="!canTick"
                   :aria-pressed="i <= count(lead(goal))" :aria-label="`${lead(goal).title}, tick ${i} of ${lead(goal).per_week}`" data-tick @click="tap(lead(goal), i)" />
               </span>
               <span class="text-right text-sm tabular-nums text-ink-gray-6" data-tick-count>{{ count(lead(goal)) }} of {{ lead(goal).per_week }}</span>

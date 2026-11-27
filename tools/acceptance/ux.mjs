@@ -56,7 +56,8 @@ export const STATE_TABS = [
   ['Archive', '/life/library/archive', 'type', ['all', 'Life Task', 'Life Note', 'Life Chat Log', 'Life Vault Document', 'Life Inbox Item', 'trash'], `area=${uxArea}`],
   ['Someday', '/life/goals/someday', 'tab', ['all', 'due', 'tasks', 'goals', 'notes'], `area=${uxArea}`],
   ['Captures', '/life/brain/captures', 'tab', ['all', 'chats', 'voice', 'documents', 'photos', 'videos', 'articles', 'email', 'text'], `area=${uxArea}`],
-  ['All', '/life/library', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'videos', 'articles', 'email', 'text'], `area=${uxArea}`],
+  // the plain /life/library (and /life/library?all=1) is the Everything list since issue 147; the Kind tabs are on the screen a non-list parameter opens
+  ['All', '/life/library?tab=all', 'tab', ['all', 'notes', 'chats', 'voice', 'documents', 'photos', 'videos', 'articles', 'email', 'text'], `area=${uxArea}`],
 ]
 
 

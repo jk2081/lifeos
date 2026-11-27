@@ -12,19 +12,19 @@
           <FormControl v-model="differently" type="textarea" :rows="3" label="What will you do differently? (optional)"
             placeholder="For example: no goal work after 17:00; it never happens." data-do-differently @update:model-value="queue" />
           <Card tint class="flex flex-col gap-2" data-week-numbers>
-            <h3 class="text-base-medium text-ink-gray-9">The week in numbers</h3>
+            <SectionHead>The week in numbers</SectionHead>
             <p class="text-sm text-ink-gray-7">{{ numbersLine }}</p>
             <p v-if="d.last" class="text-sm text-ink-gray-7" data-playback>Last week you wrote: <i>“{{ d.last.line }}”</i><template v-if="d.last.check"> {{ d.last.check }}</template></p>
           </Card>
         </div>
         <Card class="flex flex-col gap-2" data-lock-preview>
-          <h3 class="text-base-medium text-ink-gray-9">When you lock the week</h3>
+          <SectionHead>When you lock the week</SectionHead>
           <div class="text-sm-medium text-ink-gray-8">Top three</div>
-          <div v-for="t in d.preview.top" :key="t.goal" class="flex items-center gap-2 border-b border-outline-gray-1 py-1.5 last:border-b-0" data-lock-top>
+          <Row bare v-for="t in d.preview.top" :key="t.goal" class="flex items-center gap-2 py-1.5" data-lock-top>
             <span class="lucide-star size-4 shrink-0 text-ink-amber-9" aria-hidden="true" />
             <span class="min-w-0 flex-1 truncate text-base text-ink-gray-9">{{ t.title }}</span>
             <span class="text-sm tabular-nums text-ink-gray-6">{{ t.slot ? `${weekday(t.slot, 3)} ${time(t.slot)}` : 'No set time' }}</span>
-          </div>
+          </Row>
           <ul class="mt-1 flex flex-col gap-0.5 text-sm text-ink-gray-7">
             <li>· {{ d.preview.planned }} task{{ d.preview.planned === 1 ? '' : 's' }} planned, {{ d.preview.scheduled }} with a time, shown on Today</li>
             <li v-if="d.preview.delegated.length">· {{ d.preview.delegated.length }} delegated ({{ d.preview.delegated.map((x) => x.who).join(', ') }}, waiting)</li>
@@ -40,6 +40,8 @@
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 // Tab 4, Reflect (board 33): what went well (required) and what to do differently, the week in numbers, last week's note
 // played back, and what Lock will do. Lock the week shows the done screen.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'

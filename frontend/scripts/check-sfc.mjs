@@ -33,6 +33,12 @@ for (const file of files) {
     const m = re.exec(src)
     if (m) fail(file, `${what}  ->  ${m[0].slice(0, 80)}`)
   }
+  // a raw <button> is a hand-written control; the one exception is the whole-row target (class "absolute inset-0"), and the parts under components/ui/
+  if (!rel.startsWith('src/components/ui/')) {
+    for (const m of src.matchAll(/<button[\s>]/g)) {
+      if (!src.slice(m.index, m.index + 400).includes('absolute inset-0')) fail(file, 'a raw <button>: use frappe-ui Button (ui/LinkButton for a link-looking one); only <button class="absolute inset-0"> may stay')
+    }
+  }
   if (!HEX_OK.test(file)) {
     const m = /(?<![&\w])#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b(?![-\w])/.exec(src.replace(/href="#"/g, ''))
     if (m) fail(file, `a hex colour (${m[0]}): use a token class or variable`)

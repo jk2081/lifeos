@@ -13,7 +13,7 @@
           <FormControl v-if="monthly" v-model="change" type="textarea" :rows="2" label="One change for next month (optional)" data-change @update:model-value="queue" />
         </div>
         <Card class="flex flex-col gap-2" data-lock-preview>
-          <h3 class="text-base-medium text-ink-gray-9">{{ monthly ? 'When you lock the month' : 'When you lock the cycle' }}</h3>
+          <SectionHead>{{ monthly ? 'When you lock the month' : 'When you lock the cycle' }}</SectionHead>
           <ul v-if="p" class="flex flex-col gap-0.5 text-sm text-ink-gray-7">
             <template v-if="monthly">
               <li>· {{ p.goals.length }} goal{{ p.goals.length === 1 ? '' : 's' }} in {{ p.title }}, {{ p.goals.filter((g) => g.carried_from).length }} carried, in the order you gave</li>
@@ -33,6 +33,7 @@
   </div>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 // Tab 4, Reflect, and Lock: what went well (required), what did not and one change (monthly). Lock writes next month's plan or
 // closes the cycle and makes the next one.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'

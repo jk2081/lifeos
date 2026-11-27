@@ -44,7 +44,7 @@
             <div class="flex flex-wrap gap-1.5">
               <span v-for="(c, i) in s.items" :key="c + i" class="inline-flex max-w-full items-center gap-1 rounded-full bg-surface-gray-2 py-0.5 pl-2.5 pr-1 text-sm text-ink-gray-8" data-chip>
                 <span class="min-w-0 break-words">{{ c }}</span>
-                <button v-if="writable" type="button" class="flex size-5 flex-none items-center justify-center rounded-full hover:bg-surface-gray-3 focus-visible:focus-ring" :aria-label="`Remove ${c}`" data-chip-remove @click="s.items.splice(i, 1)"><span class="lucide-x size-3.5" aria-hidden="true" /></button>
+                <Button v-if="writable" class="!size-5 !rounded-full" variant="ghost" size="xs" icon="lucide-x" :label="`Remove ${c}`" data-chip-remove @click="s.items.splice(i, 1)" />
               </span>
               <span v-if="!s.items.length" class="text-sm text-ink-gray-5">Nothing listed.</span>
             </div>
@@ -138,7 +138,7 @@
         <label class="flex cursor-pointer flex-col items-center gap-1 rounded-5 border border-dashed border-outline-gray-3 px-4 py-6 text-center text-sm text-ink-gray-7 hover:bg-surface-gray-1" data-try-drop
           @dragover.prevent @drop.prevent="(e) => pick(e.dataTransfer.files?.[0])">
           <span class="lucide-upload size-5" aria-hidden="true" />{{ file ? file.name : 'Drop a file here, or pick one' }}
-          <input type="file" class="sr-only" data-try-file @change="(e) => pick(e.target.files?.[0])" />
+          <FilePick class="sr-only" data-try-file @files="(fs) => pick(fs[0])" />
         </label>
         <Textarea v-model="sample.text" :rows="4" class="w-full" placeholder="Or paste some text" aria-label="Sample text" data-try-text />
         <TextInput v-model="sample.url" placeholder="Or a link" aria-label="Sample link" data-try-url />
@@ -175,6 +175,7 @@
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import RefLink from '@/components/ui/RefLink.vue'
+import FilePick from '@/components/ui/FilePick.vue'
 // One source (issue 84): a channel (where it comes from) or a kind (what it is), as one page in one template: a strip, then Overview, Rules,
 // Examples & lessons, Activity and Try it. Rules show the source's skill as fields and save as a new version of it.
 import { computed, ref, watch } from 'vue'

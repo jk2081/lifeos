@@ -17,8 +17,9 @@ const NOT_OFFERED = new Set(['_user_tags', '_liked_by', '_assign', 'space'])
  *                           is offered: on Life Index, `area` is stored as text, and declaring it a Link gives it the record picker.
  * @param options.synthetic  table columns the screen draws itself: [{ key: '_badge', label, width, align, place }]
  * @param options.hidden     field names not to offer in the filter
+ * @param options.only       when given, the only real fields offered (a list whose method filters on a few fields, not on every one)
  */
-export function useLifeListView(doctype, { virtual = [], synthetic = [], hidden = [] } = {}) {
+export function useLifeListView(doctype, { virtual = [], synthetic = [], hidden = [], only = null } = {}) {
   const view = useListView(doctype, { synthetic })
   const { meta } = useDoctypeMeta(doctype)
   const metaFields = computed(() => meta.value?.fields ?? [])
@@ -26,7 +27,7 @@ export function useLifeListView(doctype, { virtual = [], synthetic = [], hidden 
 
   // every field a condition can be made on, as the Filter control wants them
   const fields = computed(() => [
-    ...getFilterableFields(metaFields.value, doctype).filter((f) => !NOT_OFFERED.has(f.fieldname) && !hidden.includes(f.fieldname) && !virtual.some((v) => v.fieldname === f.fieldname)),
+    ...getFilterableFields(metaFields.value, doctype).filter((f) => !NOT_OFFERED.has(f.fieldname) && !hidden.includes(f.fieldname) && (!only || only.includes(f.fieldname)) && !virtual.some((v) => v.fieldname === f.fieldname)),
     ...virtual.map((v) => ({ ...v, value: v.fieldname })),
   ])
   // the same list in the shape of the Filter's `fields` prop: a name for a Meta field, a declaration for a virtual one

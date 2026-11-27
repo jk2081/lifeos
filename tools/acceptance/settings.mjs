@@ -804,13 +804,15 @@ for (const width of WIDTHS) {
       await s.open('/life/settings?tab=calendar')
       const pick = pg.locator('[data-calendar-write]')
       await pick.waitFor({ timeout: 10000 })
-      must((await pick.inputValue()) === '', 'writing is not off by default')
-      must((await pick.locator('option').count()) >= 2, 'the calendars of the account are not listed')
-      await pick.selectOption('primary')
+      must(/Off: nothing is written/.test(await pick.innerText()), 'writing is not off by default')
+      await pick.click()
+      must((await pg.getByRole('option').count()) >= 2, 'the calendars of the account are not listed')
+      await pg.getByRole('option').nth(1).click()
       await pg.waitForTimeout(800)
+      const chosen = await pick.innerText()
       await s.open('/life/settings?tab=calendar')
       await pg.locator('[data-calendar-write]').waitFor({ timeout: 10000 })
-      must((await pg.locator('[data-calendar-write]').inputValue()) === 'primary', 'the choice was not saved')
+      must((await pg.locator('[data-calendar-write]').innerText()) === chosen && !/Off: nothing/.test(chosen), 'the choice was not saved')
       must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
     })
   } finally {
@@ -1497,7 +1499,7 @@ frappe.db.commit()`)
 from lifeos.api import tools
 tools.people_add("Done I125S ${width} ${stamp}", space="${SPACE}", source_system="${KEY}", asked_by="owner", owner_message="Add the person")
 frappe.db.commit()`)
-      await s.open('/life/brain/activity')
+      await s.open('/life/brain/activity?all=1')
       const row = pg.locator('[data-assistant-row]', { hasText: 'Done I125S' }).first()
       await row.waitFor({ timeout: 10000 })
       must((await row.innerText()).includes("Jai's assistant · you asked"), 'Activity reads: ' + (await row.innerText()).replace(/\s+/g, ' '))
@@ -1521,6 +1523,37 @@ frappe.db.commit()`)
 for n in frappe.get_all("Life Person", filters={"space": "${SPACE}", "full_name": ["like", "% I125S %"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
 for dt in ("Life Agent Action", "Life Agent Job", "Life Agent Config"): frappe.db.delete(dt, {"space": "${SPACE}", "agent": "${KEY}"})
 frappe.db.delete("Life Connection", {"space": "${SPACE}", "system": "${KEY}"})`)
+    await s.ctx.close()
+  }
+}
+
+// An empty space: every Settings list says what will appear, with at most one action.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  try {
+    bench(`if not frappe.db.exists("Life Space", "zz-settings-empty"):
+    frappe.get_doc({"doctype": "Life Space", "space_name": "zz-settings-empty", "owner_user": "owner@lifeos.test", "members": [{"user": "owner@lifeos.test", "access": "Write"}]}).insert(ignore_permissions=True)`)
+    await check('SETTINGS.48', `${width} px: on an empty space every Settings list shows [data-empty] with one line and at most one action`, async () => {
+      await pg.evaluate(() => localStorage.setItem('lifeos-space', 'zz-settings-empty'))
+      let seen = 0
+      for (const p of ['/life/settings?tab=members', '/life/settings?tab=areas', '/life/settings?tab=tags', '/life/settings?tab=habits', '/life/settings?tab=rules']) {
+        await s.open(p)
+        await pg.waitForTimeout(1500)
+        const empties = pg.locator('[data-main] [data-empty]')
+        seen += await empties.count()
+        for (let i = 0; i < await empties.count(); i++) {
+          must((await empties.nth(i).innerText()).length > 10, `${p}: an empty list has no line`)
+          must((await empties.nth(i).locator('[data-empty-action]').count()) <= 1, `${p}: an empty list has two actions`)
+        }
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `${p} scrolls sideways`)
+      }
+      must(seen >= 1, `only ${seen} empty states on the Settings lists of an empty space`)
+    })
+  } finally {
+    await pg.evaluate(() => localStorage.setItem('lifeos-space', 'Private')).catch(() => {})
+    bench(`from lifeos.tools import devtools
+devtools.purge_space("zz-settings-empty", drop=True)`)
     await s.ctx.close()
   }
 }

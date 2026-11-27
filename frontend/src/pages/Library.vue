@@ -37,8 +37,8 @@
             </div>
           </template>
         </Tree>
-        <Empty v-if="loaded && !notes.length" title="No notes yet." hint="Notes hold reference material and notes on your goals, in Markdown. Add one with New note." />
-        <Empty v-else-if="loaded && !nodes.length" title="No note matches." hint="Clear the filter to see every note." />
+        <EmptyState v-if="loaded && !notes.length" line="No notes yet. Notes hold reference material and notes on your goals, in Markdown. Add one with New note." />
+        <EmptyState v-else-if="loaded && !nodes.length" line="No note matches. Clear the filter to see every note." />
       </aside>
 
       <section class="min-w-0 flex-1 px-7 pb-12 pt-6 max-md:p-4" :class="!id && 'max-md:hidden'" data-library-reader>
@@ -55,8 +55,8 @@
             <div class="mt-6"><Backlinks doctype="Life Note" :name="note.name" :reload="reloadKey" /></div>
           </div>
         </template>
-        <Card v-else-if="missing"><Empty title="This note was not found." hint="It may be in another space, or it was removed." /></Card>
-        <Card v-else-if="!id" class="max-md:hidden"><Empty title="Pick a note." hint="Notes are listed on the left under their area. A note with no goal is reference material for its area." /></Card>
+        <Card v-else-if="missing"><EmptyState line="This note was not found. It may be in another space, or it was removed." /></Card>
+        <Card v-else-if="!id" class="max-md:hidden"><EmptyState line="Pick a note. Notes are listed on the left under their area. A note with no goal is reference material for its area." /></Card>
       </section>
     </div>
   </template>
@@ -68,7 +68,7 @@
         <div class="min-w-0 flex-1"><div class="text-base-medium text-ink-gray-9">{{ v.on }}</div><div class="text-sm text-ink-gray-6">Changed: {{ v.changed.join(', ') || 'details' }} · by {{ v.by }}</div></div>
         <Button v-if="v.previous_content != null" label="Restore the text from before this change" @click="restore(v)" />
       </Row>
-      <Empty v-if="!versions.length" title="No earlier versions." hint="Each save after the first keeps the previous text here." />
+      <EmptyState v-if="!versions.length" line="No earlier versions. Each save after the first keeps the previous text here." />
     </div>
   </Dialog>
 </template>
@@ -82,7 +82,7 @@ import { Button, Dialog, Dropdown, Select, TabButtons, TextInput, Tree, dialog, 
 import PageHead from '@/components/PageHead.vue'
 import NotesList from '@/components/lists/NotesList.vue'
 import { NOTES_VIEWS, WRITTEN_BY } from '@/lib/nav'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import NoteEditor from '@/components/NoteEditor.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import NewRecord from '@/components/NewRecord.vue'
@@ -93,7 +93,7 @@ import SectionHead from '@/components/ui/SectionHead.vue'
 import { db, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
-import { areaOptions, loadLookups } from '@/lib/lookups'
+import { loadLookups } from '@/lib/lookups'
 
 const props = defineProps({ id: String })
 const route = useRoute()
@@ -119,7 +119,7 @@ const versions = ref([])
 const reloadKey = ref(0)
 
 const writable = computed(() => store.spaces.find((s) => s.name === note.value?.space)?.access === 'Write')
-const NEW_FIELDS = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'area', label: 'Area', options: areaOptions() }])
+const NEW_FIELDS = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'area', label: 'Area', pick: 'area' }])
 
 const TREE_CAP = 50
 const showAll = ref([])

@@ -8,8 +8,7 @@
   <div v-if="ladder.loaded && !ladder.complete && !ladder.dismissed" class="mt-3 rounded-5 border border-outline-gray-2 bg-surface-gray-1 p-3" data-setup-card>
     <div class="flex items-start justify-between gap-1">
       <div class="text-sm-medium text-ink-gray-9" data-setup-level>Your setup · level {{ ladder.level }} of {{ ladder.of }}</div>
-      <button type="button" class="-mr-1 -mt-1 rounded p-1 text-ink-gray-6 hover:text-ink-gray-9 focus-visible:focus-ring" aria-label="Dismiss your setup card" data-setup-dismiss
-        @click="dismissLadder()"><span class="lucide-x block size-3.5" aria-hidden="true" /></button>
+      <Button class="-mr-1 -mt-1" variant="ghost" size="xs" icon="lucide-x" label="Dismiss your setup card" data-setup-dismiss @click="dismissLadder()" />
     </div>
     <div class="mt-1 flex gap-1" aria-hidden="true"><span v-for="n in ladder.of" :key="n" class="h-1 flex-1 rounded-full" :class="n <= ladder.level ? 'bg-surface-gray-7' : 'bg-surface-gray-3'" /></div>
     <p class="mt-2 text-sm text-ink-gray-7" data-setup-next>{{ ladder.next?.text }}</p>
@@ -20,6 +19,7 @@
   </div>
 </template>
 <script setup>
+import { Button } from 'frappe-ui'
 import { ladder, dismissLadder } from '@/lib/ladder'
 
 const emit = defineEmits(['go'])

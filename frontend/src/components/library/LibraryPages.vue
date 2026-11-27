@@ -13,7 +13,7 @@
 
     <Card v-if="rows.length" class="!p-0" data-pages-card>
       <ul class="flex flex-col">
-        <li v-for="r in rows" :key="r.doctype + r.name" class="border-b border-outline-gray-1 last:border-b-0 hover:bg-surface-gray-1" data-pages-row :data-name="r.name" :data-kind="r.kind" :data-status="r.status || ''">
+        <Row as="li" bare v-for="r in rows" :key="r.doctype + r.name" class="hover:bg-surface-gray-1" data-pages-row :data-name="r.name" :data-kind="r.kind" :data-status="r.status || ''">
           <RouterLink class="flex w-full min-w-0 items-start gap-3 px-4 py-3 focus-visible:focus-ring" :to="pagePath(r.doctype, r.name)">
             <span :class="KIND_ICON[r.kind]" class="mt-0.5 size-5 flex-none text-ink-gray-7" aria-hidden="true" />
             <div class="min-w-0 flex-1">
@@ -22,21 +22,23 @@
               <div class="break-words text-sm text-ink-gray-6" data-pages-line>{{ r.path ? r.path + ' · ' : '' }}updated {{ ago(r.updated) }}<span v-if="r.new" data-pages-new> · {{ r.new }} new</span></div>
             </div>
           </RouterLink>
-        </li>
+        </Row>
       </ul>
     </Card>
     <div v-if="data && rows.length < data.total" class="flex justify-center"><Button label="Show more" :loading="more" data-pages-more @click="loadMore" /></div>
 
     <Card v-if="loaded && !rows.length" class="py-2" data-pages-empty>
-      <Empty :title="filtered ? 'Nothing matches.' : 'No pages yet.'">
-        <p class="mt-1">{{ filtered ? 'Try another kind or status, or clear the filters.' : 'A page appears here for each person, company and part that comes up in what you capture and connect, with a brief the Brain writes.' }}</p>
-        <Button v-if="filtered" class="mt-3" label="Clear filters" data-pages-clear @click="clear" />
-        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-pages-capture @click="openChat()" />
-      </Empty>
+      <EmptyState :line="`${filtered ? 'Nothing matches.' : 'No pages yet.'} ${filtered ? 'Try another kind or status, or clear the filters.' : 'A page appears here for each person, company and part that comes up in what you capture and connect, with a brief the Brain writes.'}`">
+        <template #action>
+          <Button v-if="filtered" size="sm" variant="subtle" label="Clear filters" data-empty-action data-pages-clear @click="clear" />
+          <Button v-else-if="writable" size="sm" variant="subtle" icon-left="lucide-message-square" label="Chat" data-empty-action data-pages-capture @click="openChat()" />
+        </template>
+      </EmptyState>
     </Card>
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import { openChat } from '@/lib/ask'
 // Library > Pages (issue 111): the first section of the Library. Every person, company, part and free-form page, filtered by kind (Companies, People, Parts and
 // projects, Notes) and by status (Prospect, Client, Partner, Past), the most recently updated first; "n new" is what was linked since you last opened it.
@@ -44,7 +46,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Badge, Button, FormControl, TextInput } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import { tryCall } from '@/lib/api'
 import { libraryData } from '@/data/library'
