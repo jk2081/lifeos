@@ -38,8 +38,8 @@
           <div v-for="goal in g.goals" :key="goal.name" class="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_auto_3.5rem] items-center gap-x-3 gap-y-1 border-b border-outline-gray-1 py-2.5 last:border-b-0 max-md:grid-cols-[minmax(0,1fr)_auto]"
             data-cycle-goal :data-goal="goal.name">
             <div class="min-w-0 max-md:col-span-2">
-              <RouterLink class="break-words text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/goals/${goal.name}`">{{ goal.title }}</RouterLink>
-              <RouterLink v-if="goal.serves_title" class="block truncate text-sm text-ink-gray-6 hover:underline focus-visible:focus-ring" :to="`/goals/${goal.serves}`" data-grid-serves>Serves {{ goal.serves_title }}{{ goal.serves_progress ? ' · ' + goal.serves_progress.label : '' }}</RouterLink>
+              <RefLink class="break-words text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`goal:${goal.name}`">{{ goal.title }}</RefLink>
+              <RefLink v-if="goal.serves_title" class="block truncate text-sm text-ink-gray-6 hover:underline focus-visible:focus-ring" :to="`goal:${goal.serves}`" data-grid-serves>Serves {{ goal.serves_title }}{{ goal.serves_progress ? ' · ' + goal.serves_progress.label : '' }}</RefLink>
             </div>
             <template v-if="lead(goal)">
               <span class="min-w-0 truncate text-ink-gray-8" data-lead-action>{{ lead(goal).title }}<span class="text-ink-gray-6"> · {{ lead(goal).per_week }}/wk</span></span>
@@ -78,7 +78,7 @@
       <ol v-if="goals.length" class="flex flex-col">
         <li v-for="(m, i) in goals" :key="m.row" class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-outline-gray-1 py-2.5 last:border-b-0" data-month-goal :data-goal="m.row">
           <span class="w-5 flex-none text-center text-sm tabular-nums text-ink-gray-6" aria-hidden="true">{{ i + 1 }}</span>
-          <RouterLink class="min-w-0 flex-1 break-words hover:underline focus-visible:focus-ring" :class="m.status === 'Done' || m.status === 'Dropped' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'" :to="`/goals/${m.row}`">{{ m.title }}</RouterLink>
+          <RefLink class="min-w-0 flex-1 break-words hover:underline focus-visible:focus-ring" :class="m.status === 'Done' || m.status === 'Dropped' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'" :to="`goal:${m.row}`">{{ m.title }}</RefLink>
           <Badge v-if="m.area_name" :label="m.area_name" />
           <Badge :theme="statusOf(m).theme" :label="statusOf(m).label" data-month-status />
         </li>
@@ -102,6 +102,7 @@
   <NewGoalDialog v-model="newOpen" @saved="load" @habit="loadMonth" />
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 // Goals > Cycles (issue 45): the 12 Week Year on the left (week bars, each cycle goal's lead action and this week's ticks) and this
 // month's plan on the right. It moves the Plan section's screens; the records, the API and the scores are the same.
 import { computed, onMounted, ref, watch } from 'vue'

@@ -83,7 +83,10 @@
             </div>
             <div v-if="r.outcome === 'failed'" class="mt-0.5 text-sm text-ink-red-8" data-row-reason><span aria-hidden="true">✦</span> {{ r.error || 'The agent could not read it.' }}</div>
             <div v-if="r.made.length" class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm" data-row-made>
-              <RouterLink v-for="m in r.made" :key="m.doctype + m.name" :to="madeTo(m)" class="text-ink-blue-8 hover:underline" data-made-link>{{ m.kind }}: {{ m.title }}</RouterLink>
+              <template v-for="m in r.made" :key="m.doctype + m.name">
+                <RefLink v-if="madeRef(m)" :to="madeRef(m)" class="text-ink-blue-8 hover:underline" data-made-link>{{ m.kind }}: {{ m.title }}</RefLink>
+                <RouterLink v-else :to="madeTo(m)" class="text-ink-blue-8 hover:underline" data-made-link>{{ m.kind }}: {{ m.title }}</RouterLink>
+              </template>
             </div>
           </div>
           <div class="flex flex-none flex-wrap items-center gap-2 max-md:pl-14">
@@ -99,6 +102,7 @@
   </div>
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 import { openChat } from '@/lib/ask'
 // Brain > Activity (issue 18): what came in and what the Brain did with it, newest first, by day. Filters: source, area and
 // what was done. A failed capture says why and can be retried. This week's Outbox piles sit on top, with the flow line; the
@@ -115,7 +119,7 @@ import { canWrite, store } from '@/lib/store'
 import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
 import { dotClass } from '@/lib/lens'
 import { iso, long, time, addDays } from '@/lib/dates'
-import { onRecordChanged, openRef, paneNav } from '@/lib/pane'
+import { onRecordChanged, openRef, paneNav, refOfRoute } from '@/lib/pane'
 
 const FILTERS = [{ value: '', label: 'All' }, { value: 'filed', label: 'Filed on its own' }, { value: 'waiting', label: 'Waiting for you' },
   { value: 'dropped', label: 'Dropped' }, { value: 'failed', label: 'Failed' }, { value: 'assistant', label: 'Assistant' }]
@@ -140,7 +144,9 @@ const sourceOptions = computed(() => [{ label: 'Every source', value: '' }, ...(
 const areaFilter = computed(() => [{ label: 'Every area', value: '' }, ...areaOptions().map((o) => ({ label: o.label, value: o.value }))])
 const dot = (a) => dotClass((lookups.areas || []).find((x) => x.name === a))
 const count = (v) => (v ? data.value?.counts?.[v] ?? 0 : data.value?.all ?? 0)
-const madeTo = (m) => m.route || `/item/${m.name}`
+// a record made from a capture opens in the Drawer where it has a layer; the rest go to their page
+const madeRef = (m) => refOfRoute(m.route) || (m.route ? null : `inbox:${m.name}`)
+const madeTo = (m) => m.route
 
 const groups = computed(() => {
   const today = iso(new Date())

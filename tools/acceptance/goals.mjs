@@ -899,7 +899,7 @@ print(json.dumps(out))`).split('\n').pop())
       must(/^Week \d+ · \d+%$/.test(await fit.locator('[data-goal-score]').innerText()), 'the week and score are not shown: ' + await fit.locator('[data-goal-score]').innerText())
       must((await row('golf').locator('[data-goal-next-title]').innerText()) === 'No next action', 'a goal with no tasks should say so')
       await c.locator('[data-goal-open]').click()
-      await pg.waitForURL(new RegExp(`/life/goals/${goals.pilot}`), { timeout: 8000 })
+      await pg.waitForURL((u) => u.searchParams.get('open') === `goal:${goals.pilot}`, { timeout: 8000 })
       // the default filter is this cycle: only the cycle goal of the eight shows, and Finished shows none of them
       await openGoals('')
       must((await row('fit').count()) === 1 && (await row('pilot').count()) === 0, 'This cycle should hold the cycle goal only')
@@ -1425,7 +1425,7 @@ cycles.carry_month_goal("${old}")`)
       const row = pg.locator('[data-month-card] [data-month-goal]', { hasText: T('second') })
       await row.locator('[data-month-status]', { hasText: 'Done' }).waitFor({ timeout: 10000 })
       await row.getByRole('link', { name: T('second') }).click()
-      await pg.waitForURL((u) => u.pathname === `/life/goals/${goal}`, { timeout: 10000 })
+      await pg.waitForURL((u) => u.pathname === '/life/goals/cycles' && u.searchParams.get('open') === `goal:${goal}`, { timeout: 10000 })
     })
 
     await check('GOALS.51', `${width} px: on an empty space (an area with nothing in it) Cycles says what will appear and how to add it`, async () => {
@@ -1591,6 +1591,16 @@ print(json.dumps({"cycle": cycle.name, "goal": g.name, "old": old.name, "career"
     const openEdit = async () => { await pg.locator('[data-goal-edit]').click(); await dialog().waitFor({ timeout: 8000 }); await settle() }
     const save = async () => { await dialog().getByRole('button', { name: 'Save goal' }).click(); await dialog().waitFor({ state: 'detached', timeout: 8000 }); await settle() }
 
+    await check('GOALS.78', `${width} px: an action row of a goal's grid opens its goal in the Drawer and the screen stays`, async () => {
+      await goalPage(made.goal)
+      const row = pg.locator('[data-goal-actions] [data-grid-action]').first()
+      await row.waitFor({ timeout: 10000 })
+      must((await row.locator('[data-action-open]').getAttribute('data-ref')) === 'goal:' + made.goal, 'the action row does not name its goal')
+      await row.locator('[data-action-open]').click({ position: { x: 5, y: 5 } })
+      await pg.waitForFunction((g) => new URL(location.href).searchParams.get('open') === 'goal:' + g, made.goal, { timeout: 8000 })
+      must(await pg.locator('[data-goal-actions]').count() > 0, 'the goal page is gone')
+      await noSideways()
+    })
     await check('GOALS.57', `${width} px: the page of a 12 Week Year goal shows the cycle's name and its own grid: its actions as rows, the weeks as columns, no Open grid`, async () => {
       await goalPage(made.goal)
       must((await pg.locator('main, [data-main]').first().innerText()).includes(`I56 cycle ${width}`), 'the cycle name is not in the header')
@@ -1741,12 +1751,12 @@ print(json.dumps([frappe.db.get_value("Life Task", "${made.task}", "goal"), frap
       must((await pg.locator('[data-measure-edit]').innerText()).includes('Edit'), 'the finish line has no Edit')
     })
 
-    await check('GOALS.74', `${width} px: in Cycles a goal's name opens its goal page`, async () => {
+    await check('GOALS.74', `${width} px: in Cycles a goal's name opens its goal in the Drawer and Cycles stays`, async () => {
       await one.open(`/life/goals/cycles?cycle=${made.cycle}`)
       await pg.locator('[data-cycle-goal-list]').waitFor({ timeout: 10000 })
       await pg.locator(`[data-cycle-goal][data-goal="${made.goal}"] a`).first().click()
-      await pg.locator('[data-goal-overview]').waitFor({ timeout: 10000 })
-      must(pg.url().includes(`/life/goals/${made.goal}`), 'opened ' + pg.url())
+      await pg.waitForFunction((g) => new URL(location.href).searchParams.get('open') === 'goal:' + g, made.goal, { timeout: 10000 })
+      must(new URL(pg.url()).pathname === '/life/goals/cycles', 'the goal left Cycles: ' + pg.url())
     })
 
     await check('GOALS.75', `${width} px: Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone`, async () => {
@@ -1995,6 +2005,27 @@ print(f.name)`).split('\n').pop()
         must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
         await pg.locator('[data-pane-full]').click()
         await pg.waitForURL((x) => x.pathname === `/life/focus/${focus}`, { timeout: 10000 })
+        must(!errors.length, 'script errors: ' + errors.join(' | '))
+      })
+      await check('GOALS.77', `${width} px: a goal card, a focus title and a goal's cycle row open in the Drawer and the screen stays; none of them goes to a page`, async () => {
+        await u.open('/life/goals')
+        const card = pg.locator('[data-goal-card] [data-goal-open]').first()
+        await card.waitFor({ timeout: 15000 })
+        await card.click()
+        await pg.waitForFunction(() => /^goal:/.test(new URL(location.href).searchParams.get('open') || ''), null, { timeout: 8000 })
+        must(new URL(pg.url()).pathname === '/life/goals', 'the goal card left the screen: ' + pg.url())
+        must(await pg.locator('[data-goal-card]').count() > 0, 'the goals list is gone')
+        await pg.locator('[data-pane-close]').click()
+        await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
+        await pg.locator('[data-focus-title]').first().click()
+        await pg.waitForFunction(() => /^focus:/.test(new URL(location.href).searchParams.get('open') || ''), null, { timeout: 8000 })
+        must(new URL(pg.url()).pathname === '/life/goals', 'the focus title left the screen: ' + pg.url())
+        await u.open('/life/goals/cycles')
+        const row = pg.locator('[data-cycle-goal] a, [data-month-goal] a').first()
+        await row.waitFor({ timeout: 15000 })
+        await row.click()
+        await pg.waitForFunction(() => /^goal:/.test(new URL(location.href).searchParams.get('open') || ''), null, { timeout: 8000 })
+        must(new URL(pg.url()).pathname === '/life/goals/cycles', 'a cycle goal left the screen: ' + pg.url())
         must(!errors.length, 'script errors: ' + errors.join(' | '))
       })
     } finally {

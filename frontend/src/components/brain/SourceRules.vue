@@ -15,10 +15,10 @@
     </Card>
     <Card class="flex flex-col gap-1" data-recently>
       <h2 class="text-base-medium text-ink-gray-9">Recently</h2>
-      <div v-for="x in d?.recently || []" :key="x.name" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-outline-gray-1 py-2 text-sm last:border-b-0" data-recent-row>
+      <Row v-for="x in d?.recently || []" :key="x.name" :pane="'inbox:' + x.name" :label="x.title" class="!flex-wrap !items-center justify-between gap-x-4 gap-y-1 text-sm" data-recent-row>
         <span class="min-w-0 flex-[1_1_240px] break-words text-ink-gray-9">{{ x.title }}</span>
         <span class="text-ink-gray-6" data-recent-decided>{{ x.decided }}</span>
-      </div>
+      </Row>
       <p v-if="d && !d.recently.length" class="text-sm text-ink-gray-6" data-recent-empty>Nothing has come in from here yet. It will be listed here with what decided it.</p>
     </Card>
     <RuleDialog v-model:open="adding" :source="sourceKey.startsWith('kind-') ? '' : sourceKey" @saved="load" />
@@ -30,6 +30,7 @@
 import { ref, watch } from 'vue'
 import { Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
+import Row from '@/components/ui/Row.vue'
 import RuleDialog from '@/components/brain/RuleDialog.vue'
 import RuleList from '@/components/brain/RuleList.vue'
 import { tryCall } from '@/lib/api'

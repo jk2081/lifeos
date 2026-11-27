@@ -32,7 +32,7 @@
       <Card v-if="page.note" data-page-note-body>
         <Md v-if="page.note.text" :text="page.note.text" />
         <p v-else class="text-base text-ink-gray-6">Nothing written yet.</p>
-        <Button class="mt-3" label="Edit the note" icon-left="lucide-pencil" :route="`/library/${name}`" data-page-edit-note />
+        <Button class="mt-3" label="Edit the note" icon-left="lucide-pencil" data-page-edit-note @click="openRef(`note:${name}`)" />
       </Card>
 
       <template v-else>
@@ -61,7 +61,7 @@
           <Card data-page-open>
             <h3 class="mb-2 text-base-medium text-ink-gray-9">Open</h3>
             <ul v-if="openCount" class="flex flex-col gap-1">
-              <li v-for="n in page.open.needs_you" :key="n.name" class="text-base" data-open-needs><RouterLink class="text-ink-blue-8 hover:underline" :to="`/brain/review/${n.item}`">{{ n.title }}</RouterLink><span class="text-sm text-ink-gray-6"> · needs you</span></li>
+              <li v-for="n in page.open.needs_you" :key="n.name" class="text-base" data-open-needs><RefLink class="text-ink-blue-8 hover:underline" :to="`inbox:${n.item}`">{{ n.title }}</RefLink><span class="text-sm text-ink-gray-6"> · needs you</span></li>
               <li v-for="t in page.open.tasks" :key="t.name" class="text-base" data-open-task><button type="button" class="text-left text-ink-gray-9 hover:underline" @click="openRef(t.ref)">{{ t.title }}</button><span v-if="t.due_date" class="text-sm text-ink-gray-6"> · due {{ short(t.due_date) }}</span></li>
               <li v-for="e in page.open.events" :key="e.name" class="text-base" data-open-event><button type="button" class="text-left text-ink-gray-9 hover:underline" @click="openRef(e.ref)">{{ e.title }}</button><span class="text-sm text-ink-gray-6"> · {{ short(e.starts_on) }}</span></li>
             </ul>
@@ -140,6 +140,7 @@
   <NewRecord v-if="merging" :model-value="true" title="Merge with another" action="Merge" :fields="mergeFields" :save="doMerge" @update:model-value="(v) => !v && (merging = false)" />
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 // A page (issue 111): a person, a company, a part or a note, laid out top to bottom as header, the Brain's brief with numbered sources, Open, People, Files,
 // Timeline and Your notes. The Brain writes the brief and links what it files; the owner's own text is Your notes, which nothing else writes. A free-form page
 // is the header and its note. Opening the page clears the "new" count on its pin.

@@ -51,12 +51,42 @@ def runner_alive() -> bool:
 	return bool(seen) and get_datetime(seen) > add_to_date(now_datetime(), minutes=-ALIVE_MINUTES)
 
 
+def installed(repo=None) -> dict | None:
+	"""The commit the app's folder is at right now (`git rev-parse HEAD`), never a saved value. None when git cannot say."""
+	try:
+		return git.describe(repo or repo_path(), "HEAD")
+	except git.GitError:
+		return None
+
+
+def available_now(state_value: dict, repo=None) -> dict | None:
+	"""What the last check found, unless the app has caught up with it since (the saved value may be older than the folder)."""
+	found = state_value.get("available")
+	here = installed(repo)
+	if not found or not here:
+		return found
+	if found["commit"] == here["commit"] or git.is_ancestor(repo or repo_path(), found["commit"], "HEAD"):
+		return None
+	return found
+
+
+def ready_checks() -> list[dict]:
+	"""The checks of "Ready to update". They run as the bench's user, like the runner, so they are run by the check job, not the web page."""
+	from lifeos.updater.runner import BenchSteps
+
+	return BenchSteps().ready()
+
+
 def check(repo=None, remote_name=None, branch_name=None) -> dict:
 	"""Read the installed commit, ask the remote for its newest, and list what a fetch brings. Never changes the checkout."""
 	repo = repo or repo_path()
 	remote_name = remote_name or remote()
 	branch_name = branch_name or branch()
-	out = {"checked_at": str(now_datetime()), "branch": branch_name, "error": None, "available": None}
+	out = {"checked_at": str(now_datetime()), "branch": branch_name, "error": None, "available": None, "ready": []}
+	try:
+		out["ready"] = ready_checks()
+	except Exception:
+		frappe.log_error(title="Life OS update readiness check")
 	try:
 		out["installed"] = git.describe(repo, "HEAD")
 	except git.GitError as e:

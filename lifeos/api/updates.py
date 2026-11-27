@@ -16,7 +16,7 @@ def _owner_only():
 
 
 def _history():
-	return frappe.get_list("Life Update", fields=["name", "from_commit", "to_commit", "requested_by", "requested_on", "status", "summary", "started", "finished", "log"],
+	return frappe.get_list("Life Update", fields=["name", "from_commit", "to_commit", "requested_by", "requested_on", "status", "reason", "fix", "summary", "started", "finished", "log"],
 		order_by="creation desc", limit=HISTORY)
 
 
@@ -26,7 +26,9 @@ def get():
 	_owner_only()
 	s = status.state()
 	busy = frappe.db.exists("Life Update", {"status": ["in", ["Queued", "Running"]]})
-	return {"installed": s.get("installed"), "available": s.get("available"), "checked_at": s.get("checked_at"), "error": s.get("error"),
+	# the installed commit is read from the app's folder now; a saved value can be older than the folder
+	return {"installed": status.installed() or s.get("installed"), "available": status.available_now(s), "checked_at": s.get("checked_at"), "error": s.get("error"),
+		"ready": s.get("ready") or [],
 		"branch": s.get("branch") or status.branch(),
 		"runner": {"alive": status.runner_alive(), "last_seen": status.last_seen(), "setup_command": f"bench --site {frappe.local.site} lifeos-setup-updater"},
 		"busy": bool(busy), "history": _history()}
@@ -44,9 +46,15 @@ def check_now():
 def request_update():
 	"""Queue an update to the newest commit found by the last check. Only a commit hash is stored; the runner checks it is on the remote branch."""
 	_owner_only()
-	available = status.state().get("available")
+	state = status.state()
+	available = status.available_now(state)
 	if not available:
+		if state.get("available"):
+			frappe.throw(_("You're up to date."), title=_("You're up to date"))
 		frappe.throw(_("There is nothing newer to install. Check again first."), title=_("Nothing to install"))
+	for check in state.get("ready") or []:
+		if not check.get("ok"):
+			frappe.throw(check.get("fix") or _("A check failed."), title=_("Not ready to update"))
 	if not status.runner_alive():
 		frappe.throw(_("The updater is not running on this server. Set it up first."), title=_("The updater is not running"))
 	if frappe.db.exists("Life Update", {"status": ["in", ["Queued", "Running"]]}):
@@ -54,4 +62,19 @@ def request_update():
 	doc = frappe.get_doc({"doctype": "Life Update", "to_commit": available["commit"],
 		"summary": "\n".join(c["title"] for c in available.get("changes", []))})
 	doc.insert()
+	return get()
+
+
+@frappe.whitelist(methods=["POST"])
+def restart_now():
+	"""Run the restart step again for the update that Needs restart. The runner does it; the page only records the request."""
+	_owner_only()
+	name = frappe.db.get_value("Life Update", {"status": "Needs restart"}, "name", order_by="creation desc")
+	if not name:
+		frappe.throw(_("Nothing is waiting for a restart."), title=_("No restart needed"))
+	if not status.runner_alive():
+		frappe.throw(_("The updater is not running on this server. Set it up first."), title=_("The updater is not running"))
+	if frappe.db.exists("Life Update", {"status": ["in", ["Queued", "Running"]]}):
+		frappe.throw(_("An update is already waiting or running."), title=_("An update is in progress"))
+	frappe.db.set_value("Life Update", name, {"status": "Queued", "restart_only": 1})
 	return get()

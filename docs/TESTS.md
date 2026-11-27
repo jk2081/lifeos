@@ -16,7 +16,8 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
 | `test_library.py` | Library (`TestPages`: pages that build themselves, issue 111: an email linked to a known person and their organisation, a page made on a reply thread with Undo, a proposal after three emails, no page for a promotion, "same company" merging and adding the alias, the daily briefs with sources and no Vault text, AI usage and the cap, per-user pins capped at seven, a wrong link taken off, Your notes kept): notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
 | `test_people.py` | People and organisations, the person page and its mentions, the person picker's options (people only, company and email search, name matches first, recent first, no silent cap) |
-| `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection), Updates (who may ask, the check against a temporary repository, the runner's steps and rollback, a target not on the remote, one runner at a time, Update now) |
+| `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection) |
+| `test_updater.py` | Updates: who may ask, the check against a temporary repository, the runner's steps and rollback, a target not on the remote, one runner at a time, Update now; the checks before anything changes (restart and restore without a person), only the restart failing (Needs restart, Restart now), a failed step's command, exit code and output, the restore through the site's own user, the installed commit read from git and an update to it refused |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it, notes on events (Comments), Hide in Life OS |
 | `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers, the return address to add, Google's error, an abandoned sign-in cleaned up, which case a search with no inbox is), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools, Ask's tools (read a period page by page, the daily digests, save an attachment, make pages and people, save notes and tasks, each write logged with Undo, an agent's switches, a long read run in the background, a question with choices, File buttons named for what they file) |
@@ -42,6 +43,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
 | `ingest-email` (was `triage-email`) | `test_gmail.TestDigest`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
 | one assistant: the owner's requests through an agent, the gate, `tasks_add`/`events_add`, Activity's Assistant rows, the name and the failed job | `test_agents.TestOneAssistant`, `test_permissions.TestOnlyTheOwnerIsTheOwner` | `BRAIN.73`, `SETTINGS.45`, `SETTINGS.46` |
+| the lifeos skill names every agent tool (`lifeos.api.tools`, `chats.relay`, `chats.report`) | `test_agents.TestSkillNamesAgentTools` | none (no screen) |
 | relayed conversations (`chats.relay`) in Chat's History | `test_library.TestRelayedChat` | `BRAIN.74` |
 | the agent connector (`agent/connector/`) | `test_agents.TestConnector` | `BRAIN.49` to `BRAIN.51` |
 | Google through Life OS: acts, switches, the log and undo | `test_agents.TestGoogleActs`, `test_gmail.TestMailSearch`, `test_gmail.TestMailSearch` | `BRAIN.52` to `BRAIN.54` |
@@ -63,7 +65,7 @@ What opens over every screen: layers, the URL that holds them, Back and Esc, the
 - `CORE.2` Chat is a layer (Cmd+K); a source in an answer opens on top of it with Back; Back returns to the same chat with its answer; Esc twice closes everything
 - `CORE.3` a list, then a row, then Back returns to the list with its row marked; j moves to the next row's record
 - `CORE.4` at 1440 px the Drawer is docked and the page narrows; at 1280 px it floats and the page keeps its width; at 390 px it is full screen with Back, in light and dark
-- `CORE.5` the guard finds a link to a record route in a .vue file (a fixture fails), and the tree has none beyond the screens #129 has yet to move
+- `CORE.5` the guard finds a link to a record route in a .vue file (a fixture fails), and the tree has none
 
 ### Today (`tools/acceptance/today.mjs`, 63 checks)
 
@@ -219,6 +221,8 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.74` Ask's History lists a relayed conversation "on Telegram"; it opens read only with its turns in order and no question box
 - `BRAIN.75` Chat runs on Flow (a real Flow Server, the fake model of `tools/fake_openai.py`): the box reads "Search or chat", a question streams an answer in the Chat panel and writes a usage row, ⌘K opens the Chat panel, `/` the search palette, `/life/ask` goes to Today, and no visible text says Ask (screen, panel, ⌘K, Chat page, Settings)
 - `BRAIN.77` in Chat "Vivek owes me the ITR draft by Friday" makes a waiting task and says nothing was sent; "Ask Vivek for the ITR draft by Friday" drafts, with Send on the task
+- `BRAIN.78` a "What it did" row that changed a task opens it in the Drawer and the agent's page stays; a failed act stays plain; a reported skill that is also a Life OS skill links to its page
+- `BRAIN.79` a "Recently" row on a source's Rules tab opens the capture in the Drawer
 - `BRAIN.76` with no model in Flow, a question says "Chat needs an AI key" with its link to Settings › AI, and at the monthly cap Chat refuses and shows the spend
 - `BRAIN.64` a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"
 - `BRAIN.66` Gmail's Rules tab lists its sender rule and the two built-in rules in the order they are tried, with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings
@@ -306,8 +310,9 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.76` focus: opens a focus in the Drawer (standard, principles, goals, review); Open full page goes to /focus/<id>
 - `GOALS.72` ticking this week's cell on the goal page updates the week's score there and in Cycles
 - `GOALS.73` a goal without Done when shows one prompt; once set, the finish line shows with Edit
-- `GOALS.74` in Cycles a goal's name opens its goal page
+- `GOALS.74` in Cycles a goal's name opens its goal in the Drawer and Cycles stays
 - `GOALS.75` Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone
+- `GOALS.78` an action row of a goal's grid opens its goal in the Drawer and the screen stays
 
 ### Library (`tools/acceptance/library.mjs`, 52 checks)
 
@@ -393,13 +398,14 @@ Unit tests: `test_review.py`
 - `REVIEW.15` Decide: carry one goal and drop another with a reason; after Lock the plan holds the carried goal and the dropped one is dropped
 - `REVIEW.16` the goals made in Plan are in the order given, and Goals > Cycles shows them
 - `REVIEW.17` with no month to look back on, the monthly review says nothing is due
-- `REVIEW.18` the 12-week review's Score shows the twelve weekly scores and the cycle view's average
+- `REVIEW.18` the 12-week review's Score shows the twelve weekly scores and the cycle view's average; a goal row opens its goal in the Drawer and the review stays
 - `REVIEW.19` Goals > Cycles offers the 12-week review, and there is no Close cycle pop-up (its link opens the review)
 - `REVIEW.20` both reviews show numbered tabs, and nothing scrolls sideways
 - `REVIEW.21` when a weekly and a monthly review are both due, Review shows the weekly first, then the monthly
 - `REVIEW.22` a review left after step 2 resumes at step 2 with its decisions kept
 - `REVIEW.23` deciding each goal and locking closes the cycle with cycles.close_cycle's score and makes the next cycle with the carried goals and their lead actions
 - `REVIEW.24` Weekly review > Tasks > Waiting on others groups waiting tasks by person, oldest first; Done closes one, Move to my plate puts one on the plate, Still waiting moves check-by on 7 days
+- `REVIEW.25` a meeting in the weekly review's week at a glance opens the event in the Drawer and the review stays
 
 ### Settings (`tools/acceptance/settings.mjs`, 42 checks)
 
@@ -451,6 +457,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.42` Settings > Advanced > AI offers the provider; Another service shows the address, key, models and the data line
 - `SETTINGS.43` Test connection says Working with the fake AI, and the provider's own reason when it fails on credit
 - `SETTINGS.44` Settings > Advanced > Updates shows the installed commit; with no heartbeat it shows the set-up command and no Update now; with a heartbeat Update now queues a request
+- `SETTINGS.47` Updates shows Ready to update with a tick or cross for each check and Update now off while one has a cross; a Needs restart request shows in the warning colour with its command and Restart now (390 px: no sideways scroll)
 - `SETTINGS.45` naming the agent in Settings shows the name in Needs you; `pull` returns `assistant_name`; the failed job shows in red with its error
 - `SETTINGS.46` an act shows under the new name in Activity; the safety switch holds the owner's request in Needs you as "You asked"
 

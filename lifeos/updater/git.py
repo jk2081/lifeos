@@ -2,13 +2,15 @@
 import os
 import subprocess
 
+from lifeos.updater.shell import StepError, failure
+
 TIMEOUT = 120
 MERGE = "Merge pull request"
 # new files here, or a changed DocType definition, mean the update runs migrations
 MIGRATION_HINTS = ("/patches/", "patches.txt")
 
 
-class GitError(Exception):
+class GitError(StepError):
 	pass
 
 
@@ -19,7 +21,7 @@ def run(repo, *args, timeout=TIMEOUT):
 	except (OSError, subprocess.TimeoutExpired) as e:
 		raise GitError(f"git {args[0]} did not run: {type(e).__name__}") from e
 	if out.returncode:
-		raise GitError(f"git {args[0]} failed (exit {out.returncode})")
+		raise GitError(failure(["git", *args], out.returncode, out.stdout, out.stderr))
 	return out.stdout.strip()
 
 
@@ -75,6 +77,15 @@ def on_remote_branch(repo, remote, branch, commit):
 	"""True when `commit` is in the history of the remote branch, as of the last fetch."""
 	try:
 		run(repo, "merge-base", "--is-ancestor", commit, f"refs/remotes/{remote}/{branch}")
+		return True
+	except GitError:
+		return False
+
+
+def is_ancestor(repo, commit, rev):
+	"""True when `commit` is `rev` or in its history."""
+	try:
+		run(repo, "merge-base", "--is-ancestor", commit, rev)
 		return True
 	except GitError:
 		return False

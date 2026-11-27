@@ -8,15 +8,19 @@ import path from 'node:path'
 const ROUTE = /['"`]\/(?:life\/)?(goals|item|library\/people|library|focus|brain\/review)\/(\$\{|['"`]\s*\+|[A-Za-z0-9_-]+['"`])/g
 // the tabs of a place are routes of their own, not records
 const TABS = new Set(['goals/tasks', 'goals/plan', 'goals/cycles', 'goals/habits', 'goals/areas', 'goals/someday', 'goals/archive', 'library/notes', 'library/wiki', 'library/files', 'library/everything',
-  'library/people', 'library/pages', 'library/pins', 'library/vault', 'library/chats', 'library/sources', 'library/graph', 'library/timeline', 'library/outbox', 'library/archive'])
+  'library/people', 'library/pages', 'library/pins', 'library/vault', 'library/documents', 'library/chats', 'library/sources', 'library/graph', 'library/timeline', 'library/outbox', 'library/archive'])
 
 // The Drawer's Open full page: a layer's body names the page its record has (`meta.fullPage`), and the Drawer's button goes there.
 export const ALLOWED = ['frontend/src/components/item/ChangePane.vue', 'frontend/src/components/item/FocusPane.vue', 'frontend/src/components/item/GoalPane.vue',
-  'frontend/src/components/item/NotePane.vue', 'frontend/src/components/item/SourcePane.vue']
+  'frontend/src/components/item/NotePane.vue', 'frontend/src/components/review/InboxReview.vue', 'frontend/src/components/item/SourcePane.vue']
 
+// A line marked `guard-allow` is the Library's own navigation (its note tree) and a redirect between its tabs: places, not a record opened from a screen.
 export function findRecordLinks(text) {
   const found = []
   for (const m of text.matchAll(ROUTE)) {
+    const lineStart = text.lastIndexOf('\n', m.index) + 1
+    const lineEnd = text.indexOf('\n', m.index)
+    if (text.slice(lineStart, lineEnd < 0 ? undefined : lineEnd).includes('guard-allow')) continue
     const tail = m[2].replace(/['"`]$/, '')
     if (TABS.has(`${m[1]}/${tail}`)) continue
     found.push({ route: m[0].slice(1), at: text.slice(0, m.index).split('\n').length })
@@ -45,18 +49,9 @@ export function scanTree(root) {
   return out
 }
 
-/** The screens #129 has not moved onto the Drawer yet: file -> how many links it still has. #129 empties this list; a file may not be added to it and may not gain a link. */
-export const baseline = (root) => JSON.parse(fs.readFileSync(path.join(root, 'tools/guard-baseline.json'), 'utf8'))
-
-/** What breaks the rule: a file with record links that is not in the baseline, or one that has more than the baseline says. */
+/** What breaks the rule: any file with a record link in it. */
 export function problems(root) {
-  const base = baseline(root)
-  const out = []
-  for (const [f, list] of Object.entries(scanTree(root))) {
-    if (!(f in base)) out.push(`${f}:${list[0].at} goes to a record's page: ${list[0].route}`)
-    else if (list.length > base[f]) out.push(`${f} has ${list.length} links to record pages, the baseline allows ${base[f]}`)
-  }
-  return out
+  return Object.entries(scanTree(root)).map(([f, list]) => `${f}:${list[0].at} goes to a record's page: ${list[0].route}`)
 }
 
 if (process.argv[1] === import.meta.filename) {

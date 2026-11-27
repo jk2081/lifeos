@@ -23,11 +23,11 @@
         </Card>
         <Card class="flex min-w-0 flex-col" data-score-goals>
           <h3 class="pb-1 text-base-medium text-ink-gray-9">Each goal's result</h3>
-          <div v-for="g in d.goals" :key="g.name" class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-outline-gray-1 py-2 last:border-b-0" data-score-goal>
+          <Row v-for="g in d.goals" :key="g.name" :pane="'goal:' + g.name" :label="g.title" class="!flex-wrap !items-center gap-x-3 gap-y-1 !py-2" data-score-goal>
             <span class="min-w-0 flex-1 break-words text-base text-ink-gray-9">{{ g.title }}</span>
             <span class="text-sm text-ink-gray-7">{{ g.result.label }}</span>
             <Badge v-if="g.result.kind === 'number' || g.result.kind === 'cycle'" :theme="g.result.reached ? 'green' : 'gray'" :label="Math.round(g.percent) + '% of ticks'" />
-          </div>
+          </Row>
           <p v-if="!d.goals.length" class="text-sm text-ink-gray-6">No goals in this cycle.</p>
         </Card>
       </div>
@@ -40,6 +40,7 @@
 import { onMounted, ref } from 'vue'
 import { Badge, Progress, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
+import Row from '@/components/ui/Row.vue'
 import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 

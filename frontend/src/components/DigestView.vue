@@ -14,6 +14,7 @@
   </div>
 </template>
 <script setup>
+import { openRef } from '@/lib/pane'
 // An email digest as headed lists: each section (Needs your attention, Waiting on others, Dates and deadlines, FYI from
 // people, Company information, Left out) is a heading with its items, and each item's Gmail link is an "Open in Gmail" button.
 import { computed, reactive, ref } from 'vue'
@@ -59,13 +60,13 @@ const router = useRouter()
 const filed = reactive({})
 const busy = ref('')
 async function fileIt(key) {
-  if (filed[key]) return router.push('/item/' + filed[key])
+  if (filed[key]) return openRef('inbox:' + filed[key])
   const [account, ...rest] = key.split(':')
   busy.value = key
   try {
     const out = await brainData.mail.file({ thread_id: rest.join(':'), account })
     filed[key] = out.item
-    toast.success(`Filed: ${out.title}`, { action: { label: 'Open', onClick: () => router.push('/item/' + out.item) } })
+    toast.success(`Filed: ${out.title}`, { action: { label: 'Open', onClick: () => openRef('inbox:' + out.item) } })
   } catch (e) { toast.error(errorText(e)) } finally { busy.value = '' }
 }
 function open(u) { window.open(u, '_blank', 'noopener,noreferrer') }

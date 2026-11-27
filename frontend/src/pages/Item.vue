@@ -21,7 +21,7 @@
       <div class="mx-auto flex w-full max-w-[860px] flex-col gap-6" data-item-page>
         <div v-if="item.area || item.goal || item.status !== 'Done'" class="-mt-2 flex flex-wrap items-center gap-2" data-item-chips>
           <Button v-if="item.area" size="sm" variant="outline" icon-left="lucide-folder" :label="item.area_name || 'Area'" :route="`/today?area=${item.area}`" data-item-area />
-          <Button v-if="item.goal" size="sm" variant="outline" icon-left="lucide-target" :label="item.goal_title || item.goal" :route="`/goals/${item.goal}`" data-item-goal />
+          <Button v-if="item.goal" size="sm" variant="outline" icon-left="lucide-target" :label="item.goal_title || item.goal" data-item-goal @click="openRef(`goal:${item.goal}`)" />
           <Badge :theme="STATUS[item.status]?.[1] || 'gray'" :label="STATUS[item.status]?.[0] || item.status" data-item-status />
         </div>
         <p v-if="item.source_type === 'Voice Note' && !item.transcript_md" class="-mt-2 text-sm text-ink-gray-6" data-item-untranscribed>Voice note, not transcribed yet</p>
@@ -39,6 +39,7 @@
   <div v-else class="page-body"><Skeleton class="h-40 w-full" /></div>
 </template>
 <script setup>
+import { openRef } from '@/lib/pane'
 // Issue 10: one page per capture at /item/:id. What it is and where it came from, then its tabs (issue 118): Summary, the original,
 // the decisions waiting and what came of it (with what is related). The proposal cards are the Review screen's own.
 import { computed, onMounted, ref } from 'vue'

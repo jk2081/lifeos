@@ -756,6 +756,20 @@ class TestGoogleActs(LifeTestCase):
 			google.act(self.KEY, "calendar.respond", {"event_id": "e1", "response": "maybe"}, "owner", "Say maybe", space=PRIVATE)
 		self.assertEqual(google.calendar_list(source_system=self.KEY, space=PRIVATE)["events"][0]["title"], "Call with Meera")
 
+	def test_a_did_row_names_the_record_it_changed_unless_it_failed_was_undone_or_the_record_is_gone(self):
+		frappe.set_user("Administrator")
+		t = frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "I129 did row"}).insert()
+		made = {"task": t.name, "action": frappe.get_doc({"doctype": "Life Agent Action", "space": PRIVATE, "agent": self.KEY, "action": "add_task", "title": "Made task", "status": "Done",
+			"happened_on": frappe.utils.now_datetime(), "result": json.dumps({"line": "Made task", "task": t.name})}).insert().name}
+		self.as_user(OWNER)
+		did = {d["name"]: d for d in pages.sections(PRIVATE, self.KEY)["did"]}
+		self.assertEqual(did[made["action"]]["ref"], "task:" + made["task"])
+		self.assertEqual(pages.made_ref(json.dumps({"task": made["task"]}), 1, "Done", PRIVATE), "")  # undone
+		self.assertEqual(pages.made_ref(json.dumps({"task": made["task"]}), 0, "Failed", PRIVATE), "")
+		self.assertEqual(pages.made_ref(json.dumps({"task": made["task"]}), 0, "Done", SHARED), "")  # another space
+		self.assertEqual(pages.made_ref(json.dumps({"task": "no-such-task"}), 0, "Done", PRIVATE), "")
+		self.assertEqual(pages.made_ref(None, 0, "Done", PRIVATE), "")
+
 	def test_a_draft_a_label_and_an_archive_can_be_undone_and_a_sent_email_cannot(self):
 		self.mode("send_email", "auto")
 		draft = self.act("email.draft", self.EMAIL, "agent")
@@ -960,6 +974,22 @@ class TestAgentMethodsExist(LifeTestCase):
 			if fn is None or fn not in frappe.whitelisted:
 				missing.append(f"lifeos.api.{module}.{method}")
 		self.assertEqual(missing, [])
+
+
+class TestSkillNamesAgentTools(LifeTestCase):
+	"""An agent can only use a tool it knows exists: the skill names every one."""
+
+	def test_every_agent_tool_is_in_the_lifeos_skill(self):
+		import inspect
+		from pathlib import Path
+
+		from lifeos.api import chats, tools
+
+		text = (Path(frappe.get_app_path("lifeos")) / "skills" / "lifeos.md").read_text()
+		methods = [f"lifeos.api.tools.{n}" for n, f in inspect.getmembers(tools, inspect.isfunction) if f in frappe.whitelisted]
+		methods += ["lifeos.api.chats.relay", "lifeos.api.chats.report"]
+		self.assertGreater(len(methods), 10)
+		self.assertEqual([m for m in methods if m not in text], [])
 
 
 class TestFlow(AskCase):

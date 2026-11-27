@@ -39,7 +39,7 @@
             <div class="flex flex-wrap items-center gap-2" data-goal-serves>
               <span class="text-sm text-ink-gray-6">Serves</span>
               <Pick :model-value="g.serves || null" :options="servesOptions" placeholder="Choose a longer goal" :disabled="!writable" @update:model-value="(v) => saveServes(v)" />
-              <CountLink v-if="g.serves" :to="{ path: `/goals/${g.serves}` }" class="text-sm">Open {{ g.serves_title }}</CountLink>
+              <RefLink v-if="g.serves" :to="`goal:${g.serves}`" class="text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring">Open {{ g.serves_title }}</RefLink>
             </div>
             <div v-if="d.serves" class="flex items-center gap-2" data-goal-serves-progress>
               <div class="w-24 shrink-0"><Progress size="sm" :value="Math.round(d.serves.progress.percent || 0)" /></div>
@@ -76,7 +76,7 @@
           </section>
           <section v-if="cyc && j.history?.length"><SectionHead>History across cycles</SectionHead>
             <Card flush><Row v-for="h in j.history" :key="h.name" class="!items-center">
-              <div class="min-w-0 flex-1"><RouterLink class="break-words text-base-medium hover:underline focus-visible:focus-ring" :class="h.name === g.name ? 'text-ink-gray-9' : 'text-ink-blue-8'" :to="`/goals/${h.name}`">{{ h.cycle_title }}</RouterLink>
+              <div class="min-w-0 flex-1"><RefLink class="break-words text-base-medium hover:underline focus-visible:focus-ring" :class="h.name === g.name ? 'text-ink-gray-9' : 'text-ink-blue-8'" :to="`goal:${h.name}`">{{ h.cycle_title }}</RefLink>
                 <div class="text-sm text-ink-gray-6">{{ h.cycle_status }}{{ h.result_note ? ' · ' + h.result_note : '' }}</div></div>
               <div class="w-24 shrink-0 max-md:w-12"><Progress size="sm" :value="Math.round(h.score)" /></div><span class="w-10 text-right tabular-nums">{{ Math.round(h.score) }}%</span>
               <Badge :label="h.outcome" /></Row></Card>
@@ -102,6 +102,7 @@
   <div v-else-if="missing" class="page-body"><Card><Empty title="This goal was not found." hint="It may belong to another space." /></Card></div>
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 // A goal's page (UX fixes, set 6): what a project page and a goal page each did. Every goal shows what it serves and what
 // serves it; an open-ended goal (a project before set 6) is put on hold, completed or dropped here, and completing it
 // archives it with what is filed under it. The tabs are the main screens' lists with this goal fixed.
@@ -132,7 +133,7 @@ import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { askScope } from '@/lib/ask'
 import { loadLookups, lookups, parentOptions } from '@/lib/lookups'
-import { onRecordChanged } from '@/lib/pane'
+import { onRecordChanged, openRef } from '@/lib/pane'
 import { useUrlTab } from '@/lib/tabs'
 
 const props = defineProps({ id: String })
@@ -221,7 +222,7 @@ async function addTask() {
 }
 async function createNote(v) {
   const note = await db.insert({ doctype: 'Life Note', space: d.value.space, area: g.value.area, goal: g.value.name, title: v.title, content_md: '' })
-  router.push(`/library/${note.name}?edit=1`)
+  openRef(`note:${note.name}`)
 }
 function changed() {
   load()

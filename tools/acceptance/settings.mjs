@@ -1408,6 +1408,39 @@ ${reset}
 frappe.db.set_single_value("Life Settings", "update_state", None)`)
       }
     })
+    await check('SETTINGS.47', `${width} px: Updates shows Ready to update with a tick or a cross for each check, Update now is off while one has a cross, a Needs restart request shows in the warning colour with Restart now`, async () => {
+      const reset = `frappe.db.set_single_value("Life Settings", "updater_heartbeat", None)
+frappe.db.delete("Life Update")`
+      bench(`from lifeos.updater import git, status
+${reset}
+status.heartbeat()
+fix = "Life OS can't restart the site's services without a password. On the server, as root: \`bench setup sudoers frappe\`. Then try again."
+status.save_state({"installed": git.describe(status.repo_path(), "HEAD"), "checked_at": str(frappe.utils.now_datetime()), "branch": "main", "error": None,
+  "available": {"commit": "e" * 40, "short": "eeeeeee", "date": "2026-11-24T10:00:00+05:30", "migrations": False, "changes": [{"commit": "e" * 40, "short": "eeeeeee", "title": "Acceptance change", "date": "2026-11-24T10:00:00+05:30"}]},
+  "ready": [{"key": "restart", "label": "Restart the site's services without a password", "ok": False, "fix": fix}, {"key": "restore", "label": "Restore a backup without a password", "ok": True, "fix": ""}]})
+frappe.get_doc({"doctype": "Life Update", "to_commit": "d" * 40, "summary": "Earlier change"}).insert(ignore_permissions=True)
+frappe.db.set_value("Life Update", {"to_commit": "d" * 40}, {"status": "Needs restart", "reason": fix, "fix": "bench setup sudoers frappe"})`)
+      try {
+        await s.open('/life/settings?tab=advanced&part=updates')
+        await pg.locator('[data-updates-ready]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-updates-ready]').innerText()).includes('Not ready to update'), 'a cross does not say it is not ready')
+        must((await pg.locator('[data-ready="restart"][data-ok="0"]').count()) === 1 && (await pg.locator('[data-ready="restore"][data-ok="1"]').count()) === 1, 'the checks do not show a cross and a tick')
+        must((await pg.locator('[data-ready-fix]').innerText()).includes('bench setup sudoers'), 'the fix is not shown')
+        must(await pg.locator('[data-updates-now]').isDisabled(), 'Update now is on while a check has a cross')
+        const box = pg.locator('[data-updates-needs-restart]')
+        await box.waitFor({ timeout: 15000 })
+        must(/amber/.test(await box.evaluate((el) => el.innerHTML)), 'Needs restart is not in the warning colour')
+        must((await pg.locator('[data-updates-fix]').innerText()).includes('bench setup sudoers frappe'), 'the command is not shown')
+        must((await pg.evaluate((w) => Math.max(document.documentElement.scrollWidth, window.innerWidth) - w, width)) <= 0, 'the page scrolls sideways')
+        await pg.locator('[data-updates-restart-now]').click()
+        await pg.locator('[data-update] [data-update-status]').first().waitFor({ timeout: 15000 })
+        await pg.waitForFunction(() => document.querySelector('[data-update] [data-update-status]')?.textContent.trim() === 'Queued', null, { timeout: 15000 })
+      } finally {
+        bench(`from lifeos.updater import status
+${reset}
+frappe.db.set_single_value("Life Settings", "update_state", None)`)
+      }
+    })
   } finally {
     bench(`frappe.db.set_single_value("Life Settings", "email_in_account", None)
 frappe.db.set_single_value("Life Settings", "email_in_senders", None)

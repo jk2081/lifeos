@@ -178,7 +178,7 @@ t.db_set("refs", json.dumps({"R1": {"doctype": "Life Task", "name": "${tasks[1]}
     }
   })
 
-  await check('CORE.5', 'The guard finds a link to a record route in a .vue file, and the tree has none beyond the screens #129 has yet to move', async () => {
+  await check('CORE.5', 'The guard finds a link to a record route in a .vue file, and the tree has none', async () => {
     const bad = findRecordLinks('<RouterLink :to="`/goals/${g.name}`">x</RouterLink>')
     must(bad.length === 1 && bad[0].route.startsWith('/goals/${'), 'the guard missed a fixture link: ' + JSON.stringify(bad))
     for (const line of ["router.push('/item/' + id)", '<a :href="`/library/people/${p}`">', 'to="/focus/abc"', "router.push(`/brain/review/${n}`)", "router.push(`/library/${note.name}`)"])
@@ -187,8 +187,6 @@ t.db_set("refs", json.dumps({"R1": {"doctype": "Life Task", "name": "${tasks[1]}
       must(findRecordLinks(line).length === 0, 'the guard flagged a place: ' + line)
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lifeos-guard-'))
     fs.mkdirSync(path.join(dir, 'frontend/src/components'), { recursive: true })
-    fs.mkdirSync(path.join(dir, 'tools'), { recursive: true })
-    fs.writeFileSync(path.join(dir, 'tools/guard-baseline.json'), '{}')
     fs.writeFileSync(path.join(dir, 'frontend/src/components/Fixture.vue'), '<template><RouterLink :to="`/goals/${g.name}`">x</RouterLink></template>')
     must(problems(dir).length === 1, 'a fixture file with a record link did not fail the guard')
     const found = problems(root)

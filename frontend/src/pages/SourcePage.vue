@@ -110,9 +110,9 @@
     <!-- Activity -->
     <section v-if="tab === 'activity'" data-tab-panel="activity">
       <Card v-if="d.recent.length" flush>
-        <RouterLink v-for="r in d.recent" :key="r.name" :to="`/item/${r.name}`" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2.5 text-sm last:border-0 hover:bg-surface-gray-1" data-activity-line>
+        <RefLink v-for="r in d.recent" :key="r.name" :to="`inbox:${r.name}`" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2.5 text-sm last:border-0 hover:bg-surface-gray-1" data-activity-line>
           <span class="min-w-0 flex-1 truncate text-ink-gray-9">{{ r.title }}</span><span class="text-ink-gray-6">{{ r.kind }} · {{ r.received }}</span><Badge :theme="r.status === 'Failed' ? 'red' : r.status === 'Done' ? 'green' : 'amber'" :label="r.status" />
-        </RouterLink>
+        </RefLink>
       </Card>
       <Card v-else data-activity-empty><Empty title="Nothing yet." :hint="d.how_to_connect || 'Things of this kind that you add or connect will show up here.'" /></Card>
     </section>
@@ -172,6 +172,7 @@
   </Dialog>
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 // One source (issue 84): a channel (where it comes from) or a kind (what it is), as one page in one template: a strip, then Overview, Rules,
 // Examples & lessons, Activity and Try it. Rules show the source's skill as fields and save as a new version of it.
 import { computed, ref, watch } from 'vue'

@@ -225,6 +225,24 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     return `${rows.length} goals, 1 skipped, 3 stars, over by ${Math.round((Number((await s.api('weekly.goals', { space: SPACE })).capacity.planned_minutes) - Number(t.capacity.free_minutes)) / 60)} h`
   })
 
+  await check('REVIEW.25', `${width} px: a meeting in the weekly review's week at a glance opens the event in the Drawer and the review stays`, async () => {
+    const ev = bench(`from datetime import timedelta
+from lifeos.tasks import weekplan
+a, b = weekplan.window()
+h = weekplan.hours()
+d = a.date()
+while weekplan.DAYS[d.weekday()] not in h["days"]:
+  d += timedelta(days=1)
+e = frappe.get_doc({"doctype": "Event", "subject": "I129 glance ${width}", "starts_on": f"{d} 10:00:00", "ends_on": f"{d} 11:00:00", "event_type": "Public", "life_space": "${SPACE}"}).insert(ignore_permissions=True)
+print(e.name)`).split('\n').pop()
+    await s.open('/life/today/week?view=review&tab=goals')
+    if (phone) await pg.locator('[data-goals-week-btn]').click()
+    const block = pg.locator(`[data-glance-event][data-ref="event:${ev}"]`).locator('visible=true').first()
+    await block.waitFor({ timeout: 15000 })
+    await block.click()
+    await pg.waitForFunction((e) => new URL(location.href).searchParams.get('open') === 'event:' + e, ev, { timeout: 8000 })
+    must(new URL(pg.url()).searchParams.get('view') === 'review', 'the review is gone: ' + pg.url())
+  })
   await check('REVIEW.9', `${width} px: Pause and reopen: everything is where it was left; no tab scrolls the page at 1440 x 900 or sideways at 390`, async () => {
     if (!phone) await pg.setViewportSize({ width: 1440, height: 900 })
     await pg.locator('[data-review-pause]:visible').first().dispatchEvent('click')
@@ -587,6 +605,9 @@ print(json.dumps({"cycle": cyc.name, "goals": out, "expected": cycles.cycle_aver
       must(await pg.locator('[data-score-goal]').count() === 3, 'Score does not list the three goals')
       must(await pg.locator('[data-review-head] [data-page-title]').innerText() === '12-week review', 'the title is not 12-week review')
       await noSideways()
+      await pg.locator('[data-score-goal] [data-ref]').first().click() // a goal row opens its goal in the Drawer and the review stays
+      await pg.waitForFunction(() => /^goal:/.test(new URL(location.href).searchParams.get('open') || ''), null, { timeout: 8000 })
+      must(await pg.locator('[data-review-score]').count() === 1, 'the review is gone behind the goal: ' + pg.url())
     })
 
     await check('REVIEW.19', `${width} px: Goals > Cycles offers the 12-week review, and there is no Close cycle pop-up (its link opens the review)`, async () => {

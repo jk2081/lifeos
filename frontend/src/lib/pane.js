@@ -64,6 +64,9 @@ export function refOfRoute(path) {
   if ((m = /[?&]open=([a-z]+(?:%3A|:)[^&]+)/.exec(p))) return decodeURIComponent(m[1])
   if ((m = /^\/library\/([^/?]+)$/.exec(p))) return `note:${m[1]}`
   if ((m = /^\/goals\/([^/?]+)$/.exec(p))) return `goal:${m[1]}`
+  if ((m = /^\/library\/people\/([^/?]+)/.exec(p))) return `person:${m[1]}`
+  if ((m = /^\/focus\/([^/?]+)$/.exec(p))) return `focus:${m[1]}`
+  if ((m = /^\/(?:item|brain\/review)\/([^/?]+)$/.exec(p))) return `inbox:${m[1]}`
   return null
 }
 
