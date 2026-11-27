@@ -28,7 +28,7 @@ function group(ns, names) {
 export const goalsData = {
   calendar: group('calendar', ['add_event', 'add_important_date', 'get', 'year']),
   goals: group('goals', ['across_cycles', 'add_reading', 'by_area', 'close', 'confirm_reading', 'create', 'create_cycle', 'cycles', 'delete_goal', 'detail', 'edit', 'get', 'grid', 'habit_library', 'habits_year', 'list', 'month_habits', 'plan_next_cycle', 'reject_reading', 'reorder', 'save_goal', 'set_action_status', 'set_month_habits', 'set_status', 'start_cycle', 'suggest_horizon', 'suggest_measure', 'this_month', 'tick', 'toggle_habit', 'update', 'week_score']),
-  tasks: group('tasks', ['all_tasks', 'confirm_area', 'keep_standalone', 'make_goal', 'no_goal', 'no_goal_total', 'quick_add', 'set_status', 'update']),
+  tasks: group('tasks', ['all_tasks', 'confirm_area', 'make_goal', 'no_goal', 'no_goal_total', 'quick_add', 'set_status', 'update']),
   counts: group('counts', ['get']),
   periodic: group('periodic', ['due']),
   focus: group('focus', ['annual_for', 'sort_open']),

@@ -4,10 +4,12 @@ import App from './App.vue'
 import router from './router'
 import './styles.css'
 import { installLinkScope } from './framework/linkScope'
+import { installDocCache } from './lib/docCache'
 import { appErrorHandler, routerErrorHandler } from './lib/screenError'
 
 setConfig('resourceFetcher', frappeRequest)
 installLinkScope()
+installDocCache()
 
 const app = createApp(App)
 app.use(FrappeUI)

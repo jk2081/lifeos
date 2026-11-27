@@ -1167,3 +1167,21 @@ class TestReadsThroughFrappePermissions(LifeTestCase):
 				if isinstance(node, ast.Call) and ast.unparse(node.func) == "frappe.throw" and not any(k.arg == "title" for k in node.keywords):
 					missing.append(f"{path.relative_to(app)}:{node.lineno}")
 		self.assertEqual(missing, [])
+
+
+class TestRestReadsKeepToTheSpace(LifeTestCase):
+	"""The panes read records through Frappe's REST API (/api/v2/document/...). The space hooks apply to it as to every other read."""
+
+	def test_a_user_outside_the_space_cannot_read_a_task_by_rest_and_lists_only_their_own(self):
+		from frappe.api import v2
+
+		private = self.make("Life Task", title="Private REST task", space=PRIVATE)
+		shared = self.make("Life Task", title="Shared REST task", space=SHARED)
+		self.as_user(FAMILY)
+		self.assertRaises(frappe.PermissionError, v2.read_doc, "Life Task", private.name)
+		self.assertEqual(v2.read_doc("Life Task", shared.name)["title"], "Shared REST task")
+		frappe.local.form_dict = frappe._dict(fields=json.dumps(["name", "space"]), limit=1000)
+		rows = v2.document_list("Life Task")
+		self.assertIn(shared.name, [r["name"] for r in rows])
+		self.assertNotIn(private.name, [r["name"] for r in rows])
+		self.assertEqual({r["space"] for r in rows}, {SHARED})

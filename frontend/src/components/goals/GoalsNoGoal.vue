@@ -80,7 +80,7 @@ import AreaGuess from '@/components/AreaGuess.vue'
 import Card from '@/components/ui/Card.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
-import { errorText, tryCall } from '@/lib/api'
+import { db, errorText, tryCall } from '@/lib/api'
 import { goalsData } from '@/data/goals'
 import { canWrite, store } from '@/lib/store'
 import { dotClass } from '@/lib/lens'
@@ -124,7 +124,7 @@ function goalMenu(t, g) {
   if (rest.length) out.push({ group: own.length ? 'Other goals' : 'Goals', options: rest.map(item) })
   return out.length ? out : [{ label: 'No goals yet. Make one on By area.', disabled: true }]
 }
-const fine = (t) => act(() => goalsData.tasks.keep_standalone({ task: t.name }))
+const fine = (t) => act(() => db.set('Life Task', t.name, { standalone: 1, area_guessed: 0, area_confidence: 0 }))
 const done = (t) => act(() => goalsData.tasks.set_status({ task: t.name, status: 'Done' }))
 const onConfirmed = () => load()
 // Make it a goal asks for the goal's name and its "Done when" (required while the setting is on), then makes it

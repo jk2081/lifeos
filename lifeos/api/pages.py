@@ -264,20 +264,6 @@ def rewrite(doctype: str, name: str):
 
 
 @frappe.whitelist(methods=["POST"])
-def set_status(name: str, status: str | None = None):
-	"""A company's status: Prospect, Client, Partner, Past, or none."""
-	_people_only()
-	doc = _check("Life Person", name, "write")
-	if doc.kind != "Organisation":
-		frappe.throw(_("Only a company has a status."), title=_("Not a company"))
-	if status and status not in STATUSES:
-		frappe.throw(_("Status is one of {0}.").format(", ".join(STATUSES)), title=_("Unknown status"))
-	doc.status = status or None
-	doc.save()
-	return {"status": doc.status}
-
-
-@frappe.whitelist(methods=["POST"])
 def rename(doctype: str, name: str, title: str):
 	_people_only()
 	doc = _check(doctype, name, "write")

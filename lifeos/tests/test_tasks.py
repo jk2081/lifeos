@@ -357,7 +357,7 @@ class TestNoGoal(LifeTestCase):
 
 	def test_fine_as_is_confirms_the_area_and_leaves_the_list(self):
 		t = self.make("Life Task", title="i22 fine", area=self.career, area_guessed=1, area_confidence=60).name
-		tasks.keep_standalone(t)
+		frappe.client.set_value("Life Task", t, {"standalone": 1, "area_guessed": 0, "area_confidence": 0})  # what the screen sends: Frappe's own save
 		self.assertEqual(frappe.db.get_value("Life Task", t, ["standalone", "area_guessed"]), (1, 0))
 		self.assertEqual(self.names(tasks.no_goal(space=PRIVATE)), [])
 		self.assertEqual(tasks.no_goal_total(space=PRIVATE)["count"], 0)

@@ -2,6 +2,7 @@ import { reactive, watch } from 'vue'
 import { todayData } from '@/data/today'
 import { loadViews } from './views'
 import { loadLadder } from './ladder'
+import { clearDocCache } from './docCache'
 
 export const store = reactive({
   ready: false,
@@ -53,7 +54,8 @@ if (typeof window !== 'undefined') {
   window.addEventListener('lifeos-task-added', later)
 }
 
-watch(() => store.space, (v) => localStorage.setItem('lifeos-space', v || ''))
+// the record cache belongs to one space: it is cleared when the space changes
+watch(() => store.space, (v, old) => { localStorage.setItem('lifeos-space', v || ''); if (old && v !== old) clearDocCache() })
 watch(() => [store.space, store.lensArea], () => { if (store.ready) refreshCounts() })
 
 export function canWrite() {

@@ -18,7 +18,7 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_people.py` | People and organisations, the person page and its mentions, the person picker's options (people only, company and email search, name matches first, recent first, no silent cap), one way to add a person (the Vault and the tool share the duplicate check) and one read for a person that the Library page and the Drawer both use |
 | `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection), Google Calendar connected, read and written through `connections` |
 | `test_updater.py` | Updates: who may ask, the check against a temporary repository, the runner's steps and rollback, a target not on the remote, one runner at a time, Update now; the checks before anything changes (restart and restore without a person), only the restart failing (Needs restart, Restart now), a failed step's command, exit code and output, the restore through the site's own user, the installed commit read from git and an update to it refused |
-| `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
+| `test_permissions.py` | Spaces and members, a REST read (`/api/v2/document/...`) of another space's task refused and its list cut to the user's space, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it, notes on events (Comments), Hide in Life OS |
 | `test_gmail.py` | Gmail and Microsoft through Life OS: connect (both providers, the return address to add, Google's error, an abandoned sign-in cleaned up, which case a search with no inbox is), Microsoft's adapter, merged search across providers, live search (one inbox or many, one query shape, the person's own inboxes only, the search log, attachments stored once), the daily digest, Ask's mail tools, Ask's tools (read a period page by page, the daily digests, save an attachment, make pages and people, save notes and tasks, each write logged with Undo, an agent's switches, a long read run in the background, a question with choices, File buttons named for what they file) |
 | `test_agents.py` | What an agent calls: `file_job`, the context card and index, the weekly wiki check, the connector (report, pull, confirm), the owner's changes, an agent's switches and the areas it may read |
@@ -158,6 +158,8 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.85` after a goal exists the switch is Overview · Goals · Calendar, and Goals on Week shows Goals by area with the goal, whose row opens in the Drawer
 - `TODAY.86` no card on any view, in Overview or Goals, shows a paragraph or a Set a goal button; each shows a number; two by two on a phone; light and dark
 - `TODAY.87` Day Overview counts what is due today (overdue included) and Your plate lists the overdue task first; a tick marks it Done, the count drops and Undo brings it back; a title opens the Drawer
+- `TODAY.88` a task opened in the Drawer, closed and opened again shows its title before any request for it finishes (390 and 1440 px)
+- `TODAY.89` with a task open, a change saved on the server shows in the pane within 3 seconds, without reopening (390 and 1440 px)
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 
@@ -385,6 +387,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
 - `LIBRARY.55` on an empty space every Library list (Everything, Pages, People, Files) shows `[data-empty]` with one line and at most one action
 - `LIBRARY.56` Everything and People use the shared filter bar; a chosen filter is in the address and survives a reload
+- `LIBRARY.57` a vault document opened in the Drawer is never kept in IndexedDB, a task is, and logging out leaves nothing there
 - `LIBRARY.54` the person picker is readable in light and dark, and nothing scrolls sideways
 - `LIBRARY.53` Hand off's Who uses the same person picker
 - `LIBRARY.52` a new name offers "Add '…' as a person"; choosing it makes the person and selects them
@@ -529,6 +532,8 @@ Unit tests: none: these check the tools, not the app
 - `TOOLING.10` Online but the server gives no answer: "not responding", Today loads by itself once it answers; dark in dark mode
 - `TOOLING.11` The bench cache is saved on main only, uncancelled; pull-request jobs restore it, say hit or miss, and share one Frappe version
 - `TOOLING.12` the monthly cleanup workflow runs on the 1st and the guards run on every pull request; by hand over a fixture finding it opens one issue labelled `audit`, over none it opens none
+- `TOOLING.13` speed: Today (each mode), Goals and a record pane stay within the `lifeos.api` call numbers of `tools/speed-baseline.json`, no GET takes over a second, and a second opening of a pane shows its title before any request finishes
+- `TOOLING.14` the speed check fails on a screen that makes an extra call or a slow one
 
 ### End of every run (`tools/acceptance/end.mjs`)
 
