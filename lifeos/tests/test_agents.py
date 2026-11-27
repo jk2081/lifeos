@@ -976,6 +976,22 @@ class TestAgentMethodsExist(LifeTestCase):
 		self.assertEqual(missing, [])
 
 
+class TestSkillNamesAgentTools(LifeTestCase):
+	"""An agent can only use a tool it knows exists: the skill names every one."""
+
+	def test_every_agent_tool_is_in_the_lifeos_skill(self):
+		import inspect
+		from pathlib import Path
+
+		from lifeos.api import chats, tools
+
+		text = (Path(frappe.get_app_path("lifeos")) / "skills" / "lifeos.md").read_text()
+		methods = [f"lifeos.api.tools.{n}" for n, f in inspect.getmembers(tools, inspect.isfunction) if f in frappe.whitelisted]
+		methods += ["lifeos.api.chats.relay", "lifeos.api.chats.report"]
+		self.assertGreater(len(methods), 10)
+		self.assertEqual([m for m in methods if m not in text], [])
+
+
 class TestFlow(AskCase):
 	"""Issue 108: Life OS's tools and agent for Frappe Flow (try them at /flow)."""
 

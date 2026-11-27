@@ -1654,3 +1654,7 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - Week glance: `goal_week.glance` blocks carry `ref` (`event:` or `task:`); a block with a goal keeps opening the goal planner (a planning dialog, on purpose).
 - A grid action opens its goal (`goal:<id>`), as the issue says. The grid is only shown on the goal's own page, so there the layer is the goal's own.
 - **Skill examples (Skill.vue) stay plain.** A `Life Skill Example` has no source capture: `source` is "Built-in" or "Owner" and the sample is stored inline in `input`, so there is no capture to open. The issue says "otherwise plain".
+
+## Issue 143 (agent API in the lifeos skill)
+
+- The skill had no change-notes list, so the version bump (5 to 6) comes with a new "Change notes" section at its end. The section also names `people_add` and `undo`, which are whitelisted in `tools.py` though the issue did not list them (its test covers every whitelisted method). No acceptance check: the change has no screen.

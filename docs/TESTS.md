@@ -42,6 +42,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
 | `ingest-email` (was `triage-email`) | `test_gmail.TestDigest`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
 | one assistant: the owner's requests through an agent, the gate, `tasks_add`/`events_add`, Activity's Assistant rows, the name and the failed job | `test_agents.TestOneAssistant`, `test_permissions.TestOnlyTheOwnerIsTheOwner` | `BRAIN.73`, `SETTINGS.45`, `SETTINGS.46` |
+| the lifeos skill names every agent tool (`lifeos.api.tools`, `chats.relay`, `chats.report`) | `test_agents.TestSkillNamesAgentTools` | none (no screen) |
 | relayed conversations (`chats.relay`) in Chat's History | `test_library.TestRelayedChat` | `BRAIN.74` |
 | the agent connector (`agent/connector/`) | `test_agents.TestConnector` | `BRAIN.49` to `BRAIN.51` |
 | Google through Life OS: acts, switches, the log and undo | `test_agents.TestGoogleActs`, `test_gmail.TestMailSearch`, `test_gmail.TestMailSearch` | `BRAIN.52` to `BRAIN.54` |
