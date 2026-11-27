@@ -67,6 +67,32 @@ def feed(space: str, days: int = 14) -> list:
 		"can_undo": int(bool(r.undo) and not r.undone and r.status == "Done"), "undone": int(r.undone or 0)} for r in rows if r.agent != "ask"]
 
 
+MADE = (("task", "Life Task", "task"), ("event", "Event", "event"), ("person", "Life Person", "person"))
+
+
+def made_ref(result: str | None, undone, status: str, space: str) -> str:
+	"""The layer reference of the record an act changed (a task, event or person), or "" when it has none: a failed or undone act, a draft, a record since deleted or in another space."""
+	if undone or status != "Done" or not result:
+		return ""
+	try:
+		out = json.loads(result)
+	except ValueError:
+		return ""
+	for field, doctype, kind in MADE:
+		name = out.get(field) if isinstance(out, dict) else None
+		if name and isinstance(name, str) and frappe.db.exists(doctype, name):
+			if frappe.get_meta(doctype).has_field("space") and frappe.db.get_value(doctype, name, "space") != space:
+				continue
+			return f"{kind}:{name}"
+	return ""
+
+
+def _skills(cfg) -> list:
+	"""The skills the agent reported; one that is also a Life OS skill (the same name) carries the name of its page."""
+	reported = json.loads(cfg.skills) if cfg and cfg.skills else []
+	return [{**s, "page": s["name"] if frappe.db.exists("Life Skill", s["name"]) else ""} for s in reported]
+
+
 def sections(space: str, key: str) -> dict:
 	cfg = limits.config(space, key)
 	held = _waiting_by_target(space, key)
@@ -88,14 +114,15 @@ def sections(space: str, key: str) -> dict:
 	areas = [{"name": a.name, "title": a.area_name, "on": int(a.name not in off)} for a in frappe.get_all("Life Area", filters={"space": space, "is_on": 1, "is_archived": 0, "is_life_area": 1},
 		fields=["name", "area_name"], order_by="sort_order asc, creation asc", limit=50)]  # system: the owner's own areas
 	rows = frappe.get_all("Life Agent Action", filters={"space": space, "agent": key, "status": ("in", list(connector.DONE_STATES)), "happened_on": (">=", _week_start())},
-		fields=["name", "action", "title", "status", "cost", "happened_on", "asked_by", "request", "undo", "undone", "error"],
+		fields=["name", "action", "title", "status", "cost", "happened_on", "asked_by", "request", "undo", "undone", "error", "result"],
 		order_by="happened_on desc, creation desc", limit=200)  # system: as above
 	did = [{"name": r.name, "action": r.action, "title": r.title, "status": r.status, "cost": flt(r.cost), "when": str(r.happened_on)[:16], "asked_by": r.asked_by or "",
-		"request": r.request or "", "can_undo": int(bool(r.undo) and not r.undone and r.status == "Done"), "undone": int(r.undone or 0), "error": r.error or ""} for r in rows]
+		"request": r.request or "", "can_undo": int(bool(r.undo) and not r.undone and r.status == "Done"), "undone": int(r.undone or 0), "error": r.error or "",
+		"ref": made_ref(r.result, r.undone, r.status, space)} for r in rows]
 	return {"name": limits.display_name(cfg), "has_name": int(bool(cfg and cfg.display_name)), "reported": str(cfg.last_report)[:16] if cfg and cfg.last_report else None,
 		"waiting": requests(space, key), "facts": facts, "can": can, "areas": areas, "vault": "off", "jobs": jobs,
 		"failed_job": failed_job(space, key), "owner_runs_now": int(limits.owner_runs_now(cfg)), "did": did,
-		"cost_week": round(sum(d["cost"] for d in did), 4), "skills": json.loads(cfg.skills) if cfg and cfg.skills else [],
+		"cost_week": round(sum(d["cost"] for d in did), 4), "skills": _skills(cfg),
 		"changes": {"waiting": sum(1 for c in held.values() if c.status == "Waiting"), "failed": sum(1 for c in held.values() if c.status == "Failed")}}
 
 

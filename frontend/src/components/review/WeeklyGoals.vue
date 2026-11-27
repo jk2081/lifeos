@@ -71,7 +71,7 @@
             <RouterLink class="text-base text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="{ path: '/today/week', query: { view: 'calendar', tab: undefined } }"
               data-open-full-week>Open the full week</RouterLink>
           </div>
-          <WeekGlance :g="t.glance" class="-mx-4" @open="open" />
+          <WeekGlance :g="t.glance" class="-mx-4" @open="open" @ref="openRef" />
         </Card>
         <Button class="lg:hidden" icon-left="lucide-calendar" label="Next week" data-goals-week-btn @click="weekOpen = true" />
       </div>
@@ -84,7 +84,7 @@
       </div>
     </SideSheet>
     <SideSheet :open="weekOpen" name="next-week" title="Next week" @close="weekOpen = false">
-      <WeekGlance v-if="t" :g="t.glance" @open="(g) => { weekOpen = false; open(g) }" />
+      <WeekGlance v-if="t" :g="t.glance" @open="(g) => { weekOpen = false; open(g) }" @ref="(r) => { weekOpen = false; openRef(r) }" />
     </SideSheet>
     <ReviewFooter back label="Next: Reflect" :disabled="!t?.ready.ok" :line="footerLine" @back="emit('go', 'tasks')" @next="emit('go', 'reflect')" />
   </div>
@@ -96,6 +96,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Badge, Button, Progress, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
+import { openRef } from '@/lib/pane'
 import SideSheet from '@/components/ui/SideSheet.vue'
 import GoalDrawer from '@/components/review/GoalDrawer.vue'
 import WeekGlance from '@/components/review/WeekGlance.vue'

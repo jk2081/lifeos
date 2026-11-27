@@ -13,7 +13,8 @@
           :data-grid-head="w" :data-now="w === cur ? 1 : 0">W{{ w }}</span>
       </div>
       <div v-for="a in actions" :key="a.name" class="grid items-center gap-x-1 border-b border-outline-gray-1 py-1.5 last:border-b-0" :style="cols" role="row" data-grid-action :data-action="a.name">
-        <div class="min-w-0 pr-2" role="rowheader">
+        <div class="relative min-w-0 cursor-pointer pr-2" role="rowheader">
+          <button type="button" class="absolute inset-0 focus-visible:focus-ring" :aria-label="`Open ${a.title}'s goal`" :data-ref="'goal:' + goal.name" data-action-open @click="openRef('goal:' + goal.name)" />
           <div class="truncate text-base" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'" :title="a.title">{{ a.title }}</div>
           <div class="text-xs text-ink-gray-6" data-action-line>{{ a.per_week }} a week · {{ plural(total(a), 'tick') }} so far<template v-if="a.status !== 'Open'"> · {{ a.status }}</template></div>
         </div>
@@ -44,6 +45,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Button, Dialog } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
 import { goalsData } from '@/data/goals'
+import { openRef } from '@/lib/pane'
 import { errorText } from '@/lib/api'
 import { plural } from '@/lib/plural'
 import { toast } from 'frappe-ui'

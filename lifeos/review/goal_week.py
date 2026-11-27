@@ -114,22 +114,22 @@ def glance(gp, now=None):
 	by = {x["date"]: x for x in days}
 	titles = {g.name: g.title for g in gp.goals()}
 
-	def put(start, minutes, title, kind, goal=None):
+	def put(start, minutes, title, kind, goal=None, ref=None):
 		day = by.get(str(getdate(start)))
 		if day:
-			day["blocks"].append({"start": str(start)[:16], "minutes": int(minutes), "title": title, "kind": kind, "goal": goal})
+			day["blocks"].append({"start": str(start)[:16], "minutes": int(minutes), "title": title, "kind": kind, "goal": goal, "ref": ref})
 
 	from lifeos.calendar import calendar_data
 
 	for e in calendar_data.events_between(gp.space, a.date(), b.date()):
 		if not e.get("all_day"):
 			s, en = get_datetime(e["start"]), get_datetime(e["end"])
-			put(s, max((en - s).total_seconds() // 60, 15), e["title"], "event")
+			put(s, max((en - s).total_seconds() // 60, 15), e["title"], "event", ref="event:" + e["name"])
 	plans = {p.get("task"): n for n, p in gp.st["plans"].items() if p.get("task")}
 	for t in weekplan.scheduled(gp.space, a, b):
 		if t.name in plans:
 			continue
-		put(t.scheduled_at, cint(t.duration_min) or weekplan.DEFAULT_MINUTES, t.title, "goal" if t.goal else "event", t.goal)
+		put(t.scheduled_at, cint(t.duration_min) or weekplan.DEFAULT_MINUTES, t.title, "goal" if t.goal else "event", t.goal, "task:" + t.name)
 	for name, p in gp.st["plans"].items():
 		if name in titles and not p.get("skip") and p.get("slot"):
 			put(get_datetime(p["slot"]), cint(p.get("minutes")) or weekplan.DEFAULT_MINUTES, p.get("next_action") or titles[name], "goal", name)

@@ -219,6 +219,8 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.74` Ask's History lists a relayed conversation "on Telegram"; it opens read only with its turns in order and no question box
 - `BRAIN.75` Chat runs on Flow (a real Flow Server, the fake model of `tools/fake_openai.py`): the box reads "Search or chat", a question streams an answer in the Chat panel and writes a usage row, ⌘K opens the Chat panel, `/` the search palette, `/life/ask` goes to Today, and no visible text says Ask (screen, panel, ⌘K, Chat page, Settings)
 - `BRAIN.77` in Chat "Vivek owes me the ITR draft by Friday" makes a waiting task and says nothing was sent; "Ask Vivek for the ITR draft by Friday" drafts, with Send on the task
+- `BRAIN.78` a "What it did" row that changed a task opens it in the Drawer and the agent's page stays; a failed act stays plain; a reported skill that is also a Life OS skill links to its page
+- `BRAIN.79` a "Recently" row on a source's Rules tab opens the capture in the Drawer
 - `BRAIN.76` with no model in Flow, a question says "Chat needs an AI key" with its link to Settings › AI, and at the monthly cap Chat refuses and shows the spend
 - `BRAIN.64` a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"
 - `BRAIN.66` Gmail's Rules tab lists its sender rule and the two built-in rules in the order they are tried, with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings
@@ -306,8 +308,9 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.76` focus: opens a focus in the Drawer (standard, principles, goals, review); Open full page goes to /focus/<id>
 - `GOALS.72` ticking this week's cell on the goal page updates the week's score there and in Cycles
 - `GOALS.73` a goal without Done when shows one prompt; once set, the finish line shows with Edit
-- `GOALS.74` in Cycles a goal's name opens its goal page
+- `GOALS.74` in Cycles a goal's name opens its goal in the Drawer and Cycles stays
 - `GOALS.75` Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone
+- `GOALS.78` an action row of a goal's grid opens its goal in the Drawer and the screen stays
 
 ### Library (`tools/acceptance/library.mjs`, 52 checks)
 
@@ -393,13 +396,14 @@ Unit tests: `test_review.py`
 - `REVIEW.15` Decide: carry one goal and drop another with a reason; after Lock the plan holds the carried goal and the dropped one is dropped
 - `REVIEW.16` the goals made in Plan are in the order given, and Goals > Cycles shows them
 - `REVIEW.17` with no month to look back on, the monthly review says nothing is due
-- `REVIEW.18` the 12-week review's Score shows the twelve weekly scores and the cycle view's average
+- `REVIEW.18` the 12-week review's Score shows the twelve weekly scores and the cycle view's average; a goal row opens its goal in the Drawer and the review stays
 - `REVIEW.19` Goals > Cycles offers the 12-week review, and there is no Close cycle pop-up (its link opens the review)
 - `REVIEW.20` both reviews show numbered tabs, and nothing scrolls sideways
 - `REVIEW.21` when a weekly and a monthly review are both due, Review shows the weekly first, then the monthly
 - `REVIEW.22` a review left after step 2 resumes at step 2 with its decisions kept
 - `REVIEW.23` deciding each goal and locking closes the cycle with cycles.close_cycle's score and makes the next cycle with the carried goals and their lead actions
 - `REVIEW.24` Weekly review > Tasks > Waiting on others groups waiting tasks by person, oldest first; Done closes one, Move to my plate puts one on the plate, Still waiting moves check-by on 7 days
+- `REVIEW.25` a meeting in the weekly review's week at a glance opens the event in the Drawer and the review stays
 
 ### Settings (`tools/acceptance/settings.mjs`, 42 checks)
 

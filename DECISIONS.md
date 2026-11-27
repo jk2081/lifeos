@@ -1645,3 +1645,12 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - "Add 'x' as a person" calls `tools.people_add` (as the owner, run at once), so it reuses a person already called that, and the new person is selected.
 - The Hand off dialog lost its "Their name" box: the picker's Add option replaces it.
 - `Life Task` refuses an organisation in `delegated_to` and `waiting_on_person`, so a hand off by name to a company (by an agent or in Chat) now says "Delegate to a person…" instead of linking the company. The free-text Waiting on is unchanged.
+
+## Issue 129 (every record opens in the Drawer)
+
+- Part 1 came from `issue-129-blocked` by merge. Main's own versions of `Today.vue`, `WeekView.vue` and `YearView.vue` (reworked by #132 and #135) were kept whole; none of them has a record link, so the branch's edits to them were dropped, with the Today list checks (TODAY.24, 25, 73 of the branch) that belonged to the removed list. `tools/guard-baseline.json` is gone: the guard has no baseline and fails on any record link. `LibraryPlace.vue`'s `/library/documents` is in `TABS`, and `Library.vue`'s own page tree carries `guard-allow` lines.
+- "What it did" rows: the server (`agent_page.made_ref`) reads the log row's result and names the record only when it still exists in the space, the act is Done and not undone. A person's name (`person` in a hand-off result) is not an id, so only `task`, `event` and `person` ids that exist as records count. Rows with a draft, a failure or an undo stay plain.
+- The skills an agent reports are the agent's own names. A name that is also a Life OS skill (`Life Skill` of the same name) links to `/brain/skills/<name>`; others stay text.
+- Week glance: `goal_week.glance` blocks carry `ref` (`event:` or `task:`); a block with a goal keeps opening the goal planner (a planning dialog, on purpose).
+- A grid action opens its goal (`goal:<id>`), as the issue says. The grid is only shown on the goal's own page, so there the layer is the goal's own.
+- **Skill examples (Skill.vue) stay plain.** A `Life Skill Example` has no source capture: `source` is "Built-in" or "Owner" and the sample is stored inline in `input`, so there is no capture to open. The issue says "otherwise plain".

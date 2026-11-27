@@ -1363,6 +1363,32 @@ for (const width of WIDTHS) {
       must((await pg.locator('[data-job]').count()) === 0, 'the job is still listed after the agent dropped it')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
+    await check('BRAIN.78', `${width} px: a row of What it did that changed a task opens the task in the Drawer and the agent's page stays; a failed act stays plain; a skill that is also a Life OS skill links to its page`, async () => {
+      connector() // the agent reports once, so it has a page and a config
+      const made = bench(`import json
+from frappe.utils import now_datetime
+t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "I129 made ${width}"}).insert(ignore_permissions=True)
+base = {"doctype": "Life Agent Action", "space": "${SPACE}", "agent": "${system}", "action": "add_task", "happened_on": now_datetime(), "delivered": 1}
+frappe.get_doc({**base, "title": "I129 made a task ${width}", "status": "Done", "result": json.dumps({"line": "x", "task": t.name})}).insert(ignore_permissions=True)
+frappe.get_doc({**base, "title": "I129 failed act ${width}", "status": "Failed", "error": "no"}).insert(ignore_permissions=True)
+cfg = frappe.get_doc("Life Agent Config", {"space": "${SPACE}", "agent": "${system}"})
+cfg.skills = json.dumps([{"name": "process-capture", "description": "x"}, {"name": "chase", "description": "y"}])
+cfg.save(ignore_permissions=True)
+print(t.name)`).split('\n').pop()
+      await open()
+      const row = pg.locator('[data-did]', { hasText: `I129 made a task ${width}` })
+      await row.waitFor({ timeout: 10000 })
+      must((await row.locator('[data-ref]').first().getAttribute('data-ref')) === 'task:' + made, 'the row has no task reference')
+      must((await pg.locator('[data-did]', { hasText: `I129 failed act ${width}` }).locator('[data-ref]').count()) === 0, 'a failed act is clickable')
+      const path = new URL(pg.url()).pathname
+      await row.locator('[data-ref]').first().click()
+      await pg.waitForFunction((t) => new URL(location.href).searchParams.get('open') === 'task:' + t, made, { timeout: 10000 })
+      must(new URL(pg.url()).pathname === path && (await pg.locator('[data-agent-section="did"]').isVisible()), "the task took the agent's page away")
+      await pg.keyboard.press('Escape')
+      const links = pg.locator('[data-agent-skills] [data-agent-skill-link]')
+      must((await links.count()) === 1 && (await links.first().getAttribute('href')).endsWith('/brain/skills/process-capture'), 'the skill link is missing or wrong')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
     await check('BRAIN.51', `${width} px: an agent that has reported nothing says what will appear in each section`, async () => {
       const empty = `i85-empty-${width}`
       bench(`frappe.get_doc({"doctype": "Life Connection", "space": "${SPACE}", "system": "${empty}", "active": 1}).insert(ignore_permissions=True)`)
@@ -1572,6 +1598,17 @@ for title, by in (("I117 by rule ${width}", "Rule: when mail is from ${SENDER}: 
       const text = Object.fromEntries((await rows.allInnerTexts()).map((t) => t.split('\n').filter(Boolean)).map(([a, b]) => [a, b]))
       must((text[`I117 by rule ${width}`] || '').startsWith('Rule: '), 'the rule-filed item says: ' + JSON.stringify(text))
       must(text[`I117 by brain ${width}`] === 'The Brain', 'the guessed item says: ' + JSON.stringify(text))
+    })
+    await check('BRAIN.79', `${width} px: a row of Recently on a source's Rules tab opens the capture in the Drawer and the source's page stays`, async () => {
+      bench(`frappe.set_user("Administrator")
+frappe.get_doc({"doctype": "Life Inbox Item", "space": "${SPACE}", "title": "I129 recent ${width}", "source_type": "Email", "source_system": "gmail", "status": "Done", "processed_by": "process-capture v1", "raw_text": "x"}).insert(ignore_permissions=True)`)
+      await s.open('/life/brain/sources/gmail?tab=rules')
+      const row = pg.locator('[data-recently] [data-recent-row]', { hasText: `I129 recent ${width}` })
+      await row.waitFor({ timeout: 10000 })
+      await row.locator('[data-ref]').click()
+      await pg.waitForFunction(() => /^inbox:/.test(new URL(location.href).searchParams.get('open') || ''), null, { timeout: 10000 })
+      must(new URL(pg.url()).pathname === '/life/brain/sources/gmail' && (await pg.locator('[data-recently]').isVisible()), 'the capture took the source page away: ' + pg.url())
+      await pg.keyboard.press('Escape')
     })
     await check('BRAIN.68', `${width} px: a reason line on a Needs you row has no "Jai" and no "requested"`, async () => {
       bench(`frappe.set_user("Administrator")

@@ -86,14 +86,14 @@
       <section class="flex flex-col gap-2" data-agent-section="did">
         <div><h2 class="text-base-medium text-ink-gray-9">What it did</h2><p class="text-sm text-ink-gray-6">This week, {{ money(a.cost_week) }} in all.</p></div>
         <Card v-if="a.did.length" flush>
-          <div v-for="d in a.did" :key="d.name" class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-outline-gray-1 py-3 last:border-b-0" data-did :data-status="d.status">
+          <Row v-for="d in a.did" :key="d.name" :pane="d.ref || null" :label="d.title" class="!flex-wrap !items-center justify-between gap-x-3 gap-y-1 !py-3" data-did :data-status="d.status">
             <div class="min-w-0"><span class="break-words text-base text-ink-gray-9" data-did-title>{{ d.title }}</span>
               <span class="ml-2 text-sm text-ink-gray-6">{{ d.status === 'Approved' ? 'Approved by you · ' : '' }}{{ d.when }}</span>
               <div v-if="d.asked_by" class="text-sm text-ink-gray-6" data-did-asked>{{ d.asked_by === 'owner' ? `Asked by you: “${d.request}”` : 'Its own idea, with your OK' }}{{ d.undone ? ' · undone' : '' }}</div>
               <div v-if="d.error" class="text-sm text-ink-red-8" data-did-error>Failed: {{ d.error }}</div></div>
-            <div class="flex items-center gap-2"><Button v-if="d.can_undo && writable" size="sm" label="Undo" data-did-undo @click="undoDid(d)" />
+            <div class="relative flex items-center gap-2"><Button v-if="d.can_undo && writable" size="sm" label="Undo" data-did-undo @click="undoDid(d)" />
               <span class="text-sm text-ink-gray-6">{{ money(d.cost) }}</span></div>
-          </div>
+          </Row>
         </Card>
         <Card v-else class="text-sm text-ink-gray-6" data-agent-empty="did">Nothing this week.</Card>
       </section>
@@ -104,7 +104,7 @@
           <p>{{ a.reported ? `Last heard from ${a.name} at ${a.reported}.` : `${a.name} has not reported yet.` }} It sends what it knows, can do and has scheduled when they change and once a day, and picks up your changes from here.</p>
           <p v-if="!a.reported" data-connector-how>Set it up with the README in <code>agent/connector/</code>, on the agent's server.</p>
           <div v-if="a.skills.length" data-agent-skills><div class="text-ink-gray-9">Skills it reported</div>
-            <ul class="mt-1 list-disc pl-5"><li v-for="s in a.skills" :key="s.name">{{ s.name }}<span v-if="s.description" class="text-ink-gray-6"> · {{ s.description }}</span></li></ul></div>
+            <ul class="mt-1 list-disc pl-5"><li v-for="s in a.skills" :key="s.name"><RouterLink v-if="s.page" class="text-ink-blue-8 hover:underline" :to="`/brain/skills/${s.page}`" data-agent-skill-link>{{ s.name }}</RouterLink><template v-else>{{ s.name }}</template><span v-if="s.description" class="text-ink-gray-6"> · {{ s.description }}</span></li></ul></div>
           <form v-if="writable" class="flex flex-wrap items-end gap-2" @submit.prevent="rename"><FormControl v-model="nameDraft" label="Name" class="w-64" data-agent-rename-input />
             <Button label="Save name" type="submit" :disabled="nameDraft.trim() === (a.has_name ? a.name : '')" data-agent-rename /></form>
         </Card>
@@ -120,6 +120,7 @@ import { computed, h, ref, watch } from 'vue'
 import { Badge, Button, FormControl, Select, Switch, TextInput } from 'frappe-ui'
 import AgentRequests from '@/components/brain/AgentRequests.vue'
 import Card from '@/components/ui/Card.vue'
+import Row from '@/components/ui/Row.vue'
 import { tryCall } from '@/lib/api'
 import { brainData } from '@/data/brain'
 import { store } from '@/lib/store'
