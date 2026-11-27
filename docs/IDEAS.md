@@ -17,7 +17,7 @@ Decided: **each customer's site is isolated in its own container stack**, with i
 
 Order: the updater fix (below), the image, the control plane decision, the control plane.
 
-### The updater: check before changing, don't roll back a good migrate
+### The updater: check before changing, don't roll back a good migrate (became #138)
 > The live update failed twice on 26 Nov: `restart: failed … 'sudo supervisorctl status' returned non-zero exit status 1`, then `restore the backup: failed. bench --site exited 1:` with no reason. The site was left on old code with a migrated database.
 
 What was found:
@@ -121,3 +121,4 @@ A mic button in Life OS's own text boxes, using faster-whisper on the server (#1
 - A learning Brain, rules, plate vs waiting pile: #117, #118.
 - Chat on Flow, renamed from Ask: #119. Chat everywhere: #120.
 - Dashboard at the top of Today › Week, everything in the drawer: #123.
+- The updater: check before changing, no rollback of a good migrate, Updates page shows the truth: #138.
