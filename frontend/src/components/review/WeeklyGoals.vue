@@ -30,7 +30,7 @@
             <span class="text-sm text-ink-gray-6" data-stars-used>{{ t.stars.length }} of {{ t.needed }} stars used</span>
           </div>
           <!-- the rows scroll inside the card only when there are more than fit (the page itself never scrolls) -->
-          <div class="md:max-h-[calc(100vh-330px)] md:overflow-y-auto" data-goal-rows>
+          <div class="md:max-h-[calc(100vh-370px)] md:overflow-y-auto" data-goal-rows>
           <Row bare v-for="g in t.rows" :key="g.goal" class="grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2 hover:bg-surface-gray-1 md:grid-cols-[2rem_11rem_7rem_minmax(0,1fr)_auto_auto] -mx-4 px-4"
             :class="g.plan.skip && 'opacity-80'" data-goal-row :data-goal="g.goal" :data-star="g.star ? 1 : 0" :data-skipped="g.plan.skip ? 1 : 0">
             <button type="button" class="absolute inset-0 focus-visible:focus-ring" :aria-label="`Plan ${g.title}`" @click="open(g.goal)" />
