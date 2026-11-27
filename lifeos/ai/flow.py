@@ -176,7 +176,7 @@ def add_event(title: str, start: str, end: str | None = None, all_day: bool = Fa
 
 @tool
 def hand_off(person: str, what: str, check_by: str | None = None, how: str = "track", channel: str = "email", *, ctx: ToolContext) -> dict:
-	"""Hand off to a person: a Waiting task with a check date. how: track (default, nothing sent), draft ("ask": a message to send or drop), send (only when told to email or send it), done (they sent it). channel: email or whatsapp."""
+	"""Hand off to a person as a Waiting task. how: track (default, sends nothing), draft ("ask": a message to send), send (only when told to send), done (they sent it)."""
 	return _run("hand_off", ctx, person=person, what=what, check_by=check_by, how=how, channel=channel)
 
 
