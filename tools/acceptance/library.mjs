@@ -1051,7 +1051,7 @@ print(json.dumps(out))`).split('\n').pop()))
     await check('LIBRARY.37', `${width} px: with no people the screen says what will appear and offers + Capture`, async () => {
       bench(`frappe.db.sql("update \`tabLife Person\` set space = %s where space = %s", ("zz-i25-aside-${width}", "${SPACE}"))`)
       try {
-        await openPeople()
+        await openPeople('?all=1') // all=1: not the view LIBRARY.56 left remembered (Kind: Organisation)
         must(await pg.locator('[data-lv-empty]').isVisible(), 'no empty state')
         const t = await pg.locator('[data-lv-empty]').innerText()
         must(t.includes('will show up here') && t.includes('Chat'), 'the empty state says: ' + t)
