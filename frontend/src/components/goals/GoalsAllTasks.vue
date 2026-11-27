@@ -28,26 +28,24 @@
         @keydown.enter="add({}, topText, () => (topText = ''))" />
     </Card>
     <Card v-if="loaded && data && !data.total" class="py-2" data-tasks-empty>
-      <Empty :title="HINT[show][0]">
-        <p class="mt-1">{{ HINT[show][1] }}</p>
-        <TextInput v-if="writable && show === 'open'" v-model="emptyText" class="mt-3" placeholder="Add a task and press Enter" aria-label="Add your first task"
-          data-tasks-empty-add @keydown.enter="add({}, emptyText, () => (emptyText = ''))" />
-      </Empty>
+      <EmptyState :line="`${HINT[show][0]} ${HINT[show][1]}`">
+        <template v-if="writable && show === 'open'" #action><TextInput v-model="emptyText" placeholder="Add a task and press Enter" aria-label="Add your first task"
+          data-tasks-empty-add @keydown.enter="add({}, emptyText, () => (emptyText = ''))" /></template>
+      </EmptyState>
     </Card>
 
     <section v-for="g in data?.groups || []" :key="g.key" class="flex flex-col gap-1" data-task-group-section :data-group="g.label">
       <div class="flex flex-wrap items-center gap-2 border-b border-outline-gray-2 pb-2">
         <span v-if="g.colour" class="size-2.5 rounded-full" :class="dotClass(g)" aria-hidden="true" />
-        <h2 class="text-base-medium text-ink-gray-9">{{ g.label }}</h2>
+        <SectionHead>{{ g.label }}</SectionHead>
         <span class="text-sm text-ink-gray-6" data-group-count>{{ g.count }}</span>
       </div>
       <TextInput v-if="canAdd(g)" v-model="texts[g.key]" class="my-1" size="sm" :placeholder="`Add a task to ${g.label}`" :aria-label="`Add a task to ${g.label}`"
         :data-group-add="g.label" @keydown.enter="add(addArgs(g), texts[g.key], () => (texts[g.key] = ''))" />
       <template v-for="p in g.parts" :key="p.name">
-        <h3 v-if="p.label" class="mt-1 text-sm-medium text-ink-gray-7" data-part-head>{{ p.label }}</h3>
+        <SectionHead v-if="p.label" data-part-head>{{ p.label }}</SectionHead>
         <ul class="flex flex-col">
-          <li v-for="t in p.tasks" :key="t.name" class="flex flex-col gap-1 border-b border-outline-gray-1 py-2 last:border-b-0 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_6rem] md:items-center md:gap-4"
-            data-task-row :data-task="t.name" :data-guessed="t.area_guessed ? 1 : 0">
+          <Row as="li" bare v-for="t in p.tasks" :key="t.name" class="flex flex-col gap-1 py-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,14rem)_6rem] md:items-center md:gap-4" data-task-row :data-task="t.name" :data-guessed="t.area_guessed ? 1 : 0">
             <div class="flex min-w-0 items-start gap-2.5">
               <Checkbox class="relative mt-0.5" :model-value="t.status === 'Done'" :disabled="!writable" :aria-label="`Done: ${t.title}`" @update:model-value="toggle(t)" />
               <div class="min-w-0 flex-1">
@@ -68,7 +66,7 @@
               <Badge v-else theme="orange" label="No goal" />
             </div>
             <div class="pl-7 text-sm tabular-nums md:pl-0 md:text-right" :class="overdue(t) ? 'text-ink-red-8' : 'text-ink-gray-6'" data-task-due>{{ dueText(t) }}</div>
-          </li>
+          </Row>
         </ul>
       </template>
     </section>
@@ -76,6 +74,8 @@
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 // Goals > All tasks (issue 21): every open task once, grouped by area (then part), goal or due date, each with its goal or
 // "No goal", due date, the top-three star and ✦ when the Brain guessed its area. A quick add at the top of each group files the
 // new task in that group's area (and goal). Someday, Waiting, Due and Done are filters here. The old list is behind any
@@ -85,7 +85,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, TextInput, toast } from 'frappe-ui'
 import AreaGuess from '@/components/AreaGuess.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { goalsData } from '@/data/goals'

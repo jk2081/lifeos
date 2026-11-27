@@ -14,7 +14,7 @@
       </template>
     </div>
     <section aria-labelledby="ladder-h">
-      <h2 id="ladder-h" class="text-lg-medium text-ink-gray-9">The ladder</h2>
+      <SectionHead id="ladder-h">The ladder</SectionHead>
       <p class="mt-1 text-sm text-ink-gray-6">Each level opens when the one before it is in use. It teaches working with agents one step at a time.</p>
       <ol class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" data-ladder>
         <li v-for="l in levels" :key="l.level" class="rounded-5 border p-3" :class="[l.mark === 'next' ? 'border-outline-gray-9' : 'border-outline-gray-2', l.mark === 'later' && 'opacity-60']"
@@ -30,6 +30,7 @@
   </div>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 // How it works (issue 26): Sources → Brain → Plan → what you see, and the ladder with the current level marked "next".
 import { computed, onMounted } from 'vue'
 import { Button } from 'frappe-ui'

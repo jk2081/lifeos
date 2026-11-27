@@ -921,13 +921,6 @@ def _this_week(cycle_name, g):
 
 
 @frappe.whitelist(methods=["POST"])
-def close_cycle(cycle: str, outcomes: str | builtins.list | None = None):
-	"""Close an active cycle after its end date. `outcomes` is a list of {goal, outcome, result_note}."""
-	permissions.require_login()
-	return rules.close_cycle(cycle, parse(outcomes, []))
-
-
-@frappe.whitelist(methods=["POST"])
 def plan_next_cycle(cycle: str, goals: str | builtins.list | None = None, title: str | None = None):
 	"""Create the next cycle, starting the Monday after this one ends, and carry the chosen goals with their open actions."""
 	permissions.require_login()

@@ -1,6 +1,6 @@
 <template>
   <Card v-if="rows.length" flush data-agent-requests>
-    <div v-for="r in rows" :key="r.name" class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5 border-b border-outline-gray-1 py-3 last:border-b-0" data-agent-request :data-request="r.name">
+    <Row bare v-for="r in rows" :key="r.name" class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5 py-3" data-agent-request :data-request="r.name">
       <div class="min-w-0 flex-[1_1_320px]">
         <div class="flex flex-wrap items-center gap-2">
           <Badge theme="gray" :label="r.agent_name" data-request-agent />
@@ -14,11 +14,12 @@
         <Button variant="solid" label="Approve" :disabled="busy.has(r.name)" data-request-approve @click="decide(r, 'approve')" />
         <Button label="No" :disabled="busy.has(r.name)" data-request-no @click="decide(r, 'no')" />
       </div>
-    </div>
+    </Row>
   </Card>
 </template>
 
 <script setup>
+import Row from '@/components/ui/Row.vue'
 // What an agent waits to do until you say so (issue 85): the draft, with Approve and No. The same rows are in Needs you and on the agent's page.
 import { computed, reactive } from 'vue'
 import { Badge, Button } from 'frappe-ui'

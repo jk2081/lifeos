@@ -47,7 +47,7 @@
         <a v-if="p.route && p.exists" href="#" class="text-ink-blue-8 underline" @click.prevent="openRoute(p.route)">Open</a>
       </div>
     </Card>
-    <Card v-if="!shown.length"><Empty :title="emptyTitle" :hint="emptyHint" /></Card>
+    <Card v-if="!shown.length"><EmptyState :line="`${emptyTitle} ${emptyHint}`" /></Card>
   </div>
 
   <Dialog v-model:open="editOpen" title="Edit proposal" size="xl"
@@ -79,7 +79,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Checkbox, DatePicker, DateTimePicker, Dialog, FormControl, toast } from 'frappe-ui'
 import Card from '../ui/Card.vue'
 import Pick from '../Pick.vue'
-import Empty from '../Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'
 import { refreshCounts } from '@/lib/store'

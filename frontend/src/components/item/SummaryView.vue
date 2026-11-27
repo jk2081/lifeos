@@ -4,9 +4,9 @@
       <p class="text-base-medium text-ink-gray-9" data-summary-line>{{ summary.line }}</p>
 
       <section v-if="summary.to_act_on.length" class="flex flex-col gap-1.5" data-summary-group="act">
-        <h3 class="text-sm-medium text-ink-gray-7">To act on · <span class="tabular-nums" data-group-count>{{ summary.to_act_on.length }}</span></h3>
+        <SectionHead>To act on · <span class="tabular-nums" data-group-count>{{ summary.to_act_on.length }}</span></SectionHead>
         <Card flush>
-          <div v-for="(l, i) in summary.to_act_on" :key="i" class="flex flex-wrap items-start gap-x-3 gap-y-1.5 border-b border-outline-gray-1 px-4 py-2.5 last:border-b-0" data-summary-line-row="act">
+          <Row bare v-for="(l, i) in summary.to_act_on" :key="i" class="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-4 py-2.5" data-summary-line-row="act">
             <div class="min-w-0 flex-1 basis-60">
               <div class="break-words text-base text-ink-gray-9"><b v-if="l.who" class="font-semibold">{{ l.who }}</b> {{ l.what }}</div>
               <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-gray-6">
@@ -17,39 +17,39 @@
             <Dropdown v-if="writable" :options="menu(i, l)" placement="right">
               <Button size="sm" label="Change" data-line-change :aria-label="`Change where “${l.what}” goes`" />
             </Dropdown>
-          </div>
+          </Row>
         </Card>
       </section>
 
       <section v-if="summary.updates.length" class="flex flex-col gap-1.5" data-summary-group="updates">
-        <h3 class="text-sm-medium text-ink-gray-7">Updates · <span class="tabular-nums" data-group-count>{{ summary.updates.length }}</span></h3>
+        <SectionHead>Updates · <span class="tabular-nums" data-group-count>{{ summary.updates.length }}</span></SectionHead>
         <Card flush>
-          <div v-for="(u, i) in summary.updates" :key="i" class="flex flex-wrap items-baseline gap-x-3 border-b border-outline-gray-1 px-4 py-2.5 text-base text-ink-gray-9 last:border-b-0" data-summary-line-row="updates">
+          <Row bare v-for="(u, i) in summary.updates" :key="i" class="flex flex-wrap items-baseline gap-x-3 px-4 py-2.5 text-base text-ink-gray-9" data-summary-line-row="updates">
             <span class="min-w-0 flex-1 basis-60 break-words">{{ u.what }}</span>
             <SourceLink :source="u.source" @original="emit('original')" />
-          </div>
+          </Row>
         </Card>
       </section>
 
       <section v-if="summary.reports.length" class="flex flex-col gap-1.5" data-summary-group="reports">
-        <h3 class="text-sm-medium text-ink-gray-7">Reports · <span class="tabular-nums" data-group-count>{{ summary.reports.length }}</span> <span class="font-normal text-ink-gray-6">filed, nothing to do</span></h3>
+        <SectionHead>Reports · <span class="tabular-nums" data-group-count>{{ summary.reports.length }}</span> <span class="font-normal text-ink-gray-6">filed, nothing to do</span></SectionHead>
         <p class="break-words text-base text-ink-gray-8" data-summary-reports>
           <template v-for="(r, i) in summary.reports" :key="i"><span v-if="i" aria-hidden="true"> · </span><SourceLink :source="r.source" :label="r.title" plain @original="emit('original')" /></template>
         </p>
       </section>
 
       <section v-if="summary.facts.length" class="flex flex-col gap-1.5" data-summary-group="facts">
-        <h3 class="text-sm-medium text-ink-gray-7">Key facts</h3>
+        <SectionHead>Key facts</SectionHead>
         <ul class="flex list-disc flex-col gap-1 pl-5 text-base text-ink-gray-9"><li v-for="(f, i) in summary.facts" :key="i">{{ f }}</li></ul>
       </section>
 
       <p v-if="summary.sensitive" class="inline-flex items-center gap-1 text-sm text-ink-gray-6" data-summary-sensitive>
         <span class="lucide-lock size-3.5" aria-hidden="true" />{{ summary.sensitive === 1 ? '1 sensitive item' : `${summary.sensitive} sensitive items` }}</p>
       <Card v-if="!summary.to_act_on.length && !summary.updates.length && !summary.reports.length && !summary.facts.length && !summary.sensitive" data-summary-nothing>
-        <Empty title="Nothing to act on." hint="The Brain read it and found nothing that asks anything of you." /></Card>
+        <EmptyState line="Nothing to act on. The Brain read it and found nothing that asks anything of you." /></Card>
     </template>
     <Card v-else-if="item.summary_md" data-item-summary><Md :text="item.summary_md" /></Card>
-    <Card v-else-if="item.status !== 'New' && item.status !== 'Processing'"><Empty title="No summary." hint="The Brain adds a summary when it reads the item." /></Card>
+    <Card v-else-if="item.status !== 'New' && item.status !== 'Processing'"><EmptyState line="No summary. The Brain adds a summary when it reads the item." /></Card>
   </div>
   <Dialog v-model:open="askWho" title="Waiting on…" size="sm" data-waiting-dialog
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: 'Move to the waiting pile', variant: 'solid', onClick: confirmWaiting }]">
@@ -57,12 +57,14 @@
   </Dialog>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 // The summary of an inbox item as data you can scan (issue 118): one line on top, then To act on (each line with its Change), Updates and
 // Reports. A line that came from an email links to it. Older items, summarised as one paragraph, still show it.
 import { computed, h, ref } from 'vue'
 import { Badge, Button, Dialog, Dropdown, FormControl } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Md from '@/components/Md.vue'
 import { itemData } from '@/data/item'
 import { tryCall } from '@/lib/api'

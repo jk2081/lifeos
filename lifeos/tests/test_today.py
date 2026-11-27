@@ -498,16 +498,19 @@ class TestDashboard(LifeTestCase):
 		self.assertEqual([c["key"] for c in dash.get("year", space=PRIVATE)["cards"]], ["done", "reviews", "needs", "filed"])
 		self.assertEqual([p["key"] for p in dash.get("year", space=PRIVATE)["panels"]], ["active", "filed-months"])
 
-	def test_an_empty_space_says_what_will_appear_and_offers_one_action(self):  # acceptance 9
+	def test_an_empty_space_shows_every_card_as_a_number_and_every_empty_panel_with_at_most_one_action(self):  # acceptance 9
 		self.clear()
 		for view in dash.VIEWS:
 			out = dash.get(view, space=PRIVATE)
 			self.assertTrue(out["new"])
 			for c in out["cards"]:
-				if c["key"] == "habits" or c["value"] is None or c["value"] == 0:
-					self.assertTrue(c["empty"] and c["empty"]["line"] and c["empty"]["action"] and c["empty"]["to"], f"{view} {c['key']}")
-		simple = frappe.db.set_single_value("Life Settings", "simple_mode", 1)
-		self.assertTrue(dash.get("week", space=PRIVATE)["cards"][0]["empty"]["action"])
+				self.assertNotIn("empty", c, f"{view} {c['key']}")
+				self.assertIsNotNone(c["value"], f"{view} {c['key']}")
+			for p in out["panels"]:
+				if not p["rows"] and not p.get("groups"):
+					self.assertTrue(p["empty"] and p["empty"]["line"], f"{view} {p['key']}")
+		frappe.db.set_single_value("Life Settings", "simple_mode", 1)
+		self.assertEqual(dash.get("week", space=PRIVATE)["cards"][0]["value"], 0)
 
 	def test_the_dashboard_is_for_people_and_reads_a_bounded_number_of_queries(self):
 		self.seed_brain()

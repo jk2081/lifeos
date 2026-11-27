@@ -4,14 +4,14 @@
     <div class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6"><Avatar v-if="c.assistant" size="xs" :label="c.assistant" /><span>{{ c.assistant }} · {{ long(c.date, true) }}</span>
       <a v-if="c.url" class="text-ink-blue-8 hover:underline" :href="c.url" target="_blank" rel="noopener noreferrer">Open the chat</a></div>
     <section>
-      <Card><Md v-if="c.summary_md" :text="c.summary_md" /><Empty v-else title="Not summarised yet." :hint="c.transcript_md ? 'An agent writes the summary from the transcript.' : 'The agent logged this chat without one.'" data-not-summarised /></Card></section>
+      <Card><Md v-if="c.summary_md" :text="c.summary_md" /><EmptyState :line="`Not summarised yet. ${c.transcript_md ? 'An agent writes the summary from the transcript.' : 'The agent logged this chat without one.'}`" v-else data-not-summarised /></Card></section>
     </template>
     <section v-if="on('transcript')" data-chat-transcript>
-      <Card><Md v-if="c.transcript_md" :text="c.transcript_md" read /><Empty v-else title="No transcript." hint="Chats logged by an agent carry a summary; imported chats carry their transcript." /></Card></section>
+      <Card><Md v-if="c.transcript_md" :text="c.transcript_md" read /><EmptyState line="No transcript. Chats logged by an agent carry a summary; imported chats carry their transcript." v-else /></Card></section>
     <section v-if="on('made')" data-source-made>
       <Card flush>
         <Row v-for="m in made" :key="m.doctype + m.name" :pane="refOfRoute(m.route)" :label="m.title"><div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ m.title }}</div><div class="text-sm text-ink-gray-6">{{ m.kind }}</div></div></Row>
-        <Empty v-if="!made.length" title="Nothing made from this chat yet." hint="Tasks made from its open items, and wiki pages that cite it, are listed here." />
+        <EmptyState line="Nothing made from this chat yet. Tasks made from its open items, and wiki pages that cite it, are listed here." v-if="!made.length" />
       </Card></section>
     <section v-if="on('items')">
       <Card flush>
@@ -23,7 +23,7 @@
             <Button variant="ghost" label="Someday" data-item-someday @click="toSomeday(i)" />
             <Button variant="ghost" label="Close" @click="closeItem(i)" /></div>
         </Row>
-        <Empty v-if="!c.open_items.length" title="No open items." hint="Nothing was left to follow up from this chat." />
+        <EmptyState line="No open items. Nothing was left to follow up from this chat." v-if="!c.open_items.length" />
       </Card></section>
     <Backlinks v-if="on('links')" tab doctype="Life Chat Log" :name="c.name" :items="links" />
   </template>
@@ -34,7 +34,7 @@ import { Avatar, Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import Md from '@/components/Md.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import { tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'

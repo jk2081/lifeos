@@ -12,7 +12,7 @@
         <span v-for="w in shown" :key="w" class="text-center tabular-nums" :class="w === cur ? 'rounded-4 bg-surface-gray-2 py-0.5 text-ink-gray-9 font-medium' : ''" role="columnheader"
           :data-grid-head="w" :data-now="w === cur ? 1 : 0">W{{ w }}</span>
       </div>
-      <div v-for="a in actions" :key="a.name" class="grid items-center gap-x-1 border-b border-outline-gray-1 py-1.5 last:border-b-0" :style="cols" role="row" data-grid-action :data-action="a.name">
+      <Row bare v-for="a in actions" :key="a.name" class="grid items-center gap-x-1 py-1.5" :style="cols" role="row" data-grid-action :data-action="a.name">
         <div class="relative min-w-0 cursor-pointer pr-2" role="rowheader">
           <button type="button" class="absolute inset-0 focus-visible:focus-ring" :aria-label="`Open ${a.title}'s goal`" :data-ref="'goal:' + goal.name" data-action-open @click="openRef('goal:' + goal.name)" />
           <div class="truncate text-base" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'" :title="a.title">{{ a.title }}</div>
@@ -27,10 +27,9 @@
             :class="[n(a, w) >= a.per_week ? 'bg-surface-gray-9 text-surface-base' : n(a, w) ? 'bg-surface-gray-4 text-ink-gray-9' : w > (cur || 12) || !cur ? 'bg-surface-gray-1' : 'bg-surface-gray-2', w === cur ? 'ring-1 ring-outline-gray-4' : '']"
             data-grid-cell :data-week="w" :data-count="n(a, w)">{{ n(a, w) ? (a.per_week > 1 ? `${n(a, w)}/${a.per_week}` : '✓') : '' }}</span>
         </template>
-      </div>
+      </Row>
     </div>
-    <Empty v-else title="No actions yet." hint="Use Edit to add the weekly actions. Each week you tick what you did.">
-      <Button v-if="canEdit" class="mt-3" variant="solid" label="Edit" @click="emit('edit')" /></Empty>
+    <EmptyState v-else line="No actions yet. Use Edit to add the weekly actions. Each week you tick what you did." :action="canEdit ? { label: 'Edit', click: () => emit('edit') } : null" />
     <div v-if="!all && actions.length" class="md:hidden"><Button variant="ghost" class="!text-ink-blue-8" label="All 12 weeks" data-grid-all @click="open = true" /></div>
     <Dialog v-if="!all" v-model:open="open" title="All 12 weeks" size="lg">
       <GoalGrid all :goal="goal" :weeks="weeks" :current-week="cur" :average="average" :target="target" :closed="closed" :can-edit="canEdit" @changed="emit('changed')" />
@@ -38,12 +37,13 @@
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 // A 12 Week Year goal's own grid, on its page: its actions as rows, the 12 weeks as columns, this week highlighted and the only
 // one that can be ticked. A tick is the same record as on Goals > Cycles. On a phone it shows this week and the two before it;
 // "All 12 weeks" opens the whole grid in a sheet.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Button, Dialog } from 'frappe-ui'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { goalsData } from '@/data/goals'
 import { openRef } from '@/lib/pane'
 import { errorText } from '@/lib/api'

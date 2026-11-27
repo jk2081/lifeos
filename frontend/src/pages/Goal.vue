@@ -65,7 +65,7 @@
             <SectionHead :count="d.tabs.tasks" :to="{ query: { tab: 'tasks' } }" door="goal-overview-tasks">Open tasks</SectionHead>
             <Card flush>
               <TaskRow v-for="t in openTasks.slice(0, 6)" :key="t.name" :task="t" :today="store.today" with-due :readonly="!writable" @toggle="toggle" />
-              <Empty v-if="!openTasks.length" title="No open tasks." hint="Add the next step below." />
+              <EmptyState line="No open tasks. Add the next step below." v-if="!openTasks.length" />
               <Row v-if="writable && !g.is_archived && g.outcome === 'In Progress'"><TextInput v-model="quick" class="flex-1" placeholder="Add a task under this goal" aria-label="Add a task under this goal"
                 data-goal-quick @keydown.enter="addTask" /></Row>
             </Card>
@@ -99,7 +99,7 @@
     <GoalEditDialog v-if="writable" v-model="editOpen" :goal="g" :weekly-actions="j.goal?.actions || []" :space="d.space" @saved="changed" />
     <NewRecord v-model="noteOpen" title="New note" action="Create note" :fields="[{ name: 'title', label: 'Title', required: true }]" :save="createNote" />
   </template>
-  <div v-else-if="missing" class="page-body"><Card><Empty title="This goal was not found." hint="It may belong to another space." /></Card></div>
+  <div v-else-if="missing" class="page-body"><Card><EmptyState line="This goal was not found. It may belong to another space." /></Card></div>
 </template>
 <script setup>
 import RefLink from '@/components/ui/RefLink.vue'
@@ -115,7 +115,7 @@ import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Pick from '@/components/Pick.vue'
 import MdField from '@/components/MdField.vue'
 import TaskRow from '@/components/TaskRow.vue'

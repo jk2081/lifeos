@@ -314,11 +314,11 @@ def week_summary(space: str | None = None, week_start: str | None = None):
 	t = frappe.qb.DocType("Life Task")
 	done_tasks = task_api.query(space, [t.status == "Done", t.completed_on.between(start, end)], [(t.completed_on, Order.desc)], 0, 100)
 	carried = task_api.query(space, [t.status == "Carried", t.completed_on.between(start, end)], [(t.completed_on, Order.desc)], 0, 100)
-	loops = task_api.open_loops(space=space, page_length=20)
+	loop_rows = task_api.query(space, task_api.open_loops_criteria(t), [(t.creation, Order.asc)], 0, 20)
 	return {
 		"space": space, "week_start": str(start), "week_end": str(end), "cycle": cycle_out, "habits": habit_rows,
 		"done_total": _count_tasks(space, "Done", start, end), "carried_total": _count_tasks(space, "Carried", start, end),
-		"done": done_tasks, "carried": carried, "open_loops": loops["tasks"], "open_loops_total": loops["total"],
+		"done": done_tasks, "carried": carried, "open_loops": loop_rows, "open_loops_total": task_api.open_loops_count(space),
 		"decide": task_api.stale_tasks(space, 30),
 		"archived": archive.archived_in_week(space, start, end),
 		"stale_days": frappe.db.get_single_value("Life Settings", "stale_task_days") or 90,

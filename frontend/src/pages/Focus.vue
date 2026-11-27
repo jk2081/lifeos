@@ -14,17 +14,17 @@
         </Card>
         <Card class="flex flex-col gap-2" data-focus-principles>
           <div class="flex flex-wrap items-baseline gap-2">
-            <h2 class="text-base-medium text-ink-gray-9">Principles</h2>
+            <SectionHead>Principles</SectionHead>
             <span class="text-sm text-ink-gray-6">guidelines you and your agents work within</span>
             <Button v-if="writable && !editing" class="ml-auto" size="sm" variant="ghost" label="Edit" data-principles-edit @click="startEdit" />
           </div>
           <ol v-if="!editing" class="flex flex-col">
-            <li v-for="(p, i) in d.principles" :key="i" class="flex items-baseline gap-3 border-b border-outline-gray-1 py-2 last:border-b-0" data-principle>
+            <Row as="li" bare v-for="(p, i) in d.principles" :key="i" class="flex items-baseline gap-3 py-2" data-principle>
               <span class="w-5 flex-none rounded-4 bg-surface-gray-2 text-center text-xs tabular-nums text-ink-gray-6">{{ i + 1 }}</span>
               <span class="min-w-0 break-words text-base text-ink-gray-9">{{ p }}</span>
-            </li>
+            </Row>
           </ol>
-          <p v-if="!editing && !d.principles.length" class="text-sm text-ink-gray-6" data-principles-empty>No principles yet. Short lines on how to work, in order.</p>
+          <EmptyState v-if="!editing && !d.principles.length" line="No principles yet. Short lines on how to work, in order." data-principles-empty />
           <div v-if="editing" class="flex flex-col gap-2" data-principles-editor>
             <div v-for="(p, i) in draft" :key="p.id" class="flex items-center gap-2" data-principle-row>
               <span class="w-5 flex-none text-center text-sm tabular-nums text-ink-gray-6">{{ i + 1 }}</span>
@@ -41,26 +41,26 @@
           </div>
         </Card>
         <Card class="flex flex-col gap-1" data-focus-goals>
-          <div class="flex flex-wrap items-baseline gap-2"><h2 class="text-base-medium text-ink-gray-9">Goals serving this focus</h2>
+          <div class="flex flex-wrap items-baseline gap-2"><SectionHead>Goals serving this focus</SectionHead>
             <span class="text-sm text-ink-gray-6">short goals come and go; the focus stays</span></div>
           <div v-if="!d.has_annual" class="flex flex-wrap items-center gap-2 py-1" data-focus-no-annual>
             <Badge theme="orange" label="No annual goal" />
             <Button v-if="canAddGoal" size="sm" variant="subtle" icon-left="lucide-plus" label="Annual goal" data-focus-annual @click="addAnnual" />
           </div>
           <ul class="flex flex-col">
-            <li v-for="r in rows" :key="r.name" class="flex flex-wrap items-center gap-3 border-b border-outline-gray-1 py-2 last:border-b-0" :class="r.finished && 'opacity-60'" data-focus-goal :data-horizon="r.tag">
+            <Row as="li" bare v-for="r in rows" :key="r.name" class="flex flex-wrap items-center gap-3 py-2" :class="r.finished && 'opacity-60'" data-focus-goal :data-horizon="r.tag">
               <span class="w-28 flex-none rounded-4 bg-surface-gray-2 px-2 py-0.5 text-xs text-ink-gray-7" data-goal-tag>{{ r.tag }}</span>
               <RefLink class="min-w-0 flex-1 break-words text-base text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`goal:${r.name}`">{{ r.title }}
                 <span v-if="r.target_date" class="text-sm text-ink-gray-6">· by {{ short(r.target_date, true) }}</span></RefLink>
               <span class="text-sm tabular-nums text-ink-gray-7">{{ r.finished ? r.outcome : r.progress.label }}</span>
-            </li>
+            </Row>
           </ul>
-          <p v-if="!rows.length" class="text-sm text-ink-gray-6" data-focus-goals-empty>No goals yet. Add an annual goal to say what this focus is for this year.</p>
+          <EmptyState v-if="!rows.length" line="No goals yet. Add an annual goal to say what this focus is for this year." data-focus-goals-empty />
         </Card>
       </div>
       <div class="flex min-w-0 flex-col gap-4">
         <Card class="flex flex-col gap-2" data-focus-going>
-          <h2 class="text-base-medium text-ink-gray-9">How it is going</h2>
+          <SectionHead>How it is going</SectionHead>
           <ul class="flex flex-col gap-1.5 text-sm text-ink-gray-8">
             <li data-going-cycles>A goal in {{ d.going.cycles_with_goal }} of the last {{ d.going.cycles_considered || 3 }} cycles</li>
             <li data-going-last>{{ d.going.last_activity ? `Last activity: ${d.going.last_activity.title}, ${short(d.going.last_activity.on.slice(0, 10))}` : 'No activity yet' }}</li>
@@ -68,11 +68,11 @@
           </ul>
         </Card>
         <Card class="flex flex-col gap-1">
-          <h2 class="text-base-medium text-ink-gray-9">In the 12-week review</h2>
+          <SectionHead>In the 12-week review</SectionHead>
           <p class="text-sm text-ink-gray-6">Each focus gets one question: set a goal this cycle, or just maintain it.</p>
         </Card>
         <Card class="flex flex-col gap-1">
-          <h2 class="text-base-medium text-ink-gray-9">What agents see</h2>
+          <SectionHead>What agents see</SectionHead>
           <p class="text-sm text-ink-gray-6">The standard and principles are part of the core card, so your agents work within them when a task touches {{ d.title }}.</p>
         </Card>
       </div>
@@ -86,10 +86,11 @@
       </div>
     </Dialog>
   </template>
-  <Card v-else-if="missing" class="m-4 py-2" data-focus-missing><Empty title="This focus is not here.">
-    <p class="mt-1">It may be switched off, archived or in a space you cannot open.</p><Button class="mt-3" label="Back to Goals" route="/goals" /></Empty></Card>
+  <Card v-else-if="missing" class="m-4 py-2" data-focus-missing><EmptyState line="This focus is not here. It may be switched off, archived or in a space you cannot open." :action="{ label: 'Back to Goals', to: '/goals' }" /></Card>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 import { openRef } from '@/lib/pane'
 import RefLink from '@/components/ui/RefLink.vue'
 // A focus's own page (issue 57): its standard, numbered principles (edit, reorder), goals by horizon (annual, 12 Week Year, others, then
@@ -99,7 +100,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Dialog, ErrorMessage, FormControl, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'
 import { errorText } from '@/lib/api'

@@ -3,7 +3,7 @@
   <div class="page-body flex max-w-6xl flex-col gap-4" data-activity :data-total="data?.all ?? 0">
     <Card v-if="plate" data-plate>
       <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 class="text-base-medium text-ink-gray-9">Left the plate this week</h2>
+        <SectionHead>Left the plate this week</SectionHead>
         <p class="text-sm text-ink-gray-6" data-flow><b class="text-ink-gray-9" data-flow-in>{{ plate.in }}</b> came in · <b class="text-ink-gray-9" data-flow-out>{{ plate.piles.all }}</b> left the plate</p>
       </div>
       <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -35,19 +35,16 @@
     </div>
 
     <Card v-if="loaded && !rows.length" class="py-2" data-activity-empty>
-      <Empty :title="data?.all || data?.counts?.assistant ? 'Nothing matches these filters.' : 'Nothing has come in yet.'">
-        <p class="mt-1">{{ data?.all || data?.counts?.assistant ? 'Clear a filter to see the rest.' : 'What you capture or connect, and what the Brain does with it, will show up here.' }}</p>
-        <Button v-if="writable && !data?.all && !data?.counts?.assistant" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-activity-capture @click="openChat()" />
-      </Empty>
+      <EmptyState :line="filtered ? 'Nothing matches these filters. Clear a filter to see the rest.' : 'Nothing has come in yet. What you capture or connect, and what the Brain does with it, will show up here.'"
+        :action="writable && !filtered ? { label: 'Chat', icon: 'lucide-message-square', click: () => openChat() } : null" data-activity-capture />
     </Card>
 
     <section v-for="g in groups" :key="g.day" class="flex flex-col gap-1.5" data-activity-day :data-day="g.day">
-      <h2 class="text-sm-medium text-ink-gray-6">{{ g.label }}</h2>
+      <SectionHead>{{ g.label }}</SectionHead>
       <Card flush>
         <template v-for="r in g.rows" :key="r.kind === 'assistant' ? 'a' + r.name : r.item">
         <!-- issue 125: what an agent did for you, in the same list as the captures -->
-        <div v-if="r.kind === 'assistant'" class="flex flex-col gap-1.5 border-b border-outline-gray-1 py-3 last:border-b-0 md:flex-row md:items-start md:gap-3"
-          data-activity-row data-assistant-row :data-action="r.name" :data-asked-by="r.asked_by">
+        <Row bare v-if="r.kind === 'assistant'" class="flex flex-col gap-1.5 py-3 md:flex-row md:items-start md:gap-3" data-activity-row data-assistant-row :data-action="r.name" :data-asked-by="r.asked_by">
           <span class="w-12 flex-none text-sm tabular-nums text-ink-gray-6">{{ time(r.received_on) }}</span>
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
@@ -67,9 +64,8 @@
             <Badge :theme="r.status === 'Failed' ? 'red' : 'green'" :label="r.status === 'Failed' ? 'Failed' : r.undone ? 'Undone' : 'Done'" />
             <Button v-if="r.can_undo && writable" size="sm" label="Undo" data-assistant-undo @click="undo(r)" />
           </div>
-        </div>
-        <div v-else class="flex flex-col gap-1.5 border-b border-outline-gray-1 py-3 last:border-b-0 md:flex-row md:items-start md:gap-3"
-          data-activity-row :data-item="r.item" :data-outcome-of="r.outcome" :data-source="r.source">
+        </Row>
+        <Row bare v-else class="flex flex-col gap-1.5 py-3 md:flex-row md:items-start md:gap-3" data-activity-row :data-item="r.item" :data-outcome-of="r.outcome" :data-source="r.source">
           <span class="w-12 flex-none text-sm tabular-nums text-ink-gray-6">{{ time(r.received_on) }}</span>
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
@@ -93,7 +89,7 @@
             <Badge :theme="THEME[r.outcome]" :label="LABEL[r.outcome]" data-row-outcome />
             <Button v-if="r.outcome === 'failed' && writable" size="sm" label="Retry" data-retry @click="retry(r)" />
           </div>
-        </div>
+        </Row>
         </template>
       </Card>
     </section>
@@ -102,6 +98,8 @@
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 import RefLink from '@/components/ui/RefLink.vue'
 import { openChat } from '@/lib/ask'
 // Brain > Activity (issue 18): what came in and what the Brain did with it, newest first, by day. Filters: source, area and
@@ -111,7 +109,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Card from '@/components/ui/Card.vue'
 import { tryCall } from '@/lib/api'
 import { brainData } from '@/data/brain'
@@ -136,6 +134,7 @@ const opened = ref('')
 const loaded = ref(false)
 const more = ref(false)
 const writable = computed(() => canWrite() && !store.isAgent)
+const filtered = computed(() => !!(data.value?.all || data.value?.counts?.assistant))
 const plate = computed(() => data.value?.plate)
 const outcome = computed(() => String(route.query.outcome || ''))
 const source = computed(() => String(route.query.source || ''))

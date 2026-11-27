@@ -10,7 +10,7 @@
           <Button size="sm" :variant="h.done ? 'solid' : 'outline'" :disabled="!canWrite()" :label="h.done ? 'Done' : 'Tick'" :aria-pressed="h.done" :aria-label="`${h.title}, ${h.done ? 'done' : 'not done'}`"
             data-list-habit class="relative" @click="tick(h)" />
         </Row>
-        <Empty v-if="!data.habits.length" title="No habits yet." hint="A habit you track shows here, ticked each day." />
+        <EmptyState line="No habits yet. A habit you track shows here, ticked each day." v-if="!data.habits.length" />
       </Card>
       <div v-else-if="data.grouped && data.rows.length" class="flex flex-col gap-4" data-waiting-list :data-by="byPerson ? 'person' : 'group'">
         <section v-for="g in sections" :key="g.key" :data-waiting-group="g.key">
@@ -34,8 +34,8 @@
             <span v-if="r.percent != null" class="shrink-0 text-sm tabular-nums text-ink-gray-6">{{ Math.round(r.percent) }}%</span>
           </Row>
         </template>
-        <Empty v-if="!data.rows.length && kind.startsWith('waiting')" title="Nobody owes you anything." hint="Hand something off and it shows here, with the day to look again." data-list-empty />
-        <Empty v-else-if="!data.rows.length" title="Nothing here." hint="What this number counts is empty for this period." data-list-empty />
+        <EmptyState line="Nobody owes you anything. Hand something off and it shows here, with the day to look again." v-if="!data.rows.length && kind.startsWith('waiting')" data-list-empty />
+        <EmptyState line="Nothing here. What this number counts is empty for this period." v-else-if="!data.rows.length" data-list-empty />
       </Card>
       <div v-if="kind === 'waiting' && canWrite()" class="flex flex-wrap items-center gap-2" data-waiting-foot>
         <Button variant="solid" icon-left="lucide-plus" label="Hand off" data-waiting-handoff @click="handOpen = true" />
@@ -55,7 +55,7 @@ import { useRoute } from 'vue-router'
 import { Button, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import WaitingRow from '@/components/item/WaitingRow.vue'
 import HandOffDialog from '@/components/item/HandOffDialog.vue'

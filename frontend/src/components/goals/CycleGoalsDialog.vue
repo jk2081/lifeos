@@ -16,7 +16,7 @@
           <li v-if="!goal.actions.length" class="text-sm text-ink-gray-6">No actions yet.</li>
         </ul>
       </div>
-      <Empty v-if="!grid.goals.length" title="No goals in this cycle yet." hint="Add a goal with its weekly actions." />
+      <EmptyState line="No goals in this cycle yet. Add a goal with its weekly actions." v-if="!grid.goals.length" />
     </div>
     <template #actions><div class="flex flex-wrap justify-between gap-2">
       <div class="flex flex-wrap gap-2">
@@ -32,7 +32,7 @@ import RefLink from '@/components/ui/RefLink.vue'
 // "Cycle goals" on Goals > Cycles: the cycle's goals with their actions, for editing (the goal dialog, finishing or dropping an action).
 import { ref } from 'vue'
 import { Badge, Button, Dialog, Dropdown } from 'frappe-ui'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import GoalDialog from '@/components/goals/GoalDialog.vue'
 import { tryCall } from '@/lib/api'
 import { goalsData } from '@/data/goals'

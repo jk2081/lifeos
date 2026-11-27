@@ -24,21 +24,15 @@
     </nav>
 
     <Card v-if="loaded && data && !data.sections.length && !data.no_area.length" class="py-2" data-goals-none>
-      <Empty title="No areas are on.">
-        <p class="mt-1">Goals are kept under the areas of your life. Switch an area on and its goals appear here.</p>
-        <Button class="mt-3" variant="solid" label="Manage areas" route="/settings?tab=areas" />
-      </Empty>
+      <EmptyState line="No areas are on. Goals are kept under the areas of your life. Switch an area on and its goals appear here." :action="{ label: 'Manage areas', to: '/settings?tab=areas' }" />
     </Card>
     <Card v-else-if="loaded && data && !data.total && !data.focus_count" class="py-2" data-goals-empty>
-      <Empty :title="HINT[show][0]">
-        <p class="mt-1">{{ HINT[show][1] }}</p>
-        <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-plus" label="Goal" data-goals-empty-add @click="addGoal('')" />
-      </Empty>
+      <EmptyState :line="`${HINT[show][0]} ${HINT[show][1]}`" :action="writable ? { label: 'Goal', icon: 'lucide-plus', click: () => addGoal('') } : null" />
     </Card>
     <section v-for="s in (data?.total || data?.focus_count ? shown : [])" :key="s.area" class="flex flex-col gap-2" data-area-section :data-area="s.area_name">
       <div class="flex flex-wrap items-center gap-2 border-b border-outline-gray-2 pb-2">
         <span class="size-2.5 rounded-full" :class="dotClass(s)" aria-hidden="true" />
-        <h2 class="text-base-medium text-ink-gray-9">{{ s.area_name }}</h2>
+        <SectionHead>{{ s.area_name }}</SectionHead>
         <span class="text-sm text-ink-gray-6" data-area-line>{{ areaLine(s) }}</span>
         <Button v-if="writable && s.count" class="ml-auto" size="sm" variant="ghost" icon-left="lucide-plus" label="Goal" :aria-label="`New goal in ${s.area_name}`" @click="addGoal(s.area)" />
       </div>
@@ -47,7 +41,7 @@
         <Button v-if="writable" size="sm" variant="subtle" icon-left="lucide-plus" label="Goal" :aria-label="`New goal in ${s.area_name}`" data-area-add @click="addGoal(s.area)" />
       </div>
       <template v-for="g in s.groups" :key="g.area?.name || 'direct'">
-        <h3 v-if="g.area" class="mt-1 text-sm-medium text-ink-gray-7" data-part-head :data-part="g.area.area_name">{{ g.area.area_name }}</h3>
+        <SectionHead v-if="g.area" data-part-head :data-part="g.area.area_name">{{ g.area.area_name }}</SectionHead>
         <!-- each focus (issue 57): a heading with its standard, then its annual goal first and the goals under it -->
         <div v-for="f in g.focuses" :key="f.name" class="flex flex-col gap-1.5 rounded-5 border border-outline-gray-2 p-3" data-focus-block :data-focus="f.area_name">
           <div class="flex flex-wrap items-center gap-2">
@@ -111,7 +105,7 @@
       </template>
     </section>
     <section v-if="!only && data?.no_area.length" class="flex flex-col gap-2" data-area-section data-area="No area">
-      <div class="border-b border-outline-gray-2 pb-2"><h2 class="text-base-medium text-ink-gray-9">No area <span class="text-sm font-normal text-ink-gray-6">{{ data.no_area.length }} goal{{ data.no_area.length === 1 ? '' : 's' }}</span></h2></div>
+      <div class="border-b border-outline-gray-2 pb-2"><SectionHead>No area <span class="text-sm font-normal text-ink-gray-6">{{ data.no_area.length }} goal{{ data.no_area.length === 1 ? '' : 's' }}</span></SectionHead></div>
       <ul class="flex flex-col gap-2"><li v-for="goal in data.no_area" :key="goal.name" data-goal-card :data-goal="goal.name">
         <Card class="relative flex flex-col gap-1 hover:bg-surface-gray-1">
           <RefLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`goal:${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
@@ -123,6 +117,7 @@
   <SortOpenDialog v-model="sortOpenShown" :goal="sorting" :mode="sortMode" @done="load" />
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 import { openRef } from '@/lib/pane'
 import RefLink from '@/components/ui/RefLink.vue'
 // Goals > By area (issue 20): one section for each area that is on, its parts as sub-groups, and a card for each goal with its
@@ -132,7 +127,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Progress, Select, TabButtons } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'
 import SortOpenDialog from '@/components/goals/SortOpenDialog.vue'

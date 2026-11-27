@@ -24,12 +24,11 @@
       </Card>
     </div>
     <Card v-else-if="loaded" data-skills-empty>
-      <Empty title="No skills yet.">Skills you switch on or write will show up here.
-        <Button v-if="canEdit" class="mt-3" variant="solid" icon-left="lucide-plus" label="New skill" @click="openNew" /></Empty>
+      <EmptyState line="No skills yet. Skills you switch on or write will show up here." :action="canEdit ? { label: 'New skill', icon: 'lucide-plus', click: openNew } : null" />
     </Card>
 
     <section v-if="loaded && autoFile" class="flex flex-col gap-2" data-auto-file>
-      <h2 class="text-base-medium text-ink-gray-9">Filing on its own</h2>
+      <SectionHead>Filing on its own</SectionHead>
       <Card class="flex flex-col gap-3">
         <p class="text-sm text-ink-gray-6">The Brain files a proposal without asking only when it is at least this sure and its kind is ticked. Nothing is ticked until you tick it, so everything waits for you.</p>
         <div class="flex flex-wrap items-center gap-2"><span class="text-sm text-ink-gray-7">Sure enough at</span>
@@ -61,13 +60,14 @@
   </Dialog>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 // Brain > Skills (issue 28): one card for each skill, with when to use, its trigger, version, source, runs and cost this month, and on or
 // off. A new skill is written here from the fixed lists of triggers, tools and outputs. What the Brain may file on its own is set below.
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, Dialog, FormControl, Switch } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import { tryCall } from '@/lib/api'
 import { brainData } from '@/data/brain'

@@ -687,7 +687,6 @@ class TestProjectAliasesGone(LifeTestCase):
 		out = connections.defaults(space=PRIVATE, system="gmail")
 		self.assertEqual(out["known"], 1)
 		self.assertNotIn("default_project", out)
-		self.assertNotIn("default_project", connections.list(space=PRIVATE)["connections"][0])
 
 
 class TestNoProjectInTheCode(LifeTestCase):

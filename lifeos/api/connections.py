@@ -9,8 +9,9 @@ from frappe.query_builder import functions as fn
 from frappe.utils import add_to_date, get_datetime, getdate, now_datetime, nowdate
 
 from lifeos import permissions
-from lifeos.api.utils import flag
+from lifeos.api.utils import flag, parse
 from lifeos.mail import gmail
+from lifeos.review import gcal, gcal_write
 
 INTENTS = ("Process", "Add to wiki", "Just keep")
 # how long without anything new before a connection shows a warning, by system (hours)
@@ -157,8 +158,6 @@ def _events_synced(space):
 
 def _calendar_card(space, row, out, meta):
 	"""Google Calendar: the events it synced this week, and a warning only when the last read is over a day old or failed."""
-	from lifeos.review import gcal
-
 	when, error = gcal.last_sync(frappe.session.user)
 	n = _events_synced(space)
 	quiet = bool(row.active and (error or not when or get_datetime(when) < add_to_date(now_datetime(), days=-1)))
@@ -242,16 +241,6 @@ def defaults(space: str | None = None, system: str | None = None):
 		return {"system": (system or "").lower(), "default_area": None, "default_goal": None, "default_intent": "Process",
 			"active": 1, "known": 0}
 	return {**_out(c), "known": 1}
-
-
-@frappe.whitelist(methods=["GET"])
-def list(space: str | None = None):
-	"""Every connection of a space, with its defaults, when something last arrived and whether it has been quiet too long."""
-	space = permissions.resolve_space(space)
-	rows = frappe.get_list("Life Connection", filters={"space": space},
-		fields=["name", "system", "label", "default_area", "default_goal", "default_intent", "active", "last_received_on", "last_received_what"],
-		order_by="label asc, system asc")
-	return {"space": space, "connections": [_out(r) for r in rows]}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -531,3 +520,62 @@ def import_status(space: str | None = None, system: str | None = None):
 
 	space = permissions.resolve_space(space)
 	return chat_import.progress(space, (system or "").lower()) or {"status": None}
+
+
+# ---------------------------------------------------------------- Google Calendar (Settings > Me > Calendar), connected through Frappe's own OAuth flow
+
+def _calendar_person():
+	permissions.require_login()
+	if permissions.is_agent():
+		frappe.throw(_("Calendars are connected by people."), frappe.PermissionError, title=_("Calendars are for people"))
+	return frappe.session.user
+
+
+@frappe.whitelist(methods=["GET"])
+def gcal_state():
+	"""Whether Google Settings is configured, whether this user is connected, which calendars are read, last synced, your domains."""
+	return gcal.state(_calendar_person())
+
+
+@frappe.whitelist(methods=["POST"])
+def gcal_connect():
+	"""Start Frappe's OAuth flow for this user's calendar (read by Life OS only). Returns {"url"} to open."""
+	user = _calendar_person()
+	if not gcal.configured():
+		frappe.throw(_("Google is not set up on this site. The owner enters the OAuth client in Google Settings first."), title=_("Google is not set up"))
+	return gcal.connect(user)
+
+
+@frappe.whitelist(methods=["POST"])
+def gcal_disconnect():
+	return gcal.disconnect(_calendar_person())
+
+
+@frappe.whitelist(methods=["GET"])
+def gcal_calendars():
+	"""The user's calendars on Google (a read), to choose which ones Life OS reads."""
+	user = _calendar_person()
+	acc = gcal.account(user)
+	if not frappe.conf.get("lifeos_fake_calendar") and not (acc and acc.enable):
+		return {"calendars": []}
+	return {"calendars": gcal.source_for(acc).calendars(), "read": gcal.read_ids(acc) if acc else ["primary"], "write": gcal_write.chosen(user)}
+
+
+@frappe.whitelist(methods=["POST"])
+def gcal_set_read(ids: str | list):
+	ids = parse(ids, []) or []
+	return gcal.set_read(_calendar_person(), ids if isinstance(ids, list) else [])
+
+
+@frappe.whitelist(methods=["POST"])
+def gcal_set_write(calendar: str | None = None):
+	"""Choose the calendar Life OS writes accepted events and goal blocks to; empty turns writing off."""
+	return gcal_write.choose(_calendar_person(), calendar)
+
+
+@frappe.whitelist(methods=["POST"])
+def gcal_sync():
+	"""Read now: the last 21 days and the next 14."""
+	user = _calendar_person()
+	n = gcal.sync_user(user)
+	return {"read": n, **gcal.state(user)}

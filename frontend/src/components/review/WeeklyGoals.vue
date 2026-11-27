@@ -76,16 +76,17 @@
         <Button class="lg:hidden" icon-left="lucide-calendar" label="Next week" data-goals-week-btn @click="weekOpen = true" />
       </div>
     </div>
-    <GoalDrawer :goal="goalName" :d="detail" :focus="focus" @close="goalName = null" @save="save" @skip="skip" @unskip="unskip" @star="starFrom" @changed="reload" />
-    <SideSheet :open="othersOpen" name="other-goals" title="Other goals in progress" sub="Planning one adds it to this week's rows." @close="othersOpen = false">
+    <!-- a goal opens in the Drawer, with this week's plan on top (GoalPane); the two lists below are dialogs -->
+    <Dialog v-model:open="othersOpen" title="Other goals in progress" size="md" data-dialog="other-goals">
+      <p class="mb-2 text-sm text-ink-gray-6">Planning one adds it to this week's rows.</p>
       <div v-for="o in t?.others.rows || []" :key="o.goal" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-other-goal>
         <div class="min-w-0 flex-1"><div class="truncate text-base text-ink-gray-9">{{ o.title }}</div><div class="text-sm text-ink-gray-6">{{ o.horizon }}</div></div>
         <Button size="sm" label="Plan" data-other-goal-plan @click="addOther(o)" />
       </div>
-    </SideSheet>
-    <SideSheet :open="weekOpen" name="next-week" title="Next week" @close="weekOpen = false">
+    </Dialog>
+    <Dialog v-model:open="weekOpen" title="Next week" size="xl" data-dialog="next-week">
       <WeekGlance v-if="t" :g="t.glance" @open="(g) => { weekOpen = false; open(g) }" @ref="(r) => { weekOpen = false; openRef(r) }" />
-    </SideSheet>
+    </Dialog>
     <ReviewFooter back label="Next: Reflect" :disabled="!t?.ready.ok" :line="footerLine" @back="emit('go', 'tasks')" @next="emit('go', 'reflect')" />
   </div>
 </template>
@@ -94,11 +95,9 @@
 // length, who), the other goals folded into one line, the week's score and goal work against free hours, and next week at a
 // glance. Next: Reflect opens when every cycle goal has a next action or a skip, and exactly three are starred.
 import { computed, onMounted, ref, watch } from 'vue'
-import { Badge, Button, Progress, Skeleton } from 'frappe-ui'
+import { Badge, Button, Dialog, Progress, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import { openRef } from '@/lib/pane'
-import SideSheet from '@/components/ui/SideSheet.vue'
-import GoalDrawer from '@/components/review/GoalDrawer.vue'
+import { onRecordChanged, openRef } from '@/lib/pane'
 import WeekGlance from '@/components/review/WeekGlance.vue'
 import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
@@ -107,9 +106,6 @@ import { time, weekday } from '@/lib/dates'
 const emit = defineEmits(['go'])
 const r = useReview()
 const t = ref(null)
-const goalName = ref(null)
-const detail = ref(null)
-const focus = ref('')
 const othersOpen = ref(false)
 const weekOpen = ref(false)
 const MARK = { 'No ticks': 'red', Slipping: 'amber', 'On track': 'green' }
@@ -124,32 +120,13 @@ const footerLine = computed(() => {
 })
 
 async function load() { t.value = await r.read('goals') }
-async function open(goal, why = '') {
-  goalName.value = goal
-  focus.value = why
-  detail.value = null
-  detail.value = await r.read('goal', { goal })
-}
-async function reload() {
-  await load()
-  if (goalName.value) detail.value = await r.read('goal', { goal: goalName.value })
-}
-async function save(goal, values) {
-  await r.act('goal_save', { goal, values }, 'Saved.')
-  goalName.value = null
-  load()
-}
-async function skip(goal, reason) {
-  await r.act('goal_skip', { goal, reason }, 'Skipped this week.')
-  goalName.value = null
-  load()
-}
-async function unskip(goal) { await r.act('goal_skip', { goal, undo: 1 }); reload() }
+// a goal opens in the Drawer with the review's plan on top (`review=1`); "needs a finish line" opens it on the finish line
+function open(goal, why = '') { openRef('goal:' + goal, { review: 1, ...(why ? { focus: why } : {}) }) }
 async function star(g) { await r.act('goal_star', { goal: g.goal, on: g.star ? 0 : 1 }); load() }
-async function starFrom(goal, on) { await r.act('goal_star', { goal, on: on ? 1 : 0 }); reload() }
 async function addOther(o) { await r.act('goal_add', { goal: o.goal }); othersOpen.value = false; load() }
 watch(() => r.head?.name, load)
 onMounted(load)
+onRecordChanged(load) // the goal's plan, saved in the Drawer
 </script>
 <style scoped>
 /* the planned bar turns amber when goal work is more than the free hours (frappe-ui's Progress has no tone prop) */

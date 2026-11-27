@@ -95,14 +95,14 @@ async function walkReview(page, origin, width) {
     await page.goto(`${origin}/life/today/week?view=review&tab=${tab}&area=`, { waitUntil: 'networkidle' })
     await look(`review > ${tab}`, `[data-review-${tab}]`)
     if (tab === 'library') {
-      await drawer('a meeting', '[data-strip-meeting]:visible')
-      await drawer('the meetings that matter', '[data-meetings-door]')
+      await drawer('a meeting', '[data-strip-meeting]:visible', '[data-drawer-host] [data-meeting]')
+      await drawer('the meetings that matter', '[data-meetings-door]', '[data-dialog="meetings"], [role="dialog"]')
     } else if (tab === 'tasks') {
       // the Tasks tab lists its stale tasks in the page itself: no drawer
     } else if (tab === 'goals') {
-      await drawer('a goal', '[data-goal-row] button')
-      await drawer('other goals', '[data-goals-plan-any]')
-      if (width < 800) await drawer('next week', '[data-goals-week-btn]')
+      await drawer('a goal', '[data-goal-row] button', '[data-drawer-host] [data-goal-plan]')
+      await drawer('other goals', '[data-goals-plan-any]', '[role="dialog"]')
+      if (width < 800) await drawer('next week', '[data-goals-week-btn]', '[role="dialog"]')
     }
   }
   page.off('pageerror', onError)

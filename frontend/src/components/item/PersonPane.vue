@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col gap-4" data-person-pane>
     <Card v-if="brief" data-person-brief><Md :text="brief" /></Card>
-    <Card v-else-if="loaded"><Empty title="No brief yet." hint="The Brain writes one once there is enough about them." /></Card>
+    <Card v-else-if="loaded"><EmptyState line="No brief yet. The Brain writes one once there is enough about them." /></Card>
     <section v-if="owe.owe_me.length || owe.i_owe.length" class="flex flex-col gap-3" data-person-owed>
       <div v-if="owe.owe_me.length" data-person-owe-me>
         <SectionHead :count="owe.owe_me.length">What they owe you</SectionHead>
@@ -44,7 +44,7 @@
     <section v-if="mentions.length" data-person-mentions>
       <SectionHead>Mentions <span class="text-sm text-ink-gray-6">{{ total }}</span></SectionHead>
       <Card flush class="!px-4">
-        <template v-for="e in mentions" :key="e.link">
+        <template v-for="e in mentions" :key="e.ref">
           <Row v-if="e.ref" :pane="e.ref" :label="e.title" class="!items-center" data-person-mention>
             <span class="min-w-0 flex-1 break-words text-base text-ink-gray-9">{{ e.title }}</span><span class="flex-none text-sm text-ink-gray-6">{{ short(e.date) }}</span>
           </Row>
@@ -62,7 +62,7 @@ import { onMounted, ref } from 'vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Md from '@/components/Md.vue'
 import { tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'
@@ -80,18 +80,17 @@ const details = ref([])
 const loaded = ref(false)
 const owe = ref({ owe_me: [], i_owe: [] })
 onMounted(async () => {
-  const res = await tryCall(() => itemData.pages.get({ doctype: 'Life Person', name: props.name }))
+  const res = await tryCall(() => itemData.people.get({ name: props.name }))
   if (!res) return emit('missing')
-  const h = res.header
-  brief.value = res.brief?.md || ''
+  brief.value = res.brief || ''
   open.value = (res.open?.tasks || []).slice(0, 8)
-  people.value = res.people || []
-  company.value = h.kind === 'company'
-  mentions.value = (res.timeline || []).slice(0, 12)
-  total.value = res.timeline_total || 0
-  details.value = [['Role', h.role], ['Email', h.email], ['Phone', h.phone], ['Works at', h.organisation?.title], ['Also called', (h.aliases || []).join(', ')]].filter((x) => x[1])
+  people.value = res.related || []
+  company.value = res.kind === 'Organisation'
+  mentions.value = (res.mentioned || []).slice(0, 12)
+  total.value = res.mentioned_total || 0
+  details.value = [['Role', res.role], ['Email', res.email], ['Phone', res.phone], ['Works at', res.organisation?.title || res.organisation?.full_name], ['Also called', (res.aliases || []).join(', ')]].filter((x) => x[1])
   loaded.value = true
   owe.value = (await tryCall(() => itemData.tasks.person_owed({ person: props.name }))) || owe.value
-  emit('meta', { title: h.title, kind: h.kind_label, sub: [h.role, h.path].filter(Boolean).join(' · '), fullPage: `/library/pages/Life Person/${props.name}` })
+  emit('meta', { title: res.title, kind: company.value ? 'Company' : 'Person', sub: [res.role, res.path].filter(Boolean).join(' · '), fullPage: `/library/pages/Life Person/${props.name}` })
 })
 </script>

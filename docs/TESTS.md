@@ -15,8 +15,8 @@ Unit tests are in `lifeos/tests/test_<place>.py` (run one with `scripts/test.sh 
 | `test_today.py` | Today: tasks only, rhythm banners, the Week, Month and Year views; the dashboard (`TestDashboard`, issue 123: `dashboard.get` for each view with its cards and panels, the Brain line, coming up in six lines and the rest counted, the lists a number opens, a sensitive item counted and never named, filed alone against the month before and not counting what the owner changed, simple mode swapping the goal cards, the empty space's lines and actions, a bounded number of queries, people only) |
 | `test_review.py` | The weekly, monthly and 12-week reviews, the review components in one folder that reach the server only through `frontend/src/data/review.js` |
 | `test_library.py` | Library (`TestPages`: pages that build themselves, issue 111: an email linked to a known person and their organisation, a page made on a reply thread with Undo, a proposal after three emails, no page for a promotion, "same company" merging and adding the alias, the daily briefs with sources and no Vault text, AI usage and the cap, per-user pins capped at seven, a wrong link taken off, Your notes kept): notes, the vault, search (Frappe's Global Search over the whole app: events, goals, people, comments, space rules, install), the graph, Everything, files, the sensitive mark, the item, Brain and Library components that reach the server only through `frontend/src/data/{item,brain,library}.js`, one item view for the pane |
-| `test_people.py` | People and organisations, the person page and its mentions, the person picker's options (people only, company and email search, name matches first, recent first, no silent cap) |
-| `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection) |
+| `test_people.py` | People and organisations, the person page and its mentions, the person picker's options (people only, company and email search, name matches first, recent first, no silent cap), one way to add a person (the Vault and the tool share the duplicate check) and one read for a person that the Library page and the Drawer both use |
+| `test_settings.py` | The data model, areas, rhythms, the first run and the guide, the setup ladder (seven levels, the AI key one of them, a source counts however it was connected), one space, the AI provider (another Anthropic-compatible service, real error reasons, unpriced models, Test connection), Google Calendar connected, read and written through `connections` |
 | `test_updater.py` | Updates: who may ask, the check against a temporary repository, the runner's steps and rollback, a target not on the remote, one runner at a time, Update now; the checks before anything changes (restart and restore without a person), only the restart failing (Needs restart, Restart now), a failed step's command, exit code and output, the restore through the site's own user, the installed commit read from git and an update to it refused |
 | `test_permissions.py` | Spaces and members, what each kind of user sees, every read and every write refusing another space's records, the scan guard (`get_all` in the API, `ignore_permissions` anywhere with a `# system:` reason), no library or experimental folder kept without an import, no cache in `frappe.local`, input types, every `frappe.throw` titled, the conventions of every whitelisted method, navigation, the router, no old code left |
 | `test_calendar.py` | The calendar, reading Google Calendar, writing events and goal blocks to it, notes on events (Comments), Hide in Life OS |
@@ -137,7 +137,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.68` Needs you opens its rows in the pane, a row opens in the same pane with Back, j moves to the next row, a reload keeps the list open
 - `TODAY.69` "past check date" opens only the overdue waiting items; "rules learned" opens the rules, each with Change
 - `TODAY.70` Day, Week, Month and Year switch in place; Overview has four cards and two panels; Open full page goes to the record's page
-- `TODAY.71` on an empty space every card of every view says what will appear and offers one action
+- `TODAY.71` on an empty space every card of every view shows a number (0 included) and every empty list is one `EmptyState` with at most one action
 - `TODAY.72` every view, in Overview and in Calendar, in light and dark has no script error and nothing cut off
 - `TODAY.73` the Waiting card shows the count, late and looks done and opens the list grouped Looks done, Late, This week, Later; Confirm closes a looks-done row and Needs you drops by one; Nudge opens the draft; By person regroups
 - `TODAY.74` a waiting row opens the task layer with what was asked, the message and the reply; Back returns to the list
@@ -174,7 +174,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.17` the item page opens from the Inbox list, from Library and from search
 - `BRAIN.18` a user without access to the item's space gets "Not found" rather than its content
 - `BRAIN.19` the item page is one column with no sideways scroll
-- `BRAIN.20` on an empty space Needs you says what will appear and offers Chat
+- `BRAIN.20` on an empty space Needs you is one `EmptyState` that says what will appear and offers Chat
 - `BRAIN.21` with 3 waiting captures (one with two possible areas) Needs you shows 3 rows with their best guesses and reasons
 - `BRAIN.22` Done files a row that was not changed, with its guess, and the record exists with the guessed area
 - `BRAIN.23` picking the second of two area chips files it there
@@ -192,7 +192,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.35` a failed capture shows its reason and Retry puts it back in the queue
 - `BRAIN.36` the Outbox piles in Activity show the same numbers as the Outbox
 - `BRAIN.37` the feed is one column and nothing scrolls sideways
-- `BRAIN.38` with no source connected Sources says what will appear, shows Capture as always on and has no Add a source
+- `BRAIN.38` with no source connected Sources is one `EmptyState` that says what will appear, shows Capture as always on and has no Add a source
 - `BRAIN.39` connected sources show with this week's counts, matching the captures in the database
 - `BRAIN.40` switching the assistant off makes create_item from hermes fail with a clear message; switching it on again works
 - `BRAIN.41` a source that is not built cannot be switched on and shows no Coming tile
@@ -256,7 +256,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.18` Inbox items left too long: on Suggest an old item gets a suggested decision and the batch confirms it; on Park and Discard the job acts and Today's Undo restores
 - `GOALS.19` nothing in the goal dialog, readings, Outbox or old-items work scrolls sideways
 - `GOALS.20` a quick-captured task shows its guessed area with ✦ and the confidence; one tap confirms it and the ✦ goes
-- `GOALS.21` with no goals By area says what will appear and offers + Goal
+- `GOALS.21` with no goals By area is one `EmptyState` that says what will appear and offers + Goal (All tasks and No goal the same, GOALS.27 and the No goal check)
 - `GOALS.22` with eight goals over Career (two parts), Health, Money and Mind each appears under its area and part
 - `GOALS.23` a goal's card shows its Done when, score, next action and open task count, matching the goal page
 - `GOALS.24` an area that is off has no section; turning it on shows its goals
@@ -384,7 +384,7 @@ Unit tests: `test_review.py`
 - `REVIEW.1` Archive job archives done tasks; a stale open task waits in the weekly review's list of stale tasks
 - `REVIEW.2` an inbox item's pane and full review page are tabbed (Summary, the original, Decisions, What came of it), the tab in the URL
 - `REVIEW.3` the review opens from Today's banner on Library, with its period in the header; Goals cannot open before Tasks is done
-- `REVIEW.4` a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's drawer and the Revelations list
+- `REVIEW.4` a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's layer and the Revelations list
 - `REVIEW.5` a reading confirmed from Revelations shows its value on the goal's row in Goals
 - `REVIEW.6` the Tasks tab lists each stale task once with Keep, Someday and Drop; each button does what it says; the Outbox counts match
 - `REVIEW.7` every stale task decided (the empty list says what will appear here); Next: Goals opens
@@ -406,6 +406,9 @@ Unit tests: `test_review.py`
 - `REVIEW.23` deciding each goal and locking closes the cycle with cycles.close_cycle's score and makes the next cycle with the carried goals and their lead actions
 - `REVIEW.24` Weekly review > Tasks > Waiting on others groups waiting tasks by person, oldest first; Done closes one, Move to my plate puts one on the plate, Still waiting moves check-by on 7 days
 - `REVIEW.25` a meeting in the weekly review's week at a glance opens the event in the Drawer and the review stays
+- `REVIEW.26` in the weekly review a goal opens as the goal's Drawer layer (`?open=` names it, 480 px, full screen with Back at 390 px), Back closes it, the review stays; no SideSheet is ever in the page
+- `REVIEW.27` the same for a meeting (`?open=meeting:<event>`)
+- `REVIEW.28` the meetings list and Other goals open as dialogs, and a meeting opened from the list is a Drawer layer
 
 ### Settings (`tools/acceptance/settings.mjs`, 42 checks)
 

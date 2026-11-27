@@ -7,8 +7,8 @@
     <!-- the actions on their own line with Close pinned at the end; the kind and title below at the pane's full width,
          so the title never shares a row with buttons -->
     <div class="flex items-start gap-1.5">
-      <!-- issue 128: Back to the layer below (a list, a chat, the record this one was opened from); on a phone a list's own Back is the way to the dashboard -->
-      <Button v-if="stack.length > 1 || (phone && cur.type === 'list')" class="shrink-0" :size="btnSize" icon-left="lucide-arrow-left" label="Back" data-pane-back @click="popLayer" />
+      <!-- issue 128: Back to the layer below (a list, a chat, the record this one was opened from); on a phone a list's own Back is the way to the dashboard, and so is a review's goal or meeting's: back to the review (issue 146) -->
+      <Button v-if="stack.length > 1 || (phone && (cur.type === 'list' || cur.type === 'meeting' || route.query.review))" class="shrink-0" :size="btnSize" icon-left="lucide-arrow-left" label="Back" data-pane-back @click="popLayer" />
       <div class="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5" data-pane-actions>
       <Button v-if="!store.isAgent && ASKABLE[cur.type] && !missing" :size="btnSize" icon-left="lucide-sparkles" :label="phone ? 'Chat' : 'Chat about this'" data-pane-ask
         @click="askAbout(ASKABLE[cur.type], cur.name, meta.title)" />
@@ -39,7 +39,7 @@
   <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 md:px-5" data-pane-body>
     <Alert v-if="meta.archived" title="This record is archived. It is shown read-only."
       :primary-action="meta.canRestore ? { label: 'Restore', onClick: () => restore() } : undefined" />
-    <Card v-if="missing"><Empty title="This record was not found." hint="It may be in another space, or it was removed." /></Card>
+    <Card v-if="missing"><EmptyState line="This record was not found. It may be in another space, or it was removed." /></Card>
     <component :is="VIEW[cur.type]" v-else :key="cur.ref + ':' + stamp" :name="cur.name" :type="cur.type" :tab="tabs.length ? ptab.current.value : undefined" @meta="gotMeta" @missing="missing = true"
       @changed="changed()" @close="closePane" />
   </div>
@@ -59,7 +59,7 @@ import Card from '@/components/ui/Card.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import AskBody from '@/components/ask/AskBody.vue'
 import FocusPane from '@/components/item/FocusPane.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import TaskPane from '@/components/item/TaskPane.vue'
 import VaultPane from '@/components/item/VaultPane.vue'
 import GoalPane from '@/components/item/GoalPane.vue'
@@ -69,6 +69,7 @@ import DayPane from '@/components/item/DayPane.vue'
 import NotePane from '@/components/item/NotePane.vue'
 import ListPane from '@/components/item/ListPane.vue'
 import PersonPane from '@/components/item/PersonPane.vue'
+import MeetingPane from '@/components/item/MeetingPane.vue'
 import SourcePane from '@/components/item/SourcePane.vue'
 import ChangePane from '@/components/item/ChangePane.vue'
 import { itemData } from '@/data/item'
@@ -106,7 +107,7 @@ const ptab = useUrlTab('ptab', tabs, { replace: true, fallback: () => (route.que
 // "Ask about this": the record and the records linked to it are the question's scope
 const ASKABLE = { task: 'Life Task', note: 'Life Note', goal: 'Life Goal', chat: 'Life Chat Log', source: 'Life Inbox Item',
   inbox: 'Life Inbox Item', vault: 'Life Vault Document' }
-const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('@/components/review/InboxReview.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, list: ListPane, person: PersonPane, focus: FocusPane }
+const VIEW = { source: SourcePane, change: ChangePane, task: TaskPane, inbox: defineAsyncComponent(() => import('@/components/review/InboxReview.vue')), note: NotePane, vault: VaultPane, goal: GoalPane, chat: ChatPane, event: EntryPane, date: EntryPane, day: DayPane, list: ListPane, person: PersonPane, focus: FocusPane, meeting: MeetingPane }
 
 // where each layer was scrolled to, so Back finds a list as it was left
 const scrolls = new Map()

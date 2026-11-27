@@ -21,15 +21,12 @@
     </div>
 
     <Card v-if="loaded && !rows.length && !unfiled.length && !lessons.length && !contradictions.length && !agentRequests.length && !looksDone.length" class="py-2" data-needs-empty>
-      <Empty title="Nothing needs you.">
-        <p class="mt-1">Things you capture or connect will show up here.</p>
-        <Button v-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-needs-capture @click="openChat()" />
-      </Empty>
+      <EmptyState line="Nothing needs you. Things you capture or connect will show up here." :action="writable ? { label: 'Chat', icon: 'lucide-message-square', click: () => openChat() } : null" />
     </Card>
 
     <section v-if="looksDone.length" class="flex flex-col gap-2" data-needs-looks-done>
       <div>
-        <h2 class="text-base-medium text-ink-gray-9">Looks done</h2>
+        <SectionHead>Looks done</SectionHead>
         <p class="text-sm text-ink-gray-6">A reply seems to answer something you were waiting for. Confirm and it is done; Not yet keeps it waiting.</p>
       </div>
       <Card flush class="!px-4">
@@ -46,15 +43,14 @@
 
     <section v-if="agentRequests.length" class="flex flex-col gap-2" data-needs-agent>
       <div>
-        <h2 class="text-base-medium text-ink-gray-9">Waiting for your OK</h2>
+        <SectionHead>Waiting for your OK</SectionHead>
         <p class="text-sm text-ink-gray-6">Your agent will not do these until you say so.</p>
       </div>
       <AgentRequests :rows="agentRequests" @changed="load" />
     </section>
 
     <Card v-if="asked.length" flush data-needs-rows>
-      <div v-for="r in asked" :key="r.proposal" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-b border-outline-gray-1 py-3 last:border-b-0"
-        data-needs-row :data-proposal="r.proposal" :data-item="r.item" :data-kind="r.kind">
+      <Row bare v-for="r in asked" :key="r.proposal" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 py-3" data-needs-row :data-proposal="r.proposal" :data-item="r.item" :data-kind="r.kind">
         <div class="min-w-0 flex-[1_1_320px]">
           <div class="flex flex-wrap items-center gap-2">
             <Badge theme="gray" :label="r.source" data-row-source />
@@ -80,12 +76,12 @@
           </div>
         </div>
         <ChangeMenu v-if="writable && changing === r.proposal" :row="r" :busy="busy.has(r.proposal)" @decide="(...a) => decide(r, ...a)" @always-ask="alwaysAsk(r)" @open="change(r)" />
-      </div>
+      </Row>
     </Card>
 
     <section v-if="contradictions.length" class="flex flex-col gap-2" data-needs-contradictions>
       <div>
-        <h2 class="text-base-medium text-ink-gray-9">Pages disagree</h2>
+        <SectionHead>Pages disagree</SectionHead>
         <p class="text-sm text-ink-gray-6">The weekly check found two facts that cannot both be true. Keep one and the pages follow it.</p>
       </div>
       <Card flush>
@@ -95,7 +91,7 @@
 
     <section v-if="lessons.length" class="flex flex-col gap-2" data-needs-lessons>
       <div>
-        <h2 class="text-base-medium text-ink-gray-9">Lessons</h2>
+        <SectionHead>Lessons</SectionHead>
         <p class="text-sm text-ink-gray-6">Your corrections taught a skill something. Accept it and the skill follows it from now on.</p>
       </div>
       <Card flush>
@@ -105,12 +101,11 @@
 
     <section v-if="unfiled.length || data?.unfiled?.length" class="flex flex-col gap-2" data-unfiled>
       <div>
-        <h2 class="text-base-medium text-ink-gray-9">Unfiled</h2>
+        <SectionHead>Unfiled</SectionHead>
         <p class="text-sm text-ink-gray-6">The Brain could not place these. They stay here until you do.</p>
       </div>
       <Card flush>
-        <div v-for="r in unfiled" :key="r.proposal" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-b border-outline-gray-1 py-3 last:border-b-0"
-          data-needs-row data-unfiled-row :data-proposal="r.proposal" :data-item="r.item">
+        <Row bare v-for="r in unfiled" :key="r.proposal" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 py-3" data-needs-row data-unfiled-row :data-proposal="r.proposal" :data-item="r.item">
           <div class="min-w-0 flex-[1_1_320px]">
             <div class="flex flex-wrap items-center gap-2"><Badge theme="gray" :label="r.source" /><button type="button" class="break-words text-left text-base-medium text-ink-gray-9 hover:underline" data-row-title :aria-label="`Open ${r.title}`" @click="openRef('inbox:' + r.item)">{{ r.title }}</button></div>
             <div class="mt-0.5 text-sm text-ink-gray-6"><span aria-hidden="true">✦</span> {{ r.reason || 'No area fits yet.' }}</div>
@@ -122,9 +117,8 @@
             <Button v-if="writable" label="Change" icon-right="lucide-chevron-down" :aria-expanded="changing === r.proposal" data-change @click="changing = changing === r.proposal ? null : r.proposal" />
           </div>
           <ChangeMenu v-if="writable && changing === r.proposal" class="basis-full" :row="r" :busy="busy.has(r.proposal)" @decide="(...a) => decide(r, ...a)" @always-ask="alwaysAsk(r)" @open="change(r)" />
-        </div>
-        <div v-for="u in data?.unfiled || []" :key="u.item" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 border-b border-outline-gray-1 py-3 last:border-b-0"
-          data-needs-row data-failed-row :data-item="u.item">
+        </Row>
+        <Row bare v-for="u in data?.unfiled || []" :key="u.item" class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 py-3" data-needs-row data-failed-row :data-item="u.item">
           <div class="min-w-0 flex-[1_1_320px]">
             <div class="flex flex-wrap items-center gap-2"><Badge theme="gray" :label="u.source" /><span class="break-words text-base-medium text-ink-gray-9">{{ u.title }}</span></div>
             <div class="mt-0.5 text-sm text-ink-gray-6"><span aria-hidden="true">✦</span> {{ u.reason || 'Could not be read.' }}</div>
@@ -134,7 +128,7 @@
             <Button v-if="writable && notProcessed(u)" label="File it myself" data-file-myself @click="fileMyself(u)" />
             <Button label="Open" @click="openRef(`inbox:${u.item}`)" />
           </div>
-        </div>
+        </Row>
       </Card>
     </section>
 
@@ -149,6 +143,7 @@
   </div>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 import { openChat } from '@/lib/ask'
 // Brain > Needs you (issue 17): what the Brain asks you to decide, at most seven at a time, each with its best guess and
 // the reason. The guess is taken as right: a row has one button, Change (another area or part, Not needed, Always ask), and Done files the rest. A
@@ -159,7 +154,7 @@ import { useRouter } from 'vue-router'
 import { Badge, Button, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Pick from '@/components/Pick.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Card from '@/components/ui/Card.vue'
 import Stat from '@/components/ui/Stat.vue'
 import OldItems from '@/components/inbox/OldItems.vue'

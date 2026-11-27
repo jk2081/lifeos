@@ -38,7 +38,6 @@ export const GO = [
   { label: 'Library: Trash and archive', to: '/library/archive', key: 'r' }, { label: 'Insights', to: '/insights', key: 'q' },
   { label: 'Settings: Areas', to: '/settings?tab=areas', key: 'a' }, SETTINGS,
 ]
-export const TOOLTIPS = { Today: 'What to do now', Brain: 'What came in and what the Brain did with it', Goals: 'Where you are going', Library: 'What you have and know' }
 // the view switch of Library > Notes: List (the default), Tree and Graph, and the assistant's Changes and Health
 export const NOTES_VIEWS = ['list', 'tree', 'graph', 'changes', 'health'].map((v) => ({ label: v[0].toUpperCase() + v.slice(1), value: v,
   route: { path: '/library/notes', query: { view: v } } }))

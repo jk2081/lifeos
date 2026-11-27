@@ -16,18 +16,18 @@
     <!-- Overview -->
     <section v-if="tab === 'overview'" class="flex flex-col gap-3" data-tab-panel="overview">
       <Card class="flex flex-col gap-2">
-        <h2 class="text-base-medium text-ink-gray-9">What arrives</h2>
+        <SectionHead>What arrives</SectionHead>
         <Md :text="d.description || 'Nothing described yet.'" />
         <p class="text-sm text-ink-gray-6">Everything that arrives is read with the shared rules, then <template v-if="d.group === 'kind'">the rules of the channel it came by, then these.</template><template v-else>these, then the rules of its kind.</template>
           One skill, <RouterLink class="underline" :to="`/brain/skills/${d.skill}`">{{ d.skill }}</RouterLink>, holds them.</p>
       </Card>
       <Card v-if="d.how_to_connect && !d.connection && !d.strip.always_on" class="flex flex-col gap-2" data-source-connect>
-        <h2 class="text-base-medium text-ink-gray-9">Nothing yet</h2>
+        <SectionHead>Nothing yet</SectionHead>
         <p class="text-sm text-ink-gray-7">{{ d.how_to_connect }}</p>
         <div><Button label="Connect it" icon-left="lucide-plus" :route="'/brain/sources'" data-source-connect-go /></div>
       </Card>
       <Card v-else-if="!d.recent.length" class="flex flex-col gap-1" data-source-nothing>
-        <h2 class="text-base-medium text-ink-gray-9">Nothing yet</h2>
+        <SectionHead>Nothing yet</SectionHead>
         <p class="text-sm text-ink-gray-7">{{ d.how_to_connect || 'Things of this kind that you add or connect will show up here.' }} Try it shows what these rules would do first.</p>
       </Card>
     </section>
@@ -35,11 +35,11 @@
     <!-- Rules -->
     <div v-if="tab === 'rules'" class="flex flex-col gap-4" data-tab-panel="rules">
       <SourceRules :source-key="d.key" :writable="writable" />
-      <h2 class="text-base-medium text-ink-gray-9" data-reading-rules>How the Brain reads it</h2>
+      <SectionHead data-reading-rules>How the Brain reads it</SectionHead>
       <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div class="flex min-w-0 flex-col gap-3">
         <Card v-for="s in sections" :key="s.title" class="flex flex-col gap-2" data-rule-section :data-section="s.title">
-          <h2 class="text-base-medium text-ink-gray-9">{{ s.title }}</h2>
+          <SectionHead>{{ s.title }}</SectionHead>
           <template v-if="s.mode === 'chips'">
             <div class="flex flex-wrap gap-1.5">
               <span v-for="(c, i) in s.items" :key="c + i" class="inline-flex max-w-full items-center gap-1 rounded-full bg-surface-gray-2 py-0.5 pl-2.5 pr-1 text-sm text-ink-gray-8" data-chip>
@@ -61,7 +61,7 @@
           <Textarea v-else v-model="s.text" :rows="3" class="w-full" :disabled="!writable" :aria-label="s.title" />
         </Card>
         <Card class="flex flex-col gap-2" data-rule-section data-section="Anything else">
-          <h2 class="text-base-medium text-ink-gray-9">Anything else?</h2>
+          <SectionHead>Anything else?</SectionHead>
           <Textarea v-model="anything" :rows="3" class="w-full" :disabled="!writable" placeholder="A rule in your own words, for example: ask me before filing anything over Rs 1,00,000." aria-label="Anything else" data-rules-anything />
         </Card>
         <div class="flex flex-wrap items-center gap-2">
@@ -70,21 +70,21 @@
           <span v-else class="text-sm text-ink-gray-6" data-rules-version>Version {{ d.version }}</span>
         </div>
         <Card class="flex flex-col gap-1" data-version-history>
-          <h2 class="text-base-medium text-ink-gray-9">Version history</h2>
-          <div v-for="v in d.versions" :key="v.version" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2 text-sm last:border-0" data-version-row :data-version="v.version">
+          <SectionHead>Version history</SectionHead>
+          <Row bare v-for="v in d.versions" :key="v.version" class="flex flex-wrap items-center gap-2 py-2 text-sm" data-version-row :data-version="v.version">
             <span class="w-20 text-ink-gray-9">Version {{ v.version }}</span><span class="min-w-0 flex-1 text-ink-gray-6">{{ v.changed_by }} · {{ v.changed_on }} · {{ v.note }}</span>
             <Badge v-if="v.version === d.version" theme="green" label="Now" />
             <Button v-else-if="writable" size="sm" label="Go back to this" data-version-back @click="goBack(v)" />
-          </div>
+          </Row>
         </Card>
       </div>
       <aside class="flex flex-col gap-3" data-source-side>
         <Card class="flex flex-col gap-3">
-          <h2 class="text-base-medium text-ink-gray-9">Files without you</h2>
+          <SectionHead>Files without you</SectionHead>
           <FormControl v-model="confidence" type="number" label="Above this confidence" :disabled="!writable" min="0" max="100" data-confidence />
           <p class="text-sm text-ink-gray-6">Out of 100. Only kinds of proposal you let the Brain file in Settings are filed this way{{ d.settings.own ? '' : '; until you set it, this follows Settings' }}.</p>
-          <h2 class="text-base-medium text-ink-gray-9">Agents that may read it</h2>
-          <p v-if="!agents.length" class="text-sm text-ink-gray-6">No agents yet.</p>
+          <SectionHead>Agents that may read it</SectionHead>
+          <EmptyState v-if="!agents.length" line="No agents yet." />
           <label v-for="a in agents" :key="a.user" class="flex items-center gap-2 text-sm text-ink-gray-8" data-reader><Checkbox v-model="a.allowed" :disabled="!writable" :aria-label="a.name" />{{ a.name }}</label>
           <div v-if="writable"><Button label="Save" :disabled="!sideDirty" data-settings-save @click="saveSide" /></div>
         </Card>
@@ -95,14 +95,14 @@
     <!-- Examples and lessons -->
     <section v-if="tab === 'examples'" class="flex flex-col gap-3" data-tab-panel="examples">
       <Card class="flex flex-col gap-1" data-source-examples>
-        <h2 class="text-base-medium text-ink-gray-9">Examples</h2>
-        <div v-for="e in d.examples" :key="e.title" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 text-sm last:border-0"><span class="flex-1 text-ink-gray-9">{{ e.title }}</span><Badge v-if="e.last_result" :theme="e.last_result === 'Pass' ? 'green' : 'red'" :label="e.last_result" /></div>
-        <Empty v-if="!d.examples.length" title="No examples yet." hint="Each is a sample and what the rules must make of it. Try it can teach one." />
+        <SectionHead>Examples</SectionHead>
+        <Row bare v-for="e in d.examples" :key="e.title" class="flex items-center gap-2 py-2 text-sm"><span class="flex-1 text-ink-gray-9">{{ e.title }}</span><Badge v-if="e.last_result" :theme="e.last_result === 'Pass' ? 'green' : 'red'" :label="e.last_result" /></Row>
+        <EmptyState line="No examples yet. Each is a sample and what the rules must make of it. Try it can teach one." v-if="!d.examples.length" />
       </Card>
       <Card class="flex flex-col gap-1" data-source-lessons>
-        <h2 class="text-base-medium text-ink-gray-9">Lessons</h2>
-        <p v-for="l in lessons" :key="l" class="border-b border-outline-gray-1 py-2 text-sm text-ink-gray-8 last:border-0" data-lesson-line>{{ l }}</p>
-        <Empty v-if="!lessons.length" title="No lessons yet." hint="What your corrections teach this source shows here. Try it can turn one into a lesson." />
+        <SectionHead>Lessons</SectionHead>
+        <Row bare v-for="l in lessons" :key="l" class="py-2 text-sm text-ink-gray-8" data-lesson-line>{{ l }}</Row>
+        <EmptyState line="No lessons yet. What your corrections teach this source shows here. Try it can turn one into a lesson." v-if="!lessons.length" />
         <div class="pt-1"><RouterLink class="text-sm underline" :to="`/brain/skills/${d.skill}`">Open the skill</RouterLink></div>
       </Card>
     </section>
@@ -110,11 +110,11 @@
     <!-- Activity -->
     <section v-if="tab === 'activity'" data-tab-panel="activity">
       <Card v-if="d.recent.length" flush>
-        <RefLink v-for="r in d.recent" :key="r.name" :to="`inbox:${r.name}`" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2.5 text-sm last:border-0 hover:bg-surface-gray-1" data-activity-line>
+        <Row bare v-for="r in d.recent" :key="r.name" :pane="`inbox:${r.name}`" :label="r.title" class="flex flex-wrap items-center gap-2 py-2.5 text-sm" data-activity-line>
           <span class="min-w-0 flex-1 truncate text-ink-gray-9">{{ r.title }}</span><span class="text-ink-gray-6">{{ r.kind }} · {{ r.received }}</span><Badge :theme="r.status === 'Failed' ? 'red' : r.status === 'Done' ? 'green' : 'amber'" :label="r.status" />
-        </RefLink>
+        </Row>
       </Card>
-      <Card v-else data-activity-empty><Empty title="Nothing yet." :hint="d.how_to_connect || 'Things of this kind that you add or connect will show up here.'" /></Card>
+      <Card v-else data-activity-empty><EmptyState :line="`Nothing yet. ${d.how_to_connect || 'Things of this kind that you add or connect will show up here.'}`" /></Card>
     </section>
 
     <!-- Try it -->
@@ -126,9 +126,9 @@
           <Button type="submit" variant="solid" label="Search" icon-left="lucide-search" :loading="searching" data-mail-search /></form>
         <p v-if="mailError" class="text-sm text-ink-red-4" data-mail-error>{{ mailError }}</p>
         <div v-if="mailHits" class="flex flex-col" data-mail-hits>
-          <p v-if="!mailHits.length" class="text-sm text-ink-gray-6" data-mail-none>Nothing matches.</p>
-          <div v-for="h in mailHits" :key="h.thread_id" class="flex flex-col gap-0.5 border-b border-outline-gray-1 py-2 text-sm last:border-0" data-mail-hit>
-            <span class="text-ink-gray-9" data-mail-subject>{{ h.subject || '(no subject)' }}</span><span class="text-ink-gray-6">{{ h.from }} · {{ h.date }}</span></div>
+          <EmptyState v-if="!mailHits.length" line="Nothing matches." data-mail-none />
+          <Row bare v-for="h in mailHits" :key="h.thread_id" class="flex flex-col gap-0.5 py-2 text-sm" data-mail-hit>
+            <span class="text-ink-gray-9" data-mail-subject>{{ h.subject || '(no subject)' }}</span><span class="text-ink-gray-6">{{ h.from }} · {{ h.date }}</span></Row>
         </div>
       </Card>
     </section>
@@ -145,15 +145,15 @@
         <div><Button variant="solid" label="Try it" icon-left="lucide-play" :loading="trying" :disabled="!writable || uploading" data-try-run @click="tryIt" /></div>
       </Card>
       <Card v-if="result" class="flex flex-col gap-3" data-try-result>
-        <div><h2 class="text-base-medium text-ink-gray-9">Summary</h2><p class="text-sm text-ink-gray-8" data-try-summary>{{ result.summary || 'No summary.' }}</p></div>
-        <div v-if="result.transcript"><h2 class="text-base-medium text-ink-gray-9">Transcript</h2><Md :text="result.transcript" class="text-sm" /></div>
-        <div data-try-proposals><h2 class="text-base-medium text-ink-gray-9">What it would file</h2>
+        <div><SectionHead>Summary</SectionHead><p class="text-sm text-ink-gray-8" data-try-summary>{{ result.summary || 'No summary.' }}</p></div>
+        <div v-if="result.transcript"><SectionHead>Transcript</SectionHead><Md :text="result.transcript" class="text-sm" /></div>
+        <div data-try-proposals><SectionHead>What it would file</SectionHead>
           <p v-if="!result.proposals.length" class="text-sm text-ink-gray-6">Nothing. It would only keep it with its summary.</p>
-          <div v-for="(p, i) in result.proposals" :key="i" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 py-1.5 text-sm last:border-0" data-try-proposal>
+          <Row bare v-for="(p, i) in result.proposals" :key="i" class="flex flex-wrap items-center gap-2 py-1.5 text-sm" data-try-proposal>
             <Badge theme="gray" :label="p.kind" /><span class="min-w-0 flex-1 text-ink-gray-9">{{ p.title }}</span><span class="text-ink-gray-6">{{ p.confidence }}%</span>
-            <Badge :theme="p.files_alone ? 'green' : 'amber'" :label="p.files_alone ? 'Files without you' : 'Needs you'" /></div></div>
-        <div v-if="result.skipped.length" data-try-skipped><h2 class="text-base-medium text-ink-gray-9">What it skipped</h2><ul class="list-disc pl-5 text-sm text-ink-gray-8"><li v-for="x in result.skipped" :key="x">{{ x }}</li></ul></div>
-        <div data-try-lessons><h2 class="text-base-medium text-ink-gray-9">Lessons used</h2>
+            <Badge :theme="p.files_alone ? 'green' : 'amber'" :label="p.files_alone ? 'Files without you' : 'Needs you'" /></Row></div>
+        <div v-if="result.skipped.length" data-try-skipped><SectionHead>What it skipped</SectionHead><ul class="list-disc pl-5 text-sm text-ink-gray-8"><li v-for="x in result.skipped" :key="x">{{ x }}</li></ul></div>
+        <div data-try-lessons><SectionHead>Lessons used</SectionHead>
           <p v-if="!result.lessons_used.length" class="text-sm text-ink-gray-6">None yet.</p><ul v-else class="list-disc pl-5 text-sm text-ink-gray-8"><li v-for="x in result.lessons_used" :key="x">{{ x }}</li></ul></div>
         <p class="text-xs text-ink-gray-5">Read with {{ result.skills_used }} · cost ${{ result.cost }}</p>
         <div class="flex flex-wrap gap-2">
@@ -163,7 +163,7 @@
       </Card>
     </section>
   </div>
-  <Card v-else-if="missing" class="m-4"><Empty title="There is no such source." hint="Open Brain, Sources to see the ones there are." /></Card>
+  <Card v-else-if="missing" class="m-4"><EmptyState line="There is no such source. Open Brain, Sources to see the ones there are." /></Card>
 
   <Dialog v-model:open="teachOpen" title="Teach it" :actions="[{ label: 'Add the lesson', variant: 'solid', onClick: teach }]">
     <template #default><div class="flex flex-col gap-2" data-teach>
@@ -172,6 +172,8 @@
   </Dialog>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 import RefLink from '@/components/ui/RefLink.vue'
 // One source (issue 84): a channel (where it comes from) or a kind (what it is), as one page in one template: a strip, then Overview, Rules,
 // Examples & lessons, Activity and Try it. Rules show the source's skill as fields and save as a new version of it.
@@ -181,7 +183,7 @@ import { Badge, Button, Checkbox, Dialog, FormControl, Switch, TextInput, Textar
 import AgentPanel from '@/components/brain/AgentPanel.vue'
 import SourceRules from '@/components/brain/SourceRules.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Md from '@/components/Md.vue'
 import PageHead from '@/components/PageHead.vue'
 import TabBar from '@/components/TabBar.vue'

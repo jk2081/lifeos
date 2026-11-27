@@ -5,7 +5,7 @@
       <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ it.label || it.title }}</div>
         <div class="text-sm text-ink-gray-6">{{ SOURCE[it.source] }}<template v-if="it.multi_day"> · {{ short(it.date) }} to {{ short(it.end_date) }}</template></div></div>
     </Row>
-    <Empty v-if="loaded && !items.length" title="Nothing on this day." hint="Add an event or an important date below." />
+    <EmptyState line="Nothing on this day. Add an event or an important date below." v-if="loaded && !items.length" />
   </Card>
   <div v-if="canWrite()" class="flex flex-wrap items-center gap-2">
     <Button label="Add important date" @click="add('date')" />
@@ -18,7 +18,7 @@ import { onMounted, ref } from 'vue'
 import { Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'
 import { canWrite, store } from '@/lib/store'

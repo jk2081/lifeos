@@ -8,7 +8,7 @@ from frappe.utils import add_days, get_datetime, getdate, now_datetime, today
 from lifeos.goals import cycles as rules, readings
 from lifeos.tasks import weekplan
 from lifeos.goals import habits as habit_rules
-from lifeos.api import calendar, goals, library as library_api, outbox as outbox_api, periodic, settings, settings as settings_api, sources, today as today_api, week, weekly
+from lifeos.api import calendar, goals, library as library_api, outbox as outbox_api, periodic, settings, settings as settings_api, sources, today as today_api, weekly
 from lifeos.review import findings, periodic as rv_rules
 from lifeos.review.record import period_text, Review
 from lifeos.tests.base import AGENT, AGENT as AGENT_USER, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
@@ -623,28 +623,6 @@ class TestAddGoalWork(WeekCase):
 		frappe.get_doc({"doctype": "Life Task", "space": PRIVATE, "title": "ux7 second step", "goal": g, "status": "Open", "area": self.areas["Tea"]}).insert()
 		card = next(c for c in weekplan.cards(PRIVATE, ai=False)["cards"] if c["goal"] == g)
 		self.assertEqual((card["task"], card["next_action"], card["minutes"]), (first.name, "ux7 first step", 60))
-
-	def test_people_only(self):
-		g = goals.create("ux7 agent goal", "Long term", space=PRIVATE, area=self.areas["Tea"], done_when="x")["name"]
-		self.as_user(AGENT)
-		self.assertRaises(frappe.PermissionError, week.key_results, space=PRIVATE)
-
-
-class TestKeyResults(WeekCase):
-	def test_readings_finish_lines_and_stale_goals(self):
-		n = goals.create("ux7 kr number", "Long term", space=PRIVATE, area=self.areas["Tea"], measure_kind="Number", measure="Yield", unit="kg/ha",
-			start_value=1200, target_value=1800)["name"]
-		r = readings.suggest(n, 1500, today(), "Yield came to 1500", by="Agent")
-		old = frappe.get_doc({"doctype": "Life Goal", "space": PRIVATE, "title": "ux7 kr no line", "horizon": "Long term", "area": self.areas["Tea"]}).insert()
-		out = week.key_results(space=PRIVATE)
-		self.assertIn(r.name, [x["name"] for x in out["readings"]])
-		self.assertEqual(next(x for x in out["readings"] if x["name"] == r.name)["goal_title"], "ux7 kr number")
-		self.assertIn(old.name, [g["name"] for g in out["needs_finish_line"]])
-		self.assertIn(n, [g["name"] for g in out["stale"]])
-		goals.confirm_reading(r.name)
-		out = week.key_results(space=PRIVATE)
-		self.assertNotIn(n, [g["name"] for g in out["stale"]])
-		self.assertNotIn(r.name, [x["name"] for x in out["readings"]])
 
 
 class TestScheduledOnTodayAndCalendar(WeekCase):

@@ -209,8 +209,3 @@ def undo(space: str, name: str) -> dict:
 
 	return actions.undo(name)  # something done in Life OS (a person, a page, a task)
 
-
-def flag_stale(space: str, key: str, name: str, reason: str | None) -> None:
-	"""The Brain thinks a fact is out of date (or no longer thinks so, with no reason): the page flags it for the owner to keep or change."""
-	doc = _fact(space, key, name)
-	frappe.db.set_value("Life Agent Fact", doc.name, {"is_stale": int(bool(reason)), "stale_reason": (reason or "")[:140] or None})

@@ -3,7 +3,7 @@
     :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: rule ? 'Save' : 'Add rule', variant: 'solid', loading: busy, onClick: submit }]">
     <div class="flex flex-col gap-4">
       <div class="flex flex-col gap-2">
-        <h3 class="text-base-medium text-ink-gray-9">When a capture…</h3>
+        <SectionHead>When a capture…</SectionHead>
         <div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
           <FormControl v-model="v.sender" label="Is from this address" placeholder="sales2@rungamattee.com" data-rule-sender />
           <FormControl v-model="v.domain" label="Or anyone at this domain" placeholder="rungamattee.com" data-rule-domain />
@@ -14,7 +14,7 @@
         </div>
       </div>
       <div class="flex flex-col gap-2">
-        <h3 class="text-base-medium text-ink-gray-9">…then</h3>
+        <SectionHead>…then</SectionHead>
         <div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
           <FormControl v-model="v.action" type="select" label="Do this" :options="ACTIONS" data-rule-action />
           <FormControl v-if="v.action === 'File'" v-model="v.file_as" type="select" label="File it as" :options="FILE_AS" data-rule-file-as />
@@ -31,6 +31,7 @@
   </Dialog>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 // The form behind "+ Add a rule" and a rule's Change > Edit (issue 117): what a capture is like, then what to do with it.
 import { reactive, ref, watch } from 'vue'
 import { Checkbox, Dialog, FormControl } from 'frappe-ui'

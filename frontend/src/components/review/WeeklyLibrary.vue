@@ -43,8 +43,9 @@
         </div>
       </template>
     </div>
-    <MeetingDrawer :event="meetingName" :m="meeting" :ai="d?.ai" @close="closeMeeting" @go="openMeeting" @act="meetingAct" @finding="act" @done="doneMeeting" @plan="plan" />
-    <SideSheet :open="listOpen" name="meetings" title="Meetings that matter" sub="In this review's period." @close="listOpen = false">
+    <!-- a meeting opens in the Drawer (MeetingPane); the list of them is a dialog -->
+    <Dialog v-model:open="listOpen" title="Meetings that matter" size="md" data-dialog="meetings">
+      <p class="mb-2 text-sm text-ink-gray-6">In this review's period.</p>
       <div v-for="m in list" :key="m.name" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-meetings-row>
         <span class="size-2 flex-none rounded-full" :class="m.mark === 'linked' ? 'bg-surface-green-7' : 'border-2 border-outline-amber-6'" aria-hidden="true" />
         <div class="min-w-0 flex-1"><div class="truncate text-base text-ink-gray-9">{{ m.title }}</div>
@@ -52,7 +53,7 @@
         <Button size="sm" label="Open" @click="listOpen = false; openMeeting(m.name)" />
       </div>
       <p v-if="!list.length" class="text-sm text-ink-gray-6">No meetings that matter in this period.</p>
-    </SideSheet>
+    </Dialog>
     <ReviewFooter label="Next: Tasks" :line="footerLine" @next="emit('go', 'tasks')" />
   </div>
 </template>
@@ -60,26 +61,24 @@
 // Tab 1, Library (boards 28 and 29): the calendar strip, what came in by source, and the revelations.
 // Library never blocks: its footer button is always "Next: Tasks".
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Skeleton } from 'frappe-ui'
+import { Button, Dialog, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
-import SideSheet from '@/components/ui/SideSheet.vue'
 import { unpin } from '@/lib/pins'
 import CalendarStrip from '@/components/review/CalendarStrip.vue'
 import FindingRow from '@/components/review/FindingRow.vue'
-import MeetingDrawer from '@/components/review/MeetingDrawer.vue'
 import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
 import { dateTime } from '@/lib/dates'
-import { openRef } from '@/lib/pane'
+import { current, onRecordChanged, openRef } from '@/lib/pane'
 import { useRouter } from 'vue-router'
 
 const emit = defineEmits(['go'])
 const r = useReview()
 const router = useRouter()
 const d = ref(null)
-const meetingName = ref(null)
-const meeting = ref(null)
+// the meeting open in the Drawer, marked in the strip
+const meetingName = computed(() => (current.value?.type === 'meeting' ? current.value.name : null))
 const listOpen = ref(false)
 const list = ref([])
 const revelationsLabel = computed(() => (d.value.revelations.length < d.value.revelations_shown ? `${d.value.revelations.length} left` : d.value.revelations.length))
@@ -89,38 +88,19 @@ async function load() {
   d.value = await r.read('library')
   if (listOpen.value || !list.value.length) list.value = (await r.read('meetings_list')).rows
 }
-async function openMeeting(name) {
-  if (!name) return
-  meetingName.value = name
-  meeting.value = null
-  meeting.value = await r.read('meeting', { event: name })
-}
-function closeMeeting() { meetingName.value = null; meeting.value = null; load() }
-async function refreshMeeting() {
-  if (meetingName.value) meeting.value = await r.read('meeting', { event: meetingName.value })
-  load()
-}
-async function meetingAct(method, args) { await r.act(method, args); refreshMeeting() }
+function openMeeting(name) { if (name) openRef('meeting:' + name) }
 async function act(f, index) {
   const a = f.actions.find((x) => x.index === index)
-  if (a?.kind === 'open_meetings') {
-    if (a.events?.length) openMeeting(a.events[0])
-    return
-  }
-  // looking is not acting: these open the record or the list, and the finding stays
+  // looking is not acting: these open the meeting, the record or the list, and the finding stays
+  if (a?.kind === 'open_meetings') return a.events?.length ? openMeeting(a.events[0]) : undefined
   if (a?.kind === 'open_record' && a.ref) return openRef(a.ref)
   if ((a?.kind === 'open_list' || a?.kind === 'open_reset') && a.to) return router.push(a.to)
-  await r.act('finding_act', { insight: f.name, index, goal: meeting.value?.goal || undefined }, a?.kind === 'make_task' ? 'Task made.' : undefined)
-  refreshMeeting()
-}
-async function plan(args) { await r.act('meeting_plan', args, 'Task made, linked to this meeting.'); refreshMeeting() }
-async function doneMeeting(m) {
-  await r.act('meeting_done', { event: m.name })
-  if (m.next) openMeeting(m.next)
-  else closeMeeting()
+  await r.act('finding_act', { insight: f.name, index }, a?.kind === 'make_task' ? 'Task made.' : undefined)
+  load()
 }
 watch(() => r.head?.name, load)
 onMounted(load)
+onRecordChanged(load) // a meeting changed in the Drawer
 async function dropPin(p) {
   await unpin(p.doctype, p.name)
   d.value.unused_pins = d.value.unused_pins.filter((x) => x.name !== p.name)

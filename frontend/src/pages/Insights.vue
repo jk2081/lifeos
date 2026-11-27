@@ -17,7 +17,7 @@
     </div>
     <Card flush class="!px-4">
       <div class="sr-only" data-lv-count>{{ ins?.total ?? 0 }}</div>
-      <div v-for="r in ins?.rows || []" :key="r.name" class="border-b border-outline-gray-1 py-3 last:border-b-0" data-insight-row :data-insight="r.name" :data-kind="r.kind">
+      <Row bare v-for="r in ins?.rows || []" :key="r.name" class="py-3" data-insight-row :data-insight="r.name" :data-kind="r.kind">
         <div class="flex flex-wrap items-center gap-3">
           <Badge class="w-32 justify-center" :theme="KIND_THEME[r.kind] || 'gray'" :label="r.kind" />
           <div class="min-w-0 flex-[1_1_18rem]"><div class="break-words text-base text-ink-gray-9">{{ r.title }}</div><div class="text-sm text-ink-gray-6">{{ r.based_on }}</div></div>
@@ -40,8 +40,8 @@
             <Button v-else variant="subtle" label="Back to new" @click="restore(r)" />
           </div>
         </div>
-      </div>
-      <Empty v-if="ins && !ins.rows.length" :title="istatus === 'New' ? 'No new insights.' : 'Nothing here.'" hint="Insights are found every morning at 06:00, and when you click Refresh insights." />
+      </Row>
+      <EmptyState :line="`${istatus === 'New' ? 'No new insights.' : 'Nothing here.'} Insights are found every morning at 06:00, and when you click Refresh insights.`" v-if="ins && !ins.rows.length" />
     </Card>
     <Card class="bg-surface-gray-1" data-insights-how>
       <div class="text-base-medium text-ink-gray-9">How insights are made</div>
@@ -55,6 +55,7 @@
 </template>
 
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import { brainData } from '@/data/brain'
 // Insights (issue 120): what the Brain noticed. It was a tab of the Ask page; the chat moved to the panel on every screen and its History into the panel.
 import { computed, onMounted, ref, watch } from 'vue'
@@ -62,7 +63,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dropdown, Select, TabButtons, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { db, errorText } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'

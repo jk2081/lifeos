@@ -9,9 +9,9 @@ from lifeos.goals import areas, cycles as rules
 from lifeos.tools import demo, devtools, seed
 from lifeos.library import index
 from lifeos import install, permissions
-from lifeos.review import ladder
+from lifeos.review import gcal, ladder
 from lifeos.web import queries
-from lifeos.api import area as area_api, goals, inbox, meta, onboarding, session, settings, tasks
+from lifeos.api import area as area_api, connections, goals, inbox, meta, onboarding, session, settings, tasks
 from lifeos.constants import SPACE_DOCTYPES
 from lifeos.tests.base import AGENT, FAMILY, LifeTestCase, OWNER, PRIVATE, SHARED
 from lifeos.tests.helpers import item, task
@@ -972,3 +972,33 @@ class TestAIProvider(LifeTestCase):
 		out = settings.test_ai_connection()
 		self.assertFalse(out["ok"])
 		self.assertIn("refused the API key", out["text"])
+
+
+class TestGoogleConnectionsModule(LifeTestCase):
+	"""Google Calendar is connected, read from and written to through `lifeos.api.connections`, as Gmail is."""
+
+	def test_connect_choose_calendars_and_disconnect(self):
+		self.addCleanup(lambda: frappe.defaults.clear_default("life_write_calendar", parent=OWNER))
+		self.addCleanup(lambda: frappe.db.delete("Google Calendar", {"user": OWNER}))
+		module = "frappe.integrations.doctype.google_calendar.google_calendar"
+		validate = patch(f"{module}.GoogleCalendar.validate")  # the site has no Google client; the record is only a place to keep the choices
+		validate.start()
+		self.addCleanup(validate.stop)
+		with patch("lifeos.review.gcal.configured", return_value=True), patch(f"{module}.authorize_access", return_value={"url": "https://accounts.example/auth"}) as auth:
+			self.assertEqual(connections.gcal_connect(), {"url": "https://accounts.example/auth"})
+		auth.assert_called_once()
+		self.assertEqual(connections.gcal_state()["read"], ["primary"])
+		self.assertEqual(connections.gcal_set_read(["primary", "work"])["read"], ["primary", "work"])
+		with patch("lifeos.review.gcal.source_for", lambda acc: gcal.FakeSource()), patch.dict(frappe.local.conf, {"lifeos_fake_calendar": 1}):
+			self.assertEqual(connections.gcal_calendars()["read"], ["primary", "work"])
+			self.assertEqual(connections.gcal_set_write("primary")["write"], "primary")
+			self.assertIsNone(connections.gcal_set_write("")["write"])
+			connections.gcal_set_write("primary")
+		out = connections.gcal_disconnect()
+		self.assertFalse(out["connected"])
+		self.assertIsNone(out["write"])
+
+	def test_an_agent_cannot_use_them(self):
+		self.as_user(AGENT)
+		for call in (connections.gcal_state, connections.gcal_connect, connections.gcal_disconnect):
+			self.assertRaises(frappe.PermissionError, call)

@@ -14,7 +14,7 @@
         </template>
         <Card v-if="s.raw_text"><DigestView v-if="s.source_type === 'Email Digest'" :text="s.raw_text" /><Md v-else :text="s.raw_text" read /></Card>
         <div v-if="safeLink"><Button icon-left="lucide-external-link" :label="/mail\.google\.com/.test(safeLink) ? 'Open in Gmail' : 'Open the original'" @click="openLink" /></div>
-        <Card v-if="!s.files.length && !s.raw_text && !safeLink"><Empty title="Nothing to show." hint="This source arrived with no file, text or link." /></Card>
+        <Card v-if="!s.files.length && !s.raw_text && !safeLink"><EmptyState line="Nothing to show. This source arrived with no file, text or link." /></Card>
       </template>
     </section>
     <!-- Text: the transcript or extracted text, editable by people -->
@@ -25,16 +25,16 @@
         <div class="mb-2 text-sm text-ink-gray-6" data-extract-line>Read on the server by {{ s.extracted_by }}, {{ s.extract_confidence }}% sure<template v-if="s.needs_closer_read"> · Needs a closer read</template></div>
         <Md :text="s.extracted_text" read />
       </Card>
-      <Card v-else><Empty :title="s.needs_closer_read ? 'Needs a closer read.' : 'No text yet.'" :hint="s.needs_closer_read ? (s.extract_note || 'The text could not be read on the server.') : 'Life OS reads the text of a file (PDF text, OCR, speech) on its own server when the file arrives.'" /></Card>
+      <Card v-else><EmptyState :line="`${s.needs_closer_read ? 'Needs a closer read.' : 'No text yet.'} ${s.needs_closer_read ? (s.extract_note || 'The text could not be read on the server.') : 'Life OS reads the text of a file (PDF text, OCR, speech) on its own server when the file arrives.'}`" /></Card>
     </section>
     <section v-if="on('summary')" data-source-summary>
-      <Card><Md v-if="s.summary_md" :text="s.summary_md" /><Empty v-else title="No summary." hint="The agent adds a summary when it processes the source." /></Card>
+      <Card><Md v-if="s.summary_md" :text="s.summary_md" /><EmptyState line="No summary. The agent adds a summary when it processes the source." v-else /></Card>
     </section>
     <section v-if="on('made')" data-source-made>
       <Card flush>
         <Row v-for="m in made" :key="m.doctype + m.name" :pane="refOfRoute(m.route)" :label="m.title" :class="!refOfRoute(m.route) && 'cursor-pointer'" @click="!refOfRoute(m.route) && openRoute(m.route)" data-made-row>
           <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ m.title }}</div><div class="text-sm text-ink-gray-6">{{ m.kind }}</div></div></Row>
-        <Empty v-if="!made.length" title="Nothing made from this yet." hint="Records accepted from its proposals, and wiki pages that cite it, are listed here." />
+        <EmptyState line="Nothing made from this yet. Records accepted from its proposals, and wiki pages that cite it, are listed here." v-if="!made.length" />
       </Card>
     </section>
     <section v-if="on('details')" class="flex flex-col gap-3" data-source-details>
@@ -56,7 +56,7 @@ import Md from '@/components/Md.vue'
 import MdField from '@/components/MdField.vue'
 import DigestView from '@/components/DigestView.vue'
 import FileVersions from '@/components/FileVersions.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { db } from '@/lib/api'
 import { itemData } from '@/data/item'
 import { store } from '@/lib/store'

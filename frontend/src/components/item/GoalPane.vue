@@ -1,5 +1,7 @@
 <template>
   <template v-if="d">
+    <!-- issue 146: opened from the weekly review, the goal's plan for the week comes first -->
+    <GoalPlan v-if="planning" :goal="name" :focus="focus" @changed="emit('changed')" @done="emit('close')" />
     <div class="flex flex-wrap items-center gap-2"><Badge :theme="info?.goal.on_hold && d.goal.outcome === 'In Progress' ? 'amber' : d.goal.outcome === 'In Progress' ? 'blue' : 'gray'"
       :label="info?.goal.on_hold && d.goal.outcome === 'In Progress' ? 'On hold' : d.goal.outcome" />
       <span class="text-sm text-ink-gray-6">{{ headline }}</span>
@@ -34,7 +36,7 @@
           <div class="min-w-0 flex-1"><div class="break-words text-base-medium" :class="a.status !== 'Open' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ a.title }}</div>
             <div class="text-sm text-ink-gray-6">{{ a.per_week }} a week · {{ plural(Object.values(a.ticks).reduce((x, y) => x + y, 0), 'tick') }} so far</div></div>
           <Badge v-if="a.status !== 'Open'" :theme="a.status === 'Done' ? 'green' : 'gray'" :label="a.status" /></Row>
-          <Empty v-if="!d.goal.actions.length" title="No actions." hint="Edit the goal under Cycle goals on Goals > Cycles to add weekly actions." /></Card>
+          <EmptyState v-if="!d.goal.actions.length" line="No actions. Edit the goal under Cycle goals on Goals > Cycles to add weekly actions." /></Card>
       </section>
     </template>
     <section v-if="on('tasks')" class="flex flex-col gap-3">
@@ -49,7 +51,7 @@
         <Row v-for="t in d.tasks" :key="t.name" :pane="'task:' + t.name" :label="t.title"><div class="min-w-0 flex-1">
           <div class="break-words text-base-medium" :class="['Done', 'Dropped', 'Carried'].includes(t.status) ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'">{{ t.title }}</div>
           <div class="text-sm text-ink-gray-6">{{ t.status }}{{ t.due_date ? ' · due ' + short(t.due_date) : '' }}{{ t.is_archived ? ' · archived' : '' }}</div></div></Row>
-        <Empty v-if="!d.tasks.length" title="No tasks for this goal." hint="Add one below, or file a task under this goal from its pane." />
+        <EmptyState line="No tasks for this goal. Add one below, or file a task under this goal from its pane." v-if="!d.tasks.length" />
         <Row v-if="writable && d.goal.outcome === 'In Progress'"><TextInput v-model="quick" class="flex-1" placeholder="Add a task under this goal" aria-label="Add a task under this goal"
           data-goal-quick @keydown.enter="addTask" /></Row>
       </Card>
@@ -83,11 +85,14 @@ import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import Pick from '@/components/Pick.vue'
 import GoalMeasure from '@/components/goals/GoalMeasure.vue'
 import GoalEditDialog from '@/components/goals/GoalEditDialog.vue'
+import GoalPlan from '@/components/review/GoalPlan.vue'
+import { activeReview } from '@/lib/review'
+import { useRoute } from 'vue-router'
 import { tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'
 import { loadBacklinks } from '@/lib/links'
@@ -102,6 +107,9 @@ const props = defineProps({ name: String, type: String, tab: String })
 const emit = defineEmits(['meta', 'missing', 'changed', 'close'])
 // The pane's tabs: Actions (with the result note at the top), Tasks, History across cycles, Links. Annual and open goals
 // have no weekly actions and no cycles, so they have Tasks and Links only.
+const route = useRoute()
+const planning = computed(() => route.query.review === '1' && !!activeReview.value && activeReview.value.kind === 'weekly')
+const focus = computed(() => String(route.query.focus || ''))
 const on = (t) => !props.tab || props.tab === t
 const d = ref(null)
 const info = ref(null) // goals.get: serves, served by, on hold, done when

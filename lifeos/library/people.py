@@ -3,6 +3,7 @@ that describes them. Plumbing only: finding, creating and linking; who someone i
 import re
 
 import frappe
+from frappe import _
 
 from lifeos.life.doctype.life_person.life_person import split_aliases
 
@@ -35,6 +36,19 @@ def find(space, title):
 		if t in [n.lower() for n in names_of(p)]:
 			return p
 	return None
+
+
+def add(space, name, kind="Person", **fields):
+	"""The one way to add a person or organisation: (the Life Person doc, whether it was made now). Whoever already goes by `name` in the space
+	(any case, or another name) is returned as it is, not added twice; `fields` fill a new one."""
+	name = " ".join((name or "").split())
+	if not name:
+		frappe.throw(_("A person needs a name."), title=_("Person needs a name"))
+	found = find(space, name)
+	if found:
+		return frappe.get_doc("Life Person", found.name), False
+	doc = frappe.get_doc({"doctype": "Life Person", "space": space, "full_name": name[:140], "kind": kind, **{k: v or None for k, v in fields.items()}}).insert()
+	return doc, True
 
 
 def link_page(note, kind=None) -> str | None:

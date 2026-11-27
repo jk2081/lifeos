@@ -11,7 +11,7 @@
   <AskHistory v-if="ask.view === 'history'" class="min-h-0 flex-1 overflow-y-auto" />
   <template v-else>
     <div ref="scroller" class="min-h-0 flex-1 overflow-y-auto px-4 py-4" :class="drawer.wide && !phone && 'mx-auto w-full max-w-3xl'">
-      <h3 v-if="ask.channel" class="mb-3 text-base-medium text-ink-gray-9" data-ask-channel-title>{{ ask.title }}</h3>
+      <SectionHead v-if="ask.channel" data-ask-channel-title>{{ ask.title }}</SectionHead>
       <AskThread />
       <div v-if="!ask.messages.length && !ask.refusal" class="text-base text-ink-gray-6" data-ask-empty>Ask about your own records, tell Life OS what to do, or drop a file here. Answers cite where they came from, and what Chat does is listed with Change.</div>
     </div>
@@ -19,6 +19,7 @@
   </template>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 // What the chat shows, on the laptop panel and the phone sheet: the header, then the conversation or History, then the message box.
 import { nextTick, ref, watch } from 'vue'
 import { Button } from 'frappe-ui'

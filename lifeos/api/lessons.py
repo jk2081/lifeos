@@ -34,14 +34,6 @@ def accept(lesson: str, text: str | None = None):
 
 
 @frappe.whitelist(methods=["POST"])
-def edit(lesson: str, text: str):
-	"""Change the words of a proposed lesson, without accepting it."""
-	_admin_only()
-	_lesson(lesson)
-	return lessons.card(lessons.edit(lesson, text))
-
-
-@frappe.whitelist(methods=["POST"])
 def reject(lesson: str):
 	_admin_only()
 	_lesson(lesson)

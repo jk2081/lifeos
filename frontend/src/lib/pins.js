@@ -24,8 +24,6 @@ export async function loadPins() {
   if (res) { pins.list = res.pins; pins.limit = res.limit; pins.loaded = true }
 }
 
-export const isPinned = (doctype, name) => pins.list.some((p) => p.doctype === doctype && p.name === name)
-
 /** Pin a page. With seven pinned the server answers `refused` and `choose_to_unpin`: the caller asks which to drop and calls again with `replace`. */
 export async function pin(doctype, name, replace) {
   return take(await tryCall(() => libraryData.pages.pin({ doctype, name, replace })))
