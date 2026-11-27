@@ -1,6 +1,6 @@
 // The tooling itself: the setup switches, CI and the screenshots a failed check saves.
 // Checks are numbered TOOLING.<n> in the order they appear here; `node tools/acceptance.mjs --only=TOOLING` runs this file's checks.
-import { FAIL_SHOTS, areas, base, MAC_CHROME, ONLY, PLACES, SETUP, agentSecret, bench, check, env, execFileSync, failShots, fs, must, os, owner, path, resolveSetup, root, session } from './context.mjs'
+import { FAIL_SHOTS, SPACE, areas, base, MAC_CHROME, ONLY, PLACES, SETUP, agentSecret, bench, check, env, execFileSync, failShots, fs, must, os, owner, path, resolveSetup, root, session, stamp } from './context.mjs'
 import { ux, uxArea } from './ux.mjs'
 
 
@@ -245,4 +245,78 @@ await check('TOOLING.12', 'The monthly cleanup workflow runs on the 1st; by hand
   const none = monthly(tree('<template><div /></template>'))
   must(!fs.existsSync(log) || !fs.readFileSync(log, 'utf8').includes('issue create'), 'an issue was opened with no findings')
   must(none.includes('No findings'), 'no "No findings" line: ' + none)
+})
+
+// Issue 153: the speed check. Opening a screen makes no more `lifeos.api` calls than tools/speed-baseline.json says, no such GET takes
+// longer than its slow_ms, and a record pane opened a second time in a session shows its title before any request for it finishes.
+const SPEED = JSON.parse(fs.readFileSync(path.join(root, 'tools/speed-baseline.json'), 'utf8'))
+const API = /\/api\/method\/lifeos\.api\./
+// open `p` and say what it cost: the calls made until the page is quiet and the slowest GET
+async function measure(s, p, after) {
+  const calls = []
+  const pg = s.page
+  const started = new Map()
+  const onRequest = (r) => { if (API.test(r.url())) started.set(r, Date.now()) }
+  const onDone = (r) => { if (started.has(r)) calls.push({ method: r.method(), name: r.url().replace(/^.*lifeos\.api\./, '').split('?')[0], ms: Date.now() - started.get(r) }) }
+  pg.on('request', onRequest)
+  pg.on('requestfinished', onDone)
+  try {
+    await s.open(p)
+    if (after) await after(pg)
+    await pg.waitForTimeout(1200)
+    for (let i = 0; i < 40 && started.size !== calls.length; i++) await pg.waitForTimeout(250) // a call still on its way is counted
+  } finally {
+    pg.off('request', onRequest)
+    pg.off('requestfinished', onDone)
+  }
+  return { calls: calls.length, slowest: Math.max(0, ...calls.filter((c) => c.method === 'GET').map((c) => c.ms)), names: calls.map((c) => c.name) }
+}
+// what is wrong with a measurement, as sentences
+const speedFaults = (key, m) => [
+  ...(m.calls > SPEED.calls[key] ? [`${key} made ${m.calls} calls, the stored number is ${SPEED.calls[key]} (${m.names.join(', ')})`] : []),
+  ...(m.slowest > SPEED.slow_ms ? [`${key} had a GET of ${m.slowest} ms, the limit is ${SPEED.slow_ms}`] : []),
+]
+await check('TOOLING.13', 'Speed: Today (each mode), Goals and a record pane open within the stored number of lifeos.api calls and no GET takes over a second; a second opening of a pane shows its title before any request finishes', async () => {
+  const s = await session('owner@lifeos.test', 1440)
+  const pg = s.page
+  const task = (await owner.api('tasks.quick_add', { text: `I153 speed ${stamp}`, space: SPACE })).name
+  try {
+    const faults = []
+    for (const [key, p] of [['today-overview', '/life/today?mode=overview'], ['today-goals', '/life/today?mode=goals'], ['today-calendar', '/life/today?mode=calendar'], ['goals', '/life/goals'],
+      ['task-pane', `/life/today?mode=overview&open=task:${task}`]]) faults.push(...speedFaults(key, await measure(s, p)))
+    must(!faults.length, faults.join('; '))
+    // the second opening, in the same session
+    const go = async (to) => { await pg.waitForFunction(() => document.querySelector('#app')?.__vue_app__, null, { timeout: 15000 }); await pg.evaluate((x) => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push(x), to) }
+    await go('/today?mode=overview&area=')
+    await pg.locator('[data-pane-title]').waitFor({ state: 'detached', timeout: 10000 })
+    let finished = 0
+    const held = /tasks\.get|api\/v2\/document\/Life(%20| )Task/
+    pg.on('requestfinished', (r) => { if (held.test(r.url())) finished++ })
+    await pg.route(held, async (route) => { await new Promise((r) => setTimeout(r, 2500)); await route.continue().catch(() => {}) })
+    try {
+      await go(`/today?mode=overview&area=&open=task:${task}`)
+      await pg.locator('[data-pane-title]', { hasText: 'I153 speed' }).waitFor({ timeout: 1500 })
+      must(finished === 0, 'the title came after a request finished')
+    } finally {
+      await pg.unroute(held)
+    }
+    return `calls ${Object.entries(SPEED.calls).map(([k, v]) => `${k} ≤ ${v}`).join(', ')}`
+  } finally {
+    await s.ctx.close()
+    await owner.api('trash.delete', { doctype: 'Life Task', name: task }).catch(() => {})
+  }
+})
+await check('TOOLING.14', 'The speed check fails on a screen that makes an extra call or a slow one', async () => {
+  const s = await session('owner@lifeos.test', 1440)
+  try {
+    // the same measure, with one more call (the app asks for its counts again) and one call held for 1.3 seconds
+    await s.page.route(/lifeos\.api\.today\.get/, async (route) => { await new Promise((r) => setTimeout(r, SPEED.slow_ms + 300)); await route.continue().catch(() => {}) })
+    const m = await measure(s, '/life/today?mode=overview', (pg) => pg.evaluate(() => window.dispatchEvent(new CustomEvent('lifeos-counts-stale'))))
+    const faults = speedFaults('today-overview', m)
+    must(faults.some((f) => /GET of/.test(f)), 'a slow call was not caught: ' + JSON.stringify(m))
+    must(faults.some((f) => /made \d+ calls/.test(f)), 'an extra call was not caught: ' + JSON.stringify(m))
+    return faults.join('; ').slice(0, 160)
+  } finally {
+    await s.ctx.close()
+  }
 })

@@ -1,0 +1,11 @@
+{
+  "note": "The most lifeos.api calls a screen may make while it opens, and the slowest a lifeos.api GET may take (ms) on the CI bench. These may only get better: lower a number when a change makes the screen cheaper, never raise one (issue 153).",
+  "calls": {
+    "today-overview": 9,
+    "today-goals": 9,
+    "today-calendar": 9,
+    "goals": 12,
+    "task-pane": 15
+  },
+  "slow_ms": 1000
+}

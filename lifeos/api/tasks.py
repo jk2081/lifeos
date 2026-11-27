@@ -352,17 +352,6 @@ def no_goal(space: str | None = None):
 
 
 @frappe.whitelist(methods=["POST"])
-def keep_standalone(task: str):
-	"""Fine as is: the task stays without a goal and leaves Goals > No goal. Its guessed area, if any, is confirmed."""
-	doc = permissions.get_doc_checked("Life Task", task, "write")
-	doc.standalone = 1
-	doc.area_guessed = 0
-	doc.area_confidence = 0
-	doc.save()
-	return get(doc.name)
-
-
-@frappe.whitelist(methods=["POST"])
 def make_goal(tasks: str | builtins.list, space: str | None = None, area: str | None = None, title: str | None = None, done_when: str | None = None,
 		measure_kind: str | None = None, measure: str | None = None, unit: str | None = None, start_value: float | str | None = None,
 		target_value: float | str | None = None):

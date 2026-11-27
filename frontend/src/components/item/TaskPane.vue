@@ -19,7 +19,7 @@
   <div><div class="mb-1.5 text-sm text-ink-gray-6">Filed under</div>
     <div class="flex flex-wrap items-center gap-2">
       <div class="contents" data-task-area><Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" /></div>
-      <AreaGuess :task="task" :readonly="!writable" full @confirmed="(t) => { task = { ...task, ...t }; tell(); emit('changed', task) }" />
+      <AreaGuess :task="task" :readonly="!writable" full @confirmed="(t) => { setExtra(t); rec.reload(); emit('changed', task) }" />
       <Badge v-for="a in task.also_in" :key="a" size="lg">also in {{ areaName(a) }}
         <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)" @click="save({ also_in: task.also_in.filter((x) => x !== a) })" /></template></Badge>
       <Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== task.area && !task.also_in.includes(o.value))" placeholder="also in"
@@ -49,7 +49,7 @@
   </template>
 </template>
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge, Button, DatePicker, FormControl, TextInput, dialog, toast } from 'frappe-ui'
 import Pick from '@/components/Pick.vue'
 import PersonPicker from '@/components/ui/PersonPicker.vue'
@@ -65,6 +65,7 @@ import AreaGuess from '@/components/AreaGuess.vue'
 import HandOffCard from '@/components/item/HandOffCard.vue'
 import HandOffDialog from '@/components/item/HandOffDialog.vue'
 import { store } from '@/lib/store'
+import { useRecord } from '@/lib/record'
 import { short } from '@/lib/dates'
 import { OPEN, PRIORITIES } from '@/lib/tasks'
 import { areaName, areaOptions, goalOptions as goalsByType, loadLookups, lookups } from '@/lib/lookups'
@@ -93,6 +94,7 @@ const canRestore = computed(() => store.spaces.find((s) => s.name === task.value
 const writable = computed(() => canRestore.value && !task.value?.is_archived)
 function tell() {
   const t = task.value
+  if (!t) return
   emit('meta', { title: t.title, area: t.area, area_name: t.area_name, goal: t.goal, goal_title: t.goal_title,
     sub: !t.area && !t.goal ? 'Unfiled' : t.status === 'Someday' ? 'On the Someday list' : '', archived: !!t.is_archived, canRestore: canRestore.value,
     someday: writable.value && OPEN.includes(t.status) ? { doctype: 'Life Task', name: t.name } : null,
@@ -105,13 +107,25 @@ function pickWaiting(v) {
   save({ waiting_on_person: v || null, ...(who && !(task.value.waiting_on || '').trim() ? { waiting_on: who } : {}) })
 }
 
+// The record comes from the data layer: from its cache at once, then the current version, and again when it is saved elsewhere.
+// The server adds only what a record does not hold (the names of its area, goal and source, and its links): `tasks.get`.
+const DATES = ['creation', 'completed_on', 'last_touched_on']
+function show(d, extra) {
+  const typing = task.value?.notes_md
+  const next = { ...extra, ...d, also_in: (d.also_in || []).map((r) => r.area), links: extra.links || [] }
+  for (const k of DATES) next[k] = d[k] ? String(d[k]).slice(0, 19) : null
+  if (notesDirty && typing !== undefined) next.notes_md = typing // the text being typed is never replaced
+  task.value = next
+  tell()
+}
+const { rec, save: saveRecord, loadExtra, setExtra, draw } = useRecord('Life Task', () => props.name, {
+  fetchExtra: () => itemData.tasks.get({ task: props.name }), show, onMissing: () => emit('missing'),
+})
 async function load() {
-  try {
-    ;[task.value, links.value] = await Promise.all([itemData.tasks.get({ task: props.name }), loadBacklinks('Life Task', props.name)])
-    tell()
-  } catch (e) {
-    emit('missing')
-  }
+  rec.reload()
+  loadExtra()
+  links.value = await loadBacklinks('Life Task', props.name)
+  tell()
 }
 // the source of a task, such as the Gmail thread an email digest proposed it from (source_url)
 const safeSource = computed(() => /^https?:/i.test(task.value?.source_url || '') ? safeUrl(task.value.source_url) : '')
@@ -135,8 +149,7 @@ async function saveNotes() {
   notesState.value = 'Saving…'
   const text = task.value.notes_md
   try {
-    const res = await itemData.tasks.update({ task: props.name, values: { notes_md: text } })
-    task.value = { ...res, notes_md: task.value.notes_md }
+    await saveRecord({ notes_md: text })
     notesState.value = 'Saved'
     emit('changed', task.value)
   } catch (e) {
@@ -149,8 +162,9 @@ onBeforeUnmount(saveNotes)
 
 async function save(values) {
   try {
-    task.value = await itemData.tasks.update({ task: props.name, values })
-    tell()
+    await saveRecord(values.also_in ? { ...values, also_in: values.also_in.map((area) => ({ area })) } : values)
+    draw()
+    loadExtra() // the names of a new area or goal
     emit('changed', task.value)
   } catch (e) {
     toast.error(errorText(e))
@@ -166,9 +180,10 @@ async function setStatus(status) {
     return
   }
   try {
-    task.value = await itemData.tasks.set_status({ task: props.name, status, waiting_on: task.value.waiting_on })
+    // finishing and reopening have logic (completed_on, the goal's lead action) that lives in the method; the cached record follows its answer
+    setExtra(await itemData.tasks.set_status({ task: props.name, status, waiting_on: task.value.waiting_on }))
+    rec.reload()
     askWaiting.value = false
-    tell()
     emit('changed', task.value)
   } catch (e) {
     toast.error(errorText(e))
@@ -202,6 +217,7 @@ async function doRemove() {
 }
 onMounted(() => {
   loadLookups()
+  draw() // from the cache, before any request finishes
   load()
 })
 </script>

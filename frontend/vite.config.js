@@ -19,6 +19,7 @@ export default defineConfig({
     frameworkUI(),
     vue(),
   ],
-  resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
+  // '@fui' is frappe-ui's own data layer (docStore, idbStore), which the package does not export; one file on disk, so one copy in the bundle
+  resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src'), '@fui': path.resolve(import.meta.dirname, 'node_modules/frappe-ui/src/data-fetching') } },
   build: { chunkSizeWarningLimit: 1500 },
 })

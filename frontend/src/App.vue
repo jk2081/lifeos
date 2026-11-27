@@ -101,6 +101,8 @@ import { loadPins } from './lib/pins'
 import { errorText } from './lib/api'
 import { stepTab } from './lib/tabs'
 import { clearOffline, queue, startQueue } from './lib/offline'
+import { clearDocCache } from './lib/docCache'
+import { startRealtime, stopRealtime } from './lib/realtime'
 
 const route = useRoute()
 const router = useRouter()
@@ -160,6 +162,8 @@ window.addEventListener('online', setOnline)
 window.addEventListener('offline', setOnline)
 async function logout() {
   await clearOffline()
+  stopRealtime()
+  await clearDocCache()
   try {
     await fetch('/api/method/logout', { method: 'POST', headers: { 'X-Frappe-CSRF-Token': window.csrf_token || '' } })
   } finally {
@@ -207,6 +211,7 @@ onMounted(async () => {
   try {
     await boot({ beforeReady: initLens })
     if (!store.isAgent) { loadPins(); window.addEventListener('lifeos-pins-stale', loadPins) } // issue 111: the pinned pages in the sidebar
+    startRealtime(store.user) // records saved elsewhere reach open panes and screens (lib/realtime.js)
     startQueue() // issue 50: send what was captured offline, now and whenever the connection returns
     if (store.isAdmin && !store.isAgent) loadOnboarding() // the first-run guide (issue 49) and whether the site is still empty
   } catch (e) {

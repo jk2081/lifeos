@@ -156,7 +156,7 @@ import Md from '@/components/Md.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import PageHead from '@/components/PageHead.vue'
 import { libraryData } from '@/data/library'
-import { errorText, tryCall } from '@/lib/api'
+import { db, errorText, tryCall } from '@/lib/api'
 import { short } from '@/lib/dates'
 import { onRecordChanged, openRef } from '@/lib/pane'
 import { ITEM_ICON, KIND_ICON, loadPins, pagePath, pin, pins, unpin } from '@/lib/pins'
@@ -216,7 +216,7 @@ async function swap(p) {
 }
 
 async function setStatus(v) {
-  const res = await tryCall(() => libraryData.pages.set_status({ name: props.name, status: v || undefined }))
+  const res = await tryCall(() => db.set('Life Person', props.name, { status: v || '' }))
   if (res) page.value.header.status = res.status
 }
 async function rewrite() {

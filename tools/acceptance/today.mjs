@@ -2020,3 +2020,48 @@ t.save()`)
     await s.ctx.close()
   }
 }
+
+// Fast panes: a record opens from the data layer's cache and follows the server.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  const made = []
+  const titleOf = () => pg.locator('[data-pane-title]').first().innerText()
+  const go = (p) => pg.evaluate((to) => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push(to), p)
+  try {
+    const title = `Fast pane ${stamp} ${width}`
+    const task = bench(`t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "${title}", "status": "Open"}).insert(ignore_permissions=True)
+print(t.name)`).split('\n').pop()
+    made.push(task)
+    await check('TODAY.88', `${width} px: a task opened in the Drawer, closed and opened again shows its title before any request for it finishes`, async () => {
+      await s.open(`/life/today?open=task:${task}`)
+      await pg.locator('[data-pane-title]', { hasText: title }).waitFor({ timeout: 15000 })
+      await go('/today?mode=overview&area=')
+      await pg.locator('[data-pane-title]').waitFor({ state: 'detached', timeout: 10000 })
+      let finished = 0
+      pg.on('requestfinished', (r) => { if (/tasks\.get|api\/v2\/document\/Life(%20| )Task/.test(r.url())) finished++ })
+      const held = /tasks\.get|api\/v2\/document\/Life(%20| )Task/
+      await pg.route(held, async (route) => { await new Promise((r) => setTimeout(r, 2500)); await route.continue().catch(() => {}) })
+      try {
+        await go(`/today?mode=overview&area=&open=task:${task}`)
+        await pg.locator('[data-pane-title]', { hasText: title }).waitFor({ timeout: 1500 })
+        must(finished === 0, 'the title came after a request finished')
+      } finally {
+        await pg.unroute(held)
+      }
+    })
+    await check('TODAY.89', `${width} px: with a task open, a change saved on the server shows in the pane within 3 seconds, without reopening`, async () => {
+      await s.open(`/life/today?open=task:${task}`)
+      await pg.locator('[data-pane-title]', { hasText: title }).waitFor({ timeout: 15000 })
+      bench(`frappe.db.set_value("Life Task", "${task}", "title", "${title} changed")
+t = frappe.get_doc("Life Task", "${task}")
+t.save(ignore_permissions=True)`)
+      await pg.locator('[data-pane-title]', { hasText: 'changed' }).waitFor({ timeout: 3000 })
+      must((await titleOf()).includes('changed'), 'the pane kept the old title')
+    })
+  } finally {
+    await s.ctx.close()
+    bench(`for n in ${JSON.stringify(made)}: frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
+  }
+}

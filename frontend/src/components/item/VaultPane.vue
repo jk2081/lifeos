@@ -26,7 +26,7 @@
 </template>
 <script setup>
 // A vault document in the pane. The name "new" is the form for adding one.
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { Alert, Button, FormControl, dialog, toast } from 'frappe-ui'
 import LifeFormLayout from '@/framework/LifeFormLayout.vue'
 import AreaPicker from '@/components/ui/AreaPicker.vue'
@@ -38,6 +38,7 @@ import { store } from '@/lib/store'
 import { fileKind, fileSize } from '@/lib/upload'
 import { loadLookups, lookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
+import { useRecord } from '@/lib/record'
 
 const FIELDS = ['title', 'doc_type', 'holder', 'number_last4', 'issue_date', 'expiry_date', 'remind_days_before', 'area', 'notes_md']
 const props = defineProps({ name: String, type: String, tab: String })
@@ -60,23 +61,42 @@ const titles = computed(() => Object.fromEntries([...people.value.map((p) => ['L
 const canRestore = computed(() => store.spaces.find((s) => s.name === (doc.value?.space || store.space))?.access === 'Write')
 const writable = computed(() => canRestore.value && !doc.value?.is_archived)
 
+let snapshot = '{}'
 function fill(d) {
   doc.value = d
   for (const f of FIELDS) form[f] = d[f] ?? null
+  snapshot = JSON.stringify(form)
   emit('meta', d.name
     ? { title: d.title || 'Document', area: d.area, area_name: d.area_name, goal: d.goal, goal_title: d.goal_title,
       sub: [d.doc_type, d.holder_name].filter(Boolean).join(' · '), archived: !!d.is_archived, canRestore: canRestore.value,
       tabs: [{ value: 'details', label: 'Details' }, { value: 'file', label: 'File' }] }
     : { title: 'Add document', sub: 'Only the last four characters of a number are stored.' })
 }
+// The record comes from the data layer (in memory only: a vault document is never kept on the device) and follows the server.
+// The server adds only what a record does not hold: the holder's and area's names, the expiry badge and the file's name and size.
+function show(d, extra) {
+  const merged = { ...extra, ...d, also_in: (d.also_in || []).map((r) => r.area), notes_md: d.notes_md || '' }
+  if (JSON.stringify(form) !== snapshot) { doc.value = { ...merged }; return } // the person is typing: their edits stay
+  fill(merged)
+}
+const { rec, save: saveRecord, loadExtra, draw } = useRecord('Life Vault Document', () => (props.name === 'new' ? '' : props.name), {
+  fetchExtra: () => itemData.vault.get({ document: props.name }), show, onMissing: () => emit('missing'),
+})
 async function save() {
   try {
     const isNew = !doc.value.name
-    const d = await itemData.vault.save({ document: doc.value.name, space: store.space, values: { ...form } })
+    if (isNew) {
+      const d = await itemData.vault.save({ space: store.space, values: { ...form } })
+      toast.success('Saved.')
+      emit('changed')
+      openRef('vault:' + d.name)
+      return
+    }
+    await saveRecord(Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v === '' ? null : v])))
+    snapshot = JSON.stringify(form)
     toast.success('Saved.')
     emit('changed')
-    if (isNew) openRef('vault:' + d.name)
-    else fill(d)
+    loadExtra()
   } catch (e) {
     toast.error(errorText(e))
   }
@@ -84,7 +104,9 @@ async function save() {
 // the file is already on the server, private and attached to this document: point the document's field at it
 async function attached(f) {
   try {
-    fill(await itemData.vault.set_file({ document: doc.value.name, file_url: f.file_url }))
+    await itemData.vault.set_file({ document: doc.value.name, file_url: f.file_url })
+    rec.reload()
+    loadExtra()
     toast.success('File attached.')
     emit('changed')
   } catch (err) {
@@ -114,10 +136,7 @@ onMounted(async () => {
   await loadLookups()
   people.value = [...(lookups.people || [])]
   if (props.name === 'new') return fill({ doc_type: 'Other', remind_days_before: 60 })
-  try {
-    fill(await itemData.vault.get({ document: props.name }))
-  } catch (e) {
-    emit('missing')
-  }
+  draw() // from the cache, before any request finishes
+  loadExtra()
 })
 </script>

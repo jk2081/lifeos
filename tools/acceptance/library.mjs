@@ -1580,3 +1580,45 @@ for n in frappe.get_all("Life Person", filters={"full_name": ["like", "%I136"]},
     await u.ctx.close()
   }
 }
+
+// Fast panes: what the record cache may keep on the device.
+{
+  const s = await session('owner@lifeos.test', 390)
+  const pg = s.page
+  const idbKeys = () => pg.evaluate(() => new Promise((res) => {
+    const r = indexedDB.open('keyval-store')
+    r.onerror = () => res([])
+    r.onsuccess = () => {
+      const db = r.result
+      if (!db.objectStoreNames.contains('keyval')) return res([])
+      const q = db.transaction('keyval').objectStore('keyval').getAllKeys()
+      q.onsuccess = () => res(q.result.map(String))
+    }
+  }))
+  let doc, task
+  try {
+    await check('LIBRARY.57', 'A vault document opened in the Drawer is never kept in IndexedDB; a task is, and logging out leaves no Life OS record there', async () => {
+      doc = (await owner.api('vault.save', { space: SPACE, values: { title: `I153 vault ${stamp}`, doc_type: 'Other' } })).name
+      task = (await owner.api('tasks.quick_add', { text: `I153 cached ${stamp}`, space: SPACE })).name
+      await s.open(`/life/today?open=task:${task}`)
+      await pg.locator('[data-pane-title]', { hasText: 'I153 cached' }).waitFor({ timeout: 15000 })
+      await pg.waitForFunction(async () => (await indexedDB.databases()).some((d) => d.name === 'keyval-store'), null, { timeout: 10000 })
+      await s.open(`/life/today?open=vault:${doc}`)
+      await pg.locator('[data-pane-title]', { hasText: 'I153 vault' }).waitFor({ timeout: 15000 })
+      await pg.waitForTimeout(800)
+      const kept = await idbKeys()
+      must(kept.some((k) => k.includes('Life Task')), 'the task was not kept: ' + kept.join(', ').slice(0, 300))
+      must(!kept.some((k) => /doc:v2:Life Vault Document\//.test(k) || k.includes(doc)), 'the vault document is in IndexedDB: ' + kept.join(', ').slice(0, 300))
+      await s.open('/life/today')
+      await pg.locator('[data-more-title]').click()
+      await pg.getByRole('button', { name: 'Log out' }).click()
+      await pg.waitForFunction(() => location.pathname === '/login', null, { timeout: 15000 })
+      const after = await idbKeys()
+      must(!after.length, 'IndexedDB still holds records: ' + after.join(', ').slice(0, 300))
+    })
+  } finally {
+    if (doc) await owner.api('trash.delete', { doctype: 'Life Vault Document', name: doc }).catch(() => {})
+    if (task) await owner.api('trash.delete', { doctype: 'Life Task', name: task }).catch(() => {})
+    await s.ctx.close()
+  }
+}
