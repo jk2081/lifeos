@@ -74,7 +74,7 @@ import Card from '@/components/ui/Card.vue'
 import Stat from '@/components/ui/Stat.vue'
 import Row from '@/components/ui/Row.vue'
 import { todayData } from '@/data/today'
-import { api, errorText, tryCall } from '@/lib/api'
+import { errorText, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { onRecordChanged, openRef, recordChanged } from '@/lib/pane'
 import { UNDO_MS } from '@/lib/someday'
@@ -97,13 +97,13 @@ onMounted(load)
 // a plate row's checkbox marks the task Done in place; Undo puts it back
 async function markDone(r) {
   try {
-    await api('tasks.set_status', { task: r.task, status: 'Done' })
+    await todayData.tasks.set_status({ task: r.task, status: 'Done' })
   } catch (e) {
     toast.error(errorText(e))
     return load()
   }
   recordChanged(`task:${r.task}`)
-  toast.success(`Done: ${r.title}`, { duration: UNDO_MS, action: { label: 'Undo', onClick: async () => { await tryCall(() => api('tasks.set_status', { task: r.task, status: 'Open' })); recordChanged(`task:${r.task}`) } } })
+  toast.success(`Done: ${r.title}`, { duration: UNDO_MS, action: { label: 'Undo', onClick: async () => { await tryCall(() => todayData.tasks.set_status({ task: r.task, status: 'Open' })); recordChanged(`task:${r.task}`) } } })
 }
 defineExpose({ reload: load, data: computed(() => d.value) })
 </script>
