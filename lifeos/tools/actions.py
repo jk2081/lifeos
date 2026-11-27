@@ -41,7 +41,7 @@ def run_for(tool: str):
 	from lifeos.tools import mail, notes, pages, people, rules, work
 
 	return {"mail.save_attachment": mail._save_attachment, "pages.create": pages._create, "pages.update": pages._update, "people.add": people._add,
-		"notes.save": notes._save, "tasks.add": work._add_task, "events.add": work._add_event, "tasks.hand_off": work._hand_off, "rules.add": rules._add_rule}[tool]
+		"notes.save": notes._save, "tasks.add": work._add_task, "events.add": work._add_event, "tasks.hand_off": work._hand_off, "tasks.finish": work._finish_task, "tasks.reopen": work._reopen_task, "tasks.merge": work._merge_tasks, "rules.add": rules._add_rule}[tool]
 
 
 def agent_key(space: str, source_system: str | None) -> str:
@@ -143,6 +143,18 @@ def undo(action: str) -> dict:
 		frappe.throw(_("That cannot be undone."), title=_("Nothing to undo"))
 	data = json.loads(row.undo)
 	removed = []
+	for doctype, name, values in data.get("restore") or []:  # a record goes back to the values it had (a task's status)
+		if frappe.db.exists(doctype, name):
+			permissions.get_doc_checked(doctype, name, "write")
+			frappe.db.set_value(doctype, name, values)
+	for comment, parent in data.get("recomment") or []:  # a note moved to another record goes back
+		if frappe.db.exists("Comment", comment):
+			frappe.db.set_value("Comment", comment, "reference_name", parent, update_modified=False)
+	for comment in data.get("comments") or []:  # a note this call added goes
+		if frappe.db.exists("Comment", comment):
+			doc = frappe.get_doc("Comment", comment)
+			permissions.get_doc_checked(doc.reference_doctype, doc.reference_name, "write")
+			frappe.delete_doc("Comment", comment, ignore_permissions=True, force=True)  # system: the write check on the task is above
 	for doctype, name, field in data.get("clear") or []:  # a link to what goes is taken off first
 		if frappe.db.exists(doctype, name):
 			permissions.get_doc_checked(doctype, name, "write")

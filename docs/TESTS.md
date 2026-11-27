@@ -43,6 +43,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
 | `ingest-email` (was `triage-email`) | `test_gmail.TestDigest`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
 | one assistant: the owner's requests through an agent, the gate, `tasks_add`/`events_add`, Activity's Assistant rows, the name and the failed job | `test_agents.TestOneAssistant`, `test_permissions.TestOnlyTheOwnerIsTheOwner` | `BRAIN.73`, `SETTINGS.45`, `SETTINGS.46` |
+| Chat finishes, reopens and merges tasks, each with Undo (`finish_task`, `reopen_task`, `merge_tasks`) | `test_agents.TestFlow` | `TODAY.82` |
 | the lifeos skill names every agent tool (`lifeos.api.tools`, `chats.relay`, `chats.report`) | `test_agents.TestSkillNamesAgentTools` | none (no screen) |
 | relayed conversations (`chats.relay`) in Chat's History | `test_library.TestRelayedChat` | `BRAIN.74` |
 | the agent connector (`agent/connector/`) | `test_agents.TestConnector` | `BRAIN.49` to `BRAIN.51` |
@@ -152,6 +153,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.79` Day Calendar lists an all-day event, a timed event, a task planned at 09:30 and a task due today in that order with the now line in place, each once
 - `TODAY.80` Week Overview's Waiting panel lists the waiting items and a row opens in the Drawer
 - `TODAY.81` in a task's pane the goal picker is searchable: typing part of a goal's title filters it
+- `TODAY.82` Chat: "mark it done" on a task open in the Drawer: the Done list shows the line with Undo and the task leaves the open list
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 

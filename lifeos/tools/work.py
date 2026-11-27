@@ -118,3 +118,94 @@ def cancel_event(space: str, event: str, message: str) -> dict:
 		frappe.throw(out.get("error") or _("Google did not cancel it."), title=_("Not cancelled"))
 	doc.db_set("life_hidden", 1, update_modified=False)  # a flag only: nothing more is sent to Google
 	return {"done": _("Cancelled {0} in Google Calendar").format(title), "title": title, "event": doc.name}
+
+
+# ---------------------------------------------------------------- finish, reopen and merge tasks (issue 149)
+
+HANDOFF = ("waiting_on", "waiting_on_person", "check_by", "handed_off_how", "handed_off_channel", "handed_off_ask", "handed_off_message", "handed_off_thread", "handed_off_action")
+LINKS = ("goal", "area", "delegated_to", "inbox_item")
+
+
+def _task_in(space: str, task: str):
+	doc = permissions.get_doc_checked("Life Task", task, "write")
+	if doc.space != space:
+		frappe.throw(_("That task is in another space."), title=_("Task is in another space"))
+	return doc
+
+
+def _was(doc) -> dict:
+	"""What a status change puts back on Undo."""
+	return {"status": doc.status, "completed_on": str(doc.completed_on) if doc.completed_on else None}
+
+
+def finish_task(task: str, space: str | None = None, owner_message: str | None = None) -> dict:
+	"""Set a task Done, the way the screens do (`tasks.set_status`)."""
+	return actions.write("tasks.finish", space, {"task": task}, None, owner_message, actions.OWNER)
+
+
+def _finish_task(space: str, task: str) -> tuple[str, dict, dict | None]:
+	from lifeos.api import tasks
+
+	doc = _task_in(space, task)
+	if doc.status == "Done":
+		return _("{0} was already done").format(doc.title), {"task": doc.name, "title": doc.title}, None
+	was = _was(doc)
+	tasks.set_status(doc.name, "Done")
+	return _("Marked {0} done").format(doc.title), {"task": doc.name, "title": doc.title}, {"restore": [["Life Task", doc.name, was]]}
+
+
+def reopen_task(task: str, space: str | None = None, owner_message: str | None = None) -> dict:
+	"""A Done or Dropped task goes back to Open."""
+	return actions.write("tasks.reopen", space, {"task": task}, None, owner_message, actions.OWNER)
+
+
+def _reopen_task(space: str, task: str) -> tuple[str, dict, dict | None]:
+	from lifeos.api import tasks
+
+	doc = _task_in(space, task)
+	if doc.status not in ("Done", "Dropped"):
+		frappe.throw(_("{0} is not done or dropped.").format(doc.title), title=_("Nothing to reopen"))
+	was = _was(doc)
+	tasks.set_status(doc.name, "Open")
+	return _("Reopened {0}").format(doc.title), {"task": doc.name, "title": doc.title}, {"restore": [["Life Task", doc.name, was]]}
+
+
+def merge_tasks(keep: str, drop: str, space: str | None = None, owner_message: str | None = None) -> dict:
+	"""Two tasks are the same: `keep` stays and takes what `drop` has that it lacks; `drop` is set Dropped."""
+	return actions.write("tasks.merge", space, {"keep": keep, "drop": drop}, None, owner_message, actions.OWNER)
+
+
+def _merge_tasks(space: str, keep: str, drop: str) -> tuple[str, dict, dict | None]:
+	from lifeos.api import tasks
+
+	if keep == drop:
+		frappe.throw(_("Name two different tasks."), title=_("Same task"))
+	kept, gone = _task_in(space, keep), _task_in(space, drop)
+	gone_was = _was(gone)
+	took, differ = {}, []
+	for field in LINKS:  # a link moves over only where the kept task has none
+		if gone.get(field) and not kept.get(field):
+			took[field] = gone.get(field)
+		elif field == "goal" and gone.get(field) and kept.get(field) != gone.get(field):
+			differ.append(_("goal"))
+	if any(gone.get(f) for f in HANDOFF):
+		if not any(kept.get(f) for f in HANDOFF):
+			took.update({f: gone.get(f) for f in HANDOFF if gone.get(f)})
+		elif any(kept.get(f) != gone.get(f) for f in HANDOFF if gone.get(f)):
+			differ.append(_("hand-off"))
+	restore = [["Life Task", gone.name, gone_was]]
+	if took:
+		restore.append(["Life Task", kept.name, {f: kept.get(f) for f in took}])
+		for f, v in took.items():
+			kept.set(f, v)
+		kept.save()
+	comments = frappe.get_all("Comment", filters={"reference_doctype": "Life Task", "reference_name": gone.name, "comment_type": "Comment"}, pluck="name")
+	for c in comments:  # the dropped task's notes move to the kept one
+		frappe.db.set_value("Comment", c, "reference_name", kept.name, update_modified=False)
+	added = [kept.add_comment("Comment", _("Merged from: {0}").format(gone.title)).name]
+	tasks.set_status(gone.name, "Dropped")
+	added.append(gone.add_comment("Comment", _("Merged into: {0}").format(kept.title)).name)
+	line = _("Merged {0} into {1}").format(gone.title, kept.title)
+	if differ:
+		line += " " + _("(they had different {0}: kept the ones on {1})").format(", ".join(differ), kept.title)
+	return line, {"task": kept.name, "title": kept.title, "dropped": gone.name, "differ": ", ".join(differ)}, {"restore": restore, "recomment": [[c, gone.name] for c in comments], "comments": added}
