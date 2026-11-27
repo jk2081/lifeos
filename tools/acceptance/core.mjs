@@ -35,7 +35,7 @@ try {
     pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
     try {
       await check('CORE.1', `${width} px: a task opened from Today shows in the Drawer and the screen stays; Back closes it; a reload reopens it`, async () => {
-        await s.open('/life/today')
+        await s.open('/life/today?mode=calendar')
         const row = pg.locator(`[data-ref="task:${tasks[0]}"]`).first()
         await row.waitFor({ timeout: 15000 })
         await row.click()
@@ -136,7 +136,7 @@ t.db_set("refs", json.dumps({"R1": {"doctype": "Life Task", "name": "${tasks[1]}
       for (const scheme of ['light', 'dark']) {
         await pg.emulateMedia({ colorScheme: scheme })
         await pg.setViewportSize({ width: 1440, height: 1000 })
-        await s.open('/life/today')
+        await s.open('/life/today?mode=calendar')
         await pg.locator(`[data-ref="task:${tasks[0]}"]`).first().waitFor({ timeout: 15000 })
         const wide = (await pg.locator('[data-main]').boundingBox()).width
         await pg.locator(`[data-ref="task:${tasks[0]}"]`).first().click()

@@ -36,7 +36,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `plan-week` | `test_skills.TestPlanWeek` | `SETTINGS.38` |
 | `notice` | `test_skills.TestNotice` | `SETTINGS.38` |
 | `define-goal` | `test_skills.TestDefineGoal` | `SETTINGS.38` |
-| `key-date` | `test_calendar.TestKeyDates`, `test_skills` (examples) | `SETTINGS.38`, `TODAY.56` |
+| `key-date` | `test_calendar.TestKeyDates`, `test_skills` (examples) | `SETTINGS.38`, `TODAY.58` |
 | `reflect` | `test_review` (Reflect), `test_skills.TestNewSkillsExamples` | `SETTINGS.38` |
 | `ask` (shown as Chat) | `test_chat.TestChatTools`, `test_chat.TestChat` | `SETTINGS.38` |
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
@@ -73,9 +73,9 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 
 - `TODAY.1` Log in, open /life, Today is filled from seed data
 - `TODAY.2` Add a birthday and see it on the calendar this year and next
-- `TODAY.3` Vault document expiring in 30 days shows a badge on Today
+- `TODAY.3` Vault document expiring in 30 days shows on its day of the month calendar
 - `TODAY.4` every number is a door, and the list count equals the number clicked
-- `TODAY.5` Today: no Open band, the list of tasks in order, the rail; Someday never shows
+- `TODAY.5` Today: no Open band; Day Calendar lists the task due today and never a Someday task
 - `TODAY.6` counts: every number on Today, Reset, Someday and the sidebar opens a list with exactly that many rows
 - `TODAY.7` Insights: rules make Stuck, 12 Week Year and Habit insights from seeded data; a dismissed one does not return; a snoozed one returns after its date; at most 12 new a day
 - `TODAY.8` Reset: each rule batch finds its seeded items; a batch changes exactly those and Undo reverts; one by one with the keys; Delete then Restore from the trash; stuck task…
@@ -83,9 +83,9 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.10` Rhythm banners: the weekly review, Plan <month>, Plan your next 12 weeks and Close this cycle each show on Today on their day (the clock moved with at=); Skip hides ea…
 - `TODAY.11` Week shows this week's calendar events and due tasks on the right days, and a day opens Day
 - `TODAY.12` Month shows key dates and due tasks on the right dates and counts meetings; next and previous months work
-- `TODAY.13` Year shows a bar for each goal in its area's lane, and one tick per weekly review since setup with the right count
-- `TODAY.14` an area that is off has no lane
-- `TODAY.15` clicking a goal on Year opens the goal
+- `TODAY.13` Year's Overview shows a goal under its area and the weekly reviews locked since setup
+- `TODAY.14` an area that is off has no goals on Year
+- `TODAY.15` clicking a goal on Year's Overview opens the goal in the Drawer
 - `TODAY.16` Week, Month and Year have no sideways scroll
 - `TODAY.17` the first visit opens the guide; Start, Next, Skip and Done land on Today and the guide does not return
 - `TODAY.18` the guide shows one screen at a time and each screen fits the phone
@@ -93,12 +93,9 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.20` going through the guide sets what to call the person and the time zone, switches on a third area, adds a part and turns three typed things into tasks with areas
 - `TODAY.21` after the guide the ladder card shows level 1 of 7 and the AI key as the next step
 - `TODAY.22` on an empty site Today shows its empty state and no Open band
-- `TODAY.23` cycle goals with lead actions and no task this week are not rows on Today
-- `TODAY.24` a task planned this week under a cycle goal shows with its goal, and ticking it records the lead action's tick
-- `TODAY.25` with three cycle goals planned for nothing, one line says so and Plan opens Goals > Cycles
+- `TODAY.23` cycle goals with lead actions and no task this week are not on Day Calendar
 - `TODAY.26` the Open band is gone from Today; the habits row shows today's habits by name and ticks them
 - `TODAY.27` no link on Today goes to an old route, and each opens where it says
-- `TODAY.28` the order is Needs you, the list, habits, then the rail
 - `TODAY.29` each moved number is in its new place with the count the old card had (All tasks, Goals, Library, Brain Activity)
 - `TODAY.30` with the fake AI failing on credit, Today shows "The Brain is off" with a link to Settings > AI, until a call works
 - `TODAY.31` on every guide step the footer sits under the content, within 48 px
@@ -125,28 +122,29 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.52` a Google all-day event reads "weekday, day month · all day"; a two-day one is one bar across its days
 - `TODAY.53` with the drawer open all seven day headers of Week are visible (1440 px)
 - `TODAY.54` the Week toolbar has no Reset and nothing cut off, the heading is the dates, and the chat's + offers Important date
-- `TODAY.55` Day has no builder's note under "Today"
-- `TODAY.56` Year shows five key dates of one week as one dot "5" that lists them (each opens its event, with the Key date star), and no two key-date labels overlap
-- `TODAY.57` Year has four cycle columns with today's line in the second; back moves one cycle and Today returns; no hint line
 - `TODAY.58` Month names a key date, counts the day's meetings, and the count opens Day
 - `TODAY.59` on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link
-- `TODAY.60` Year and Month in light and dark have no script error and nothing cut off
+- `TODAY.60` Year and Month in Calendar, light and dark, have no script error and nothing cut off
 - `TODAY.61` a waiting task is not on Today; past its check-by date it is one line naming who, with Look now to the review
 - `TODAY.62` the chat panel stays open with its messages from Today to the Library to a goal, and its chip shows the goal (removing it makes the chat about everything; Expand widens the panel) (issue 120)
 - `TODAY.63` "add a note: quote by Friday" with an event open adds a Comment on that event, and the Done list shows it with Change
 - `TODAY.64` a PDF dropped on the page is attached to the chat and, sent, becomes a capture for the Brain, listed with Change
 - `TODAY.65` the chat open in light and dark has no script error and nothing is cut off
-- `TODAY.66` the ruler is on all four views, this month and today carry the accent with their neighbours labelled, today opens Day, another day opens in the pane, a month tick moves the days (laptop)
+- `TODAY.66` Calendar has the ruler directly above the calendar and Overview has none; the ruler is centred on today, nothing is clipped, and its clicks work
 - `TODAY.67` Week: a goal row opens the goal in the pane and the dashboard stays on screen
 - `TODAY.68` Needs you opens its rows in the pane, a row opens in the same pane with Back, j moves to the next row, a reload keeps the list open
 - `TODAY.69` "past check date" opens only the overdue waiting items; "rules learned" opens the rules, each with Change
-- `TODAY.70` Day, Week, Month and Year switch in place with four cards and two panels each; Open full page goes to the record's page
+- `TODAY.70` Day, Week, Month and Year switch in place; Overview has four cards and two panels; Open full page goes to the record's page
 - `TODAY.71` on an empty space every card of every view says what will appear and offers one action
-- `TODAY.72` every view in light and dark has no script error and nothing cut off
+- `TODAY.72` every view, in Overview and in Calendar, in light and dark has no script error and nothing cut off
 - `TODAY.73` the Waiting card shows the count, late and looks done and opens the list grouped Looks done, Late, This week, Later; Confirm closes a looks-done row and Needs you drops by one; Nudge opens the draft; By person regroups
 - `TODAY.74` a waiting row opens the task layer with what was asked, the message and the reply; Back returns to the list
 - `TODAY.75` the list and the task layer are full screen with Back at 390 px; the WhatsApp link has the phone and the text, URL-encoded, and a WhatsApp draft has no Send
 - `TODAY.76` on an empty space the Waiting list says what will appear and offers + Hand off
+- `TODAY.77` each of Day, Week, Month and Year has Overview · Calendar; switching keeps the period and sets `?mode=`, a reload keeps it, Today opens in the last mode used; full width under the tabs at 390 px
+- `TODAY.78` Overview has the four cards and two panels of its view and no calendar or ruler; Calendar has the ruler directly above the calendar and no cards
+- `TODAY.79` Day Calendar lists an all-day event, a timed event, a task planned at 09:30 and a task due today in that order with the now line in place, each once
+- `TODAY.80` Week Overview's Waiting panel lists the waiting items and a row opens in the Drawer
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 
@@ -250,7 +248,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.14` a 12-week goal serving a longer goal shows on both
 - `GOALS.15` ticking a 4-a-week action once shows 1 of 4 and raises the week score
 - `GOALS.16` completing, delegating, parking and dropping a task each add to the right Outbox pile; Bring back reverses; Brain > Activity's in and out match the Outbox lists
-- `GOALS.17` goal work planned the way Lock the week plans it makes a scheduled task that shows on Today and in the week calendar, and a delegated one that shows as Waiting
+- `GOALS.17` goal work planned the way Lock the week plans it makes a scheduled task that shows on Day Calendar and in the week calendar, and a delegated one that shows as Waiting
 - `GOALS.18` Inbox items left too long: on Suggest an old item gets a suggested decision and the batch confirms it; on Park and Discard the job acts and Today's Undo restores
 - `GOALS.19` nothing in the goal dialog, readings, Outbox or old-items work scrolls sideways
 - `GOALS.20` a quick-captured task shows its guessed area with ✦ and the confidence; one tap confirms it and the ✦ goes
@@ -383,7 +381,7 @@ Unit tests: `test_review.py`
 - `REVIEW.7` every stale task decided (the empty list says what will appear here); Next: Goals opens
 - `REVIEW.8` every cycle goal gets a next action or a skip with a reason; exactly three stars; more than the free time shows the warning
 - `REVIEW.9` Pause and reopen: everything is where it was left; no tab scrolls the page at 1440 x 900 or sideways at 390
-- `REVIEW.10` what went well; Lock; the done screen; Today shows the top three first; the scheduled tasks are on Today and in Plan > Week
+- `REVIEW.10` what went well; Lock; the done screen; Today's Top three panel lists them; the scheduled tasks are on Today and in Plan > Week
 - `REVIEW.11` the weekly review renders on data like the owner's (a goal migrated from a project, a number goal with a Suggested reading, a milestone goal without "done when", a goa…
 - `REVIEW.12` a screen forced to fail shows "This screen could not be shown." with Reload and a reference, logs it, and navigation keeps working
 - `REVIEW.13` every place, every Plan and Library tab and every view of Plan's rhythms opens by clicking, and navigation works afterwards
@@ -469,11 +467,10 @@ Unit tests: `test_capture.py` (the phone's captures, sent once); `test_permissio
 - `PHONE.9` Archive, Outbox, Graph, Timeline, Reset and Vault are reached from their new homes
 - `PHONE.10` the chat bar is above the tabs on every screen with +, the camera and the mic, there is no + Capture, and "buy rakhi thread", with no question, makes a capture
 - `PHONE.11` tabs are routes: each tab has its own path, and reloading /life/goals/tasks lands on Goals > All tasks
-- `PHONE.12` Today > Day shows today's tasks, the top three and the day's events from the calendar
-- `PHONE.13` ticking a task on Today marks it done and updates the counts
+- `PHONE.12` Today > Day, Calendar lists today's tasks and the day's events once each, and Overview has the top three
 - `PHONE.14` the Needs you line shows the waiting count and opens Brain > Needs you
 - `PHONE.15` the switch moves to Week, Month and Year routes
-- `PHONE.16` the layout matches the mockups (the plate with the calendar beside it), with no sideways scroll
+- `PHONE.16` the layout matches the mockups (Overview: cards then two panels; Calendar: the ruler then the timeline), with no sideways scroll
 - `PHONE.17` The manifest is valid and the service worker is registered (phone profile)
 - `PHONE.18` The service worker's cache holds only static app files, never an /api/ response
 - `PHONE.19` Posting to the share target with a photo and text opens the share screen; Save puts it in the chat, which keeps the file as a capture
@@ -482,7 +479,7 @@ Unit tests: `test_capture.py` (the phone's captures, sent once); `test_permissio
 - `PHONE.22` Logging out empties the offline queue
 - `PHONE.23` The share target while logged out goes to login and sends nothing
 - `PHONE.24` every route in the router loads without an error; an unknown address lands on Today with "That page moved"
-- `PHONE.25` the dashboard at 390 px: only today's day labelled on the ruler, the cards two by two, the list full screen with Back and Esc, nothing cut off in light and dark
+- `PHONE.25` the dashboard at 390 px: only today and the month labelled on the ruler (Calendar), the cards two by two, the list full screen with Back and Esc, nothing cut off in light and dark
 
 ### Tooling (`tools/acceptance/tooling.mjs`, 4 checks)
 

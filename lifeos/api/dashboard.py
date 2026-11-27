@@ -24,10 +24,10 @@ from lifeos.calendar import calendar_data
 from lifeos.goals import areas, cycles, habits as habit_rules, readings, year_plan
 
 VIEWS = ("day", "week", "month", "year")
-LIST_KINDS = ("needs-you", "waiting", "waiting-overdue", "waiting-due", "rules", "filed-alone", "came-in", "done", "active", "score", "coming-up", "habits",
+LIST_KINDS = ("needs-you", "waiting", "waiting-overdue", "waiting-due", "rules", "filed-alone", "came-in", "done", "active", "score", "habits",
 	"week-work", "cycle", "goals-due", "key-dates", "plate", "top-three")
 OPEN = ("Open", "Doing", "Waiting")
-COMING_ROWS = 6
+PANEL_ROWS = 6
 LIST_MAX = 100
 
 
@@ -350,7 +350,7 @@ def brain_line(space, start, end):
 	return {"parts": parts, "numbers": {"came_in": f["came_in"], "filed": f["filed"], "to_waiting": to_waiting(space, start, end), "to_you": f["waiting"], "rules": n_rules}}
 
 
-def goals_panel(space, now, new):
+def goals_panel(space, now, new, title=None):
 	rows = goal_rows(space, now)
 	areas = names_map("Life Area", [r.area for r in rows if r.area], "area_name")
 	by = {}
@@ -358,29 +358,8 @@ def goals_panel(space, now, new):
 		by.setdefault(r.area, []).append(row(r.title, _("{0}% · by {1}").format(r.percent, r.date) if r.percent is not None and r.date else (f"{r.percent}%" if r.percent is not None else r.date),
 			f"goal:{r.name}", percent=r.percent, tone="warn" if r.behind else None))
 	groups = [{"area": areas.get(a) or _("No area"), "rows": rs} for a, rs in by.items()]
-	return panel("goals", _("Goals by area"), [], groups=groups, kind="goals",
+	return panel("goals", title or _("Goals by area"), [], groups=groups, kind="goals",
 		empty=None if groups else _line(new, _("Your goals show here, grouped by area, each as a bar."), _("Set a goal"), "/goals?new=goal"))
-
-
-def coming_up(space, now, limit=COMING_ROWS):
-	"""The next seven days: events, key dates, tasks due and expiring documents, in date order."""
-	end = add_days(now, 6)
-	out = []
-	for e in calendar_data.events_between(space, now, end):
-		out.append((e["date"], e["start"] or "", row(e["title"], str(e["date"]), f"event:{e['name']}")))
-	for d in calendar_data.important_dates_between(space, now, end):
-		out.append((d["date"], "", row(d["label"], str(d["date"]), f"date:{d['name']}")))
-	for d in calendar_data.vault_expiries_between(space, now, end):
-		out.append((d["date"], "", row(d["title"], str(d["date"]), f"vault:{d['name']}")))
-	t = frappe.qb.DocType("Life Task")
-	for name, title, due in (frappe.qb.get_query("Life Task", fields=[t.name, t.title, t.due_date], ignore_permissions=False)
-			.where((t.space == space) & t.status.isin(OPEN) & (t.is_archived == 0) & (t.due_date >= now) & (t.due_date <= end)).orderby(t.due_date).limit(40).run()):
-		out.append((str(due), "", row(title, str(due), f"task:{name}")))
-	out.sort(key=lambda x: (str(x[0]), x[1]))
-	rows = [r for _d, _s, r in out]
-	for r in rows:
-		r["sub"] = _short(r["sub"])
-	return rows[:limit], max(len(rows) - limit, 0)
 
 
 def _short(d):
@@ -388,29 +367,32 @@ def _short(d):
 	return f"{d.day} {SHORT[d.month - 1]}"
 
 
-def coming_panel(space, now, new):
-	rows, more = coming_up(space, now)
-	return panel("coming", _("Coming up"), rows, more=more and {"n": more, "open": "list:coming-up"}, empty=_line(new, _("Meetings, due dates and key dates of the next seven days show here."), _("Chat"), "chat"))
+def needs_panel(space, new):
+	"""Day: what waits for the owner's decision, the rows the Needs you card counts."""
+	rows = _l_needs(space)["rows"]
+	return panel("needs", _("Needs you"), rows[:PANEL_ROWS], more=len(rows) > PANEL_ROWS and {"n": len(rows) - PANEL_ROWS, "open": "list:needs-you"},
+		empty=_line(new, _("Nothing needs you. Things you capture or connect will show up here."), _("Connect"), "/settings?tab=sources"))
 
 
-def key_dates_panel(space, start, end, new):
-	rows = [row(k["title"], _short(k["date"]), k["ref"]) for k in year_plan.key_dates(space, start, end)]
-	return panel("key-dates", _("Key dates"), rows[:LIST_MAX], empty=_line(new, _("Birthdays, trips and expiries you add show here."), _("Add a key date"), "/today/month"))
+def waiting_panel(space, new):
+	"""Week: the Waiting list's first rows (the list itself is `list:waiting`)."""
+	rows = _l_waiting(space, "all")["rows"]
+	shown = [row(f"{r['who']} · {r['title']}", _("late") if r.get("late") and r.get("group") != "looks_done" else (_short(r["check_by"]) if r.get("check_by") else None), r["ref"],
+		tone="warn" if r.get("late") and r.get("group") != "looks_done" else None) for r in rows[:PANEL_ROWS]]
+	return panel("waiting", _("Waiting on others"), shown, more=len(rows) > PANEL_ROWS and {"n": len(rows) - PANEL_ROWS, "open": "list:waiting"},
+		empty=_line(new, _("Things you wait on others for will show up here."), _("Chat"), "chat"))
+
+
+def goals_due_panel(space, start, end, new):
+	"""Month: the goals whose date falls in the month."""
+	rows = _l_goals_due(space, start, end)["rows"]
+	return panel("goals-due", _("Goals due"), rows[:PANEL_ROWS], more=len(rows) > PANEL_ROWS and {"n": len(rows) - PANEL_ROWS, "open": "list:goals-due"},
+		empty=_line(new, _("Goals with a date this month show here."), _("Set a goal"), "/goals?new=goal"))
 
 
 # ---- the four views ----
 def _day(space, on, new, simple):
-	now = getdate(today())
 	cards, panels = [], []
-	events = calendar_data.events_between(space, on, add_days(on, 1))
-	events.sort(key=lambda e: e["start"] or "")
-	sched = [row(e["title"], "All day" if e.get("all_day") else str(e["start"])[11:16], f"event:{e['name']}", at=str(e["start"])[11:16] if not e.get("all_day") else "") for e in events]
-	# tasks planned at a time that day are part of the day's schedule, as they were on Today's timeline before this view
-	from lifeos.api.today import scheduled_today
-	for t in scheduled_today(space, on):
-		hm = str(t.get("scheduled_at"))[11:16]
-		sched.append(row(t.get("title"), hm, f"task:{t.get('name')}", at=hm, task=1))
-	sched.sort(key=lambda r: (r.get("at") != "", r.get("at") or ""))  # all-day first, then by time
 	t = frappe.qb.DocType("Life Task")
 	if simple:
 		due = (frappe.qb.get_query("Life Task", fields=[t.name, t.title, t.due_date], ignore_permissions=False)
@@ -420,8 +402,7 @@ def _day(space, on, new, simple):
 		plate_panel = panel("plate", _("Your plate"), [row(title, _short(d), f"task:{n}", tone="warn" if d < on else None) for n, title, d in due[:8]], more=len(due) > 8 and {"n": len(due) - 8, "open": "list:plate"},
 			empty=_line(new, _("Tasks due today show here."), _("Chat"), "chat"))
 	else:
-		week_start = bounds("week", on)[0]
-		top = frappe.get_list("Life Task", filters={"space": space, "is_top_three": 1, "top_three_week": week_start, "is_archived": 0}, fields=["name", "title", "status"], order_by="creation asc", limit=3)
+		top = frappe.get_list("Life Task", filters={"space": space, "is_top_three": 1, "is_archived": 0}, fields=["name", "title", "status"], order_by="creation asc", limit=3)
 		done = sum(1 for r in top if r.status == "Done")
 		cards.append(card("top", _("Top three"), f"{done} of 3" if top else None, _("done this week") if top else None, "list:top-three" if top else None,
 			empty=_line(new, _("Your three most important tasks of the week show here."), _("Chat"), "chat")))
@@ -434,8 +415,7 @@ def _day(space, on, new, simple):
 	habits = habits_today(space, on)
 	if habits or not simple:
 		cards.append(habits_card(space, new, on))
-	panels.append(panel("schedule", _("Schedule"), sched, now_line=str(now) == str(on), empty=_line(new, _("Meetings and time blocks of the day show here."), _("Connect"), "/settings?tab=sources")))
-	panels.append(plate_panel)
+	panels += [plate_panel, needs_panel(space, new)]
 	return cards, panels, None
 
 
@@ -467,11 +447,7 @@ def _week(space, on, new, simple):
 		panels.append(panel("active", _("Most active this week"), [row(p["title"], p["what"], f"person:{p['person']}") for p in people], empty=_line(False, _("The people and companies you hear from most show here."))))
 	else:
 		panels.append(goals_panel(space, now, new))
-	coming = coming_panel(space, now, new)
-	habits = habits_today(space, now)
-	coming["habits"] = habits if (habits or not simple) else []
-	coming["habits_empty"] = None if habits or simple else _line(new, _("A habit you track shows here, ticked each day."), _("Set a habit"), "/goals/habits")
-	panels.append(coming)
+	panels.append(waiting_panel(space, new))
 	return cards, panels, brain_line(space, start, end)
 
 
@@ -518,7 +494,7 @@ def _month(space, on, new, simple):
 			rows.append(row(_("Week of {0}").format(_short(w)), f"{round(s['score'])}%" if s and s["score"] is not None else None, f"list:week-work:{w}", percent=s["score"] if s else None,
 				accent=w <= getdate(today()) <= add_days(w, 6)))
 	panels.append(panel("weeks", _("Weeks of the month"), rows, kind="weeks" if not simple else "rows"))
-	panels.append(key_dates_panel(space, start, add_days(end, 7), new))
+	panels.append(waiting_panel(space, new) if simple else goals_due_panel(space, start, end, new))
 	return cards, panels, None
 
 
@@ -549,7 +525,7 @@ def _year(space, on, new, simple):
 	else:
 		cards.append(card("cycle", _("This cycle's score"), None, empty=_line(new or not cycle, _("Your cycle score appears once a 12 Week Year is running."), _("Set a goal"), "/goals?new=goal")))
 	cards += [reviews, filed_card(space, new, "year", start, end)]
-	panels.append(goals_panel(space, getdate(today()), new))
+	panels.append(goals_panel(space, getdate(today()), new, _("Year goals by area")))
 	all_cycles = frappe.get_list("Life Cycle", filters={"space": space, "start_date": ("<=", end), "end_date": (">=", start)}, fields=["name", "title", "status", "final_score", "start_date", "end_date"], order_by="start_date asc", limit=12)
 	rows = []
 	for c in all_cycles:
@@ -560,6 +536,26 @@ def _year(space, on, new, simple):
 		rows.append(row(c.title, f"{round(score)}%" if score is not None else None, f"list:cycle:{c.name}", percent=score, accent=c.status == "Active"))
 	panels.append(panel("cycles", _("Cycles"), rows, kind="cycles", empty=_line(new, _("Each 12 Week Year and its score show here."), _("Set a goal"), "/goals?new=goal")))
 	return cards, panels, None
+
+
+MODES = ("overview", "calendar")
+MODE_KEY = "lifeos_today_mode"
+
+
+def remembered_mode() -> str:
+	"""The mode Today last opened in for this person (a user default; Calendar until one is chosen)."""
+	mode = frappe.defaults.get_user_default(MODE_KEY)
+	return mode if mode in MODES else "calendar"
+
+
+@frappe.whitelist(methods=["POST"])
+def set_mode(mode: str):
+	"""Remember Overview or Calendar for this person, so Today opens in the last one used."""
+	permissions.require_login()
+	if mode not in MODES:
+		frappe.throw(_("Mode must be overview or calendar."), title=_("Not a mode"))
+	frappe.defaults.set_user_default(MODE_KEY, mode)
+	return {"mode": mode}
 
 
 @frappe.whitelist(methods=["GET"])
@@ -670,11 +666,6 @@ def _l_score(space, start, view):
 	return {"title": _("Week {0} score").format(wk), "rows": rows}
 
 
-def _l_coming(space, now):
-	rows, _m = coming_up(space, now, limit=200)
-	return {"title": _("Coming up"), "rows": rows}
-
-
 def _l_habits(space, on):
 	return {"title": _("Habits"), "habits": habits_today(space, on), "date": str(on), "rows": []}
 
@@ -716,5 +707,5 @@ def _l_plate(space, on):
 
 
 def _l_top(space, on):
-	rows = frappe.get_list("Life Task", filters={"space": space, "is_top_three": 1, "top_three_week": bounds("week", on)[0], "is_archived": 0}, fields=["name", "title", "status"], order_by="creation asc", limit=3)
+	rows = frappe.get_list("Life Task", filters={"space": space, "is_top_three": 1, "is_archived": 0}, fields=["name", "title", "status"], order_by="creation asc", limit=3)
 	return {"title": _("Top three"), "rows": _task_rows(rows)}

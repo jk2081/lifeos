@@ -5,14 +5,15 @@
     <Button icon="lucide-chevron-right" label="Next month" tooltip="Next month" data-cal-next @click="step(1)" />
   </PageHead>
   <div class="page-body" data-month-view :data-month="month">
-    <Dashboard view="month" />
-    <ViewLinks :links="LINKS" />
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
+    <Dashboard v-if="mode === 'overview'" view="month" />
+    <ViewLinks v-if="mode === 'overview'" :links="LINKS" />
+    <div v-if="mode === 'calendar'" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>other events, counted</span>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-blue-3"></i>goal work and key dates</span>
       <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-red-3"></i>due dates</span>
     </div>
-    <div class="overflow-hidden rounded-5 border border-outline-gray-2" data-month-grid><div class="grid grid-cols-7">
+    <Ruler v-if="mode === 'calendar'" />
+    <div v-if="mode === 'calendar'" class="overflow-hidden rounded-5 border border-outline-gray-2" data-month-grid><div class="grid grid-cols-7">
       <div v-for="w in HEADS" :key="w" class="border-b border-outline-gray-1 bg-surface-gray-1 p-2 text-xs font-semibold text-ink-gray-7 max-md:px-1 max-md:py-1.5">{{ w }}</div>
       <div v-for="c in cells" :key="c.date" class="relative flex min-h-[104px] min-w-0 flex-col gap-[3px] border-b border-r border-outline-gray-1 p-1.5 text-left hover:bg-surface-gray-2 max-md:min-h-14 max-md:items-center max-md:p-1 [&:nth-child(7n)]:border-r-0"
         :class="[c.date === store.today && 'bg-surface-gray-1', c.date === picked && phone && '!bg-surface-gray-3']" :data-day="c.date" :data-today="c.date === store.today || undefined">
@@ -32,7 +33,7 @@
       </div>
     </div></div>
     <!-- a phone: the grid is compact, the chosen day's items are listed below it -->
-    <section v-if="phone" data-month-list>
+    <section v-if="phone && mode === 'calendar'" data-month-list>
       <SectionHead>{{ weekday(picked) }}, {{ long(picked) }}</SectionHead>
       <Card flush>
         <Row v-for="(it, i) in shownOn(picked)" :key="i" :pane="itemRef(it)" :label="itemLabel(it)" class="!items-center">
@@ -61,10 +62,12 @@ import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import Dashboard from './Dashboard.vue'
+import Ruler from './Ruler.vue'
 import ViewLinks from './ViewLinks.vue'
 import { store } from '@/lib/store'
 import { chipClass, dotClass, itemLabel, itemRef, openDay, useCalendarRange } from '@/lib/calRange'
 import { openRef } from '@/lib/pane'
+import { todayMode as mode } from '@/lib/todayMode'
 import { MONTHS, addDays, iso, long, parse, startOfWeek, time, weekday } from '@/lib/dates'
 
 const MAX = 3

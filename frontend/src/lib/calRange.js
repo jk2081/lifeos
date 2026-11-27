@@ -1,7 +1,6 @@
 // Week and Month of Today (issue 16) read the same calendar: events, tasks planned at a time, tasks due, important dates and
 // documents expiring, merged by the server (calendar.get). This holds the loading, the grouping by day and the colours.
 import { computed, ref, watch } from 'vue'
-import { current } from '@/lib/pane'
 import router from '@/router'
 import { api, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
@@ -45,8 +44,6 @@ export function weekBars(days, items) {
 }
 /** Events hidden in Life OS: Show hidden events in the week menu brings them back. */
 export const showHidden = ref(false)
-/** True while the Drawer is open: the week keeps to one column (the Drawer itself makes room for the page, from 1440 px). */
-export const paneOpen = computed(() => !!current.value)
 export const itemLabel = (it) => it.label || it.title
 /** Day opens for a date: Today's own screen, held to that day. */
 export const openDay = (date) => router.push({ path: '/today', query: { ...router.currentRoute.value.query, open: undefined, date: date === store.today ? undefined : date } })
