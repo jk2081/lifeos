@@ -23,7 +23,7 @@
         <template v-if="!list.view.quickFilter.customizing.value">
           <Checkbox v-for="f in shownFlags" :key="f.key" :label="f.label" :model-value="!!flagValues[f.key]" :data-flag="f.key" @update:model-value="(v) => setFlag(f.key, v)" />
           <LifeFilter :list="list" align="end" />
-          <LifeSortBy :list="list" />
+          <LifeSortBy v-if="sortable" :list="list" />
           <LifeGroupBy v-if="groupable" :list="list" />
           <LifeColumnSettings v-if="mode === 'table'" :list="list" />
           <Button v-if="list.view.quickFilter.canCustomize.value" icon="lucide-sliders-horizontal" label="Choose the quick filters" tooltip="Choose the quick filters"
@@ -42,7 +42,7 @@
         <Checkbox v-for="f in shownFlags" :key="f.key" :label="f.label" :model-value="!!flagValues[f.key]" :data-flag="f.key" @update:model-value="(v) => setFlag(f.key, v)" />
         <div class="flex flex-wrap gap-2">
           <LifeFilter :list="list" align="start" />
-          <LifeSortBy :list="list" />
+          <LifeSortBy v-if="sortable" :list="list" />
           <LifeGroupBy v-if="groupable" :list="list" />
         </div>
         <div class="flex gap-2">
@@ -93,7 +93,7 @@
     </Card>
     <Card v-if="!grouped && loaded && !rows.length && !(mode === 'custom' && !activeN)" data-lv-empty>
       <EmptyState v-if="activeN" :line="`No ${noun} match these filters. ${activeText}.`" :action="{ label: 'Clear filters', click: clearFilters }" />
-      <EmptyState v-else :line="`${emptyTitle || `No ${noun} yet.`}${emptyHint ? ' ' + emptyHint : ''}`" />
+      <EmptyState v-else :line="`${emptyTitle || `No ${noun} yet.`}${emptyHint ? ' ' + emptyHint : ''}`" :action="emptyAction" />
     </Card>
     <div v-if="!loaded" class="flex flex-col gap-3 py-2" aria-busy="true"><Skeleton v-for="i in 5" :key="i" class="h-9 w-full rounded-4" /></div>
     <div v-if="!grouped && rows.length < total"><Button :loading="loading" :label="`Show more (${total - rows.length} left)`" data-more @click="load(true)" /></div>
@@ -144,6 +144,8 @@ const props = defineProps({
   virtual: { type: Array, default: () => [] }, // filter fields with no column behind them, resolved by the server from a short parameter
   synthetic: { type: Array, default: () => [] }, // table columns the screen draws itself: { key: '_badge', label, width, align, place }
   hidden: { type: Array, default: () => [] }, // fields not offered in the filter
+  only: { type: Array, default: null }, // the real fields the filter offers, when the list method filters on a few of them only
+  sortable: { type: Boolean, default: true }, // false for a list whose method has one fixed order: no Sort control
   // state tabs: { key: 'status', field: 'status', label, items: [{ value, label }] }. The first item is the default and is not
   // written to the URL; one item has the value 'all'. `key` is the short URL parameter, `field` the field it is a preset on.
   tabs: { type: Object, default: null },
@@ -157,6 +159,7 @@ const props = defineProps({
   groupBy: { type: Function, default: null }, // (row) => the heading its rows are listed under
   watchKeys: { type: Array, default: () => [] }, // other query keys that change what is listed
   emptyTitle: String, emptyHint: String,
+  emptyAction: { type: Object, default: null }, // the one action of the empty state: { label, icon, click }
   pageSize: { type: Number, default: 50 },
   // A list inside a record page's tab (the area page): `fixed` are short parameters the page sets and the person cannot
   // change ({ area }), left out of the URL and the controls. `active` is false while another tab is open: the list then
@@ -176,7 +179,7 @@ const hasArea = props.spec.some((e) => e.key === 'area')
 const lensKey = hasArea && !props.fixed ? 'area' : null
 const fixedKeys = [...new Set([...(props.fixed ? Object.keys(props.fixed) : []), ...(hasArea ? ['area'] : [])])]
 const fixedFields = props.spec.filter((e) => fixedKeys.includes(e.key)).map((e) => e.field)
-const list = useLifeListView(props.doctype, { virtual: props.virtual.filter((v) => !fixedFields.includes(v.fieldname)), synthetic: props.synthetic, hidden: [...props.hidden, ...fixedFields] })
+const list = useLifeListView(props.doctype, { virtual: props.virtual.filter((v) => !fixedFields.includes(v.fieldname)), synthetic: props.synthetic, hidden: [...props.hidden, ...fixedFields], only: props.only })
 // the query this list reads: the URL while it is the open tab, what it last saw while another tab is open
 const isActive = computed(() => (typeof props.active === 'function' ? !!props.active(route) : props.active))
 let last = {}

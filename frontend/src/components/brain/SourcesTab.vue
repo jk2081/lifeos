@@ -80,9 +80,9 @@
         <Switch v-model="draft.active" :disabled="!writable" :label="draft.active ? 'On: Life OS accepts captures from it' : 'Off: Life OS refuses captures from it'" data-settings-active />
         <div data-settings-intent><FormControl v-model="draft.default_intent" type="select" label="Default intent" :options="INTENTS" :disabled="!writable" /></div>
         <div class="flex flex-wrap items-center gap-2"><span class="w-24 text-sm text-ink-gray-6">Default area</span>
-          <span data-settings-area><Pick v-model="draft.default_area" :options="areaOptions()" placeholder="No default area" :disabled="!writable" @update:model-value="draft.default_goal = null" /></span></div>
+          <span data-settings-area><AreaPicker v-model="draft.default_area" placeholder="No default area" :disabled="!writable" @update:model-value="draft.default_goal = null" /></span></div>
         <div class="flex flex-wrap items-center gap-2"><span class="w-24 text-sm text-ink-gray-6">Default goal</span>
-          <span data-settings-goal><Pick v-model="draft.default_goal" :options="goalOptions" placeholder="No default goal" :disabled="!writable" /></span></div>
+          <span data-settings-goal><GoalPicker v-model="draft.default_goal" :options="goalOptions" placeholder="No default goal" :disabled="!writable" /></span></div>
         <p class="text-sm text-ink-gray-6" data-settings-processed>{{ current.processed_by }}. {{ current.lands }}</p>
         <template v-if="MAIL.includes(current.system) && current.mailbox">
           <div data-gmail-label><FormControl v-model="draft.label_name" label="The daily digest reads only mail with this label" placeholder="Empty reads the Inbox, for example Life OS" :disabled="!writable" /></div>
@@ -132,11 +132,12 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dialog, FormControl, Switch, TextInput, Textarea, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Pick from '@/components/Pick.vue'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import GoalPicker from '@/components/ui/GoalPicker.vue'
 import PageHead from '@/components/PageHead.vue'
 import { tryCall } from '@/lib/api'
 import { brainData } from '@/data/brain'
-import { areaOptions, loadLookups, lookups } from '@/lib/lookups'
+import { loadLookups, lookups } from '@/lib/lookups'
 import { dateTime } from '@/lib/dates'
 import { canWrite, store } from '@/lib/store'
 

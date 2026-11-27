@@ -8,13 +8,13 @@
         <FormControl v-model="v.horizon" type="select" label="Horizon" :options="HORIZONS" data-goal-horizon @update:model-value="horizonChosen" />
       </div>
       <div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
-        <FormControl v-model="v.area" type="select" label="Area" :required="areaRequired" placeholder="Choose" :options="areaOptions()" @update:model-value="suggestServes" />
+        <AreaPicker v-model="v.area" :label="areaRequired ? 'Area *' : 'Area'" placeholder="Choose" data-goal-area @update:model-value="suggestServes" />
         <FormControl v-if="v.horizon === '12 weeks' && !quarters" v-model="v.cycle" type="select" label="12 Week Year" placeholder="Choose"
           :options="cycles.map((c) => ({ label: `${c.title} (${c.status.toLowerCase()})`, value: c.name }))" />
       </div>
       <DoneWhen :model-value="m" :title="v.title" :space="store.space" @habit="toHabit" />
-      <FormControl v-model="v.serves" type="select" label="Serves (optional)" placeholder="None" data-goal-serves
-        :description="parentHorizon ? `A ${parentHorizon.toLowerCase()} goal is suggested first.` : 'The longer goal this goal serves.'" :options="parentOptions" />
+      <GoalPicker v-model="v.serves" label="Serves (optional)" placeholder="None" data-goal-serves :options="parentOptions" />
+      <p class="-mt-2 text-sm text-ink-gray-6">{{ parentHorizon ? `A ${parentHorizon.toLowerCase()} goal is suggested first.` : 'The longer goal this goal serves.' }}</p>
     </div>
   </Dialog>
 </template>
@@ -23,6 +23,8 @@
 // (a finish line or a number, with Suggest and the habit check), and the goal it serves, one horizon up. Used by Plan > Goals and the New menu.
 import { computed, reactive, ref, watch } from 'vue'
 import { DatePicker, Dialog, FormControl, toast } from 'frappe-ui'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import GoalPicker from '@/components/ui/GoalPicker.vue'
 import DoneWhen from './DoneWhen.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { goalsData } from '@/data/goals'

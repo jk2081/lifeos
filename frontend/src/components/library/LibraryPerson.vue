@@ -13,12 +13,12 @@
         <Card class="!p-0" data-person-mentions>
           <SectionHead class="px-4 pt-3">Mentioned in <span class="text-sm text-ink-gray-6" data-mention-count>{{ person.mentioned_total }}</span></SectionHead>
           <ul v-if="person.mentioned.length" class="mt-2 flex flex-col">
-            <Row as="li" bare v-for="m in person.mentioned" :key="m.ref" class="hover:bg-surface-gray-1" data-mention :data-ref="m.ref" :data-kind="m.kind">
-              <button type="button" class="flex w-full min-w-0 items-baseline gap-3 px-4 py-2.5 text-left focus-visible:focus-ring" @click="openRef(m.ref)">
+            <Row as="li" bare v-for="m in person.mentioned" :key="m.ref" :pane="m.ref" :label="m.title" class="!mx-0 !px-0" data-mention :data-ref="m.ref" :data-kind="m.kind">
+              <div class="flex w-full min-w-0 items-baseline gap-3 px-4 py-2.5">
                 <Badge class="flex-none" size="sm" :label="m.kind" />
                 <span class="min-w-0 flex-1 break-words text-base text-ink-gray-9" data-mention-title>{{ m.title }}<span v-if="m.how" class="text-sm text-ink-gray-6"> · {{ m.how }}</span></span>
                 <span class="flex-none whitespace-nowrap text-sm text-ink-gray-6" data-mention-date>{{ short(m.date) }}</span>
-              </button>
+              </div>
             </Row>
           </ul>
           <EmptyState v-else data-mention-empty>Nothing mentions {{ person.title }} yet. Captures, notes, tasks, meetings and chats that name them will show up here.</EmptyState>

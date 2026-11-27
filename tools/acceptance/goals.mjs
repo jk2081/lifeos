@@ -2031,6 +2031,27 @@ print(f.name)`).split('\n').pop()
         must(new URL(pg.url()).pathname === '/life/goals/cycles', 'a cycle goal left the screen: ' + pg.url())
         must(!errors.length, 'script errors: ' + errors.join(' | '))
       })
+      await check('GOALS.79', `${width} px: in New goal, typing part of an area's name filters the area picker to it`, async () => {
+        const phone = width < 800
+        const areas = (await u.api('meta.space_context', { space: SPACE })).areas
+        must(areas.length > 1, 'the space has fewer than two areas')
+        const word = areas[0].area_name.slice(1, 5).toLowerCase() // part of a name, not its start
+        await u.open('/life/goals')
+        await pg.locator('[data-new-goal]').first().click()
+        const dlg = pg.locator('[role="dialog"]').last()
+        await dlg.waitFor({ timeout: 8000 })
+        await dlg.locator(phone ? '[data-area-open]' : '[data-goal-area] button').first().click()
+        const search = phone ? pg.locator('[data-area-search] input, input[data-area-search]').first() : pg.locator('[data-slot="content"] input[data-slot="input"]').last()
+        await search.waitFor({ timeout: 8000 })
+        const names = async () => (await (phone ? pg.locator('[data-area-option]') : pg.locator('[data-slot="item"]')).allInnerTexts()).map((t) => t.toLowerCase())
+        const before = (await names()).length
+        await search.fill(word)
+        await pg.waitForTimeout(500)
+        const after = await names()
+        must(after.length > 0 && after.length < before && after.every((t) => t.includes(word)), `typing "${word}" leaves ${after.length} of ${before} areas: ${after.join(' | ')}`)
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+        must(!errors.length, 'script errors: ' + errors.join(' | '))
+      })
     } finally {
       await u.ctx.close()
     }

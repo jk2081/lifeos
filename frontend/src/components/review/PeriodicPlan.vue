@@ -25,8 +25,8 @@
                 </template>
               </div>
               <div v-if="!g.carried_from" class="grid gap-2 md:grid-cols-2">
-                <FormControl type="select" label="Area" :model-value="g.area || ''" placeholder="Choose" :options="areaOptions()" data-plan-area @update:model-value="(v) => edit(g, { area: v })" />
-                <FormControl type="select" :label="monthly ? 'Serves (optional)' : 'Serves (optional)'" :model-value="g.serves || ''" :options="[{ label: '—', value: '' }, ...(d.serves_options || goalChoices)]"
+                <AreaPicker label="Area" :model-value="g.area || ''" placeholder="Choose" data-plan-area @update:model-value="(v) => edit(g, { area: v })" />
+                <GoalPicker label="Serves (optional)" :model-value="g.serves || ''" :options="d.serves_options || goalChoices" placeholder="None" data-plan-serves
                   @update:model-value="(v) => edit(g, { serves: v })" />
               </div>
               <FormControl v-if="monthly && !g.carried_from && store.settings.require_done_when" type="text" label="Done when" :model-value="g.done_when" placeholder="What is true when it is done"
@@ -83,10 +83,12 @@ import SectionHead from '@/components/ui/SectionHead.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge, Button, FormControl, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import GoalPicker from '@/components/ui/GoalPicker.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import ReviewFooter from '@/components/review/ReviewFooter.vue'
 import { useReview } from '@/lib/review'
-import { areaOptions, goalOptions, loadLookups } from '@/lib/lookups'
+import { goalOptions, loadLookups } from '@/lib/lookups'
 import { long, short } from '@/lib/dates'
 import { store } from '@/lib/store'
 

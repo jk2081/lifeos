@@ -41,8 +41,8 @@
           <SectionHead><span class="lucide-sparkles size-4 text-ink-gray-6" aria-hidden="true" />Brief</SectionHead>
           <template v-if="page.brief">
             <p class="text-base leading-6 text-ink-gray-9" data-brief-text>
-              <template v-for="(part, i) in briefParts" :key="i"><template v-if="part.n"><button type="button" class="mx-0.5 rounded px-1 text-sm font-medium text-ink-blue-8 hover:bg-surface-gray-2 focus-visible:focus-ring"
-                :aria-label="`Source ${part.n}`" data-brief-source :data-n="part.n" @click="openSource(part.n)">{{ part.n }}</button></template><template v-else>{{ part.text }}</template></template>
+              <template v-for="(part, i) in briefParts" :key="i"><template v-if="part.n"><Button class="mx-0.5 !h-auto !px-1 !py-0 text-sm font-medium !text-ink-blue-8" variant="ghost"
+                :aria-label="`Source ${part.n}`" data-brief-source :data-n="part.n" @click="openSource(part.n)">{{ part.n }}</Button></template><template v-else>{{ part.text }}</template></template>
             </p>
             <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-gray-6" data-brief-by>
               <span>by the Brain · as of {{ short(page.brief.on) }} · {{ page.brief.n_sources }} {{ page.brief.n_sources === 1 ? 'source' : 'sources' }}</span>
@@ -62,8 +62,8 @@
             <SectionHead>Open</SectionHead>
             <ul v-if="openCount" class="flex flex-col gap-1">
               <li v-for="n in page.open.needs_you" :key="n.name" class="text-base" data-open-needs><RefLink class="text-ink-blue-8 hover:underline" :to="`inbox:${n.item}`">{{ n.title }}</RefLink><span class="text-sm text-ink-gray-6"> · needs you</span></li>
-              <li v-for="t in page.open.tasks" :key="t.name" class="text-base" data-open-task><button type="button" class="text-left text-ink-gray-9 hover:underline" @click="openRef(t.ref)">{{ t.title }}</button><span v-if="t.due_date" class="text-sm text-ink-gray-6"> · due {{ short(t.due_date) }}</span></li>
-              <li v-for="e in page.open.events" :key="e.name" class="text-base" data-open-event><button type="button" class="text-left text-ink-gray-9 hover:underline" @click="openRef(e.ref)">{{ e.title }}</button><span class="text-sm text-ink-gray-6"> · {{ short(e.starts_on) }}</span></li>
+              <li v-for="t in page.open.tasks" :key="t.name" class="text-base" data-open-task><LinkButton class="!inline-flex !text-ink-gray-9" @click="openRef(t.ref)">{{ t.title }}</LinkButton><span v-if="t.due_date" class="text-sm text-ink-gray-6"> · due {{ short(t.due_date) }}</span></li>
+              <li v-for="e in page.open.events" :key="e.name" class="text-base" data-open-event><LinkButton class="!inline-flex !text-ink-gray-9" @click="openRef(e.ref)">{{ e.title }}</LinkButton><span class="text-sm text-ink-gray-6"> · {{ short(e.starts_on) }}</span></li>
             </ul>
             <EmptyState v-else data-open-empty>Nothing is open about this.</EmptyState>
           </Card>
@@ -99,7 +99,7 @@
             <Row as="li" bare v-for="e in page.timeline" :key="e.link" class="flex items-start gap-3 px-4 py-2.5" data-timeline-row :data-kind="e.kind" :data-ref="e.ref || ''">
               <span :class="ITEM_ICON[e.kind] || 'lucide-circle'" class="mt-0.5 size-4 flex-none text-ink-gray-6" :title="e.kind" aria-hidden="true" />
               <div class="min-w-0 flex-1">
-                <button v-if="e.ref" type="button" class="break-words text-left text-base text-ink-gray-9 hover:underline focus-visible:focus-ring" data-timeline-title @click="openRef(e.ref)">{{ e.title }}</button>
+                <LinkButton v-if="e.ref" class="text-base !font-normal !text-ink-gray-9" data-timeline-title @click="openRef(e.ref)">{{ e.title }}</LinkButton>
                 <a v-else-if="e.url" class="break-words text-base text-ink-blue-8 hover:underline" :href="e.url" target="_blank" rel="noopener" data-timeline-title>{{ e.title }}</a>
                 <span v-else class="break-words text-base text-ink-gray-9" data-timeline-title>{{ e.title }}</span>
               </div>
@@ -140,6 +140,7 @@
   <NewRecord v-if="merging" :model-value="true" title="Merge with another" action="Merge" :fields="mergeFields" :save="doMerge" @update:model-value="(v) => !v && (merging = false)" />
 </template>
 <script setup>
+import LinkButton from '@/components/ui/LinkButton.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 import RefLink from '@/components/ui/RefLink.vue'

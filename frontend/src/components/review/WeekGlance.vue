@@ -8,8 +8,8 @@
         <template v-for="b in d.blocks" :key="b.start + b.title">
           <Button v-if="b.kind === 'goal' && b.goal" variant="subtle" size="sm" class="!absolute inset-x-1 !h-auto !min-h-0 !items-start !justify-start overflow-hidden !rounded-1 border border-outline-blue-6 !bg-surface-blue-2 !px-1 !py-0.5 !text-xs !text-ink-blue-8"
             :style="place(b)" :label="b.title" :data-glance-goal="b.goal" @click="emit('open', b.goal)"><span class="truncate">{{ b.title }}</span></Button>
-          <button v-else-if="b.ref" type="button" class="absolute inset-x-1 cursor-pointer overflow-hidden rounded-1 bg-surface-gray-2 px-1 py-0.5 text-left text-xs text-ink-gray-7 hover:bg-surface-gray-3 focus-visible:focus-ring"
-            :style="place(b)" :title="b.title" :data-ref="b.ref" data-glance-event @click="emit('ref', b.ref)"><span class="block truncate">{{ b.title }}</span></button>
+          <Button v-else-if="b.ref" variant="subtle" size="sm" class="!absolute inset-x-1 !h-auto !min-h-0 !items-start !justify-start overflow-hidden !rounded-1 !px-1 !py-0.5 !text-xs !text-ink-gray-7"
+            :style="place(b)" :title="b.title" :data-ref="b.ref" data-glance-event @click="emit('ref', b.ref)"><span class="block truncate">{{ b.title }}</span></Button>
           <div v-else class="absolute inset-x-1 overflow-hidden rounded-1 bg-surface-gray-2 px-1 py-0.5 text-xs text-ink-gray-7" :style="place(b)" :title="b.title" data-glance-event>
             <span class="block truncate">{{ b.title }}</span></div>
         </template>

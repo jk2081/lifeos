@@ -99,7 +99,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { dateTime, long, short } from '@/lib/dates'
-import { areaOptions, loadLookups } from '@/lib/lookups'
+import { loadLookups } from '@/lib/lookups'
 import { useUrlTab } from '@/lib/tabs'
 import { NOTES_VIEWS } from '@/lib/nav'
 import { onRecordChanged, openRef } from '@/lib/pane'
@@ -155,7 +155,7 @@ async function loadOverview() {
 
 const newOpen = ref(false)
 const NEW_FIELDS = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'summary', label: 'Summary, one line', required: true },
-  { name: 'area', label: 'Area', options: areaOptions() }])
+  { name: 'area', label: 'Area', pick: 'area' }])
 async function create(v) {
   const res = await libraryData.wiki.create_page({ space: store.space, title: v.title, summary: v.summary, area: v.area || undefined, content_md: '' })
   openRef(`note:${res.name}`)

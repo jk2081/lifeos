@@ -19,10 +19,9 @@
           <div class="text-xs text-ink-gray-6" data-action-line>{{ a.per_week }} a week · {{ plural(total(a), 'tick') }} so far<template v-if="a.status !== 'Open'"> · {{ a.status }}</template></div>
         </div>
         <template v-for="w in shown" :key="w">
-          <button v-if="w === cur && a.status === 'Open' && canTick" type="button" role="cell"
-            class="mx-auto flex h-8 w-full max-w-10 items-center justify-center rounded-4 border text-xs tabular-nums focus-visible:focus-ring"
-            :class="n(a, w) ? 'border-outline-gray-9 bg-surface-gray-9 text-surface-base' : 'border-outline-gray-3 bg-surface-base text-ink-gray-6'"
-            :aria-label="`${a.title}, week ${w}: ${n(a, w)} of ${a.per_week}. Tap to tick`" data-grid-cell data-tickable :data-week="w" :data-count="n(a, w)" @click="tap(a, w)">{{ a.per_week > 1 ? `${n(a, w)}/${a.per_week}` : n(a, w) ? '✓' : '' }}</button>
+          <Button v-if="w === cur && a.status === 'Open' && canTick" role="cell" :variant="n(a, w) ? 'solid' : 'outline'"
+            class="mx-auto !h-8 !w-full !max-w-10 !px-0 text-xs tabular-nums"
+            :aria-label="`${a.title}, week ${w}: ${n(a, w)} of ${a.per_week}. Tap to tick`" data-grid-cell data-tickable :data-week="w" :data-count="n(a, w)" @click="tap(a, w)">{{ a.per_week > 1 ? `${n(a, w)}/${a.per_week}` : n(a, w) ? '✓' : '' }}</Button>
           <span v-else role="cell" class="mx-auto flex h-8 w-full max-w-10 items-center justify-center rounded-4 text-xs tabular-nums"
             :class="[n(a, w) >= a.per_week ? 'bg-surface-gray-9 text-surface-base' : n(a, w) ? 'bg-surface-gray-4 text-ink-gray-9' : w > (cur || 12) || !cur ? 'bg-surface-gray-1' : 'bg-surface-gray-2', w === cur ? 'ring-1 ring-outline-gray-4' : '']"
             data-grid-cell :data-week="w" :data-count="n(a, w)">{{ n(a, w) ? (a.per_week > 1 ? `${n(a, w)}/${a.per_week}` : '✓') : '' }}</span>

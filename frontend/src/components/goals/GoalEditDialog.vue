@@ -4,7 +4,7 @@
     <div class="flex flex-col gap-3">
       <FormControl v-model="v.title" label="Goal" required data-edit-title />
       <div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
-        <FormControl v-model="v.area" type="select" label="Area and part" placeholder="Choose" :options="areas" data-edit-area />
+        <AreaPicker v-model="v.area" label="Area and part" placeholder="Choose" :options="areas" data-edit-area />
         <FormControl v-model="v.horizon" type="select" label="Type" :options="TYPES" data-edit-type @update:model-value="typeChosen" />
       </div>
       <div class="grid grid-cols-2 gap-2 max-sm:grid-cols-1">
@@ -12,7 +12,7 @@
         <DatePicker v-model="v.target_date" format="D MMM YYYY" clearable label="Target date" :description="v.horizon === 'Year' || v.horizon === 'Month' ? 'Needed for this type.' : 'Optional.'" />
       </div>
       <DoneWhen :model-value="m" :title="v.title" :goal="goal.name" :horizon="v.horizon" :space="space" no-habit />
-      <FormControl v-model="v.serves" type="select" label="Serves (optional)" placeholder="None" :options="[{ label: 'None', value: '' }, ...parentOptions(goal)]" data-edit-serves />
+      <GoalPicker v-model="v.serves" label="Serves (optional)" placeholder="None" :options="parentOptions(goal)" data-edit-serves />
       <div v-if="v.horizon === '12 weeks'" data-edit-actions>
         <div class="mb-1.5 text-sm text-ink-gray-6">Weekly actions, and how many times a week</div>
         <div v-for="(a, i) in actions" :key="a.key" class="mb-2 flex flex-wrap items-center gap-2" data-edit-action :data-retired="a.retired ? 1 : 0">
@@ -35,6 +35,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { DatePicker, Dialog, FormControl, TextInput, Button, toast } from 'frappe-ui'
 import DoneWhen from './DoneWhen.vue'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import GoalPicker from '@/components/ui/GoalPicker.vue'
 import { errorText } from '@/lib/api'
 import { goalsData } from '@/data/goals'
 import { store } from '@/lib/store'

@@ -69,7 +69,7 @@
     :actions="[{ label: 'Set area', variant: 'solid', onClick: refile }]">
     <template #default>
       <div class="flex flex-col gap-3" data-refile-dialog>
-        <FormControl v-model="refileArea" type="select" label="Area" :options="[{ label: 'Unfiled', value: '' }, ...areaOptions()]" />
+        <AreaPicker v-model="refileArea" label="Area" placeholder="Unfiled" />
         <p class="text-sm text-ink-gray-6">A goal that does not belong to the new area is taken off.</p>
       </div>
     </template>
@@ -91,7 +91,8 @@ import CountLink from '@/components/ui/CountLink.vue'
 import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { long, short, weekday } from '@/lib/dates'
-import { areaOptions, loadLookups } from '@/lib/lookups'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import { loadLookups } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 
 const KINDS = [{ value: 'all', label: 'All' }, { value: 'chats', label: 'Chats' },

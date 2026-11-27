@@ -3,6 +3,8 @@
     <div class="flex flex-col gap-3">
       <template v-for="fld in fields" :key="fld.name">
         <LifeLink v-if="fld.link" v-model="values[fld.name]" :doctype="fld.link" :filters="fld.filters" :label="fld.label" :required="fld.required" :placeholder="fld.placeholder" />
+        <AreaPicker v-else-if="fld.pick === 'area'" v-model="values[fld.name]" :label="fld.label" />
+        <GoalPicker v-else-if="fld.pick === 'goal'" v-model="values[fld.name]" :label="fld.label" />
         <FormControl v-else-if="fld.options" v-model="values[fld.name]" type="select" :label="fld.label" :required="fld.required" :description="fld.help"
           :placeholder="fld.placeholder || 'Choose'" :options="options(fld)" />
         <FormControl v-else-if="fld.type === 'textarea'" v-model="values[fld.name]" type="textarea" :label="fld.label" :required="fld.required" :description="fld.help" :rows="3" />
@@ -16,10 +18,12 @@
 <script setup>
 // A small form dialog used for "New goal", "New note", "Add event" and the like. Every control is a library control:
 // frappe-ui FormControl and DatePicker, and @framework/ui's Link (through LifeLink) for a field that points to a record.
-// A field is { name, label, required, help, placeholder } plus one of: options (a select), type ('textarea', 'date', 'number'), link (a DocType).
+// A field is { name, label, required, help, placeholder } plus one of: options (a select), pick ('area' or 'goal': the searchable picker), type ('textarea', 'date', 'number'), link (a DocType).
 import { reactive, ref, watch } from 'vue'
 import { DatePicker, Dialog, FormControl, toast } from 'frappe-ui'
 import LifeLink from '@/framework/LifeLink.vue'
+import AreaPicker from '@/components/ui/AreaPicker.vue'
+import GoalPicker from '@/components/ui/GoalPicker.vue'
 import { errorText } from '@/lib/api'
 
 const props = defineProps({ modelValue: Boolean, title: String, action: { type: String, default: 'Save' }, fields: Array, initial: { type: Object, default: () => ({}) }, save: Function })

@@ -27,11 +27,8 @@
         </SettingRow>
         <SettingRow v-if="s.connected && cals.length" label="Write to Google Calendar"
           help="Off by default. Events you accept and goal blocks from the weekly review are added to this calendar, private, with a link back here. Writing needs the Calendar scope on the Google client.">
-          <select v-model="write" class="h-7 rounded border border-outline-gray-2 bg-surface-white px-2 text-base text-ink-gray-8" aria-label="Write to Google Calendar"
-            data-calendar-write @change="saveWrite">
-            <option value="">Off: nothing is written</option>
-            <option v-for="c in cals" :key="c.id" :value="c.id">{{ c.summary || c.id }}</option>
-          </select>
+          <Select :model-value="write" class="min-w-48" :options="[{ label: 'Off: nothing is written', value: '' }, ...cals.map((c) => ({ label: c.summary || c.id, value: c.id }))]" aria-label="Write to Google Calendar"
+            data-calendar-write @update:model-value="(v) => { write = v; saveWrite() }" />
         </SettingRow>
       </Card>
       <Card flush>
@@ -49,7 +46,7 @@
 // Settings > Me > Calendar (set 8, issue 31): Google Calendar through Frappe's own OAuth flow; read, and written to only when a calendar is chosen.
 import { settingsData } from '@/data/settings'
 import { onMounted, ref } from 'vue'
-import { Alert, Badge, Button, Checkbox, Skeleton, Textarea, toast } from 'frappe-ui'
+import { Alert, Badge, Button, Checkbox, Select, Skeleton, Textarea, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import SettingRow from './SettingRow.vue'
 import { tryCall } from '@/lib/api'

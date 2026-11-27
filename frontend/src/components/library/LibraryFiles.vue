@@ -33,7 +33,7 @@
           <div class="min-w-0 pl-11 text-sm md:pl-0" data-file-used>
             <span class="text-ink-gray-6">Used in</span>
             <ul class="mt-0.5 flex flex-col gap-0.5">
-              <li v-for="u in r.used_in" :key="u.ref" class="min-w-0"><button type="button" class="max-w-full truncate text-left text-ink-blue-8 hover:underline focus-visible:focus-ring" data-file-used-in :data-ref="u.ref" @click="openRef(u.ref)">{{ u.title }}</button></li>
+              <li v-for="u in r.used_in" :key="u.ref" class="min-w-0"><LinkButton class="max-w-full !text-ink-blue-8" data-file-used-in :data-ref="u.ref" @click="openRef(u.ref)">{{ u.title }}</LinkButton></li>
             </ul>
           </div>
           <div class="flex flex-wrap items-center gap-2 pl-11 md:pl-0">
@@ -56,6 +56,7 @@
   </div>
 </template>
 <script setup>
+import LinkButton from '@/components/ui/LinkButton.vue'
 import Row from '@/components/ui/Row.vue'
 import { openChat } from '@/lib/ask'
 // Library > Files (issue 24): every stored file once (issue 7 keeps one copy per space), with its type, size, date, earlier

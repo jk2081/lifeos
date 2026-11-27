@@ -50,8 +50,8 @@
               <Checkbox class="relative mt-0.5" :model-value="t.status === 'Done'" :disabled="!writable" :aria-label="`Done: ${t.title}`" @update:model-value="toggle(t)" />
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <button type="button" class="break-words text-left text-base-medium hover:underline focus-visible:focus-ring" :class="t.status === 'Done' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'"
-                    data-task-title @click="openRef('task:' + t.name)">{{ t.title }}</button>
+                  <LinkButton class="text-base-medium" :class="t.status === 'Done' ? '!text-ink-gray-6 line-through' : '!text-ink-gray-9'"
+                    data-task-title @click="openRef('task:' + t.name)">{{ t.title }}</LinkButton>
                   <span v-if="t.is_top_three" class="text-ink-amber-3" title="One of your top three" aria-label="Top three" data-top-three>★</span>
                   <AreaGuess :task="t" :readonly="!writable" />
                 </div>
@@ -74,6 +74,7 @@
   </div>
 </template>
 <script setup>
+import LinkButton from '@/components/ui/LinkButton.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
 // Goals > All tasks (issue 21): every open task once, grouped by area (then part), goal or due date, each with its goal or

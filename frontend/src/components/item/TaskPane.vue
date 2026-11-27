@@ -26,7 +26,7 @@
         :clearable="false" :disabled="!writable" @update:model-value="(v) => save({ also_in: [...task.also_in, v] })" />
     </div>
   </div>
-   <FormControl type="select" label="Goal" :model-value="task.goal || ''" :options="goalOptions" :disabled="!writable" @update:model-value="(v) => save({ goal: v || null })" />
+   <GoalPicker label="Goal" :model-value="task.goal || ''" :options="goalOptions" placeholder="No goal" :disabled="!writable" data-task-goal-picker @update:model-value="(v) => save({ goal: v || null })" />
   <div class="text-sm text-ink-gray-6">
     <div v-if="task.inbox_item">From <a class="text-ink-blue-8 hover:underline" href="#" @click.prevent="openRef('inbox:' + task.inbox_item)">{{ task.source_title || 'an inbox item' }}</a></div>
     <div v-if="safeSource" class="my-1"><Button size="sm" icon-left="lucide-external-link" :label="sourceLabel" data-open-source @click="openSource" /></div>
@@ -53,6 +53,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Badge, Button, DatePicker, FormControl, TextInput, dialog, toast } from 'frappe-ui'
 import Pick from '@/components/Pick.vue'
 import PersonPicker from '@/components/ui/PersonPicker.vue'
+import GoalPicker from '@/components/ui/GoalPicker.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import LiveEditor from '@/components/LiveEditor.vue'
 import { safeUrl } from '@/lib/editor/livePreview'
@@ -83,7 +84,7 @@ const STATUSES = ['Open', 'Doing', 'Waiting', 'Done', 'Dropped', 'Carried', 'Som
 const PRIORITY_OPTIONS = [{ label: '—', value: '' }, ...PRIORITIES.map((p) => ({ label: p, value: p }))]
 // every goal in progress, grouped by type; a goal no longer in progress stays shown while the task points to it
 const goalOptions = computed(() => {
-  const opts = goalsByType()
+  const opts = goalsByType(undefined, { empty: null })
   if (task.value?.goal && !opts.some((o) => o.value === task.value.goal)) opts.push({ label: task.value.goal_title || task.value.goal, value: task.value.goal })
   return opts
 })

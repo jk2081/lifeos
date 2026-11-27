@@ -93,7 +93,7 @@ import SectionHead from '@/components/ui/SectionHead.vue'
 import { db, tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
-import { areaOptions, loadLookups } from '@/lib/lookups'
+import { loadLookups } from '@/lib/lookups'
 
 const props = defineProps({ id: String })
 const route = useRoute()
@@ -119,7 +119,7 @@ const versions = ref([])
 const reloadKey = ref(0)
 
 const writable = computed(() => store.spaces.find((s) => s.name === note.value?.space)?.access === 'Write')
-const NEW_FIELDS = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'area', label: 'Area', options: areaOptions() }])
+const NEW_FIELDS = computed(() => [{ name: 'title', label: 'Title', required: true }, { name: 'area', label: 'Area', pick: 'area' }])
 
 const TREE_CAP = 50
 const showAll = ref([])

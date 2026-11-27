@@ -147,6 +147,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.78` Overview has the four cards and two panels of its view and no calendar or ruler; Calendar has the ruler directly above the calendar and no cards
 - `TODAY.79` Day Calendar lists an all-day event, a timed event, a task planned at 09:30 and a task due today in that order with the now line in place, each once
 - `TODAY.80` Week Overview's Waiting panel lists the waiting items and a row opens in the Drawer
+- `TODAY.81` in a task's pane the goal picker is searchable: typing part of a goal's title filters it
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 
@@ -223,6 +224,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.77` in Chat "Vivek owes me the ITR draft by Friday" makes a waiting task and says nothing was sent; "Ask Vivek for the ITR draft by Friday" drafts, with Send on the task
 - `BRAIN.78` a "What it did" row that changed a task opens it in the Drawer and the agent's page stays; a failed act stays plain; a reported skill that is also a Life OS skill links to its page
 - `BRAIN.79` a "Recently" row on a source's Rules tab opens the capture in the Drawer
+- `BRAIN.80` Activity's filters are the shared filter bar, and a chosen filter is in the address and survives a reload
 - `BRAIN.76` with no model in Flow, a question says "Chat needs an AI key" with its link to Settings › AI, and at the monthly cap Chat refuses and shows the spend
 - `BRAIN.64` a Needs you row has exactly one button, Change; Change > Not needed twice for one sender makes a drop rule without asking, and Activity says "New rule … Change"
 - `BRAIN.66` Gmail's Rules tab lists its sender rule and the two built-in rules in the order they are tried, with "used n times", marks an all-sources rule, leaves a Calendar rule off; Change > Switch off there shows off in Settings
@@ -313,6 +315,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.74` in Cycles a goal's name opens its goal in the Drawer and Cycles stays
 - `GOALS.75` Cycles shows all 12 weekly scores without sideways scroll; the goal page shows three weeks and All 12 weeks on a phone
 - `GOALS.78` an action row of a goal's grid opens its goal in the Drawer and the screen stays
+- `GOALS.79` in New goal, typing part of an area's name filters the area picker to it
 
 ### Library (`tools/acceptance/library.mjs`, 52 checks)
 
@@ -368,6 +371,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.46` the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library
 - `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
 - `LIBRARY.55` on an empty space every Library list (Everything, Pages, People, Files) shows `[data-empty]` with one line and at most one action
+- `LIBRARY.56` Everything and People use the shared filter bar; a chosen filter is in the address and survives a reload
 - `LIBRARY.54` the person picker is readable in light and dark, and nothing scrolls sideways
 - `LIBRARY.53` Hand off's Who uses the same person picker
 - `LIBRARY.52` a new name offers "Add '…' as a person"; choosing it makes the person and selects them
