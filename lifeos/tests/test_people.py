@@ -115,3 +115,37 @@ class TestPeople(LifeTestCase):
 		self.make("Life Person", full_name="i25 Secret")
 		self.as_user(FAMILY)
 		self.assertRaises(frappe.PermissionError, people_api.list, space=PRIVATE)
+
+	def test_9_options_are_people_only_with_their_company_and_search_by_company_or_email(self):
+		linc = self.make("Life Person", full_name="i136 Linc pens", kind="Organisation").name
+		self.make("Life Person", full_name="i136 Rungamattee Tea", kind="Organisation")
+		ravi = self.make("Life Person", full_name="i136 Ravi Singh", organisation=linc, email="ravi@linc.example").name
+		self.make("Life Person", full_name="i136 Asha", email="asha@else.example")
+		out = people_api.options(space=PRIVATE)
+		self.assertEqual({r["kind"] for r in out["rows"]}, {"Person"})
+		self.assertFalse(out["more"])
+		row = next(r for r in out["rows"] if r["value"] == ravi)
+		self.assertEqual((row["organisation"], row["email"]), ("i136 Linc pens", "ravi@linc.example"))
+		self.assertEqual([r["label"] for r in people_api.options(space=PRIVATE, q="Linc pens")["rows"]], ["i136 Ravi Singh"])
+		self.assertEqual([r["label"] for r in people_api.options(space=PRIVATE, q="asha@else")["rows"]], ["i136 Asha"])
+		self.assertEqual(people_api.options(space=PRIVATE, q="Rungamattee")["rows"], [])  # a company with no people lists no one
+		self.assertEqual([r["label"] for r in people_api.options(space=PRIVATE, kind="Organisation", q="Linc")["rows"]], ["i136 Linc pens"])
+
+	def test_10_options_put_name_matches_before_company_matches_and_recent_people_first(self):
+		org = self.make("Life Person", full_name="i136 Zed Traders", kind="Organisation").name
+		self.make("Life Person", full_name="i136 Amar", organisation=org)
+		self.make("Life Person", full_name="i136 Zed Person")
+		self.assertEqual([r["label"] for r in people_api.options(space=PRIVATE, q="Zed")["rows"]], ["i136 Zed Person", "i136 Amar"])
+		bob = self.make("Life Person", full_name="i136 Bob").name
+		t = self.make("Life Task", title="i136 task").name
+		tasks.update(t, {"delegated_to": bob})
+		self.assertEqual(people_api.options(space=PRIVATE)["rows"][0]["value"], bob)
+
+	def test_11_options_have_no_silent_cap(self):
+		for i in range(55):
+			self.make("Life Person", full_name=f"i136 P{i:02d}")
+		out = people_api.options(space=PRIVATE)
+		self.assertEqual((len(out["rows"]), out["more"]), (50, True))
+		hit = people_api.options(space=PRIVATE, q="P54")
+		self.assertEqual([r["label"] for r in hit["rows"]], ["i136 P54"])  # past the first 50, found by typing
+		self.assertEqual(people_api.options(space=PRIVATE, include=frappe.db.get_value("Life Person", {"full_name": "i136 P54", "space": PRIVATE}))["rows"][-1]["label"], "i136 P54")

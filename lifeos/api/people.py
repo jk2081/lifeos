@@ -136,14 +136,48 @@ def get(name: str):
 		"wiki": who["page"], "text": who["text"], "mentioned": [{k: v for k, v in r.items() if k != "at"} for r in mentioned], "mentioned_total": total}
 
 
+OPTIONS_CAP = 50
+
+
+def _recent_people(space: str) -> list[str]:
+	"""People used on tasks (delegated to, waiting on, handed off), most recently used first."""
+	last: dict[str, object] = {}
+	for field in ("delegated_to", "waiting_on_person"):
+		for r in frappe.get_list("Life Task", filters={"space": space, field: ("is", "set")}, fields=[field + " as person", "modified"], order_by="modified desc", limit=500):
+			if r.person not in last or r.modified > last[r.person]:
+				last[r.person] = r.modified
+	return sorted(last, key=lambda n: last[n], reverse=True)
+
+
 @frappe.whitelist(methods=["GET"])
-def options(space: str | None = None, q: str | None = None, kind: str | None = None):
-	"""People and organisations to pick from, for a task's "waiting on" and "delegated to": [{value, label, kind}], at most 50."""
+def options(space: str | None = None, q: str | None = None, kind: str | None = None, include: str | None = None):
+	"""People to pick from, for a task's "waiting on" and "delegated to" and for Hand off: {rows: [{value, label, kind, organisation, email}], more}.
+	`kind` is Person unless Organisation is asked for. Without `q`: the 50 most recently used on tasks first, then by name, and `more` says there are others.
+	With `q`: the best 50 matches, name, other names and email first, then people at an organisation whose name matches. `include` adds that person (the one already picked)."""
 	space = permissions.resolve_space(space)
-	filters = {"space": space}
-	if kind in KINDS:
-		filters["kind"] = kind
+	kind = kind if kind in KINDS else "Person"
+	filters = {"space": space, "kind": kind}
+	fields = ["name", "full_name", "kind", "organisation", "email"]
 	q = (q or "").strip()[:200]
-	rows = frappe.get_list("Life Person", filters=filters, or_filters=[["full_name", "like", _like(q)], ["aliases", "like", _like(q)]] if q else None,
-		fields=["name", "full_name", "kind"], order_by="full_name asc", limit=50)
-	return [{"value": r.name, "label": r.full_name, "kind": r.kind or "Person"} for r in rows]
+	if q:
+		own = frappe.get_list("Life Person", filters=filters, or_filters=[["full_name", "like", _like(q)], ["aliases", "like", _like(q)], ["email", "like", _like(q)]],
+			fields=fields, order_by="full_name asc", limit=OPTIONS_CAP + 1)
+		rows = own[:OPTIONS_CAP]
+		orgs = frappe.get_list("Life Person", filters={"space": space, "kind": "Organisation", "full_name": ("like", _like(q))}, pluck="name", limit=200)
+		if orgs and len(rows) < OPTIONS_CAP:
+			seen = {r.name for r in rows}
+			rest = frappe.get_list("Life Person", filters={**filters, "organisation": ("in", orgs)}, fields=fields, order_by="full_name asc", limit=OPTIONS_CAP + 1)
+			rows += [r for r in rest if r.name not in seen][:OPTIONS_CAP - len(rows)]
+		more = len(own) > OPTIONS_CAP
+	else:
+		recent = [n for n in _recent_people(space)][:200]
+		by_name = {r.name: r for r in frappe.get_list("Life Person", filters={**filters, "name": ("in", recent)}, fields=fields, limit=200)} if recent else {}
+		rows = [by_name[n] for n in recent if n in by_name][:OPTIONS_CAP]
+		if len(rows) < OPTIONS_CAP:
+			taken = [r.name for r in rows]
+			rows += frappe.get_list("Life Person", filters={**filters, **({"name": ("not in", taken)} if taken else {})}, fields=fields, order_by="full_name asc", limit=OPTIONS_CAP - len(rows))
+		more = frappe.db.count("Life Person", filters) > len(rows)
+	if include and include not in {r.name for r in rows}:
+		rows += frappe.get_list("Life Person", filters={**filters, "name": include}, fields=fields, limit=1)
+	org_names = names_map("Life Person", [r.organisation for r in rows], "full_name")
+	return {"rows": [{"value": r.name, "label": r.full_name, "kind": r.kind or "Person", "organisation": org_names.get(r.organisation), "email": r.email or None} for r in rows], "more": more}

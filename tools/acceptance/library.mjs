@@ -1410,3 +1410,104 @@ for n in frappe.get_all("Life Person", filters={"full_name": ["like", "%I130L"]}
     await u.ctx.close()
   }
 }
+
+// Issue 136: one searchable person picker for Delegated to, Waiting on (person) and Hand off's Who: people only, the company under each name, searched by company too.
+for (const width of WIDTHS) {
+  const u = await session('owner@lifeos.test', width)
+  const pg = u.page
+  const errors = []
+  pg.on('pageerror', (e) => errors.push(String(e).slice(0, 160)))
+  const phone = width < 768
+  // opens a picker, types a search and waits for the list: a popover on a desktop, a sheet with the search focused on a phone
+  const openPicker = async (root, text = '') => {
+    await root.locator(phone ? '[data-person-open]' : 'button').first().click()
+    const search = phone ? pg.locator('[data-person-search] input, input[data-person-search]').first() : pg.locator('[data-slot="content"] input[data-slot="input"]').last()
+    if (phone) must(await search.evaluate((el) => el === document.activeElement), 'the search is not focused in the sheet')
+    if (text) await search.fill(text)
+    await pg.waitForTimeout(600)
+    return search
+  }
+  const optionNames = async () => phone ? (await pg.locator('[data-person-option]').allInnerTexts()) : (await pg.locator('[data-slot="item"]').allInnerTexts())
+  try {
+    const seeded = JSON.parse(bench(`import json
+for n in frappe.get_all("Life Task", filters={"title": ["like", "I136 %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "%I136"]}, pluck="name"): frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)
+org = frappe.get_doc({"doctype": "Life Person", "space": "${SPACE}", "full_name": "Linc pens I136", "kind": "Organisation"}).insert(ignore_permissions=True)
+other = frappe.get_doc({"doctype": "Life Person", "space": "${SPACE}", "full_name": "Hartwell Tea I136", "kind": "Organisation"}).insert(ignore_permissions=True)
+ravi = frappe.get_doc({"doctype": "Life Person", "space": "${SPACE}", "full_name": "Ravi Singh I136", "kind": "Person", "organisation": org.name}).insert(ignore_permissions=True)
+asha = frappe.get_doc({"doctype": "Life Person", "space": "${SPACE}", "full_name": "Asha Mehta I136", "kind": "Person"}).insert(ignore_permissions=True)
+t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "I136 Send the samples", "status": "Open"}).insert(ignore_permissions=True)
+print(json.dumps({"task": t.name, "ravi": ravi.name, "asha": asha.name}))`).split('\n').pop())
+    const root = () => pg.locator('[data-task-delegated]')
+    await check('LIBRARY.51', `${width} px: Delegated to is a searchable list of people only, the company under each name; Linc leaves Linc pens' people; picking saves, × clears`, async () => {
+      await u.open(`/life/today?open=task:${seeded.task}`)
+      await root().waitFor({ timeout: 15000 })
+      await openPicker(root())
+      let names = (await optionNames()).join('\n')
+      must(names.includes('Ravi Singh I136') && names.includes('Linc pens I136'), 'Ravi does not show his company: ' + names)
+      must(!names.includes('Hartwell Tea I136'), 'a company is in the list: ' + names)
+      const search = phone ? pg.locator('[data-person-search] input, input[data-person-search]').last() : pg.locator('[data-slot="content"] input[data-slot="input"]').last()
+      await search.fill('Linc')
+      await pg.waitForTimeout(800)
+      names = await optionNames()
+      must(names.some((n) => n.includes('Ravi Singh I136')) && !names.some((n) => n.includes('Asha Mehta')), 'Linc does not leave only its people: ' + names.join(' | '))
+      await (phone ? pg.locator('[data-person-option]') : pg.locator('[data-slot="item"]')).filter({ hasText: 'Ravi Singh I136' }).first().click()
+      await pg.waitForFunction(() => document.querySelector('[data-task-delegated]')?.innerText.includes('Ravi Singh I136'), null, { timeout: 8000 })
+      must((await bench(`print(frappe.db.get_value("Life Task", "${seeded.task}", "delegated_to"))`).trim().split('\n').pop()) === seeded.ravi, 'Delegated to was not saved')
+      await root().locator('[data-person-clear]').click()
+      await pg.waitForFunction(() => !document.querySelector('[data-task-delegated] [data-person-clear]'), null, { timeout: 8000 })
+      must((await bench(`print(frappe.db.get_value("Life Task", "${seeded.task}", "delegated_to"))`).trim().split('\n').pop()) === 'None', '× did not clear Delegated to')
+      must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
+      must(!errors.length, 'script errors: ' + errors.join(' | '))
+    })
+    await check('LIBRARY.52', `${width} px: a new name offers "Add '…' as a person"; choosing it makes the person and selects them`, async () => {
+      await u.open(`/life/today?open=task:${seeded.task}`)
+      await root().waitFor({ timeout: 15000 })
+      await openPicker(root(), 'Zubin Karanja I136')
+      const add = (phone ? pg.locator('[data-person-option]') : pg.locator('[data-slot="item"]')).filter({ hasText: "Add 'Zubin Karanja I136' as a person" })
+      must(await add.count() === 1, 'no Add as a person: ' + (await optionNames()).join(' | '))
+      await add.click()
+      await pg.waitForFunction(() => document.querySelector('[data-task-delegated]')?.innerText.includes('Zubin Karanja I136'), null, { timeout: 10000 })
+      const made = bench(`print(frappe.db.get_value("Life Person", {"full_name": "Zubin Karanja I136", "space": "${SPACE}"}, "kind"))`).trim().split('\n').pop()
+      must(made === 'Person', 'the person was not made: ' + made)
+      must((await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) === false, 'the page scrolls sideways')
+    })
+    await check('LIBRARY.53', `${width} px: Hand off's Who uses the same picker`, async () => {
+      await u.open(`/life/today?open=task:${seeded.task}`)
+      await pg.locator('[data-task-delegated]').waitFor({ timeout: 15000 })
+      await pg.getByRole('button', { name: /hand off/i }).first().click()
+      const who = pg.locator('[data-handoff-person]')
+      await who.waitFor({ timeout: 10000 })
+      await openPicker(who, 'Linc')
+      const names = await optionNames()
+      must(names.some((n) => n.includes('Ravi Singh I136') && n.includes('Linc pens I136')), 'Hand off does not list Ravi at Linc pens: ' + names.join(' | '))
+    })
+    await check('LIBRARY.54', `${width} px: the picker is readable in the light and the dark theme, and nothing scrolls sideways`, async () => {
+      for (const scheme of ['light', 'dark']) {
+        await pg.emulateMedia({ colorScheme: scheme })
+        await u.open(`/life/today?open=task:${seeded.task}`)
+        await pg.locator('[data-task-delegated]').waitFor({ timeout: 15000 })
+        await openPicker(pg.locator('[data-task-delegated]'), 'Linc')
+        const item = (phone ? pg.locator('[data-person-option]') : pg.locator('[data-slot="item"]')).filter({ hasText: 'Ravi Singh I136' }).first()
+        await item.waitFor({ timeout: 8000 })
+        const seen = await item.evaluate((el) => {
+          const lum = (c) => { const unit = c.startsWith('color(') ? 1 : 255; const m = c.replace('srgb', '').match(/[\d.]+/g).slice(0, 3).map(Number).map((v) => { v /= unit; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }); return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2] }
+          let bg = el, back = 'rgb(255, 255, 255)'
+          for (; bg; bg = bg.parentElement) { const c = getComputedStyle(bg).backgroundColor; const a = c.replace('srgb', '').match(/[\d.]+/g); if (a.length < 4 || Number(a[3]) >= 0.95) { if (a.length >= 3 && (a.length < 4 || Number(a[3]) > 0)) { back = c; break } } }
+          const label = [...el.querySelectorAll('span, div')].find((n) => n.textContent.trim().startsWith('Ravi')) || el
+          return { text: lum(getComputedStyle(label).color), back: lum(back) }
+        })
+        must(Math.abs(seen.text - seen.back) > 0.3, `${scheme}: the names are not readable ${JSON.stringify(seen)}`)
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `${scheme}: the page scrolls sideways`)
+        await pg.keyboard.press('Escape')
+      }
+      await pg.emulateMedia({ colorScheme: null })
+    })
+  } finally {
+    bench(`for n in frappe.get_all("Life Task", filters={"title": ["like", "I136 %"]}, pluck="name"): frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)
+for n in frappe.get_all("Life Person", filters={"full_name": ["like", "%I136"]}, pluck="name"):
+    frappe.db.delete("Life Link", {"to_doctype": "Life Person", "to_name": n})
+    frappe.delete_doc("Life Person", n, force=1, ignore_permissions=True)`)
+    await u.ctx.close()
+  }
+}

@@ -1637,3 +1637,11 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 
 - The safety net runs where an answer is built (`lifeos/ai/chat.py` `strip_internal`, in `answer_of`), so every read of a run is clean without changing the stored Flow Run output. It logs once per run (Error Log, reference Flow Run). A markdown link is left alone, so cited sources and record links stay; the numbered `[1]` citations are made afterwards and are not touched.
 - The ask skill is at version 8 in both copies; the two have different front matter by design (Life OS's own and Flow's), and the check compares the bodies.
+
+## Issue 136 (one searchable person picker)
+
+- Built on frappe-ui's `Combobox` (button trigger, `filterable=false` so the server's search is the only filter, `description` for the company under the name). It has no phone sheet, so on a phone `PersonPicker.vue` opens a `Dialog` with the search focused instead; both read the same options.
+- `people.options` now returns `{rows, more}` (it returned a bare list); `kind` is Person unless Organisation is asked for; `include` adds the person already picked so the trigger can show their name beyond the first 50. With a search, name, other names and email come first, then people at a company whose name matches.
+- "Add 'x' as a person" calls `tools.people_add` (as the owner, run at once), so it reuses a person already called that, and the new person is selected.
+- The Hand off dialog lost its "Their name" box: the picker's Add option replaces it.
+- `Life Task` refuses an organisation in `delegated_to` and `waiting_on_person`, so a hand off by name to a company (by an agent or in Chat) now says "Delegate to a person…" instead of linking the company. The free-text Waiting on is unchanged.

@@ -9,10 +9,10 @@
   </div>
   <TextInput v-if="task.status === 'Waiting' || askWaiting" ref="waitInput" v-model="task.waiting_on" label="Waiting on" placeholder="Who or what is this waiting on?" :disabled="!writable"
     @change="askWaiting ? setStatus('Waiting') : save({ waiting_on: task.waiting_on })" />
-  <div v-if="peopleOptions.length > 1" class="form-grid" data-task-people>
-    <FormControl v-if="task.status === 'Waiting' || task.waiting_on_person" type="select" label="Waiting on (person)" :model-value="task.waiting_on_person || ''" :options="peopleOptions" :disabled="!writable"
-      data-task-waiting-person @update:model-value="pickWaiting" />
-    <FormControl type="select" label="Delegated to" :model-value="task.delegated_to || ''" :options="peopleOptions" :disabled="!writable"
+  <div class="form-grid" data-task-people>
+    <PersonPicker v-if="task.status === 'Waiting' || task.waiting_on_person" label="Waiting on (person)" :model-value="task.waiting_on_person || ''" :space="task.space" :disabled="!writable"
+      data-task-waiting-person @update:model-value="(v) => pickWaiting(v)" @picked="(p) => (lastPicked = p)" />
+    <PersonPicker label="Delegated to" :model-value="task.delegated_to || ''" :space="task.space" :disabled="!writable"
       data-task-delegated @update:model-value="(v) => save({ delegated_to: v || null })" />
   </div>
   <HandOffCard v-if="task.status === 'Waiting' || task.handed_off_how" :task="name" :writable="writable" @changed="load" />
@@ -52,6 +52,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Badge, Button, DatePicker, FormControl, TextInput, dialog, toast } from 'frappe-ui'
 import Pick from '@/components/Pick.vue'
+import PersonPicker from '@/components/ui/PersonPicker.vue'
 import Backlinks from '@/components/Backlinks.vue'
 import LiveEditor from '@/components/LiveEditor.vue'
 import { safeUrl } from '@/lib/editor/livePreview'
@@ -96,22 +97,17 @@ function tell() {
     someday: writable.value && OPEN.includes(t.status) ? { doctype: 'Life Task', name: t.name } : null,
     tabs: [{ value: 'details', label: 'Details' }, { value: 'notes', label: 'Notes' }, { value: 'links', label: 'Links', count: links.value.length, noun: 'linked records' }] })
 }
-// the people and organisations of the task's space, to pick for "waiting on" and "delegated to" (issue 25)
-const peopleOptions = ref([{ label: '—', value: '' }])
-async function loadPeople() {
-  const rows = await itemData.people.options({ space: task.value.space })
-  peopleOptions.value = [{ label: '—', value: '' }, ...rows.map((r) => ({ label: r.label, value: r.value }))]
-}
+// "Waiting on (person)" also fills the free-text Waiting on with their name when it is empty
+const lastPicked = ref(null)
 function pickWaiting(v) {
-  const who = peopleOptions.value.find((o) => o.value === v)
-  save({ waiting_on_person: v || null, ...(v && !(task.value.waiting_on || '').trim() ? { waiting_on: who.label } : {}) })
+  const who = v && lastPicked.value?.value === v ? lastPicked.value.label : ''
+  save({ waiting_on_person: v || null, ...(who && !(task.value.waiting_on || '').trim() ? { waiting_on: who } : {}) })
 }
 
 async function load() {
   try {
     ;[task.value, links.value] = await Promise.all([itemData.tasks.get({ task: props.name }), loadBacklinks('Life Task', props.name)])
     tell()
-    loadPeople().catch(() => {})
   } catch (e) {
     emit('missing')
   }
