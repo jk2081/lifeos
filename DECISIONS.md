@@ -1632,3 +1632,8 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - The cache is now only saved by `cache-bench.yml`; a miss on a pull request builds but does not save (a branch's cache would not reach other pull requests anyway).
 - Key names changed (`frappe-bench-tests-…` / `frappe-bench-walk-…`), so the first runs after merge miss until `cache-bench.yml` has run on main; the push of this change to main triggers it (the paths include the action and the script).
 - Acceptance tests 1 to 3 need GitHub runs on main and a branch; `TOOLING.11` checks the files as written.
+
+## Issue 140 (Chat never shows internal notes)
+
+- The safety net runs where an answer is built (`lifeos/ai/chat.py` `strip_internal`, in `answer_of`), so every read of a run is clean without changing the stored Flow Run output. It logs once per run (Error Log, reference Flow Run). A markdown link is left alone, so cited sources and record links stay; the numbered `[1]` citations are made afterwards and are not touched.
+- The ask skill is at version 8 in both copies; the two have different front matter by design (Life OS's own and Flow's), and the check compares the bodies.
