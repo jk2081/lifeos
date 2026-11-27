@@ -44,6 +44,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `ingest-email` (was `triage-email`) | `test_gmail.TestDigest`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
 | one assistant: the owner's requests through an agent, the gate, `tasks_add`/`events_add`, Activity's Assistant rows, the name and the failed job | `test_agents.TestOneAssistant`, `test_permissions.TestOnlyTheOwnerIsTheOwner` | `BRAIN.73`, `SETTINGS.45`, `SETTINGS.46` |
 | Chat finishes, reopens and merges tasks, each with Undo (`finish_task`, `reopen_task`, `merge_tasks`) | `test_agents.TestFlow` | `TODAY.82` |
+| Chat writes a message to a person and sends it only on Send or yes (`message`, `send_message`, `edit_message`; the draft card) | `test_agents.TestMessageDrafts` | `TODAY.83` |
 | the lifeos skill names every agent tool (`lifeos.api.tools`, `chats.relay`, `chats.report`) | `test_agents.TestSkillNamesAgentTools` | none (no screen) |
 | relayed conversations (`chats.relay`) in Chat's History | `test_library.TestRelayedChat` | `BRAIN.74` |
 | the agent connector (`agent/connector/`) | `test_agents.TestConnector` | `BRAIN.49` to `BRAIN.51` |
@@ -72,7 +73,7 @@ What opens over every screen: layers, the URL that holds them, Back and Esc, the
 - `CORE.8` G3: no raw `<button>`, `<select>`, `<input>` or `<textarea>` outside `components/ui/`; a fixture with a raw `<select>` fails
 - `CORE.9` G4: every file in `components/ui/` is listed in `COMPONENTS.md`; a hand-built row or heading in a file outside the baseline fails
 
-### Today (`tools/acceptance/today.mjs`, 63 checks)
+### Today (`tools/acceptance/today.mjs`, 64 checks)
 
 Day, Week, Month and Year, the numbers that open lists, Reset, rhythm banners, the first-run guide, Today's tasks.
 
@@ -154,6 +155,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.80` Week Overview's Waiting panel lists the waiting items and a row opens in the Drawer
 - `TODAY.81` in a task's pane the goal picker is searchable: typing part of a goal's title filters it
 - `TODAY.82` Chat: "mark it done" on a task open in the Drawer: the Done list shows the line with Undo and the task leaves the open list
+- `TODAY.83` Chat: "tell Subhangee it's done, email ok" shows a draft card with Send, Edit and Drop and sends nothing; Send sends it once and the Done list shows "Emailed …" with no Undo
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 

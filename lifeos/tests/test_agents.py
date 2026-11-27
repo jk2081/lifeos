@@ -1119,6 +1119,110 @@ class TestFlow(AskCase):
 		self.assertEqual(flow.TOOL_NAMES, [n for n in flow.TOOL_NAMES if n in {t.name for t in flow.TOOLS}])
 		for t in flow.TOOLS:
 			self.assertLessEqual(len(t.description), MAX_DESCRIPTION_LENGTH, t.name)
-		for n in ("finish_task", "reopen_task", "merge_tasks"):
+		for n in ("finish_task", "reopen_task", "merge_tasks", "message", "send_message", "edit_message"):
 			self.assertIn(n, flow.TOOL_NAMES)
 			self.assertIn(n, [t['name'] for t in tools.WRITE_TOOLS])
+
+
+class TestMessageDrafts(LifeTestCase):
+	"""Issue 150: Chat writes a message to a person and sends it only when the owner says so."""
+	ADDRESS = "owner150@example.com"
+
+	def setUp(self):
+		super().setUp()
+		from lifeos.tests.test_tasks import FakeGoogle
+
+		frappe.set_user("Administrator")
+		for dt in ("Life Agent Action", "Life Mail Account"):
+			frappe.db.delete(dt, {"space": PRIVATE})
+		frappe.db.delete("Communication", {"subject": ("like", "I150 %")})
+		frappe.db.delete("Life Person", {"space": PRIVATE, "full_name": ("like", "%I150%")})
+		frappe.get_doc({"doctype": "Life Mail Account", "space": PRIVATE, "user": OWNER, "provider": "gmail", "address": self.ADDRESS, "label": "Personal", "is_default": 1}).insert()
+		self.google = FakeGoogle()
+		frappe.flags.lifeos_google = {self.ADDRESS: self.google}
+		self.addCleanup(lambda: setattr(frappe.flags, "lifeos_google", {}))
+		self.sub = frappe.get_doc({"doctype": "Life Person", "space": PRIVATE, "full_name": "Subhangee I150", "kind": "Person", "email": "subhangee150@example.com"}).insert()
+		self.task = self.make("Life Task", title="I150 the report")
+		permissions.clear_cache()
+		frappe.set_user(OWNER)
+
+	def ctx(self):
+		from frappe.flow import ToolContext
+
+		return ToolContext(session_id="t150", agent="lifeos/Life OS", user=OWNER)
+
+	def draft(self, person="Subhangee I150", **kw):
+		from lifeos.ai import flow
+
+		with patch("lifeos.permissions.default_space", return_value=PRIVATE):
+			return flow.message(person=person, text="Hi Subhangee, the report is done.", subject="I150 report", about=[self.task.name], ctx=self.ctx(), **kw)
+
+	def test_1_message_saves_a_draft_linked_to_the_person_and_the_records_and_sends_nothing(self):
+		out = self.draft()
+		self.assertNotIn("error", out)
+		comm = frappe.get_doc("Communication", out["draft"])
+		self.assertEqual((comm.delivery_status, comm.reference_doctype, comm.reference_name, comm.recipients), ("Scheduled", "Life Person", self.sub.name, "subhangee150@example.com"))
+		self.assertIn(("Life Task", self.task.name), [(l.link_doctype, l.link_name) for l in comm.timeline_links])
+		self.assertEqual(out["draft_list"], [out["draft"]])
+		self.assertEqual(self.google.calls, [])  # the mail fake records no send
+		self.assertEqual(frappe.db.count("Life Agent Action", {"space": PRIVATE, "action": ["like", "email%"]}), 0)
+
+	def test_2_sending_the_draft_calls_email_send_once_as_the_owner_and_a_second_send_does_nothing(self):
+		from lifeos.ai import flow
+		from lifeos.tools import messages
+
+		name = self.draft()["draft"]
+		with patch("lifeos.permissions.default_space", return_value=PRIVATE):
+			out = flow.send_message(draft=name, ctx=self.ctx())
+		self.assertEqual([c[0] for c in self.google.calls], ["send"])
+		self.assertEqual(self.google.calls[0][1]["to"], "subhangee150@example.com")
+		self.assertEqual(out["done_list"][0]["text"], "Emailed Subhangee I150: I150 report")
+		self.assertIsNone(out["done_list"][0]["undo"])
+		row = frappe.get_doc("Life Agent Action", frappe.db.get_value("Life Agent Action", {"space": PRIVATE}, "name", order_by="creation desc"))
+		self.assertEqual((row.asked_by, row.status), ("owner", "Done"))
+		self.assertEqual(frappe.db.get_value("Communication", name, "delivery_status"), "Sent")
+		again = messages.send(name)
+		self.assertEqual((again["sent"], again["already"]), (False, True))
+		self.assertEqual([c[0] for c in self.google.calls], ["send"])
+
+	def test_3_a_person_with_no_email_keeps_the_draft_and_the_address_given_later_is_saved_to_the_person(self):
+		from lifeos.tools import messages
+
+		frappe.db.set_value("Life Person", self.sub.name, "email", None)
+		out = self.draft()
+		self.assertTrue(out["needs_address"])
+		self.assertIn("no email", out["note"])
+		with self.assertRaises(frappe.ValidationError):
+			messages.send(out["draft"])
+		self.assertEqual(self.google.calls, [])
+		messages.edit(out["draft"], address="sub150@example.com")
+		self.assertEqual(frappe.db.get_value("Life Person", self.sub.name, "email"), "sub150@example.com")
+		self.assertTrue(messages.send(out["draft"])["sent"])
+
+	def test_4_edit_changes_the_words_drop_deletes_and_a_draft_written_this_turn_is_not_sent(self):
+		from lifeos.tools import messages
+
+		name = self.draft()["draft"]
+		self.assertEqual(messages.edit(name, "I150 new words")["body"], "I150 new words")
+		with self.assertRaises(frappe.ValidationError):  # written after the turn began: the owner has not been asked
+			messages.send(name, not_after=frappe.utils.add_to_date(None, minutes=-1))
+		self.assertEqual(self.google.calls, [])
+		self.assertEqual(messages.drop(name), {"dropped": name})
+		self.assertFalse(frappe.db.exists("Communication", name))
+
+	def test_5_two_people_who_fit_make_the_owner_choose_and_nobody_is_invented(self):
+		self.make("Life Person", full_name="Subhangee I150 Roy", kind="Person")
+		out = self.draft(person="Subhangee")
+		self.assertIn("error", out)
+		self.assertIn("Subhangee I150 Roy", out["error"])
+		self.assertIn("error", self.draft(person="Nobody I150"))
+		self.assertFalse(frappe.db.exists("Life Person", {"full_name": "Nobody I150"}))
+
+	def test_6_only_the_owner_sends_and_a_family_member_cannot_use_the_draft(self):
+		from lifeos.tools import messages
+
+		name = self.draft()["draft"]
+		frappe.set_user(FAMILY)
+		with self.assertRaises(frappe.PermissionError):
+			messages.send(name)
+		self.assertEqual(self.google.calls, [])

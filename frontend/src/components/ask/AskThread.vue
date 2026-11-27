@@ -19,6 +19,26 @@
               <Button v-if="!d.undone && d.undo && canWrite()" size="sm" variant="subtle" label="Undo" data-ask-undo @click="undoDone(m, j)" />
             </div>
           </div>
+          <!-- a message Chat wrote for a person: nothing goes until Send -->
+          <div v-for="d in m.drafts || []" :key="d.name" class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5" data-ask-draft :data-status="d.status">
+            <div class="flex flex-wrap items-center gap-x-2 text-sm text-ink-gray-6"><span>To</span><span class="text-base text-ink-gray-9" data-ask-draft-to>{{ d.to }}<template v-if="d.address"> · {{ d.address }}</template></span>
+              <Badge v-if="d.status === 'Sent'" theme="green" label="Sent" /></div>
+            <div v-if="d.channel === 'email'" class="text-base font-medium text-ink-gray-9" data-ask-draft-subject>{{ d.subject }}</div>
+            <FormControl v-if="edits[d.name] !== undefined" v-model="edits[d.name]" type="textarea" :rows="6" data-ask-draft-text />
+            <div v-else class="whitespace-pre-wrap break-words text-base text-ink-gray-9" data-ask-draft-body>{{ d.body }}</div>
+            <div v-if="d.needs_address && d.status === 'Draft'" class="flex flex-wrap items-center gap-2" data-ask-draft-address>
+              <TextInput v-model="addresses[d.name]" class="min-w-0 flex-[1_1_200px]" placeholder="Their email address" />
+              <Button size="sm" variant="subtle" label="Save address" :disabled="!addresses[d.name]" @click="draftAddress(d, addresses[d.name])" />
+            </div>
+            <div v-if="d.status === 'Sent'" class="text-sm text-ink-gray-6" data-ask-draft-sent>Sent. A sent email cannot be taken back.</div>
+            <div v-else-if="canWrite()" class="flex flex-wrap items-center gap-2">
+              <Button v-if="edits[d.name] === undefined" size="sm" variant="solid" label="Send" :disabled="d.needs_address" :loading="busy[d.name]" data-ask-draft-send @click="send(m, d)" />
+              <Button v-else size="sm" variant="solid" label="Save" data-ask-draft-save @click="saveEdit(d)" />
+              <Button v-if="edits[d.name] === undefined" size="sm" variant="subtle" label="Edit" data-ask-draft-edit @click="edits[d.name] = d.body" />
+              <Button v-else size="sm" variant="subtle" label="Cancel" @click="delete edits[d.name]" />
+              <Button size="sm" variant="subtle" label="Drop" data-ask-draft-drop @click="draftDrop(m, d)" />
+            </div>
+          </div>
           <!-- whose is this card: one question with tappable answers, then it is saved -->
           <div v-for="q in m.questions || []" :key="q.index" class="flex flex-col gap-2 rounded-5 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2.5" data-ask-question-card>
             <div class="text-base text-ink-gray-9">{{ q.text }} <span class="text-sm text-ink-gray-6">{{ q.file_name }}</span></div>
@@ -49,12 +69,17 @@
 <script setup>
 // One Chat thread: messages on the right, answers with numbered citations, what Chat did (each line with Change) and the sources.
 // Clicking a citation opens the record in the pane.
-import { computed } from 'vue'
-import { Alert, Button, LoadingIndicator } from 'frappe-ui'
+import { computed, reactive } from 'vue'
+import { Alert, Badge, Button, FormControl, LoadingIndicator, TextInput } from 'frappe-ui'
 import Md from '../Md.vue'
 import { manySpaces } from '@/lib/lens'
 import { canWrite, store } from '@/lib/store'
 import AskSearchHits from './AskSearchHits.vue'
-import { answerCard, ask, openCite, openPane, undoDone } from '@/lib/ask'
+import { answerCard, ask, draftAddress, draftDrop, draftEdit, draftSend, openCite, openPane, undoDone } from '@/lib/ask'
+const edits = reactive({})
+const addresses = reactive({})
+const busy = reactive({})
+async function send(m, d) { busy[d.name] = true; try { await draftSend(m, d) } finally { busy[d.name] = false } }
+async function saveEdit(d) { if (await draftEdit(d, edits[d.name])) delete edits[d.name] }
 const lastQuestion = computed(() => [...ask.messages].reverse().find((m) => m.role === 'user')?.text || '')
 </script>

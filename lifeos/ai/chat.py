@@ -125,18 +125,35 @@ def refs_of(thread) -> dict:
 	return frappe.parse_json(thread.refs) if thread.refs else {}
 
 
-def _done_lines(run: str, session: str) -> list[dict]:
-	"""What the answer did: the `done_list` of every tool result in the run, in order."""
+def _tool_results(run: str, session: str):
+	"""The result of every tool call in the run, in order."""
 	rows = frappe.get_all("Flow Session Message", filters={"parent": session, "parenttype": "Flow Session", "run": run, "role": "tool"}, fields=["content"], order_by="idx asc")
-	lines = []
 	for r in rows:
 		try:
 			out = json.loads(r.content or "")
 		except ValueError:
 			continue
 		if isinstance(out, dict):
-			lines += [dict(d) for d in out.get("done_list") or []]
-	return lines
+			yield out
+
+
+def _done_lines(run: str, session: str) -> list[dict]:
+	"""What the answer did: the `done_list` of every tool result in the run, in order."""
+	return [dict(d) for out in _tool_results(run, session) for d in out.get("done_list") or []]
+
+
+def _drafts(run: str, session: str) -> list[dict]:
+	"""The messages the answer drafted, as they are now (issue 150): each once, with its status; a dropped draft is gone."""
+	from lifeos.tools import messages
+
+	names = list(dict.fromkeys(n for out in _tool_results(run, session) for n in out.get("draft_list") or []))
+	cards = []
+	for n in names:
+		try:
+			cards.append(messages.card(n))
+		except (frappe.ValidationError, frappe.DoesNotExistError):
+			frappe.clear_messages()  # dropped, or not this user's
+	return cards
 
 
 def _status(run) -> str:
@@ -175,6 +192,7 @@ def answer_of(thread, run) -> dict:
 	done = _done_lines(run.name, run.session)
 	for i, d in enumerate(done):
 		d["undone"] = int(bool(undone.get(f"{run.name}:{i}")))
+	drafts = _drafts(run.name, run.session)
 	filed = filed_of(thread).get(run.name) or {}
 	done += [{**d, "undone": 0} for d in filed.get("lines") or []]  # after the tools' own lines, so the numbers Undo uses do not move
 	status = _status(run)
@@ -184,7 +202,7 @@ def answer_of(thread, run) -> dict:
 	if status == "Done" and not text:
 		text = _("Done.") if done or filed.get("pending") else _("I could not find that.")
 	usage = frappe.parse_json(run.usage) if run.usage else {}
-	return {"name": run.name, "thread": thread.name, "role": "assistant", "text": text, "status": status, "error": error, "cited": cited, "actions": [], "done": done, "read": [],
+	return {"name": run.name, "thread": thread.name, "role": "assistant", "text": text, "status": status, "error": error, "cited": cited, "actions": [], "done": done, "read": [], "drafts": drafts,
 		"questions": [{"index": i, "text": q["text"], "file_name": q["file_name"], "options": q["options"]} for i, q in enumerate(filed.get("pending") or []) if q],
 		"cost": flt(usage.get("cost")), "created": str(run.creation)[:19]}
 

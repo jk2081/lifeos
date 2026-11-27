@@ -3,7 +3,7 @@
     python3 tools/fake_openai.py 8765
 
 Chat completions only, streamed or not. With tools offered, the first turn calls the tool whose name ends in
-`__list_records` (kind: tasks) or, if the user's message starts with `make task:`, `__make_task`, or, if the question is `add a note: …` with a record open, `__add_note`, or, if it is `mark it done` with a task open, `__finish_task`, or, if it starts "Vivek owes me", "Ask Vivek for" or "Email Vivek for", `__hand_off` (track, draft, send); once a tool result is
+`__list_records` (kind: tasks) or, if the user's message starts with `make task:`, `__make_task`, or, if the question is `add a note: …` with a record open, `__add_note`, or, if it is `mark it done` with a task open, `__finish_task`, or, if it starts `tell Subhangee`, `__message`, or, if it starts "Vivek owes me", "Ask Vivek for" or "Email Vivek for", `__hand_off` (track, draft, send); once a tool result is
 in the conversation it answers in words, quoting the result. Used by `docs/FLOW_TRIAL.md`; not part of the app.
 """
 import json
@@ -29,6 +29,8 @@ def reply(body):
 		call = (pick("__add_note"), {"text": question.split(":", 1)[1].strip(), "doctype": opened.group(1), "name": opened.group(2)})
 	elif question.lower().startswith("mark it done") and opened and opened.group(1) == "Life Task" and pick("__finish_task"):  # issue 149: Done on the task the owner has open
 		call = (pick("__finish_task"), {"task": opened.group(2)})
+	elif question.lower().startswith("tell subhangee") and pick("__message"):  # issue 150: a message to a person, drafted and not sent
+		call = (pick("__message"), {"person": "Subhangee I150", "text": "Hi Subhangee, it is done. Thanks.", "subject": "It is done", "channel": "email"})
 	elif re.match(r"(vivek owes me|ask vivek for|email vivek for) ", question.lower()) and pick("__hand_off"):  # issue 130: the three ways to hand off
 		how = "track" if question.lower().startswith("vivek owes") else "send" if "send it" in question.lower() else "draft"
 		call = (pick("__hand_off"), {"person": "Vivek I130", "what": "the ITR draft", "check_by": "friday", "how": how, "channel": "email"})
