@@ -286,7 +286,7 @@ await check('TOOLING.13', 'Speed: Today (each mode), Goals and a record pane ope
       ['task-pane', `/life/today?mode=overview&open=task:${task}`]]) faults.push(...speedFaults(key, await measure(s, p)))
     must(!faults.length, faults.join('; '))
     // the second opening, in the same session
-    const go = (to) => pg.evaluate((x) => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push(x), to)
+    const go = async (to) => { await pg.waitForFunction(() => document.querySelector('#app')?.__vue_app__, null, { timeout: 15000 }); await pg.evaluate((x) => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push(x), to) }
     await go('/today?mode=overview&area=')
     await pg.locator('[data-pane-title]').waitFor({ state: 'detached', timeout: 10000 })
     let finished = 0
