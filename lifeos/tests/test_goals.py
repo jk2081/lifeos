@@ -631,11 +631,71 @@ class TestGoalsByArea(LifeTestCase):
 		done = self.goal("i20 done", self.health)
 		frappe.db.set_value("Life Goal", done, "outcome", "Achieved")
 		names = lambda show: {x["name"] for s in goals.by_area(space=PRIVATE, show=show)["sections"] for grp in s["groups"] for x in grp["goals"]}
-		self.assertEqual(names("cycle"), {inside})
+		self.assertEqual(names("cycle"), {inside, outside})  # the cycle's goals, and the Year (and longer) goals in progress
 		self.assertEqual(names("open"), {inside, outside})
 		self.assertEqual(names("finished"), {done})
 		with self.assertRaises(frappe.ValidationError):
 			goals.by_area(space=PRIVATE, show="nonsense")
+
+	def no_cycle(self):
+		frappe.db.sql("update `tabLife Cycle` set status='Planned' where space=%s and status='Active'", PRIVATE)
+
+	def year(self, title, area, **kw):
+		return self.make("Life Goal", title=title, area=area, horizon="Year", target_date="2027-12-01", **kw).name
+
+	def test_1_with_no_active_cycle_the_page_opens_on_all_open(self):
+		self.no_cycle()
+		a, b = self.year("i137 ghillidary", self.tea), self.year("i137 sell", self.health)
+		res = goals.by_area(space=PRIVATE)  # default arguments
+		self.assertEqual(res["shows"], ["open", "finished"])
+		self.assertEqual((res["show"], res["total"]), ("open", 2))
+		self.assertEqual({x["name"] for s in res["sections"] for g in s["groups"] for x in g["goals"]}, {a, b})
+		self.assertEqual(goals.by_area(space=PRIVATE, show="cycle")["show"], "open")  # a ?show=cycle link falls back
+
+	def test_2_this_cycle_nests_the_12_week_goals_under_the_year_goal_they_serve(self):
+		self.no_cycle()
+		cycle = self.make("Life Cycle", title="i137 cycle", start_date=add_days(today(), -7), status="Active").name
+		served, lonely = self.year("i137 served", self.health), self.year("i137 lonely", self.health)
+		twelve = self.make("Life Goal", title="i137 twelve", horizon="12 weeks", cycle=cycle, area=self.health, serves=served).name
+		res = goals.by_area(space=PRIVATE)
+		self.assertEqual((res["show"], res["shows"]), ("cycle", ["cycle", "open", "finished"]))
+		top = {x["name"]: x for s in res["sections"] for g in s["groups"] for x in g["goals"]}
+		self.assertEqual(set(top), {served, lonely})  # the 12-week goal is inside its Year goal, not beside it
+		self.assertEqual([c["name"] for c in top[served]["children"]], [twelve])
+		self.assertEqual((top[served]["no_twelve_week"], top[lonely]["no_twelve_week"]), (0, 1))
+		self.assertEqual(res["total"], 2)
+
+	def test_3_a_goal_counts_for_its_focus_part_and_area_and_the_line_says_so(self):
+		self.no_cycle()
+		use_focuses(True)
+		try:
+			focus = frappe.get_doc({"doctype": "Life Area", "space": PRIVATE, "area_name": "i137 Yield", "parent_area": self.tea, "is_focus": 1}).insert().name
+			self.year("i137 under a focus", focus)
+			res = goals.by_area(space=PRIVATE)
+			career = self.section(res, self.career)
+			part = next(g for g in career["groups"] if g["area"] and g["area"]["name"] == self.tea)
+			entry = part["focuses"][0]
+			self.assertEqual((career["count"], part["area"]["count"], entry["count"], res["total"]), (1, 1, 1, 1))
+			self.assertEqual(res["line"], "1 goal across 1 area · 1 focus")
+		finally:
+			use_focuses(False)
+		self.assertEqual(goals.by_area(space=PRIVATE)["line"], "1 goal across 1 area")  # the goal sits under its part now
+
+	def test_4_a_goal_also_in_another_place_is_listed_there_marked_and_counted_once(self):
+		self.no_cycle()
+		g = self.year("i137 launch", self.health)
+		goals.update(g, {"also_in": [self.career]})
+		self.assertEqual(goals.get(g)["goal"]["also_in"], [self.career])
+		res = goals.by_area(space=PRIVATE)
+		self.assertEqual(res["total"], 1)
+		health, career = self.section(res, self.health), self.section(res, self.career)
+		self.assertEqual((health["count"], career["count"], career["also_count"]), (1, 0, 1))
+		listed = next(x for grp in career["groups"] for x in grp["goals"])
+		self.assertEqual((listed["name"], listed["is_also"], listed["also_in_from"]), (g, 1, "Health"))
+		self.assertFalse(next(x for grp in health["groups"] for x in grp["goals"]).get("is_also"))
+		self.assertIn(g, [r["name"] for r in goals.list(space=PRIVATE, area=self.career)["goals"]])  # the Career filter includes it
+		goals.update(g, {"also_in": [self.health]})  # never also in its own place
+		self.assertEqual(goals.get(g)["goal"]["also_in"], [])
 
 	def test_reorder_saves_the_owners_order_and_score_sort_is_the_other_order(self):
 		a, b, c = (self.goal(f"i20 {n}", self.health) for n in "abc")

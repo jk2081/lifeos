@@ -75,7 +75,7 @@ def where_criteria(space, state=None, horizon=None, area=None, cycle=None, targe
 	if horizon:
 		where.append(g.horizon == horizon)
 	if area:
-		where.append(area_criterion(space, area, g))
+		where.append(area_criterion(space, area, g, also_in="Life Goal"))  # a goal also in the area counts as in it
 	off = off_criterion(space, g.area)  # goals of an area that is off are hidden (issue 11)
 	if off is not None:
 		where.append(off)
@@ -141,9 +141,16 @@ def list(space: str | None = None, state: str | None = "in_progress", horizon: s
 
 
 def show_criteria(g, c):
-	"""The `show` choices of Goals -> By area as criteria over the goal table `g` and the joined cycle `c`."""
-	return {"cycle": (g.outcome == "In Progress") & (g.is_someday == 0) & (g.is_archived == 0) & (c.status == "Active"),
+	"""The `show` choices of Goals -> By area as criteria over the goal table `g` and the joined cycle `c`. "cycle" is the active
+	12 Week Year's goals and the Year (and longer) goals in progress, which the 12-week goals are shown under."""
+	return {"cycle": tab_criteria(g)["in_progress"] & ((c.status == "Active") | g.horizon.isin(("Year", "Long term"))),
 		"open": tab_criteria(g)["in_progress"], "finished": (g.outcome != "In Progress") & (g.is_someday == 0)}
+
+
+def shows_of(space):
+	"""The `show` choices of a space: "This cycle" only while a 12 Week Year is Active."""
+	active = frappe.db.exists("Life Cycle", {"space": space, "status": "Active"})
+	return ["cycle", "open", "finished"] if active else ["open", "finished"]
 
 
 def _next_actions(space, names):
@@ -173,13 +180,19 @@ def _done_when_line(g):
 
 @frappe.whitelist(methods=["GET"])
 def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
-	"""Goals → By area: one section for each area that is on, with its parts as sub-groups. `show` is cycle (goals in the active
-	12 Week Year), open (every goal in progress) or finished. `sort` is order (the owner's order, set by reorder) or score. Each
+	"""Goals → By area: one section for each area that is on, with its parts as sub-groups. `show` is cycle (the active
+	12 Week Year's goals nested under the Year goals they serve; only while one is Active, else it falls back to open), open
+	(every goal in progress) or finished. `shows` lists the choices there are. A goal is listed under its main place and, marked
+	`also_in_from`, under each place it is also in; counts and `total` count it once, under its main place, and count for every
+	part and area above that place. `sort` is order (the owner's order, set by reorder) or score. Each
 	goal has its Done when, progress, the cycle's current week and score, the next action, the open task count and what it
 	serves. Areas that are off have no section and are listed in `off` for the chips."""
 	space = permissions.resolve_space(space)
 	if show not in ("cycle", "open", "finished"):
 		frappe.throw(_("Unknown filter."), title=_("Unknown goal filter"))
+	shows = shows_of(space)
+	if show not in shows:  # no 12 Week Year is running: "This cycle" has nothing to show, so the page opens on All open
+		show = "open"
 	if sort not in ("order", "score"):
 		frappe.throw(_("Unknown sort."), title=_("Unknown sort order"))
 	g, c, sv = frappe.qb.DocType("Life Goal"), frappe.qb.DocType("Life Cycle").as_("c"), frappe.qb.DocType("Life Goal").as_("s")
@@ -215,19 +228,39 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 		rows.sort(key=lambda r: -(r.score if r.score is not None else (r.progress.get("percent") or 0)))
 	for r in rows:  # "To sort" (issue 57): an Open goal is kept, and the owner chooses what it becomes
 		r["to_sort"] = int(r.horizon == "Long term" and r.outcome == "In Progress")
+	rows = _nest_under_served(rows) if show == "cycle" else rows
 	tree = frappe.get_list("Life Area", filters={"space": space, "is_archived": 0}, fields=["name", "area_name", "parent_area", "is_life_area", "is_on", "colour",
 		"sort_order", "is_focus", "standard"], order_by="sort_order asc, area_name asc", limit=5000)
 	top = [a for a in tree if not a.parent_area]
 	hidden = set(areas_off(space))
 	use = use_focuses()
 	parent_of = {a.name: a.parent_area for a in tree}
+	known = {a.name for a in tree}
 	hidden_focus = {a.name for a in tree if a.is_focus} if not use else set()
-	by_area_name = {}
+
+	def place(area):  # "Use focuses" is off: a goal under a focus sits under its part or area
+		return (parent_of.get(area) or "") if area in hidden_focus else (area or "")
+
+	def path_of(area):
+		out = []
+		while area in known:
+			out.append(next(a.area_name for a in tree if a.name == area))
+			area = parent_of.get(area)
+		return " › ".join(reversed(out))
+
+	counts, by_area_name = {}, {}
+	also = _also_in_of(rows)
 	for r in rows:
-		area = r.area or ""
-		if area in hidden_focus:  # "Use focuses" is off: a goal under a focus sits under its part or area
-			area = parent_of.get(area) or ""
-		by_area_name.setdefault(area, []).append(r)
+		main = place(r.area)
+		a = main
+		while a:  # a goal counts once for its own place and for every part and area above it
+			counts[a] = counts.get(a, 0) + 1
+			a = parent_of.get(a)
+		by_area_name.setdefault(main, []).append(r)
+		for other in also.get(r.name, []):  # listed again under each place it is also in, marked, never counted again
+			other = place(other)
+			if other in known and other not in hidden and other != main:
+				by_area_name.setdefault(other, []).append(frappe._dict(r, is_also=1, also_in_from=path_of(main), children=[]))
 	with_annual = annual_focuses(space) if use else set()
 	order = {h: i for i, h in enumerate(("Year", "12 weeks", "Month", "Long term"))}
 
@@ -235,8 +268,9 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 		out = []
 		for f in tree:
 			if f.parent_area == parent and f.is_focus and f.name not in hidden and use:
-				goals = sorted(by_area_name.get(f.name, []), key=lambda r: order.get(r.horizon, 9))
-				out.append({"name": f.name, "area_name": f.area_name, "standard": f.standard, "goals": goals, "has_annual": f.name in with_annual})
+				goals = sorted(by_area_name.get(f.name, []), key=lambda r: (r.get("is_also", 0), order.get(r.horizon, 9)))
+				out.append({"name": f.name, "area_name": f.area_name, "standard": f.standard, "goals": goals, "has_annual": f.name in with_annual,
+					"count": counts.get(f.name, 0)})
 		return out
 
 	sections = []
@@ -245,17 +279,55 @@ def by_area(space: str | None = None, show: str = "cycle", sort: str = "order"):
 			continue
 		parts = [p for p in tree if p.parent_area == a.name and p.name not in hidden and not p.is_focus]
 		groups = [{"area": None, "focuses": focus_entries(a.name), "goals": by_area_name.get(a.name, [])}]
-		groups += [{"area": {"name": p.name, "area_name": p.area_name}, "focuses": focus_entries(p.name), "goals": by_area_name.get(p.name, [])} for p in parts]
+		groups += [{"area": {"name": p.name, "area_name": p.area_name, "count": counts.get(p.name, 0)}, "focuses": focus_entries(p.name),
+			"goals": by_area_name.get(p.name, [])} for p in parts]
 		groups = [g for g in groups if g["goals"] or g["focuses"]]
-		n = sum(len(g["goals"]) + sum(len(f["goals"]) for f in g["focuses"]) for g in groups)
-		sections.append({"area": a.name, "area_name": a.area_name, "colour": a.colour, "count": n,
+		also_n = sum(sum(1 for r in g["goals"] if r.get("is_also")) + sum(1 for f in g["focuses"] for r in f["goals"] if r.get("is_also")) for g in groups)
+		sections.append({"area": a.name, "area_name": a.area_name, "colour": a.colour, "count": counts.get(a.name, 0), "also_count": also_n,
 			"parts": [{"name": p.name, "area_name": p.area_name} for p in parts], "groups": groups})
-	known = {a.name for a in tree}
 	loose = [r for r in rows if not r.area or r.area not in known]
-	return {"space": space, "show": show, "sort": sort, "total": len(rows), "sections": sections, "use_focuses": int(use),
-		"focus_count": sum(len(g["focuses"]) for s in sections for g in s["groups"]),
-		"no_area": loose, "areas_on": len([s for s in sections if s["area"]]),
+	focus_count = sum(len(g["focuses"]) for s in sections for g in s["groups"])
+	areas_with_goals = len([s for s in sections if s["count"]])
+	line = f"{_n(len(rows), 'goal')} across {_n(areas_with_goals, 'area')}"
+	if focus_count:
+		line += f" · {_n(focus_count, 'focus', 'focuses')}"
+	return {"space": space, "show": show, "shows": shows, "sort": sort, "total": len(rows), "line": line, "sections": sections, "use_focuses": int(use),
+		"focus_count": focus_count, "no_area": loose, "areas_on": len([s for s in sections if s["area"]]),
 		"off": [{"name": a.name, "area_name": a.area_name} for a in top if a.name in hidden]}
+
+
+def _n(n, one, many=None):
+	return f"{n} {one if n == 1 else many or one + 's'}"
+
+
+def _nest_under_served(rows):
+	"""This cycle: a 12-week goal whose `serves` is a Year (or longer) goal shown here moves under it, as `children`; a Year goal with
+	none is marked `no_twelve_week`. Returns the rows that stay at the top. Nested goals are not counted apart from the goal above."""
+	by_name = {r.name: r for r in rows}
+	top = []
+	for r in rows:
+		r["children"] = []
+	for r in rows:
+		parent = by_name.get(r.serves) if r.horizon == "12 weeks" else None
+		if parent and parent.horizon != "12 weeks":
+			parent["children"].append(r)
+		else:
+			top.append(r)
+	for r in top:
+		r["no_twelve_week"] = int(r.horizon in ("Year", "Long term") and not r["children"])
+	return top
+
+
+def _also_in_of(rows):
+	"""{goal: [areas it is also in]} for the goals read (a goal's own child rows, in the order they were added)."""
+	names = [r.name for r in rows]
+	if not names:
+		return {}
+	ai = frappe.qb.DocType("Life Also In")
+	out = {}
+	for parent, area in frappe.qb.from_(ai).select(ai.parent, ai.area).where((ai.parenttype == "Life Goal") & ai.parent.isin(names)).orderby(ai.idx).run():  # system: reads child rows of goals the user's own query returned
+		out.setdefault(parent, []).append(area)
+	return out
 
 
 def annual_focuses(space):
@@ -452,6 +524,7 @@ def get(goal: str):
 	for k in ("target_date", "closed_on", "completed_on", "last_activity_on", "archived_on", "someday_on", "someday_review_on", "creation", "modified"):
 		g[k] = str(g[k])[:19] if g.get(k) else None
 	g.pop("actions", None)
+	g["also_in"] = [r.area for r in doc.also_in]
 	g["status"] = status_of(doc)
 	g["area_name"] = frappe.db.get_value("Life Area", doc.area, "area_name") if doc.area else None
 	g["serves_title"] = frappe.db.get_value("Life Goal", doc.serves, "title") if doc.serves else None
@@ -539,6 +612,9 @@ def _apply_values(doc, values, allowed):
 			frappe.throw(_("Choose Long term, Year, Month or 12 weeks."), title=_("Unknown goal horizon"))
 		if k == "horizon" and v != doc.horizon:
 			refuse_open(v)
+		if k == "also_in":
+			doc.set("also_in", [{"area": a} for a in (v if isinstance(v, builtins.list) else parse(v, [])) or []])
+			continue
 		doc.set(k, _float(v) if k in ("start_value", "target_value") else (v if v == 0 else v or None))
 	if "measure_kind" not in values and values.get("done_when") and not doc.measure_kind:
 		doc.measure_kind = "Milestone"
@@ -546,7 +622,7 @@ def _apply_values(doc, values, allowed):
 
 @frappe.whitelist(methods=["POST"])
 def update(goal: str, values: str | dict):
-	"""Change the fields of a goal a person edits: title, area, serves, done_when, notes_md, target_date, horizon (Long term, Year or Month; a goal joins 12 weeks with
+	"""Change the fields of a goal a person edits: title, area, also_in (the other areas, parts or focuses it is in), serves, done_when, notes_md, target_date, horizon (Long term, Year or Month; a goal joins 12 weeks with
 	add_to_cycle), result_note, and its
 	key result (measure_kind, measure, unit, start_value, target_value). Changing the key result applies the rule of a new goal."""
 	_person_only()
@@ -556,7 +632,7 @@ def update(goal: str, values: str | dict):
 		frappe.throw(_("values must be an object of fields."), title=_("Values must be fields"))
 	if values.get("horizon") == "12 weeks":
 		frappe.throw(_("A goal joins a 12 Week Year with Add to a 12 Week Year."), title=_("Use Add to a 12 Week Year"))
-	_apply_values(doc, values, {"title", "area", "serves", "done_when", "notes_md", "target_date", "result_note", "horizon", *MEASURE_FIELDS})
+	_apply_values(doc, values, {"title", "area", "also_in", "serves", "done_when", "notes_md", "target_date", "result_note", "horizon", *MEASURE_FIELDS})
 	doc.save()
 	return get(doc.name)
 

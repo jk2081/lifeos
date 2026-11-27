@@ -901,9 +901,9 @@ print(json.dumps(out))`).split('\n').pop())
       must((await row('golf').locator('[data-goal-next-title]').innerText()) === 'No next action', 'a goal with no tasks should say so')
       await c.locator('[data-goal-open]').click()
       await pg.waitForURL((u) => u.searchParams.get('open') === `goal:${goals.pilot}`, { timeout: 8000 })
-      // the default filter is this cycle: only the cycle goal of the eight shows, and Finished shows none of them
+      // the default filter is this cycle: the cycle goal and the Year (and longer) goals in progress show, and Finished shows none of them
       await openGoals('')
-      must((await row('fit').count()) === 1 && (await row('pilot').count()) === 0, 'This cycle should hold the cycle goal only')
+      must((await row('fit').count()) === 1 && (await row('pilot').count()) === 1, 'This cycle should hold the cycle goal and the longer goals')
       await openGoals('show=finished')
       must((await pg.locator('[data-goal-card][data-goal]').evaluateAll((els, ids) => els.filter((e) => ids.includes(e.dataset.goal)).length, Object.values(goals))) === 0, 'an open goal shows under Finished')
     })
@@ -1880,10 +1880,10 @@ print(json.dumps({"part": part.name, "yield": yld.name, "quality": qual.name, "a
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('GOALS.67', `${width} px: a focus with no active Annual goal shows "No annual goal" and + Annual goal; adding one clears it`, async () => {
+    await check('GOALS.67', `${width} px: a focus with no goal shows one line, "no goal yet" and + Annual goal; a focus with goals but no Annual goal says "No annual goal"; adding one clears it`, async () => {
       await byArea()
       const qb = block(`I57 Quality ${width}`)
-      must(await qb.locator('[data-focus-no-annual]').count() === 1, 'No annual goal is not shown')
+      must((await qb.locator('[data-focus-count]').innerText()).includes('no goal yet') && await qb.locator('[data-focus-add-annual]').count() === 1, 'the empty focus is not one line with + Annual goal')
       must(await block(`I57 Yield ${width}`).locator('[data-focus-no-annual]').count() === 0, 'a focus with an annual goal says it has none')
       await qb.locator('[data-focus-add-annual]').click()
       await pg.locator('[role="dialog"]').last().waitFor({ timeout: 8000 })
@@ -1891,7 +1891,7 @@ print(json.dumps({"part": part.name, "yield": yld.name, "quality": qual.name, "a
       await pg.keyboard.press('Escape')
       await one.api('goals.create', { space, title: `I57 new annual ${width}`, horizon: 'Year', target_date: bench('from frappe.utils import add_days, today\nprint(add_days(today(), 120))').split('\n').pop(), area: made.quality, done_when: 'Done' })
       await byArea()
-      must(await block(`I57 Quality ${width}`).locator('[data-focus-no-annual]').count() === 0, 'No annual goal is still shown after adding one')
+      must(await block(`I57 Quality ${width}`).locator('[data-focus-no-annual], [data-focus-add-annual]').count() === 0, 'No annual goal is still shown after adding one')
     })
 
     await check('GOALS.68', `${width} px: a focus page shows the standard, numbered principles (edit and reorder) and goals by horizon`, async () => {
@@ -2059,4 +2059,105 @@ print(f.name)`).split('\n').pop()
   bench(`frappe.set_user("Administrator")
 for n in frappe.get_all("Life Area", filters={"area_name": ["like", "I128 Focus ${stamp}"]}, pluck="name") + frappe.get_all("Life Area", filters={"area_name": ["like", "I128 Part ${stamp}"]}, pluck="name"):
     frappe.delete_doc("Life Area", n, force=1, ignore_permissions=True)`)
+}
+
+// Issue 137: Goals opens on All open when no 12 Week Year runs, counts roll up the tree, and a goal can be also in other places. A user made
+// for the run has a space of their own (no cycle) with a part, three focuses (one without a goal) and two Year goals.
+for (const width of WIDTHS) {
+  const phone = width < 800
+  const user = `i137-${width}-${stamp}@lifeos.test`.toLowerCase()
+  const space = `I137 ${width} ${stamp}`
+  const restore = () => bench(`frappe.set_user("Administrator")
+frappe.db.set_single_value("Life Settings", "use_focuses", 1)
+for dt in ("Life Task", "Life Goal", "Life Cycle"):
+    for n in frappe.get_all(dt, filters={"space": "${space}"}, pluck="name"): frappe.delete_doc(dt, n, force=1, ignore_permissions=True)
+from lifeos.tools import devtools
+devtools.purge_space("${space}", drop=True)
+frappe.db.delete("DefaultValue", {"parent": "${user}"})
+if frappe.db.exists("User", "${user}"): frappe.delete_doc("User", "${user}", force=1, ignore_permissions=True)`)
+  let one = null
+  try {
+    bench(`from lifeos.tools import devtools
+devtools.make_user("${user}", "Newcomer137", ["Life Admin", "Life User"])
+frappe.db.sql("delete from __Auth where doctype='User' and name=%s and fieldname='password'", "${user}")
+frappe.db.sql("insert into __Auth (doctype, name, fieldname, password, encrypted) select doctype, %s, fieldname, password, encrypted from __Auth where doctype='User' and name='owner@lifeos.test' and fieldname='password'", "${user}")
+frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user": "${user}", "members": [{"user": "${user}", "access": "Write"}]}).insert(ignore_permissions=True)
+frappe.db.set_single_value("Life Settings", "use_focuses", 1)`)
+    one = await session(user, width)
+    const pg = one.page
+    const errors = []
+    pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
+    const settle = () => pg.waitForTimeout(450)
+    await one.api('onboarding.complete', { status: 'skipped' })
+    const made = JSON.parse(bench(`import json
+from frappe.utils import add_days, today
+space = "${space}"
+top = lambda n: frappe.get_all("Life Area", filters={"space": space, "is_life_area": 1, "area_name": n}, pluck="name")[0]
+career, mind = top("Career"), top("Mind")
+for a in (career, mind): frappe.db.set_value("Life Area", a, "is_on", 1)
+def area(name, parent, **kw):
+    return frappe.get_doc({"doctype": "Life Area", "space": space, "area_name": name, "parent_area": parent, **kw}).insert(ignore_permissions=True)
+part = area("I137 Tea ${width}", career, part_kind="Estate")
+ghilli = area("I137 Ghillidary ${width}", part.name, is_focus=1)
+learn = area("I137 Learn ${width}", mind, is_focus=1)
+empty = area("I137 Empty ${width}", part.name, is_focus=1)
+def goal(title, **kw):
+    return frappe.get_doc({"doctype": "Life Goal", "space": space, "title": title, "done_when": "Done", "horizon": "Year", "target_date": add_days(today(), 300), **kw}).insert(ignore_permissions=True)
+a = goal("I137 leaf ${width}", area=ghilli.name)
+b = goal("I137 launch ${width}", area=learn.name)
+print(json.dumps({"career": career, "mind": mind, "leaf": a.name, "launch": b.name, "empty": empty.name}))`).split('\n').pop())
+    const byArea = async (q = '') => { await one.open('/life/goals' + q); await pg.locator('[data-goals-by-area][data-loaded="1"]').waitFor({ timeout: 10000 }); await settle() }
+    const card = (name, scope = '') => pg.locator(`${scope} [data-goal-card][data-goal="${name}"]`)
+
+    await check('GOALS.80', `${width} px: with no 12 Week Year Goals opens on All open, both goals show under their focuses, Career's chip says 1 and a focus with no goal is one line with + Annual goal`, async () => {
+      await byArea()
+      const tabs = await pg.locator('[data-goal-show]').innerText()
+      must(!tabs.includes('This cycle') && tabs.includes('All open') && tabs.includes('Finished'), 'the show control is: ' + tabs)
+      await byArea('?show=cycle') // a link to a view that does not exist falls back
+      must(!(await pg.locator('[data-goal-show]').innerText()).includes('This cycle'), 'This cycle is offered with no cycle running')
+      must((await card(made.leaf, `[data-focus-block][data-focus="I137 Ghillidary ${width}"]`).count()) === 1, 'the Career goal is not under its focus')
+      must((await card(made.launch, `[data-focus-block][data-focus="I137 Learn ${width}"]`).count()) === 1, 'the Mind goal is not under its focus')
+      must((await pg.locator('[data-area-chip="Career"]').innerText()).replace(/\s+/g, ' ').trim() === 'Career 1', 'the Career chip says ' + await pg.locator('[data-area-chip="Career"]').innerText())
+      must((await pg.locator('[data-area-section][data-area="Career"] [data-part-count]').innerText()).includes('1 goal'), 'the part does not count the goal under its focus')
+      const none = pg.locator(`[data-focus-block][data-focus="I137 Empty ${width}"]`)
+      must((await none.locator('[data-focus-add-annual]').count()) === 1 && (await none.locator('[data-focus-count]').innerText()).includes('no goal yet'), 'the empty focus is not one line with + Annual goal')
+      must(!(await pg.locator('body').innerText()).includes('No goal serves this focus yet'), 'the old paragraph is still there')
+      must(!errors.length, 'script errors: ' + errors.join(' | '))
+    })
+
+    await check('GOALS.81', `${width} px: adding Career to a goal's also in from its layer lists it under Career marked also in, and opening it there opens the same goal`, async () => {
+      await byArea()
+      await card(made.launch).locator('[data-goal-open]').click()
+      await pg.waitForFunction((g) => new URL(location.href).searchParams.get('open') === 'goal:' + g, made.launch, { timeout: 8000 })
+      await pg.locator('[data-pane-add-also-in] button').click()
+      await pg.getByRole('menuitem', { name: /^\s*Career\s*$/ }).click()
+      await pg.locator('[data-pane-also-in]').filter({ hasText: 'Career' }).waitFor({ timeout: 8000 })
+      await pg.locator('[data-pane-close]').click()
+      await byArea()
+      const also = pg.locator(`[data-area-section][data-area="Career"] [data-goal-card][data-goal="${made.launch}"]`)
+      must((await also.count()) === 1 && (await also.locator('[data-goal-also]').innerText()).includes('also in · from Mind'), 'the goal is not listed under Career marked also in')
+      must((await pg.locator('[data-area-chip="Career"]').innerText()).replace(/\s+/g, ' ').trim() === 'Career 1', 'the also-in goal was counted again in Career')
+      must((await pg.locator('[data-area-chip="all"]').innerText()).includes('All 2'), 'the total changed')
+      await also.locator('[data-goal-open]').click()
+      await pg.waitForFunction((g) => new URL(location.href).searchParams.get('open') === 'goal:' + g, made.launch, { timeout: 8000 })
+      must(!errors.length, 'script errors: ' + errors.join(' | '))
+    })
+
+    await check('GOALS.82', `${width} px: Goals with an also-in goal and a focus with no goal fits in light and dark with nothing scrolling sideways`, async () => {
+      bench(`g = frappe.get_doc("Life Goal", "${made.launch}")
+if not g.also_in:
+    g.append("also_in", {"area": "${made.career}"})
+    g.save(ignore_permissions=True)`)
+      for (const scheme of ['light', 'dark']) {
+        await pg.emulateMedia({ colorScheme: scheme })
+        await byArea()
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `the page scrolls sideways in ${scheme}`)
+        must((await pg.locator('[data-goal-also]').count()) >= 1, 'the also-in marker is missing')
+      }
+      must(!errors.length, 'script errors: ' + errors.join(' | '))
+    })
+  } finally {
+    if (one) await one.ctx.close()
+    restore()
+  }
 }

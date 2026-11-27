@@ -227,9 +227,15 @@ def space_context(space):
 		for row in frappe.get_list("Life Goal Action", filters={"parent": ("in", cycle_goals)}, fields=["parent", "name", "title", "status", "per_week"],
 				order_by="idx", parent_doctype="Life Goal", limit=0):
 			actions.setdefault(row.pop("parent"), []).append(row)
+	also = {}
+	for parent, area in frappe.get_all("Life Also In", filters={"parenttype": "Life Goal", "parent": ("in", [g.name for g in rows])},  # system: child rows of the goals read above, which are in the space
+			fields=["parent", "area"], order_by="idx", as_list=True, limit=0) if rows else []:
+
+		also.setdefault(parent, []).append(area)
 	for g in rows:
 		if g.area in off:  # the goals of an area that is off are hidden
 			continue
+		g["also_in"] = [a for a in also.get(g.name, []) if a not in off]  # a task filed in one of these is offered the goal too
 		g["actions"] = actions.get(g.name, []) if g.cycle else []
 		if g.measure_kind == "Number":  # a number goal: what a Reading proposal reports (set 7)
 			g["measure"] = {"measure": g.measure, "unit": g.unit, "start": g.start_value, "target": g.target_value, "current": g.current_value if g.current_on else None}

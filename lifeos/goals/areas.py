@@ -248,3 +248,14 @@ def goal_counts(space):
 			out[a] = out.get(a, 0) + n
 			a = parent.get(a)
 	return out
+
+
+def goals_for(space, area):
+	"""Names of the goals in progress a task filed in `area` is offered: goals filed under that area or below it, and goals that list it
+	(or one of its sub-areas) in "also in" (issue 137)."""
+	from lifeos.api.utils import area_criterion
+
+	g = frappe.qb.DocType("Life Goal")
+	query = frappe.qb.get_query("Life Goal", fields=[g.name], ignore_permissions=False)
+	return query.where((g.space == space) & (g.outcome == "In Progress") & (g.is_someday == 0) & (g.is_archived == 0)
+		& area_criterion(space, area, g, also_in="Life Goal")).orderby(g.creation).run(pluck=True)

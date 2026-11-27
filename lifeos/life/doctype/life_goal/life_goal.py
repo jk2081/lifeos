@@ -69,6 +69,7 @@ class LifeGoal(Document):
 			self.last_activity_on = today()
 		if self.horizon != "Long term":
 			self.on_hold = 0
+		self.check_also_in()
 		self.check_serves()
 		self.check_measure()
 		check_cycle_open(self.cycle, self.flags)
@@ -78,6 +79,15 @@ class LifeGoal(Document):
 				a.done_on = today()
 			if a.status != "Done":
 				a.done_on = None
+
+	def check_also_in(self):
+		"""A goal is never also in its own area, and lists each other place once."""
+		seen, rows = {self.area}, []
+		for r in self.get("also_in") or []:
+			if r.area and r.area not in seen:
+				seen.add(r.area)
+				rows.append(r)
+		self.set("also_in", rows)
 
 	def check_horizon(self):
 		if not self.horizon:

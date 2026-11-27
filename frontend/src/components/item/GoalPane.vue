@@ -6,6 +6,15 @@
       :label="info?.goal.on_hold && d.goal.outcome === 'In Progress' ? 'On hold' : d.goal.outcome" />
       <span class="text-sm text-ink-gray-6">{{ headline }}</span>
       <Button v-if="writable && info && !info.goal.is_archived" class="ml-auto" size="sm" icon-left="lucide-pencil" label="Edit" data-pane-goal-edit @click="editOpen = true" /></div>
+    <!-- Filed under: its main area, and the other places it is also in (issue 137), as on a task -->
+    <div v-if="info" class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6" data-pane-filed>
+      <span>Filed under</span>
+      <div class="contents" data-pane-goal-area><Pick :model-value="info.goal.area || null" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => saveFiling({ area: v || null })" /></div>
+      <Badge v-for="a in info.goal.also_in" :key="a" size="lg" data-pane-also-in>also in {{ areaName(a) }}
+        <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)" @click="saveFiling({ also_in: info.goal.also_in.filter((x) => x !== a) })" /></template></Badge>
+      <div v-if="writable" class="contents" data-pane-add-also-in><Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== info.goal.area && !info.goal.also_in.includes(o.value))" placeholder="+ also in"
+        :clearable="false" @update:model-value="(v) => saveFiling({ also_in: [...info.goal.also_in, v] })" /></div>
+    </div>
     <!-- what this goal serves and what serves it (UX fixes, set 6) -->
     <div v-if="info" class="flex flex-wrap items-center gap-2 text-sm text-ink-gray-6" data-pane-serves>
       <span>Serves</span>
@@ -99,7 +108,7 @@ import { loadBacklinks } from '@/lib/links'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { plural } from '@/lib/plural'
-import { loadLookups, lookups, parentOptions } from '@/lib/lookups'
+import { areaName, areaOptions, loadLookups, lookups, parentOptions } from '@/lib/lookups'
 import { openRef } from '@/lib/pane'
 
 const OUTCOMES = ['Achieved', 'Partly Achieved', 'Not Achieved', 'Dropped']
@@ -152,6 +161,9 @@ const servesOptions = computed(() => [{ label: 'None', value: '' },
   ...(info.value?.goal.serves && !(lookups.goals || []).some((x) => x.name === info.value.goal.serves) ? [{ label: info.value.goal.serves_title, value: info.value.goal.serves }] : [])])
 async function saveServes(v) {
   if (await tryCall(() => itemData.goals.update({ goal: props.name, values: { serves: v || null } }))) { await load(); emit('changed') }
+}
+async function saveFiling(values) {
+  if (await tryCall(() => itemData.goals.update({ goal: props.name, values }))) { await load(); emit('changed') }
 }
 async function setStatus(status) {
   if (await tryCall(() => itemData.goals.set_status({ goal: props.name, status }), status === 'On Hold' ? 'On hold' : 'Resumed')) { await load(); emit('changed') }

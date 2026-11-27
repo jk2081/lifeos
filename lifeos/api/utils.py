@@ -91,7 +91,7 @@ def _also_in_rows(area_ids, parenttype=None):
 
 
 # the DocTypes with an "also in" table
-ALSO_IN = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document")
+ALSO_IN = ("Life Task", "Life Note", "Life Inbox Item", "Life Chat Log", "Life Vault Document", "Life Goal")
 
 
 def lens_area(area):

@@ -32,7 +32,7 @@ import { store } from '@/lib/store'
 import { areaOptions, goalOptions, loadLookups, lookups } from '@/lib/lookups'
 import { doneWhenRequired, emptyMeasure, makeHabit, measureArgs, measureProblem } from '@/lib/goals'
 
-const props = defineProps({ modelValue: Boolean, areaRequired: Boolean, area: { type: String, default: '' }, horizon: { type: String, default: '' } })
+const props = defineProps({ modelValue: Boolean, areaRequired: Boolean, area: { type: String, default: '' }, horizon: { type: String, default: '' }, serves: { type: String, default: '' } })
 const emit = defineEmits(['update:modelValue', 'saved', 'habit'])
 const HORIZONS = ['Year', '12 weeks', 'Month'] // Open (Long term) goals are retired (issue 57)
 const UP = { Month: '12 weeks', '12 weeks': 'Year' }
@@ -66,11 +66,12 @@ function pickCycle() { if (!v.cycle) v.cycle = cycles.value[0]?.name || '' }
 watch(() => props.modelValue, async (o) => {
   open.value = o
   if (!o) return
-  Object.assign(v, { title: '', horizon: props.horizon || 'Year', area: props.area || store.lensArea || '', target_date: '', cycle: '', serves: '' })
+  Object.assign(v, { title: '', horizon: props.horizon || 'Year', area: props.area || store.lensArea || '', target_date: '', cycle: '', serves: props.serves || '' })
   Object.assign(m, emptyMeasure())
   loadLookups()
   cycles.value = (await goalsData.goals.cycles({ space: store.space })) || []
   quarters.value = (await goalsData.goals.suggest_horizon({ space: store.space })).quarters
+  if (v.horizon === '12 weeks') pickCycle()
 }, { immediate: true })
 watch(open, (o) => emit('update:modelValue', o))
 
