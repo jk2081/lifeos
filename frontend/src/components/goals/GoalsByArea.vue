@@ -52,17 +52,17 @@
         <div v-for="f in g.focuses" :key="f.name" class="flex flex-col gap-1.5 rounded-5 border border-outline-gray-2 p-3" data-focus-block :data-focus="f.area_name">
           <div class="flex flex-wrap items-center gap-2">
             <Badge theme="blue" label="FOCUS" data-focus-tag />
-            <RouterLink class="text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/focus/${f.name}`" data-focus-title>{{ f.area_name }}</RouterLink>
+            <RefLink class="text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`focus:${f.name}`" data-focus-title>{{ f.area_name }}</RefLink>
             <span class="text-sm text-ink-gray-6">· {{ f.goals.length }} goal{{ f.goals.length === 1 ? '' : 's' }}</span>
             <Badge v-if="!f.has_annual" theme="orange" label="No annual goal" data-focus-no-annual />
             <Button v-if="writable && !f.has_annual" size="sm" variant="subtle" icon-left="lucide-plus" label="Annual goal" :aria-label="`New annual goal for ${f.area_name}`" data-focus-add-annual @click="addGoal(f.name, 'Year')" />
-            <RouterLink class="ml-auto text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/focus/${f.name}`" data-focus-open>Open</RouterLink>
+            <RefLink class="ml-auto text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`focus:${f.name}`" data-focus-open>Open</RefLink>
           </div>
           <p v-if="f.standard" class="text-sm text-ink-gray-6" data-focus-standard>Standard: {{ f.standard }}</p>
           <ul class="flex flex-col gap-1.5">
             <li v-for="goal in f.goals" :key="goal.name" data-goal-card :data-goal="goal.name" :data-focus-goal="f.area_name">
               <Card class="relative flex flex-col gap-1 hover:bg-surface-gray-1 md:flex-row md:items-center md:justify-between md:gap-4">
-                <RouterLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`/goals/${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
+                <RefLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`goal:${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
                 <div class="min-w-0">
                   <div class="break-words text-base-medium text-ink-gray-9"><span data-goal-title>{{ goal.title }}</span> <Badge :label="horizonLabel(goal)" data-goal-horizon-tag /></div>
                   <div class="text-sm" :class="goal.done_when_line ? 'text-ink-gray-6' : 'text-ink-amber-9'" data-goal-done-when>{{ doneWhen(goal) }}</div>
@@ -77,7 +77,7 @@
           <li v-for="(goal, i) in g.goals" :key="goal.name" class="group" :draggable="canDrag" data-goal-card :data-goal="goal.name" :data-area-name="s.area_name" :data-part-name="g.area?.area_name || ''"
             @dragstart="dragged = goal" @dragover.prevent="over(g.goals, goal)" @drop.prevent="drop(g.goals)" @dragend="dragged = null">
             <Card class="relative flex flex-col gap-2 hover:bg-surface-gray-1 md:grid md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.3fr)_8rem] md:items-start md:gap-4">
-              <RouterLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`/goals/${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
+              <RefLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`goal:${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
               <div class="min-w-0">
                 <div class="break-words text-base-medium text-ink-gray-9" data-goal-title>{{ goal.title }}</div>
                 <div class="text-sm" :class="goal.done_when_line ? 'text-ink-gray-6' : 'text-ink-amber-9'" data-goal-done-when :data-missing="goal.done_when_line ? 0 : 1">{{ doneWhen(goal) }}</div>
@@ -114,7 +114,7 @@
       <div class="border-b border-outline-gray-2 pb-2"><h2 class="text-base-medium text-ink-gray-9">No area <span class="text-sm font-normal text-ink-gray-6">{{ data.no_area.length }} goal{{ data.no_area.length === 1 ? '' : 's' }}</span></h2></div>
       <ul class="flex flex-col gap-2"><li v-for="goal in data.no_area" :key="goal.name" data-goal-card :data-goal="goal.name">
         <Card class="relative flex flex-col gap-1 hover:bg-surface-gray-1">
-          <RouterLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`/goals/${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
+          <RefLink class="absolute inset-0 rounded-5 focus-visible:focus-ring" :to="`goal:${goal.name}`" :aria-label="`Open ${goal.title}`" data-goal-open />
           <div class="break-words text-base-medium text-ink-gray-9" data-goal-title>{{ goal.title }}</div><div class="text-sm text-ink-gray-6">{{ goal.progress.label }}</div>
         </Card></li></ul>
     </section>
@@ -123,6 +123,8 @@
   <SortOpenDialog v-model="sortOpenShown" :goal="sorting" :mode="sortMode" @done="load" />
 </template>
 <script setup>
+import { openRef } from '@/lib/pane'
+import RefLink from '@/components/ui/RefLink.vue'
 // Goals > By area (issue 20): one section for each area that is on, its parts as sub-groups, and a card for each goal with its
 // Done when, progress, the cycle's week and score, the next action, the open task count and the goal it serves. The old
 // goals list (filters, columns) is still behind /goals with any filter in the address (GoalsPlace).
@@ -203,7 +205,7 @@ function sortOpen(goal, mode) {
 const horizonLabel = (g) => (g.horizon === '12 weeks' ? '12 Week Year' : g.horizon === 'Year' ? `Annual${g.target_date ? ' · ' + short(g.target_date, true) : ''}` : g.horizon)
 async function created(g) {
   await load()
-  router.push(`/goals/${g.name}`)
+  openRef(`goal:${g.name}`)
 }
 // the owner's order: move one step, or drag over another card of the same group; saved when dropped
 async function save(list) {

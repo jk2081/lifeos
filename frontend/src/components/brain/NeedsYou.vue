@@ -132,7 +132,7 @@
           <div class="flex flex-wrap items-center gap-2 max-md:w-full">
             <Button v-if="writable" label="Retry" data-retry @click="retry(u)" />
             <Button v-if="writable && notProcessed(u)" label="File it myself" data-file-myself @click="fileMyself(u)" />
-            <Button label="Open" @click="router.push(`/item/${u.item}`)" />
+            <Button label="Open" @click="openRef(`inbox:${u.item}`)" />
           </div>
         </div>
       </Card>
@@ -224,7 +224,7 @@ async function alwaysAsk(r) {
   await load()
 }
 function change(r) {
-  router.push(`/item/${r.item}`)
+  openRef(`inbox:${r.item}`)
 }
 // Done, file all: every row shown that has a best guess to keep. A capture whose pending proposals are all on screen goes
 // through review.decide_all in one call; any other proposal is decided alone.
@@ -263,7 +263,7 @@ async function retry(u) {
   if (await tryCall(() => brainData.inbox.retry({ item: u.item }), 'Sent back to be processed.')) await load()
 }
 async function fileMyself(u) {
-  if (await tryCall(() => brainData.inbox.file_myself({ item: u.item }))) router.push(`/item/${u.item}`)
+  if (await tryCall(() => brainData.inbox.file_myself({ item: u.item }))) openRef(`inbox:${u.item}`)
 }
 onRecordChanged(load)
 onMounted(async () => { await loadLookups(); await load() })

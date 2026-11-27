@@ -158,7 +158,7 @@ const NEW_FIELDS = computed(() => [{ name: 'title', label: 'Title', required: tr
   { name: 'area', label: 'Area', options: areaOptions() }])
 async function create(v) {
   const res = await libraryData.wiki.create_page({ space: store.space, title: v.title, summary: v.summary, area: v.area || undefined, content_md: '' })
-  router.push(`/library/${res.name}`)
+  openRef(`note:${res.name}`)
 }
 async function createFromLink(title) {
   const res = await tryCall(() => libraryData.wiki.create_page({ space: store.space, title, summary: title, content_md: '' }), 'Page created.')

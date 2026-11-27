@@ -29,7 +29,7 @@
           <div class="flex flex-wrap items-center gap-2"><Badge size="lg" :label="person.kind" data-person-kind /><span v-if="person.role" class="text-base text-ink-gray-8" data-person-role>{{ person.role }}</span></div>
           <dl class="mt-3 flex flex-col gap-2 text-sm">
             <div v-if="person.organisation"><dt class="text-ink-gray-6">Organisation</dt>
-              <dd><a class="text-base text-ink-blue-8 hover:underline" :href="'/life/library/people/' + person.organisation.name" data-person-org @click.prevent="go(person.organisation.name)">{{ person.organisation.title || person.organisation.full_name }}</a></dd></div>
+              <dd><RefLink class="text-base text-ink-blue-8 hover:underline" :to="`person:${person.organisation.name}`" data-person-org>{{ person.organisation.title || person.organisation.full_name }}</RefLink></dd></div>
             <div v-if="person.area_name"><dt class="text-ink-gray-6">Area</dt><dd class="text-base text-ink-gray-8">{{ person.area_name }}</dd></div>
             <div v-if="person.aliases.length"><dt class="text-ink-gray-6">Also called</dt><dd class="text-base text-ink-gray-8">{{ person.aliases.join(', ') }}</dd></div>
           </dl>
@@ -38,8 +38,8 @@
           <h2 class="mb-2 text-base-medium text-ink-gray-9">People</h2>
           <ul v-if="person.people.length" class="flex flex-col gap-1">
             <li v-for="m in person.people" :key="m.name" data-org-person :data-name="m.name">
-              <a class="block rounded px-1 py-1 hover:bg-surface-gray-1" :href="'/life/library/people/' + m.name" @click.prevent="go(m.name)">
-                <span class="text-base text-ink-blue-8">{{ m.title }}</span><span v-if="m.role" class="text-sm text-ink-gray-6"> · {{ m.role }}</span></a>
+              <RefLink class="block rounded px-1 py-1 hover:bg-surface-gray-1" :to="`person:${m.name}`">
+                <span class="text-base text-ink-blue-8">{{ m.title }}</span><span v-if="m.role" class="text-sm text-ink-gray-6"> · {{ m.role }}</span></RefLink>
             </li>
           </ul>
           <p v-else class="text-sm text-ink-gray-6" data-org-no-people>No one is linked to {{ person.title }} yet.</p>
@@ -57,6 +57,7 @@ import { Badge, Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Empty from '@/components/Empty.vue'
 import Md from '@/components/Md.vue'
+import RefLink from '@/components/ui/RefLink.vue'
 import PageHead from '@/components/PageHead.vue'
 import { libraryData } from '@/data/library'
 import { short } from '@/lib/dates'
@@ -67,7 +68,6 @@ const route = useRoute()
 const router = useRouter()
 const person = ref(null)
 const missing = ref(false)
-const go = (name) => router.push({ path: `/library/people/${name}`, query: { space: route.query.space } })
 
 async function load() {
   try {

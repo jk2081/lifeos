@@ -4,7 +4,7 @@
       <p v-if="!writable" class="text-sm text-ink-gray-6">This cycle is read-only.</p>
       <div v-for="goal in grid.goals" :key="goal.name" class="rounded-5 border border-outline-gray-2 p-3" data-cg-goal>
         <div class="flex flex-wrap items-center gap-2">
-          <RouterLink class="min-w-0 flex-1 break-words text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`/goals/${goal.name}`">{{ goal.title }}</RouterLink>
+          <RefLink class="min-w-0 flex-1 break-words text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`goal:${goal.name}`">{{ goal.title }}</RefLink>
           <Badge v-if="goal.area_name" :label="goal.area_name" />
           <Button v-if="writable" size="sm" label="Edit" :aria-label="`Edit ${goal.title}`" @click="edit(goal)" />
         </div>
@@ -28,6 +28,7 @@
   <GoalDialog v-model="goalOpen" :cycle="grid.cycle.name" :goal="editing" @saved="emit('changed')" />
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 // "Cycle goals" on Goals > Cycles: the cycle's goals with their actions, for editing (the goal dialog, finishing or dropping an action).
 import { ref } from 'vue'
 import { Badge, Button, Dialog, Dropdown } from 'frappe-ui'

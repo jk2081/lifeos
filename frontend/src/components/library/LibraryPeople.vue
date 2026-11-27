@@ -14,7 +14,7 @@
       <ul class="flex flex-col">
         <li v-for="r in rows" :key="r.name" class="relative border-b border-outline-gray-1 last:border-b-0 hover:bg-surface-gray-1" data-people-row :data-name="r.name" :data-kind="r.kind">
           <button type="button" class="flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left md:grid md:grid-cols-[2rem_minmax(0,1fr)_minmax(0,9rem)_minmax(0,16rem)] md:items-center md:gap-4 focus-visible:focus-ring"
-            @click="router.push({ path: `/library/people/${r.name}`, query: { space: route.query.space } })">
+            @click="openRef(`person:${r.name}`)">
             <div class="flex min-w-0 items-start gap-3 md:contents">
               <span class="flex size-8 flex-none items-center justify-center rounded-md text-sm-medium" :class="r.letter === 'O' ? 'bg-surface-amber-2 text-ink-gray-9' : 'bg-surface-blue-2 text-ink-gray-9'" aria-hidden="true" data-people-letter>{{ r.letter }}</span>
               <div class="min-w-0 flex-1">
@@ -56,7 +56,7 @@ import { libraryData } from '@/data/library'
 import { canWrite, store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { areaOptions, loadLookups } from '@/lib/lookups'
-import { onRecordChanged } from '@/lib/pane'
+import { onRecordChanged, openRef } from '@/lib/pane'
 
 const route = useRoute()
 const router = useRouter()

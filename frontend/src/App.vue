@@ -83,7 +83,7 @@ import { GO, PLACES } from './lib/nav'
 import { activePlace } from './lib/sidebar'
 import { navCount } from './lib/newMenu'
 import { db } from './lib/api'
-import { recordChanged } from './lib/pane'
+import { openRef, recordChanged } from './lib/pane'
 import { areaOptions, loadLookups } from './lib/lookups'
 import SearchPalette from './components/SearchPalette.vue'
 import ItemView from '@/components/item/ItemView.vue'
@@ -123,7 +123,7 @@ useColorScheme() // light and dark come from frappe-ui: it follows the system se
 async function createNote(v) {
   const note = await db.insert({ doctype: 'Life Note', space: store.space, title: v.title, content_md: '' })
   store.newKind = ''
-  router.push(`/library/${note.name}?edit=1`)
+  openRef(`note:${note.name}`)
 }
 const somedayFields = computed(() => [{ name: 'title', label: 'What to park', required: true },
   { name: 'as_note', label: 'It is', options: [{ label: 'A task', value: 0 }, { label: 'A thought with no action (a note)', value: 1 }] }, { name: 'area', label: 'Area', options: areaOptions() },
@@ -148,7 +148,7 @@ async function createDate(v) {
 }
 function goalCreated(g) {
   store.newKind = ''
-  router.push(`/goals/${g.name}`)
+  openRef(`goal:${g.name}`)
 }
 // the sidebar's areas come from the space's lookups, read again when the space changes or Settings changes them
 watch(() => [store.ready, store.space], ([ready]) => ready && loadLookups(true), { immediate: true })

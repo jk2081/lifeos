@@ -472,7 +472,7 @@ for (const width of WIDTHS) {
     await pg.waitForTimeout(900)
     await pg.keyboard.press('Enter')
     await settle()
-    must(new URL(pg.url()).pathname === `/life/item/${id}`, 'the search result did not open the item page: ' + new URL(pg.url()).pathname)
+    must(new URL(pg.url()).searchParams.get('open') === `inbox:${id}`, 'the search result did not open the item in the Drawer: ' + pg.url())
   })
 
   await check('BRAIN.18', `${width} px: a user without access to the item's space gets "Not found" rather than its content`, async () => {
@@ -685,7 +685,7 @@ print(json.dumps({"n": len(rows), "sources": len({r.source_type for r in rows})}
       }
       await noSideways()
       await rw.locator('[data-open-capture]').click()
-      await pg.waitForURL((u) => u.pathname.startsWith('/life/item/'), { timeout: 10000 })
+      await pg.waitForURL((u) => (u.searchParams.get('open') || '').startsWith('inbox:'), { timeout: 10000 })
       await queue()
     })
     await check('BRAIN.29', `${width} px: an agent's proposal with alt_area shows two area chips; picking the second files it in that area`, async () => {
@@ -1159,7 +1159,7 @@ print(json.dumps(d.name))`).split('\n').pop())
       must((await row.innerText()).includes('Not processed: no AI key'), 'the reason is not shown')
       must(await row.locator('[data-retry]').isVisible() && await row.locator('[data-file-myself]').isVisible(), 'Retry and File it myself are not both shown')
       await row.locator('[data-file-myself]').click()
-      await pg.waitForURL(new RegExp(`/item/${item}`), { timeout: 10000 })
+      await pg.waitForURL((u) => u.searchParams.get('open') === `inbox:${item}`, { timeout: 10000 })
       const status = bench(`print(frappe.db.get_value("Life Inbox Item", "${item}", "status"))`).split('\n').pop()
       must(status === 'Done', 'the capture is ' + status)
       await s.open('/life/brain')

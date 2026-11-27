@@ -22,7 +22,7 @@
           <Button class="ml-auto" variant="ghost" size="sm" label="Open grid" :route="`/goals/cycles?cycle=${c.name}`" />
         </div>
         <div v-for="g in c.goals" :key="g.name" class="gr border-t border-outline-gray-1 px-4 py-2.5">
-          <div><RouterLink class="font-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/goals/${g.name}`">{{ g.title }}</RouterLink>
+          <div><RefLink class="font-medium text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`goal:${g.name}`">{{ g.title }}</RefLink>
             <div v-if="goalNote(g, c)" class="text-sm text-ink-gray-6">{{ goalNote(g, c) }}</div></div>
           <div><Badge v-if="g.area_name" :label="g.area_name" /></div>
           <div>{{ g.actions }}</div>
@@ -50,6 +50,7 @@
   </Dialog>
 </template>
 <script setup>
+import RefLink from '@/components/ui/RefLink.vue'
 import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Checkbox, Dialog, Progress, TabButtons, toast } from 'frappe-ui'
 import Empty from '@/components/Empty.vue'
