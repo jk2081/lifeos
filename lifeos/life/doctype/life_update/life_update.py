@@ -21,4 +21,4 @@ class LifeUpdate(Document):
 		if not self.from_commit:
 			from lifeos.updater import status
 
-			self.from_commit = (status.state().get("installed") or {}).get("commit")
+			self.from_commit = (status.installed() or {}).get("commit")

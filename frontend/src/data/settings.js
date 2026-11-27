@@ -8,7 +8,7 @@ export const settingsData = {
   onboarding: group('onboarding', ['add_first_things', 'guess_area', 'remove_first_thing', 'reset', 'save_ai_key', 'save_you']),
   tasks: group('tasks', ['update']),
   gcal: group('gcal', ['calendars', 'connect', 'disconnect', 'set_read', 'set_write', 'state', 'sync']),
-  updates: group('updates', ['check_now', 'get', 'request_update']),
+  updates: group('updates', ['check_now', 'get', 'request_update', 'restart_now']),
   connections: group('connections', ['import_status', 'start_import']),
   reset: group('reset', ['apply_batch', 'decide', 'get', 'next_item', 'undo']),
   chat: group('chat', ['status']),

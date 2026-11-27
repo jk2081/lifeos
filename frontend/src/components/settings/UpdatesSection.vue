@@ -7,6 +7,26 @@
           description="Updating runs outside the web app, from a crontab line that runs every minute. On the server, as the user that owns the bench, run the command below once." />
         <code class="block select-all break-all rounded bg-surface-gray-2 px-2 py-1.5 text-sm text-ink-gray-8" data-updates-command>{{ s.runner.setup_command }}</code>
       </div>
+      <div v-if="restartNeeded" class="flex flex-col gap-2" data-updates-needs-restart>
+        <Alert theme="amber" title="Updated, but the site needs a restart" :description="restartNeeded.reason || 'The new version is installed. The services have not restarted.'">
+          <template #actions>
+            <Button v-if="s.runner.alive" variant="solid" label="Restart now" :loading="restarting" data-updates-restart-now @click="restart" />
+          </template>
+        </Alert>
+        <code v-if="restartNeeded.fix" class="block select-all break-all rounded bg-surface-gray-2 px-2 py-1.5 text-sm text-ink-gray-8" data-updates-fix>{{ restartNeeded.fix }}</code>
+      </div>
+      <section v-if="s.ready.length" data-updates-ready>
+        <SectionHead>{{ allReady ? 'Ready to update' : 'Not ready to update' }}</SectionHead>
+        <Card flush>
+          <Row v-for="c in s.ready" :key="c.key" :data-ready="c.key" :data-ok="c.ok ? 1 : 0">
+            <span class="w-5 shrink-0 text-base-medium" :class="c.ok ? 'text-ink-green-7' : 'text-ink-red-8'" :aria-label="c.ok ? 'ok' : 'not ok'">{{ c.ok ? '✓' : '✗' }}</span>
+            <span class="min-w-0 flex-1">
+              <span class="block text-base text-ink-gray-8">{{ c.label }}</span>
+              <span v-if="!c.ok" class="block text-sm text-ink-red-8" data-ready-fix>{{ c.fix }}</span>
+            </span>
+          </Row>
+        </Card>
+      </section>
       <Card flush>
         <SettingRow label="Installed" :help="s.installed ? (s.installed.title || '') : 'Not read yet. Choose Check now.'">
           <span v-if="s.installed" class="text-base tabular-nums text-ink-gray-8" data-updates-installed>{{ s.installed.short }} · {{ shortDate(s.installed.date) }}</span>
@@ -15,7 +35,7 @@
         <SettingRow label="Available" :help="availableHelp">
           <div class="flex items-center gap-2">
             <Button label="Check now" :loading="checking" data-updates-check @click="check" />
-            <Button v-if="s.runner.alive && s.available" variant="solid" label="Update now" :disabled="s.busy" :loading="requesting" data-updates-now @click="update" />
+            <Button v-if="s.runner.alive && s.available" variant="solid" label="Update now" :disabled="s.busy || !allReady" :loading="requesting" data-updates-now @click="update" />
           </div>
         </SettingRow>
         <p v-if="s.error" class="pb-3 text-sm text-ink-red-8" data-updates-error>{{ s.error }}</p>
@@ -59,23 +79,37 @@ import { settingsData } from '@/data/settings'
 import { tryCall } from '@/lib/api'
 import { dateTime, short } from '@/lib/dates'
 
-const THEME = { Queued: 'gray', Running: 'blue', Done: 'green', Failed: 'red', 'Rolled back': 'amber' }
+const THEME = { Queued: 'gray', Running: 'blue', Done: 'green', Failed: 'red', 'Rolled back': 'amber', 'Needs restart': 'amber' }
+const STALE_MS = 60 * 1000
 const s = ref(null)
 const open = ref('')
 const checking = ref(false)
 const requesting = ref(false)
+const restarting = ref(false)
 let timer = null
 const shortDate = (d) => (d ? short(String(d).slice(0, 10), true) : '')
+const allReady = computed(() => (s.value?.ready || []).every((c) => c.ok))
+// only the newest request can be restarted
+const restartNeeded = computed(() => {
+  const latest = s.value?.history?.[0]
+  return latest?.status === 'Needs restart' ? latest : null
+})
 const availableHelp = computed(() => {
   if (!s.value?.installed) return 'Choose Check now to look at the repository.'
   if (s.value.available) return `${s.value.available.short} on ${s.value.branch}, ${shortDate(s.value.available.date)}`
-  return s.value.checked_at ? `Nothing newer on ${s.value.branch}. Checked ${dateTime(s.value.checked_at)}.` : 'Not checked yet.'
+  return s.value.checked_at ? `You're up to date with ${s.value.branch}. Checked ${dateTime(s.value.checked_at)}.` : 'Not checked yet.'
 })
 async function load() {
   s.value = await tryCall(() => settingsData.updates.get())
   // an update that is waiting or running is watched
   clearTimeout(timer)
   if (s.value?.busy) timer = setTimeout(load, 5000)
+}
+async function restart() {
+  restarting.value = true
+  const out = await tryCall(() => settingsData.updates.restart_now(), 'Restart queued. The server starts it within a minute.')
+  restarting.value = false
+  if (out) { s.value = out; await load() }
 }
 async function check() {
   checking.value = true
@@ -94,6 +128,11 @@ async function update() {
   requesting.value = false
   if (out) { s.value = out; await load() }
 }
-onMounted(load)
+onMounted(async () => {
+  await load()
+  // the page opens on what is true now: look at the repository again when the last look is more than a minute old
+  const at = s.value?.checked_at
+  if (s.value?.runner && (!at || Date.now() - new Date(String(at).replace(' ', 'T')).getTime() > STALE_MS)) check()
+})
 onBeforeUnmount(() => clearTimeout(timer))
 </script>

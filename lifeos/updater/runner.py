@@ -4,8 +4,7 @@
 one update runs at a time, and works the oldest Queued Life Update through `execute`. The steps themselves are the methods of a
 steps object (`BenchSteps` for real, a fake in the tests). A request carries only a commit; nothing a person typed reaches a shell."""
 import fcntl
-import os
-import re
+import gzip
 import shutil
 import subprocess
 import time
@@ -15,14 +14,13 @@ from pathlib import Path
 import frappe
 from frappe.utils import now_datetime
 
-from lifeos.updater import git, status
+from lifeos.updater import checks, git, shell, status
+from lifeos.updater.shell import StepError
 
 # the steps, in order; maintenance mode is switched off by the last
 ORDER = ("backup", "record", "maintenance_on", "checkout", "requirements", "migrate", "build", "restart", "health", "maintenance_off")
-SECRET = re.compile(r"(secret|token|password|passwd|api[_-]?key|authorization|bearer)", re.I)
 # the only untracked path a checkout may remove: the link `bench build` makes to the app's node_modules
 BUILD_LINKS = ("lifeos/public/node_modules",)
-TAIL = 4
 
 
 class StepFailed(Exception):
@@ -74,9 +72,9 @@ def _stop_crashed():
 class Log:
 	"""The request's log, kept in memory and written whole after every line (a restore can replace the database under it)."""
 
-	def __init__(self, doc):
+	def __init__(self, doc, lines=None):
 		self.doc = doc
-		self.lines = []
+		self.lines = list(lines or [])
 
 	def add(self, text):
 		self.lines.append(f"{now_datetime().strftime('%H:%M:%S')}  {text}")
@@ -95,20 +93,17 @@ class Log:
 		try:
 			result = fn(*args)
 		except Exception as e:
-			self.add(f"{name}: failed. {scrub(str(e))}")
+			# a StepError carries a message that is already safe; anything else is scrubbed before it is written
+			self.add(f"{name}: failed. {e if isinstance(e, StepError) else shell.scrub(str(e))}")
 			raise StepFailed(name) from e
 		self.add(f"{name}: ok")
 		return result
 
 
-def scrub(text: str) -> str:
-	"""A failure's last lines, without any line that looks like it holds a secret."""
-	lines = [x.strip() for x in str(text).splitlines() if x.strip() and not SECRET.search(x)]
-	return " | ".join(lines[-TAIL:])[:600]
-
-
 def execute(doc, steps) -> str:
 	"""Work one request through the steps. Returns the status it ended with."""
+	if doc.get("restart_only"):
+		return _restart_again(doc, steps)
 	log = Log(doc)
 	log.save(status="Running", started=now_datetime())
 	try:
@@ -132,8 +127,36 @@ def execute(doc, steps) -> str:
 			args = (doc.to_commit,) if name == "checkout" else ()  # the one step that needs the target
 			log.step(name, getattr(steps, name), *args)
 		return _finish(doc, log, "Done")
-	except StepFailed:
+	except StepFailed as e:
+		if e.args[0] == "restart":  # checkout, migrate and build worked: the code and the database agree, only the services are old
+			return _needs_restart(doc, log, steps, e)
 		return _finish(doc, log, _roll_back(log, steps, old, backup, switched, changed, migrating))
+
+
+def _needs_restart(doc, log, steps, error) -> str:
+	"""Only the restart failed. Do not roll back a good migrate: open the site again and ask for the restart to be run by hand or again."""
+	cause = error.__cause__ or error
+	reason = (str(cause) if isinstance(cause, StepError) else shell.scrub(str(cause), tail=3)).replace("\n", " ")[:400]
+	fix = checks.restart_fix(reason)
+	log.add("The restart failed after a good migrate and build, so nothing is rolled back.")
+	_try(log, "maintenance_off", steps.maintenance_off)
+	log.add(f"Needs restart. On the server, run `{fix}`, or choose Restart now here.")
+	log.save(reason=reason, fix=fix)
+	return _finish(doc, log, "Needs restart")
+
+
+def _restart_again(doc, steps) -> str:
+	"""Restart now: only the restart step, then the health check. The request goes back to Needs restart if it fails again."""
+	log = Log(doc, (doc.log or "").splitlines())
+	log.save(status="Running", started=now_datetime(), restart_only=0)
+	log.add("Restart now: running the restart step again.")
+	try:
+		log.step("restart", steps.restart)
+		log.step("health", steps.health)
+	except StepFailed as e:
+		return _needs_restart(doc, log, steps, e)
+	log.save(reason="", fix="")
+	return _finish(doc, log, "Done")
 
 
 def _roll_back(log, steps, old, backup, switched, changed, migrating) -> str:
@@ -176,6 +199,8 @@ def _notify(doc, result):
 	if result == "Done":
 		n = len([x for x in (doc.summary or "").splitlines() if x.strip()])
 		subject = f"Life OS updated to {doc.to_commit[:7]}: {n} change{'s' if n != 1 else ''}"
+	elif result == "Needs restart":
+		subject = f"Life OS updated to {doc.to_commit[:7]}, but the site needs a restart"
 	elif result == "Rolled back":
 		subject = "Update failed and was rolled back"
 	else:
@@ -197,19 +222,29 @@ class BenchSteps:
 		self.bench = shutil.which("bench") or str(Path.home() / ".local" / "bin" / "bench")
 		self.started = None
 
+	def run(self, args, cwd=None, timeout=3600, text_in=None):
+		"""Run a fixed argument list; the result is never raised, so a check can read the exit code."""
+		return shell.run(args, cwd=cwd or self.bench_path, timeout=timeout, text_in=text_in)
+
 	def sh(self, *args, cwd=None, timeout=3600):
-		try:
-			out = subprocess.run(list(args), cwd=cwd or self.bench_path, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL, check=False)  # noqa: S603 -- fixed arguments
-		except (OSError, subprocess.TimeoutExpired) as e:
-			raise RuntimeError(f"{Path(args[0]).name} did not run: {type(e).__name__}") from e
+		out = self.run(args, cwd=cwd, timeout=timeout)
 		if out.returncode:
-			raise RuntimeError(f"{Path(args[0]).name} {args[1] if len(args) > 1 else ''} exited {out.returncode}: {scrub(out.stderr or out.stdout)}")
+			raise StepError(shell.failure(args, out.returncode, out.stdout, out.stderr))
 		return out.stdout
+
+	def ready(self) -> list[dict]:
+		"""The checks that must pass before anything changes: the restart and the restore can run with no person at a terminal."""
+		return checks.ready(self.run, self.bench_path, self.bench, self.site)
 
 	def verify(self, commit):
 		git.fetch(self.repo, self.remote, self.branch)
 		if not git.on_remote_branch(self.repo, self.remote, self.branch, commit):
-			raise RuntimeError(f"{commit[:7]} is not on {self.remote}/{self.branch}")
+			raise StepError(f"{commit[:7]} is not on {self.remote}/{self.branch}")
+		if git.run(self.repo, "rev-parse", "HEAD") == commit:
+			raise StepError(f"You're up to date: this site is already at {commit[:7]}.")
+		for check in self.ready():
+			if not check["ok"]:
+				raise StepError(check["fix"])
 
 	def backup(self):
 		from frappe.utils.backups import new_backup
@@ -258,19 +293,33 @@ class BenchSteps:
 
 	def restart(self):
 		self.started = now_datetime()
-		if subprocess.run(["sudo", "-n", "-l", "supervisorctl", "restart", "all"], capture_output=True, check=False).returncode == 0:  # noqa: S603, S607
+		mode = checks.restart_mode(self.run, self.bench_path)
+		if mode == "sudo":
 			self.sh("sudo", "-n", "supervisorctl", "restart", "all")
-		else:
+		elif mode == "bench":
 			self.sh(self.bench, "restart")
+		else:
+			raise StepError(checks.sudoers_fix())
 
 	def restore(self, backup):
-		args = [self.bench, "--site", self.site, "--force", "restore", backup["db"]]
-		for flag, key in (("--with-public-files", "public"), ("--with-private-files", "private")):
-			if backup.get(key):
-				args += [flag, backup[key]]
-		self.sh(*args)
+		"""Load the gzipped dump through the site's own database user (`bench --site X mariadb`), so no root password is needed. A Frappe
+		backup drops and recreates every table. The files are not restored: migrate and build never change them."""
+		args = [self.bench, "--site", self.site, "mariadb"]
+		opener = gzip.open if str(backup["db"]).endswith(".gz") else open
 		frappe.db.close()
-		frappe.connect()
+		try:
+			with opener(backup["db"], "rb") as dump:
+				proc = subprocess.Popen(args, cwd=self.bench_path, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # noqa: S603 -- fixed arguments
+				try:
+					shutil.copyfileobj(dump, proc.stdin)
+					proc.stdin.close()
+				except BrokenPipeError:  # the client stopped reading: its exit code and stderr say why
+					pass
+				out, err = proc.communicate(timeout=3600)
+		finally:
+			frappe.connect()
+		if proc.returncode:
+			raise StepError(shell.failure(args, proc.returncode, out.decode(errors="replace"), err.decode(errors="replace")))
 
 	def wait_for_ping(self, want_pong=False, seconds=120):
 		"""The site answers /api/method/ping. In maintenance mode Frappe answers SessionStopped, which also shows the app is up."""
