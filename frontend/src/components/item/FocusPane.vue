@@ -26,7 +26,7 @@
             <span class="min-w-0 flex-1 break-words text-base text-ink-gray-9">{{ g.title }}</span>
             <span class="flex-none text-sm tabular-nums text-ink-gray-7">{{ g.finished ? g.outcome : g.progress.label }}</span>
           </Row>
-          <Empty v-if="!rows.length" title="No goals yet." hint="An annual goal says what this focus is for this year." />
+          <EmptyState line="No goals yet. An annual goal says what this focus is for this year." v-if="!rows.length" />
         </Card>
       </section>
       <Card data-pane-focus-review>
@@ -44,7 +44,7 @@ import { Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { tryCall } from '@/lib/api'
 import { todayData } from '@/data/today'
 

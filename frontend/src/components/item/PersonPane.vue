@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col gap-4" data-person-pane>
     <Card v-if="brief" data-person-brief><Md :text="brief" /></Card>
-    <Card v-else-if="loaded"><Empty title="No brief yet." hint="The Brain writes one once there is enough about them." /></Card>
+    <Card v-else-if="loaded"><EmptyState line="No brief yet. The Brain writes one once there is enough about them." /></Card>
     <section v-if="owe.owe_me.length || owe.i_owe.length" class="flex flex-col gap-3" data-person-owed>
       <div v-if="owe.owe_me.length" data-person-owe-me>
         <SectionHead :count="owe.owe_me.length">What they owe you</SectionHead>
@@ -62,7 +62,7 @@ import { onMounted, ref } from 'vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Md from '@/components/Md.vue'
 import { tryCall } from '@/lib/api'
 import { itemData } from '@/data/item'

@@ -15,7 +15,7 @@ await check('TODAY.1', 'Log in, open /life, Today is filled from seed data', asy
   must(/Week \d+ of 12/.test(text), 'no 12 Week Year week on Today')
   await owner.page.locator('[data-card="habits"]').waitFor({ timeout: 10000 })
   const t = await owner.api('today.get', { space: SPACE })
-  must(text.includes('Habits') && t.habits.length && (await owner.page.locator('[data-card="habits"] [data-dash-value]').innerText()).includes(`of ${t.habits.length}`), 'habits are missing on Today')
+  must(text.includes('Habits') && t.habits.length && (await owner.page.locator('[data-card="habits"] [data-stat-value]').innerText()).includes(`of ${t.habits.length}`), 'habits are missing on Today')
   must(t.cycle, 'today.get has no cycle')
   return `week ${t.cycle.week}, ${t.habits.length} habits, ${t.tasks.due} tasks due`
 })
@@ -937,7 +937,7 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.71', `${width} px: on an empty space every card of every view says what will appear and offers one action`, async () => {
+    await check('TODAY.71', `${width} px: on an empty space every card of every view shows a number (0 included) and every empty list says what will appear with at most one action`, async () => {
       for (const p of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
         await one.open(p)
         await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
@@ -946,11 +946,15 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
         for (let i = 0; i < 4; i++) {
           const c = cards.nth(i)
           const key = await c.getAttribute('data-card')
-          must((await c.locator('[data-dash-empty]').count()) === 1, `${p}: the ${key} card has no empty line`)
-          must((await c.locator('[data-dash-empty]').innerText()).length > 10, `${p}: the ${key} card's line is empty`)
-          must((await c.locator('[data-dash-action]').count()) === 1, `${p}: the ${key} card has no action`)
+          must((await c.locator('[data-empty]').count()) === 0, `${p}: the ${key} card says a sentence instead of its number`)
+          must(/\d/.test(await c.locator('[data-stat-value]').innerText()), `${p}: the ${key} card shows no number`)
         }
-        must((await pg.locator('[data-dash-panel] [data-dash-empty]').count()) >= 1, `${p}: no panel says what will appear`)
+        const empties = pg.locator('[data-dash-panel] [data-empty]')
+        must((await empties.count()) >= 1, `${p}: no panel says what will appear`)
+        for (let i = 0; i < await empties.count(); i++) {
+          must((await empties.nth(i).innerText()).length > 10, `${p}: an empty panel has no line`)
+          must((await empties.nth(i).locator('[data-empty-action]').count()) <= 1, `${p}: an empty panel has two actions`)
+        }
         await noSideways()
       }
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
@@ -970,7 +974,7 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
 
     await check('TODAY.59', `${width} px: on a new space with no goals Year's Overview says what will appear in Goals by area, with a Set a goal button`, async () => {
       await one.open('/life/today/year?mode=overview')
-      const empty = pg.locator('[data-panel="goals"] [data-dash-empty]')
+      const empty = pg.locator('[data-panel="goals"] [data-empty]')
       await empty.waitFor({ timeout: 10000 })
       must((await empty.innerText()).includes('Your goals show here'), 'the empty line is missing: ' + await empty.innerText())
       must(await empty.getByRole('button', { name: 'Set a goal' }).isVisible(), 'there is no Set a goal button')
@@ -1006,7 +1010,7 @@ print(json.dumps({"cycle": cycle.name, "goals": [g.name for g in goals], "action
       const card = pg.locator('[data-card="habits"]')
       await card.waitFor({ timeout: 10000 })
       must(/0 of 2/.test(await card.innerText()), 'the card does not count the habits: ' + (await card.innerText()))
-      await card.locator('[data-dash-open]').click()
+      await card.locator('[data-stat-open]').click()
       const list = pg.locator('[data-list="habits"]')
       await list.locator('[data-list-habit]').first().waitFor({ timeout: 10000 })
       must((await list.innerText()).includes(`I55 Walk ${width}`) && (await list.innerText()).includes(`I55 Read ${width}`), 'the habits are not named in the list: ' + (await list.innerText()))
@@ -1514,8 +1518,8 @@ print(json.dumps(out))`).split('\n').pop())
       const total = (await s.api('brain.needs_you', { space: SPACE, limit: 50 })).total
       await dash('/life/today/week')
       const card = pg.locator('[data-card="needs"]')
-      must(Number((await card.locator('[data-dash-value]').innerText()).replace(/\D/g, '')) === total, 'the card does not show ' + total)
-      await card.locator('[data-dash-open]').click()
+      must(Number((await card.locator('[data-stat-value]').innerText()).replace(/\D/g, '')) === total, 'the card does not show ' + total)
+      await card.locator('[data-stat-open]').click()
       const list = pg.locator('[data-list="needs-you"]')
       await list.waitFor({ timeout: 10000 })
       await list.locator('[data-list-row]').first().waitFor({ timeout: 10000 })
@@ -1775,13 +1779,13 @@ for (const width of WIDTHS) {
     await check('TODAY.73', `${width} px: the Waiting card shows the count, late and looks done; it opens the list grouped Looks done, Late, This week, Later; Confirm closes a looks-done row and Needs you drops by one; Nudge opens the draft; By person regroups`, async () => {
       await dash('/life/today/week')
       const w = seed.waiting
-      must((await card('waiting').locator('[data-dash-value]').innerText()).trim() === String(w.n), `the card says ${await card('waiting').locator('[data-dash-value]').innerText()}, the server ${w.n}`)
+      must((await card('waiting').locator('[data-stat-value]').innerText()).trim() === String(w.n), `the card says ${await card('waiting').locator('[data-stat-value]').innerText()}, the server ${w.n}`)
       const parts = await card('waiting').locator('[data-dash-part]').allInnerTexts()
       must(parts.includes(`${w.past} late`) && parts.includes(`${w.looks_done} looks done`), 'the card parts are ' + parts.join(' | '))
       must(w.looks_done >= 1 && w.past >= 2, `seed: ${JSON.stringify(w)}`)
-      const before = Number((await card('needs').locator('[data-dash-value]').innerText()).trim())
+      const before = Number((await card('needs').locator('[data-stat-value]').innerText()).trim())
       must(before === seed.needs, `Needs you says ${before}, the server ${seed.needs}`)
-      await card('waiting').locator('[data-dash-value], [data-dash-open]').first().click()
+      await card('waiting').locator('[data-stat-value], [data-stat-open]').first().click()
       const list = pg.locator('[data-list="waiting"]')
       await list.locator('[data-waiting-row]').first().waitFor({ timeout: 15000 })
       const order = await list.locator('[data-waiting-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-waiting-group')))
@@ -1810,7 +1814,7 @@ for (const width of WIDTHS) {
       must((await pg.locator('[data-waiting-list]').innerText()).includes('Vivek I130'), 'By person has no section for Vivek')
       await pg.keyboard.press('Escape')
       await dash('/life/today/week')
-      must(Number((await card('needs').locator('[data-dash-value]').innerText()).trim()) === before - 1, 'Needs you did not drop by one')
+      must(Number((await card('needs').locator('[data-stat-value]').innerText()).trim()) === before - 1, 'Needs you did not drop by one')
       must(!errors.length, 'script errors: ' + errors.join(' | '))
     })
 

@@ -8,12 +8,12 @@
     <section v-if="on('sources')" data-wiki-sources>
       <Card flush><Row v-for="s in note.sources" :key="s.doctype + s.name" :pane="(s.doctype === 'Life Chat Log' ? 'chat:' : 'source:') + s.name" :label="s.title">
         <div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ s.title || s.name }}</div><div class="text-sm text-ink-gray-6">{{ s.doctype === 'Life Chat Log' ? 'AI chat' : 'Source' }}<template v-if="s.added_on"> · added {{ s.added_on }}</template></div></div></Row>
-        <Empty v-if="!note.sources.length" title="No sources yet." hint="A wiki page cites the sources it was written from." /></Card></section>
+        <EmptyState line="No sources yet. A wiki page cites the sources it was written from." v-if="!note.sources.length" /></Card></section>
     <section v-if="on('history')" data-wiki-history>
       <Card flush><Row v-for="c in history" :key="c.name" :pane="'change:' + c.name" :label="c.change_type + ' by ' + c.by">
         <div class="min-w-0 flex-1"><div class="text-base-medium text-ink-gray-9">{{ c.change_type }}{{ c.reverted ? ', undone' : '' }} · {{ c.by }}</div>
           <div class="text-sm text-ink-gray-6">{{ [dateTime(c.changed_on), c.change_note, c.source_title && 'from ' + c.source_title].filter(Boolean).join(' · ') }}</div></div></Row>
-        <Empty v-if="!history.length" title="No changes yet." /></Card></section>
+        <EmptyState line="No changes yet." v-if="!history.length" /></Card></section>
     <section v-if="on('children') && note.children.length">
       <Card flush><Row v-for="c in note.children" :key="c.name" :pane="'note:' + c.name" :label="c.title"><div class="min-w-0 flex-1"><div class="break-words text-base-medium text-ink-gray-9">{{ c.title }}</div></div></Row></Card></section>
     <Backlinks v-if="on('links')" tab doctype="Life Note" :name="note.name" :items="links" />
@@ -25,7 +25,7 @@ import { computed, onMounted, ref } from 'vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import NoteEditor from '@/components/NoteEditor.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { Button } from 'frappe-ui'
 import { dateTime } from '@/lib/dates'
 import { tryCall } from '@/lib/api'

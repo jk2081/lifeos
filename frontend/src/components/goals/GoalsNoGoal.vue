@@ -15,17 +15,16 @@
       <TextInput ref="addInput" v-model="addText" placeholder="Add a task and press Enter. The Brain guesses its area." aria-label="Add a task" @keydown.enter="add" />
     </Card>
     <Card v-if="loaded && data && !data.total" class="py-2" data-no-goal-empty>
-      <Empty title="Every open task serves a goal.">
-        <p class="mt-1">Tasks with no goal, and the area the Brain guessed for each, will show here so you can attach them to a goal or leave them as they are.</p>
-        <TextInput v-if="writable" v-model="emptyText" class="mt-3" placeholder="Add a task and press Enter" aria-label="Add a task" data-no-goal-empty-add @keydown.enter="addEmpty" />
-      </Empty>
+      <EmptyState line="Every open task serves a goal. Tasks with no goal, and the area the Brain guessed for each, will show here so you can attach them to a goal or leave them as they are.">
+        <template v-if="writable" #action><TextInput v-model="emptyText" placeholder="Add a task and press Enter" aria-label="Add a task" data-no-goal-empty-add @keydown.enter="addEmpty" /></template>
+      </EmptyState>
     </Card>
 
     <Card v-if="data?.groups?.length" class="flex flex-col gap-1 !p-4 md:!p-5" data-no-goal-card>
       <section v-for="g in data.groups" :key="g.key" class="flex flex-col" data-no-goal-group :data-group="g.label" :data-on="g.is_on ? 1 : 0">
         <div class="flex flex-wrap items-center gap-2 pb-1 pt-3 first:pt-0" :class="g.is_on ? '' : 'opacity-70'">
           <span v-if="g.colour" class="size-2.5 rounded-full" :class="dotClass(g)" aria-hidden="true" />
-          <h2 class="text-base-medium text-ink-gray-9">{{ g.label }}</h2>
+          <SectionHead>{{ g.label }}</SectionHead>
           <span class="text-sm text-ink-gray-6" data-group-count>{{ g.count }} task{{ g.count === 1 ? '' : 's' }}{{ g.is_on ? '' : ' · area is off' }}</span>
           <RouterLink v-if="!g.is_on" class="ml-auto text-sm text-ink-blue-8 hover:underline focus-visible:focus-ring" to="/settings?tab=areas">Switch on {{ g.label }}</RouterLink>
         </div>
@@ -34,8 +33,7 @@
           <Button size="sm" variant="solid" label="Make it a goal" :loading="making === g.key" data-make-goal @click="askGoal(g)" />
         </div>
         <ul class="flex flex-col">
-          <li v-for="t in g.tasks" :key="t.name" class="flex flex-col gap-2 border-b border-outline-gray-1 py-3 last:border-b-0 md:flex-row md:items-center md:gap-4"
-            data-no-goal-row :data-task="t.name" :data-guessed="t.area_guessed ? 1 : 0">
+          <Row as="li" bare v-for="t in g.tasks" :key="t.name" class="flex flex-col gap-2 py-3 md:flex-row md:items-center md:gap-4" data-no-goal-row :data-task="t.name" :data-guessed="t.area_guessed ? 1 : 0">
             <div class="flex min-w-0 flex-1 items-start gap-2.5">
               <Checkbox class="relative mt-0.5" :model-value="false" :disabled="!writable" :aria-label="`Done: ${t.title}`" @update:model-value="done(t)" />
               <div class="min-w-0 flex-1">
@@ -59,7 +57,7 @@
                 <Button size="sm" variant="outline" label="Add to goal" data-add-to-goal :aria-label="`Add ${t.title} to a goal`" />
               </Dropdown>
             </div>
-          </li>
+          </Row>
         </ul>
       </section>
     </Card>
@@ -67,6 +65,8 @@
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 // Goals > No goal (issue 22): open tasks with no goal, grouped by the area they are filed in (✦ where the Brain guessed it).
 // Per task: Area (confirm or move), Fine as is (stays without a goal, leaves this list) and Add to goal (that area's goals first).
 // Per group: when three or more tasks share a word, Make it a goal, which creates the goal and attaches them. Nothing happens
@@ -77,7 +77,7 @@ import DoneWhen from '@/components/goals/DoneWhen.vue'
 import { doneWhenRequired, emptyMeasure, measureArgs, measureProblem } from '@/lib/goals'
 import AreaGuess from '@/components/AreaGuess.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { goalsData } from '@/data/goals'

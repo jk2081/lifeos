@@ -29,7 +29,7 @@
 
         <template v-else-if="step.key === 'areas'">
           <div class="flex flex-col" data-guide-areas>
-            <div v-for="a in lifeAreas" :key="a.name" class="border-b border-outline-gray-1 py-3 last:border-b-0" :data-guide-area="a.area_name" :data-on="a.is_on ? 1 : 0">
+            <Row bare v-for="a in lifeAreas" :key="a.name" class="py-3" :data-guide-area="a.area_name" :data-on="a.is_on ? 1 : 0">
               <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0 flex-1">
                   <div class="text-base-medium text-ink-gray-9">{{ a.area_name }}</div>
@@ -53,7 +53,7 @@
                 </div>
                 <Button v-else variant="ghost" size="sm" icon-left="lucide-plus" label="Add a part" :data-guide-add-part="a.area_name" @click="startPart(a)" />
               </div>
-            </div>
+            </Row>
           </div>
         </template>
 
@@ -70,13 +70,13 @@
         <template v-else-if="step.key === 'things'">
           <div class="flex flex-col gap-2" data-guide-rows>
             <template v-for="(r, i) in rows" :key="r.id">
-              <div v-if="r.task" class="flex flex-wrap items-center gap-2 border-b border-outline-gray-1 pb-2" data-guide-task>
+              <Row bare v-if="r.task" class="flex flex-wrap items-center gap-2 pb-2" data-guide-task>
                 <span class="min-w-0 flex-1 break-words text-base text-ink-gray-9">{{ r.task.title }}</span>
                 <Dropdown :options="areaMenu(r)">
                   <Button size="sm" :variant="r.state === 'sure' ? 'subtle' : 'outline'" :label="areaLabel(r)" :loading="r.state === 'filing'" icon-right="lucide-chevron-down" :disabled="r.state === 'filing'" data-guide-task-area />
                 </Dropdown>
                 <Button variant="ghost" size="sm" icon="lucide-x" :aria-label="`Remove ${r.task.title}`" data-guide-task-remove @click="removeTask(r)" />
-              </div>
+              </Row>
               <TextInput v-else v-model="r.text" :aria-label="`Thing ${i + 1}`" :data-guide-thing="i" @keydown.enter="next" />
             </template>
           </div>
@@ -107,6 +107,7 @@
 </template>
 
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import { settingsData } from '@/data/settings'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'

@@ -3,28 +3,22 @@
     <template v-if="d">
       <!-- four cards: a number, what it is, and what it leads to. Two by two on a phone -->
       <div class="grid grid-cols-2 gap-3 md:gap-4" :class="d.cards.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-4'" data-dash-cards>
-        <Card v-for="c in d.cards" :key="c.key" tint class="relative flex min-w-0 flex-col gap-0.5 !border-transparent max-md:!px-3 max-md:!py-2.5" data-dash-card :data-card="c.key" :data-open="c.open || undefined">
-          <button v-if="c.open" type="button" class="absolute inset-0 rounded-5 focus-visible:focus-ring" :aria-label="`${c.label}: ${c.value}`" data-dash-open @click="openRef(c.open)" />
-          <span class="text-sm text-ink-gray-6">{{ c.label }}</span>
-          <template v-if="c.empty">
-            <span class="text-sm text-ink-gray-7" data-dash-empty>{{ c.empty.line }}</span>
-            <Button v-if="c.empty.action" class="relative mt-1.5 self-start" size="sm" variant="subtle" :label="c.empty.action" data-dash-action @click="act(c.empty)" />
-          </template>
-          <template v-else>
-            <b class="text-3xl-semibold tabular-nums text-ink-gray-9 max-md:text-2xl-semibold" :class="c.tone === 'warn' && '!text-ink-amber-9'" data-dash-value>{{ c.value }}</b>
+        <Stat v-for="c in d.cards" :key="c.key" tint :label="c.label" :value="c.value" :warn="c.tone === 'warn'" :open="c.open" class="min-w-0 !border-transparent max-md:!px-3 max-md:!py-2.5"
+          data-dash-card :data-card="c.key" :data-open="c.open || undefined">
+          <template v-if="c.parts.length || c.sub" #sub>
             <span v-if="c.parts.length" class="flex flex-wrap gap-x-2 text-sm">
               <Button v-for="p in c.parts" :key="p.text" class="relative !h-auto !px-0 !py-0 text-sm" :class="p.tone === 'warn' ? '!text-ink-amber-9' : p.tone === 'ok' ? '!text-ink-green-8' : '!text-ink-gray-6'" variant="ghost" :label="p.text"
                 data-dash-part @click="openRef(p.open)" />
             </span>
-            <span v-else-if="c.sub" class="text-sm text-ink-gray-6">{{ c.sub }}</span>
+            <template v-else>{{ c.sub }}</template>
           </template>
-        </Card>
+        </Stat>
       </div>
 
       <!-- two panels; they stack on a phone -->
       <div class="grid grid-cols-1 gap-3 md:gap-4" :class="d.panels.length === 2 && 'md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]'" data-dash-panels>
         <Card v-for="p in d.panels" :key="p.key" class="flex min-w-0 flex-col gap-1 !pb-2" data-dash-panel :data-panel="p.key">
-          <h2 class="mb-1 text-base font-semibold text-ink-gray-9">{{ p.title }}</h2>
+          <SectionHead>{{ p.title }}</SectionHead>
 
           <!-- goals by area: each goal a bar -->
           <template v-if="p.kind === 'goals' && p.groups.length">
@@ -50,9 +44,7 @@
             <div v-if="p.more" class="pt-1"><Button class="!px-0 !text-ink-blue-8" variant="ghost" :label="`${p.more.n} more`" data-dash-more @click="openRef(p.more.open)" /></div>
           </template>
 
-          <Empty v-else-if="p.empty" :title="p.empty.line" data-dash-empty>
-            <Button v-if="p.empty.action" class="mt-2" size="sm" variant="subtle" :label="p.empty.action" data-dash-action @click="act(p.empty)" />
-          </Empty>
+          <EmptyState v-else-if="p.empty" :line="p.empty.line" :action="p.empty.action ? { label: p.empty.action, click: () => act(p.empty) } : null" data-dash-empty />
 
         </Card>
       </div>
@@ -70,6 +62,7 @@
   </div>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 // The dashboard of a Today view (issue 123): four cards and two panels, and on Week one line about the Brain. One request (`dashboard.get`) loads a view. Every card, row and
 // count opens in the side pane (a record, or `list:<kind>` for what a count counts); nothing here takes the person away from the page. With goals switched off the server sends
 // other cards in their place, so this component draws whatever it is given.
@@ -77,8 +70,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Progress, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
+import Stat from '@/components/ui/Stat.vue'
 import Row from '@/components/ui/Row.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { todayData } from '@/data/today'
 import { openChat } from '@/lib/ask'
 import { tryCall } from '@/lib/api'

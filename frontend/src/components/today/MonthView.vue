@@ -43,7 +43,7 @@
         <Row v-if="meetingsOn(picked)" :pane="null" class="!items-center" data-meetings-row>
           <span class="min-w-0 flex-1 text-base text-ink-gray-7">{{ meetingsText(picked) }}</span>
         </Row>
-        <Empty v-if="!shownOn(picked).length && !meetingsOn(picked)" title="Nothing on this day." />
+        <EmptyState line="Nothing on this day." v-if="!shownOn(picked).length && !meetingsOn(picked)" />
       </Card>
       <Button class="mt-2" label="Open in Day" data-open-day @click="openDay(picked)" />
     </section>
@@ -57,7 +57,7 @@ import { useMediaQuery } from '@vueuse/core'
 import { useRoute, useRouter } from 'vue-router'
 import { Button } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'

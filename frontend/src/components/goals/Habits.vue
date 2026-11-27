@@ -13,7 +13,7 @@
         <td v-for="m in 12" :key="m" class="px-3 py-2.5 text-right tabular-nums">
           <Tooltip :text="h.months[m] ? `${h.months[m].done} of ${h.months[m].target}` : 'Not tracked'"><span>{{ h.months[m] ? h.months[m].percent + '%' : ' ' }}</span></Tooltip></td></tr></tbody>
     </table></div></div>
-    <Card v-else-if="yearData"><Empty :title="`No habits were tracked in ${year}.`" hint="A month shows here once its plan lists a habit." /></Card>
+    <Card v-else-if="yearData"><EmptyState :line="`No habits were tracked in ${year}. A month shows here once its plan lists a habit.`" /></Card>
     <p class="text-sm text-ink-gray-6">Each habit's percentage for the months it was tracked. A blank month means it was not tracked then.</p>
   </div>
   <div v-else-if="d" class="page-body">
@@ -51,7 +51,7 @@
       </div>
     </template>
     <Card v-else>
-      <Empty :title="`No habits are tracked in ${MONTHS[month - 1]} ${year}.`" hint="Each month has its own habit list. A new month starts with last month's list." />
+      <EmptyState :line="`No habits are tracked in ${MONTHS[month - 1]} ${year}. Each month has its own habit list. A new month starts with last month's list.`" />
       <Button v-if="canWrite()" variant="solid" label="Manage habits" @click="openManage" />
     </Card>
   </div>
@@ -75,7 +75,7 @@
 // Habits of one month: a box for each day of the chosen habit (a frappe-ui Button whose variant says its state), and the year table.
 import { computed, onMounted, ref } from 'vue'
 import { Button, Dialog, Progress, Select, TabButtons, TextInput, Tooltip } from 'frappe-ui'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'

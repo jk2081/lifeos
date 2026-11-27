@@ -18,6 +18,7 @@ Before using a library component, read its source and types: `node_modules/frapp
 
 - **No hand-written control.** No raw `<button>`, `<input>`, `<select>`, `<textarea>`, checkbox, switch, date input, tab bar, badge, dialog, dropdown, tooltip, progress bar, avatar, tree or breadcrumb. The one exception is a `<button class="absolute inset-0">` that makes a whole row clickable (see Rows).
 - **Tokens only.** Colours, type, radii, shadows and focus rings come from the frappe-ui preset's Tailwind classes. No hex colours, no `rgb()`, no colour variables of our own. Drawing code (the line chart, the graph) reads token variables such as `var(--ink-blue-7)`; a canvas library gets `tokenColor('--ink-blue-7')` from `lib/tokens.js`.
+- **A card shows its number; a list shows `EmptyState`.** A card (a `Stat`) shows its number, 0 included, and never a sentence instead. A list with nothing in it shows `ui/EmptyState`: one line on what will appear there and at most one action (`:action="{ label, icon, to }"` for a route or `{ label, icon, click }` for a function; the `action` slot takes the one control when it is a field, such as a box to add the first task). It carries `data-empty`, its button `data-empty-action`. frappe-ui has no such part. Rows are `Row`, section headings `SectionHead`, big numbers `Stat`; hand-building any of them is a fault.
 - **4.5 to 1 for all text.** `styles.css` points three library text colours at darker tokens (`text-ink-gray-5`, and the amber and blue subtle `Badge`). Do not use `text-ink-gray-5` or lighter for text of our own. `node tools/screens.mjs` measures every screen in both themes.
 - **No `<style>` blocks with colours or sizes of our own.** Use Tailwind classes in the template. A scoped `<style>` is acceptable only for geometry that classes cannot say (a grid template built from data, an SVG).
 - **Lucide icons** by name: `icon="lucide-plus"` on a component, or `<span class="lucide-plus size-4" aria-hidden="true" />`. `node scripts/check-sfc.mjs` checks that every name exists.
@@ -65,7 +66,7 @@ Before using a library component, read its source and types: `node_modules/frapp
 | `a.num` | `NumLink` |
 | `.st` in `.stats` | `Stat` inside `<div class="stats">` |
 | `.br` progress | `Progress` |
-| `.empty` | `Empty.vue` inside a `Card`; `Alert` for a notice with an action |
+| `.empty` | `ui/EmptyState.vue` (on screens not yet moved, `Empty.vue`); `Alert` for a notice with an action |
 | `.only-phone`, `.only-desktop` | `md:hidden`, `max-md:hidden` |
 | `.lbl` + control | the control's own `label` prop |
 | Loading text | `Skeleton`, `LoadingIndicator` |
@@ -96,9 +97,10 @@ Wrapper for `frappe-ui/experimental`: `src/experimental/index.js` re-exports the
 | `SetupCard.vue` (issue 26) | "Your setup · level n of 6": the next step, Go, How it works and a dismiss button, from `lib/ladder.js`. In the sidebar and the phone's focus sheet; do not build another | `RouterLink` |
 | `ui/Card.vue` | frappe-ui has no card | `rounded-5 border border-outline-gray-2 bg-surface-base` |
 | `ui/SectionHead.vue`, `ui/NumLink.vue` | A section heading whose count links to the list it counts | `text-sm-medium text-ink-gray-7`, `text-ink-blue-8` |
-| `ui/Row.vue`, `TaskRow.vue` | Rows of mixed content inside a section card, opening the pane | The stretched-button pattern of frappe-ui's list guide, `Checkbox`, `Badge` |
-| `ui/Stat.vue` | A number with a label | `Card`, `text-3xl-semibold` |
-| `Empty.vue` | Empty states that say what belongs here | token text classes |
+| `ui/Row.vue`, `TaskRow.vue` | Rows of mixed content inside a section card, opening the pane. Props: `pane`, `label`, and (issue 144) `as` (`li`, `label`: the tag) and `bare` (keep the border and the pane behaviour, leave flex, grid, gap and padding to the row's own classes, for a row that is a grid or a column) | The stretched-button pattern of frappe-ui's list guide, `Checkbox`, `Badge` |
+| `ui/Stat.vue` | A number with a label, 0 included. Props (issue 144): `tint` (Today's grey card), `warn` (amber number), `open` (a pane reference the whole card opens; the `sub` slot's buttons need the class `relative`) | `Card`, `text-3xl-semibold` |
+| `ui/EmptyState.vue` (issue 144) | What a list says when it has nothing: one line and at most one action; frappe-ui has no such part | token text classes, `Button` |
+| `Empty.vue` | Still used by Library, the reviews, Settings and the older pages until issue 145 moves them to `ui/EmptyState.vue` and deletes it | token text classes |
 | `ScreenBoundary.vue`, `ScreenErrorMessage.vue` (bug fix 1) | The error boundary around the routed page: a screen that fails shows "This screen could not be shown." with Reload and a reference; the rest of the app keeps working (`lib/screenError.js`) | `Card`, `Button` |
 | `Pick.vue` | One-tap change of a filing value | `Dropdown`, `Button` |
 | `FileAttach.vue` | Attach one private file to a record, in one step | frappe-ui `FileUploader`, `Button`, `ErrorMessage` |

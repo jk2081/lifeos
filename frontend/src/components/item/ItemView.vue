@@ -39,7 +39,7 @@
   <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-8 pt-4 md:px-5" data-pane-body>
     <Alert v-if="meta.archived" title="This record is archived. It is shown read-only."
       :primary-action="meta.canRestore ? { label: 'Restore', onClick: () => restore() } : undefined" />
-    <Card v-if="missing"><Empty title="This record was not found." hint="It may be in another space, or it was removed." /></Card>
+    <Card v-if="missing"><EmptyState line="This record was not found. It may be in another space, or it was removed." /></Card>
     <component :is="VIEW[cur.type]" v-else :key="cur.ref + ':' + stamp" :name="cur.name" :type="cur.type" :tab="tabs.length ? ptab.current.value : undefined" @meta="gotMeta" @missing="missing = true"
       @changed="changed()" @close="closePane" />
   </div>
@@ -59,7 +59,7 @@ import Card from '@/components/ui/Card.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import AskBody from '@/components/ask/AskBody.vue'
 import FocusPane from '@/components/item/FocusPane.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import TaskPane from '@/components/item/TaskPane.vue'
 import VaultPane from '@/components/item/VaultPane.vue'
 import GoalPane from '@/components/item/GoalPane.vue'

@@ -31,10 +31,10 @@
             <div class="text-sm text-ink-gray-6" data-goal-tasks>{{ g.tasks_counted ? `${g.tasks_done} of ${g.tasks_counted} tasks` : 'No tasks yet' }}</div></div>
           <div><Badge :theme="OUTCOME[c.status === 'Planned' ? 'Draft' : g.outcome]" :label="c.status === 'Planned' ? 'Draft' : g.outcome === 'In Progress' ? 'In progress' : g.outcome" /></div>
         </div>
-        <div v-if="!c.goals.length" class="border-t border-outline-gray-1 px-4 py-2.5 text-sm text-ink-gray-6">No goals{{ area ? ' in this area' : '' }} in this cycle.</div>
+        <EmptyState v-if="!c.goals.length" class="border-t border-outline-gray-1 !px-4" :line="`No goals${area ? ' in this area' : ''} in this cycle.`" />
       </template>
     </div></div></div>
-    <Card v-else-if="d"><Empty title="No goals yet." hint="Goals belong to a 12 Week Year. Open the 12 Week Year tab to start a cycle and add goals." /></Card>
+    <Card v-else-if="d"><EmptyState line="No goals yet. Goals belong to a 12 Week Year. Open the 12 Week Year tab to start a cycle and add goals." /></Card>
   </div>
 
   <GoalDialog v-model="goalOpen" :cycle="active && active.name" :goal="null" @saved="load" />
@@ -53,7 +53,7 @@
 import RefLink from '@/components/ui/RefLink.vue'
 import { computed, onMounted, ref } from 'vue'
 import { Badge, Button, Checkbox, Dialog, Progress, TabButtons, toast } from 'frappe-ui'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import GoalDialog from './GoalDialog.vue'

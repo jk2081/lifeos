@@ -137,7 +137,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.68` Needs you opens its rows in the pane, a row opens in the same pane with Back, j moves to the next row, a reload keeps the list open
 - `TODAY.69` "past check date" opens only the overdue waiting items; "rules learned" opens the rules, each with Change
 - `TODAY.70` Day, Week, Month and Year switch in place; Overview has four cards and two panels; Open full page goes to the record's page
-- `TODAY.71` on an empty space every card of every view says what will appear and offers one action
+- `TODAY.71` on an empty space every card of every view shows a number (0 included) and every empty list is one `EmptyState` with at most one action
 - `TODAY.72` every view, in Overview and in Calendar, in light and dark has no script error and nothing cut off
 - `TODAY.73` the Waiting card shows the count, late and looks done and opens the list grouped Looks done, Late, This week, Later; Confirm closes a looks-done row and Needs you drops by one; Nudge opens the draft; By person regroups
 - `TODAY.74` a waiting row opens the task layer with what was asked, the message and the reply; Back returns to the list
@@ -174,7 +174,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.17` the item page opens from the Inbox list, from Library and from search
 - `BRAIN.18` a user without access to the item's space gets "Not found" rather than its content
 - `BRAIN.19` the item page is one column with no sideways scroll
-- `BRAIN.20` on an empty space Needs you says what will appear and offers Chat
+- `BRAIN.20` on an empty space Needs you is one `EmptyState` that says what will appear and offers Chat
 - `BRAIN.21` with 3 waiting captures (one with two possible areas) Needs you shows 3 rows with their best guesses and reasons
 - `BRAIN.22` Done files a row that was not changed, with its guess, and the record exists with the guessed area
 - `BRAIN.23` picking the second of two area chips files it there
@@ -192,7 +192,7 @@ Unit tests: `test_capture.py`; `test_brain.py`; `test_gmail.py`; `test_agents.py
 - `BRAIN.35` a failed capture shows its reason and Retry puts it back in the queue
 - `BRAIN.36` the Outbox piles in Activity show the same numbers as the Outbox
 - `BRAIN.37` the feed is one column and nothing scrolls sideways
-- `BRAIN.38` with no source connected Sources says what will appear, shows Capture as always on and has no Add a source
+- `BRAIN.38` with no source connected Sources is one `EmptyState` that says what will appear, shows Capture as always on and has no Add a source
 - `BRAIN.39` connected sources show with this week's counts, matching the captures in the database
 - `BRAIN.40` switching the assistant off makes create_item from hermes fail with a clear message; switching it on again works
 - `BRAIN.41` a source that is not built cannot be switched on and shows no Coming tile
@@ -256,7 +256,7 @@ Unit tests: `test_goals.py`; `test_tasks.py` (All tasks, No goal, task filters a
 - `GOALS.18` Inbox items left too long: on Suggest an old item gets a suggested decision and the batch confirms it; on Park and Discard the job acts and Today's Undo restores
 - `GOALS.19` nothing in the goal dialog, readings, Outbox or old-items work scrolls sideways
 - `GOALS.20` a quick-captured task shows its guessed area with ✦ and the confidence; one tap confirms it and the ✦ goes
-- `GOALS.21` with no goals By area says what will appear and offers + Goal
+- `GOALS.21` with no goals By area is one `EmptyState` that says what will appear and offers + Goal (All tasks and No goal the same, GOALS.27 and the No goal check)
 - `GOALS.22` with eight goals over Career (two parts), Health, Money and Mind each appears under its area and part
 - `GOALS.23` a goal's card shows its Done when, score, next action and open task count, matching the goal page
 - `GOALS.24` an area that is off has no section; turning it on shows its goals

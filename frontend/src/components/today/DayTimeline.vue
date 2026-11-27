@@ -6,10 +6,8 @@
       <span class="min-w-0 flex-1 break-words text-base" :class="r.kind === 'now' ? 'text-ink-blue-8' : 'text-ink-gray-9'">{{ r.title }}</span>
       <Badge v-if="r.kind === 'due'" theme="orange" label="task" />
     </Row>
-    <Empty v-if="data && !items.length" title="Nothing on this day." data-timeline-empty>
-      <p class="mt-1">Events, tasks planned at a time, tasks due and key dates show here.</p>
-      <Button v-if="canWrite()" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-timeline-chat @click="openChat()" />
-    </Empty>
+    <EmptyState v-if="data && !items.length" line="Nothing on this day. Events, tasks planned at a time, tasks due and key dates show here." :action="canWrite() ? { label: 'Chat', icon: 'lucide-message-square', click: () => openChat() } : null"
+      data-timeline-empty data-timeline-chat />
   </Card>
 </template>
 <script setup>
@@ -17,7 +15,7 @@ import { computed, ref } from 'vue'
 import { Badge, Button } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { chipType, itemLabel, itemRef, useCalendarRange } from '@/lib/calRange'
 import { canWrite, store } from '@/lib/store'
 import { openChat } from '@/lib/ask'

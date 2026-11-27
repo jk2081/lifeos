@@ -35,8 +35,7 @@
         <div v-if="g.goals.length" class="flex flex-col" data-cycle-goal-list>
           <div class="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_auto_3.5rem] gap-3 border-b border-outline-gray-1 pb-1.5 text-sm text-ink-gray-6 max-md:hidden">
             <span>Goal</span><span>Lead action {{ g.current_week ? 'this week' : '' }}</span><span>Ticks</span><span class="text-right" /></div>
-          <div v-for="goal in g.goals" :key="goal.name" class="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_auto_3.5rem] items-center gap-x-3 gap-y-1 border-b border-outline-gray-1 py-2.5 last:border-b-0 max-md:grid-cols-[minmax(0,1fr)_auto]"
-            data-cycle-goal :data-goal="goal.name">
+          <Row bare v-for="goal in g.goals" :key="goal.name" class="grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)_auto_3.5rem] items-center gap-x-3 gap-y-1 py-2.5 max-md:grid-cols-[minmax(0,1fr)_auto]" data-cycle-goal :data-goal="goal.name">
             <div class="min-w-0 max-md:col-span-2">
               <RefLink class="break-words text-base-medium text-ink-gray-9 hover:underline focus-visible:focus-ring" :to="`goal:${goal.name}`">{{ goal.title }}</RefLink>
               <RefLink v-if="goal.serves_title" class="block truncate text-sm text-ink-gray-6 hover:underline focus-visible:focus-ring" :to="`goal:${goal.serves}`" data-grid-serves>Serves {{ goal.serves_title }}{{ goal.serves_progress ? ' · ' + goal.serves_progress.label : '' }}</RefLink>
@@ -51,9 +50,9 @@
               <span class="text-right text-sm tabular-nums text-ink-gray-6" data-tick-count>{{ count(lead(goal)) }} of {{ lead(goal).per_week }}</span>
             </template>
             <span v-else class="col-span-3 text-sm text-ink-gray-6 max-md:col-span-1">No action yet</span>
-          </div>
+          </Row>
         </div>
-        <Empty v-else title="No goals in this cycle yet." hint="Add a goal with its weekly actions. Each week you tick what you did, and the score follows."><Button v-if="canEdit" class="mt-3" variant="solid" label="Cycle goals" @click="goalsOpen = true" /></Empty>
+        <EmptyState v-else line="No goals in this cycle yet. Add a goal with its weekly actions. Each week you tick what you did, and the score follows." :action="canEdit ? { label: 'Cycle goals', click: () => (goalsOpen = true) } : null" />
 
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-5 bg-surface-gray-1 px-4 py-3 text-sm text-ink-gray-7" data-cycle-footer>
           <p class="min-w-0 flex-1">
@@ -65,8 +64,8 @@
           <Button v-if="g.current_week" label="Score this week" route="/today/week?view=review" />
         </div>
       </template>
-      <Empty v-else-if="loaded" title="No 12 Week Year yet." hint="A cycle is twelve weeks of goals with weekly actions. Each week you tick what you did, and the score follows.">
-        <Button v-if="writable" class="mt-3" variant="solid" label="Start a cycle next Monday" data-create-cycle @click="createCycle" /></Empty>
+      <EmptyState v-else-if="loaded" line="No 12 Week Year yet. A cycle is twelve weeks of goals with weekly actions. Each week you tick what you did, and the score follows."
+        :action="writable ? { label: 'Start a cycle next Monday', click: createCycle } : null" data-create-cycle />
     </Card>
 
     <!-- right: this month's goals (goals with the Month horizon) and its habits -->
@@ -76,15 +75,14 @@
         <span v-if="goals.length" class="text-sm text-ink-gray-6">{{ goals.length }} month goal{{ goals.length === 1 ? '' : 's' }} · {{ closedCount }} done or closed</span>
       </div>
       <ol v-if="goals.length" class="flex flex-col">
-        <li v-for="(m, i) in goals" :key="m.row" class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-outline-gray-1 py-2.5 last:border-b-0" data-month-goal :data-goal="m.row">
+        <Row as="li" bare v-for="(m, i) in goals" :key="m.row" class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5" data-month-goal :data-goal="m.row">
           <span class="w-5 flex-none text-center text-sm tabular-nums text-ink-gray-6" aria-hidden="true">{{ i + 1 }}</span>
           <RefLink class="min-w-0 flex-1 break-words hover:underline focus-visible:focus-ring" :class="m.status === 'Done' || m.status === 'Dropped' ? 'text-ink-gray-6 line-through' : 'text-ink-gray-9'" :to="`goal:${m.row}`">{{ m.title }}</RefLink>
           <Badge v-if="m.area_name" :label="m.area_name" />
           <Badge :theme="statusOf(m).theme" :label="statusOf(m).label" data-month-status />
-        </li>
+        </Row>
       </ol>
-      <Empty v-else title="No goals this month." hint="A month goal is a goal with the Month horizon. Add one with + Goal.">
-        <Button v-if="writable" class="mt-3" variant="solid" label="Goal" @click="newOpen = true" /></Empty>
+      <EmptyState v-else line="No goals this month. A month goal is a goal with the Month horizon. Add one with + Goal." :action="writable ? { label: 'Goal', click: () => (newOpen = true) } : null" />
 
       <div v-if="mp.habits.habits.length" data-month-habits>
         <h3 class="mb-2 text-sm text-ink-gray-6">Habits this month</h3>
@@ -102,6 +100,7 @@
   <NewGoalDialog v-model="newOpen" @saved="load" @habit="loadMonth" />
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import RefLink from '@/components/ui/RefLink.vue'
 // Goals > Cycles (issue 45): the 12 Week Year on the left (week bars, each cycle goal's lead action and this week's ticks) and this
 // month's plan on the right. It moves the Plan section's screens; the records, the API and the scores are the same.
@@ -110,7 +109,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dropdown, Progress, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Md from '@/components/Md.vue'
 import CycleGoalsDialog from '@/components/goals/CycleGoalsDialog.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'

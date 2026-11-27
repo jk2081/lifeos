@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col gap-4" data-digest>
     <section v-for="(s, i) in sections" :key="i" :data-digest-section="s.title">
-      <h3 v-if="s.title" class="mb-1.5 text-base-semibold text-ink-gray-9">{{ s.title }} <span class="text-sm font-normal text-ink-gray-6">{{ s.items.length || '' }}</span></h3>
+      <SectionHead v-if="s.title">{{ s.title }} <span class="text-sm font-normal text-ink-gray-6">{{ s.items.length || '' }}</span></SectionHead>
       <Md v-if="s.intro" :text="s.intro" />
       <ul v-if="s.items.length" class="flex flex-col divide-y divide-outline-gray-1 rounded-5 border border-outline-gray-2">
         <li v-for="(it, j) in s.items" :key="j" class="flex flex-wrap items-start gap-2 px-3 py-2" data-digest-item>
@@ -14,6 +14,7 @@
   </div>
 </template>
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 import { openRef } from '@/lib/pane'
 // An email digest as headed lists: each section (Needs your attention, Waiting on others, Dates and deadlines, FYI from
 // people, Company information, Left out) is a heading with its items, and each item's Gmail link is an "Open in Gmail" button.

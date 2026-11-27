@@ -46,7 +46,7 @@
             </Row>
           </Card>
         </section>
-        <Card v-if="!monthsWithEntries.length"><Empty :title="`Nothing in ${year} yet.`" hint="Add an important date or an all-day event, and it shows here." /></Card>
+        <Card v-if="!monthsWithEntries.length"><EmptyState :line="`Nothing in ${year} yet. Add an important date or an all-day event, and it shows here.`" /></Card>
       </div>
       <p class="text-sm text-ink-gray-6 max-md:hidden">Laid out like the year pages in the journal: one column a month, one line a day. Timed meetings are left out. Click a day to add or open an entry.</p>
     </template>
@@ -92,7 +92,7 @@
           </Row>
         </Card>
       </section>
-      <Card v-if="!agendaDays.length"><Empty title="Nothing in the next 30 days." hint="Events, important dates, tasks with a due date and expiring documents show here." /></Card>
+      <Card v-if="!agendaDays.length"><EmptyState line="Nothing in the next 30 days. Events, important dates, tasks with a due date and expiring documents show here." /></Card>
     </template>
   </div>
 
@@ -106,7 +106,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Alert, Button, TabButtons, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import NewRecord from '@/components/NewRecord.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'

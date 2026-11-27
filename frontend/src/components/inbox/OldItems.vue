@@ -1,6 +1,5 @@
 <template>
-  <Alert v-if="total" theme="amber" :title="`${total} item${total === 1 ? '' : 's'} older than ${days} days ${total === 1 ? 'has a' : 'have'} suggested decision${total === 1 ? '' : 's'}`"
-    description="Each says what to do with it and why: accept its proposals, park it in Someday, or discard it." data-old-items-banner :data-old-items-n="total">
+  <Alert v-if="total" theme="amber" :title="`${total} item${total === 1 ? '' : 's'} older than ${days} days ${total === 1 ? 'has a' : 'have'} suggested decision${total === 1 ? '' : 's'}`" description="Each says what to do with it and why: accept its proposals, park it in Someday, or discard it." data-old-items-banner :data-old-items-n="total">
     <template #actions><Button variant="solid" :label="`Review ${total}`" data-old-items-open @click="openBatch" /></template>
   </Alert>
   <Dialog v-model:open="open" :title="`Inbox items older than ${days} days`" size="3xl" data-old-items-dialog>
@@ -11,7 +10,7 @@
         <span class="text-sm text-ink-gray-7">{{ chosen.size }} of {{ rows.length }} selected</span>
       </div>
       <div class="flex max-h-[60vh] flex-col overflow-y-auto">
-        <div v-for="r in rows" :key="r.name" class="flex flex-wrap items-start gap-3 border-b border-outline-gray-1 py-2.5 last:border-b-0" data-old-item :data-item="r.name">
+        <Row bare v-for="r in rows" :key="r.name" class="flex flex-wrap items-start gap-3 py-2.5" data-old-item :data-item="r.name">
           <Checkbox class="mt-0.5" :model-value="chosen.has(r.name)" :aria-label="'Select ' + r.title" @update:model-value="(v) => (v ? chosen.add(r.name) : chosen.delete(r.name))" />
           <div class="min-w-0 flex-[1_1_220px]">
             <div class="flex items-center gap-1.5 break-words text-base-medium text-ink-gray-9">
@@ -20,8 +19,8 @@
             <div class="mt-1 text-sm text-ink-gray-8" data-old-item-reason>{{ r.reason }}<span v-if="r.by" class="text-ink-gray-5"> · Suggested by {{ r.by }}</span></div>
           </div>
           <Select class="w-36" :model-value="r.decision" :options="DECISIONS" :aria-label="'Decision for ' + r.title" data-old-item-decision @update:model-value="(v) => (r.decision = v)" />
-        </div>
-        <Empty v-if="!rows.length" title="Nothing waiting." hint="Items older than the rule's days get a suggested decision each night." />
+        </Row>
+        <EmptyState line="Nothing waiting. Items older than the rule's days get a suggested decision each night." v-if="!rows.length" />
       </div>
     </div>
     <template #actions><div class="flex justify-end gap-2"><Button label="Close" @click="open = false" />
@@ -29,13 +28,14 @@
   </Dialog>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 // Inbox items left too long (set 7): the banner on the Inbox and the batch screen of suggested decisions. Confirm applies
 // exactly the ticked items and toasts an Undo. ?decisions=1 (Reset's batch) opens it.
 import { brainData } from '@/data/brain'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Alert, Button, Checkbox, Dialog, Select, toast } from 'frappe-ui'
-import Empty from '../Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { errorText, tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'

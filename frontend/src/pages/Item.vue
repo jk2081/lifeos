@@ -34,7 +34,7 @@
   </template>
   <template v-else-if="missing">
     <PageHead title="Not found" :path="[{ label: 'Brain', to: '/brain' }, { label: 'Activity', to: '/brain/activity' }]" />
-    <div class="page-body"><Card data-item-missing><Empty title="Not found." hint="There is no such item, or it is in a space you cannot open." /></Card></div>
+    <div class="page-body"><Card data-item-missing><EmptyState line="Not found. There is no such item, or it is in a space you cannot open." /></Card></div>
   </template>
   <div v-else class="page-body"><Skeleton class="h-40 w-full" /></div>
 </template>
@@ -46,7 +46,7 @@ import { computed, onMounted, ref } from 'vue'
 import { Alert, Badge, Button, Skeleton } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import TabBar from '@/components/TabBar.vue'
 import ItemBody from '@/components/item/ItemBody.vue'
 import { tryCall } from '@/lib/api'

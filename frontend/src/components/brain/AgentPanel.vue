@@ -7,16 +7,15 @@
       </Card>
 
       <section class="flex flex-col gap-2" data-agent-section="waiting">
-        <div><h2 class="text-base-medium text-ink-gray-9">Waiting for your OK</h2><p class="text-sm text-ink-gray-6">What {{ a.name }} wants to do and will not until you say so.</p></div>
+        <div><SectionHead>Waiting for your OK</SectionHead><p class="text-sm text-ink-gray-6">What {{ a.name }} wants to do and will not until you say so.</p></div>
         <AgentRequests v-if="a.waiting.length" :rows="a.waiting" @changed="load" />
         <Card v-else class="text-sm text-ink-gray-6" data-agent-empty="waiting">Nothing waits for you.</Card>
       </section>
 
       <section class="flex flex-col gap-2" data-agent-section="knows">
-        <div><h2 class="text-base-medium text-ink-gray-9">What it knows</h2><p class="text-sm text-ink-gray-6">Facts {{ a.name }} keeps about you, and where each came from.</p></div>
+        <div><SectionHead>What it knows</SectionHead><p class="text-sm text-ink-gray-6">Facts {{ a.name }} keeps about you, and where each came from.</p></div>
         <Card v-if="a.facts.length" flush>
-          <div v-for="f in a.facts" :key="f.name" class="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b border-outline-gray-1 py-3 last:border-b-0" data-fact :data-fact-id="f.id"
-            :data-state="f.change ? f.change.status : ''">
+          <Row bare v-for="f in a.facts" :key="f.name" class="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 py-3" data-fact :data-fact-id="f.id" :data-state="f.change ? f.change.status : ''">
             <div class="min-w-0 flex-[1_1_320px]">
               <form v-if="editing === f.name" class="flex gap-2" @submit.prevent="saveFact(f)">
                 <TextInput v-model="draft" class="min-w-0 flex-1" aria-label="The fact" data-fact-input /><Button variant="solid" label="Save" type="submit" data-fact-save />
@@ -33,58 +32,56 @@
               <Button size="sm" label="Edit" data-fact-edit @click="startEdit(f)" />
               <Button size="sm" label="Delete" data-fact-delete @click="act(() => brainData.agentPage.delete_fact({ key, fact: f.name, space: store.space }))" />
             </div>
-          </div>
+          </Row>
         </Card>
         <Card v-else class="text-sm text-ink-gray-6" data-agent-empty="knows">Nothing yet. What {{ a.name }} learns about you will show up here once it is connected.</Card>
       </section>
 
       <section class="flex flex-col gap-2" data-agent-section="can">
-        <div><h2 class="text-base-medium text-ink-gray-9">What it can do</h2><p class="text-sm text-ink-gray-6">On its own, asks you first, or off.</p></div>
+        <div><SectionHead>What it can do</SectionHead><p class="text-sm text-ink-gray-6">On its own, asks you first, or off.</p></div>
         <Card flush>
-          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-outline-gray-1 py-3" data-owner-runs-now :data-on="a.owner_runs_now">
+          <Row bare class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3" data-owner-runs-now :data-on="a.owner_runs_now">
             <div><span class="text-base text-ink-gray-9">Your requests through this agent run at once</span><p class="text-sm text-ink-gray-6">Off, what you ask it waits in Needs you.</p></div>
             <Switch :model-value="!!a.owner_runs_now" :disabled="!writable" aria-label="Your requests through this agent run at once"
               @update:model-value="(v) => act(() => brainData.agentPage.set_owner_runs_now({ key, on: v ? 1 : 0, space: store.space }))" />
-          </div>
-          <div v-for="c in a.can" :key="c.key" class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-outline-gray-1 py-3 last:border-b-0" data-ability :data-ability-key="c.key" :data-mode="c.mode"
-            :data-state="c.change ? c.change.status : ''">
+          </Row>
+          <Row bare v-for="c in a.can" :key="c.key" class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3" data-ability :data-ability-key="c.key" :data-mode="c.mode" :data-state="c.change ? c.change.status : ''">
             <div class="flex flex-wrap items-center gap-2"><span class="text-base text-ink-gray-9">{{ c.label }}</span><ChangeBadge :change="c.change" /></div>
             <Select v-if="!c.fixed" class="w-40" :model-value="c.mode" :options="MODES" :disabled="!writable" :aria-label="c.label" data-ability-select
               @update:model-value="(m) => act(() => brainData.agentPage.set_ability({ key, action: c.key, mode: m, space: store.space }))" />
             <span v-else class="text-sm text-ink-gray-6" data-ability-fixed>Always off</span>
-          </div>
+          </Row>
         </Card>
       </section>
 
       <section class="flex flex-col gap-2" data-agent-section="read">
-        <div><h2 class="text-base-medium text-ink-gray-9">What it may read in Life OS</h2><p class="text-sm text-ink-gray-6">Life OS leaves out what is off, whatever {{ a.name }} asks for.</p></div>
+        <div><SectionHead>What it may read in Life OS</SectionHead><p class="text-sm text-ink-gray-6">Life OS leaves out what is off, whatever {{ a.name }} asks for.</p></div>
         <Card flush>
-          <label v-for="ar in a.areas" :key="ar.name" class="flex items-center justify-between gap-3 border-b border-outline-gray-1 py-3" data-area :data-area-id="ar.name" :data-on="ar.on">
+          <Row as="label" bare v-for="ar in a.areas" :key="ar.name" class="flex items-center justify-between gap-3 py-3" data-area :data-area-id="ar.name" :data-on="ar.on">
             <span class="text-base text-ink-gray-9">{{ ar.title }}</span>
             <Switch :model-value="!!ar.on" :disabled="!writable" :label="ar.on ? 'On' : 'Off'" @update:model-value="(v) => act(() => brainData.agentPage.set_area({ key, area: ar.name, on: v ? 1 : 0, space: store.space }))" />
-          </label>
+          </Row>
           <div class="flex items-center justify-between gap-3 py-3" data-area-vault><span class="text-base text-ink-gray-9">The Vault</span><span class="text-sm text-ink-gray-6">Always off</span></div>
         </Card>
       </section>
 
       <section class="flex flex-col gap-2" data-agent-section="scheduled">
-        <div><h2 class="text-base-medium text-ink-gray-9">Scheduled</h2><p class="text-sm text-ink-gray-6">{{ a.name }}'s jobs and when they run.</p></div>
+        <div><SectionHead>Scheduled</SectionHead><p class="text-sm text-ink-gray-6">{{ a.name }}'s jobs and when they run.</p></div>
         <Card v-if="a.jobs.length" flush>
-          <div v-for="j in a.jobs" :key="j.name" class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-outline-gray-1 py-3 last:border-b-0" data-job :data-job-id="j.id" :data-paused="j.paused"
-            :data-state="j.change ? j.change.status : ''">
+          <Row bare v-for="j in a.jobs" :key="j.name" class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 py-3" data-job :data-job-id="j.id" :data-paused="j.paused" :data-state="j.change ? j.change.status : ''">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2"><span class="break-words text-base text-ink-gray-9" data-job-title>{{ j.title }}</span><Badge v-if="j.paused" theme="gray" label="Paused" data-job-paused /><ChangeBadge :change="j.change" /></div>
               <div class="text-sm text-ink-gray-6">{{ [j.schedule, j.next_run && `next ${j.next_run}`].filter(Boolean).join(' · ') || 'No time given' }}</div>
               <div v-if="j.failed" class="text-sm text-ink-red-8" data-job-failed><span aria-hidden="true">✦</span> Failed{{ j.last_run ? ` ${j.last_run}` : '' }}: {{ j.last_error || 'no reason given' }}</div>
             </div>
             <Button v-if="writable" size="sm" :label="j.paused ? 'Resume' : 'Pause'" data-job-toggle @click="act(() => brainData.agentPage.pause_job({ key, job: j.name, paused: j.paused ? 0 : 1, space: store.space }))" />
-          </div>
+          </Row>
         </Card>
         <Card v-else class="text-sm text-ink-gray-6" data-agent-empty="scheduled">Nothing scheduled yet.</Card>
       </section>
 
       <section class="flex flex-col gap-2" data-agent-section="did">
-        <div><h2 class="text-base-medium text-ink-gray-9">What it did</h2><p class="text-sm text-ink-gray-6">This week, {{ money(a.cost_week) }} in all.</p></div>
+        <div><SectionHead>What it did</SectionHead><p class="text-sm text-ink-gray-6">This week, {{ money(a.cost_week) }} in all.</p></div>
         <Card v-if="a.did.length" flush>
           <Row v-for="d in a.did" :key="d.name" :pane="d.ref || null" :label="d.title" class="!flex-wrap !items-center justify-between gap-x-3 gap-y-1 !py-3" data-did :data-status="d.status">
             <div class="min-w-0"><span class="break-words text-base text-ink-gray-9" data-did-title>{{ d.title }}</span>
@@ -99,7 +96,7 @@
       </section>
 
       <section class="flex flex-col gap-2" data-agent-section="connector">
-        <div><h2 class="text-base-medium text-ink-gray-9">The connector</h2><p class="text-sm text-ink-gray-6">A small skill and script your agent runs. It does not change the agent itself.</p></div>
+        <div><SectionHead>The connector</SectionHead><p class="text-sm text-ink-gray-6">A small skill and script your agent runs. It does not change the agent itself.</p></div>
         <Card class="flex flex-col gap-2 text-sm text-ink-gray-7">
           <p>{{ a.reported ? `Last heard from ${a.name} at ${a.reported}.` : `${a.name} has not reported yet.` }} It sends what it knows, can do and has scheduled when they change and once a day, and picks up your changes from here.</p>
           <p v-if="!a.reported" data-connector-how>Set it up with the README in <code>agent/connector/</code>, on the agent's server.</p>
@@ -114,6 +111,7 @@
 </template>
 
 <script setup>
+import SectionHead from '@/components/ui/SectionHead.vue'
 // An agent's page (issue 85): what it waits for, knows, can do, may read, has scheduled and did, and the connector that carries the owner's changes to it.
 // A change shows waiting until the connector confirms it, then applied, or failed with the reason.
 import { computed, h, ref, watch } from 'vue'

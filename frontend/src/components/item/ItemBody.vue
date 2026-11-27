@@ -24,10 +24,10 @@
                 <a href="#" class="relative text-ink-blue-8 underline" @click.prevent="openRoute(i.asset_route)">{{ i.asset_title || i.reusable_as }}</a></div>
             </div>
           </Row>
-          <Empty v-if="!item.inputs.length" title="No inputs." hint="The agent filed no inputs with this work." />
+          <EmptyState line="No inputs. The agent filed no inputs with this work." v-if="!item.inputs.length" />
         </Card>
       </div>
-      <Card v-if="!item.files.length && !item.raw_text && !safeLink && !item.instruction"><Empty title="Nothing came with it." hint="This item arrived with no file, text or link." /></Card>
+      <Card v-if="!item.files.length && !item.raw_text && !safeLink && !item.instruction"><EmptyState line="Nothing came with it. This item arrived with no file, text or link." /></Card>
       <!-- "Add a transcript" lives with the original -->
       <div v-if="item.transcript_md || writable" data-item-transcript>
         <Button variant="ghost" size="sm" class="-ml-2" :icon-left="showTranscript ? 'lucide-chevron-down' : 'lucide-chevron-right'"
@@ -49,7 +49,7 @@
     <div v-else-if="tab === 'came'" class="flex flex-col gap-4">
       <Card flush>
         <RecordRow v-for="m in item.came_of_it" :key="m.doctype + m.name" :record="m" data-came-of-it />
-        <Empty v-if="!item.came_of_it.length" title="Nothing yet." hint="Tasks, notes, dates and events made from it are listed here." />
+        <EmptyState line="Nothing yet. Tasks, notes, dates and events made from it are listed here." v-if="!item.came_of_it.length" />
       </Card>
       <template v-for="g in relatedGroups" :key="g.key">
         <div v-if="g.rows.length" class="flex flex-col gap-1" :data-related="g.key">
@@ -68,7 +68,7 @@ import { Alert, Button } from 'frappe-ui'
 import Backlinks from '@/components/Backlinks.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Md from '@/components/Md.vue'
 import MdField from '@/components/MdField.vue'
 import DigestView from '@/components/DigestView.vue'

@@ -7,7 +7,7 @@
     </p>
 
     <section class="flex flex-col gap-3" data-connected>
-      <p v-if="loaded && !sources.some((c) => c.connected !== 0)" class="text-sm text-ink-gray-7" data-sources-empty>Nothing is connected yet. Things you capture yourself are always read. Connect a source below and what it brings in is filed for you.</p>
+      <EmptyState v-if="loaded && !sources.some((c) => c.connected !== 0)" line="Nothing is connected yet. Things you capture yourself are always read. Connect a source below and what it brings in is filed for you." data-sources-empty />
       <div v-if="sources.length" class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <Card v-for="c in sources" :key="c.name || c.system" class="relative flex flex-col gap-2" :class="c.connected === 0 ? '' : 'hover:bg-surface-gray-1'" data-source-card
           :data-system="c.system" :data-state="c.state" :data-active="c.active" :data-week="c.this_week">
@@ -40,7 +40,7 @@
     </section>
 
     <section v-if="more" class="flex flex-col gap-3" data-more-sources>
-      <h2 class="text-base-medium text-ink-gray-9">Not built yet <span class="text-sm font-normal text-ink-gray-6">Shown because more sources are switched on for this site.</span></h2>
+      <SectionHead>Not built yet <span class="text-sm font-normal text-ink-gray-6">Shown because more sources are switched on for this site.</span></SectionHead>
       <div class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <div v-for="t in coming" :key="t.system" class="flex flex-col items-center gap-0.5 rounded-5 border border-dashed border-outline-gray-2 px-3 py-4 text-center opacity-80"
           data-source-tile data-tile-coming :data-system="t.system" aria-disabled="true">
@@ -52,7 +52,7 @@
     </section>
 
     <section class="flex flex-col gap-3" data-email-in :data-configured="emailIn.configured ? 1 : 0">
-      <h2 class="text-base-medium text-ink-gray-9">Email-in address <span class="text-sm font-normal text-ink-gray-6">Optional. Forward an email to capture it.</span></h2>
+      <SectionHead>Email-in address <span class="text-sm font-normal text-ink-gray-6">Optional. Forward an email to capture it.</span></SectionHead>
       <Card class="flex flex-col gap-2">
         <p class="text-sm text-ink-gray-8" data-email-in-address>
           <template v-if="emailIn.address">Forward to <span class="text-base-medium">{{ emailIn.address }}</span></template>
@@ -124,6 +124,8 @@
   </Dialog>
 </template>
 <script setup>
+import EmptyState from '@/components/ui/EmptyState.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 // Brain > Sources (issue 19, simplified in 101): one list of the sources in use, each with its state (On, Off, Waiting) and its Connect or settings
 // button. A source that is off makes the server refuse its captures; nothing it brought in is deleted.
 import { computed, ref, watch } from 'vue'

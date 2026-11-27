@@ -23,7 +23,7 @@
             </div>
           </li>
         </ul>
-        <p v-if="!e.notes.length" class="text-sm text-ink-gray-6" data-notes-empty>No notes yet. A note stays here, on this event, and is never sent to Google.</p>
+        <EmptyState v-if="!e.notes.length" line="No notes yet. A note stays here, on this event, and is never sent to Google." data-notes-empty />
       </section>
     </template>
     <template v-else>
@@ -43,6 +43,7 @@
   </template>
 </template>
 <script setup>
+import EmptyState from '@/components/ui/EmptyState.vue'
 // An event or an important date in the pane. An event has Notes (Frappe Comments on it), Hide in Life OS when it came from Google, a Key date star, and
 // Delete when it was made here. A repeat of a repeating event is `name@date` and has its own notes.
 import { computed, onMounted, ref } from 'vue'

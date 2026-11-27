@@ -14,7 +14,7 @@
 
     <section class="flex flex-col gap-2" data-skill-instructions>
       <div class="flex items-center justify-between gap-2">
-        <h2 class="text-base-medium text-ink-gray-9">Instructions</h2>
+        <SectionHead>Instructions</SectionHead>
         <div class="flex items-center gap-2">
           <Button size="sm" :label="preview ? 'Edit' : 'Preview'" data-skill-preview-toggle @click="preview = !preview" />
           <Button v-if="d.can_edit" size="sm" label="Test" icon-left="lucide-flask-conical" :loading="testing" data-skill-test @click="runTest" />
@@ -27,9 +27,9 @@
     </section>
 
     <section class="flex flex-col gap-2" data-skill-examples>
-      <h2 class="text-base-medium text-ink-gray-9">Examples <span class="text-sm font-normal text-ink-gray-6">Each is a sample capture and what it must make of it.</span></h2>
+      <SectionHead>Examples <span class="text-sm font-normal text-ink-gray-6">Each is a sample capture and what it must make of it.</span></SectionHead>
       <Card v-if="d.examples.length" flush>
-        <div v-for="e in d.examples" :key="e.name" class="flex flex-col gap-1 border-b border-outline-gray-1 py-3 last:border-0" data-skill-example>
+        <Row bare v-for="e in d.examples" :key="e.name" class="flex flex-col gap-1 py-3" data-skill-example>
           <div class="flex items-center gap-2">
             <span class="flex-1 text-base text-ink-gray-9">{{ e.title }}</span>
             <Badge v-if="shown(e)" :theme="shown(e).passed ? 'green' : 'red'" :label="shown(e).passed ? 'Pass' : 'Fail'" :data-example-result="shown(e).passed ? 'pass' : 'fail'" />
@@ -40,23 +40,23 @@
             <li v-for="(c, i) in shown(e).checks" :key="i" :class="c.passed ? '' : 'text-ink-red-8'">{{ c.passed ? '✓' : '✗' }} {{ checkText(c.check) }}</li>
           </ul>
           <p v-if="shown(e)" class="text-xs text-ink-gray-5">Ran against {{ shown(e).source === 'recorded' ? 'the recorded answer' : 'the model' }}.</p>
-        </div>
+        </Row>
       </Card>
-      <Card v-else><Empty title="No examples yet." hint="An example is a sample capture and what the skill must make of it. It is how a changed text is tested before it is saved." /></Card>
+      <Card v-else><EmptyState line="No examples yet. An example is a sample capture and what the skill must make of it. It is how a changed text is tested before it is saved." /></Card>
     </section>
 
     <section class="flex flex-col gap-2" data-skill-lessons>
-      <h2 class="text-base-medium text-ink-gray-9">Lessons <span class="text-sm font-normal text-ink-gray-6">What your corrections in Needs you taught this skill. They change its words, nothing else.</span></h2>
+      <SectionHead>Lessons <span class="text-sm font-normal text-ink-gray-6">What your corrections in Needs you taught this skill. They change its words, nothing else.</span></SectionHead>
       <Card v-if="d.lessons.length" flush>
         <LessonCard v-for="l in d.lessons" :key="l.name" :lesson="l" :can-edit="d.can_edit" @changed="load" />
       </Card>
-      <Card v-else><Empty title="No lessons yet." hint="When you correct this skill's guesses in Needs you the same way three times, it proposes a lesson here." /></Card>
+      <Card v-else><EmptyState line="No lessons yet. When you correct this skill's guesses in Needs you the same way three times, it proposes a lesson here." /></Card>
     </section>
 
     <section class="flex flex-col gap-2" data-skill-versions>
-      <h2 class="text-base-medium text-ink-gray-9">Versions</h2>
+      <SectionHead>Versions</SectionHead>
       <Card flush>
-        <div v-for="(v, i) in d.versions" :key="v.version" class="flex flex-col gap-1 border-b border-outline-gray-1 py-3 last:border-0" data-skill-version-row :data-version="v.version">
+        <Row bare v-for="(v, i) in d.versions" :key="v.version" class="flex flex-col gap-1 py-3" data-skill-version-row :data-version="v.version">
           <div class="flex flex-wrap items-center gap-2">
             <span class="text-base-medium text-ink-gray-9">Version {{ v.version }}</span><Badge v-if="i === 0" theme="green" label="Current" />
             <span class="flex-1 text-sm text-ink-gray-6">{{ v.changed_by_name }} · {{ dateTime(v.changed_on) }}<template v-if="v.note"> · {{ v.note }}</template></span>
@@ -64,23 +64,24 @@
             <Button v-if="d.can_edit && i > 0" size="sm" label="Roll back" data-version-rollback @click="rollback(v)" />
           </div>
           <DiffView v-if="open === v.version" :before="d.versions[i + 1]?.instructions" :after="v.instructions" />
-        </div>
+        </Row>
       </Card>
     </section>
 
     <section class="flex flex-col gap-2" data-skill-runs>
-      <h2 class="text-base-medium text-ink-gray-9">Recent runs</h2>
+      <SectionHead>Recent runs</SectionHead>
       <Card v-if="d.runs.length" flush>
-        <button v-for="r in d.runs" :key="r.name" type="button" class="flex w-full flex-wrap items-center gap-2 border-b border-outline-gray-1 py-2.5 text-left last:border-0 hover:bg-surface-gray-1 focus-visible:focus-ring" data-skill-run @click="openRun(r)">
+        <Row bare v-for="r in d.runs" :key="r.name" class="flex flex-wrap items-center gap-2 py-2.5 hover:bg-surface-gray-1" data-skill-run>
+          <button type="button" class="absolute inset-0 focus-visible:focus-ring" :aria-label="`${r.status} run of ${dateTime(r.creation)}`" data-skill-run-open @click="openRun(r)" />
           <Badge :theme="STATUS[r.status] || 'gray'" :label="r.status" />
           <span class="flex-1 text-sm text-ink-gray-8">{{ r.trigger }} · v{{ r.skill_version }} · {{ dateTime(r.creation) }}</span>
           <span class="text-sm tabular-nums text-ink-gray-6">${{ (r.cost || 0).toFixed(4) }}</span>
-        </button>
+        </Row>
       </Card>
-      <Card v-else><Empty title="No runs yet." hint="Each time this skill runs, what it did and what it cost is listed here." /></Card>
+      <Card v-else><EmptyState line="No runs yet. Each time this skill runs, what it did and what it cost is listed here." /></Card>
     </section>
   </div>
-  <div v-else-if="missing" class="page-body" data-skill-missing><Empty title="There is no such skill." hint="Go back to the list of skills." /></div>
+  <div v-else-if="missing" class="page-body" data-skill-missing><EmptyState line="There is no such skill. Go back to the list of skills." /></div>
 
   <Dialog v-model:open="logOpen" title="Run log">
     <template #default>
@@ -96,6 +97,8 @@
   </Dialog>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 // A skill page (issue 28): its instructions (editable, with a preview), its examples with Test (pass or fail before saving), its versions with
 // a diff and Roll back, and its recent runs, each opening its log.
 import { settingsData } from '@/data/settings'
@@ -103,7 +106,7 @@ import { computed, ref, watch } from 'vue'
 import { Badge, Button, Dialog, FormControl, Switch } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import DiffView from '@/components/DiffView.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import LessonCard from '@/components/brain/LessonCard.vue'
 import Md from '@/components/Md.vue'
 import PageHead from '@/components/PageHead.vue'
