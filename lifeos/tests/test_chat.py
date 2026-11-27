@@ -29,6 +29,7 @@ class ChatCase(AskCase):
 			frappe.get_doc({"doctype": "Flow Provider", "provider": "openai", "api_key": "sk-test-not-real"}).insert()
 		if not frappe.db.get_value("Flow Model", {"enabled": 1, "embedding": 0}, "name"):
 			frappe.get_doc({"doctype": "Flow Model", "title": "t119 model", "provider": "openai", "model_id": "gpt-test"}).insert()
+		engine.ensure_agent()  # a fresh site has no "Life OS" agent until a model exists, and the Flow Session the test makes links to it (test order must not matter)
 		frappe.set_user(OWNER)
 		self.runs = []
 		self.patches = [mock.patch("frappe.flow.lib.session.new_session", side_effect=self.new_session), mock.patch("lifeos.ai.chat.ensure_agent", return_value=engine.AGENT),
