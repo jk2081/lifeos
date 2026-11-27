@@ -104,7 +104,7 @@ for (const width of WIDTHS) {
     for (const [name, p, key, values, other] of STATE_TABS) {
       for (const extra of ['', other]) {
         // the lens's area is not a list query (set 6): a URL with only area= restores the remembered view, so the default tab says all=1 too
-        const q = (v) => `${p}?${[v === values[0] ? '' : `${key}=${encodeURIComponent(v)}`, extra, name === 'Tasks' ? 'view=list' : '', v === values[0] && (!extra || extra.startsWith('area=')) ? 'all=1' : ''].filter(Boolean).join('&')}`
+        const q = (v) => `${p}${p.includes('?') ? '&' : '?'}${[v === values[0] ? '' : `${key}=${encodeURIComponent(v)}`, extra, name === 'Tasks' ? 'view=list' : '', v === values[0] && (!extra || extra.startsWith('area=')) ? 'all=1' : ''].filter(Boolean).join('&')}`
         await s.open(q(values[0]))
         must((await bar.locator('[role="tab"]').count()) === values.length, `${name}: ${await bar.locator('[role="tab"]').count()} tabs, not ${values.length}`)
         must((await current()) === values[0], `${name}: the default tab is ${await current()}`)
