@@ -43,6 +43,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 | `check-wiki` | `test_agents.TestWeeklyCheck` | `SETTINGS.38` |
 | `ingest-email` (was `triage-email`) | `test_gmail.TestDigest`, `test_skills.TestSourceSkills` | `SETTINGS.38`, `BRAIN.46` to `BRAIN.48` |
 | one assistant: the owner's requests through an agent, the gate, `tasks_add`/`events_add`, Activity's Assistant rows, the name and the failed job | `test_agents.TestOneAssistant`, `test_permissions.TestOnlyTheOwnerIsTheOwner` | `BRAIN.73`, `SETTINGS.45`, `SETTINGS.46` |
+| Chat finishes, reopens and merges tasks, each with Undo (`finish_task`, `reopen_task`, `merge_tasks`) | `test_agents.TestFlow` | `TODAY.82` |
 | the lifeos skill names every agent tool (`lifeos.api.tools`, `chats.relay`, `chats.report`) | `test_agents.TestSkillNamesAgentTools` | none (no screen) |
 | relayed conversations (`chats.relay`) in Chat's History | `test_library.TestRelayedChat` | `BRAIN.74` |
 | the agent connector (`agent/connector/`) | `test_agents.TestConnector` | `BRAIN.49` to `BRAIN.51` |
@@ -57,7 +58,7 @@ Every skill the app ships has a unit test, and `SETTINGS.38` opens Brain > Skill
 
 ## Acceptance checks by place
 
-### Core: the Drawer (`tools/acceptance/core.mjs`, 5 checks)
+### Core: the Drawer and the cleanup guards (`tools/acceptance/core.mjs`, 9 checks)
 
 What opens over every screen: layers, the URL that holds them, Back and Esc, the widths.
 
@@ -66,6 +67,10 @@ What opens over every screen: layers, the URL that holds them, Back and Esc, the
 - `CORE.3` a list, then a row, then Back returns to the list with its row marked; j moves to the next row's record
 - `CORE.4` at 1440 px the Drawer is docked and the page narrows; at 1280 px it floats and the page keeps its width; at 390 px it is full screen with Back, in light and dark
 - `CORE.5` the guard finds a link to a record route in a .vue file (a fixture fails), and the tree has none
+- `CORE.6` G1: every whitelisted method is called (by a screen, the data layer's `group()`, a test, a file or a skill, or is in the allow list); a fixture with an unused one fails
+- `CORE.7` G2: the copy-paste level of `frontend/src` and `lifeos/` is at or under its ceiling; a fixture with a pasted block fails
+- `CORE.8` G3: no raw `<button>`, `<select>`, `<input>` or `<textarea>` outside `components/ui/`; a fixture with a raw `<select>` fails
+- `CORE.9` G4: every file in `components/ui/` is listed in `COMPONENTS.md`; a hand-built row or heading in a file outside the baseline fails
 
 ### Today (`tools/acceptance/today.mjs`, 63 checks)
 
@@ -148,6 +153,7 @@ Unit tests: `test_today.py` (Today's tasks, banners, the four cycle columns of t
 - `TODAY.79` Day Calendar lists an all-day event, a timed event, a task planned at 09:30 and a task due today in that order with the now line in place, each once
 - `TODAY.80` Week Overview's Waiting panel lists the waiting items and a row opens in the Drawer
 - `TODAY.81` in a task's pane the goal picker is searchable: typing part of a goal's title filters it
+- `TODAY.82` Chat: "mark it done" on a task open in the Drawer: the Done list shows the line with Undo and the task leaves the open list
 
 ### Brain (`tools/acceptance/brain.mjs`, 65 checks)
 
@@ -505,7 +511,7 @@ Unit tests: `test_capture.py` (the phone's captures, sent once); `test_permissio
 - `PHONE.24` every route in the router loads without an error; an unknown address lands on Today with "That page moved"
 - `PHONE.25` the dashboard at 390 px: only today and the month labelled on the ruler (Calendar), the cards two by two, the list full screen with Back and Esc, nothing cut off in light and dark
 
-### Tooling (`tools/acceptance/tooling.mjs`, 4 checks)
+### Tooling (`tools/acceptance/tooling.mjs`, 5 checks)
 
 The test tools themselves: the setup switches, CI and the screenshots a failed check saves.
 
@@ -518,6 +524,7 @@ Unit tests: none: these check the tools, not the app
 - `TOOLING.9` With the browser offline, /life/today shows the offline page saying "this device", in dark mode too
 - `TOOLING.10` Online but the server gives no answer: "not responding", Today loads by itself once it answers; dark in dark mode
 - `TOOLING.11` The bench cache is saved on main only, uncancelled; pull-request jobs restore it, say hit or miss, and share one Frappe version
+- `TOOLING.12` the monthly cleanup workflow runs on the 1st and the guards run on every pull request; by hand over a fixture finding it opens one issue labelled `audit`, over none it opens none
 
 ### End of every run (`tools/acceptance/end.mjs`)
 

@@ -1330,7 +1330,7 @@ for (const width of WIDTHS) {
   const errors = []
   pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
   const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
-  const made = { events: [], goals: [], items: [] }
+  const made = { events: [], goals: [], items: [], tasks: [] }
   const panel = () => pg.locator('[data-ask-panel]:visible').first()
   // the thread holds earlier answers: wait until the one just asked for is written
   const answered = async () => { await pg.waitForTimeout(700); await panel().locator('[data-ask-working]').waitFor({ state: 'detached', timeout: 90000 }); await panel().locator('[data-ask-answer][data-status="Done"]').last().waitFor({ timeout: 5000 }) }
@@ -1382,6 +1382,27 @@ print(e.name)`).split('\n').pop()
       const n = bench(`print(frappe.db.count("Comment", {"reference_doctype": "Event", "reference_name": "${ev}", "content": "quote by Friday"}))`).split('\n').pop()
       must(Number(n) === 1, 'no Comment on the event: ' + n)
     })
+    await check('TODAY.82', `${width} px: "mark it done" on a task open in the Drawer: the Done list shows the line with Undo and the task leaves the open list`, async () => {
+      const task = bench(`t = frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "I149 finish me ${stamp}", "status": "Open"}).insert(ignore_permissions=True)
+print(t.name)`).split('\n').pop()
+      made.tasks.push(task)
+      await s.open(`/life/today?open=task:${task}`)
+      await pg.locator('[data-pane-title]').waitFor({ timeout: 10000 })
+      if (phone) await pg.keyboard.press('Control+k') // the task fills the phone: Cmd/Ctrl+K opens the chat over it
+      else await openPanel()
+      await panel().waitFor({ timeout: 10000 })
+      await pg.locator('[data-ask-input]:visible').fill('mark it done')
+      await pg.locator('[data-ask-send]:visible').click()
+      await answered()
+      const line = panel().locator('[data-ask-done-line]').last()
+      must(await line.locator('[data-ask-undo]').count() === 1, 'the Done line has no Undo: ' + await line.innerText())
+      must((await line.innerText()).includes('I149 finish me'), 'the Done line is: ' + await line.innerText())
+      const status = bench(`print(frappe.db.get_value("Life Task", "${task}", "status"))`).split('\n').pop()
+      must(status === 'Done', 'the task is ' + status)
+      const open = await s.api('tasks.list', { status: 'Open', space: SPACE })
+      must(!JSON.stringify(open).includes(task), 'the task is still in the open list')
+      await noSideways()
+    })
     if (!phone) {
       await check('TODAY.64', `${width} px: a PDF bill dropped on the page is attached to the chat and, sent, becomes a capture for the Brain, listed with Change`, async () => {
         await s.open('/life/today')
@@ -1421,7 +1442,8 @@ print(e.name)`).split('\n').pop()
     chatOff()
     bench(`for n in ${JSON.stringify(made.events)}: frappe.delete_doc("Event", n, force=1, ignore_permissions=True)
 for n in ${JSON.stringify(made.goals)}: frappe.delete_doc("Life Goal", n, force=1, ignore_permissions=True)
-for n in ${JSON.stringify(made.items)}: frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)`)
+for n in ${JSON.stringify(made.items)}: frappe.delete_doc("Life Inbox Item", n, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(made.tasks)}: frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
     await s.ctx.close()
   }
 }

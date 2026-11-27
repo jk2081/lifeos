@@ -67,6 +67,12 @@ WRITE_TOOLS = [
 		"input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "body": {"type": "string"}, "area": {"type": "string"}, "part": {"type": "string"}}, "required": ["title", "body", "area"]}},
 	{"name": "make_task", "description": "Make a task now, only when the owner asked for it. For a task you think of yourself, offer a button with suggest_actions instead.",
 		"input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "area": {"type": "string"}, "part": {"type": "string"}, "due_date": {"type": "string", "description": "YYYY-MM-DD"}}, "required": ["title"]}},
+	{"name": "finish_task", "description": "Mark a task done, when the owner says it is done or finished. Give its reference (R3) or name. Never ask the owner to do it by hand.",
+		"input_schema": {"type": "object", "properties": {"task": {"type": "string", "description": "The task's reference, like R3, or its name."}}, "required": ["task"]}},
+	{"name": "reopen_task", "description": "Put a done or dropped task back to open, when the owner says it is not done after all.",
+		"input_schema": {"type": "object", "properties": {"task": {"type": "string", "description": "The task's reference, like R3, or its name."}}, "required": ["task"]}},
+	{"name": "merge_tasks", "description": "Two tasks are the same: keep one, drop the other. The dropped task's notes and missing links move to the kept one and the dropped one is set Dropped.",
+		"input_schema": {"type": "object", "properties": {"keep": {"type": "string", "description": "The task that stays: reference or name."}, "drop": {"type": "string", "description": "The task that goes into it: reference or name."}}, "required": ["keep", "drop"]}},
 	{"name": "add_event", "description": "Put an event on the calendar now, only when the owner asked for it.",
 		"input_schema": {"type": "object", "properties": {"title": {"type": "string"}, "start": {"type": "string", "description": "YYYY-MM-DD or YYYY-MM-DD HH:MM"}, "end": {"type": "string"},
 			"all_day": {"type": "boolean"}, "description": {"type": "string"}}, "required": ["title", "start"]}},
@@ -201,7 +207,7 @@ def run_tool(ctx, name, args):
 		fn = {"search": t_search, "get_record": t_get_record, "list_records": t_list, "counts": t_counts,
 			"cycle_state": t_cycle, "timeline": t_timeline, "catch_up": t_catch_up, "mail_search": t_mail_search, "mail_thread": t_mail_thread,
 			"mail_list_threads": t_mail_list_threads, "read_page": t_read_page, "digests_read": t_digests_read, "save_attachment": t_save_attachment, "create_page": t_create_page,
-			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "add_event": t_add_event,
+			"update_page": t_update_page, "add_person": t_add_person, "save_note": t_save_note, "make_task": t_make_task, "finish_task": t_finish_task, "reopen_task": t_reopen_task, "merge_tasks": t_merge_tasks, "add_event": t_add_event,
 			"make_rule": t_make_rule, "hand_off": t_hand_off, "find_events": t_find_events, "add_note": t_add_note, "cancel_event": t_cancel_event}[name]
 	except KeyError:
 		return {"error": f"Unknown tool {name}."}
@@ -580,7 +586,7 @@ def t_digests_read(ctx, start, end):
 def _did(ctx, out, kind, doctype=None, name=None):
 	"""Remember a write for the "Done" list under the answer; the model gets the same line back."""
 	ctx.done.append({"text": out["done"], "undo": out.get("undo"), "kind": kind, "doctype": doctype, "name": name, "pane": ref_of(doctype, name) if doctype and name else None})
-	return {"done": out["done"], **{k: v for k, v in out.items() if k in ("page", "person", "note", "task", "event", "rule", "item", "file", "file_name", "title", "organisation", "vault_document", "how", "message", "whatsapp", "needs_phone", "check_by")}}
+	return {"done": out["done"], **{k: v for k, v in out.items() if k in ("page", "person", "note", "task", "event", "rule", "item", "file", "file_name", "title", "organisation", "vault_document", "dropped", "differ", "how", "message", "whatsapp", "needs_phone", "check_by")}}
 
 
 def _page_arg(ctx, page):
@@ -631,6 +637,37 @@ def t_make_task(ctx, title, area=None, part=None, due_date=None):
 	from lifeos.tools import work
 
 	out = work.add_task(title, area, part, due_date, None, ctx.space)
+	return _did(ctx, out, "task", "Life Task", out["task"])
+
+
+def _task_arg(ctx, task):
+	"""A task from the chat's reference (R3) or its name."""
+	r = ctx.refs.get(str(task).strip()) if task else None
+	if r:
+		if r["doctype"] != "Life Task":
+			frappe.throw(_("That record is not a task."), title=_("Not a task"))
+		return r["name"]
+	return task
+
+
+def t_finish_task(ctx, task):
+	from lifeos.tools import work
+
+	out = work.finish_task(_task_arg(ctx, task), ctx.space)
+	return _did(ctx, out, "task", "Life Task", out["task"])
+
+
+def t_reopen_task(ctx, task):
+	from lifeos.tools import work
+
+	out = work.reopen_task(_task_arg(ctx, task), ctx.space)
+	return _did(ctx, out, "task", "Life Task", out["task"])
+
+
+def t_merge_tasks(ctx, keep, drop):
+	from lifeos.tools import work
+
+	out = work.merge_tasks(_task_arg(ctx, keep), _task_arg(ctx, drop), ctx.space)
 	return _did(ctx, out, "task", "Life Task", out["task"])
 
 

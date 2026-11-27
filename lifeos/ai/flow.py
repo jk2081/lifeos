@@ -11,7 +11,7 @@ from frappe.flow import Agent, ToolContext, tool
 
 from lifeos.ai.tools import Context, run_tool
 
-TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'add_event', 'hand_off', 'find_events', 'add_note', 'cancel_event', 'make_rule']
+TOOL_NAMES = ['search', 'read_page', 'get_record', 'list_records', 'counts', 'cycle_state', 'timeline', 'catch_up', 'mail_search', 'mail_thread', 'mail_list_threads', 'digests_read', 'save_attachment', 'create_page', 'update_page', 'add_person', 'save_note', 'make_task', 'finish_task', 'reopen_task', 'merge_tasks', 'add_event', 'hand_off', 'find_events', 'add_note', 'cancel_event', 'make_rule']
 
 
 def _thread_of(session_id: str):
@@ -166,6 +166,24 @@ def save_note(title: str, body: str, area: str, part: str | None = None, *, ctx:
 def make_task(title: str, area: str | None = None, part: str | None = None, due_date: str | None = None, *, ctx: ToolContext) -> dict:
 	"""Make a task now, only when the owner asked for it."""
 	return _run("make_task", ctx, title=title, area=area, part=part, due_date=due_date)
+
+
+@tool
+def finish_task(task: str, *, ctx: ToolContext) -> dict:
+	"""Mark a task done when the owner says it is done or finished. Give its reference (R3) or name."""
+	return _run("finish_task", ctx, task=task)
+
+
+@tool
+def reopen_task(task: str, *, ctx: ToolContext) -> dict:
+	"""Put a done or dropped task back to open. Give its reference (R3) or name."""
+	return _run("reopen_task", ctx, task=task)
+
+
+@tool
+def merge_tasks(keep: str, drop: str, *, ctx: ToolContext) -> dict:
+	"""Two tasks are the same: keep one, drop the other. Notes and missing links move to the kept task; the other is set Dropped. Give references (R3) or names."""
+	return _run("merge_tasks", ctx, keep=keep, drop=drop)
 
 
 @tool

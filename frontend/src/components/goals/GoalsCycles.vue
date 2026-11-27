@@ -84,7 +84,7 @@
       <EmptyState v-else line="No goals this month. A month goal is a goal with the Month horizon. Add one with + Goal." :action="writable ? { label: 'Goal', click: () => (newOpen = true) } : null" />
 
       <div v-if="mp.habits.habits.length" data-month-habits>
-        <h3 class="mb-2 text-sm text-ink-gray-6">Habits this month</h3>
+        <SectionHead>Habits this month</SectionHead>
         <div v-for="h in mp.habits.habits" :key="h.habit" class="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] items-center gap-3 py-1.5 max-md:grid-cols-[minmax(0,1fr)_auto]" data-month-habit>
           <span class="min-w-0 truncate text-ink-gray-9">{{ h.title }} <span class="text-ink-gray-6">{{ h.days_per_week >= 7 ? 'daily' : `${h.days_per_week} a week` }}</span></span>
           <div class="max-md:col-span-2 max-md:order-3"><Progress size="sm" :value="h.percent" /></div>
@@ -109,6 +109,7 @@ import { Badge, Button, Dropdown, Progress, toast } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 import Md from '@/components/Md.vue'
 import CycleGoalsDialog from '@/components/goals/CycleGoalsDialog.vue'
 import NewGoalDialog from '@/components/goals/NewGoalDialog.vue'

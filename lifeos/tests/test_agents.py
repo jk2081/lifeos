@@ -1057,3 +1057,68 @@ class TestFlow(AskCase):
 				self.assertIn("error", out)
 				self.assertNotIn("t108 owner-only secret", str(out))
 		self.assertFalse(frappe.db.exists("Life Task", {"title": "t108 family writes"}))
+
+	# issue 149: finish, reopen and merge tasks from Chat, each with Undo
+	@patch("lifeos.permissions.default_space", return_value=PRIVATE)
+	def test_5_finish_task_sets_done_and_undo_puts_back_open(self, _space):
+		from lifeos.ai import flow
+		from lifeos.api import tools
+
+		t = self.make("Life Task", title="t149 finish me")
+		out = flow.finish_task(task=t.name, ctx=self.ctx(OWNER))
+		self.assertEqual(out["done_list"][0]["kind"], "task")
+		self.assertEqual(frappe.db.get_value("Life Task", t.name, ["status", "completed_on"]), ("Done", frappe.utils.getdate(today())))
+		tools.undo(frappe.db.get_value("Life Agent Action", {"space": PRIVATE}, "name", order_by="creation desc"))
+		self.assertEqual(frappe.db.get_value("Life Task", t.name, ["status", "completed_on"]), ("Open", None))
+		flow.finish_task(task=t.name, ctx=self.ctx(OWNER))
+		out = flow.reopen_task(task=t.name, ctx=self.ctx(OWNER))
+		self.assertEqual(frappe.db.get_value("Life Task", t.name, ["status", "completed_on"]), ("Open", None))
+		self.assertTrue(out["done_list"][0]["undo"])
+
+	@patch("lifeos.permissions.default_space", return_value=PRIVATE)
+	def test_6_merge_tasks_moves_notes_and_links_and_undo_restores_both(self, _space):
+		from lifeos.ai import flow
+		from lifeos.api import tools
+
+		area = frappe.db.get_value("Life Area", {"space": PRIVATE})
+		keep = self.make("Life Task", title="t149 keep")
+		frappe.db.set_value("Life Task", keep.name, "area", None)
+		drop = self.make("Life Task", title="t149 drop", area=area)
+		drop.add_comment("Comment", "t149 a note on the dropped one")
+		out = flow.merge_tasks(keep=keep.name, drop=drop.name, ctx=self.ctx(OWNER))
+		self.assertNotIn("error", out)
+		self.assertEqual(frappe.db.get_value("Life Task", drop.name, "status"), "Dropped")
+		self.assertEqual(frappe.db.get_value("Life Task", keep.name, "area"), area)
+		notes = frappe.get_all("Comment", filters={"reference_doctype": "Life Task", "reference_name": keep.name}, pluck="content")
+		self.assertTrue(any("t149 a note on the dropped one" in n for n in notes))
+		self.assertTrue(any("Merged from: t149 drop" in n for n in notes))
+		self.assertTrue(frappe.db.exists("Comment", {"reference_name": drop.name, "content": ["like", "%Merged into: t149 keep%"]}))
+		tools.undo(frappe.db.get_value("Life Agent Action", {"space": PRIVATE}, "name", order_by="creation desc"))
+		self.assertEqual(frappe.db.get_value("Life Task", drop.name, "status"), "Open")
+		self.assertIsNone(frappe.db.get_value("Life Task", keep.name, "area"))
+		notes = frappe.get_all("Comment", filters={"reference_doctype": "Life Task", "reference_name": keep.name, "comment_type": "Comment"}, pluck="content")
+		self.assertEqual(notes, [])
+		self.assertEqual(frappe.db.count("Comment", {"reference_doctype": "Life Task", "reference_name": drop.name, "comment_type": "Comment"}), 1)
+
+	@patch("lifeos.permissions.default_space", return_value=PRIVATE)
+	def test_7_a_task_in_a_space_the_user_cannot_write_to_is_refused_by_each_tool(self, _space):
+		from lifeos.ai import flow
+
+		a = self.make("Life Task", title="t149 private a")
+		b = self.make("Life Task", title="t149 private b")
+		for out in (flow.finish_task(task=a.name, ctx=self.ctx(FAMILY)), flow.reopen_task(task=a.name, ctx=self.ctx(FAMILY)),
+				flow.merge_tasks(keep=a.name, drop=b.name, ctx=self.ctx(FAMILY))):
+			self.assertIn("error", out)
+		self.assertEqual([frappe.db.get_value("Life Task", n, "status") for n in (a.name, b.name)], ["Open", "Open"])
+
+	def test_8_every_tool_name_has_a_tool_and_a_description_within_flows_limit(self):
+		from frappe.flow.doctype.flow_skill.flow_skill import MAX_DESCRIPTION_LENGTH
+
+		from lifeos.ai import flow, tools
+
+		self.assertEqual(flow.TOOL_NAMES, [n for n in flow.TOOL_NAMES if n in {t.name for t in flow.TOOLS}])
+		for t in flow.TOOLS:
+			self.assertLessEqual(len(t.description), MAX_DESCRIPTION_LENGTH, t.name)
+		for n in ("finish_task", "reopen_task", "merge_tasks"):
+			self.assertIn(n, flow.TOOL_NAMES)
+			self.assertIn(n, [t['name'] for t in tools.WRITE_TOOLS])

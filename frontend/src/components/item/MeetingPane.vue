@@ -2,26 +2,26 @@
   <Skeleton v-if="!m" class="h-48 w-full" />
   <div v-else class="flex flex-col gap-5" data-meeting :data-meeting-name="m.name">
     <section>
-      <h3 class="mb-1 text-base-medium text-ink-gray-9">Linked to this meeting · {{ m.linked.length }}</h3>
-      <div v-for="l in m.linked" :key="l.link" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-meeting-linked :data-how="l.how">
+      <SectionHead :count="m.linked.length">Linked to this meeting</SectionHead>
+      <Row v-for="l in m.linked" :key="l.link" class="!items-center" data-meeting-linked :data-how="l.how">
         <Badge size="sm" theme="gray" :label="l.kind" />
         <span v-if="l.sensitive" class="lucide-lock size-3.5 shrink-0 text-ink-gray-6" role="img" aria-label="Sensitive" data-sensitive-lock />
         <span class="min-w-0 flex-1 truncate text-base text-ink-gray-8">{{ l.title }}</span>
         <Button variant="ghost" size="sm" label="Open" @click="openRef(l.ref)" />
         <Button variant="ghost" size="sm" icon="lucide-unlink" label="Unlink" data-meeting-unlink @click="act('meeting_link', { event: m.name, unlink: l.link })" />
-      </div>
+      </Row>
       <p v-if="!m.linked.length" class="text-sm text-ink-gray-6">Nothing captured during or after this meeting is linked yet.</p>
       <Dropdown v-if="m.candidates.length" class="mt-2" :options="m.candidates.map((c) => ({ label: `${c.kind}: ${c.title}`, onClick: () => act('meeting_link', { event: m.name, doctype: c.doctype, name: c.name }) }))">
         <Button size="sm" icon-left="lucide-link" label="Link a record" data-meeting-link-add />
       </Dropdown>
     </section>
     <section>
-      <h3 class="mb-1 text-base-medium text-ink-gray-9">Follow-ups found · {{ m.followups.length }}</h3>
+      <SectionHead :count="m.followups.length">Follow-ups found</SectionHead>
       <FindingRow v-for="f in m.followups" :key="f.name" :f="f" @act="(i) => finding(f, i)" />
       <p v-if="!m.followups.length" class="text-sm text-ink-gray-6">{{ m.ai ? 'None found in what was linked.' : 'The assistant is not set up, so follow-ups are not read.' }}</p>
     </section>
     <section class="flex flex-col gap-2">
-      <h3 class="text-base-medium text-ink-gray-9">Anything to plan from this meeting?</h3>
+      <SectionHead>Anything to plan from this meeting?</SectionHead>
       <TextInput v-model="line" placeholder="Type a task. Enter adds it, linked to this meeting." aria-label="A task from this meeting" data-meeting-plan
         @keydown.enter.prevent="plan" />
       <div class="flex items-center gap-2 text-sm text-ink-gray-7"><span>Will link to goal:</span>
@@ -45,6 +45,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Badge, Button, Dropdown, Select, Skeleton, Switch, TextInput } from 'frappe-ui'
 import FindingRow from '@/components/review/FindingRow.vue'
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 import { closePane, openRef, swapTop } from '@/lib/pane'
 import { weeklyAct, weeklyRead } from '@/lib/review'
 import { store } from '@/lib/store'
