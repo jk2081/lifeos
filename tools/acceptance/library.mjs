@@ -125,7 +125,7 @@ for (const width of WIDTHS) {
     await check('LIBRARY.5', '1440 px: pane widths, Esc, j and k, focus, Open full page, search opens in the pane', async () => {
       await s.open('/life/goals/tasks?view=list')
       await clickRow(ROW)
-      must(Math.round((await pane.boundingBox()).width) === 520, 'a task pane is not 520 px wide')
+      must(Math.round((await pane.boundingBox()).width) === 480, 'a task pane is not 480 px wide')  // the Drawer's width (#128)
       must(await pg.evaluate(() => document.activeElement?.hasAttribute('data-pane')), 'focus did not move into the pane')
       const first = new URL(pg.url()).searchParams.get('open')
       await pg.keyboard.press('j')
