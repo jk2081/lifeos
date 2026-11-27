@@ -213,3 +213,36 @@ await check('TOOLING.11', 'The bench cache is saved on main only, uncancelled; p
   must(!action.includes('actions/cache/save'), 'the restore action saves')
   return `Frappe ${version} in one file; saved by cache-bench.yml only`
 })
+
+// Issue 148: the monthly cleanup check. The workflow's job as written, and the script run by hand over a fixture with one finding (one issue, labelled audit, never ready)
+// and over a clean one (none), with a stand-in `gh` that records what it was asked.
+await check('TOOLING.12', 'The monthly cleanup workflow runs on the 1st; by hand over a fixture finding it opens one issue labelled audit, over none it opens none', async () => {
+  const yml = fs.readFileSync(path.join(root, '.github/workflows/monthly-cleanup.yml'), 'utf8')
+  must(/cron: "\d+ \d+ 1 \* \*"/.test(yml) && yml.includes('workflow_dispatch:') && yml.includes('issues: write') && yml.includes('node tools/monthly-cleanup.mjs') && yml.includes('vulture'), 'the workflow is not monthly with issues: write, vulture and the script')
+  const ci = fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8')
+  const guards = ciJob('guards')
+  must(guards && !guards.includes('needs:'), 'ci.yml has no guards job that runs on every pull request')
+  for (const g of ['guard-routes.mjs', 'guard-api.py', 'guard-dup.mjs', 'guard-ui.mjs']) must(guards.includes(g), 'the guards job does not run ' + g)
+  must(ci.includes('pull_request:'), 'ci.yml does not run on pull requests')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lifeos-monthly-'))
+  const log = path.join(dir, 'gh.log')
+  const gh = path.join(dir, 'gh')
+  fs.writeFileSync(gh, `#!/bin/sh\necho "$@" >> "${log}"\nif [ "$1 $2" = "issue list" ]; then echo 0; fi\nif [ "$1 $2" = "issue create" ]; then echo https://github.com/x/y/issues/1; fi\n`, { mode: 0o755 })
+  const tree = (vue) => {
+    const t = fs.mkdtempSync(path.join(dir, 'tree-'))
+    for (const [f, text] of Object.entries({ 'frontend/COMPONENTS.md': '', 'frontend/src/X.vue': vue, 'lifeos/a.py': 'x = 1\n', 'tools/guard-dup-ceiling.json': '{ "frontend/src": 100, "lifeos": 100 }' })) {
+      fs.mkdirSync(path.dirname(path.join(t, f)), { recursive: true })
+      fs.writeFileSync(path.join(t, f), text)
+    }
+    return t
+  }
+  const monthly = (t) => execFileSync('node', [path.join(root, 'tools/monthly-cleanup.mjs'), '--root', t], { encoding: 'utf8', env: { ...process.env, GH: gh } })
+  monthly(tree('<template><select /></template>'))
+  const asked = fs.readFileSync(log, 'utf8').split('\n').filter(Boolean)
+  const created = asked.filter((l) => l.startsWith('issue create'))
+  must(created.length === 1 && created[0].includes('--label audit') && /Monthly cleanup check: \w+ \d{4}/.test(created[0]) && !/ready/.test(created[0]), 'not one audit issue: ' + created.join(' | '))
+  fs.rmSync(log)
+  const none = monthly(tree('<template><div /></template>'))
+  must(!fs.existsSync(log) || !fs.readFileSync(log, 'utf8').includes('issue create'), 'an issue was opened with no findings')
+  must(none.includes('No findings'), 'no "No findings" line: ' + none)
+})

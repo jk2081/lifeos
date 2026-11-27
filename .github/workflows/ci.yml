@@ -44,6 +44,29 @@ jobs:
           echo "parts=$parts" >> "$GITHUB_OUTPUT"
           echo "Walking: $parts"
 
+  # The cleanup guards (docs/BUILDING.md, "The guards"): no bench, so they run on every pull request, the `quick` lane included.
+  guards:
+    name: Guards (routes, API, copy-paste, controls and shared parts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Guards
+        run: |
+          status=0
+          for guard in "node tools/guard-routes.mjs" "python3 -I tools/guard-api.py" "node tools/guard-dup.mjs" "node tools/guard-ui.mjs"; do
+            echo "::group::$guard"
+            $guard || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
   scan:
     name: Scan (Frappe semgrep rules)
     runs-on: ubuntu-latest

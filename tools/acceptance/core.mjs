@@ -1,7 +1,9 @@
 // The Drawer (issue 128): the one control for everything that opens over a screen, Chat included. Layers, the URL that holds them, Back and Esc, the widths, the guard.
 // Checks are numbered CORE.<n> in the order they appear here; `node tools/acceptance.mjs --only=CORE` runs this file's checks.
-import { SPACE, WIDTHS, bench, chatOff, chatOn, check, fs, must, os, path, pathOf, root, session, stamp } from './context.mjs'
+import { SPACE, WIDTHS, bench, chatOff, chatOn, check, execFileSync, fs, must, os, path, pathOf, root, session, stamp } from './context.mjs'
 import { findRecordLinks, problems } from '../guard-routes.mjs'
+import { problems as uiProblems } from '../guard-ui.mjs'
+import { problems as dupProblems } from '../guard-dup.mjs'
 
 const T = `I128 ${stamp}`
 const made = { tasks: [], threads: [] }
@@ -191,6 +193,71 @@ t.db_set("refs", json.dumps({"R1": {"doctype": "Life Task", "name": "${tasks[1]}
     must(problems(dir).length === 1, 'a fixture file with a record link did not fail the guard')
     const found = problems(root)
     must(!found.length, found.join('; '))
+  })
+
+  // The cleanup guards (issue 148): each passes on the tree, and fails on a fixture with one new finding.
+  const fixture = (files) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lifeos-guard-'))
+    for (const [f, text] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true })
+      fs.writeFileSync(path.join(dir, f), text)
+    }
+    return dir
+  }
+  const py = (dir) => { try { return { rc: 0, out: execFileSync('python3', ['-I', path.join(root, 'tools/guard-api.py'), dir], { encoding: 'utf8' }) } } catch (e) { return { rc: e.status, out: e.stdout } } }
+
+  await check('CORE.6', 'G1: every whitelisted method is called; a fixture with an unused one fails, and calling it passes', async () => {
+    const now = py(root)
+    must(now.rc === 0, now.out)
+    const lonely = 'import frappe\n\n@frappe.whitelist(methods=["GET"])\ndef lonely_method(x: int):\n\treturn x\n'
+    const bad = py(fixture({ 'lifeos/api/fx.py': lonely }))
+    must(bad.rc === 1 && bad.out.includes('lifeos.api.fx.lonely_method'), 'an unused whitelisted method did not fail: ' + bad.out)
+    const screen = py(fixture({ 'lifeos/api/fx.py': lonely, 'frontend/src/Screen.vue': "<script setup>api('fx.lonely_method')</script>" }))
+    must(screen.rc === 0, 'a method a screen calls failed: ' + screen.out)
+    const grouped = py(fixture({ 'lifeos/api/fx.py': lonely.replace('lonely_method', 'get'), 'frontend/src/data/fx.js': "group('fx', ['add', 'get'])" }))
+    must(grouped.rc === 0, "a method in the data layer's group() failed: " + grouped.out)
+    const allowed = fixture({ 'lifeos/api/fx.py': lonely, 'tools/guard-api-allow.json': JSON.stringify({ 'lifeos.api.fx.lonely_method': 'called by the scheduler' }) })
+    must(py(allowed).rc === 0, 'an allow-listed method failed')
+    fs.mkdirSync(path.join(allowed, 'frontend/src'), { recursive: true })
+    fs.writeFileSync(path.join(allowed, 'frontend/src/S.vue'), "api('fx.lonely_method')")
+    must(py(allowed).rc === 1, 'an allow-list entry for a method that is now called did not fail')
+  })
+
+  await check('CORE.7', 'G2: the copy-paste level is at or under its ceiling; a fixture with a pasted block fails', async () => {
+    const found = dupProblems(root)
+    must(!found.length, found.join('; '))
+    const block = Array.from({ length: 60 }, (_, i) => `export const value${i} = compute(${i}, 'name${i}', { mode: ${i % 3}, flag: ${i % 2 === 0} })`).join('\n')
+    const dir = fixture({ 'frontend/src/a.js': block, 'frontend/src/b.js': block })
+    const bad = dupProblems(dir, { 'frontend/src': 0 })
+    must(bad.length === 1 && bad[0].startsWith('frontend/src'), 'a pasted block did not fail: ' + JSON.stringify(bad))
+    must(!dupProblems(fixture({ 'frontend/src/a.js': block }), { 'frontend/src': 0 }).length, 'a single copy failed')
+  })
+
+  await check('CORE.8', 'G3: no raw button, select, input or textarea outside components/ui/; a fixture with a raw <select> fails', async () => {
+    const tree = (files) => uiProblems(fixture({ 'frontend/COMPONENTS.md': '', ...files }), {})
+    const found = uiProblems(root)
+    must(!found.length, found.join('; '))
+    must(tree({ 'frontend/src/pages/X.vue': '<template><select><option>a</option></select></template>' }).length === 1, 'a raw <select> did not fail')
+    for (const tag of ['<button @click="go">x</button>', '<textarea />', '<input v-model="a" :on="() => 1">'])
+      must(tree({ 'frontend/src/pages/X.vue': `<template>${tag}</template>` }).length === 1, 'did not fail: ' + tag)
+    for (const tag of ['<button class="absolute inset-0" @click="go" />', '<input type="file" class="hidden">', '<Button label="x" />', '<TextInput />'])
+      must(!tree({ 'frontend/src/pages/X.vue': `<template>${tag}</template>` }).length, 'failed: ' + tag)
+    must(!tree({ 'frontend/src/components/ui/Y.vue': '<template><button>x</button></template>' }).filter((l) => !l.includes('COMPONENTS.md')).length, 'a part under components/ui/ failed')
+  })
+
+  await check('CORE.9', 'G4: every file in components/ui/ is listed in COMPONENTS.md; a hand-built row or heading in a new file fails, in a Row, SectionHead, dialog or the baseline it does not', async () => {
+    const run = (files, baseline = {}) => uiProblems(fixture({ 'frontend/COMPONENTS.md': '`ui/Row.vue`', 'frontend/src/components/ui/Row.vue': '<template><div /></template>', ...files }), baseline)
+    must(!run({}).length, 'a listed part failed')
+    must(run({ 'frontend/src/components/ui/Fresh.vue': '<template><div /></template>' }).some((l) => l.includes('Fresh.vue')), 'an unlisted part did not fail')
+    const row = '<template><div v-for="r in rows" :key="r" :on="() => 1" class="flex border-b border-outline-gray-1 py-2">{{ r }}</div></template>'
+    must(run({ 'frontend/src/pages/N.vue': row }).length === 1, 'a hand-built row did not fail')
+    must(!run({ 'frontend/src/pages/N.vue': '<template><Row v-for="r in rows" :key="r" class="border-b" /></template>' }).length, 'a Row failed')
+    must(run({ 'frontend/src/pages/N.vue': '<template><section><h3>Things</h3></section></template>' }).length === 1, 'a hand-built heading did not fail')
+    must(!run({ 'frontend/src/pages/N.vue': '<template><Dialog><h2>Title</h2></Dialog></template>' }).length, 'a heading in a dialog failed')
+    must(!run({ 'frontend/src/pages/N.vue': row }, { 'frontend/src/pages/N.vue': 1 }).length, 'a baseline file failed')
+    must(run({ 'frontend/src/pages/N.vue': '<template><div /></template>' }, { 'frontend/src/pages/N.vue': 1 }).length === 1, 'a baseline entry with no finding left did not fail')
+    const now = uiProblems(root)
+    must(!now.length, now.join('; '))
   })
 } finally {
   chatOff()

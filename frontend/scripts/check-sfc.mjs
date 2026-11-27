@@ -5,6 +5,7 @@
 // files resolve, and that none of the patterns UX fixes set 2 removed has come back.
 import fs from 'node:fs'
 import path from 'node:path'
+import { rawControls } from '../../tools/guard-ui.mjs'
 import { compileScript, compileTemplate, parse } from 'vue/compiler-sfc'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -16,9 +17,6 @@ const files = (args.length ? args.map((a) => path.resolve(a)) : walk(path.join(r
 const BANNED = [
   [/class="[^"]*\b(bt|inp|ck|pl|cd|sh|mt|ch)\b(?![-\w])[^"]*"/, 'a removed helper class (bt, inp, ck, pl, cd, sh, mt, ch)'],
   [/window\.(prompt|confirm)\(|(?<![.\w])(prompt|confirm)\(/, 'a browser prompt() or confirm(): use a frappe-ui Dialog'],
-  [/<select[\s>]/, 'a raw <select>: use frappe-ui Select or FormControl type="select"'],
-  [/<textarea[\s>]/, 'a raw <textarea>: use frappe-ui Textarea or FormControl type="textarea"'],
-  [/<input(?![^>]*type="file")[\s>]/, 'a raw <input>: use frappe-ui TextInput, FormControl, Checkbox or DatePicker'],
   [/Ico\.vue|<Ico[\s/]/, 'Ico.vue: use a lucide-* icon name'],
   [/var\(--(bg|side|soft|softer|line\d?|faint|ink2?|mut2?|fill|accent(-hover)?|[gborn]-(bg|ink)|shadow|read|series-\d)\)/, 'one of the old Life OS colour variables'],
 ]
@@ -33,12 +31,8 @@ for (const file of files) {
     const m = re.exec(src)
     if (m) fail(file, `${what}  ->  ${m[0].slice(0, 80)}`)
   }
-  // a raw <button> is a hand-written control; the one exception is the whole-row target (class "absolute inset-0"), and the parts under components/ui/
-  if (!rel.startsWith('src/components/ui/')) {
-    for (const m of src.matchAll(/<button[\s>]/g)) {
-      if (!src.slice(m.index, m.index + 400).includes('absolute inset-0')) fail(file, 'a raw <button>: use frappe-ui Button (ui/LinkButton for a link-looking one); only <button class="absolute inset-0"> may stay')
-    }
-  }
+  // a raw <button>, <select>, <input> or <textarea> is a hand-written control (G3 of tools/guard-ui.mjs, which CI also runs); the parts under components/ui/ may have them
+  if (!rel.startsWith('src/components/ui/')) for (const x of rawControls(src)) fail(file, `line ${x.at}: ${x.what}`)
   if (!HEX_OK.test(file)) {
     const m = /(?<![&\w])#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b(?![-\w])/.exec(src.replace(/href="#"/g, ''))
     if (m) fail(file, `a hex colour (${m[0]}): use a token class or variable`)

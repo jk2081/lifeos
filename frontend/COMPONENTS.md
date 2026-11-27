@@ -213,6 +213,27 @@ async function fetch({ params, tab, filters, ... }) {            // `tab` is the
 - **Inside a page's tab** (the goal page) the state tabs are folded into the filter bar as one `Select` (`tabs-in-filter`), since there are no tabs inside tabs.
 - The values in use: Goals `status=` in_progress (default), achieved, closed, someday, all. Inbox `status=` To Review (default), Waiting, Failed (Done and all open Library > Captures). Captures `tab=` all (default), chats, voice, documents (with the sensitive documents of the Vault), photos, pages (journal pages), articles, email, text; All adds notes. Tasks `status=` open (default), loops, Waiting, Done, Someday, all. Someday `tab=` all, due, tasks, goals, ideas. Archive `type=` all (default), the DocTypes and trash.
 
+## The shared parts in `components/ui/` (the registry)
+
+Every file in `components/ui/` has one line here on when to use it. `tools/guard-ui.mjs` fails a file that is missing from this list, a raw `<button>`, `<select>`, `<input>` or `<textarea>` outside `components/ui/`, and (in a file that is not in `tools/guard-ui-baseline.json`) a hand-built list row or section heading. Add the line when you add the part.
+
+| File | Use it when |
+| --- | --- |
+| `ui/AreaPicker.vue` | a record is filed on an area: a searchable list of the areas that are on, each part under its area |
+| `ui/Card.vue` | a bordered box holds a section or a list |
+| `ui/CountLink.vue` | a count is a door that opens the list it counts |
+| `ui/Drawer.vue` | anything opens over a screen: a chat, a record or a list, as a layer |
+| `ui/EmptyState.vue` | a list has nothing in it: one line and at most one action |
+| `ui/FilePick.vue` | a screen only wants the chosen files of the browser's file chooser (the one raw `<input type="file">`) |
+| `ui/GoalPicker.vue` | a record is linked to a goal: goals in progress with their horizon, searchable |
+| `ui/LinkButton.vue` | a control reads as a link: a title that opens a record, an example to tap |
+| `ui/OptionPicker.vue` | the base of a searchable picker; use a wrapper (people, areas, goals) unless none fits |
+| `ui/PersonPicker.vue` | a record is linked to a person or company, with "Add as a person" at the end |
+| `ui/RefLink.vue` | a link to a record that opens it in the Drawer |
+| `ui/Row.vue` | one row in a Card or a list, with `pane` to open the record |
+| `ui/SectionHead.vue` | the small heading above a section, with a count that links to the list it counts |
+| `ui/Stat.vue` | a number with a label, 0 included |
+
 ## Checks
 
 ```
