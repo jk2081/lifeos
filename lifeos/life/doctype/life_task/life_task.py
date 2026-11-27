@@ -21,6 +21,7 @@ class LifeTask(Document):
 		for field in ("waiting_on_person", "delegated_to"):
 			if self.get(field) and frappe.db.get_value("Life Person", self.get(field), "space") != self.space:
 				frappe.throw(_("{0} must be someone in the task's space.").format(_(self.meta.get_label(field))), title=_("Person is in another space"))
+		self.check_people_are_people()
 		if self.status == "Waiting" and self.waiting_on_person and not (self.waiting_on or "").strip():
 			self.waiting_on = frappe.db.get_value("Life Person", self.waiting_on_person, "full_name")
 		if self.status == "Waiting" and not (self.waiting_on or "").strip():
@@ -29,6 +30,16 @@ class LifeTask(Document):
 			self.last_touched_on = today()
 		self.check_someday()
 		area_guess.track_change(self)  # issue 13: every task has an area
+
+	def check_people_are_people(self):
+		"""Delegated to and Waiting on (person) are a person; a company has people, and the free-text Waiting on can still name a company (issue 136)."""
+		for field in ("waiting_on_person", "delegated_to"):
+			who = self.get(field)
+			row = who and frappe.db.get_value("Life Person", who, ["full_name", "kind"], as_dict=True)
+			if row and row.kind == "Organisation":
+				people = frappe.get_all("Life Person", filters={"organisation": who, "kind": "Person"}, pluck="full_name", order_by="full_name asc", limit=5)
+				hint = " " + _("People there: {0}.").format(", ".join(people)) if people else ""
+				frappe.throw(_("Delegate to a person. {0} is a company: pick someone there.").format(row.full_name) + hint, title=_("Pick a person"))
 
 	def check_someday(self):
 		"""Only an open task goes on the Someday list, and a parked task has the day it went and the day it is looked at again."""

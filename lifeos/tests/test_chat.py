@@ -122,6 +122,19 @@ class TestChat(ChatCase):
 		self.assertEqual(chat.threads(space=PRIVATE, q="t119hist")["total"], 0)
 		self.assertFalse(frappe.db.exists("Flow Session", session))
 
+	def test_6_an_answer_never_shows_a_bracketed_note_or_a_record_id(self):
+		res = chat.send("What is going on?", space=PRIVATE)
+		run = res["message"]["name"]
+		self.finish(run, "No cycle came back [scope: this cycle].")
+		before = frappe.db.count("Error Log", {"method": "Chat answer had an internal note"})
+		self.assertEqual(chat.progress(res["thread"], run)["text"], "No cycle came back.")
+		chat.progress(res["thread"], run)  # read again: still one entry
+		self.assertEqual(frappe.db.count("Error Log", {"method": "Chat answer had an internal note"}), before + 1)
+		two = chat.send("And the task?", thread=res["thread"])["message"]["name"]
+		self.finish(two, "See task 9c5emtf13d now, and [the task](/life/tasks/9c5emtf13d) stays.")
+		self.assertEqual(chat.progress(res["thread"], two)["text"], "See task now, and [the task](/life/tasks/9c5emtf13d) stays.")
+		self.assertEqual(engine.strip_internal("A plain answer, 2026 and restaurant."), "A plain answer, 2026 and restaurant.")
+
 
 class TestChatTools(ChatCase):
 	"""The tools Flow runs for Chat: the thread's space and scope, the Vault, and the Done list."""

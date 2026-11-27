@@ -1,0 +1,48 @@
+name: Frappe bench cache
+description: Restores the cached Frappe bench for one kind (tests or walk) and says in the log whether it hit. Never saves; cache-bench.yml saves, on main.
+inputs:
+  kind:
+    description: tests (unit job, no assets) or walk (acceptance jobs, assets built)
+    required: true
+  lookup-only:
+    description: only check that the cache exists
+    default: "false"
+outputs:
+  hit:
+    description: "true when the bench cache was found"
+    value: ${{ steps.restore.outputs.cache-hit }}
+  key:
+    description: the cache key
+    value: ${{ steps.key.outputs.key }}
+runs:
+  using: composite
+  steps:
+    - id: key
+      shell: bash
+      env:
+        KIND: ${{ inputs.kind }}
+      run: |
+        version="$(tr -d '[:space:]' < "$GITHUB_WORKSPACE/.github/frappe-version")"
+        echo "key=frappe-bench-$KIND-$version-py3.14-$RUNNER_OS-1" >> "$GITHUB_OUTPUT"
+    - id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: /home/runner/frappe-bench
+        key: ${{ steps.key.outputs.key }}
+        lookup-only: ${{ inputs.lookup-only }}
+    - shell: bash
+      env:
+        HIT: ${{ steps.restore.outputs.cache-hit }}
+        KEY: ${{ steps.key.outputs.key }}
+        EVENT: ${{ github.event_name }}
+      run: |
+        if [ "$HIT" = "true" ]; then
+          echo "bench cache: hit (key $KEY)"
+          echo "bench cache: hit (key \`$KEY\`)" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "bench cache: miss: building (key $KEY)"
+          echo "bench cache: miss: building (key \`$KEY\`)" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$EVENT" = "pull_request" ]; then
+            echo "::warning title=bench cache miss::No bench cache for $KEY; building Frappe (about 25 minutes). Run the 'Cache the bench' workflow on main."
+          fi
+        fi

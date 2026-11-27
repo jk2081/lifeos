@@ -1,0 +1,58 @@
+# Saves the Frappe bench caches that ci.yml restores. Caches saved on a pull-request branch are visible to that branch only;
+# only a cache saved on main is shared with every pull request, so it is saved here, on main, and ci.yml only restores.
+# Runs when the Frappe release or the bench setup changes, weekly (a cache unused for 7 days is evicted) and by hand.
+name: Cache the bench
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/frappe-version
+      - .github/actions/bench-cache/**
+      - .github/workflows/cache-bench.yml
+      - tools/ci-bench.sh
+      - pyproject.toml
+  schedule:
+    - cron: "0 20 * * 0"
+  workflow_dispatch:
+
+# its own group and never cancelled: a later push to main (which cancels ci.yml's runs) cannot stop a cache being saved
+concurrency:
+  group: cache-bench
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  cache:
+    name: Bench cache (${{ matrix.kind }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [tests, walk]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Is it cached already
+        id: cache
+        uses: ./.github/actions/bench-cache
+        with:
+          kind: ${{ matrix.kind }}
+          lookup-only: "true"
+      - name: Build the bench
+        if: steps.cache.outputs.hit != 'true'
+        run: tools/ci-bench.sh ${{ matrix.kind }}
+      - name: Save the bench
+        if: steps.cache.outputs.hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /home/runner/frappe-bench
+          key: ${{ steps.cache.outputs.key }}

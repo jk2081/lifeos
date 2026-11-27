@@ -17,6 +17,7 @@ export const itemData = {
   someday: group('someday', ['create']),
   calendar: group('calendar', ['add_note', 'delete_event', 'delete_note', 'entry', 'get', 'hide_event', 'note_to_task', 'set_key_date', 'update_note']),
   people: group('people', ['options']),
+  tools: group('tools', ['people_add']),
   pages: group('pages', ['get']),
   dashboard: group('dashboard', ['list']),
   rules: group('rules', ['change']),

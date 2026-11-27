@@ -1625,3 +1625,23 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **The acceptance harness opens Today in Overview** (`session.open` adds `mode=overview` to Today paths with no `mode`), because most older checks read the cards; the checks that read a calendar say `mode=calendar`.
 - **Day's Top three is the starred tasks, not the tasks starred for this Monday.** Lock the week stores `top_three_week` as the review's period end and clears the flag at the next lock; #123's panel filtered on `top_three_week` equal to this week's Monday and so showed nothing after a real Lock (the old Today list showed them "until the next review"). Both the card and the panel now read `is_top_three` alone, as the old list did.
 
+## Issue 139 (bench cache saved on main)
+
+- Chose a separate `cache-bench.yml` (the issue's first option) over a main-only job in `ci.yml`: its own workflow has its own concurrency group, so nothing else cancels it.
+- The Frappe version is a one-line file, `.github/frappe-version`, because workflow files cannot share a variable; the composite action and `tools/ci-bench.sh` read it. The bench setup moved from two inline copies in `ci.yml` into `tools/ci-bench.sh tests|walk` so `cache-bench.yml` builds exactly what CI would.
+- The cache is now only saved by `cache-bench.yml`; a miss on a pull request builds but does not save (a branch's cache would not reach other pull requests anyway).
+- Key names changed (`frappe-bench-tests-…` / `frappe-bench-walk-…`), so the first runs after merge miss until `cache-bench.yml` has run on main; the push of this change to main triggers it (the paths include the action and the script).
+- Acceptance tests 1 to 3 need GitHub runs on main and a branch; `TOOLING.11` checks the files as written.
+
+## Issue 140 (Chat never shows internal notes)
+
+- The safety net runs where an answer is built (`lifeos/ai/chat.py` `strip_internal`, in `answer_of`), so every read of a run is clean without changing the stored Flow Run output. It logs once per run (Error Log, reference Flow Run). A markdown link is left alone, so cited sources and record links stay; the numbered `[1]` citations are made afterwards and are not touched.
+- The ask skill is at version 8 in both copies; the two have different front matter by design (Life OS's own and Flow's), and the check compares the bodies.
+
+## Issue 136 (one searchable person picker)
+
+- Built on frappe-ui's `Combobox` (button trigger, `filterable=false` so the server's search is the only filter, `description` for the company under the name). It has no phone sheet, so on a phone `PersonPicker.vue` opens a `Dialog` with the search focused instead; both read the same options.
+- `people.options` now returns `{rows, more}` (it returned a bare list); `kind` is Person unless Organisation is asked for; `include` adds the person already picked so the trigger can show their name beyond the first 50. With a search, name, other names and email come first, then people at a company whose name matches.
+- "Add 'x' as a person" calls `tools.people_add` (as the owner, run at once), so it reuses a person already called that, and the new person is selected.
+- The Hand off dialog lost its "Their name" box: the picker's Add option replaces it.
+- `Life Task` refuses an organisation in `delegated_to` and `waiting_on_person`, so a hand off by name to a company (by an agent or in Chat) now says "Delegate to a person…" instead of linking the company. The free-text Waiting on is unchanged.

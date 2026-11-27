@@ -6,6 +6,7 @@ scope checks). The screen polls `progress`, which reads the run from the Flow Ru
 when a run ends. Nothing here calls a model or writes a prompt: the loop, the model and the key are Flow's.
 """
 import json
+import re
 
 import frappe
 from frappe import _
@@ -142,9 +143,34 @@ def _status(run) -> str:
 	return "Working" if run.status in WORKING else ("Done" if run.status == "Completed" else "Error")
 
 
+# What an answer never shows (issue 140): a link is kept as it is; a bracketed note `[word: …]` and a bare record ID (10 lowercase letters and digits, with both) are removed.
+INTERNAL = re.compile(r"(?P<link>\[[^\]]*\]\([^)]*\))|(?P<note>\s*\[[A-Za-z_]+:[^\]]*\])|(?P<id>(?<![\w/#=.-])(?=[a-z0-9]*\d)(?=[a-z0-9]*[a-z])[a-z0-9]{10}(?![\w/-]))")
+NOTE_TITLE = "Chat answer had an internal note"
+
+
+def strip_internal(text: str, run: str | None = None) -> str:
+	"""The answer without internal notes or record IDs. This is a safety net; the skill is the fix. Logs once per run."""
+	found = []
+
+	def sub(m):
+		if m.group("link"):
+			return m.group(0)
+		found.append(m.group(0).strip())
+		return ""
+
+	out = INTERNAL.sub(sub, text or "")
+	if not found:
+		return text
+	out = re.sub(r"[ \t]{2,}", " ", out)
+	out = re.sub(r"[ \t]+([.,;:!?])", r"\1", out)
+	if run and not frappe.db.exists("Error Log", {"reference_doctype": "Flow Run", "reference_name": run, "method": NOTE_TITLE}):
+		frappe.log_error(title=NOTE_TITLE, message="\n".join(found), reference_doctype="Flow Run", reference_name=run)
+	return out.strip()
+
+
 def answer_of(thread, run) -> dict:
 	"""One run as an answer message: {name, role, text, status, error, cited, done, …}."""
-	text, cited = cite(run.output or "", frappe._dict(refs=refs_of(thread)))
+	text, cited = cite(strip_internal(run.output or "", run.name), frappe._dict(refs=refs_of(thread)))
 	undone = frappe.parse_json(thread.undone) if thread.undone else {}
 	done = _done_lines(run.name, run.session)
 	for i, d in enumerate(done):

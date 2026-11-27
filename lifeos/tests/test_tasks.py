@@ -41,6 +41,18 @@ class TestDateWords(LifeTestCase):
 
 
 class TestTasks(LifeTestCase):
+	def test_delegated_to_and_waiting_on_person_must_be_a_person_not_a_company(self):
+		linc = self.make("Life Person", full_name="I136 Linc pens", kind="Organisation").name
+		ravi = self.make("Life Person", full_name="I136 Ravi Singh", organisation=linc).name
+		t = self.make("Life Task", title="I136 task").name
+		for field in ("delegated_to", "waiting_on_person"):
+			with self.assertRaises(frappe.ValidationError) as e:
+				tasks.update(t, {field: linc})
+			self.assertIn("Delegate to a person. I136 Linc pens is a company: pick someone there.", str(e.exception))
+			self.assertIn("I136 Ravi Singh", str(e.exception))
+		self.assertEqual(tasks.update(t, {"delegated_to": ravi})["delegated_to"], ravi)
+		self.assertEqual(tasks.update(t, {"status": "Waiting", "waiting_on": "I136 Linc pens"})["waiting_on"], "I136 Linc pens")  # free text may name a company
+
 	def test_quick_add(self):
 		t = tasks.quick_add("Call the auditor tomorrow", space=PRIVATE)
 		self.assertEqual((t["title"], t["due_date"], t["status"]), ("Call the auditor", str(add_days(getdate(today()), 1)), "Open"))

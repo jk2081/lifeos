@@ -196,3 +196,20 @@ await check('TOOLING.10', 'Online but the server gives no answer: the page says 
   await page.locator('[data-sidebar], [data-tab-capture]').first().waitFor({ timeout: 10000 })
   must(new URL(page.url()).pathname === '/life/today', 'Today did not load by itself: ' + page.url())
 }))
+
+// Issue 139: the bench caches are saved on main, in a run nothing cancels; pull requests only restore, and say in the log whether it hit.
+await check('TOOLING.11', 'The bench cache is saved on main only, uncancelled; pull-request jobs restore it, say hit or miss, and share one Frappe version', async () => {
+  const read = (f) => fs.readFileSync(path.join(root, f), 'utf8')
+  const ci = read('.github/workflows/ci.yml'), cache = read('.github/workflows/cache-bench.yml'), action = read('.github/actions/bench-cache/action.yml')
+  const version = read('.github/frappe-version').trim()
+  must(/^v\d+\.\d+\.\d+$/.test(version), 'no Frappe version in .github/frappe-version: ' + version)
+  must(!ci.includes('actions/cache/save') && !ci.includes(version) && !ci.includes('--frappe-branch'), 'ci.yml saves a bench cache or names the Frappe version itself')
+  must(!read('tools/ci-bench.sh').includes(version), 'tools/ci-bench.sh has the Frappe version written in it')
+  must((ci.match(/uses: \.\/\.github\/actions\/bench-cache/g) || []).length === 2, 'the unit job and the walk do not both restore through the action')
+  must(/push:\s*\n\s*branches: \[main\]/.test(cache) && cache.includes('schedule:') && cache.includes('workflow_dispatch:'), 'cache-bench.yml does not run on main, weekly and by hand')
+  must(/cancel-in-progress: false/.test(cache) && !/group: cache-bench-\$/.test(cache), 'cache-bench.yml can be cancelled')
+  must(cache.includes('actions/cache/save') && cache.includes('kind: [tests, walk]'), 'cache-bench.yml does not save both benches')
+  must(action.includes('bench cache: hit') && action.includes('bench cache: miss: building') && action.includes('::warning') && action.includes('GITHUB_STEP_SUMMARY'), 'the action does not report hit or miss')
+  must(!action.includes('actions/cache/save'), 'the restore action saves')
+  return `Frappe ${version} in one file; saved by cache-bench.yml only`
+})
