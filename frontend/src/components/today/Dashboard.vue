@@ -38,14 +38,6 @@
             </div>
           </template>
 
-          <!-- a schedule: times, with a now line between them -->
-          <template v-else-if="p.key === 'schedule' && (p.rows.length || p.now_line)">
-            <Row v-for="r in schedule(p)" :key="r.key" :pane="r.ref" :label="r.title" class="!items-center" data-dash-row :data-now="r.now || undefined">
-              <span class="w-14 shrink-0 text-sm tabular-nums" :class="r.now ? 'text-ink-blue-8' : 'text-ink-gray-6'">{{ r.time }}</span>
-              <span class="min-w-0 flex-1 break-words text-base" :class="r.now ? 'text-ink-blue-8' : 'text-ink-gray-9'">{{ r.title }}</span>
-            </Row>
-          </template>
-
           <template v-else-if="p.rows.length">
             <Row v-for="(r, i) in p.rows" :key="(r.ref || '') + i" :pane="r.ref" :label="r.title" class="!block !py-2" data-dash-row :data-accent="r.accent || undefined">
               <div class="flex items-baseline justify-between gap-3">
@@ -58,19 +50,10 @@
             <div v-if="p.more" class="pt-1"><Button class="!px-0 !text-ink-blue-8" variant="ghost" :label="`${p.more.n} more`" data-dash-more @click="openRef(p.more.open)" /></div>
           </template>
 
-          <Empty v-else-if="p.empty && !(p.habits && p.habits.length)" :title="p.empty.line" data-dash-empty>
+          <Empty v-else-if="p.empty" :title="p.empty.line" data-dash-empty>
             <Button v-if="p.empty.action" class="mt-2" size="sm" variant="subtle" :label="p.empty.action" data-dash-action @click="act(p.empty)" />
           </Empty>
 
-          <!-- Week's Coming up carries the habits under it: tick one for today -->
-          <section v-if="p.habits && (p.habits.length || p.habits_empty)" class="mt-3 border-t border-outline-gray-1 pt-3" data-dash-habits>
-            <h3 class="mb-1 text-sm-medium text-ink-gray-7">Habits</h3>
-            <div class="flex flex-wrap gap-2">
-              <Button v-for="h in p.habits" :key="h.habit" size="sm" :variant="h.done ? 'solid' : 'outline'" :disabled="!canWrite()" :label="h.title" :aria-pressed="h.done"
-                :aria-label="`${h.title}, ${h.done ? 'done' : 'not done'} today`" :data-habit="h.habit" @click="tickHabit(h)" />
-            </div>
-            <p v-if="!p.habits.length" class="text-sm text-ink-gray-6">{{ p.habits_empty.line }}<Button v-if="p.habits_empty.action" class="ml-2" size="sm" variant="subtle" :label="p.habits_empty.action" @click="act(p.habits_empty)" /></p>
-          </section>
         </Card>
       </div>
 
@@ -98,8 +81,8 @@ import Row from '@/components/ui/Row.vue'
 import Empty from '@/components/Empty.vue'
 import { todayData } from '@/data/today'
 import { openChat } from '@/lib/ask'
-import { optimistic, tryCall } from '@/lib/api'
-import { canWrite, store } from '@/lib/store'
+import { tryCall } from '@/lib/api'
+import { store } from '@/lib/store'
 import { onRecordChanged, openRef } from '@/lib/pane'
 
 const props = defineProps({ view: String })
@@ -121,24 +104,6 @@ onMounted(load)
 function act(e) {
   if (e.to === 'chat') openChat()
   else if (e.to) router.push(e.to)
-}
-// the schedule with a "now" line between the events
-const nowTime = ref(new Date().toTimeString().slice(0, 5))
-function schedule(p) {
-  const rows = p.rows.map((r, i) => ({ key: 'e' + i, ref: r.ref, title: r.title, time: r.at || 'All day' }))
-  if (!p.now_line) return rows
-  const out = []
-  let placed = false
-  for (const r of rows) {
-    if (!placed && r.time !== 'All day' && r.time > nowTime.value) { out.push({ key: 'now', now: true, title: 'now', time: nowTime.value }); placed = true }
-    out.push(r)
-  }
-  if (!placed) out.push({ key: 'now', now: true, title: 'now', time: nowTime.value })
-  return out
-}
-function tickHabit(h) {
-  optimistic(() => (h.done = !h.done), () => (h.done = !h.done),
-    () => todayData.goals.toggle_habit({ habit: h.habit, date: d.value.date, done: h.done ? 1 : 0 })).then(load).catch(() => {})
 }
 defineExpose({ reload: load, data: computed(() => d.value) })
 </script>

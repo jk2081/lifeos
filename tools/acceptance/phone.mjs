@@ -388,38 +388,21 @@ print(ev.name)`).split('\n').pop()
     const item = await s.api('inbox.create_item', { title: `I15 to review ${width} ${stamp}`, source_type: 'Message', space: SPACE, raw_text: 'I15' })
     bench(`frappe.db.set_value("Life Inbox Item", "${item.name}", "status", "To Review")`)
     try {
-      bench(`frappe.db.set_value("Life Task", "${names[0]}", "is_top_three", 1)`)
-      await check('PHONE.12', `${width} px: Today > Day shows today's tasks, the top three and the day's events from the calendar`, async () => {
-        await s.open('/life/today')
-        await pg.locator('[data-next]').waitFor({ timeout: 10000 })
-        if (await pg.locator('[data-next-more]').count()) await pg.locator('[data-next-more]').click() // earlier checks leave tasks due today: show them all
-        const plate = await pg.locator('[data-next]').innerText()
-        for (const t of names.map((_, i) => `I15 ${['one', 'two'][i]} ${width} ${stamp}`)) must(plate.includes(t), `${t} is not on the plate`)
-        must(await pg.locator('[data-next-group="today"]').count(), 'no Today group')
-        const rail = await pg.locator('[data-panel="schedule"]').innerText()
-        must(rail.includes(meeting), 'the calendar does not show ' + meeting)
-        must(!plate.includes(meeting), 'the meeting is on the plate as well as in the calendar')
+      bench(`from frappe.utils import add_days, getdate, today
+frappe.db.set_value("Life Task", "${names[0]}", {"is_top_three": 1, "top_three_week": add_days(today(), -getdate(today()).weekday())})`)
+      await check('PHONE.12', `${width} px: Today > Day, Calendar lists today's tasks and the day's events once each, and Overview has the top three`, async () => {
+        await s.open('/life/today?mode=calendar')
+        await pg.locator('[data-day-timeline]').waitFor({ timeout: 10000 })
+        await pg.waitForFunction((t) => document.querySelector('[data-day-timeline]')?.innerText.includes(t), meeting, { timeout: 10000 })
+        const plate = await pg.locator('[data-day-timeline]').innerText()
+        for (const t of names.map((_, i) => `I15 ${['one', 'two'][i]} ${width} ${stamp}`)) must(plate.includes(t), `${t} is not on the day's calendar`)
+        must(plate.split(meeting).length === 2, 'the meeting is on the calendar more than once')
         const tops = (await s.api('today.get', { space: SPACE })).next.groups.find((g) => g.key === 'top').rows
-        must(tops.some((r) => r.name === names[0]) && (await pg.locator('[data-top-three]').count()) >= 1, 'the top three are not marked')
-        const od = pg.locator('[data-next-group="overdue"]')
-        if (await od.count()) must(!(await pg.locator('[data-next-row][data-why="Overdue"]').count()), 'overdue items are not folded')
+        await s.open('/life/today?mode=overview')
+        await pg.locator('[data-panel="top"]').waitFor({ timeout: 10000 })
+        must(tops.some((r) => r.name === names[0]) && (await pg.locator('[data-panel="top"] [data-dash-row]').count()) >= 1, 'the top three are not in the Top three panel')
         must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is gone from Today (issue 55)')
         must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-      })
-      await check('PHONE.13', `${width} px: ticking a task on Today marks it done and updates the counts`, async () => {
-        await s.open('/life/today')
-        if (await pg.locator('[data-next-more]').count()) await pg.locator('[data-next-more]').click()
-        const row = pg.locator('[data-task-row]', { hasText: `I15 two ${width} ${stamp}` }).first()
-        await row.waitFor({ timeout: 10000 })
-        const before = (await s.api('today.get', { space: SPACE })).tasks.today_count
-        await row.locator('[role="checkbox"], input[type="checkbox"], button[aria-label^="Done"]').first().click()
-        await pg.waitForTimeout(1500)
-        const after = (await s.api('today.get', { space: SPACE })).tasks.today_count
-        must(after === before - 1, `the due-today count went from ${before} to ${after}`)
-        const st = (await s.api('tasks.list', { space: SPACE, status: 'any', filters: JSON.stringify([['name', '=', names[1]]]), page_length: 1 })).tasks[0].status
-        must(st === 'Done', 'the task is ' + st)
-        await s.open('/life/today')
-        must(!(await pg.locator('[data-task-row]', { hasText: `I15 two ${width} ${stamp}` }).count()), 'the done task is still on the plate')
       })
       await check('PHONE.14', `${width} px: the Needs you card shows the waiting count and opens them in the pane, over Today`, async () => {
         await s.open('/life/today')
@@ -441,14 +424,19 @@ print(ev.name)`).split('\n').pop()
           must(path(pg) === want, `${t} opened ${path(pg)}`)
         }
       })
-      await check('PHONE.16', `${width} px: the layout matches the mockups (${phone ? 'Needs you, the plate, then the calendar below it' : 'the plate with the calendar beside it'}), with no sideways scroll`, async () => {
-        await s.open('/life/today')
+      await check('PHONE.16', `${width} px: the layout matches the mockups (Overview: the cards, then the Top three and Needs you panels${phone ? ' stacked' : ' side by side'}; Calendar: the ruler, then the timeline), with no sideways scroll`, async () => {
+        await s.open('/life/today?mode=overview')
         await pg.locator('[data-card="needs"]').waitFor({ timeout: 10000 })
         const box = async (sel) => (await pg.locator(sel).first().boundingBox())
-        const nu = await box('[data-card="needs"]'), plate = await box('[data-next]'), rail = await box('[data-rail-week]')
-        must(nu.y < plate.y, 'Needs you is not above the plate')
-        if (phone) must(rail.y > plate.y && Math.abs(rail.x - plate.x) < 4, 'the calendar is not below the plate')
-        else must(rail.x > plate.x + plate.width - 4 && rail.y < plate.y + 80, 'the calendar is not beside the plate')
+        const nu = await box('[data-card="needs"]'), top = await box('[data-panel="top"]'), needs = await box('[data-panel="needs"]')
+        must(nu.y < top.y, 'Needs you is not above the panels')
+        if (phone) must(needs.y > top.y && Math.abs(needs.x - top.x) < 4, 'the panels are not stacked')
+        else must(needs.x > top.x + top.width - 4 && Math.abs(needs.y - top.y) < 4, 'the panels are not side by side')
+        await noSideways(pg)
+        await s.open('/life/today?mode=calendar')
+        await pg.locator('[data-day-timeline]').waitFor({ timeout: 10000 })
+        const ruler = await box('[data-ruler]'), line = await box('[data-day-timeline]')
+        must(ruler.y + ruler.height <= line.y + 1, 'the ruler is not above the timeline')
         await noSideways(pg)
         must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
       })
@@ -675,15 +663,18 @@ for (const width of WIDTHS.filter((w) => w < 800)) {
   pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
   const made = []
   try {
-    await check('PHONE.25', `${width} px: the ruler labels only today's day; the cards are two by two; the list opens full screen with Back and Esc, and an item opens from it and goes back; nothing is cut off, light and dark`, async () => {
+    await check('PHONE.25', `${width} px: the ruler labels only today and the month on a phone; the cards are two by two; the list opens full screen with Back and Esc, and an item opens from it and goes back; nothing is cut off, light and dark`, async () => {
       for (const scheme of ['light', 'dark']) {
         await pg.emulateMedia({ colorScheme: scheme })
-        await s.open('/life/today/week')
-        await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+        await s.open('/life/today/week?mode=calendar')
+        await pg.locator('[data-ruler]').waitFor({ timeout: 15000 })
         const labels = await pg.locator('[data-ruler-days] [data-ruler-label]').allInnerTexts()
-        must(labels.length === 1 && labels[0] === String(Number(today.slice(8))), `the days labelled are ${labels}`)
+        must(labels.length === 1 && labels[0].endsWith(String(Number(today.slice(8)))), `the days labelled are ${labels}`)
         const months = await pg.locator('[data-ruler-months] [data-ruler-label]').allInnerTexts()
-        must(months.every((m) => m.length === 3), `the months are not short: ${months}`)
+        must(months.length === 1 && months[0].length === 3, `the months are not short: ${months}`)
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `the calendar scrolls sideways in ${scheme}`)
+        await s.open('/life/today/week?mode=overview')
+        await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
         const boxes = await pg.locator('[data-dash-card]').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [Math.round(r.x), Math.round(r.y)] }))
         must(boxes.length === 4 && boxes[0][1] === boxes[1][1] && boxes[2][1] === boxes[3][1] && boxes[2][1] > boxes[0][1] && boxes[0][0] === boxes[2][0], `the cards are not two by two: ${JSON.stringify(boxes)}`)
         must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `the page scrolls sideways in ${scheme}`)

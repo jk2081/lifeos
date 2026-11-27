@@ -6,85 +6,59 @@
     <WeekMenu />
   </PageHead>
   <div ref="root" class="page-body" data-week-view :data-week-start="first">
-    <Dashboard view="week" />
-    <ViewLinks :links="LINKS" />
-    <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
-      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>meetings</span>
-      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-blue-3"></i>goal work</span>
-      <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-red-3"></i>due dates</span>
-    </div>
-    <div class="grid grid-cols-1 gap-5" :class="!paneOpen && !narrow && 'md:grid-cols-[minmax(0,1fr)_18.5rem]'">
+    <Dashboard v-if="mode === 'overview'" view="week" />
+    <ViewLinks v-if="mode === 'overview'" :links="LINKS" />
+    <template v-else>
+      <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-gray-6" data-legend>
+        <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-gray-3"></i>meetings</span>
+        <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-blue-3"></i>goal work</span>
+        <span class="inline-flex items-center gap-1.5"><i class="inline-block size-3 rounded-sm bg-surface-red-3"></i>due dates</span>
+      </div>
+      <Ruler />
       <div class="flex min-w-0 flex-col gap-2">
-      <WeekBars :days="days" :items="data?.items" />
-      <div class="grid min-w-0 items-start gap-2" :class="tight ? 'grid-cols-1' : 'grid-cols-7 max-md:grid-cols-1'" data-week-grid :data-stacked="tight ? 1 : 0">
-        <Card v-for="day in days" :key="day" class="flex min-h-48 min-w-0 flex-col gap-1.5 !p-2 max-md:min-h-0" :data-day="day" :data-today="day === store.today || undefined">
-          <Button class="!justify-start" :variant="day === store.today ? 'solid' : 'ghost'" :label="`${weekday(day, 3)} ${parse(day).getDate()}`" :aria-label="`Open ${long(day)} in Day`"
-            data-open-day @click="openDay(day)" />
-          <div v-for="(it, i) in itemsOn(day)" :key="i" class="relative cursor-pointer rounded px-1.5 py-1 text-sm [overflow-wrap:anywhere]" :class="chipClass(it)" data-week-item :data-source="it.source">
-            <button type="button" class="absolute inset-0 rounded focus-visible:focus-ring" :aria-label="itemLabel(it)" :data-ref="itemRef(it)" @click="openRef(itemRef(it))" />
-            <span v-if="!it.all_day" class="tabular-nums opacity-80">{{ time(it.start) }}</span> {{ itemLabel(it) }}
-          </div>
-          <div v-if="!itemsOn(day).length" class="text-sm text-ink-gray-6 max-md:hidden">Nothing</div>
-        </Card>
-      </div>
-      </div>
-      <aside class="flex min-w-0 flex-col gap-4" data-week-side>
-        <Card data-week-focus>
-          <h2 class="mb-2 text-base font-semibold text-ink-gray-9">The week's focus</h2>
-          <template v-if="plan">
-            <div v-if="plan.score" class="mb-3" data-week-score>
-              <div class="flex items-baseline gap-2"><span class="text-2xl-semibold tabular-nums text-ink-gray-9">{{ Math.round(plan.score.percent) }}%</span>
-                <span class="text-sm text-ink-gray-6">week {{ plan.score.week }} of {{ plan.score.weeks }} · target {{ plan.target }}%</span></div>
-              <Progress class="mt-1.5" size="sm" :value="Math.min(Math.round(plan.score.percent), 100)" />
+        <WeekBars :days="days" :items="data?.items" />
+        <div class="grid min-w-0 items-start gap-2" :class="tight ? 'grid-cols-1' : 'grid-cols-7 max-md:grid-cols-1'" data-week-grid :data-stacked="tight ? 1 : 0">
+          <Card v-for="day in days" :key="day" class="flex min-h-48 min-w-0 flex-col gap-1.5 !p-2 max-md:min-h-0" :data-day="day" :data-today="day === store.today || undefined">
+            <Button class="!justify-start" :variant="day === store.today ? 'solid' : 'ghost'" :label="`${weekday(day, 3)} ${parse(day).getDate()}`" :aria-label="`Open ${long(day)} in Day`"
+              data-open-day @click="openDay(day)" />
+            <div v-for="(it, i) in itemsOn(day)" :key="i" class="relative cursor-pointer rounded px-1.5 py-1 text-sm [overflow-wrap:anywhere]" :class="chipClass(it)" data-week-item :data-source="it.source">
+              <button type="button" class="absolute inset-0 rounded focus-visible:focus-ring" :aria-label="itemLabel(it)" :data-ref="itemRef(it)" @click="openRef(itemRef(it))" />
+              <span v-if="!it.all_day" class="tabular-nums opacity-80">{{ time(it.start) }}</span> {{ itemLabel(it) }}
             </div>
-            <p v-else class="mb-3 text-sm text-ink-gray-6">This week is not in a 12 Week Year, so it has no score.</p>
-            <Row v-for="t in plan.top" :key="t.name" :pane="'task:' + t.name" :label="t.title" class="!items-center">
-              <span class="lucide-star size-3.5 shrink-0 text-ink-amber-8" aria-hidden="true" /><span class="min-w-0 flex-1 break-words text-base text-ink-gray-9">{{ t.title }}</span>
-            </Row>
-            <p v-if="!plan.top.length" class="text-sm text-ink-gray-6">No top three chosen yet. The weekly review sets them.</p>
-          </template>
-        </Card>
-        <Card data-week-goals>
-          <h2 class="mb-2 text-base font-semibold text-ink-gray-9">Goals this week</h2>
-          <template v-if="plan">
-            <Row v-for="g in plan.goals" :key="g.goal" class="!items-center" data-goal-block>
-              <RouterLink class="relative min-w-0 flex-1 break-words text-base text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="`/goals/${g.goal}`">{{ g.title }}</RouterLink>
-              <span class="text-sm tabular-nums text-ink-gray-6">{{ hours(g.minutes) }}</span>
-            </Row>
-            <p v-if="!plan.goals.length" class="text-sm text-ink-gray-6">No time planned for a goal yet. Plan a task at a time and it shows here.</p>
-          </template>
-        </Card>
-      </aside>
-    </div>
+            <div v-if="!itemsOn(day).length" class="text-sm text-ink-gray-6 max-md:hidden">Nothing</div>
+          </Card>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 <script setup>
-// Today > Week (issue 16): seven days with what is on each (meetings, goal work, due tasks, important dates), the week's focus
-// and score, and the goal work planned by goal. A day opens in Day; an item opens in the record pane. The cursor is `date=`.
+// Today > Week (issues 16 and 132): Overview is the dashboard; Calendar is the ruler and the seven days with what is on each (meetings, goal work, due tasks, important dates), the full
+// width. A day opens in Day; an item opens in the record pane. The cursor is `date=`. The week's score and goal work are Overview's (Goals by area).
 import { todayData } from '@/data/today'
 import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Button, Progress } from 'frappe-ui'
+import { useRoute, useRouter } from 'vue-router'
+import { Button } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
-import Row from '@/components/ui/Row.vue'
 import Dashboard from './Dashboard.vue'
+import Ruler from './Ruler.vue'
 import ViewLinks from './ViewLinks.vue'
 import WeekBars from './WeekBars.vue'
 import WeekMenu from './WeekMenu.vue'
 import { tryCall } from '@/lib/api'
 import { store } from '@/lib/store'
-import { chipClass, isBar, itemLabel, itemRef, openDay, paneOpen, useCalendarRange } from '@/lib/calRange'
+import { chipClass, isBar, itemLabel, itemRef, openDay, useCalendarRange } from '@/lib/calRange'
 import { onRecordChanged, openRef } from '@/lib/pane'
+import { todayMode as mode } from '@/lib/todayMode'
 import { addDays, dayRange, long, parse, startOfWeek, time, weekday } from '@/lib/dates'
 
 const route = useRoute()
 // The week fits its own width, not the window's: with Chat or the record pane beside it the page can be narrow on a laptop.
-// Under 1100 px the week's focus goes below the days; under 760 px the days stack (as on a phone) instead of breaking words letter by letter.
+// Under 760 px the days stack (as on a phone) instead of breaking words letter by letter.
 const root = ref(null)
 const { width } = useElementSize(root)
-const narrow = computed(() => width.value > 0 && width.value < 1100)
 const tight = computed(() => width.value > 0 && width.value < 760)
 const router = useRouter()
 const LINKS = [{ label: 'Weekly review', to: { path: '/today/week', query: { view: 'review' } } }, { label: 'Agenda', to: { path: '/today/week', query: { view: 'agenda' } } }]

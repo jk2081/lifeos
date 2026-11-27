@@ -315,8 +315,9 @@ for (const width of WIDTHS) {
     must((await s.api('frappe.client.get_value', { doctype: 'Life Task', filters: { name: t.name }, fieldname: 'creation' })).creation === created, 'parking changed the creation date')
     const open = (await s.api('tasks.list', { space: SPACE, status: 'open', page_length: 100, filters: JSON.stringify([['title', 'like', `%${stamp}%`]]) })).tasks.map((x) => x.name)
     must(![t.name, ...pt.map((x) => x.name)].some((n) => open.includes(n)), 'a parked task is still in Tasks')
-    await s.open('/life')
-    must(!(await pg.locator('[data-next]').innerText()).includes(S5('someday task')), 'a parked task is on Today')
+    await s.open('/life/today?mode=calendar')
+    await pg.locator('[data-day-timeline]').waitFor({ timeout: 10000 })
+    must(!(await pg.locator('[data-day-timeline]').innerText()).includes(S5('someday task')), 'a parked task is on Today')
     // the clock moves past the review date
     bench(`frappe.db.set_value("Life Task", "${t.name}", "someday_review_on", frappe.utils.add_days(frappe.utils.today(), -1))`)
     await s.open('/life/goals/someday?tab=due')
@@ -605,9 +606,6 @@ frappe.db.sql("update \`tabLife Insight\` set status='Dismissed' where space=%s 
     must((await pg.locator('[data-cycle-goal]', { hasText: `S7 calls ${W}` }).locator('[data-tick-count]').innerText()).startsWith('1 of 4'), 'the goal row does not say 1 of 4')
     const after = await s.api('goals.week_score', { cycle: cycle.name, week: wk })
     must(after.done === before.done + 1 && after.percent > before.percent, `score ${before.percent}% → ${after.percent}%`)
-    await s.open('/life')
-    const row = pg.locator('[data-next] [data-why="12WY"]', { hasText: `S7 calls ${W}` })
-    if (await row.count()) must((await row.innerText()).includes('1 of 4 this week'), 'Today does not say 1 of 4')
     return `${before.percent}% → ${after.percent}%`
   })
 
@@ -667,11 +665,10 @@ print(json.dumps({"task": d.name, "status": d.status, "waiting_on": d.waiting_on
     const handed = addWork({ goal: b, title: `S7 handoff step ${W}`, who: 'Vivek' })
     must(handed.status === 'Waiting' && handed.waiting_on === 'Vivek', 'the delegated task is not Waiting on Vivek: ' + JSON.stringify(handed))
     must((await s.api('outbox.list', { space: SPACE, pile: 'Delegated', page_length: 500 })).rows.some((r) => r.record === handed.task), 'not in Delegated')
-    await s.open('/life')
-    const next = pg.locator('[data-next] [data-why="Scheduled"]', { hasText: `S7 plan step ${W}` })
-    const rail = pg.locator('[data-rail-task], [data-dash-panel][data-panel="schedule"] [data-dash-row]', { hasText: `S7 plan step ${W}` }) // the Day dashboard's schedule (#123) replaced the rail's timeline
-    must(await next.count() || await rail.count(), 'the scheduled task is not on Today')
-    must(await rail.count(), "the scheduled task is not on the day's schedule")
+    await s.open('/life/today?mode=calendar')
+    const planned = pg.locator('[data-day-timeline] [data-tl-row]', { hasText: `S7 plan step ${W}` })
+    await planned.first().waitFor({ timeout: 10000 })
+    must(await planned.count() === 1 && await planned.first().getAttribute('data-tl-kind') === 'timed', "the scheduled task is not once on the day's calendar")
     await s.open('/life/today/week?view=calendar')
     must((await pg.locator('[data-week-grid], [data-main]').first().innerText()).includes(`S7 plan step ${W}`), 'not in the week calendar')
     await s.open(`/life/goals/tasks?status=Waiting`)

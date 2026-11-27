@@ -22,8 +22,10 @@
     </div>
   </PageHeader>
   <!-- a place's tabs (Plan, Library) under the header of whichever screen is open in it -->
-  <TabBar v-if="place" class="flex-none border-b border-outline-gray-1" inset :tabs="place.tabs" :model-value="place.current" :label="place.label" data-place-tabs
-    @update:model-value="place.set" />
+  <div v-if="place" class="flex flex-none items-center justify-between border-b border-outline-gray-1 max-md:flex-col max-md:items-stretch">
+    <TabBar class="min-w-0 flex-1 max-md:w-full" inset :tabs="place.tabs" :model-value="place.current" :label="place.label" data-place-tabs @update:model-value="place.set" />
+    <component :is="place.end" v-if="place.end" />
+  </div>
 </template>
 <script setup>
 // The header of a screen: frappe-ui's PageHeader with the path (issue 83) as Breadcrumbs and a back button, its title, the page's

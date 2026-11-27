@@ -3,9 +3,7 @@
     <span>That page moved. Here is Today.</span>
     <Button size="sm" variant="ghost" label="Dismiss" @click="router.replace({ query: { ...route.query, moved: undefined } })" />
   </div>
-  <Ruler v-if="!route.query.view" />
-  <DayOther v-if="current === 'day' && otherDay" :date="otherDay" />
-  <Today v-else-if="current === 'day'" />
+  <Today v-if="current === 'day' && !route.query.view" />
   <Plan v-else-if="route.query.view" :tab="current" />
   <WeekView v-else-if="current === 'week'" />
   <MonthView v-else-if="current === 'month'" />
@@ -16,23 +14,20 @@
 // /today/week); every screen open here shows them under its header (PageHead). Day holds to a date with `date=` (Week and Month open
 // a day there); the older views of a rhythm (the weekly review, the month plan, habits, the 12 Week grid, the calendar grids) keep
 // their `view=` and are still Plan's screens.
-import { computed, provide } from 'vue'
+import { computed, markRaw, provide } from 'vue'
 import { Button } from 'frappe-ui'
 import { useRoute, useRouter } from 'vue-router'
 import Today from '@/pages/Today.vue'
 import Plan from '@/pages/Plan.vue'
-import Ruler from '@/components/today/Ruler.vue'
-import DayOther from '@/components/today/DayOther.vue'
+import ModeSwitch from '@/components/today/ModeSwitch.vue'
 import WeekView from '@/components/today/WeekView.vue'
 import MonthView from '@/components/today/MonthView.vue'
 import YearView from '@/components/today/YearView.vue'
 import { TODAY_TABS, todayPath } from '@/lib/nav'
-import { store } from '@/lib/store'
 
 const props = defineProps({ tab: String })
 const route = useRoute()
 const router = useRouter()
 const current = computed(() => props.tab || 'day')
-const otherDay = computed(() => (/^\d{4}-\d{2}-\d{2}$/.test(String(route.query.date || '')) && route.query.date !== store.today ? route.query.date : null))
-provide('placeTabs', computed(() => ({ tabs: TODAY_TABS, current: current.value, label: 'Today', set: (v) => router.push(todayPath(v)) })))
+provide('placeTabs', computed(() => ({ tabs: TODAY_TABS, current: current.value, label: 'Today', end: route.query.view ? null : markRaw(ModeSwitch), set: (v) => router.push({ path: todayPath(v), query: route.query.mode ? { mode: route.query.mode } : {} }) })))
 </script>

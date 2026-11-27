@@ -104,6 +104,24 @@ def year(space: str | None = None, year: int | None = None):
 
 
 @frappe.whitelist(methods=["GET"])
+def year_months(space: str | None = None, year: int | None = None):
+	"""Today > Year, Calendar: the twelve months of a year, each with how many key dates it holds and the next one or two (from today in the
+	current month, the first of the month otherwise)."""
+	from lifeos.goals import year_plan as plan
+
+	space = permissions.resolve_space(space)
+	y = int(year or getdate(today()).year)
+	keys = plan.key_dates(space, date(y, 1, 1), date(y, 12, 31))
+	now = str(getdate(today()))
+	months = []
+	for m in range(1, 13):
+		mine = sorted((k for k in keys if getdate(k["date"]).month == m), key=lambda k: str(k["date"]))
+		coming = [k for k in mine if str(k["date"]) >= now] if str(now)[:7] == f"{y}-{m:02d}" else mine
+		months.append({"month": m, "count": len(mine), "next": [{"title": k["title"], "date": str(k["date"]), "ref": k["ref"]} for k in coming[:2]]})
+	return {"year": y, "today": now, "months": months}
+
+
+@frappe.whitelist(methods=["GET"])
 def year_plan(space: str | None = None, shift: int | None = 0, area: str | None = None):
 	"""Today > Year: four columns of cycles around today (the last, this, the next and the one after; four quarters when no 12 Week Year is
 	running), each with its score, a row for each area that is on with its goals as bars, key dates by week, and the weekly reviews since

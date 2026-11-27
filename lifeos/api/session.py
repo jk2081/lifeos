@@ -4,6 +4,7 @@ from frappe.utils import today
 
 from lifeos.goals import areas, readings
 from lifeos import permissions
+from lifeos.api.dashboard import remembered_mode
 
 
 @frappe.whitelist(methods=["GET"])
@@ -32,6 +33,7 @@ def boot():
 			"use_focuses": int(areas.use_focuses()),
 		},
 		"today": today(),
+		"today_mode": remembered_mode(),
 		"time_zone": frappe.utils.get_system_timezone(),
 	}
 

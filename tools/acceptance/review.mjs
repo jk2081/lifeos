@@ -255,7 +255,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     return seen.join(', ')
   })
 
-  await check('REVIEW.10', `${width} px: what went well; Lock; the done screen; Today shows the top three first; the scheduled tasks are on Today and in Plan > Week`, async () => {
+  await check('REVIEW.10', `${width} px: what went well; Lock; the done screen; Today's Top three panel lists them; the scheduled tasks are on Today and in Plan > Week`, async () => {
     await goTab('reflect')
     await pg.locator('[data-went-well] textarea, textarea[data-went-well]').first().fill(`S8 went well ${W}`)
     await pg.locator('[data-review-next]').dispatchEvent('click')
@@ -266,10 +266,10 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     await pg.locator('[data-done-today]').click()
     await pg.waitForLoadState('networkidle')
     await settle()
-    const first = pg.locator('[data-next-group]').first()
-    must((await first.getAttribute('data-next-group')) === 'top', `Today's first group is ${await first.getAttribute('data-next-group')}`)
-    const tops = await pg.locator('[data-next] [data-why="Top three"]').count()
-    must(tops === 3 && await pg.locator('[data-next] [data-top-three]').count() === 3, `${tops} top-three rows on Today`)
+    await s.open('/life/today?mode=overview')
+    await pg.locator('[data-panel="top"] [data-dash-row]').first().waitFor({ timeout: 15000 })
+    const tops = await pg.locator('[data-panel="top"] [data-dash-row]').count()
+    must(tops === 3, `${tops} top-three rows on Today's Top three panel`)
     const made = (await s.api('tasks.list', { space: SPACE, status: 'all', filters: [['title', 'like', `S8 next % ${W}`]] })).tasks
     const scheduled = made.filter((x) => x.scheduled_at)
     must(scheduled.length >= 2, 'the plans were not scheduled')
@@ -278,7 +278,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     must(scheduled.every((x) => weekCal.items.some((i) => i.name === x.name && i.scheduled)), 'a scheduled task is not in Plan > Week')
     // the plans fall on the days ahead, which on a Friday to Sunday run are in next week: open the week of the earliest one
     const firstDay = scheduled.map((x) => String(x.scheduled_at).slice(0, 10)).sort()[0]
-    await s.open(`/life/today/week?date=${firstDay}`)
+    await s.open(`/life/today/week?mode=calendar&date=${firstDay}`)
     await pg.locator('[data-week-item]').first().waitFor({ timeout: 20000 })
     const text = await pg.locator('[data-main]').innerText()
     must(scheduled.some((x) => text.includes(x.title)), 'no scheduled task on the Week calendar')

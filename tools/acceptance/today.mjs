@@ -33,15 +33,17 @@ await check('TODAY.2', 'Add a birthday and see it on the calendar this year and 
   must(JSON.stringify(plan.key_weeks).includes(title), 'not among the key dates of the year view')
 })
 
-await check('TODAY.3', 'Vault document expiring in 30 days shows a badge on Today', async () => {
+await check('TODAY.3', 'Vault document expiring in 30 days shows on its day of the month calendar', async () => {
   const title = `Passport ${stamp}`
   await owner.api('vault.save', { space: SPACE, values: { title, doc_type: 'Travel', expiry_date: addDays(30), number_last4: '4821', area: areaId('Money & Legal') } })
   const refused = await owner.api('vault.save', { space: SPACE, values: { title: 'x', doc_type: 'ID', number_last4: '123456789', area: areaId('Money & Legal') } }, { raw: true })
   must(!refused.ok(), 'a full number was stored')
   const t = await owner.api('today.get', { space: SPACE })
   must(t.coming_up.some((c) => c.kind === 'vault' && c.title === title), 'not in today.get')
-  await owner.open('/life')
-  must((await owner.page.locator('[data-main]').innerText()).includes(title), 'not shown on Today')
+  await owner.open(`/life/today/month?mode=calendar&date=${addDays(30)}`) // issue 132: Today's Coming up is gone; the expiry is on the month's calendar, on its day
+  await owner.page.locator('[data-month-grid]').waitFor({ timeout: 10000 })
+  await owner.page.waitForFunction((t) => document.querySelector('[data-month-grid]')?.innerText.includes(t), title, { timeout: 10000 }).catch(() => {})
+  must((await owner.page.locator('[data-month-grid]').innerText()).includes(title), 'not shown on the month calendar')
   // set 6: the Vault's documents are captures of kind Document, marked sensitive, with their expiry
   await owner.open('/life/library/documents?tab=documents&sensitive=1')
   const row = owner.page.locator('[data-row]', { hasText: title }).first()
@@ -101,25 +103,20 @@ for (const width of WIDTHS) {
     return `${done.length + 1} numbers`
   })
 
-  await check('TODAY.5', `${width} px: Today: no Open band, the list of tasks in order, the rail; Someday never shows`, async () => {
+  await check('TODAY.5', `${width} px: Today: no Open band; Day Calendar lists the task due today and never a Someday task`, async () => {
     // an overdue task, a task due today, a parked task due today
-    const over = await s.api('tasks.quick_add', { text: S5('overdue'), space: SPACE, area: uxArea, due_date: addDays(-2) })
-    const due = await s.api('tasks.quick_add', { text: S5('due today'), space: SPACE, area: uxArea, due_date: today })
+    await s.api('tasks.quick_add', { text: S5('overdue'), space: SPACE, area: uxArea, due_date: addDays(-2) })
+    await s.api('tasks.quick_add', { text: S5('due today'), space: SPACE, area: uxArea, due_date: today })
     const parked = await s.api('tasks.quick_add', { text: S5('parked'), space: SPACE, area: uxArea, due_date: today })
     await s.api('someday.park', { doctype: 'Life Task', name: parked.name })
-    await s.open('/life')
+    await s.open('/life/today?mode=calendar')
+    await pg.locator('[data-day-timeline]').waitFor({ timeout: 10000 })
     must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is still on Today (issue 55)')
-    const groups = await pg.locator('[data-next-group]').evaluateAll((els) => els.map((e) => e.getAttribute('data-next-group')))
-    const order = ['top', 'today', 'overdue', 'week']
-    must(JSON.stringify(groups) === JSON.stringify(order.filter((g) => groups.includes(g))), `Next groups are ${groups}`)
-    if (await pg.locator('[data-overdue-toggle]').count()) { await tap(pg.locator('[data-overdue-toggle]')); await settle() } // issue 15: overdue is folded
-    if (await pg.locator('[data-next-more]').count()) { await tap(pg.locator('[data-next-more]')); await settle() }
-    const next = await pg.locator('[data-next]').innerText()
-    must(next.includes(S5('overdue')) && next.includes(S5('due today')), 'the overdue or due task is not in Next')
-    must(!next.includes(S5('parked')), 'a Someday task is on Today')
-    must(await pg.locator('[data-next-row][data-why="12WY"]').count() === 0 && await pg.locator('[data-next-group="decisions"]').count() === 0, 'a 12 Week Year row or a decision is in the list')
-    must(await pg.locator('[data-rail-week]').isVisible(), 'the rail is missing')
-    return `${groups.join(', ')}`
+    await pg.waitForFunction((t) => document.querySelector('[data-day-timeline]')?.innerText.includes(t), S5('due today'), { timeout: 10000 })
+    const text = await pg.locator('[data-day-timeline]').innerText()
+    must(!text.includes(S5('parked')), 'a Someday task is on Today')
+    must(await pg.locator('[data-next], [data-rail]').count() === 0, 'the old Next list or rail is still on Today')
+    return 'due today is on the timeline'
   })
 
   await check('TODAY.6', `${width} px: counts: every number on Today, Reset, Someday and the sidebar opens a list with exactly that many rows`, async () => {
@@ -129,7 +126,7 @@ for (const width of WIDTHS) {
       if (phone && from === '/life/settings?tab=data') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
       const keys = await pg.locator('[data-count-door]:visible').evaluateAll((els) => [...new Set(els.map((e) => e.getAttribute('data-count-key')))])
       // Someday's own numbers are its tab counts, which U.8 clicks; here only the doors on the page (the sidebar's on a wide screen)
-      must(keys.length || from.includes('someday'), `no counts on ${from}`)
+      must(keys.length || from.includes('someday') || (phone && from === '/life'), `no counts on ${from}`) // issue 132: Today's own list of counts is gone; a phone has no sidebar
       for (const key of keys) {
         await s.open(from)
         if (phone && from === '/life/settings?tab=data') { await pg.locator('[role="tab"]', { hasText: 'Inventory' }).first().click(); await settle() }
@@ -303,8 +300,8 @@ print(json.dumps({"start": str(c.start_date), "planned": bool(planned)}))`).spli
       must((await banner.innerText()).includes(b.text), `the ${key} banner says "${await banner.innerText()}"`)
       // at most one line, above the list
       must((await pg.locator('[data-rhythm-banner]').count()) === 1, 'more than one banner')
-      const order = await pg.evaluate(() => { const a = document.querySelector('[data-rhythm-banner]'), o = document.querySelector('[data-next]'); return !!(a && o && (a.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING)) })
-      must(order, 'the banner is not above the list')
+      const order = await pg.evaluate(() => { const a = document.querySelector('[data-rhythm-banner]'), o = document.querySelector('[data-day-timeline], [data-dashboard]'); return !!(a && o && (a.compareDocumentPosition(o) & Node.DOCUMENT_POSITION_FOLLOWING)) })
+      must(order, 'the banner is not above the day')
       must(new URL(await banner.locator('[data-banner-open]').evaluate((a) => a.href)).pathname === to.split('?')[0], `the ${key} banner does not lead to ${to} (${await banner.locator('[data-banner-open]').evaluate((a) => a.href)})`)
       await banner.locator('[data-banner-skip]').click()
       await pg.waitForTimeout(900)
@@ -363,7 +360,7 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
   let reviewName = null
   try {
     await check('TODAY.11', `${width} px: Week shows this week's calendar events and due tasks on the right days, and a day opens Day`, async () => {
-      await s.open('/life/today/week')
+      await s.open('/life/today/week?mode=calendar')
       await pg.locator('[data-week-grid]').waitFor({ timeout: 10000 })
       const dayText = async (d) => await pg.locator(`[data-week-grid] [data-day="${d}"]`).innerText()
       must((await dayText(meetDay)).includes(meeting), `${meeting} is not on ${meetDay}`)
@@ -372,14 +369,14 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
       const to = dueDay === today ? meetDay : dueDay
       await pg.locator(`[data-week-grid] [data-day="${to}"] [data-open-day]`).click()
       await pg.waitForURL((u) => u.pathname === '/life/today' && u.searchParams.get('date') === to, { timeout: 10000 })
-      await pg.locator('[data-day-other]').waitFor({ timeout: 10000 })
-      await pg.waitForFunction((t) => document.querySelector('[data-day-other]')?.innerText.includes(t), to === dueDay ? due : meeting, { timeout: 10000 }).catch(() => {})
-      must((await pg.locator('[data-day-other]').innerText()).includes(to === dueDay ? due : meeting), 'Day does not list the item of ' + to)
+      await pg.locator('[data-day-timeline]').waitFor({ timeout: 10000 })
+      await pg.waitForFunction((t) => document.querySelector('[data-day-timeline]')?.innerText.includes(t), to === dueDay ? due : meeting, { timeout: 10000 }).catch(() => {})
+      must((await pg.locator('[data-day-timeline]').innerText()).includes(to === dueDay ? due : meeting), 'Day does not list the item of ' + to)
       must((await pg.locator('[data-page-head]').first().innerText()).includes(String(Number(to.slice(8)))), 'Day is not headed with the date')
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
     await check('TODAY.12', `${width} px: Month shows events and due tasks on the right dates; next and previous months work`, async () => {
-      await s.open('/life/today/month')
+      await s.open('/life/today/month?mode=calendar')
       await pg.locator('[data-month-grid]').waitFor({ timeout: 10000 })
       const month = today.slice(0, 7)
       must((await pg.locator('[data-month-view]').getAttribute('data-month')) === month, 'Month is not on this month')
@@ -409,7 +406,7 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
       await pg.waitForFunction((k) => document.querySelector('[data-month-view]')?.getAttribute('data-month') === k, month, { timeout: 10000 })
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
-    await check('TODAY.13', `${width} px: Year shows a bar for each goal in its area's lane, and one tick per weekly review since setup with the right count`, async () => {
+    await check('TODAY.13', `${width} px: Year's Overview shows a goal under its area and the weekly reviews locked since setup`, async () => {
       const before = await s.api('calendar.year_plan', { space: SPACE })
       const week = before.reviews.weeks.find((w) => !w.done && w.start <= today)
       must(week, 'no week since setup without a review')
@@ -418,45 +415,33 @@ print(json.dumps({"career": career, "tea": tea, "mind": mind, "was": was, "event
 print(r.name)`).split('\n').pop()
       const after = await s.api('calendar.year_plan', { space: SPACE })
       must(after.reviews.done === before.reviews.done + 1, `the server counts ${after.reviews.done} reviews; it was ${before.reviews.done}`)
-      await s.open('/life/today/year')
-      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
-      if (phone) {
-        must((await pg.locator('[data-year-list]').innerText()).includes(goalTitle), 'the goal is not listed in its cycles')
-        must((await pg.locator('[data-reviews-phone]').innerText()).includes(`${after.reviews.done} of ${after.reviews.total} since setup`), 'the reviews count is wrong')
-      } else {
-        const lane = pg.locator(`[data-lane="area-${made.tea}"]`)
-        await lane.waitFor({ timeout: 10000 })
-        const bar = pg.locator(`[data-goal-bar][data-goal="${made.goal}"]`)
-        must((await bar.count()) === 1 && (await bar.innerText()).includes(goalTitle), 'the goal has no bar')
-        const lanes = await pg.locator('[data-lane]').evaluateAll((els) => els.map((e) => e.getAttribute('data-lane')))
-        must(lanes.indexOf(`area-${made.tea}`) > lanes.indexOf(`area-${made.career}`), "the goal's part is not under its area")
-        must((await pg.locator('[data-review-tick]').count()) === after.reviews.weeks.length, 'there is not a tick for every week')
-        must((await pg.locator('[data-review-tick][data-done]').count()) === after.reviews.weeks.filter((w) => w.done).length, 'the done ticks are not the reviews held')
-        must((await pg.locator('[data-lane="reviews"]').innerText()).includes(`${after.reviews.done} of ${after.reviews.total} since setup`), 'the lane does not say n of m since setup')
-        must(await pg.locator(`[data-review-tick][data-start="${week.start}"][data-done]`).count(), 'the week of the review is not ticked')
-      }
+      await s.open('/life/today/year?mode=overview')
+      await pg.locator('[data-year-view] [data-dash-card]').first().waitFor({ timeout: 10000 })
+      await pg.waitForFunction((t) => document.querySelector('[data-panel="goals"]')?.innerText.includes(t), goalTitle, { timeout: 10000 })
+      must((await pg.locator('[data-card="reviews"]').innerText()).includes(`${after.reviews.done} of ${after.reviews.total}`), 'the Reviews locked card does not say ' + `${after.reviews.done} of ${after.reviews.total}`)
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
-    await check('TODAY.14', `${width} px: an area that is off has no lane`, async () => {
+    await check('TODAY.14', `${width} px: an area that is off has no goals on Year`, async () => {
       const out = await s.api('calendar.year_plan', { space: SPACE })
       must(!out.lanes.some((l) => l.area === made.mind), 'the server sent a lane for an area that is off')
-      await s.open('/life/today/year')
-      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
+      await s.open('/life/today/year?mode=overview')
+      await pg.locator('[data-year-view] [data-dash-card]').first().waitFor({ timeout: 10000 })
+      await pg.waitForFunction((t) => document.querySelector('[data-panel="goals"]')?.innerText.includes(t), goalTitle, { timeout: 10000 })
       must(!(await pg.locator('[data-year-view]').innerText()).includes(offTitle), 'the goal of an area that is off is shown')
-      if (!phone) must(!(await pg.locator(`[data-lane="area-${made.mind}"]`).count()), 'the area that is off has a lane')
       bench(`frappe.db.set_value("Life Area", "${made.mind}", "is_on", 1)`)
-      await s.open('/life/today/year')
-      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
-      must((await pg.locator('[data-year-view]').innerText()).includes(offTitle), 'the goal does not show once the area is on')
+      await s.open('/life/today/year?mode=overview')
+      await pg.locator('[data-year-view] [data-dash-card]').first().waitFor({ timeout: 10000 })
+      await pg.waitForFunction((t) => document.querySelector('[data-year-view]')?.innerText.includes(t), offTitle, { timeout: 10000 })
       bench(`frappe.db.set_value("Life Area", "${made.mind}", "is_on", 0)`)
     })
-    await check('TODAY.15', `${width} px: clicking a goal on Year opens the goal`, async () => {
-      await s.open('/life/today/year')
-      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
-      await (phone ? pg.locator('[data-year-list] a', { hasText: goalTitle }) : pg.locator(`[data-goal-bar][data-goal="${made.goal}"] a`)).first().click()
-      await pg.waitForURL((u) => u.pathname === `/life/goals/${made.goal}`, { timeout: 10000 })
-      await pg.getByText(goalTitle).first().waitFor({ timeout: 10000 }).catch(() => {})
-      must((await pg.locator('body').innerText()).includes(goalTitle), 'the goal page does not show the goal')
+    await check('TODAY.15', `${width} px: clicking a goal on Year's Overview opens the goal in the Drawer`, async () => {
+      await s.open('/life/today/year?mode=overview')
+      const row = pg.locator('[data-panel="goals"] [data-dash-row]', { hasText: goalTitle }).first()
+      await row.waitFor({ timeout: 10000 })
+      await row.locator('button').first().click()
+      await pg.waitForFunction((g) => new URL(location.href).searchParams.get('open') === 'goal:' + g, made.goal, { timeout: 10000 })
+      must(new URL(pg.url()).pathname === '/life/today/year', 'the goal took the page away')
+      await pg.keyboard.press('Escape')
     })
     await check('TODAY.16', `${width} px: Week, Month and Year have no sideways scroll`, async () => {
       for (const p of ['week', 'month', 'year']) {
@@ -599,7 +584,7 @@ frappe.clear_cache()`)
 
     await check('TODAY.19', `${width} px: Today, Brain, Goals and Library on a fresh site each show their empty state with one action`, async () => {
       reset()
-      for (const [p, sel] of [['/life/today', '[data-today-empty]'], ['/life/brain', '[data-needs-empty]'], ['/life/goals', '[data-goals-empty]'], ['/life/library', '[data-lib-empty]']]) {
+      for (const [p, sel] of [['/life/today?mode=calendar', '[data-timeline-empty]'], ['/life/brain', '[data-needs-empty]'], ['/life/goals', '[data-goals-empty]'], ['/life/library', '[data-lib-empty]']]) {
         await one.open(p)
         // the guide opens on a new site: close it to see the screen under it
         const g = pg.locator('[data-guide-close]')
@@ -941,11 +926,11 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
     pg.on('pageerror', (x) => errors.push(String(x).split('\n')[0]))
     const noSideways = async () => must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the page scrolls sideways')
     await one.api('onboarding.complete', { status: 'skipped' })
-    const today55 = async () => { await one.open('/life/today'); await pg.locator('[data-next]').waitFor({ timeout: 10000 }).catch(() => {}); await pg.waitForTimeout(500) }
+    const today55 = async () => { await one.open('/life/today'); await pg.locator('[data-dash-cards]').waitFor({ timeout: 10000 }).catch(() => {}); await pg.waitForTimeout(500) }
 
     await check('TODAY.22', `${width} px: on an empty site Today shows its empty state and no Open band`, async () => {
-      await one.open('/life/today')
-      await pg.locator('[data-today-empty]').waitFor({ timeout: 10000 })
+      await one.open('/life/today?mode=calendar')
+      await pg.locator('[data-timeline-empty]').waitFor({ timeout: 10000 })
       must(await pg.locator('[data-open-band]').count() === 0, 'the Open band is on an empty Today')
       must(await pg.locator('[data-no-plan]').count() === 0, 'a goal line is on an empty Today')
       await noSideways()
@@ -983,13 +968,12 @@ frappe.get_doc({"doctype": "Life Space", "space_name": "${space}", "owner_user":
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
-    await check('TODAY.59', `${width} px: on a new space with no goals Year says "No goals yet" with a Plan button, and has no "Also:" link`, async () => {
-      await one.open('/life/today/year')
-      const empty = pg.locator(phone ? '[data-year-empty-phone]' : '[data-year-empty]')
+    await check('TODAY.59', `${width} px: on a new space with no goals Year's Overview says what will appear in Goals by area, with a Set a goal button`, async () => {
+      await one.open('/life/today/year?mode=overview')
+      const empty = pg.locator('[data-panel="goals"] [data-dash-empty]')
       await empty.waitFor({ timeout: 10000 })
-      must((await empty.innerText()).includes('No goals yet. Plan a 12 Week Year to see them here.'), 'the empty line is missing')
-      must(await empty.getByRole('button', { name: 'Plan' }).isVisible(), 'there is no Plan button')
-      must(!(await pg.locator('[data-year-view]').innerText()).includes('Also:'), 'an "Also:" link is on Year')
+      must((await empty.innerText()).includes('Your goals show here'), 'the empty line is missing: ' + await empty.innerText())
+      must(await empty.getByRole('button', { name: 'Set a goal' }).isVisible(), 'there is no Set a goal button')
       await noSideways()
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
@@ -1005,37 +989,12 @@ goals = [frappe.get_doc({"doctype": "Life Goal", "space": space, "cycle": cycle.
 print(json.dumps({"cycle": cycle.name, "goals": [g.name for g in goals], "actions": [g.actions[0].name for g in goals]}))`).split('\n').pop())
 
     await check('TODAY.23', `${width} px: cycle goals with lead actions and no task this week are not rows on Today`, async () => {
-      await today55()
-      const text = await pg.locator('[data-next]').innerText()
+      await one.open('/life/today?mode=calendar')
+      await pg.locator('[data-day-timeline]').waitFor({ timeout: 10000 })
+      const text = await pg.locator('[data-day-timeline]').innerText()
       must(!/I55 goal|I55 lead/.test(text), 'a goal or lead action is in the list: ' + text.slice(0, 300))
       must(await pg.locator('[data-week-tick], [data-action]').count() === 0, 'a lead action tick box is on Today')
       must(!(await pg.locator('[data-main]').innerText()).includes('12WY'), 'a 12WY row is on Today')
-      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-    })
-
-    await check('TODAY.24', `${width} px: a task planned this week under a cycle goal shows with its goal, and ticking it records the lead action's tick`, async () => {
-      bench(`from frappe.utils import today
-frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I55 lead 0 ${width}", "goal": "${made.goals[0]}", "due_date": today()}).insert(ignore_permissions=True)`)
-      await today55()
-      const row = pg.locator('[data-task-row]', { hasText: `I55 lead 0 ${width}` })
-      await row.waitFor({ timeout: 10000 })
-      must((await row.locator('[data-task-goal-link]').innerText()) === `I55 goal 0 ${width}`, 'the goal is not shown as a link on the task')
-      must((await row.locator('[data-task-goal-link]').getAttribute('href')) === `/life/goals/${made.goals[0]}`, 'the goal link goes elsewhere')
-      await row.locator('[role="checkbox"], input[type="checkbox"], button[role="checkbox"]').first().click()
-      await pg.waitForTimeout(1200)
-      const ticks = bench(`print(frappe.db.get_value("Life Action Log", {"action_id": "${made.actions[0]}"}, "count"))`).split('\n').pop()
-      must(ticks === '1', 'the lead action has ' + ticks + ' ticks')
-      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-    })
-
-    await check('TODAY.25', `${width} px: with three cycle goals planned for nothing, one line says so and Plan opens Goals > Cycles`, async () => {
-      await today55()
-      const line = pg.locator('[data-no-plan]')
-      await line.waitFor({ timeout: 10000 })
-      must((await line.getAttribute('data-count')) === '3', 'the line counts ' + (await line.getAttribute('data-count')))
-      must(/3 cycle goals have nothing planned this week/.test(await line.innerText()), 'the line says: ' + (await line.innerText()))
-      await line.locator('[data-no-plan-link]').click()
-      await pg.waitForFunction(() => location.pathname === '/life/goals/cycles', null, { timeout: 8000 })
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
@@ -1065,7 +1024,6 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I55 lead 
     await check('TODAY.27', `${width} px: no link on Today goes to an old route, and each opens where it says`, async () => {
       await today55()
       const hrefs = [...new Set(await pg.locator('[data-main] a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))))]
-      must(hrefs.length > 0, 'no links on Today')
       for (const h of hrefs) {
         if (!h.startsWith('/life')) continue
         must(!OLD_ROUTES.test(h), 'Today links to an old route: ' + h)
@@ -1077,18 +1035,6 @@ frappe.get_doc({"doctype": "Life Task", "space": "${space}", "title": "I55 lead 
       for (const h of await pg.locator('[data-main] a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href')))) must(!OLD_ROUTES.test(h), 'old route ' + h)
     })
 
-    if (phone) {
-      await check('TODAY.28', `${width} px: the order is the dashboard's Needs you card, the list, then the rail`, async () => {
-        bench(`from frappe.utils import now_datetime
-frappe.get_doc({"doctype": "Life Inbox Item", "space": "${space}", "title": "I55 to review ${width}", "source_type": "Upload", "status": "To Review", "raw_text": "x", "received_on": now_datetime()}).insert(ignore_permissions=True)`)
-        await today55()
-        await pg.locator('[data-card="needs"]').waitFor({ timeout: 10000 })
-        const y = async (sel) => (await pg.locator(sel).first().boundingBox()).y
-        const [needs, list, rail] = [await y('[data-card="needs"]'), await y('[data-next]'), await y('[data-rail]')]
-        must(needs < list && list < rail, `the order is Needs you ${needs}, list ${list}, rail ${rail}`)
-        await noSideways()
-      })
-    }
   } finally {
     if (one) await one.ctx.close()
     restore()
@@ -1176,7 +1122,7 @@ print(d.name)`).split('\n').pop()
     mine: make(mine, `${wed} 12:00:00`, `${wed} 13:00:00`, false),
   }
   const chip = (name) => pg.locator(`[data-week-grid] [data-ref="event:${name}"]`)
-  const open = async (name) => { await s.open('/life/today/week'); await pg.locator('[data-week-grid]').waitFor({ timeout: 10000 }); await pg.locator(`[data-ref="event:${name}"]`).first().click(); await settle() }
+  const open = async (name) => { await s.open('/life/today/week?mode=calendar'); await pg.locator('[data-week-grid]').waitFor({ timeout: 10000 }); await pg.locator(`[data-ref="event:${name}"]`).first().click(); await settle() }
   try {
     await check('TODAY.50', `${width} px: an event in Week opens without "Open full page", the path reads "Week / Event" and a note shows at once`, async () => {
       await open(ev.mine)
@@ -1252,11 +1198,6 @@ print(d.name)`).split('\n').pop()
       await pg.getByRole('dialog', { name: 'Add important date' }).waitFor({ timeout: 8000 })
       await pg.keyboard.press('Escape')
     })
-    await check('TODAY.55', `${width} px: Day has no builder's note under "Today"`, async () => {
-      await s.open('/life/today')
-      await pg.locator('[data-next]').waitFor({ timeout: 10000 })
-      must(!/the top three, what is due/i.test(await pg.locator('[data-next]').innerText()), 'the note is still there')
-    })
   } finally {
     bench(`for n in ${JSON.stringify(Object.values(ev))}:
     frappe.db.delete("Comment", {"reference_doctype": "Event", "reference_name": n})
@@ -1299,63 +1240,8 @@ names.append(event("${monthKey}", "${keyDay} 00:00:00"))
 names += [event(f"I100 meeting {i} ${width} ${stamp}", "${meetDay} 1%d:00:00" % i, "${meetDay} 1%d:30:00" % i, 0) for i in (0, 1)]
 print(json.dumps({"active": active, "cycle": cycle, "events": names}))`).split('\n').pop())
   try {
-    await check('TODAY.56', `${width} px: Year shows five key dates of one week as one dot "5" that lists them, and no two key-date labels overlap`, async () => {
-      await s.open('/life/today/year')
-      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
-      if (phone) {
-        const list = await pg.locator('[data-year-list]').innerText()
-        for (const t of five) must(list.includes(t), `${t} is not listed`)
-      } else {
-        const dot = pg.locator(`[data-key-dot][data-week="${weekOf}"]`)
-        await dot.waitFor({ timeout: 10000 })
-        must((await dot.getAttribute('data-count')) === '5' && (await dot.innerText()).trim() === '5', `the week is not one dot with 5: count ${await dot.getAttribute('data-count')}, text "${(await dot.innerText()).trim()}": ${JSON.stringify((await s.api('calendar.year_plan', { space: SPACE })).key_weeks.find((k) => k.start === weekOf)?.items.map((i) => i.title + '@' + i.date))}`)
-        await dot.click()
-        const pop = pg.locator('[data-key-popover]')
-        await pop.waitFor({ timeout: 5000 })
-        const text = await pop.innerText()
-        for (const t of five) must(text.includes(t), `${t} is not in the list`)
-        // an item opens the event, where the Key date star is on and can be corrected
-        await pop.locator('[data-key-item]', { hasText: five[0] }).click()
-        const star = pg.locator('[data-event-key]')
-        await star.waitFor({ timeout: 10000 })
-        must((await star.getAttribute('aria-pressed')) === 'true', 'an all-day event is not a key date')
-        await star.click()
-        await pg.waitForFunction(() => document.querySelector('[data-event-key]')?.getAttribute('aria-pressed') === 'false', null, { timeout: 5000 })
-        await star.click()
-        await pg.keyboard.press('Escape')
-        await pg.locator('[data-key-label]').first().waitFor({ timeout: 5000 })
-        const boxes = await pg.locator('[data-key-label], [data-key-dot]').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { l: e.hasAttribute('data-key-label'), x: r.x, y: r.y, w: r.width, h: r.height, t: e.textContent } }))
-        for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
-          const a = boxes[i], b = boxes[j]
-          if (!a.l && !b.l) continue
-          must(a.x + a.w <= b.x + 0.5 || b.x + b.w <= a.x + 0.5 || a.y + a.h <= b.y + 0.5 || b.y + b.h <= a.y + 0.5, `"${a.t}" and "${b.t}" overlap`)
-        }
-      }
-      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-    })
-    await check('TODAY.57', `${width} px: Year has four cycle columns with today's line in the second; back moves one cycle and Today returns`, async () => {
-      await s.open('/life/today/year')
-      await pg.locator('[data-year-view]').waitFor({ timeout: 10000 })
-      const cols = phone ? pg.locator('[data-col-section]') : pg.locator('[data-col]')
-      await cols.first().waitFor({ timeout: 10000 })
-      must((await cols.count()) === 4, 'there are not four columns')
-      const current = async () => (await cols.evaluateAll((els) => els.findIndex((e) => e.hasAttribute('data-current')))) + 1
-      must((await current()) === 2, `the current cycle is column ${await current()}`)
-      must((await cols.nth(1).innerText()).includes('This cycle · week 3'), 'the second column is not "This cycle · week 3": ' + (await cols.nth(1).innerText()))
-      if (!phone) {
-        const line = await pg.locator('[data-today-line]').first().boundingBox(), box = await cols.nth(1).boundingBox()
-        must(line.x >= box.x && line.x <= box.x + box.width, "today's line is not inside the second column")
-      }
-      await pg.locator('[data-year-prev]').click()
-      await pg.waitForFunction(() => new URL(location.href).searchParams.get('shift') === '-1', null, { timeout: 5000 })
-      await pg.waitForFunction((phoneMode) => [...document.querySelectorAll(phoneMode ? '[data-col-section]' : '[data-col]')].findIndex((e) => e.hasAttribute('data-current')) === 2, phone, { timeout: 10000 })
-      await pg.locator('[data-year-today]').click()
-      await pg.waitForFunction((phoneMode) => !new URL(location.href).searchParams.get('shift') && [...document.querySelectorAll(phoneMode ? '[data-col-section]' : '[data-col]')].findIndex((e) => e.hasAttribute('data-current')) === 1, phone, { timeout: 10000 })
-      must(!(await pg.locator('body').innerText()).includes('Click a goal to open it'), 'the old hint line is still there')
-      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
-    })
     await check('TODAY.58', `${width} px: Month names a key date, counts the day's meetings, and the count opens Day`, async () => {
-      await s.open('/life/today/month')
+      await s.open('/life/today/month?mode=calendar')
       await pg.locator('[data-month-grid]').waitFor({ timeout: 10000 })
       if (phone) {
         await pg.locator(`[data-month-grid] [data-day="${keyDay}"] > button`).click()
@@ -1373,18 +1259,18 @@ print(json.dumps({"active": active, "cycle": cycle, "events": names}))`).split('
         await count.click()
       }
       await pg.waitForURL((u) => u.pathname === '/life/today' && u.searchParams.get('date') === meetDay, { timeout: 10000 })
-      await pg.locator('[data-day-other]').waitFor({ timeout: 10000 })
+      await pg.locator('[data-day-timeline]').waitFor({ timeout: 10000 })
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
     await check('TODAY.60', `${width} px: Year and Month in light and dark have no script error and nothing cut off`, async () => {
       for (const scheme of ['light', 'dark']) {
         await pg.emulateMedia({ colorScheme: scheme })
-        for (const [path, sel] of [['/life/today/year', '[data-year-view]'], ['/life/today/month', '[data-month-grid]']]) {
+        for (const [path, sel] of [['/life/today/year?mode=calendar', '[data-year-months]'], ['/life/today/month?mode=calendar', '[data-month-grid]']]) {
           await s.open(path)
           await pg.locator(sel).waitFor({ timeout: 10000 })
           await pg.waitForTimeout(400)
           await noSideways()
-          const cut = await pg.evaluate(() => [...document.querySelectorAll('[data-year-timeline] > div, [data-month-grid]')].filter((e) => e.scrollWidth > e.clientWidth + 1).length)
+          const cut = await pg.evaluate(() => [...document.querySelectorAll('[data-year-months], [data-month-grid]')].filter((e) => e.scrollWidth > e.clientWidth + 1).length)
           must(cut === 0, `${path} is cut off in ${scheme}`)
         }
       }
@@ -1549,40 +1435,56 @@ for (const width of WIDTHS) {
   const dash = async (p) => { await s.open(p); await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 }) }
   const made = { items: [], tasks: [], rules: [] }
   try {
-    if (!phone) await check('TODAY.66', `${width} px: the ruler is on all four views; this month and today carry the accent and are labelled with their neighbours; today opens Day, another day opens in the pane, a month tick moves the days`, async () => {
-      for (const p of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
-        await dash(p)
+    await check('TODAY.66', `${width} px: Calendar has the ruler directly above the calendar and Overview has none; it is centred on today, nothing is clipped, and its clicks work`, async () => {
+      const VIEWS = [['/life/today', '[data-day-timeline]'], ['/life/today/week', '[data-week-grid]'], ['/life/today/month', '[data-month-grid]'], ['/life/today/year', '[data-year-months]']]
+      for (const [p, cal] of VIEWS) {
+        await s.open(p + '?mode=overview')
+        await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+        must(await pg.locator('[data-ruler]').count() === 0, `Overview of ${p} has the ruler`)
+        await s.open(p + '?mode=calendar')
+        await pg.locator(cal).first().waitFor({ timeout: 15000 })
         must(await pg.locator('[data-ruler]').isVisible(), `no ruler on ${p}`)
-        must((await pg.locator('[data-ruler-month][data-current]').count()) === 1, 'the current month has no accent tick')
+        must(await pg.locator('[data-dash-card]').count() === 0, `Calendar of ${p} has cards`)
         const h = (await pg.locator('[data-ruler]').boundingBox()).height
         must(h <= 62, `the ruler is ${h} px tall`)
+        // directly above the calendar: nothing but the legend between them, and the ruler ends before the calendar starts
+        const gap = await pg.evaluate((sel) => { const r = document.querySelector('[data-ruler]').getBoundingClientRect(), c = document.querySelector(sel).getBoundingClientRect(); return c.top - r.bottom }, cal)
+        must(gap >= 0 && gap < 80, `the ruler is ${gap} px from the calendar`)
       }
-      await dash('/life/today/week')
+      await s.open('/life/today/week?mode=calendar')
+      await pg.locator('[data-ruler]').waitFor({ timeout: 10000 })
+      const box = await pg.locator('[data-ruler]').boundingBox(), mid = box.x + box.width / 2
+      const centre = async (sel) => { const b = await pg.locator(sel).boundingBox(); return b.x + b.width / 2 }
+      const monthLabel = new Date(today + 'T12:00:00Z').toLocaleString('en', { month: 'long', timeZone: 'UTC' })
+      must(Math.abs((await centre(`[data-ruler-month][data-current] [data-ruler-label]`)) - mid) <= 10, `${monthLabel} is not at the ruler's centre`)
+      must(Math.abs((await centre(`[data-ruler-day="${today}"] [data-ruler-label]`)) - mid) <= 10, "today is not at the ruler's centre")
+      must((await pg.locator('[data-ruler-month]').count()) === 11 && (await pg.locator('[data-ruler-day]').count()) === 31, 'the ruler is not 11 months and 31 days')
+      const labels = await pg.locator('[data-ruler-label]').evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { t: e.textContent, l: r.left, r: r.right } }))
+      const vw = await pg.evaluate(() => window.innerWidth)
+      for (const b of labels) must(b.l >= 0 && b.r <= vw, `"${b.t}" is clipped`)
       const dayNo = Number(today.slice(8))
-      const labelled = await pg.locator('[data-ruler-days] [data-ruler-label]').allInnerTexts()
-      must(labelled.some((t) => t.startsWith(DAY_SHORT(today)) && t.endsWith(String(dayNo))), `today's label is not "Thu 26" style: ${labelled}`)
-      const near = [-2, -1, 1, 2].map((n) => plusDays(today, n)).filter((d) => d.slice(0, 7) === today.slice(0, 7)).map((d) => String(Number(d.slice(8))))
-      for (const n of near) must(labelled.includes(n), `the neighbour ${n} is not labelled: ${labelled}`)
+      const days = await pg.locator('[data-ruler-days] [data-ruler-label]').allInnerTexts()
+      must(days.some((t) => t.startsWith(DAY_SHORT(today)) && t.endsWith(String(dayNo))), `today's label is not "Thu 26" style: ${days}`)
       const months = await pg.locator('[data-ruler-months] [data-ruler-label]').allInnerTexts()
-      must(months.length === 3 || (months.length === 2 && ['January', 'December'].includes(months.find((m) => m.length > 3))), `the months labelled are ${months}`)
-      must((await pg.locator('[data-ruler-month][data-current] [data-ruler-label]').innerText()).length > 3, 'the current month is not written in full')
-      must(Boolean(await pg.locator(`[data-ruler-day="${today}"]`).getAttribute('title')), 'hovering a tick shows no date')
-      // another day opens in the pane
-      const other = today.slice(8) === '20' ? `${today.slice(0, 8)}19` : `${today.slice(0, 8)}20`
+      if (phone) must(days.length === 1 && months.length === 1, `a phone labels ${days.length} days and ${months.length} months`)
+      else must(days.length === 5 && months.length === 3, `the labels are ${days} and ${months}`)
+      must(Boolean(await pg.locator(`[data-ruler-day="${today}"]`).getAttribute('aria-label')), 'a tick has no date')
+      // another day opens in the Drawer
+      const other = plusDays(today, 3)
       await pg.locator(`[data-ruler-day="${other}"]`).click()
       await pg.waitForFunction((d) => new URL(location.href).searchParams.get('open') === 'day:' + d, other, { timeout: 8000 })
       must(pathOf(pg) === '/life/today/week', 'a day took the page away')
       await pg.keyboard.press('Escape')
       await pg.waitForFunction(() => !new URL(location.href).searchParams.get('open'), null, { timeout: 8000 })
-      // a month tick moves the day strip, in place
-      const nextKey = today.slice(5, 7) === '12' ? `${Number(today.slice(0, 4)) - 0}-11` : `${today.slice(0, 5)}${String(Number(today.slice(5, 7)) + 1).padStart(2, '0')}`
+      // a month tick moves the calendar to that month
+      const nextKey = plusDays(`${today.slice(0, 7)}-01`, 32).slice(0, 7)
       await pg.locator(`[data-ruler-month="${nextKey}"]`).click()
-      must((await pg.locator('[data-ruler-days] [data-ruler-day]').first().getAttribute('data-ruler-day')).startsWith(nextKey), 'the day strip did not move to ' + nextKey)
+      await pg.waitForFunction((k) => (new URL(location.href).searchParams.get('date') || '').startsWith(k), nextKey, { timeout: 8000 })
       must(pathOf(pg) === '/life/today/week', 'a month tick took the page away')
-      // today's label opens Day
-      await pg.locator(`[data-ruler-month="${today.slice(0, 7)}"]`).click()
+      // today opens Day
       await pg.locator(`[data-ruler-day="${today}"]`).click()
       await pg.waitForFunction(() => location.pathname === '/life/today', null, { timeout: 8000 })
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
     })
 
     await check('TODAY.67', `${width} px: Week: a goal row opens the goal in the pane and the dashboard stays on screen`, async () => {
@@ -1674,7 +1576,7 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
       must(pathOf(pg) === '/life/today/week', 'the count took the page away')
     })
 
-    await check('TODAY.70', `${width} px: Day, Week, Month and Year switch in place, each with four cards; Open full page in the pane goes to the record's page`, async () => {
+    await check('TODAY.70', `${width} px: Day, Week, Month and Year switch in place; Overview has four cards and two panels; Open full page in the pane goes to the record's page`, async () => {
       await dash('/life/today')
       for (const [tab, want, key] of [['week', '/life/today/week', 'score'], ['month', '/life/today/month', 'plan'], ['year', '/life/today/year', 'year-goals'], ['day', '/life/today', 'top']]) {
         await pg.locator(`[data-place-tabs] [data-tab="${tab}"]`).first().click()
@@ -1682,7 +1584,8 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
         await pg.locator(`[data-dashboard][data-view="${tab}"] [data-card="${key}"]`).waitFor({ timeout: 15000 })
         must((await pg.locator('[data-dash-card]').count()) === 4, `${tab} has ${await pg.locator('[data-dash-card]').count()} cards`)
         must((await pg.locator('[data-dash-panel]').count()) === 2, `${tab} has ${await pg.locator('[data-dash-panel]').count()} panels`)
-        must(await pg.locator('[data-ruler]').isVisible(), `${tab} has no ruler`)
+        must(await pg.locator('[data-ruler], [data-day-timeline], [data-week-grid], [data-month-grid], [data-year-months]').count() === 0, `${tab} Overview has part of a calendar`)
+        for (const gone of ['schedule', 'coming', 'key-dates']) must(await pg.locator(`[data-panel="${gone}"]`).count() === 0, `${tab} has the ${gone} panel`)
       }
       const goal = bench(`print(frappe.db.get_value("Life Goal", {"space": "${SPACE}", "is_archived": 0}, "name"))`).split('\n').pop()
       await dash(`/life/today/week?open=goal:${goal}`)
@@ -1690,17 +1593,128 @@ print(json.dumps({"rules": rules, "past": past}))`).split('\n').pop())
       await pg.waitForFunction((g) => location.pathname === '/life/goals/' + g, goal, { timeout: 10000 })
     })
 
-    await check('TODAY.72', `${width} px, light and dark: every view has no script error and nothing cut off`, async () => {
+    await check('TODAY.72', `${width} px, light and dark: every view, in Overview and in Calendar, has no script error and nothing cut off`, async () => {
       for (const scheme of ['light', 'dark']) {
         await pg.emulateMedia({ colorScheme: scheme })
         for (const p of ['/life/today', '/life/today/week', '/life/today/month', '/life/today/year']) {
           await dash(p)
           await pg.waitForTimeout(300)
           await noSideways()
+          await s.open(p + '?mode=calendar')
+          await pg.locator('[data-ruler]').waitFor({ timeout: 15000 })
+          await pg.waitForTimeout(300)
+          await noSideways()
         }
       }
       await pg.emulateMedia({ colorScheme: 'light' })
       must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    // issue 132: Today has two modes
+    const VIEWS132 = [['day', '/life/today'], ['week', '/life/today/week'], ['month', '/life/today/month'], ['year', '/life/today/year']]
+    await check('TODAY.77', `${width} px: each of Day, Week, Month and Year has Overview · Calendar; switching keeps the period and sets ?mode=, a reload keeps it, and Today opens in the last mode used${phone ? '; on a phone the switch is full width under the tabs' : ''}`, async () => {
+      const there = (mode) => pg.waitForFunction((m) => new URL(location.href).searchParams.get('mode') === m, mode, { timeout: 8000 })
+      for (const [view, path] of VIEWS132) {
+        await s.open(path + '?mode=calendar')
+        await pg.locator('[data-mode-switch]').waitFor({ timeout: 15000 })
+        must((await pg.locator('[data-mode-option]').allInnerTexts()).join('|') === 'Overview|Calendar', `${view} has no Overview · Calendar`)
+        if (phone) {
+          const sw = await pg.locator('[data-mode-switch]').boundingBox(), tabs = await pg.locator('[data-place-tabs]').boundingBox()
+          must(sw.width >= 390 - 40 && sw.y >= tabs.y + tabs.height - 2, `the switch is ${Math.round(sw.width)} px wide at y ${Math.round(sw.y)}, the tabs end at ${Math.round(tabs.y + tabs.height)}`)
+        }
+      }
+      // the period is kept: the week after this one, Calendar to Overview and back
+      const next = plusDays(today, 7)
+      await s.open(`/life/today/week?mode=calendar&date=${next}`)
+      await pg.locator('[data-week-grid]').waitFor({ timeout: 15000 })
+      const title = await pg.locator('[data-page-title]').innerText()
+      await pg.locator('[data-mode-option="overview"]').click()
+      await there('overview')
+      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+      must(new URL(pg.url()).searchParams.get('date') === next && (await pg.locator('[data-page-title]').innerText()) === title, 'switching to Overview changed the week')
+      await pg.reload({ waitUntil: 'networkidle' })
+      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+      must(new URL(pg.url()).searchParams.get('mode') === 'overview', 'a reload lost the mode')
+      // Today opens later in the last mode used (a user default, not browser storage)
+      await pg.goto(new URL('/life/today?area=', pg.url()).href, { waitUntil: 'networkidle' })
+      await pg.locator('[data-dash-card]').first().waitFor({ timeout: 15000 })
+      must(await pg.locator('[data-ruler]').count() === 0, 'Today did not open in the last mode used (Overview)')
+      await pg.locator('[data-mode-option="calendar"]').click()
+      await there('calendar')
+      await pg.locator('[data-ruler]').waitFor({ timeout: 15000 })
+      await pg.goto(new URL('/life/today?area=', pg.url()).href, { waitUntil: 'networkidle' })
+      await pg.locator('[data-ruler]').waitFor({ timeout: 15000 })
+      must(await pg.locator('[data-dash-card]').count() === 0, 'Today did not open in Calendar after it was chosen')
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check('TODAY.78', `${width} px: Overview has the four cards and two panels of its view and no calendar or ruler; Calendar has the ruler directly above the calendar and no cards`, async () => {
+      const PANELS = { day: ['top', 'needs'], week: ['goals', 'waiting'], month: ['weeks', 'goals-due'], year: ['goals', 'cycles'] }
+      const CAL = { day: '[data-day-timeline]', week: '[data-week-grid]', month: '[data-month-grid]', year: '[data-year-months]' }
+      for (const [view, path] of VIEWS132) {
+        await dash(path + '?mode=overview')
+        must((await pg.locator('[data-dash-card]').count()) === 4, `${view} Overview has ${await pg.locator('[data-dash-card]').count()} cards`)
+        const keys = await pg.locator('[data-dash-panel]').evaluateAll((els) => els.map((e) => e.getAttribute('data-panel')))
+        must(JSON.stringify(keys) === JSON.stringify(PANELS[view]), `${view} Overview panels are ${keys}`)
+        must(await pg.locator(`[data-ruler], ${CAL[view]}`).count() === 0, `${view} Overview has a calendar or the ruler`)
+        const text = await pg.locator('[data-main]').innerText()
+        for (const gone of ['Schedule', 'Coming up', 'Key dates']) must(!text.includes(gone), `${view} Overview still has ${gone}`)
+        await s.open(path + '?mode=calendar')
+        await pg.locator(CAL[view]).first().waitFor({ timeout: 15000 })
+        must(await pg.locator('[data-dash-card], [data-dash-panel]').count() === 0, `${view} Calendar has cards or panels`)
+        const ruler = await pg.locator('[data-ruler]').boundingBox(), cal = await pg.locator(CAL[view]).first().boundingBox()
+        must(ruler.y < cal.y && cal.y - (ruler.y + ruler.height) < 80, `${view}: the ruler is not directly above the calendar`)
+      }
+      must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+    })
+
+    await check('TODAY.79', `${width} px: Day Calendar lists an all-day event, a timed event, a task planned at 09:30 and a task due today in that order with the now line in place, each once`, async () => {
+      const t = { allDay: `I132 all day ${width} ${stamp}`, timed: `I132 timed ${width} ${stamp}`, planned: `I132 planned ${width} ${stamp}`, due: `I132 due ${width} ${stamp}` }
+      const names = JSON.parse(bench(`import json
+from frappe.utils import add_days, today
+sp = "${SPACE}"
+mk = lambda s, a, b, all_day: frappe.get_doc({"doctype": "Event", "subject": s, "starts_on": a, "ends_on": b, "all_day": all_day, "event_type": "Public", "life_space": sp, "pulled_from_google_calendar": all_day}).insert(ignore_permissions=True).name
+ev = [mk("${t.allDay}", today() + " 00:00:00", add_days(today(), 1) + " 00:00:00", 1), mk("${t.timed}", today() + " 08:00:00", today() + " 08:30:00", 0)]
+tasks = [frappe.get_doc({"doctype": "Life Task", "space": sp, "title": "${t.planned}", "status": "Open", "scheduled_at": today() + " 09:30:00", "duration_min": 30}).insert(ignore_permissions=True).name,
+  frappe.get_doc({"doctype": "Life Task", "space": sp, "title": "${t.due}", "status": "Open", "due_date": today()}).insert(ignore_permissions=True).name]
+print(json.dumps({"events": ev, "tasks": tasks}))`).split('\n').pop())
+      try {
+        await s.open('/life/today?mode=calendar')
+        await pg.waitForFunction((x) => document.querySelector('[data-day-timeline]')?.innerText.includes(x), t.due, { timeout: 15000 })
+        const rows = await pg.locator('[data-day-timeline] [data-tl-row]').evaluateAll((els) => els.map((e) => ({ kind: e.dataset.tlKind, text: e.innerText.replace(/\s+/g, ' ').trim() })))
+        const at = (x) => rows.findIndex((r) => r.text.includes(x))
+        must([t.allDay, t.timed, t.planned, t.due].every((x) => rows.filter((r) => r.text.includes(x)).length === 1), 'an item is missing or listed twice: ' + JSON.stringify(rows))
+        must(at(t.allDay) < at(t.timed) && at(t.timed) < at(t.planned) && at(t.planned) < at(t.due), 'the order is wrong: ' + JSON.stringify(rows.map((r) => r.text)))
+        const now = rows.filter((r) => r.kind === 'now')
+        must(now.length === 1 && at(t.allDay) < rows.indexOf(now[0]) && rows.indexOf(now[0]) < at(t.due), 'the now line is not among the timed items: ' + JSON.stringify(rows))
+        // in time order: the now line sits after what has begun and before what has not
+        const hm = (r) => /(\d\d:\d\d)/.exec(r.text)?.[1] || ''
+        for (const r of rows.filter((x) => x.kind === 'timed')) must((hm(r) <= hm(now[0])) === (rows.indexOf(r) < rows.indexOf(now[0])), `"${r.text}" is on the wrong side of the now line`)
+        await noSideways()
+        must(!errors.length, 'script errors: ' + errors.slice(0, 3).join(' | '))
+      } finally {
+        bench(`for n in ${JSON.stringify(names.events)}: frappe.delete_doc("Event", n, force=1, ignore_permissions=True)
+for n in ${JSON.stringify(names.tasks)}: frappe.delete_doc("Life Task", n, force=1, ignore_permissions=True)`)
+      }
+    })
+
+    await check('TODAY.80', `${width} px: Week Overview's Waiting panel lists the waiting items and a row opens in the Drawer`, async () => {
+      const name = bench(`from frappe.utils import add_days, today
+print(frappe.get_doc({"doctype": "Life Task", "space": "${SPACE}", "title": "I132 waiting ${width} ${stamp}", "status": "Waiting", "waiting_on": "Ekta I132", "check_by": add_days(today(), -1)}).insert(ignore_permissions=True).name)`).split('\n').pop()
+      try {
+        await dash('/life/today/week?mode=overview')
+        const row = pg.locator('[data-panel="waiting"] [data-dash-row]', { hasText: `I132 waiting ${width}` })
+        await row.first().waitFor({ timeout: 15000 })
+        must((await row.first().innerText()).includes('Ekta I132') && (await row.first().innerText()).includes('late'), 'the row does not name who and say late: ' + await row.first().innerText())
+        const listed = (await s.api('dashboard.list', { kind: 'waiting', view: 'week', space: SPACE })).rows.some((r) => r.ref === 'task:' + name)
+        must(listed, "the Waiting list does not hold the panel's item")
+        await row.first().locator('button').first().click()
+        await pg.waitForFunction((n) => new URL(location.href).searchParams.get('open') === 'task:' + n, name, { timeout: 8000 })
+        must(pathOf(pg) === '/life/today/week', 'the row took the page away')
+        await pg.keyboard.press('Escape')
+      } finally {
+        bench(`frappe.delete_doc("Life Task", "${name}", force=1, ignore_permissions=True)`)
+      }
     })
   } finally {
     bench(`for n in ${JSON.stringify(made.items)}:
