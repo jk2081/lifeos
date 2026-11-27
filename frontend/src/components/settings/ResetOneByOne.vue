@@ -18,7 +18,7 @@
       </div>
       <p v-if="!phone" class="text-sm text-ink-gray-6">Do asks for a date. Waiting asks for whom. Someday moves it to the Someday list with its creation date kept; it comes back for review in {{ months }} months. Deleted items stay in the trash for 30 days.</p>
     </template>
-    <Empty v-else-if="loaded" title="Nothing left to decide." hint="Every open task and open-ended goal has been looked at in this session." />
+    <EmptyState v-else-if="loaded" line="Nothing left to decide. Every open task and open-ended goal has been looked at in this session." />
     <Dialog v-model:open="ask.open" :title="ask.kind === 'do' ? 'When will you do it?' : 'Waiting on whom?'" size="sm"
       :actions="[{ label: 'Cancel', onClick: ({ close }) => close() }, { label: ask.kind === 'do' ? 'Set date' : 'Mark waiting', variant: 'solid', onClick: confirmAsk }]">
       <DatePicker v-if="ask.kind === 'do'" v-model="ask.date" label="Date" format="D MMM YYYY" data-obo-date />
@@ -34,7 +34,7 @@ import { settingsData } from '@/data/settings'
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { Button, DatePicker, Dialog, KeyboardShortcut, TextInput, toast } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { errorText } from '@/lib/api'
 import { store } from '@/lib/store'
 import { addDays, short } from '@/lib/dates'

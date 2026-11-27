@@ -17,7 +17,7 @@
 
     <Card v-if="rows.length" class="!p-0" data-lib-card>
       <ul class="flex flex-col">
-        <li v-for="r in rows" :key="r.ref" class="relative border-b border-outline-gray-1 last:border-b-0 hover:bg-surface-gray-1" data-lib-row :data-ref="r.ref" :data-kind="r.kind" :data-letter="r.letter">
+        <Row as="li" bare v-for="r in rows" :key="r.ref" class="hover:bg-surface-gray-1" data-lib-row :data-ref="r.ref" :data-kind="r.kind" :data-letter="r.letter">
           <button type="button"
             class="flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left md:grid md:grid-cols-[2rem_minmax(0,1fr)_minmax(0,16rem)_4.5rem] md:items-center md:gap-4 focus-visible:focus-ring" @click="open(r)">
             <div class="flex min-w-0 items-start gap-3 md:contents">
@@ -31,21 +31,23 @@
             <div class="min-w-0 truncate pl-11 text-sm text-ink-gray-7 md:pl-0 md:text-base" data-lib-where>{{ [r.area_name, r.goal_title].filter(Boolean).join(' · ') }}</div>
             <div class="whitespace-nowrap pl-11 text-sm text-ink-gray-6 md:pl-0 md:text-right" data-lib-date>{{ short(r.date) }}</div>
           </button>
-        </li>
+        </Row>
       </ul>
     </Card>
     <div v-if="data && rows.length < data.total" class="flex justify-center"><Button label="Show more" :loading="more" data-lib-more @click="loadMore" /></div>
 
     <Card v-if="loaded && !rows.length" class="py-2" data-lib-empty>
-      <Empty :title="filtered ? 'Nothing matches.' : tab === 'people' ? 'No people kept yet.' : 'Nothing kept yet.'">
-        <p class="mt-1">{{ filtered ? 'Try a different word, or clear the filters.' : 'Notes, documents, people and chats you keep, or the Brain files for you, will show up here.' }}</p>
-        <Button v-if="filtered" class="mt-3" label="Clear filters" data-lib-clear @click="clear" />
-        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-lib-capture @click="openChat()" />
-      </Empty>
+      <EmptyState :line="`${filtered ? 'Nothing matches.' : tab === 'people' ? 'No people kept yet.' : 'Nothing kept yet.'} ${filtered ? 'Try a different word, or clear the filters.' : 'Notes, documents, people and chats you keep, or the Brain files for you, will show up here.'}`">
+        <template #action>
+          <Button v-if="filtered" size="sm" variant="subtle" label="Clear filters" data-empty-action data-lib-clear @click="clear" />
+          <Button v-else-if="writable" size="sm" variant="subtle" icon-left="lucide-message-square" label="Chat" data-empty-action data-lib-capture @click="openChat()" />
+        </template>
+      </EmptyState>
     </Card>
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import { openChat } from '@/lib/ask'
 // Library > Everything and Library > People (issue 23): notes, documents, people and chats in one list, newest first. Each row has a
 // kind letter (N, P, D, C), a title, a line about it, its area and goal, and a date. The search box reads titles and bodies;
@@ -54,7 +56,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, TextInput } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import { tryCall } from '@/lib/api'
 import { libraryData } from '@/data/library'

@@ -12,7 +12,7 @@
 
     <Card v-if="rows.length" class="!p-0" data-people-card>
       <ul class="flex flex-col">
-        <li v-for="r in rows" :key="r.name" class="relative border-b border-outline-gray-1 last:border-b-0 hover:bg-surface-gray-1" data-people-row :data-name="r.name" :data-kind="r.kind">
+        <Row as="li" bare v-for="r in rows" :key="r.name" class="hover:bg-surface-gray-1" data-people-row :data-name="r.name" :data-kind="r.kind">
           <button type="button" class="flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-left md:grid md:grid-cols-[2rem_minmax(0,1fr)_minmax(0,9rem)_minmax(0,16rem)] md:items-center md:gap-4 focus-visible:focus-ring"
             @click="openRef(`person:${r.name}`)">
             <div class="flex min-w-0 items-start gap-3 md:contents">
@@ -27,21 +27,23 @@
               <template v-if="r.last">{{ short(r.last.date) }} · {{ r.last.title }}</template><template v-else>Not mentioned yet</template>
             </div>
           </button>
-        </li>
+        </Row>
       </ul>
     </Card>
     <div v-if="data && rows.length < data.total" class="flex justify-center"><Button label="Show more" :loading="more" data-people-more @click="loadMore" /></div>
 
     <Card v-if="loaded && !rows.length" class="py-2" data-people-empty>
-      <Empty :title="filtered ? 'Nothing matches.' : 'No people or organisations yet.'">
-        <p class="mt-1">{{ filtered ? 'Try a different word, or clear the filters.' : 'People and organisations you capture, or the Brain finds in what you keep, will show up here.' }}</p>
-        <Button v-if="filtered" class="mt-3" label="Clear filters" data-people-clear @click="clear" />
-        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-people-capture @click="openChat()" />
-      </Empty>
+      <EmptyState :line="`${filtered ? 'Nothing matches.' : 'No people or organisations yet.'} ${filtered ? 'Try a different word, or clear the filters.' : 'People and organisations you capture, or the Brain finds in what you keep, will show up here.'}`">
+        <template #action>
+          <Button v-if="filtered" size="sm" variant="subtle" label="Clear filters" data-empty-action data-people-clear @click="clear" />
+          <Button v-else-if="writable" size="sm" variant="subtle" icon-left="lucide-message-square" label="Chat" data-empty-action data-people-capture @click="openChat()" />
+        </template>
+      </EmptyState>
     </Card>
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import { openChat } from '@/lib/ask'
 // Library > People (issue 25): one row per person or organisation with its kind, a line about them, area and the newest thing
 // that mentions them. Kind, Area and the search narrow the list (kind, area and q live in the address). A row opens the person's page.
@@ -49,7 +51,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, TextInput } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import { tryCall } from '@/lib/api'
 import { libraryData } from '@/data/library'

@@ -92,11 +92,8 @@
       </List>
     </Card>
     <Card v-if="!grouped && loaded && !rows.length && !(mode === 'custom' && !activeN)" data-lv-empty>
-      <Empty v-if="activeN" :title="`No ${noun} match these filters.`">
-        {{ activeText }}.
-        <div class="mt-2.5"><Button label="Clear filters" @click="clearFilters" /></div>
-      </Empty>
-      <Empty v-else :title="emptyTitle || `No ${noun} yet.`" :hint="emptyHint" />
+      <EmptyState v-if="activeN" :line="`No ${noun} match these filters. ${activeText}.`" :action="{ label: 'Clear filters', click: clearFilters }" />
+      <EmptyState v-else :line="`${emptyTitle || `No ${noun} yet.`}${emptyHint ? ' ' + emptyHint : ''}`" />
     </Card>
     <div v-if="!loaded" class="flex flex-col gap-3 py-2" aria-busy="true"><Skeleton v-for="i in 5" :key="i" class="h-9 w-full rounded-4" /></div>
     <div v-if="!grouped && rows.length < total"><Button :loading="loading" :label="`Show more (${total - rows.length} left)`" data-more @click="load(true)" /></div>
@@ -117,7 +114,7 @@ import { Badge, BottomSheet, Button, Checkbox, Select, Skeleton, TabButtons } fr
 import { List, ListCell, ListGroup, ListHeader, ListHeaderCell, ListHeaderCellSort, ListRow } from 'frappe-ui/list'
 import PageHead from './PageHead.vue'
 import TabBar from './TabBar.vue'
-import Empty from './Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Card from './ui/Card.vue'
 import LifeFilter from '@/framework/LifeFilter.vue'
 import LifeQuickFilter from '@/framework/LifeQuickFilter.vue'

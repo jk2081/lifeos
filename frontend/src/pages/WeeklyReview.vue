@@ -10,22 +10,23 @@
   </div>
   <Dialog v-model:open="pastOpen" title="Past reviews" size="lg">
     <div data-past-list>
-      <div v-for="p in past" :key="p.name" class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-outline-gray-1 py-2 last:border-b-0" data-past-review :data-kind="p.kind">
+      <Row bare v-for="p in past" :key="p.name" class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2" data-past-review :data-kind="p.kind">
         <Badge :theme="p.kind === 'Weekly' ? 'gray' : p.kind === 'Monthly' ? 'blue' : 'green'" :label="p.kind" data-past-kind />
         <span class="min-w-0 flex-1 break-words text-base text-ink-gray-9">{{ p.title }}</span>
         <span class="text-sm tabular-nums text-ink-gray-6">{{ p.locked_on ? long(p.locked_on.slice(0, 10), true) : '' }}</span>
-      </div>
-      <Empty v-if="!past.length" title="No reviews yet." hint="Reviews you lock are listed here, with their kind." />
+      </Row>
+      <EmptyState v-if="!past.length" line="No reviews yet. Reviews you lock are listed here, with their kind." />
     </div>
   </Dialog>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 // Review (issues 14 and 47): opens whichever review is due, the weekly one first and then the monthly; the 12-week review stands
 // in for the weekly one in its week. A strip names what is due, and Past reviews lists every kind together with its kind.
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dialog, Skeleton } from 'frappe-ui'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import ReviewPage from '@/components/review/ReviewPage.vue'
 import { tryCall } from '@/lib/api'
 import { reviewData } from '@/data/review'

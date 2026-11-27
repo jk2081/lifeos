@@ -47,7 +47,7 @@
         <a v-if="p.route && p.exists" href="#" class="text-ink-blue-8 underline" @click.prevent="openRoute(p.route)">Open</a>
       </div>
     </Card>
-    <Card v-if="!shown.length"><EmptyState :line="`${emptyTitle} ${emptyHint}`" /></Card>
+    <Card v-if="!shown.length"><EmptyState :line="`${emptyTitle}${emptyHint ? ' ' + emptyHint : ''}`" /></Card>
   </div>
 
   <Dialog v-model:open="editOpen" title="Edit proposal" size="xl"

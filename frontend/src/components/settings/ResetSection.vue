@@ -22,7 +22,7 @@
           <SectionHead class="max-md:hidden">Suggested batches <span class="ml-1 font-normal text-ink-gray-6">{{ shown.length }} batch{{ shown.length === 1 ? '' : 'es' }} · {{ shown.reduce((n, b) => n + b.count, 0) }} items</span></SectionHead>
           <div class="flex flex-col gap-3">
             <BatchCard v-for="b in shown" :key="b.key" :batch="b" :writable="writable" :phone="phone" :busy="busy === b.key" @apply="askApply" @review="review" @skip="skipped.push(b.key)" />
-            <Card v-if="!shown.length"><Empty title="No batches to suggest." hint="Nothing is duplicated, old or waiting in a pile. Use One by one for the rest." /></Card>
+            <Card v-if="!shown.length"><EmptyState line="No batches to suggest. Nothing is duplicated, old or waiting in a pile. Use One by one for the rest." /></Card>
             <Button v-if="!aiAsked && aiReady" class="self-start" icon-left="lucide-sparkles" label="Suggest more with AI" :loading="aiLoading" data-reset-ai @click="loadAI" />
           </div>
         </section>
@@ -54,7 +54,7 @@ import TabBar from '@/components/TabBar.vue'
 import Card from '@/components/ui/Card.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import BatchCard from '@/components/settings/ResetBatchCard.vue'
 import Inventory from '@/components/settings/ResetInventory.vue'
 import OneByOne from '@/components/settings/ResetOneByOne.vue'

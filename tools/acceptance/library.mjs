@@ -1308,6 +1308,26 @@ subjects.link("${SPACE}", "Life Inbox Item", it, "Life Person", "${seeded.org}")
           await pg.evaluate(() => localStorage.setItem('lifeos-space', 'Private'))
         }
       })
+      await check('LIBRARY.55', `${width} px: on an empty space every Library list shows [data-empty] with one line and at most one action`, async () => {
+        bench(`if not frappe.db.exists("Life Space", "zz-pages-empty"):
+    frappe.get_doc({"doctype": "Life Space", "space_name": "zz-pages-empty", "owner_user": "owner@lifeos.test", "members": [{"user": "owner@lifeos.test", "access": "Write"}]}).insert(ignore_permissions=True)`)
+        try {
+          await pg.evaluate(() => localStorage.setItem('lifeos-space', 'zz-pages-empty'))
+          for (const tab of ['', '/pages', '/people', '/files']) {
+            await u.open('/life/library' + tab)
+            await pg.locator('[data-empty]').first().waitFor({ timeout: 15000 })
+            const empties = pg.locator('[data-main] [data-empty]')
+            must((await empties.count()) >= 1, `/library${tab}: no empty state`)
+            for (let i = 0; i < await empties.count(); i++) {
+              must((await empties.nth(i).innerText()).length > 10, `/library${tab}: an empty list has no line`)
+              must((await empties.nth(i).locator('[data-empty-action]').count()) <= 1, `/library${tab}: an empty list has two actions`)
+            }
+            must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `/library${tab} scrolls sideways`)
+          }
+        } finally {
+          await pg.evaluate(() => localStorage.setItem('lifeos-space', 'Private'))
+        }
+      })
       await u.ctx.close()
     }
   } finally {

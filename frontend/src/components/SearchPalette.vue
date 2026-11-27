@@ -33,8 +33,8 @@
       </CommandPaletteItem>
     </CommandPaletteList>
     <CommandPaletteEmpty>
-      <Empty v-if="searched" :title="`Nothing found for “${searched}”.`" :hint="`Try fewer words${archived ? '' : ', or include archived records'}.`" />
-      <Empty v-else title="Search everything you can see." hint="Type a word from a title, a note or a transcript." />
+      <EmptyState v-if="searched" :line="`Nothing found for “${searched}”. Try fewer words${archived ? '' : ', or include archived records'}.`" />
+      <EmptyState v-else line="Search everything you can see. Type a word from a title, a note or a transcript." />
     </CommandPaletteEmpty>
     <CommandPaletteFooter>
       <div class="flex w-full flex-wrap items-center justify-between gap-2">
@@ -58,7 +58,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Checkbox, KeyboardShortcut } from 'frappe-ui'
 import { CommandPalette, CommandPaletteEmpty, CommandPaletteFooter, CommandPaletteGroup, CommandPaletteInput, CommandPaletteItem, CommandPaletteList } from '@/experimental'
-import Empty from './Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { store } from '@/lib/store'
 import { short } from '@/lib/dates'
 import { openHit, screenHits } from '@/lib/search'

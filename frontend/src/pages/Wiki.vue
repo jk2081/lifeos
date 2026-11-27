@@ -52,22 +52,22 @@
           <div class="text-sm text-ink-gray-6">{{ r.summary }}</div></div></Row></Card></section>
       <section data-health="orphans"><SectionHead :count="health.orphans.length">Orphans: no other page links to these</SectionHead>
         <Card flush><Row v-for="p in health.orphans" :key="p.name" :pane="'note:' + p.name" :label="p.title"><div class="text-base text-ink-gray-9">{{ p.title }}</div></Row>
-          <Empty v-if="!health.orphans.length" title="No orphans." hint="Every page is linked from another one." /></Card></section>
+          <EmptyState v-if="!health.orphans.length" line="No orphans. Every page is linked from another one." /></Card></section>
       <section data-health="broken"><SectionHead :count="health.broken.length">Broken links</SectionHead>
         <Card flush><Row v-for="(b, i) in health.broken" :key="i" class="flex-wrap !items-center">
           <div class="min-w-0 flex-1"><div class="text-base text-ink-gray-9">[[{{ b.link }}]]</div><div class="text-sm text-ink-gray-6">in {{ b.page_title }}</div></div>
           <Button v-if="canWrite()" size="sm" label="Create this page" data-create-page @click="createFromLink(b.link)" />
           <Button size="sm" variant="ghost" label="Open the page" @click="openRef('note:' + b.page)" /></Row>
-          <Empty v-if="!health.broken.length" title="No broken links." hint="Every [[link]] leads to a page." /></Card></section>
+          <EmptyState v-if="!health.broken.length" line="No broken links. Every [[link]] leads to a page." /></Card></section>
       <section v-if="health.ambiguous.length" data-health="ambiguous"><SectionHead :count="health.ambiguous.length">Ambiguous links: more than one page has this title</SectionHead>
         <Card flush><Row v-for="(b, i) in health.ambiguous" :key="i" :pane="'note:' + b.page" :label="b.page_title"><div class="text-base text-ink-gray-9">[[{{ b.link }}]] <span class="text-sm text-ink-gray-6">in {{ b.page_title }}</span></div></Row></Card></section>
       <section data-health="no_sources"><SectionHead :count="health.no_sources.length">Pages without sources</SectionHead>
         <Card flush><Row v-for="p in health.no_sources" :key="p.name" :pane="'note:' + p.name" :label="p.title"><div class="text-base text-ink-gray-9">{{ p.title }}</div></Row>
-          <Empty v-if="!health.no_sources.length" title="Every page cites a source." /></Card></section>
+          <EmptyState v-if="!health.no_sources.length" line="Every page cites a source." /></Card></section>
       <section data-health="duplicates"><SectionHead :count="health.duplicates.length">Near-duplicate titles</SectionHead>
         <Card flush><Row v-for="(g, i) in health.duplicates" :key="i" class="flex-wrap !items-center"><div class="flex flex-wrap gap-2">
           <Button v-for="p in g" :key="p.name" size="sm" :label="p.title" @click="openRef('note:' + p.name)" /></div></Row>
-          <Empty v-if="!health.duplicates.length" title="No near-duplicates." hint="No two pages share a title once case and punctuation are ignored." /></Card></section>
+          <EmptyState v-if="!health.duplicates.length" line="No near-duplicates. No two pages share a title once case and punctuation are ignored." /></Card></section>
     </template>
     <div v-else class="flex flex-col gap-3"><Skeleton v-for="i in 4" :key="i" class="h-9 w-full rounded-4" /></div>
   </div>
@@ -95,7 +95,7 @@ import NewRecord from '@/components/NewRecord.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'
 import { dateTime, long, short } from '@/lib/dates'

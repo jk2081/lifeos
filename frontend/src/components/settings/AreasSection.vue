@@ -12,7 +12,7 @@
       </div>
     </Card>
     <Card flush data-areas-card>
-      <div v-for="a in life" :key="a.name" class="border-b border-outline-gray-1 py-3 last:border-b-0" :data-life-area="a.area_name" :data-on="a.is_on ? 1 : 0">
+      <Row bare v-for="a in life" :key="a.name" class="py-3" :data-life-area="a.area_name" :data-on="a.is_on ? 1 : 0">
         <div class="flex items-center gap-3">
           <div class="flex flex-none items-center max-md:order-last">
             <Switch :model-value="!!a.is_on" :disabled="!isAdmin || busy === a.name" :aria-label="`${a.area_name} ${a.is_on ? 'on' : 'off'}`" :data-area-switch="a.area_name"
@@ -51,7 +51,7 @@
             <Button size="sm" variant="ghost" class="-ml-2 !text-ink-blue-8" icon-left="lucide-plus" :label="`Add a part of ${a.area_name}`" :data-add-part="a.area_name" @click="add(a)" />
           </div>
         </div>
-      </div>
+      </Row>
     </Card>
     <p class="text-sm text-ink-gray-6" data-areas-footer>Switching an area off hides it and its goals; nothing is deleted. The Brain stops filing into it and sends those items to Needs you.</p>
     <p v-if="!isAdmin" class="text-sm text-ink-gray-6" data-areas-read-only>Only the owner can change areas.</p>
@@ -95,6 +95,7 @@
   </Dialog>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import { settingsData } from '@/data/settings'
 import { computed, reactive, ref } from 'vue'
 import { Badge, Button, Dialog, ErrorMessage, Select, Switch, TextInput, toast } from 'frappe-ui'

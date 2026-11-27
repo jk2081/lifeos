@@ -15,7 +15,7 @@
       <template v-else>
         <CalendarStrip :strip="d.strip" :open="meetingName" @open="openMeeting" @list="listOpen = true" />
         <Card v-if="d.unused_pins?.length" class="flex flex-col gap-2" data-unused-pins>
-          <h3 class="text-base-medium text-ink-gray-9">Pinned, not opened for a month</h3>
+          <SectionHead>Pinned, not opened for a month</SectionHead>
           <div v-for="p in d.unused_pins" :key="p.doctype + p.name" class="flex items-center justify-between gap-2" data-unused-pin :data-name="p.name">
             <span class="min-w-0 truncate text-base text-ink-gray-8">{{ p.title }}</span>
             <Button size="sm" :label="`Unpin ${p.title}`" data-unpin @click="dropPin(p)" />
@@ -23,21 +23,21 @@
         </Card>
         <div class="grid grid-cols-[minmax(0,1fr)] items-start gap-4 md:grid-cols-[minmax(280px,1fr)_2fr]">
           <Card class="flex flex-col gap-1" data-came-in>
-            <h3 class="mb-1 text-base-medium text-ink-gray-9">Came in · {{ d.came_in.total }}</h3>
-            <div v-for="c in d.came_in.rows" :key="c.key" class="flex items-center justify-between border-b border-outline-gray-1 py-1.5 text-base last:border-b-0" :data-came-in-row="c.key">
+            <SectionHead>Came in · {{ d.came_in.total }}</SectionHead>
+            <Row bare v-for="c in d.came_in.rows" :key="c.key" class="flex items-center justify-between py-1.5 text-base" :data-came-in-row="c.key">
               <span class="text-ink-gray-8">{{ c.label }}</span>
               <Button v-if="c.drawer" variant="ghost" size="sm" class="!text-ink-blue-8 tabular-nums" :label="String(c.n)" :aria-label="`${c.n} ${c.label}`"
                 data-meetings-door :data-count-n="c.n" @click="listOpen = true" />
               <CountLink v-else class="font-semibold" :count="{ n: c.n, to: c.to, label: c.label }" :data-door="'review-came-' + c.key" />
-            </div>
+            </Row>
           </Card>
           <Card class="flex min-w-0 flex-col" data-revelations>
             <div class="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 class="text-base-medium text-ink-gray-9" data-revelations-count :data-n="d.revelations.length">Revelations · {{ revelationsLabel }}</h3>
+              <SectionHead data-revelations-count :data-n="d.revelations.length">Revelations · {{ revelationsLabel }}</SectionHead>
               <span class="text-sm text-ink-gray-6">What the assistant noticed. Act or dismiss each.</span>
             </div>
             <FindingRow v-for="f in d.revelations" :key="f.name" :f="f" @act="(i) => act(f, i)" />
-            <p v-if="!d.revelations.length" class="py-3 text-sm text-ink-gray-6" data-revelations-empty>Nothing left to look at.</p>
+            <EmptyState v-if="!d.revelations.length" data-revelations-empty>Nothing left to look at.</EmptyState>
             <p v-if="!d.ai" class="mt-2 text-sm text-ink-gray-6" data-revelations-no-key>The assistant is not set up, so revelations are limited.</p>
           </Card>
         </div>
@@ -46,18 +46,21 @@
     <!-- a meeting opens in the Drawer (MeetingPane); the list of them is a dialog -->
     <Dialog v-model:open="listOpen" title="Meetings that matter" size="md" data-dialog="meetings">
       <p class="mb-2 text-sm text-ink-gray-6">In this review's period.</p>
-      <div v-for="m in list" :key="m.name" class="flex items-center gap-2 border-b border-outline-gray-1 py-2 last:border-b-0" data-meetings-row>
+      <Row bare v-for="m in list" :key="m.name" class="flex items-center gap-2 py-2" data-meetings-row>
         <span class="size-2 flex-none rounded-full" :class="m.mark === 'linked' ? 'bg-surface-green-7' : 'border-2 border-outline-amber-6'" aria-hidden="true" />
         <div class="min-w-0 flex-1"><div class="truncate text-base text-ink-gray-9">{{ m.title }}</div>
           <div class="text-sm text-ink-gray-6">{{ dateTime(m.start) }} · {{ m.attendees.join(', ') }}</div></div>
         <Button size="sm" label="Open" @click="listOpen = false; openMeeting(m.name)" />
-      </div>
-      <p v-if="!list.length" class="text-sm text-ink-gray-6">No meetings that matter in this period.</p>
+      </Row>
+      <EmptyState v-if="!list.length">No meetings that matter in this period.</EmptyState>
     </Dialog>
     <ReviewFooter label="Next: Tasks" :line="footerLine" @next="emit('go', 'tasks')" />
   </div>
 </template>
 <script setup>
+import EmptyState from '@/components/ui/EmptyState.vue'
+import Row from '@/components/ui/Row.vue'
+import SectionHead from '@/components/ui/SectionHead.vue'
 // Tab 1, Library (boards 28 and 29): the calendar strip, what came in by source, and the revelations.
 // Library never blocks: its footer button is always "Next: Tasks".
 import { computed, onMounted, ref, watch } from 'vue'

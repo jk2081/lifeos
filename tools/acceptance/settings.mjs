@@ -1524,3 +1524,34 @@ frappe.db.delete("Life Connection", {"space": "${SPACE}", "system": "${KEY}"})`)
     await s.ctx.close()
   }
 }
+
+// An empty space: every Settings list says what will appear, with at most one action.
+for (const width of WIDTHS) {
+  const s = await session('owner@lifeos.test', width)
+  const pg = s.page
+  try {
+    bench(`if not frappe.db.exists("Life Space", "zz-settings-empty"):
+    frappe.get_doc({"doctype": "Life Space", "space_name": "zz-settings-empty", "owner_user": "owner@lifeos.test", "members": [{"user": "owner@lifeos.test", "access": "Write"}]}).insert(ignore_permissions=True)`)
+    await check('SETTINGS.48', `${width} px: on an empty space every Settings list shows [data-empty] with one line and at most one action`, async () => {
+      await pg.evaluate(() => localStorage.setItem('lifeos-space', 'zz-settings-empty'))
+      let seen = 0
+      for (const p of ['/life/settings?tab=members', '/life/settings?tab=areas', '/life/settings?tab=tags', '/life/settings?tab=habits', '/life/settings?tab=rules']) {
+        await s.open(p)
+        await pg.waitForTimeout(1500)
+        const empties = pg.locator('[data-main] [data-empty]')
+        seen += await empties.count()
+        for (let i = 0; i < await empties.count(); i++) {
+          must((await empties.nth(i).innerText()).length > 10, `${p}: an empty list has no line`)
+          must((await empties.nth(i).locator('[data-empty-action]').count()) <= 1, `${p}: an empty list has two actions`)
+        }
+        must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), `${p} scrolls sideways`)
+      }
+      must(seen >= 1, `only ${seen} empty states on the Settings lists of an empty space`)
+    })
+  } finally {
+    await pg.evaluate(() => localStorage.setItem('lifeos-space', 'Private')).catch(() => {})
+    bench(`from lifeos.tools import devtools
+devtools.purge_space("zz-settings-empty", drop=True)`)
+    await s.ctx.close()
+  }
+}

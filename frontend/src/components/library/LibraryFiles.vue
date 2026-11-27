@@ -11,7 +11,7 @@
 
     <Card v-if="rows.length" class="!p-0" data-files-card>
       <ul class="flex flex-col">
-        <li v-for="r in rows" :key="r.key" class="flex flex-col gap-2 border-b border-outline-gray-1 px-4 py-3 last:border-b-0 md:grid md:grid-cols-[2rem_minmax(0,1fr)_minmax(0,18rem)_auto] md:items-start md:gap-4" data-file-row :data-name="r.name" :data-type="r.type">
+        <Row as="li" bare v-for="r in rows" :key="r.key" class="flex flex-col gap-2 px-4 py-3 md:grid md:grid-cols-[2rem_minmax(0,1fr)_minmax(0,18rem)_auto] md:items-start md:gap-4" data-file-row :data-name="r.name" :data-type="r.type">
           <div class="flex min-w-0 items-start gap-3 md:contents">
             <span class="flex size-8 flex-none items-center justify-center rounded-md text-sm-medium" :class="LETTER_CLASS[r.type]" aria-hidden="true">{{ r.letter }}</span>
             <div class="min-w-0 flex-1">
@@ -40,21 +40,23 @@
             <a class="inline-flex h-7 items-center rounded border border-outline-gray-2 px-2 text-sm text-ink-gray-8 hover:bg-surface-gray-2 focus-visible:focus-ring" :href="r.url" target="_blank" rel="noopener" data-file-open>Open</a>
             <a class="inline-flex h-7 items-center rounded border border-outline-gray-2 px-2 text-sm text-ink-gray-8 hover:bg-surface-gray-2 focus-visible:focus-ring" :href="r.url" :download="r.name" data-file-download>Download</a>
           </div>
-        </li>
+        </Row>
       </ul>
     </Card>
     <div v-if="data && rows.length < data.total" class="flex justify-center"><Button label="Show more" :loading="more" data-files-more @click="loadMore" /></div>
 
     <Card v-if="loaded && !rows.length" class="py-2" data-files-empty>
-      <Empty :title="filtered ? 'No file matches.' : 'No files kept yet.'">
-        <p class="mt-1">{{ filtered ? 'Try a different name, or clear the filters.' : 'Files you capture or the Brain files for you will show up here, each once.' }}</p>
-        <Button v-if="filtered" class="mt-3" label="Clear filters" data-files-clear @click="clear" />
-        <Button v-else-if="writable" class="mt-3" variant="solid" icon-left="lucide-message-square" label="Chat" data-files-capture @click="openChat()" />
-      </Empty>
+      <EmptyState :line="`${filtered ? 'No file matches.' : 'No files kept yet.'} ${filtered ? 'Try a different name, or clear the filters.' : 'Files you capture or the Brain files for you will show up here, each once.'}`">
+        <template #action>
+          <Button v-if="filtered" size="sm" variant="subtle" label="Clear filters" data-empty-action data-files-clear @click="clear" />
+          <Button v-else-if="writable" size="sm" variant="subtle" icon-left="lucide-message-square" label="Chat" data-empty-action data-files-capture @click="openChat()" />
+        </template>
+      </EmptyState>
     </Card>
   </div>
 </template>
 <script setup>
+import Row from '@/components/ui/Row.vue'
 import { openChat } from '@/lib/ask'
 // Library > Files (issue 24): every stored file once (issue 7 keeps one copy per space), with its type, size, date, earlier
 // versions and the records that use it. Open shows it in the browser where it can; Download saves it. Filters live in the address.
@@ -62,7 +64,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Select, TextInput } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageHead from '@/components/PageHead.vue'
 import { tryCall } from '@/lib/api'
 import { libraryData } from '@/data/library'

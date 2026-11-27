@@ -2,7 +2,7 @@
   <div class="flex min-h-0 flex-1 flex-col" data-review :data-review-kind="kind" :data-review-tab="tab" :data-review-name="r.head?.name || ''">
     <ReviewHeader v-if="r.head" :tab="tab" :tabs="steps" :title="weekly ? 'Weekly review' : r.head.title" @go="go" @pause="pause" />
     <div v-if="r.notDue" class="page-body" data-review-not-due>
-      <Empty :title="`No ${kind === 'monthly' ? 'monthly' : '12-week'} review is due.`" :hint="kind === 'monthly' ? 'It opens on your review day after a month ends, and stays until you lock it.' : 'It opens on the last day of a 12 Week Year, and stays until you lock it.'" />
+      <EmptyState :line="`No ${kind === 'monthly' ? 'monthly' : '12-week'} review is due. ${kind === 'monthly' ? 'It opens on your review day after a month ends, and stays until you lock it.' : 'It opens on the last day of a 12 Week Year, and stays until you lock it.'}`" />
     </div>
     <div v-else-if="!r.head" class="page-body"><Skeleton class="h-8 w-80" /><Skeleton class="h-64 w-full" /></div>
     <ReviewDone v-else-if="r.head.status === 'Locked'" :weekly="weekly" />
@@ -16,7 +16,7 @@
 import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Skeleton, toast } from 'frappe-ui'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import ReviewHeader from '@/components/review/ReviewHeader.vue'
 import ReviewDone from '@/components/review/ReviewDone.vue'
 import TabLibrary from '@/components/review/WeeklyLibrary.vue'

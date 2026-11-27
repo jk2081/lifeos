@@ -367,6 +367,7 @@ Unit tests: `test_library.py`; `test_people.py`
 - `LIBRARY.45` Your notes takes text, and a brief rewrite afterwards leaves it unchanged
 - `LIBRARY.46` the page, the list and a pin in light and dark: no script error, nothing cut off; on a phone the pins are at the top of Library
 - `LIBRARY.47` on an empty space Pages says what will appear and offers + Capture
+- `LIBRARY.55` on an empty space every Library list (Everything, Pages, People, Files) shows `[data-empty]` with one line and at most one action
 - `LIBRARY.54` the person picker is readable in light and dark, and nothing scrolls sideways
 - `LIBRARY.53` Hand off's Who uses the same person picker
 - `LIBRARY.52` a new name offers "Add '…' as a person"; choosing it makes the person and selects them
@@ -408,6 +409,7 @@ Unit tests: `test_review.py`
 - `REVIEW.25` a meeting in the weekly review's week at a glance opens the event in the Drawer and the review stays
 - `REVIEW.26` in the weekly review a goal opens as the goal's Drawer layer (`?open=` names it, 480 px, full screen with Back at 390 px), Back closes it, the review stays; no SideSheet is ever in the page
 - `REVIEW.27` the same for a meeting (`?open=meeting:<event>`)
+- `REVIEW.29` on an empty space the weekly and monthly reviews show `[data-empty]` on every empty list, each with at most one action
 - `REVIEW.28` the meetings list and Other goals open as dialogs, and a meeting opened from the list is a Drawer layer
 
 ### Settings (`tools/acceptance/settings.mjs`, 42 checks)
@@ -460,6 +462,7 @@ Unit tests: `test_settings.py`; `test_permissions.py` (who sees and changes what
 - `SETTINGS.42` Settings > Advanced > AI offers the provider; Another service shows the address, key, models and the data line
 - `SETTINGS.43` Test connection says Working with the fake AI, and the provider's own reason when it fails on credit
 - `SETTINGS.44` Settings > Advanced > Updates shows the installed commit; with no heartbeat it shows the set-up command and no Update now; with a heartbeat Update now queues a request
+- `SETTINGS.48` on an empty space the Settings lists show `[data-empty]` with one line and at most one action
 - `SETTINGS.47` Updates shows Ready to update with a tick or cross for each check and Update now off while one has a cross; a Needs restart request shows in the warning colour with its command and Restart now (390 px: no sideways scroll)
 - `SETTINGS.45` naming the agent in Settings shows the name in Needs you; `pull` returns `assistant_name`; the failed job shows in red with its error
 - `SETTINGS.46` an act shows under the new name in Activity; the safety switch holds the owner's request in Needs you as "You asked"

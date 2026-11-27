@@ -49,7 +49,7 @@
       </section>
       <section>
         <SectionHead>Past updates</SectionHead>
-        <Empty v-if="!s.history.length" title="No updates yet" hint="When you update from here, each one is listed with its result and log." data-updates-empty />
+        <EmptyState v-if="!s.history.length" data-updates-empty line="No updates yet. When you update from here, each one is listed with its result and log." />
         <Card v-else flush data-updates-history>
           <div v-for="u in s.history" :key="u.name" class="border-b border-outline-gray-1 px-3 py-2.5 last:border-b-0" :data-update="u.name">
             <div class="flex items-center gap-2">
@@ -73,7 +73,7 @@ import { Alert, Badge, Button, Skeleton } from 'frappe-ui'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import SettingRow from './SettingRow.vue'
 import { settingsData } from '@/data/settings'
 import { tryCall } from '@/lib/api'

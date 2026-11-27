@@ -24,7 +24,7 @@
       <p v-if="current === 'decisions'" class="text-sm text-ink-gray-6">Nothing here becomes a record until you accept it. The original is always kept.</p>
     </div>
   </template>
-  <div v-else-if="missing && page" class="page-body"><Card><Empty title="This item was not found." hint="It may be in another space, or it was removed." /></Card></div>
+  <div v-else-if="missing && page" class="page-body"><Card><EmptyState line="This item was not found. It may be in another space, or it was removed." /></Card></div>
 </template>
 <script setup>
 import { computed, onMounted, ref } from 'vue'
@@ -32,7 +32,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Avatar, Button } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import TabBar from '@/components/TabBar.vue'
 import ItemBody from '@/components/item/ItemBody.vue'
 import { itemTabs } from '@/lib/itemTabs'

@@ -1695,3 +1695,11 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **Back on a phone** also shows on the first layer of a review's goal or meeting (before, only lists), so a phone gets Back at the top left as the issue asks.
 - **A check changed:** REVIEW.9 held the open goal sheet to "no page scroll at 1440 x 900"; the docked Drawer narrows the page, so it now holds the layer to "no sideways scroll".
 
+
+## Issue 145 (cleanup: shared parts on Library, the reviews, Settings and pages)
+
+- **`Empty.vue` is deleted.** Every list that said "nothing here" now uses `ui/EmptyState` (one line, at most one action), including the few outside the screens the issue names (`ListView`, `Backlinks`, `SearchPalette`, `InboxReview`, `Wiki`, `Graph`, `Sources`, `Share`, `ProposalCards`, the Reset and Updates sections), so the old part could go. The old title and hint are one line now ("No pages yet. A page appears here for each ..."). Library's lists keep their `data-*-clear` and `data-*-capture` attributes on the one action (passed through the `action` slot).
+- **Step titles and page titles stay headings.** The large `text-xl-semibold` titles of each review step, the heading of a note (`NoteEditor`) and of a Settings section are the title of the screen, not a section heading; `SectionHead` is only the small heading above a section, so only those are swapped.
+- **The pile cards of the periodic decide step lose their coloured dot.** They are `Stat`s now (label and number); the dot was the only thing `Stat` has no place for. The Done, Carry and Drop buttons below keep their colour.
+- **The wiki, page and note screens only swapped parts** (`LibraryPages`, `PagePage`, `NoteEditor`, a person's page): rows, headings and empty lines; nothing moved. A later feature merges pages and notes.
+- **The empty-space checks use a throw-away space** (`zz-pages-empty`, `zz-review-empty`, `zz-settings-empty`). Settings' agents list is across spaces, so on an empty space it lists the site's agents; SETTINGS.48 therefore visits Members, Areas, Tags, Habits and Rules and needs at least one empty state in all.

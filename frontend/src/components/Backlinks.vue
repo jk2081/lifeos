@@ -8,7 +8,7 @@
           <div class="text-sm text-ink-gray-6">{{ r.kind }} · {{ r.why }}</div>
         </div>
       </Row>
-      <Empty v-if="tab && !list.length" title="Nothing links here yet." hint="Records that link to this one with [[Title]], or are filed under it, show here." />
+      <EmptyState v-if="tab && !list.length" line="Nothing links here yet. Records that link to this one with [[Title]], or are filed under it, show here." />
     </Card>
   </section>
 </template>
@@ -20,7 +20,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import Card from './ui/Card.vue'
 import Row from './ui/Row.vue'
 import SectionHead from './ui/SectionHead.vue'
-import Empty from './Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { loadBacklinks } from '@/lib/links'
 import { openRoute, refOfRoute } from '@/lib/pane'
 

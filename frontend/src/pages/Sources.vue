@@ -61,7 +61,7 @@
             <div class="truncate text-sm text-ink-gray-6">{{ [short(r.received), r.area_name].filter(Boolean).join(' · ') }}</div></div>
         </div>
       </div>
-      <Card v-else-if="loaded"><Empty :title="EMPTY[list?.tab] || 'No sources yet.'" hint="Photos and scans show here as thumbnails." /></Card>
+      <Card v-else-if="loaded"><EmptyState :line="`${EMPTY[list?.tab] || 'No sources yet.'} Photos and scans show here as thumbnails.`" /></Card>
     </template>
   </ListView>
 
@@ -86,7 +86,7 @@ import { Badge, Button, Checkbox, Dialog, FormControl, Select } from 'frappe-ui'
 import { WRITTEN_BY } from '@/lib/nav'
 import ListView from '@/components/ListView.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import CountLink from '@/components/ui/CountLink.vue'
 import { tryCall } from '@/lib/api'
 import { canWrite, store } from '@/lib/store'

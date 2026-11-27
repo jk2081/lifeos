@@ -231,11 +231,11 @@
           <RuleDialog v-model:open="addingRule" @saved="loadRules" />
           <SectionHead>What agents know about you</SectionHead>
           <p class="text-sm text-ink-gray-6">The first thing an agent reads. Life OS writes it from your areas, goals, the 12 Week Year and your rules, and rebuilds it when they change. You cannot edit it here; change what it is made from.</p>
-          <Card data-agent-card :data-words="agentCard?.words"><Md v-if="agentCard" :text="agentCard.card" /><Empty v-else title="Nothing to show yet." hint="It appears as soon as your areas and goals are set." /></Card>
+          <Card data-agent-card :data-words="agentCard?.words"><Md v-if="agentCard" :text="agentCard.card" /><EmptyState v-else line="Nothing to show yet. It appears as soon as your areas and goals are set." /></Card>
           <SectionHead>Note rules</SectionHead>
           <p class="text-sm text-ink-gray-6">The assistant reads this page before it writes its notes. People edit it; agents cannot. It is also pinned at the top of the assistant's notes in the Library.</p>
           <NoteEditor v-if="rulesDoc" :key="rulesDoc.name" :note="rulesDoc" data-settings-rules />
-          <Card v-else><Empty title="No rules page yet in this space." hint="It is made the first time the assistant reads the rules." /></Card>
+          <Card v-else><EmptyState line="No rules page yet in this space. It is made the first time the assistant reads the rules." /></Card>
           <SectionHead>Sensitive items</SectionHead>
           <p class="text-sm text-ink-gray-6">A sensitive item is a document from the Vault, or a capture or note marked sensitive. {{ manySpaces ? 'Each space decides who may read them. ' : '' }}Anyone who can edit an item may mark it; only the space's owner may unmark it.</p>
           <Card flush data-sensitive>
@@ -280,8 +280,7 @@
             <div v-if="mSpace" class="flex min-w-0 flex-1 flex-col gap-3">
               <Card flush data-members>
                 <MemberRow v-for="m in shownMembers" :key="m.user" :member="m" @access="(v) => setMember(mSpace.name, m.user, v)" @remove="askRemove(mSpace, m)" />
-                <Empty v-if="!shownMembers.length" :title="memberKind === 'agents' ? `No agents in ${mSpace.name}.` : memberKind === 'people' ? `No people in ${mSpace.name}.` : 'No members.'"
-                  hint="Add someone with Add member." />
+                <EmptyState v-if="!shownMembers.length" :line="`${memberKind === 'agents' ? `No agents in ${mSpace.name}.` : memberKind === 'people' ? `No people in ${mSpace.name}.` : 'No members.'} Add someone with Add member.`" />
               </Card>
             </div>
           </div>
@@ -315,8 +314,7 @@
                 @update:model-value="(v) => setAgent(r.space, a.user, v, r.access)" />
             </div>
           </Card>
-          <Card v-if="!d.agents.length"><Empty title="No agents yet." data-agents-empty
-            hint="An agent is a Frappe user that only an assistant signs in as. Create the user in Frappe, then add it to a space with Add member under Members: Life OS offers it agent access there." /></Card>
+          <Card v-if="!d.agents.length"><EmptyState data-agents-empty line="No agents yet. An agent is a Frappe user that only an assistant signs in as. Create the user in Frappe, then add it to a space with Add member under Members: Life OS offers it agent access there." /></Card>
           <p class="text-sm text-ink-gray-6"><template v-if="manySpaces">Whether agents may open sensitive items is set for each space under
             <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'members', view: 'spaces' } }">Spaces</RouterLink>.
             </template><template v-else>Whether agents may open sensitive items is set under <RouterLink class="text-ink-blue-8 hover:underline" :to="{ query: { tab: 'rules' } }">Rules</RouterLink>. </template>Keys for agents are made in Frappe, never on this screen.</p>
@@ -387,7 +385,7 @@
               <Row><span class="flex-1 text-base text-ink-gray-9" data-cost-total>{{ d.ai.spend.text }}</span></Row>
               <Row v-for="p in d.ai.by_purpose" :key="p.purpose" :data-cost-feature="p.purpose"><span class="flex-1 text-base text-ink-gray-8">{{ p.purpose }}</span>
                 <span class="text-sm tabular-nums text-ink-gray-6">{{ (p.input_tokens + p.output_tokens).toLocaleString() }} tokens · ${{ p.cost.toFixed(2) }}</span></Row>
-              <Empty v-if="!d.ai.by_purpose.length" title="No AI calls this month." hint="Each call to the model, and what it cost, will be listed here." data-cost-empty />
+              <EmptyState v-if="!d.ai.by_purpose.length" data-cost-empty line="No AI calls this month. Each call to the model, and what it cost, will be listed here." />
             </Card>
           </section>
           <section>
@@ -466,7 +464,7 @@
                   <div class="text-sm text-ink-gray-6">{{ r.archived_on ? 'Archived ' + short(r.archived_on, true) : 'Archived before the date was kept' }} · {{ r.count }} {{ r.count === 1 ? l.countNoun[0] : l.countNoun[1] }}</div></div>
                 <Button v-if="canEdit" label="Restore" :data-restore="r.name" @click="askRestore(l, r)" />
               </div>
-              <Empty v-if="!archived(l).length" :title="`No archived ${l.noun}.`" />
+              <EmptyState v-if="!archived(l).length" :line="`No archived ${l.noun}.`" />
             </Card>
           </section>
           </template>
@@ -518,7 +516,7 @@ import PageHead from '@/components/PageHead.vue'
 import Card from '@/components/ui/Card.vue'
 import Row from '@/components/ui/Row.vue'
 import SectionHead from '@/components/ui/SectionHead.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import Md from '@/components/Md.vue'
 import UpdatesSection from '@/components/settings/UpdatesSection.vue'
 import CalendarSection from '@/components/settings/CalendarSection.vue'

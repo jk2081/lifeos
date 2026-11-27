@@ -4,7 +4,7 @@
     <Dropdown :options="menu"><Button icon="lucide-ellipsis" label="More" data-note-menu /></Dropdown>
   </PageHead>
   <div class="page-body" data-dev-editor>
-    <Card v-if="!store.isAdmin"><Empty title="Only the owner can open this page." hint="It is for checking the editor during development." /></Card>
+    <Card v-if="!store.isAdmin"><EmptyState line="Only the owner can open this page. It is for checking the editor during development." /></Card>
     <template v-else>
       <LiveEditor v-model="text" :space="store.space" :links="links" :raw="raw" label="Sample note" />
       <div class="text-sm text-ink-gray-6" data-dev-length>{{ text.length }} characters</div>
@@ -19,7 +19,7 @@ import { Button, Dropdown } from 'frappe-ui'
 import PageHead from '@/components/PageHead.vue'
 import LiveEditor from '@/components/LiveEditor.vue'
 import Card from '@/components/ui/Card.vue'
-import Empty from '@/components/Empty.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import { store } from '@/lib/store'
 
 const raw = ref(false)
