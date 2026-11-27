@@ -6,7 +6,7 @@
           <h2 class="text-xl-semibold text-ink-gray-9">Your commitments</h2>
           <p class="text-sm text-ink-gray-6">What left your plate this week, then the tasks nobody has touched for a while.</p>
         </div>
-        <Stat v-if="s" class="w-64 max-md:w-full" label="Left to decide" :value="s.left" :sub="`${s.decided} decided in this review`" data-left-to-clear :data-n="s.left" />
+        <Stat v-if="s" class="w-64 max-md:w-full !border-0 !bg-transparent !p-0" label="Left to decide" :value="s.left" :sub="`${s.decided} decided in this review`" data-left-to-clear :data-n="s.left" />
       </div>
       <section v-if="p" class="flex flex-col gap-2" data-left-your-plate>
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">

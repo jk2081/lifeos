@@ -584,7 +584,7 @@ frappe.clear_cache()`)
 
     await check('TODAY.19', `${width} px: Today, Brain, Goals and Library on a fresh site each show their empty state with one action`, async () => {
       reset()
-      for (const [p, sel] of [['/life/today?mode=calendar', '[data-timeline-empty]'], ['/life/brain', '[data-needs-empty]'], ['/life/goals', '[data-goals-empty]'], ['/life/library', '[data-lib-empty]']]) {
+      for (const [p, sel] of [['/life/today?mode=calendar', '[data-timeline-empty]'], ['/life/brain', '[data-needs-empty]'], ['/life/goals', '[data-goals-empty]'], ['/life/library', '[data-lv-empty]']]) {
         await one.open(p)
         // the guide opens on a new site: close it to see the screen under it
         const g = pg.locator('[data-guide-close]')

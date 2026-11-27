@@ -7,16 +7,16 @@
           <p class="text-sm text-ink-gray-6">One next action per goal, already suggested. Star exactly three. Click a row to change anything.</p>
         </div>
         <div v-if="t" class="flex gap-6 max-md:w-full max-md:flex-col max-md:gap-3">
-          <Stat class="w-52 max-md:w-full" :label="t.score ? `Week ${t.score.week} score` : 'Week score'" :value="t.score ? Math.round(t.score.percent) + '%' : '—'" data-goals-score>
+          <Stat class="w-52 max-md:w-full !border-0 !bg-transparent !p-0" :label="t.score ? `Week ${t.score.week} score` : 'Week score'" :value="t.score ? Math.round(t.score.percent) + '%' : '—'" data-goals-score>
+            <span class="flex items-baseline gap-2">{{ t.score ? Math.round(t.score.percent) + '%' : '—' }}<span class="text-sm font-normal text-ink-gray-7">target {{ t.target }}%</span></span>
             <template #sub>
-              <span class="block">target {{ t.target }}%</span>
-              <Progress class="mt-1" size="sm" :value="t.score ? Math.min(100, t.score.percent) : 0" :aria-label="`Week score against a target of ${t.target}%`" />
+              <Progress size="sm" :value="t.score ? Math.min(100, t.score.percent) : 0" :aria-label="`Week score against a target of ${t.target}%`" />
             </template>
           </Stat>
-          <Stat class="w-56 max-md:w-full" label="Goal work planned" :value="hours(t.capacity.planned_minutes)" :warn="!!t.capacity.over" data-goals-capacity :data-over="t.capacity.over ? 1 : 0">
+          <Stat class="w-56 max-md:w-full !border-0 !bg-transparent !p-0" label="Goal work planned" :value="hours(t.capacity.planned_minutes)" :warn="!!t.capacity.over" data-goals-capacity :data-over="t.capacity.over ? 1 : 0">
+            <span class="flex items-baseline gap-2">{{ hours(t.capacity.planned_minutes) }}<span class="text-sm font-normal" :class="t.capacity.over ? 'text-ink-amber-9' : 'text-ink-gray-7'" data-goals-capacity-line>{{ t.capacity.over ? `planned, ${hours(t.capacity.free_minutes)} free` : `of ${hours(t.capacity.free_minutes)} free` }}</span></span>
             <template #sub>
-              <span class="block" :class="t.capacity.over && 'text-ink-amber-9'" data-goals-capacity-line>{{ t.capacity.over ? `planned, ${hours(t.capacity.free_minutes)} free` : `of ${hours(t.capacity.free_minutes)} free` }}</span>
-              <Progress class="mt-1" size="sm" :class="t.capacity.over && 'capacity-over'" :value="t.capacity.free_minutes ? Math.min(100, (100 * t.capacity.planned_minutes) / t.capacity.free_minutes) : 100"
+              <Progress size="sm" :class="t.capacity.over && 'capacity-over'" :value="t.capacity.free_minutes ? Math.min(100, (100 * t.capacity.planned_minutes) / t.capacity.free_minutes) : 100"
                 :aria-label="`${hours(t.capacity.planned_minutes)} planned of ${hours(t.capacity.free_minutes)} free`" />
             </template>
           </Stat>
@@ -26,7 +26,7 @@
       <div v-else class="grid items-start gap-4 lg:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)]">
         <Card class="flex min-w-0 flex-col" flush data-goals-list>
           <div class="flex flex-wrap items-baseline justify-between gap-2 pb-1 pt-3">
-            <SectionHead>{{ t.cycle ? 'This 12 Week Year' : 'Goals this week' }} · {{ t.rows.length }} goal{{ t.rows.length === 1 ? '' : 's' }}</SectionHead>
+            <SectionHead class="!mb-0">{{ t.cycle ? 'This 12 Week Year' : 'Goals this week' }} · {{ t.rows.length }} goal{{ t.rows.length === 1 ? '' : 's' }}</SectionHead>
             <span class="text-sm text-ink-gray-6" data-stars-used>{{ t.stars.length }} of {{ t.needed }} stars used</span>
           </div>
           <!-- the rows scroll inside the card only when there are more than fit (the page itself never scrolls) -->
@@ -66,7 +66,7 @@
         </Card>
         <Card class="flex min-w-0 flex-col max-lg:hidden" flush data-goals-calendar>
           <div class="flex items-baseline justify-between py-2.5">
-            <SectionHead>Next week</SectionHead>
+            <SectionHead class="!mb-0">Next week</SectionHead>
             <RouterLink class="text-base text-ink-blue-8 hover:underline focus-visible:focus-ring" :to="{ path: '/today/week', query: { view: 'calendar', tab: undefined } }"
               data-open-full-week>Open the full week</RouterLink>
           </div>

@@ -46,12 +46,17 @@ class HttpClient:
 		else:
 			headers["Content-Type"] = "application/json"
 			req = urllib.request.Request(url, data=json.dumps(args).encode(), headers=headers, method="POST")
-		try:
-			with urllib.request.urlopen(req, timeout=60) as res:
-				return json.loads(res.read().decode()).get("message")
-		except urllib.error.HTTPError as e:
-			body = e.read().decode(errors="replace")[:400]
-			raise RuntimeError(f"{method} failed with HTTP {e.code}: {body}") from None
+		# a database deadlock (the server's workers and this call touching the same rows) is the server's to retry; the answer is "try again"
+		for attempt in range(4):
+			try:
+				with urllib.request.urlopen(req, timeout=60) as res:
+					return json.loads(res.read().decode()).get("message")
+			except urllib.error.HTTPError as e:
+				body = e.read().decode(errors="replace")[:400]
+				if "QueryDeadlockError" in body and attempt < 3:
+					time.sleep(1 + attempt)
+					continue
+				raise RuntimeError(f"{method} failed with HTTP {e.code}: {body}") from None
 
 	def download(self, file_url):
 		"""Fetch a private file with the agent's own credentials. Returns its bytes."""
