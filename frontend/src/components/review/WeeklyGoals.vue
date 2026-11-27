@@ -7,13 +7,13 @@
           <p class="text-sm text-ink-gray-6">One next action per goal, already suggested. Star exactly three. Click a row to change anything.</p>
         </div>
         <div v-if="t" class="flex gap-6 max-md:w-full max-md:flex-col max-md:gap-3">
-          <Stat class="w-52 max-md:w-full" :label="t.score ? `Week ${t.score.week} score` : 'Week score'" :value="t.score ? Math.round(t.score.percent) + '%' : '—'" data-goals-score>
+          <Stat class="w-52 max-md:w-full !border-0 !bg-transparent !p-0" :label="t.score ? `Week ${t.score.week} score` : 'Week score'" :value="t.score ? Math.round(t.score.percent) + '%' : '—'" data-goals-score>
             <template #sub>
               <span class="block">target {{ t.target }}%</span>
               <Progress class="mt-1" size="sm" :value="t.score ? Math.min(100, t.score.percent) : 0" :aria-label="`Week score against a target of ${t.target}%`" />
             </template>
           </Stat>
-          <Stat class="w-56 max-md:w-full" label="Goal work planned" :value="hours(t.capacity.planned_minutes)" :warn="!!t.capacity.over" data-goals-capacity :data-over="t.capacity.over ? 1 : 0">
+          <Stat class="w-56 max-md:w-full !border-0 !bg-transparent !p-0" label="Goal work planned" :value="hours(t.capacity.planned_minutes)" :warn="!!t.capacity.over" data-goals-capacity :data-over="t.capacity.over ? 1 : 0">
             <template #sub>
               <span class="block" :class="t.capacity.over && 'text-ink-amber-9'" data-goals-capacity-line>{{ t.capacity.over ? `planned, ${hours(t.capacity.free_minutes)} free` : `of ${hours(t.capacity.free_minutes)} free` }}</span>
               <Progress class="mt-1" size="sm" :class="t.capacity.over && 'capacity-over'" :value="t.capacity.free_minutes ? Math.min(100, (100 * t.capacity.planned_minutes) / t.capacity.free_minutes) : 100"
