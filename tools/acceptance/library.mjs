@@ -242,9 +242,13 @@ for (const width of WIDTHS) {
     must(new URL(other.page.url()).searchParams.get('priority') === 'II', `a second browser does not show the saved filter: ${new URL(other.page.url()).search}`)
     await other.ctx.close()
     // a link with a query wins over what was saved, and then becomes the saved state
-    await s.open('/life')
-    const loops = num(await pg.locator('[data-count-key="next:overdue"]:visible').first().innerText())
-    await pg.locator('[data-count-key="next:overdue"]:visible').first().click()
+    // Today no longer carries an Overdue door (issue 132), so the door is read from the server and its link opened as a link
+    const door = JSON.parse(bench(`import json
+frappe.set_user("owner@lifeos.test")
+from lifeos.review import counts
+print(json.dumps(counts.overdue_tasks("${SPACE}")))`).split('\n').pop())
+    const loops = door.n
+    await s.open('/life/goals/tasks?' + new URLSearchParams(door.to.query))
     await pg.waitForLoadState('networkidle')
     await settle()
     must(!param('priority'), 'the Overdue link kept the saved filter')
