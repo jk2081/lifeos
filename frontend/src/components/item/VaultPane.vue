@@ -74,25 +74,14 @@ function fill(d) {
 }
 // The record comes from the data layer (in memory only: a vault document is never kept on the device) and follows the server.
 // The server adds only what a record does not hold: the holder's and area's names, the expiry badge and the file's name and size.
-const { rec, save: saveRecord } = useRecord('Life Vault Document', () => (props.name === 'new' ? '' : props.name))
-let extra = {}
-function show() {
-  const d = rec.doc
-  if (!d) return
+function show(d, extra) {
   const merged = { ...extra, ...d, also_in: (d.also_in || []).map((r) => r.area), notes_md: d.notes_md || '' }
   if (JSON.stringify(form) !== snapshot) { doc.value = { ...merged }; return } // the person is typing: their edits stay
   fill(merged)
 }
-watch(() => rec.doc, show, { deep: true })
-async function loadExtra() {
-  try {
-    extra = await itemData.vault.get({ document: props.name })
-    show()
-  } catch (e) {
-    if (!rec.doc) emit('missing')
-  }
-}
-watch(() => rec.error, (e) => { if (e && !rec.doc) emit('missing') })
+const { rec, save: saveRecord, loadExtra, draw } = useRecord('Life Vault Document', () => (props.name === 'new' ? '' : props.name), {
+  fetchExtra: () => itemData.vault.get({ document: props.name }), show, onMissing: () => emit('missing'),
+})
 async function save() {
   try {
     const isNew = !doc.value.name
@@ -147,7 +136,7 @@ onMounted(async () => {
   await loadLookups()
   people.value = [...(lookups.people || [])]
   if (props.name === 'new') return fill({ doc_type: 'Other', remind_days_before: 60 })
-  show() // from the cache, before any request finishes
+  draw() // from the cache, before any request finishes
   loadExtra()
 })
 </script>

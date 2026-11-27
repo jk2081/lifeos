@@ -19,7 +19,7 @@
   <div><div class="mb-1.5 text-sm text-ink-gray-6">Filed under</div>
     <div class="flex flex-wrap items-center gap-2">
       <div class="contents" data-task-area><Pick :model-value="task.area" :options="areaOptions()" placeholder="area" :disabled="!writable" @update:model-value="(v) => save({ area: v })" /></div>
-      <AreaGuess :task="task" :readonly="!writable" full @confirmed="(t) => { extra = { ...extra, ...t }; rec.reload(); show(); emit('changed', task) }" />
+      <AreaGuess :task="task" :readonly="!writable" full @confirmed="(t) => { setExtra(t); rec.reload(); emit('changed', task) }" />
       <Badge v-for="a in task.also_in" :key="a" size="lg">also in {{ areaName(a) }}
         <template v-if="writable" #suffix><Button class="!size-4" size="sm" variant="ghost" icon="lucide-x" :label="'Remove also in ' + areaName(a)" @click="save({ also_in: task.also_in.filter((x) => x !== a) })" /></template></Badge>
       <Pick :model-value="null" :options="areaOptions().filter((o) => o.value !== task.area && !task.also_in.includes(o.value))" placeholder="also in"
@@ -109,12 +109,8 @@ function pickWaiting(v) {
 
 // The record comes from the data layer: from its cache at once, then the current version, and again when it is saved elsewhere.
 // The server adds only what a record does not hold (the names of its area, goal and source, and its links): `tasks.get`.
-const { rec, save: saveRecord } = useRecord('Life Task', () => props.name)
-let extra = {}
 const DATES = ['creation', 'completed_on', 'last_touched_on']
-function show() {
-  const d = rec.doc
-  if (!d) return
+function show(d, extra) {
   const typing = task.value?.notes_md
   const next = { ...extra, ...d, also_in: (d.also_in || []).map((r) => r.area), links: extra.links || [] }
   for (const k of DATES) next[k] = d[k] ? String(d[k]).slice(0, 19) : null
@@ -122,16 +118,9 @@ function show() {
   task.value = next
   tell()
 }
-watch(() => rec.doc, show, { deep: true })
-async function loadExtra() {
-  try {
-    extra = await itemData.tasks.get({ task: props.name })
-    show()
-  } catch (e) {
-    if (!rec.doc) emit('missing')
-  }
-}
-watch(() => rec.error, (e) => { if (e && !rec.doc) emit('missing') })
+const { rec, save: saveRecord, loadExtra, setExtra, draw } = useRecord('Life Task', () => props.name, {
+  fetchExtra: () => itemData.tasks.get({ task: props.name }), show, onMissing: () => emit('missing'),
+})
 async function load() {
   rec.reload()
   loadExtra()
@@ -174,7 +163,7 @@ onBeforeUnmount(saveNotes)
 async function save(values) {
   try {
     await saveRecord(values.also_in ? { ...values, also_in: values.also_in.map((area) => ({ area })) } : values)
-    show()
+    draw()
     loadExtra() // the names of a new area or goal
     emit('changed', task.value)
   } catch (e) {
@@ -192,10 +181,9 @@ async function setStatus(status) {
   }
   try {
     // finishing and reopening have logic (completed_on, the goal's lead action) that lives in the method; the cached record follows its answer
-    extra = await itemData.tasks.set_status({ task: props.name, status, waiting_on: task.value.waiting_on })
+    setExtra(await itemData.tasks.set_status({ task: props.name, status, waiting_on: task.value.waiting_on }))
     rec.reload()
     askWaiting.value = false
-    show()
     emit('changed', task.value)
   } catch (e) {
     toast.error(errorText(e))
@@ -229,7 +217,7 @@ async function doRemove() {
 }
 onMounted(() => {
   loadLookups()
-  show() // from the cache, before any request finishes
+  draw() // from the cache, before any request finishes
   load()
 })
 </script>
