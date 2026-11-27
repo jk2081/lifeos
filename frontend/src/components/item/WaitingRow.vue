@@ -1,5 +1,5 @@
 <template>
-  <Row :pane="r.ref" :label="r.title" class="!items-center" :class="active && '!bg-surface-gray-2'" data-list-row data-waiting-row :data-active="active || undefined" :data-ref="r.ref" :data-group="r.group" :data-task="r.task" @click.capture="$emit('open', r)">
+  <Row :pane="r.ref" :label="r.title" class="!items-center" :class="active && '!bg-surface-gray-2'" data-list-row data-waiting-row :data-active="active || undefined" :data-ref="r.ref" :data-group="r.group" :data-task="r.task" @click.capture="(e) => !e.target.closest('button, a') && $emit('open', r)">
     <Avatar :label="r.who || r.title" size="sm" theme="gray" aria-hidden="true" class="flex-none" />
     <div class="min-w-0 flex-1">
       <div class="break-words text-base text-ink-gray-9" data-waiting-title>{{ r.title }}</div>

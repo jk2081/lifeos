@@ -145,7 +145,8 @@ for (const width of WIDTHS) {
       must(!(await pane.isVisible()), 'Esc did not close the pane')
       must((await pg.evaluate(() => document.activeElement?.getAttribute('data-ref'))) === third, 'focus did not return to the row')
       await s.open('/life/brain/queue?open=inbox:' + ux.inbox)
-      must(Math.round((await pane.boundingBox()).width) === 760, 'an inbox pane is not 760 px wide')
+      const wide = Math.round((await pg.locator('[data-drawer-host]').boundingBox()).width)
+      must(wide === 760, `an inbox item's drawer is ${wide} px wide, not 760`)  // measured on the Drawer itself, as above
       await pg.locator('[data-pane-full]').click()
       await settle()
       must(new URL(pg.url()).pathname === `/life/item/${ux.inbox}` && !(await pane.isVisible()), "Open full page did not open the item page")
