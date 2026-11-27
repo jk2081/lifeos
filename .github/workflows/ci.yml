@@ -100,28 +100,17 @@ jobs:
             ~/.cache/yarn
           key: deps-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'frontend/yarn.lock', 'frontend/package.json') }}
 
+      # saved on main by cache-bench.yml; a pull request only restores
       - name: Restore the Frappe bench
         id: bench-cache
-        uses: actions/cache/restore@v4
+        uses: ./.github/actions/bench-cache
         with:
-          path: /home/runner/frappe-bench
-          key: frappe-bench-tests-v16.61.0-py3.14-${{ runner.os }}-1
+          kind: tests
 
       - name: Bench
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client libmariadb-dev tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin tesseract-ocr-ben ocrmypdf ffmpeg >/dev/null  # issue 104: the tools that read files on the server
-          npm install -g yarn >/dev/null
-          pip install -q frappe-bench
-          # the Frappe release Life OS is tested on (Flow ships from v16.60, issue 108); restored from the cache when it was made before
-          [ -d ~/frappe-bench/apps/frappe ] || bench init --skip-redis-config-generation --skip-assets --python "$(which python)" --frappe-branch v16.61.0 ~/frappe-bench
+          tools/ci-bench.sh tests
           mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'; SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
-
-      - name: Save the Frappe bench
-        if: steps.bench-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: /home/runner/frappe-bench
-          key: ${{ steps.bench-cache.outputs.cache-primary-key }}
 
       - name: Install Life OS
         working-directory: /home/runner/frappe-bench
@@ -216,33 +205,15 @@ jobs:
           done
           echo "MariaDB did not start"; exit 1
 
-      # the bench with Frappe alone (before Life OS is added) is the same on every run of one Frappe release: made once, then restored
+      # the bench with Frappe alone (before Life OS is added) is the same on every run of one Frappe release: saved on main by cache-bench.yml
       - name: Restore the Frappe bench
         id: bench-cache
-        uses: actions/cache/restore@v4
+        uses: ./.github/actions/bench-cache
         with:
-          path: /home/runner/frappe-bench
-          key: frappe-bench-v16.61.0-py3.14-${{ runner.os }}-1
+          kind: walk
 
       - name: Bench
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq mariadb-client libmariadb-dev tesseract-ocr tesseract-ocr-eng tesseract-ocr-hin tesseract-ocr-ben ocrmypdf ffmpeg >/dev/null  # issue 104: the tools that read files on the server
-          npm install -g yarn >/dev/null
-          pip install -q frappe-bench
-          pipx install semgrep >/dev/null
-          if [ ! -d "$LIFEOS_BENCH_PATH/apps/frappe" ]; then
-            # the Frappe release Life OS is tested on (Flow ships from v16.60, issue 108), with its own assets built (the desk and login pages)
-            bench init --skip-redis-config-generation --python "$(which python)" --frappe-branch v16.61.0 "$LIFEOS_BENCH_PATH"
-            # as on the Docker bench
-            cd "$LIFEOS_BENCH_PATH" && bench set-config -g developer_mode 1
-          fi
-
-      - name: Save the Frappe bench
-        if: steps.bench-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: /home/runner/frappe-bench
-          key: ${{ steps.bench-cache.outputs.cache-primary-key }}
+        run: tools/ci-bench.sh walk
 
       - name: Install Life OS and build the front end
         working-directory: /home/runner/frappe-bench

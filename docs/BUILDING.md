@@ -56,3 +56,11 @@ Title: what changes, in plain words. Body:
 - **Not in this issue.**
 
 The rules every issue follows are in `docs/ISSUE_RULES.md`; the target design is in `docs/DIRECTION.md`.
+
+## The bench cache (CI)
+
+Building Frappe's bench takes about 25 minutes, so CI restores it from a cache instead. The Frappe release is written once, in `.github/frappe-version`; the cache keys (`frappe-bench-tests-…` for the unit job, `frappe-bench-walk-…` for the walks, made by `.github/actions/bench-cache`) and the bench setup (`tools/ci-bench.sh`) both read it.
+
+- **Only a cache saved on `main` is shared with every pull request** (one saved on a branch is that branch's alone). So `cache-bench.yml` builds and saves both benches on main: on a push that changes the Frappe version, the action, `tools/ci-bench.sh` or `pyproject.toml`; every Sunday (GitHub drops a cache unused for 7 days); and by hand. It has its own concurrency group that never cancels, so a later push to main cannot stop it. `ci.yml` only restores.
+- **Every job says** `bench cache: hit (key …)` or `bench cache: miss: building (key …)` in its log and step summary; on a pull request a miss also raises a warning annotation. A miss builds the bench and carries on; it is slow, not a failure.
+- **When the Frappe version changes:** edit `.github/frappe-version` and merge. The push to main runs `cache-bench.yml` and saves the new keys. Until it finishes, pull requests miss and build. To rebuild without a change (a cache evicted), run "Cache the bench" by hand from the Actions tab on `main`. To force a fresh bench under the same version, bump the `-1` at the end of the key in `.github/actions/bench-cache/action.yml`.

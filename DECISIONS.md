@@ -1625,3 +1625,10 @@ DocTypes: 51 -> 44 (seven deleted: the journal page, check-in, check-in score, m
 - **The acceptance harness opens Today in Overview** (`session.open` adds `mode=overview` to Today paths with no `mode`), because most older checks read the cards; the checks that read a calendar say `mode=calendar`.
 - **Day's Top three is the starred tasks, not the tasks starred for this Monday.** Lock the week stores `top_three_week` as the review's period end and clears the flag at the next lock; #123's panel filtered on `top_three_week` equal to this week's Monday and so showed nothing after a real Lock (the old Today list showed them "until the next review"). Both the card and the panel now read `is_top_three` alone, as the old list did.
 
+## Issue 139 (bench cache saved on main)
+
+- Chose a separate `cache-bench.yml` (the issue's first option) over a main-only job in `ci.yml`: its own workflow has its own concurrency group, so nothing else cancels it.
+- The Frappe version is a one-line file, `.github/frappe-version`, because workflow files cannot share a variable; the composite action and `tools/ci-bench.sh` read it. The bench setup moved from two inline copies in `ci.yml` into `tools/ci-bench.sh tests|walk` so `cache-bench.yml` builds exactly what CI would.
+- The cache is now only saved by `cache-bench.yml`; a miss on a pull request builds but does not save (a branch's cache would not reach other pull requests anyway).
+- Key names changed (`frappe-bench-tests-…` / `frappe-bench-walk-…`), so the first runs after merge miss until `cache-bench.yml` has run on main; the push of this change to main triggers it (the paths include the action and the script).
+- Acceptance tests 1 to 3 need GitHub runs on main and a branch; `TOOLING.11` checks the files as written.
