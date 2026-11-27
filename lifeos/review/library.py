@@ -15,9 +15,7 @@ DAY = "%a %-d"
 
 def data(review, user):
 	space, start, end = review.doc.space, getdate(review.doc.period_start), getdate(review.doc.period_end)
-	from lifeos.ai import client
-
-	ai = client.is_set_up() and bool(frappe.db.get_value("Life Space", space, "ask_enabled"))
+	ai = _ai_set_up(space)
 	shown = findings.revelations(review)
 	rows = findings.rows(shown)
 	return {"strip": strip(space, start, end, user), "came_in": came_in(space, start, end),
@@ -92,6 +90,12 @@ def _revelation(r):
 
 # ---- a meeting opened ----
 
+def _ai_set_up(space):
+	from lifeos.ai import client
+
+	return client.is_set_up() and bool(frappe.db.get_value("Life Space", space, "ask_enabled"))
+
+
 def meeting(review, event):
 	space, start, end = review.doc.space, review.doc.period_start, review.doc.period_end
 	ev = frappe.get_doc("Event", event)
@@ -111,7 +115,7 @@ def meeting(review, event):
 		"all_day": ev.all_day, "attendees": meetings.attendees(ev), "matters": bool(ev.life_matters), "set_by": ev.life_matters_set_by,
 		"area_name": _area_of(links), "linked": recs, "followups": [_revelation(r) for r in findings.for_meeting(event)],
 		"goal": goal, "goals": goal_options(space), "prev": order[i - 1] if i > 0 else None, "next": order[i + 1] if 0 <= i < len(order) - 1 else None,
-		"done": event in (review.state.get("meetings_done") or []), "candidates": candidates(space, ev, recs)}
+		"done": event in (review.state.get("meetings_done") or []), "ai": _ai_set_up(space), "candidates": candidates(space, ev, recs)}
 
 
 def _area_of(links):

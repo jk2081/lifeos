@@ -384,7 +384,7 @@ Unit tests: `test_review.py`
 - `REVIEW.1` Archive job archives done tasks; a stale open task waits in the weekly review's list of stale tasks
 - `REVIEW.2` an inbox item's pane and full review page are tabbed (Summary, the original, Decisions, What came of it), the tab in the URL
 - `REVIEW.3` the review opens from Today's banner on Library, with its period in the header; Goals cannot open before Tasks is done
-- `REVIEW.4` a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's drawer and the Revelations list
+- `REVIEW.4` a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's layer and the Revelations list
 - `REVIEW.5` a reading confirmed from Revelations shows its value on the goal's row in Goals
 - `REVIEW.6` the Tasks tab lists each stale task once with Keep, Someday and Drop; each button does what it says; the Outbox counts match
 - `REVIEW.7` every stale task decided (the empty list says what will appear here); Next: Goals opens
@@ -406,6 +406,9 @@ Unit tests: `test_review.py`
 - `REVIEW.23` deciding each goal and locking closes the cycle with cycles.close_cycle's score and makes the next cycle with the carried goals and their lead actions
 - `REVIEW.24` Weekly review > Tasks > Waiting on others groups waiting tasks by person, oldest first; Done closes one, Move to my plate puts one on the plate, Still waiting moves check-by on 7 days
 - `REVIEW.25` a meeting in the weekly review's week at a glance opens the event in the Drawer and the review stays
+- `REVIEW.26` in the weekly review a goal opens as the goal's Drawer layer (`?open=` names it, 480 px, full screen with Back at 390 px), Back closes it, the review stays; no SideSheet is ever in the page
+- `REVIEW.27` the same for a meeting (`?open=meeting:<event>`)
+- `REVIEW.28` the meetings list and Other goals open as dialogs, and a meeting opened from the list is a Drawer layer
 
 ### Settings (`tools/acceptance/settings.mjs`, 42 checks)
 

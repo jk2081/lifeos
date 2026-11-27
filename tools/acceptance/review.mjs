@@ -63,7 +63,10 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     await pg.waitForLoadState('networkidle')
     await settle()
   }
-  const drawer = (name) => pg.locator(`[data-drawer][data-drawer-name="${name}"]`)
+  // a goal or a meeting opens as a layer of the one Drawer (issue 146)
+  const host = pg.locator('[data-drawer-host]')
+  // Back: the button on a phone, the browser's Back (Esc) where there is none
+  const back = async () => { if (phone) await host.locator('[data-pane-back]').click(); else await pg.keyboard.press('Escape'); await settle() }
   const closeDrawer = async () => { await pg.keyboard.press('Escape'); await settle() }
   // nothing scrolls the page at 1440 x 900; nothing scrolls sideways at 390
   const fits = async (where) => {
@@ -89,10 +92,10 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     return period
   })
 
-  await check('REVIEW.4', `${width} px: a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's drawer and the Revelations list`, async () => {
+  await check('REVIEW.4', `${width} px: a meeting that matters with a linked voice note; a task made from its follow-up leaves the meeting's layer and the Revelations list`, async () => {
     await s.open('/life/today/week?view=review&tab=library')
     await pg.locator(`[data-strip-meeting="${data.meeting}"]:visible`).first().click()
-    const d = drawer('meeting')
+    const d = host
     await d.locator('[data-meeting]').waitFor({ timeout: 10000 })
     must((await d.locator('[data-meeting-linked]').allInnerTexts()).some((t) => t.includes(`S8 voice after Dalmia ${W}`)), 'the voice note is not linked')
     const promise = d.locator('[data-finding][data-kind="Promise"]', { hasText: W }).first()
@@ -105,6 +108,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     const tasks = (await s.api('tasks.list', { space: SPACE, status: 'all', filters: [['title', 'like', `%send the blend sheet to Mithun ${W}%`]] })).tasks
     must(tasks.length === 1, 'the task was not made: ' + tasks.length)
     await closeDrawer()
+    await pg.locator('[data-drawer-host]').waitFor({ state: 'detached', timeout: 5000 })
     must(!(await pg.locator(`[data-revelations] [data-finding-name="${name}"]`).count()), 'the finding is still in Revelations')
     return tasks[0].title
   })
@@ -183,8 +187,8 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     // one through the drawer: a new next action, a free slot, Save
     const first = rows[0]
     await pg.locator(`[data-goal-row][data-goal="${first.goal}"] button`).first().click()
-    const d = drawer('goal')
-    await d.locator('[data-goal-drawer]').waitFor({ timeout: 10000 })
+    const d = host
+    await d.locator('[data-goal-plan]').waitFor({ timeout: 10000 })
     await d.locator('[data-goal-next] input, input[data-goal-next]').first().fill(`S8 next 0 ${W}`)
     await d.locator('[data-goal-save]').click()
     await pg.waitForLoadState('networkidle')
@@ -192,7 +196,7 @@ print(json.dumps(devtools_review.setup("${W}"), default=str))`).split('\n').pop(
     // skip one with a reason, in its drawer
     const skipped = rows[rows.length - 1]
     await pg.locator(`[data-goal-row][data-goal="${skipped.goal}"] button`).first().click()
-    await d.locator('[data-goal-drawer]').waitFor({ timeout: 10000 })
+    await d.locator('[data-goal-plan]').waitFor({ timeout: 10000 })
     await d.locator('[data-goal-skip]').click()
     must(await d.locator('[data-goal-skip-confirm]').isDisabled(), 'a skip without a reason is allowed')
     await d.locator('[data-goal-skip-reason] input, input[data-goal-skip-reason]').first().fill('Travelling all week')
@@ -243,6 +247,57 @@ print(e.name)`).split('\n').pop()
     await pg.waitForFunction((e) => new URL(location.href).searchParams.get('open') === 'event:' + e, ev, { timeout: 8000 })
     must(new URL(pg.url()).searchParams.get('view') === 'review', 'the review is gone: ' + pg.url())
   })
+  await check('REVIEW.26', `${width} px: in the weekly review a goal opens as the goal's Drawer layer (?open= names it), Back closes it, the review is still there; no SideSheet is ever in the page`, async () => {
+    await s.open('/life/today/week?view=review&tab=goals')
+    await pg.locator('[data-goals-list]').waitFor({ timeout: 15000 })
+    const row = pg.locator('[data-goal-row]').first()
+    const goal = await row.getAttribute('data-goal')
+    await row.locator('button').first().click()
+    await host.locator('[data-goal-plan]').waitFor({ timeout: 10000 })
+    must(new URL(pg.url()).searchParams.get('open') === 'goal:' + goal, 'open= is ' + new URL(pg.url()).searchParams.get('open'))
+    const w = Math.round((await host.boundingBox()).width)
+    if (phone) must(w === width, `the layer is ${w} px wide at ${width} px`)
+    else must(w === 480, `the Drawer is ${w} px wide, not 480`)
+    must(!(await pg.locator('[data-drawer], [data-drawer-name]').count()), 'a SideSheet is in the page')
+    if (phone) must((await host.locator('[data-pane-back]').boundingBox()).x < 80, 'Back is not at the top left on a phone')
+    await back()
+    await host.waitFor({ state: 'detached', timeout: 5000 })
+    must(await pg.locator('[data-goals-list]').isVisible(), 'the review is gone')
+    must(!(await pg.locator('[data-drawer]').count()), 'a SideSheet is in the page')
+  })
+
+  await check('REVIEW.27', `${width} px: in the weekly review a meeting opens as a meeting layer of the Drawer (?open=meeting:), Back closes it, the review is still there`, async () => {
+    await s.open('/life/today/week?view=review&tab=library')
+    await pg.locator(`[data-strip-meeting="${data.meeting}"]:visible`).first().click()
+    await host.locator('[data-meeting]').waitFor({ timeout: 10000 })
+    must(new URL(pg.url()).searchParams.get('open') === 'meeting:' + data.meeting, 'open= is ' + new URL(pg.url()).searchParams.get('open'))
+    const w = Math.round((await host.boundingBox()).width)
+    must(phone ? w === width : w === 480, `the layer is ${w} px wide at ${width} px`)
+    must(!(await pg.locator('[data-drawer]').count()), 'a SideSheet is in the page')
+    await back()
+    await host.waitFor({ state: 'detached', timeout: 5000 })
+    must(await pg.locator('[data-review-library]').isVisible(), 'the review is gone')
+  })
+
+  await check('REVIEW.28', `${width} px: the meetings list and Other goals open as dialogs, not as a second drawer, and a meeting opened from the list is a Drawer layer`, async () => {
+    await s.open('/life/today/week?view=review&tab=library')
+    const door = pg.locator('[data-meetings-door]').first()
+    await door.waitFor({ timeout: 15000 })
+    await door.click()
+    await pg.locator('[role="dialog"] [data-meetings-row]').first().waitFor({ timeout: 8000 })
+    must(!(await pg.locator('[data-drawer]').count()), 'a SideSheet is in the page')
+    await pg.locator('[role="dialog"] [data-meetings-row] button').first().click()
+    await host.locator('[data-meeting]').waitFor({ timeout: 10000 })
+    must(new URL(pg.url()).searchParams.get('open')?.startsWith('meeting:'), 'the meeting is not a layer')
+    await back()
+    await s.open('/life/today/week?view=review&tab=goals')
+    const any = pg.locator('[data-goals-plan-any]')
+    await any.waitFor({ timeout: 15000 })
+    await any.click()
+    await pg.locator('[role="dialog"] [data-other-goal]').first().waitFor({ timeout: 8000 })
+    must(!(await pg.locator('[data-drawer]').count()), 'a SideSheet is in the page')
+  })
+
   await check('REVIEW.9', `${width} px: Pause and reopen: everything is where it was left; no tab scrolls the page at 1440 x 900 or sideways at 390`, async () => {
     if (!phone) await pg.setViewportSize({ width: 1440, height: 900 })
     await pg.locator('[data-review-pause]:visible').first().dispatchEvent('click')
@@ -266,8 +321,9 @@ print(e.name)`).split('\n').pop()
     must(await pg.locator('[data-goal-row][data-star="1"]').count() === 3 && await pg.locator('[data-goal-row][data-skipped="1"]').count() === 1, 'stars or skip lost')
     // the drawers too
     await pg.locator('[data-goal-row] button').first().click()
-    await drawer('goal').locator('[data-goal-drawer]').waitFor()
-    await fits('the goal drawer')
+    await host.locator('[data-goal-plan]').waitFor()
+    // the docked Drawer narrows the page, so only sideways scrolling is held to account here
+    must(!(await pg.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)), 'the goal layer scrolls the page sideways')
     await closeDrawer()
     if (!phone) await pg.setViewportSize({ width: 1440, height: 1000 })
     return seen.join(', ')

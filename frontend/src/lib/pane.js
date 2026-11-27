@@ -17,6 +17,7 @@ export const TYPES = {
   day: { place: 'Today', label: 'Day' },
   person: { place: 'Library', label: 'Person' },
   list: { place: 'Today', label: 'List' }, // issue 123: what a number counts (`list:needs-you`), shown by dashboard.list
+  meeting: { place: 'Library', label: 'Meeting' }, // issue 146: a meeting that matters, opened from the weekly review (`meeting:<event>`)
   focus: { place: 'Goals', label: 'Focus' }, // issue 128: a focus's standard, principles and goals
   ask: { place: 'Chat', label: 'Chat' }, // issue 128: the chat as a layer (`ask:new` or `ask:<thread>`); `chat:` is a chat an assistant logged
 }
@@ -47,7 +48,7 @@ export const stack = computed(() => {
   const top = parseOpen(r)
   return top ? [...underOf(r), top] : []
 })
-const LAYER_QUERY = { focus: undefined, ptab: undefined, back: undefined }
+const LAYER_QUERY = { focus: undefined, ptab: undefined, back: undefined, review: undefined } // `review=1`: the goal is shown with the weekly review's plan (issue 146)
 const queryWith = (route, layers) => ({ ...route.query, ...LAYER_QUERY, open: layers.length ? layers[layers.length - 1] : undefined,
   under: layers.length > 1 ? layers.slice(0, -1).join('|') : undefined })
 // a click inside the Drawer opens the next layer on top of its own; a click anywhere else on the screen replaces the layers
