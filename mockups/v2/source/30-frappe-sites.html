@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Frappe sites as sources and tools</title>
+<!-- Left: Brain > Sources with two connected Frappe sites; each app found on a site is switched on as a Source, a Tool, or both, with the key it uses. Right: a Chat answer read live from ERPNext, with the site named and the records linked. Dark theme. Site addresses, figures and invoice numbers are examples. -->
+<style>
+:root{--t:#EDEDED;--t2:#A3A3A3;--t3:#7C7C7C;--b:#2A2A2A;--b2:#3A3A3A;--bg:#262626;--s:#1C1C1C;--page:#141414;--amber:#E0A33B;--green:#5FB37A;--ac:#7CB7FF}
+*{box-sizing:border-box}body{margin:0;padding:28px;font-family:Inter,system-ui,sans-serif;color:var(--t);background:var(--page);font-size:14px;width:1480px}
+.wrap{display:flex;gap:28px;align-items:flex-start}
+.lab{font-size:13px;color:var(--t3);margin:0 0 8px}
+.panel{background:var(--s);border:1px solid var(--b);border-radius:14px;padding:20px 24px}
+.crumb{font-size:12px;color:var(--t3)}h1{font-size:19px;font-weight:600;margin:2px 0 14px}
+.site{border:1px solid var(--b);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.sh{display:flex;justify-content:space-between;align-items:flex-start}
+.sh .n{font-weight:600;font-size:15px;display:flex;align-items:center;gap:8px}.sh .m{font-size:12px;color:var(--t3);margin-top:2px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}.dot.warn{background:var(--amber)}
+.btn{font-size:12px;border-radius:7px;padding:4px 9px;background:var(--bg);border:1px solid var(--b2);color:var(--t);white-space:nowrap;display:inline-block}
+.btn.g{background:transparent;border-color:transparent;color:var(--t2)}.btn.s{background:var(--t);color:#111;border-color:var(--t)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+th{text-align:left;font-weight:500;color:var(--t3);font-size:12px;padding:5px 8px;border-bottom:1px solid var(--b)}
+td{padding:8px;border-bottom:1px solid var(--b);vertical-align:middle}tr:last-child td{border-bottom:0}
+.app{font-weight:500}.app small{display:block;font-weight:400;font-size:12px;color:var(--t3)}
+.sw{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--t2)}
+.tg{width:28px;height:16px;border-radius:999px;background:#3A3A3A;position:relative;display:inline-block}
+.tg::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#888}
+.tg.on{background:#3B6E4D}.tg.on::after{left:14px;background:#fff}
+.key{font-size:12px;color:var(--t2)}.key b{font-weight:500;color:var(--t)}
+.sens{font-size:11px;color:var(--amber);border:1px solid #5A4520;border-radius:999px;padding:0 6px;margin-left:4px}
+.add{border:1px dashed var(--b2);border-radius:12px;padding:12px 16px;color:var(--t2);font-size:13px}
+.msg{background:var(--bg);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45;margin-bottom:10px}
+.msg .who{font-size:12px;color:var(--t3);margin-bottom:2px}
+.ans{border:1px solid var(--b2);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.5}
+.ans .src{font-size:12px;color:var(--t3);margin-bottom:8px}
+.ans table{margin:6px 0 8px}.ans td,.ans th{padding:5px 6px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+a{color:var(--ac);text-decoration:none}
+.foot{font-size:12px;color:var(--t3);margin-top:8px}
+.ask{margin-top:14px;border-top:1px solid var(--b);padding-top:12px}
+.chips{display:flex;gap:6px;margin-top:6px}
+</style></head><body>
+<div class="wrap">
+
+<div style="width:880px">
+<p class="lab">Brain › Sources: one card per Frappe site; each app on it is a Source, a Tool, or both, with the key it uses</p>
+<div class="panel">
+  <div class="crumb">Brain / Sources</div>
+  <h1>Frappe sites</h1>
+
+  <div class="site">
+    <div class="sh"><div><div class="n"><span class="dot"></span>BTW · btw.businessthat.works</div><div class="m">Frappe 16 · 3 apps · default area Career · checked 2 min ago</div></div>
+      <div><span class="btn g">Log</span><span class="btn g">Keys</span><span class="btn g">⋯</span></div></div>
+    <table>
+      <tr><th>App</th><th>Source (feeds the Brain)</th><th>Tool (Chat may look up)</th><th>Uses the key of</th><th></th></tr>
+      <tr><td class="app">Raven<small>9 of 13 channels read</small></td><td><span class="sw"><span class="tg on"></span>Channels, DMs</span></td><td><span class="sw"><span class="tg on"></span>Search, post (confirmed)</span></td><td class="key"><b>Jai Kejriwal</b> · yours</td><td><span class="btn">Channels</span></td></tr>
+      <tr><td class="app">ERPNext<span class="sens">sensitive</span><small>v16</small></td><td><span class="sw"><span class="tg on"></span>Approvals waiting on you</span></td><td><span class="sw"><span class="tg on"></span>Read records and reports</span></td><td class="key"><b>Life OS</b> · read-only</td><td><span class="btn">Settings</span></td></tr>
+      <tr><td class="app">CRM<small>Frappe CRM</small></td><td><span class="sw"><span class="tg"></span>Off</span></td><td><span class="sw"><span class="tg"></span>Off</span></td><td class="key">—</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="site">
+    <div class="sh"><div><div class="n"><span class="dot warn"></span>Rungamattee ERP · erp.rungamattee.com</div><div class="m">Frappe 15 · 2 apps · default area Tea &amp; Coffee · <span style="color:var(--amber)">HRMS version not known to Life OS</span></div></div>
+      <div><span class="btn g">Log</span><span class="btn g">Keys</span><span class="btn g">⋯</span></div></div>
+    <table>
+      <tr><th>App</th><th>Source (feeds the Brain)</th><th>Tool (Chat may look up)</th><th>Uses the key of</th><th></th></tr>
+      <tr><td class="app">ERPNext<span class="sens">sensitive</span><small>v15</small></td><td><span class="sw"><span class="tg on"></span>Approvals waiting on you</span></td><td><span class="sw"><span class="tg on"></span>Read records and reports</span></td><td class="key"><b>Life OS</b> · read-only</td><td><span class="btn">Settings</span></td></tr>
+      <tr><td class="app">HRMS<span class="sens">sensitive</span><small>v15</small></td><td><span class="sw"><span class="tg"></span>Off</span></td><td><span class="sw"><span class="tg"></span>Off</span></td><td class="key">—</td><td></td></tr>
+    </table>
+  </div>
+
+  <div class="add">+ Add a Frappe site · address, a label, and a user's API key and secret</div>
+</div>
+</div>
+
+<div style="width:520px">
+<p class="lab">Chat: a live lookup, the site named, the records linked, nothing copied</p>
+<div class="panel">
+  <div class="msg"><div class="who">You</div>what does Foxin owe us?</div>
+  <div class="ans">
+    <div class="src">From <b>BTW · ERPNext</b> · Accounts Receivable · read just now</div>
+    Foxin (Balaji Solutions Ltd) owes <b>₹4,82,000</b> on 3 invoices; one is 45 days overdue.
+    <table>
+      <tr><th>Invoice</th><th>Due</th><th class="num">Outstanding</th></tr>
+      <tr><td><a>ACC-SINV-2026-00412</a></td><td style="color:var(--amber)">14 Oct</td><td class="num">₹2,10,000</td></tr>
+      <tr><td><a>ACC-SINV-2026-00468</a></td><td>2 Dec</td><td class="num">₹1,72,000</td></tr>
+      <tr><td><a>ACC-SINV-2026-00491</a></td><td>18 Dec</td><td class="num">₹1,00,000</td></tr>
+    </table>
+    Want me to draft a reminder to their accounts contact?
+  </div>
+  <div class="ask">
+    <div class="msg"><div class="who">You</div>stock of CTC at Ghatia</div>
+    <div class="ans"><div class="src">Two sites have ERPNext</div>Which books: <b>Rungamattee ERP</b> or <b>BTW</b>?
+      <div class="chips"><span class="btn s">Rungamattee ERP</span><span class="btn">BTW</span></div></div>
+    <div class="foot">Asked once; for Tea &amp; Coffee questions it uses Rungamattee from then on.</div>
+  </div>
+</div>
+</div>
+
+</div>
+</body></html>
