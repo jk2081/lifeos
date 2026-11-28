@@ -142,7 +142,8 @@ SCHEMA["New Subject"] = {
 }
 SCHEMA["Same Subject"] = {
 	"target": "Life Person", "filed": False,
-	"fields": {"name": F("text", True, "The name seen in the email."), "same_as": F("text", True, "The existing subject it may be (its id)."), "address": F("text"), "kind": F("text")},
+	"fields": {"name": F("text", True, "The name seen in the email."), "same_as": F("link", True, "The existing person or company it may be: its name (id) or exact title.", doctype="Life Person"),
+		"address": F("text"), "kind": F("select", options=["Person", "Organisation"])},
 	"example": {"name": "Shakambhari Foods", "same_as": "abc123"},
 }
 AREA_REQUIRED = ("Task", "Note", "Vault Document")
