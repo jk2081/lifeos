@@ -7,6 +7,7 @@ import frappe
 from frappe.utils import add_days, getdate, today
 
 from lifeos import install
+from lifeos.brain import proposals
 from lifeos.library import archive, globalsearch
 from lifeos import permissions
 from lifeos.ai.tools import Context, t_get_record
@@ -790,6 +791,16 @@ class TestPages(AskCase):
 		line, total = subjects.timeline("Life Person", org.name)
 		self.assertEqual(total, 1)
 		self.assertEqual((line[0]["kind"], line[0]["title"]), ("Email", "Blueprint email q111"))
+
+	def test_1b_same_as_is_a_person_picked_by_name_not_a_typed_id(self):
+		# the Edit dialog shows PersonPicker for a link to Life Person, so the owner sees "Accounts Team", not "a86n0c3jog"
+		spec = proposals.SCHEMA["Same Subject"]["fields"]
+		self.assertEqual((spec["same_as"]["type"], spec["same_as"]["doctype"]), ("link", "Life Person"))
+		self.assertEqual((spec["kind"]["type"], spec["kind"]["options"]), ("select", ["Person", "Organisation"]))
+		team = self.person("Accounts Team q111b")
+		got = proposals.validate("Same Subject", {"name": "Profitedge q111b", "same_as": "Accounts Team q111b", "kind": "Person"}, PRIVATE)
+		self.assertEqual(got["same_as"], team.name)
+		self.assertEqual(proposals.validate("Same Subject", {"name": "Profitedge q111b", "same_as": team.name}, PRIVATE)["same_as"], team.name)
 
 	def test_2_a_reply_thread_with_a_new_sender_makes_a_person_and_a_company_and_undo_removes_both(self):
 		self.script(who(organisation="SAP Partner Pvt Ltd", role="Solutions Lead"))
